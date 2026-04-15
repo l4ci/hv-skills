@@ -133,19 +133,19 @@ You are implementing Task N of [total].
 - Constraint: read files first, minimal diff, no unrelated changes
 - If worktree isolation: always include the absolute worktree path and instruct the agent to work there
 
-Launch all independent agents in a single message (parallel tool calls).
+Launch all independent agents in a single message (parallel tool calls). Don't announce the dispatch — just do it.
 
 ## Step 6 — Verify Each Completion
 
-As each agent completes, the orchestrator verifies:
+As each agent completes, the orchestrator verifies internally (don't narrate the checks to the user):
 
 1. **Check the commit exists:** `git log --oneline -1` (in the worktree if applicable)
 2. **Read the modified files** — confirm changes match the brief
 3. **Structural verification:** grep for expected patterns, count functions, check no regressions
 
 Verdicts:
-- **PASS** — commit is correct, move on
-- **FAIL** — dispatch a fix agent with the specific issue, then re-verify
+- **PASS** — move on silently
+- **FAIL** — dispatch a fix agent with the specific issue, then re-verify. Mention failures to the user only if they persist after the retry.
 
 ## Step 7 — Sequential Waves
 
@@ -230,7 +230,22 @@ Share the PR URL with the user.
 
 Remove this work session's entry from `.hv/status.json`. This marks the work as complete so `/hv:next` no longer shows these items as in-progress.
 
-## Step 11 — Refactor Nudge
+## Step 11 — Report to User
+
+After merge/PR, give one compact summary. Example:
+
+```
+Done — merged `hv/fix-timer-badge` into main.
+
+- [B-1] Timer badge shows stale duration — fixed invalidation in MenuBarManager
+- [F-3] Quick-switch projects — added Cmd+Tab overlay to project picker
+
+Commit: a1b2c3d
+```
+
+That's it. Don't recap the plan, don't list verification results, don't describe intermediate steps. The user can read the diff if they want details.
+
+## Step 12 — Refactor Nudge
 
 After completing all work, count the entries in `## Completed` and `ARCHIVE.md` (if it exists) that don't have a `refactor:` commit prefix — i.e., items completed by `/hv:work`, not by `/hv:refactor`. Count features (`[F-*]`) and bugs (`[B-*]`) separately.
 
@@ -242,6 +257,7 @@ This is a suggestion, not a blocker. Don't repeat it if the user has already bee
 
 ## Key Principles
 
+- **No noise.** Don't narrate steps that produced no output or found nothing. Don't echo back what you're about to do before doing it. Report results, not process.
 - **Orchestrator plans and verifies, worker executes.** Models are configured in `.hv/config.json` (default: opus/sonnet). Never dispatch work without a clear brief. Never trust completion without reading the result.
 - **Orchestrator owns `.hv/` state.** Only the orchestrator reads and writes `.hv/status.json` and `.hv/TODO.md`. Sub-agents never touch these files — they focus on implementation.
 - **Clean base.** Never start work on a dirty working tree. Guard against it.

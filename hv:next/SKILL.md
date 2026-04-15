@@ -22,6 +22,8 @@ Read the `active` array from `.hv/status.json`. For each entry, validate against
 2. **Check if a worktree exists** (if `worktree` is set): `git worktree list` and look for the path
 3. **Check for commits:** `git log --oneline <branch-name> --not main` — are there commits on the branch beyond main?
 
+If the `active` array is empty, skip this step silently — don't mention it.
+
 Based on the findings:
 
 **Branch exists, has commits resolving the items:**
@@ -40,7 +42,7 @@ Stale status entry. Remove it from status.json silently. The items remain in TOD
 **Worktree path is set but worktree doesn't exist:**
 The worktree was cleaned up but the status entry remains. Check if the branch still exists and handle as above. Remove the stale worktree path from the entry or clean up the entry entirely.
 
-Present any reconciliation notices before the backlog.
+Present reconciliation notices before the backlog only when there's something to report. If everything is clean, produce no output for this step.
 
 ## Step 3 — Archive Completed Items
 
@@ -50,7 +52,7 @@ Check the `## Completed` section. Any entry whose completion date is **more than
 2. Append the old entries to the end of ARCHIVE.md (preserve their full text including the strikethrough and commit hash)
 3. Remove them from `## Completed` in TODO.md
 
-This keeps the active backlog focused on recent work while preserving history. Archive silently — don't list moved entries to the user.
+This keeps the active backlog focused on recent work while preserving history. Archive silently — no output for this step regardless of whether items were moved or not.
 
 Write both files back if anything changed.
 
@@ -105,6 +107,8 @@ Clusters:
   [T-1] → [F-4] — toolchain update unblocks the feature
 ```
 
+If no clusters exist, omit the clusters section entirely — don't mention their absence.
+
 If all sections are empty, say so and suggest `/hv:bug`, `/hv:feature`, or `/hv:todo`.
 
 ## Step 6 — Suggest Next
@@ -142,6 +146,7 @@ Ask the user: **"Work on this?"** (or "Work on these?" for a batch)
 
 ## Rules
 
+- **No noise** — never report on a step that found nothing. "No active work", "nothing to archive", "no clusters" are all zero-information messages. Skip them silently. The user sees the backlog table and the suggestion — that's the output.
 - **Always reconcile before presenting** — check status.json and git state first
 - **Always render the table** — the table is the default view, not optional
 - **Don't auto-start work** — always confirm with the user first

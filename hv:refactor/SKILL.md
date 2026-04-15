@@ -163,7 +163,7 @@ For each agent brief:
 - Include the replacement code or a precise description of it
 - Name every line number so the agent doesn't have to hunt
 
-After parallel batch completes, dispatch any sequential agents that depended on the first batch.
+Don't announce the dispatch — just do it. After parallel batch completes, dispatch any sequential agents that depended on the first batch.
 
 ## Step 6 — Verify with Orchestrator
 
@@ -172,7 +172,7 @@ Dispatch a single verification agent using the configured **orchestrator** model
 - **FAIL** — something is wrong (with exact finding)
 - **CONCERN** — works but has a side effect worth knowing
 
-The verification agent must read actual file content, not trust the fix summaries.
+The verification agent must read actual file content, not trust the fix summaries. Don't relay individual PASS verdicts to the user — only surface FAILs and CONCERNs.
 
 ## Step 7 — Handle Failures
 
@@ -180,10 +180,11 @@ If any fix got **FAIL**:
 - Read the verification finding
 - Dispatch a new worker agent with the corrected brief
 - Re-verify with orchestrator
+- Only mention persistent failures to the user (ones that don't resolve after retry)
 
 If any fix got **CONCERN**:
 - Assess whether it blocks commit
-- Fix if blocking, note if informational
+- Fix if blocking, note if informational — surface informational concerns briefly at the end, not inline during verification
 
 ## Step 8 — Commit
 
@@ -205,8 +206,30 @@ git commit -m "refactor: [N] architectural improvements
 
 If the project uses a build tool to regenerate project files (e.g. `xcodegen generate` for XcodeGen projects), run it before committing if any files were added or deleted.
 
+## Step 9 — Report to User
+
+After commit, give one compact summary. Example:
+
+```
+Refactored 4 items — commit d7e8f9a
+
+- SessionOrchestrator: surface autosave errors to lastError
+- RingBuffer: write() returns overflow count
+- SpeakerReconciler: returned embeddings use EMA values
+- TimerManager: consolidated 3 timer sources into one
+```
+
+If any CONCERNs surfaced during verification, append them briefly:
+
+```
+Note: RingBuffer overflow count changes the return type — callers using `_ = write()` are fine, but check any that inspect the return.
+```
+
+Don't recap the exploration findings, the design alternatives, or the verification pass/fail log. The user can read the diff.
+
 ## Key Principles
 
+- **No noise.** Don't narrate steps that produced no output or found nothing. Don't echo back what you're about to do before doing it. Report results, not process.
 - **Orchestrator for judgment, worker for execution.** Models are configured in `.hv/config.json` (default: opus/sonnet). Exploration, design, and verification require deep reasoning; implementation is precise execution of a known fix.
 - **Categorize before fixing.** Every friction point gets a dependency category and a simple/structural classification. This prevents over-engineering simple fixes and under-designing structural ones.
 - **Compete on structural changes.** When multiple valid approaches exist, design them in parallel and pick the strongest. Don't commit to the first idea.
