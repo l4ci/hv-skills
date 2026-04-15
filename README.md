@@ -16,16 +16,20 @@ A lightweight project backlog and workflow system for Claude Code. Capture bugs,
 
 ## Install
 
-### Claude Code skill installer
+### npx (one-liner)
 
+```bash
+npx @anthropic-ai/claude-code plugin marketplace add l4ci/hv-skills
+npx @anthropic-ai/claude-code plugin install hv-skills
 ```
-/install-skill l4ci/hv-skills hv:bug
-/install-skill l4ci/hv-skills hv:feature
-/install-skill l4ci/hv-skills hv:todo
-/install-skill l4ci/hv-skills hv:init
-/install-skill l4ci/hv-skills hv:next
-/install-skill l4ci/hv-skills hv:work
-/install-skill l4ci/hv-skills hv:refactor
+
+### Claude Code CLI
+
+If you already have Claude Code installed:
+
+```bash
+claude plugin marketplace add l4ci/hv-skills
+claude plugin install hv-skills
 ```
 
 ### Local development (GNU Stow)

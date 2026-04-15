@@ -1,0 +1,19 @@
+{
+  "name": "hv-skills",
+  "owner": {
+    "name": "l4ci"
+  },
+  "metadata": {
+    "description": "Lightweight project backlog and workflow skills for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "hv-skills",
+      "source": "./",
+      "description": "Capture bugs, features, and tasks into a per-project backlog, then execute them with parallel subagents",
+      "version": "1.0.0",
+      "category": "development"
+    }
+  ]
+}
