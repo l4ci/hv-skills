@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Increment counter and return zero-padded ID.
+# Usage: hv-next-id <bugs|features|tasks>
+set -euo pipefail
+TYPE="${1:?usage: hv-next-id <bugs|features|tasks>}"
+case "$TYPE" in
+  bugs) P=B ;; features) P=F ;; tasks) P=T ;;
+  *) echo "error: unknown type '$TYPE'" >&2; exit 1 ;;
+esac
+python3 -c "
+import json
+p='.hv/counters.json'
+d=json.load(open(p))
+d['$TYPE']=d.get('$TYPE',0)+1
+json.dump(d,open(p,'w'))
+print(f'$P{d[\"$TYPE\"]:02d}')
+"

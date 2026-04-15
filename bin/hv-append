@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Append entry to a section in .hv/TODO.md.
+# Usage: hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."
+set -euo pipefail
+SECTION="${1:?usage: hv-append <section> <entry>}"
+ENTRY="${2:?usage: hv-append <section> <entry>}"
+python3 - "$SECTION" "$ENTRY" <<'PY'
+import sys
+sec, entry, path = sys.argv[1], sys.argv[2], ".hv/TODO.md"
+with open(path) as f: content = f.read()
+marker = sec + "\n"
+idx = content.find(marker)
+if idx == -1:
+    print(f"error: section '{sec}' not found", file=sys.stderr); sys.exit(1)
+after = idx + len(marker)
+nxt = content.find("\n## ", after)
+if nxt == -1:
+    content = content.rstrip("\n") + "\n" + entry + "\n"
+else:
+    before = content[:nxt].rstrip("\n")
+    content = before + "\n" + entry + "\n" + content[nxt:]
+with open(path, "w") as f: f.write(content)
+PY
