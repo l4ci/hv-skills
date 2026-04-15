@@ -1,6 +1,6 @@
 ---
 name: hv:bug
-description: Add a bug report to the project's TODO.md with automatic context gathering, priority assignment (P0/P1/P2), and auto-incrementing ID [B-N]. Use when the user wants to capture a bug, defect, or broken behavior for later fixing.
+description: Add a bug report to the project's TODO.md with automatic context gathering, priority assignment (P0/P1/P2), and auto-incrementing ID [B01]. Use when the user wants to capture a bug, defect, or broken behavior for later fixing.
 user-invocable: true
 ---
 
@@ -34,22 +34,57 @@ Assign one of:
 | `[P1]` | Degrades experience — wrong behavior, broken feature, ugly but usable, workaround exists |
 | `[P2]` | Minor annoyance — cosmetic glitch, edge case, slightly wrong state, user unlikely to notice |
 
-## Step 4 — Write the Entry
+## Step 4 — Handle Large Input
+
+If the user's input contains bulky raw data (crash dumps, stack traces, log output, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
+
+1. Create the directory `.hv/bugs/` if it doesn't exist
+2. Write a detail file `.hv/bugs/B{NN}.md` (using the same zero-padded ID) with this format:
+
+```markdown
+# B{NN}: Short title
+
+> Related TODO entry: `[B{NN}]` in `.hv/TODO.md`
+
+## Summary
+
+{The same 1–3 sentence summary that goes into TODO.md}
+
+## Detail
+
+{Full user input — crash dump, stack trace, logs, verbose reproduction steps, etc. Preserved verbatim or lightly formatted for readability.}
+```
+
+3. In the TODO.md entry, append a `Detail:` reference pointing to the file (see format below)
+
+**Skip this step entirely if the input fits comfortably in 1–3 sentences.** Most bug reports won't need a detail file — only create one when there's genuinely bulky data that would be lost by summarizing.
+
+## Step 5 — Write the Entry
 
 1. Read `.hv/counters.json`, increment `bugs` by 1, write it back
-2. Use the new counter value as N in `[B-N]`
+2. Zero-pad the counter to at least 2 digits: 1→`01`, 9→`09`, 10→`10`, 100→`100`
 3. Add the bug to `## Bugs` in `.hv/TODO.md`
 
-Format:
+Format (without detail file):
 ```markdown
-- **[B-N] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Just enough to reproduce and remember what this was about. Related: [F-2], [T-1]
+- **[B01] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Just enough to reproduce and remember what this was about. Related: [F02], [T01]
+```
+
+Format (with detail file):
+```markdown
+- **[B01] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Detail: `.hv/bugs/B01.md` Related: [F02], [T01]
 ```
 
 The `Related:` suffix is optional — only add it when the bug clearly relates to an existing item (caused by a feature, blocks a todo, duplicates another bug). Scan `## Bugs`, `## Features`, and `## Todos` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing the entry. Archived items are still valid link targets. Don't force links that aren't there.
 
-Example:
+Example (without detail file):
 ```markdown
-- **[B-5] [P1] Timer badge shows stale duration after pause.** When you pause a running timer and reopen the panel 5+ minutes later, the menubar badge still shows the duration from when it was paused, not the current elapsed. Refreshes correctly after any interaction. Likely a timer invalidation issue in MenuBarManager. Related: [F-3]
+- **[B05] [P1] Timer badge shows stale duration after pause.** When you pause a running timer and reopen the panel 5+ minutes later, the menubar badge still shows the duration from when it was paused, not the current elapsed. Refreshes correctly after any interaction. Likely a timer invalidation issue in MenuBarManager. Related: [F03]
+```
+
+Example (with detail file):
+```markdown
+- **[B07] [P0] App crashes on launch after iOS 18.2 update.** EXC_BAD_ACCESS in CoreData stack during migration. Affects all users on 18.2+, 100% repro rate. Detail: `.hv/bugs/B07.md` Related: [F12]
 ```
 
 ## Rules
