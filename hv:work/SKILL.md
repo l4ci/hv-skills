@@ -185,9 +185,11 @@ Get the commit hash from `git log --oneline -1` (use the short hash of the merge
 **If `mergeStrategy` is `"direct"`:**
 
 ```bash
-# If worktree isolation, remove the worktree first
-git worktree remove .claude/worktrees/<branch-name>  # only if worktree was used
+# 1. Remove the worktree (only if worktree isolation was used)
+#    Must happen before branch delete — git won't delete a branch checked out in a worktree
+git worktree remove .claude/worktrees/<branch-name>
 
+# 2. Merge and clean up
 git checkout main
 git merge <branch> --no-ff -m "merge: <summary of all work>
 
@@ -197,11 +199,13 @@ git merge <branch> --no-ff -m "merge: <summary of all work>
 git branch -d <branch>
 ```
 
+Skip the `worktree remove` step if branch isolation was used (no worktree exists).
+
 **If `mergeStrategy` is `"pr"`:**
 
 ```bash
-# If worktree isolation, remove the worktree first (branch stays)
-git worktree remove .claude/worktrees/<branch-name>  # only if worktree was used
+# Remove the worktree but keep the branch (only if worktree isolation was used)
+git worktree remove .claude/worktrees/<branch-name>
 
 git push -u origin <branch>
 gh pr create --title "<short summary>" --body "$(cat <<'EOF'

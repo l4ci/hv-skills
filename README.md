@@ -2,6 +2,8 @@
 
 A lightweight project backlog and workflow system for Claude Code. Capture bugs, features, and tasks into a per-project `.hv/TODO.md`, then pick items off the backlog and execute them with parallel subagents.
 
+[How to use](#how-to-use) · [Install](#install) · [Full guide](GUIDE.md)
+
 ## Skills
 
 | Skill | Description |
