@@ -31,9 +31,6 @@ Whenever you spot something, capture it without breaking your flow:
 - `/hv:todo` — chores, refactoring, docs, dependency updates
 
 Each item gets an auto-incrementing ID and is appended to `.hv/TODO.md`.
-
-> **Tip:** Use Claude Code's `/btw` to capture ideas mid-session without interrupting what's currently running. Type `/btw there's a layout bug on the settings screen` and it gets queued — then follow up with `/hv:bug` when you're ready.
-
 **3. Pick what to work on**
 
 Run `/hv:next` to review the backlog. It cleans up completed entries, shows a priority table, and suggests what to tackle next.
