@@ -157,28 +157,18 @@ If tasks have dependencies (shared files, one task's output feeds another):
 
 ## Step 8 — Update TODO.md
 
-After all tasks pass verification, check if `.hv/TODO.md` exists. If it does:
+After all tasks pass verification, mark each resolved item as completed using the helper:
 
-1. Read `.hv/TODO.md`
-2. For each completed task, find matching entries in `## Bugs`, `## Features`, or `## Tasks`
-3. Move matched entries to `## Completed`, appending metadata:
-
-```markdown
-## Completed
-
-- ~~**[B01] [P1] Timer badge shows stale duration.**~~ Done 2025-04-15 [`a1b2c3d`]
-- ~~**[F03] [Minor] Quick-switch recent projects.**~~ Done 2025-04-15 [`f4e5d6c`]
-- ~~**[T01] Update Swift toolchain.**~~ Done 2025-04-15 [`d7e8f9a`]
+```bash
+.hv/bin/hv-complete B01 a1b2c3d
+.hv/bin/hv-complete F03 f4e5d6c
 ```
 
-Format: `- ~~**[ID] [tag] Title.**~~ Done YYYY-MM-DD [\`<short-hash>\`]`
-
-Get the commit hash from `git log --oneline -1` (use the short hash of the merge commit or the last task commit).
+This moves the entry to `## Completed` with strikethrough and metadata. The second argument is the commit hash (defaults to `git log -1 --format='%h'` if omitted).
 
 **Matching rules:**
 - Match by keyword overlap between the task description and TODO entry titles
 - If unsure whether a TODO item was addressed, leave it in place — don't move items you didn't work on
-- If the `## Completed` section doesn't exist, create it at the end of the file
 
 ## Step 9 — Merge or PR
 

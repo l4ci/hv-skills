@@ -10,7 +10,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 
 ## Step 1 — Read State
 
-Check if `.hv/TODO.md` exists. If not, tell the user there's nothing tracked yet and suggest running `/hv:init` to set up, then `/hv:capture` to add items.
+Check if `.hv/TODO.md` exists. If not, tell the user there's nothing tracked yet and suggest running `/hv:init` to set up, then `/hv:capture` to add items. If `.hv/TODO.md` exists but `.hv/bin/hv-next-id` doesn't, run `/hv:init` to refresh helpers.
 
 Read `.hv/TODO.md` and `.hv/status.json` (if it exists).
 

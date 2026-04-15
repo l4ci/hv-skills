@@ -10,7 +10,7 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 
 ## Step 1 — Ensure .hv/ Exists
 
-Check if `.hv/TODO.md` exists. If not, run `/hv:init` first, then continue.
+Check if `.hv/bin/hv-next-id` exists. If not, run `/hv:init` first, then continue.
 
 ## Step 2 — Parse & Classify
 
@@ -80,8 +80,7 @@ For **features**, assign one of:
 
 If any item's input contains bulky raw data (crash dumps, stack traces, log output, specs, checklists, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
 
-1. Create the appropriate directory (`.hv/bugs/`, `.hv/features/`, or `.hv/tasks/`) if it doesn't exist
-2. Write a detail file (e.g. `.hv/bugs/B{NN}.md`) using the same zero-padded ID with this format:
+1. Get the ID first (Step 6 command), then write a detail file using that ID:
 
 ```markdown
 # {ID}: Short title
@@ -103,33 +102,23 @@ If any item's input contains bulky raw data (crash dumps, stack traces, log outp
 
 ## Step 6 — Write All Entries
 
-1. Read `.hv/counters.json` once
-2. For each item, increment the appropriate counter (`bugs`, `features`, or `tasks`)
-3. Zero-pad each counter to at least 2 digits: 1→`01`, 9→`09`, 10→`10`, 100→`100`
-4. Append each item to the correct section in `.hv/TODO.md` (`## Bugs`, `## Features`, or `## Tasks`)
-5. Write `.hv/counters.json` back once with all updated counters
+For each item, get the next ID and append the entry in a single command:
 
-**Bug format:**
-```markdown
-- **[B01] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Related: [F02], [T01]
+```bash
+ID=$(.hv/bin/hv-next-id bugs) && .hv/bin/hv-append "## Bugs" "- **[$ID] [P1] Short title.** Description. Related: [F02]"
 ```
 
-**Feature format:**
-```markdown
-- **[F01] [Size] Short title.** One to three sentences of context — what it does, where it lives, why it matters. Related: [B01], [T03]
-```
+Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`, `## Tasks`), and entry content for each item.
 
-**Task format:**
-```markdown
-- **[T01] Short title.** One to two sentences of context — what needs to happen and why. Related: [F01], [B02]
-```
+**Entry formats:**
 
-With detail file, insert before `Related:`:
-```
-Detail: `.hv/{type}/{ID}.md`
-```
+- Bug: `- **[$ID] [Priority] Short title.** What happens, when, what should happen instead. Related: [F02], [T01]`
+- Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03]`
+- Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02]`
 
-The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry (caused by a feature, blocks a task, duplicates another bug). **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Archived items are still valid link targets. Don't force links that aren't there.
+With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
+
+The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 
 ### Examples
 

@@ -18,6 +18,10 @@ Run `/hv:init` once per project to create the folder. It contains:
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, refactor settings |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
+| `bin/` | CLI helpers — `hv-next-id`, `hv-append`, `hv-complete` |
+| `bugs/` | Overflow detail files for large bug reports |
+| `features/` | Overflow detail files for large feature specs |
+| `tasks/` | Overflow detail files for large task descriptions |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
 All files are gitignored. The backlog is local to your machine.
@@ -114,6 +118,18 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 |----------|-------------|-------------|
 | `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
 | `"pr"` | Push branch, create GitHub PR | Team work, code review required |
+
+## CLI Helpers
+
+`/hv:init` installs three bash scripts to `.hv/bin/` that reduce the number of tool calls needed by the skills. They use `python3` for JSON and file manipulation.
+
+| Script | What it does | Example |
+|--------|-------------|---------|
+| `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
+| `hv-append` | Append entry to a section in TODO.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
+| `hv-complete` | Move item to Completed with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
+
+These are refreshed every time `/hv:init` runs. Data files (TODO.md, counters.json, etc.) are never overwritten.
 
 ## Mixed-Input Routing
 

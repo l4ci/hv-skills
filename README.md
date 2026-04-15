@@ -18,7 +18,7 @@ A lightweight project backlog and workflow system for Claude Code. Capture bugs,
 
 **1. Initialize once per project**
 
-Run `/hv:init` in your project root. This creates `.hv/` with a TODO file, counters, model config, and status tracking.
+Run `/hv:init` in your project root. This creates `.hv/` with a TODO file, counters, model config, status tracking, and CLI helpers that keep tool calls minimal.
 
 **2. Capture work as you go**
 
