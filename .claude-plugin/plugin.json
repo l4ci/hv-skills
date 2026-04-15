@@ -9,9 +9,7 @@
   "repository": "https://github.com/l4ci/hv-skills",
   "skills": [
     "./hv:init",
-    "./hv:bug",
-    "./hv:feature",
-    "./hv:todo",
+    "./hv:capture",
     "./hv:next",
     "./hv:work",
     "./hv:refactor"

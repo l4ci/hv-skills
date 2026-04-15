@@ -59,7 +59,7 @@ Read `.hv/status.json`. Add an entry for this work session:
 
 ```json
 {
-  "items": ["F-1", "B-2"],
+  "items": ["F01", "B02"],
   "branch": "hv/quick-switch",
   "worktree": null,
   "startedAt": "2026-04-15T12:00:00Z"
@@ -160,15 +160,15 @@ If tasks have dependencies (shared files, one task's output feeds another):
 After all tasks pass verification, check if `.hv/TODO.md` exists. If it does:
 
 1. Read `.hv/TODO.md`
-2. For each completed task, find matching entries in `## Bugs`, `## Features`, or `## Todos`
+2. For each completed task, find matching entries in `## Bugs`, `## Features`, or `## Tasks`
 3. Move matched entries to `## Completed`, appending metadata:
 
 ```markdown
 ## Completed
 
-- ~~**[B-1] [P1] Timer badge shows stale duration.**~~ Done 2025-04-15 [`a1b2c3d`]
-- ~~**[F-3] [Minor] Quick-switch recent projects.**~~ Done 2025-04-15 [`f4e5d6c`]
-- ~~**[T-1] Update Swift toolchain.**~~ Done 2025-04-15 [`d7e8f9a`]
+- ~~**[B01] [P1] Timer badge shows stale duration.**~~ Done 2025-04-15 [`a1b2c3d`]
+- ~~**[F03] [Minor] Quick-switch recent projects.**~~ Done 2025-04-15 [`f4e5d6c`]
+- ~~**[T01] Update Swift toolchain.**~~ Done 2025-04-15 [`d7e8f9a`]
 ```
 
 Format: `- ~~**[ID] [tag] Title.**~~ Done YYYY-MM-DD [\`<short-hash>\`]`
@@ -214,8 +214,8 @@ gh pr create --title "<short summary>" --body "$(cat <<'EOF'
 - item 2 description
 
 ## Items resolved
-- [B-1] Title
-- [F-3] Title
+- [B01] Title
+- [F03] Title
 
 ## Test plan
 - [ ] Verify each item's acceptance criteria
@@ -237,8 +237,8 @@ After merge/PR, give one compact summary. Example:
 ```
 Done — merged `hv/fix-timer-badge` into main.
 
-- [B-1] Timer badge shows stale duration — fixed invalidation in MenuBarManager
-- [F-3] Quick-switch projects — added Cmd+Tab overlay to project picker
+- [B01] Timer badge shows stale duration — fixed invalidation in MenuBarManager
+- [F03] Quick-switch projects — added Cmd+Tab overlay to project picker
 
 Commit: a1b2c3d
 ```
@@ -247,7 +247,7 @@ That's it. Don't recap the plan, don't list verification results, don't describe
 
 ## Step 12 — Refactor Nudge
 
-After completing all work, count the entries in `## Completed` and `ARCHIVE.md` (if it exists) that don't have a `refactor:` commit prefix — i.e., items completed by `/hv:work`, not by `/hv:refactor`. Count features (`[F-*]`) and bugs (`[B-*]`) separately.
+After completing all work, count the entries in `## Completed` and `ARCHIVE.md` (if it exists) that don't have a `refactor:` commit prefix — i.e., items completed by `/hv:work`, not by `/hv:refactor`. Count features (`[F*]`) and bugs (`[B*]`) separately.
 
 If **5 or more features** or **10 or more bugs** have been completed since the last refactor, tell the user:
 

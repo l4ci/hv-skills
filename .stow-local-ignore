@@ -1,4 +1,5 @@
 \.claude-plugin
+\.git
 LICENSE
 README\.md
 \.stow-local-ignore

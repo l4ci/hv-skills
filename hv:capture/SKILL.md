@@ -1,0 +1,175 @@
+---
+name: hv:capture
+description: Capture bugs, features, and tasks into the project's TODO.md. Automatically classifies each item, assigns priority/size, and routes to the correct section with zero-padded auto-incrementing IDs ([B01], [F01], [T01]). Use when the user wants to capture any work item — bugs, features, tasks, or a mix.
+user-invocable: true
+---
+
+# hv:capture — Capture Work Items
+
+Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
+
+## Step 1 — Ensure .hv/ Exists
+
+Check if `.hv/TODO.md` exists. If not, run `/hv:init` first, then continue.
+
+## Step 2 — Parse & Classify
+
+The user will provide a keyword, short phrase, or longer description — possibly covering multiple issues or mixing bugs with feature requests and tasks.
+
+**Split the input into distinct items.** Each item is a separate concern that would get its own ID. Clues that you're looking at multiple items:
+
+- Separate sentences about unrelated problems
+- "Also…", "and another thing…", "plus…"
+- A list (numbered, bulleted, or comma-separated)
+- Mixed language: some items describe broken behavior (→ bug), some describe desired behavior that doesn't exist yet (→ feature), some describe chores or maintenance (→ task)
+
+**Classify each item:**
+
+| Goes to | When the item describes… |
+|---------|--------------------------|
+| `## Bugs` | Broken behavior — something that worked and stopped, or doesn't work as expected |
+| `## Features` | New or enhanced behavior — something that doesn't exist yet but should |
+| `## Tasks` | Chores and maintenance — refactoring, dependency updates, docs, CI, cleanup |
+
+## Step 3 — Gather Context
+
+For each item, gather **just enough context** to make it actionable later. Ask 2–4 quick questions total across all items — not per item. Pick from:
+
+**For bugs:**
+- What's the expected vs. actual behavior? (if not obvious)
+- How do you trigger it? (steps or conditions)
+- Does it happen every time or intermittently?
+- Which view/screen/component is affected?
+- Any error messages or console output?
+
+**For features:**
+- What's the user-facing behavior? (if not obvious)
+- Which part of the app does this touch?
+- Is there an existing workaround?
+- What triggers the need for this?
+
+**For tasks:**
+- What's the goal or desired outcome? (if not obvious)
+- Which area of the codebase does this touch?
+- Is there a deadline or dependency?
+- Any relevant context (error output, PR link, conversation reference)?
+
+**Skip questions the user already answered.** If the input is detailed enough, you may not need to ask anything.
+
+## Step 4 — Assign Priority / Size
+
+For **bugs**, assign one of:
+
+| Tag | Meaning |
+|-----|---------|
+| `[P0]` | Blocks usage — crash, data loss, can't complete core workflow, security issue |
+| `[P1]` | Degrades experience — wrong behavior, broken feature, ugly but usable, workaround exists |
+| `[P2]` | Minor annoyance — cosmetic glitch, edge case, slightly wrong state, user unlikely to notice |
+
+For **features**, assign one of:
+
+| Tag | Meaning |
+|-----|---------|
+| `[Major]` | Large scope — new screens, significant rework, breaks existing patterns, multi-day effort |
+| `[Minor]` | Contained change — new option, small UI addition, touches 1–3 files, hours of work |
+| `[Cosmetic]` | Visual polish — spacing, color, label tweak, animation refinement, minutes of work |
+
+**Tasks** get no priority or size tag.
+
+## Step 5 — Handle Large Input
+
+If any item's input contains bulky raw data (crash dumps, stack traces, log output, specs, checklists, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
+
+1. Create the appropriate directory (`.hv/bugs/`, `.hv/features/`, or `.hv/tasks/`) if it doesn't exist
+2. Write a detail file (e.g. `.hv/bugs/B{NN}.md`) using the same zero-padded ID with this format:
+
+```markdown
+# {ID}: Short title
+
+> Related TODO entry: `[{ID}]` in `.hv/TODO.md`
+
+## Summary
+
+{The same 1–3 sentence summary that goes into TODO.md}
+
+## Detail
+
+{Full user input — crash dump, stack trace, logs, specs, checklists, etc. Preserved verbatim or lightly formatted for readability.}
+```
+
+3. In the TODO.md entry, append a `Detail:` reference pointing to the file (see format below)
+
+**Skip this step entirely for items that fit comfortably in 1–3 sentences.** Most entries won't need a detail file.
+
+## Step 6 — Write All Entries
+
+1. Read `.hv/counters.json` once
+2. For each item, increment the appropriate counter (`bugs`, `features`, or `tasks`)
+3. Zero-pad each counter to at least 2 digits: 1→`01`, 9→`09`, 10→`10`, 100→`100`
+4. Append each item to the correct section in `.hv/TODO.md` (`## Bugs`, `## Features`, or `## Tasks`)
+5. Write `.hv/counters.json` back once with all updated counters
+
+**Bug format:**
+```markdown
+- **[B01] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Related: [F02], [T01]
+```
+
+**Feature format:**
+```markdown
+- **[F01] [Size] Short title.** One to three sentences of context — what it does, where it lives, why it matters. Related: [B01], [T03]
+```
+
+**Task format:**
+```markdown
+- **[T01] Short title.** One to two sentences of context — what needs to happen and why. Related: [F01], [B02]
+```
+
+With detail file, insert before `Related:`:
+```
+Detail: `.hv/{type}/{ID}.md`
+```
+
+The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry (caused by a feature, blocks a task, duplicates another bug). **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Archived items are still valid link targets. Don't force links that aren't there.
+
+### Examples
+
+Single bug:
+```markdown
+- **[B05] [P1] Timer badge shows stale duration after pause.** When you pause a running timer and reopen the panel 5+ minutes later, the menubar badge still shows the duration from when it was paused, not the current elapsed. Refreshes correctly after any interaction. Likely a timer invalidation issue in MenuBarManager. Related: [F03]
+```
+
+Single feature:
+```markdown
+- **[F03] [Minor] Quick-switch between recent projects.** Cmd+Tab-style overlay that shows the 3 most recent projects for fast switching without opening the project picker. Useful for consultants bouncing between clients throughout the day. Related: [B05]
+```
+
+Single task:
+```markdown
+- **[T02] Update Swift toolchain to 6.2.** Current project uses 5.10. Needed before adopting typed throws and the new concurrency features in the next milestone. Related: [F04]
+```
+
+Bug with detail file:
+```markdown
+- **[B07] [P0] App crashes on launch after iOS 18.2 update.** EXC_BAD_ACCESS in CoreData stack during migration. Affects all users on 18.2+, 100% repro rate. Detail: `.hv/bugs/B07.md` Related: [F12]
+```
+
+Mixed input — user says *"the sidebar flickers on hover, also we should add keyboard shortcuts for the top 5 actions, and update the linter config to enable the new rules"*:
+```markdown
+## Bugs
+- **[B03] [P2] Sidebar flickers on hover.** Hover state causes a visible flicker, likely a re-render or transition conflict in the sidebar component.
+
+## Features
+- **[F04] [Minor] Keyboard shortcuts for top actions.** Add keyboard shortcuts for the 5 most-used actions to speed up power-user workflows.
+
+## Tasks
+- **[T06] Update linter config for new rules.** Enable the recently added lint rules in the project config. Related: [B03]
+```
+
+## Rules
+
+- **Never remove or reorder existing entries** — append only
+- **Don't investigate now** — just capture
+- **Split mixed input** — route each item to the correct section with the correct ID type
+- **One set of questions for all items** — don't interrogate the user per-item
+- **Confirm what you wrote** — show the user every entry you added, grouped by section
+- **Always increment counters** — even if you're unsure, every ID must be unique

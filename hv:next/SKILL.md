@@ -10,7 +10,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 
 ## Step 1 — Read State
 
-Check if `.hv/TODO.md` exists. If not, tell the user there's nothing tracked yet and suggest running `/hv:init` to set up, then `/hv:bug`, `/hv:feature`, or `/hv:todo` to add items.
+Check if `.hv/TODO.md` exists. If not, tell the user there's nothing tracked yet and suggest running `/hv:init` to set up, then `/hv:capture` to add items.
 
 Read `.hv/TODO.md` and `.hv/status.json` (if it exists).
 
@@ -58,7 +58,7 @@ Write both files back if anything changed.
 
 ## Step 4 — Build Relationship Map
 
-Scan all items in `## Bugs`, `## Features`, and `## Todos` for `Related: [X-N], [Y-M]` suffixes. Build a bidirectional relationship map — if B-3 lists `Related: [F-2]`, then F-2 is also related to B-3, even if F-2 doesn't have an explicit `Related:` suffix.
+Scan all items in `## Bugs`, `## Features`, and `## Tasks` for `Related: [B01], [F02]` suffixes. Build a bidirectional relationship map — if B03 lists `Related: [F02]`, then F02 is also related to B03, even if F02 doesn't have an explicit `Related:` suffix.
 
 Identify **clusters**: groups of 2+ items that are connected (directly or transitively). These clusters inform the suggestion in Step 6.
 
@@ -72,14 +72,14 @@ Render a table for each non-empty section. Exclude items that are currently acti
 
 | ID | Title | Branch | Started |
 |----|-------|--------|---------|
-| F-1 | Quick-switch projects | hv/quick-switch | 2026-04-15 |
+| F01 | Quick-switch projects | hv/quick-switch | 2026-04-15 |
 
 ### Bugs
 
 | ID | Prio | Title | Related |
 |----|------|-------|---------|
-| B-1 | P0 | Crash on launch | |
-| B-2 | P1 | Stale badge | F-3 |
+| B01 | P0 | Crash on launch | |
+| B02 | P1 | Stale badge | F03 |
 
 Sort by priority: P0 first, then P1, then P2. Flag P0 items with a note that they're urgent.
 
@@ -87,15 +87,15 @@ Sort by priority: P0 first, then P1, then P2. Flag P0 items with a note that the
 
 | ID | Size | Title | Related |
 |----|------|-------|---------|
-| F-3 | Minor | Quick-switch projects | B-2 |
+| F03 | Minor | Quick-switch projects | B02 |
 
 Sort by size: Cosmetic first (quick wins), then Minor, then Major.
 
-### Todos
+### Tasks
 
 | ID | Title | Related |
 |----|-------|---------|
-| T-1 | Update Swift toolchain | F-4 |
+| T01 | Update Swift toolchain | F04 |
 
 The **Related** column shows IDs from the relationship map (both explicit and inferred). Leave it empty when the item has no links.
 
@@ -103,13 +103,13 @@ If clusters exist, add a brief note after the tables:
 
 ```
 Clusters:
-  [F-3] ↔ [B-2] — fix the badge bug before or alongside the feature
-  [T-1] → [F-4] — toolchain update unblocks the feature
+  [F03] ↔ [B02] — fix the badge bug before or alongside the feature
+  [T01] → [F04] — toolchain update unblocks the feature
 ```
 
 If no clusters exist, omit the clusters section entirely — don't mention their absence.
 
-If all sections are empty, say so and suggest `/hv:bug`, `/hv:feature`, or `/hv:todo`.
+If all sections are empty, say so and suggest `/hv:capture`.
 
 ## Step 6 — Suggest Next
 
@@ -119,7 +119,7 @@ Recommend what to work on next using this logic:
 2. **Cluster with blocking bugs?** → If a feature has related bugs, suggest fixing the bugs first or tackling the cluster together
 3. **Quick win available?** → If there's a Cosmetic feature or P2 bug that takes minutes, suggest bundling 2–3 of them together
 4. **Highest-impact P1 bug** → Bugs that degrade daily experience
-5. **Blocking todos** → Chores that unblock other items (check `Related:` links)
+5. **Blocking tasks** → Chores that unblock other items (check `Related:` links)
 6. **Minor features** → Good default when no urgent bugs
 7. **Major features** → Only suggest if nothing else is pending, or the user specifically wants to tackle something big
 
@@ -152,5 +152,5 @@ Ask the user: **"Work on this?"** (or "Work on these?" for a batch)
 - **Don't auto-start work** — always confirm with the user first
 - **Respect the user's choice** — your suggestion is a recommendation, not a mandate
 - **Pass full context to /hv:work** — include the TODO.md description so the work skill doesn't need to re-read it
-- **Reference items by ID** — use `[B-1]`, `[F-3]`, `[T-2]` in suggestions and when talking about items
+- **Reference items by ID** — use `[B01]`, `[F03]`, `[T02]` in suggestions and when talking about items
 - **Git is the source of truth** — if status.json disagrees with git state, trust git and fix status.json

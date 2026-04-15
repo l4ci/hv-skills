@@ -23,7 +23,7 @@ Create `.hv/TODO.md` with this exact structure:
 
 ## Features
 
-## Todos
+## Tasks
 
 ## Completed
 ```
@@ -35,7 +35,7 @@ Create `.hv/TODO.md` with this exact structure:
 Create `.hv/counters.json` with:
 
 ```json
-{"bugs": 0, "features": 0, "todos": 0}
+{"bugs": 0, "features": 0, "tasks": 0}
 ```
 
 **If `.hv/counters.json` already exists, do not overwrite it.**
@@ -97,13 +97,13 @@ Tell the user:
 
 ```
 Initialized .hv/ backlog:
-  .hv/TODO.md        — bugs, features, todos
+  .hv/TODO.md        — bugs, features, tasks
   .hv/counters.json  — auto-increment IDs
   .hv/config.json    — model, isolation, and merge settings
   .hv/status.json    — active work stream tracking
   .gitignore          — .hv/ excluded
 
-Use /hv:bug, /hv:feature, or /hv:todo to add items.
+Use /hv:capture to add bugs, features, or tasks.
 Use /hv:next to see what to work on.
 Edit .hv/config.json to change models, isolation, or merge strategy.
 ```

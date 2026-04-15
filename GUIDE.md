@@ -14,7 +14,7 @@ Run `/hv:init` once per project to create the folder. It contains:
 
 | File | Purpose |
 |------|---------|
-| `TODO.md` | Active backlog — bugs, features, todos, and recent completions |
+| `TODO.md` | Active backlog — bugs, features, tasks, and recent completions |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, refactor settings |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
@@ -28,17 +28,11 @@ All files are gitignored. The backlog is local to your machine.
 
 Creates the `.hv/` folder with all required files. Safe to run multiple times — never overwrites existing files. Also adds `.hv/` to `.gitignore` if not already present.
 
-### /hv:bug
+### /hv:capture
 
-Captures a bug report. Asks 2-4 quick questions to gather context, assigns a priority (P0/P1/P2), and appends it to `TODO.md` with an auto-incrementing `[B-N]` ID. Scans existing items (including the archive) for related entries and links them.
+Single entry point for capturing all work items. Automatically classifies each item as a bug, feature, or task and routes it to the correct section in `TODO.md`. Asks 2-4 quick questions to gather context, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features. Tasks get no tag.
 
-### /hv:feature
-
-Captures a feature idea. Asks 2-4 quick questions, assigns a size (Major/Minor/Cosmetic), and appends it to `TODO.md` with an `[F-N]` ID. Scans for related items.
-
-### /hv:todo
-
-Captures a general task or chore. Asks 1-3 questions and appends to `TODO.md` with a `[T-N]` ID. Use for anything that isn't a bug or feature — refactoring, documentation, dependency updates, research.
+Each item gets a zero-padded auto-incrementing ID — `[B01]` for bugs, `[F01]` for features, `[T01]` for tasks. Scans existing items (including the archive) for related entries and links them. Handles mixed input naturally — mention a bug, a feature, and a task in the same message and all three get captured with the correct ID type and section. Large input overflows into detail files at `.hv/bugs/B{NN}.md`, `.hv/features/F{NN}.md`, or `.hv/tasks/T{NN}.md`.
 
 ### /hv:next
 
@@ -48,7 +42,7 @@ Reviews the backlog and suggests what to work on. Does several things before pre
 2. **Archives old completions** — moves items completed more than 5 days ago from `TODO.md` to `ARCHIVE.md`.
 3. **Builds a relationship map** — finds `Related:` links across all items and identifies clusters of connected work.
 4. **Presents the backlog** — tables sorted by priority/size, with a Related column and cluster notes.
-5. **Suggests next work** — P0 bugs first, then clusters with blocking bugs, quick wins, P1 bugs, blocking todos, features.
+5. **Suggests next work** — P0 bugs first, then clusters with blocking bugs, quick wins, P1 bugs, blocking tasks, features.
 6. **Routes to /hv:work** — after the user confirms.
 
 ### /hv:work
@@ -121,25 +115,62 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 | `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
 | `"pr"` | Push branch, create GitHub PR | Team work, code review required |
 
+## Mixed-Input Routing
+
+`/hv:capture` handles mixed input. If you mention a bug, a feature, and a task in the same message, the skill splits them into distinct items and routes each to the correct section with the correct ID type.
+
+For example, telling `/hv:capture` *"the sidebar flickers on hover, also we should add keyboard shortcuts, and update the linter config"* produces:
+
+```markdown
+## Bugs
+- **[B03] [P2] Sidebar flickers on hover.** ...
+
+## Features
+- **[F04] [Minor] Keyboard shortcuts for top actions.** ...
+
+## Tasks
+- **[T06] Update linter config for new rules.** ...
+```
+
+Items created in the same batch can reference each other with `Related:` links.
+
+## Detail Files
+
+When an item's input is too large for a TODO entry (crash dumps, specs, logs, checklists), `/hv:capture` creates a detail file in a subdirectory:
+
+| Type | Directory | Example |
+|------|-----------|---------|
+| Bug | `.hv/bugs/` | `.hv/bugs/B07.md` |
+| Feature | `.hv/features/` | `.hv/features/F08.md` |
+| Task | `.hv/tasks/` | `.hv/tasks/T09.md` |
+
+The TODO.md entry gets a `Detail:` reference pointing to the file:
+
+```markdown
+- **[B07] [P0] App crashes on launch after iOS 18.2 update.** EXC_BAD_ACCESS in CoreData stack during migration. Detail: `.hv/bugs/B07.md` Related: [F12]
+```
+
+Most entries won't need a detail file — they're only created when the input would bloat the TODO entry beyond a few sentences.
+
 ## Related Items
 
 Any item can link to other items with a `Related:` suffix:
 
 ```markdown
-- **[B-5] [P1] Timer badge stale after pause.** Description... Related: [F-3]
+- **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
 ```
 
 Links are optional and bidirectional — `/hv:next` infers the reverse link automatically. When linked items form clusters, `/hv:next` suggests tackling them together.
 
-Capture skills scan both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link to a completed feature.
+`/hv:capture` scans both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link to a completed feature.
 
 ## Concurrent Work Streams
 
 With `"isolation": "worktree"`, you can run multiple `/hv:work` sessions in parallel from separate terminals:
 
 ```
-Terminal 1: /hv:next → picks [F-1], [B-2] → /hv:work
-Terminal 2: /hv:next → picks [F-3]        → /hv:work
+Terminal 1: /hv:next → picks [F01], [B02] → /hv:work
+Terminal 2: /hv:next → picks [F03]        → /hv:work
 ```
 
 Each session creates its own worktree and branch. Both orchestrators write to the same `.hv/status.json` in the main worktree (they own different entries, so no conflicts). `/hv:next` in a third terminal will show both work streams as "In Progress" and skip those items when suggesting new work.
