@@ -226,6 +226,16 @@ Share the PR URL with the user.
 
 Remove this work session's entry from `.hv/status.json`. This marks the work as complete so `/hv:next` no longer shows these items as in-progress.
 
+## Step 11 — Refactor Nudge
+
+After completing all work, count the entries in `## Completed` and `ARCHIVE.md` (if it exists) that don't have a `refactor:` commit prefix — i.e., items completed by `/hv:work`, not by `/hv:refactor`. Count features (`[F-*]`) and bugs (`[B-*]`) separately.
+
+If **5 or more features** or **10 or more bugs** have been completed since the last refactor, tell the user:
+
+*"You've shipped [N] features / [N] bug fixes since the last refactor. Might be a good time to run `/hv:refactor` to clean up accumulated friction."*
+
+This is a suggestion, not a blocker. Don't repeat it if the user has already been nudged in this session.
+
 ## Key Principles
 
 - **Orchestrator plans and verifies, worker executes.** Models are configured in `.hv/config.json` (default: opus/sonnet). Never dispatch work without a clear brief. Never trust completion without reading the result.
