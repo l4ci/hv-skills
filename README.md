@@ -14,6 +14,34 @@ A lightweight project backlog and workflow system for Claude Code. Capture bugs,
 | `/hv:work` | Opus-orchestrated parallel implementation with per-task commits |
 | `/hv:refactor` | Full architectural refactor cycle with parallel subagents |
 
+## How to use
+
+**1. Initialize once per project**
+
+Run `/hv:init` in your project root. This creates `.hv/` with a TODO file, counters, and model config.
+
+**2. Capture work as you go**
+
+Whenever you spot something, capture it without breaking your flow:
+
+- `/hv:bug` — broken behavior, defects, regressions
+- `/hv:feature` — ideas, enhancements, new capabilities
+- `/hv:todo` — chores, refactoring, docs, dependency updates
+
+Each item gets an auto-incrementing ID and is appended to `.hv/TODO.md`.
+
+**3. Pick what to work on**
+
+Run `/hv:next` to review the backlog. It cleans up completed entries, shows a priority table, and suggests what to tackle next.
+
+**4. Build it**
+
+Run `/hv:work` to implement the selected items. It plans the tasks, dispatches parallel subagents, verifies each result, and commits per task. If you paused mid-work, `/hv:work` picks up where you left off.
+
+**5. Refactor periodically**
+
+After a few rounds of feature work, run `/hv:refactor` to clean up accumulated friction. It explores the codebase, categorizes findings, designs competing approaches for structural changes, and fixes everything in one pass.
+
 ## Install
 
 ### npx (one-liner)
