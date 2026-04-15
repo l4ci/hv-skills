@@ -49,14 +49,18 @@ Create `.hv/config.json` with:
   "models": {
     "orchestrator": "opus",
     "worker": "sonnet"
+  },
+  "refactor": {
+    "confirmBeforeExecute": true
   }
 }
 ```
 
-- `orchestrator` — the model used for planning, exploration, and verification (in `/hv:work` and `/hv:refactor`)
-- `worker` — the model used for implementation subagents
+- `models.orchestrator` — the model used for planning, exploration, design, and verification (in `/hv:work` and `/hv:refactor`)
+- `models.worker` — the model used for implementation subagents
+- `refactor.confirmBeforeExecute` — when `true`, `/hv:refactor` pauses for user approval before executing fixes. Set `false` for full autonomy.
 
-Valid values: `"opus"`, `"sonnet"`, `"haiku"`.
+Valid model values: `"opus"`, `"sonnet"`, `"haiku"`.
 
 **If `.hv/config.json` already exists, do not overwrite it.**
 
@@ -77,7 +81,7 @@ Tell the user:
 Initialized .hv/ backlog:
   .hv/TODO.md        — bugs, features, todos
   .hv/counters.json  — auto-increment IDs
-  .hv/config.json    — model config (orchestrator: opus, worker: sonnet)
+  .hv/config.json    — model config + refactor settings
   .gitignore          — .hv/ excluded
 
 Use /hv:bug, /hv:feature, or /hv:todo to add items.
