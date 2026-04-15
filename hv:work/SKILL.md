@@ -8,6 +8,24 @@ user-invocable: true
 
 Opus-orchestrated parallel implementation with per-task verification and commits.
 
+## Model Configuration
+
+Before starting, read `.hv/config.json` if it exists. It contains:
+
+```json
+{
+  "models": {
+    "orchestrator": "opus",
+    "worker": "sonnet"
+  }
+}
+```
+
+- Use `orchestrator` for the planning and verification model (Agent `model` parameter)
+- Use `worker` for the implementation subagents (Agent `model` parameter)
+
+If `.hv/config.json` doesn't exist, default to `opus` for orchestrator and `sonnet` for worker.
+
 ## When to Use
 
 - User describes a task, feature, or list of improvements
@@ -22,10 +40,10 @@ digraph work_flow {
   "Gather context" -> "Plan tasks";
   "Plan tasks" -> "Identify dependencies";
   "Identify dependencies" -> "Wave 1: parallel independents";
-  "Wave 1: parallel independents" -> "Opus verifies each";
-  "Opus verifies each" -> "Commit per task";
+  "Wave 1: parallel independents" -> "Orchestrator verifies each";
+  "Orchestrator verifies each" -> "Commit per task";
   "Commit per task" -> "Wave 2: dependents" [label="if any"];
-  "Wave 2: dependents" -> "Opus verifies each";
+  "Wave 2: dependents" -> "Orchestrator verifies each";
   "Commit per task" -> "Update TODO.md" [label="all complete"];
   "Update TODO.md" -> "Done";
 }
@@ -51,9 +69,9 @@ Then, from the conversation context (user request, prior analysis, existing code
 
 Create a feature branch: `git checkout -b <descriptive-branch-name>`
 
-## Step 2 — Dispatch Parallel Sonnet Agents
+## Step 2 — Dispatch Parallel Worker Agents
 
-For each independent task, dispatch a sonnet subagent (`model: "sonnet"`) with:
+For each independent task, dispatch a subagent using the configured **worker** model with:
 
 ```
 You are implementing Task N of [total].
@@ -85,7 +103,7 @@ Launch all independent agents in a single message (parallel tool calls).
 
 ## Step 3 — Verify Each Completion
 
-As each agent completes, opus verifies:
+As each agent completes, the orchestrator verifies:
 
 1. **Check the commit exists:** `git log --oneline -1`
 2. **Read the modified files** — confirm changes match the brief
@@ -144,7 +162,7 @@ git branch -d <branch>
 
 ## Key Principles
 
-- **Opus plans and verifies, sonnet executes.** Never dispatch work without a clear brief. Never trust completion without reading the result.
+- **Orchestrator plans and verifies, worker executes.** Models are configured in `.hv/config.json` (default: opus/sonnet). Never dispatch work without a clear brief. Never trust completion without reading the result.
 - **One commit per task.** Each agent commits its own atomic change. This gives clean git history and easy revert granularity.
 - **Parallel by default.** Independent tasks always run in parallel. Sequential only when there's a real file conflict or data dependency.
 - **Agents commit themselves.** Include the commit message in the brief. The orchestrator doesn't batch-commit — each task is self-contained.

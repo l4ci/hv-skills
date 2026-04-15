@@ -6,15 +6,36 @@ user-invocable: true
 
 # hv:refactor
 
-Run a full architectural refactor cycle on the current codebase:
-1. **Opus** explores for friction
-2. **Parallel sonnet subagents** implement every fix
-3. **Opus** verifies all changes
+Run a full architectural refactor cycle on the current codebase.
+
+## Model Configuration
+
+Before starting, read `.hv/config.json` if it exists. It contains:
+
+```json
+{
+  "models": {
+    "orchestrator": "opus",
+    "worker": "sonnet"
+  }
+}
+```
+
+- Use `orchestrator` for the exploration and verification agents (Agent `model` parameter)
+- Use `worker` for the implementation subagents (Agent `model` parameter)
+
+If `.hv/config.json` doesn't exist, default to `opus` for orchestrator and `sonnet` for worker.
+
+## Flow
+
+1. **Orchestrator** explores for friction
+2. **Parallel worker subagents** implement every fix
+3. **Orchestrator** verifies all changes
 4. **Commit** everything
 
-## Step 1 — Explore with Opus
+## Step 1 — Explore with Orchestrator
 
-Dispatch an opus exploration agent. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent explores organically, reads files in full, follows seams, and reports every friction point with file name, line numbers, and why it matters.
+Dispatch an exploration agent using the configured **orchestrator** model. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent explores organically, reads files in full, follows seams, and reports every friction point with file name, line numbers, and why it matters.
 
 Prompt template for the exploration agent:
 ```
@@ -44,9 +65,9 @@ Rules for grouping:
 - **Same file** → single agent handles all changes to that file
 - **Sequential dependency** (fix A must land before fix B can reference it) → note the order, run sequentially after the first batch
 
-## Step 3 — Fix with Parallel Sonnet Agents
+## Step 3 — Fix with Parallel Worker Agents
 
-Dispatch all independent fixes in parallel. Each agent gets:
+Dispatch all independent fixes in parallel using the configured **worker** model. Each agent gets:
 - Exact files to read and modify
 - Precise description of the bug/friction
 - Exact fix to implement (no ambiguity)
@@ -60,9 +81,9 @@ For each agent brief:
 
 After parallel batch completes, dispatch any sequential agents that depended on the first batch.
 
-## Step 4 — Verify with Opus
+## Step 4 — Verify with Orchestrator
 
-Dispatch a single opus verification agent. For each fix, it reads the modified file and reports:
+Dispatch a single verification agent using the configured **orchestrator** model. For each fix, it reads the modified file and reports:
 - **PASS** — change is correct and complete
 - **FAIL** — something is wrong (with exact finding)
 - **CONCERN** — works but has a side effect worth knowing
@@ -72,9 +93,9 @@ The verification agent must read actual file content, not trust the fix summarie
 ## Step 5 — Handle Failures
 
 If any fix got **FAIL**:
-- Read the opus finding
-- Dispatch a new sonnet agent with the corrected brief
-- Re-verify with opus
+- Read the verification finding
+- Dispatch a new worker agent with the corrected brief
+- Re-verify with orchestrator
 
 If any fix got **CONCERN**:
 - Assess whether it blocks commit
@@ -102,9 +123,9 @@ If the project uses a build tool to regenerate project files (e.g. `xcodegen gen
 
 ## Key Principles
 
-- **Opus for judgment, sonnet for execution.** Exploration and verification require deep reasoning; implementation is precise execution of a known fix.
+- **Orchestrator for judgment, worker for execution.** Models are configured in `.hv/config.json` (default: opus/sonnet). Exploration and verification require deep reasoning; implementation is precise execution of a known fix.
 - **Parallel by default.** Independent fixes always run in parallel. Sequential only when there's a real dependency.
 - **Minimal diffs.** Each fix touches only what's necessary. No reformatting, no unrelated cleanup.
 - **Read before edit.** Every agent reads the target file before making changes.
-- **Verify before commit.** Never commit without opus sign-off.
+- **Verify before commit.** Never commit without orchestrator sign-off.
 - **Commit once** per run (not per fix) unless fixes are truly independent milestones.

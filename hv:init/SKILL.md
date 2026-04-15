@@ -40,7 +40,27 @@ Create `.hv/counters.json` with:
 
 **If `.hv/counters.json` already exists, do not overwrite it.**
 
-## Step 4 — Ensure .gitignore Covers .hv/
+## Step 4 — Create config.json
+
+Create `.hv/config.json` with:
+
+```json
+{
+  "models": {
+    "orchestrator": "opus",
+    "worker": "sonnet"
+  }
+}
+```
+
+- `orchestrator` — the model used for planning, exploration, and verification (in `/hv:work` and `/hv:refactor`)
+- `worker` — the model used for implementation subagents
+
+Valid values: `"opus"`, `"sonnet"`, `"haiku"`.
+
+**If `.hv/config.json` already exists, do not overwrite it.**
+
+## Step 5 — Ensure .gitignore Covers .hv/
 
 Check the project's `.gitignore`. If `.hv/` is not already listed, append it:
 
@@ -49,7 +69,7 @@ Check the project's `.gitignore`. If `.hv/` is not already listed, append it:
 .hv/
 ```
 
-## Step 5 — Confirm
+## Step 6 — Confirm
 
 Tell the user:
 
@@ -57,8 +77,10 @@ Tell the user:
 Initialized .hv/ backlog:
   .hv/TODO.md        — bugs, features, todos
   .hv/counters.json  — auto-increment IDs
+  .hv/config.json    — model config (orchestrator: opus, worker: sonnet)
   .gitignore          — .hv/ excluded
 
 Use /hv:bug, /hv:feature, or /hv:todo to add items.
 Use /hv:next to see what to work on.
+Edit .hv/config.json to change which models /hv:work and /hv:refactor use.
 ```
