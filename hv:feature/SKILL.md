@@ -44,7 +44,7 @@ Format:
 - **[F-N] [Size] Short title.** One to three sentences of context — what it does, where it lives, why it matters. Just enough to remember what this was about. Related: [B-1], [T-3]
 ```
 
-The `Related:` suffix is optional — only add it when the feature clearly relates to an existing item (fixes a bug, depends on a todo, extends another feature). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
+The `Related:` suffix is optional — only add it when the feature clearly relates to an existing item (fixes a bug, depends on a todo, extends another feature). Scan `## Bugs`, `## Features`, and `## Todos` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing the entry. Archived items are still valid link targets. Don't force links that aren't there.
 
 Example:
 ```markdown

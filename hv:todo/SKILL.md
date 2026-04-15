@@ -34,7 +34,7 @@ Format:
 - **[T-N] Short title.** One to two sentences of context — what needs to happen and why. Related: [F-1], [B-2]
 ```
 
-The `Related:` suffix is optional — only add it when the task clearly relates to an existing item (blocks a feature, required before a bug fix, depends on another todo). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
+The `Related:` suffix is optional — only add it when the task clearly relates to an existing item (blocks a feature, required before a bug fix, depends on another todo). Scan `## Bugs`, `## Features`, and `## Todos` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing the entry. Archived items are still valid link targets. Don't force links that aren't there.
 
 Example:
 ```markdown

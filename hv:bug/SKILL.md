@@ -45,7 +45,7 @@ Format:
 - **[B-N] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Just enough to reproduce and remember what this was about. Related: [F-2], [T-1]
 ```
 
-The `Related:` suffix is optional — only add it when the bug clearly relates to an existing item (caused by a feature, blocks a todo, duplicates another bug). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
+The `Related:` suffix is optional — only add it when the bug clearly relates to an existing item (caused by a feature, blocks a todo, duplicates another bug). Scan `## Bugs`, `## Features`, and `## Todos` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing the entry. Archived items are still valid link targets. Don't force links that aren't there.
 
 Example:
 ```markdown
