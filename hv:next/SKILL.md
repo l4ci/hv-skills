@@ -1,6 +1,6 @@
 ---
 name: hv:next
-description: Review all items in TODO.md, clean up old completed entries, show a backlog table, suggest the next thing to work on, and route to /hv:work for implementation. Use when the user wants to pick up the next task, asks "what should I work on", or wants to see their backlog.
+description: Review all items in TODO.md, reconcile active work from status.json and git state, archive old completed items, show a backlog table with relationship clusters, suggest the next thing to work on, and route to /hv:work for implementation. Use when the user wants to pick up the next task, asks "what should I work on", or wants to see their backlog.
 user-invocable: true
 ---
 
@@ -8,23 +8,39 @@ user-invocable: true
 
 Review the project backlog, suggest what to tackle next, and execute it.
 
-## Step 1 — Read TODO.md
+## Step 1 — Read State
 
 Check if `.hv/TODO.md` exists. If not, tell the user there's nothing tracked yet and suggest running `/hv:init` to set up, then `/hv:bug`, `/hv:feature`, or `/hv:todo` to add items.
 
-Read `.hv/TODO.md`.
+Read `.hv/TODO.md` and `.hv/status.json` (if it exists).
 
-## Step 2 — Reconcile Active Items
+## Step 2 — Reconcile Active Work
 
-Scan `## Bugs`, `## Features`, and `## Todos` for entries with an `*(active since YYYY-MM-DD)*` marker. These are items a previous `/hv:work` run started but may not have finished (e.g., session ended, context was lost).
+Read the `active` array from `.hv/status.json`. For each entry, validate against actual git state:
 
-For each active item:
+1. **Check if the branch exists:** `git branch --list '<branch-name>'`
+2. **Check if a worktree exists** (if `worktree` is set): `git worktree list` and look for the path
+3. **Check for commits:** `git log --oneline <branch-name> --not main` — are there commits on the branch beyond main?
 
-1. **Check git history** — run `git log --oneline --since="YYYY-MM-DD" --all` (using the date from the marker) and search commit messages for keywords from the item's title
-2. **If commits exist that clearly resolve the item** → move it to `## Completed` with the commit hash and today's date, same as a normal completion. Tell the user: *"[ID] [Title] was started earlier and looks complete based on git history — moved to Completed."*
-3. **If no matching commits found** → remove the active marker (so it returns to normal pending state) and flag it to the user: *"[ID] [Title] was marked active on [date] but doesn't appear finished. Keeping it in the backlog."*
+Based on the findings:
 
-This reconciliation happens silently for resolved items and with a brief notice for unfinished ones. Present the notices before the backlog.
+**Branch exists, has commits resolving the items:**
+The work looks complete but was never merged. Tell the user:
+*"[ID] [Title] appears complete on branch `<branch>`. Merge it? (`git merge <branch>`) or create a PR?"*
+
+**Branch exists, has partial commits or no commits:**
+The work was started but interrupted. Tell the user:
+*"[ID] [Title] is in progress on branch `<branch>` (started <date>). Resume or abandon?"*
+- **Resume** → switch to the branch (or enter the worktree) and invoke `/hv:work` with the remaining items
+- **Abandon** → delete the branch (and worktree if applicable), remove the status entry, items return to the backlog
+
+**Branch doesn't exist (was deleted or never created):**
+Stale status entry. Remove it from status.json silently. The items remain in TODO.md as pending.
+
+**Worktree path is set but worktree doesn't exist:**
+The worktree was cleaned up but the status entry remains. Check if the branch still exists and handle as above. Remove the stale worktree path from the entry or clean up the entry entirely.
+
+Present any reconciliation notices before the backlog.
 
 ## Step 3 — Archive Completed Items
 
@@ -46,7 +62,15 @@ Identify **clusters**: groups of 2+ items that are connected (directly or transi
 
 ## Step 5 — Present the Backlog
 
-Render a table for each non-empty section. Use this format:
+Render a table for each non-empty section. Exclude items that are currently active (present in `status.json`) — show them separately as "In Progress" instead.
+
+**If any items are active**, show them first:
+
+### In Progress
+
+| ID | Title | Branch | Started |
+|----|-------|--------|---------|
+| F-1 | Quick-switch projects | hv/quick-switch | 2026-04-15 |
 
 ### Bugs
 
@@ -95,6 +119,8 @@ Recommend what to work on next using this logic:
 6. **Minor features** → Good default when no urgent bugs
 7. **Major features** → Only suggest if nothing else is pending, or the user specifically wants to tackle something big
 
+Skip items that are already active in another work stream.
+
 When suggesting a cluster, present it as a batch: *"These are related — tackle them together?"*
 
 Present your recommendation clearly:
@@ -116,9 +142,10 @@ Ask the user: **"Work on this?"** (or "Work on these?" for a batch)
 
 ## Rules
 
-- **Always clean up before presenting** — stale completed items are noise
+- **Always reconcile before presenting** — check status.json and git state first
 - **Always render the table** — the table is the default view, not optional
 - **Don't auto-start work** — always confirm with the user first
 - **Respect the user's choice** — your suggestion is a recommendation, not a mandate
 - **Pass full context to /hv:work** — include the TODO.md description so the work skill doesn't need to re-read it
 - **Reference items by ID** — use `[B-1]`, `[F-3]`, `[T-2]` in suggestions and when talking about items
+- **Git is the source of truth** — if status.json disagrees with git state, trust git and fix status.json

@@ -62,6 +62,15 @@ Your own services across a network boundary (microservices, internal APIs). Defi
 
 Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the boundary. The module takes the external dependency as an injected port, and tests provide a mock implementation.
 
+## Step 0 — Guard: Clean Working Tree
+
+Check for uncommitted changes: `git status --porcelain`
+
+- If the output is empty → proceed
+- If there are uncommitted changes → **stop and warn the user**:
+  *"You have uncommitted changes. Stash them (`git stash`) or commit them before running /hv:refactor, so the refactor happens on a clean base."*
+  Do not proceed until the working tree is clean.
+
 ## Step 1 — Explore with Orchestrator
 
 Dispatch an exploration agent using the configured **orchestrator** model. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent explores organically, reads files in full, follows seams, and reports every friction point with file name, line numbers, and why it matters.
