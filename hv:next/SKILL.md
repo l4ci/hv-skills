@@ -26,53 +26,76 @@ For each active item:
 
 This reconciliation happens silently for resolved items and with a brief notice for unfinished ones. Present the notices before the backlog.
 
-## Step 3 — Cleanup Completed Items
+## Step 3 — Archive Completed Items
 
-Check the `## Completed` section. Remove any entry whose completion date is **more than 1 day old** (compare against today's date). This keeps the list focused on recent work. If you remove entries, do it silently — don't list them to the user.
+Check the `## Completed` section. Any entry whose completion date is **more than 5 days old** (compare the `Done YYYY-MM-DD` date against today) gets moved to `.hv/ARCHIVE.md`.
 
-Write the cleaned `.hv/TODO.md` back if anything changed.
+1. If `.hv/ARCHIVE.md` doesn't exist, create it with a `# Archive` heading
+2. Append the old entries to the end of ARCHIVE.md (preserve their full text including the strikethrough and commit hash)
+3. Remove them from `## Completed` in TODO.md
 
-## Step 4 — Present the Backlog
+This keeps the active backlog focused on recent work while preserving history. Archive silently — don't list moved entries to the user.
+
+Write both files back if anything changed.
+
+## Step 4 — Build Relationship Map
+
+Scan all items in `## Bugs`, `## Features`, and `## Todos` for `Related: [X-N], [Y-M]` suffixes. Build a bidirectional relationship map — if B-3 lists `Related: [F-2]`, then F-2 is also related to B-3, even if F-2 doesn't have an explicit `Related:` suffix.
+
+Identify **clusters**: groups of 2+ items that are connected (directly or transitively). These clusters inform the suggestion in Step 6.
+
+## Step 5 — Present the Backlog
 
 Render a table for each non-empty section. Use this format:
 
 ### Bugs
 
-| ID | Prio | Title | Description |
-|----|------|-------|-------------|
-| B-1 | P0 | Crash on launch | App crashes when... |
-| B-2 | P1 | Stale badge | Timer badge shows... |
+| ID | Prio | Title | Related |
+|----|------|-------|---------|
+| B-1 | P0 | Crash on launch | |
+| B-2 | P1 | Stale badge | F-3 |
 
 Sort by priority: P0 first, then P1, then P2. Flag P0 items with a note that they're urgent.
 
 ### Features
 
-| ID | Size | Title | Description |
-|----|------|-------|-------------|
-| F-1 | Minor | Quick-switch projects | Cmd+Tab-style overlay... |
+| ID | Size | Title | Related |
+|----|------|-------|---------|
+| F-3 | Minor | Quick-switch projects | B-2 |
 
 Sort by size: Cosmetic first (quick wins), then Minor, then Major.
 
 ### Todos
 
-| ID | Title | Description |
-|----|-------|-------------|
-| T-1 | Update Swift toolchain | Current project uses... |
+| ID | Title | Related |
+|----|-------|---------|
+| T-1 | Update Swift toolchain | F-4 |
 
-**Description column:** Show only the first sentence of context, truncated to ~60 chars if needed.
+The **Related** column shows IDs from the relationship map (both explicit and inferred). Leave it empty when the item has no links.
+
+If clusters exist, add a brief note after the tables:
+
+```
+Clusters:
+  [F-3] ↔ [B-2] — fix the badge bug before or alongside the feature
+  [T-1] → [F-4] — toolchain update unblocks the feature
+```
 
 If all sections are empty, say so and suggest `/hv:bug`, `/hv:feature`, or `/hv:todo`.
 
-## Step 5 — Suggest Next
+## Step 6 — Suggest Next
 
 Recommend what to work on next using this logic:
 
 1. **Any P0 bug?** → Always suggest P0 bugs first, they block usage
-2. **Quick win available?** → If there's a Cosmetic feature or P2 bug that takes minutes, suggest bundling 2–3 of them together
-3. **Highest-impact P1 bug** → Bugs that degrade daily experience
-4. **Todos** → Chores that unblock other work
-5. **Minor features** → Good default when no urgent bugs
-6. **Major features** → Only suggest if nothing else is pending, or the user specifically wants to tackle something big
+2. **Cluster with blocking bugs?** → If a feature has related bugs, suggest fixing the bugs first or tackling the cluster together
+3. **Quick win available?** → If there's a Cosmetic feature or P2 bug that takes minutes, suggest bundling 2–3 of them together
+4. **Highest-impact P1 bug** → Bugs that degrade daily experience
+5. **Blocking todos** → Chores that unblock other items (check `Related:` links)
+6. **Minor features** → Good default when no urgent bugs
+7. **Major features** → Only suggest if nothing else is pending, or the user specifically wants to tackle something big
+
+When suggesting a cluster, present it as a batch: *"These are related — tackle them together?"*
 
 Present your recommendation clearly:
 
@@ -83,7 +106,7 @@ Suggested next: [ID] [Title] ([tag])
 
 If there are 2–3 small items that make sense together, suggest them as a batch.
 
-## Step 6 — Confirm & Execute
+## Step 7 — Confirm & Execute
 
 Ask the user: **"Work on this?"** (or "Work on these?" for a batch)
 

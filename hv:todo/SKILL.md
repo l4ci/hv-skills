@@ -31,12 +31,14 @@ The user will provide a keyword, short phrase, or longer description. From what 
 
 Format:
 ```markdown
-- **[T-N] Short title.** One to two sentences of context — what needs to happen and why.
+- **[T-N] Short title.** One to two sentences of context — what needs to happen and why. Related: [F-1], [B-2]
 ```
+
+The `Related:` suffix is optional — only add it when the task clearly relates to an existing item (blocks a feature, required before a bug fix, depends on another todo). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
 
 Example:
 ```markdown
-- **[T-2] Update Swift toolchain to 6.2.** Current project uses 5.10. Needed before adopting typed throws and the new concurrency features in the next milestone.
+- **[T-2] Update Swift toolchain to 6.2.** Current project uses 5.10. Needed before adopting typed throws and the new concurrency features in the next milestone. Related: [F-4]
 ```
 
 ## Rules

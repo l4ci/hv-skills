@@ -41,12 +41,14 @@ Assign one of:
 
 Format:
 ```markdown
-- **[F-N] [Size] Short title.** One to three sentences of context — what it does, where it lives, why it matters. Just enough to remember what this was about.
+- **[F-N] [Size] Short title.** One to three sentences of context — what it does, where it lives, why it matters. Just enough to remember what this was about. Related: [B-1], [T-3]
 ```
+
+The `Related:` suffix is optional — only add it when the feature clearly relates to an existing item (fixes a bug, depends on a todo, extends another feature). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
 
 Example:
 ```markdown
-- **[F-3] [Minor] Quick-switch between recent projects.** Cmd+Tab-style overlay that shows the 3 most recent projects for fast switching without opening the project picker. Useful for consultants bouncing between clients throughout the day.
+- **[F-3] [Minor] Quick-switch between recent projects.** Cmd+Tab-style overlay that shows the 3 most recent projects for fast switching without opening the project picker. Useful for consultants bouncing between clients throughout the day. Related: [B-5]
 ```
 
 ## Rules

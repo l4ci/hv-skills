@@ -42,12 +42,14 @@ Assign one of:
 
 Format:
 ```markdown
-- **[B-N] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Just enough to reproduce and remember what this was about.
+- **[B-N] [Priority] Short title.** One to three sentences of context — what happens, when it happens, what should happen instead. Just enough to reproduce and remember what this was about. Related: [F-2], [T-1]
 ```
+
+The `Related:` suffix is optional — only add it when the bug clearly relates to an existing item (caused by a feature, blocks a todo, duplicates another bug). Scan the current `## Bugs`, `## Features`, and `## Todos` sections for obvious connections before writing the entry. Don't force links that aren't there.
 
 Example:
 ```markdown
-- **[B-5] [P1] Timer badge shows stale duration after pause.** When you pause a running timer and reopen the panel 5+ minutes later, the menubar badge still shows the duration from when it was paused, not the current elapsed. Refreshes correctly after any interaction. Likely a timer invalidation issue in MenuBarManager.
+- **[B-5] [P1] Timer badge shows stale duration after pause.** When you pause a running timer and reopen the panel 5+ minutes later, the menubar badge still shows the duration from when it was paused, not the current elapsed. Refreshes correctly after any interaction. Likely a timer invalidation issue in MenuBarManager. Related: [F-3]
 ```
 
 ## Rules
