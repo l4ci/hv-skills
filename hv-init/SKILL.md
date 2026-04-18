@@ -10,17 +10,41 @@ Set up the `.hv/` folder with data files and CLI helpers for a project.
 
 ## Step 1 — Verify Environment
 
-Before touching the filesystem, make sure the tools we depend on are present:
+Make sure the tools we depend on are present — both are hard requirements:
 
 ```bash
 command -v git >/dev/null 2>&1 || { echo "error: git is required but not installed" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required but not installed" >&2; exit 1; }
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "warning: not a git repository — /hv:work and /hv:refactor require git. Initialize with \`git init\` before using those skills." >&2
-fi
 ```
 
-The `git init` suggestion is a warning, not a hard stop — `/hv:capture`, `/hv:next`, and `/hv:learn` work fine without a repo.
+Then check whether the current directory is already a git repository:
+
+```bash
+git rev-parse --git-dir >/dev/null 2>&1
+```
+
+If it **is** a repo, continue to Step 2.
+
+If it **isn't**, offer to initialize one — `/hv:work`, `/hv:debug`, `/hv:ship`, and `/hv:refactor` all require git, so running hv-skills here without a repo only gives access to the backlog-capture subset. Use `AskUserQuestion`:
+
+- **Header:** `"Git"`
+- **Question:** *"This directory isn't a git repository. Initialize one?"*
+- **Options** (single-select):
+  1. *"Yes, `git init` now (Recommended)"* — *"Run `git init` here; enables `/hv:work`, `/hv:debug`, `/hv:ship`, and `/hv:refactor`. Reversible with `rm -rf .git`."*
+  2. *"No, backlog-only"* — *"Skip init; `/hv:capture`, `/hv:next`, `/hv:learn`, `/hv:status` still work. Git-dependent skills will fail until you init manually."*
+  3. *"Stop"* — *"Cancel `/hv:init`; rerun when you're ready."*
+
+On **Yes** — run `git init` and continue to Step 2. Mention the created branch in the Step 6 summary (one line, e.g., *"Initialized git repo on `main`."*).
+
+On **No** — continue to Step 2 but log a warning so the user isn't surprised later:
+
+```
+Warning: not a git repository. /hv:work, /hv:debug, /hv:ship, /hv:refactor will fail here until you run `git init`.
+```
+
+On **Stop** — surface the reason and exit.
+
+Plain-text fallback: run `git init` straight through — it's the Recommended choice, and one-off initialization is reversible with `rm -rf .git`. (See GUIDE.md § Host Question Conventions.)
 
 ## Step 2 — Create Directories and Data Files
 
