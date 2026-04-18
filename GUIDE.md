@@ -33,7 +33,14 @@ All files are gitignored. The backlog is local to your machine.
 
 ### /hv:init
 
-Creates the `.hv/` folder with all required files. Safe to run multiple times — never overwrites existing files. Also adds `.hv/` to `.gitignore` if not already present.
+Creates the `.hv/` folder with all required files. On first run, asks four questions via the host's native question UI (Claude Code's `AskUserQuestion`, equivalents elsewhere) to configure:
+
+1. **Models** — Balanced (Opus + Sonnet, Recommended) / Premium (Opus) / Fast (Sonnet) / Minimal (Sonnet + Haiku)
+2. **Isolation** — Branch (Recommended) / Worktree
+3. **Integration** — Direct merge (Recommended) / GitHub PR
+4. **Quality gates** (multi-select) — Review before ship / Verify learnings / Confirm before refactor (all Recommended)
+
+Skipping a question (or picking every Recommended) writes the default. Re-running `/hv:init` on an existing project never re-prompts — the user's prior `config.json` is the source of truth. Helpers always refresh; data files never overwrite. Adds `.hv/` to `.gitignore` if not already present.
 
 ### /hv:capture
 

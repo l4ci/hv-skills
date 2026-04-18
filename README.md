@@ -46,7 +46,7 @@ claude plugin install hv-skills
 /hv:next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 18 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`.
+First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 18 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`. `/hv:init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
 
 ## Skills
 
