@@ -29,7 +29,11 @@ command -v gh >/dev/null 2>&1 || echo "gh not installed"
 
 If missing, tell the user the check needs `gh` (or `brew install gh` / equivalent) and stop. Don't try to `curl` the GitHub API — users with `gh` get auth'd rate limits for free.
 
-If `.hv/bin/hv-update-check` doesn't exist, invoke `hv:init` to refresh helpers, then continue.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool to refresh helpers, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Run the Check
 

@@ -31,7 +31,11 @@ Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → V
 
 ## Step 1 — Preflight & Guard
 
-If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool, then continue. Then:
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:work"

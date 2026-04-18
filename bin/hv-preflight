@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Verify .hv/ is initialized and helpers are present.
+# Exit 0: fully initialized  |  Exit 2: uninitialized  |  Exit 3: partial install
+# Typical caller: `.hv/bin/hv-preflight || invoke hv:init via Skill tool`.
+set -euo pipefail
+
+HV=".hv"
+
+if [ ! -d "$HV" ]; then
+  echo "uninitialized: .hv/ directory missing" >&2
+  exit 2
+fi
+
+for f in TODO.md KNOWLEDGE.md counters.json config.json status.json; do
+  if [ ! -f "$HV/$f" ]; then
+    echo "uninitialized: $HV/$f missing" >&2
+    exit 2
+  fi
+done
+
+HELPERS=(
+  hv-append hv-archive-old hv-backlog hv-complete hv-guard-clean
+  hv-knowledge-index hv-knowledge-query hv-merge hv-next-id hv-pr
+  hv-preflight hv-reconcile hv-refactor-age hv-review-scope hv-ship-body
+  hv-status-add hv-status-remove hv-summary hv-update-check
+)
+missing=()
+for h in "${HELPERS[@]}"; do
+  [ -x "$HV/bin/$h" ] || missing+=("$h")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  printf 'stale: missing helpers: %s\n' "${missing[*]}" >&2
+  exit 3
+fi
+
+exit 0

@@ -22,7 +22,11 @@ Capture the state living in the orchestrator's head — what you were about to d
 
 ## Step 1 — Preflight
 
-If `.hv/` doesn't exist, tell the user there's nothing to pause and stop.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, tell the user *"Nothing to pause — `/hv:init` the project first."* and stop. Don't auto-init: pause on an empty project has nothing to hand off. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Resolve the Branch
 

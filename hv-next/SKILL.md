@@ -8,9 +8,18 @@ user-invocable: true
 
 Review the project backlog, suggest what to tackle next, and execute it.
 
-## Step 1 — Read State
+## Step 1 — Preflight
 
-If `.hv/TODO.md` is missing, tell the user nothing is tracked yet and suggest `/hv:init` then `/hv:capture`. If `TODO.md` exists but `.hv/bin/hv-next-id` doesn't, run `/hv:init` to refresh helpers.
+```bash
+.hv/bin/hv-preflight
+```
+
+Branch on exit code:
+- `0` — continue.
+- `2` (uninitialized) or helper absent — tell the user *"Nothing tracked yet — run `/hv:init` then `/hv:capture`."* and stop.
+- `3` (partial install) — invoke `hv:init` via the `Skill` tool to refresh helpers, then continue.
+
+See GUIDE.md § Preflight for details.
 
 ## Step 2 — Reconcile Active Work
 

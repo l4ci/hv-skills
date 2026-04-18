@@ -22,7 +22,11 @@ Read-only reorientation. Surfaces active work, recent commits per branch, and ba
 
 ## Step 1 — Preflight
 
-If `.hv/bin/hv-reconcile` doesn't exist, tell the user nothing is tracked and suggest `/hv:init`. Don't auto-init here — resume on an unset project is meaningless.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, tell the user *"Nothing tracked — run `/hv:init` first."* and stop. Don't auto-init: resume on an empty project has nothing to reorient around. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Reconcile Active Work
 

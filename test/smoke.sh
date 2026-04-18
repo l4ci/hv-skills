@@ -412,4 +412,36 @@ echo "$OUT" | grep -q "Recent: \[B01\]" || fail "recent completion missing: $OUT
 echo "$OUT" | grep -q "Knowledge: 2 topics" || fail "knowledge topic count wrong: $OUT"
 pass "summary reports backlog/recent/knowledge correctly"
 
+echo "hv-preflight"
+# Ensure all core data files exist (smoke setup creates TODO.md/counters.json/status.json;
+# KNOWLEDGE.md got written by hv-knowledge-index; config.json is needed by preflight).
+[ -f .hv/config.json ] || echo '{}' > .hv/config.json
+
+# 1. Helpers not yet installed in .hv/bin → exit 3 (partial install).
+rc=0
+"$BIN/hv-preflight" 2>/dev/null || rc=$?
+[ "$rc" = "3" ] || fail "expected exit 3 (partial install), got $rc"
+pass "preflight exits 3 when helpers missing from .hv/bin"
+
+# 2. Install all helpers into .hv/bin, everything present → exit 0.
+mkdir -p .hv/bin
+cp "$BIN"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
+"$BIN/hv-preflight" >/dev/null 2>&1 || fail "preflight failed on fully initialized project"
+pass "preflight exits 0 when fully initialized"
+
+# 3. Missing core data file → exit 2 (uninitialized).
+mv .hv/TODO.md .hv/TODO.md.bak
+rc=0
+"$BIN/hv-preflight" 2>/dev/null || rc=$?
+[ "$rc" = "2" ] || fail "expected exit 2 (uninitialized), got $rc"
+pass "preflight exits 2 when a data file is missing"
+mv .hv/TODO.md.bak .hv/TODO.md
+
+# 4. Missing helper → exit 3 (stale install after plugin upgrade).
+rm .hv/bin/hv-summary
+rc=0
+"$BIN/hv-preflight" 2>/dev/null || rc=$?
+[ "$rc" = "3" ] || fail "expected exit 3 (missing helper), got $rc"
+pass "preflight exits 3 when a helper is missing"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

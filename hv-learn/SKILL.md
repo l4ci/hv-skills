@@ -8,9 +8,13 @@ user-invocable: true
 
 Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, organized by topic, so it's available to future work.
 
-## Step 1 — Ensure .hv/ Exists
+## Step 1 — Preflight
 
-If `.hv/KNOWLEDGE.md` is missing, invoke `/hv:init` first.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Scan the Session for Learnings
 

@@ -204,6 +204,7 @@ All helpers are installed together. They require `python3`:
 | `hv-ship-body` | Build a PR body (Summary + Items resolved) for a feature branch |
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, and matching TODO entries |
 | `hv-update-check` | JSON: install type, current/latest version, status, exact update command |
+| `hv-preflight` | Exit 0/2/3 — verifies `.hv/` is initialized and all helpers are present |
 
 ## Step 5 — Seed CLAUDE.md Knowledge Block
 

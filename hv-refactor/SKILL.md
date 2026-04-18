@@ -46,9 +46,13 @@ If `.hv/config.json` doesn't exist, default to `opus`/`sonnet` and `confirmBefor
 
 Every friction point gets classified into one of four categories — **in-process**, **local-substitutable**, **remote-but-owned (ports & adapters)**, or **true external (mock)**. The category drives the fix strategy. See `GUIDE.md` § Dependency Categories for the full reference.
 
-## Step 0 — Preflight & Guard
+## Step 1 — Preflight & Guard
 
-If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool, then continue. Then:
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:refactor"
@@ -56,7 +60,7 @@ If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool
 
 Non-zero exit = stop and surface the script's message. Do not proceed until clean.
 
-## Step 1 — Explore with Orchestrator
+## Step 2 — Explore with Orchestrator
 
 Dispatch an exploration agent using the configured **orchestrator** model. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent explores organically, reads files in full, follows seams, and reports every friction point with file name, line numbers, and why it matters.
 
@@ -82,7 +86,7 @@ local-substitutable, remote-but-owned, or true external).
 Be thorough — this is looking for things a first pass might miss.
 ```
 
-## Step 2 — Triage, Categorize & Classify
+## Step 3 — Triage, Categorize & Classify
 
 After the exploration agent returns, process each friction point:
 
@@ -95,7 +99,7 @@ After the exploration agent returns, process each friction point:
    - **Same file** → single agent handles all changes to that file
    - **Sequential dependency** (fix A must land before fix B can reference it) → note the order, run sequentially after the first batch
 
-## Step 3 — Present Candidates
+## Step 4 — Present Candidates
 
 Present a numbered list of all friction points. For each, show:
 
@@ -123,7 +127,7 @@ Plain-text fallback: *"Proceed with all, a subset, or none?"*
 
 If `confirmBeforeExecute` is `false`: present the list for visibility, then proceed immediately with all items.
 
-## Step 4 — Design Competing Approaches (Structural Only)
+## Step 5 — Design Competing Approaches (Structural Only)
 
 For each **structural** friction point, spawn 3+ sub-agents in parallel using the configured **orchestrator** model. Each agent gets the same technical brief (file paths, coupling details, dependency category, what's being hidden) but a different design constraint:
 
@@ -154,14 +158,14 @@ Plain-text fallback: *"Which approach for `<friction point>`? (design 1 / 2 / 3 
 
 If `confirmBeforeExecute` is `false`: use the recommended approach and proceed.
 
-**Simple** friction points skip this step entirely — they go straight to Step 5.
+**Simple** friction points skip this step entirely — they go straight to Step 6.
 
-## Step 5 — Fix with Parallel Worker Agents
+## Step 6 — Fix with Parallel Worker Agents
 
 Dispatch all independent fixes in parallel using the configured **worker** model. Each agent gets:
 - Exact files to read and modify
 - Precise description of the friction and the chosen approach
-- For structural changes: the selected interface design from Step 4
+- For structural changes: the selected interface design from Step 5
 - Dependency category and how deps should be handled
 - Constraint: read the file first, minimal diff, no unrelated changes
 - Return: short summary of what changed
@@ -173,7 +177,7 @@ For each agent brief:
 
 Don't announce the dispatch — just do it. After parallel batch completes, dispatch any sequential agents that depended on the first batch.
 
-## Step 6 — Verify with Orchestrator
+## Step 7 — Verify with Orchestrator
 
 Dispatch a single verification agent using the configured **orchestrator** model. For each fix, it reads the modified file and reports:
 - **PASS** — change is correct and complete
@@ -182,7 +186,7 @@ Dispatch a single verification agent using the configured **orchestrator** model
 
 The verification agent must read actual file content, not trust the fix summaries. Don't relay individual PASS verdicts to the user — only surface FAILs and CONCERNs.
 
-## Step 7 — Handle Failures
+## Step 8 — Handle Failures
 
 If any fix got **FAIL**:
 - Read the verification finding
@@ -194,7 +198,7 @@ If any fix got **CONCERN**:
 - Assess whether it blocks commit
 - Fix if blocking, note if informational — surface informational concerns briefly at the end, not inline during verification
 
-## Step 8 — Commit
+## Step 9 — Commit
 
 After all fixes pass verification, commit everything:
 
@@ -214,7 +218,7 @@ git commit -m "refactor: [N] architectural improvements
 
 If the project uses a build tool to regenerate project files (e.g. `xcodegen generate` for XcodeGen projects), run it before committing if any files were added or deleted.
 
-## Step 9 — Report to User
+## Step 10 — Report to User
 
 After commit, give one compact summary. Example:
 

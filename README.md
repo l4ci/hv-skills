@@ -47,7 +47,7 @@ claude plugin install hv-skills
 /hv:next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 18 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`. `/hv:init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
+First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 19 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`. `/hv:init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
 
 ## Skills
 
@@ -131,12 +131,12 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 ├── status.json       # active work streams
 ├── bugs/ features/ tasks/   # overflow detail files
 ├── handoff/          # /hv:pause notes, one per branch; /hv:resume consumes them
-└── bin/              # 18 CLI helpers (hv-next-id, hv-append, hv-complete,
+└── bin/              # 19 CLI helpers (hv-next-id, hv-append, hv-complete,
                       #  hv-guard-clean, hv-status-add, hv-status-remove,
                       #  hv-archive-old, hv-knowledge-index, hv-knowledge-query,
                       #  hv-reconcile, hv-backlog, hv-merge, hv-pr,
                       #  hv-refactor-age, hv-summary, hv-ship-body,
-                      #  hv-review-scope, hv-update-check)
+                      #  hv-review-scope, hv-update-check, hv-preflight)
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
@@ -166,7 +166,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 18 helpers across 34 assertions. Exits non-zero on any failure.
+Exercises all 19 helpers across 38 assertions. Exits non-zero on any failure.
 
 ## Contributing
 

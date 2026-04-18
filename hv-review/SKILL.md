@@ -28,7 +28,11 @@ Read `.hv/config.json`:
 
 ## Step 1 — Preflight
 
-If `.hv/bin/hv-review-scope` doesn't exist, invoke `hv:init`, then continue.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Scope the Review
 

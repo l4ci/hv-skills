@@ -36,7 +36,11 @@ Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → F
 
 ## Step 1 — Preflight & Guard
 
-If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init`, then continue.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:debug"

@@ -8,9 +8,13 @@ user-invocable: true
 
 Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
 
-## Step 1 — Ensure .hv/ Exists
+## Step 1 — Preflight
 
-Check if `.hv/bin/hv-next-id` exists. If not, run `/hv:init` first, then continue.
+```bash
+.hv/bin/hv-preflight
+```
+
+If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Parse & Classify
 

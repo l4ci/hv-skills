@@ -282,12 +282,25 @@ Knowledge quality compounds — a weak bullet consulted by 20 future `/hv:work` 
 | `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope hv/foo` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
+| `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 
 All helpers are refreshed every time `/hv:init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
 
 ### Why helpers matter
 
 Every skill step that would otherwise chain several tool calls (read file → compute → write file, or run several `git` queries and parse them) becomes one subprocess with structured output. This reduces context token consumption on each invocation and keeps the SKILL.md files focused on *what* to do rather than *how* to parse JSON or regex Markdown.
+
+## Preflight
+
+Every non-init skill runs `.hv/bin/hv-preflight` in its Step 1 to verify the project state before doing any work. The helper is deliberately small — it only checks that `.hv/` is initialized and all expected helpers are present — and exits with one of three codes:
+
+| Exit | Meaning | What the caller does |
+|------|---------|----------------------|
+| `0` | Fully initialized; all helpers present | Continue |
+| `2` | Uninitialized — `.hv/` or a core data file is missing | Skills that mutate state (`/hv:capture`, `/hv:work`, etc.) auto-invoke `hv:init` via the `Skill` tool; skills that only observe (`/hv:pause`, `/hv:resume`) tell the user to run `/hv:init` first and stop |
+| `3` | Partial install — data files are fine but one or more helpers are missing (typically after a plugin upgrade) | Re-invoke `hv:init` to refresh `.hv/bin/`; data files are preserved |
+
+If the helper itself is absent, the skill treats that as exit 2 — a fresh project has never installed hv-skills. Standardizing on this one helper means a partial install self-heals the same way from every skill, instead of each skill picking a different sentinel file and a different fallback behavior.
 
 ## Dependency Categories (used by /hv:refactor)
 
