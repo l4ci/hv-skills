@@ -147,7 +147,7 @@ Path(".hv/config.json").write_text(json.dumps({
 PY
 ```
 
-Briefly confirm the chosen profile in the Step 5 summary; users who picked all Recommended should just see *"Config: defaults."* — no itemization.
+Briefly confirm the chosen profile in the Step 6 summary; users who picked all Recommended should just see *"Config: defaults."* — no itemization.
 
 ## Step 4 — Install CLI Helpers
 

@@ -12,7 +12,7 @@ Turn the commits on the current feature branch into either a GitHub PR or a dire
 
 Read `.hv/config.json`:
 
-- `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the branch isn't managed by `/hv:work`)
+- `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv:review` before integrating; `false` skips the review
 
 ## When to Use
@@ -60,7 +60,7 @@ If enabled, invoke `hv:review` via the `Skill` tool for this branch. Pass throug
   - **Header:** `"Concerns"`
   - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
   - **Options** (single-select):
-    1. "Address first (Recommended)" — *"Route the concerns to `/hv:work` as a fix list; rerun `/hv:ship` after."*
+    1. "Address via `/hv:work` (Recommended)" — *"Route the concerns to `/hv:work` as a fix list; rerun `/hv:ship` after."*
     2. "Ship anyway" — *"Proceed with the merge or PR despite the concerns."*
     3. "Stop" — *"Leave the branch as-is; no integration now."*
   - Plain-text fallback: *"Address first, ship anyway, or stop?"*
@@ -165,4 +165,4 @@ If `/hv:review` surfaced concerns that the user proceeded through, append them o
 - **Read-only until Step 6.** Review, scoping, and body generation never mutate anything.
 - **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
 - **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
-- **`hv-complete` is idempotent-ish.** Running it on an already-completed ID is a no-op in practice — the helper looks for an active bullet and silently skips if none matches.
+- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `TODO.md` entirely produce an error (exit 1). No grep needed.

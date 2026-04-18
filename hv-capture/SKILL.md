@@ -33,7 +33,11 @@ The user will provide a keyword, short phrase, or longer description — possibl
 
 ## Step 3 — Gather Context
 
-For each item, gather **just enough context** to make it actionable later. Ask 2–4 quick questions total across all items — not per item. Pick from:
+For each item, gather **just enough context** to make it actionable later. Ask 2–4 quick questions total across all items — not per item.
+
+**Caller caps.** If the invoking args carry a speed-path signal from an upstream skill (e.g., a `(hv:go — cap clarification at 1-2 questions)` prefix), respect it — usually 1-2 questions max, often zero. `/hv:go` prioritizes speed over thoroughness; honoring the cap is what keeps that contract.
+
+Pick from:
 
 **For bugs:**
 - What's the expected vs. actual behavior? (if not obvious)
@@ -160,5 +164,6 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 - **Don't investigate now** — just capture
 - **Split mixed input** — route each item to the correct section with the correct ID type
 - **One set of questions for all items** — don't interrogate the user per-item
+- **Honor caller caps** — when invoked from a speed-path skill like `/hv:go`, respect the question cap signaled in the invoking args
 - **Confirm what you wrote** — show the user every entry you added, grouped by section
 - **Always increment counters** — even if you're unsure, every ID must be unique

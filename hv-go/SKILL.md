@@ -13,28 +13,28 @@ Route a freshly-described bug, feature, or task straight into implementation. Th
 ## Flow
 
 ```
-Init guard → Clean-tree guard → Capture → Hand off to /hv:work
+Init guard → Capture → Clean-tree guard → Hand off to /hv:work
 ```
 
 ## Step 1 — Ensure .hv/ Exists
 
 If `.hv/bin/hv-next-id` is missing, invoke `hv:init` via the `Skill` tool, then continue.
 
-## Step 2 — Guard: Clean Working Tree
+## Step 2 — Capture
+
+Invoke `hv:capture` via the `Skill` tool. Prefix the args passed to capture with `(hv:go — cap clarification at 1-2 questions)` so capture applies the speed-path question limit; then pass the user's input verbatim. `hv:capture` handles classification, ID assignment, detail files, and the `TODO.md` write.
+
+Capture runs before the clean-tree guard on purpose: `TODO.md` lives under gitignored `.hv/`, so capture never dirties the tree. If Step 3 then fails, the item is safely on the backlog and the user can run `/hv:work` after cleaning up instead of re-describing it.
+
+Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 4.
+
+## Step 3 — Guard: Clean Working Tree
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:go"
 ```
 
-Fail early — no point capturing if we can't execute. Non-zero exit = stop and surface the script's message.
-
-## Step 3 — Capture
-
-Invoke `hv:capture` via the `Skill` tool, passing the user's input verbatim. `hv:capture` handles classification, ID assignment, detail files, and the `TODO.md` write.
-
-**Keep clarifying questions tight.** Ask at most 1-2, and only if the item is too vague to implement. Anything more is better gathered by the worker during execution. If the input is clear, ask nothing.
-
-Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 4.
+Non-zero exit = stop and surface the script's message. Tell the user *"Captured `[ID] Title` — clean your working tree and run `/hv:work` to execute."* so they know the capture survived.
 
 ## Step 4 — Hand Off to /hv:work
 
@@ -49,6 +49,6 @@ Invoke `hv:work` via the `Skill` tool with a brief containing:
 ## Rules
 
 - **Capture is real.** IDs increment, entries land in `TODO.md`, detail files get written. Preserves audit trail.
-- **Guard first.** Clean-tree check runs before capture so we don't write orphan TODO entries we can't act on.
+- **Capture before guard.** Capture writes to gitignored `.hv/`, so it never dirties the tree — and the user never loses freshly-described input to a guard failure. If the guard then fails, the captured item waits on the backlog for a clean-tree rerun.
 - **Multiple items OK.** If the user mentioned 3 items, all get captured and all get passed to `/hv:work` as a batch.
 - **Delegate, don't duplicate.** Every capture rule lives in `/hv:capture`; every execution rule lives in `/hv:work`.
