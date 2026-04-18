@@ -20,10 +20,22 @@ if [ -n "$WT" ]; then
   git worktree remove "$WT"
 fi
 
-# Pick default base branch.
-MAIN=main
-if ! git rev-parse --verify main >/dev/null 2>&1; then
-  git rev-parse --verify master >/dev/null 2>&1 && MAIN=master
+# Determine the default branch.
+MAIN=""
+for candidate in main master trunk; do
+  if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
+    MAIN="$candidate"
+    break
+  fi
+done
+if [ -z "$MAIN" ]; then
+  # Fall back to the remote's HEAD symref (e.g., origin/HEAD → origin/develop).
+  REMOTE_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
+  [ -n "$REMOTE_HEAD" ] && MAIN="${REMOTE_HEAD#refs/remotes/origin/}"
+fi
+if [ -z "$MAIN" ]; then
+  echo "error: hv-merge could not determine the default branch (tried main, master, trunk, origin/HEAD)" >&2
+  exit 1
 fi
 
 git checkout -q "$MAIN"

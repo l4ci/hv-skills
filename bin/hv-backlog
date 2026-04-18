@@ -41,9 +41,12 @@ def parse_items(body):
         if not idm:
             continue
         item_id = idm.group(1)
+        # Strip the ID+tag prefix so title parsing works even when titles contain periods.
+        # Entry format: "- **[ID] [tag] Title.** Desc..." or "- **[ID] Title.** Desc..."
+        after_id = re.sub(r"^- \*\*\[[BFT]\d+\]\s*(?:\[(?:P[012]|Major|Minor|Cosmetic)\]\s*)?", "", line)
         tagm = re.search(r"\[(P[012]|Major|Minor|Cosmetic)\]", line)
         tag = tagm.group(1) if tagm else ""
-        titlem = re.search(r"\]\s+([^.]+?)\.\*\*", line)
+        titlem = re.match(r"(.+?)\.\*\*", after_id)
         title = titlem.group(1).strip() if titlem else "?"
         relm = re.search(r"Related:\s*([^\n]*?)(?:\s+Detail:|$)", line)
         related = relm.group(1).strip().rstrip(".") if relm else ""

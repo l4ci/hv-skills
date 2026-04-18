@@ -38,20 +38,18 @@ for line in section.splitlines():
             continue
     kept_lines.append(line)
 
-if not old_lines:
-    sys.exit(0)
+if old_lines:
+    # Rebuild TODO.md
+    new_section = "\n".join(kept_lines)
+    if not new_section.startswith("\n"):
+        new_section = "\n" + new_section
+    todo.write_text(content[:start] + new_section + content[end:])
 
-# Rebuild TODO.md
-new_section = "\n".join(kept_lines)
-if not new_section.startswith("\n"):
-    new_section = "\n" + new_section
-todo.write_text(content[:start] + new_section + content[end:])
-
-# Append to ARCHIVE.md
-archive = Path(".hv/ARCHIVE.md")
-header = "# Archive\n\nCompleted items older than the active window.\n\n"
-existing = archive.read_text() if archive.exists() else header
-archive.write_text(existing.rstrip() + "\n" + "\n".join(old_lines) + "\n")
+    # Append to ARCHIVE.md
+    archive = Path(".hv/ARCHIVE.md")
+    header = "# Archive\n\nCompleted items older than the active window.\n\n"
+    existing = archive.read_text() if archive.exists() else header
+    archive.write_text(existing.rstrip() + "\n" + "\n".join(old_lines) + "\n")
 
 print(len(old_lines))
 PY

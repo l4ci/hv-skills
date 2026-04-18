@@ -45,6 +45,12 @@ Each item gets a zero-padded auto-incrementing ID — `[B01]` for bugs, `[F01]` 
 
 Shortcut alias for `/hv:capture`. Identical behavior — useful when capturing is frequent and you want the keystroke savings.
 
+### /hv:status
+
+Read-only project state glance. Prints backlog counts (bugs/features/tasks), any active work streams, the three most recent completions, knowledge-topic count, and archive size — then stops. No reconciliation, no suggestions, no mutation.
+
+Use this to orient — *"where does the project stand?"* — before deciding whether to capture more items, pick work, or wrap up a session. Lighter than `/hv:next`, which does all of the above plus git reconciliation and a next-item recommendation.
+
 ### /hv:go
 
 Capture + execute in one pass. The item still gets written to `TODO.md` with a real ID (counters increment, detail files land where needed, history is preserved), but the normal `/hv:next` review round-trip is skipped — `/hv:go` hands directly off to `/hv:work` after capture completes.
@@ -187,6 +193,7 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 | `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge hv/foo` |
 | `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
+| `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 
 All helpers are refreshed every time `/hv:init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
 

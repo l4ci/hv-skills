@@ -134,6 +134,7 @@ All helpers are installed together. They require `python3`:
 | `hv-merge` | Remove worktree, merge `--no-ff`, delete branch (commit msg on stdin) |
 | `hv-pr` | Remove worktree, push, `gh pr create` (body on stdin) |
 | `hv-refactor-age` | JSON: non-refactor features/bugs completed since last `refactor:` commit |
+| `hv-summary` | Compact project state: backlog counts, active work, recent completions |
 
 ## Step 4 — Seed CLAUDE.md Knowledge Block
 

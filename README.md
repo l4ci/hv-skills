@@ -14,6 +14,7 @@ A lightweight project backlog and workflow system for Claude Code. Capture bugs,
 | `/hv:go` | Capture an item and immediately implement it — combines `/hv:capture` and `/hv:work` in one pass |
 | `/hv:learn` | Extract durable learnings from the current session into `.hv/KNOWLEDGE.md`, grouped by topic; updates the `CLAUDE.md` topic index. Opus verification is opt-in via `config.json` |
 | `/hv:next` | Review backlog, reconcile active work against git state, suggest what to work on, route to `/hv:work` |
+| `/hv:status` | Compact read-only state glance — counts, active work, recent completions, knowledge topics |
 | `/hv:work` | Orchestrated parallel implementation with per-task commits; consults `.hv/KNOWLEDGE.md` for relevant learnings |
 | `/hv:refactor` | Full architectural refactor cycle with parallel subagents |
 

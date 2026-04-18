@@ -1,12 +1,21 @@
 {
   "name": "hv-skills",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Lightweight project backlog and workflow skills for Claude Code",
   "author": {
     "name": "l4ci"
   },
   "license": "MIT",
   "repository": "https://github.com/l4ci/hv-skills",
+  "keywords": [
+    "backlog",
+    "todo",
+    "workflow",
+    "tasks",
+    "project-management",
+    "parallel-agents",
+    "knowledge-base"
+  ],
   "skills": [
     "./hv-init",
     "./hv-capture",
@@ -14,6 +23,7 @@
     "./hv-go",
     "./hv-learn",
     "./hv-next",
+    "./hv-status",
     "./hv-work",
     "./hv-refactor"
   ]

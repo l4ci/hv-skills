@@ -46,7 +46,9 @@ If `.hv/config.json` doesn't exist, default to `opus`/`sonnet` and `confirmBefor
 
 Every friction point gets classified into one of four categories — **in-process**, **local-substitutable**, **remote-but-owned (ports & adapters)**, or **true external (mock)**. The category drives the fix strategy. See `GUIDE.md` § Dependency Categories for the full reference.
 
-## Step 0 — Guard: Clean Working Tree
+## Step 0 — Preflight & Guard
+
+If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool, then continue. Then:
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:refactor"

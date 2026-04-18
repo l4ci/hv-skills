@@ -29,7 +29,9 @@ Read `.hv/config.json`:
 Guard → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge/PR → Status
 ```
 
-## Step 1 — Guard: Clean Working Tree
+## Step 1 — Preflight & Guard
+
+If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool, then continue. Then:
 
 ```bash
 .hv/bin/hv-guard-clean "/hv:work"
@@ -177,7 +179,15 @@ Commit: a1b2c3d
 
 Don't recap the plan, list verification results, or describe intermediate steps.
 
-## Step 12 — Refactor Nudge
+## Step 12 — Learn Nudge
+
+If the session produced non-trivial learning material — **2 or more items resolved**, or **≥5 files touched**, or a **hard bug** that took multiple debug cycles — suggest capturing it while it's fresh:
+
+*"Capture learnings from this session? Run `/hv:learn` to save durable knowledge before context fades."*
+
+One line, opt-in. Skip the nudge for single-item fixes or tasks that were pure mechanical changes. Don't repeat in the same session.
+
+## Step 13 — Refactor Nudge
 
 ```bash
 .hv/bin/hv-refactor-age
