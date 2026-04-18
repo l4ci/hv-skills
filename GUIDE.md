@@ -6,7 +6,7 @@ A detailed guide to the hv-skills workflow system for Claude Code.
 
 hv-skills is a lightweight project backlog and execution system. It lives entirely in a `.hv/` folder inside your project (gitignored) and uses Claude Code skills to capture work items, prioritize them, execute them with parallel subagents, and carry durable learnings forward.
 
-The workflow is: **capture → prioritize → execute → learn → refactor**.
+The workflow is: **capture → prioritize → execute → review → ship → learn → refactor**, with `/hv:resume` and `/hv:pause` for graceful session hand-offs, `/hv:debug` for bug investigation, and `/hv:update` for keeping the skills themselves current.
 
 ## The .hv/ Folder
 
@@ -79,6 +79,27 @@ Read-only project state glance. Prints backlog counts (bugs/features/tasks), any
 
 Use this to orient — *"where does the project stand?"* — before deciding whether to capture more items, pick work, or wrap up a session. Lighter than `/hv:next`, which does all of the above plus git reconciliation and a next-item recommendation.
 
+### /hv:resume
+
+Reorientation for a fresh session or a post-`/clear` context. Runs git reconciliation, enriches each active stream with its recent commit subjects, checks for a `/hv:pause` handoff note, then routes:
+
+- Handoff note present → `/hv:work` (or `/hv:debug`) with the note's "Next planned step" as the brief; note is deleted after consumption
+- A branch with commits that look complete → `/hv:ship`
+- A branch that's mid-implementation → `/hv:work`
+- No active streams → `/hv:next`
+
+Read-only for everything except the handoff-note delete that happens after the user picks that stream to resume. Lighter than `/hv:next` when you know something is already in flight; heavier than `/hv:status` because it pulls per-branch commit history and handoff notes.
+
+### /hv:pause
+
+Graceful mid-session stop. Captures what lives in the orchestrator's head — current hypothesis, next planned step, files mid-edit, gotchas discovered — into `.hv/handoff/<branch>.md`. Git commits carry code; the handoff note carries intent.
+
+**When to use**: context window is filling, you have to step away mid-`/hv:work` or mid-`/hv:debug`, or you want a long investigation to survive a `/clear`.
+
+**Flow**: resolve the active branch → handle uncommitted work (wip commit, stash, or leave dirty) → write the handoff note with structured sections (*Working on*, *What's done*, *Next planned step*, *Current hypothesis*, *Files mid-edit*, *Uncommitted work*, *Gotchas discovered*, *Do not*) → refresh the `status.json` entry. One note per branch; overwrites on re-pause.
+
+`/hv:resume` is the consumer — it surfaces the note's key fields inline and deletes it after routing to the downstream skill.
+
 ### /hv:work
 
 Executes a batch of work items with parallel subagents. The orchestrator (default: opus) plans the tasks, the workers (default: sonnet) implement them.
@@ -97,6 +118,41 @@ Executes a batch of work items with parallel subagents. The orchestrator (defaul
 
 **Status tracking**: registers in `status.json` at the start, removes the entry on completion. This lets `/hv:next` in another session see what's in progress and avoid suggesting the same items.
 
+### /hv:debug
+
+Systematic root-cause cycle for a single `[B##]`. Flow: read the TODO entry and any detail file → consult `KNOWLEDGE.md` on relevant topics → reproduce (run the bug's test or write a failing one) → hypothesize with the orchestrator model → verify the hypothesis before touching code → fix with the worker model → confirm the reproducer now passes → commit → mark complete.
+
+Uses the same isolation mode as `/hv:work` (`branch` or `worktree`) and inherits the same model configuration. The fix lands as a single atomic commit tagged `fix: ... [B##]` so `/hv:ship` can close the loop.
+
+If the root cause was non-obvious — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem — the skill nudges the user to run `/hv:learn` so the gotcha lands in `KNOWLEDGE.md`.
+
+Use it when a bug needs a real cycle. For a one-liner that's already obvious, `/hv:go` is lighter.
+
+### /hv:review
+
+Staff-engineer review of a feature branch before it leaves your machine. Read-only — no mutations, no commits.
+
+1. Scopes the branch via `hv-review-scope` (commits, touched files, referenced item IDs, matched TODO entries).
+2. Pulls relevant topics from `KNOWLEDGE.md`.
+3. Captures the diff per file.
+4. Dispatches an Opus reviewer that evaluates on three axes:
+   - **Intent match** — does the diff deliver what the TODO entries promised?
+   - **Convention compliance** — does it respect captured gotchas and project rules?
+   - **Obvious quality** — dead code, swallowed errors, untested new branches, security smells, contract breaks.
+5. Returns PASS / CONCERNS / FAIL with file:line evidence.
+
+Typically invoked from `/hv:ship` (controlled by `ship.review`, default `true`). Can be run standalone any time you want a second-opinion pass on a branch.
+
+### /hv:ship
+
+Finishes a feature branch. Flow: preflight → `hv-review-scope` → optional `/hv:review` (gated by `ship.review`) → build PR body via `hv-ship-body` → open PR (`hv-pr`) or direct merge (`hv-merge`) based on `work.mergeStrategy` → clear `status.json` → close any still-active `[ID]` entries referenced in commit messages.
+
+**PR body** is composed from commit subjects (`## Summary`), referenced IDs with titles pulled from `TODO.md` and `ARCHIVE.md` (`## Items resolved`), and a short test plan the skill generates from touched areas.
+
+**Review gate**: when `ship.review` is `true`, a FAIL verdict blocks integration until the user fixes and reruns. CONCERNS surface but the user can proceed. PASS flows straight through.
+
+Use this to integrate finished work. Don't use it mid-implementation — finish in `/hv:work` first.
+
 ### /hv:learn
 
 Distills durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. A learning is worth capturing if it would save a future `/hv:work` run from re-discovering it.
@@ -110,6 +166,14 @@ Entries are grouped by short topic headings (`Build & Tooling`, `Testing`, `Netw
 After writing, `/hv:learn` updates the managed `hv:knowledge` block in `CLAUDE.md` so its topic list matches the current `KNOWLEDGE.md` headings. `/hv:work` reads this index to know when the task at hand should consult `KNOWLEDGE.md`.
 
 **Verification (opt-in).** By default, the skill writes and reports. If `learn.verify` is set to `true` in `.hv/config.json`, it dispatches an Opus verifier subagent that reads the updated files with fresh eyes and judges whether the new entries are durable, sharp, non-obvious, correctly topic'd, and non-duplicated. Use this if you want a second-opinion pass before learnings become part of your project's long-term context.
+
+### /hv:update
+
+Read-only check for a newer hv-skills release. Detects install type (plugin, stow, repo clone, or override), reads the current version from `plugin.json`, fetches the latest GitHub release via `gh api`, and prints the exact update command for the detected install type.
+
+Never runs the update — too many install paths to get right automatically. Once the user updates, they rerun `/hv:init` in each project to refresh `.hv/bin/` with any new helpers.
+
+Requires `gh` on the PATH. Reports `status: unknown` if `gh` can't reach the API; don't retry on a loop.
 
 ### /hv:refactor
 
@@ -139,7 +203,10 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
     "confirmBeforeExecute": true
   },
   "learn": {
-    "verify": false
+    "verify": true
+  },
+  "ship": {
+    "review": true
   }
 }
 ```
@@ -168,10 +235,21 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 
 ### Learn verification
 
+Controls whether `/hv:learn` runs a second-opinion pass on what it just wrote. The verifier is a fresh Opus subagent — no session context, reads only the updated `KNOWLEDGE.md` diff — and judges each new bullet on four criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly topic'd, and non-duplicate. It can demote weak entries, sharpen vague wording, re-file wrong-topic bullets, or delete restatements of existing knowledge.
+
 | Value | Behavior |
 |-------|----------|
-| `false` (default) | `/hv:learn` writes entries and reports. Fast, cheap. |
-| `true` | After writing, dispatches an Opus verifier subagent for a cold review pass. Flags weak, duplicate, or wrong-topic entries. Adds cost and latency. |
+| `true` (default) | After writing, dispatches the verifier. Catches weak, duplicate, or wrong-topic entries before they accrete in `KNOWLEDGE.md`. Adds one Opus roundtrip per `/hv:learn` call. |
+| `false` | Skip the verifier. `/hv:learn` writes and reports. Fast, cheap. Use when you're iterating rapidly and the occasional weak entry is acceptable. |
+
+Knowledge quality compounds — a weak bullet consulted by 20 future `/hv:work` runs is worse than one extra Opus call now. The default favors quality; flip to `false` only when you're sure the noise doesn't matter.
+
+### Ship review
+
+| Value | Behavior |
+|-------|----------|
+| `true` (default) | `/hv:ship` runs `/hv:review` before integrating. FAIL blocks, CONCERNS ask, PASS flows through. |
+| `false` | `/hv:ship` integrates directly without a review pass. Use when you want raw speed and already reviewed manually. |
 
 ## CLI Helpers
 
@@ -194,6 +272,9 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 | `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
+| `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
+| `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope hv/foo` |
+| `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 
 All helpers are refreshed every time `/hv:init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
 

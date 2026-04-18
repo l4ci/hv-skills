@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Scope a review: list commits, touched files, referenced IDs, and the
+# original TODO entries those IDs point at. Emits JSON so /hv:review can
+# build its agent brief in one step.
+# Usage: hv-review-scope [branch]   # defaults to current branch
+set -euo pipefail
+BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+
+BASE=""
+for candidate in main master trunk; do
+  if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
+    BASE="$candidate"
+    break
+  fi
+done
+if [ -z "$BASE" ]; then
+  REMOTE_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
+  [ -n "$REMOTE_HEAD" ] && BASE="${REMOTE_HEAD#refs/remotes/origin/}"
+fi
+if [ -z "$BASE" ]; then
+  echo "error: could not determine base branch" >&2
+  exit 1
+fi
+
+if [ "$BRANCH" = "$BASE" ]; then
+  echo "error: cannot review base branch '$BASE' against itself" >&2
+  exit 1
+fi
+git rev-parse --verify "$BRANCH" >/dev/null 2>&1 || {
+  echo "error: branch '$BRANCH' not found" >&2
+  exit 1
+}
+
+export HV_BRANCH="$BRANCH" HV_BASE="$BASE"
+HV_LOG=$(git log --no-merges --format='%h%x1f%s' "$BASE..$BRANCH")
+HV_FILES=$(git diff --name-only "$BASE...$BRANCH")
+HV_BODIES=$(git log --no-merges --format='%B' "$BASE..$BRANCH")
+export HV_LOG HV_FILES HV_BODIES
+
+python3 - <<'PY'
+import json, os, re
+from pathlib import Path
+
+branch = os.environ["HV_BRANCH"]
+base = os.environ["HV_BASE"]
+log = [l for l in os.environ["HV_LOG"].splitlines() if l.strip()]
+files = sorted({l for l in os.environ["HV_FILES"].splitlines() if l.strip()})
+full = os.environ["HV_BODIES"]
+
+commits = []
+for line in log:
+    if "\x1f" in line:
+        h, s = line.split("\x1f", 1)
+        commits.append({"hash": h, "subject": s})
+
+id_re = re.compile(r"\[([BFT]\d{2,})\]")
+seen, ordered = set(), []
+for match in id_re.finditer(full):
+    iid = match.group(1)
+    if iid not in seen:
+        seen.add(iid)
+        ordered.append(iid)
+
+def read(p):
+    path = Path(p)
+    return path.read_text() if path.exists() else ""
+
+corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
+done_tail = re.compile(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$")
+
+def entry_for(iid):
+    pat = re.compile(rf"^(?:- )?.*\[{re.escape(iid)}\].*$", re.MULTILINE)
+    m = pat.search(corpus)
+    if not m:
+        return None
+    line = m.group(0).strip()
+    if line.startswith("- "):
+        line = line[2:]
+    line = done_tail.sub("", line)
+    strike = re.match(r"~~(.+?)~~$", line)
+    if strike:
+        line = strike.group(1)
+    title_m = re.search(
+        rf"\[{re.escape(iid)}\](?:\s+\[[^\]]+\])?\s+(?P<t>[^.\n]+)\.",
+        line,
+    )
+    title = title_m.group("t").strip() if title_m else None
+    return {"id": iid, "title": title, "entry": line}
+
+intents = [e for e in (entry_for(iid) for iid in ordered) if e]
+
+out = {
+    "branch": branch,
+    "base": base,
+    "commitCount": len(commits),
+    "commits": commits,
+    "touchedFiles": files,
+    "referencedIds": ordered,
+    "intents": intents,
+}
+print(json.dumps(out, indent=2))
+PY

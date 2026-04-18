@@ -28,8 +28,10 @@
 |  |  |
 |---|---|
 | **Auto-classified capture** — bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | **Parallel execution** — orchestrator plans, workers implement in parallel, one atomic commit per task |
-| **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | **Knowledge retention** — `/hv:learn` distills durable learnings; `/hv:work` consults them on relevant topics |
-| **Backlog reconciliation** — `/hv:next` validates `status.json` against git state, auto-cleans stale entries | **Refactor cycles** — `/hv:refactor` explores friction, designs competing approaches, fixes in parallel |
+| **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | **Knowledge retention** — `/hv:learn` distills durable learnings; `/hv:work`, `/hv:debug`, and `/hv:review` all consult them |
+| **Backlog reconciliation** — `/hv:next` validates `status.json` against git state, auto-cleans stale entries | **Systematic debugging** — `/hv:debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv:learn` |
+| **Review-gated shipping** — `/hv:ship` runs `/hv:review` against original intent + conventions before PR or merge | **Context-clear recovery** — `/hv:resume` re-reads active streams with recent commits and routes you back to work |
+| **Refactor cycles** — `/hv:refactor` explores friction, designs competing approaches, fixes in parallel | &nbsp; |
 
 ## Quick start
 
@@ -44,7 +46,7 @@ claude plugin install hv-skills
 /hv:next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 15 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`.
+First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 18 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`.
 
 ## Skills
 
@@ -56,9 +58,15 @@ First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 15 CLI
 | `/hv:go` | Capture an item and immediately implement it — combines `/hv:capture` + `/hv:work` in one pass |
 | `/hv:next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv:work` |
 | `/hv:status` | Compact read-only state glance — counts, active work, recent completions, knowledge topics |
+| `/hv:resume` | Reorient after `/clear` — active streams with recent commits and any handoff notes, routes to `/hv:work`, `/hv:ship`, or `/hv:next` |
+| `/hv:pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv:resume` |
 | `/hv:work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` for relevant topics |
-| `/hv:learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification opt-in |
+| `/hv:debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit, nudge `/hv:learn` |
+| `/hv:review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
+| `/hv:ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv:review` first by default |
+| `/hv:learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv:refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
+| `/hv:update` | Check for a newer hv-skills release on GitHub and print the exact update command for your install type |
 
 ## How it works
 
@@ -70,11 +78,26 @@ flowchart LR
   TODO --> NEXT["/hv:next"]
   NEXT --> WORK["/hv:work"]
   STATUS["/hv:status"] -.reads.-> TODO
+  WORK -.pause.-> PAUSE["/hv:pause"]
+  DEBUG -.pause.-> PAUSE
+  PAUSE --> HANDOFF[(.hv/handoff/)]
+  RESUME["/hv:resume"] -.reads.-> TODO
+  RESUME -.reads.-> HANDOFF
+  RESUME -.routes.-> WORK
+  RESUME -.routes.-> SHIP
   WORK --> COMMIT[(atomic commits)]
+  DEBUG["/hv:debug"] --> COMMIT
+  REFACTOR["/hv:refactor"] --> COMMIT
+  COMMIT -.review.-> REVIEW["/hv:review"]
+  REVIEW -.gate.-> SHIP["/hv:ship"]
+  SHIP --> PR[(PR / merge)]
   WORK --> LEARN["/hv:learn"]
+  DEBUG -.nudge.-> LEARN
   LEARN --> KNOW[(KNOWLEDGE.md)]
   KNOW -.consults.-> WORK
-  REFACTOR["/hv:refactor"] --> COMMIT
+  KNOW -.consults.-> DEBUG
+  KNOW -.consults.-> REVIEW
+  UPDATE["/hv:update"] -.checks.-> RELEASES[(GitHub releases)]
 ```
 
 Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth — `status.json` is just a cache, and `/hv:next` reconciles any drift.
@@ -88,11 +111,12 @@ Edit `.hv/config.json`:
   "models":   { "orchestrator": "opus",   "worker": "sonnet" },
   "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
   "refactor": { "confirmBeforeExecute": true },
-  "learn":    { "verify": false }
+  "learn":    { "verify": true },
+  "ship":     { "review": true }
 }
 ```
 
-Defaults favor fast iteration (branch isolation, direct merge, no verifier). See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
+Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on). See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
 
 ## Architecture
 
@@ -105,11 +129,13 @@ Defaults favor fast iteration (branch isolation, direct merge, no verifier). See
 ├── config.json       # models, isolation, merge, verify
 ├── status.json       # active work streams
 ├── bugs/ features/ tasks/   # overflow detail files
-└── bin/              # 15 CLI helpers (hv-next-id, hv-append, hv-complete,
+├── handoff/          # /hv:pause notes, one per branch; /hv:resume consumes them
+└── bin/              # 18 CLI helpers (hv-next-id, hv-append, hv-complete,
                       #  hv-guard-clean, hv-status-add, hv-status-remove,
                       #  hv-archive-old, hv-knowledge-index, hv-knowledge-query,
                       #  hv-reconcile, hv-backlog, hv-merge, hv-pr,
-                      #  hv-refactor-age, hv-summary)
+                      #  hv-refactor-age, hv-summary, hv-ship-body,
+                      #  hv-review-scope, hv-update-check)
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
@@ -139,7 +165,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 15 helpers across 26 assertions. Exits non-zero on any failure.
+Exercises all 18 helpers across 33 assertions. Exits non-zero on any failure.
 
 ## Contributing
 

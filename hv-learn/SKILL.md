@@ -1,6 +1,6 @@
 ---
 name: hv:learn
-description: Extract durable session learnings (gotchas, conventions, constraints) into .hv/KNOWLEDGE.md grouped by topic, and update the CLAUDE.md topic index. Opus verification is opt-in via learn.verify in config.json.
+description: Extract durable session learnings (gotchas, conventions, constraints) into .hv/KNOWLEDGE.md grouped by topic, and update the CLAUDE.md topic index. Opus verification is on by default via learn.verify in config.json; set to false for fast/cheap mode.
 user-invocable: true
 ---
 
@@ -39,7 +39,7 @@ Don't create a topic per learning.
 
 Skip approval prompts. Proceed to Step 5 (merge into `KNOWLEDGE.md`) and Step 6 (update `CLAUDE.md`).
 
-Verification is **opt-in**. Read `.hv/config.json` — if `learn.verify` is `true`, run Step 7. Otherwise skip to Step 8.
+Verification is **on by default**. Read `.hv/config.json` — if `learn.verify` is `true` (default) or unset, run Step 7. Set `learn.verify: false` to skip it.
 
 ## Step 5 — Merge into KNOWLEDGE.md
 
@@ -72,9 +72,9 @@ Use `Edit` for surgical updates, not `Write`.
 
 Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv:knowledge:start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv:work` reads this block to know when to consult `KNOWLEDGE.md`.
 
-## Step 7 — Opus Verification (opt-in)
+## Step 7 — Opus Verification (default)
 
-Only run if `learn.verify` is `true`. Follow the brief in `hv-learn/verifier.md` — it contains the dispatch instructions, the verifier prompt, and the verdict-application rules. Apply the verdict, then continue to Step 8.
+Run unless `learn.verify` is explicitly `false`. Follow the brief in `hv-learn/verifier.md` — it contains the dispatch instructions, the verifier prompt, and the verdict-application rules. Apply the verdict, then continue to Step 8.
 
 ## Step 8 — Confirm
 

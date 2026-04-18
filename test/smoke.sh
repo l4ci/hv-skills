@@ -264,6 +264,77 @@ COUNT=$("$BIN/hv-archive-old" 5)
 [ "$COUNT" = "0" ] || fail "expected '0' when nothing to archive, got '$COUNT'"
 pass "archive-old prints 0 when no items to move"
 
+echo "hv-ship-body"
+# Fresh branch state for ship-body + review-scope
+git checkout -q main 2>/dev/null || true
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B70] [P1] Ship demo bug.** Broken badge.~~ Done 2026-04-18 [`aaa1111`]
+- ~~**[F70] [Minor] Ship demo feature.** Overlay.~~ Done 2026-04-18 [`bbb2222`]
+EOF
+git add -A && git commit -q -m "seed ship demo" || true
+git checkout -q -b hv/ship-demo
+echo ship1 > ship1.txt && git add ship1.txt && git commit -q -m "fix: badge invalidation [B70]"
+echo ship2 > ship2.txt && git add ship2.txt && git commit -q -m "feat: overlay [F70]"
+git checkout -q main
+
+BODY=$("$BIN/hv-ship-body" hv/ship-demo)
+echo "$BODY" | grep -q "^## Summary" || fail "ship-body missing Summary section"
+echo "$BODY" | grep -q "^## Items resolved" || fail "ship-body missing Items resolved section"
+echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship-body missing B70 title"
+echo "$BODY" | grep -q "\[F70\] Ship demo feature" || fail "ship-body missing F70 title"
+pass "ship-body emits Summary + Items resolved with resolved titles"
+
+if "$BIN/hv-ship-body" main 2>/dev/null; then fail "ship-body should reject main (no commits vs base)"; fi
+pass "ship-body errors when base has no commits"
+
+echo "hv-review-scope"
+OUT=$("$BIN/hv-review-scope" hv/ship-demo)
+echo "$OUT" | grep -q '"commitCount": 2' || fail "review-scope commitCount != 2: $OUT"
+echo "$OUT" | grep -q '"B70"' || fail "review-scope missing B70"
+echo "$OUT" | grep -q '"F70"' || fail "review-scope missing F70"
+echo "$OUT" | grep -q '"title": "Ship demo bug"' || fail "review-scope missing B70 title"
+echo "$OUT" | grep -q '"ship1.txt"' || fail "review-scope missing touched file"
+pass "review-scope emits commits, IDs, titles, and files"
+
+if "$BIN/hv-review-scope" main 2>/dev/null; then fail "review-scope should reject base branch"; fi
+pass "review-scope rejects base branch"
+
+# Cleanup demo branch before later tests
+git branch -D hv/ship-demo >/dev/null 2>&1 || true
+rm -f ship1.txt ship2.txt
+
+echo "hv-update-check"
+# Seed a fake install with a plugin.json so detection has something to find.
+mkdir -p fake-install/.claude-plugin
+cat > fake-install/.claude-plugin/plugin.json <<'EOF'
+{"name":"hv-skills","version":"1.2.0"}
+EOF
+
+OUT=$(HV_INSTALL_ROOT="$TMP/fake-install" HV_LATEST_VERSION=1.3.0 "$BIN/hv-update-check")
+echo "$OUT" | grep -q '"currentVersion": "1.2.0"' || fail "update-check didn't read current version"
+echo "$OUT" | grep -q '"latestVersion": "1.3.0"' || fail "update-check didn't use override latest"
+echo "$OUT" | grep -q '"status": "behind"' || fail "update-check didn't mark behind"
+pass "update-check reports behind when current < latest"
+
+OUT=$(HV_INSTALL_ROOT="$TMP/fake-install" HV_LATEST_VERSION=1.2.0 "$BIN/hv-update-check")
+echo "$OUT" | grep -q '"status": "current"' || fail "update-check didn't mark current"
+pass "update-check reports current when equal"
+
+OUT=$(HV_INSTALL_ROOT="$TMP/fake-install" HV_LATEST_VERSION=1.1.0 "$BIN/hv-update-check")
+echo "$OUT" | grep -q '"status": "ahead"' || fail "update-check didn't mark ahead"
+pass "update-check reports ahead when current > latest"
+
+rm -rf fake-install
+
 echo "hv-summary"
 # Reset to a known state and check the summary lines
 rm -f .hv/ARCHIVE.md

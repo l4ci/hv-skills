@@ -67,7 +67,10 @@ EOF
     "confirmBeforeExecute": true
   },
   "learn": {
-    "verify": false
+    "verify": true
+  },
+  "ship": {
+    "review": true
   }
 }
 CONF
@@ -135,6 +138,9 @@ All helpers are installed together. They require `python3`:
 | `hv-pr` | Remove worktree, push, `gh pr create` (body on stdin) |
 | `hv-refactor-age` | JSON: non-refactor features/bugs completed since last `refactor:` commit |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions |
+| `hv-ship-body` | Build a PR body (Summary + Items resolved) for a feature branch |
+| `hv-review-scope` | JSON: commits, touched files, referenced IDs, and matching TODO entries |
+| `hv-update-check` | JSON: install type, current/latest version, status, exact update command |
 
 ## Step 4 — Seed CLAUDE.md Knowledge Block
 
@@ -160,4 +166,4 @@ Edit .hv/config.json for models, isolation, merge strategy, and verify flags.
 
 If `.hv/TODO.md` already existed, say it was already initialized and helper scripts were refreshed.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`. See `GUIDE.md` for full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`. See `GUIDE.md` for full reference.

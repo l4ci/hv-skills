@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Detect hv-skills install type + current version, compare against latest
+# GitHub release, and emit JSON for /hv:update. Network access via `gh`.
+#
+# Env overrides (for testing and airgapped use):
+#   HV_INSTALL_ROOT    — skip detection, use this path
+#   HV_LATEST_VERSION  — skip network, use this version string
+#
+# Usage: hv-update-check
+set -euo pipefail
+
+REPO="l4ci/hv-skills"
+
+resolve_root() {
+  if [ -n "${HV_INSTALL_ROOT:-}" ] && [ -d "$HV_INSTALL_ROOT" ]; then
+    echo "override|$HV_INSTALL_ROOT"
+    return
+  fi
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" ]; then
+    echo "plugin|$CLAUDE_PLUGIN_ROOT"
+    return
+  fi
+  for candidate in \
+    "$HOME"/.claude/plugins/*/hv-skills \
+    "$HOME"/.claude/plugins/hv-skills; do
+    if [ -f "$candidate/.claude-plugin/plugin.json" ]; then
+      echo "plugin|$candidate"
+      return
+    fi
+  done
+  for candidate in \
+    "$HOME"/.agents/skills/hv-skills \
+    "$HOME"/.agents/skills; do
+    if [ -f "$candidate/.claude-plugin/plugin.json" ]; then
+      echo "stow|$candidate"
+      return
+    fi
+  done
+  # Repo clone — walk up from this script.
+  SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+  for up in "$SELF_DIR" "$SELF_DIR/.." "$SELF_DIR/../.."; do
+    if [ -f "$up/.claude-plugin/plugin.json" ]; then
+      echo "repo|$(cd "$up" && pwd)"
+      return
+    fi
+  done
+  echo "unknown|"
+}
+
+read_version() {
+  local root="$1"
+  [ -z "$root" ] && { echo ""; return; }
+  local mf="$root/.claude-plugin/plugin.json"
+  [ -f "$mf" ] || { echo ""; return; }
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("version",""))' "$mf"
+}
+
+fetch_latest() {
+  if [ -n "${HV_LATEST_VERSION:-}" ]; then
+    echo "$HV_LATEST_VERSION"
+    return
+  fi
+  command -v gh >/dev/null 2>&1 || { echo ""; return; }
+  local tag
+  tag=$(gh api "repos/$REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
+  echo "${tag#v}"
+}
+
+IFS='|' read -r TYPE ROOT <<<"$(resolve_root)"
+CURRENT=$(read_version "$ROOT")
+LATEST=$(fetch_latest)
+
+export TYPE ROOT CURRENT LATEST
+
+python3 - <<'PY'
+import json, os, re
+
+def cmp_semver(a, b):
+    def parts(v):
+        return tuple(int(x) for x in re.findall(r"\d+", v)[:3]) or (0,)
+    pa, pb = parts(a), parts(b)
+    # Pad to length 3 for comparison.
+    pa = pa + (0,) * (3 - len(pa))
+    pb = pb + (0,) * (3 - len(pb))
+    return (pa > pb) - (pa < pb)
+
+t = os.environ.get("TYPE", "unknown")
+cur = os.environ.get("CURRENT", "")
+lat = os.environ.get("LATEST", "")
+root = os.environ.get("ROOT", "")
+
+if cur and lat:
+    c = cmp_semver(cur, lat)
+    status = "behind" if c < 0 else "ahead" if c > 0 else "current"
+else:
+    status = "unknown"
+
+commands = {
+    "plugin": "claude plugin update hv-skills",
+    "stow":   "cd ~/Code/hv-skills && git pull",
+    "repo":   f"cd {root} && git pull" if root else "git pull in your hv-skills clone",
+    "override": "manual — HV_INSTALL_ROOT was set",
+    "unknown":  "reinstall: claude plugin install hv-skills",
+}
+
+out = {
+    "installType": t,
+    "installRoot": root,
+    "currentVersion": cur,
+    "latestVersion": lat,
+    "status": status,
+    "updateCommand": commands.get(t, commands["unknown"]),
+}
+print(json.dumps(out, indent=2))
+PY
