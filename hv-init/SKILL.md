@@ -64,13 +64,46 @@ fi
 
 Data files are never overwritten if they already exist. `config.json` is created interactively in Step 3.
 
-## Step 3 — Configure (Interactive)
+## Step 3 — Configure (Interactive, with Upgrade Migration)
 
-If `.hv/config.json` already exists, skip this entire step — the user's prior config is the source of truth.
+Detect the current config state — fresh projects take the full interactive path; upgrading projects keep every prior value and are only prompted for keys added since their config was written:
 
-Otherwise, use the `AskUserQuestion` tool to gather the four most impactful choices in a single turn. The "(Recommended)" option on each is the existing default; selecting it (or "Other" with no alternative) writes the default value. The user can decline the whole thing with the native "skip" — if that happens, write all defaults and continue.
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
 
-Call `AskUserQuestion` with these four questions in one call:
+EXPECTED = [
+    ("models", "orchestrator"),
+    ("models", "worker"),
+    ("work", "isolation"),
+    ("work", "mergeStrategy"),
+    ("refactor", "confirmBeforeExecute"),
+    ("learn", "verify"),
+    ("ship", "review"),
+]
+p = Path(".hv/config.json")
+if not p.exists():
+    print("FRESH"); raise SystemExit
+try:
+    cfg = json.loads(p.read_text())
+    if not isinstance(cfg, dict): raise ValueError
+except Exception:
+    print("CORRUPT"); raise SystemExit
+missing = [f"{s}.{k}" for s, k in EXPECTED
+           if not isinstance(cfg.get(s), dict) or cfg.get(s, {}).get(k) is None]
+print("UP_TO_DATE" if not missing else "STALE:" + ",".join(missing))
+PY
+```
+
+Branch on the output:
+
+- `UP_TO_DATE` — existing config already matches the current schema. Skip the rest of this step.
+- `CORRUPT` — the file exists but isn't valid JSON. Tell the user to fix or delete `.hv/config.json`, then rerun `/hv:init`. Stop.
+- `FRESH` — no config yet. Ask all four questions below, then write the full config (FRESH write block).
+- `STALE:key1,key2,…` — upgrade path. Ask **only** the questions that map to the listed missing keys, then merge the answers into the existing file via the STALE write block — every value already in the file stays untouched.
+
+Call `AskUserQuestion` with just the applicable questions in one call. The "(Recommended)" option on each is the current default; selecting it (or "Other" with no alternative) writes the default value. The user can decline with the native "skip" — if that happens, write the Recommended defaults for the pending keys only.
 
 **Q1 — Models** (`header: "Models"`, single-select)
 
@@ -129,9 +162,11 @@ Map answers to config values:
 
 If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`); otherwise silently fall back to the Recommended value.
 
-Plain-text fallback: write the Recommended defaults straight through — don't stall the init on a missing tool. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool. (See GUIDE.md § Host Question Conventions.)
 
-Write the resolved config:
+### FRESH write block
+
+Write the full resolved config:
 
 ```bash
 python3 - <<PY
@@ -147,7 +182,28 @@ Path(".hv/config.json").write_text(json.dumps({
 PY
 ```
 
-Briefly confirm the chosen profile in the Step 6 summary; users who picked all Recommended should just see *"Config: defaults."* — no itemization.
+### STALE write block
+
+Read the existing file, merge only the keys the user answered (or Recommended defaults for any they skipped), preserve everything else:
+
+```bash
+python3 - <<PY
+import json
+from pathlib import Path
+p = Path(".hv/config.json")
+cfg = json.loads(p.read_text())
+
+# Example: user answered Q4 "Review before ship" → ship.review was missing.
+# Set only the keys from the STALE list; never overwrite existing values.
+cfg.setdefault("ship", {})["review"] = True   # or answered value
+
+p.write_text(json.dumps(cfg, indent=2) + "\n")
+PY
+```
+
+Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present.
+
+Briefly confirm the chosen profile in the Step 6 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
 ## Step 4 — Install CLI Helpers
 
@@ -207,6 +263,10 @@ Next: /hv:capture to add items, /hv:next to pick work, /hv:learn to save learnin
 Edit .hv/config.json to change any of these later.
 ```
 
-If `.hv/TODO.md` already existed, say it was already initialized and helper scripts were refreshed — skip the config line (nothing was asked).
+If `.hv/TODO.md` already existed, say it was already initialized and helper scripts were refreshed. Then:
+
+- **Config up-to-date** → drop the config line entirely; nothing was asked.
+- **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
+- **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
 Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`. See `GUIDE.md` for full reference.
