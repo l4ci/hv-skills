@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Push a branch and open a GitHub PR via gh. Cleans up any worktree first.
+# Reads PR body from stdin.
+# Usage: echo "body" | hv-pr <branch> <title>
+# Prints: the PR URL.
+set -euo pipefail
+BRANCH="${1:?usage: hv-pr <branch> <title>  (body on stdin)}"
+TITLE="${2:?usage: hv-pr <branch> <title>  (body on stdin)}"
+BODY=$(cat)
+if [ -z "$BODY" ]; then
+  echo "error: hv-pr expects PR body on stdin" >&2
+  exit 1
+fi
+
+WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
+  /^worktree / { wt=substr($0, 10) }
+  $0 == "branch " b { print wt; exit }
+')
+if [ -n "$WT" ]; then
+  git worktree remove "$WT"
+fi
+
+git push -u origin "$BRANCH"
+gh pr create --title "$TITLE" --body "$BODY"

@@ -147,4 +147,88 @@ echo "$OUTPUT" | grep -q '"branch": "hv/real-branch"' || fail "real branch not i
 echo "$OUTPUT" | grep -q '"hasCommits": true' || fail "hasCommits should be true"
 pass "reconcile reports real branch with commits"
 
+echo "hv-knowledge-query"
+cat > .hv/KNOWLEDGE.md <<'EOF'
+# Knowledge
+
+## Architecture
+- arch bullet one
+- arch bullet two
+
+## Testing
+- testing bullet
+
+## Networking
+- net bullet
+EOF
+OUT=$("$BIN/hv-knowledge-query" "Testing" "Networking")
+echo "$OUT" | grep -q "testing bullet" || fail "testing topic missing from query"
+echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
+echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
+pass "knowledge-query returns only requested topics"
+
+echo "hv-backlog"
+# Seed a mix of items in TODO.md
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B10] [P2] Minor glitch.** Desc.
+- **[B11] [P0] Crash on launch.** Desc. Related: [F20]
+
+## Features
+- **[F20] [Minor] Quick-switch.** Desc. Related: [B11]
+- **[F21] [Cosmetic] Tweak spacing.** Desc.
+
+## Tasks
+- **[T30] Update toolchain.** Desc.
+
+## Completed
+EOF
+OUT=$("$BIN/hv-backlog")
+LINE_P0=$(echo "$OUT" | grep -n "| B11 " | head -1 | cut -d: -f1)
+LINE_P2=$(echo "$OUT" | grep -n "| B10 " | head -1 | cut -d: -f1)
+[ "$LINE_P0" -lt "$LINE_P2" ] || fail "P0 not sorted before P2 (B11 at $LINE_P0, B10 at $LINE_P2)"
+LINE_COS=$(echo "$OUT" | grep -n "| F21 " | head -1 | cut -d: -f1)
+LINE_MIN=$(echo "$OUT" | grep -n "| F20 " | head -1 | cut -d: -f1)
+[ "$LINE_COS" -lt "$LINE_MIN" ] || fail "Cosmetic not sorted before Minor (F21 at $LINE_COS, F20 at $LINE_MIN)"
+pass "backlog sorts bugs by priority and features by size"
+
+# Active items should move to In Progress
+"$BIN/hv-status-add" hv/real-branch F20
+OUT=$("$BIN/hv-backlog")
+echo "$OUT" | grep -q "### In Progress" || fail "In Progress section missing"
+# F20 should no longer appear in ### Features section
+FEAT_BLOCK=$(echo "$OUT" | awk '/^### Features/,/^### Tasks/')
+echo "$FEAT_BLOCK" | grep -q "F20" && fail "active F20 leaked into Features table"
+pass "active items excluded from Features section"
+"$BIN/hv-status-remove" hv/real-branch
+
+echo "hv-refactor-age"
+# Seed two completed entries with real commits
+git checkout -q main
+echo "f1" > f1.txt && git add f1.txt && git commit -q -m "feat: add f1"
+HASH_F=$(git log -1 --format='%h')
+echo "b1" > b1.txt && git add b1.txt && git commit -q -m "fix: resolve b1"
+HASH_B=$(git log -1 --format='%h')
+echo "r1" > r1.txt && git add r1.txt && git commit -q -m "refactor: clean up"
+HASH_R=$(git log -1 --format='%h')
+cat >> .hv/TODO.md <<EOF
+- ~~**[F40] Feature done.**~~ Done 2026-04-18 [\`$HASH_F\`]
+- ~~**[B40] Bug fixed.**~~ Done 2026-04-18 [\`$HASH_B\`]
+- ~~**[F41] Refactor-driven feature.**~~ Done 2026-04-18 [\`$HASH_R\`]
+EOF
+OUT=$("$BIN/hv-refactor-age")
+echo "$OUT" | grep -q '"features": 1' || fail "expected 1 non-refactor feature, got: $OUT"
+echo "$OUT" | grep -q '"bugs": 1' || fail "expected 1 non-refactor bug, got: $OUT"
+pass "refactor-age excludes refactor: commits"
+
+echo "hv-merge / hv-pr"
+# Check syntactic integrity — they should error cleanly without stdin input
+if echo "" | "$BIN/hv-merge" hv/real-branch 2>/dev/null; then
+  fail "hv-merge should reject empty message"
+fi
+pass "hv-merge rejects empty message"
+# Don't actually run hv-pr — no remote
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

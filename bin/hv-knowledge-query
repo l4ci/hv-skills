@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Print specified topic sections from .hv/KNOWLEDGE.md (case-insensitive match).
+# Usage: hv-knowledge-query "Topic A" "Topic B" ...
+# Silent (exit 0) if KNOWLEDGE.md doesn't exist or no topics match.
+set -euo pipefail
+[ $# -ge 1 ] || { echo "usage: hv-knowledge-query <topic>..." >&2; exit 1; }
+python3 - "$@" <<'PY'
+import re, sys
+from pathlib import Path
+
+wanted = {t.strip().lower() for t in sys.argv[1:]}
+path = Path(".hv/KNOWLEDGE.md")
+if not path.exists():
+    sys.exit(0)
+content = path.read_text()
+
+# Split into (heading, body) pairs. Only ## Topic headings count.
+parts = re.split(r"^(## .+)$", content, flags=re.MULTILINE)
+# parts alternates: [preamble, heading1, body1, heading2, body2, ...]
+first = True
+for i in range(1, len(parts), 2):
+    heading = parts[i]
+    body = parts[i + 1] if i + 1 < len(parts) else ""
+    title = heading[3:].strip()
+    if title.lower() in wanted:
+        if not first:
+            print()
+        print(heading)
+        print(body.rstrip())
+        first = False
+PY

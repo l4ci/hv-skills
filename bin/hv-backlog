@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Render pre-sorted backlog tables from .hv/TODO.md, excluding items active in status.json.
+# Output: markdown — "In Progress" + "Bugs" (P0/P1/P2) + "Features" (Cosmetic/Minor/Major) + "Tasks".
+# Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
+# Usage: hv-backlog
+set -euo pipefail
+python3 - <<'PY'
+import json, re
+from pathlib import Path
+
+todo_path = Path(".hv/TODO.md")
+if not todo_path.exists():
+    print("No .hv/TODO.md yet. Run /hv:init then /hv:capture.")
+    raise SystemExit(0)
+content = todo_path.read_text()
+
+status_path = Path(".hv/status.json")
+active_entries, active_ids = [], set()
+if status_path.exists():
+    data = json.loads(status_path.read_text())
+    for entry in data.get("active", []):
+        active_entries.append(entry)
+        for i in entry.get("items", []):
+            active_ids.add(i)
+
+def section_body(name):
+    m = re.search(rf"^## {re.escape(name)}\s*$", content, re.MULTILINE)
+    if not m:
+        return ""
+    start = m.end()
+    nxt = re.search(r"^## ", content[start:], re.MULTILINE)
+    return content[start:start + nxt.start()] if nxt else content[start:]
+
+def parse_items(body):
+    items = []
+    for line in body.splitlines():
+        line = line.strip()
+        if not line.startswith("- **["):
+            continue
+        idm = re.match(r"- \*\*\[([BFT]\d+)\]", line)
+        if not idm:
+            continue
+        item_id = idm.group(1)
+        tagm = re.search(r"\[(P[012]|Major|Minor|Cosmetic)\]", line)
+        tag = tagm.group(1) if tagm else ""
+        titlem = re.search(r"\]\s+([^.]+?)\.\*\*", line)
+        title = titlem.group(1).strip() if titlem else "?"
+        relm = re.search(r"Related:\s*([^\n]*?)(?:\s+Detail:|$)", line)
+        related = relm.group(1).strip().rstrip(".") if relm else ""
+        items.append({"id": item_id, "tag": tag, "title": title, "related": related})
+    return items
+
+bugs = [i for i in parse_items(section_body("Bugs")) if i["id"] not in active_ids]
+features = [i for i in parse_items(section_body("Features")) if i["id"] not in active_ids]
+tasks = [i for i in parse_items(section_body("Tasks")) if i["id"] not in active_ids]
+
+prio = {"P0": 0, "P1": 1, "P2": 2, "": 3}
+size = {"Cosmetic": 0, "Minor": 1, "Major": 2, "": 3}
+bugs.sort(key=lambda x: prio.get(x["tag"], 3))
+features.sort(key=lambda x: size.get(x["tag"], 3))
+
+def title_of(item_id):
+    m = re.search(rf"\*\*\[{re.escape(item_id)}\][^*]*\*\*", content)
+    if not m:
+        return "?"
+    tm = re.search(r"\]\s+([^.]+?)\.", m.group(0))
+    return tm.group(1).strip() if tm else "?"
+
+out = []
+
+if active_entries:
+    out.append("### In Progress\n")
+    out.append("| ID | Title | Branch | Started |")
+    out.append("|----|-------|--------|---------|")
+    for e in active_entries:
+        branch = e.get("branch", "")
+        started = (e.get("startedAt") or "")[:10]
+        for iid in e.get("items", []):
+            out.append(f"| {iid} | {title_of(iid)} | {branch} | {started} |")
+    out.append("")
+
+if bugs:
+    out.append("### Bugs\n")
+    out.append("| ID | Prio | Title | Related |")
+    out.append("|----|------|-------|---------|")
+    for i in bugs:
+        out.append(f"| {i['id']} | {i['tag']} | {i['title']} | {i['related']} |")
+    out.append("")
+
+if features:
+    out.append("### Features\n")
+    out.append("| ID | Size | Title | Related |")
+    out.append("|----|------|-------|---------|")
+    for i in features:
+        out.append(f"| {i['id']} | {i['tag']} | {i['title']} | {i['related']} |")
+    out.append("")
+
+if tasks:
+    out.append("### Tasks\n")
+    out.append("| ID | Title | Related |")
+    out.append("|----|-------|---------|")
+    for i in tasks:
+        out.append(f"| {i['id']} | {i['title']} | {i['related']} |")
+    out.append("")
+
+if not (active_entries or bugs or features or tasks):
+    out.append("Backlog empty. Run /hv:capture to add items.")
+
+print("\n".join(out))
+PY

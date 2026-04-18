@@ -128,7 +128,12 @@ All helpers are installed together. They require `python3`:
 | `hv-status-remove` | Clear an active entry by branch name |
 | `hv-archive-old` | Move `## Completed` items >N days old to `ARCHIVE.md` |
 | `hv-knowledge-index` | Regenerate the managed `hv:knowledge` block in `CLAUDE.md` |
-| `hv-reconcile` | Validate `status.json` vs git state, auto-clean stale entries |
+| `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` |
+| `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries |
+| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) |
+| `hv-merge` | Remove worktree, merge `--no-ff`, delete branch (commit msg on stdin) |
+| `hv-pr` | Remove worktree, push, `gh pr create` (body on stdin) |
+| `hv-refactor-age` | JSON: non-refactor features/bugs completed since last `refactor:` commit |
 
 ## Step 4 — Seed CLAUDE.md Knowledge Block
 
@@ -144,35 +149,14 @@ The helper never touches any other content in `CLAUDE.md`.
 
 ## Step 5 — Confirm
 
-Tell the user:
+Tell the user one compact block:
 
 ```
-Initialized .hv/ backlog:
-  .hv/TODO.md         — bugs, features, tasks
-  .hv/KNOWLEDGE.md    — durable learnings, grouped by topic
-  .hv/counters.json   — auto-increment IDs
-  .hv/config.json     — model, isolation, and merge settings
-  .hv/status.json     — active work stream tracking
-  .hv/bin/             — CLI helpers (hv-next-id, hv-append, hv-complete)
-  .hv/bugs/            — overflow detail files for bug reports
-  .hv/features/        — overflow detail files for feature specs
-  .hv/tasks/           — overflow detail files for task descriptions
-  CLAUDE.md            — managed knowledge-index block added
-  .gitignore           — .hv/ excluded
-
-Use /hv:capture to add bugs, features, or tasks.
-Use /hv:learn to capture durable learnings at the end of a session.
-Use /hv:next to see what to work on.
-Edit .hv/config.json to change models, isolation, or merge strategy.
+Initialized .hv/ in <project>.
+Next: /hv:capture to add items, /hv:next to pick work, /hv:learn to save learnings.
+Edit .hv/config.json for models, isolation, merge strategy, and verify flags.
 ```
 
-If `.hv/TODO.md` already existed, tell the user it was already initialized and that helper scripts were refreshed.
+If `.hv/TODO.md` already existed, say it was already initialized and helper scripts were refreshed.
 
-## Config Reference
-
-- `models.orchestrator` — model for planning, exploration, design, and verification (`"opus"`, `"sonnet"`, `"haiku"`)
-- `models.worker` — model for implementation subagents
-- `work.isolation` — `"branch"` (default) or `"worktree"` (isolated directory under `.claude/worktrees/`)
-- `work.mergeStrategy` — `"direct"` (default, merge to main) or `"pr"` (push and create GitHub PR)
-- `refactor.confirmBeforeExecute` — `true` (default, pause for approval) or `false` (full autonomy)
-- `learn.verify` — `false` (default, trust the writer) or `true` (dispatch an Opus verifier subagent to review new entries)
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`. See `GUIDE.md` for full reference.

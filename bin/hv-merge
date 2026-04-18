@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Merge a feature branch into main/master. Cleans up any worktree first, then merges --no-ff and deletes the branch.
+# Reads the merge commit message from stdin.
+# Usage: echo "merge message" | hv-merge <branch>
+# Prints: the merge commit's short hash.
+set -euo pipefail
+BRANCH="${1:?usage: hv-merge <branch>  (merge message on stdin)}"
+MSG=$(cat)
+if [ -z "$MSG" ]; then
+  echo "error: hv-merge expects merge message on stdin" >&2
+  exit 1
+fi
+
+# Resolve a worktree for this branch, if one exists, and remove it.
+WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
+  /^worktree / { wt=substr($0, 10) }
+  $0 == "branch " b { print wt; exit }
+')
+if [ -n "$WT" ]; then
+  git worktree remove "$WT"
+fi
+
+# Pick default base branch.
+MAIN=main
+if ! git rev-parse --verify main >/dev/null 2>&1; then
+  git rev-parse --verify master >/dev/null 2>&1 && MAIN=master
+fi
+
+git checkout -q "$MAIN"
+git merge --no-ff "$BRANCH" -m "$MSG"
+git branch -d "$BRANCH"
+git log -1 --format='%h'

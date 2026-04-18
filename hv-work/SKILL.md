@@ -1,6 +1,6 @@
 ---
 name: hv:work
-description: Use when the user has described a task, feature, or set of improvements to implement — orchestrator plans, parallel worker subagents execute each piece, orchestrator verifies, and atomic commits are created per task. Supports branch or worktree isolation and direct merge or PR. Trigger on "implement this", "build these", "do this work", or any multi-step implementation request.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, and commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Trigger on "implement this", "build these", or any multi-step implementation request.
 user-invocable: true
 ---
 
@@ -10,32 +10,17 @@ Orchestrator-driven parallel implementation with per-task verification and commi
 
 ## Configuration
 
-Before starting, read `.hv/config.json` if it exists. It contains:
+Read `.hv/config.json`:
 
-```json
-{
-  "models": {
-    "orchestrator": "opus",
-    "worker": "sonnet"
-  },
-  "work": {
-    "isolation": "branch",
-    "mergeStrategy": "direct"
-  }
-}
-```
-
-- `models.orchestrator` — model for planning and verification (Agent `model` parameter)
-- `models.worker` — model for implementation subagents (Agent `model` parameter)
+- `models.orchestrator` — model for planning and verification (default `opus`)
+- `models.worker` — model for implementation subagents (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
-
-If `.hv/config.json` doesn't exist, default to `opus`/`sonnet`, `branch` isolation, `direct` merge.
 
 ## When to Use
 
 - User describes a task, feature, or list of improvements
-- Conversation context contains enough spec to act on
+- Conversation has enough spec to act on
 - Work is decomposable into 2+ independent pieces
 
 ## Flow
@@ -50,63 +35,62 @@ Guard → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge
 .hv/bin/hv-guard-clean "/hv:work"
 ```
 
-Non-zero exit = stop and surface the script's message to the user. Do not proceed until the working tree is clean.
+Non-zero exit = stop and surface the script's message.
 
 ## Step 2 — Register in Status
 
-After picking the branch name, register the work so `/hv:next` in another session can see it:
+After picking the branch name:
 
 ```bash
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] [worktree-path]
 ```
 
-The helper writes the entry with a UTC `startedAt` stamp. It's idempotent on branch name — call it a second time with the worktree path once Step 4 creates the worktree.
+Idempotent on branch name — call again with the worktree path once Step 4 creates it.
 
 ## Step 3 — Plan Tasks
 
-From the conversation context (user request, prior analysis, existing code):
+From the conversation context:
 
-1. **Consult project knowledge.** If `.hv/KNOWLEDGE.md` exists, scan its topic headings (also mirrored in the `hv:knowledge` block of `CLAUDE.md`). For every topic that plausibly touches the planned work, read that section. Carry relevant learnings — gotchas, conventions, constraints — into the task briefs so workers don't re-discover them. If nothing looks relevant, skip silently.
-2. Identify all discrete tasks to implement
-3. For each task, determine: files to create/modify, what changes, acceptance criteria
-4. Group into dependency waves:
-   - **Wave 1:** All tasks that touch independent files (run in parallel)
-   - **Wave 2+:** Tasks that depend on wave 1 outputs (sequential or next parallel batch)
+1. **Consult project knowledge.** Read the `hv:knowledge` block in `CLAUDE.md` for the current topic list. For topics that plausibly touch the planned work, pull just those sections:
+
+   ```bash
+   .hv/bin/hv-knowledge-query "Architecture" "Testing"
+   ```
+
+   Carry the relevant gotchas/conventions into the task briefs (Step 5) under a `**Known gotchas:**` block — only the bullets that apply, not the whole file. Skip silently if nothing looks relevant.
+
+2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
+3. Group into dependency waves:
+   - **Wave 1:** independent files → parallel
+   - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
 
 ## Step 4 — Create Branch or Worktree
 
-Choose a descriptive name based on the work (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
+Choose a descriptive name (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
 
-**If `isolation` is `"branch"`:**
+**Branch isolation:**
 
 ```bash
 git checkout -b <branch-name>
 ```
 
-Sub-agents work in the current directory.
-
-**If `isolation` is `"worktree"`:**
+**Worktree isolation:**
 
 ```bash
 git branch <branch-name>
 git worktree add .claude/worktrees/<branch-name> <branch-name>
-```
-
-Update the worktree path in `status.json` by re-calling the helper:
-
-```bash
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] .claude/worktrees/<branch-name>
 ```
 
-The **orchestrator stays in the main worktree** and retains access to `.hv/`. Sub-agents receive the absolute worktree path in their briefs and work there. All git operations in agent briefs use the worktree path.
+Orchestrator stays in the main worktree (retains `.hv/` access). Workers get the absolute worktree path in their briefs and work there.
 
 ## Step 5 — Dispatch Parallel Worker Agents
 
-For each independent task, dispatch a subagent using the configured **worker** model with:
+For each independent task, dispatch a subagent with the **worker** model:
 
 ```
 You are implementing Task N of [total].
-[WORKTREE: if worktree isolation, include "Working directory: <absolute-worktree-path>. cd there before any file operations."]
+[WORKTREE: "Working directory: <absolute-worktree-path>. cd there before any file operations."]
 
 **Goal:** [one sentence]
 
@@ -117,118 +101,70 @@ You are implementing Task N of [total].
 **What to do:**
 [Precise instructions — what to read, what to change, exact code where possible]
 
+**Known gotchas:**
+[Relevant bullets from hv-knowledge-query output]
+
 **Critical constraints:**
-[Behavior preservation rules, patterns to follow, things NOT to touch]
+[Behavior preservation, patterns to follow, things NOT to touch]
 
 **Commit with message:**
 [exact commit message to use]
 ```
 
-**Rules for agent briefs:**
-- Include enough context that the agent can work without asking questions
-- Specify exact file paths and relevant line numbers
-- Show the code pattern to follow (from existing codebase)
-- **Inline relevant learnings from `.hv/KNOWLEDGE.md`** under a short `**Known gotchas:**` section in the brief — only the bullets that apply to this task, not the whole file
-- Name the commit message — agents commit their own work
-- Constraint: read files first, minimal diff, no unrelated changes
-- If worktree isolation: always include the absolute worktree path and instruct the agent to work there
+Rules for briefs: exact paths + line numbers; show the pattern to follow; name the commit message (agents commit themselves); read-first, minimal-diff, no unrelated changes.
 
-Launch all independent agents in a single message (parallel tool calls). Don't announce the dispatch — just do it.
+Launch all independent agents in one message (parallel tool calls). Don't announce — just do it.
 
 ## Step 6 — Verify Each Completion
 
-As each agent completes, the orchestrator verifies internally (don't narrate the checks to the user):
+Orchestrator verifies internally (don't narrate):
 
-1. **Check the commit exists:** `git log --oneline -1` (in the worktree if applicable)
-2. **Read the modified files** — confirm changes match the brief
-3. **Structural verification:** grep for expected patterns, count functions, check no regressions
+1. Commit exists: `git log --oneline -1`
+2. Read modified files — changes match the brief
+3. Structural checks: grep for expected patterns, no regressions
 
-Verdicts:
-- **PASS** — move on silently
-- **FAIL** — dispatch a fix agent with the specific issue, then re-verify. Mention failures to the user only if they persist after the retry.
+**PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
 ## Step 7 — Sequential Waves
 
-If tasks have dependencies (shared files, one task's output feeds another):
-
-1. Wait for wave 1 to complete and verify
-2. Dispatch wave 2 agents with updated context (they can read wave 1's committed code)
-3. Verify wave 2 the same way
+For dependent tasks: wait for wave 1 to complete and verify, then dispatch wave 2 with updated context. Same verification.
 
 ## Step 8 — Update TODO.md
 
-After all tasks pass verification, mark each resolved item as completed using the helper:
-
 ```bash
-.hv/bin/hv-complete B01 a1b2c3d
-.hv/bin/hv-complete F03 f4e5d6c
+.hv/bin/hv-complete <ID> <commit-hash>
 ```
 
-This moves the entry to `## Completed` with strikethrough and metadata. The second argument is the commit hash (defaults to `git log -1 --format='%h'` if omitted).
-
-**Matching rules:**
-- Match by keyword overlap between the task description and TODO entry titles
-- If unsure whether a TODO item was addressed, leave it in place — don't move items you didn't work on
+Run per resolved item. Match by keyword overlap between task description and TODO entry title. If unsure whether an item was addressed, leave it — don't move items you didn't work on.
 
 ## Step 9 — Merge or PR
 
-**If `mergeStrategy` is `"direct"`:**
+**Direct merge:**
 
 ```bash
-# 1. Remove the worktree (only if worktree isolation was used)
-#    Must happen before branch delete — git won't delete a branch checked out in a worktree
-git worktree remove .claude/worktrees/<branch-name>
-
-# 2. Merge and clean up
-git checkout main
-git merge <branch> --no-ff -m "merge: <summary of all work>
-
-- task 1 description
-- task 2 description
-..."
-git branch -d <branch>
+printf 'merge: <summary>\n\n- task 1 description\n- task 2 description\n' | .hv/bin/hv-merge <branch>
 ```
 
-Skip the `worktree remove` step if branch isolation was used (no worktree exists).
+The helper removes any worktree for the branch, checks out main, merges `--no-ff` with the piped message, deletes the branch, and prints the merge commit's short hash.
 
-**If `mergeStrategy` is `"pr"`:**
+**PR:**
 
 ```bash
-# Remove the worktree but keep the branch (only if worktree isolation was used)
-git worktree remove .claude/worktrees/<branch-name>
-
-git push -u origin <branch>
-gh pr create --title "<short summary>" --body "$(cat <<'EOF'
-## Summary
-- item 1 description
-- item 2 description
-
-## Items resolved
-- [B01] Title
-- [F03] Title
-
-## Test plan
-- [ ] Verify each item's acceptance criteria
-- [ ] Check for regressions
-EOF
-)"
+printf '## Summary\n- item 1\n- item 2\n\n## Items resolved\n- [B01] Title\n- [F03] Title\n\n## Test plan\n- [ ] ...\n' \
+  | .hv/bin/hv-pr <branch> "<short title>"
 ```
 
-Share the PR URL with the user.
+The helper removes any worktree, pushes the branch with `-u`, and runs `gh pr create`. Share the PR URL with the user.
 
 ## Step 10 — Update Status
-
-Clear the work session:
 
 ```bash
 .hv/bin/hv-status-remove <branch>
 ```
 
-This marks the work as complete so `/hv:next` no longer shows these items as in-progress.
-
 ## Step 11 — Report to User
 
-After merge/PR, give one compact summary. Example:
+One compact summary:
 
 ```
 Done — merged `hv/fix-timer-badge` into main.
@@ -239,28 +175,24 @@ Done — merged `hv/fix-timer-badge` into main.
 Commit: a1b2c3d
 ```
 
-That's it. Don't recap the plan, don't list verification results, don't describe intermediate steps. The user can read the diff if they want details.
+Don't recap the plan, list verification results, or describe intermediate steps.
 
 ## Step 12 — Refactor Nudge
 
-After completing all work, count the entries in `## Completed` and `ARCHIVE.md` (if it exists) that don't have a `refactor:` commit prefix — i.e., items completed by `/hv:work`, not by `/hv:refactor`. Count features (`[F*]`) and bugs (`[B*]`) separately.
+```bash
+.hv/bin/hv-refactor-age
+```
 
-If **5 or more features** or **10 or more bugs** have been completed since the last refactor, tell the user:
+Returns JSON: `{"features": N, "bugs": M}` — count of items completed since the last `refactor:` commit. If `features >= 5` or `bugs >= 10`, tell the user:
 
-*"You've shipped [N] features / [N] bug fixes since the last refactor. Might be a good time to run `/hv:refactor` to clean up accumulated friction."*
+*"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv:refactor` to clean up accumulated friction."*
 
-This is a suggestion, not a blocker. Don't repeat it if the user has already been nudged in this session.
+Suggestion, not a blocker. Don't repeat in the same session.
 
 ## Key Principles
 
-- **No noise.** Don't narrate steps that produced no output or found nothing. Don't echo back what you're about to do before doing it. Report results, not process.
-- **Orchestrator plans and verifies, worker executes.** Models are configured in `.hv/config.json` (default: opus/sonnet). Never dispatch work without a clear brief. Never trust completion without reading the result.
-- **Orchestrator owns `.hv/` state.** Only the orchestrator reads and writes `.hv/status.json` and `.hv/TODO.md`. Sub-agents never touch these files — they focus on implementation.
-- **Clean base.** Never start work on a dirty working tree. Guard against it.
-- **One commit per task.** Each agent commits its own atomic change. This gives clean git history and easy revert granularity.
-- **Parallel by default.** Independent tasks always run in parallel. Sequential only when there's a real file conflict or data dependency.
-- **Agents commit themselves.** Include the commit message in the brief. The orchestrator doesn't batch-commit — each task is self-contained.
-- **Isolation protects main.** Branch or worktree — work never happens directly on main.
-- **Read before edit.** Every agent brief must instruct reading target files first.
-- **Fail fast.** If an agent's work fails verification, fix it before moving to dependent tasks.
-- **Track completions.** Always update TODO.md and status.json when items are resolved.
+- **No noise.** Report results, not process. Don't narrate steps that produced nothing.
+- **Orchestrator plans and verifies; worker executes.** Never dispatch without a clear brief. Never trust completion without reading the result.
+- **Orchestrator owns `.hv/` state.** Only the orchestrator touches `status.json` and `TODO.md`. Workers focus on implementation.
+- **Isolation protects main.** Branch or worktree — never work directly on main.
+- **One commit per task.** Clean history, easy revert granularity.

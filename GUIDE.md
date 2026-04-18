@@ -181,13 +181,38 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
 | `hv-status-remove` | Clear an active entry by branch | `.hv/bin/hv-status-remove hv/foo` |
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-knowledge-index` | Regenerate the managed `hv:knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
+| `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
 | `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON | `.hv/bin/hv-reconcile` |
+| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
+| `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge hv/foo` |
+| `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
+| `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
 
 All helpers are refreshed every time `/hv:init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
 
 ### Why helpers matter
 
 Every skill step that would otherwise chain several tool calls (read file → compute → write file, or run several `git` queries and parse them) becomes one subprocess with structured output. This reduces context token consumption on each invocation and keeps the SKILL.md files focused on *what* to do rather than *how* to parse JSON or regex Markdown.
+
+## Dependency Categories (used by /hv:refactor)
+
+When assessing each friction point, `/hv:refactor` classifies its dependencies into one of four categories. The classification drives the fix strategy.
+
+### 1. In-process
+
+Pure computation, in-memory state, no I/O. Always fixable — merge the modules and test directly.
+
+### 2. Local-substitutable
+
+Dependencies that have local test stand-ins (e.g., PGLite for Postgres, in-memory filesystem). Fixable if the test substitute exists. The deepened module is tested with the local stand-in running in the test suite.
+
+### 3. Remote but owned (Ports & Adapters)
+
+Your own services across a network boundary (microservices, internal APIs). Define a port (interface) at the module boundary. The deep module owns the logic; the transport is injected. Tests use an in-memory adapter, production uses the real HTTP/gRPC/queue adapter.
+
+### 4. True external (Mock)
+
+Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the boundary. The module takes the external dependency as an injected port; tests provide a mock implementation.
 
 ### Resolving the source bin/
 

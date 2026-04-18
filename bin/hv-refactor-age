@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Count features/bugs completed since the last refactor pass.
+# Walks entries in .hv/TODO.md ## Completed and .hv/ARCHIVE.md, looks up each
+# entry's commit hash, and counts those whose commit message does NOT start
+# with "refactor:".
+# Usage: hv-refactor-age
+# Prints JSON: {"features": N, "bugs": M}
+set -euo pipefail
+python3 - <<'PY'
+import json, re, subprocess
+from pathlib import Path
+
+def is_refactor(h):
+    r = subprocess.run(["git", "log", "-1", "--format=%s", h],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and r.stdout.startswith("refactor:")
+
+def completed_body(path):
+    if not path.exists():
+        return ""
+    content = path.read_text()
+    if path.name == "TODO.md":
+        m = re.search(r"^## Completed\s*$", content, re.MULTILINE)
+        if not m:
+            return ""
+        start = m.end()
+        nxt = re.search(r"^## ", content[start:], re.MULTILINE)
+        return content[start:start + nxt.start()] if nxt else content[start:]
+    return content
+
+line_re = re.compile(r"\[([BF])\d+\].*?\[`([0-9a-f]+)`\]")
+f = b = 0
+for path in (Path(".hv/TODO.md"), Path(".hv/ARCHIVE.md")):
+    for line in completed_body(path).splitlines():
+        m = line_re.search(line)
+        if not m:
+            continue
+        kind, h = m.group(1), m.group(2)
+        if is_refactor(h):
+            continue
+        if kind == "F":
+            f += 1
+        else:
+            b += 1
+
+print(json.dumps({"features": f, "bugs": b}))
+PY
