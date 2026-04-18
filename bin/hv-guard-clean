@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Exit 0 if git working tree is clean, 1 if dirty, 2 if not a git repo.
+# Usage: hv-guard-clean [context]   # context is printed in the warning
+set -euo pipefail
+CTX="${1:-this command}"
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "error: not a git repository — $CTX requires git" >&2
+  exit 2
+fi
+if [ -n "$(git status --porcelain)" ]; then
+  echo "error: uncommitted changes — stash (\`git stash\`) or commit before running $CTX" >&2
+  exit 1
+fi

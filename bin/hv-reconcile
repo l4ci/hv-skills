@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Validate .hv/status.json against git state. Auto-remove stale entries (branch gone).
+# Emit JSON: { "cleaned": [...], "needsAction": [...] } so the agent can present clearly.
+# Usage: hv-reconcile
+set -euo pipefail
+python3 - <<'PY'
+import json, subprocess, os, sys
+from pathlib import Path
+
+path = Path(".hv/status.json")
+if not path.exists():
+    print(json.dumps({"cleaned": [], "needsAction": []}))
+    sys.exit(0)
+
+data = json.loads(path.read_text())
+active = data.get("active", [])
+
+def git(*args):
+    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    return r.stdout.strip(), r.returncode
+
+# Determine a default base branch
+base = None
+for candidate in ("main", "master"):
+    _, rc = git("rev-parse", "--verify", candidate)
+    if rc == 0:
+        base = candidate
+        break
+
+cleaned, needs_action, still_active = [], [], []
+for entry in active:
+    branch = entry.get("branch")
+    if not branch:
+        cleaned.append({"reason": "no_branch_field", "entry": entry})
+        continue
+
+    out, _ = git("branch", "--list", branch)
+    if not out:
+        cleaned.append({
+            "branch": branch,
+            "reason": "branch_gone",
+            "items": entry.get("items", []),
+        })
+        continue
+
+    worktree = entry.get("worktree")
+    worktree_missing = bool(worktree) and not os.path.isdir(worktree)
+    if worktree_missing:
+        entry = {**entry, "worktree": None}
+
+    commit_count = 0
+    if base:
+        out, rc = git("rev-list", "--count", f"{base}..{branch}")
+        if rc == 0 and out.isdigit():
+            commit_count = int(out)
+
+    needs_action.append({
+        "branch": branch,
+        "items": entry.get("items", []),
+        "worktree": entry.get("worktree"),
+        "startedAt": entry.get("startedAt"),
+        "hasCommits": commit_count > 0,
+        "commitCount": commit_count,
+        "worktreeMissing": worktree_missing,
+    })
+    still_active.append(entry)
+
+data["active"] = still_active
+path.write_text(json.dumps(data, indent=2) + "\n")
+print(json.dumps({"cleaned": cleaned, "needsAction": needs_action}, indent=2))
+PY

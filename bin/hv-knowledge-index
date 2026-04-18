@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv:knowledge:start --> block in CLAUDE.md from .hv/KNOWLEDGE.md topics.
+# Usage: hv-knowledge-index
+# Creates CLAUDE.md if missing. Preserves all other content.
+set -euo pipefail
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+knowledge = Path(".hv/KNOWLEDGE.md")
+topics = []
+if knowledge.exists():
+    for line in knowledge.read_text().splitlines():
+        m = re.match(r"^##\s+(.+?)\s*$", line)
+        if m:
+            topics.append(m.group(1).strip())
+
+if topics:
+    topic_lines = "\n".join(f"- {t}" for t in topics)
+else:
+    topic_lines = "- _(no topics yet — run `/hv:learn` to capture learnings)_"
+
+block = (
+    "<!-- hv:knowledge:start -->\n"
+    "## Project Knowledge\n\n"
+    "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n"
+    f"{topic_lines}\n\n"
+    "<!-- hv:knowledge:end -->"
+)
+
+claude = Path("CLAUDE.md")
+if not claude.exists():
+    claude.write_text(block + "\n")
+    print("created")
+else:
+    content = claude.read_text()
+    pattern = re.compile(
+        r"<!-- hv:knowledge:start -->.*?<!-- hv:knowledge:end -->",
+        re.DOTALL,
+    )
+    if pattern.search(content):
+        content = pattern.sub(block, content)
+        claude.write_text(content)
+        print("updated")
+    else:
+        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
+        print("appended")
+PY

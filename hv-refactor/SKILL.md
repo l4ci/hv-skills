@@ -64,12 +64,11 @@ Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the bound
 
 ## Step 0 — Guard: Clean Working Tree
 
-Check for uncommitted changes: `git status --porcelain`
+```bash
+.hv/bin/hv-guard-clean "/hv:refactor"
+```
 
-- If the output is empty → proceed
-- If there are uncommitted changes → **stop and warn the user**:
-  *"You have uncommitted changes. Stash them (`git stash`) or commit them before running /hv:refactor, so the refactor happens on a clean base."*
-  Do not proceed until the working tree is clean.
+Non-zero exit = stop and surface the script's message. Do not proceed until clean.
 
 ## Step 1 — Explore with Orchestrator
 

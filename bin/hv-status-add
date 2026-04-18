@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Add an active work entry to .hv/status.json.
+# Usage: hv-status-add <branch> <item-id>[,<item-id>...] [worktree-path]
+set -euo pipefail
+BRANCH="${1:?usage: hv-status-add <branch> <items> [worktree]}"
+ITEMS="${2:?usage: hv-status-add <branch> <items> [worktree]}"
+WORKTREE="${3:-}"
+python3 - "$BRANCH" "$ITEMS" "$WORKTREE" <<'PY'
+import json, sys
+from datetime import datetime, timezone
+from pathlib import Path
+branch, items_csv, worktree = sys.argv[1], sys.argv[2], sys.argv[3]
+path = Path(".hv/status.json")
+data = json.loads(path.read_text()) if path.exists() else {"active": []}
+data.setdefault("active", [])
+# Drop any existing entry with the same branch (idempotent)
+data["active"] = [e for e in data["active"] if e.get("branch") != branch]
+data["active"].append({
+    "branch": branch,
+    "items": [i.strip() for i in items_csv.split(",") if i.strip()],
+    "worktree": worktree or None,
+    "startedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+})
+path.write_text(json.dumps(data, indent=2) + "\n")
+PY

@@ -16,45 +16,36 @@ Read `.hv/TODO.md` and `.hv/status.json` (if it exists).
 
 ## Step 2 — Reconcile Active Work
 
-Read the `active` array from `.hv/status.json`. For each entry, validate against actual git state:
+Delegate to the helper — it validates `status.json` against git, auto-cleans stale entries (dead branches), nulls missing worktree paths, and emits JSON:
 
-1. **Check if the branch exists:** `git branch --list '<branch-name>'`
-2. **Check if a worktree exists** (if `worktree` is set): `git worktree list` and look for the path
-3. **Check for commits:** `git log --oneline <branch-name> --not main` — are there commits on the branch beyond main?
+```bash
+.hv/bin/hv-reconcile
+```
 
-If the `active` array is empty, skip this step silently — don't mention it.
+Parse the JSON. Two arrays:
 
-Based on the findings:
+- `cleaned` — entries removed silently. No output needed.
+- `needsAction` — entries where the branch still exists. Fields: `branch`, `items`, `worktree`, `startedAt`, `hasCommits`, `commitCount`, `worktreeMissing`.
 
-**Branch exists, has commits resolving the items:**
-The work looks complete but was never merged. Tell the user:
-*"[ID] [Title] appears complete on branch `<branch>`. Merge it? (`git merge <branch>`) or create a PR?"*
+For each `needsAction` entry, present one line before the backlog:
 
-**Branch exists, has partial commits or no commits:**
-The work was started but interrupted. Tell the user:
-*"[ID] [Title] is in progress on branch `<branch>` (started <date>). Resume or abandon?"*
-- **Resume** → switch to the branch (or enter the worktree) and invoke `/hv:work` with the remaining items
-- **Abandon** → delete the branch (and worktree if applicable), remove the status entry, items return to the backlog
+- **`hasCommits: true`** → *"[items] look complete on `<branch>` (<commitCount> commits). Merge or open a PR?"*
+- **`hasCommits: false`** → *"[items] in progress on `<branch>` (started <startedAt>). Resume or abandon?"*
+- Append *"(worktree was cleaned up)"* if `worktreeMissing: true`.
 
-**Branch doesn't exist (was deleted or never created):**
-Stale status entry. Remove it from status.json silently. The items remain in TODO.md as pending.
+Resume routes to `/hv:work` on the existing branch. Abandon = `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>`.
 
-**Worktree path is set but worktree doesn't exist:**
-The worktree was cleaned up but the status entry remains. Check if the branch still exists and handle as above. Remove the stale worktree path from the entry or clean up the entry entirely.
-
-Present reconciliation notices before the backlog only when there's something to report. If everything is clean, produce no output for this step.
+If `needsAction` is empty, produce no output.
 
 ## Step 3 — Archive Completed Items
 
-Check the `## Completed` section. Any entry whose completion date is **more than 5 days old** (compare the `Done YYYY-MM-DD` date against today) gets moved to `.hv/ARCHIVE.md`.
+Delegate:
 
-1. If `.hv/ARCHIVE.md` doesn't exist, create it with a `# Archive` heading
-2. Append the old entries to the end of ARCHIVE.md (preserve their full text including the strikethrough and commit hash)
-3. Remove them from `## Completed` in TODO.md
+```bash
+.hv/bin/hv-archive-old 5
+```
 
-This keeps the active backlog focused on recent work while preserving history. Archive silently — no output for this step regardless of whether items were moved or not.
-
-Write both files back if anything changed.
+Prints the count of items moved (or nothing). Archive silently — don't report the count to the user.
 
 ## Step 4 — Build Relationship Map
 

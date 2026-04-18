@@ -46,35 +46,30 @@ Guard → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge
 
 ## Step 1 — Guard: Clean Working Tree
 
-Check for uncommitted changes: `git status --porcelain`
+```bash
+.hv/bin/hv-guard-clean "/hv:work"
+```
 
-- If the output is empty → proceed
-- If there are uncommitted changes → **stop and warn the user**:
-  *"You have uncommitted changes. Stash them (`git stash`) or commit them before running /hv:work, so work happens on a clean base."*
-  Do not proceed until the working tree is clean.
+Non-zero exit = stop and surface the script's message to the user. Do not proceed until the working tree is clean.
 
 ## Step 2 — Register in Status
 
-Read `.hv/status.json`. Add an entry for this work session:
+After picking the branch name, register the work so `/hv:next` in another session can see it:
 
-```json
-{
-  "items": ["F01", "B02"],
-  "branch": "hv/quick-switch",
-  "worktree": null,
-  "startedAt": "2026-04-15T12:00:00Z"
-}
+```bash
+.hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] [worktree-path]
 ```
 
-Set `worktree` to `null` for branch isolation, or the worktree path for worktree isolation (filled in Step 4). Write status.json immediately — this registers the work so `/hv:next` in another session can see it.
+The helper writes the entry with a UTC `startedAt` stamp. It's idempotent on branch name — call it a second time with the worktree path once Step 4 creates the worktree.
 
 ## Step 3 — Plan Tasks
 
 From the conversation context (user request, prior analysis, existing code):
 
-1. Identify all discrete tasks to implement
-2. For each task, determine: files to create/modify, what changes, acceptance criteria
-3. Group into dependency waves:
+1. **Consult project knowledge.** If `.hv/KNOWLEDGE.md` exists, scan its topic headings (also mirrored in the `hv:knowledge` block of `CLAUDE.md`). For every topic that plausibly touches the planned work, read that section. Carry relevant learnings — gotchas, conventions, constraints — into the task briefs so workers don't re-discover them. If nothing looks relevant, skip silently.
+2. Identify all discrete tasks to implement
+3. For each task, determine: files to create/modify, what changes, acceptance criteria
+4. Group into dependency waves:
    - **Wave 1:** All tasks that touch independent files (run in parallel)
    - **Wave 2+:** Tasks that depend on wave 1 outputs (sequential or next parallel batch)
 
@@ -97,7 +92,11 @@ git branch <branch-name>
 git worktree add .claude/worktrees/<branch-name> <branch-name>
 ```
 
-Update the `worktree` field in `.hv/status.json` with the worktree path (e.g., `.claude/worktrees/hv-quick-switch`).
+Update the worktree path in `status.json` by re-calling the helper:
+
+```bash
+.hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] .claude/worktrees/<branch-name>
+```
 
 The **orchestrator stays in the main worktree** and retains access to `.hv/`. Sub-agents receive the absolute worktree path in their briefs and work there. All git operations in agent briefs use the worktree path.
 
@@ -129,6 +128,7 @@ You are implementing Task N of [total].
 - Include enough context that the agent can work without asking questions
 - Specify exact file paths and relevant line numbers
 - Show the code pattern to follow (from existing codebase)
+- **Inline relevant learnings from `.hv/KNOWLEDGE.md`** under a short `**Known gotchas:**` section in the brief — only the bullets that apply to this task, not the whole file
 - Name the commit message — agents commit their own work
 - Constraint: read files first, minimal diff, no unrelated changes
 - If worktree isolation: always include the absolute worktree path and instruct the agent to work there
@@ -218,7 +218,13 @@ Share the PR URL with the user.
 
 ## Step 10 — Update Status
 
-Remove this work session's entry from `.hv/status.json`. This marks the work as complete so `/hv:next` no longer shows these items as in-progress.
+Clear the work session:
+
+```bash
+.hv/bin/hv-status-remove <branch>
+```
+
+This marks the work as complete so `/hv:next` no longer shows these items as in-progress.
 
 ## Step 11 — Report to User
 

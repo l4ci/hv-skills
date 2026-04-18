@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Move items from ## Completed in .hv/TODO.md to .hv/ARCHIVE.md if older than THRESHOLD days (default 5).
+# Usage: hv-archive-old [threshold-days]
+# Outputs: number of items moved (silent if 0)
+set -euo pipefail
+THRESHOLD="${1:-5}"
+python3 - "$THRESHOLD" <<'PY'
+import re, sys
+from datetime import date, timedelta
+from pathlib import Path
+threshold = int(sys.argv[1])
+cutoff = date.today() - timedelta(days=threshold)
+
+todo = Path(".hv/TODO.md")
+if not todo.exists():
+    sys.exit(0)
+content = todo.read_text()
+
+# Find ## Completed section
+m = re.search(r"^## Completed\s*$", content, re.MULTILINE)
+if not m:
+    sys.exit(0)
+start = m.end()
+nxt = re.search(r"^## ", content[start:], re.MULTILINE)
+end = start + nxt.start() if nxt else len(content)
+section = content[start:end]
+
+# Find bullet lines with Done YYYY-MM-DD
+pattern = re.compile(r"^(- .*Done (\d{4})-(\d{2})-(\d{2}).*)$", re.MULTILINE)
+old_lines, kept_lines = [], []
+for line in section.splitlines():
+    mm = pattern.match(line)
+    if mm:
+        y, mo, d = int(mm.group(2)), int(mm.group(3)), int(mm.group(4))
+        done_date = date(y, mo, d)
+        if done_date < cutoff:
+            old_lines.append(line)
+            continue
+    kept_lines.append(line)
+
+if not old_lines:
+    sys.exit(0)
+
+# Rebuild TODO.md
+new_section = "\n".join(kept_lines)
+if not new_section.startswith("\n"):
+    new_section = "\n" + new_section
+todo.write_text(content[:start] + new_section + content[end:])
+
+# Append to ARCHIVE.md
+archive = Path(".hv/ARCHIVE.md")
+header = "# Archive\n\nCompleted items older than the active window.\n\n"
+existing = archive.read_text() if archive.exists() else header
+archive.write_text(existing.rstrip() + "\n" + "\n".join(old_lines) + "\n")
+
+print(len(old_lines))
+PY
