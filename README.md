@@ -1,96 +1,150 @@
+<div align="center">
+
 # hv-skills
 
-A lightweight project backlog and workflow system for Claude Code. Capture bugs, features, and tasks into a per-project `.hv/` folder, pick items off the backlog, execute them with parallel subagents, and carry durable learnings forward.
+**A lightweight project backlog for Claude Code — capture, execute, learn.**
 
-[How to use](#how-to-use) · [Install](#install) · [Full guide](GUIDE.md)
+[![Release](https://img.shields.io/github/v/release/l4ci/hv-skills?color=blue&sort=semver)](https://github.com/l4ci/hv-skills/releases)
+[![License](https://img.shields.io/github/license/l4ci/hv-skills?color=green)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/l4ci/hv-skills)](https://github.com/l4ci/hv-skills/commits)
+[![Stars](https://img.shields.io/github/stars/l4ci/hv-skills?style=social)](https://github.com/l4ci/hv-skills/stargazers)
+[![For Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2)](https://claude.com/claude-code)
+
+[Quick start](#quick-start) · [Skills](#skills) · [How it works](#how-it-works) · [Full guide](GUIDE.md)
+
+</div>
+
+---
+
+## Why hv-skills?
+
+- **Your backlog lives with your code.** Per-project `.hv/` folder, gitignored. No external tool to open, no context-switch.
+- **Your agent already knows the project.** Let Claude Code pick the next task, execute it in parallel, and commit per task — atomic history, easy reverts.
+- **Knowledge persists across sessions.** Capture hard-won gotchas, conventions, and constraints into `.hv/KNOWLEDGE.md`; future work consults it automatically.
+- **Zero ceremony.** One `/hv:capture` routes bugs, features, and tasks to the right section with auto-incrementing IDs.
+
+## Features
+
+|  |  |
+|---|---|
+| **Auto-classified capture** — bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | **Parallel execution** — orchestrator plans, workers implement in parallel, one atomic commit per task |
+| **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | **Knowledge retention** — `/hv:learn` distills durable learnings; `/hv:work` consults them on relevant topics |
+| **Backlog reconciliation** — `/hv:next` validates `status.json` against git state, auto-cleans stale entries | **Refactor cycles** — `/hv:refactor` explores friction, designs competing approaches, fixes in parallel |
+
+## Quick start
+
+```bash
+# Install the plugin
+claude plugin marketplace add l4ci/hv-skills
+claude plugin install hv-skills
+
+# In your project
+/hv:init                                     # one-time setup
+/hv:capture "timer bug + keyboard shortcut"  # auto-classify and file
+/hv:next                                     # review + pick + execute
+```
+
+First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 15 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
-| `/hv:init` | Initialize `.hv/` folder with `TODO.md`, `KNOWLEDGE.md`, `counters.json`, `config.json`, `status.json`, and a managed knowledge-index block in `CLAUDE.md` |
+| `/hv:init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `counters.json`, `config.json`, `status.json`, and helpers |
 | `/hv:capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv:c` | Shortcut for `/hv:capture` |
-| `/hv:go` | Capture an item and immediately implement it — combines `/hv:capture` and `/hv:work` in one pass |
-| `/hv:learn` | Extract durable learnings from the current session into `.hv/KNOWLEDGE.md`, grouped by topic; updates the `CLAUDE.md` topic index. Opus verification is opt-in via `config.json` |
-| `/hv:next` | Review backlog, reconcile active work against git state, suggest what to work on, route to `/hv:work` |
+| `/hv:go` | Capture an item and immediately implement it — combines `/hv:capture` + `/hv:work` in one pass |
+| `/hv:next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv:work` |
 | `/hv:status` | Compact read-only state glance — counts, active work, recent completions, knowledge topics |
-| `/hv:work` | Orchestrated parallel implementation with per-task commits; consults `.hv/KNOWLEDGE.md` for relevant learnings |
-| `/hv:refactor` | Full architectural refactor cycle with parallel subagents |
+| `/hv:work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` for relevant topics |
+| `/hv:learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification opt-in |
+| `/hv:refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
 
-## How to use
+## How it works
 
-**1. Initialize once per project**
+```mermaid
+flowchart LR
+  CAP["/hv:capture"] --> TODO[(TODO.md)]
+  GO["/hv:go"] --> TODO
+  GO -.one-pass.-> WORK
+  TODO --> NEXT["/hv:next"]
+  NEXT --> WORK["/hv:work"]
+  STATUS["/hv:status"] -.reads.-> TODO
+  WORK --> COMMIT[(atomic commits)]
+  WORK --> LEARN["/hv:learn"]
+  LEARN --> KNOW[(KNOWLEDGE.md)]
+  KNOW -.consults.-> WORK
+  REFACTOR["/hv:refactor"] --> COMMIT
+```
 
-Run `/hv:init` in your project root. This creates `.hv/` with a TODO file, knowledge file, counters, model config, status tracking, and CLI helpers that keep tool calls minimal.
+Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth — `status.json` is just a cache, and `/hv:next` reconciles any drift.
 
-**2. Capture work as you go**
+## Configuration
 
-Whenever you spot something, capture it without breaking your flow — just run `/hv:capture` (or the shorter `/hv:c`). It auto-classifies each item as a bug, feature, or task and routes it to the correct section:
+Edit `.hv/config.json`:
 
-- **Bugs** — broken behavior, defects, regressions → `[B01]` with priority (P0/P1/P2)
-- **Features** — ideas, enhancements, new capabilities → `[F01]` with size (Major/Minor/Cosmetic)
-- **Tasks** — chores, refactoring, docs, dependency updates → `[T01]`
+```json
+{
+  "models":   { "orchestrator": "opus",   "worker": "sonnet" },
+  "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
+  "refactor": { "confirmBeforeExecute": true },
+  "learn":    { "verify": false }
+}
+```
 
-Mixed input works naturally — mention a bug and a feature in the same message and both get captured. Large input (crash dumps, specs, logs) overflows into detail files under `.hv/bugs/`, `.hv/features/`, or `.hv/tasks/`.
+Defaults favor fast iteration (branch isolation, direct merge, no verifier). See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
 
-**3. Pick what to work on**
+## Architecture
 
-Run `/hv:next` to review the backlog. It reconciles active work against git state, cleans up completed entries, shows a priority table, and suggests what to tackle next.
+```
+.hv/
+├── TODO.md           # bugs, features, tasks, recent completions
+├── KNOWLEDGE.md      # durable learnings, grouped by topic
+├── ARCHIVE.md        # completions older than 5 days
+├── counters.json     # auto-incrementing IDs
+├── config.json       # models, isolation, merge, verify
+├── status.json       # active work streams
+├── bugs/ features/ tasks/   # overflow detail files
+└── bin/              # 15 CLI helpers (hv-next-id, hv-append, hv-complete,
+                      #  hv-guard-clean, hv-status-add, hv-status-remove,
+                      #  hv-archive-old, hv-knowledge-index, hv-knowledge-query,
+                      #  hv-reconcile, hv-backlog, hv-merge, hv-pr,
+                      #  hv-refactor-age, hv-summary)
+```
 
-**4. Build it**
+Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
 
-Run `/hv:work` to implement the selected items. It plans the tasks, dispatches parallel subagents, verifies each result, and commits per task. If you paused mid-work, `/hv:work` picks up where you left off.
+## Install alternatives
 
-**Shortcut: `/hv:go`** — if you want to describe something and have it done right now (no backlog round-trip), run `/hv:go fix the timer bug`. It captures the item with a proper ID, then immediately hands off to `/hv:work`. Useful for hot-path fixes you don't want to queue.
-
-**5. Capture learnings**
-
-At the end of a productive session, run `/hv:learn`. It distills durable gotchas, conventions, and constraints into `.hv/KNOWLEDGE.md`, grouped by topic. Future `/hv:work` runs consult this file when the task touches a relevant topic, so nothing gets re-discovered. Opus verification is opt-in — enable it in `config.json` if you want a second-opinion pass.
-
-**6. Refactor periodically**
-
-After a few rounds of feature work, run `/hv:refactor` to clean up accumulated friction. It explores the codebase, categorizes findings, designs competing approaches for structural changes, and fixes everything in one pass.
-
-## Install
-
-### npx (one-liner)
+### npx one-liner
 
 ```bash
 npx @anthropic-ai/claude-code plugin marketplace add l4ci/hv-skills
 npx @anthropic-ai/claude-code plugin install hv-skills
 ```
 
-### Claude Code CLI
-
-If you already have Claude Code installed:
-
-```bash
-claude plugin marketplace add l4ci/hv-skills
-claude plugin install hv-skills
-```
-
 ### Local development (GNU Stow)
-
-Clone the repo and use `stow` to symlink all skills into `~/.agents/skills/`:
 
 ```bash
 git clone https://github.com/l4ci/hv-skills.git ~/Code/hv-skills
 stow --dir="$HOME/Code" --target="$HOME/.agents/skills" hv-skills
-```
-
-To remove the symlinks:
-
-```bash
-stow --dir="$HOME/Code" --target="$HOME/.agents/skills" -D hv-skills
+# remove: stow --dir="$HOME/Code" --target="$HOME/.agents/skills" -D hv-skills
 ```
 
 ## Testing
 
-Smoke-test the CLI helpers without touching your project:
+Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 
 ```bash
 bash test/smoke.sh
 ```
 
-This creates a throwaway `.hv/` in a tmpdir, exercises `hv-next-id`, `hv-append`, and `hv-complete`, and asserts the expected state. Exits non-zero on any failure.
+Exercises all 15 helpers across 26 assertions. Exits non-zero on any failure.
+
+## Contributing
+
+Issues and PRs welcome. Keep changes minimal, include a smoke-test assertion if you touch or add a helper, and follow the commit style in `git log`.
+
+## License
+
+[MIT](LICENSE)

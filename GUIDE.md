@@ -45,12 +45,6 @@ Each item gets a zero-padded auto-incrementing ID — `[B01]` for bugs, `[F01]` 
 
 Shortcut alias for `/hv:capture`. Identical behavior — useful when capturing is frequent and you want the keystroke savings.
 
-### /hv:status
-
-Read-only project state glance. Prints backlog counts (bugs/features/tasks), any active work streams, the three most recent completions, knowledge-topic count, and archive size — then stops. No reconciliation, no suggestions, no mutation.
-
-Use this to orient — *"where does the project stand?"* — before deciding whether to capture more items, pick work, or wrap up a session. Lighter than `/hv:next`, which does all of the above plus git reconciliation and a next-item recommendation.
-
 ### /hv:go
 
 Capture + execute in one pass. The item still gets written to `TODO.md` with a real ID (counters increment, detail files land where needed, history is preserved), but the normal `/hv:next` review round-trip is skipped — `/hv:go` hands directly off to `/hv:work` after capture completes.
@@ -68,20 +62,6 @@ Capture + execute in one pass. The item still gets written to `TODO.md` with a r
 
 `/hv:go` inherits all `/hv:capture` rules (classification, detail-file overflow, ID assignment) and all `/hv:work` rules (branch/worktree isolation, parallel workers, per-task commits). The only difference is that it suppresses both the capture confirmation prompt and the backlog selection step — one invocation, one pass.
 
-### /hv:learn
-
-Distills durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. A learning is worth capturing if it would save a future `/hv:work` run from re-discovering it.
-
-**What gets captured** — gotchas (non-obvious failure modes), conventions (project-specific patterns that aren't obvious from reading code), constraints (invariants, compatibility rules), debugging insights (root causes for hard-won bugs), decisions with rationale, and tool quirks.
-
-**What doesn't** — things already documented in code or README, transient session state, obvious facts derivable from the codebase, restatements of framework docs, personal preferences.
-
-Entries are grouped by short topic headings (`Build & Tooling`, `Testing`, `Networking`, etc.) with newest bullets at the top of each topic. New entries carry an HTML-comment date stamp: `<!-- YYYY-MM-DD -->`.
-
-After writing, `/hv:learn` updates the managed `hv:knowledge` block in `CLAUDE.md` so its topic list matches the current `KNOWLEDGE.md` headings. `/hv:work` reads this index to know when the task at hand should consult `KNOWLEDGE.md`.
-
-**Verification (opt-in).** By default, the skill writes and reports. If `learn.verify` is set to `true` in `.hv/config.json`, it dispatches an Opus verifier subagent that reads the updated files with fresh eyes and judges whether the new entries are durable, sharp, non-obvious, correctly topic'd, and non-duplicated. Use this if you want a second-opinion pass before learnings become part of your project's long-term context.
-
 ### /hv:next
 
 Reviews the backlog and suggests what to work on. Does several things before presenting the table:
@@ -92,6 +72,12 @@ Reviews the backlog and suggests what to work on. Does several things before pre
 4. **Presents the backlog** — tables sorted by priority/size, with a Related column and cluster notes.
 5. **Suggests next work** — P0 bugs first, then clusters with blocking bugs, quick wins, P1 bugs, blocking tasks, features.
 6. **Routes to /hv:work** — after the user confirms.
+
+### /hv:status
+
+Read-only project state glance. Prints backlog counts (bugs/features/tasks), any active work streams, the three most recent completions, knowledge-topic count, and archive size — then stops. No reconciliation, no suggestions, no mutation.
+
+Use this to orient — *"where does the project stand?"* — before deciding whether to capture more items, pick work, or wrap up a session. Lighter than `/hv:next`, which does all of the above plus git reconciliation and a next-item recommendation.
 
 ### /hv:work
 
@@ -110,6 +96,20 @@ Executes a batch of work items with parallel subagents. The orchestrator (defaul
 **Safety**: refuses to start on a dirty working tree. Stash or commit first.
 
 **Status tracking**: registers in `status.json` at the start, removes the entry on completion. This lets `/hv:next` in another session see what's in progress and avoid suggesting the same items.
+
+### /hv:learn
+
+Distills durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. A learning is worth capturing if it would save a future `/hv:work` run from re-discovering it.
+
+**What gets captured** — gotchas (non-obvious failure modes), conventions (project-specific patterns that aren't obvious from reading code), constraints (invariants, compatibility rules), debugging insights (root causes for hard-won bugs), decisions with rationale, and tool quirks.
+
+**What doesn't** — things already documented in code or README, transient session state, obvious facts derivable from the codebase, restatements of framework docs, personal preferences.
+
+Entries are grouped by short topic headings (`Build & Tooling`, `Testing`, `Networking`, etc.) with newest bullets at the top of each topic. New entries carry an HTML-comment date stamp: `<!-- YYYY-MM-DD -->`.
+
+After writing, `/hv:learn` updates the managed `hv:knowledge` block in `CLAUDE.md` so its topic list matches the current `KNOWLEDGE.md` headings. `/hv:work` reads this index to know when the task at hand should consult `KNOWLEDGE.md`.
+
+**Verification (opt-in).** By default, the skill writes and reports. If `learn.verify` is set to `true` in `.hv/config.json`, it dispatches an Opus verifier subagent that reads the updated files with fresh eyes and judges whether the new entries are durable, sharp, non-obvious, correctly topic'd, and non-duplicated. Use this if you want a second-opinion pass before learnings become part of your project's long-term context.
 
 ### /hv:refactor
 

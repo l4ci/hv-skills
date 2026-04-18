@@ -21,10 +21,10 @@
     "./hv-capture",
     "./hv-c",
     "./hv-go",
-    "./hv-learn",
     "./hv-next",
     "./hv-status",
     "./hv-work",
+    "./hv-learn",
     "./hv-refactor"
   ]
 }
