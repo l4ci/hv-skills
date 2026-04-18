@@ -1,6 +1,6 @@
 {
   "name": "hv-skills",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Lightweight project backlog and workflow skills for Claude Code",
   "author": {
     "name": "l4ci"

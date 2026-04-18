@@ -2,7 +2,7 @@
 
 # hv-skills
 
-**A lightweight project backlog for Claude Code — capture, execute, learn.**
+**A zero-dependency project backlog for Claude Code — capture, execute, review, ship.**
 
 [![Release](https://img.shields.io/github/v/release/l4ci/hv-skills?color=blue&sort=semver)](https://github.com/l4ci/hv-skills/releases)
 [![License](https://img.shields.io/github/license/l4ci/hv-skills?color=green)](LICENSE)
@@ -19,6 +19,7 @@
 ## Why hv-skills?
 
 - **Your backlog lives with your code.** Per-project `.hv/` folder, gitignored. No external tool to open, no context-switch.
+- **Zero dependencies.** Bash, Python 3, Git, and optionally `gh` — all already on a developer's machine. No npm, no pip, no daemon, no database, no cloud.
 - **Your agent already knows the project.** Let Claude Code pick the next task, execute it in parallel, and commit per task — atomic history, easy reverts.
 - **Knowledge persists across sessions.** Capture hard-won gotchas, conventions, and constraints into `.hv/KNOWLEDGE.md`; future work consults it automatically.
 - **Zero ceremony.** One `/hv:capture` routes bugs, features, and tasks to the right section with auto-incrementing IDs.
@@ -27,11 +28,11 @@
 
 |  |  |
 |---|---|
-| **Auto-classified capture** — bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | **Parallel execution** — orchestrator plans, workers implement in parallel, one atomic commit per task |
-| **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | **Knowledge retention** — `/hv:learn` distills durable learnings; `/hv:work`, `/hv:debug`, and `/hv:review` all consult them |
-| **Backlog reconciliation** — `/hv:next` validates `status.json` against git state, auto-cleans stale entries | **Systematic debugging** — `/hv:debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv:learn` |
-| **Review-gated shipping** — `/hv:ship` runs `/hv:review` against original intent + conventions before PR or merge | **Context-clear recovery** — `/hv:resume` re-reads active streams with recent commits and routes you back to work |
-| **Refactor cycles** — `/hv:refactor` explores friction, designs competing approaches, fixes in parallel | &nbsp; |
+| 📥 **Auto-classified capture** — bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | ⚡ **Parallel execution** — orchestrator plans, workers implement in parallel, one atomic commit per task |
+| 🌿 **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | 🧠 **Knowledge retention** — `/hv:learn` distills durable learnings; `/hv:work`, `/hv:debug`, and `/hv:review` all consult them |
+| ♻️ **Backlog reconciliation** — `/hv:next` validates `status.json` against git state, auto-cleans stale entries | 🐛 **Systematic debugging** — `/hv:debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv:learn` |
+| 🚢 **Review-gated shipping** — `/hv:ship` runs `/hv:review` against original intent + conventions before PR or merge | 💾 **Context-clear recovery** — `/hv:resume` re-reads active streams with recent commits and routes you back to work |
+| 🔧 **Refactor cycles** — `/hv:refactor` explores friction, designs competing approaches, fixes in parallel | 🤝 **Graceful handoff** — `/hv:pause` writes what's in your head (hypothesis, next step, mid-edit files) so `/hv:resume` picks up after a `/clear` |
 
 ## Quick start
 
