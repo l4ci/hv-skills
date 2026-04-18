@@ -26,7 +26,7 @@ Read `.hv/config.json`:
 ## Flow
 
 ```
-Guard → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge/PR → Status
+Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge/PR → Status
 ```
 
 ## Step 1 — Preflight & Guard
@@ -38,6 +38,30 @@ If `.hv/bin/hv-guard-clean` doesn't exist, invoke `hv:init` via the `Skill` tool
 ```
 
 Non-zero exit = stop and surface the script's message.
+
+## Step 1.5 — Clarify Ambiguous Briefs (only when needed)
+
+If — and only if — the current brief is too thin to plan concrete tasks (missing scope, conflicting requirements, or two equally plausible interpretations), use the `AskUserQuestion` tool to resolve the ambiguity before touching any code. Otherwise skip this step entirely — the default is to proceed.
+
+Good reasons to ask:
+
+- The scope hits 2+ incompatible files or areas, and picking one vs. both changes the plan materially.
+- A requirement is vague in a way that yields opposite reasonable implementations (e.g., *"add sorting"* — ascending or descending, stable or not, which columns).
+- Multiple captured items imply different orderings, and the user didn't say which to tackle first.
+
+Bad reasons to ask (don't):
+
+- To confirm you understand — just act.
+- For preferences you can infer from `KNOWLEDGE.md` or the existing codebase.
+- Style choices inside an agreed scope — that's implementation.
+
+When asking, use a single `AskUserQuestion` call with 1-3 questions. Each question:
+
+- Short `header` (e.g., `"Scope"`, `"Target"`, `"Order"`).
+- Options map to concrete plans. Mark the most likely intent `(Recommended)`.
+- For conflicting items, use `multiSelect: true` and ask which subset to include in this run.
+
+If `AskUserQuestion` isn't available on the host, ask in plain text but only once — don't stall multi-turn. If you still can't decide after one round, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed.
 
 ## Step 2 — Register in Status
 

@@ -180,7 +180,16 @@ Root cause: MenuBarManager held an invalidated timer ref after pause; the next t
 Fix: reset badge to `--:--` in `pause()` before invalidating.
 ```
 
-Ask the user: *"Merge now with `/hv:ship`, or keep it on the branch for more work?"*
+Use `AskUserQuestion` for the next move:
+
+- **Header:** `"Next"`
+- **Question:** *"Fix for [B##] is committed. What's next?"*
+- **Options** (single-select):
+  1. "Ship via `/hv:ship` (Recommended)" — *"Run the review gate and integrate."*
+  2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
+  3. "Stop here" — *"Leave the branch; come back later."*
+
+Plain-text fallback: *"Merge now with `/hv:ship`, or keep it on the branch for more work?"*
 
 ## Step 12 — Learn Nudge
 

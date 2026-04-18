@@ -131,11 +131,15 @@ Verdict: CONCERNS
 
 ## Step 7 — Route Based on Verdict
 
-- **PASS** — tell the user "Ready to ship. Run `/hv:ship`." Stop.
-- **CONCERNS** — ask *"Address now, proceed anyway, or stop?"* — honor the choice.
-  - Address → route to `/hv:work` with the concerns as the task list
-  - Proceed → the caller (`/hv:ship`) decides; if run standalone, tell the user they can `/hv:ship` with eyes open
-  - Stop → no-op
+- **PASS** — tell the user *"Ready to ship. Run `/hv:ship`."* Stop.
+- **CONCERNS** — if invoked from `/hv:ship`, return the verdict to the caller (it owns the decision). If invoked standalone, use `AskUserQuestion`:
+  - **Header:** `"Concerns"`
+  - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
+  - **Options** (single-select):
+    1. "Address via `/hv:work` (Recommended)" — *"Route the concerns to `/hv:work` as a fix list."*
+    2. "Ship anyway" — *"Hand off to `/hv:ship` with the concerns acknowledged."*
+    3. "Stop" — *"Leave it; rerun `/hv:review` later if you want another pass."*
+  - Plain-text fallback: *"Address now, proceed anyway, or stop?"*
 - **FAIL** — tell the user it would regress. Suggest fixing via `/hv:work` or `/hv:debug`. Don't route to `/hv:ship`.
 
 ## Rules

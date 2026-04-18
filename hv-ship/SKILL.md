@@ -56,8 +56,15 @@ Read `ship.review` from `.hv/config.json`. Default `true`.
 If enabled, invoke `hv:review` via the `Skill` tool for this branch. Pass through the verdict:
 
 - **PASS** → continue to Step 4
-- **CONCERNS** → surface concerns to the user, ask *"Proceed anyway?"* Wait for yes/no
-- **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv:ship`
+- **CONCERNS** → surface each concern, then use `AskUserQuestion` to decide:
+  - **Header:** `"Concerns"`
+  - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
+  - **Options** (single-select):
+    1. "Address first (Recommended)" — *"Route the concerns to `/hv:work` as a fix list; rerun `/hv:ship` after."*
+    2. "Ship anyway" — *"Proceed with the merge or PR despite the concerns."*
+    3. "Stop" — *"Leave the branch as-is; no integration now."*
+  - Plain-text fallback: *"Address first, ship anyway, or stop?"*
+- **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv:ship`.
 
 If `ship.review` is `false`, skip this step.
 
@@ -82,9 +89,19 @@ If a scope area is unclear, pick the most visible behavior change. Don't pad wit
 
 ## Step 5 — Pick Strategy
 
-Check `work.mergeStrategy` in `.hv/config.json`. If it's unset or the user hasn't been asked recently, ask:
+Check `work.mergeStrategy` in `.hv/config.json`.
 
-*"Ship `<branch>` as a PR or direct merge?"*
+- If set to `"direct"` or `"pr"` and the user hasn't explicitly overridden in this session, use it silently.
+- If unset, or the user said something that suggests they want the other option, use `AskUserQuestion`:
+  - **Header:** `"Strategy"`
+  - **Question:** *"How should I integrate `<branch>`?"*
+  - **Options** (single-select):
+    1. Mark whichever matches `work.mergeStrategy` (or `"Direct merge"` if unset) with `(Recommended)`.
+    2. The other strategy as a peer option.
+    - `"Direct merge"` — *"Merge into main with `--no-ff` and delete the branch."*
+    - `"GitHub PR"` — *"Push and `gh pr create` with the body from Step 4."*
+
+Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"*
 
 ## Step 6a — Open a PR
 

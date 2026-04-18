@@ -23,15 +23,35 @@ Validates `status.json` against git, auto-cleans stale entries (dead branches), 
 - `cleaned` — removed silently. No output needed.
 - `needsAction` — branch still exists. Fields: `branch`, `items`, `worktree`, `startedAt`, `hasCommits`, `commitCount`, `worktreeMissing`.
 
-For each `needsAction` entry, present one line before the backlog:
+If `needsAction` is empty, produce no output and continue. Otherwise, use the `AskUserQuestion` tool so the user can resolve each stream with the host's native question UI. Batch up to 4 streams into one `AskUserQuestion` call; if there are more than 4, present the rest in a second call after the first resolves.
 
-- `hasCommits: true` → *"[items] look complete on `<branch>` (<commitCount> commits). Merge or open a PR?"*
-- `hasCommits: false` → *"[items] in progress on `<branch>` (started <startedAt>). Resume or abandon?"*
-- Append *"(worktree was cleaned up)"* if `worktreeMissing: true`.
+For each entry, build one question:
 
-Resume → `/hv:work` on the existing branch. Abandon → `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>`.
+- **Header:** `"<branch>"` (truncate to 12 chars)
+- **Question:** context line describing the stream. Examples:
+  - `hasCommits: true` — *"[B01], [F03] look complete on `hv/timer-fix` (3 commits). What should I do?"*
+  - `hasCommits: false` — *"[F07] is in progress on `hv/auth-refresh` (started 2026-04-18, no commits yet). What should I do?"*
+  - Append *" (worktree was cleaned up)"* to the question if `worktreeMissing: true`.
+- **Options** (single-select):
+  - `hasCommits: true`:
+    1. "Ship via `/hv:ship` (Recommended)" — *"Run `/hv:ship` on the branch — runs review, then merges or opens a PR."*
+    2. "Resume with `/hv:work`" — *"Keep adding to the branch."*
+    3. "Leave as-is" — *"No action now; stream stays in `status.json`."*
+  - `hasCommits: false`:
+    1. "Resume with `/hv:work` (Recommended)" — *"Pick up where it left off."*
+    2. "Abandon" — *"Delete the branch and clear `status.json`."*
+    3. "Leave as-is" — *"No action now; stream stays in `status.json`."*
 
-If `needsAction` is empty, produce no output.
+Route each resolution:
+
+| Answer | Action |
+|--------|--------|
+| Ship via `/hv:ship` | Invoke `hv:ship` via the `Skill` tool with this branch |
+| Resume with `/hv:work` | Invoke `hv:work` on the existing branch |
+| Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
+| Leave as-is | Print *"Skipped `<branch>` — still in `status.json`."* and continue |
+
+If `AskUserQuestion` is unavailable on the host, fall back to the plain-text prompts: *"Merge or open a PR?"* and *"Resume or abandon?"* — honor the user's free-text reply.
 
 ## Step 3 — Archive Completed Items
 
@@ -86,11 +106,25 @@ Suggested next: [ID] [Title] ([tag])
 
 ## Step 7 — Confirm & Execute
 
-Ask: **"Work on this?"** (or "Work on these?" for a batch).
+Use the `AskUserQuestion` tool so the user picks with the host's native UI. Build a single question:
 
-- **Yes** → invoke `/hv:work` with the selected item(s) and their TODO.md descriptions as context
-- **No** → ask for an alternative, then route that to `/hv:work`
-- **User picks specific items** → route those to `/hv:work`
+- **Header:** `"Next"`
+- **Question:** *"Work on the suggested item(s)?"* (substitute "items" for a batch)
+- **Options** (single-select):
+  1. `"Start [ID] (Recommended)"` — *"Invoke `/hv:work` with the suggested item(s) and their TODO descriptions."* (list IDs in the label if it's a batch, else the single ID)
+  2. `"Pick different items"` — *"Choose from the backlog yourself."*
+  3. `"Stop here"` — *"No execution now; just leave me with the backlog view."*
+
+Route the answer:
+
+| Answer | Action |
+|--------|--------|
+| Start (Recommended) | Invoke `hv:work` via the `Skill` tool with the selected items + their TODO entries |
+| Pick different items | Second `AskUserQuestion` call with a `multiSelect: true` question listing up to 4 alternative items (or ask the user to name them if the backlog has more than 4). Then invoke `hv:work` on the chosen set |
+| Stop here | Print *"OK — run `/hv:next` again when you're ready."* and exit |
+| "Other" (free text) | Treat the user's text as the item spec; route to `/hv:work` |
+
+If `AskUserQuestion` isn't available on the host, fall back to plain-text: *"Work on this?"* and honor yes/no/"pick specific IDs" replies.
 
 ## Rules
 

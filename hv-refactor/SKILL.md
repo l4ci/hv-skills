@@ -104,7 +104,22 @@ Present a numbered list of all friction points. For each, show:
 - **Dependency category**: which of the 4 categories applies
 - **Why it matters**: the concrete risk or cost of leaving it
 
-If `confirmBeforeExecute` is `true`: ask the user which items to proceed with (all, a subset, or none). Wait for confirmation before continuing.
+If `confirmBeforeExecute` is `true`, gate with `AskUserQuestion`:
+
+- **Header:** `"Candidates"`
+- **Question:** *"Found N friction points. Which should I fix?"*
+- **Options** (single-select):
+  1. "Fix all N (Recommended)" — *"Proceed with every candidate in parallel."*
+  2. "Pick a subset" — *"Choose which items to include; the rest are skipped."*
+  3. "Stop" — *"No changes; surface the list and exit."*
+
+If the user picks "Pick a subset", follow up with a second `AskUserQuestion`:
+
+- **Header:** `"Subset"`, `multiSelect: true`
+- **Question:** *"Select the items to fix."*
+- **Options:** up to 4 candidates by label (e.g., `"SessionOrchestrator error propagation"`). If more than 4, list top 4 by impact and ask the user to name the rest in free text.
+
+Plain-text fallback: *"Proceed with all, a subset, or none?"*
 
 If `confirmBeforeExecute` is `false`: present the list for visibility, then proceed immediately with all items.
 
@@ -127,7 +142,15 @@ Each sub-agent outputs:
 
 Present designs sequentially, then compare them in prose. Give an opinionated recommendation: which design is strongest and why. If elements from different designs combine well, propose a hybrid.
 
-If `confirmBeforeExecute` is `true`: ask the user which approach to use (or accept the recommendation). Wait for confirmation.
+If `confirmBeforeExecute` is `true`, gate with `AskUserQuestion` per structural friction point (batch up to 4 in one call):
+
+- **Header:** short name of the friction point (≤12 chars, e.g., `"Ring buffer"`)
+- **Question:** *"Which design should I use for `<friction point>`?"*
+- **Options** (single-select, up to 4): one per competing design. Mark your recommended design `(Recommended)`. Label each with the design's constraint (e.g., `"Minimal interface (Recommended)"`, `"Max flexibility"`, `"Caller-optimized"`, `"Ports & adapters"`).
+
+Use the `preview` field on each option to show the interface signature + usage example — this is exactly the case that's worth a side-by-side comparison.
+
+Plain-text fallback: *"Which approach for `<friction point>`? (design 1 / 2 / 3 / 4)"*
 
 If `confirmBeforeExecute` is `false`: use the recommended approach and proceed.
 

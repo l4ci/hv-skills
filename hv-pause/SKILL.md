@@ -39,13 +39,16 @@ git status --porcelain
 ```
 
 - **Clean** → continue to Step 4
-- **Dirty** → ask the user:
-  *"Uncommitted changes in `[files]`. Wrap them in a `wip:` commit, stash them, or leave them in place?"*
-  - `wip:` commit → `git add -A && git commit -m "wip: pause before context cutoff"` (note the hash for Step 4)
-  - Stash → `git stash push -u -m "hv:pause <branch>"` (note the stash ref)
-  - Leave → continue; mention in the handoff that the tree is dirty
+- **Dirty** → use `AskUserQuestion`:
+  - **Header:** `"Uncommitted"`
+  - **Question:** *"N uncommitted files on `<branch>`. How should I handle them?"*
+  - **Options** (single-select):
+    1. "WIP commit (Recommended)" — *"`git add -A && git commit -m 'wip: pause before context cutoff'` — keeps changes on the branch."*
+    2. "Stash" — *"`git stash push -u -m 'hv:pause <branch>'` — keeps changes out of history."*
+    3. "Leave in place" — *"No action; the handoff will note that the tree is dirty."*
+  - Plain-text fallback: *"Wrap them in a `wip:` commit, stash them, or leave them in place?"*
 
-Don't force a choice — the user may have reasons. But make sure the handoff records whichever path was taken.
+Carry out whichever path was chosen and note the artifact (commit hash, stash ref, or "dirty tree") for the handoff in Step 4.
 
 ## Step 4 — Write the Handoff Note
 

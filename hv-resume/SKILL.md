@@ -86,29 +86,45 @@ Backlog: 4 bugs, 6 features, 2 tasks
 Knowledge: 5 topics
 ```
 
-Then ask: *"Resume one of these, or pick new work with `/hv:next`?"*
+Then use `AskUserQuestion`. Build one question per stream (up to 4 streams in one call; present any overflow in a second call). Each stream's question:
 
-Routing cheat sheet by stream state:
+- **Header:** the first 12 chars of the branch name.
+- **Question:** the stream's one-line summary (same text you just printed, minus the commit list).
+- **Options** (single-select) derived from the stream state — mark the best fit `(Recommended)`:
 
-| State | Suggest |
-|-------|---------|
-| Handoff note present | `/hv:work` with the handoff's "Next planned step" as the task |
-| `hasCommits: true`, commits look complete, no handoff | `/hv:ship` |
-| `hasCommits: true`, still mid-implementation | `/hv:work` (continue) |
-| `hasCommits: false`, no handoff | `/hv:work` (pick up) or `git branch -D` to abandon |
-| no active streams | `/hv:next` |
+| State | Recommended | Other options |
+|-------|-------------|---------------|
+| Handoff note present | "Resume with `/hv:work`" (consumes the note) | "Leave handoff for later", "Abandon branch" |
+| `hasCommits: true`, commits look complete, no handoff | "Ship via `/hv:ship`" | "Keep working with `/hv:work`", "Leave as-is" |
+| `hasCommits: true`, mid-implementation | "Resume with `/hv:work`" | "Ship via `/hv:ship`", "Leave as-is" |
+| `hasCommits: false`, no handoff | "Resume with `/hv:work`" | "Abandon branch", "Leave as-is" |
+
+If there are no active streams, skip the stream questions entirely and ask a single:
+
+- **Header:** `"Next"`
+- **Question:** *"No active streams. Pick new work with `/hv:next`?"*
+- **Options:** "Open backlog (Recommended)" (→ `/hv:next`) / "Stop here".
+
+Plain-text fallback: *"Resume one of these, or pick new work with `/hv:next`?"*
 
 ## Step 6 — Execute User's Choice
 
-Whatever they pick, invoke the corresponding skill via the `Skill` tool. Pass the branch name and item IDs as context so the downstream skill doesn't re-read state.
+Route each stream's answer via the `Skill` tool. Pass the branch name and item IDs as context so the downstream skill doesn't re-read state.
 
-**If a handoff note was consumed**, include the note's full content in the brief you pass downstream — `/hv:work` or `/hv:debug` needs the "Next planned step", "Current hypothesis", and "Do not" sections to pick up cleanly. Then delete the note:
+| Answer | Action |
+|--------|--------|
+| "Resume with `/hv:work`" | Invoke `hv:work` on the branch; if a handoff note was consumed, include its full content in the brief |
+| "Ship via `/hv:ship`" | Invoke `hv:ship` on the branch |
+| "Abandon branch" | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
+| "Leave as-is" / "Leave handoff for later" | Print *"Skipped `<branch>`."* and continue |
+| "Open backlog" | Invoke `hv:next` |
+| "Stop here" | Print *"OK — run `/hv:resume` again when you're ready."* and exit |
+
+**Handoff consumption**: only delete `.hv/handoff/<branch>.md` when the user chose to resume that specific branch. For "Leave handoff for later" and every other non-resume answer, the note stays in place so the next `/hv:resume` surfaces it again:
 
 ```bash
-rm .hv/handoff/<branch>.md
+rm .hv/handoff/<branch>.md   # only after dispatching /hv:work or /hv:debug
 ```
-
-Don't delete if the user declined to resume that branch; leave the note for later.
 
 ## Rules
 
