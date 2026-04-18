@@ -182,29 +182,7 @@ fi
 cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
-All helpers are installed together. They require `python3`:
-
-| Script | Purpose |
-|--------|---------|
-| `hv-next-id` | Increment counter, return zero-padded ID |
-| `hv-append` | Append entry to a section in `TODO.md` |
-| `hv-complete` | Move item to `## Completed` with strikethrough |
-| `hv-guard-clean` | Exit non-zero if the git tree is dirty or not a repo |
-| `hv-status-add` | Register an active work entry in `status.json` |
-| `hv-status-remove` | Clear an active entry by branch name |
-| `hv-archive-old` | Move `## Completed` items >N days old to `ARCHIVE.md` |
-| `hv-knowledge-index` | Regenerate the managed `hv:knowledge` block in `CLAUDE.md` |
-| `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` |
-| `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries |
-| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) |
-| `hv-merge` | Remove worktree, merge `--no-ff`, delete branch (commit msg on stdin) |
-| `hv-pr` | Remove worktree, push, `gh pr create` (body on stdin) |
-| `hv-refactor-age` | JSON: non-refactor features/bugs completed since last `refactor:` commit |
-| `hv-summary` | Compact project state: backlog counts, active work, recent completions |
-| `hv-ship-body` | Build a PR body (Summary + Items resolved) for a feature branch |
-| `hv-review-scope` | JSON: commits, touched files, referenced IDs, and matching TODO entries |
-| `hv-update-check` | JSON: install type, current/latest version, status, exact update command |
-| `hv-preflight` | Exit 0/2/3 — verifies `.hv/` is initialized and all helpers are present |
+All helpers are installed together and require `python3`. See `GUIDE.md` § CLI Helpers for the full reference of what each one does.
 
 ## Step 5 — Seed CLAUDE.md Knowledge Block
 

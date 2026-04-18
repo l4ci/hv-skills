@@ -131,12 +131,7 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 ├── status.json       # active work streams
 ├── bugs/ features/ tasks/   # overflow detail files
 ├── handoff/          # /hv:pause notes, one per branch; /hv:resume consumes them
-└── bin/              # 19 CLI helpers (hv-next-id, hv-append, hv-complete,
-                      #  hv-guard-clean, hv-status-add, hv-status-remove,
-                      #  hv-archive-old, hv-knowledge-index, hv-knowledge-query,
-                      #  hv-reconcile, hv-backlog, hv-merge, hv-pr,
-                      #  hv-refactor-age, hv-summary, hv-ship-body,
-                      #  hv-review-scope, hv-update-check, hv-preflight)
+└── bin/              # 19 CLI helpers — see GUIDE.md § CLI Helpers
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
