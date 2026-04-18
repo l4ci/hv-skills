@@ -69,7 +69,12 @@ corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
 done_tail = re.compile(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$")
 
 def entry_for(iid):
-    pat = re.compile(rf"^(?:- )?.*\[{re.escape(iid)}\].*$", re.MULTILINE)
+    # Only match the ORIGIN bullet where ID is the leading token after `- **` or
+    # `- ~~**`. Lines that merely mention the ID in a `Related:` suffix don't qualify.
+    pat = re.compile(
+        rf"^- (?:~~)?\*\*\[{re.escape(iid)}\].*$",
+        re.MULTILINE,
+    )
     m = pat.search(corpus)
     if not m:
         return None

@@ -112,7 +112,7 @@ Don't delete if the user declined to resume that branch; leave the note for late
 
 ## Rules
 
-- **No mutation.** This skill never writes. Git, `status.json`, `TODO.md` are all read-only here.
+- **Minimal mutation.** Only two writes happen: `hv-reconcile` normalizes `status.json` (clears dead-branch entries, nulls missing worktree paths) and the handoff note is deleted after the user picks its branch to resume. `TODO.md` and `KNOWLEDGE.md` stay untouched.
 - **Trust git over status.** `hv-reconcile` already reconciles; don't second-guess its output.
 - **Don't re-plan.** If the user picks `/hv:work`, hand off — don't re-narrate the plan.
 - **Silent on empty.** No active streams and an empty backlog → say *"Nothing in flight."* and stop. Don't manufacture work.

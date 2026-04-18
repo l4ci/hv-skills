@@ -114,13 +114,13 @@ Silently clears the entry if one existed. Harmless if not.
 
 Most IDs are already completed by `/hv:work`. This catches manual commits that referenced IDs without closing them.
 
-For each ID in the scope JSON's `referencedIds`, check if the ID appears as an active bullet — `grep -E '^- \*\*\[<ID>\]' .hv/TODO.md`. If it does, close it:
+For each ID in the scope JSON's `referencedIds`:
 
 ```bash
 .hv/bin/hv-complete <ID> <merge-or-last-commit-hash>
 ```
 
-Skip IDs that aren't active (already completed or not in TODO.md at all). `hv-complete` errors on missing actives, so always grep first.
+`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `TODO.md` entirely) produce an error. No grep needed.
 
 ## Step 9 — Report to User
 

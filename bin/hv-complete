@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Move item to ## Completed with strikethrough and metadata.
+# Idempotent: silent no-op if the ID is already completed.
+# Errors only if the ID is not present at all (typo guard).
 # Usage: hv-complete <ID> [commit-hash]
 set -euo pipefail
 ID="${1:?usage: hv-complete <ID> [commit-hash]}"
@@ -10,10 +12,19 @@ import re, sys
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
-pat = re.compile(r"^- \*\*\[" + re.escape(id_s) + r"\].*$", re.MULTILINE)
-m = pat.search(content)
+
+active = re.compile(r"^- \*\*\[" + re.escape(id_s) + r"\].*$", re.MULTILINE)
+completed = re.compile(r"^- ~~\*\*\[" + re.escape(id_s) + r"\].*~~\s+Done\s+\d{4}-\d{2}-\d{2}", re.MULTILINE)
+
+m = active.search(content)
 if not m:
-    print(f"error: [{id_s}] not found", file=sys.stderr); sys.exit(1)
+    # Already completed → silent no-op (idempotent).
+    if completed.search(content):
+        sys.exit(0)
+    # Nowhere to be found → typo guard.
+    print(f"error: [{id_s}] not found", file=sys.stderr)
+    sys.exit(1)
+
 line = m.group(0)
 content = content[:m.start()] + content[m.end()+1:]
 done = f"- ~~{line[2:]}~~ Done {date_s} [`{hash_s}`]"

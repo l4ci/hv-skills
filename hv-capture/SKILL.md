@@ -96,7 +96,7 @@ If any item's input contains bulky raw data (crash dumps, stack traces, log outp
 {Full user input — crash dump, stack trace, logs, specs, checklists, etc. Preserved verbatim or lightly formatted for readability.}
 ```
 
-3. In the TODO.md entry, append a `Detail:` reference pointing to the file (see format below)
+2. In the TODO.md entry, append a `Detail:` reference pointing to the file (see format below)
 
 **Skip this step entirely for items that fit comfortably in 1–3 sentences.** Most entries won't need a detail file.
 

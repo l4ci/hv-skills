@@ -69,6 +69,18 @@ grep -q "~~.*\[B01\].*~~ Done" .hv/TODO.md || fail "B01 not marked completed"
 grep -q "^- \*\*\[B01\]" .hv/TODO.md && fail "B01 still in active section"
 pass "B01 moved to Completed with strikethrough"
 
+# Idempotent: running hv-complete again on an already-completed ID is a no-op.
+"$BIN/hv-complete" B01 "$HASH" >/dev/null 2>&1 || fail "second hv-complete errored on already-completed ID"
+COMPLETED_COUNT=$(grep -c "~~.*\[B01\].*~~ Done" .hv/TODO.md || true)
+[ "$COMPLETED_COUNT" = "1" ] || fail "re-running hv-complete duplicated B01: found $COMPLETED_COUNT rows"
+pass "hv-complete is idempotent on already-completed ID"
+
+# Typo guard: an ID that is nowhere in TODO.md still errors out.
+if "$BIN/hv-complete" B99 "$HASH" 2>/dev/null; then
+  fail "hv-complete should error on an unknown ID"
+fi
+pass "hv-complete rejects unknown ID"
+
 echo "hv-guard-clean"
 git add -A && git commit -q -m "progress"
 "$BIN/hv-guard-clean" test >/dev/null 2>&1 || fail "guard rejected clean tree"
@@ -307,6 +319,36 @@ pass "review-scope emits commits, IDs, titles, and files"
 
 if "$BIN/hv-review-scope" main 2>/dev/null; then fail "review-scope should reject base branch"; fi
 pass "review-scope rejects base branch"
+
+# Regression: review-scope must attribute an ID to its OWN bullet, not to
+# another item that mentions the ID in a `Related:` suffix.
+git checkout -q main
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+- **[F80] [Minor] Refers to B70.** Something else. Related: [B70]
+
+## Tasks
+
+## Completed
+EOF
+cat > .hv/ARCHIVE.md <<'EOF'
+# Archive
+
+- ~~**[B70] [P1] Ship demo bug.** Broken badge.~~ Done 2026-04-10 [`aaa1111`]
+EOF
+git add -A && git commit -q -m "seed related-link test" || true
+git checkout -q -b hv/scope-regression
+echo r > r.txt && git add r.txt && git commit -q -m "fix: badge [B70]"
+git checkout -q main
+OUT=$("$BIN/hv-review-scope" hv/scope-regression)
+echo "$OUT" | grep -q '"title": "Ship demo bug"' || fail "review-scope picked wrong bullet for B70 (Related-link regression): $OUT"
+pass "review-scope picks origin bullet, ignores Related-link references"
+git branch -D hv/scope-regression >/dev/null 2>&1 || true
+rm -f r.txt
 
 # Cleanup demo branch before later tests
 git branch -D hv/ship-demo >/dev/null 2>&1 || true

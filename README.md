@@ -165,7 +165,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 18 helpers across 33 assertions. Exits non-zero on any failure.
+Exercises all 18 helpers across 34 assertions. Exits non-zero on any failure.
 
 ## Contributing
 
