@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "A zero-dependency project backlog for Claude Code — capture, execute, review, ship.",
-    "version": "1.3.4"
+    "version": "1.3.5"
   },
   "plugins": [
     {
       "name": "hv-skills",
       "source": "./",
       "description": "Capture, execute, review, and ship work from a per-project backlog — with parallel subagents, systematic debugging, and durable knowledge capture.",
-      "version": "1.3.4",
+      "version": "1.3.5",
       "category": "development"
     }
   ]
