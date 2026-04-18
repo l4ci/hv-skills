@@ -60,7 +60,7 @@ Route each resolution:
 | Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
 | Leave as-is | Print *"Skipped `<branch>` — still in `status.json`."* and continue |
 
-If `AskUserQuestion` is unavailable on the host, fall back to the plain-text prompts: *"Merge or open a PR?"* and *"Resume or abandon?"* — honor the user's free-text reply.
+Plain-text fallback: *"Merge or open a PR?"* and *"Resume or abandon?"* — honor the user's free-text reply.
 
 ## Step 3 — Archive Completed Items
 
@@ -133,7 +133,7 @@ Route the answer:
 | Stop here | Print *"OK — run `/hv:next` again when you're ready."* and exit |
 | "Other" (free text) | Treat the user's text as the item spec; route to `/hv:work` |
 
-If `AskUserQuestion` isn't available on the host, fall back to plain-text: *"Work on this?"* and honor yes/no/"pick specific IDs" replies.
+Plain-text fallback: *"Work on this?"* — honor yes/no/"pick specific IDs" replies.
 
 ## Rules
 

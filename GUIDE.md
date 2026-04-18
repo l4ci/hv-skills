@@ -302,6 +302,14 @@ Every non-init skill runs `.hv/bin/hv-preflight` in its Step 1 to verify the pro
 
 If the helper itself is absent, the skill treats that as exit 2 — a fresh project has never installed hv-skills. Standardizing on this one helper means a partial install self-heals the same way from every skill, instead of each skill picking a different sentinel file and a different fallback behavior.
 
+## Host Question Conventions
+
+Every skill that needs user input calls Claude Code's `AskUserQuestion` tool. Other hosts (Gemini CLI, some Copilot builds) may not provide an equivalent, or the tool call itself may fail.
+
+When that happens, the skill falls back to plain text using the wording in its `Plain-text fallback:` line. A fallback **never loops**: ask once, either act on the reply or pick the Recommended interpretation and continue. Skills never stall on a missing tool, and they don't walk the user through the same decision twice.
+
+The fallback always offers the same semantic choices as the `AskUserQuestion` options — only the surface changes.
+
 ## Dependency Categories (used by /hv:refactor)
 
 When assessing each friction point, `/hv:refactor` classifies its dependencies into one of four categories. The classification drives the fix strategy.

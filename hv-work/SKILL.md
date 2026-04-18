@@ -65,7 +65,7 @@ When asking, use a single `AskUserQuestion` call with 1-3 questions. Each questi
 - Options map to concrete plans. Mark the most likely intent `(Recommended)`.
 - For conflicting items, use `multiSelect: true` and ask which subset to include in this run.
 
-If `AskUserQuestion` isn't available on the host, ask in plain text but only once — don't stall multi-turn. If you still can't decide after one round, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed.
+Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed. (See GUIDE.md § Host Question Conventions.)
 
 ## Step 3 — Register in Status
 

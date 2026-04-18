@@ -129,7 +129,7 @@ Map answers to config values:
 
 If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`); otherwise silently fall back to the Recommended value.
 
-If `AskUserQuestion` is unavailable on the current platform (Gemini CLI, Copilot CLI with no equivalent, or tool call fails), write the defaults straight through — don't stall the init on a missing tool.
+Plain-text fallback: write the Recommended defaults straight through — don't stall the init on a missing tool. (See GUIDE.md § Host Question Conventions.)
 
 Write the resolved config:
 
