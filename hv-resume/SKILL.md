@@ -1,10 +1,10 @@
 ---
-name: hv:resume
-description: Reorient after a context clear or a fresh session — shows active work streams reconciled against git, recent commits per stream, backlog counts, and routes to /hv:work, /hv:ship, or /hv:next. Use on "where was I", "pick up where I left off", "resume work", or right after /clear.
+name: hv-resume
+description: Reorient after a context clear or a fresh session — shows active work streams reconciled against git, recent commits per stream, backlog counts, and routes to /hv-work, /hv-ship, or /hv-next. Use on "where was I", "pick up where I left off", "resume work", or right after /clear.
 user-invocable: true
 ---
 
-# hv:resume — Pick Up Where You Left Off
+# hv-resume — Pick Up Where You Left Off
 
 Read-only reorientation. Surfaces active work, recent commits per branch, and backlog counts — then routes to the right next action. No mutation.
 
@@ -16,9 +16,9 @@ Read-only reorientation. Surfaces active work, recent commits per branch, and ba
 
 ## When NOT to Use
 
-- Nothing is in progress → `/hv:next` to pick work
-- You just want a state glance, no routing → `/hv:status`
-- You want to commit + ship → `/hv:ship`
+- Nothing is in progress → `/hv-next` to pick work
+- You just want a state glance, no routing → `/hv-status`
+- You want to commit + ship → `/hv-ship`
 
 ## Step 1 — Preflight
 
@@ -26,7 +26,7 @@ Read-only reorientation. Surfaces active work, recent commits per branch, and ba
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, tell the user *"Nothing tracked — run `/hv:init` first."* and stop. Don't auto-init: resume on an empty project has nothing to reorient around. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, tell the user *"Nothing tracked — run `/hv-init` first."* and stop. Don't auto-init: resume on an empty project has nothing to reorient around. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Reconcile Active Work
 
@@ -49,9 +49,9 @@ git log --no-merges --format='- %h %s' <base>..<branch> | head -5
 
 (Use `main` or `master` as base; match how `hv-reconcile` picked it.)
 
-If `worktreeMissing: true`, note *"(worktree was cleaned up — run `/hv:work` to re-create)"*.
+If `worktreeMissing: true`, note *"(worktree was cleaned up — run `/hv-work` to re-create)"*.
 
-**Check for a handoff note** from `/hv:pause`:
+**Check for a handoff note** from `/hv-pause`:
 
 ```bash
 HANDOFF=".hv/handoff/<branch>.md"
@@ -81,10 +81,10 @@ Active work:
       Stage: mid-hypothesis verification for B07
       Next: run the verification probe in MenuBarManager.swift:54
       Uncommitted: wip commit a1b2c3d
-    → Resume with /hv:work (handoff will be consumed)
+    → Resume with /hv-work (handoff will be consumed)
 
   `hv/auth-refresh` — [F07] (started 2026-04-18, 0 commits)
-    → In progress — run /hv:work to continue
+    → In progress — run /hv-work to continue
 
 Backlog: 4 bugs, 6 features, 2 tasks
 Knowledge: 5 topics
@@ -98,18 +98,18 @@ Then use `AskUserQuestion`. Build one question per stream (up to 4 streams in on
 
 | State | Recommended | Other options |
 |-------|-------------|---------------|
-| Handoff note present | "Resume with `/hv:work`" (consumes the note) | "Leave handoff for later", "Abandon branch" |
-| `hasCommits: true`, commits look complete, no handoff | "Ship via `/hv:ship`" | "Keep working with `/hv:work`", "Leave as-is" |
-| `hasCommits: true`, mid-implementation | "Resume with `/hv:work`" | "Ship via `/hv:ship`", "Leave as-is" |
-| `hasCommits: false`, no handoff | "Resume with `/hv:work`" | "Abandon branch", "Leave as-is" |
+| Handoff note present | "Resume with `/hv-work`" (consumes the note) | "Leave handoff for later", "Abandon branch" |
+| `hasCommits: true`, commits look complete, no handoff | "Ship via `/hv-ship`" | "Keep working with `/hv-work`", "Leave as-is" |
+| `hasCommits: true`, mid-implementation | "Resume with `/hv-work`" | "Ship via `/hv-ship`", "Leave as-is" |
+| `hasCommits: false`, no handoff | "Resume with `/hv-work`" | "Abandon branch", "Leave as-is" |
 
 If there are no active streams, skip the stream questions entirely and ask a single:
 
 - **Header:** `"Next"`
-- **Question:** *"No active streams. Pick new work with `/hv:next`?"*
-- **Options:** "Open backlog (Recommended)" (→ `/hv:next`) / "Stop here".
+- **Question:** *"No active streams. Pick new work with `/hv-next`?"*
+- **Options:** "Open backlog (Recommended)" (→ `/hv-next`) / "Stop here".
 
-Plain-text fallback: *"Resume one of these, or pick new work with `/hv:next`?"*
+Plain-text fallback: *"Resume one of these, or pick new work with `/hv-next`?"*
 
 ## Step 6 — Execute User's Choice
 
@@ -117,22 +117,22 @@ Route each stream's answer via the `Skill` tool. Pass the branch name and item I
 
 | Answer | Action |
 |--------|--------|
-| "Resume with `/hv:work`" | Invoke `hv:work` on the branch; if a handoff note was consumed, include its full content in the brief |
-| "Ship via `/hv:ship`" | Invoke `hv:ship` on the branch |
+| "Resume with `/hv-work`" | Invoke `hv-work` on the branch; if a handoff note was consumed, include its full content in the brief |
+| "Ship via `/hv-ship`" | Invoke `hv-ship` on the branch |
 | "Abandon branch" | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
 | "Leave as-is" / "Leave handoff for later" | Print *"Skipped `<branch>`."* and continue |
-| "Open backlog" | Invoke `hv:next` |
-| "Stop here" | Print *"OK — run `/hv:resume` again when you're ready."* and exit |
+| "Open backlog" | Invoke `hv-next` |
+| "Stop here" | Print *"OK — run `/hv-resume` again when you're ready."* and exit |
 
-**Handoff consumption**: only delete `.hv/handoff/<branch>.md` when the user chose to resume that specific branch. For "Leave handoff for later" and every other non-resume answer, the note stays in place so the next `/hv:resume` surfaces it again:
+**Handoff consumption**: only delete `.hv/handoff/<branch>.md` when the user chose to resume that specific branch. For "Leave handoff for later" and every other non-resume answer, the note stays in place so the next `/hv-resume` surfaces it again:
 
 ```bash
-rm .hv/handoff/<branch>.md   # only after dispatching /hv:work or /hv:debug
+rm .hv/handoff/<branch>.md   # only after dispatching /hv-work or /hv-debug
 ```
 
 ## Rules
 
 - **Minimal mutation.** Only two writes happen: `hv-reconcile` normalizes `status.json` (clears dead-branch entries, nulls missing worktree paths) and the handoff note is deleted after the user picks its branch to resume. `TODO.md` and `KNOWLEDGE.md` stay untouched.
 - **Trust git over status.** `hv-reconcile` already reconciles; don't second-guess its output.
-- **Don't re-plan.** If the user picks `/hv:work`, hand off — don't re-narrate the plan.
+- **Don't re-plan.** If the user picks `/hv-work`, hand off — don't re-narrate the plan.
 - **Silent on empty.** No active streams and an empty backlog → say *"Nothing in flight."* and stop. Don't manufacture work.

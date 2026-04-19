@@ -10,7 +10,7 @@ from pathlib import Path
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
-    print("No .hv/TODO.md yet. Run /hv:init then /hv:capture.")
+    print("No .hv/TODO.md yet. Run /hv-init then /hv-capture.")
     raise SystemExit(0)
 content = todo_path.read_text()
 
@@ -107,7 +107,7 @@ if tasks:
     out.append("")
 
 if not (active_entries or bugs or features or tasks):
-    out.append("Backlog empty. Run /hv:capture to add items.")
+    out.append("Backlog empty. Run /hv-capture to add items.")
 
 print("\n".join(out))
 PY

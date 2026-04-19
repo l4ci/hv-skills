@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify .hv/ is initialized and helpers are present.
 # Exit 0: fully initialized  |  Exit 2: uninitialized  |  Exit 3: partial install
-# Typical caller: `.hv/bin/hv-preflight || invoke hv:init via Skill tool`.
+# Typical caller: `.hv/bin/hv-preflight || invoke hv-init via Skill tool`.
 set -euo pipefail
 
 HV=".hv"

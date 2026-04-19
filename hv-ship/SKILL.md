@@ -1,31 +1,31 @@
 ---
-name: hv:ship
-description: Bundle completed work on a feature branch into a PR (or direct merge) — extracts commits, resolved item IDs with titles, optionally runs /hv:review, and calls hv-pr or hv-merge. Use on "ship it", "open the PR", "finish this branch", when work is done and you want to integrate.
+name: hv-ship
+description: Bundle completed work on a feature branch into a PR (or direct merge) — extracts commits, resolved item IDs with titles, optionally runs /hv-review, and calls hv-pr or hv-merge. Use on "ship it", "open the PR", "finish this branch", when work is done and you want to integrate.
 user-invocable: true
 ---
 
-# hv:ship — Finish a Feature Branch
+# hv-ship — Finish a Feature Branch
 
-Turn the commits on the current feature branch into either a GitHub PR or a direct merge. Optionally runs `/hv:review` first so the diff gets a staff-engineer pass before it leaves your machine.
+Turn the commits on the current feature branch into either a GitHub PR or a direct merge. Optionally runs `/hv-review` first so the diff gets a staff-engineer pass before it leaves your machine.
 
 ## Configuration
 
 Read `.hv/config.json`:
 
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
-- `ship.review` — `true` (default) runs `/hv:review` before integrating; `false` skips the review
+- `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
 
 ## When to Use
 
 - Feature branch has 1+ commits, work is done, you want to integrate
-- After `/hv:work` finished with `mergeStrategy: "pr"` and you want to open the PR now
+- After `/hv-work` finished with `mergeStrategy: "pr"` and you want to open the PR now
 - Any branch you want reviewed + merged/pushed in one pass
 
 ## When NOT to Use
 
-- Work is still in progress → finish implementing via `/hv:work`
+- Work is still in progress → finish implementing via `/hv-work`
 - Nothing committed yet → clean up, then come back
-- You want to resume a paused branch → `/hv:resume`
+- You want to resume a paused branch → `/hv-resume`
 
 ## Step 1 — Preflight
 
@@ -33,7 +33,7 @@ Read `.hv/config.json`:
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 Determine the current branch:
 
@@ -57,18 +57,18 @@ If `commitCount` is 0, tell the user the branch has no commits beyond the base a
 
 Read `ship.review` from `.hv/config.json`. Default `true`.
 
-If enabled, invoke `hv:review` via the `Skill` tool for this branch. Pass through the verdict:
+If enabled, invoke `hv-review` via the `Skill` tool for this branch. Pass through the verdict:
 
 - **PASS** → continue to Step 4
 - **CONCERNS** → surface each concern, then use `AskUserQuestion` to decide:
   - **Header:** `"Concerns"`
   - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
   - **Options** (single-select):
-    1. "Address via `/hv:work` (Recommended)" — *"Route the concerns to `/hv:work` as a fix list; rerun `/hv:ship` after."*
+    1. "Address via `/hv-work` (Recommended)" — *"Route the concerns to `/hv-work` as a fix list; rerun `/hv-ship` after."*
     2. "Ship anyway" — *"Proceed with the merge or PR despite the concerns."*
     3. "Stop" — *"Leave the branch as-is; no integration now."*
   - Plain-text fallback: *"Address first, ship anyway, or stop?"*
-- **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv:ship`.
+- **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
 
 If `ship.review` is `false`, skip this step.
 
@@ -133,7 +133,7 @@ Silently clears the entry if one existed. Harmless if not.
 
 ## Step 8 — Mark Unfinished Items Complete
 
-Most IDs are already completed by `/hv:work`. This catches manual commits that referenced IDs without closing them.
+Most IDs are already completed by `/hv-work`. This catches manual commits that referenced IDs without closing them.
 
 For each ID in the scope JSON's `referencedIds`:
 
@@ -162,7 +162,7 @@ Merged `hv/demo` into main — commit a1b2c3d
 Resolved: [B01] [F03]
 ```
 
-If `/hv:review` surfaced concerns that the user proceeded through, append them one-liner at the end.
+If `/hv-review` surfaced concerns that the user proceeded through, append them one-liner at the end.
 
 ## Key Principles
 

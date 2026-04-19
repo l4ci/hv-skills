@@ -1,10 +1,10 @@
 ---
-name: hv:capture
+name: hv-capture
 description: Capture bugs, features, and tasks into the project's TODO.md. Automatically classifies each item, assigns priority/size, and routes to the correct section with zero-padded auto-incrementing IDs ([B01], [F01], [T01]). Use when the user wants to capture any work item — bugs, features, tasks, or a mix.
 user-invocable: true
 ---
 
-# hv:capture — Capture Work Items
+# hv-capture — Capture Work Items
 
 Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
 
@@ -14,7 +14,7 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Parse & Classify
 
@@ -39,7 +39,7 @@ The user will provide a keyword, short phrase, or longer description — possibl
 
 For each item, gather **just enough context** to make it actionable later. Ask 2–4 quick questions total across all items — not per item.
 
-**Caller caps.** If the invoking args carry a speed-path signal from an upstream skill (e.g., a `(hv:go — cap clarification at 1-2 questions)` prefix), respect it — usually 1-2 questions max, often zero. `/hv:go` prioritizes speed over thoroughness; honoring the cap is what keeps that contract.
+**Caller caps.** If the invoking args carry a speed-path signal from an upstream skill (e.g., a `(hv-go — cap clarification at 1-2 questions)` prefix), respect it — usually 1-2 questions max, often zero. `/hv-go` prioritizes speed over thoroughness; honoring the cap is what keeps that contract.
 
 Pick from:
 
@@ -168,6 +168,6 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 - **Don't investigate now** — just capture
 - **Split mixed input** — route each item to the correct section with the correct ID type
 - **One set of questions for all items** — don't interrogate the user per-item
-- **Honor caller caps** — when invoked from a speed-path skill like `/hv:go`, respect the question cap signaled in the invoking args
+- **Honor caller caps** — when invoked from a speed-path skill like `/hv-go`, respect the question cap signaled in the invoking args
 - **Confirm what you wrote** — show the user every entry you added, grouped by section
 - **Always increment counters** — even if you're unsure, every ID must be unique

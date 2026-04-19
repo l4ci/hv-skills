@@ -1,24 +1,24 @@
 ---
-name: hv:pause
-description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv:resume in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv:work cycle cleanly.
+name: hv-pause
+description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv-resume in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
 user-invocable: true
 ---
 
-# hv:pause — Graceful Session Pause
+# hv-pause — Graceful Session Pause
 
-Capture the state living in the orchestrator's head — what you were about to do next, which hypothesis you were on, which files are mid-edit — into a handoff note. `/hv:resume` reads and deletes the note on the next session.
+Capture the state living in the orchestrator's head — what you were about to do next, which hypothesis you were on, which files are mid-edit — into a handoff note. `/hv-resume` reads and deletes the note on the next session.
 
 ## When to Use
 
 - Context window is filling up and you want to stop cleanly
-- You have to step away mid-`/hv:work` or mid-`/hv:debug` cycle
+- You have to step away mid-`/hv-work` or mid-`/hv-debug` cycle
 - Work will continue in a new session; git commits alone won't carry the intent
 
 ## When NOT to Use
 
-- Work is actually complete → `/hv:ship`
+- Work is actually complete → `/hv-ship`
 - You can finish in this session → just finish
-- No active branch / no `/hv:work` running → nothing to hand off
+- No active branch / no `/hv-work` running → nothing to hand off
 
 ## Step 1 — Preflight
 
@@ -26,7 +26,7 @@ Capture the state living in the orchestrator's head — what you were about to d
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, tell the user *"Nothing to pause — `/hv:init` the project first."* and stop. Don't auto-init: pause on an empty project has nothing to hand off. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, tell the user *"Nothing to pause — `/hv-init` the project first."* and stop. Don't auto-init: pause on an empty project has nothing to hand off. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Resolve the Branch
 
@@ -48,7 +48,7 @@ git status --porcelain
   - **Question:** *"N uncommitted files on `<branch>`. How should I handle them?"*
   - **Options** (single-select):
     1. "WIP commit (Recommended)" — *"`git add -A && git commit -m 'wip: pause before context cutoff'` — keeps changes on the branch."*
-    2. "Stash" — *"`git stash push -u -m 'hv:pause <branch>'` — keeps changes out of history."*
+    2. "Stash" — *"`git stash push -u -m 'hv-pause <branch>'` — keeps changes out of history."*
     3. "Leave in place" — *"No action; the handoff will note that the tree is dirty."*
   - Plain-text fallback: *"Wrap them in a `wip:` commit, stash them, or leave them in place?"*
 
@@ -78,7 +78,7 @@ Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the 
 
 ## Next planned step
 
-<one or two sentences — the concrete action /hv:resume should dispatch. Not a summary; a directive.>
+<one or two sentences — the concrete action /hv-resume should dispatch. Not a summary; a directive.>
 
 ## Current hypothesis (if debugging)
 
@@ -91,15 +91,15 @@ Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the 
 
 ## Uncommitted work
 
-<one of: "clean tree" / "stashed as `stash@{0}` — message: hv:pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
+<one of: "clean tree" / "stashed as `stash@{0}` — message: hv-pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
 
 ## Gotchas discovered
 
-<anything learned this session that isn't yet in KNOWLEDGE.md but would save /hv:resume from re-discovering it>
+<anything learned this session that isn't yet in KNOWLEDGE.md but would save /hv-resume from re-discovering it>
 
 ## Do not
 
-<things /hv:resume should NOT do — dead ends already ruled out, rabbit holes, wrong-turn fixes to revert>
+<things /hv-resume should NOT do — dead ends already ruled out, rabbit holes, wrong-turn fixes to revert>
 ```
 
 Use `Write` for the note (always overwrite — one handoff per branch).
@@ -107,7 +107,7 @@ Use `Write` for the note (always overwrite — one handoff per branch).
 ## Step 5 — Pin Status
 
 ```bash
-# Make sure status.json has the current branch so /hv:resume finds it
+# Make sure status.json has the current branch so /hv-resume finds it
 .hv/bin/hv-status-add <branch> <item-ids> [worktree-path]
 ```
 
@@ -124,7 +124,7 @@ Stage: mid-hypothesis verification for [B07]
 Next: run the verification probe in MenuBarManager.swift:54
 Uncommitted: wip commit a1b2c3d
 
-Resume with `/hv:resume` in a fresh session.
+Resume with `/hv-resume` in a fresh session.
 ```
 
 ## Rules
@@ -132,5 +132,5 @@ Resume with `/hv:resume` in a fresh session.
 - **Write what you know, not what you wish you knew.** The handoff is a snapshot of orchestrator state, not a task spec.
 - **One note per branch.** Overwrite on re-pause; don't accumulate stale notes.
 - **Never commit `.hv/handoff/`.** `.hv/` is gitignored, so this is automatic — but don't add an exception.
-- **`/hv:resume` owns cleanup.** Once resume has read and routed, it deletes the note. Don't self-delete here.
+- **`/hv-resume` owns cleanup.** Once resume has read and routed, it deletes the note. Don't self-delete here.
 - **No mutation beyond the handoff + optional wip/stash.** This skill's job is capture, not integration.

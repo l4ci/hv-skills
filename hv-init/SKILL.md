@@ -1,10 +1,10 @@
 ---
-name: hv:init
-description: Initialize the .hv/ folder structure with TODO.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also seeds a managed knowledge-index block in CLAUDE.md so future /hv:work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
+name: hv-init
+description: Initialize the .hv/ folder structure with TODO.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also seeds a managed knowledge-index block in CLAUDE.md so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
 user-invocable: true
 ---
 
-# hv:init — Initialize Project Backlog
+# hv-init — Initialize Project Backlog
 
 Set up the `.hv/` folder with data files and CLI helpers for a project.
 
@@ -25,21 +25,21 @@ git rev-parse --git-dir >/dev/null 2>&1
 
 If it **is** a repo, continue to Step 2.
 
-If it **isn't**, offer to initialize one — `/hv:work`, `/hv:debug`, `/hv:ship`, and `/hv:refactor` all require git, so running hv-skills here without a repo only gives access to the backlog-capture subset. Use `AskUserQuestion`:
+If it **isn't**, offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor` all require git, so running hv-skills here without a repo only gives access to the backlog-capture subset. Use `AskUserQuestion`:
 
 - **Header:** `"Git"`
 - **Question:** *"This directory isn't a git repository. Initialize one?"*
 - **Options** (single-select):
-  1. *"Yes, `git init` now (Recommended)"* — *"Run `git init` here; enables `/hv:work`, `/hv:debug`, `/hv:ship`, and `/hv:refactor`. Reversible with `rm -rf .git`."*
-  2. *"No, backlog-only"* — *"Skip init; `/hv:capture`, `/hv:next`, `/hv:learn`, `/hv:status` still work. Git-dependent skills will fail until you init manually."*
-  3. *"Stop"* — *"Cancel `/hv:init`; rerun when you're ready."*
+  1. *"Yes, `git init` now (Recommended)"* — *"Run `git init` here; enables `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor`. Reversible with `rm -rf .git`."*
+  2. *"No, backlog-only"* — *"Skip init; `/hv-capture`, `/hv-next`, `/hv-learn`, `/hv-status` still work. Git-dependent skills will fail until you init manually."*
+  3. *"Stop"* — *"Cancel `/hv-init`; rerun when you're ready."*
 
 On **Yes** — run `git init` and continue to Step 2. Mention the created branch in the Step 6 summary (one line, e.g., *"Initialized git repo on `main`."*).
 
 On **No** — continue to Step 2 but log a warning so the user isn't surprised later:
 
 ```
-Warning: not a git repository. /hv:work, /hv:debug, /hv:ship, /hv:refactor will fail here until you run `git init`.
+Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail here until you run `git init`.
 ```
 
 On **Stop** — surface the reason and exit.
@@ -72,7 +72,7 @@ EOF
 
 Durable learnings captured from sessions — gotchas, conventions, constraints, and hard-won debugging insights. Grouped by topic, newest first within each topic.
 
-Use `/hv:learn` at the end of a session to capture new learnings. `/hv:work` consults this file when its topics are relevant to the task.
+Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
 EOF
 
 [ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0}' > "$HV/counters.json"
@@ -123,7 +123,7 @@ PY
 Branch on the output:
 
 - `UP_TO_DATE` — existing config already matches the current schema. Skip the rest of this step.
-- `CORRUPT` — the file exists but isn't valid JSON. Tell the user to fix or delete `.hv/config.json`, then rerun `/hv:init`. Stop.
+- `CORRUPT` — the file exists but isn't valid JSON. Tell the user to fix or delete `.hv/config.json`, then rerun `/hv-init`. Stop.
 - `FRESH` — no config yet. Ask all four questions below, then write the full config (FRESH write block).
 - `STALE:key1,key2,…` — upgrade path. Ask **only** the questions that map to the listed missing keys, then merge the answers into the existing file via the STALE write block — every value already in the file stays untouched.
 
@@ -142,7 +142,7 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 
 **Q2 — Isolation** (`header: "Isolation"`, single-select)
 
-> *"How should `/hv:work` isolate changes from main?"*
+> *"How should `/hv-work` isolate changes from main?"*
 
 | Label | Description |
 |-------|-------------|
@@ -151,7 +151,7 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 
 **Q3 — Integration** (`header: "Integration"`, single-select)
 
-> *"How should `/hv:work` and `/hv:ship` integrate finished work?"*
+> *"How should `/hv-work` and `/hv-ship` integrate finished work?"*
 
 | Label | Description |
 |-------|-------------|
@@ -164,9 +164,9 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 
 | Label | Description |
 |-------|-------------|
-| Review before ship (Recommended) | `/hv:ship` runs `/hv:review` first. FAIL blocks, CONCERNS ask, PASS flows through. |
-| Verify learnings (Recommended) | `/hv:learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
-| Confirm before refactor (Recommended) | `/hv:refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
+| Review before ship (Recommended) | `/hv-ship` runs `/hv-review` first. FAIL blocks, CONCERNS ask, PASS flows through. |
+| Verify learnings (Recommended) | `/hv-learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
+| Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
 
 Map answers to config values:
 
@@ -266,7 +266,7 @@ All helpers are installed together and require `python3`. See `GUIDE.md` § CLI 
 
 ## Step 5 — Seed CLAUDE.md Knowledge Block
 
-Ensure `CLAUDE.md` in the project root contains a managed knowledge-index block. `/hv:learn` keeps this block in sync with `.hv/KNOWLEDGE.md` topics, and `/hv:work` reads it to know when to consult knowledge.
+Ensure `CLAUDE.md` in the project root contains a managed knowledge-index block. `/hv-learn` keeps this block in sync with `.hv/KNOWLEDGE.md` topics, and `/hv-work` reads it to know when to consult knowledge.
 
 Delegate to the helper — it creates `CLAUDE.md` if missing, updates the block in place if present, or appends it if `CLAUDE.md` exists without a block:
 
@@ -283,7 +283,7 @@ Tell the user one compact block:
 ```
 Initialized .hv/ in <project>.
 Config: <summary — "defaults" if all Recommended, else a one-liner e.g. "Balanced models, worktree isolation, PR merges, verifier on">.
-Next: /hv:capture to add items, /hv:next to pick work, /hv:learn to save learnings.
+Next: /hv-capture to add items, /hv-next to pick work, /hv-learn to save learnings.
 Edit .hv/config.json to change any of these later.
 ```
 

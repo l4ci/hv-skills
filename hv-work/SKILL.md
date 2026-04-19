@@ -1,10 +1,10 @@
 ---
-name: hv:work
+name: hv-work
 description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, and commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Trigger on "implement this", "build these", or any multi-step implementation request.
 user-invocable: true
 ---
 
-# hv:work
+# hv-work
 
 Orchestrator-driven parallel implementation with per-task verification and commits.
 
@@ -35,10 +35,10 @@ Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → V
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
-.hv/bin/hv-guard-clean "/hv:work"
+.hv/bin/hv-guard-clean "/hv-work"
 ```
 
 Non-zero exit = stop and surface the script's message.
@@ -81,7 +81,7 @@ Idempotent on branch name — call again with the worktree path once Step 5 crea
 
 From the conversation context:
 
-1. **Consult project knowledge.** Read the `hv:knowledge` block in `CLAUDE.md` for the current topic list. For topics that plausibly touch the planned work, pull just those sections:
+1. **Consult project knowledge.** Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. For topics that plausibly touch the planned work, pull just those sections:
 
    ```bash
    .hv/bin/hv-knowledge-query "Architecture" "Testing"
@@ -211,7 +211,7 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 If the session produced non-trivial learning material — **2 or more items resolved**, or **≥5 files touched**, or a **hard bug** that took multiple debug cycles — suggest capturing it while it's fresh:
 
-*"Capture learnings from this session? Run `/hv:learn` to save durable knowledge before context fades."*
+*"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
 
 One line, opt-in. Skip the nudge for single-item fixes or tasks that were pure mechanical changes. Don't repeat in the same session.
 
@@ -223,7 +223,7 @@ One line, opt-in. Skip the nudge for single-item fixes or tasks that were pure m
 
 Returns JSON: `{"features": N, "bugs": M}` — count of items completed since the last `refactor:` commit. If `features >= 5` or `bugs >= 10`, tell the user:
 
-*"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv:refactor` to clean up accumulated friction."*
+*"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
 
 Suggestion, not a blocker. Don't repeat in the same session.
 

@@ -1,10 +1,10 @@
 ---
-name: hv:refactor
+name: hv-refactor
 description: Run a full architectural refactor cycle — explores the codebase for friction, categorizes dependencies, designs competing approaches for structural changes, then fixes everything with parallel subagents. Use when you want to find and fix architectural issues.
 user-invocable: true
 ---
 
-# hv:refactor
+# hv-refactor
 
 Run a full architectural refactor cycle on the current codebase.
 
@@ -52,10 +52,10 @@ Every friction point gets classified into one of four categories — **in-proces
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
-.hv/bin/hv-guard-clean "/hv:refactor"
+.hv/bin/hv-guard-clean "/hv-refactor"
 ```
 
 Non-zero exit = stop and surface the script's message. Do not proceed until clean.

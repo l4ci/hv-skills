@@ -1,10 +1,10 @@
 ---
-name: hv:review
-description: Staff-engineer review of a feature branch before merge or PR — reads commits, diff, referenced item IDs, and matching KNOWLEDGE.md topics; dispatches an Opus reviewer that checks intent match, convention compliance, and quality. Returns PASS / CONCERNS / FAIL. Use on "review this", "check before I ship", "look over the branch", or implicitly from /hv:ship.
+name: hv-review
+description: Staff-engineer review of a feature branch before merge or PR — reads commits, diff, referenced item IDs, and matching KNOWLEDGE.md topics; dispatches an Opus reviewer that checks intent match, convention compliance, and quality. Returns PASS / CONCERNS / FAIL. Use on "review this", "check before I ship", "look over the branch", or implicitly from /hv-ship.
 user-invocable: true
 ---
 
-# hv:review — Pre-Merge Review
+# hv-review — Pre-Merge Review
 
 Read-only staff-engineer review of a feature branch against its original intent, project conventions, and obvious quality issues. No mutations, no commits — just a verdict.
 
@@ -16,14 +16,14 @@ Read `.hv/config.json`:
 
 ## When to Use
 
-- Before merging or opening a PR — typically invoked from `/hv:ship`
+- Before merging or opening a PR — typically invoked from `/hv-ship`
 - *"Review this branch"*, *"Second-opinion this"*, *"Look over what I've got"*
 - After manual commits to a branch you want validated before integrating
 
 ## When NOT to Use
 
-- Code is still in flight → finish implementing via `/hv:work`
-- You want to change code based on the review → `/hv:refactor` or a fresh `/hv:work` run
+- Code is still in flight → finish implementing via `/hv-work`
+- You want to change code based on the review → `/hv-refactor` or a fresh `/hv-work` run
 - Nothing committed yet → there's nothing to review
 
 ## Step 1 — Preflight
@@ -32,7 +32,7 @@ Read `.hv/config.json`:
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Scope the Review
 
@@ -52,7 +52,7 @@ If `commitCount` is 0, stop and tell the user.
 
 ## Step 3 — Consult KNOWLEDGE.md
 
-Read the `hv:knowledge` block in `CLAUDE.md` to see available topics. Pick topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
+Read the `hv-knowledge` block in `CLAUDE.md` to see available topics. Pick topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
 
 ```bash
 .hv/bin/hv-knowledge-query "Topic A" "Topic B"
@@ -135,16 +135,16 @@ Verdict: CONCERNS
 
 ## Step 7 — Route Based on Verdict
 
-- **PASS** — tell the user *"Ready to ship. Run `/hv:ship`."* Stop.
-- **CONCERNS** — if invoked from `/hv:ship`, return the verdict to the caller (it owns the decision). If invoked standalone, use `AskUserQuestion`:
+- **PASS** — tell the user *"Ready to ship. Run `/hv-ship`."* Stop.
+- **CONCERNS** — if invoked from `/hv-ship`, return the verdict to the caller (it owns the decision). If invoked standalone, use `AskUserQuestion`:
   - **Header:** `"Concerns"`
   - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
   - **Options** (single-select):
-    1. "Address via `/hv:work` (Recommended)" — *"Route the concerns to `/hv:work` as a fix list."*
-    2. "Ship anyway" — *"Hand off to `/hv:ship` with the concerns acknowledged."*
-    3. "Stop" — *"Leave it; rerun `/hv:review` later if you want another pass."*
+    1. "Address via `/hv-work` (Recommended)" — *"Route the concerns to `/hv-work` as a fix list."*
+    2. "Ship anyway" — *"Hand off to `/hv-ship` with the concerns acknowledged."*
+    3. "Stop" — *"Leave it; rerun `/hv-review` later if you want another pass."*
   - Plain-text fallback: *"Address now, proceed anyway, or stop?"*
-- **FAIL** — tell the user it would regress. Suggest fixing via `/hv:work` or `/hv:debug`. Don't route to `/hv:ship`.
+- **FAIL** — tell the user it would regress. Suggest fixing via `/hv-work` or `/hv-debug`. Don't route to `/hv-ship`.
 
 ## Rules
 

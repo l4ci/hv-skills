@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Detect hv-skills install type + current version, compare against latest
-# GitHub release, and emit JSON for /hv:update. Network access via `gh`.
+# GitHub release, and emit JSON for /hv-update. Network access via `gh`.
 #
 # Env overrides (for testing and airgapped use):
 #   HV_INSTALL_ROOT    — skip detection, use this path

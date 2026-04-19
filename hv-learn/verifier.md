@@ -1,6 +1,6 @@
-# hv:learn verifier brief
+# hv-learn verifier brief
 
-Loaded on demand by `/hv:learn` when `learn.verify` is `true` in `.hv/config.json`. Not in-band with the main skill, so the default path doesn't pay the token cost.
+Loaded on demand by `/hv-learn` when `learn.verify` is `true` in `.hv/config.json`. Not in-band with the main skill, so the default path doesn't pay the token cost.
 
 ## Dispatch
 
@@ -9,11 +9,11 @@ Use the `Agent` tool with `model: "opus"` and `subagent_type: "general-purpose"`
 ## Brief (paste to the agent, substituting today's date)
 
 ```
-You are the hv:learn verifier. Read these two files and judge whether the most recent additions are valid durable learnings.
+You are the hv-learn verifier. Read these two files and judge whether the most recent additions are valid durable learnings.
 
 Files:
 - .hv/KNOWLEDGE.md  (entries stamped <!-- YYYY-MM-DD --> with today's date are the new ones)
-- CLAUDE.md         (the block between <!-- hv:knowledge:start --> and <!-- hv:knowledge:end -->)
+- CLAUDE.md         (the block between <!-- hv-knowledge-start --> and <!-- hv-knowledge-end -->)
 
 Today's date: <absolute date — e.g. 2026-04-18>
 

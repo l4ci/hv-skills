@@ -1,10 +1,10 @@
 ---
-name: hv:debug
-description: Systematic root-cause investigation for a bug — reads the TODO entry + detail file, consults KNOWLEDGE.md, reproduces, hypothesizes, verifies, fixes with one atomic commit, and nudges /hv:learn. Use on "debug [B07]", "why is X broken", "investigate the crash", when a bug needs a proper cycle rather than a /hv:go shot.
+name: hv-debug
+description: Systematic root-cause investigation for a bug — reads the TODO entry + detail file, consults KNOWLEDGE.md, reproduces, hypothesizes, verifies, fixes with one atomic commit, and nudges /hv-learn. Use on "debug [B07]", "why is X broken", "investigate the crash", when a bug needs a proper cycle rather than a /hv-go shot.
 user-invocable: true
 ---
 
-# hv:debug — Systematic Bug Cycle
+# hv-debug — Systematic Bug Cycle
 
 Full reproduce → hypothesize → verify → fix cycle for a single bug. Anchors to a `[B##]` ID so the fix commit closes the backlog entry and the learning gets routed back to `KNOWLEDGE.md`.
 
@@ -24,9 +24,9 @@ Read `.hv/config.json`:
 
 ## When NOT to Use
 
-- Trivial fix with an obvious one-liner → `/hv:go`
-- Multiple items in one pass → `/hv:work`
-- You don't have a reproducer and the bug isn't captured → `/hv:capture` first
+- Trivial fix with an obvious one-liner → `/hv-go`
+- Multiple items in one pass → `/hv-work`
+- You don't have a reproducer and the bug isn't captured → `/hv-capture` first
 
 ## Flow
 
@@ -40,10 +40,10 @@ Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → F
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ```bash
-.hv/bin/hv-guard-clean "/hv:debug"
+.hv/bin/hv-guard-clean "/hv-debug"
 ```
 
 Non-zero = stop.
@@ -55,11 +55,11 @@ If the user named a `[B##]`:
 - Read that line from `.hv/TODO.md`
 - If `Detail:` points at `.hv/bugs/B##.md`, read the detail file too
 
-If the user described a symptom without an ID, invoke `hv:capture` via the `Skill` tool first so the bug gets logged — then resume here with the new ID.
+If the user described a symptom without an ID, invoke `hv-capture` via the `Skill` tool first so the bug gets logged — then resume here with the new ID.
 
 ## Step 3 — Consult KNOWLEDGE.md
 
-Read the `hv:knowledge` block in `CLAUDE.md` for the current topic list. Pull topics that plausibly touch the symptom (e.g., `Networking`, `Persistence`, `Concurrency`):
+Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. Pull topics that plausibly touch the symptom (e.g., `Networking`, `Persistence`, `Concurrency`):
 
 ```bash
 .hv/bin/hv-knowledge-query "Topic A" "Topic B"
@@ -157,7 +157,7 @@ fix: <short imperative> [B##]
 <optional body with the root cause in 1-2 sentences>
 ```
 
-The worker reads, edits, stages, and commits in one pass. Standard `/hv:work` rules apply.
+The worker reads, edits, stages, and commits in one pass. Standard `/hv-work` rules apply.
 
 ## Step 9 — Verify the Fix
 
@@ -189,17 +189,17 @@ Use `AskUserQuestion` for the next move:
 - **Header:** `"Next"`
 - **Question:** *"Fix for [B##] is committed. What's next?"*
 - **Options** (single-select):
-  1. "Ship via `/hv:ship` (Recommended)" — *"Run the review gate and integrate."*
+  1. "Ship via `/hv-ship` (Recommended)" — *"Run the review gate and integrate."*
   2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
   3. "Stop here" — *"Leave the branch; come back later."*
 
-Plain-text fallback: *"Merge now with `/hv:ship`, or keep it on the branch for more work?"*
+Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
 
 ## Step 12 — Learn Nudge
 
 A debugged bug with a non-obvious root cause is textbook `KNOWLEDGE.md` material. If the root cause was not obvious from reading the code alone (required verification, contradicted an initial hypothesis, or involved a known-tricky subsystem), tell the user:
 
-*"Capture this gotcha? Run `/hv:learn` to save the root cause before context fades."*
+*"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
 
 Skip the nudge for trivial fixes (typo, off-by-one that was immediately obvious).
 

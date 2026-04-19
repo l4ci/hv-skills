@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Scope a review: list commits, touched files, referenced IDs, and the
-# original TODO entries those IDs point at. Emits JSON so /hv:review can
+# original TODO entries those IDs point at. Emits JSON so /hv-review can
 # build its agent brief in one step.
 # Usage: hv-review-scope [branch]   # defaults to current branch
 set -euo pipefail

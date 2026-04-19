@@ -9,7 +9,7 @@ from pathlib import Path
 
 todo = Path(".hv/TODO.md")
 if not todo.exists():
-    print("No .hv/ yet — run /hv:init.")
+    print("No .hv/ yet — run /hv-init.")
     raise SystemExit(0)
 content = todo.read_text()
 

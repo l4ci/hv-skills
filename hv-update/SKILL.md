@@ -1,16 +1,16 @@
 ---
-name: hv:update
-description: Check for a newer hv-skills release on GitHub and tell the user how to update — detects install type (plugin, stow, repo clone), compares plugin.json version against the latest release, and prints the exact update command. Read-only; does not run the update itself. Use on "check for updates", "is hv-skills up to date", before long /hv:work sessions.
+name: hv-update
+description: Check for a newer hv-skills release on GitHub and tell the user how to update — detects install type (plugin, stow, repo clone), compares plugin.json version against the latest release, and prints the exact update command. Read-only; does not run the update itself. Use on "check for updates", "is hv-skills up to date", before long /hv-work sessions.
 user-invocable: true
 ---
 
-# hv:update — Check for hv-skills Updates
+# hv-update — Check for hv-skills Updates
 
 Diagnose whether the installed hv-skills is current, and tell the user how to update if not. Never runs the update itself — too many install paths to get right automatically.
 
 ## When to Use
 
-- Before starting a long `/hv:work` session and you want current helpers
+- Before starting a long `/hv-work` session and you want current helpers
 - *"Is hv-skills up to date?"*, *"Check for updates"*, *"What version am I on?"*
 - After noticing a skill behaves unexpectedly — maybe the install is stale
 
@@ -33,7 +33,7 @@ If missing, tell the user the check needs `gh` (or `brew install gh` / equivalen
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool to refresh helpers, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool to refresh helpers, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Run the Check
 
@@ -70,7 +70,7 @@ Installed as plugin at ~/.claude/plugins/hv-skills.
 Update:
   claude plugin update hv-skills
 
-After updating, run /hv:init in your project to refresh .hv/bin/ helpers.
+After updating, run /hv-init in your project to refresh .hv/bin/ helpers.
 ```
 
 **`ahead`:**
@@ -90,13 +90,13 @@ Latest: <not reachable — check `gh auth status` or network>
 
 ## Step 4 — Offer to Re-Init
 
-Only when `status` is `behind` and the user has run the update command: a fresh release may ship new helpers or config defaults. Tell them to run `/hv:init` in each project that uses hv-skills to refresh `.hv/bin/` scripts.
+Only when `status` is `behind` and the user has run the update command: a fresh release may ship new helpers or config defaults. Tell them to run `/hv-init` in each project that uses hv-skills to refresh `.hv/bin/` scripts.
 
-Don't auto-invoke `/hv:init` — the user may want to update multiple projects.
+Don't auto-invoke `/hv-init` — the user may want to update multiple projects.
 
 ## Rules
 
 - **Read-only.** Never invoke the update command yourself. Surface it, let the user run it.
 - **Network-dependent.** If `gh` can't reach the API, report `unknown` and stop — don't retry on a loop.
 - **Honor dev builds.** An `ahead` status is not an error; contributors run that way.
-- **Helpers refresh is separate.** Upgrading the plugin does not rewrite `.hv/bin/` in existing projects. The user runs `/hv:init` per project to pick up new helpers.
+- **Helpers refresh is separate.** Upgrading the plugin does not rewrite `.hv/bin/` in existing projects. The user runs `/hv-init` per project to pick up new helpers.

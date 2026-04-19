@@ -1,10 +1,10 @@
 ---
-name: hv:learn
+name: hv-learn
 description: Extract durable session learnings (gotchas, conventions, constraints) into .hv/KNOWLEDGE.md grouped by topic, and update the CLAUDE.md topic index. Opus verification is on by default via learn.verify in config.json; set to false for fast/cheap mode.
 user-invocable: true
 ---
 
-# hv:learn — Capture Session Learnings
+# hv-learn — Capture Session Learnings
 
 Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, organized by topic, so it's available to future work.
 
@@ -14,11 +14,11 @@ Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, orga
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv:init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
 
 ## Step 2 — Scan the Session for Learnings
 
-A learning is worth capturing if it would save a future `/hv:work` run from re-discovering it.
+A learning is worth capturing if it would save a future `/hv-work` run from re-discovering it.
 
 **Capture:**
 
@@ -74,7 +74,7 @@ Use `Edit` for surgical updates, not `Write`.
 .hv/bin/hv-knowledge-index
 ```
 
-Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv:knowledge:start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv:work` reads this block to know when to consult `KNOWLEDGE.md`.
+Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
 
 ## Step 7 — Opus Verification (default)
 
@@ -89,14 +89,14 @@ Captured 3 learnings into .hv/KNOWLEDGE.md:
   Testing (2 new)
   Networking (1 new)
 
-Updated CLAUDE.md topic index — /hv:work will consult these on relevant tasks.
+Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 ```
 
 If verification ran and passed, add a middle line: `Opus verification: PASS — all entries durable, sharp, correctly categorized.` If it returned `PASS_WITH_NOTES`, replace that line with a one-liner naming what was adjusted. If it failed, say so and stop.
 
 ## Key Principles
 
-- **Durable, not ephemeral.** If it only matters this week, it's a TODO. Use `/hv:capture`.
+- **Durable, not ephemeral.** If it only matters this week, it's a TODO. Use `/hv-capture`.
 - **Preserve existing structure.** Edit surgically; never regenerate the whole file.
 - **Sharp and short.** One sentence with a concrete claim. If you need a paragraph, link to code instead.
 - **Today's date.** Always stamp with the absolute current date.

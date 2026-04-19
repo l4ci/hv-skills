@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Regenerate the managed <!-- hv:knowledge:start --> block in CLAUDE.md from .hv/KNOWLEDGE.md topics.
+# Regenerate the managed <!-- hv-knowledge-start --> block in CLAUDE.md from .hv/KNOWLEDGE.md topics.
 # Usage: hv-knowledge-index
 # Creates CLAUDE.md if missing. Preserves all other content.
+# Back-compat: also recognizes the legacy <!-- hv:knowledge:start --> markers and migrates them.
 set -euo pipefail
 python3 - <<'PY'
 import re
@@ -18,14 +19,14 @@ if knowledge.exists():
 if topics:
     topic_lines = "\n".join(f"- {t}" for t in topics)
 else:
-    topic_lines = "- _(no topics yet — run `/hv:learn` to capture learnings)_"
+    topic_lines = "- _(no topics yet — run `/hv-learn` to capture learnings)_"
 
 block = (
-    "<!-- hv:knowledge:start -->\n"
+    "<!-- hv-knowledge-start -->\n"
     "## Project Knowledge\n\n"
     "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n"
     f"{topic_lines}\n\n"
-    "<!-- hv:knowledge:end -->"
+    "<!-- hv-knowledge-end -->"
 )
 
 claude = Path("CLAUDE.md")
@@ -34,8 +35,10 @@ if not claude.exists():
     print("created")
 else:
     content = claude.read_text()
+    # Match either the new dashed markers or the legacy colon markers.
+    # Matching blocks (including legacy ones) get replaced with the new-format block.
     pattern = re.compile(
-        r"<!-- hv:knowledge:start -->.*?<!-- hv:knowledge:end -->",
+        r"<!-- hv(?:-knowledge-start|:knowledge:start) -->.*?<!-- hv(?:-knowledge-end|:knowledge:end) -->",
         re.DOTALL,
     )
     if pattern.search(content):
