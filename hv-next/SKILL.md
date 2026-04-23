@@ -84,7 +84,9 @@ Identify **clusters**: groups of 2+ connected items. These inform Step 6.
 
 Prints pre-sorted markdown tables: "In Progress" (active items from `status.json`), "Bugs" (P0→P2), "Features" (Cosmetic→Major), "Tasks". Empty sections are omitted. If the backlog is empty, the helper prints a placeholder — pass it through and stop.
 
-Pass the helper's output through to the user verbatim. Then, if clusters exist from Step 4, add a brief note after the tables:
+**Always print the full helper output verbatim — every row, every section.** Do not summarize, truncate, omit rows, collapse sections, wrap in code fences, or replace with a count ("12 bugs pending"). The user invoked `/hv-next` specifically to *see* the backlog; a missing or shortened table defeats the command. This applies even if the table is long or a word-budget hint suggests otherwise — backlog tables are exempt from response-length limits.
+
+Then, if clusters exist from Step 4, add a brief note after the tables:
 
 ```
 Clusters:
@@ -138,6 +140,7 @@ Plain-text fallback: *"Work on this?"* — honor yes/no/"pick specific IDs" repl
 ## Rules
 
 - **No noise** — never report on a step that found nothing. Silence is signal.
+- **Backlog table is mandatory** — Step 5 output must always reach the user in full. No row-count summaries, no "…and 8 more", no dropping sections, no placing the table inside a collapsed block. If the response would otherwise be trimmed, shorten *your* prose (suggestion, clusters, questions) before touching the table.
 - **Pass full context to /hv-work** — include TODO.md descriptions so work doesn't re-read.
 - **Reference items by ID** — `[B01]`, `[F03]`, `[T02]` in suggestions and messages.
 - **Git is the source of truth** — if `status.json` disagrees with git state, trust git.
