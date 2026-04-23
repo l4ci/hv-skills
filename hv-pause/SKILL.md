@@ -127,6 +127,12 @@ Uncommitted: wip commit a1b2c3d
 Resume with `/hv-resume` in a fresh session.
 ```
 
+**Learn nudge (conditional).** Pausing = context loss. If the Step 4 handoff populated a non-trivial **Gotchas discovered** section, the session learned something durable that `/hv-resume` in a new context won't carry forward. Before the user walks away, suggest one line:
+
+*"Handoff has N gotchas. Run `/hv-learn` now to preserve them durably — the handoff gets deleted on `/hv-resume`."*
+
+Skip if Gotchas was empty, a single trivial note, or `/hv-learn` already ran this session. Don't block the pause — the nudge is advisory.
+
 ## Rules
 
 - **Write what you know, not what you wish you knew.** The handoff is a snapshot of orchestrator state, not a task spec.
