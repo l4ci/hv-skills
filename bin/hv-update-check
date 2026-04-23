@@ -36,6 +36,25 @@ resolve_root() {
       return
     fi
   done
+  # Stow dev layout: individual skill dirs are symlinked into a skills root
+  # (e.g. ~/.claude/skills/hv-update -> ~/Code/hv-skills/hv-update). Stow
+  # doesn't symlink .claude-plugin/, so plugin.json doesn't sit under the
+  # skills root — follow a known skill symlink to its parent instead.
+  for stow_link in \
+    "$HOME"/.claude/skills/hv-update \
+    "$HOME"/.agents/skills/hv-update \
+    "$HOME"/.claude/skills/hv-init \
+    "$HOME"/.agents/skills/hv-init; do
+    if [ -L "$stow_link" ] && [ -d "$stow_link" ]; then
+      # cd -P resolves the symlink so the following `..` strips the
+      # physical target's last component, not the symlink path's.
+      repo_root="$(cd -P "$stow_link" 2>/dev/null && cd .. && pwd -P)"
+      if [ -n "$repo_root" ] && [ -f "$repo_root/.claude-plugin/plugin.json" ]; then
+        echo "stow|$repo_root"
+        return
+      fi
+    fi
+  done
   # Repo clone — walk up from this script.
   SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
   for up in "$SELF_DIR" "$SELF_DIR/.." "$SELF_DIR/../.."; do
@@ -97,7 +116,7 @@ else:
 
 commands = {
     "plugin": "claude plugin update hv-skills",
-    "stow":   "cd ~/Code/hv-skills && git pull",
+    "stow":   f"cd {root} && git pull" if root else "cd ~/Code/hv-skills && git pull",
     "repo":   f"cd {root} && git pull" if root else "git pull in your hv-skills clone",
     "override": "manual — HV_INSTALL_ROOT was set",
     "unknown":  "reinstall: claude plugin install hv-skills",
