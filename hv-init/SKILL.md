@@ -84,9 +84,32 @@ if [ -f .gitignore ]; then
 else
   printf '# ── hv backlog ──\n.hv/\n' > .gitignore
 fi
+
+# Migrate KNOWLEDGE.md preamble from legacy /hv:X to /hv-X (Claude Code
+# normalizes colons; the rename shipped in plugin 1.3.6+). Only rewrites
+# the preamble region — captured learning bullets are never touched.
+if [ -f "$HV/KNOWLEDGE.md" ] && grep -q '^Use `/hv:' "$HV/KNOWLEDGE.md"; then
+  python3 - <<'PY'
+from pathlib import Path
+import re
+p = Path(".hv/KNOWLEDGE.md")
+lines = p.read_text().splitlines(keepends=True)
+# Preamble is the run from line 1 until the first "## " topic heading.
+changed = False
+for i, line in enumerate(lines):
+    if line.startswith("## "):
+        break
+    new = re.sub(r"/hv:([a-z][a-z0-9-]*)", r"/hv-\1", line)
+    if new != line:
+        lines[i] = new
+        changed = True
+if changed:
+    p.write_text("".join(lines))
+PY
+fi
 ```
 
-Data files are never overwritten if they already exist. `config.json` is created interactively in Step 3.
+Data files are never overwritten if they already exist (preamble migration is surgical — touches only `/hv:X` → `/hv-X` in lines above the first `## Topic` heading, never captured bullets). `config.json` is created interactively in Step 3.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
 
