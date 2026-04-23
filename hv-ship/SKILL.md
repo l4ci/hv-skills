@@ -143,6 +143,16 @@ For each ID in the scope JSON's `referencedIds`:
 
 `hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `TODO.md` entirely) produce an error. No grep needed.
 
+## Step 8.5 — Learn Nudge
+
+Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh. Use the same threshold as `/hv-work`: **2+ items resolved**, OR **≥5 files touched** (from the scope JSON's `touchedFiles`), OR a **hard bug** that took multiple debug cycles to land.
+
+If triggered, append one line to the Step 9 report:
+
+*"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
+
+Skip when: single trivial item, pure mechanical work, or the branch is a straight dependency bump. Don't nudge if `/hv-learn` already ran this session.
+
 ## Step 9 — Report to User
 
 One compact block.
