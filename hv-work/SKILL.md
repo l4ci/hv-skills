@@ -41,7 +41,29 @@ If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool
 .hv/bin/hv-guard-clean "/hv-work"
 ```
 
-Non-zero exit = stop and surface the script's message.
+Exit 0 = clean, continue. Exit 2 = not a repo, surface and stop.
+
+**Exit 1 (dirty tree) — auto-sweep known tool siblings first.** Some toolchains generate sibling files *after* a previous `/hv-work` wave finished (Godot `.gd.uid`, Xcode `.xcworkspace/contents.xcworkspacedata`, SwiftPM `Package.resolved`, Tuist-regenerated `.xcodeproj`, `.DS_Store`). If these are all that's dirty, they belong in a `chore:` commit, not a refusal.
+
+```bash
+git status --porcelain
+```
+
+Classify every line:
+
+- **Sibling artifact** — path matches a sibling of a tracked file (e.g. `Foo.gd.uid` next to tracked `Foo.gd`), or matches one of these patterns: `*.gd.uid`, `*.xcworkspace/contents.xcworkspacedata`, `Package.resolved`, `*.xcodeproj/project.pbxproj` regenerated without meaningful diff, `.DS_Store`.
+- **User change** — anything else.
+
+If **every** dirty path is a sibling artifact, sweep them into a single commit and continue:
+
+```bash
+git add -A -- <matching paths>
+git commit -m "chore: sweep tool-generated siblings before hv-work"
+```
+
+If **any** path is a user change, stop with the original guard message — the user decides whether to stash, commit, or discard.
+
+Don't narrate the sweep unless it happened; silent pass-through is the common case.
 
 ## Step 2 — Clarify Ambiguous Briefs (only when needed)
 
@@ -158,6 +180,27 @@ Orchestrator verifies internally (don't narrate):
 ## Step 8 — Sequential Waves
 
 For dependent tasks: wait for wave 1 to complete and verify, then dispatch wave 2 with updated context. Same verification.
+
+## Step 8.5 — Sweep Tool-Generated Siblings
+
+Some toolchains produce sibling artifacts when they first see a new source file — Godot's `.gd.uid`, Xcode's regenerated project plists, SwiftPM's `Package.resolved`. Workers often create source files without triggering the tool, leaving the siblings untracked. If left alone, the NEXT `/hv-work` hits Step 1's dirty-tree guard and refuses.
+
+Before moving to the merge step, commit any remaining sibling artifacts as a single `chore:`:
+
+```bash
+git status --porcelain
+```
+
+If any lines match the sibling patterns from Step 1 (`*.gd.uid`, `*.xcworkspace/contents.xcworkspacedata`, `Package.resolved`, `.DS_Store`, or siblings of tracked files touched in this cycle):
+
+```bash
+git add -A -- <matching paths>
+git commit -m "chore: track tool-generated siblings"
+```
+
+If the tree has non-sibling dirt, surface it — a worker produced unexpected changes and the orchestrator should investigate before merging.
+
+For projects where a tool regenerates siblings only when the editor loads (Godot `class_name`, for example): if the cycle introduced new `class_name` declarations and `.gd.uid` files are missing, force generation once with the tool's headless mode before the sweep — e.g., `godot --headless --editor --quit`. Project-specific commands should be captured in `KNOWLEDGE.md` so subsequent cycles learn the right invocation.
 
 ## Step 9 — Update TODO.md
 
