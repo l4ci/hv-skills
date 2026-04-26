@@ -48,9 +48,11 @@ def parse_items(body):
         tag = tagm.group(1) if tagm else ""
         titlem = re.match(r"(.+?)\.\*\*", after_id)
         title = titlem.group(1).strip() if titlem else "?"
-        relm = re.search(r"Related:\s*([^\n]*?)(?:\s+Detail:|$)", line)
+        relm = re.search(r"Related:\s*([^\n]*?)(?:\s+(?:Detail|Milestone):|$)", line)
         related = relm.group(1).strip().rstrip(".") if relm else ""
-        items.append({"id": item_id, "tag": tag, "title": title, "related": related})
+        msm = re.search(r"Milestone:\s*([^\n]*?)(?:\s+(?:Detail|Related):|$)", line)
+        milestones = ", ".join(re.findall(r"M\d+", msm.group(1))) if msm else ""
+        items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones})
     return items
 
 bugs = [i for i in parse_items(section_body("Bugs")) if i["id"] not in active_ids]
@@ -82,29 +84,25 @@ if active_entries:
             out.append(f"| {iid} | {title_of(iid)} | {branch} | {started} |")
     out.append("")
 
-if bugs:
-    out.append("### Bugs\n")
-    out.append("| ID | Prio | Title | Related |")
-    out.append("|----|------|-------|---------|")
-    for i in bugs:
-        out.append(f"| {i['id']} | {i['tag']} | {i['title']} | {i['related']} |")
+def render_table(label, items, base_headers, row_fn):
+    if not items:
+        return
+    show_ms = any(i["milestone"] for i in items)
+    headers = list(base_headers) + (["Milestone"] if show_ms else [])
+    out.append(f"### {label}\n")
+    out.append("| " + " | ".join(headers) + " |")
+    out.append("|" + "|".join("----" for _ in headers) + "|")
+    for i in items:
+        row = row_fn(i) + ([i["milestone"]] if show_ms else [])
+        out.append("| " + " | ".join(row) + " |")
     out.append("")
 
-if features:
-    out.append("### Features\n")
-    out.append("| ID | Size | Title | Related |")
-    out.append("|----|------|-------|---------|")
-    for i in features:
-        out.append(f"| {i['id']} | {i['tag']} | {i['title']} | {i['related']} |")
-    out.append("")
-
-if tasks:
-    out.append("### Tasks\n")
-    out.append("| ID | Title | Related |")
-    out.append("|----|-------|---------|")
-    for i in tasks:
-        out.append(f"| {i['id']} | {i['title']} | {i['related']} |")
-    out.append("")
+render_table("Bugs", bugs, ["ID", "Prio", "Title", "Related"],
+             lambda i: [i["id"], i["tag"], i["title"], i["related"]])
+render_table("Features", features, ["ID", "Size", "Title", "Related"],
+             lambda i: [i["id"], i["tag"], i["title"], i["related"]])
+render_table("Tasks", tasks, ["ID", "Title", "Related"],
+             lambda i: [i["id"], i["title"], i["related"]])
 
 if not (active_entries or bugs or features or tasks):
     out.append("Backlog empty. Run /hv-capture to add items.")

@@ -53,7 +53,7 @@ Run this in the project root:
 ```bash
 set -euo pipefail
 HV=".hv"
-mkdir -p "$HV"/{bugs,features,tasks,bin}
+mkdir -p "$HV"/{bugs,features,tasks,milestones,bin}
 
 [ -f "$HV/TODO.md" ] || cat > "$HV/TODO.md" <<'EOF'
 # TODO
@@ -75,7 +75,30 @@ Durable learnings captured from sessions — gotchas, conventions, constraints, 
 Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
 EOF
 
-[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0}' > "$HV/counters.json"
+[ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
+# Vision
+
+_(no vision yet — run `/hv-vision` to brainstorm milestones)_
+
+## Active milestones
+
+_(none active — set with `/hv-vision`)_
+
+## Milestones
+EOF
+
+[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > "$HV/counters.json"
+
+# Migrate older counters.json that predates the milestones key.
+python3 - <<'PY'
+import json
+from pathlib import Path
+p = Path(".hv/counters.json")
+d = json.loads(p.read_text())
+if "milestones" not in d:
+    d["milestones"] = 0
+    p.write_text(json.dumps(d) + "\n")
+PY
 
 [ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"
 
@@ -287,17 +310,18 @@ cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
 
 All helpers are installed together and require `python3`. See `GUIDE.md` § CLI Helpers for the full reference of what each one does.
 
-## Step 5 — Seed CLAUDE.md Knowledge Block
+## Step 5 — Seed CLAUDE.md Knowledge & Vision Blocks
 
-Ensure `CLAUDE.md` in the project root contains a managed knowledge-index block. `/hv-learn` keeps this block in sync with `.hv/KNOWLEDGE.md` topics, and `/hv-work` reads it to know when to consult knowledge.
+Ensure `CLAUDE.md` in the project root contains the two managed blocks — one for knowledge topics, one for active milestones. `/hv-learn` keeps the knowledge block in sync; `/hv-vision` keeps the vision block in sync. `/hv-work` reads both to know when to consult knowledge and which milestone the work belongs to.
 
-Delegate to the helper — it creates `CLAUDE.md` if missing, updates the block in place if present, or appends it if `CLAUDE.md` exists without a block:
+Delegate to the helpers — each creates `CLAUDE.md` if missing, updates its block in place if present, or appends it if `CLAUDE.md` exists without a block:
 
 ```bash
 .hv/bin/hv-knowledge-index
+.hv/bin/hv-vision-index
 ```
 
-The helper never touches any other content in `CLAUDE.md`.
+Neither helper touches any other content in `CLAUDE.md`.
 
 ## Step 6 — Confirm
 

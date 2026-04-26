@@ -33,6 +33,7 @@
 | ♻️ **Backlog reconciliation** — `/hv-next` validates `status.json` against git state, auto-cleans stale entries | 🐛 **Systematic debugging** — `/hv-debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv-learn` |
 | 🚢 **Review-gated shipping** — `/hv-ship` runs `/hv-review` against original intent + conventions before PR or merge | 💾 **Context-clear recovery** — `/hv-resume` re-reads active streams with recent commits and routes you back to work |
 | 🔧 **Refactor cycles** — `/hv-refactor` explores friction, designs competing approaches, fixes in parallel | 🤝 **Graceful handoff** — `/hv-pause` writes what's in your head (hypothesis, next step, mid-edit files) so `/hv-resume` picks up after a `/clear` |
+| 🧭 **Vision & milestones** — `/hv-vision` brainstorms milestones with web research and deliberate challenge, then `/hv-next`, `/hv-resume`, `/hv-pause`, and `/hv-status` keep work scoped to the active set | 🔗 **Loose milestone tags** — items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
 
 ## Quick start
 
@@ -47,13 +48,14 @@ claude plugin install hv-skills
 /hv-next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 19 CLI helpers, and a managed knowledge-index block in `CLAUDE.md`. `/hv-init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
+First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, 25 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
-| `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-vision` | Brainstorm a project's bigger vision and milestones — Socratic discovery, web research, deliberate challenge, then writes `MILESTONES.md` + per-milestone detail files |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-c` | Shortcut for `/hv-capture` |
 | `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
@@ -73,17 +75,22 @@ First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, 19 CLI
 
 ```mermaid
 flowchart LR
+  VISION["/hv-vision"] --> MILES[(MILESTONES.md)]
   CAP["/hv-capture"] --> TODO[(TODO.md)]
+  CAP -.tag.-> MILES
   GO["/hv-go"] --> TODO
   GO -.one-pass.-> WORK
   TODO --> NEXT["/hv-next"]
+  MILES -.scopes.-> NEXT
   NEXT --> WORK["/hv-work"]
   STATUS["/hv-status"] -.reads.-> TODO
+  STATUS -.reads.-> MILES
   WORK -.pause.-> PAUSE["/hv-pause"]
   DEBUG -.pause.-> PAUSE
   PAUSE --> HANDOFF[(.hv/handoff/)]
   RESUME["/hv-resume"] -.reads.-> TODO
   RESUME -.reads.-> HANDOFF
+  RESUME -.reads.-> MILES
   RESUME -.routes.-> WORK
   RESUME -.routes.-> SHIP
   WORK --> COMMIT[(atomic commits)]
@@ -125,13 +132,15 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 .hv/
 ├── TODO.md           # bugs, features, tasks, recent completions
 ├── KNOWLEDGE.md      # durable learnings, grouped by topic
+├── MILESTONES.md     # vision paragraph + milestone overview
 ├── ARCHIVE.md        # completions older than 5 days
 ├── counters.json     # auto-incrementing IDs
 ├── config.json       # models, isolation, merge, verify
 ├── status.json       # active work streams
 ├── bugs/ features/ tasks/   # overflow detail files
+├── milestones/       # one detail file per milestone (M01.md, M02.md, ...)
 ├── handoff/          # /hv-pause notes, one per branch; /hv-resume consumes them
-└── bin/              # 19 CLI helpers — see GUIDE.md § CLI Helpers
+└── bin/              # 25 CLI helpers — see GUIDE.md § CLI Helpers
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
@@ -161,7 +170,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 19 helpers across 38 assertions. Exits non-zero on any failure.
+Exercises all 25 helpers across 51 assertions. Exits non-zero on any failure.
 
 ## Contributing
 

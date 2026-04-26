@@ -66,7 +66,9 @@ If the note exists, the orchestrator paused this branch deliberately — treat i
 .hv/bin/hv-summary
 ```
 
-One-shot overview: backlog counts, any active streams (redundant with Step 2 but harmless), recent completions, knowledge topics, archive size.
+One-shot overview: backlog counts, any active streams (redundant with Step 2 but harmless), active milestones, recent completions, knowledge topics, archive size.
+
+The summary now includes an *Active milestones* line when any milestone has `status: active`. Surface that line as-is in Step 5's present block — it tells the user what's in focus when they pick what to resume.
 
 ## Step 5 — Present & Route
 
@@ -87,8 +89,11 @@ Active work:
     → In progress — run /hv-work to continue
 
 Backlog: 4 bugs, 6 features, 2 tasks
+Active milestones: M01 — Auth foundation
 Knowledge: 5 topics
 ```
+
+Omit the `Active milestones` line if no milestone is active.
 
 Then use `AskUserQuestion`. Build one question per stream (up to 4 streams in one call; present any overflow in a second call). Each stream's question:
 

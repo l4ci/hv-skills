@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Increment counter and return zero-padded ID.
-# Usage: hv-next-id <bugs|features|tasks>
+# Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
-TYPE="${1:?usage: hv-next-id <bugs|features|tasks>}"
+TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
-  bugs) P=B ;; features) P=F ;; tasks) P=T ;;
+  bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;
   *) echo "error: unknown type '$TYPE'" >&2; exit 1 ;;
 esac
 python3 -c "

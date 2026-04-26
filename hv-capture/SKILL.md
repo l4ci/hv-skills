@@ -84,6 +84,35 @@ For **features**, assign one of:
 
 **Tasks** get no priority or size tag.
 
+## Step 4.5 — Tag Active Milestone (when applicable)
+
+```bash
+.hv/bin/hv-vision-active
+```
+
+If the helper prints nothing, no milestones are active — skip this step entirely.
+
+If exactly **one** milestone is active and there's no caller cap signaling speed, ask once:
+
+- **Header:** `"Milestone"`
+- **Question:** *"Tag these items with `<MID> — <title>`?"* (the active milestone's title)
+- **Options** (single-select):
+  1. *"Yes — tag all (Recommended)"*
+  2. *"No — leave untagged"*
+  3. *"Different milestone"* (free text — accept any `M\d+` value that exists)
+
+If **multiple** milestones are active, show them as options instead of yes/no:
+
+- One option per active milestone (mark the first listed `(Recommended)`)
+- *"No — leave untagged"*
+- *"Different milestone"* (free text)
+
+Plain-text fallback: ask *"Tag with M01?"* once. If the reply is ambiguous, default to leaving untagged — under-tagging is recoverable; mis-tagging clutters the milestone view.
+
+**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one active milestone, **auto-tag without asking** — the speed path uses the obvious answer. With multiple active milestones, skip the question entirely (don't tag anything; the user can edit later).
+
+Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into Step 6's `Milestone:` suffix. If "No — leave untagged" was picked, omit the suffix entirely.
+
 ## Step 5 — Handle Large Input
 
 If any item's input contains bulky raw data (crash dumps, stack traces, log output, specs, checklists, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
@@ -120,11 +149,13 @@ Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`
 
 **Entry formats:**
 
-- Bug: `- **[$ID] [Priority] Short title.** What happens, when, what should happen instead. Related: [F02], [T01]`
-- Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03]`
-- Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02]`
+- Bug: `- **[$ID] [Priority] Short title.** What happens, when, what should happen instead. Related: [F02], [T01] Milestone: M01`
+- Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03] Milestone: M02`
+- Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02] Milestone: M01, M03`
 
 With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
+
+**Field order:** title.description. then any combination of `Detail:`, `Related:`, and `Milestone:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5.
 
 The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 
@@ -148,6 +179,11 @@ Single task:
 Bug with detail file:
 ```markdown
 - **[B07] [P0] App crashes on launch after iOS 18.2 update.** EXC_BAD_ACCESS in CoreData stack during migration. Affects all users on 18.2+, 100% repro rate. Detail: `.hv/bugs/B07.md` Related: [F12]
+```
+
+Feature tagged with the active milestone:
+```markdown
+- **[F08] [Minor] OAuth token rotation.** Refresh tokens 5 minutes before expiry; transparent retry on 401. Milestone: M01
 ```
 
 Mixed input — user says *"the sidebar flickers on hover, also we should add keyboard shortcuts for the top 5 actions, and update the linter config to enable the new rules"*:

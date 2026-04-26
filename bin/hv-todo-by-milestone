@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Print IDs of TODO items tagged with a given milestone, one per line.
+# Scans `## Bugs`, `## Features`, `## Tasks` (skips `## Completed`).
+# Items list multiple milestones via `Milestone: M01, M03`.
+# Usage: hv-todo-by-milestone <MID>
+set -euo pipefail
+MID="${1:?usage: hv-todo-by-milestone <MID>}"
+python3 - "$MID" <<'PY'
+import re, sys
+from pathlib import Path
+
+mid = sys.argv[1]
+todo = Path(".hv/TODO.md")
+if not todo.exists():
+    raise SystemExit(0)
+content = todo.read_text()
+
+def section(name):
+    m = re.search(rf"^## {re.escape(name)}\s*$", content, re.MULTILINE)
+    if not m:
+        return ""
+    start = m.end()
+    nxt = re.search(r"^## ", content[start:], re.MULTILINE)
+    return content[start:start + nxt.start()] if nxt else content[start:]
+
+body = section("Bugs") + section("Features") + section("Tasks")
+for line in body.splitlines():
+    line = line.strip()
+    if not line.startswith("- **["):
+        continue
+    idm = re.match(r"- \*\*\[([BFT]\d+)\]", line)
+    if not idm:
+        continue
+    mm = re.search(r"Milestone:\s*([^\n]*?)(?:\s+(?:Related|Detail):|$)", line)
+    if not mm:
+        continue
+    milestones = [m.strip() for m in re.findall(r"M\d+", mm.group(1))]
+    if mid in milestones:
+        print(idm.group(1))
+PY

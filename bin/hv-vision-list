@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# List all milestones from .hv/milestones/*.md as JSON.
+# Each entry: { id, title, status, depends, ready }.
+# `ready` = no dependency is unshipped (true for shipped/active too if deps OK).
+# Usage: hv-vision-list
+set -euo pipefail
+python3 - <<'PY'
+import json, re
+from pathlib import Path
+
+dir_ = Path(".hv/milestones")
+items = []
+if dir_.exists():
+    for path in sorted(dir_.glob("M*.md")):
+        text = path.read_text()
+        m = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+        if not m:
+            continue
+        fm = m.group(1)
+        def field(key, default=""):
+            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", fm, re.MULTILINE)
+            return mm.group(1).strip() if mm else default
+        depends_raw = field("depends", "[]")
+        depends = [d.strip() for d in re.findall(r"M\d+", depends_raw)]
+        items.append({
+            "id": field("id", path.stem),
+            "title": field("title"),
+            "status": field("status", "planned"),
+            "depends": depends,
+            "_path": str(path),
+        })
+
+shipped = {i["id"] for i in items if i["status"] == "shipped"}
+for i in items:
+    i["ready"] = all(d in shipped for d in i["depends"])
+
+print(json.dumps([{k: v for k, v in i.items() if not k.startswith("_")} for i in items], indent=2))
+PY

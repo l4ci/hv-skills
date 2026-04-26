@@ -76,6 +76,22 @@ Scan all items in `## Bugs`, `## Features`, `## Tasks` for `Related: [B01], [F02
 
 Identify **clusters**: groups of 2+ connected items. These inform Step 6.
 
+## Step 4.5 — Read Active Milestones
+
+```bash
+.hv/bin/hv-vision-active
+```
+
+If the helper prints nothing, no milestones are active — Step 6 ranks the whole backlog without milestone bias. Otherwise capture the list (one or more IDs); it shapes both the backlog presentation in Step 5 and the suggestion in Step 6.
+
+If at least one milestone is active, also gather items already tagged to each:
+
+```bash
+for MID in $(.hv/bin/hv-vision-active); do .hv/bin/hv-todo-by-milestone "$MID"; done
+```
+
+Carry the per-milestone ID set forward.
+
 ## Step 5 — Present the Backlog
 
 ```bash
@@ -96,17 +112,29 @@ Clusters:
 
 If no clusters exist, omit the section entirely.
 
+If Step 4.5 found active milestones, prefix the backlog with a one-line header so the user knows what's in focus:
+
+```
+Active milestones: M01 — Auth foundation, M03 — Public API
+```
+
+(The `Milestone` column in `hv-backlog`'s tables already shows per-item tags when any are present — don't restate that.)
+
 ## Step 6 — Suggest Next
 
 Recommend using this priority order:
 
-1. P0 bugs first — they block usage
+1. P0 bugs first — they block usage (always, regardless of milestone)
 2. Clusters with blocking bugs — fix bugs first or tackle the cluster together
 3. Quick wins — Cosmetic features or P2 bugs; bundle 2–3 if small
 4. Highest-impact P1 bugs
 5. Blocking tasks (check `Related:` links)
 6. Minor features — default when no urgent bugs
 7. Major features — only if nothing else is pending or the user asks
+
+**Milestone bias** — when Step 4.5 found active milestones, prefer items tagged to one of them at *every level except P0*. Concretely: within each priority/size band, items tagged to an active milestone come before untagged items, which come before items tagged to a non-active (planned) milestone. P0 bugs ignore this — production fires don't wait for the milestone schedule.
+
+If the active milestone has no captured items yet, surface that in the suggestion line — *"M01 has no items yet; consider running `/hv-capture` to seed it"* — and then suggest the best general-backlog item.
 
 Skip items already active. Present:
 

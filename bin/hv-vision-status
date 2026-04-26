@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Change a milestone's status — updates both the frontmatter in
+# .hv/milestones/MNN.md and the **Status:** line in .hv/MILESTONES.md.
+# Usage: hv-vision-status <ID> <planned|active|shipped>
+set -euo pipefail
+ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped>}"
+NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped>}"
+case "$NEW_STATUS" in
+  planned|active|shipped) ;;
+  *) echo "error: status must be planned, active, or shipped" >&2; exit 1 ;;
+esac
+python3 - "$ID" "$NEW_STATUS" <<'PY'
+import re, sys
+from pathlib import Path
+
+mid, status = sys.argv[1], sys.argv[2]
+
+detail = Path(f".hv/milestones/{mid}.md")
+if not detail.exists():
+    print(f"error: {detail} not found", file=sys.stderr)
+    sys.exit(1)
+
+content = detail.read_text()
+new = re.sub(r"^(status:\s*)\w+", rf"\g<1>{status}", content, count=1, flags=re.MULTILINE)
+if new == content:
+    print(f"error: status field not found in {detail}", file=sys.stderr)
+    sys.exit(1)
+detail.write_text(new)
+
+ms = Path(".hv/MILESTONES.md")
+if ms.exists():
+    ms_content = ms.read_text()
+    pattern = re.compile(
+        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped)",
+        re.MULTILINE,
+    )
+    updated = pattern.sub(rf"\g<1>{status}", ms_content, count=1)
+    if updated != ms_content:
+        ms.write_text(updated)
+PY

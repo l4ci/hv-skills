@@ -10,7 +10,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 cd "$TMP"
-mkdir -p .hv/bugs .hv/features .hv/tasks
+mkdir -p .hv/bugs .hv/features .hv/tasks .hv/milestones
 
 cat > .hv/TODO.md <<'EOF'
 # TODO
@@ -23,7 +23,18 @@ cat > .hv/TODO.md <<'EOF'
 
 ## Completed
 EOF
-echo '{"bugs":0,"features":0,"tasks":0}' > .hv/counters.json
+cat > .hv/MILESTONES.md <<'EOF'
+# Vision
+
+_(no vision yet — run `/hv-vision` to brainstorm milestones)_
+
+## Active milestones
+
+_(none active — set with `/hv-vision`)_
+
+## Milestones
+EOF
+echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
 echo '{"active":[]}' > .hv/status.json
 
 git init -q
@@ -47,9 +58,14 @@ ID3=$("$BIN/hv-next-id" features)
 [ "$ID3" = "F01" ] || fail "expected F01, got $ID3"
 pass "first feature id = F01"
 
+ID4=$("$BIN/hv-next-id" milestones)
+[ "$ID4" = "M01" ] || fail "expected M01, got $ID4"
+pass "first milestone id = M01"
+
 COUNTERS=$(cat .hv/counters.json)
 echo "$COUNTERS" | grep -q '"bugs": 2' || fail "counters.bugs != 2: $COUNTERS"
 echo "$COUNTERS" | grep -q '"features": 1' || fail "counters.features != 1: $COUNTERS"
+echo "$COUNTERS" | grep -q '"milestones": 1' || fail "counters.milestones != 1: $COUNTERS"
 pass "counters persisted"
 
 echo "hv-append"
@@ -429,6 +445,140 @@ echo "$OUT" | grep -q "0 tasks" || fail "task count wrong: $OUT"
 echo "$OUT" | grep -q "Recent: \[B01\]" || fail "recent completion missing: $OUT"
 echo "$OUT" | grep -q "Knowledge: 2 topics" || fail "knowledge topic count wrong: $OUT"
 pass "summary reports backlog/recent/knowledge correctly"
+
+echo "hv-vision-add / hv-vision-status / hv-vision-active / hv-vision-list / hv-vision-index"
+# Reset milestones counter so the next mint is M01.
+python3 -c "
+import json
+p='.hv/counters.json'
+d=json.load(open(p)); d['milestones']=0; json.dump(d,open(p,'w'))
+"
+# Re-seed MILESTONES.md (earlier hv-knowledge-index test rewrote CLAUDE.md, but
+# MILESTONES.md is untouched).
+cat > .hv/MILESTONES.md <<'EOF'
+# Vision
+
+Test project vision.
+
+## Active milestones
+
+_(none active — set with `/hv-vision`)_
+
+## Milestones
+EOF
+mkdir -p .hv/milestones
+
+ID_M1=$("$BIN/hv-vision-add" "Auth foundation" "OAuth + sessions for end users.")
+[ "$ID_M1" = "M01" ] || fail "expected M01 from vision-add, got $ID_M1"
+[ -f .hv/milestones/M01.md ] || fail "M01 detail file not created"
+grep -q "^id: M01$" .hv/milestones/M01.md || fail "M01 frontmatter missing id"
+grep -q "^status: planned$" .hv/milestones/M01.md || fail "M01 status not planned"
+grep -q "### M01 — Auth foundation" .hv/MILESTONES.md || fail "M01 not in MILESTONES.md"
+grep -q "Status:\*\* planned" .hv/MILESTONES.md || fail "M01 overview missing status"
+pass "vision-add creates detail file + overview entry"
+
+ID_M2=$("$BIN/hv-vision-add" "Multi-tenant" "Org isolation for B2B." "M01")
+[ "$ID_M2" = "M02" ] || fail "expected M02, got $ID_M2"
+grep -q "^depends: \[M01\]$" .hv/milestones/M02.md || fail "M02 depends not [M01]"
+grep -q "Depends:\*\* M01" .hv/MILESTONES.md || fail "M02 overview missing depends"
+pass "vision-add records dependencies"
+
+"$BIN/hv-vision-status" M01 active
+grep -q "^status: active$" .hv/milestones/M01.md || fail "M01 status not updated to active in detail"
+grep -q "### M01 — Auth foundation" .hv/MILESTONES.md || fail "M01 section gone"
+# Confirm overview status line for M01 is now active
+python3 -c "
+import re, sys
+ms = open('.hv/MILESTONES.md').read()
+m = re.search(r'### M01 — Auth foundation\n\n\*\*Status:\*\* (\w+)', ms)
+sys.exit(0 if (m and m.group(1) == 'active') else 1)
+" || fail "M01 overview status not updated to active"
+pass "vision-status updates frontmatter and overview"
+
+ACTIVE=$("$BIN/hv-vision-active")
+[ "$ACTIVE" = "M01" ] || fail "expected active=M01, got '$ACTIVE'"
+pass "vision-active lists only active IDs"
+
+LIST=$("$BIN/hv-vision-list")
+echo "$LIST" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+ids = {i['id']: i for i in data}
+assert 'M01' in ids and 'M02' in ids, f'missing IDs: {ids.keys()}'
+assert ids['M02']['depends'] == ['M01'], f'M02 depends: {ids[\"M02\"][\"depends\"]}'
+assert ids['M02']['ready'] is False, 'M02 should not be ready (M01 not shipped)'
+assert ids['M01']['ready'] is True, 'M01 has no deps; should be ready'
+" || fail "vision-list output did not match expectations"
+pass "vision-list emits JSON with status, depends, ready"
+
+"$BIN/hv-vision-index" >/dev/null
+grep -q "<!-- hv-vision-start -->" CLAUDE.md || fail "vision block not in CLAUDE.md"
+grep -q "M01.*Auth foundation" CLAUDE.md || fail "active milestone not in CLAUDE.md vision block"
+# Re-running idempotent
+"$BIN/hv-vision-index" >/dev/null
+COUNT_VISION=$(grep -c "hv-vision-start" CLAUDE.md)
+[ "$COUNT_VISION" = "1" ] || fail "vision block duplicated"
+pass "vision-index updates CLAUDE.md and active section in MILESTONES.md"
+
+# Active section in MILESTONES.md should now reflect M01
+grep -q "^- M01 — Auth foundation" .hv/MILESTONES.md || fail "## Active milestones not updated"
+pass "vision-index regenerates ## Active milestones section"
+
+# Marking M01 shipped should mark M02 as ready
+"$BIN/hv-vision-status" M01 shipped
+LIST=$("$BIN/hv-vision-list")
+echo "$LIST" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+m02 = next(i for i in data if i['id'] == 'M02')
+sys.exit(0 if m02['ready'] else 1)
+" || fail "M02 should be ready once M01 shipped"
+pass "vision-list marks ready when dependencies are shipped"
+
+echo "hv-todo-by-milestone / Milestone field on entries"
+# Reactivate M01 and tag a couple of TODO entries.
+"$BIN/hv-vision-status" M01 active >/dev/null
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B60] [P1] Auth flicker.** Sign-in card flashes on render. Related: [F60] Milestone: M01
+
+## Features
+- **[F60] [Minor] OAuth rotation.** Refresh tokens before expiry. Milestone: M01, M02
+- **[F61] [Cosmetic] Untagged feature.** Just a tweak.
+
+## Tasks
+
+## Completed
+EOF
+TAGGED=$("$BIN/hv-todo-by-milestone" M01)
+echo "$TAGGED" | grep -qx "B60" || fail "hv-todo-by-milestone missed B60 (M01): '$TAGGED'"
+echo "$TAGGED" | grep -qx "F60" || fail "hv-todo-by-milestone missed F60 (M01): '$TAGGED'"
+echo "$TAGGED" | grep -qx "F61" && fail "hv-todo-by-milestone returned untagged F61"
+pass "hv-todo-by-milestone returns only tagged items"
+TAGGED2=$("$BIN/hv-todo-by-milestone" M02)
+echo "$TAGGED2" | grep -qx "F60" || fail "hv-todo-by-milestone missed F60 (M02 multi-tag)"
+pass "hv-todo-by-milestone handles multi-milestone tags"
+
+echo "hv-backlog regression: Milestone field doesn't leak into Related"
+OUT=$("$BIN/hv-backlog")
+B60_ROW=$(echo "$OUT" | grep " B60 ")
+# Related cell should be exactly "[F60]" (no Milestone bleed)
+echo "$B60_ROW" | grep -q "| \[F60\] |" || fail "B60 row Related cell looks wrong: $B60_ROW"
+echo "$B60_ROW" | grep -q "Milestone:" && fail "Milestone: leaked into a backlog row"
+# Milestone column should appear when any item carries the field
+echo "$OUT" | grep -q "| Milestone |" || fail "backlog header missing Milestone column"
+echo "$OUT" | grep -q " M01, M02 " || fail "F60 multi-milestone cell missing"
+pass "backlog adds Milestone column without breaking Related parsing"
+
+echo "hv-summary surfaces active milestones"
+OUT=$("$BIN/hv-summary")
+echo "$OUT" | grep -q "Active milestones: M01" || fail "summary missing active milestone line: $OUT"
+pass "summary lists active milestones"
+
+# Reset summary fixtures (no Milestone field) to keep later assertions clean.
+"$BIN/hv-vision-status" M01 shipped >/dev/null
 
 echo "hv-preflight"
 # Ensure all core data files exist (smoke setup creates TODO.md/counters.json/status.json;

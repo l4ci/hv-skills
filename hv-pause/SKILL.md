@@ -60,6 +60,8 @@ Carry out whichever path was chosen and note the artifact (commit hash, stash re
 mkdir -p .hv/handoff
 ```
 
+Resolve milestone context first — if any active item carries a `Milestone:` tag in `TODO.md` (grep the line for the captured ID), or if `.hv/bin/hv-vision-active` lists a single milestone, include it in the **Working on** block below. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
+
 Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the current session — omit sections that don't apply, but don't manufacture content.
 
 ```markdown
@@ -70,6 +72,7 @@ Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the 
 ## Working on
 
 - **Items:** [B07], [F03]
+- **Milestone:** M01 — Auth foundation  <!-- omit if no active milestone or items aren't tagged -->
 - **Stage:** <e.g., "mid-hypothesis verification for B07", "implementing wave 2 of 3">
 
 ## What's done

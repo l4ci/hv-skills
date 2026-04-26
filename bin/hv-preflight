@@ -11,7 +11,7 @@ if [ ! -d "$HV" ]; then
   exit 2
 fi
 
-for f in TODO.md KNOWLEDGE.md counters.json config.json status.json; do
+for f in TODO.md KNOWLEDGE.md MILESTONES.md counters.json config.json status.json; do
   if [ ! -f "$HV/$f" ]; then
     echo "uninitialized: $HV/$f missing" >&2
     exit 2
@@ -23,6 +23,8 @@ HELPERS=(
   hv-knowledge-index hv-knowledge-query hv-merge hv-next-id hv-pr
   hv-preflight hv-reconcile hv-refactor-age hv-review-scope hv-ship-body
   hv-status-add hv-status-remove hv-summary hv-update-check
+  hv-vision-active hv-vision-add hv-vision-index hv-vision-list hv-vision-status
+  hv-todo-by-milestone
 )
 missing=()
 for h in "${HELPERS[@]}"; do

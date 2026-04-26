@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-vision-start --> block in CLAUDE.md, the
+# "## Active milestones" section, and each per-section **Status:** line in
+# .hv/MILESTONES.md from per-milestone frontmatter. Idempotent; preserves all
+# other content. Frontmatter is the single source of truth — running this
+# heals any drift in MILESTONES.md.
+# Usage: hv-vision-index
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ITEMS_JSON="$("$HERE/hv-vision-list")"
+python3 - "$ITEMS_JSON" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+items = json.loads(sys.argv[1])
+active = [i for i in items if i["status"] == "active"]
+
+# 1) Refresh .hv/MILESTONES.md: per-section **Status:** lines + ## Active milestones
+ms_path = Path(".hv/MILESTONES.md")
+if ms_path.exists():
+    ms = ms_path.read_text()
+
+    # Heal each section's **Status:** line from frontmatter (drift insurance).
+    for i in items:
+        section_pat = re.compile(
+            rf"(### {re.escape(i['id'])} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped)",
+            re.MULTILINE,
+        )
+        ms = section_pat.sub(rf"\g<1>{i['status']}", ms, count=1)
+
+    if active:
+        active_block = "## Active milestones\n\n" + "\n".join(
+            f"- {i['id']} — {i['title']}" for i in active
+        ) + "\n"
+    else:
+        active_block = "## Active milestones\n\n_(none active — set with `/hv-vision`)_\n"
+
+    section_pat = re.compile(r"^## Active milestones\s*\n(?:.*?\n)*?(?=^## |\Z)", re.MULTILINE)
+    if section_pat.search(ms):
+        ms = section_pat.sub(active_block + "\n", ms)
+    else:
+        msec = re.search(r"^## Milestones\s*$", ms, re.MULTILINE)
+        if msec:
+            ms = ms[:msec.start()].rstrip("\n") + "\n\n" + active_block + "\n" + ms[msec.start():]
+        else:
+            ms = ms.rstrip("\n") + "\n\n" + active_block
+
+    ms_path.write_text(ms if ms.endswith("\n") else ms + "\n")
+
+# 2) Refresh CLAUDE.md vision block
+shipped_ids = {i["id"] for i in items if i["status"] == "shipped"}
+if active:
+    lines = []
+    for i in active:
+        deps = ", ".join(i["depends"]) if i["depends"] else "—"
+        unmet = [d for d in i["depends"] if d not in shipped_ids]
+        flag = " ⚠ blocked" if unmet else ""
+        lines.append(f"- **{i['id']}** — {i['title']} (depends: {deps}){flag}")
+    body = "\n".join(lines)
+    intro = (
+        "Active milestones live in `.hv/MILESTONES.md` "
+        "(detail in `.hv/milestones/MNN.md`). Tag captured items with their "
+        "milestone via the `Milestone:` field where applicable."
+    )
+elif items:
+    body = f"_(no active milestones — {len(items)} planned; set one active with `/hv-vision`)_"
+    intro = "Project milestones live in `.hv/MILESTONES.md`."
+else:
+    body = "_(no milestones yet — run `/hv-vision` to brainstorm)_"
+    intro = "Project milestones live in `.hv/MILESTONES.md`."
+
+block = (
+    "<!-- hv-vision-start -->\n"
+    "## Project Vision\n\n"
+    f"{intro}\n\n"
+    f"{body}\n\n"
+    "<!-- hv-vision-end -->"
+)
+
+claude = Path("CLAUDE.md")
+if not claude.exists():
+    claude.write_text(block + "\n")
+    print("created")
+else:
+    content = claude.read_text()
+    pattern = re.compile(r"<!-- hv-vision-start -->.*?<!-- hv-vision-end -->", re.DOTALL)
+    if pattern.search(content):
+        claude.write_text(pattern.sub(block, content))
+        print("updated")
+    else:
+        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
+        print("appended")
+PY

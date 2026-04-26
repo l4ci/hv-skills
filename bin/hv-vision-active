@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Print IDs of active milestones, one per line. Silent if none active.
+# Usage: hv-vision-active
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$HERE/hv-vision-list" | python3 -c "
+import json, sys
+for m in json.load(sys.stdin):
+    if m['status'] == 'active':
+        print(m['id'])
+"

@@ -54,6 +54,25 @@ if pairs:
     recent = pairs[:3]
     print("Recent: " + ", ".join(f"{iid} on {d}" for iid, d in recent))
 
+# Active milestones
+ms_dir = Path(".hv/milestones")
+if ms_dir.exists():
+    actives = []
+    for path in sorted(ms_dir.glob("M*.md")):
+        text = path.read_text()
+        fm = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+        if not fm:
+            continue
+        body = fm.group(1)
+        sm = re.search(r"^status:\s*(\w+)\s*$", body, re.MULTILINE)
+        if sm and sm.group(1) == "active":
+            idm = re.search(r"^id:\s*(\S+)\s*$", body, re.MULTILINE)
+            tm = re.search(r"^title:\s*(.+?)\s*$", body, re.MULTILINE)
+            if idm:
+                actives.append((idm.group(1), tm.group(1) if tm else ""))
+    if actives:
+        print("Active milestones: " + ", ".join(f"{i} {t}".strip() for i, t in actives))
+
 # Knowledge topics
 k = Path(".hv/KNOWLEDGE.md")
 if k.exists():
