@@ -23,6 +23,7 @@ Read `.hv/config.json`:
 - `models.worker` — model for implementation subagents (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly. See `GUIDE.md` § Autonomy.
 
 ## When to Use
 
@@ -95,6 +96,8 @@ When asking, use a single `AskUserQuestion` call with 1-3 questions. Each questi
 - For conflicting items, use `multiSelect: true` and ask which subset to include in this run.
 
 Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed. (See GUIDE.md § Host Question Conventions.)
+
+**Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
 
 ## Step 3 — Register in Status
 
@@ -265,25 +268,38 @@ Commit: a1b2c3d
 
 Don't recap the plan, list verification results, or describe intermediate steps.
 
-## Step 13 — Learn Nudge
+## Step 13 — Learn (Nudge or Auto-Invoke)
 
-If the session produced non-trivial learning material — **2 or more items resolved**, or **≥5 files touched**, or a **hard bug** that took multiple debug cycles — suggest capturing it while it's fresh:
+Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
 
-*"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
+When triggered, branch on `autonomy.level`:
 
-One line, opt-in. Skip the nudge for single-item fixes or tasks that were pure mechanical changes. Don't repeat in the same session.
+- `"off"` (default) — print one line: *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."* — opt-in.
+- `"auto"` or `"loop"` — invoke `hv-learn` via the `Skill` tool. Pass a brief that names the cycle's resolved IDs and the touched files so the verifier (if `learn.verify: true`) has the right context. No prompt, no confirmation.
 
-## Step 14 — Refactor Nudge
+## Step 14 — Refactor (Nudge or Auto-Invoke)
 
 ```bash
 .hv/bin/hv-refactor-age
 ```
 
-Returns JSON: `{"features": N, "bugs": M}` — count of items completed since the last `refactor:` commit. If `features >= 5` or `bugs >= 10`, tell the user:
+Returns JSON: `{"features": N, "bugs": M}` — count of items completed since the last `refactor:` commit. Threshold: `features >= 5` OR `bugs >= 10`. If under threshold, skip the step entirely. Don't repeat in the same session.
 
-*"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
+When triggered, branch on `autonomy.level`:
 
-Suggestion, not a blocker. Don't repeat in the same session.
+- `"off"` (default) — print one line: *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
+- `"auto"` or `"loop"` — invoke `hv-refactor` via the `Skill` tool. `refactor.confirmBeforeExecute` still governs whether `/hv-refactor` itself pauses for approval at its own checkpoints, so the user retains a steering wheel even under autonomy.
+
+## Step 15 — Loop Continuation
+
+Only when `autonomy.level == "loop"`. Invoke `hv-next` via the `Skill` tool to surface the next item and continue the queue. `/hv-next` reads autonomy too — in loop mode it auto-selects the suggested item and dispatches `/hv-work`, so the loop sustains itself.
+
+Loop stops naturally when:
+- `/hv-next` reports an empty backlog (or the active milestone has no items and the general backlog is also empty)
+- A guard fails downstream (dirty tree, `/hv-review` FAIL, ambiguous brief in Step 2)
+- The user interrupts
+
+Skip this step entirely for `"off"` and `"auto"` modes — the user picks what's next themselves.
 
 ## Key Principles
 

@@ -18,7 +18,7 @@ Run `/hv-init` once per project to create the folder. It contains:
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
 | `counters.json` | Auto-incrementing IDs for each item type |
-| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates |
+| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
 | `bin/` | CLI helpers — `hv-next-id`, `hv-append`, `hv-complete`, … |
 | `bugs/` | Overflow detail files for large bug reports |
@@ -37,14 +37,23 @@ All files are gitignored. The backlog is local to your machine.
 
 ### /hv-init
 
-Creates the `.hv/` folder with all required files. On first run, asks four questions via the host's native question UI (Claude Code's `AskUserQuestion`, equivalents elsewhere) to configure:
+Creates the `.hv/` folder with all required files. On first run, asks five questions via the host's native question UI (Claude Code's `AskUserQuestion`, equivalents elsewhere) to configure:
 
 1. **Models** — Balanced (Opus + Sonnet, Recommended) / Premium (Opus) / Fast (Sonnet) / Minimal (Sonnet + Haiku)
 2. **Isolation** — Branch (Recommended) / Worktree
 3. **Integration** — Direct merge (Recommended) / GitHub PR
 4. **Quality gates** (multi-select) — Review before ship / Verify learnings / Confirm before refactor (all Recommended)
+5. **Autonomy** — Off (Recommended) / Auto chain / Full loop
 
-Skipping a question (or picking every Recommended) writes the default. Re-running `/hv-init` on an existing project never re-prompts — the user's prior `config.json` is the source of truth. Helpers always refresh; data files never overwrite. Adds `.hv/` to `.gitignore` if not already present.
+Skipping a question (or picking every Recommended) writes the default. Re-running `/hv-init` on an existing project never re-prompts for keys that already exist — the user's prior `config.json` is the source of truth. New schema keys added in later releases (e.g. `autonomy.level`) trigger a STALE migration that asks **only** the missing question and merges the answer in, leaving every prior value untouched. Helpers always refresh; data files never overwrite. Adds `.hv/` to `.gitignore` if not already present.
+
+To change settings later, use `/hv-config` — it shows current values, lets you pick which keys to change from a checklist, and reuses the same option vocabulary as `/hv-init` so you only learn the choices once.
+
+### /hv-config
+
+Interactive editor for `.hv/config.json`. Step 1 prints the current values for all seven configurable fields (model profile, isolation, integration, ship review, learn verification, refactor confirmation, autonomy level). Step 2 asks which to change with a multi-select checklist whose labels include the current value of each. Step 3 asks each selected key with the same option set as the matching `/hv-init` question, but tags the user's current value as `(current)` instead of marking the install-time default as `(Recommended)`. Step 4 merges only the changed keys into the existing file (never touches the rest), then prints a `before → after` diff.
+
+Use it for any settings change after init — toggling autonomy on, switching merge strategy, flipping a quality gate. For brand-new schema keys added by a plugin upgrade, `/hv-init` runs the STALE migration automatically — `/hv-config` is for editing keys that already exist.
 
 ### /hv-vision
 
@@ -270,6 +279,9 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
   },
   "ship": {
     "review": true
+  },
+  "autonomy": {
+    "level": "off"
   }
 }
 ```
@@ -313,6 +325,31 @@ Knowledge quality compounds — a weak bullet consulted by 20 future `/hv-work` 
 |-------|----------|
 | `true` (default) | `/hv-ship` runs `/hv-review` before integrating. FAIL blocks, CONCERNS ask, PASS flows through. |
 | `false` | `/hv-ship` integrates directly without a review pass. Use when you want raw speed and already reviewed manually. |
+
+### Autonomy
+
+Controls whether skills *nudge* at decision points or *invoke the next skill directly*. Three levels, mutually exclusive.
+
+| Value | Behavior |
+|-------|----------|
+| `"off"` (default) | Skills surface a one-line suggestion at each decision point and stop. The user picks. Same hand-on-the-wheel feel as 1.5.x. |
+| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. The chain stops after the chained step — the user picks the next item themselves. |
+| `"loop"` | Auto chain plus loop continuation. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
+
+**What still gates the chain.** Autonomy decides whether to *invoke* the next skill; the destination skill's own gates still decide whether *it* pauses. So:
+
+- `learn.verify: true` — `/hv-learn` still runs the Opus verifier even when invoked under autonomy.
+- `ship.review: true` — `/hv-ship` still runs `/hv-review` and blocks on FAIL.
+- `refactor.confirmBeforeExecute: true` — `/hv-refactor` still pauses for approval at its own checkpoints.
+
+**Stop conditions in loop mode.** The loop stops cleanly on any of:
+
+- `/hv-next` reports an empty backlog (no items in active milestone, no items in general backlog).
+- `/hv-work` Step 2 detects a genuinely ambiguous brief — invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
+- A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
+- The user interrupts.
+
+**When to flip it on.** `"auto"` is good when you want the natural endgame of each cycle (capture learnings, ship the fix) without typing the follow-up command. `"loop"` is good when you have a known queue you want drained — milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified — and you'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you don't want a long-running session of model spend without checkpoints.
 
 ## CLI Helpers
 

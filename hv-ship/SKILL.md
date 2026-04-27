@@ -21,6 +21,7 @@ Read `.hv/config.json`:
 
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly. See `GUIDE.md` § Autonomy.
 
 ## When to Use
 
@@ -150,15 +151,14 @@ For each ID in the scope JSON's `referencedIds`:
 
 `hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `TODO.md` entirely) produce an error. No grep needed.
 
-## Step 8.5 — Learn Nudge
+## Step 8.5 — Learn (Nudge or Auto-Invoke)
 
-Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh. Use the same threshold as `/hv-work`: **2+ items resolved**, OR **≥5 files touched** (from the scope JSON's `touchedFiles`), OR a **hard bug** that took multiple debug cycles to land.
+Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh. Trigger condition (same as `/hv-work`): **2+ items resolved**, OR **≥5 files touched** (from the scope JSON's `touchedFiles`), OR a **hard bug** that took multiple debug cycles to land. Skip when: single trivial item, pure mechanical work, or the branch is a straight dependency bump. Don't trigger if `/hv-learn` already ran this session.
 
-If triggered, append one line to the Step 9 report:
+When triggered, branch on `autonomy.level`:
 
-*"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
-
-Skip when: single trivial item, pure mechanical work, or the branch is a straight dependency bump. Don't nudge if `/hv-learn` already ran this session.
+- `"off"` (default) — append one line to the Step 9 report: *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
+- `"auto"` or `"loop"` — invoke `hv-learn` via the `Skill` tool with a brief naming the resolved IDs and touched files. No prompt.
 
 ## Step 9 — Report to User
 
@@ -180,6 +180,12 @@ Resolved: [B01] [F03]
 ```
 
 If `/hv-review` surfaced concerns that the user proceeded through, append them one-liner at the end.
+
+## Step 10 — Loop Continuation
+
+Only when `autonomy.level == "loop"`. After the report, invoke `hv-next` via the `Skill` tool to surface the next item and continue the queue. `/hv-next` reads autonomy too — in loop mode it auto-selects the suggested item and dispatches `/hv-work`.
+
+Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts. Skip this step entirely for `"off"` and `"auto"` modes.
 
 ## Key Principles
 

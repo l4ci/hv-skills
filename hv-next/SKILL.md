@@ -152,7 +152,13 @@ Suggested next: [ID] [Title] ([tag])
 
 ## Step 7 — Confirm & Execute
 
-Use the `AskUserQuestion` tool so the user picks with the host's native UI. Build a single question:
+Read `autonomy.level` from `.hv/config.json` (default `"off"`).
+
+**Loop mode auto-pick.** When `autonomy.level == "loop"`, skip the question entirely and invoke `hv-work` via the `Skill` tool with the suggested item(s) and their TODO descriptions. This is what sustains the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` loop. Print one line first so the user sees the pick: *"Loop: starting [ID] [Title]."*
+
+If Step 6 found nothing to suggest (empty backlog, no active milestone items), do **not** invoke `/hv-work`. Print *"Loop: backlog empty — stopping."* and exit. The user re-invokes `/hv-capture` or `/hv-vision` to seed more work.
+
+**Off and auto modes.** Use the `AskUserQuestion` tool so the user picks with the host's native UI. Build a single question:
 
 - **Header:** `"Next"`
 - **Question:** *"Work on the suggested item(s)?"* (substitute "items" for a batch)

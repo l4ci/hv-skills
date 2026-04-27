@@ -22,6 +22,7 @@ Read `.hv/config.json`:
 - `models.orchestrator` — model for hypothesis + verification (default `opus`)
 - `models.worker` — model for the fix agent (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly. See `GUIDE.md` § Autonomy.
 
 ## When to Use
 
@@ -191,24 +192,28 @@ Root cause: MenuBarManager held an invalidated timer ref after pause; the next t
 Fix: reset badge to `--:--` in `pause()` before invalidating.
 ```
 
-Use `AskUserQuestion` for the next move:
+Branch on `autonomy.level`:
 
-- **Header:** `"Next"`
-- **Question:** *"Fix for [B##] is committed. What's next?"*
-- **Options** (single-select):
-  1. "Ship via `/hv-ship` (Recommended)" — *"Run the review gate and integrate."*
-  2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
-  3. "Stop here" — *"Leave the branch; come back later."*
+- `"off"` (default) — use `AskUserQuestion`:
+  - **Header:** `"Next"`
+  - **Question:** *"Fix for [B##] is committed. What's next?"*
+  - **Options** (single-select):
+    1. "Ship via `/hv-ship` (Recommended)" — *"Run the review gate and integrate."*
+    2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
+    3. "Stop here" — *"Leave the branch; come back later."*
 
-Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
+  Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
 
-## Step 12 — Learn Nudge
+- `"auto"` or `"loop"` — invoke `hv-ship` via the `Skill` tool with the current branch. No prompt. The Recommended path is always ship; autonomy just commits to it. (`ship.review` still governs whether `/hv-ship` runs the review gate.)
 
-A debugged bug with a non-obvious root cause is textbook `KNOWLEDGE.md` material. If the root cause was not obvious from reading the code alone (required verification, contradicted an initial hypothesis, or involved a known-tricky subsystem), tell the user:
+## Step 12 — Learn (Nudge or Auto-Invoke)
 
-*"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
+Trigger condition (same in all modes): the root cause was **not obvious from reading the code alone** — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem. Skip for trivial fixes (typo, obvious off-by-one).
 
-Skip the nudge for trivial fixes (typo, off-by-one that was immediately obvious).
+When triggered, branch on `autonomy.level`:
+
+- `"off"` (default) — print one line: *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
+- `"auto"` or `"loop"` — invoke `hv-learn` via the `Skill` tool. Pass a brief naming the bug ID, root cause, and the subsystem so the captured entry lands in the right topic.
 
 ## Key Principles
 

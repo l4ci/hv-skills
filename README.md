@@ -36,6 +36,7 @@
 | 🧭 **Vision & milestones** — `/hv-vision` brainstorms milestones with web research and deliberate challenge, then `/hv-next`, `/hv-resume`, `/hv-pause`, and `/hv-status` keep work scoped to the active set | 🔗 **Loose milestone tags** — items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
 | 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main |
 | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
+| 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
 
 ## Quick start
 
@@ -50,13 +51,14 @@ claude plugin install hv-skills
 /hv-next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories (`bugs/`, `features/`, `tasks/`, `milestones/`, `plans/`, `spikes/`), 32 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
+First run takes ≤30s and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories (`bugs/`, `features/`, `tasks/`, `milestones/`, `plans/`, `spikes/`), 32 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted; skip or accept to get the defaults. To change settings later, run `/hv-config` instead of editing JSON by hand.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
 | `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-config` | Edit `.hv/config.json` interactively — checklist of current values, then native option pickers for each chosen key |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones — Socratic discovery, web research, deliberate challenge, then writes `MILESTONES.md` + per-milestone detail files |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-c` | Shortcut for `/hv-capture` |
@@ -114,7 +116,8 @@ flowchart LR
   REVIEW -.gate.-> SHIP["/hv-ship"]
   SHIP --> PR[(PR / merge)]
   WORK --> LEARN["/hv-learn"]
-  DEBUG -.nudge.-> LEARN
+  DEBUG -.nudge/auto.-> LEARN
+  SHIP -.loop.-> NEXT
   LEARN --> KNOW[(KNOWLEDGE.md)]
   KNOW -.consults.-> WORK
   KNOW -.consults.-> DEBUG
@@ -134,11 +137,12 @@ Edit `.hv/config.json`:
   "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
   "refactor": { "confirmBeforeExecute": true },
   "learn":    { "verify": true },
-  "ship":     { "review": true }
+  "ship":     { "review": true },
+  "autonomy": { "level": "off" }
 }
 ```
 
-Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on). See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
+Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
 
 ## Architecture
 

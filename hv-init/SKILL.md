@@ -158,6 +158,7 @@ EXPECTED = [
     ("refactor", "confirmBeforeExecute"),
     ("learn", "verify"),
     ("ship", "review"),
+    ("autonomy", "level"),
 ]
 p = Path(".hv/config.json")
 if not p.exists():
@@ -177,7 +178,7 @@ Branch on the output:
 
 - `UP_TO_DATE` — existing config already matches the current schema. Skip the rest of this step.
 - `CORRUPT` — the file exists but isn't valid JSON. Tell the user to fix or delete `.hv/config.json`, then rerun `/hv-init`. Stop.
-- `FRESH` — no config yet. Ask all four questions below, then write the full config (FRESH write block).
+- `FRESH` — no config yet. Ask all five questions below, then write the full config (FRESH write block).
 - `STALE:key1,key2,…` — upgrade path. Ask **only** the questions that map to the listed missing keys, then merge the answers into the existing file via the STALE write block — every value already in the file stays untouched.
 
 Call `AskUserQuestion` with just the applicable questions in one call. The "(Recommended)" option on each is the current default; selecting it (or "Other" with no alternative) writes the default value. The user can decline with the native "skip" — if that happens, write the Recommended defaults for the pending keys only.
@@ -221,6 +222,16 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 | Verify learnings (Recommended) | `/hv-learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
 | Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
 
+**Q5 — Autonomy** (`header: "Autonomy"`, single-select)
+
+> *"How autonomously should hv-skills chain to the next logical step?"*
+
+| Label | Description |
+|-------|-------------|
+| Off (Recommended) | Skills nudge with a one-line suggestion at decision points. You stay in the driver's seat. |
+| Auto chain | One-hop chaining: `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`, `/hv-ship` → `/hv-learn`, refactor threshold → `/hv-refactor`. Stops after the chained step. |
+| Full loop | Auto chain + after each cycle, invoke `/hv-next` and start the next item. Runs until the backlog drains, a guard fails, or a brief is genuinely ambiguous. |
+
 Map answers to config values:
 
 | Answer | Config |
@@ -236,8 +247,11 @@ Map answers to config values:
 | Q4 includes "Review before ship" | `ship.review: true` (else `false`) |
 | Q4 includes "Verify learnings" | `learn.verify: true` (else `false`) |
 | Q4 includes "Confirm before refactor" | `refactor.confirmBeforeExecute: true` (else `false`) |
+| Q5 Off | `autonomy.level: "off"` |
+| Q5 Auto chain | `autonomy.level: "auto"` |
+| Q5 Full loop | `autonomy.level: "loop"` |
 
-If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`); otherwise silently fall back to the Recommended value.
+If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`, `"off"/"auto"/"loop"`); otherwise silently fall back to the Recommended value.
 
 Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool. (See GUIDE.md § Host Question Conventions.)
 
@@ -254,7 +268,8 @@ Path(".hv/config.json").write_text(json.dumps({
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>},
   "learn":    {"verify": <Q4-learn>},
-  "ship":     {"review": <Q4-ship>}
+  "ship":     {"review": <Q4-ship>},
+  "autonomy": {"level": "<Q5>"}
 }, indent=2) + "\n")
 PY
 ```
@@ -347,4 +362,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`. See `GUIDE.md` for full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`. See `GUIDE.md` for full reference.
