@@ -1,6 +1,6 @@
 {
   "name": "hv-skills",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A zero-dependency project backlog for Claude Code — capture, execute, review, ship.",
   "author": {
     "name": "l4ci"
