@@ -212,6 +212,12 @@ Helpers collapse multi-step agent logic into single subprocess calls — less co
 
 ## Install alternatives
 
+### skills CLI
+
+```bash
+npx skills add l4ci/hv-skills
+```
+
 ### npx one-liner
 
 ```bash
