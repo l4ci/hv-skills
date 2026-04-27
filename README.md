@@ -10,7 +10,7 @@
 [![Stars](https://img.shields.io/github/stars/l4ci/hv-skills?style=social)](https://github.com/l4ci/hv-skills/stargazers)
 [![For Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2)](https://claude.com/claude-code)
 
-[Quick start](#quick-start) · [Skills](#skills) · [How it works](#how-it-works) · [Full guide](GUIDE.md)
+[Quickstarts](#quickstarts) · [FAQ](#faq) · [Skills](#skills) · [How it works](#how-it-works) · [Full guide](GUIDE.md)
 
 </div>
 
@@ -38,20 +38,65 @@
 | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
 | 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
 
-## Quick start
+## Quickstarts
+
+Install once, then pick the path that matches where you're starting from.
 
 ```bash
-# Install the plugin
 claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
-
-# In your project
-/hv-init                                     # one-time setup
-/hv-capture "timer bug + keyboard shortcut"  # auto-classify and file
-/hv-next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories (`bugs/`, `features/`, `tasks/`, `milestones/`, `plans/`, `spikes/`), 32 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted; skip or accept to get the defaults. To change settings later, run `/hv-config` instead of editing JSON by hand.
+`/hv-init` always comes first. It takes ≤30s, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted, and creates `.hv/` with data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories, 32 CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` — never hand-edit JSON.
+
+### Path A — Drop into an existing project
+
+You already have code. You want a workflow that captures the work piling up in your head, executes it cleanly, and remembers what it learns.
+
+```bash
+/hv-init                                       # one-time setup
+/hv-capture "timer bug + keyboard shortcut"    # auto-classify, assign IDs
+/hv-next                                       # review backlog, pick next, route
+                                               # → /hv-work runs (parallel, atomic commits)
+/hv-ship                                       # review-gated PR or direct merge
+/hv-learn                                      # distill durable gotchas to KNOWLEDGE.md
+```
+
+After the first cycle you mostly live in `/hv-capture` (or `/hv-c`) and `/hv-next`. Use `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug` for real bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`. See [GUIDE.md § Path A](GUIDE.md#path-a--drop-into-an-existing-project) for a fuller walkthrough.
+
+### Path B — Start from (nearly) nothing
+
+You have an empty repo or a few sketches. You want to think about *where the project is going* before you ship anything, and keep that vision present as work progresses.
+
+```bash
+/hv-init                                       # one-time setup
+/hv-vision                                     # Socratic discovery + web research
+                                               # → writes MILESTONES.md and per-milestone files
+                                               # → marks the first milestone active
+/hv-plan M01                                   # implementation plan for the first slice
+                                               # (or skip and let /hv-vision hand off to /hv-capture)
+/hv-capture "seed items for M01"               # populate the backlog with milestone-tagged items
+/hv-next                                       # active milestone scopes the picks
+                                               # → /hv-work runs against the plan
+/hv-ship                                       # ship M01 slice
+/hv-learn                                      # capture what was non-obvious
+```
+
+When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. For risky pre-commitment questions ("can SSE work over our nginx?"), drop in `/hv-spike <name>` before `/hv-plan` — its branch never merges, only the findings come back. See [GUIDE.md § Path B](GUIDE.md#path-b--start-from-nearly-nothing) for the deeper walkthrough.
+
+## FAQ
+
+**Why hv-skills over GSD?**
+
+GSD models projects as formal phases — discuss → plan → execute → verify → audit, each with its own agent and `.planning/` sign-off artifacts. That's the right shape for regulated work, hard requirements, or anywhere a defensible verification trail matters more than speed. hv-skills bets the other way: a tight `capture → next → work → ship → learn` loop, markdown artifacts you can edit by hand, no phase ceremony. Plan-as-artifact exists (`/hv-plan` writes one file per slice or item), but it's optional and ad-hoc rather than the spine of the workflow. Pick GSD if you want sign-off rigor; pick hv-skills if you want momentum and a knowledge layer that compounds across sessions.
+
+**Why hv-skills over Octo?**
+
+Octo orchestrates multiple AI providers (Claude, Gemini, Codex) — debates, multi-AI consensus, 100-point PRD scoring across providers, the Double Diamond Discover/Define/Develop/Deliver pipeline. If your value comes from cross-model validation or multi-provider workflows, Octo is purpose-built for that. hv-skills is single-provider on purpose: it trades cross-AI debate for tight Claude Code integration (`AskUserQuestion`, subagent dispatch, branch/worktree isolation, atomic commits) and a workflow built to survive `/clear` via handoff notes. Pick Octo for AI-vs-AI; pick hv-skills for Claude Code, deeply.
+
+**Why hv-skills over a TODO.md and good intentions?**
+
+That's how every workflow starts and how most stay. The drift happens at three places hv-skills addresses by design: (1) commits stop being atomic — one PR ends up touching six unrelated things; (2) knowledge stops compounding — you re-discover the same gotcha three sessions in a row because nothing reads it back; (3) sessions don't survive `/clear` — you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-resume` carry intent across context resets. If those three never bite you, stock Claude Code is fine. If they do, that's why hv-skills exists.
 
 ## Skills
 

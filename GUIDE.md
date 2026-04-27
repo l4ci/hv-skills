@@ -8,6 +8,58 @@ hv-skills is a zero-dependency development workflow for Claude Code. It lives en
 
 The happy path is: **vision → plan → work → review → ship → learn**. Side skills cover quick intake (`/hv-capture`, `/hv-go`), feasibility exploration (`/hv-spike`), pre-execution alignment (`/hv-assume`), bug cycles (`/hv-debug`), architectural cleanup (`/hv-refactor`), session hand-offs (`/hv-pause`, `/hv-resume`), and plugin upgrades (`/hv-update`).
 
+## Quickstarts
+
+Two ways to come into hv-skills depending on where the project is. Both start with `/hv-init` — it's the one skill that mutates `.hv/` from nothing to a working install. Everything else is layered on top.
+
+### Path A — Drop into an existing project
+
+You have a codebase. There's work piling up — a flaky test, a half-thought-through feature, a bug a teammate mentioned in chat. You want a workflow that captures it, executes it cleanly, and retains the learnings. No vision exercise needed yet; the project already has direction.
+
+**Step 1 — install and initialize.** Add the plugin, then run `/hv-init` once at the project root. Five questions, Recommended defaults are sane — pick those unless you have a specific reason. The first decision worth a second of thought is **isolation**: stick with `branch` for solo work, switch to `worktree` if you want main untouched while agents run or if you plan to run multiple `/hv-work` sessions in parallel. The second is **merge strategy**: `direct` for fast iteration, `pr` if your team requires GitHub review.
+
+**Step 2 — capture what's already in your head.** Don't curate — dump. `/hv-capture "the sidebar flickers on hover, also we should add keyboard shortcuts, also update the linter config"` splits into three items with three IDs (`B0N`, `F0N`, `T0N`) and routes them to the correct `TODO.md` sections. Mention related work and `Related:` links get inferred. If an item carries a long crash dump, log, or spec, it overflows into `.hv/bugs/B0N.md` (or `features/`, `tasks/`) automatically. Use `/hv-c` as the keystroke-saving alias.
+
+**Step 3 — pick and execute.** `/hv-next` reconciles `status.json` against actual git state (so old branches don't re-suggest the same item), archives completions older than 5 days, builds a relationship map across `Related:` links, and presents a sorted backlog. P0 bugs jump the queue; clusters of connected work are surfaced as a unit. The skill suggests one item or batch and routes to `/hv-work` after you confirm. For high-stakes picks, accept the `/hv-assume` peek first — it prints the orchestrator's intended files, tests, and assumptions before any code lands.
+
+**Step 4 — let `/hv-work` run.** Orchestrator (Opus by default) plans the tasks, workers (Sonnet) implement in parallel, one atomic commit per task. The orchestrator consults `KNOWLEDGE.md` automatically — empty on the first run, but it grows. If you have to step away mid-flight, `/hv-pause` writes a handoff note (current hypothesis, next planned step, mid-edit files); `/hv-resume` picks up after a `/clear`.
+
+**Step 5 — ship.** `/hv-ship` runs `/hv-review` (Opus, staff-engineer review against the original intent and `KNOWLEDGE.md`), then either merges directly or opens a PR with an ID-linked body. FAIL blocks; CONCERNS surface but proceed; PASS flows through. If you flipped autonomy to `auto`, `/hv-debug` chains straight into `/hv-ship` and `/hv-ship` chains into `/hv-learn`.
+
+**Step 6 — distill what was non-obvious.** `/hv-learn` writes durable gotchas, conventions, and constraints into `KNOWLEDGE.md` grouped by topic. By default an Opus verifier judges each new bullet for durability and sharpness before it lands. Skip vague restatements — only capture things a future `/hv-work` would otherwise re-discover the hard way.
+
+**Side skills you'll reach for:**
+
+- `/hv-go "fix the off-by-one in RingBuffer"` — capture + execute in one pass for hot-path fixes that don't need a queue.
+- `/hv-debug B07` — full systematic cycle (reproduce, hypothesize, verify, fix) for a real bug, not a one-liner.
+- `/hv-status` — read-only state glance when you want orientation without `/hv-next`'s reconciliation.
+- `/hv-refactor` — when friction has accumulated and you want a parallel-design pass at module boundaries.
+- `/hv-update` — when a new release ships, prints the exact update command for your install type.
+
+By the second or third cycle, you mostly live in `/hv-capture` and `/hv-next`. The rest is `/hv-work`, `/hv-ship`, `/hv-learn` — repeat.
+
+### Path B — Start from (nearly) nothing
+
+You have an empty repo, a `README.md` sketch, or a single prototype file. You want to think about *where the project is going* before any code lands, and keep that vision present as work progresses. Same skills as Path A, but routed through `/hv-vision` and `/hv-plan` first so the backlog comes from a roadmap instead of an inbox.
+
+**Step 1 — install and initialize.** Same as Path A: plugin, then `/hv-init`. Sane defaults. If you don't have a GitHub remote yet, leave merge strategy on `direct` — you can flip it later with `/hv-config` once the repo's pushed.
+
+**Step 2 — establish the vision.** `/hv-vision` is a brainstorming skill, not a templating one. It runs Socratic discovery (2–3 questions tailored to whether you're creating fresh or editing an existing roadmap), pulls 3–5 grounded findings from web research, deliberately challenges your scope and ordering, and proposes milestones with explicit dependencies. You iterate until the milestone breakdown feels right. The skill writes `.hv/MILESTONES.md` (vision paragraph + active list + per-milestone overview) and one detail file per milestone (`.hv/milestones/M01.md` and so on, with goal, acceptance, rationale, risks, research findings). Mark the first milestone `active` — multiple independent milestones can be active simultaneously when their dependencies allow.
+
+**Step 3 — (optional) de-risk the unknowns with a spike.** If the milestone hinges on a question you can't answer from the chair (*"can SSE work over our nginx setup?"*, *"is this library's threading model compatible with our concurrency model?"*), run `/hv-spike <name> "<question>"`. It creates a `spike/<name>` branch off HEAD plus `.hv/spikes/<name>.md`. You experiment freely on the branch — the branch never merges, only the findings (viable / not viable / depends-on-X / inconclusive) come back as a markdown record. Skip this for normal implementation work; that's `/hv-work`'s job.
+
+**Step 4 — write the implementation plan.** `/hv-plan M01` writes a sign-off artifact for the first slice — goal in one sentence, approach in 3–6 sentences, tasks with observable behaviors and verify steps, named assumptions, open questions. The plan lives at `.hv/plans/M01-S01.md`. `/hv-work` consults it instead of decomposing ad-hoc when you reach this slice. For items size-Major or larger, this is the right place to lock in the approach before code lands. For smaller items you can skip `/hv-plan` and let `/hv-vision` hand off directly to `/hv-capture` — Step 9 of `/hv-vision` offers exactly that.
+
+**Step 5 — seed the backlog.** `/hv-capture` (or `/hv-c`) tags items with the active milestone automatically when there's exactly one active. Multiple actives → it offers them as picks. Items without a milestone are still valid backlog. Once a few items are filed, `/hv-next` prefers milestone-tagged items within each priority/size band (P0 bugs always still jump the queue), so the active milestone naturally scopes the work without being a hard wall.
+
+**Step 6 — execute against the plan.** `/hv-next` → confirm → `/hv-work`. The orchestrator reads `.hv/plans/M01-S01.md` if it exists, otherwise it decomposes ad-hoc. For high-stakes picks, run `/hv-assume` first to see the orchestrator's intended files and assumptions before code lands; the suggestions take seconds and corrections are cheaper than reverts.
+
+**Step 7 — ship the slice, then loop.** `/hv-ship` runs `/hv-review` and integrates. `/hv-learn` captures what was non-obvious. When all the slices for a milestone are done, mark it `shipped` (`hv-vision-status M01 shipped`) — that unblocks any milestones that depended on it. Then either run `/hv-vision` again to add new milestones based on what you've learned, or activate the next planned milestone and go to Step 3.
+
+**Why the extra ceremony.** Path A treats the project as a stream of incoming work; Path B treats it as a journey with named waypoints. The vision artifacts mean six weeks from now, when you've forgotten why M02 has to wait for M01, the dependency is in `MILESTONES.md` and the rationale is in `M01.md`. The plan artifacts mean when `/hv-work` runs the slice, the orchestrator is executing your written approach, not its own ad-hoc one. The cost is a 20-minute up-front conversation per milestone — small relative to the cost of building the wrong thing in the right way.
+
+**Autonomy.** All of the above runs at `autonomy.level: "off"` (the default) — every skill nudges, you pick. Once a milestone's plan is written and the backlog is seeded, flipping to `"auto"` (chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship`) or `"loop"` (drain the milestone's items end-to-end) is a reasonable next step. Quality gates (`learn.verify`, `ship.review`, `refactor.confirmBeforeExecute`) still fire under autonomy.
+
 ## The .hv/ Folder
 
 Run `/hv-init` once per project to create the folder. It contains:
