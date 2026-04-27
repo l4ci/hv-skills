@@ -25,6 +25,8 @@ HELPERS=(
   hv-status-add hv-status-remove hv-summary hv-update-check
   hv-vision-active hv-vision-add hv-vision-index hv-vision-list hv-vision-status
   hv-todo-by-milestone
+  hv-plan-add hv-plan-list hv-plan-show hv-plan-rm
+  hv-spike-add hv-spike-list hv-spike-finish
 )
 missing=()
 for h in "${HELPERS[@]}"; do

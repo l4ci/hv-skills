@@ -25,6 +25,8 @@ Run `/hv-init` once per project to create the folder. It contains:
 | `features/` | Overflow detail files for large feature specs |
 | `tasks/` | Overflow detail files for large task descriptions |
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) — full plan with goal, acceptance, rationale, risks, research findings, notes |
+| `plans/` | Implementation plans from `/hv-plan` keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
+| `spikes/` | Spike findings from `/hv-spike` — one markdown file per spike; the actual experimental code lives on the `spike/<name>` git branch and is never merged |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
 `/hv-init` also adds two managed blocks to `CLAUDE.md` at the project root: one listing current `KNOWLEDGE.md` topics, another listing active milestones from `MILESTONES.md`. `/hv-work` reads the knowledge block; `/hv-next`, `/hv-resume`, and `/hv-pause` read the vision block to keep their suggestions and handoff notes scoped to active milestones.
@@ -61,6 +63,30 @@ Brainstorm a project's bigger vision and break it into milestones. Sits above th
 **TODO ↔ milestone link**: items can carry an optional `Milestone:` field, with one or more milestone IDs (`Milestone: M01` or `Milestone: M01, M02`). The link is loose — items without a milestone are still valid backlog. When an active milestone exists, `/hv-capture` offers it as the Recommended tag, `/hv-go` auto-tags on the speed path when there's exactly one active milestone, `/hv-next` prefers tagged items within each priority/size band (P0 bugs always jump the queue regardless), `/hv-resume` and `/hv-status` surface the active milestone list, and `/hv-pause` records it in the handoff note.
 
 Use `/hv-vision` whenever the conversation is about strategy, not tactics — *"let's plan the next quarter"*, *"what's the bigger picture"*, *"create a roadmap"*, *"brainstorm milestones"*.
+
+### /hv-plan
+
+Write an implementation plan as a first-class artifact before `/hv-work` runs. The plan is keyed under a milestone and a unit — a slice (`M01-S01.md`) for a chunk of milestone work, or a backlog item (`M01-B07.md`) for a single item that warrants its own plan. Lives at `.hv/plans/<key>.md`.
+
+**Sections**: goal (one sentence), approach (3–6 sentences), tasks with observable behaviors + files + verify steps, open questions, named assumptions. Tasks must fit one execution window — if they don't, split. Every task gets a verify step; no verify means the task isn't well-defined.
+
+**Integration**: `/hv-work` checks `.hv/plans/<milestone>-<unit>.md` at the start of its planning step and uses the plan as the dispatch source if present, instead of decomposing ad-hoc. `/hv-next` actively suggests `/hv-plan` for size-Major items that don't have a plan yet. `/hv-vision` Step 9 offers `/hv-plan` alongside `/hv-capture` when seeding a freshly active milestone.
+
+**Helpers**: `hv-plan-add` (mints slice numbers automatically), `hv-plan-list` (filterable by milestone), `hv-plan-show`, `hv-plan-rm`.
+
+Use it when an item or slice is too big to one-shot, when alignment matters before code lands, or when you want the orchestrator and user to share a sign-off artifact rather than ad-hoc plans the user can't review.
+
+### /hv-spike
+
+Throwaway feasibility experiment on a dedicated git branch. Answers a *specific* yes/no/conditional question — *"can SSE work over our nginx setup?"* — without polluting main or the backlog. Creates `spike/<name>` (never merged) and `.hv/spikes/<name>.md` for the question, what was tried, findings, and decision.
+
+**Two modes**: start (frame question, create branch + file, hand off) and finish (extract findings into the spike file, mark `done`). Code on the spike branch is reference, not product — the spike's value is the markdown record, not the experimental code.
+
+**Decisions**: `viable` / `not viable` / `depends-on-X` / `inconclusive`. Honest reporting matters more than salvage — a "not viable" conclusion is just as valuable as "viable".
+
+**Helpers**: `hv-spike-add` (creates branch + spike file from current HEAD), `hv-spike-list` (JSON, includes whether the branch still exists), `hv-spike-finish` (flips status to `done`, stamps the date).
+
+Use it when you need to *try* something before committing to it as a backlog item or a milestone slice. Skip it for normal implementation work — that's `/hv-work`'s job.
 
 ### /hv-capture
 
@@ -99,6 +125,16 @@ Reviews the backlog and suggests what to work on. Does several things before pre
 4. **Presents the backlog** — tables sorted by priority/size, with a Related column and cluster notes.
 5. **Suggests next work** — P0 bugs first, then clusters with blocking bugs, quick wins, P1 bugs, blocking tasks, features.
 6. **Routes to /hv-work** — after the user confirms.
+
+### /hv-assume
+
+Print the orchestrator's intended approach for an item, slice, or milestone — files it would touch, files it would create, tests it would add, assumptions it's making, known unknowns it would resolve mid-flight. **Read-only**: no writes, no commits, no helper calls beyond reads.
+
+**Output structure**: one-paragraph approach, then bulleted lists for *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*. Specific paths, test names, and function names — not generic descriptions. Stops after printing; the user reviews and either pushes back, asks for a written plan (`/hv-plan`), or invokes `/hv-work` themselves.
+
+**Integration**: `/hv-next` actively suggests `/hv-assume` as a question option when the suggested pick is a size-Major feature, a P0/P1 bug, or a multi-item batch. If a plan already exists at `.hv/plans/<key>.md`, the peek largely restates it; if no plan exists, the peek is the orchestrator's own ad-hoc decomposition — and the user should consider running `/hv-plan` instead of `/hv-work` if alignment matters.
+
+Use it as a cheap gate before `/hv-work` for high-stakes items, when corrections after the fact are expensive. For an item that needs durable alignment rather than an ephemeral peek, `/hv-plan` is the better tool.
 
 ### /hv-status
 

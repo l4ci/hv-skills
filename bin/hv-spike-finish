@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Mark a spike as finished — sets status: done and adds a finished date.
+# Findings/decision are written by the skill via Edit; this only flips state.
+# Usage: hv-spike-finish <name>
+set -euo pipefail
+NAME="${1:?usage: hv-spike-finish <name>}"
+SPIKE=".hv/spikes/${NAME}.md"
+if [ ! -f "$SPIKE" ]; then
+  echo "error: $SPIKE not found" >&2
+  exit 1
+fi
+python3 - "$SPIKE" <<'PY'
+import re, sys
+from datetime import date
+from pathlib import Path
+
+p = Path(sys.argv[1])
+content = p.read_text()
+new = re.sub(r"^(status:\s*)\w+", r"\g<1>done", content, count=1, flags=re.MULTILINE)
+if new == content:
+    print(f"error: status field not found in {p}", file=sys.stderr)
+    sys.exit(1)
+
+if re.search(r"^finished:\s*", new, re.MULTILINE):
+    new = re.sub(r"^(finished:\s*).+$", rf"\g<1>{date.today().isoformat()}", new, count=1, flags=re.MULTILINE)
+else:
+    new = re.sub(r"^(status:\s*done)$", rf"\g<1>\nfinished: {date.today().isoformat()}", new, count=1, flags=re.MULTILINE)
+
+p.write_text(new)
+PY

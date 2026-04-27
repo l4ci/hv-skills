@@ -4,6 +4,13 @@ description: Reorient after a context clear or a fresh session — shows active 
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟪  hv-resume  ·  reorient after /clear or fresh session
+  triggers: "where was I", "resume"  ·  pairs: hv-pause
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-resume — Pick Up Where You Left Off
 
 Read-only reorientation. Surfaces active work, recent commits per branch, and backlog counts — then routes to the right next action. No mutation.

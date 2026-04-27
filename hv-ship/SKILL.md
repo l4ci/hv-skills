@@ -4,6 +4,13 @@ description: Bundle completed work on a feature branch into a PR (or direct merg
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟩  hv-ship  ·  bundle work into a PR or merge
+  triggers: "ship it", "open the PR"  ·  pairs: hv-review
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-ship — Finish a Feature Branch
 
 Turn the commits on the current feature branch into either a GitHub PR or a direct merge. Optionally runs `/hv-review` first so the diff gets a staff-engineer pass before it leaves your machine.

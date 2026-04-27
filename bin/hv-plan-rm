@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Remove a plan file.
+# Usage: hv-plan-rm <key>     (e.g. hv-plan-rm M01-S01)
+set -euo pipefail
+KEY="${1:?usage: hv-plan-rm <key>}"
+PLAN=".hv/plans/${KEY}.md"
+if [ ! -f "$PLAN" ]; then
+  echo "error: $PLAN not found" >&2
+  exit 1
+fi
+rm "$PLAN"

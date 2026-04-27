@@ -4,6 +4,13 @@ description: Compact project-state overview — backlog counts, active work, rec
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟪  hv-status  ·  compact project state overview
+  triggers: "status", "summary"  ·  pairs: hv-next, hv-resume
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-status — Quick State Glance
 
 Pure read — shows where the project stands without running git reconciliation, archival, or suggestions. Use this when the user wants to orient, not act.

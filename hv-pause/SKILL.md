@@ -4,6 +4,13 @@ description: Gracefully pause mid-session — writes a handoff note (current hyp
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟨  hv-pause  ·  write handoff note for clean pause
+  triggers: "pause", "hand off"  ·  pairs: hv-resume, hv-learn
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-pause — Graceful Session Pause
 
 Capture the state living in the orchestrator's head — what you were about to do next, which hypothesis you were on, which files are mid-edit — into a handoff note. `/hv-resume` reads and deletes the note on the next session.

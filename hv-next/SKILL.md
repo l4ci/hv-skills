@@ -4,6 +4,13 @@ description: Review the backlog, reconcile active work against git state, archiv
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟪  hv-next  ·  review backlog, suggest next item
+  triggers: "what's next", "what to do"  ·  pairs: hv-status, hv-work
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-next — Pick & Work the Next Item
 
 Review the project backlog, suggest what to tackle next, and execute it.
@@ -149,16 +156,20 @@ Use the `AskUserQuestion` tool so the user picks with the host's native UI. Buil
 
 - **Header:** `"Next"`
 - **Question:** *"Work on the suggested item(s)?"* (substitute "items" for a batch)
-- **Options** (single-select):
+- **Options** (single-select). Build the list dynamically — option 1 is always present, options 2 and 3 are conditional, options 4–5 always close the list:
   1. `"Start [ID] (Recommended)"` — *"Invoke `/hv-work` with the suggested item(s) and their TODO descriptions."* (list IDs in the label if it's a batch, else the single ID)
-  2. `"Pick different items"` — *"Choose from the backlog yourself."*
-  3. `"Stop here"` — *"No execution now; just leave me with the backlog view."*
+  2. `"Peek approach first (/hv-assume)"` — *"Print the orchestrator's intended files, tests, and assumptions; nothing executes."* — **include when** the suggested pick is a size-Major feature, a P0/P1 bug, or a multi-item batch.
+  3. `"Write a plan first (/hv-plan)"` — *"Open `/hv-plan` to write a milestone-keyed plan; `/hv-work` will consult it later."* — **include when** the suggested pick is size-Major **and** no plan exists at `.hv/plans/<milestone>-<unit>.md`. Skip the option silently if the item has no `Milestone:` tag (no plan key without a milestone).
+  4. `"Pick different items"` — *"Choose from the backlog yourself."*
+  5. `"Stop here"` — *"No execution now; just leave me with the backlog view."*
 
 Route the answer:
 
 | Answer | Action |
 |--------|--------|
 | Start (Recommended) | Invoke `hv-work` via the `Skill` tool with the selected items + their TODO entries |
+| Peek approach first | Invoke `hv-assume` via the `Skill` tool with the suggested item ID(s); after the peek prints, the user re-invokes `/hv-next` or `/hv-work` themselves |
+| Write a plan first | Invoke `hv-plan` via the `Skill` tool with the milestone tag and item ID; once the plan is written, suggest `/hv-work <milestone>-<id>` as the natural next step |
 | Pick different items | Second `AskUserQuestion` call with a `multiSelect: true` question listing up to 4 alternative items (or ask the user to name them if the backlog has more than 4). Then invoke `hv-work` on the chosen set |
 | Stop here | Print *"OK — run `/hv-next` again when you're ready."* and exit |
 | "Other" (free text) | Treat the user's text as the item spec; route to `/hv-work` |

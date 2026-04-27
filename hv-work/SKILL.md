@@ -4,6 +4,13 @@ description: Orchestrator-driven parallel implementation — plans tasks, dispat
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟩  hv-work  ·  orchestrator-driven parallel implementation
+  triggers: "implement", "build these"  ·  pairs: hv-ship, hv-review
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-work
 
 Orchestrator-driven parallel implementation with per-task verification and commits.
@@ -100,6 +107,14 @@ After picking the branch name:
 Idempotent on branch name — call again with the worktree path once Step 5 creates it.
 
 ## Step 4 — Plan Tasks
+
+**Plan-as-artifact check (first).** If the work has a milestone-and-unit key — an item tagged to a milestone (`Milestone: M01` on `B07` → key `M01-B07`) or a slice (`M01-S01`) — check for an existing plan:
+
+```bash
+.hv/bin/hv-plan-show <milestone>-<unit> 2>/dev/null
+```
+
+If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it. If no plan exists, proceed with the steps below.
 
 From the conversation context:
 

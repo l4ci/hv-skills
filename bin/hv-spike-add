@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Start a spike — creates branch spike/<name> and .hv/spikes/<name>.md.
+# Does NOT switch to the branch; the calling skill drives the UX.
+# Usage: hv-spike-add <name> "<question>"
+# Prints the branch name on stdout.
+set -euo pipefail
+NAME="${1:?usage: hv-spike-add <name> <question>}"
+QUESTION="${2:?usage: hv-spike-add <name> <question>}"
+
+if ! [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "error: name must be lowercase alphanumeric + dashes, got '$NAME'" >&2
+  exit 1
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "error: not a git repository" >&2
+  exit 1
+fi
+
+BRANCH="spike/$NAME"
+if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+  echo "error: branch $BRANCH already exists" >&2
+  exit 1
+fi
+
+git branch "$BRANCH"
+
+python3 - "$NAME" "$QUESTION" "$BRANCH" <<'PY'
+import sys
+from datetime import date
+from pathlib import Path
+
+name, question, branch = sys.argv[1], sys.argv[2], sys.argv[3]
+
+spikes_dir = Path(".hv/spikes")
+spikes_dir.mkdir(parents=True, exist_ok=True)
+
+spike_path = spikes_dir / f"{name}.md"
+if spike_path.exists():
+    print(f"error: {spike_path} already exists", file=sys.stderr)
+    sys.exit(1)
+
+spike_path.write_text(
+    f"""---
+name: {name}
+branch: {branch}
+status: open
+created: {date.today().isoformat()}
+---
+
+# spike/{name}
+
+## Question
+
+{question}
+
+## What was tried
+
+_(commands run, files touched on the spike branch — fill in as you go)_
+
+## Findings
+
+_(3–5 bullets — what you learned)_
+
+## Decision
+
+_(viable / not viable / depends-on-X)_
+
+## Recommended approach
+
+_(if viable, the shape of the real implementation — write only at /hv-spike done)_
+"""
+)
+PY
+
+echo "$BRANCH"

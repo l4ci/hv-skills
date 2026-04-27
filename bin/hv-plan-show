@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Print the contents of a plan file.
+# Usage: hv-plan-show <key>     (e.g. hv-plan-show M01-S01)
+set -euo pipefail
+KEY="${1:?usage: hv-plan-show <key>}"
+PLAN=".hv/plans/${KEY}.md"
+if [ ! -f "$PLAN" ]; then
+  echo "error: $PLAN not found" >&2
+  exit 1
+fi
+cat "$PLAN"

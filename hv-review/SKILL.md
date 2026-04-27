@@ -4,6 +4,13 @@ description: Staff-engineer review of a feature branch before merge or PR — re
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟧  hv-review  ·  staff-engineer review of a branch
+  triggers: "review this", "check before ship"  ·  pairs: hv-ship
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-review — Pre-Merge Review
 
 Read-only staff-engineer review of a feature branch against its original intent, project conventions, and obvious quality issues. No mutations, no commits — just a verdict.

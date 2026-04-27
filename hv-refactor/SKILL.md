@@ -4,6 +4,13 @@ description: Run a full architectural refactor cycle — explores the codebase f
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟩  hv-refactor  ·  full architectural refactor cycle
+  triggers: "refactor", "clean architecture"  ·  pairs: hv-work
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-refactor
 
 Run a full architectural refactor cycle on the current codebase.

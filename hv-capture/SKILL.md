@@ -4,6 +4,13 @@ description: Capture bugs, features, and tasks into the project's TODO.md. Autom
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟦  hv-capture  ·  capture work items into .hv/TODO.md
+  triggers: "capture", "log bug"  ·  pairs: hv-go, hv-next
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-capture — Capture Work Items
 
 Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.

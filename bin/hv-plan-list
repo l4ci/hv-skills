@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# List all plans from .hv/plans/*.md as JSON.
+# Each entry: { key, milestone, unit, unitKind, title, status, created }.
+# Usage: hv-plan-list [milestone]
+#   With a milestone arg, returns only plans under that milestone.
+set -euo pipefail
+FILTER="${1:-}"
+python3 - "$FILTER" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+filter_milestone = sys.argv[1] if len(sys.argv) > 1 else ""
+
+dir_ = Path(".hv/plans")
+items = []
+if dir_.exists():
+    for path in sorted(dir_.glob("*.md")):
+        text = path.read_text()
+        m = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+        if not m:
+            continue
+        fm = m.group(1)
+        def field(key, default=""):
+            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", fm, re.MULTILINE)
+            return mm.group(1).strip() if mm else default
+        ms = field("milestone")
+        if filter_milestone and ms != filter_milestone:
+            continue
+        items.append({
+            "key": field("key", path.stem),
+            "milestone": ms,
+            "unit": field("unit"),
+            "unitKind": field("unitKind", "item"),
+            "title": field("title"),
+            "status": field("status", "planned"),
+            "created": field("created"),
+        })
+
+print(json.dumps(items, indent=2))
+PY

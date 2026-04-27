@@ -4,6 +4,13 @@ description: Capture a work item and immediately implement it — combines /hv-c
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟦  hv-go  ·  capture and implement in one pass
+  triggers: "fix X", "add Y", "do Z"  ·  pairs: hv-capture, hv-work
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-go — Capture & Execute in One Pass
 
 Route a freshly-described bug, feature, or task straight into implementation. The item is still written to `TODO.md` with a real ID so history is preserved, but the `/hv-next` review step is skipped.

@@ -4,6 +4,13 @@ description: Systematic root-cause investigation for a bug — reads the TODO en
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  🟥  hv-debug  ·  systematic root-cause investigation
+  triggers: "debug [B07]", "why is X broken"  ·  pairs: hv-learn
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-debug — Systematic Bug Cycle
 
 Full reproduce → hypothesize → verify → fix cycle for a single bug. Anchors to a `[B##]` ID so the fix commit closes the backlog entry and the learning gets routed back to `KNOWLEDGE.md`.

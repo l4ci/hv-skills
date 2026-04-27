@@ -612,4 +612,125 @@ rc=0
 [ "$rc" = "3" ] || fail "expected exit 3 (missing helper), got $rc"
 pass "preflight exits 3 when a helper is missing"
 
+echo "hv-plan-add / hv-plan-list / hv-plan-show / hv-plan-rm"
+KEY1=$("$BIN/hv-plan-add" M01 slice "Auth foundation")
+[ "$KEY1" = "M01-S01" ] || fail "expected M01-S01, got $KEY1"
+[ -f .hv/plans/M01-S01.md ] || fail "M01-S01.md not created"
+grep -q "^key: M01-S01$" .hv/plans/M01-S01.md || fail "key field missing"
+grep -q "^unitKind: slice$" .hv/plans/M01-S01.md || fail "unitKind not slice"
+grep -q "title: Auth foundation" .hv/plans/M01-S01.md || fail "title missing from plan"
+pass "first slice plan = M01-S01"
+
+KEY2=$("$BIN/hv-plan-add" M01 slice "Auth refresh")
+[ "$KEY2" = "M01-S02" ] || fail "expected M01-S02, got $KEY2"
+pass "second slice plan auto-mints M01-S02"
+
+KEY3=$("$BIN/hv-plan-add" M01 B07 "Sign-in flicker")
+[ "$KEY3" = "M01-B07" ] || fail "expected M01-B07, got $KEY3"
+[ -f .hv/plans/M01-B07.md ] || fail "M01-B07.md not created"
+grep -q "^unitKind: item$" .hv/plans/M01-B07.md || fail "unitKind not item"
+pass "item plan uses item ID verbatim"
+
+if "$BIN/hv-plan-add" M01 B07 "Duplicate" 2>/dev/null; then
+  fail "hv-plan-add should reject existing key"
+fi
+pass "hv-plan-add rejects existing key"
+
+if "$BIN/hv-plan-add" not-a-milestone slice "x" 2>/dev/null; then
+  fail "hv-plan-add should reject malformed milestone"
+fi
+pass "hv-plan-add rejects malformed milestone"
+
+if "$BIN/hv-plan-add" M01 bogus "x" 2>/dev/null; then
+  fail "hv-plan-add should reject malformed unit"
+fi
+pass "hv-plan-add rejects malformed unit"
+
+"$BIN/hv-plan-add" M02 slice "Multi-tenant" >/dev/null
+LIST=$("$BIN/hv-plan-list")
+echo "$LIST" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+keys = {i['key']: i for i in data}
+for k in ('M01-S01', 'M01-S02', 'M01-B07', 'M02-S01'):
+    assert k in keys, f'missing {k}'
+assert keys['M01-S01']['unitKind'] == 'slice'
+assert keys['M01-B07']['unitKind'] == 'item'
+assert keys['M01-B07']['milestone'] == 'M01'
+" || fail "hv-plan-list output did not match"
+pass "hv-plan-list emits all plans with correct fields"
+
+LIST_M01=$("$BIN/hv-plan-list" M01)
+echo "$LIST_M01" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+mss = {i['milestone'] for i in data}
+assert mss == {'M01'}, f'leak: {mss}'
+" || fail "hv-plan-list M01 leaked other milestones"
+pass "hv-plan-list filters by milestone"
+
+SHOW=$("$BIN/hv-plan-show" M01-S01)
+echo "$SHOW" | grep -q "^# M01-S01 — Auth foundation" || fail "show output missing title"
+pass "hv-plan-show prints content"
+
+if "$BIN/hv-plan-show" M99-S99 2>/dev/null; then
+  fail "hv-plan-show should reject unknown key"
+fi
+pass "hv-plan-show rejects unknown key"
+
+"$BIN/hv-plan-rm" M01-B07
+[ -f .hv/plans/M01-B07.md ] && fail "M01-B07 not removed"
+pass "hv-plan-rm deletes plan"
+
+if "$BIN/hv-plan-rm" M99-S99 2>/dev/null; then
+  fail "hv-plan-rm should reject unknown key"
+fi
+pass "hv-plan-rm rejects unknown key"
+
+echo "hv-spike-add / hv-spike-list / hv-spike-finish"
+git checkout -q main 2>/dev/null || true
+
+BRANCH=$("$BIN/hv-spike-add" sse-feasibility "Can SSE work over our nginx without proxy buffering?")
+[ "$BRANCH" = "spike/sse-feasibility" ] || fail "expected spike/sse-feasibility, got $BRANCH"
+[ -f .hv/spikes/sse-feasibility.md ] || fail "spike file not created"
+git rev-parse --verify spike/sse-feasibility >/dev/null 2>&1 || fail "spike branch not created"
+grep -q "^name: sse-feasibility$" .hv/spikes/sse-feasibility.md || fail "spike name missing"
+grep -q "^status: open$" .hv/spikes/sse-feasibility.md || fail "spike status not open"
+grep -q "Can SSE work" .hv/spikes/sse-feasibility.md || fail "question not embedded"
+pass "spike-add creates branch and file"
+
+if "$BIN/hv-spike-add" "Bad Name" "?" 2>/dev/null; then
+  fail "hv-spike-add should reject bad name"
+fi
+pass "hv-spike-add rejects bad name"
+
+if "$BIN/hv-spike-add" sse-feasibility "?" 2>/dev/null; then
+  fail "hv-spike-add should reject existing branch"
+fi
+pass "hv-spike-add rejects existing branch"
+
+SLIST=$("$BIN/hv-spike-list")
+echo "$SLIST" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+sse = next((s for s in data if s['name'] == 'sse-feasibility'), None)
+assert sse is not None, 'sse-feasibility missing'
+assert sse['branch'] == 'spike/sse-feasibility', f'wrong branch: {sse[\"branch\"]}'
+assert sse['status'] == 'open', f'wrong status: {sse[\"status\"]}'
+assert sse['branchExists'] is True, 'branchExists should be True'
+" || fail "spike-list output did not match"
+pass "spike-list emits spikes with branch state"
+
+"$BIN/hv-spike-finish" sse-feasibility
+grep -q "^status: done$" .hv/spikes/sse-feasibility.md || fail "spike status not done"
+grep -q "^finished:" .hv/spikes/sse-feasibility.md || fail "spike finished date missing"
+pass "spike-finish flips status to done"
+
+if "$BIN/hv-spike-finish" not-a-spike 2>/dev/null; then
+  fail "hv-spike-finish should reject unknown name"
+fi
+pass "hv-spike-finish rejects unknown name"
+
+git branch -D spike/sse-feasibility >/dev/null 2>&1 || true
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

@@ -63,7 +63,10 @@ First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILES
 | `/hv-status` | Compact read-only state glance — counts, active work, recent completions, knowledge topics |
 | `/hv-resume` | Reorient after `/clear` — active streams with recent commits and any handoff notes, routes to `/hv-work`, `/hv-ship`, or `/hv-next` |
 | `/hv-pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-resume` |
-| `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` for relevant topics |
+| `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`) — task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
+| `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch — branch never merges, only findings come back as `.hv/spikes/<name>.md` |
+| `/hv-assume` | Read-only peek of the orchestrator's intended approach — files, tests, assumptions, unknowns; gates `/hv-work` for high-stakes work |
+| `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present |
 | `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit, nudge `/hv-learn` |
 | `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
@@ -76,15 +79,24 @@ First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILES
 ```mermaid
 flowchart LR
   VISION["/hv-vision"] --> MILES[(MILESTONES.md)]
+  VISION -.optional.-> SPIKE["/hv-spike"]
+  VISION -.routes.-> PLAN["/hv-plan"]
   CAP["/hv-capture"] --> TODO[(TODO.md)]
   CAP -.tag.-> MILES
   GO["/hv-go"] --> TODO
   GO -.one-pass.-> WORK
   TODO --> NEXT["/hv-next"]
   MILES -.scopes.-> NEXT
+  NEXT -.suggests.-> ASSUME["/hv-assume"]
+  NEXT -.suggests.-> PLAN
   NEXT --> WORK["/hv-work"]
   STATUS["/hv-status"] -.reads.-> TODO
   STATUS -.reads.-> MILES
+  PLAN --> PLANS[(.hv/plans/)]
+  PLANS -.consults.-> WORK
+  ASSUME -.reads.-> PLANS
+  ASSUME -.peeks.-> WORK
+  SPIKE --> SPIKES[(.hv/spikes/)]
   WORK -.pause.-> PAUSE["/hv-pause"]
   DEBUG -.pause.-> PAUSE
   PAUSE --> HANDOFF[(.hv/handoff/)]
@@ -139,8 +151,10 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 ├── status.json       # active work streams
 ├── bugs/ features/ tasks/   # overflow detail files
 ├── milestones/       # one detail file per milestone (M01.md, M02.md, ...)
+├── plans/            # /hv-plan output (M01-S01.md slice plans, M01-B07.md item plans)
+├── spikes/           # /hv-spike findings — one file per spike, branch lives in git
 ├── handoff/          # /hv-pause notes, one per branch; /hv-resume consumes them
-└── bin/              # 25 CLI helpers — see GUIDE.md § CLI Helpers
+└── bin/              # CLI helpers — see GUIDE.md § CLI Helpers
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.

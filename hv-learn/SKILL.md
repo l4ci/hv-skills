@@ -4,6 +4,13 @@ description: Extract durable session learnings (gotchas, conventions, constraint
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  ⬛  hv-learn  ·  extract session learnings to KNOWLEDGE.md
+  triggers: "learn this", "save gotcha"  ·  pairs: hv-debug, hv-pause
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-learn — Capture Session Learnings
 
 Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, organized by topic, so it's available to future work.

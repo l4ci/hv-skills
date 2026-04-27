@@ -4,6 +4,13 @@ description: Initialize the .hv/ folder structure with TODO.md, KNOWLEDGE.md, co
 user-invocable: true
 ---
 
+```
+════════════════════════════════════════════════════════════════════════
+  ⬛  hv-init  ·  initialize .hv/ folder structure
+  triggers: auto-called by other hv skills  ·  pairs: all hv-*
+════════════════════════════════════════════════════════════════════════
+```
+
 # hv-init — Initialize Project Backlog
 
 Set up the `.hv/` folder with data files and CLI helpers for a project.
@@ -53,7 +60,7 @@ Run this in the project root:
 ```bash
 set -euo pipefail
 HV=".hv"
-mkdir -p "$HV"/{bugs,features,tasks,milestones,bin}
+mkdir -p "$HV"/{bugs,features,tasks,milestones,plans,spikes,bin}
 
 [ -f "$HV/TODO.md" ] || cat > "$HV/TODO.md" <<'EOF'
 # TODO
