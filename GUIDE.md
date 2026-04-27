@@ -4,9 +4,9 @@ A detailed guide to the hv-skills workflow system for Claude Code.
 
 ## Overview
 
-hv-skills is a lightweight project backlog and execution system. It lives entirely in a `.hv/` folder inside your project (gitignored) and uses Claude Code skills to capture work items, prioritize them, execute them with parallel subagents, and carry durable learnings forward.
+hv-skills is a zero-dependency development workflow for Claude Code. It lives entirely in a `.hv/` folder inside your project (gitignored) and helps you plan with intent (vision, milestones, plans, spikes, approach peeks), ship atomic per-task commits with parallel subagents, review-gate before integration, and retain hard-won knowledge across sessions.
 
-The workflow is: **capture → prioritize → execute → review → ship → learn → refactor**, with `/hv-resume` and `/hv-pause` for graceful session hand-offs, `/hv-debug` for bug investigation, and `/hv-update` for keeping the skills themselves current.
+The happy path is: **vision → plan → work → review → ship → learn**. Side skills cover quick intake (`/hv-capture`, `/hv-go`), feasibility exploration (`/hv-spike`), pre-execution alignment (`/hv-assume`), bug cycles (`/hv-debug`), architectural cleanup (`/hv-refactor`), session hand-offs (`/hv-pause`, `/hv-resume`), and plugin upgrades (`/hv-update`).
 
 ## The .hv/ Folder
 
@@ -18,7 +18,7 @@ Run `/hv-init` once per project to create the folder. It contains:
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
 | `counters.json` | Auto-incrementing IDs for each item type |
-| `config.json` | Model selection, isolation mode, merge strategy, refactor and learn settings |
+| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
 | `bin/` | CLI helpers — `hv-next-id`, `hv-append`, `hv-complete`, … |
 | `bugs/` | Overflow detail files for large bug reports |
@@ -345,6 +345,13 @@ Knowledge quality compounds — a weak bullet consulted by 20 future `/hv-work` 
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
 | `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the `<!-- hv-vision-start -->` block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a given milestone, one per line | `.hv/bin/hv-todo-by-milestone M01` |
+| `hv-plan-add` | Create a plan at `.hv/plans/<milestone>-<unit>.md`; mints next slice number when called with `slice` | `.hv/bin/hv-plan-add M01 slice "Auth foundation"` |
+| `hv-plan-list` | JSON: every plan with key, milestone, unit, unitKind, title, status, created (filter by milestone if arg given) | `.hv/bin/hv-plan-list M01` |
+| `hv-plan-show` | Print a plan file's contents | `.hv/bin/hv-plan-show M01-S01` |
+| `hv-plan-rm` | Delete a plan file | `.hv/bin/hv-plan-rm M01-S01` |
+| `hv-spike-add` | Create branch `spike/<name>` off HEAD and `.hv/spikes/<name>.md` with question stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
+| `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
+| `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
 
 All helpers are refreshed every time `/hv-init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
 

@@ -2,7 +2,7 @@
 
 # hv-skills
 
-**A zero-dependency project backlog for Claude Code — capture, execute, review, ship.**
+**Plan with intent, ship atomic commits, retain hard-won knowledge — a zero-dependency development workflow for Claude Code.**
 
 [![Release](https://img.shields.io/github/v/release/l4ci/hv-skills?color=blue&sort=semver)](https://github.com/l4ci/hv-skills/releases)
 [![License](https://img.shields.io/github/license/l4ci/hv-skills?color=green)](LICENSE)
@@ -18,11 +18,11 @@
 
 ## Why hv-skills?
 
-- **Your backlog lives with your code.** Per-project `.hv/` folder, gitignored. No external tool to open, no context-switch.
-- **Zero dependencies.** Bash, Python 3, Git, and optionally `gh` — all already on a developer's machine. No npm, no pip, no daemon, no database, no cloud.
-- **Your agent already knows the project.** Let Claude Code pick the next task, execute it in parallel, and commit per task — atomic history, easy reverts.
-- **Knowledge persists across sessions.** Capture hard-won gotchas, conventions, and constraints into `.hv/KNOWLEDGE.md`; future work consults it automatically.
-- **Zero ceremony.** One `/hv-capture` routes bugs, features, and tasks to the right section with auto-incrementing IDs.
+- **Plan with intent, not just intuition.** `/hv-vision` for milestones, `/hv-plan` for sign-off plans, `/hv-spike` for feasibility experiments, `/hv-assume` for pre-execution approach peeks. The plan exists before the code does.
+- **Ship atomic per-task commits.** Clean history, easy reverts; every commit lands one task with one verify step. Parallel workers, one orchestrator, no merge mess.
+- **Knowledge that compounds.** `/hv-learn` distills hard-won gotchas and conventions into `KNOWLEDGE.md`; `/hv-work`, `/hv-debug`, and `/hv-review` all consult it automatically on future runs.
+- **Your code, your `.hv/`, your machine.** No daemon, no MCP server, no cloud, no database. Bash + Python + Git + optionally `gh` — that's it.
+- **Survives `/clear`.** `/hv-pause` writes a handoff note (current hypothesis, next step, mid-edit files); `/hv-resume` picks up where you left off, even in a fresh session.
 
 ## Features
 
@@ -34,6 +34,8 @@
 | 🚢 **Review-gated shipping** — `/hv-ship` runs `/hv-review` against original intent + conventions before PR or merge | 💾 **Context-clear recovery** — `/hv-resume` re-reads active streams with recent commits and routes you back to work |
 | 🔧 **Refactor cycles** — `/hv-refactor` explores friction, designs competing approaches, fixes in parallel | 🤝 **Graceful handoff** — `/hv-pause` writes what's in your head (hypothesis, next step, mid-edit files) so `/hv-resume` picks up after a `/clear` |
 | 🧭 **Vision & milestones** — `/hv-vision` brainstorms milestones with web research and deliberate challenge, then `/hv-next`, `/hv-resume`, `/hv-pause`, and `/hv-status` keep work scoped to the active set | 🔗 **Loose milestone tags** — items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
+| 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main |
+| 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
 
 ## Quick start
 
@@ -48,7 +50,7 @@ claude plugin install hv-skills
 /hv-next                                     # review + pick + execute
 ```
 
-First run takes ≤30s and creates `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, 25 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
+First run takes ≤30s and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories (`bugs/`, `features/`, `tasks/`, `milestones/`, `plans/`, `spikes/`), 32 CLI helpers, and managed knowledge + vision blocks in `CLAUDE.md`. `/hv-init` asks four questions (models, isolation, merge strategy, quality gates) with Recommended defaults highlighted; skip or accept to get the defaults.
 
 ## Skills
 
@@ -184,7 +186,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 25 helpers across 51 assertions. Exits non-zero on any failure.
+Exercises all 32 helpers across 69 assertions. Exits non-zero on any failure.
 
 ## Contributing
 
