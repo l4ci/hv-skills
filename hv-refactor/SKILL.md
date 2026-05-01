@@ -69,7 +69,7 @@ Every friction point gets classified into one of four categories. The category d
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-refactor"

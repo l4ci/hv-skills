@@ -63,6 +63,10 @@ PY
 
 [ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"
 
+[ -f "$HV/config.json" ] || cat > "$HV/config.json" <<'EOF'
+{}
+EOF
+
 if [ -f .gitignore ]; then
   grep -qxF '.hv/' .gitignore 2>/dev/null || printf '\n# ── hv backlog ──\n.hv/\n' >> .gitignore
 else

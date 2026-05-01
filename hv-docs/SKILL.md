@@ -43,7 +43,7 @@ Missing keys fall back to defaults silently — `/hv-init` migration adds them i
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs.path>/` exists and is non-empty:
 

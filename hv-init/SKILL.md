@@ -102,6 +102,9 @@ EXPECTED = [
     ("ship", "review"),
     ("autonomy", "level"),
     ("debug", "competingHypotheses"),
+    ("docs", "path"),
+    ("docs", "autoCreate"),
+    ("git", "baseBranch"),
 ]
 p = Path(".hv/config.json")
 if not p.exists():
@@ -215,7 +218,9 @@ Path(".hv/config.json").write_text(json.dumps({
   "learn":    {"verify": <Q4-learn>},
   "ship":     {"review": <Q4-ship>},
   "autonomy": {"level": "<Q5>"},
-  "debug":    {"competingHypotheses": <Q4-debug>}
+  "debug":    {"competingHypotheses": <Q4-debug>},
+  "docs":     {"path": "docs", "autoCreate": True},
+  "git":      {"baseBranch": ""}
 }, indent=2) + "\n")
 PY
 ```
@@ -274,4 +279,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate}`, `git.baseBranch`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

@@ -41,7 +41,7 @@ Read `.hv/config.json`:
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ## Step 2 — Scope the Review
 

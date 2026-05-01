@@ -23,7 +23,7 @@ Write a plan to disk that the user signs off on before `/hv-work` runs. The plan
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ## Step 2 — Resolve Target
 

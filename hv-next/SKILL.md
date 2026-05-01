@@ -23,7 +23,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 .hv/bin/hv-preflight
 ```
 
-Variant: exit `0` continue; exit `2` (or absent) — tell the user *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop; exit `3` — invoke `hv-init` via `Skill` to refresh, then continue.
+See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop (no auto-init).
 
 ## Step 2 — Reconcile Active Work
 

@@ -7,10 +7,16 @@ BRANCH="${1:?usage: hv-status-remove <branch>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import update_json
+from hvlib import load_json, dump_json_atomic
 branch = sys.argv[1]
 path = Path(".hv/status.json")
 if not path.exists():
     sys.exit(0)
-update_json(path, {"active": []}, lambda d: d.update({"active": [e for e in d.get("active", []) if e.get("branch") != branch]}) or d)
+data = load_json(path, {"active": []})
+before = data.get("active", [])
+after = [e for e in before if e.get("branch") != branch]
+if before == after:
+    sys.exit(0)
+data["active"] = after
+dump_json_atomic(path, data)
 PY

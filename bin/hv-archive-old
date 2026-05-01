@@ -24,8 +24,13 @@ if span is None:
 start, end = span
 section = content[start:end]
 
-# Find bullet lines with Done YYYY-MM-DD
-pattern = re.compile(r"^(- .*Done (\d{4})-(\d{2})-(\d{2}).*)$", re.MULTILINE)
+# Match only the canonical completed shape produced by hv-complete:
+#   - ~~**[ID] …**~~ Done YYYY-MM-DD [`hash`]
+# Prefix char class [BFTM] mirrors hv-types.sh; update both if types change.
+pattern = re.compile(
+    r"^(- ~~\*\*\[[BFTM]\d+\].*\*\*~~\s+Done\s+(\d{4})-(\d{2})-(\d{2})\s+\[`[^`]+`\])$",
+    re.MULTILINE,
+)
 old_lines, kept_lines = [], []
 for line in section.splitlines():
     mm = pattern.match(line)

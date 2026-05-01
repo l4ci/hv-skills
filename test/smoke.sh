@@ -116,6 +116,13 @@ pass "status-add wrote entry"
 grep -q '"branch": "hv/test-branch"' .hv/status.json && fail "status-remove did not remove"
 pass "status-remove cleared entry"
 
+echo "hv-status-remove no-op when branch absent"
+MTIME_BEFORE=$(stat -c %Y .hv/status.json)
+"$BIN/hv-status-remove" hv/no-such-branch
+MTIME_AFTER=$(stat -c %Y .hv/status.json)
+[ "$MTIME_BEFORE" = "$MTIME_AFTER" ] || fail "status-remove rewrote status.json for absent branch"
+pass "status-remove skipped rewrite for absent branch"
+
 echo "hv-status-add upsert (no flag) overwrites startedAt"
 "$BIN/hv-status-add" hv/ts-branch X01
 TS1=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/ts-branch'))")
@@ -443,6 +450,30 @@ EOF
 COUNT=$("$BIN/hv-archive-old" 5)
 [ "$COUNT" = "0" ] || fail "expected '0' when nothing to archive, got '$COUNT'"
 pass "archive-old prints 0 when no items to move"
+
+echo "regression: hv-archive-old only archives canonical completed shape"
+FAKE_HASH="abc1234"
+OLD_DATE="2024-01-01"
+cat > .hv/TODO.md <<EOF
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+
+- ~~**[B01] Fix login crash.**~~ Done ${OLD_DATE} [\`${FAKE_HASH}\`]
+- Note: see issue [B05] which was Done 2024-01-01 by accident.
+EOF
+COUNT=$("$BIN/hv-archive-old" 1)
+[ "$COUNT" = "1" ] || fail "expected 1 item archived, got '$COUNT'"
+grep -q "Fix login crash" .hv/ARCHIVE.md || fail "canonical bullet not found in ARCHIVE.md"
+grep -q "by accident" .hv/TODO.md || fail "free-form note was wrongly removed from TODO.md"
+! grep -q "Fix login crash" .hv/TODO.md || fail "canonical bullet still present in TODO.md"
+pass "archive-old only moves canonical completed bullets"
 
 echo "hv-ship-body"
 # Fresh branch state for ship-body + review-scope
@@ -1066,6 +1097,25 @@ BB_TMP="$(mktemp -d)"
 )
 rm -rf "$BB_TMP"
 pass "hv-base-branch resolves 'main' in a fresh git repo"
+
+# 1b. hv-base-branch respects git.baseBranch from config
+BB2_TMP="$(mktemp -d)"
+(
+  cd "$BB2_TMP"
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  echo seed > seed.txt && git add seed.txt && git commit -q -m "seed"
+  git checkout -q -b develop
+  echo dev > dev.txt && git add dev.txt && git commit -q -m "dev"
+  git checkout -q main
+  mkdir -p .hv
+  printf '{"git":{"baseBranch":"develop"}}\n' > .hv/config.json
+  OUT=$("$BIN/hv-base-branch")
+  [ "$OUT" = "develop" ] || { echo "FAIL hv-base-branch config override: expected 'develop', got '$OUT'"; exit 1; }
+)
+rm -rf "$BB2_TMP"
+pass "hv-base-branch respects git.baseBranch config override"
 
 # 2. hv-worktree-clear
 WC_TMP="$(mktemp -d)"

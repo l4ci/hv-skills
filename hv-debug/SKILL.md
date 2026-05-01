@@ -51,7 +51,7 @@ Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → F
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-debug"

@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 # Print the resolved base branch (main, master, trunk, or origin/HEAD).
+# Respects git.baseBranch in .hv/config.json when set.
 # Usage: hv-base-branch
 # Exits 1 with a stderr message if none can be resolved.
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from hvlib import load_json
+cfg = load_json('.hv/config.json', {})
+print(cfg.get('git', {}).get('baseBranch', ''))
+" 2>/dev/null || true)
+if [ -n "$CONFIGURED" ] && git rev-parse --verify "$CONFIGURED" >/dev/null 2>&1; then
+  echo "$CONFIGURED"
+  exit 0
+fi
 for candidate in main master trunk; do
   if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
     echo "$candidate"

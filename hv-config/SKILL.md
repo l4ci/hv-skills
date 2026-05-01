@@ -35,7 +35,7 @@ Change one or more configuration values without hand-editing JSON. Same option v
 .hv/bin/hv-preflight
 ```
 
-Variant: exit `0` continue; exit `2` — invoke `hv-init` via `Skill` then stop (init writes the initial config interactively); exit `3` — invoke `hv-init` to refresh, then continue.
+See `docs/reference/preflight.md` for exit-code handling. Variant: on exit `2`, invoke `hv-init` via `Skill` then stop — init writes the initial config interactively, so this skill has nothing to do afterward.
 
 ## Step 2 — Read & Display Current Config
 
@@ -65,6 +65,9 @@ print(f"  Verify learnings         {'on' if cfg.get('learn',{}).get('verify',Tru
 print(f"  Confirm before refactor  {'on' if cfg.get('refactor',{}).get('confirmBeforeExecute',True) else 'off'}")
 print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
 print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHypotheses',False) else 'off'}")
+print(f"  Docs path                {cfg.get('docs',{}).get('path','docs')}")
+print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',True) else 'off'}")
+print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
 PY
 ```
 
@@ -85,10 +88,13 @@ One `AskUserQuestion` call, multiSelect:
   6. *"Confirm before refactor — current: <on|off>"*
   7. *"Autonomy — current: <off|auto|loop>"*
   8. *"Competing hypotheses — current: <on|off>"*
+  9. *"Docs path — current: <path>"*
+  10. *"Docs auto-create — current: <on|off>"*
+  11. *"Git base branch — current: <branch|(auto-detect)>"*
 
 If the user selects nothing, print *"No changes."* and stop.
 
-Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the eight names above.
+Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the eleven names above.
 
 ## Step 4 — Ask the Selected Questions
 
@@ -104,6 +110,9 @@ Build a single `AskUserQuestion` call containing **only** the questions for the 
 | Confirm before refactor | *"Pause for approval at `/hv-refactor` checkpoints?"* | On / Off |
 | Autonomy | *"How autonomously should hv-skills chain to the next logical step?"* | Off / Auto chain / Full loop |
 | Competing hypotheses | *"Dispatch 3 parallel hypothesis agents in `/hv-debug` Step 6? (Better diversity, ~3× orchestrator cost on every debug run.)"* | On / Off |
+| Docs path | *"Which directory contains your project documentation?"* | Free text (default: `docs`) |
+| Docs auto-create | *"Should `/hv-docs` auto-write doc updates after work cycles?"* | On / Off |
+| Git base branch | *"Enter the base branch for this project, or leave blank to auto-detect (main / master / trunk / origin HEAD)."* | Free text (default: `""`) |
 
 For each question, tag the matching option with `(current)`. If the user's current value doesn't match any option (custom config), don't tag any — every option is a real change.
 

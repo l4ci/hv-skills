@@ -35,7 +35,7 @@ Capture the state living in the orchestrator's head — what you were about to d
 .hv/bin/hv-preflight
 ```
 
-On failure, tell the user *"Nothing to pause — `/hv-init` the project first."* and stop — observe-only, never auto-inits.
+See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing to pause — `/hv-init` the project first."* and stop (no auto-init).
 
 ## Step 2 — Resolve the Branch
 

@@ -28,6 +28,13 @@ Default config:
   },
   "debug": {
     "competingHypotheses": false
+  },
+  "docs": {
+    "path": "docs",
+    "autoCreate": true
+  },
+  "git": {
+    "baseBranch": ""
   }
 }
 ```
@@ -106,3 +113,39 @@ Flip on when you have a class of bugs that consistently take multiple cycles to 
 ## autonomy.level
 
 Controls whether skills nudge or invoke the next skill directly. Three levels: `"off"` (default), `"auto"`, `"loop"`. See [autonomy levels](autonomy.md) for the full breakdown — when each level fires, what gates still apply, stop conditions in loop mode, and how to pick.
+
+## docs.path
+
+- **Type:** string
+- **Default:** `"docs"`
+
+Relative path (from the project root) to the documentation folder that `/hv-docs` reads and writes. Set this when your project keeps docs somewhere other than the default — for example `"documentation"`, `"site/content"`, or `"wiki"`.
+
+```json
+{ "docs": { "path": "documentation" } }
+```
+
+## docs.autoCreate
+
+- **Type:** boolean
+- **Default:** `true`
+
+Controls whether `/hv-docs` after-work mode automatically writes proposed doc updates without pausing for approval. When `true`, `/hv-docs` writes changes and reports what it did. When `false`, `/hv-docs` proposes changes and waits for your confirmation before writing.
+
+| Value | Behavior |
+|-------|----------|
+| `true` (default) | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. |
+| `false` | After-work mode proposes updates and waits for approval before writing. Safer when doc quality is critical or the agent is unfamiliar with your doc style. |
+
+## git.baseBranch
+
+- **Type:** string
+- **Default:** `""` (auto-detect)
+
+Override the base branch that `hv-base-branch` resolves to. When empty (the default), the helper auto-detects by probing `main`, `master`, `trunk`, then `origin/HEAD` in that order. Set this explicitly when your project uses a non-default base branch such as `develop` (gitflow), `release`, or any other name that won't be found by auto-detection.
+
+```json
+{ "git": { "baseBranch": "develop" } }
+```
+
+Skills that use the base branch — including `/hv-reconcile`, `/hv-ship`, `/hv-review`, and `/hv-merge` — all call `hv-base-branch` and will pick up this override automatically.

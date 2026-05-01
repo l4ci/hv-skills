@@ -23,7 +23,7 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ## Step 2 — Parse & Classify
 

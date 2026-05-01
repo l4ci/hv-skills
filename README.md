@@ -117,6 +117,8 @@ That's how every workflow starts and how most stay. The drift happens at three p
 | `/hv-assume` | Read-only peek of the orchestrator's intended approach — files, tests, assumptions, unknowns; gates `/hv-work` for high-stakes work |
 | `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present |
 | `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit, nudge `/hv-learn` |
+| `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
+| `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
 | `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
@@ -180,6 +182,7 @@ Edit `.hv/config.json`:
 {
   "models":   { "orchestrator": "opus",   "worker": "sonnet" },
   "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
+  "debug":    { "competingHypotheses": false },
   "refactor": { "confirmBeforeExecute": true },
   "learn":    { "verify": true },
   "ship":     { "review": true },

@@ -28,7 +28,7 @@ Two modes:
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool.
+See `docs/reference/preflight.md` for exit-code handling.
 
 Determine the mode silently:
 

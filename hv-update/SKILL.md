@@ -42,7 +42,7 @@ If missing, tell the user the check needs `gh` (or `brew install gh` / equivalen
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool to refresh helpers.
+See `docs/reference/preflight.md` for exit-code handling.
 
 ## Step 2 — Run the Check
 
