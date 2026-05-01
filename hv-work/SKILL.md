@@ -1,6 +1,6 @@
 ---
 name: hv-work
-description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in TODO.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go. See GUIDE.md § Capture vs. Go vs. Work Routing.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in TODO.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
 user-invocable: true
 ---
 
@@ -25,7 +25,7 @@ Read `.hv/config.json`:
 - `models.worker` — model for implementation subagents (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly. See `GUIDE.md` § Branching template.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly.
 
 ## When to Use
 
@@ -45,7 +45,7 @@ Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → V
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-work"
@@ -97,7 +97,7 @@ When asking, use a single `AskUserQuestion` call with 1-3 questions. Each questi
 - Options map to concrete plans. Mark the most likely intent `(Recommended)`.
 - For conflicting items, use `multiSelect: true` and ask which subset to include in this run.
 
-Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed.
 
 **Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
 
@@ -274,9 +274,12 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 ## Step 13 — Learn (Nudge or Auto-Invoke)
 
-Trigger: see GUIDE.md § Learn Trigger.
+Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
 
-Per GUIDE.md § Branching template: in `off`, nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
+When triggered, branch on `autonomy.level`:
+
+- `"off"` — nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
+- `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
@@ -286,11 +289,14 @@ Per GUIDE.md § Branching template: in `off`, nudge *"Capture learnings from thi
 
 Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit. Trigger when `features >= 5` OR `bugs >= 10`. Don't repeat in the same session.
 
-Per GUIDE.md § Branching template: in `off`, nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*; in `auto`/`loop`, **dispatch `hv-refactor` via `Skill` immediately — no prompt, no confirmation.** (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
+Branch on `autonomy.level`:
+
+- `"off"` — nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
+- `"auto"` or `"loop"` — **dispatch `hv-refactor` via `Skill` immediately — no prompt, no confirmation.** (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
 
 ## Step 15 — Loop Continuation
 
-`"loop"`-only (per GUIDE.md § Branching template). **Dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
+Only when `autonomy.level == "loop"`. **Dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
 
 Loop stops naturally when:
 - `/hv-next` reports an empty backlog (or the active milestone has no items and the general backlog is also empty)

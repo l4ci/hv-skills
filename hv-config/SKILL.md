@@ -35,7 +35,7 @@ Change one or more configuration values without hand-editing JSON. Same option v
 .hv/bin/hv-preflight
 ```
 
-Variant: exit `0` continue; exit `2` — invoke `hv-init` via `Skill` then stop (init writes the initial config interactively); exit `3` — invoke `hv-init` to refresh, then continue. See GUIDE.md § Preflight.
+Variant: exit `0` continue; exit `2` — invoke `hv-init` via `Skill` then stop (init writes the initial config interactively); exit `3` — invoke `hv-init` to refresh, then continue.
 
 ## Step 2 — Read & Display Current Config
 

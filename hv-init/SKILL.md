@@ -53,7 +53,7 @@ Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will 
 
 On **Stop** — surface the reason and exit.
 
-Plain-text fallback: run `git init` straight through — it's the Recommended choice, and one-off initialization is reversible with `rm -rf .git`. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: run `git init` straight through — it's the Recommended choice, and one-off initialization is reversible with `rm -rf .git`.
 
 ## Step 2 — Bootstrap & Install Helpers
 
@@ -81,7 +81,7 @@ fi
 cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
-`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See `GUIDE.md` § CLI Helpers for the full reference.
+`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
 
@@ -198,7 +198,7 @@ Map answers to config values:
 
 If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`, `"off"/"auto"/"loop"`); otherwise silently fall back to the Recommended value.
 
-Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool.
 
 ### FRESH write block
 
@@ -273,4 +273,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`. See `GUIDE.md` for full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

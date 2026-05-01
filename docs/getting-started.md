@@ -11,7 +11,7 @@ claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
 ```
 
-For git-clone or GNU stow installs, see [GUIDE.md § Installation](../GUIDE.md#installation).
+For git-clone or GNU stow installs, see the [Install alternatives](../README.md#install-alternatives) section in the project README.
 
 ## Initialize the project
 
