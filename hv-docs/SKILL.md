@@ -1,6 +1,6 @@
 ---
 name: hv-docs
-description: Scaffold and maintain a public-facing user guide under <docs.path>/ (default docs/) at repo root — aimed at consumers of the project, not contributors. Four invocation modes — first-run (discovery + scaffold), after-work (post-cycle proposals), restructure (audit + reorganize), and manual. This version implements the first-run mode; after-work lands in M01-S02 and restructure in M01-S04. See GUIDE.md § Documentation for the full surface.
+description: Scaffold and maintain a public-facing user guide under <docs.path>/ (default docs/) at repo root — aimed at consumers of the project, not contributors. Four invocation modes — first-run (discovery + scaffold), after-work (post-cycle proposals), restructure (audit + reorganize), and manual. This version implements the first-run mode; after-work lands in M01-S02 and restructure in M01-S04.
 user-invocable: true
 ---
 
@@ -43,7 +43,7 @@ Missing keys fall back to defaults silently — `/hv-init` migration adds them i
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs.path>/` exists and is non-empty:
 
@@ -109,7 +109,7 @@ Then ask via `AskUserQuestion`:
   3. *"Minimal — `README.md` + `getting-started.md` only"*
   4. *"Cancel"* — don't scaffold; exit.
 
-Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed.
 
 On **Cancel** — print *"Scaffold cancelled. Run `/hv-docs` again whenever you're ready."* and exit.
 
@@ -170,7 +170,7 @@ This flow is invoked by `/hv-work` Step 13.5 / `/hv-ship` Step 8.6 (those wires 
 
 ## Step A1 — Trigger Gate
 
-Trigger condition (mirrors `/hv-learn`'s Learn-trigger — see GUIDE.md § Learn Trigger): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+Trigger condition (same as `/hv-learn`'s): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
 
 If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print one line: *"`/hv-docs` not yet initialized — run `/hv-docs` to scaffold."* and exit. Don't auto-scaffold mid-cycle.
 
@@ -242,7 +242,7 @@ Show all drafts in one batch (plain markdown — same as the first-run proposal 
   3. *"Skip"* — don't write anything; exit cleanly. Doesn't advance the `docs:` marker.
   4. *"Cancel"* — same as Skip in this slice; reserved for future-divergent semantics.
 
-Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed.
 
 ## Step A6 — Commit
 

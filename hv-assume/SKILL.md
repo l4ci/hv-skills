@@ -23,7 +23,7 @@ Print what `/hv-work` would do *before it does it*. Surface assumptions, intende
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ## Step 2 — Resolve Target
 

@@ -23,7 +23,7 @@ Read `.hv/config.json`:
 
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly. See `GUIDE.md` § Branching template.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
 
 ## When to Use
 
@@ -43,7 +43,7 @@ Read `.hv/config.json`:
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 Determine the current branch:
 
@@ -157,9 +157,12 @@ For each ID in the scope JSON's `referencedIds`:
 
 Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh.
 
-Trigger: see GUIDE.md § Learn Trigger (use the scope JSON's `touchedFiles` for the file count).
+Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched** (use the scope JSON's `touchedFiles` for the count), OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
 
-Per GUIDE.md § Branching template: in `off`, append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the resolved IDs and touched files.
+When triggered, branch on `autonomy.level`:
+
+- `"off"` — append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
+- `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the resolved IDs and touched files.
 
 ## Step 9 — Report to User
 
@@ -184,7 +187,7 @@ If `/hv-review` surfaced concerns that the user proceeded through, append them o
 
 ## Step 10 — Loop Continuation
 
-`"loop"`-only (per GUIDE.md § Branching template). After the report, **dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.
+Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.
 
 ## Key Principles
 

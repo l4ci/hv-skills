@@ -24,8 +24,8 @@ Read `.hv/config.json`:
 - `models.orchestrator` — model for hypothesis + verification (default `opus`)
 - `models.worker` — model for the fix agent (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly. See `GUIDE.md` § Branching template.
-- `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one. See `GUIDE.md` § Competing hypotheses.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly.
+- `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one.
 
 ## When to Use
 
@@ -51,7 +51,7 @@ Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → F
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-debug"
@@ -215,7 +215,7 @@ Root cause: MenuBarManager held an invalidated timer ref after pause; the next t
 Fix: reset badge to `--:--` in `pause()` before invalidating.
 ```
 
-Per GUIDE.md § Autonomy:
+Branch on `autonomy.level`:
 
 - `"off"` (default) — `AskUserQuestion`:
   - **Header:** `"Next"`
@@ -231,7 +231,10 @@ Per GUIDE.md § Autonomy:
 
 Trigger: the root cause was **not obvious from reading the code alone** — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem. Skip for trivial fixes (typo, obvious off-by-one).
 
-Per GUIDE.md § Branching template: in `off`, nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
+Branch on `autonomy.level`:
+
+- `"off"` — nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
+- `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
 ## Key Principles
 

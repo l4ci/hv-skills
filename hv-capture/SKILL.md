@@ -1,6 +1,6 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into TODO.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in TODO use /hv-work. See GUIDE.md § Capture vs. Go vs. Work Routing.
+description: Capture bugs, features, and tasks into TODO.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in TODO use /hv-work.
 user-invocable: true
 ---
 
@@ -23,7 +23,7 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ## Step 2 — Parse & Classify
 

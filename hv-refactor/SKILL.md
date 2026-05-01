@@ -53,7 +53,15 @@ If `.hv/config.json` doesn't exist, default to `opus`/`sonnet` and `confirmBefor
 
 ## Dependency Categories
 
-Every friction point gets classified into one of four categories — **in-process**, **local-substitutable**, **remote-but-owned (ports & adapters)**, or **true external (mock)**. The category drives the fix strategy. See `GUIDE.md` § Dependency Categories for the full reference.
+Every friction point gets classified into one of four categories. The category drives the fix strategy.
+
+**1. In-process.** Pure computation, in-memory state, no I/O. Always fixable — merge the modules and test directly.
+
+**2. Local-substitutable.** Dependencies that have local test stand-ins (e.g., PGLite for Postgres, in-memory filesystem). Fixable if the test substitute exists. The deepened module is tested with the local stand-in running in the test suite.
+
+**3. Remote but owned (Ports & Adapters).** Your own services across a network boundary (microservices, internal APIs). Define a port (interface) at the module boundary. The deep module owns the logic; the transport is injected. Tests use an in-memory adapter, production uses the real HTTP/gRPC/queue adapter.
+
+**4. True external (Mock).** Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the boundary. The module takes the external dependency as an injected port; tests provide a mock implementation.
 
 ## Step 1 — Preflight & Guard
 
@@ -61,7 +69,7 @@ Every friction point gets classified into one of four categories — **in-proces
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-refactor"

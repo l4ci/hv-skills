@@ -10,7 +10,7 @@
 [![Stars](https://img.shields.io/github/stars/l4ci/hv-skills?style=social)](https://github.com/l4ci/hv-skills/stargazers)
 [![For Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2)](https://claude.com/claude-code)
 
-[Quickstarts](#quickstarts) · [FAQ](#faq) · [Skills](#skills) · [How it works](#how-it-works) · [Full guide](GUIDE.md)
+[Quickstarts](#quickstarts) · [FAQ](#faq) · [Skills](#skills) · [How it works](#how-it-works) · [Docs](docs/)
 
 </div>
 
@@ -62,7 +62,7 @@ You already have code. You want a workflow that captures the work piling up in y
 /hv-learn                                      # distill durable gotchas to KNOWLEDGE.md
 ```
 
-After the first cycle you mostly live in `/hv-capture` (or `/hv-c`) and `/hv-next`. Use `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug` for real bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`. See [GUIDE.md § Path A](GUIDE.md#path-a--drop-into-an-existing-project) for a fuller walkthrough.
+After the first cycle you mostly live in `/hv-capture` (or `/hv-c`) and `/hv-next`. Use `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug` for real bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`. See [docs/getting-started.md](docs/getting-started.md) for a fuller walkthrough.
 
 ### Path B — Start from (nearly) nothing
 
@@ -82,7 +82,7 @@ You have an empty repo or a few sketches. You want to think about *where the pro
 /hv-learn                                      # capture what was non-obvious
 ```
 
-When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. For risky pre-commitment questions ("can SSE work over our nginx?"), drop in `/hv-spike <name>` before `/hv-plan` — its branch never merges, only the findings come back. See [GUIDE.md § Path B](GUIDE.md#path-b--start-from-nearly-nothing) for the deeper walkthrough.
+When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. For risky pre-commitment questions ("can SSE work over our nginx?"), drop in `/hv-spike <name>` before `/hv-plan` — its branch never merges, only the findings come back. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
 
 ## FAQ
 
@@ -187,7 +187,7 @@ Edit `.hv/config.json`:
 }
 ```
 
-Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. See [GUIDE.md § Configuration](GUIDE.md#configuration) for every key and when to flip it.
+Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. See [docs/usage/configuration.md](docs/usage/configuration.md) for every key and when to flip it.
 
 ## Architecture
 
@@ -205,7 +205,7 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 ├── plans/            # /hv-plan output (M01-S01.md slice plans, M01-B07.md item plans)
 ├── spikes/           # /hv-spike findings — one file per spike, branch lives in git
 ├── handoff/          # /hv-pause notes, one per branch; /hv-resume consumes them
-└── bin/              # CLI helpers — see GUIDE.md § CLI Helpers
+└── bin/              # CLI helpers — see docs/reference/cli-helpers.md
 ```
 
 Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.

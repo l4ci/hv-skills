@@ -35,7 +35,7 @@ Read-only reorientation. Surfaces active work, recent commits per branch, and ba
 .hv/bin/hv-preflight
 ```
 
-On failure, tell the user *"Nothing tracked — run `/hv-init` first."* and stop — observe-only, never auto-inits. See GUIDE.md § Preflight.
+On failure, tell the user *"Nothing tracked — run `/hv-init` first."* and stop — observe-only, never auto-inits.
 
 ## Step 2 — Reconcile Active Work
 

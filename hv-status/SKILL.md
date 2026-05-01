@@ -34,7 +34,7 @@ Pure read — shows where the project stands without running git reconciliation,
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 ## Step 2 — Render
 

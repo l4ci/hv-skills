@@ -2,8 +2,6 @@
 
 Public user guide for hv-skills — a zero-dependency development workflow for Claude Code.
 
-This is the consumer-facing docs surface. For contributor reference and internals, see [GUIDE.md](../GUIDE.md) at repo root.
-
 ## Contents
 
 ### Getting started

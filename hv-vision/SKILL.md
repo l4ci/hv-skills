@@ -25,7 +25,7 @@ Sit above the day-to-day backlog. The user describes where they want the project
 .hv/bin/hv-preflight
 ```
 
-On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
+On failure, invoke `hv-init` via the `Skill` tool.
 
 Determine the mode silently:
 
@@ -76,7 +76,7 @@ Then ask discovery questions via `AskUserQuestion`. Tailor them to the mode:
   - Re-prioritize the active set
   - Explore a new direction the project should consider
 
-Plain-text fallback: ask the same question once in prose; if the answer is ambiguous, pick the Recommended interpretation, name it, and proceed. (See GUIDE.md § Host Question Conventions.)
+Plain-text fallback: ask the same question once in prose; if the answer is ambiguous, pick the Recommended interpretation, name it, and proceed.
 
 ## Step 4 — Web Research
 
