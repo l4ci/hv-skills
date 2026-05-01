@@ -12,9 +12,13 @@ if [ -z "$MSG" ]; then
 fi
 
 # Resolve a worktree for this branch, if one exists, and remove it.
+# Skip the main working tree — `git worktree remove` refuses to remove it,
+# and under branch isolation the feature branch is checked out there. The
+# checkout below moves the main worktree off the branch before merging.
+# `git worktree list --porcelain` always lists the main worktree first.
 WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
-  /^worktree / { wt=substr($0, 10) }
-  $0 == "branch " b { print wt; exit }
+  /^worktree / { wt=substr($0, 10); count++ }
+  $0 == "branch " b && count > 1 { print wt; exit }
 ')
 if [ -n "$WT" ]; then
   git worktree remove "$WT"
