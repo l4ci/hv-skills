@@ -16,7 +16,7 @@ def existing_spike_branches():
             text=True,
         )
         return set(line.strip() for line in out.splitlines() if line.strip())
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return set()
 
 existing = existing_spike_branches()

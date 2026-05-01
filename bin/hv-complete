@@ -4,11 +4,13 @@
 # Errors only if the ID is not present at all (typo guard).
 # Usage: hv-complete <ID> [commit-hash]
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 ID="${1:?usage: hv-complete <ID> [commit-hash]}"
 HASH="${2:-$(git log --oneline -1 --format='%h' 2>/dev/null || echo unknown)}"
 DATE=$(date +%Y-%m-%d)
-python3 - "$ID" "$HASH" "$DATE" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<'PY'
 import re, sys
+from hvlib import find_section
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
@@ -28,15 +30,11 @@ if not m:
 line = m.group(0)
 content = content[:m.start()] + content[m.end()+1:]
 done = f"- ~~{line[2:]}~~ Done {date_s} [`{hash_s}`]"
-ci = content.find("## Completed")
-if ci == -1:
+span = find_section(content, "Completed")
+if span is None:
     content = content.rstrip("\n") + "\n\n## Completed\n\n" + done + "\n"
 else:
-    after = ci + len("## Completed\n")
-    nxt = content.find("\n## ", after)
-    if nxt == -1:
-        content = content.rstrip("\n") + "\n" + done + "\n"
-    else:
-        content = content[:nxt].rstrip("\n") + "\n" + done + "\n" + content[nxt:]
+    start, end = span
+    content = content[:end].rstrip("\n") + "\n" + done + "\n" + content[end:]
 with open(path, "w") as f: f.write(content)
 PY

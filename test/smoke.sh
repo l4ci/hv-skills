@@ -498,6 +498,37 @@ pass "review-scope picks origin bullet, ignores Related-link references"
 git branch -D hv/scope-regression >/dev/null 2>&1 || true
 rm -f r.txt
 
+# Regression: hv-ship-body must attribute an ID to its OWN bullet, not to
+# another item that mentions the ID in a `Related:` suffix.
+git checkout -q main
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+- **[F80] [Minor] Refers to B70.** Something else. Related: [B70]
+
+## Tasks
+
+## Completed
+EOF
+cat > .hv/ARCHIVE.md <<'EOF'
+# Archive
+
+- ~~**[B70] [P1] Ship demo bug.** Broken badge.~~ Done 2026-04-10 [`aaa1111`]
+EOF
+git add -A && git commit -q -m "seed ship-body related-link test" || true
+git checkout -q -b hv/ship-body-regression
+echo r > r2.txt && git add r2.txt && git commit -q -m "fix: badge [B70]"
+git checkout -q main
+BODY=$("$BIN/hv-ship-body" hv/ship-body-regression)
+echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship-body picked wrong bullet for B70 (Related-link regression): $BODY"
+pass "ship-body picks origin bullet, ignores Related-link references"
+git checkout -q main
+git branch -D hv/ship-body-regression >/dev/null 2>&1 || true
+rm -f r2.txt
+
 # Cleanup demo branch before later tests
 git branch -D hv/ship-demo >/dev/null 2>&1 || true
 rm -f ship1.txt ship2.txt

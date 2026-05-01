@@ -54,13 +54,31 @@ def read(p):
     return path.read_text() if path.exists() else ""
 
 corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
+done_tail = re.compile(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$")
 
 def title_for(iid):
-    pat = re.compile(
-        rf"\[{re.escape(iid)}\](?:\s+\[[^\]]+\])?\s+(?P<t>[^.\n]+)\."
+    # Only match the ORIGIN bullet where ID is the leading token after `- **`
+    # or `- ~~**`. Lines that merely mention the ID in a `Related:` suffix
+    # don't qualify.
+    bullet = re.compile(
+        rf"^- (?:~~)?\*\*\[{re.escape(iid)}\].*$",
+        re.MULTILINE,
     )
-    m = pat.search(corpus)
-    return m.group("t").strip() if m else None
+    m = bullet.search(corpus)
+    if not m:
+        return None
+    line = m.group(0).strip()
+    if line.startswith("- "):
+        line = line[2:]
+    line = done_tail.sub("", line)
+    strike = re.match(r"~~(.+?)~~$", line)
+    if strike:
+        line = strike.group(1)
+    title_m = re.search(
+        rf"\[{re.escape(iid)}\](?:\s+\[[^\]]+\])?\s+(?P<t>[^.\n]+)\.",
+        line,
+    )
+    return title_m.group("t").strip() if title_m else None
 
 print("## Items resolved")
 print()

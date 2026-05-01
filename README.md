@@ -47,7 +47,7 @@ claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
 ```
 
-`/hv-init` always comes first. It takes ≤30s, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted, and creates `.hv/` with data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories, 39 CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` — never hand-edit JSON.
+`/hv-init` always comes first. It takes ≤30s, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted, and creates `.hv/` with data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` — never hand-edit JSON.
 
 ### Path A — Drop into an existing project
 
@@ -241,7 +241,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all 39 helpers across 102 assertions. Exits non-zero on any failure.
+Exercises all `hv-*` helpers across 102 assertions. Exits non-zero on any failure.
 
 ## Contributing
 
