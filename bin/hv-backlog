@@ -4,10 +4,12 @@
 # Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
 # Usage: hv-backlog
 set -euo pipefail
-. "$(dirname "$0")/hv-types.sh"
-python3 - <<'PY'
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-types.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from pathlib import Path
+from hvlib import section, load_json
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -19,20 +21,11 @@ content = todo_path.read_text()
 
 status_path = Path(".hv/status.json")
 active_entries, active_ids = [], set()
-if status_path.exists():
-    data = json.loads(status_path.read_text())
-    for entry in data.get("active", []):
-        active_entries.append(entry)
-        for i in entry.get("items", []):
-            active_ids.add(i)
-
-def section_body(name):
-    m = re.search(rf"^## {re.escape(name)}\s*$", content, re.MULTILINE)
-    if not m:
-        return ""
-    start = m.end()
-    nxt = re.search(r"^## ", content[start:], re.MULTILINE)
-    return content[start:start + nxt.start()] if nxt else content[start:]
+data = load_json(status_path, {"active": []})
+for entry in data.get("active", []):
+    active_entries.append(entry)
+    for i in entry.get("items", []):
+        active_ids.add(i)
 
 def parse_items(body):
     items = []
@@ -58,9 +51,9 @@ def parse_items(body):
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones})
     return items
 
-bugs = [i for i in parse_items(section_body("Bugs")) if i["id"] not in active_ids]
-features = [i for i in parse_items(section_body("Features")) if i["id"] not in active_ids]
-tasks = [i for i in parse_items(section_body("Tasks")) if i["id"] not in active_ids]
+bugs = [i for i in parse_items(section(content, "Bugs")) if i["id"] not in active_ids]
+features = [i for i in parse_items(section(content, "Features")) if i["id"] not in active_ids]
+tasks = [i for i in parse_items(section(content, "Tasks")) if i["id"] not in active_ids]
 
 prio = {"P0": 0, "P1": 1, "P2": 2, "": 3}
 size = {"Cosmetic": 0, "Minor": 1, "Major": 2, "": 3}

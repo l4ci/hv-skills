@@ -11,20 +11,25 @@
 #   # bash regex:  use "[$HV_ITEM_TYPES]"
 #   # python:      os.environ["HV_ITEM_TYPES"]   (re-emit as f"[{cls}]")
 #
-# HV_ITEM_TYPES   — backlog items only: Bugs / Features / Tasks.
-#                   Used by hv-backlog, hv-summary, hv-ship-body,
-#                   hv-review-scope, hv-todo-by-milestone.
-# HV_ALL_PREFIXES — everything that owns an ID counter (B/F/T plus
-#                   Milestones). Use when you want to scan ALL prefixes.
+# HV_ITEM_TYPES        — backlog items only: Bugs / Features / Tasks.
+#                        Used by hv-backlog, hv-summary, hv-ship-body,
+#                        hv-review-scope, hv-todo-by-milestone.
+# HV_ALL_PREFIXES      — everything that owns an ID counter (B/F/T plus
+#                        Milestones). Use when you want to scan ALL prefixes.
+# HV_MILESTONE_STATUSES — pipe-separated milestone status enum.
+#                        Used by hv-vision-status (validation) and
+#                        hv-vision-index (drift heal regex).
 #
 # Deliberately distinct from these helper-local classes (left untouched):
 #   - hv-refactor-age uses [BF] — counts shipped countable work only.
 #   - hv-plan-add uses [BFTS]    — accepts a Slice prefix not present in TODO.md.
 #
 # Naming note: this file is "hv-types.sh" (not "_hv-types.sh") so that
-# `cp hv-* .hv/bin/` in /hv-init Step 2 picks it up. hv-preflight's
-# discoverability check is an explicit allow-list, so it ignores this file
-# regardless of name.
+# `cp hv-* .hv/bin/` in /hv-init Step 2 picks it up. hv-preflight discovers
+# helpers via a `hv-*` glob and skips itself; this file is verified by the
+# same glob (it's a sourced lib, but `/hv-init` chmods it +x alongside the
+# executables, so the `[ -x ]` check passes).
 HV_ITEM_TYPES="BFT"
 HV_ALL_PREFIXES="BFTM"
-export HV_ITEM_TYPES HV_ALL_PREFIXES
+HV_MILESTONE_STATUSES="planned|active|shipped|archived"
+export HV_ITEM_TYPES HV_ALL_PREFIXES HV_MILESTONE_STATUSES

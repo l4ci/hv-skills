@@ -56,7 +56,7 @@ For each entry in `needsAction`, fetch recent commit subjects so the user can se
 git log --no-merges --format='- %h %s' <base>..<branch> | head -5
 ```
 
-(Use `main` or `master` as base; match how `hv-reconcile` picked it.)
+(Use the project's resolved base branch — `hv-reconcile` calls `hv-base-branch`, which checks `main`, `master`, `trunk`, then `origin/HEAD`.)
 
 **Issue one `git log` per stream in parallel** (one tool-call batch, not a serial loop), and join the per-branch handoff-note read into the same batch — they're all independent.
 

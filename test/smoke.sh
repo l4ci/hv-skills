@@ -737,7 +737,7 @@ pass "preflight exits 3 when helpers missing from .hv/bin"
 
 # 2. Install all helpers into .hv/bin, everything present → exit 0.
 mkdir -p .hv/bin
-cp "$BIN"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
+cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
 "$BIN/hv-preflight" >/dev/null 2>&1 || fail "preflight failed on fully initialized project"
 pass "preflight exits 0 when fully initialized"
 
@@ -1079,5 +1079,117 @@ assert '_path' in data[0], '_path missing'
 )
 rm -rf "$FM_TMP"
 pass "hv-fm-list extracts FM fields, skips files without frontmatter, includes _path"
+
+echo "hv-vision-index heals archived Status line"
+# Seed MILESTONES.md with a stale archived line; frontmatter says planned.
+# hv-vision-index must overwrite the archived line with planned.
+HEAL_TMP="$(mktemp -d)"
+(
+  cd "$HEAL_TMP"
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  mkdir -p .hv/milestones
+  printf -- '---\nid: M99\ntitle: Foo\nstatus: planned\ndepends: []\n---\nBody.\n' > .hv/milestones/M99.md
+  printf '# MILESTONES\n\n## Active milestones\n\n_(none)_\n\n## Milestones\n\n### M99 — Foo\n\n**Status:** archived\n' > .hv/MILESTONES.md
+  touch CLAUDE.md
+  git add . && git commit -q -m "seed"
+  "$BIN/hv-vision-index"
+  python3 -c "
+import re, sys
+ms = open('.hv/MILESTONES.md').read()
+m = re.search(r'### M99 — Foo\n\n\*\*Status:\*\* (\w+)', ms)
+if not (m and m.group(1) == 'planned'):
+    print('heal failed; Status line:', m.group(0) if m else 'not found', file=sys.stderr)
+    sys.exit(1)
+" || { echo "FAIL: hv-vision-index did not heal archived -> planned"; exit 1; }
+)
+rm -rf "$HEAL_TMP"
+pass "hv-vision-index heals stale 'archived' Status line to match frontmatter"
+
+## hv-fm-list (CRLF tolerance)
+CRLF_TMP="$(mktemp -d)"
+(
+  mkdir -p "$CRLF_TMP/ms"
+  python3 -c "
+from pathlib import Path
+Path('$CRLF_TMP/ms/M01.md').write_bytes(
+  b'---\r\nid: M01\r\ntitle: CRLF Milestone\r\nstatus: planned\r\n---\r\nBody.\r\n'
+)
+"
+  OUT=$("$BIN/hv-fm-list" "$CRLF_TMP/ms" id title)
+  echo "$OUT" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+assert len(data) == 1, f'file skipped (CRLF not tolerated): {data}'
+assert data[0]['id'] == 'M01', f'id wrong: {data[0][\"id\"]}'
+assert data[0]['title'] == 'CRLF Milestone', f'title wrong: {data[0][\"title\"]}'
+" || { echo "FAIL: hv-fm-list skipped CRLF file or extracted garbled values"; exit 1; }
+)
+rm -rf "$CRLF_TMP"
+pass "hv-fm-list parses frontmatter with CRLF line endings"
+
+echo "## hvlib.py (find_section, section, load_json, dump_json_atomic, update_json)"
+
+# 1. find_section finds known section
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import find_section
+content = '## A\nbody-a\n\n## B\nbody-b\n'
+span = find_section(content, 'A')
+assert span is not None, 'find_section returned None'
+assert content[span[0]:span[1]].strip() == 'body-a', f'got: {content[span[0]:span[1]]!r}'
+" || fail "find_section did not locate known section body"
+pass "find_section returns correct (start, end) for known section"
+
+# 2. section returns empty string for missing heading
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import section
+result = section('foo', 'Bar')
+assert result == '', f'expected empty string, got {result!r}'
+" || fail "section did not return '' for missing heading"
+pass "section returns '' for missing heading"
+
+# 3. load_json returns default on corrupt file
+HVLIB_CORRUPT="$(mktemp)"
+printf 'not-json' > "$HVLIB_CORRUPT"
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import load_json
+result = load_json('$HVLIB_CORRUPT', {'x': 1})
+assert result == {'x': 1}, f'expected default, got {result!r}'
+" || fail "load_json did not return default on corrupt file"
+rm -f "$HVLIB_CORRUPT"
+pass "load_json returns default on corrupt file"
+
+# 4. dump_json_atomic writes pretty JSON with trailing newline; no .tmp leftover
+HVLIB_ATOMIC="$(mktemp -d)"
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import dump_json_atomic
+import os
+path = '$HVLIB_ATOMIC/out.json'
+dump_json_atomic(path, {'k': 'v'})
+content = open(path).read()
+assert content == '{' + chr(10) + '  \"k\": \"v\"' + chr(10) + '}' + chr(10), f'got: {content!r}'
+assert not os.path.exists(path + '.tmp'), '.tmp file was not cleaned up'
+" || fail "dump_json_atomic did not write expected content or left .tmp"
+rm -rf "$HVLIB_ATOMIC"
+pass "dump_json_atomic writes indent=2 JSON with trailing newline; no .tmp leftover"
+
+# 5. update_json mutates and atomically writes
+HVLIB_UPDATE="$(mktemp -d)"
+python3 -c "
+import sys, json; sys.path.insert(0, '$REPO/bin')
+from hvlib import dump_json_atomic, update_json
+path = '$HVLIB_UPDATE/data.json'
+dump_json_atomic(path, {'n': 1})
+update_json(path, {}, lambda data: data.update({'n': 2}) or None)
+result = json.loads(open(path).read())
+assert result == {'n': 2}, f'expected n=2, got {result!r}'
+" || fail "update_json did not mutate and write correctly"
+rm -rf "$HVLIB_UPDATE"
+pass "update_json mutates in place and atomically writes result"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

@@ -6,9 +6,11 @@
 # Usage: hv-refactor-age
 # Prints JSON: {"features": N, "bugs": M}
 set -euo pipefail
-python3 - <<'PY'
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, re, subprocess
 from pathlib import Path
+from hvlib import section
 
 def is_refactor(h):
     r = subprocess.run(["git", "log", "-1", "--format=%s", h],
@@ -20,12 +22,7 @@ def completed_body(path):
         return ""
     content = path.read_text()
     if path.name == "TODO.md":
-        m = re.search(r"^## Completed\s*$", content, re.MULTILINE)
-        if not m:
-            return ""
-        start = m.end()
-        nxt = re.search(r"^## ", content[start:], re.MULTILINE)
-        return content[start:start + nxt.start()] if nxt else content[start:]
+        return section(content, "Completed")
     return content
 
 line_re = re.compile(r"\[([BF])\d+\].*?\[`([0-9a-f]+)`\]")

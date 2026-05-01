@@ -1,2 +1,6 @@
 # ── hv backlog ──
 .hv/
+
+# Python bytecode (hvlib.py)
+__pycache__/
+*.pyc

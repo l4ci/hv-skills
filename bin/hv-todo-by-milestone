@@ -4,10 +4,12 @@
 # Items list multiple milestones via `Milestone: M01, M03`.
 # Usage: hv-todo-by-milestone <MID>
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 MID="${1:?usage: hv-todo-by-milestone <MID>}"
-python3 - "$MID" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
 import re, sys
 from pathlib import Path
+from hvlib import section
 
 mid = sys.argv[1]
 todo = Path(".hv/TODO.md")
@@ -15,15 +17,7 @@ if not todo.exists():
     raise SystemExit(0)
 content = todo.read_text()
 
-def section(name):
-    m = re.search(rf"^## {re.escape(name)}\s*$", content, re.MULTILINE)
-    if not m:
-        return ""
-    start = m.end()
-    nxt = re.search(r"^## ", content[start:], re.MULTILINE)
-    return content[start:start + nxt.start()] if nxt else content[start:]
-
-body = section("Bugs") + section("Features") + section("Tasks")
+body = section(content, "Bugs") + section(content, "Features") + section(content, "Tasks")
 for line in body.splitlines():
     line = line.strip()
     if not line.startswith("- **["):

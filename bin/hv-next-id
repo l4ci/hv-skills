@@ -2,16 +2,22 @@
 # Increment counter and return zero-padded ID.
 # Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
   bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;
   *) echo "error: unknown type '$TYPE'" >&2; exit 1 ;;
 esac
-python3 -c "
-import json
-p='.hv/counters.json'
-d=json.load(open(p))
-d['$TYPE']=d.get('$TYPE',0)+1
-json.dump(d,open(p,'w'))
-print(f'$P{d[\"$TYPE\"]:02d}')
-"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TYPE" "$P" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+key, prefix = sys.argv[1], sys.argv[2]
+path = Path(".hv/counters.json")
+result = []
+def mutator(d):
+    d[key] = d.get(key, 0) + 1
+    result.append(d[key])
+update_json(path, {}, mutator)
+print(f"{prefix}{result[0]:02d}")
+PY

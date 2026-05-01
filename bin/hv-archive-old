@@ -3,11 +3,13 @@
 # Usage: hv-archive-old [threshold-days]
 # Outputs: number of items moved (silent if 0)
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 THRESHOLD="${1:-5}"
-python3 - "$THRESHOLD" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$THRESHOLD" <<'PY'
 import re, sys
 from datetime import date, timedelta
 from pathlib import Path
+from hvlib import find_section
 threshold = int(sys.argv[1])
 cutoff = date.today() - timedelta(days=threshold)
 
@@ -16,13 +18,10 @@ if not todo.exists():
     sys.exit(0)
 content = todo.read_text()
 
-# Find ## Completed section
-m = re.search(r"^## Completed\s*$", content, re.MULTILINE)
-if not m:
+span = find_section(content, "Completed")
+if span is None:
     sys.exit(0)
-start = m.end()
-nxt = re.search(r"^## ", content[start:], re.MULTILINE)
-end = start + nxt.start() if nxt else len(content)
+start, end = span
 section = content[start:end]
 
 # Find bullet lines with Done YYYY-MM-DD

@@ -78,7 +78,7 @@ fi
 "$SRC/hv-bootstrap"
 
 # Install / refresh helpers — they're tools, not data.
-cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
+cp "$SRC"/hv-* "$SRC"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
 `hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.

@@ -21,13 +21,13 @@ items = []
 if dir_.exists():
     for path in sorted(dir_.glob("*.md")):
         text = path.read_text()
-        m = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+        m = re.match(r"---\r?\n(.*?)\r?\n---", text, re.DOTALL)
         if not m:
             continue
         fm = m.group(1)
         entry = {}
         for key in keys:
-            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", fm, re.MULTILINE)
+            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*\r?$", fm, re.MULTILINE)
             entry[key] = mm.group(1).strip() if mm else ""
         entry["_path"] = str(path)
         items.append(entry)

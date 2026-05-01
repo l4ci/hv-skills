@@ -50,14 +50,15 @@ EOF
 [ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > "$HV/counters.json"
 
 # Migrate older counters.json that predates the milestones key.
-python3 - <<'PY'
-import json
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from pathlib import Path
+from hvlib import load_json, dump_json_atomic
 p = Path(".hv/counters.json")
-d = json.loads(p.read_text())
+d = load_json(p, {})
 if "milestones" not in d:
     d["milestones"] = 0
-    p.write_text(json.dumps(d) + "\n")
+    dump_json_atomic(p, d)
 PY
 
 [ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"

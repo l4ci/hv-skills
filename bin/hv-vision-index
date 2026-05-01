@@ -6,10 +6,11 @@
 # heals any drift in MILESTONES.md.
 # Usage: hv-vision-index
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ITEMS_JSON="$("$HERE/hv-vision-list")"
 BODY=$(python3 - "$ITEMS_JSON" <<'PY'
-import json, re, sys
+import json, os, re, sys
 from pathlib import Path
 
 items = json.loads(sys.argv[1])
@@ -23,7 +24,7 @@ if ms_path.exists():
     # Heal each section's **Status:** line from frontmatter (drift insurance).
     for i in items:
         section_pat = re.compile(
-            rf"(### {re.escape(i['id'])} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped)",
+            rf"(### {re.escape(i['id'])} — [^\n]+\n\n\*\*Status:\*\* )(?:{os.environ['HV_MILESTONE_STATUSES']})",
             re.MULTILINE,
         )
         ms = section_pat.sub(rf"\g<1>{i['status']}", ms, count=1)

@@ -33,6 +33,7 @@ missing=()
 for h in "${HELPERS[@]}"; do
   [ -x "$HV/bin/$h" ] || missing+=("$h")
 done
+[ -f "$HV/bin/hvlib.py" ] || missing+=("hvlib.py")
 if [ ${#missing[@]} -gt 0 ]; then
   printf 'stale: missing helpers: %s\n' "${missing[*]}" >&2
   exit 3

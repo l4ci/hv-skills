@@ -3,14 +3,15 @@
 # .hv/milestones/MNN.md and the **Status:** line in .hv/MILESTONES.md.
 # Usage: hv-vision-status <ID> <planned|active|shipped|archived>
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
 ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
 NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
-case "$NEW_STATUS" in
-  planned|active|shipped|archived) ;;
-  *) echo "error: status must be planned, active, shipped, or archived" >&2; exit 1 ;;
-esac
+if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
+    echo "error: status must be one of: $HV_MILESTONE_STATUSES" >&2
+    exit 1
+fi
 python3 - "$ID" "$NEW_STATUS" <<'PY'
-import re, sys
+import os, re, sys
 from pathlib import Path
 
 mid, status = sys.argv[1], sys.argv[2]
@@ -31,7 +32,7 @@ ms = Path(".hv/MILESTONES.md")
 if ms.exists():
     ms_content = ms.read_text()
     pattern = re.compile(
-        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped|archived)",
+        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:{os.environ['HV_MILESTONE_STATUSES']})",
         re.MULTILINE,
     )
     updated = pattern.sub(rf"\g<1>{status}", ms_content, count=1)

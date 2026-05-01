@@ -2,16 +2,15 @@
 # Remove an active entry from .hv/status.json by branch name.
 # Usage: hv-status-remove <branch>
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 BRANCH="${1:?usage: hv-status-remove <branch>}"
-python3 - "$BRANCH" <<'PY'
-import json, sys
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" <<'PY'
+import sys
 from pathlib import Path
+from hvlib import update_json
 branch = sys.argv[1]
 path = Path(".hv/status.json")
 if not path.exists():
     sys.exit(0)
-data = json.loads(path.read_text())
-before = len(data.get("active", []))
-data["active"] = [e for e in data.get("active", []) if e.get("branch") != branch]
-path.write_text(json.dumps(data, indent=2) + "\n")
+update_json(path, {"active": []}, lambda d: d.update({"active": [e for e in d.get("active", []) if e.get("branch") != branch]}) or d)
 PY

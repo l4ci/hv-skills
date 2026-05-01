@@ -22,8 +22,10 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
+| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision` (`vision` is `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
+| `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
 | `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
-| `hv-vision-status` | Set a milestone's status to `planned`, `active`, or `shipped` | `.hv/bin/hv-vision-status M01 active` |
+| `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` | `.hv/bin/hv-vision-status M01 active` |
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
 | `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
@@ -34,6 +36,8 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-spike-add` | Create `spike/<name>` branch and `.hv/spikes/<name>.md` stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
 | `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
 | `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
+| `hv-base-branch` | Print the resolved base branch (`main`, `master`, `trunk`, or `origin/HEAD`) | `.hv/bin/hv-base-branch` |
+| `hv-worktree-clear <branch>` | Remove a non-main worktree that has `<branch>` checked out; silent if none | `.hv/bin/hv-worktree-clear hv/foo` |
 | `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge hv/foo` |
 | `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
 | `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |

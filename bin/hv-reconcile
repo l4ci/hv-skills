@@ -3,29 +3,28 @@
 # Emit JSON: { "cleaned": [...], "needsAction": [...] } so the agent can present clearly.
 # Usage: hv-reconcile
 set -euo pipefail
-python3 - <<'PY'
+HERE="$(cd "$(dirname "$0")" && pwd)"
+HV_BASE="$("$HERE/hv-base-branch")"
+export HV_BASE
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
+from hvlib import load_json
 
 path = Path(".hv/status.json")
 if not path.exists():
     print(json.dumps({"cleaned": [], "needsAction": []}))
     sys.exit(0)
 
-data = json.loads(path.read_text())
+data = load_json(path, {"active": []})
 active = data.get("active", [])
 
 def git(*args):
     r = subprocess.run(["git", *args], capture_output=True, text=True)
     return r.stdout.strip(), r.returncode
 
-# Determine a default base branch
-base = None
-for candidate in ("main", "master"):
-    _, rc = git("rev-parse", "--verify", candidate)
-    if rc == 0:
-        base = candidate
-        break
+# Determine a default base branch (resolved by hv-base-branch: main → master → trunk → origin/HEAD)
+base = os.environ["HV_BASE"]
 
 cleaned, needs_action, still_active = [], [], []
 for entry in active:
@@ -49,10 +48,9 @@ for entry in active:
         entry = {**entry, "worktree": None}
 
     commit_count = 0
-    if base:
-        out, rc = git("rev-list", "--count", f"{base}..{branch}")
-        if rc == 0 and out.isdigit():
-            commit_count = int(out)
+    out, rc = git("rev-list", "--count", f"{base}..{branch}")
+    if rc == 0 and out.isdigit():
+        commit_count = int(out)
 
     needs_action.append({
         "branch": branch,
