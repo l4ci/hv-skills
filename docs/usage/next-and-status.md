@@ -14,7 +14,7 @@ Before presenting results it:
 4. Sorts the backlog by priority and size, with cluster notes.
 5. Suggests one item or a connected batch — P0 bugs jump the queue.
 
-After you confirm the pick, `/hv-next` routes you to [implementing](implementing.md) via `/hv-work`.
+After you confirm the pick, `/hv-next` routes you to [running work](running-work.md) via `/hv-work`.
 
 **Example:**
 
@@ -58,7 +58,7 @@ Output structure:
 - One-paragraph approach summary
 - Bulleted lists: *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*
 
-Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output and either push back, ask for a durable plan (`/hv-plan`), or proceed to [implementing](implementing.md).
+Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output and either push back, ask for a durable plan (`/hv-plan`), or proceed to [running work](running-work.md).
 
 **Example:**
 

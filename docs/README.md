@@ -10,21 +10,32 @@ This is the consumer-facing docs surface. For contributor reference and internal
 
 - [Getting started](getting-started.md) — install and run your first cycle in five minutes
 
-### Usage
+### Capture and backlog
 
 - [Capturing work](usage/capturing-work.md) — `/hv-capture`, `/hv-c`, mixed input, related links, detail files
-- [Picking next](usage/picking-next.md) — `/hv-next`, `/hv-status`, `/hv-assume`
-- [Implementing](usage/implementing.md) — `/hv-work` parallel cycles, branch vs worktree isolation, `/hv-go` speed-path
+- [Reviewing and picking work](usage/next-and-status.md) — `/hv-next`, `/hv-status`, `/hv-assume`
+
+### Execution
+
+- [Running work](usage/running-work.md) — `/hv-work` parallel cycles, branch vs worktree isolation, `/hv-go` speed-path
 - [Debugging](usage/debugging.md) — `/hv-debug` systematic cycle
-- [Shipping](usage/shipping.md) — `/hv-review` and `/hv-ship` gates
-- [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
-- [Vision and plans](usage/vision-and-plans.md) — `/hv-vision`, `/hv-plan`, `/hv-spike`, milestones
-- [Handoff](usage/handoff.md) — `/hv-pause`, `/hv-resume`, recovering after `/clear`
+- [Pausing and resuming](usage/pausing-and-resuming.md) — `/hv-pause`, `/hv-resume`, recovering after `/clear`
 - [Parallel work](usage/parallel-work.md) — worktree mode, concurrent `/hv-work` sessions
+
+### Shipping
+
+- [Review and ship](usage/review-and-ship.md) — `/hv-review` and `/hv-ship` gates
+- [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
+
+### Vision and planning
+
+- [Vision and plans](usage/vision-and-plans.md) — `/hv-vision`, `/hv-plan`, milestones
+- [Spikes](usage/spikes.md) — throwaway feasibility experiments via `/hv-spike`
 
 ### Configuration
 
-- [Configuration](configuration.md) — every key in `.hv/config.json` and what it does
+- [Configuration](usage/configuration.md) — every key in `.hv/config.json` and what it does
+- [Autonomy levels](usage/autonomy.md) — how `off` / `auto` / `loop` change skill chaining
 
 ### Reference
 

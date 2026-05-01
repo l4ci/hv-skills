@@ -65,7 +65,7 @@ Any item can carry a `Related:` suffix linking it to other items:
 - **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
 ```
 
-Links are optional. `/hv-next` infers the reverse link automatically — you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [picking next](picking-next.md)).
+Links are optional. `/hv-next` infers the reverse link automatically — you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [reviewing and picking work](next-and-status.md)).
 
 `/hv-capture` scans both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
 
@@ -75,4 +75,4 @@ Links are optional. `/hv-next` infers the reverse link automatically — you don
 
 ## What /hv-capture is not
 
-`/hv-capture` is a pure recording tool. It classifies and files — it doesn't act, doesn't validate the item, and doesn't deduplicate against existing entries. If you want to implement something immediately after capturing it, use [/hv-go](implementing.md) instead. If you want to pick up an already-filed item and implement it, use [/hv-work](implementing.md).
+`/hv-capture` is a pure recording tool. It classifies and files — it doesn't act, doesn't validate the item, and doesn't deduplicate against existing entries. If you want to implement something immediately after capturing it, use [/hv-go](running-work.md) instead. If you want to pick up an already-filed item and implement it, use [/hv-work](running-work.md).

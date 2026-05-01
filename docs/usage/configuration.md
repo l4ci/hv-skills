@@ -79,7 +79,7 @@ Controls whether `/hv-learn` runs a second-opinion pass on what it just wrote. T
 
 Knowledge quality compounds — a weak bullet consulted by 20 future `/hv-work` runs is worse than one extra Opus call now. The default favors quality; flip to `false` only when you're sure the noise doesn't matter.
 
-See [learning](usage/learning.md) for the full `/hv-learn` workflow.
+See [learning](learning.md) for the full `/hv-learn` workflow.
 
 ## ship.review
 
@@ -90,7 +90,7 @@ Controls whether `/hv-ship` runs a review pass before integrating.
 | `true` (default) | `/hv-ship` runs `/hv-review` before integrating. FAIL blocks, CONCERNS ask, PASS flows through. |
 | `false` | `/hv-ship` integrates directly without a review pass. Use when you want raw speed and already reviewed manually. |
 
-See [shipping](usage/shipping.md) for the full `/hv-ship` workflow.
+See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
 ## debug.competingHypotheses
 
@@ -128,4 +128,4 @@ Controls whether skills nudge at decision points or invoke the next skill direct
 
 **When to flip it on.** `"auto"` is good when you want the natural endgame of each cycle (capture learnings, ship the fix) without typing the follow-up command. `"loop"` is good when you have a known queue you want drained — milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified — and you'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you don't want a long-running session of model spend without checkpoints.
 
-See [implementing](usage/implementing.md) for how autonomy interacts with the `/hv-work` cycle.
+See [running work](running-work.md) for how autonomy interacts with the `/hv-work` cycle.
