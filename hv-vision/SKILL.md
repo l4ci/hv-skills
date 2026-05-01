@@ -1,6 +1,6 @@
 ---
 name: hv-vision
-description: Brainstorm a project's bigger vision and break it into milestones — Socratic discovery, web research for outside perspective, deliberate challenge, then write MILESTONES.md and per-milestone detail files. Handles both creating a fresh vision and editing/extending an existing one. Use on "let's plan", "what's the bigger picture", "create a roadmap", "brainstorm milestones", or when the user wants strategy above the day-to-day backlog.
+description: Brainstorm a project's vision and break it into milestones — Socratic discovery, web research, deliberate challenge, then write MILESTONES.md and per-milestone detail files. Handles fresh vision and editing/extending an existing one. Use on "let's plan", "what's the bigger picture", "create a roadmap", "brainstorm milestones".
 user-invocable: true
 ---
 
@@ -27,16 +27,7 @@ Sit above the day-to-day backlog. The user describes where they want the project
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-Determine the mode silently:
-
-```bash
-.hv/bin/hv-vision-list
-```
-
-- **Empty list** → **Create mode** (no milestones yet, building the vision from scratch)
-- **Non-empty** → **Edit mode** (extend, refine, retire, or re-prioritize existing milestones)
-
-Don't announce the mode — it shapes the questions you ask, not the user's view.
+Determine the mode silently via `.hv/bin/hv-vision-list`: empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
 
 ## Step 2 — Load Context Silently
 
@@ -131,11 +122,10 @@ M02 — Multi-tenant         [blocked · depends M01]
 
 Rules for the plan:
 
-- **No hard cap on count.** Take as many milestones as the vision needs. Five is common, two is fine, fifteen is fine.
-- **Mark each as `ready` or `blocked`** based on dependencies. Ready = all prerequisite milestones are shipped (or have no deps). Blocked = at least one prerequisite is still planned/active.
-- **State dependencies explicitly** in the heading and `Depends:` line. Don't bury them in prose.
-- **Ordering is by dependency layer, not chronology.** Independent milestones that could run in parallel sit at the same layer — make this visible (*"M01 and M03 are both ready, no deps between them"*).
-- **Each milestone gets a 1-sentence goal**, 3–5 acceptance bullets, a 1–2 sentence rationale, and at least one open risk. If you can't name a risk, the milestone isn't well thought out yet.
+- **No hard cap on count.** Take what the vision needs — two is fine, fifteen is fine.
+- **Ready vs blocked** is computed: `ready` = all prerequisites shipped or no deps; `blocked` = ≥1 prerequisite still planned/active.
+- **Order by dependency layer, not chronology.** Make parallel-able milestones visible (*"M01 and M03 are both ready, no deps between them"*).
+- **Every milestone has at least one open risk.** If you can't name one, it isn't well thought out yet.
 
 ## Step 7 — Iterate
 

@@ -1,6 +1,6 @@
 ---
 name: hv-docs
-description: Scaffold and maintain a public-facing user guide under <docs.path>/ (default docs/) at repo root — aimed at consumers of the project, not contributors. Four invocation modes — first-run (discovery + scaffold), after-work (post-cycle proposals), restructure (audit + reorganize), and manual. This version implements the first-run mode; after-work lands in M01-S02 and restructure in M01-S04.
+description: Scaffold and maintain a public-facing user guide under <docs.path>/ (default docs/) — aimed at consumers, not contributors. Modes — first-run (discovery + scaffold), after-work (post-cycle proposals), restructure (audit + reorganize). Use on "/hv-docs", "update docs"; auto-invoked by /hv-work and /hv-ship post-cycle.
 user-invocable: true
 ---
 
@@ -15,18 +15,18 @@ user-invocable: true
 
 # hv-docs — Public User-Guide Maintainer
 
-Scaffolds and maintains a public user guide under `<docs.path>/` (default `docs/`) for the people who *use* the project — CLI users, library consumers, API clients, app users — not contributors. Three runtime modes (first-run, after-work, restructure) plus a `.docsignore` boundary and on-write secret scrub for safety. This slice adds the after-work mode (propose mode, `autoCreate=false`) on top of the previously-shipped first-run flow. Restructure mode and the autoCreate path land in M01-S04 / M01-S03.
+Scaffolds and maintains a public user guide under `<docs.path>/` (default `docs/`) for *consumers* of the project — CLI users, library callers, API clients, app users — not contributors. `.docsignore` and on-write secret scrub guard sensitive content.
 
 ## Modes
 
-| Detected when | Mode | Status |
-|---|---|---|
-| `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) | **Implemented in this slice** |
-| Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose/write doc updates) | **Implemented in this slice (propose mode)** |
-| Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + propose splits/merges) | _Coming in M01-S04_ |
-| Manual invoke, no signal | Falls through to first-run if `<docs.path>/` missing; else nudge | _Partial — first-run path implemented_ |
+| Detected when | Mode |
+|---|---|
+| `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) |
+| Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose doc updates) |
+| Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + reorganize, _M01-S04_) |
+| Manual invoke, no signal | First-run if `<docs.path>/` missing; else nudge |
 
-If invoked in a not-yet-implemented mode, print one line stating the mode is coming in a later slice (cite the slice key) and exit cleanly.
+If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
 
 ## Configuration
 
@@ -65,9 +65,7 @@ In a **single parallel batch** (one tool-call response, multiple reads), gather:
 - Recent git history: `git log --oneline -20`
 - Root-level `.md` files other than README (CHANGELOG, CONTRIBUTING, LICENSE) — note presence; don't duplicate
 
-Issue these as parallel tool calls in a single response. Load latency dominates this step.
-
-Don't dump the contents to the user. Form a picture and use what's relevant in Step 3.
+Don't dump the contents to the user — form a picture and use what's relevant in Step 3.
 
 ## Step 3 — Form Hypothesis (silent)
 
@@ -179,10 +177,8 @@ If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print o
 In a **single parallel batch** (one tool-call response, multiple reads), gather:
 
 - `git log --oneline <last-docs-marker>..HEAD` — boundary is the last `docs:` commit's SHA. Fall back to last 20 commits if no `docs:` commit exists yet.
-- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; in this slice that filter is a **pass-through stub**: read all paths as-is. Note: `bin/hv-docs-filter` lands in M01-S03).
+- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; pass-through stub in this slice — `bin/hv-docs-filter` lands in M01-S03).
 - Current `<docs.path>/` tree (one-level listing) and each existing page's H1+H2 outline (`grep -E '^#{1,2} ' <page>`).
-
-Issue these as parallel tool calls in a single response. Don't do them sequentially.
 
 ## Step A3 — Classify Changes
 

@@ -123,9 +123,7 @@ If you can't reproduce, surface that to the user: *"Can't reproduce — need [X]
 
 Read `debug.competingHypotheses` from `.hv/config.json` (default `false`).
 
-### Single hypothesis (default)
-
-Dispatch one hypothesis agent with the **orchestrator** model. Brief contains:
+Brief template (both modes use this):
 
 ```
 Investigate [B##]: <title>.
@@ -140,6 +138,8 @@ Investigate [B##]: <title>.
 <bullets from hv-knowledge-query, if any>
 <entries from hv-decisions-query, if any — boundaries that rule out fix directions>
 
+[FRAMING — competing mode only: insert one lens prompt below]
+
 Read the code organically. Do not propose a fix yet.
 
 Return: ranked list of 2-3 hypotheses, each with
@@ -148,23 +148,19 @@ Return: ranked list of 2-3 hypotheses, each with
   - a concrete verification probe (code to read, a print statement to add, a test to run)
 ```
 
-Pick the top hypothesis. If the top two are close, verify both.
+### Single hypothesis (default)
+
+Dispatch one orchestrator-model agent with no FRAMING line. Pick the top hypothesis; verify both if the top two are close.
 
 ### Competing hypotheses (`debug.competingHypotheses: true`)
 
-Dispatch **3 parallel hypothesis agents** with the **orchestrator** model — all in one tool-call batch so they run concurrently. Each gets the same symptom, entry points, and relevant knowledge but a different framing constraint. The framing is what produces diversity:
+Dispatch **3 parallel orchestrator-model agents** in one tool-call batch. Each gets a different framing lens:
 
-- **Agent 1 — recent-changes lens:** *"Start from recent commits. Run `git log --oneline -20 -- <suspect paths>` and skim diffs. The bug likely correlates with something that changed. Frame hypotheses around what was modified and why it might have introduced the symptom."*
-- **Agent 2 — data-shape lens:** *"Start from the values flowing through the suspect code path. The bug likely arises when a value violates an implicit contract — null/empty, off-by-one, wrong type, stale cache, malformed input from upstream. Trace the data, not the code."*
-- **Agent 3 — concurrency / lifecycle lens:** *"Start from timing and ordering. The bug likely arises from a race window, ordering assumption, partial state, double-fire, listener registered twice, async resolution out of order, or something that holds a reference past its valid lifetime. Look for state, not logic."*
+- **Recent-changes lens:** *"Start from recent commits — run `git log --oneline -20 -- <suspect paths>`. The bug likely correlates with something that changed; frame hypotheses around what was modified and why."*
+- **Data-shape lens:** *"Start from the values flowing through the suspect path. The bug likely arises when a value violates an implicit contract — null/empty, off-by-one, wrong type, stale cache, malformed upstream input. Trace data, not code."*
+- **Concurrency / lifecycle lens:** *"Start from timing and ordering. Likely a race window, ordering assumption, partial state, double-fire, listener registered twice, async resolution out of order, or a reference held past its lifetime. Look for state, not logic."*
 
-Each agent returns a ranked list of 2–3 hypotheses in the same format as the single-agent case.
-
-After all three return, the orchestrator:
-
-1. **Deduplicates.** Same root cause framed differently from two angles → one hypothesis. Keep the sharper wording.
-2. **Picks the strongest.** The best hypothesis wins regardless of which lens surfaced it. If the top two are close, verify both in Step 7.
-3. **Discards weak ones silently.** Don't surface every angle's output to the user — only the chosen hypothesis (or two) and its verification probe.
+After all three return: deduplicate (same root cause from different angles → one hypothesis, keep sharper wording), pick the strongest regardless of lens (verify both if the top two are close), discard weak ones silently — don't relay every angle's output.
 
 ## Step 7 — Verify
 
@@ -249,11 +245,9 @@ Branch on `autonomy.level`:
 
 ## Step 12.5 — Decide (Nudge Only)
 
-If the fix path codified a constraint (e.g., "we will never use timer-X here", "this surface only goes through controller-Y"), surface a one-liner — never auto-invoke, regardless of `autonomy.level`:
+If the fix codified a constraint (e.g., "never use timer-X here", "this surface only goes through controller-Y"), surface a one-liner. **Always nudge — never auto-invoke**, regardless of `autonomy.level`. Skip trivial fixes (single-line edit, obvious typo). Don't repeat in the session.
 
 > *"Did this fix lock in a boundary worth preserving? Run `/hv-decide` to capture it as a hard constraint."*
-
-Skip for trivial fixes (single-line edit, obvious typo, etc.). Don't repeat in the same session. Decisions are always manual — even in `loop` mode this is a nudge, not an auto-step.
 
 ## Key Principles
 

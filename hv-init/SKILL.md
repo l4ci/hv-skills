@@ -26,34 +26,24 @@ command -v git >/dev/null 2>&1 || { echo "error: git is required but not install
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required but not installed" >&2; exit 1; }
 ```
 
-Then check whether the current directory is already a git repository:
+Then check whether the current directory is a git repo:
 
 ```bash
 git rev-parse --git-dir >/dev/null 2>&1
 ```
 
-If it **is** a repo, continue to Step 2.
-
-If it **isn't**, offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor` all require git, so running hv-skills here without a repo only gives access to the backlog-capture subset. Use `AskUserQuestion`:
+If yes, continue to Step 2. Otherwise offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor` all require git, so without a repo only the backlog-capture subset works. Use `AskUserQuestion`:
 
 - **Header:** `"Git"`
 - **Question:** *"This directory isn't a git repository. Initialize one?"*
 - **Options** (single-select):
-  1. *"Yes, `git init` now (Recommended)"* — *"Run `git init` here; enables `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor`. Reversible with `rm -rf .git`."*
-  2. *"No, backlog-only"* — *"Skip init; `/hv-capture`, `/hv-next`, `/hv-learn`, `/hv-status` still work. Git-dependent skills will fail until you init manually."*
-  3. *"Stop"* — *"Cancel `/hv-init`; rerun when you're ready."*
+  1. *"Yes, `git init` now (Recommended)"* — *"Enables all hv skills. Reversible with `rm -rf .git`."*
+  2. *"No, backlog-only"* — *"Skip init; capture/next/learn/status still work. Git skills fail until you init manually."*
+  3. *"Stop"* — *"Cancel `/hv-init`."*
 
-On **Yes** — run `git init` and continue to Step 2. Mention the created branch in the Step 5 summary (one line, e.g., *"Initialized git repo on `main`."*).
+On **Yes** — run `git init`, continue to Step 2, mention the created branch in the Step 5 summary. On **No** — continue but warn: *"Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail until you run `git init`."* On **Stop** — exit.
 
-On **No** — continue to Step 2 but log a warning so the user isn't surprised later:
-
-```
-Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail here until you run `git init`.
-```
-
-On **Stop** — surface the reason and exit.
-
-Plain-text fallback: run `git init` straight through — it's the Recommended choice, and one-off initialization is reversible with `rm -rf .git`.
+Plain-text fallback: run `git init` straight through — it's the Recommended choice and reversible.
 
 ## Step 2 — Bootstrap & Install Helpers
 
@@ -136,7 +126,7 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 | Label | Description |
 |-------|-------------|
 | Balanced — Opus + Sonnet (Recommended) | Opus plans and verifies, Sonnet executes. Strong reasoning where it matters; fast execution elsewhere. |
-| Premium — Opus only | Opus for everything. Highest quality, highest cost. Pick when correctness dominates. |
+| Premium — Opus only | Opus for everything. Highest quality, highest cost. |
 | Fast — Sonnet only | Sonnet for both roles. Faster and cheaper; fine for well-specified tasks. |
 | Minimal — Sonnet + Haiku | Sonnet plans, Haiku executes. Cheapest. Best for mechanical, low-risk work. |
 
@@ -167,7 +157,7 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 | Review before ship (Recommended) | `/hv-ship` runs `/hv-review` first. FAIL blocks, CONCERNS ask, PASS flows through. |
 | Verify learnings (Recommended) | `/hv-learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
 | Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
-| Competing hypotheses (debug) | `/hv-debug` Step 6 dispatches 3 parallel hypothesis agents from different angles. Better diversity on hard bugs, ~3× orchestrator cost on every debug run. Off by default. |
+| Competing hypotheses (debug) | `/hv-debug` dispatches 3 parallel hypothesis agents from different angles. Better diversity on hard bugs, ~3× orchestrator cost. |
 
 **Q5 — Autonomy** (`header: "Autonomy"`, single-select)
 
@@ -250,9 +240,7 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Knowledge, Vision & Decisions Blocks
 
-Ensure `CLAUDE.md` in the project root contains the three managed blocks — one for knowledge topics, one for active milestones, one for decision topics. `/hv-learn` keeps the knowledge block in sync; `/hv-vision` keeps the vision block in sync; `/hv-decide` keeps the decisions block in sync. `/hv-work` reads all three: knowledge for advisory context, milestones to scope work, and decisions as hard constraints.
-
-Delegate to the helpers — each creates `CLAUDE.md` if missing, updates its block in place if present, or appends it if `CLAUDE.md` exists without a block:
+Seed three managed blocks in `CLAUDE.md` (created if missing): knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), and decision topics (`/hv-decide`). `/hv-work` reads all three — knowledge as advisory context, milestones for scope, decisions as hard constraints.
 
 ```bash
 .hv/bin/hv-knowledge-index
@@ -260,7 +248,7 @@ Delegate to the helpers — each creates `CLAUDE.md` if missing, updates its blo
 .hv/bin/hv-decisions-index
 ```
 
-None of the helpers touch any other content in `CLAUDE.md`.
+Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
 
 ## Step 5 — Confirm
 

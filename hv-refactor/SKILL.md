@@ -19,49 +19,24 @@ Run a full architectural refactor cycle on the current codebase.
 
 ## Configuration
 
-Before starting, read `.hv/config.json` if it exists. It contains:
+Read `.hv/config.json`:
 
-```json
-{
-  "models": {
-    "orchestrator": "opus",
-    "worker": "sonnet"
-  },
-  "refactor": {
-    "confirmBeforeExecute": true
-  }
-}
-```
-
-- Use `orchestrator` for exploration, design, and verification agents (Agent `model` parameter)
-- Use `worker` for implementation subagents (Agent `model` parameter)
-- `confirmBeforeExecute` — when `true` (default), pause for user approval before executing fixes. Set `false` for full autonomy.
-
-If `.hv/config.json` doesn't exist, default to `opus`/`sonnet` and `confirmBeforeExecute: true`.
+- `models.orchestrator` — exploration, design, and verification (default `opus`)
+- `models.worker` — implementation subagents (default `sonnet`)
+- `refactor.confirmBeforeExecute` — pause for user approval before executing fixes (default `true`; `false` for full autonomy)
 
 ## Flow
 
-1. **Orchestrator** explores for friction
-2. **Triage** — categorize dependencies, classify as simple or structural
-3. **Present candidates** — show the user what was found *(checkpoint if confirmBeforeExecute)*
-4. **Design competing approaches** — for structural changes only, spawn parallel design agents
-5. **User picks approach** *(checkpoint if confirmBeforeExecute)*
-6. **Parallel worker subagents** implement every fix
-7. **Orchestrator** verifies all changes
-8. **Handle failures** — re-fix and re-verify
-9. **Commit** everything
+Explore → Triage → Present *(checkpoint)* → Design competing approaches *(checkpoint)* → Fix in parallel → Verify → Re-fix on failures → Commit → Report
 
 ## Dependency Categories
 
-Every friction point gets classified into one of four categories. The category drives the fix strategy.
+Every friction point gets one category — it drives the fix strategy:
 
-**1. In-process.** Pure computation, in-memory state, no I/O. Always fixable — merge the modules and test directly.
-
-**2. Local-substitutable.** Dependencies that have local test stand-ins (e.g., PGLite for Postgres, in-memory filesystem). Fixable if the test substitute exists. The deepened module is tested with the local stand-in running in the test suite.
-
-**3. Remote but owned (Ports & Adapters).** Your own services across a network boundary (microservices, internal APIs). Define a port (interface) at the module boundary. The deep module owns the logic; the transport is injected. Tests use an in-memory adapter, production uses the real HTTP/gRPC/queue adapter.
-
-**4. True external (Mock).** Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the boundary. The module takes the external dependency as an injected port; tests provide a mock implementation.
+1. **In-process** — pure computation, in-memory state, no I/O. Merge modules, test directly.
+2. **Local-substitutable** — has a local test stand-in (PGLite for Postgres, in-memory FS). Test with the stand-in in the suite.
+3. **Ports & Adapters** — your services across a network boundary (microservices, internal APIs). Define a port at the module boundary; deep module owns logic, transport is injected. Tests use an in-memory adapter; production uses the real one.
+4. **True external** — third-party services (Stripe, Twilio) you don't control. Mock at the boundary; tests provide the mock, production uses the real implementation.
 
 ## Step 1 — Preflight & Guard
 
@@ -85,20 +60,19 @@ Prompt template for the exploration agent:
 ```
 Explore [PROJECT] at [PATH]. Navigate organically — read files in full,
 follow every interesting seam. Look for:
-- Modules so shallow the interface is nearly as complex as the implementation
+- Shallow modules where the interface is nearly as complex as the impl
 - Concepts co-owned across multiple files that should live in one place
-- Silent failure modes — errors logged but not propagated or shown to users
-- State split across types and hard to reason about
-- Untested seams or code paths that can only fail in production
+- Silent failures — errors logged but not propagated or surfaced
+- State split across types in ways hard to reason about
 - Implicit assumptions baked into data transformations
 - Anything requiring 3+ files to understand one concept
-- Tightly-coupled modules creating integration risk at their seams
+- Tightly-coupled modules with integration risk at their seams
 
 [If prior rounds exist]: Do NOT re-surface already-fixed issues: [list them].
 
-For every friction point report: file, approximate lines, what the friction
-is, why it matters, and which dependencies are involved (pure in-process,
-local-substitutable, remote-but-owned, or true external).
+For every friction point report: file, approximate lines, the friction,
+why it matters, and the dependency category (in-process,
+local-substitutable, ports-and-adapters, or true external).
 
 Be thorough — this is looking for things a first pass might miss.
 ```

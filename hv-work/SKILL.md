@@ -123,21 +123,14 @@ If a plan exists, **use it as the orchestrator's plan** — its task decompositi
 
 From the conversation context:
 
-1. **Consult project knowledge.** Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. For topics that plausibly touch the planned work, pull just those sections:
+1. **Consult knowledge + decisions.** Read the `hv-knowledge` and `hv-decisions` blocks in `CLAUDE.md`. For topics that touch the planned work, pull just those sections:
 
    ```bash
    .hv/bin/hv-knowledge-query "Architecture" "Testing"
-   ```
-
-   Carry the relevant gotchas/conventions into the task briefs (Step 6) under a `**Known gotchas:**` block — only the bullets that apply, not the whole file. Skip silently if nothing looks relevant.
-
-1. **Consult project decisions.** Read the `hv-decisions` block in `CLAUDE.md` for committed boundaries. For topics that plausibly touch the planned work, pull just those sections:
-
-   ```bash
    .hv/bin/hv-decisions-query "Architecture" "Testing"
    ```
 
-   Carry the full entry (rule + *Why* + **Forbids** + **Permits**) into the task briefs (Step 6) under a `**Hard boundaries:**` block — workers must respect these as constraints, not advisory hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching workers; do not silently work around the boundary. Skip silently if nothing relevant.
+   Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches.
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. Group into dependency waves:
@@ -216,24 +209,17 @@ For dependent tasks: wait for wave 1 to complete and verify, then dispatch wave 
 
 ## Step 8.5 — Sweep Tool-Generated Siblings
 
-Some toolchains produce sibling artifacts when they first see a new source file — Godot's `.gd.uid`, Xcode's regenerated project plists, SwiftPM's `Package.resolved`. Workers often create source files without triggering the tool, leaving the siblings untracked. If left alone, the NEXT `/hv-work` hits Step 1's dirty-tree guard and refuses.
-
-Before moving to the merge step, commit any remaining sibling artifacts as a single `chore:`:
+Workers create source files without triggering the toolchain, so sibling artifacts (Step 1 patterns) end up untracked. Sweep them now or the next `/hv-work` guard will refuse on a dirty tree:
 
 ```bash
 git status --porcelain
-```
-
-If any lines match the sibling patterns from Step 1 (`*.gd.uid`, `*.xcworkspace/contents.xcworkspacedata`, `Package.resolved`, `.DS_Store`, or siblings of tracked files touched in this cycle):
-
-```bash
-git add -A -- <matching paths>
+git add -A -- <matching sibling paths>
 git commit -m "chore: track tool-generated siblings"
 ```
 
-If the tree has non-sibling dirt, surface it — a worker produced unexpected changes and the orchestrator should investigate before merging.
+Non-sibling dirt → surface it; a worker produced unexpected changes and the orchestrator should investigate before merging.
 
-For projects where a tool regenerates siblings only when the editor loads (Godot `class_name`, for example): if the cycle introduced new `class_name` declarations and `.gd.uid` files are missing, force generation once with the tool's headless mode before the sweep — e.g., `godot --headless --editor --quit`. Project-specific commands should be captured in `KNOWLEDGE.md` so subsequent cycles learn the right invocation.
+If a tool regenerates siblings only when the editor loads (e.g., Godot `class_name` → `.gd.uid`), force generation once in headless mode before the sweep (e.g., `godot --headless --editor --quit`). Capture project-specific commands in `KNOWLEDGE.md`.
 
 ## Step 9 — Update TODO.md
 
@@ -294,13 +280,11 @@ When triggered, branch on `autonomy.level`:
 
 ## Step 13.5 — Decide (Nudge Only)
 
-Trigger condition: same gating as Step 13 (**2+ items resolved**, OR **≥5 files touched**), OR the orchestrator noticed a non-obvious pick during verification (e.g., chose SQLite over Postgres, locked a coding pattern not dictated by existing code). Skip for trivial fixes. Don't repeat in the same session.
+Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick during verification (e.g., chose SQLite over Postgres, locked a pattern not dictated by existing code). Skip trivial fixes. Don't repeat in the same session.
 
-When triggered, **always nudge — never auto-invoke**, regardless of `autonomy.level`:
+**Always nudge — never auto-invoke**, regardless of `autonomy.level`. The active/passive split (decisions vs learnings) requires the human pressing the button.
 
-> *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in. Decisions are always manual — even in `loop` mode this is a nudge, not an auto-step."*
-
-Even with `autonomy.level == "loop"`, do **not** dispatch `hv-decide` via `Skill`. The active/passive distinction (decisions vs learnings) depends on the human pressing the button.
+> *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in."*
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
