@@ -3,9 +3,12 @@
 # recent completions, knowledge topics. Pure read — no git calls, no mutation.
 # Usage: hv-summary
 set -euo pipefail
+. "$(dirname "$0")/hv-types.sh"
 python3 - <<'PY'
-import json, re
+import json, os, re
 from pathlib import Path
+
+ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
 todo = Path(".hv/TODO.md")
 if not todo.exists():
@@ -49,7 +52,7 @@ if status.exists():
 
 # Recent completions (top 3 from ## Completed)
 completed = section("Completed")
-pairs = re.findall(r"(\[[BFT]\d+\])[^[\n]*?Done (\d{4}-\d{2}-\d{2})", completed)
+pairs = re.findall(rf"(\[{ITEM_CLASS}\d+\])[^[\n]*?Done (\d{{4}}-\d{{2}}-\d{{2}})", completed)
 if pairs:
     recent = pairs[:3]
     print("Recent: " + ", ".join(f"{iid} on {d}" for iid, d in recent))

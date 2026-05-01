@@ -763,4 +763,106 @@ pass "hv-spike-finish rejects unknown name"
 
 git branch -D spike/sse-feasibility >/dev/null 2>&1 || true
 
+echo "items <-> milestones <-> plans triangle"
+# Reset TODO.md to a known state, mint a fresh bug ID via hv-next-id, append a
+# Milestone-tagged entry, and verify the full chain: hv-todo-by-milestone picks
+# it up, hv-plan-add mints a plan keyed under the same milestone, hv-plan-list
+# surfaces it.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+TRI_BUG=$("$BIN/hv-next-id" bugs)
+"$BIN/hv-append" "## Bugs" "- **[$TRI_BUG] [P1] Triangle bug.** Desc. Milestone: M01"
+TAGGED=$("$BIN/hv-todo-by-milestone" M01)
+echo "$TAGGED" | grep -qx "$TRI_BUG" || fail "triangle: $TRI_BUG not found in M01 items: '$TAGGED'"
+pass "triangle: tagged bug surfaces in hv-todo-by-milestone M01"
+
+TRI_KEY=$("$BIN/hv-plan-add" M01 "$TRI_BUG" "Triangle bug fix")
+[ "$TRI_KEY" = "M01-$TRI_BUG" ] || fail "triangle: expected plan key M01-$TRI_BUG, got $TRI_KEY"
+[ -f ".hv/plans/M01-$TRI_BUG.md" ] || fail "triangle: plan file .hv/plans/M01-$TRI_BUG.md missing"
+pass "triangle: hv-plan-add minted plan keyed M01-$TRI_BUG"
+
+LIST_M01=$("$BIN/hv-plan-list" M01)
+echo "$LIST_M01" | TRI_BUG="$TRI_BUG" python3 -c "
+import json, sys, os
+key = 'M01-' + os.environ['TRI_BUG']
+data = json.load(sys.stdin)
+keys = {i['key']: i for i in data}
+assert key in keys, f'missing {key} in {list(keys)}'
+assert keys[key]['unitKind'] == 'item', f'unitKind: {keys[key][\"unitKind\"]}'
+assert keys[key]['milestone'] == 'M01', f'milestone: {keys[key][\"milestone\"]}'
+" || fail "triangle: hv-plan-list M01 missing $TRI_KEY entry"
+pass "triangle: hv-plan-list M01 reports new plan with item unitKind"
+
+# Cleanup the triangle plan to avoid polluting later assertions.
+"$BIN/hv-plan-rm" "$TRI_KEY" >/dev/null
+
+echo "hv-todo-by-milestone field-order regression"
+# Wave 1 made the regex order-agnostic. Guard against a future regression by
+# tagging Milestone: in three different positions: first, middle, last.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B71] [P1] Milestone first.** Milestone: M01 Detail: `.hv/bugs/B71.md` Related: [F71]
+- **[B72] [P1] Milestone middle.** Detail: `.hv/bugs/B72.md` Milestone: M01 Related: [F71]
+- **[B73] [P1] Milestone last.** Detail: `.hv/bugs/B73.md` Related: [F71] Milestone: M01
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+TAGGED=$("$BIN/hv-todo-by-milestone" M01)
+for ID in B71 B72 B73; do
+  echo "$TAGGED" | grep -qx "$ID" || fail "field-order: $ID missing from M01 items (regex regressed?): '$TAGGED'"
+done
+pass "hv-todo-by-milestone is order-agnostic across Detail/Related/Milestone"
+
+echo "archived milestone status"
+# Mint a fresh milestone, archive it, and verify exclusion + frontmatter + overview.
+ARCH_ID=$("$BIN/hv-vision-add" "Throwaway prototype" "Will be abandoned for testing.")
+ACTIVE_BEFORE=$("$BIN/hv-vision-active")
+echo "$ACTIVE_BEFORE" | grep -qx "$ARCH_ID" && fail "archived test: $ARCH_ID was active before archival (unexpected)"
+
+"$BIN/hv-vision-status" "$ARCH_ID" archived
+ACTIVE_AFTER=$("$BIN/hv-vision-active")
+echo "$ACTIVE_AFTER" | grep -qx "$ARCH_ID" && fail "archived: $ARCH_ID still appears in hv-vision-active"
+pass "archived milestone excluded from hv-vision-active"
+
+grep -q "^status: archived$" ".hv/milestones/$ARCH_ID.md" || fail "archived: frontmatter status not 'archived'"
+pass "archived milestone frontmatter status updated"
+
+ARCH_ID="$ARCH_ID" python3 -c "
+import re, sys, os
+mid = os.environ['ARCH_ID']
+ms = open('.hv/MILESTONES.md').read()
+m = re.search(rf'### {mid} — Throwaway prototype\n\n\*\*Status:\*\* (\w+)', ms)
+sys.exit(0 if (m and m.group(1) == 'archived') else 1)
+" || fail "archived: MILESTONES.md overview not 'archived'"
+pass "archived milestone overview line reflects status"
+
+# Reject unknown status values with the new four-option error message.
+if "$BIN/hv-vision-status" "$ARCH_ID" bogus 2>/dev/null; then
+  fail "archived: hv-vision-status accepted a bogus status value"
+fi
+pass "hv-vision-status rejects unknown status values"
+
+echo "hv-types.sh source contract"
+# Source the file in a subshell and assert the exported env vars.
+( . "$BIN/hv-types.sh"
+  [ "$HV_ITEM_TYPES" = "BFT" ] || { echo "HV_ITEM_TYPES=$HV_ITEM_TYPES"; exit 1; }
+  [ "$HV_ALL_PREFIXES" = "BFTM" ] || { echo "HV_ALL_PREFIXES=$HV_ALL_PREFIXES"; exit 1; }
+) || fail "hv-types.sh did not export expected values"
+pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_ALL_PREFIXES=BFTM"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

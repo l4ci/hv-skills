@@ -110,15 +110,18 @@ If exactly **one** milestone is active and there's no caller cap signaling speed
   2. *"No — leave untagged"*
   3. *"Different milestone"* (free text — accept any `M\d+` value that exists)
 
-If **multiple** milestones are active, show them as options instead of yes/no:
+If **multiple** milestones are active, always ask via `AskUserQuestion` — there's no obvious default to auto-pick:
 
-- One option per active milestone (mark the first listed `(Recommended)`)
-- *"No — leave untagged"*
-- *"Different milestone"* (free text)
+- **Header:** `"Milestone"`
+- **Question:** *"Tag these items with which milestone?"*
+- **Options** (single-select):
+  1. One option per active milestone, labelled `<MID> — <title>` (title from each milestone file's frontmatter `title:`; mark the first listed `(Recommended)`)
+  2. *"None / unrelated — leave untagged"*
+  3. *"Different milestone"* (free text — accept any `M\d+` value that exists)
 
 Plain-text fallback: ask *"Tag with M01?"* once. If the reply is ambiguous, default to leaving untagged — under-tagging is recoverable; mis-tagging clutters the milestone view.
 
-**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one active milestone, **auto-tag without asking** — the speed path uses the obvious answer. With multiple active milestones, skip the question entirely (don't tag anything; the user can edit later).
+**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one active milestone, **auto-tag without asking** — the speed path uses the obvious answer. With multiple active milestones, the cap is **exempt for this single question** — silently skipping the tag would orphan items from every milestone view, which is worse than spending one question. Ask the multi-active question above; this counts toward the cap, so spend remaining clarification budget carefully (often zero further questions).
 
 Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into Step 6's `Milestone:` suffix. If "No — leave untagged" was picked, omit the suffix entirely.
 

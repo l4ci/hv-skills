@@ -4,9 +4,12 @@
 # Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
 # Usage: hv-backlog
 set -euo pipefail
+. "$(dirname "$0")/hv-types.sh"
 python3 - <<'PY'
-import json, re
+import json, os, re
 from pathlib import Path
+
+ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
@@ -37,13 +40,13 @@ def parse_items(body):
         line = line.strip()
         if not line.startswith("- **["):
             continue
-        idm = re.match(r"- \*\*\[([BFT]\d+)\]", line)
+        idm = re.match(rf"- \*\*\[({ITEM_CLASS}\d+)\]", line)
         if not idm:
             continue
         item_id = idm.group(1)
         # Strip the ID+tag prefix so title parsing works even when titles contain periods.
         # Entry format: "- **[ID] [tag] Title.** Desc..." or "- **[ID] Title.** Desc..."
-        after_id = re.sub(r"^- \*\*\[[BFT]\d+\]\s*(?:\[(?:P[012]|Major|Minor|Cosmetic)\]\s*)?", "", line)
+        after_id = re.sub(rf"^- \*\*\[{ITEM_CLASS}\d+\]\s*(?:\[(?:P[012]|Major|Minor|Cosmetic)\]\s*)?", "", line)
         tagm = re.search(r"\[(P[012]|Major|Minor|Cosmetic)\]", line)
         tag = tagm.group(1) if tagm else ""
         titlem = re.match(r"(.+?)\.\*\*", after_id)

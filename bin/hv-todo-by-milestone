@@ -31,7 +31,10 @@ for line in body.splitlines():
     idm = re.match(r"- \*\*\[([BFT]\d+)\]", line)
     if not idm:
         continue
-    mm = re.search(r"Milestone:\s*([^\n]*?)(?:\s+(?:Related|Detail):|$)", line)
+    # Order-agnostic field extraction: a field's value runs from its label
+    # to the next known field label (Detail/Related/Milestone) or end of line.
+    # This way Milestone:/Related:/Detail: can appear in any order.
+    mm = re.search(r"Milestone:\s*(.*?)(?=\s+(?:Detail|Related|Milestone):|$)", line)
     if not mm:
         continue
     milestones = [m.strip() for m in re.findall(r"M\d+", mm.group(1))]

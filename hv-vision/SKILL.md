@@ -144,7 +144,7 @@ The user redlines. Common edits:
 - *"M01 should ship faster, cut acceptance #3"* — adjust, restate
 - *"M04 actually depends on M02"* — update the dependency, recompute ready/blocked
 - *"Add an M05 for X"* — extend the plan
-- *"Retire M03, we're not doing that anymore"* — drop it (or keep it with `status: shipped` if already shipped, or just remove the section)
+- *"Retire M03, we're not doing that anymore"* — set `status: archived` (preserves the section and detail file as a record), or keep it with `status: shipped` if already shipped, or remove the section entirely if it was a mistake
 
 Iterate until the user explicitly confirms. Don't skip confirmation — the writes in Step 8 mutate disk state.
 
@@ -164,7 +164,7 @@ The helper mints `MNN`, creates `.hv/milestones/MNN.md` with a stub plan, and ap
 
 **Existing milestone edits:** use `Edit` to update `.hv/milestones/MNN.md` directly. If you change the title or the dependencies, also update the `### MNN — Title` section in `.hv/MILESTONES.md` so the overview matches.
 
-**Activate / deactivate:** call `.hv/bin/hv-vision-status MNN <planned|active|shipped>` once per milestone whose status changed. Multi-active is supported — independent milestones (no shared dependencies) can run simultaneously.
+**Activate / deactivate / retire:** call `.hv/bin/hv-vision-status MNN <planned|active|shipped|archived>` once per milestone whose status changed. Multi-active is supported — independent milestones (no shared dependencies) can run simultaneously. Use `archived` to retire a milestone that's no longer being pursued — its section stays in `MILESTONES.md` as a record but it drops out of the "Active milestones" header (same exclusion model as `shipped`). Note: `shipped` deps satisfy dependent milestones; `archived` deps do not, so a milestone blocked by an archived prerequisite stays blocked until the prerequisite is reframed.
 
 **Vision paragraph (Create mode only).** Replace the top-of-file placeholder in `MILESTONES.md` *"(no vision yet — run `/hv-vision` to brainstorm milestones)"* with 2–4 sentences that frame the project's why. In Edit mode, leave the paragraph alone unless the brainstorm meaningfully changed the framing.
 

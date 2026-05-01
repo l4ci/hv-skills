@@ -5,6 +5,7 @@
 # Usage: hv-ship-body <branch>
 # Prints: markdown body on stdout.
 set -euo pipefail
+. "$(dirname "$0")/hv-types.sh"
 BRANCH="${1:?usage: hv-ship-body <branch>}"
 
 BASE=""
@@ -51,7 +52,7 @@ for line in subjects:
     print(f"- {line.strip()}")
 print()
 
-id_re = re.compile(r"\[([BFT]\d{2,})\]")
+id_re = re.compile(rf"\[([{os.environ['HV_ITEM_TYPES']}]\d{{2,}})\]")
 seen, ordered = set(), []
 for match in id_re.finditer(full):
     iid = match.group(1)

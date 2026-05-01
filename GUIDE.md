@@ -628,3 +628,16 @@ Each session creates its own worktree and branch. Both orchestrators write to th
 If `status.json` ever gets out of sync (crashed session, manual git operations), `/hv-next` repairs it by checking `git branch` and `git worktree list`.
 
 **Concurrency caveat**: `status.json` writes are not file-locked. If you run `/hv-next` while `/hv-work` is mid-update in another terminal, the last writer wins. In practice this is harmless — git state is the source of truth and the next `/hv-next` run will reconcile any drift — but avoid running both simultaneously against the same project if you want clean output.
+
+### Active-state model
+
+hv-skills tracks two distinct kinds of "active" — they are deliberately not merged.
+
+- **Item-level active** — `.hv/status.json`, populated by `hv-status-add` / `hv-status-remove`. Short-lived, tied to a git branch or worktree, exists only while a `/hv-work` or `/hv-debug` cycle is in flight. Drives `/hv-resume`, `/hv-status`, and `/hv-pause`'s reconciliation against `git branch` / `git worktree list`.
+- **Milestone-level active** — the `status:` field in the frontmatter of `.hv/milestones/MNN.md` (one of `planned` / `active` / `shipped` / `archived`), queried by `hv-vision-active` and `hv-vision-list`. Long-lived and strategic — a milestone stays `active` across many sessions, branches, and items.
+
+A new helper that needs to check "active" must decide which sense it means and consult the right source. The two concepts are independent: an item can be in flight under no active milestone (`status.json` populated, no milestone tag), and a milestone can be `active` with nothing currently in flight against it (`hv-vision-active` returns it, `status.json` empty). Don't reach for whichever one is closer at hand — pick the source that matches the question being asked.
+
+### Milestones are excluded from archival
+
+`hv-archive-old`, `hv-complete`, and `hv-reconcile` deliberately ignore `.hv/milestones/`. Milestones use the `planned` / `active` / `shipped` / `archived` status flow on the per-milestone detail file, not the `## Completed` section in `TODO.md`. A milestone is never "archived old" by elapsed time; retirement is explicit via `hv-vision-status MNN archived` (work abandoned) or `hv-vision-status MNN shipped` (work completed). The two lifecycles are separate and shouldn't be unified.

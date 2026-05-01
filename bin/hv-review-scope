@@ -4,6 +4,7 @@
 # build its agent brief in one step.
 # Usage: hv-review-scope [branch]   # defaults to current branch
 set -euo pipefail
+. "$(dirname "$0")/hv-types.sh"
 BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 
 BASE=""
@@ -53,7 +54,7 @@ for line in log:
         h, s = line.split("\x1f", 1)
         commits.append({"hash": h, "subject": s})
 
-id_re = re.compile(r"\[([BFT]\d{2,})\]")
+id_re = re.compile(rf"\[([{os.environ['HV_ITEM_TYPES']}]\d{{2,}})\]")
 seen, ordered = set(), []
 for match in id_re.finditer(full):
     iid = match.group(1)

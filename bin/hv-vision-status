@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Change a milestone's status — updates both the frontmatter in
 # .hv/milestones/MNN.md and the **Status:** line in .hv/MILESTONES.md.
-# Usage: hv-vision-status <ID> <planned|active|shipped>
+# Usage: hv-vision-status <ID> <planned|active|shipped|archived>
 set -euo pipefail
-ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped>}"
-NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped>}"
+ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
+NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
 case "$NEW_STATUS" in
-  planned|active|shipped) ;;
-  *) echo "error: status must be planned, active, or shipped" >&2; exit 1 ;;
+  planned|active|shipped|archived) ;;
+  *) echo "error: status must be planned, active, shipped, or archived" >&2; exit 1 ;;
 esac
 python3 - "$ID" "$NEW_STATUS" <<'PY'
 import re, sys
@@ -31,7 +31,7 @@ ms = Path(".hv/MILESTONES.md")
 if ms.exists():
     ms_content = ms.read_text()
     pattern = re.compile(
-        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped)",
+        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:planned|active|shipped|archived)",
         re.MULTILINE,
     )
     updated = pattern.sub(rf"\g<1>{status}", ms_content, count=1)
