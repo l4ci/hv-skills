@@ -243,18 +243,19 @@ Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
-## Step 4 — Seed CLAUDE.md Knowledge & Vision Blocks
+## Step 4 — Seed CLAUDE.md Knowledge, Vision & Decisions Blocks
 
-Ensure `CLAUDE.md` in the project root contains the two managed blocks — one for knowledge topics, one for active milestones. `/hv-learn` keeps the knowledge block in sync; `/hv-vision` keeps the vision block in sync. `/hv-work` reads both to know when to consult knowledge and which milestone the work belongs to.
+Ensure `CLAUDE.md` in the project root contains the three managed blocks — one for knowledge topics, one for active milestones, one for decision topics. `/hv-learn` keeps the knowledge block in sync; `/hv-vision` keeps the vision block in sync; `/hv-decide` keeps the decisions block in sync. `/hv-work` reads all three: knowledge for advisory context, milestones to scope work, and decisions as hard constraints.
 
 Delegate to the helpers — each creates `CLAUDE.md` if missing, updates its block in place if present, or appends it if `CLAUDE.md` exists without a block:
 
 ```bash
 .hv/bin/hv-knowledge-index
 .hv/bin/hv-vision-index
+.hv/bin/hv-decisions-index
 ```
 
-Neither helper touches any other content in `CLAUDE.md`.
+None of the helpers touch any other content in `CLAUDE.md`.
 
 ## Step 5 — Confirm
 
