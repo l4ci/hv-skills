@@ -257,6 +257,55 @@ echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
 echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
 pass "knowledge-query returns only requested topics"
 
+echo "hv-decisions-query"
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+
+## Architecture
+
+### No background queues
+Jobs run in-process.
+*Why.* Simplicity.
+**Forbids.** External queues.
+**Permits.** Goroutines.
+
+## Testing
+
+### No mocked DB
+Integration tests hit real DB.
+*Why.* Mock divergence.
+**Forbids.** Mock DB.
+**Permits.** Other mocks.
+
+## Networking
+### Strict TLS
+Only TLS 1.3+.
+*Why.* Compliance.
+**Forbids.** TLS 1.2 fallback.
+**Permits.** Cert pinning.
+EOF
+OUT_D=$("$BIN/hv-decisions-query" "Testing" "Networking")
+echo "$OUT_D" | grep -q "No mocked DB" || fail "Testing decision missing from query"
+echo "$OUT_D" | grep -q "Strict TLS" || fail "Networking decision missing from query"
+echo "$OUT_D" | grep -q "No background queues" && fail "Architecture decision leaked into query"
+pass "decisions-query returns only requested topics"
+
+# Forbids/permits content must come through verbatim
+echo "$OUT_D" | grep -q "Forbids.*Mock DB" || fail "Forbids line missing for Testing decision"
+echo "$OUT_D" | grep -q "Permits.*Cert pinning" || fail "Permits line missing for Networking decision"
+pass "decisions-query preserves forbids/permits structure"
+
+# Empty/missing file is silent (exit 0, no output)
+rm -f .hv/DECISIONS.md
+OUT_EMPTY=$("$BIN/hv-decisions-query" "Anything")
+[ -z "$OUT_EMPTY" ] || fail "decisions-query should be silent when DECISIONS.md missing"
+pass "decisions-query silent when file missing"
+
+# Restore .hv/DECISIONS.md so subsequent tests have a known state
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+EOF
+
 echo "hv-backlog"
 # Seed a mix of items in TODO.md
 cat > .hv/TODO.md <<'EOF'
