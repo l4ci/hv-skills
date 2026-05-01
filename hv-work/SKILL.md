@@ -131,6 +131,14 @@ From the conversation context:
 
    Carry the relevant gotchas/conventions into the task briefs (Step 6) under a `**Known gotchas:**` block — only the bullets that apply, not the whole file. Skip silently if nothing looks relevant.
 
+1. **Consult project decisions.** Read the `hv-decisions` block in `CLAUDE.md` for committed boundaries. For topics that plausibly touch the planned work, pull just those sections:
+
+   ```bash
+   .hv/bin/hv-decisions-query "Architecture" "Testing"
+   ```
+
+   Carry the full entry (rule + *Why* + **Forbids** + **Permits**) into the task briefs (Step 6) under a `**Hard boundaries:**` block — workers must respect these as constraints, not advisory hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching workers; do not silently work around the boundary. Skip silently if nothing relevant.
+
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. Group into dependency waves:
    - **Wave 1:** independent files → parallel
@@ -175,6 +183,9 @@ You are implementing Task N of [total].
 
 **Known gotchas:**
 [Relevant bullets from hv-knowledge-query output]
+
+**Hard boundaries:**
+[Relevant entries from hv-decisions-query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
 
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]
@@ -280,6 +291,16 @@ When triggered, branch on `autonomy.level`:
 
 - `"off"` — nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
+
+## Step 13.5 — Decide (Nudge Only)
+
+Trigger condition: same gating as Step 13 (**2+ items resolved**, OR **≥5 files touched**), OR the orchestrator noticed a non-obvious pick during verification (e.g., chose SQLite over Postgres, locked a coding pattern not dictated by existing code). Skip for trivial fixes. Don't repeat in the same session.
+
+When triggered, **always nudge — never auto-invoke**, regardless of `autonomy.level`:
+
+> *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in. Decisions are always manual — even in `loop` mode this is a nudge, not an auto-step."*
+
+Even with `autonomy.level == "loop"`, do **not** dispatch `hv-decide` via `Skill`. The active/passive distinction (decisions vs learnings) depends on the human pressing the button.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 

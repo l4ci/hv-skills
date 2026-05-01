@@ -78,6 +78,16 @@ Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. Pull to
 
 Carry any bullets that look relevant into Step 5's hypothesis brief. Skip silently if nothing fits.
 
+## Step 3.5 — Consult DECISIONS.md
+
+Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch the bug area, pull just those sections:
+
+```bash
+.hv/bin/hv-decisions-query "Architecture" "Testing"
+```
+
+Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
+
 ## Step 4 — Branch or Worktree
 
 Pick a descriptive name (e.g., `hv/fix-B07-timer-badge`).
@@ -128,6 +138,7 @@ Investigate [B##]: <title>.
 
 **Relevant knowledge:**
 <bullets from hv-knowledge-query, if any>
+<entries from hv-decisions-query, if any — boundaries that rule out fix directions>
 
 Read the code organically. Do not propose a fix yet.
 
@@ -235,6 +246,14 @@ Branch on `autonomy.level`:
 
 - `"off"` — nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
+
+## Step 12.5 — Decide (Nudge Only)
+
+If the fix path codified a constraint (e.g., "we will never use timer-X here", "this surface only goes through controller-Y"), surface a one-liner — never auto-invoke, regardless of `autonomy.level`:
+
+> *"Did this fix lock in a boundary worth preserving? Run `/hv-decide` to capture it as a hard constraint."*
+
+Skip for trivial fixes (single-line edit, obvious typo, etc.). Don't repeat in the same session. Decisions are always manual — even in `loop` mode this is a nudge, not an auto-step.
 
 ## Key Principles
 

@@ -20,6 +20,8 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 | `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
 | `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
+| `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
+| `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
 | `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
 | `hv-vision-status` | Set a milestone's status to `planned`, `active`, or `shipped` | `.hv/bin/hv-vision-status M01 active` |
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
@@ -76,13 +78,20 @@ skills use to avoid acting on stale context. `hv-summary` prints a human-readabl
 snapshot of the same data: backlog counts, what's actively in progress, and the
 most recent completions.
 
-## Knowledge and vision indexes
+## Knowledge, vision, and decisions indexes
 
 `hv-knowledge-index` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`.
 `hv-knowledge-index` regenerates the `<!-- hv-knowledge-start -->` block in
 `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query`
 lets you pull specific topic sections out of `KNOWLEDGE.md` by name — useful
 when scripting post-session summaries.
+
+`hv-decisions-index` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
+identically — the file structure, marker shape, and query semantics all mirror
+the knowledge helpers. The distinction is semantic: decisions are *active*
+hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
+where knowledge is *passive* gotchas captured by `/hv-learn`. See
+[Decisions](../usage/decisions.md) for when to use which.
 
 The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints
 the next `MNN` ID, creates the milestone file, and appends its overview line to

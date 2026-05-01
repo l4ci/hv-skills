@@ -247,8 +247,6 @@ Exercises all 32 helpers across 69 assertions. Exits non-zero on any failure.
 
 Issues and PRs welcome. Keep changes minimal, include a smoke-test assertion if you touch or add a helper, and follow the commit style in `git log`.
 
-Before proposing changes that touch documentation, skill structure, or `.hv/` state semantics, read [DECISIONS.md](DECISIONS.md) — it captures the boundaries the project has committed to (skills self-contained, `docs/` consumer-facing only, git as source of truth, atomic per-task commits, etc.). Each entry has explicit *forbids* and *permits* so it's unambiguous when applied.
-
 ## License
 
 [MIT](LICENSE)

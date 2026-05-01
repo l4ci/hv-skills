@@ -49,6 +49,7 @@ If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv
 - `.hv/<bugs|features|tasks>/<itemId>.md` — overflow detail for the item if any
 - Existing plans for this milestone: `.hv/bin/hv-plan-list <MID>`
 - Relevant `KNOWLEDGE.md` topics: `.hv/bin/hv-knowledge-query <topics…>`
+- Relevant `DECISIONS.md` topics: `.hv/bin/hv-decisions-query <topics…>` — committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
 - Recent git history: `git log --oneline -20`
 
 **Issue these as parallel tool calls in a single response** — they're independent. Form a picture; don't dump it.

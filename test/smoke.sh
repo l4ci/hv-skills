@@ -176,6 +176,50 @@ grep -q "^# Preamble" CLAUDE.md || fail "preamble lost during migration"
 grep -q "^# Postamble" CLAUDE.md || fail "postamble lost during migration"
 pass "legacy colon markers migrated to dashed format in place"
 
+echo "hv-decisions-index"
+mkdir -p .hv
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+
+## Architecture
+
+### No background queues
+Background jobs run in-process.
+*Why.* Operational simplicity.
+**Forbids.** Adding Sidekiq, RabbitMQ, etc.
+**Permits.** In-process Goroutines, threads.
+
+## Testing
+
+### No mocked DB in integration tests
+Integration tests must hit a real database.
+*Why.* Past mock/prod divergence.
+**Forbids.** Mock DB libraries in tests/integration.
+**Permits.** Mocks elsewhere.
+EOF
+"$BIN/hv-decisions-index" >/dev/null
+grep -q "<!-- hv-decisions-start -->" CLAUDE.md || fail "hv-decisions managed block not in CLAUDE.md"
+grep -q "## Project Decisions" CLAUDE.md || fail "Project Decisions heading missing"
+grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Architecture" || fail "Architecture topic missing in decisions block"
+grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Testing" || fail "Testing topic missing in decisions block"
+pass "decisions managed block created with topics"
+
+# Re-running should update in place, not duplicate
+"$BIN/hv-decisions-index" >/dev/null
+COUNT_DEC=$(grep -c "hv-decisions-start" CLAUDE.md)
+[ "$COUNT_DEC" = "1" ] || fail "decisions managed block duplicated"
+pass "decisions block updated in place"
+
+# Empty .hv/DECISIONS.md (no topics) — block should still appear with placeholder
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+
+Hard boundaries for this project.
+EOF
+"$BIN/hv-decisions-index" >/dev/null
+grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "no decisions yet" || fail "empty-state placeholder missing"
+pass "decisions block handles empty file"
+
 echo "hv-reconcile"
 # Seed an entry whose branch doesn't exist — should be cleaned
 "$BIN/hv-status-add" hv/dead-branch B05
@@ -212,6 +256,76 @@ echo "$OUT" | grep -q "testing bullet" || fail "testing topic missing from query
 echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
 echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
 pass "knowledge-query returns only requested topics"
+
+echo "hv-decisions-query"
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+
+## Architecture
+
+### No background queues
+Jobs run in-process.
+*Why.* Simplicity.
+**Forbids.** External queues.
+**Permits.** Goroutines.
+
+## Testing
+
+### No mocked DB
+Integration tests hit real DB.
+*Why.* Mock divergence.
+**Forbids.** Mock DB.
+**Permits.** Other mocks.
+
+## Networking
+### Strict TLS
+Only TLS 1.3+.
+*Why.* Compliance.
+**Forbids.** TLS 1.2 fallback.
+**Permits.** Cert pinning.
+EOF
+OUT_D=$("$BIN/hv-decisions-query" "Testing" "Networking")
+echo "$OUT_D" | grep -q "No mocked DB" || fail "Testing decision missing from query"
+echo "$OUT_D" | grep -q "Strict TLS" || fail "Networking decision missing from query"
+echo "$OUT_D" | grep -q "No background queues" && fail "Architecture decision leaked into query"
+pass "decisions-query returns only requested topics"
+
+# Forbids/permits content must come through verbatim
+echo "$OUT_D" | grep -q "Forbids.*Mock DB" || fail "Forbids line missing for Testing decision"
+echo "$OUT_D" | grep -q "Permits.*Cert pinning" || fail "Permits line missing for Networking decision"
+pass "decisions-query preserves forbids/permits structure"
+
+# Empty/missing file is silent (exit 0, no output)
+rm -f .hv/DECISIONS.md
+OUT_EMPTY=$("$BIN/hv-decisions-query" "Anything")
+[ -z "$OUT_EMPTY" ] || fail "decisions-query should be silent when DECISIONS.md missing"
+pass "decisions-query silent when file missing"
+
+# Restore .hv/DECISIONS.md so subsequent tests have a known state
+cat > .hv/DECISIONS.md <<'EOF'
+# Decisions
+EOF
+
+echo "hv-bootstrap (DECISIONS.md seed)"
+# Fresh tmpdir so we test bootstrap on a truly clean slate
+BOOT_TMP="$(mktemp -d)"
+cd "$BOOT_TMP"
+git init -q
+git config user.email t@t && git config user.name t
+"$BIN/hv-bootstrap"
+[ -f .hv/DECISIONS.md ] || fail "bootstrap did not create .hv/DECISIONS.md"
+grep -q "^# Decisions" .hv/DECISIONS.md || fail "DECISIONS.md missing # Decisions header"
+grep -q "Hard boundaries" .hv/DECISIONS.md || fail "DECISIONS.md missing framing sentence"
+pass "bootstrap creates .hv/DECISIONS.md with header preamble"
+
+# Re-running bootstrap must NOT overwrite existing DECISIONS.md
+echo "user content marker" >> .hv/DECISIONS.md
+"$BIN/hv-bootstrap"
+grep -q "user content marker" .hv/DECISIONS.md || fail "bootstrap overwrote existing DECISIONS.md"
+pass "bootstrap idempotent — preserves existing DECISIONS.md content"
+
+cd "$TMP"
+rm -rf "$BOOT_TMP"
 
 echo "hv-backlog"
 # Seed a mix of items in TODO.md
