@@ -22,6 +22,10 @@ Interactive editor for `.hv/config.json`. Shows current values for all configura
 
 Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, and mark complete. Uses the same isolation mode as `/hv-work` and nudges you toward `/hv-learn` when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
 
+## /hv-decide
+
+Captures a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked. Decisions differ from learnings in `KNOWLEDGE.md` by being active commitments with explicit forbids/permits; `/hv-work`, `/hv-debug`, `/hv-refactor`, and `/hv-review` consult them as constraints. See [decisions](../usage/decisions.md) for the full flow.
+
 ## /hv-docs
 
 Manages the public documentation site under the configured `docs.path` directory. Handles creating, updating, and organizing docs pages so project documentation stays in sync with the codebase.
