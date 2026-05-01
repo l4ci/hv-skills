@@ -292,6 +292,16 @@ When triggered, branch on `autonomy.level`:
 - `"off"` — nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
 
+## Step 13.5 — Decide (Nudge Only)
+
+Trigger condition: same gating as Step 13 (**2+ items resolved**, OR **≥5 files touched**), OR the orchestrator noticed a non-obvious pick during verification (e.g., chose SQLite over Postgres, locked a coding pattern not dictated by existing code). Skip for trivial fixes. Don't repeat in the same session.
+
+When triggered, **always nudge — never auto-invoke**, regardless of `autonomy.level`:
+
+> *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in. Decisions are always manual — even in `loop` mode this is a nudge, not an auto-step."*
+
+Even with `autonomy.level == "loop"`, do **not** dispatch `hv-decide` via `Skill`. The active/passive distinction (decisions vs learnings) depends on the human pressing the button.
+
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
 ```bash
