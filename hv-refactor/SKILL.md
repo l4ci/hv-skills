@@ -146,6 +146,14 @@ If `confirmBeforeExecute` is `false`: present the list for visibility, then proc
 
 ## Step 5 — Design Competing Approaches (Structural Only)
 
+**Consult decisions before designing.** Pull relevant boundary entries:
+
+```bash
+.hv/bin/hv-decisions-query <topics…>
+```
+
+Any approach that violates a decision is disqualified before the design phase. If every generated approach would violate, **stop and surface to the user** — refactors must not silently work around committed boundaries. Refactors are exactly when boundaries matter most.
+
 For each **structural** friction point, spawn 3+ sub-agents in parallel using the configured **orchestrator** model. Each agent gets the same technical brief (file paths, coupling details, dependency category, what's being hidden) but a different design constraint:
 
 - **Agent 1**: "Minimize the interface — aim for 1-3 entry points max"

@@ -69,6 +69,14 @@ Read the `hv-knowledge` block in `CLAUDE.md` to see available topics. Pick topic
 
 Carry the relevant bullets into the reviewer brief.
 
+**Also consult decisions:**
+
+```bash
+.hv/bin/hv-decisions-query "Topic A" "Topic B"
+```
+
+Pass any matched entries to the reviewer in Step 5 under a `**Hard boundaries:**` section. The reviewer must check the diff against each boundary and **FAIL** if a violation is present (even if the change looks otherwise good).
+
 ## Step 4 — Capture the Diff
 
 The reviewer needs concrete diff content, not just file names. For each touched file (up to ~8 — more than that, ask the user which to focus on):
@@ -99,6 +107,9 @@ Review the feature branch `<branch>` against base `<base>` before merge.
 - <bullet 1>
 - <bullet 2>
 
+**Hard boundaries (from DECISIONS.md):**
+<entries from hv-decisions-query, if any — full rule + forbids/permits>
+
 **Diff by file:**
 <file>
 ```diff
@@ -111,6 +122,7 @@ Review the feature branch `<branch>` against base `<base>` before merge.
 1. **Intent match** — does the diff deliver what the TODO entries promise? Anything missing, anything scope-creeping?
 2. **Convention compliance** — does the diff respect the bullets from KNOWLEDGE.md? Any regressions on captured gotchas?
 3. **Obvious quality** — dead code, error swallowing, untested new branches, security smells, API contract breaks, performance cliffs. Not a full code review; focus on things the user would regret after merge.
+- **Decision violations.** Compare the diff against the `**Hard boundaries:**` block above. Any forbidden pattern present in the diff = FAIL.
 
 Return verdict as three labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
 

@@ -131,6 +131,14 @@ From the conversation context:
 
    Carry the relevant gotchas/conventions into the task briefs (Step 6) under a `**Known gotchas:**` block — only the bullets that apply, not the whole file. Skip silently if nothing looks relevant.
 
+1. **Consult project decisions.** Read the `hv-decisions` block in `CLAUDE.md` for committed boundaries. For topics that plausibly touch the planned work, pull just those sections:
+
+   ```bash
+   .hv/bin/hv-decisions-query "Architecture" "Testing"
+   ```
+
+   Carry the full entry (rule + *Why* + **Forbids** + **Permits**) into the task briefs (Step 6) under a `**Hard boundaries:**` block — workers must respect these as constraints, not advisory hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching workers; do not silently work around the boundary. Skip silently if nothing relevant.
+
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. Group into dependency waves:
    - **Wave 1:** independent files → parallel
@@ -175,6 +183,9 @@ You are implementing Task N of [total].
 
 **Known gotchas:**
 [Relevant bullets from hv-knowledge-query output]
+
+**Hard boundaries:**
+[Relevant entries from hv-decisions-query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
 
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]

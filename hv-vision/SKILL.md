@@ -46,6 +46,7 @@ Before opening the conversation, gather everything that should inform the brains
 - Every `.hv/milestones/M*.md` (full per-milestone plans — read whatever exists)
 - `.hv/TODO.md` (what's already on the backlog hints at the user's mental model)
 - `.hv/KNOWLEDGE.md` topics via `hv-knowledge-query` if any topic plausibly relates to the project's domain
+- `.hv/DECISIONS.md` topics via `hv-decisions-query` — committed boundaries constrain what milestones can promise; surface any conflict before proposing milestones
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
 - Recent git history: `git log --oneline -20`
 

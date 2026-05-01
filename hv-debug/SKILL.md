@@ -78,6 +78,16 @@ Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. Pull to
 
 Carry any bullets that look relevant into Step 5's hypothesis brief. Skip silently if nothing fits.
 
+## Step 3.5 — Consult DECISIONS.md
+
+Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch the bug area, pull just those sections:
+
+```bash
+.hv/bin/hv-decisions-query "Architecture" "Testing"
+```
+
+Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
+
 ## Step 4 — Branch or Worktree
 
 Pick a descriptive name (e.g., `hv/fix-B07-timer-badge`).
@@ -128,6 +138,7 @@ Investigate [B##]: <title>.
 
 **Relevant knowledge:**
 <bullets from hv-knowledge-query, if any>
+<entries from hv-decisions-query, if any — boundaries that rule out fix directions>
 
 Read the code organically. Do not propose a fix yet.
 
