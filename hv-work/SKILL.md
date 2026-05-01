@@ -25,7 +25,7 @@ Read `.hv/config.json`:
 - `models.worker` — model for implementation subagents (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly. See `GUIDE.md` § Autonomy.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly. See `GUIDE.md` § Branching template.
 
 ## When to Use
 
@@ -276,7 +276,7 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 Trigger: see GUIDE.md § Learn Trigger.
 
-Per GUIDE.md § Autonomy: in `off`, nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*; in `auto`/`loop`, invoke `hv-learn` via `Skill` with a brief naming the cycle's resolved IDs and touched files (so the verifier has the right context if `learn.verify: true`).
+Per GUIDE.md § Branching template: in `off`, nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
@@ -286,11 +286,11 @@ Per GUIDE.md § Autonomy: in `off`, nudge *"Capture learnings from this session?
 
 Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit. Trigger when `features >= 5` OR `bugs >= 10`. Don't repeat in the same session.
 
-Per GUIDE.md § Autonomy: in `off`, nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*; in `auto`/`loop`, invoke `hv-refactor` via `Skill`. (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
+Per GUIDE.md § Branching template: in `off`, nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*; in `auto`/`loop`, **dispatch `hv-refactor` via `Skill` immediately — no prompt, no confirmation.** (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
 
 ## Step 15 — Loop Continuation
 
-`"loop"`-only (per GUIDE.md § Autonomy). Invoke `hv-next` via `Skill` to surface the next item — `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
+`"loop"`-only (per GUIDE.md § Branching template). **Dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
 
 Loop stops naturally when:
 - `/hv-next` reports an empty backlog (or the active milestone has no items and the general backlog is also empty)

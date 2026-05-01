@@ -23,7 +23,7 @@ Read `.hv/config.json`:
 
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly. See `GUIDE.md` § Autonomy.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly. See `GUIDE.md` § Branching template.
 
 ## When to Use
 
@@ -159,7 +159,7 @@ Integration is a natural capture moment — the user just finished a cohesive un
 
 Trigger: see GUIDE.md § Learn Trigger (use the scope JSON's `touchedFiles` for the file count).
 
-Per GUIDE.md § Autonomy: in `off`, append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*; in `auto`/`loop`, invoke `hv-learn` via `Skill` with a brief naming the resolved IDs and touched files.
+Per GUIDE.md § Branching template: in `off`, append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the resolved IDs and touched files.
 
 ## Step 9 — Report to User
 
@@ -184,7 +184,7 @@ If `/hv-review` surfaced concerns that the user proceeded through, append them o
 
 ## Step 10 — Loop Continuation
 
-`"loop"`-only (per GUIDE.md § Autonomy). After the report, invoke `hv-next` via `Skill` to surface the next item — `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.
+`"loop"`-only (per GUIDE.md § Branching template). After the report, **dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.
 
 ## Key Principles
 
