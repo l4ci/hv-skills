@@ -24,7 +24,7 @@ Read `.hv/config.json`:
 - `models.orchestrator` — model for hypothesis + verification (default `opus`)
 - `models.worker` — model for the fix agent (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly. See `GUIDE.md` § Autonomy.
+- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly. See `GUIDE.md` § Branching template.
 - `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one. See `GUIDE.md` § Competing hypotheses.
 
 ## When to Use
@@ -225,13 +225,13 @@ Per GUIDE.md § Autonomy:
     2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
     3. "Stop here" — *"Leave the branch; come back later."*
   - Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
-- `"auto"` or `"loop"` — invoke `hv-ship` via `Skill` with the current branch. (`ship.review` still governs the review gate.)
+- `"auto"` or `"loop"` — **dispatch `hv-ship` via `Skill` with the current branch immediately — no prompt, no confirmation.** (`ship.review` still governs the review gate.)
 
 ## Step 12 — Learn (Nudge or Auto-Invoke)
 
 Trigger: the root cause was **not obvious from reading the code alone** — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem. Skip for trivial fixes (typo, obvious off-by-one).
 
-Per GUIDE.md § Autonomy: in `off`, nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*; in `auto`/`loop`, invoke `hv-learn` via `Skill` with a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
+Per GUIDE.md § Branching template: in `off`, nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*; in `auto`/`loop`, **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
 ## Key Principles
 

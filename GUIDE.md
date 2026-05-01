@@ -422,9 +422,16 @@ Controls whether skills *nudge* at decision points or *invoke the next skill dir
 Each autonomy-aware step branches on `autonomy.level`:
 
 - `"off"` (default) — surface the decision to the user. Usually a one-line nudge naming the next skill; an `AskUserQuestion` when more than one path is reasonable (e.g. `/hv-debug` Step 11).
-- `"auto"` or `"loop"` — invoke the next skill via the `Skill` tool. No prompt, no confirmation; pass any context the next skill needs in the brief.
+- `"auto"` or `"loop"` — **invoke the next skill via the `Skill` tool. No prompt. No confirmation. No "want me to…" question. No alternatives offered.** Pass any context the next skill needs in the brief, then dispatch.
 
-Loop-continuation steps run only when `level == "loop"`; skip for `"off"` and `"auto"`. The destination skill's own gates (`learn.verify`, `ship.review`, `refactor.confirmBeforeExecute`) still fire under autonomy.
+**Forbidden under `auto`/`loop`.** The user opted in by setting the level — every confirmation question undoes that. Specifically don't:
+
+- Ask *"Want me to invoke `/hv-learn` now?"* or *"Run `/hv-refactor`?"*
+- Offer alternatives like *"…or push to origin first?"* or *"…or just stop here?"*
+- Justify holding off ("conversation is long", "user might prefer X", "verifier dispatch is expensive") — those are exactly the rationalizations the autonomy setting is meant to bypass. If the trigger fires, dispatch.
+- Insert a "checkpoint" the spec doesn't call for. The spec's checkpoints are the destination skill's own gates (`learn.verify`, `ship.review`, `refactor.confirmBeforeExecute`) — those still fire. Adding a meta-checkpoint above them is the failure mode this rule prevents.
+
+Loop-continuation steps run only when `level == "loop"`; skip for `"off"` and `"auto"`. The destination skill's own gates still fire under autonomy regardless of level.
 
 ## Learn Trigger
 
