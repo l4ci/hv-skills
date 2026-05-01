@@ -5,11 +5,12 @@
 # Usage: hv-todo-by-milestone <MID>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-types.sh"
 MID="${1:?usage: hv-todo-by-milestone <MID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
-import re, sys
+import os, re, sys
 from pathlib import Path
-from hvlib import section
+from hvlib import section, parse_todo_fields
 
 mid = sys.argv[1]
 todo = Path(".hv/TODO.md")
@@ -22,16 +23,13 @@ for line in body.splitlines():
     line = line.strip()
     if not line.startswith("- **["):
         continue
-    idm = re.match(r"- \*\*\[([BFT]\d+)\]", line)
+    idm = re.match(rf"- \*\*\[([{os.environ['HV_ITEM_TYPES']}]\d+)\]", line)
     if not idm:
         continue
-    # Order-agnostic field extraction: a field's value runs from its label
-    # to the next known field label (Detail/Related/Milestone) or end of line.
-    # This way Milestone:/Related:/Detail: can appear in any order.
-    mm = re.search(r"Milestone:\s*(.*?)(?=\s+(?:Detail|Related|Milestone):|$)", line)
-    if not mm:
+    milestone_val = parse_todo_fields(line)["milestone"]
+    if not milestone_val:
         continue
-    milestones = [m.strip() for m in re.findall(r"M\d+", mm.group(1))]
+    milestones = [m.strip() for m in re.findall(r"M\d+", milestone_val)]
     if mid in milestones:
         print(idm.group(1))
 PY

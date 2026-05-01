@@ -2,7 +2,7 @@
 
 Loaded via PYTHONPATH = $(dirname "$0") set by the bash wrapper. Do NOT import
 this from outside bin/. The functions here are stdlib-only and side-effect-free
-(except dump_json_atomic / update_json, which write).
+(except write_text_atomic / dump_json_atomic / update_json, which write).
 """
 import json
 import os
@@ -61,6 +61,66 @@ def print_matching_sections(content: str, wanted: set[str], out=None) -> None:
             first = False
 
 
+def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
+    """Find the origin bullet for `iid` in `corpus` (typically TODO.md +
+    ARCHIVE.md concatenated). The origin bullet is the line that introduces
+    the item (`- **[ID] ...`), not a `Related: [ID]` reference inside another
+    bullet.
+
+    Returns (cleaned_line, title) or None if no origin bullet exists.
+    `cleaned_line` has the leading `- `, any `~~strikethrough~~` wrapper,
+    and any trailing ` Done YYYY-MM-DD [`hash`]` suffix removed.
+    `title` is None if the cleaned line lacks the standard `[ID] [tag] Title.`
+    pattern.
+    """
+    bullet = re.compile(
+        rf"^- (?:~~)?\*\*\[{re.escape(iid)}\].*$",
+        re.MULTILINE,
+    )
+    m = bullet.search(corpus)
+    if not m:
+        return None
+    line = m.group(0).strip()
+    if line.startswith("- "):
+        line = line[2:]
+    line = re.sub(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$", "", line)
+    strike = re.match(r"~~(.+?)~~$", line)
+    if strike:
+        line = strike.group(1)
+    title_m = re.search(
+        rf"\[{re.escape(iid)}\](?:\s+\[[^\]]+\])?\s+(?P<t>[^.\n]+)\.",
+        line,
+    )
+    title = title_m.group("t").strip() if title_m else None
+    return (line, title)
+
+
+def parse_todo_fields(line: str) -> dict[str, str]:
+    """Extract Detail/Related/Milestone fields from a TODO bullet line.
+
+    Each field starts with `<Field>: ` and runs until the next field marker
+    or end of line. Order-agnostic. Returns a dict with keys 'detail',
+    'related', 'milestone' — missing fields map to ''.
+
+    Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
+        => {"detail": "foo.", "related": "[F02].", "milestone": "M01"}
+    """
+    fields = {"detail": "", "related": "", "milestone": ""}
+    others = {
+        "detail": ["Related", "Milestone"],
+        "related": ["Detail", "Milestone"],
+        "milestone": ["Detail", "Related"],
+    }
+    for key in fields:
+        cap = key.capitalize()
+        end_lookahead = "|".join(others[key])
+        pat = re.compile(rf"\b{cap}:\s*(.+?)(?=\s+(?:{end_lookahead}):|$)")
+        m = pat.search(line)
+        if m:
+            fields[key] = m.group(1).strip()
+    return fields
+
+
 def load_json(path, default):
     """Read JSON from `path`. Return `default` if the file is missing or corrupt.
     Never raises. `path` may be a str or Path.
@@ -72,6 +132,16 @@ def load_json(path, default):
         return json.loads(p.read_text())
     except json.JSONDecodeError:
         return default
+
+
+def write_text_atomic(path, text: str) -> None:
+    """Write `text` to `path` atomically (tmp + os.replace). Trailing
+    newline is the caller's responsibility. `path` may be a str or Path.
+    """
+    p = Path(path)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(text)
+    os.replace(tmp, p)
 
 
 def dump_json_atomic(path, data) -> None:

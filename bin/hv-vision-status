@@ -10,9 +10,11 @@ if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
     echo "error: status must be one of: $HV_MILESTONE_STATUSES" >&2
     exit 1
 fi
-python3 - "$ID" "$NEW_STATUS" <<'PY'
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
 import os, re, sys
 from pathlib import Path
+from hvlib import write_text_atomic
 
 mid, status = sys.argv[1], sys.argv[2]
 
@@ -26,7 +28,7 @@ new = re.sub(r"^(status:\s*)\w+", rf"\g<1>{status}", content, count=1, flags=re.
 if new == content:
     print(f"error: status field not found in {detail}", file=sys.stderr)
     sys.exit(1)
-detail.write_text(new)
+write_text_atomic(detail, new)
 
 ms = Path(".hv/MILESTONES.md")
 if ms.exists():
@@ -37,5 +39,5 @@ if ms.exists():
     )
     updated = pattern.sub(rf"\g<1>{status}", ms_content, count=1)
     if updated != ms_content:
-        ms.write_text(updated)
+        write_text_atomic(ms, updated)
 PY

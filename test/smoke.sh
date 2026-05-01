@@ -116,6 +116,26 @@ pass "status-add wrote entry"
 grep -q '"branch": "hv/test-branch"' .hv/status.json && fail "status-remove did not remove"
 pass "status-remove cleared entry"
 
+echo "hv-status-add upsert (no flag) overwrites startedAt"
+"$BIN/hv-status-add" hv/ts-branch X01
+TS1=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/ts-branch'))")
+sleep 1
+"$BIN/hv-status-add" hv/ts-branch X01
+TS2=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/ts-branch'))")
+[ "$TS1" != "$TS2" ] || fail "second status-add should have updated startedAt but it did not"
+pass "status-add (no flag) overwrites startedAt on second call"
+"$BIN/hv-status-remove" hv/ts-branch
+
+echo "hv-status-add --if-absent is no-op when entry exists"
+"$BIN/hv-status-add" hv/ia-branch Y01
+TS1=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/ia-branch'))")
+sleep 1
+"$BIN/hv-status-add" --if-absent hv/ia-branch Y01
+TS2=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/ia-branch'))")
+[ "$TS1" = "$TS2" ] || fail "--if-absent overwrote startedAt but should have been a no-op"
+pass "status-add --if-absent preserved startedAt when entry already exists"
+"$BIN/hv-status-remove" hv/ia-branch
+
 echo "hv-archive-old"
 # Inject two completed items: one old, one recent
 python3 - <<'PY'
@@ -973,6 +993,27 @@ for ID in B71 B72 B73; do
 done
 pass "hv-todo-by-milestone is order-agnostic across Detail/Related/Milestone"
 
+echo "hv-backlog field-order regression"
+# Guard against parse_todo_fields regressions: Milestone before Related, and after.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B74] [P1] MS before Related.** Desc. Milestone: M01 Related: [F02]
+- **[B75] [P1] MS after Related.** Desc. Related: [F02] Milestone: M01
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+BL_OUT=$("$BIN/hv-backlog")
+echo "$BL_OUT" | grep -q "M01" || fail "hv-backlog field-order: Milestone column missing from output: '$BL_OUT'"
+echo "$BL_OUT" | grep "B74" | grep -q "M01" || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
+echo "$BL_OUT" | grep "B75" | grep -q "M01" || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
+pass "hv-backlog Milestone column correct regardless of field order"
+
 echo "archived milestone status"
 # Mint a fresh milestone, archive it, and verify exclusion + frontmatter + overview.
 ARCH_ID=$("$BIN/hv-vision-add" "Throwaway prototype" "Will be abandoned for testing.")
@@ -1209,7 +1250,21 @@ assert not os.path.exists(path + '.tmp'), '.tmp file was not cleaned up'
 rm -rf "$HVLIB_ATOMIC"
 pass "dump_json_atomic writes indent=2 JSON with trailing newline; no .tmp leftover"
 
-# 5. update_json mutates and atomically writes
+# 5. write_text_atomic writes text and cleans up .tmp
+HVLIB_TXT="$(mktemp -d)"
+python3 -c "
+import sys, os; sys.path.insert(0, '$REPO/bin')
+from hvlib import write_text_atomic
+path = '$HVLIB_TXT/out.md'
+write_text_atomic(path, '# Header\n')
+content = open(path).read()
+assert content == '# Header' + chr(10), f'got: {content!r}'
+assert not os.path.exists(path + '.tmp'), '.tmp file was not cleaned up'
+" || fail "write_text_atomic did not write expected content or left .tmp"
+rm -rf "$HVLIB_TXT"
+pass "write_text_atomic writes text atomically; no .tmp leftover"
+
+# 6. update_json mutates and atomically writes
 HVLIB_UPDATE="$(mktemp -d)"
 python3 -c "
 import sys, json; sys.path.insert(0, '$REPO/bin')
@@ -1222,5 +1277,36 @@ assert result == {'n': 2}, f'expected n=2, got {result!r}'
 " || fail "update_json did not mutate and write correctly"
 rm -rf "$HVLIB_UPDATE"
 pass "update_json mutates in place and atomically writes result"
+
+# 7. find_origin_bullet returns origin bullet, ignores Related: references
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import find_origin_bullet
+corpus = '- **[F80] [Minor] Refers to B70.** Something. Related: [B70]\n- ~~**[B70] [P1] Real bug.** Description.~~ Done 2026-04-10 [\`abc1234\`]\n'
+result = find_origin_bullet(corpus, 'B70')
+assert result is not None, 'find_origin_bullet returned None for known ID'
+line, title = result
+assert title == 'Real bug', f'expected title \"Real bug\", got {title!r}'
+assert 'Done' not in line, f'Done suffix not stripped: {line!r}'
+assert '~~' not in line, f'strikethrough not unwrapped: {line!r}'
+" || fail "find_origin_bullet did not return correct origin bullet"
+pass "find_origin_bullet picks origin bullet over Related-link reference"
+
+# 8. parse_todo_fields is order-agnostic
+python3 -c "
+import sys; sys.path.insert(0, '$REPO/bin')
+from hvlib import parse_todo_fields
+# Order: Detail, Related, Milestone
+r = parse_todo_fields('Body. Detail: alpha. Related: [F02]. Milestone: M01')
+assert r['detail'] == 'alpha.', f'detail wrong: {r}'
+assert r['related'] == '[F02].', f'related wrong: {r}'
+assert r['milestone'] == 'M01', f'milestone wrong: {r}'
+# Order: Milestone, Related, Detail (reversed)
+r = parse_todo_fields('Body. Milestone: M01 Related: [F02] Detail: alpha')
+assert r['detail'] == 'alpha', f'detail wrong reversed: {r}'
+assert r['related'] == '[F02]', f'related wrong reversed: {r}'
+assert r['milestone'] == 'M01', f'milestone wrong reversed: {r}'
+" || fail "parse_todo_fields not order-agnostic"
+pass "parse_todo_fields extracts Detail/Related/Milestone in any order"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

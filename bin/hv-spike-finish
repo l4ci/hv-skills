@@ -3,16 +3,18 @@
 # Findings/decision are written by the skill via Edit; this only flips state.
 # Usage: hv-spike-finish <name>
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 NAME="${1:?usage: hv-spike-finish <name>}"
 SPIKE=".hv/spikes/${NAME}.md"
 if [ ! -f "$SPIKE" ]; then
   echo "error: $SPIKE not found" >&2
   exit 1
 fi
-python3 - "$SPIKE" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SPIKE" <<'PY'
 import re, sys
 from datetime import date
 from pathlib import Path
+from hvlib import write_text_atomic
 
 p = Path(sys.argv[1])
 content = p.read_text()
@@ -26,5 +28,5 @@ if re.search(r"^finished:\s*", new, re.MULTILINE):
 else:
     new = re.sub(r"^(status:\s*done)$", rf"\g<1>\nfinished: {date.today().isoformat()}", new, count=1, flags=re.MULTILINE)
 
-p.write_text(new)
+write_text_atomic(p, new)
 PY

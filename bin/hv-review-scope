@@ -24,9 +24,11 @@ HV_FILES=$(git diff --name-only "$BASE...$BRANCH")
 HV_BODIES=$(git log --no-merges --format='%B' "$BASE..$BRANCH")
 export HV_LOG HV_FILES HV_BODIES
 
+export PYTHONPATH="$(dirname "$0")"
 python3 - <<'PY'
 import json, os, re
 from pathlib import Path
+from hvlib import find_origin_bullet
 
 branch = os.environ["HV_BRANCH"]
 base = os.environ["HV_BASE"]
@@ -53,30 +55,12 @@ def read(p):
     return path.read_text() if path.exists() else ""
 
 corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
-done_tail = re.compile(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$")
 
 def entry_for(iid):
-    # Only match the ORIGIN bullet where ID is the leading token after `- **` or
-    # `- ~~**`. Lines that merely mention the ID in a `Related:` suffix don't qualify.
-    pat = re.compile(
-        rf"^- (?:~~)?\*\*\[{re.escape(iid)}\].*$",
-        re.MULTILINE,
-    )
-    m = pat.search(corpus)
-    if not m:
+    result = find_origin_bullet(corpus, iid)
+    if result is None:
         return None
-    line = m.group(0).strip()
-    if line.startswith("- "):
-        line = line[2:]
-    line = done_tail.sub("", line)
-    strike = re.match(r"~~(.+?)~~$", line)
-    if strike:
-        line = strike.group(1)
-    title_m = re.search(
-        rf"\[{re.escape(iid)}\](?:\s+\[[^\]]+\])?\s+(?P<t>[^.\n]+)\.",
-        line,
-    )
-    title = title_m.group("t").strip() if title_m else None
+    line, title = result
     return {"id": iid, "title": title, "entry": line}
 
 intents = [e for e in (entry_for(iid) for iid in ordered) if e]

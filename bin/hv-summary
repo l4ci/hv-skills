@@ -9,7 +9,7 @@ MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import section
+from hvlib import section, load_json
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -31,13 +31,8 @@ tasks = count(section(content, "Tasks"))
 print(f"Backlog: {pluralize(bugs, 'bug')}, {pluralize(features, 'feature')}, {pluralize(tasks, 'task')}")
 
 # Active work
-status = Path(".hv/status.json")
-if status.exists():
-    try:
-        data = json.loads(status.read_text())
-    except json.JSONDecodeError:
-        data = {"active": []}
-    for entry in data.get("active", []):
+data = load_json(".hv/status.json", {"active": []})
+for entry in data.get("active", []):
         ids = ", ".join(entry.get("items", [])) or "?"
         branch = entry.get("branch", "?")
         started = (entry.get("startedAt") or "")[:10]

@@ -9,7 +9,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from pathlib import Path
-from hvlib import section, load_json
+from hvlib import section, load_json, parse_todo_fields
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -44,10 +44,9 @@ def parse_items(body):
         tag = tagm.group(1) if tagm else ""
         titlem = re.match(r"(.+?)\.\*\*", after_id)
         title = titlem.group(1).strip() if titlem else "?"
-        relm = re.search(r"Related:\s*([^\n]*?)(?:\s+(?:Detail|Milestone):|$)", line)
-        related = relm.group(1).strip().rstrip(".") if relm else ""
-        msm = re.search(r"Milestone:\s*([^\n]*?)(?:\s+(?:Detail|Related):|$)", line)
-        milestones = ", ".join(re.findall(r"M\d+", msm.group(1))) if msm else ""
+        fields = parse_todo_fields(line)
+        related = fields["related"].rstrip(".")
+        milestones = ", ".join(re.findall(r"M\d+", fields["milestone"]))
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones})
     return items
 

@@ -9,9 +9,10 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ITEMS_JSON="$("$HERE/hv-vision-list")"
-BODY=$(python3 - "$ITEMS_JSON" <<'PY'
+BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEMS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
+from hvlib import write_text_atomic
 
 items = json.loads(sys.argv[1])
 active = [i for i in items if i["status"] == "active"]
@@ -46,7 +47,7 @@ if ms_path.exists():
         else:
             ms = ms.rstrip("\n") + "\n\n" + active_block
 
-    ms_path.write_text(ms if ms.endswith("\n") else ms + "\n")
+    write_text_atomic(ms_path, ms if ms.endswith("\n") else ms + "\n")
 
 # 2) Render vision body for CLAUDE.md
 shipped_ids = {i["id"] for i in items if i["status"] == "shipped"}

@@ -9,10 +9,11 @@ SUMMARY="${2:?usage: hv-vision-add <title> <summary> [depends-csv]}"
 DEPENDS="${3:-}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MID=$("$HERE/hv-next-id" milestones)
-python3 - "$MID" "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
 import re, sys
 from datetime import date
 from pathlib import Path
+from hvlib import write_text_atomic
 
 mid, title, summary, depends_csv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
@@ -22,7 +23,7 @@ depends_overview = ", ".join(depends) if depends else "—"
 
 detail_path = Path(f".hv/milestones/{mid}.md")
 detail_path.parent.mkdir(parents=True, exist_ok=True)
-detail_path.write_text(
+write_text_atomic(detail_path,
     f"""---
 id: {mid}
 title: {title}
@@ -74,6 +75,6 @@ if re.search(r"^## Milestones\s*$", content, re.MULTILINE):
 else:
     content = content.rstrip("\n") + ("\n\n" if content.strip() else "") + "## Milestones\n" + section
 
-ms_path.write_text(content if content.endswith("\n") else content + "\n")
+write_text_atomic(ms_path, content if content.endswith("\n") else content + "\n")
 print(mid)
 PY

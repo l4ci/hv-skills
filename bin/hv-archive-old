@@ -9,7 +9,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$THRESHOLD" <<'PY'
 import re, sys
 from datetime import date, timedelta
 from pathlib import Path
-from hvlib import find_section
+from hvlib import find_section, write_text_atomic
 threshold = int(sys.argv[1])
 cutoff = date.today() - timedelta(days=threshold)
 
@@ -42,13 +42,13 @@ if old_lines:
     new_section = "\n".join(kept_lines)
     if not new_section.startswith("\n"):
         new_section = "\n" + new_section
-    todo.write_text(content[:start] + new_section + content[end:])
+    write_text_atomic(todo, content[:start] + new_section + content[end:])
 
     # Append to ARCHIVE.md
     archive = Path(".hv/ARCHIVE.md")
     header = "# Archive\n\nCompleted items older than the active window.\n\n"
     existing = archive.read_text() if archive.exists() else header
-    archive.write_text(existing.rstrip() + "\n" + "\n".join(old_lines) + "\n")
+    write_text_atomic(archive, existing.rstrip() + "\n" + "\n".join(old_lines) + "\n")
 
 print(len(old_lines))
 PY

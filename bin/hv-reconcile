@@ -9,7 +9,7 @@ export HV_BASE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
-from hvlib import load_json
+from hvlib import load_json, dump_json_atomic
 
 path = Path(".hv/status.json")
 if not path.exists():
@@ -64,6 +64,6 @@ for entry in active:
     still_active.append(entry)
 
 data["active"] = still_active
-path.write_text(json.dumps(data, indent=2) + "\n")
+dump_json_atomic(path, data)
 print(json.dumps({"cleaned": cleaned, "needsAction": needs_action}, indent=2))
 PY

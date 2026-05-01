@@ -155,8 +155,16 @@ check before making commits.
 
 ## Bootstrap (run during /hv-init only)
 
-`hv-bootstrap` seeds the `.hv/` folder structure — creating directories, writing
-initial data files, and copying helpers into `.hv/bin/`. It is called by
+`hv-bootstrap` seeds the `.hv/` folder structure. Concretely it:
+
+1. Creates subdirectories: `.hv/bin/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`,
+   `.hv/milestones/`, `.hv/plans/`, `.hv/spikes/`.
+2. Writes initial data files (skipping any that already exist): `TODO.md`,
+   `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `counters.json`,
+   `status.json`.
+3. Appends a `.hv/` entry to `.gitignore` if one is not already present.
+
+It does **not** copy helper scripts — that is `/hv-init`'s job. It is called by
 `/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and
 it never overwrites files that already exist. You do not normally need to call
 this directly; rerun `/hv-init` if you want to refresh the installation.

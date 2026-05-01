@@ -10,7 +10,7 @@ HASH="${2:-$(git log --oneline -1 --format='%h' 2>/dev/null || echo unknown)}"
 DATE=$(date +%Y-%m-%d)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<'PY'
 import re, sys
-from hvlib import find_section
+from hvlib import find_section, write_text_atomic
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
@@ -36,5 +36,5 @@ if span is None:
 else:
     start, end = span
     content = content[:end].rstrip("\n") + "\n" + done + "\n" + content[end:]
-with open(path, "w") as f: f.write(content)
+write_text_atomic(path, content)
 PY

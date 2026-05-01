@@ -40,5 +40,5 @@ for path in (Path(".hv/TODO.md"), Path(".hv/ARCHIVE.md")):
         else:
             b += 1
 
-print(json.dumps({"features": f, "bugs": b}))
+print(json.dumps({"features": f, "bugs": b}, indent=2))
 PY

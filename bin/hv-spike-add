@@ -4,6 +4,7 @@
 # Usage: hv-spike-add <name> "<question>"
 # Prints the branch name on stdout.
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 NAME="${1:?usage: hv-spike-add <name> <question>}"
 QUESTION="${2:?usage: hv-spike-add <name> <question>}"
 
@@ -25,10 +26,11 @@ fi
 
 git branch "$BRANCH"
 
-python3 - "$NAME" "$QUESTION" "$BRANCH" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$NAME" "$QUESTION" "$BRANCH" <<'PY'
 import sys
 from datetime import date
 from pathlib import Path
+from hvlib import write_text_atomic
 
 name, question, branch = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -40,7 +42,7 @@ if spike_path.exists():
     print(f"error: {spike_path} already exists", file=sys.stderr)
     sys.exit(1)
 
-spike_path.write_text(
+write_text_atomic(spike_path,
     f"""---
 name: {name}
 branch: {branch}

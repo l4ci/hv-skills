@@ -7,14 +7,16 @@
 set -euo pipefail
 KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"
 MODE="${2:-}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "$MODE" = "--body-stdin" ]; then
   _BODY_TMP=$(mktemp)
   trap 'rm -f "$_BODY_TMP"' EXIT
   cat > "$_BODY_TMP"
-  python3 - "$KEY" "$_BODY_TMP" <<'PY'
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" "$_BODY_TMP" <<'PY'
 import sys, re
 from pathlib import Path
+from hvlib import write_text_atomic
 
 key = sys.argv[1]
 body = Path(sys.argv[2]).read_text().rstrip("\n")
@@ -23,7 +25,7 @@ block = f"<!-- hv-{key}-start -->\n{body}\n<!-- hv-{key}-end -->"
 
 claude = Path("CLAUDE.md")
 if not claude.exists():
-    claude.write_text(block + "\n")
+    write_text_atomic(claude, block + "\n")
     print("created")
 else:
     content = claude.read_text()
@@ -33,16 +35,17 @@ else:
     )
     if pattern.search(content):
         content = pattern.sub(block, content)
-        claude.write_text(content)
+        write_text_atomic(claude, content)
         print("updated")
     else:
-        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
+        write_text_atomic(claude, content.rstrip() + "\n\n" + block + "\n")
         print("appended")
 PY
 else
-  python3 - "$KEY" <<'PY'
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY'
 import sys, re
 from pathlib import Path
+from hvlib import write_text_atomic
 
 REGISTRY = {
     "knowledge": {
@@ -86,7 +89,7 @@ block = (
 
 claude = Path("CLAUDE.md")
 if not claude.exists():
-    claude.write_text(block + "\n")
+    write_text_atomic(claude, block + "\n")
     print("created")
 else:
     content = claude.read_text()
@@ -103,10 +106,10 @@ else:
         )
     if pattern.search(content):
         content = pattern.sub(block, content)
-        claude.write_text(content)
+        write_text_atomic(claude, content)
         print("updated")
     else:
-        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
+        write_text_atomic(claude, content.rstrip() + "\n\n" + block + "\n")
         print("appended")
 PY
 fi

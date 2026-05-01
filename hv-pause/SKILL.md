@@ -105,10 +105,10 @@ These four sections are exactly what `/hv-resume` reads. Anything else (commit l
 
 ```bash
 # Make sure status.json has the current branch so /hv-resume finds it
-.hv/bin/hv-status-add <branch> <item-ids> [worktree-path]
+.hv/bin/hv-status-add --if-absent <branch> <item-ids> [worktree-path]
 ```
 
-Idempotent — if the entry exists, this refreshes the `startedAt` timestamp, which is fine (the handoff note carries the pause timestamp anyway).
+Idempotent — `--if-absent` skips the write if the entry already exists, preserving the original `startedAt` so "time in flight" stays accurate. The handoff note carries the pause timestamp separately.
 
 ## Step 6 — Confirm
 

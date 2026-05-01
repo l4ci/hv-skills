@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # Add an active work entry to .hv/status.json.
-# Usage: hv-status-add <branch> <item-id>[,<item-id>...] [worktree-path]
+# Usage: hv-status-add [--if-absent] <branch> <item-id>[,<item-id>...] [worktree-path]
+#   --if-absent  Only write if no entry for <branch> already exists (no-op if present).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-BRANCH="${1:?usage: hv-status-add <branch> <items> [worktree]}"
-ITEMS="${2:?usage: hv-status-add <branch> <items> [worktree]}"
+IF_ABSENT=0
+if [ "${1:-}" = "--if-absent" ]; then IF_ABSENT=1; shift; fi
+BRANCH="${1:?usage: hv-status-add [--if-absent] <branch> <items> [worktree]}"
+ITEMS="${2:?usage: hv-status-add [--if-absent] <branch> <items> [worktree]}"
 WORKTREE="${3:-}"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$ITEMS" "$WORKTREE" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$ITEMS" "$WORKTREE" "$IF_ABSENT" <<'PY'
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from hvlib import update_json
-branch, items_csv, worktree = sys.argv[1], sys.argv[2], sys.argv[3]
+from hvlib import load_json, update_json
+branch, items_csv, worktree, if_absent = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
 path = Path(".hv/status.json")
+if if_absent:
+    data = load_json(path, {"active": []})
+    if any(e.get("branch") == branch for e in data.get("active", [])):
+        sys.exit(0)
 def mutator(data):
     data.setdefault("active", [])
     data["active"] = [e for e in data["active"] if e.get("branch") != branch]
