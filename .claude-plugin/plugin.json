@@ -35,6 +35,7 @@
     "./hv-review",
     "./hv-ship",
     "./hv-learn",
+    "./hv-docs",
     "./hv-refactor",
     "./hv-update"
   ]
