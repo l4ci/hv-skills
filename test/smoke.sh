@@ -306,6 +306,27 @@ cat > .hv/DECISIONS.md <<'EOF'
 # Decisions
 EOF
 
+echo "hv-bootstrap (DECISIONS.md seed)"
+# Fresh tmpdir so we test bootstrap on a truly clean slate
+BOOT_TMP="$(mktemp -d)"
+cd "$BOOT_TMP"
+git init -q
+git config user.email t@t && git config user.name t
+"$BIN/hv-bootstrap"
+[ -f .hv/DECISIONS.md ] || fail "bootstrap did not create .hv/DECISIONS.md"
+grep -q "^# Decisions" .hv/DECISIONS.md || fail "DECISIONS.md missing # Decisions header"
+grep -q "Hard boundaries" .hv/DECISIONS.md || fail "DECISIONS.md missing framing sentence"
+pass "bootstrap creates .hv/DECISIONS.md with header preamble"
+
+# Re-running bootstrap must NOT overwrite existing DECISIONS.md
+echo "user content marker" >> .hv/DECISIONS.md
+"$BIN/hv-bootstrap"
+grep -q "user content marker" .hv/DECISIONS.md || fail "bootstrap overwrote existing DECISIONS.md"
+pass "bootstrap idempotent — preserves existing DECISIONS.md content"
+
+cd "$TMP"
+rm -rf "$BOOT_TMP"
+
 echo "hv-backlog"
 # Seed a mix of items in TODO.md
 cat > .hv/TODO.md <<'EOF'

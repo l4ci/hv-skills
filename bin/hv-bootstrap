@@ -27,6 +27,14 @@ Durable learnings captured from sessions — gotchas, conventions, constraints, 
 Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
 EOF
 
+[ -f "$HV/DECISIONS.md" ] || cat > "$HV/DECISIONS.md" <<'EOF'
+# Decisions
+
+Hard boundaries for this project. Each entry is a commitment, not a preference — re-read before proposing changes that touch its area.
+
+Use `/hv-decide` to capture a new decision. `/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision` consult this file when its topics are relevant.
+EOF
+
 [ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
 # Vision
 
