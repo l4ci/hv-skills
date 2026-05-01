@@ -1,425 +1,30 @@
 # hv-skills Guide
 
-A detailed guide to the hv-skills workflow system for Claude Code.
+Contributor reference for hv-skills internals — preflight semantics, inter-skill contracts, host fallbacks, and the design rationale behind helpers and state. End-user documentation lives in [`docs/`](docs/).
 
-## Overview
+## Preflight
 
-hv-skills is a zero-dependency development workflow for Claude Code. It lives entirely in a `.hv/` folder inside your project (gitignored) and helps you plan with intent (vision, milestones, plans, spikes, approach peeks), ship atomic per-task commits with parallel subagents, review-gate before integration, and retain hard-won knowledge across sessions.
+Every non-init skill runs `.hv/bin/hv-preflight` in its Step 1 to verify the project state before doing any work. The helper is deliberately small — it only checks that `.hv/` is initialized and all expected helpers are present — and exits with one of three codes:
 
-The happy path is: **vision → plan → work → review → ship → learn**. Side skills cover quick intake (`/hv-capture`, `/hv-go`), feasibility exploration (`/hv-spike`), pre-execution alignment (`/hv-assume`), bug cycles (`/hv-debug`), architectural cleanup (`/hv-refactor`), session hand-offs (`/hv-pause`, `/hv-resume`), and plugin upgrades (`/hv-update`).
+| Exit | Meaning | What the caller does |
+|------|---------|----------------------|
+| `0` | Fully initialized; all helpers present | Continue |
+| `2` | Uninitialized — `.hv/` or a core data file is missing | Skills that mutate state (`/hv-capture`, `/hv-work`, etc.) auto-invoke `hv-init` via the `Skill` tool; skills that only observe (`/hv-pause`, `/hv-resume`) tell the user to run `/hv-init` first and stop |
+| `3` | Partial install — data files are fine but one or more helpers are missing (typically after a plugin upgrade) | Re-invoke `hv-init` to refresh `.hv/bin/`; data files are preserved |
 
-## Quickstarts
+If the helper itself is absent, the skill treats that as exit 2 — a fresh project has never installed hv-skills. Standardizing on this one helper means a partial install self-heals the same way from every skill, instead of each skill picking a different sentinel file and a different fallback behavior.
 
-Two ways to come into hv-skills depending on where the project is. Both start with `/hv-init` — it's the one skill that mutates `.hv/` from nothing to a working install. Everything else is layered on top.
+## Host Question Conventions
 
-### Path A — Drop into an existing project
+Every skill that needs user input calls Claude Code's `AskUserQuestion` tool. Other hosts (Gemini CLI, some Copilot builds) may not provide an equivalent, or the tool call itself may fail.
 
-You have a codebase. There's work piling up — a flaky test, a half-thought-through feature, a bug a teammate mentioned in chat. You want a workflow that captures it, executes it cleanly, and retains the learnings. No vision exercise needed yet; the project already has direction.
+When that happens, the skill falls back to plain text using the wording in its `Plain-text fallback:` line. A fallback **never loops**: ask once, either act on the reply or pick the Recommended interpretation and continue. Skills never stall on a missing tool, and they don't walk the user through the same decision twice.
 
-**Step 1 — install and initialize.** Add the plugin, then run `/hv-init` once at the project root. Five questions, Recommended defaults are sane — pick those unless you have a specific reason. The first decision worth a second of thought is **isolation**: stick with `branch` for solo work, switch to `worktree` if you want main untouched while agents run or if you plan to run multiple `/hv-work` sessions in parallel. The second is **merge strategy**: `direct` for fast iteration, `pr` if your team requires GitHub review.
+The fallback always offers the same semantic choices as the `AskUserQuestion` options — only the surface changes.
 
-**Step 2 — capture what's already in your head.** Don't curate — dump. `/hv-capture "the sidebar flickers on hover, also we should add keyboard shortcuts, also update the linter config"` splits into three items with three IDs (`B0N`, `F0N`, `T0N`) and routes them to the correct `TODO.md` sections. Mention related work and `Related:` links get inferred. If an item carries a long crash dump, log, or spec, it overflows into `.hv/bugs/B0N.md` (or `features/`, `tasks/`) automatically. Use `/hv-c` as the keystroke-saving alias.
+## Branching template
 
-**Step 3 — pick and execute.** `/hv-next` reconciles `status.json` against actual git state (so old branches don't re-suggest the same item), archives completions older than 5 days, builds a relationship map across `Related:` links, and presents a sorted backlog. P0 bugs jump the queue; clusters of connected work are surfaced as a unit. The skill suggests one item or batch and routes to `/hv-work` after you confirm. For high-stakes picks, accept the `/hv-assume` peek first — it prints the orchestrator's intended files, tests, and assumptions before any code lands.
-
-**Step 4 — let `/hv-work` run.** Orchestrator (Opus by default) plans the tasks, workers (Sonnet) implement in parallel, one atomic commit per task. The orchestrator consults `KNOWLEDGE.md` automatically — empty on the first run, but it grows. If you have to step away mid-flight, `/hv-pause` writes a handoff note (current hypothesis, next planned step, mid-edit files); `/hv-resume` picks up after a `/clear`.
-
-**Step 5 — ship.** `/hv-ship` runs `/hv-review` (Opus, staff-engineer review against the original intent and `KNOWLEDGE.md`), then either merges directly or opens a PR with an ID-linked body. FAIL blocks; CONCERNS surface but proceed; PASS flows through. If you flipped autonomy to `auto`, `/hv-debug` chains straight into `/hv-ship` and `/hv-ship` chains into `/hv-learn`.
-
-**Step 6 — distill what was non-obvious.** `/hv-learn` writes durable gotchas, conventions, and constraints into `KNOWLEDGE.md` grouped by topic. By default an Opus verifier judges each new bullet for durability and sharpness before it lands. Skip vague restatements — only capture things a future `/hv-work` would otherwise re-discover the hard way.
-
-**Side skills you'll reach for:**
-
-- `/hv-go "fix the off-by-one in RingBuffer"` — capture + execute in one pass for hot-path fixes that don't need a queue.
-- `/hv-debug B07` — full systematic cycle (reproduce, hypothesize, verify, fix) for a real bug, not a one-liner.
-- `/hv-status` — read-only state glance when you want orientation without `/hv-next`'s reconciliation.
-- `/hv-refactor` — when friction has accumulated and you want a parallel-design pass at module boundaries.
-- `/hv-update` — when a new release ships, prints the exact update command for your install type.
-
-By the second or third cycle, you mostly live in `/hv-capture` and `/hv-next`. The rest is `/hv-work`, `/hv-ship`, `/hv-learn` — repeat.
-
-### Path B — Start from (nearly) nothing
-
-You have an empty repo, a `README.md` sketch, or a single prototype file. You want to think about *where the project is going* before any code lands, and keep that vision present as work progresses. Same skills as Path A, but routed through `/hv-vision` and `/hv-plan` first so the backlog comes from a roadmap instead of an inbox.
-
-**Step 1 — install and initialize.** Same as Path A: plugin, then `/hv-init`. Sane defaults. If you don't have a GitHub remote yet, leave merge strategy on `direct` — you can flip it later with `/hv-config` once the repo's pushed.
-
-**Step 2 — establish the vision.** `/hv-vision` is a brainstorming skill, not a templating one. It runs Socratic discovery (2–3 questions tailored to whether you're creating fresh or editing an existing roadmap), pulls 3–5 grounded findings from web research, deliberately challenges your scope and ordering, and proposes milestones with explicit dependencies. You iterate until the milestone breakdown feels right. The skill writes `.hv/MILESTONES.md` (vision paragraph + active list + per-milestone overview) and one detail file per milestone (`.hv/milestones/M01.md` and so on, with goal, acceptance, rationale, risks, research findings). Mark the first milestone `active` — multiple independent milestones can be active simultaneously when their dependencies allow.
-
-**Step 3 — (optional) de-risk the unknowns with a spike.** If the milestone hinges on a question you can't answer from the chair (*"can SSE work over our nginx setup?"*, *"is this library's threading model compatible with our concurrency model?"*), run `/hv-spike <name> "<question>"`. It creates a `spike/<name>` branch off HEAD plus `.hv/spikes/<name>.md`. You experiment freely on the branch — the branch never merges, only the findings (viable / not viable / depends-on-X / inconclusive) come back as a markdown record. Skip this for normal implementation work; that's `/hv-work`'s job.
-
-**Step 4 — write the implementation plan.** `/hv-plan M01` writes a sign-off artifact for the first slice — goal in one sentence, approach in 3–6 sentences, tasks with observable behaviors and verify steps, named assumptions, open questions. The plan lives at `.hv/plans/M01-S01.md`. `/hv-work` consults it instead of decomposing ad-hoc when you reach this slice. For items size-Major or larger, this is the right place to lock in the approach before code lands. For smaller items you can skip `/hv-plan` and let `/hv-vision` hand off directly to `/hv-capture` — Step 9 of `/hv-vision` offers exactly that.
-
-**Step 5 — seed the backlog.** `/hv-capture` (or `/hv-c`) tags items with the active milestone automatically when there's exactly one active. Multiple actives → it offers them as picks. Items without a milestone are still valid backlog. Once a few items are filed, `/hv-next` prefers milestone-tagged items within each priority/size band (P0 bugs always still jump the queue), so the active milestone naturally scopes the work without being a hard wall.
-
-**Step 6 — execute against the plan.** `/hv-next` → confirm → `/hv-work`. The orchestrator reads `.hv/plans/M01-S01.md` if it exists, otherwise it decomposes ad-hoc. For high-stakes picks, run `/hv-assume` first to see the orchestrator's intended files and assumptions before code lands; the suggestions take seconds and corrections are cheaper than reverts.
-
-**Step 7 — ship the slice, then loop.** `/hv-ship` runs `/hv-review` and integrates. `/hv-learn` captures what was non-obvious. When all the slices for a milestone are done, mark it `shipped` (`hv-vision-status M01 shipped`) — that unblocks any milestones that depended on it. Then either run `/hv-vision` again to add new milestones based on what you've learned, or activate the next planned milestone and go to Step 3.
-
-**Why the extra ceremony.** Path A treats the project as a stream of incoming work; Path B treats it as a journey with named waypoints. The vision artifacts mean six weeks from now, when you've forgotten why M02 has to wait for M01, the dependency is in `MILESTONES.md` and the rationale is in `M01.md`. The plan artifacts mean when `/hv-work` runs the slice, the orchestrator is executing your written approach, not its own ad-hoc one. The cost is a 20-minute up-front conversation per milestone — small relative to the cost of building the wrong thing in the right way.
-
-**Autonomy.** All of the above runs at `autonomy.level: "off"` (the default) — every skill nudges, you pick. Once a milestone's plan is written and the backlog is seeded, flipping to `"auto"` (chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship`) or `"loop"` (drain the milestone's items end-to-end) is a reasonable next step. Quality gates (`learn.verify`, `ship.review`, `refactor.confirmBeforeExecute`) still fire under autonomy.
-
-## The .hv/ Folder
-
-Run `/hv-init` once per project to create the folder. It contains:
-
-| File | Purpose |
-|------|---------|
-| `TODO.md` | Active backlog — bugs, features, tasks, and recent completions |
-| `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
-| `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
-| `counters.json` | Auto-incrementing IDs for each item type |
-| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
-| `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
-| `bin/` | CLI helpers — `hv-next-id`, `hv-append`, `hv-complete`, … |
-| `bugs/` | Overflow detail files for large bug reports |
-| `features/` | Overflow detail files for large feature specs |
-| `tasks/` | Overflow detail files for large task descriptions |
-| `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) — full plan with goal, acceptance, rationale, risks, research findings, notes |
-| `plans/` | Implementation plans from `/hv-plan` keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
-| `spikes/` | Spike findings from `/hv-spike` — one markdown file per spike; the actual experimental code lives on the `spike/<name>` git branch and is never merged |
-| `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
-
-`/hv-init` also adds two managed blocks to `CLAUDE.md` at the project root: one listing current `KNOWLEDGE.md` topics, another listing active milestones from `MILESTONES.md`. `/hv-work` reads the knowledge block; `/hv-next`, `/hv-resume`, and `/hv-pause` read the vision block to keep their suggestions and handoff notes scoped to active milestones.
-
-All files are gitignored. The backlog is local to your machine.
-
-## Skills Reference
-
-### /hv-init
-
-Creates the `.hv/` folder with all required files. On first run, asks five questions via the host's native question UI (Claude Code's `AskUserQuestion`, equivalents elsewhere) to configure:
-
-1. **Models** — Balanced (Opus + Sonnet, Recommended) / Premium (Opus) / Fast (Sonnet) / Minimal (Sonnet + Haiku)
-2. **Isolation** — Branch (Recommended) / Worktree
-3. **Integration** — Direct merge (Recommended) / GitHub PR
-4. **Quality gates** (multi-select) — Review before ship / Verify learnings / Confirm before refactor (all Recommended)
-5. **Autonomy** — Off (Recommended) / Auto chain / Full loop
-
-Skipping a question (or picking every Recommended) writes the default. Re-running `/hv-init` on an existing project never re-prompts for keys that already exist — the user's prior `config.json` is the source of truth. New schema keys added in later releases (e.g. `autonomy.level`) trigger a STALE migration that asks **only** the missing question and merges the answer in, leaving every prior value untouched. Helpers always refresh; data files never overwrite. Adds `.hv/` to `.gitignore` if not already present.
-
-To change settings later, use `/hv-config` — it shows current values, lets you pick which keys to change from a checklist, and reuses the same option vocabulary as `/hv-init` so you only learn the choices once.
-
-### /hv-config
-
-Interactive editor for `.hv/config.json`. Step 1 prints the current values for all seven configurable fields (model profile, isolation, integration, ship review, learn verification, refactor confirmation, autonomy level). Step 2 asks which to change with a multi-select checklist whose labels include the current value of each. Step 3 asks each selected key with the same option set as the matching `/hv-init` question, but tags the user's current value as `(current)` instead of marking the install-time default as `(Recommended)`. Step 4 merges only the changed keys into the existing file (never touches the rest), then prints a `before → after` diff.
-
-Use it for any settings change after init — toggling autonomy on, switching merge strategy, flipping a quality gate. For brand-new schema keys added by a plugin upgrade, `/hv-init` runs the STALE migration automatically — `/hv-config` is for editing keys that already exist.
-
-### /hv-vision
-
-Brainstorm a project's bigger vision and break it into milestones. Sits above the day-to-day backlog — `MILESTONES.md` describes *where the project is going*, while `TODO.md` describes *what's on the path right now*.
-
-**Flow**: preflight → load context (existing milestones, backlog, knowledge, README, recent commits) → frame and discover (2–3 questions tailored to create vs. edit mode) → web research (3–5 grounded findings, citations) → challenge (push back on scope, ordering, dependencies, hidden assumptions) → propose milestones with explicit dependencies and ready/blocked status → iterate with the user → write to disk via `hv-vision-add`, edit detail files, set status with `hv-vision-status`, refresh with `hv-vision-index` → optionally hand off to `/hv-capture` for the active milestone's seed items.
-
-**Multi-active is supported.** Independent milestones (no dependency relationship) can be active simultaneously — `/hv-next`, `/hv-resume`, and `/hv-pause` all read the active list and treat any of them as fair game. There's no hard cap on milestone count; the vision takes as many as it needs.
-
-**File structure:**
-- `.hv/MILESTONES.md` — vision paragraph, `## Active milestones` (regenerated by `hv-vision-index`), one short `### MNN — Title` section per milestone with status, depends, 1–2 line summary, and a link to the detail file.
-- `.hv/milestones/MNN.md` — frontmatter (`id`, `title`, `status`, `depends`, `created`) + sections for goal, acceptance criteria, rationale, open risks, research findings, free-form notes.
-
-**Statuses**: `planned` (default), `active` (in flight), `shipped` (complete; unblocks anything that depends on it).
-
-**TODO ↔ milestone link**: items can carry an optional `Milestone:` field, with one or more milestone IDs (`Milestone: M01` or `Milestone: M01, M02`). The link is loose — items without a milestone are still valid backlog. When an active milestone exists, `/hv-capture` offers it as the Recommended tag, `/hv-go` auto-tags on the speed path when there's exactly one active milestone, `/hv-next` prefers tagged items within each priority/size band (P0 bugs always jump the queue regardless), `/hv-resume` and `/hv-status` surface the active milestone list, and `/hv-pause` records it in the handoff note.
-
-Use `/hv-vision` whenever the conversation is about strategy, not tactics — *"let's plan the next quarter"*, *"what's the bigger picture"*, *"create a roadmap"*, *"brainstorm milestones"*.
-
-### /hv-plan
-
-Write an implementation plan as a first-class artifact before `/hv-work` runs. The plan is keyed under a milestone and a unit — a slice (`M01-S01.md`) for a chunk of milestone work, or a backlog item (`M01-B07.md`) for a single item that warrants its own plan. Lives at `.hv/plans/<key>.md`.
-
-**Sections**: goal (one sentence), approach (3–6 sentences), tasks with observable behaviors + files + verify steps, open questions, named assumptions. Tasks must fit one execution window — if they don't, split. Every task gets a verify step; no verify means the task isn't well-defined.
-
-**Integration**: `/hv-work` checks `.hv/plans/<milestone>-<unit>.md` at the start of its planning step and uses the plan as the dispatch source if present, instead of decomposing ad-hoc. `/hv-next` actively suggests `/hv-plan` for size-Major items that don't have a plan yet. `/hv-vision` Step 9 offers `/hv-plan` alongside `/hv-capture` when seeding a freshly active milestone.
-
-**Helpers**: `hv-plan-add` (mints slice numbers automatically), `hv-plan-list` (filterable by milestone), `hv-plan-show`, `hv-plan-rm`.
-
-Use it when an item or slice is too big to one-shot, when alignment matters before code lands, or when you want the orchestrator and user to share a sign-off artifact rather than ad-hoc plans the user can't review.
-
-### /hv-spike
-
-Throwaway feasibility experiment on a dedicated git branch. Answers a *specific* yes/no/conditional question — *"can SSE work over our nginx setup?"* — without polluting main or the backlog. Creates `spike/<name>` (never merged) and `.hv/spikes/<name>.md` for the question, what was tried, findings, and decision.
-
-**Two modes**: start (frame question, create branch + file, hand off) and finish (extract findings into the spike file, mark `done`). Code on the spike branch is reference, not product — the spike's value is the markdown record, not the experimental code.
-
-**Decisions**: `viable` / `not viable` / `depends-on-X` / `inconclusive`. Honest reporting matters more than salvage — a "not viable" conclusion is just as valuable as "viable".
-
-**Helpers**: `hv-spike-add` (creates branch + spike file from current HEAD), `hv-spike-list` (JSON, includes whether the branch still exists), `hv-spike-finish` (flips status to `done`, stamps the date).
-
-Use it when you need to *try* something before committing to it as a backlog item or a milestone slice. Skip it for normal implementation work — that's `/hv-work`'s job.
-
-### /hv-capture
-
-Single entry point for capturing all work items. Automatically classifies each item as a bug, feature, or task and routes it to the correct section in `TODO.md`. Asks 2-4 quick questions to gather context, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features. Tasks get no tag.
-
-Each item gets a zero-padded auto-incrementing ID — `[B01]` for bugs, `[F01]` for features, `[T01]` for tasks. Scans existing items (including the archive) for related entries and links them. Handles mixed input naturally — mention a bug, a feature, and a task in the same message and all three get captured with the correct ID type and section. Large input overflows into detail files at `.hv/bugs/B{NN}.md`, `.hv/features/F{NN}.md`, or `.hv/tasks/T{NN}.md`.
-
-### /hv-c
-
-Shortcut alias for `/hv-capture`. Identical behavior — useful when capturing is frequent and you want the keystroke savings.
-
-### /hv-go
-
-Capture + execute in one pass. The item still gets written to `TODO.md` with a real ID (counters increment, detail files land where needed, history is preserved), but the normal `/hv-next` review round-trip is skipped — `/hv-go` hands directly off to `/hv-work` after capture completes.
-
-**Flow:** clean-tree guard → capture via `/hv-capture` → work via `/hv-work`.
-
-**When to use:**
-- You describe a fix and want it done now, not queued — *"fix the off-by-one in RingBuffer"*, *"add a Cmd+K shortcut to the project picker"*
-- Hot-path work: you spot a bug during a session and want to resolve it on the spot
-
-**When NOT to use:**
-- Brainstorming or dumping ideas → use `/hv-capture`
-- Picking from an existing backlog → use `/hv-next`
-- Multiple unrelated items that need prioritization → `/hv-capture` first, then `/hv-next`
-
-`/hv-go` inherits all `/hv-capture` rules (classification, detail-file overflow, ID assignment) and all `/hv-work` rules (branch/worktree isolation, parallel workers, per-task commits). The only difference is that it suppresses both the capture confirmation prompt and the backlog selection step — one invocation, one pass.
-
-### /hv-next
-
-Reviews the backlog and suggests what to work on. Does several things before presenting the table:
-
-1. **Reconciles active work** — reads `status.json` and validates against git state. Detects completed branches that were never merged, interrupted work that can be resumed, and stale entries that need cleanup.
-2. **Archives old completions** — moves items completed more than 5 days ago from `TODO.md` to `ARCHIVE.md`.
-3. **Builds a relationship map** — finds `Related:` links across all items and identifies clusters of connected work.
-4. **Presents the backlog** — tables sorted by priority/size, with a Related column and cluster notes.
-5. **Suggests next work** — P0 bugs first, then clusters with blocking bugs, quick wins, P1 bugs, blocking tasks, features.
-6. **Routes to /hv-work** — after the user confirms.
-
-### /hv-assume
-
-Print the orchestrator's intended approach for an item, slice, or milestone — files it would touch, files it would create, tests it would add, assumptions it's making, known unknowns it would resolve mid-flight. **Read-only**: no writes, no commits, no helper calls beyond reads.
-
-**Output structure**: one-paragraph approach, then bulleted lists for *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*. Specific paths, test names, and function names — not generic descriptions. Stops after printing; the user reviews and either pushes back, asks for a written plan (`/hv-plan`), or invokes `/hv-work` themselves.
-
-**Integration**: `/hv-next` actively suggests `/hv-assume` as a question option when the suggested pick is a size-Major feature, a P0/P1 bug, or a multi-item batch. If a plan already exists at `.hv/plans/<key>.md`, the peek largely restates it; if no plan exists, the peek is the orchestrator's own ad-hoc decomposition — and the user should consider running `/hv-plan` instead of `/hv-work` if alignment matters.
-
-Use it as a cheap gate before `/hv-work` for high-stakes items, when corrections after the fact are expensive. For an item that needs durable alignment rather than an ephemeral peek, `/hv-plan` is the better tool.
-
-### /hv-status
-
-Read-only project state glance. Prints backlog counts (bugs/features/tasks), any active work streams, the three most recent completions, knowledge-topic count, and archive size — then stops. No reconciliation, no suggestions, no mutation.
-
-Use this to orient — *"where does the project stand?"* — before deciding whether to capture more items, pick work, or wrap up a session. Lighter than `/hv-next`, which does all of the above plus git reconciliation and a next-item recommendation.
-
-### /hv-resume
-
-Reorientation for a fresh session or a post-`/clear` context. Runs git reconciliation, enriches each active stream with its recent commit subjects, checks for a `/hv-pause` handoff note, then routes:
-
-- Handoff note present → `/hv-work` (or `/hv-debug`) with the note's "Next planned step" as the brief; note is deleted after consumption
-- A branch with commits that look complete → `/hv-ship`
-- A branch that's mid-implementation → `/hv-work`
-- No active streams → `/hv-next`
-
-Read-only for everything except the handoff-note delete that happens after the user picks that stream to resume. Lighter than `/hv-next` when you know something is already in flight; heavier than `/hv-status` because it pulls per-branch commit history and handoff notes.
-
-### /hv-pause
-
-Graceful mid-session stop. Captures what lives in the orchestrator's head — current hypothesis, next planned step, files mid-edit, gotchas discovered — into `.hv/handoff/<branch>.md`. Git commits carry code; the handoff note carries intent.
-
-**When to use**: context window is filling, you have to step away mid-`/hv-work` or mid-`/hv-debug`, or you want a long investigation to survive a `/clear`.
-
-**Flow**: resolve the active branch → handle uncommitted work (wip commit, stash, or leave dirty) → write the handoff note with structured sections (*Working on*, *What's done*, *Next planned step*, *Current hypothesis*, *Files mid-edit*, *Uncommitted work*, *Gotchas discovered*, *Do not*) → refresh the `status.json` entry. One note per branch; overwrites on re-pause.
-
-`/hv-resume` is the consumer — it surfaces the note's key fields inline and deletes it after routing to the downstream skill.
-
-### /hv-work
-
-Executes a batch of work items with parallel subagents. The orchestrator (default: opus) plans the tasks, the workers (default: sonnet) implement them.
-
-**Isolation modes** (configured in `config.json`):
-
-- `"branch"` (default) — creates a feature branch in the current worktree. Simple, works everywhere.
-- `"worktree"` — creates an isolated git worktree under `.claude/worktrees/`. The orchestrator stays in the main worktree (retaining access to `.hv/`), while sub-agents work in the worktree. This lets you keep working on main while agents execute, and supports running multiple `/hv-work` sessions in parallel on different item batches.
-
-**Merge strategies** (configured in `config.json`):
-
-- `"direct"` (default) — merges the branch into main with `--no-ff` after all verification passes, then deletes the branch.
-- `"pr"` — pushes the branch and creates a GitHub PR with a summary of items resolved and a test plan. The branch stays open for review.
-
-**Safety**: refuses to start on a dirty working tree. Stash or commit first.
-
-**Status tracking**: registers in `status.json` at the start, removes the entry on completion. This lets `/hv-next` in another session see what's in progress and avoid suggesting the same items.
-
-### /hv-debug
-
-Systematic root-cause cycle for a single `[B##]`. Flow: read the TODO entry and any detail file → consult `KNOWLEDGE.md` on relevant topics → reproduce (run the bug's test or write a failing one) → hypothesize with the orchestrator model → verify the hypothesis before touching code → fix with the worker model → confirm the reproducer now passes → commit → mark complete.
-
-Uses the same isolation mode as `/hv-work` (`branch` or `worktree`) and inherits the same model configuration. The fix lands as a single atomic commit tagged `fix: ... [B##]` so `/hv-ship` can close the loop.
-
-If the root cause was non-obvious — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem — the skill nudges the user to run `/hv-learn` so the gotcha lands in `KNOWLEDGE.md`.
-
-Use it when a bug needs a real cycle. For a one-liner that's already obvious, `/hv-go` is lighter.
-
-### /hv-review
-
-Staff-engineer review of a feature branch before it leaves your machine. Read-only — no mutations, no commits.
-
-1. Scopes the branch via `hv-review-scope` (commits, touched files, referenced item IDs, matched TODO entries).
-2. Pulls relevant topics from `KNOWLEDGE.md`.
-3. Captures the diff per file.
-4. Dispatches an Opus reviewer that evaluates on three axes:
-   - **Intent match** — does the diff deliver what the TODO entries promised?
-   - **Convention compliance** — does it respect captured gotchas and project rules?
-   - **Obvious quality** — dead code, swallowed errors, untested new branches, security smells, contract breaks.
-5. Returns PASS / CONCERNS / FAIL with file:line evidence.
-
-Typically invoked from `/hv-ship` (controlled by `ship.review`, default `true`). Can be run standalone any time you want a second-opinion pass on a branch.
-
-### /hv-ship
-
-Finishes a feature branch. Flow: preflight → `hv-review-scope` → optional `/hv-review` (gated by `ship.review`) → build PR body via `hv-ship-body` → open PR (`hv-pr`) or direct merge (`hv-merge`) based on `work.mergeStrategy` → clear `status.json` → close any still-active `[ID]` entries referenced in commit messages.
-
-**PR body** is composed from commit subjects (`## Summary`), referenced IDs with titles pulled from `TODO.md` and `ARCHIVE.md` (`## Items resolved`), and a short test plan the skill generates from touched areas.
-
-**Review gate**: when `ship.review` is `true`, a FAIL verdict blocks integration until the user fixes and reruns. CONCERNS surface but the user can proceed. PASS flows straight through.
-
-Use this to integrate finished work. Don't use it mid-implementation — finish in `/hv-work` first.
-
-### /hv-learn
-
-Distills durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. A learning is worth capturing if it would save a future `/hv-work` run from re-discovering it.
-
-**What gets captured** — gotchas (non-obvious failure modes), conventions (project-specific patterns that aren't obvious from reading code), constraints (invariants, compatibility rules), debugging insights (root causes for hard-won bugs), decisions with rationale, and tool quirks.
-
-**What doesn't** — things already documented in code or README, transient session state, obvious facts derivable from the codebase, restatements of framework docs, personal preferences.
-
-Entries are grouped by short topic headings (`Build & Tooling`, `Testing`, `Networking`, etc.) with newest bullets at the top of each topic. New entries carry an HTML-comment date stamp: `<!-- YYYY-MM-DD -->`.
-
-After writing, `/hv-learn` updates the managed `hv-knowledge` block in `CLAUDE.md` so its topic list matches the current `KNOWLEDGE.md` headings. `/hv-work` reads this index to know when the task at hand should consult `KNOWLEDGE.md`.
-
-**Verification (opt-in).** By default, the skill writes and reports. If `learn.verify` is set to `true` in `.hv/config.json`, it dispatches an Opus verifier subagent that reads the updated files with fresh eyes and judges whether the new entries are durable, sharp, non-obvious, correctly topic'd, and non-duplicated. Use this if you want a second-opinion pass before learnings become part of your project's long-term context.
-
-### /hv-update
-
-Read-only check for a newer hv-skills release. Detects install type (plugin, stow, repo clone, or override), reads the current version from `plugin.json`, fetches the latest GitHub release via `gh api`, and prints the exact update command for the detected install type.
-
-Never runs the update — too many install paths to get right automatically. Once the user updates, they rerun `/hv-init` in each project to refresh `.hv/bin/` with any new helpers.
-
-Requires `gh` on the PATH. Reports `status: unknown` if `gh` can't reach the API; don't retry on a loop.
-
-### /hv-refactor
-
-Runs a full architectural refactor cycle. The orchestrator explores the codebase for friction, categorizes each finding by dependency type, classifies it as simple or structural, and then fixes everything.
-
-**For structural changes** (module boundary reshaping, concept consolidation), it spawns 3-4 parallel design agents with competing constraints (minimal interface, maximum flexibility, caller-optimized, ports & adapters), compares the results, and recommends the strongest approach.
-
-**User checkpoints** (configurable): when `confirmBeforeExecute` is `true` (default), pauses after presenting findings and after design selection so the user can steer. Set `false` for full autonomy.
-
-**Safety**: refuses to start on a dirty working tree.
-
-## Configuration
-
-All settings live in `.hv/config.json`. Edit it directly — no special command needed.
-
-```json
-{
-  "models": {
-    "orchestrator": "opus",
-    "worker": "sonnet"
-  },
-  "work": {
-    "isolation": "branch",
-    "mergeStrategy": "direct"
-  },
-  "refactor": {
-    "confirmBeforeExecute": true
-  },
-  "learn": {
-    "verify": true
-  },
-  "ship": {
-    "review": true
-  },
-  "autonomy": {
-    "level": "off"
-  },
-  "debug": {
-    "competingHypotheses": false
-  }
-}
-```
-
-### Model choices
-
-| Value | Best for |
-|-------|----------|
-| `"opus"` | Deep reasoning — planning, exploration, verification, design |
-| `"sonnet"` | Fast execution — implementing well-specified tasks |
-| `"haiku"` | Quick, cheap — simple fixes, small tasks |
-
-### Isolation modes
-
-| Mode | How it works | When to use |
-|------|-------------|-------------|
-| `"branch"` | Feature branch in current worktree | Solo work, simple workflows |
-| `"worktree"` | Isolated directory under `.claude/worktrees/` | Parallel work streams, keep main clean while agents work |
-
-### Merge strategies
-
-| Strategy | How it works | When to use |
-|----------|-------------|-------------|
-| `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
-| `"pr"` | Push branch, create GitHub PR | Team work, code review required |
-
-### Learn verification
-
-Controls whether `/hv-learn` runs a second-opinion pass on what it just wrote. The verifier is a fresh Opus subagent — no session context, reads only the updated `KNOWLEDGE.md` diff — and judges each new bullet on four criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly topic'd, and non-duplicate. It can demote weak entries, sharpen vague wording, re-file wrong-topic bullets, or delete restatements of existing knowledge.
-
-| Value | Behavior |
-|-------|----------|
-| `true` (default) | After writing, dispatches the verifier. Catches weak, duplicate, or wrong-topic entries before they accrete in `KNOWLEDGE.md`. Adds one Opus roundtrip per `/hv-learn` call. |
-| `false` | Skip the verifier. `/hv-learn` writes and reports. Fast, cheap. Use when you're iterating rapidly and the occasional weak entry is acceptable. |
-
-Knowledge quality compounds — a weak bullet consulted by 20 future `/hv-work` runs is worse than one extra Opus call now. The default favors quality; flip to `false` only when you're sure the noise doesn't matter.
-
-### Ship review
-
-| Value | Behavior |
-|-------|----------|
-| `true` (default) | `/hv-ship` runs `/hv-review` before integrating. FAIL blocks, CONCERNS ask, PASS flows through. |
-| `false` | `/hv-ship` integrates directly without a review pass. Use when you want raw speed and already reviewed manually. |
-
-### Competing hypotheses
-
-Controls whether `/hv-debug` Step 6 dispatches a single hypothesis agent or fans out 3 parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator dedupes the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.
-
-| Value | Behavior |
-|-------|----------|
-| `false` (default) | Single hypothesis agent. Cheaper and faster; fine for most bugs where one angle is obviously primary. |
-| `true` | Three parallel hypothesis agents in one tool-call batch. Better diversity on hard bugs (the right framing isn't obvious upfront), at ~3× orchestrator cost on every `/hv-debug` run. Step 6 latency stays roughly the same — the agents run concurrently. |
-
-Flip on when you have a class of bugs that consistently take multiple cycles to land — the diversity of framings is what makes the difference. Keep off when most bugs are single-cause and you're paying for cycles you don't need.
-
-### Autonomy
-
-Controls whether skills *nudge* at decision points or *invoke the next skill directly*. Three levels, mutually exclusive.
-
-| Value | Behavior |
-|-------|----------|
-| `"off"` (default) | Skills surface a one-line suggestion at each decision point and stop. The user picks. Same hand-on-the-wheel feel as 1.5.x. |
-| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. The chain stops after the chained step — the user picks the next item themselves. |
-| `"loop"` | Auto chain plus loop continuation. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
-
-**What still gates the chain.** Autonomy decides whether to *invoke* the next skill; the destination skill's own gates still decide whether *it* pauses. So:
-
-- `learn.verify: true` — `/hv-learn` still runs the Opus verifier even when invoked under autonomy.
-- `ship.review: true` — `/hv-ship` still runs `/hv-review` and blocks on FAIL.
-- `refactor.confirmBeforeExecute: true` — `/hv-refactor` still pauses for approval at its own checkpoints.
-
-**Stop conditions in loop mode.** The loop stops cleanly on any of:
-
-- `/hv-next` reports an empty backlog (no items in active milestone, no items in general backlog).
-- `/hv-work` Step 2 detects a genuinely ambiguous brief — invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
-- A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
-- The user interrupts.
-
-**When to flip it on.** `"auto"` is good when you want the natural endgame of each cycle (capture learnings, ship the fix) without typing the follow-up command. `"loop"` is good when you have a known queue you want drained — milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified — and you'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you don't want a long-running session of model spend without checkpoints.
-
-### Branching template
-
-Each autonomy-aware step branches on `autonomy.level`:
+Each autonomy-aware step in a skill branches on `.hv/config.json`'s `autonomy.level`:
 
 - `"off"` (default) — surface the decision to the user. Usually a one-line nudge naming the next skill; an `AskUserQuestion` when more than one path is reasonable (e.g. `/hv-debug` Step 11).
 - `"auto"` or `"loop"` — **invoke the next skill via the `Skill` tool. No prompt. No confirmation. No "want me to…" question. No alternatives offered.** Pass any context the next skill needs in the brief, then dispatch.
@@ -445,71 +50,35 @@ Skip for single-item fixes, pure mechanical work, and dependency bumps. Don't fi
 
 `/hv-debug` Step 12 uses a different signal (root cause was non-obvious from reading the code alone) and stays inline; this section covers `/hv-work` and `/hv-ship` only.
 
-## CLI Helpers
+## Active-state model
 
-`/hv-init` installs bash scripts to `.hv/bin/` that collapse multi-step agent logic into a single call. Each helper is small, idempotent, and `python3`-based where JSON parsing is needed.
+hv-skills tracks two distinct kinds of "active" — they are deliberately not merged.
 
-| Script | What it does | Example |
-|--------|-------------|---------|
-| `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
-| `hv-append` | Append entry to a section in TODO.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
-| `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
-| `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
-| `hv-status-add` | Register an active work entry (idempotent on branch) | `.hv/bin/hv-status-add hv/foo B01,F02 .claude/worktrees/hv-foo` |
-| `hv-status-remove` | Clear an active entry by branch | `.hv/bin/hv-status-remove hv/foo` |
-| `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
-| `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
-| `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
-| `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON | `.hv/bin/hv-reconcile` |
-| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
-| `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge hv/foo` |
-| `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
-| `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
-| `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
-| `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
-| `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope hv/foo` |
-| `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
-| `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
-| `hv-bootstrap` | Seed `.hv/` directories and data files (idempotent). Run from source bin during `/hv-init`; never overwrites existing files | `<source-bin>/hv-bootstrap` |
-| `hv-vision-add` | Mint a milestone ID, create `.hv/milestones/MNN.md`, append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
-| `hv-vision-status` | Set a milestone's status to `planned`, `active`, or `shipped` (updates frontmatter and overview line) | `.hv/bin/hv-vision-status M01 active` |
-| `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
-| `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
-| `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the `<!-- hv-vision-start -->` block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
-| `hv-todo-by-milestone` | Print IDs of TODO items tagged with a given milestone, one per line | `.hv/bin/hv-todo-by-milestone M01` |
-| `hv-plan-add` | Create a plan at `.hv/plans/<milestone>-<unit>.md`; mints next slice number when called with `slice` | `.hv/bin/hv-plan-add M01 slice "Auth foundation"` |
-| `hv-plan-list` | JSON: every plan with key, milestone, unit, unitKind, title, status, created (filter by milestone if arg given) | `.hv/bin/hv-plan-list M01` |
-| `hv-plan-show` | Print a plan file's contents | `.hv/bin/hv-plan-show M01-S01` |
-| `hv-plan-rm` | Delete a plan file | `.hv/bin/hv-plan-rm M01-S01` |
-| `hv-spike-add` | Create branch `spike/<name>` off HEAD and `.hv/spikes/<name>.md` with question stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
-| `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
-| `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
+- **Item-level active** — `.hv/status.json`, populated by `hv-status-add` / `hv-status-remove`. Short-lived, tied to a git branch or worktree, exists only while a `/hv-work` or `/hv-debug` cycle is in flight. Drives `/hv-resume`, `/hv-status`, and `/hv-pause`'s reconciliation against `git branch` / `git worktree list`.
+- **Milestone-level active** — the `status:` field in the frontmatter of `.hv/milestones/MNN.md` (one of `planned` / `active` / `shipped` / `archived`), queried by `hv-vision-active` and `hv-vision-list`. Long-lived and strategic — a milestone stays `active` across many sessions, branches, and items.
 
-All helpers are refreshed every time `/hv-init` runs. Data files (`TODO.md`, `counters.json`, etc.) are never overwritten.
+A new helper that needs to check "active" must decide which sense it means and consult the right source. The two concepts are independent: an item can be in flight under no active milestone (`status.json` populated, no milestone tag), and a milestone can be `active` with nothing currently in flight against it (`hv-vision-active` returns it, `status.json` empty). Don't reach for whichever one is closer at hand — pick the source that matches the question being asked.
+
+## Milestones are excluded from archival
+
+`hv-archive-old`, `hv-complete`, and `hv-reconcile` deliberately ignore `.hv/milestones/`. Milestones use the `planned` / `active` / `shipped` / `archived` status flow on the per-milestone detail file, not the `## Completed` section in `TODO.md`. A milestone is never "archived old" by elapsed time; retirement is explicit via `hv-vision-status MNN archived` (work abandoned) or `hv-vision-status MNN shipped` (work completed). The two lifecycles are separate and shouldn't be unified.
+
+## Helpers
 
 ### Why helpers matter
 
-Every skill step that would otherwise chain several tool calls (read file → compute → write file, or run several `git` queries and parse them) becomes one subprocess with structured output. This reduces context token consumption on each invocation and keeps the SKILL.md files focused on *what* to do rather than *how* to parse JSON or regex Markdown.
+Every skill step that would otherwise chain several tool calls (read file → compute → write file, or run several `git` queries and parse them) becomes one subprocess with structured output. This reduces context token consumption on each invocation and keeps the SKILL.md files focused on *what* to do rather than *how* to parse JSON or regex Markdown. The full helper catalogue lives in [`docs/reference/cli-helpers.md`](docs/reference/cli-helpers.md); this section is the rationale, not the index.
 
-## Preflight
+### Resolving the source bin/
 
-Every non-init skill runs `.hv/bin/hv-preflight` in its Step 1 to verify the project state before doing any work. The helper is deliberately small — it only checks that `.hv/` is initialized and all expected helpers are present — and exits with one of three codes:
+`/hv-init` copies helpers from the installed plugin, trying these paths in order:
 
-| Exit | Meaning | What the caller does |
-|------|---------|----------------------|
-| `0` | Fully initialized; all helpers present | Continue |
-| `2` | Uninitialized — `.hv/` or a core data file is missing | Skills that mutate state (`/hv-capture`, `/hv-work`, etc.) auto-invoke `hv-init` via the `Skill` tool; skills that only observe (`/hv-pause`, `/hv-resume`) tell the user to run `/hv-init` first and stop |
-| `3` | Partial install — data files are fine but one or more helpers are missing (typically after a plugin upgrade) | Re-invoke `hv-init` to refresh `.hv/bin/`; data files are preserved |
+1. `$CLAUDE_PLUGIN_ROOT/bin/` — set by Claude Code when the skill runs from an installed plugin
+2. `~/.claude/plugins/*/hv-skills/bin/`, `~/.claude/plugins/hv-skills/bin/` — standard plugin install locations
+3. `~/.agents/skills/hv-skills/bin/`, `~/.agents/skills/bin/` — stow-based install locations
+4. Repo-local `bin/` if the skill is running from a cloned repo
 
-If the helper itself is absent, the skill treats that as exit 2 — a fresh project has never installed hv-skills. Standardizing on this one helper means a partial install self-heals the same way from every skill, instead of each skill picking a different sentinel file and a different fallback behavior.
-
-## Host Question Conventions
-
-Every skill that needs user input calls Claude Code's `AskUserQuestion` tool. Other hosts (Gemini CLI, some Copilot builds) may not provide an equivalent, or the tool call itself may fail.
-
-When that happens, the skill falls back to plain text using the wording in its `Plain-text fallback:` line. A fallback **never loops**: ask once, either act on the reply or pick the Recommended interpretation and continue. Skills never stall on a missing tool, and they don't walk the user through the same decision twice.
-
-The fallback always offers the same semantic choices as the `AskUserQuestion` options — only the surface changes.
+If none of these resolve, `/hv-init` exits with a clear error. The scripts themselves are verified by `test/smoke.sh` in the repo — run it if you suspect a helper is misbehaving.
 
 ## Dependency Categories (used by /hv-refactor)
 
@@ -530,121 +99,3 @@ Your own services across a network boundary (microservices, internal APIs). Defi
 ### 4. True external (Mock)
 
 Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the boundary. The module takes the external dependency as an injected port; tests provide a mock implementation.
-
-### Resolving the source bin/
-
-`/hv-init` copies helpers from the installed plugin, trying these paths in order:
-
-1. `$CLAUDE_PLUGIN_ROOT/bin/` — set by Claude Code when the skill runs from an installed plugin
-2. `~/.claude/plugins/*/hv-skills/bin/`, `~/.claude/plugins/hv-skills/bin/` — standard plugin install locations
-3. `~/.agents/skills/hv-skills/bin/`, `~/.agents/skills/bin/` — stow-based install locations
-4. Repo-local `bin/` if the skill is running from a cloned repo
-
-If none of these resolve, `/hv-init` exits with a clear error. The scripts themselves are verified by `test/smoke.sh` in the repo — run it if you suspect a helper is misbehaving.
-
-## Capture vs. Go vs. Work Routing
-
-Three skills trigger on action-shaped phrases. Pick by **intent**, not by the verb the user typed:
-
-| The user wants to… | Use | Why |
-|---------------------|-----|-----|
-| Brain-dump items into the backlog without acting now | `/hv-capture` | Records only; no execution, no clean-tree guard |
-| Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`; speed-path question caps |
-| Implement an item that's already in `TODO.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
-| Pick the next thing from the backlog and execute | `/hv-next` | Reconciles → suggests → routes to `/hv-work` |
-
-**Rules of thumb:**
-
-- *"fix X"* / *"add Y"* / *"do Z"* — clear single thing, not yet captured → `/hv-go`.
-- A list of things, no immediate action, *"capture this"* / *"add to backlog"* → `/hv-capture`.
-- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"* → `/hv-work`.
-- *"what's next?"* / *"pick something"* / *"what should I work on?"* → `/hv-next`.
-
-When the intent is genuinely ambiguous, the cheapest path is `/hv-capture` — items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if the user actually wanted a backlog entry.
-
-## Mixed-Input Routing
-
-`/hv-capture` handles mixed input. If you mention a bug, a feature, and a task in the same message, the skill splits them into distinct items and routes each to the correct section with the correct ID type.
-
-For example, telling `/hv-capture` *"the sidebar flickers on hover, also we should add keyboard shortcuts, and update the linter config"* produces:
-
-```markdown
-## Bugs
-- **[B03] [P2] Sidebar flickers on hover.** ...
-
-## Features
-- **[F04] [Minor] Keyboard shortcuts for top actions.** ...
-
-## Tasks
-- **[T06] Update linter config for new rules.** ...
-```
-
-Items created in the same batch can reference each other with `Related:` links.
-
-## Detail Files
-
-When an item's input is too large for a TODO entry (crash dumps, specs, logs, checklists), `/hv-capture` creates a detail file in a subdirectory:
-
-| Type | Directory | Example |
-|------|-----------|---------|
-| Bug | `.hv/bugs/` | `.hv/bugs/B07.md` |
-| Feature | `.hv/features/` | `.hv/features/F08.md` |
-| Task | `.hv/tasks/` | `.hv/tasks/T09.md` |
-
-The TODO.md entry gets a `Detail:` reference pointing to the file:
-
-```markdown
-- **[B07] [P0] App crashes on launch after iOS 18.2 update.** EXC_BAD_ACCESS in CoreData stack during migration. Detail: `.hv/bugs/B07.md` Related: [F12]
-```
-
-Most entries won't need a detail file — they're only created when the input would bloat the TODO entry beyond a few sentences.
-
-## Related Items
-
-Any item can link to other items with a `Related:` suffix:
-
-```markdown
-- **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
-```
-
-Links are optional and bidirectional — `/hv-next` infers the reverse link automatically. When linked items form clusters, `/hv-next` suggests tackling them together.
-
-`/hv-capture` scans both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link to a completed feature.
-
-## Concurrent Work Streams
-
-With `"isolation": "worktree"`, you can run multiple `/hv-work` sessions in parallel from separate terminals:
-
-```
-Terminal 1: /hv-next → picks [F01], [B02] → /hv-work
-Terminal 2: /hv-next → picks [F03]        → /hv-work
-```
-
-Each session creates its own worktree and branch. Both orchestrators write to the same `.hv/status.json` in the main worktree (they own different entries, so no conflicts). `/hv-next` in a third terminal will show both work streams as "In Progress" and skip those items when suggesting new work.
-
-## State Tracking
-
-`status.json` is a cache for speed. **Git is the source of truth.**
-
-`/hv-next` always validates `status.json` against actual git state:
-- Branches that exist → work is in progress or ready to merge
-- Branches that were deleted → stale status entries, cleaned up automatically
-- Worktrees that exist → active parallel work stream
-- Worktrees that were removed → entry updated or cleaned up
-
-If `status.json` ever gets out of sync (crashed session, manual git operations), `/hv-next` repairs it by checking `git branch` and `git worktree list`.
-
-**Concurrency caveat**: `status.json` writes are not file-locked. If you run `/hv-next` while `/hv-work` is mid-update in another terminal, the last writer wins. In practice this is harmless — git state is the source of truth and the next `/hv-next` run will reconcile any drift — but avoid running both simultaneously against the same project if you want clean output.
-
-### Active-state model
-
-hv-skills tracks two distinct kinds of "active" — they are deliberately not merged.
-
-- **Item-level active** — `.hv/status.json`, populated by `hv-status-add` / `hv-status-remove`. Short-lived, tied to a git branch or worktree, exists only while a `/hv-work` or `/hv-debug` cycle is in flight. Drives `/hv-resume`, `/hv-status`, and `/hv-pause`'s reconciliation against `git branch` / `git worktree list`.
-- **Milestone-level active** — the `status:` field in the frontmatter of `.hv/milestones/MNN.md` (one of `planned` / `active` / `shipped` / `archived`), queried by `hv-vision-active` and `hv-vision-list`. Long-lived and strategic — a milestone stays `active` across many sessions, branches, and items.
-
-A new helper that needs to check "active" must decide which sense it means and consult the right source. The two concepts are independent: an item can be in flight under no active milestone (`status.json` populated, no milestone tag), and a milestone can be `active` with nothing currently in flight against it (`hv-vision-active` returns it, `status.json` empty). Don't reach for whichever one is closer at hand — pick the source that matches the question being asked.
-
-### Milestones are excluded from archival
-
-`hv-archive-old`, `hv-complete`, and `hv-reconcile` deliberately ignore `.hv/milestones/`. Milestones use the `planned` / `active` / `shipped` / `archived` status flow on the per-milestone detail file, not the `## Completed` section in `TODO.md`. A milestone is never "archived old" by elapsed time; retirement is explicit via `hv-vision-status MNN archived` (work abandoned) or `hv-vision-status MNN shipped` (work completed). The two lifecycles are separate and shouldn't be unified.
