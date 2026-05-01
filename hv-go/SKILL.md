@@ -62,6 +62,5 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 ## Rules
 
 - **Capture is real.** IDs increment, entries land in `TODO.md`, detail files get written. Preserves audit trail.
-- **Capture before guard.** Capture writes to gitignored `.hv/`, so it never dirties the tree — and the user never loses freshly-described input to a guard failure. If the guard then fails, the captured item waits on the backlog for a clean-tree rerun.
 - **Multiple items OK.** If the user mentioned 3 items, all get captured and all get passed to `/hv-work` as a batch.
 - **Delegate, don't duplicate.** Every capture rule lives in `/hv-capture`; every execution rule lives in `/hv-work`.

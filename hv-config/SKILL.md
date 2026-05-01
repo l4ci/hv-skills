@@ -71,7 +71,7 @@ print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(
 PY
 ```
 
-Print the helper output verbatim — the user is about to edit it, so they need to see what they're starting from.
+Print the helper output verbatim — the user needs to see what they're editing.
 
 ## Step 3 — Pick Which Keys to Change
 

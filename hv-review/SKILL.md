@@ -59,23 +59,16 @@ If the user didn't name a branch, default to the current one. `hv-review-scope` 
 
 If `commitCount` is 0, stop and tell the user.
 
-## Step 3 — Consult KNOWLEDGE.md
+## Step 3 — Consult KNOWLEDGE & DECISIONS
 
-Read the `hv-knowledge` block in `CLAUDE.md` to see available topics. Pick topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
+Read the `hv-knowledge` block in `CLAUDE.md` to see available topics. Pick topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic). Then query both stores for those topics:
 
 ```bash
 .hv/bin/hv-knowledge-query "Topic A" "Topic B"
-```
-
-Carry the relevant bullets into the reviewer brief.
-
-**Also consult decisions:**
-
-```bash
 .hv/bin/hv-decisions-query "Topic A" "Topic B"
 ```
 
-Pass any matched entries to the reviewer in Step 5 under a `**Hard boundaries:**` section. The reviewer must check the diff against each boundary and **FAIL** if a violation is present (even if the change looks otherwise good).
+Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
 
 ## Step 4 — Capture the Diff
 

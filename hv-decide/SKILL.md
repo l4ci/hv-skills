@@ -131,8 +131,7 @@ If the entry created a new topic, prepend a line: *"New topic: `<topic>`."*
 
 ## Key Principles
 
-- **Always manual.** `/hv-decide` is never auto-invoked by another skill, regardless of `autonomy.level`. The active/passive distinction depends on this.
-- **Confirmation-gated.** Step 5 is non-skippable. No silent writes.
+- **Never auto-invoked.** Regardless of `autonomy.level` — the active/passive distinction depends on this.
 - **Forbids and permits are required.** If you can't articulate both, it's a learning — redirect to `/hv-learn`.
 - **One sentence rule, one paragraph why.** If a decision needs more, link to a plan or knowledge entry.
 - **No verifier.** Manual confirmation is the verification.

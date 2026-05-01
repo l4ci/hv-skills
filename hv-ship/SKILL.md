@@ -88,9 +88,7 @@ If `ship.review` is `false`, skip this step.
 .hv/bin/hv-ship-body <branch>
 ```
 
-Prints `## Summary` and `## Items resolved`. Capture the output.
-
-Append a `## Test plan` section. Build the list from the touched files in the scope JSON — one checkbox per meaningful area, not per file. Keep it short (2-5 items). Example:
+Prints `## Summary` and `## Items resolved`. Capture the output, then append a `## Test plan` section — 2-5 checkboxes, one per meaningful area (not per file), built from the scope JSON's touched files. Example:
 
 ```markdown
 ## Test plan

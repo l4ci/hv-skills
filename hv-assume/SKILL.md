@@ -15,7 +15,7 @@ user-invocable: true
 
 # hv-assume — Approach Peek (Read-Only)
 
-Print what `/hv-work` would do *before it does it*. Surface assumptions, intended file changes, and known unknowns so the user can correct course before code lands. **No writes. No commits. No tool calls beyond reads.**
+Print what `/hv-work` would do *before it does it* — assumptions, intended file changes, known unknowns — so the user can correct course before code lands. **No writes. No commits. No tool calls beyond reads.**
 
 ## Step 1 — Preflight
 

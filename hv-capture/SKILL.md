@@ -214,8 +214,5 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 
 - **Never remove or reorder existing entries** — append only
 - **Don't investigate now** — just capture
-- **Split mixed input** — route each item to the correct section with the correct ID type
-- **One set of questions for all items** — don't interrogate the user per-item
-- **Honor caller caps** — when invoked from a speed-path skill like `/hv-go`, respect the question cap signaled in the invoking args
 - **Confirm what you wrote** — show the user every entry you added, grouped by section
 - **Always increment counters** — even if you're unsure, every ID must be unique
