@@ -4,9 +4,11 @@ description: Initialize the .hv/ folder structure with TODO.md, KNOWLEDGE.md, co
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  ⬛  hv-init  ·  initialize .hv/ folder structure
+  🌱  hv-init  ·  initialize .hv/ folder structure
   triggers: auto-called by other hv skills  ·  pairs: all hv-*
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -41,7 +43,7 @@ If it **isn't**, offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`
   2. *"No, backlog-only"* — *"Skip init; `/hv-capture`, `/hv-next`, `/hv-learn`, `/hv-status` still work. Git-dependent skills will fail until you init manually."*
   3. *"Stop"* — *"Cancel `/hv-init`; rerun when you're ready."*
 
-On **Yes** — run `git init` and continue to Step 2. Mention the created branch in the Step 6 summary (one line, e.g., *"Initialized git repo on `main`."*).
+On **Yes** — run `git init` and continue to Step 2. Mention the created branch in the Step 5 summary (one line, e.g., *"Initialized git repo on `main`."*).
 
 On **No** — continue to Step 2 but log a warning so the user isn't surprised later:
 
@@ -53,93 +55,33 @@ On **Stop** — surface the reason and exit.
 
 Plain-text fallback: run `git init` straight through — it's the Recommended choice, and one-off initialization is reversible with `rm -rf .git`. (See GUIDE.md § Host Question Conventions.)
 
-## Step 2 — Create Directories and Data Files
+## Step 2 — Bootstrap & Install Helpers
 
-Run this in the project root:
+Resolve the source `bin/` from the installed plugin, then run `hv-bootstrap` to seed `.hv/` and copy every helper into `.hv/bin/`. Source resolution order: `$CLAUDE_PLUGIN_ROOT/bin/` first, then standard install locations, then a repo-local clone.
 
 ```bash
-set -euo pipefail
-HV=".hv"
-mkdir -p "$HV"/{bugs,features,tasks,milestones,plans,spikes,bin}
-
-[ -f "$HV/TODO.md" ] || cat > "$HV/TODO.md" <<'EOF'
-# TODO
-
-## Bugs
-
-## Features
-
-## Tasks
-
-## Completed
-EOF
-
-[ -f "$HV/KNOWLEDGE.md" ] || cat > "$HV/KNOWLEDGE.md" <<'EOF'
-# Knowledge
-
-Durable learnings captured from sessions — gotchas, conventions, constraints, and hard-won debugging insights. Grouped by topic, newest first within each topic.
-
-Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
-EOF
-
-[ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
-# Vision
-
-_(no vision yet — run `/hv-vision` to brainstorm milestones)_
-
-## Active milestones
-
-_(none active — set with `/hv-vision`)_
-
-## Milestones
-EOF
-
-[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > "$HV/counters.json"
-
-# Migrate older counters.json that predates the milestones key.
-python3 - <<'PY'
-import json
-from pathlib import Path
-p = Path(".hv/counters.json")
-d = json.loads(p.read_text())
-if "milestones" not in d:
-    d["milestones"] = 0
-    p.write_text(json.dumps(d) + "\n")
-PY
-
-[ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"
-
-if [ -f .gitignore ]; then
-  grep -qxF '.hv/' .gitignore 2>/dev/null || printf '\n# ── hv backlog ──\n.hv/\n' >> .gitignore
+SRC=""
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT/bin" ]; then
+  SRC="$CLAUDE_PLUGIN_ROOT/bin"
 else
-  printf '# ── hv backlog ──\n.hv/\n' > .gitignore
+  for candidate in \
+    "$HOME"/.claude/plugins/*/hv-skills/bin \
+    "$HOME"/.claude/plugins/hv-skills/bin \
+    "$HOME"/.agents/skills/hv-skills/bin \
+    "$HOME"/.agents/skills/bin; do
+    [ -d "$candidate" ] && SRC="$candidate" && break
+  done
 fi
+[ -z "$SRC" ] && { echo "error: could not locate hv-skills bin/ — set CLAUDE_PLUGIN_ROOT or install the plugin" >&2; exit 1; }
 
-# Migrate KNOWLEDGE.md preamble from legacy /hv:X to /hv-X (Claude Code
-# normalizes colons; the rename shipped in plugin 1.3.6+). Only rewrites
-# the preamble region — captured learning bullets are never touched.
-if [ -f "$HV/KNOWLEDGE.md" ] && grep -q '^Use `/hv:' "$HV/KNOWLEDGE.md"; then
-  python3 - <<'PY'
-from pathlib import Path
-import re
-p = Path(".hv/KNOWLEDGE.md")
-lines = p.read_text().splitlines(keepends=True)
-# Preamble is the run from line 1 until the first "## " topic heading.
-changed = False
-for i, line in enumerate(lines):
-    if line.startswith("## "):
-        break
-    new = re.sub(r"/hv:([a-z][a-z0-9-]*)", r"/hv-\1", line)
-    if new != line:
-        lines[i] = new
-        changed = True
-if changed:
-    p.write_text("".join(lines))
-PY
-fi
+# Seed directories and data files (idempotent — never overwrites existing files).
+"$SRC/hv-bootstrap"
+
+# Install / refresh helpers — they're tools, not data.
+cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
-Data files are never overwritten if they already exist (preamble migration is surgical — touches only `/hv:X` → `/hv-X` in lines above the first `## Topic` heading, never captured bullets). `config.json` is created interactively in Step 3.
+`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See `GUIDE.md` § CLI Helpers for the full reference.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
 
@@ -159,6 +101,7 @@ EXPECTED = [
     ("learn", "verify"),
     ("ship", "review"),
     ("autonomy", "level"),
+    ("debug", "competingHypotheses"),
 ]
 p = Path(".hv/config.json")
 if not p.exists():
@@ -221,6 +164,7 @@ Call `AskUserQuestion` with just the applicable questions in one call. The "(Rec
 | Review before ship (Recommended) | `/hv-ship` runs `/hv-review` first. FAIL blocks, CONCERNS ask, PASS flows through. |
 | Verify learnings (Recommended) | `/hv-learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
 | Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
+| Competing hypotheses (debug) | `/hv-debug` Step 6 dispatches 3 parallel hypothesis agents from different angles. Better diversity on hard bugs, ~3× orchestrator cost on every debug run. Off by default. |
 
 **Q5 — Autonomy** (`header: "Autonomy"`, single-select)
 
@@ -247,6 +191,7 @@ Map answers to config values:
 | Q4 includes "Review before ship" | `ship.review: true` (else `false`) |
 | Q4 includes "Verify learnings" | `learn.verify: true` (else `false`) |
 | Q4 includes "Confirm before refactor" | `refactor.confirmBeforeExecute: true` (else `false`) |
+| Q4 includes "Competing hypotheses" | `debug.competingHypotheses: true` (else `false`) |
 | Q5 Off | `autonomy.level: "off"` |
 | Q5 Auto chain | `autonomy.level: "auto"` |
 | Q5 Full loop | `autonomy.level: "loop"` |
@@ -269,7 +214,8 @@ Path(".hv/config.json").write_text(json.dumps({
   "refactor": {"confirmBeforeExecute": <Q4-refactor>},
   "learn":    {"verify": <Q4-learn>},
   "ship":     {"review": <Q4-ship>},
-  "autonomy": {"level": "<Q5>"}
+  "autonomy": {"level": "<Q5>"},
+  "debug":    {"competingHypotheses": <Q4-debug>}
 }, indent=2) + "\n")
 PY
 ```
@@ -295,44 +241,9 @@ PY
 
 Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present.
 
-Briefly confirm the chosen profile in the Step 6 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
+Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
-## Step 4 — Install CLI Helpers
-
-Copy the helpers from the hv-skills plugin `bin/` directory into `.hv/bin/`. Helpers are always refreshed — they're tools, not data.
-
-Resolve the source `bin/` in this order, stopping at the first match:
-
-1. **Plugin env var** — `$CLAUDE_PLUGIN_ROOT/bin/` (set by Claude Code when the skill runs from an installed plugin)
-2. **Standard install locations** — glob these paths, first match wins:
-   - `~/.claude/plugins/*/hv-skills/bin/`
-   - `~/.claude/plugins/hv-skills/bin/`
-   - `~/.agents/skills/hv-skills/bin/`
-   - `~/.agents/skills/bin/`
-3. **Repo-local clone** — if the skill is running from a cloned repo, `bin/` sits next to the `hv-init/` folder. Walk up from the skill directory.
-
-Once resolved, copy and chmod:
-
-```bash
-SRC=""
-if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT/bin" ]; then
-  SRC="$CLAUDE_PLUGIN_ROOT/bin"
-else
-  for candidate in \
-    "$HOME"/.claude/plugins/*/hv-skills/bin \
-    "$HOME"/.claude/plugins/hv-skills/bin \
-    "$HOME"/.agents/skills/hv-skills/bin \
-    "$HOME"/.agents/skills/bin; do
-    [ -d "$candidate" ] && SRC="$candidate" && break
-  done
-fi
-[ -z "$SRC" ] && { echo "error: could not locate hv-skills bin/ — set CLAUDE_PLUGIN_ROOT or install the plugin" >&2; exit 1; }
-cp "$SRC"/hv-* .hv/bin/ && chmod +x .hv/bin/hv-*
-```
-
-All helpers are installed together and require `python3`. See `GUIDE.md` § CLI Helpers for the full reference of what each one does.
-
-## Step 5 — Seed CLAUDE.md Knowledge & Vision Blocks
+## Step 4 — Seed CLAUDE.md Knowledge & Vision Blocks
 
 Ensure `CLAUDE.md` in the project root contains the two managed blocks — one for knowledge topics, one for active milestones. `/hv-learn` keeps the knowledge block in sync; `/hv-vision` keeps the vision block in sync. `/hv-work` reads both to know when to consult knowledge and which milestone the work belongs to.
 
@@ -345,7 +256,7 @@ Delegate to the helpers — each creates `CLAUDE.md` if missing, updates its blo
 
 Neither helper touches any other content in `CLAUDE.md`.
 
-## Step 6 — Confirm
+## Step 5 — Confirm
 
 Tell the user one compact block:
 
@@ -362,4 +273,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`. See `GUIDE.md` for full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`. See `GUIDE.md` for full reference.

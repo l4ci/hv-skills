@@ -1,12 +1,14 @@
 ---
 name: hv-work
-description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, and commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Trigger on "implement this", "build these", or any multi-step implementation request.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in TODO.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go. See GUIDE.md § Capture vs. Go vs. Work Routing.
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟩  hv-work  ·  orchestrator-driven parallel implementation
+  🔨  hv-work  ·  orchestrator-driven parallel implementation
   triggers: "implement", "build these"  ·  pairs: hv-ship, hv-review
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -43,7 +45,7 @@ Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → V
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-work"
@@ -193,6 +195,8 @@ Orchestrator verifies internally (don't narrate):
 2. Read modified files — changes match the brief
 3. Structural checks: grep for expected patterns, no regressions
 
+**When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
+
 **PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
 ## Step 8 — Sequential Waves
@@ -270,12 +274,9 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 ## Step 13 — Learn (Nudge or Auto-Invoke)
 
-Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+Trigger: see GUIDE.md § Learn Trigger.
 
-When triggered, branch on `autonomy.level`:
-
-- `"off"` (default) — print one line: *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."* — opt-in.
-- `"auto"` or `"loop"` — invoke `hv-learn` via the `Skill` tool. Pass a brief that names the cycle's resolved IDs and the touched files so the verifier (if `learn.verify: true`) has the right context. No prompt, no confirmation.
+Per GUIDE.md § Autonomy: in `off`, nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*; in `auto`/`loop`, invoke `hv-learn` via `Skill` with a brief naming the cycle's resolved IDs and touched files (so the verifier has the right context if `learn.verify: true`).
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
@@ -283,23 +284,18 @@ When triggered, branch on `autonomy.level`:
 .hv/bin/hv-refactor-age
 ```
 
-Returns JSON: `{"features": N, "bugs": M}` — count of items completed since the last `refactor:` commit. Threshold: `features >= 5` OR `bugs >= 10`. If under threshold, skip the step entirely. Don't repeat in the same session.
+Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit. Trigger when `features >= 5` OR `bugs >= 10`. Don't repeat in the same session.
 
-When triggered, branch on `autonomy.level`:
-
-- `"off"` (default) — print one line: *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
-- `"auto"` or `"loop"` — invoke `hv-refactor` via the `Skill` tool. `refactor.confirmBeforeExecute` still governs whether `/hv-refactor` itself pauses for approval at its own checkpoints, so the user retains a steering wheel even under autonomy.
+Per GUIDE.md § Autonomy: in `off`, nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*; in `auto`/`loop`, invoke `hv-refactor` via `Skill`. (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
 
 ## Step 15 — Loop Continuation
 
-Only when `autonomy.level == "loop"`. Invoke `hv-next` via the `Skill` tool to surface the next item and continue the queue. `/hv-next` reads autonomy too — in loop mode it auto-selects the suggested item and dispatches `/hv-work`, so the loop sustains itself.
+`"loop"`-only (per GUIDE.md § Autonomy). Invoke `hv-next` via `Skill` to surface the next item — `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
 
 Loop stops naturally when:
 - `/hv-next` reports an empty backlog (or the active milestone has no items and the general backlog is also empty)
 - A guard fails downstream (dirty tree, `/hv-review` FAIL, ambiguous brief in Step 2)
 - The user interrupts
-
-Skip this step entirely for `"off"` and `"auto"` modes — the user picks what's next themselves.
 
 ## Key Principles
 

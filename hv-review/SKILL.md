@@ -4,9 +4,11 @@ description: Staff-engineer review of a feature branch before merge or PR — re
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟧  hv-review  ·  staff-engineer review of a branch
+  🔍  hv-review  ·  staff-engineer review of a branch
   triggers: "review this", "check before ship"  ·  pairs: hv-ship
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -39,7 +41,7 @@ Read `.hv/config.json`:
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Scope the Review
 
@@ -75,7 +77,7 @@ The reviewer needs concrete diff content, not just file names. For each touched 
 git diff <base>...<branch> -- <file>
 ```
 
-Keep a per-file diff map in memory for the reviewer brief.
+**Issue all the per-file `git diff` calls in parallel** — they're independent and serial calls add up fast on bigger branches. Keep a per-file diff map in memory for the reviewer brief.
 
 ## Step 5 — Dispatch the Reviewer
 
@@ -142,16 +144,11 @@ Verdict: CONCERNS
 
 ## Step 7 — Route Based on Verdict
 
-- **PASS** — tell the user *"Ready to ship. Run `/hv-ship`."* Stop.
-- **CONCERNS** — if invoked from `/hv-ship`, return the verdict to the caller (it owns the decision). If invoked standalone, use `AskUserQuestion`:
-  - **Header:** `"Concerns"`
-  - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
-  - **Options** (single-select):
-    1. "Address via `/hv-work` (Recommended)" — *"Route the concerns to `/hv-work` as a fix list."*
-    2. "Ship anyway" — *"Hand off to `/hv-ship` with the concerns acknowledged."*
-    3. "Stop" — *"Leave it; rerun `/hv-review` later if you want another pass."*
-  - Plain-text fallback: *"Address now, proceed anyway, or stop?"*
-- **FAIL** — tell the user it would regress. Suggest fixing via `/hv-work` or `/hv-debug`. Don't route to `/hv-ship`.
+The verdict is the entire product — return it and stop. Never ask a follow-up; the caller (the user, or `/hv-ship` when invoked) owns what happens next.
+
+- **PASS** — tell the user *"Ready to ship. Run `/hv-ship`."*
+- **CONCERNS** — print the concerns inline (already done in Step 6) and suggest the next move: *"Address via `/hv-work` and rerun `/hv-review`, or accept and ship via `/hv-ship`."* When invoked from `/hv-ship`, return the verdict; the parent owns the question (see `/hv-ship` Step 3).
+- **FAIL** — tell the user the merge would regress. Suggest fixing via `/hv-work` or `/hv-debug`. Don't route to `/hv-ship`.
 
 ## Rules
 

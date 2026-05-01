@@ -4,9 +4,11 @@ description: Check for a newer hv-skills release on GitHub and tell the user how
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  ⬛  hv-update  ·  check for newer hv-skills release
+  🆙  hv-update  ·  check for newer hv-skills release
   triggers: "check for updates"  ·  pairs: —
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -40,7 +42,7 @@ If missing, tell the user the check needs `gh` (or `brew install gh` / equivalen
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool to refresh helpers, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool to refresh helpers. See GUIDE.md § Preflight.
 
 ## Step 2 — Run the Check
 

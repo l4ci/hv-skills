@@ -4,9 +4,11 @@ description: Throwaway feasibility experiment on a dedicated git branch — answ
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟨  hv-spike  ·  throwaway feasibility experiment on a branch
+  🧪  hv-spike  ·  throwaway feasibility experiment on a branch
   triggers: "spike X", "feasibility"  ·  pairs: hv-vision, hv-plan
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -26,7 +28,7 @@ Two modes:
 .hv/bin/hv-preflight
 ```
 
-If absent or non-zero, invoke `hv-init` via the `Skill` tool, then continue.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 Determine the mode silently:
 

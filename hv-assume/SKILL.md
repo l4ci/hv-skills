@@ -4,9 +4,11 @@ description: Print the orchestrator's intended approach for an item, slice, or m
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-assume  ·  peek the orchestrator's intended approach
+  🔮  hv-assume  ·  peek the orchestrator's intended approach
   triggers: "assume B07", "peek M01-S01"  ·  pairs: hv-plan, hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -21,7 +23,7 @@ Print what `/hv-work` would do *before it does it*. Surface assumptions, intende
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Resolve Target
 
@@ -41,6 +43,8 @@ If the target is ambiguous, ask once. Do not auto-pick.
 - Relevant `KNOWLEDGE.md` topics via `.hv/bin/hv-knowledge-query <topics…>`
 - Recent git history: `git log --oneline -20`
 - Recent commits touching probable target files: `git log --oneline -- <path>`
+
+**Issue these as parallel tool calls in a single response** — they're independent.
 
 If a plan exists at `.hv/plans/<key>.md`, the peek largely restates it (plus any updates from recent context). If no plan exists, the peek is your own decomposition — and the user should consider running `/hv-plan` instead of `/hv-work` if alignment matters.
 

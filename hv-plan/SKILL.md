@@ -4,9 +4,11 @@ description: Write an implementation plan as a first-class artifact before execu
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-plan  ·  write implementation plan before execution
+  📋  hv-plan  ·  write implementation plan before execution
   triggers: "plan M01-S01", "plan B07"  ·  pairs: hv-vision, hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -21,7 +23,7 @@ Write a plan to disk that the user signs off on before `/hv-work` runs. The plan
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Resolve Target
 
@@ -49,7 +51,7 @@ If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv
 - Relevant `KNOWLEDGE.md` topics: `.hv/bin/hv-knowledge-query <topics…>`
 - Recent git history: `git log --oneline -20`
 
-Form a picture; don't dump it.
+**Issue these as parallel tool calls in a single response** — they're independent. Form a picture; don't dump it.
 
 ## Step 4 — Propose the Plan
 

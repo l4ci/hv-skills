@@ -1,12 +1,14 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into the project's TODO.md. Automatically classifies each item, assigns priority/size, and routes to the correct section with zero-padded auto-incrementing IDs ([B01], [F01], [T01]). Use when the user wants to capture any work item — bugs, features, tasks, or a mix.
+description: Capture bugs, features, and tasks into TODO.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in TODO use /hv-work. See GUIDE.md § Capture vs. Go vs. Work Routing.
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟦  hv-capture  ·  capture work items into .hv/TODO.md
+  📥  hv-capture  ·  capture work items into .hv/TODO.md
   triggers: "capture", "log bug"  ·  pairs: hv-go, hv-next
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -21,7 +23,7 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Parse & Classify
 

@@ -4,9 +4,11 @@ description: Gracefully pause mid-session — writes a handoff note (current hyp
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟨  hv-pause  ·  write handoff note for clean pause
+  💤  hv-pause  ·  write handoff note for clean pause
   triggers: "pause", "hand off"  ·  pairs: hv-resume, hv-learn
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -33,7 +35,7 @@ Capture the state living in the orchestrator's head — what you were about to d
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, tell the user *"Nothing to pause — `/hv-init` the project first."* and stop. Don't auto-init: pause on an empty project has nothing to hand off. See GUIDE.md § Preflight for exit codes.
+On failure, tell the user *"Nothing to pause — `/hv-init` the project first."* and stop — observe-only, never auto-inits. See GUIDE.md § Preflight.
 
 ## Step 2 — Resolve the Branch
 
@@ -82,10 +84,6 @@ Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the 
 - **Milestone:** M01 — Auth foundation  <!-- omit if no active milestone or items aren't tagged -->
 - **Stage:** <e.g., "mid-hypothesis verification for B07", "implementing wave 2 of 3">
 
-## What's done
-
-- <bullet per completed piece, referencing commit hashes where relevant>
-
 ## Next planned step
 
 <one or two sentences — the concrete action /hv-resume should dispatch. Not a summary; a directive.>
@@ -94,25 +92,14 @@ Write `.hv/handoff/<branch>.md` with this structure. Fill each section from the 
 
 <the causal claim under test, with the verification probe that was about to run>
 
-## Files mid-edit
-
-- `path/to/Foo.swift:42-78` — <what was being changed>
-- `path/to/Bar.swift` — <what was being changed>
-
 ## Uncommitted work
 
 <one of: "clean tree" / "stashed as `stash@{0}` — message: hv-pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
-
-## Gotchas discovered
-
-<anything learned this session that isn't yet in KNOWLEDGE.md but would save /hv-resume from re-discovering it>
-
-## Do not
-
-<things /hv-resume should NOT do — dead ends already ruled out, rabbit holes, wrong-turn fixes to revert>
 ```
 
 Use `Write` for the note (always overwrite — one handoff per branch).
+
+These four sections are exactly what `/hv-resume` reads. Anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere: `git log` and `git status` carry recent commits and mid-edit paths; durable learnings go to `/hv-learn` via the Step 6 nudge.
 
 ## Step 5 — Pin Status
 
@@ -137,11 +124,11 @@ Uncommitted: wip commit a1b2c3d
 Resume with `/hv-resume` in a fresh session.
 ```
 
-**Learn nudge (conditional).** Pausing = context loss. If the Step 4 handoff populated a non-trivial **Gotchas discovered** section, the session learned something durable that `/hv-resume` in a new context won't carry forward. Before the user walks away, suggest one line:
+**Learn nudge (conditional).** Pausing = context loss. If the session uncovered a durable gotcha (typical signals: a hypothesis that contradicted initial assumptions, a non-obvious root cause, a tool quirk you'll hit again), suggest one line:
 
-*"Handoff has N gotchas. Run `/hv-learn` now to preserve them durably — the handoff gets deleted on `/hv-resume`."*
+*"Run `/hv-learn` now to preserve session insights durably — handoff captures intent, not learnings."*
 
-Skip if Gotchas was empty, a single trivial note, or `/hv-learn` already ran this session. Don't block the pause — the nudge is advisory.
+Skip if nothing non-obvious surfaced or `/hv-learn` already ran this session. Don't block the pause — the nudge is advisory.
 
 ## Rules
 

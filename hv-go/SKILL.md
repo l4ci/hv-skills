@@ -1,12 +1,14 @@
 ---
 name: hv-go
-description: Capture a work item and immediately implement it — combines /hv-capture and /hv-work in one pass. Writes to TODO.md (counters increment, history preserved) but skips the backlog-review round-trip. Trigger on "fix X", "add Y", "do Z" when the user clearly wants action, not a backlog entry.
+description: Capture one item and immediately implement it — combines /hv-capture and /hv-work, skipping the /hv-next review. Use when the user wants one specific thing done right now ("fix X", "add Y", "do Z") and it's not yet captured. For brain-dumping use /hv-capture; for items already in TODO.md use /hv-work. See GUIDE.md § Capture vs. Go vs. Work Routing.
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟦  hv-go  ·  capture and implement in one pass
+  ⚡  hv-go  ·  capture and implement in one pass
   triggers: "fix X", "add Y", "do Z"  ·  pairs: hv-capture, hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -29,7 +31,7 @@ Init guard → Capture → Clean-tree guard → Hand off to /hv-work
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Capture
 

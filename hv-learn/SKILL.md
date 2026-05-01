@@ -4,9 +4,11 @@ description: Extract durable session learnings (gotchas, conventions, constraint
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  ⬛  hv-learn  ·  extract session learnings to KNOWLEDGE.md
+  🧠  hv-learn  ·  extract session learnings to KNOWLEDGE.md
   triggers: "learn this", "save gotcha"  ·  pairs: hv-debug, hv-pause
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -21,7 +23,7 @@ Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, orga
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Scan the Session for Learnings
 

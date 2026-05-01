@@ -4,9 +4,11 @@ description: Change hv-skills configuration interactively — pick which setting
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  ⬛  hv-config  ·  change project settings interactively
+  🔧  hv-config  ·  change project settings interactively
   triggers: "change config", "edit settings"  ·  pairs: hv-init
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -33,10 +35,7 @@ Change one or more configuration values without hand-editing JSON. Same option v
 .hv/bin/hv-preflight
 ```
 
-Branch on exit code:
-- `0` — continue.
-- `2` (uninitialized) — invoke `hv-init` via the `Skill` tool, then stop. There's nothing for `/hv-config` to edit yet; init writes the initial file interactively.
-- `3` (partial install) — invoke `hv-init` to refresh helpers, then continue.
+Variant: exit `0` continue; exit `2` — invoke `hv-init` via `Skill` then stop (init writes the initial config interactively); exit `3` — invoke `hv-init` to refresh, then continue. See GUIDE.md § Preflight.
 
 ## Step 2 — Read & Display Current Config
 
@@ -65,6 +64,7 @@ print(f"  Ship review              {'on' if cfg.get('ship',{}).get('review',True
 print(f"  Verify learnings         {'on' if cfg.get('learn',{}).get('verify',True) else 'off'}")
 print(f"  Confirm before refactor  {'on' if cfg.get('refactor',{}).get('confirmBeforeExecute',True) else 'off'}")
 print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
+print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHypotheses',False) else 'off'}")
 PY
 ```
 
@@ -84,10 +84,11 @@ One `AskUserQuestion` call, multiSelect:
   5. *"Verify learnings — current: <on|off>"*
   6. *"Confirm before refactor — current: <on|off>"*
   7. *"Autonomy — current: <off|auto|loop>"*
+  8. *"Competing hypotheses — current: <on|off>"*
 
 If the user selects nothing, print *"No changes."* and stop.
 
-Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the seven names above.
+Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the eight names above.
 
 ## Step 4 — Ask the Selected Questions
 
@@ -102,6 +103,7 @@ Build a single `AskUserQuestion` call containing **only** the questions for the 
 | Verify learnings | *"Run the Opus verifier on new `/hv-learn` entries?"* | On / Off |
 | Confirm before refactor | *"Pause for approval at `/hv-refactor` checkpoints?"* | On / Off |
 | Autonomy | *"How autonomously should hv-skills chain to the next logical step?"* | Off / Auto chain / Full loop |
+| Competing hypotheses | *"Dispatch 3 parallel hypothesis agents in `/hv-debug` Step 6? (Better diversity, ~3× orchestrator cost on every debug run.)"* | On / Off |
 
 For each question, tag the matching option with `(current)`. If the user's current value doesn't match any option (custom config), don't tag any — every option is a real change.
 
@@ -134,6 +136,7 @@ cfg = json.loads(p.read_text())
 # cfg.setdefault("learn", {})["verify"] = True
 # cfg.setdefault("refactor", {})["confirmBeforeExecute"] = False
 # cfg.setdefault("autonomy", {})["level"] = "loop"
+# cfg.setdefault("debug", {})["competingHypotheses"] = True
 
 p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY

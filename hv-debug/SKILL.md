@@ -4,9 +4,11 @@ description: Systematic root-cause investigation for a bug — reads the TODO en
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟥  hv-debug  ·  systematic root-cause investigation
+  🐛  hv-debug  ·  systematic root-cause investigation
   triggers: "debug [B07]", "why is X broken"  ·  pairs: hv-learn
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -23,6 +25,7 @@ Read `.hv/config.json`:
 - `models.worker` — model for the fix agent (default `sonnet`)
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly. See `GUIDE.md` § Autonomy.
+- `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one. See `GUIDE.md` § Competing hypotheses.
 
 ## When to Use
 
@@ -48,7 +51,7 @@ Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → F
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-debug"
@@ -108,7 +111,11 @@ If you can't reproduce, surface that to the user: *"Can't reproduce — need [X]
 
 ## Step 6 — Hypothesize (orchestrator)
 
-Dispatch a hypothesis agent with the **orchestrator** model. Brief contains:
+Read `debug.competingHypotheses` from `.hv/config.json` (default `false`).
+
+### Single hypothesis (default)
+
+Dispatch one hypothesis agent with the **orchestrator** model. Brief contains:
 
 ```
 Investigate [B##]: <title>.
@@ -131,6 +138,22 @@ Return: ranked list of 2-3 hypotheses, each with
 ```
 
 Pick the top hypothesis. If the top two are close, verify both.
+
+### Competing hypotheses (`debug.competingHypotheses: true`)
+
+Dispatch **3 parallel hypothesis agents** with the **orchestrator** model — all in one tool-call batch so they run concurrently. Each gets the same symptom, entry points, and relevant knowledge but a different framing constraint. The framing is what produces diversity:
+
+- **Agent 1 — recent-changes lens:** *"Start from recent commits. Run `git log --oneline -20 -- <suspect paths>` and skim diffs. The bug likely correlates with something that changed. Frame hypotheses around what was modified and why it might have introduced the symptom."*
+- **Agent 2 — data-shape lens:** *"Start from the values flowing through the suspect code path. The bug likely arises when a value violates an implicit contract — null/empty, off-by-one, wrong type, stale cache, malformed input from upstream. Trace the data, not the code."*
+- **Agent 3 — concurrency / lifecycle lens:** *"Start from timing and ordering. The bug likely arises from a race window, ordering assumption, partial state, double-fire, listener registered twice, async resolution out of order, or something that holds a reference past its valid lifetime. Look for state, not logic."*
+
+Each agent returns a ranked list of 2–3 hypotheses in the same format as the single-agent case.
+
+After all three return, the orchestrator:
+
+1. **Deduplicates.** Same root cause framed differently from two angles → one hypothesis. Keep the sharper wording.
+2. **Picks the strongest.** The best hypothesis wins regardless of which lens surfaced it. If the top two are close, verify both in Step 7.
+3. **Discards weak ones silently.** Don't surface every angle's output to the user — only the chosen hypothesis (or two) and its verification probe.
 
 ## Step 7 — Verify
 
@@ -192,28 +215,23 @@ Root cause: MenuBarManager held an invalidated timer ref after pause; the next t
 Fix: reset badge to `--:--` in `pause()` before invalidating.
 ```
 
-Branch on `autonomy.level`:
+Per GUIDE.md § Autonomy:
 
-- `"off"` (default) — use `AskUserQuestion`:
+- `"off"` (default) — `AskUserQuestion`:
   - **Header:** `"Next"`
   - **Question:** *"Fix for [B##] is committed. What's next?"*
   - **Options** (single-select):
     1. "Ship via `/hv-ship` (Recommended)" — *"Run the review gate and integrate."*
     2. "Keep working on the branch" — *"Stay on the branch to add more fixes."*
     3. "Stop here" — *"Leave the branch; come back later."*
-
-  Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
-
-- `"auto"` or `"loop"` — invoke `hv-ship` via the `Skill` tool with the current branch. No prompt. The Recommended path is always ship; autonomy just commits to it. (`ship.review` still governs whether `/hv-ship` runs the review gate.)
+  - Plain-text fallback: *"Merge now with `/hv-ship`, or keep it on the branch for more work?"*
+- `"auto"` or `"loop"` — invoke `hv-ship` via `Skill` with the current branch. (`ship.review` still governs the review gate.)
 
 ## Step 12 — Learn (Nudge or Auto-Invoke)
 
-Trigger condition (same in all modes): the root cause was **not obvious from reading the code alone** — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem. Skip for trivial fixes (typo, obvious off-by-one).
+Trigger: the root cause was **not obvious from reading the code alone** — required verification, contradicted an initial hypothesis, or touched a known-tricky subsystem. Skip for trivial fixes (typo, obvious off-by-one).
 
-When triggered, branch on `autonomy.level`:
-
-- `"off"` (default) — print one line: *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
-- `"auto"` or `"loop"` — invoke `hv-learn` via the `Skill` tool. Pass a brief naming the bug ID, root cause, and the subsystem so the captured entry lands in the right topic.
+Per GUIDE.md § Autonomy: in `off`, nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*; in `auto`/`loop`, invoke `hv-learn` via `Skill` with a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
 ## Key Principles
 

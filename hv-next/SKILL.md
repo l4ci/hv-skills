@@ -4,9 +4,11 @@ description: Review the backlog, reconcile active work against git state, archiv
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-next  ·  review backlog, suggest next item
+  👉  hv-next  ·  review backlog, suggest next item
   triggers: "what's next", "what to do"  ·  pairs: hv-status, hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -21,12 +23,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 .hv/bin/hv-preflight
 ```
 
-Branch on exit code:
-- `0` — continue.
-- `2` (uninitialized) or helper absent — tell the user *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop.
-- `3` (partial install) — invoke `hv-init` via the `Skill` tool to refresh helpers, then continue.
-
-See GUIDE.md § Preflight for details.
+Variant: exit `0` continue; exit `2` (or absent) — tell the user *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop; exit `3` — invoke `hv-init` via `Skill` to refresh, then continue. See GUIDE.md § Preflight.
 
 ## Step 2 — Reconcile Active Work
 
@@ -91,13 +88,15 @@ Identify **clusters**: groups of 2+ connected items. These inform Step 6.
 
 If the helper prints nothing, no milestones are active — Step 6 ranks the whole backlog without milestone bias. Otherwise capture the list (one or more IDs); it shapes both the backlog presentation in Step 5 and the suggestion in Step 6.
 
-If at least one milestone is active, also gather items already tagged to each:
+If at least one milestone is active, also gather items already tagged to each. **Issue one `hv-todo-by-milestone` call per active milestone in parallel** (one tool-call batch, not the sequential shell loop):
 
 ```bash
-for MID in $(.hv/bin/hv-vision-active); do .hv/bin/hv-todo-by-milestone "$MID"; done
+.hv/bin/hv-todo-by-milestone M01
+.hv/bin/hv-todo-by-milestone M03
+# …one per active milestone, all dispatched in the same response
 ```
 
-Carry the per-milestone ID set forward.
+Carry the per-milestone ID set forward. Step 3 (`hv-archive-old`), Step 4.5 (`hv-vision-active` and the per-milestone reads above), and Step 5's `hv-backlog` can also share the same parallel batch — none of them mutate shared state, so there's no ordering constraint beyond the reconcile in Step 2.
 
 ## Step 5 — Present the Backlog
 

@@ -4,9 +4,11 @@ description: Shortcut for /hv-capture — forwards verbatim. See hv-capture for 
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟦  hv-c  ·  shortcut for /hv-capture
+  📥  hv-c  ·  shortcut for /hv-capture
   triggers: "/hv-c"  ·  pairs: hv-capture
 ════════════════════════════════════════════════════════════════════════
 ```

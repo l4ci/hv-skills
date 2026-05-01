@@ -19,7 +19,7 @@ for f in TODO.md KNOWLEDGE.md MILESTONES.md counters.json config.json status.jso
 done
 
 HELPERS=(
-  hv-append hv-archive-old hv-backlog hv-complete hv-guard-clean
+  hv-append hv-archive-old hv-backlog hv-bootstrap hv-complete hv-guard-clean
   hv-knowledge-index hv-knowledge-query hv-merge hv-next-id hv-pr
   hv-preflight hv-reconcile hv-refactor-age hv-review-scope hv-ship-body
   hv-status-add hv-status-remove hv-summary hv-update-check

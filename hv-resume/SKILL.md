@@ -4,9 +4,11 @@ description: Reorient after a context clear or a fresh session — shows active 
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-resume  ·  reorient after /clear or fresh session
+  🔄  hv-resume  ·  reorient after /clear or fresh session
   triggers: "where was I", "resume"  ·  pairs: hv-pause
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -33,7 +35,7 @@ Read-only reorientation. Surfaces active work, recent commits per branch, and ba
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, tell the user *"Nothing tracked — run `/hv-init` first."* and stop. Don't auto-init: resume on an empty project has nothing to reorient around. See GUIDE.md § Preflight for exit codes.
+On failure, tell the user *"Nothing tracked — run `/hv-init` first."* and stop — observe-only, never auto-inits. See GUIDE.md § Preflight.
 
 ## Step 2 — Reconcile Active Work
 
@@ -55,6 +57,8 @@ git log --no-merges --format='- %h %s' <base>..<branch> | head -5
 ```
 
 (Use `main` or `master` as base; match how `hv-reconcile` picked it.)
+
+**Issue one `git log` per stream in parallel** (one tool-call batch, not a serial loop), and join the per-branch handoff-note read into the same batch — they're all independent.
 
 If `worktreeMissing: true`, note *"(worktree was cleaned up — run `/hv-work` to re-create)"*.
 

@@ -4,9 +4,11 @@ description: Run a full architectural refactor cycle — explores the codebase f
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟩  hv-refactor  ·  full architectural refactor cycle
+  🧱  hv-refactor  ·  full architectural refactor cycle
   triggers: "refactor", "clean architecture"  ·  pairs: hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -59,7 +61,7 @@ Every friction point gets classified into one of four categories — **in-proces
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ```bash
 .hv/bin/hv-guard-clean "/hv-refactor"

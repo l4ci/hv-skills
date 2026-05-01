@@ -4,9 +4,11 @@ description: Compact project-state overview — backlog counts, active work, rec
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-status  ·  compact project state overview
+  📊  hv-status  ·  compact project state overview
   triggers: "status", "summary"  ·  pairs: hv-next, hv-resume
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -32,7 +34,7 @@ Pure read — shows where the project stands without running git reconciliation,
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 ## Step 2 — Render
 

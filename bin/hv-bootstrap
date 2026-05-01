@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Seed .hv/ directories and data files in the current directory.
+# Idempotent — never overwrites existing files. Safe to re-run.
+# Called by /hv-init Step 2 from the source bin/ before .hv/bin/ exists.
+set -euo pipefail
+
+HV=".hv"
+mkdir -p "$HV"/{bugs,features,tasks,milestones,plans,spikes,bin}
+
+[ -f "$HV/TODO.md" ] || cat > "$HV/TODO.md" <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+
+[ -f "$HV/KNOWLEDGE.md" ] || cat > "$HV/KNOWLEDGE.md" <<'EOF'
+# Knowledge
+
+Durable learnings captured from sessions — gotchas, conventions, constraints, and hard-won debugging insights. Grouped by topic, newest first within each topic.
+
+Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
+EOF
+
+[ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
+# Vision
+
+_(no vision yet — run `/hv-vision` to brainstorm milestones)_
+
+## Active milestones
+
+_(none active — set with `/hv-vision`)_
+
+## Milestones
+EOF
+
+[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > "$HV/counters.json"
+
+# Migrate older counters.json that predates the milestones key.
+python3 - <<'PY'
+import json
+from pathlib import Path
+p = Path(".hv/counters.json")
+d = json.loads(p.read_text())
+if "milestones" not in d:
+    d["milestones"] = 0
+    p.write_text(json.dumps(d) + "\n")
+PY
+
+[ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"
+
+if [ -f .gitignore ]; then
+  grep -qxF '.hv/' .gitignore 2>/dev/null || printf '\n# ── hv backlog ──\n.hv/\n' >> .gitignore
+else
+  printf '# ── hv backlog ──\n.hv/\n' > .gitignore
+fi
+
+# Migrate KNOWLEDGE.md preamble from legacy /hv:X to /hv-X (Claude Code
+# normalizes colons; the rename shipped in plugin 1.3.6+). Only rewrites
+# the preamble region — captured learning bullets are never touched.
+if [ -f "$HV/KNOWLEDGE.md" ] && grep -q '^Use `/hv:' "$HV/KNOWLEDGE.md"; then
+  python3 - <<'PY'
+from pathlib import Path
+import re
+p = Path(".hv/KNOWLEDGE.md")
+lines = p.read_text().splitlines(keepends=True)
+changed = False
+for i, line in enumerate(lines):
+    if line.startswith("## "):
+        break
+    new = re.sub(r"/hv:([a-z][a-z0-9-]*)", r"/hv-\1", line)
+    if new != line:
+        lines[i] = new
+        changed = True
+if changed:
+    p.write_text("".join(lines))
+PY
+fi

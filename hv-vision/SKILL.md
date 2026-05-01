@@ -4,9 +4,11 @@ description: Brainstorm a project's bigger vision and break it into milestones �
 user-invocable: true
 ---
 
+**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+
 ```
 ════════════════════════════════════════════════════════════════════════
-  🟪  hv-vision  ·  brainstorm milestones with research
+  🔭  hv-vision  ·  brainstorm milestones with research
   triggers: "vision", "brainstorm milestones"  ·  pairs: hv-next
 ════════════════════════════════════════════════════════════════════════
 ```
@@ -23,7 +25,7 @@ Sit above the day-to-day backlog. The user describes where they want the project
 .hv/bin/hv-preflight
 ```
 
-If the helper is absent or exits non-zero, invoke `hv-init` via the `Skill` tool, then continue. See GUIDE.md § Preflight for exit codes.
+On failure, invoke `hv-init` via the `Skill` tool. See GUIDE.md § Preflight.
 
 Determine the mode silently:
 
@@ -47,7 +49,7 @@ Before opening the conversation, gather everything that should inform the brains
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
 - Recent git history: `git log --oneline -20`
 
-Don't dump these to the user. Read them, form a picture, and use what's relevant in Step 3.
+**Issue these as parallel tool calls in a single response** — they're independent, and load latency dominates this step. Don't dump the contents to the user; read them, form a picture, and use what's relevant in Step 3.
 
 ## Step 3 — Frame & Discover
 
@@ -85,7 +87,7 @@ Before proposing milestones, ground the conversation in outside context. Use `We
 - Architectural or product patterns worth borrowing
 - Recent industry shifts that change the calculus
 
-Run 2–4 searches max — depth over breadth. Pull in 3–5 concrete findings the user can react to. Each finding should be **actionable** in the milestone discussion: *"here's a pitfall to avoid in M01"*, *"here's a pattern worth borrowing"*, *"here's a competitor's mistake."*
+Run 2–4 searches max — depth over breadth. **Issue all `WebSearch` calls (and any follow-up `WebFetch`s on the same wave) in parallel in a single response** — research is the latency bottleneck here, sequential calls add up. Pull in 3–5 concrete findings the user can react to. Each finding should be **actionable** in the milestone discussion: *"here's a pitfall to avoid in M01"*, *"here's a pattern worth borrowing"*, *"here's a competitor's mistake."*
 
 Present findings inline with citations. If a search yields nothing useful, say so and move on — don't pad with generic observations.
 

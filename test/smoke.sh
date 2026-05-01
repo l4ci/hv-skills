@@ -580,6 +580,36 @@ pass "summary lists active milestones"
 # Reset summary fixtures (no Milestone field) to keep later assertions clean.
 "$BIN/hv-vision-status" M01 shipped >/dev/null
 
+echo "hv-bootstrap"
+# Self-contained: run in a fresh subdir so the existing .hv/ in TMP isn't touched.
+BOOT_DIR="$TMP/boot-test"
+mkdir -p "$BOOT_DIR"
+( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
+[ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "hv-bootstrap did not seed TODO.md"
+[ -f "$BOOT_DIR/.hv/KNOWLEDGE.md" ] || fail "hv-bootstrap did not seed KNOWLEDGE.md"
+[ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "hv-bootstrap did not seed MILESTONES.md"
+[ -f "$BOOT_DIR/.hv/counters.json" ] || fail "hv-bootstrap did not seed counters.json"
+[ -f "$BOOT_DIR/.hv/status.json" ] || fail "hv-bootstrap did not seed status.json"
+[ -d "$BOOT_DIR/.hv/bin" ] || fail "hv-bootstrap did not create .hv/bin"
+grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "hv-bootstrap did not add .hv/ to .gitignore"
+grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap counters.json missing milestones key"
+pass "hv-bootstrap seeds dirs, data files, and .gitignore"
+
+# Idempotency: re-running must not overwrite existing data.
+echo "user content" > "$BOOT_DIR/.hv/TODO.md"
+( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
+grep -q "^user content$" "$BOOT_DIR/.hv/TODO.md" || fail "hv-bootstrap overwrote existing TODO.md"
+pass "hv-bootstrap is idempotent (preserves existing files)"
+
+# Counters migration: older counters.json without milestones key must gain it.
+echo '{"bugs":3,"features":1,"tasks":0}' > "$BOOT_DIR/.hv/counters.json"
+( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
+grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap did not migrate counters.json to add milestones key"
+grep -q '"bugs": *3' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap dropped existing counters during migration"
+pass "hv-bootstrap migrates legacy counters.json"
+
+rm -rf "$BOOT_DIR"
+
 echo "hv-preflight"
 # Ensure all core data files exist (smoke setup creates TODO.md/counters.json/status.json;
 # KNOWLEDGE.md got written by hv-knowledge-index; config.json is needed by preflight).
