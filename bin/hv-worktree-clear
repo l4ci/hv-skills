@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# If a non-main worktree has <branch> checked out, remove it. Silent if none.
+# Usage: hv-worktree-clear <branch>
+# Always skips the main working tree (which `git worktree remove` refuses anyway).
+# This guard centralizes what was previously inline in hv-merge — see hv-pr,
+# which previously omitted it.
+set -euo pipefail
+BRANCH="${1:?usage: hv-worktree-clear <branch>}"
+WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
+  /^worktree / { wt=substr($0, 10); count++ }
+  $0 == "branch " b && count > 1 { print wt; exit }
+')
+if [ -n "$WT" ]; then
+  git worktree remove "$WT"
+fi

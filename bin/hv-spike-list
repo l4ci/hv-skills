@@ -3,8 +3,10 @@
 # Each entry: { name, branch, status, created, branchExists }.
 # Usage: hv-spike-list
 set -euo pipefail
-python3 - <<'PY'
-import json, re, subprocess
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RAW=$("$HERE/hv-fm-list" .hv/spikes name branch status created)
+python3 - "$RAW" <<'PY'
+import json, subprocess, sys
 from pathlib import Path
 
 def branch_exists(name):
@@ -17,26 +19,16 @@ def branch_exists(name):
     except Exception:
         return False
 
-dir_ = Path(".hv/spikes")
 items = []
-if dir_.exists():
-    for path in sorted(dir_.glob("*.md")):
-        text = path.read_text()
-        m = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
-        if not m:
-            continue
-        fm = m.group(1)
-        def field(key, default=""):
-            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", fm, re.MULTILINE)
-            return mm.group(1).strip() if mm else default
-        branch = field("branch", f"spike/{path.stem}")
-        items.append({
-            "name": field("name", path.stem),
-            "branch": branch,
-            "status": field("status", "open"),
-            "created": field("created"),
-            "branchExists": branch_exists(branch),
-        })
-
+for fm in json.loads(sys.argv[1]):
+    stem = Path(fm["_path"]).stem
+    branch = fm.get("branch") or f"spike/{stem}"
+    items.append({
+        "name":        fm.get("name") or stem,
+        "branch":      branch,
+        "status":      fm.get("status") or "open",
+        "created":     fm.get("created", ""),
+        "branchExists": branch_exists(branch),
+    })
 print(json.dumps(items, indent=2))
 PY

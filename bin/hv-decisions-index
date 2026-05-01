@@ -1,48 +1,5 @@
 #!/usr/bin/env bash
 # Regenerate the managed <!-- hv-decisions-start --> block in CLAUDE.md from .hv/DECISIONS.md topics.
 # Usage: hv-decisions-index
-# Creates CLAUDE.md if missing. Preserves all other content.
 set -euo pipefail
-python3 - <<'PY'
-import re
-from pathlib import Path
-
-decisions = Path(".hv/DECISIONS.md")
-topics = []
-if decisions.exists():
-    for line in decisions.read_text().splitlines():
-        m = re.match(r"^##\s+(.+?)\s*$", line)
-        if m:
-            topics.append(m.group(1).strip())
-
-if topics:
-    topic_lines = "\n".join(f"- {t}" for t in topics)
-else:
-    topic_lines = "- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_"
-
-block = (
-    "<!-- hv-decisions-start -->\n"
-    "## Project Decisions\n\n"
-    "Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:\n\n"
-    f"{topic_lines}\n\n"
-    "<!-- hv-decisions-end -->"
-)
-
-claude = Path("CLAUDE.md")
-if not claude.exists():
-    claude.write_text(block + "\n")
-    print("created")
-else:
-    content = claude.read_text()
-    pattern = re.compile(
-        r"<!-- hv-decisions-start -->.*?<!-- hv-decisions-end -->",
-        re.DOTALL,
-    )
-    if pattern.search(content):
-        content = pattern.sub(block, content)
-        claude.write_text(content)
-        print("updated")
-    else:
-        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
-        print("appended")
-PY
+exec "$(dirname "$0")/hv-managed-block" decisions

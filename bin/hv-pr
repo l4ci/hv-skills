@@ -12,13 +12,7 @@ if [ -z "$BODY" ]; then
   exit 1
 fi
 
-WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
-  /^worktree / { wt=substr($0, 10) }
-  $0 == "branch " b { print wt; exit }
-')
-if [ -n "$WT" ]; then
-  git worktree remove "$WT"
-fi
+"$(dirname "$0")/hv-worktree-clear" "$BRANCH"
 
 git push -u origin "$BRANCH"
 gh pr create --title "$TITLE" --body "$BODY"

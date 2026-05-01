@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Print the resolved base branch (main, master, trunk, or origin/HEAD).
+# Usage: hv-base-branch
+# Exits 1 with a stderr message if none can be resolved.
+set -euo pipefail
+for candidate in main master trunk; do
+  if git rev-parse --verify "$candidate" >/dev/null 2>&1; then
+    echo "$candidate"
+    exit 0
+  fi
+done
+REMOTE_HEAD=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
+if [ -n "$REMOTE_HEAD" ]; then
+  echo "${REMOTE_HEAD#refs/remotes/origin/}"
+  exit 0
+fi
+echo "error: could not determine base branch (tried main, master, trunk, origin/HEAD)" >&2
+exit 1

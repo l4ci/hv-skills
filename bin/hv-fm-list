@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Generic frontmatter-list helper. Glob <dir>/*.md, parse YAML-ish ---...---
+# frontmatter, emit a JSON array of {field1, field2, ..., _path}.
+# Usage: hv-fm-list <dir> <field1> [<field2> ...]
+# Files without frontmatter are skipped. Missing fields → "".
+set -euo pipefail
+DIR="${1:?usage: hv-fm-list <dir> <field1> [<field2> ...]}"
+shift
+if [ $# -eq 0 ]; then
+  echo "usage: hv-fm-list <dir> <field1> [<field2> ...]" >&2
+  exit 1
+fi
+python3 - "$DIR" "$@" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+dir_ = Path(sys.argv[1])
+keys = sys.argv[2:]
+
+items = []
+if dir_.exists():
+    for path in sorted(dir_.glob("*.md")):
+        text = path.read_text()
+        m = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
+        if not m:
+            continue
+        fm = m.group(1)
+        entry = {}
+        for key in keys:
+            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", fm, re.MULTILINE)
+            entry[key] = mm.group(1).strip() if mm else ""
+        entry["_path"] = str(path)
+        items.append(entry)
+
+print(json.dumps(items, indent=2))
+PY

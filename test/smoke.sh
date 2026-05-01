@@ -979,4 +979,105 @@ echo "hv-types.sh source contract"
 ) || fail "hv-types.sh did not export expected values"
 pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_ALL_PREFIXES=BFTM"
 
+echo "## hv-base-branch + hv-worktree-clear + hv-managed-block + hv-fm-list (refactor)"
+
+# 1. hv-base-branch
+BB_TMP="$(mktemp -d)"
+(
+  cd "$BB_TMP"
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  echo seed > seed.txt && git add seed.txt && git commit -q -m "seed"
+  OUT=$("$BIN/hv-base-branch")
+  [ "$OUT" = "main" ] || { echo "FAIL hv-base-branch: expected 'main', got '$OUT'"; exit 1; }
+)
+rm -rf "$BB_TMP"
+pass "hv-base-branch resolves 'main' in a fresh git repo"
+
+# 2. hv-worktree-clear
+WC_TMP="$(mktemp -d)"
+(
+  cd "$WC_TMP"
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  echo seed > seed.txt && git add seed.txt && git commit -q -m "seed"
+  "$BIN/hv-worktree-clear" nonexistent-branch
+  git checkout -q -b feat-x
+  echo wip > wip.txt && git add wip.txt && git commit -q -m "wip"
+  git checkout -q main
+  WT_PATH="$WC_TMP/wt-feat-x"
+  git worktree add "$WT_PATH" feat-x -q
+  "$BIN/hv-worktree-clear" feat-x
+  git worktree list | grep -q "$WT_PATH" && { echo "FAIL: worktree still present"; exit 1; }
+  true
+)
+rm -rf "$WC_TMP"
+pass "hv-worktree-clear silently exits on missing branch; removes non-main worktree"
+
+# 3. hv-managed-block knowledge (flat-list mode)
+MB_TMP="$(mktemp -d)"
+(
+  cd "$MB_TMP"
+  git init -q && git config user.email t@t && git config user.name t
+  OUT=$("$BIN/hv-managed-block" knowledge)
+  [ "$OUT" = "created" ] || { echo "FAIL: expected 'created', got '$OUT'"; exit 1; }
+  grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || { echo "FAIL: marker missing"; exit 1; }
+  grep -q "no topics yet" CLAUDE.md || { echo "FAIL: empty msg missing"; exit 1; }
+
+  mkdir -p .hv
+  printf '# Knowledge\n\n## Build\n- details\n\n## Testing\n- more\n' > .hv/KNOWLEDGE.md
+  OUT=$("$BIN/hv-managed-block" knowledge)
+  [ "$OUT" = "updated" ] || { echo "FAIL: expected 'updated', got '$OUT'"; exit 1; }
+  grep -q "^- Build" CLAUDE.md || { echo "FAIL: Build topic missing"; exit 1; }
+  grep -q "^- Testing" CLAUDE.md || { echo "FAIL: Testing topic missing"; exit 1; }
+
+  printf '# Preamble\n\n<!-- hv:knowledge:start -->\n## Project Knowledge\n- OldTopic\n<!-- hv:knowledge:end -->\n\n# Postamble\n' > CLAUDE.md
+  "$BIN/hv-managed-block" knowledge >/dev/null
+  grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || { echo "FAIL: legacy markers not migrated"; exit 1; }
+  grep -q "hv:knowledge:start" CLAUDE.md && { echo "FAIL: legacy colon markers still present"; exit 1; }
+  grep -q "^# Preamble" CLAUDE.md || { echo "FAIL: preamble lost"; exit 1; }
+)
+rm -rf "$MB_TMP"
+pass "hv-managed-block knowledge: creates, updates, and migrates legacy markers"
+
+# 4. hv-managed-block decisions --body-stdin
+BS_TMP="$(mktemp -d)"
+(
+  cd "$BS_TMP"
+  CUSTOM_BODY="## Project Decisions
+
+Custom intro.
+
+- Topic A"
+  OUT=$(printf '%s' "$CUSTOM_BODY" | "$BIN/hv-managed-block" decisions --body-stdin)
+  [ "$OUT" = "created" ] || { echo "FAIL: expected 'created', got '$OUT'"; exit 1; }
+  grep -q "<!-- hv-decisions-start -->" CLAUDE.md || { echo "FAIL: start marker missing"; exit 1; }
+  grep -q "<!-- hv-decisions-end -->" CLAUDE.md || { echo "FAIL: end marker missing"; exit 1; }
+  grep -q "Topic A" CLAUDE.md || { echo "FAIL: body content missing"; exit 1; }
+)
+rm -rf "$BS_TMP"
+pass "hv-managed-block decisions --body-stdin writes stdin body wrapped in markers"
+
+# 5. hv-fm-list
+FM_TMP="$(mktemp -d)"
+(
+  mkdir -p "$FM_TMP/docs"
+  printf -- '---\nid: X01\ntitle: Alpha\nstatus: active\n---\nBody here.\n' > "$FM_TMP/docs/X01.md"
+  printf 'No frontmatter here.\n' > "$FM_TMP/docs/X02.md"
+  OUT=$("$BIN/hv-fm-list" "$FM_TMP/docs" id title status)
+  echo "$OUT" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+assert len(data) == 1, f'expected 1, got {len(data)}: {data}'
+assert data[0]['id'] == 'X01', f'id: {data[0][\"id\"]}'
+assert data[0]['title'] == 'Alpha', f'title: {data[0][\"title\"]}'
+assert data[0]['status'] == 'active', f'status: {data[0][\"status\"]}'
+assert '_path' in data[0], '_path missing'
+" || { echo "FAIL: fm-list output wrong"; exit 1; }
+)
+rm -rf "$FM_TMP"
+pass "hv-fm-list extracts FM fields, skips files without frontmatter, includes _path"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

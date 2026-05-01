@@ -4,8 +4,10 @@
 # Usage: hv-summary
 set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"
-python3 - <<'PY'
-import json, os, re
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MS_JSON="$("$HERE/hv-vision-list")"
+python3 - "$MS_JSON" <<'PY'
+import json, os, re, sys
 from pathlib import Path
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
@@ -58,23 +60,10 @@ if pairs:
     print("Recent: " + ", ".join(f"{iid} on {d}" for iid, d in recent))
 
 # Active milestones
-ms_dir = Path(".hv/milestones")
-if ms_dir.exists():
-    actives = []
-    for path in sorted(ms_dir.glob("M*.md")):
-        text = path.read_text()
-        fm = re.match(r"---\n(.*?)\n---", text, re.DOTALL)
-        if not fm:
-            continue
-        body = fm.group(1)
-        sm = re.search(r"^status:\s*(\w+)\s*$", body, re.MULTILINE)
-        if sm and sm.group(1) == "active":
-            idm = re.search(r"^id:\s*(\S+)\s*$", body, re.MULTILINE)
-            tm = re.search(r"^title:\s*(.+?)\s*$", body, re.MULTILINE)
-            if idm:
-                actives.append((idm.group(1), tm.group(1) if tm else ""))
-    if actives:
-        print("Active milestones: " + ", ".join(f"{i} {t}".strip() for i, t in actives))
+ms = json.loads(sys.argv[1])
+actives = [(m["id"], m["title"]) for m in ms if m["status"] == "active"]
+if actives:
+    print("Active milestones: " + ", ".join(f"{i} {t}".strip() for i, t in actives))
 
 # Knowledge topics
 k = Path(".hv/KNOWLEDGE.md")
@@ -84,6 +73,15 @@ if k.exists():
         shown = topics[:4]
         suffix = ", ..." if len(topics) > 4 else ""
         print(f"Knowledge: {len(topics)} topics ({', '.join(shown)}{suffix})")
+
+# Decisions topics
+d = Path(".hv/DECISIONS.md")
+if d.exists():
+    topics = re.findall(r"^## (.+?)\s*$", d.read_text(), re.MULTILINE)
+    if topics:
+        shown = topics[:4]
+        suffix = ", ..." if len(topics) > 4 else ""
+        print(f"Decisions: {len(topics)} topics ({', '.join(shown)}{suffix})")
 
 # Archive size
 a = Path(".hv/ARCHIVE.md")

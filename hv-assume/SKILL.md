@@ -41,10 +41,13 @@ If the target is ambiguous, ask once. Do not auto-pick.
 - The plan file at `.hv/plans/<key>.md` if one exists
 - Milestone context at `.hv/milestones/<MID>.md` if applicable
 - Relevant `KNOWLEDGE.md` topics via `.hv/bin/hv-knowledge-query <topics…>`
+- Relevant `DECISIONS.md` boundaries via `.hv/bin/hv-decisions-query <topics…>`
 - Recent git history: `git log --oneline -20`
 - Recent commits touching probable target files: `git log --oneline -- <path>`
 
 **Issue these as parallel tool calls in a single response** — they're independent.
+
+If `hv-decisions-query` returns matched entries, surface them in the peek under "Hard boundaries to respect" (between "Files I'd create" and "Tests I'd add") — one line each: `- <decision title> — <one-line summary>`. The user's job during review is to spot whether the planned approach conflicts with any of these; if it does, they push back before code lands. Omit the section entirely if nothing matched.
 
 If a plan exists at `.hv/plans/<key>.md`, the peek largely restates it (plus any updates from recent context). If no plan exists, the peek is your own decomposition — and the user should consider running `/hv-plan` instead of `/hv-work` if alignment matters.
 
@@ -65,6 +68,10 @@ Files I'd touch
 Files I'd create
   - <path>  — <reason>
 
+Hard boundaries to respect
+  - <decision title>  — <one-line summary>
+  - <decision title>  — <one-line summary>
+
 Tests I'd add
   - <test name or location>  — <what it verifies>
 
@@ -78,6 +85,8 @@ Known unknowns
 
 If any of this is wrong, push back before /hv-work runs.
 ```
+
+Omit `Hard boundaries to respect` if no DECISIONS topics matched.
 
 Be specific. *"I'd touch the auth code"* is useless — cite paths. If you don't know the path well enough to cite it, say so under Known unknowns.
 

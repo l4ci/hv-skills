@@ -8,7 +8,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ITEMS_JSON="$("$HERE/hv-vision-list")"
-python3 - "$ITEMS_JSON" <<'PY'
+BODY=$(python3 - "$ITEMS_JSON" <<'PY'
 import json, re, sys
 from pathlib import Path
 
@@ -47,7 +47,7 @@ if ms_path.exists():
 
     ms_path.write_text(ms if ms.endswith("\n") else ms + "\n")
 
-# 2) Refresh CLAUDE.md vision block
+# 2) Render vision body for CLAUDE.md
 shipped_ids = {i["id"] for i in items if i["status"] == "shipped"}
 if active:
     lines = []
@@ -69,25 +69,7 @@ else:
     body = "_(no milestones yet — run `/hv-vision` to brainstorm)_"
     intro = "Project milestones live in `.hv/MILESTONES.md`."
 
-block = (
-    "<!-- hv-vision-start -->\n"
-    "## Project Vision\n\n"
-    f"{intro}\n\n"
-    f"{body}\n\n"
-    "<!-- hv-vision-end -->"
-)
-
-claude = Path("CLAUDE.md")
-if not claude.exists():
-    claude.write_text(block + "\n")
-    print("created")
-else:
-    content = claude.read_text()
-    pattern = re.compile(r"<!-- hv-vision-start -->.*?<!-- hv-vision-end -->", re.DOTALL)
-    if pattern.search(content):
-        claude.write_text(pattern.sub(block, content))
-        print("updated")
-    else:
-        claude.write_text(content.rstrip() + "\n\n" + block + "\n")
-        print("appended")
+print(f"## Project Vision\n\n{intro}\n\n{body}", end="")
 PY
+)
+echo -n "$BODY" | "$HERE/hv-managed-block" vision --body-stdin
