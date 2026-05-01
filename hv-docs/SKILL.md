@@ -15,14 +15,14 @@ user-invocable: true
 
 # hv-docs — Public User-Guide Maintainer
 
-Scaffolds and maintains a public user guide under `<docs.path>/` (default `docs/`) for the people who *use* the project — CLI users, library consumers, API clients, app users — not contributors. Three runtime modes (first-run, after-work, restructure) plus a `.docsignore` boundary and on-write secret scrub for safety. This slice implements the first-run discovery + scaffold flow.
+Scaffolds and maintains a public user guide under `<docs.path>/` (default `docs/`) for the people who *use* the project — CLI users, library consumers, API clients, app users — not contributors. Three runtime modes (first-run, after-work, restructure) plus a `.docsignore` boundary and on-write secret scrub for safety. This slice adds the after-work mode (propose mode, `autoCreate=false`) on top of the previously-shipped first-run flow. Restructure mode and the autoCreate path land in M01-S04 / M01-S03.
 
 ## Modes
 
 | Detected when | Mode | Status |
 |---|---|---|
 | `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) | **Implemented in this slice** |
-| Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose/write doc updates) | _Coming in M01-S02_ |
+| Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose/write doc updates) | **Implemented in this slice (propose mode)** |
 | Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + propose splits/merges) | _Coming in M01-S04_ |
 | Manual invoke, no signal | Falls through to first-run if `<docs.path>/` missing; else nudge | _Partial — first-run path implemented_ |
 
@@ -164,6 +164,103 @@ Next:
   Or write <docs.path>/getting-started.md yourself first to set the voice.
 ```
 
+## After-work Flow
+
+This flow is invoked by `/hv-work` Step 13.5 / `/hv-ship` Step 8.6 (those wires land in M01-S05; this slice defines the SKILL.md side).
+
+## Step A1 — Trigger Gate
+
+Trigger condition (mirrors `/hv-learn`'s Learn-trigger — see GUIDE.md § Learn Trigger): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+
+If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print one line: *"`/hv-docs` not yet initialized — run `/hv-docs` to scaffold."* and exit. Don't auto-scaffold mid-cycle.
+
+## Step A2 — Gather Context
+
+In a **single parallel batch** (one tool-call response, multiple reads), gather:
+
+- `git log --oneline <last-docs-marker>..HEAD` — boundary is the last `docs:` commit's SHA. Fall back to last 20 commits if no `docs:` commit exists yet.
+- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; in this slice that filter is a **pass-through stub**: read all paths as-is. Note: `bin/hv-docs-filter` lands in M01-S03).
+- Current `<docs.path>/` tree (one-level listing) and each existing page's H1+H2 outline (`grep -E '^#{1,2} ' <page>`).
+
+Issue these as parallel tool calls in a single response. Don't do them sequentially.
+
+## Step A3 — Classify Changes
+
+For each non-ignored diff file, decide: user-facing surface change (doc-relevant) vs internal-only refactor/test/build (not doc-relevant).
+
+**Doc-relevant** heuristics:
+
+- Changes to `bin/*` entry points
+- Public API exports
+- Route handlers
+- CLI flag definitions
+- Config-key surface
+- Plugin-manifest entries
+- README-shaped behavior
+
+**Internal-only** heuristics:
+
+- Tests
+- Build scripts
+- Internal helpers not re-exported
+- Refactors with no visible behavior change
+- CI config, lint config
+- Dependency bumps
+
+LLM judgment is the primary signal; the heuristics are hints, not hard gates.
+
+If **no** files classify as doc-relevant after this pass, print one line (*"No user-facing changes since last `docs:` commit. Skipping."*) and exit cleanly.
+
+## Step A4 — Map to Pages + Draft Edits
+
+Per doc-relevant change, pick a target page from `<docs.path>/`:
+
+- An existing page that covers the surface (e.g., `usage/<command>.md` for a CLI flag change).
+- Or `*needs new page*` — propose a path under `<docs.path>/` with one-line rationale; never auto-create a page in propose mode.
+
+Draft a concrete before/after fragment per page using a simple unified-diff-shaped block:
+
+```
+<docs.path>/usage/foo.md
+- old line or section
++ new line or section
+```
+
+Drafts should reference real file/section anchors (e.g., the H2 heading the edit lands under). No hallucinated content; if no concrete edit can be drafted, mark the entry "*needs prose — author yourself*" and skip it from the apply set.
+
+Layer-2 scrub on the final draft text is a **pass-through stub** in this slice — note: `bin/hv-docs-scrub` lands in M01-S03.
+
+## Step A5 — Approval Gate
+
+Show all drafts in one batch (plain markdown — same as the first-run proposal in Step 4). Then ask via `AskUserQuestion`:
+
+- **Header:** `"Docs"`
+- **Question:** *"Apply these doc updates?"*
+- **Options** (single-select):
+  1. *"Apply all (Recommended)"*
+  2. *"Apply selectively"* — free text. User lists the page paths to apply; revise the apply set and proceed.
+  3. *"Skip"* — don't write anything; exit cleanly. Doesn't advance the `docs:` marker.
+  4. *"Cancel"* — same as Skip in this slice; reserved for future-divergent semantics.
+
+Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed. (See GUIDE.md § Host Question Conventions.)
+
+## Step A6 — Commit
+
+Write the chosen edits idempotently (don't overwrite unrelated content). Then a **single** `docs:` commit. Message format:
+
+```
+docs: <one-line summary>
+
+- <page>: <one-line per-page change>
+- <page>: <…>
+
+Resolves: [B07], [F03]
+```
+
+`Resolves:` lists the item IDs of the work cycle that triggered this run (passed in by the calling skill's Skill-tool brief). If no IDs were passed (manual `/hv-docs` invocation), omit the `Resolves:` line.
+
+`autoCreate: true` (auto-write path) lands in M01-S03 and adds Layer-3 LLM safety review before commit. This slice ships propose-mode only.
+
 ## Key Principles
 
 - **First-run is interactive — never auto-scaffold.** Always go through Step 4's `AskUserQuestion` before writing.
@@ -171,3 +268,4 @@ Next:
 - **`<docs.path>/README.md` is the spine.** Every other page links from there.
 - **`.docsignore` is the safety boundary.** Seeded with safe defaults; user extends.
 - **Don't narrate the discovery analysis.** It shapes the proposal silently.
+- **After-work runs in propose mode by default.** `docs.autoCreate: false` (the default) means every batch goes through user approval; `true` (auto-write + Layer-3 LLM review) lands in M01-S03.
