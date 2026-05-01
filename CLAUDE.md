@@ -17,7 +17,3 @@ Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`
 - **M01** — User-Guide Maintainer (/hv-docs) (depends: —)
 
 <!-- hv-vision-end -->
-
-## Project Decisions
-
-Boundary decisions live in [`DECISIONS.md`](DECISIONS.md) at repo root. Read it before proposing changes that touch documentation, skill structure, or `.hv/` state semantics — each entry has explicit *forbids* and *permits*.
