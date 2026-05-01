@@ -334,6 +334,9 @@ All settings live in `.hv/config.json`. Edit it directly — no special command 
   },
   "autonomy": {
     "level": "off"
+  },
+  "debug": {
+    "competingHypotheses": false
   }
 }
 ```
@@ -378,6 +381,17 @@ Knowledge quality compounds — a weak bullet consulted by 20 future `/hv-work` 
 | `true` (default) | `/hv-ship` runs `/hv-review` before integrating. FAIL blocks, CONCERNS ask, PASS flows through. |
 | `false` | `/hv-ship` integrates directly without a review pass. Use when you want raw speed and already reviewed manually. |
 
+### Competing hypotheses
+
+Controls whether `/hv-debug` Step 6 dispatches a single hypothesis agent or fans out 3 parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator dedupes the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | Single hypothesis agent. Cheaper and faster; fine for most bugs where one angle is obviously primary. |
+| `true` | Three parallel hypothesis agents in one tool-call batch. Better diversity on hard bugs (the right framing isn't obvious upfront), at ~3× orchestrator cost on every `/hv-debug` run. Step 6 latency stays roughly the same — the agents run concurrently. |
+
+Flip on when you have a class of bugs that consistently take multiple cycles to land — the diversity of framings is what makes the difference. Keep off when most bugs are single-cause and you're paying for cycles you don't need.
+
 ### Autonomy
 
 Controls whether skills *nudge* at decision points or *invoke the next skill directly*. Three levels, mutually exclusive.
@@ -402,6 +416,27 @@ Controls whether skills *nudge* at decision points or *invoke the next skill dir
 - The user interrupts.
 
 **When to flip it on.** `"auto"` is good when you want the natural endgame of each cycle (capture learnings, ship the fix) without typing the follow-up command. `"loop"` is good when you have a known queue you want drained — milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified — and you'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you don't want a long-running session of model spend without checkpoints.
+
+### Branching template
+
+Each autonomy-aware step branches on `autonomy.level`:
+
+- `"off"` (default) — surface the decision to the user. Usually a one-line nudge naming the next skill; an `AskUserQuestion` when more than one path is reasonable (e.g. `/hv-debug` Step 11).
+- `"auto"` or `"loop"` — invoke the next skill via the `Skill` tool. No prompt, no confirmation; pass any context the next skill needs in the brief.
+
+Loop-continuation steps run only when `level == "loop"`; skip for `"off"` and `"auto"`. The destination skill's own gates (`learn.verify`, `ship.review`, `refactor.confirmBeforeExecute`) still fire under autonomy.
+
+## Learn Trigger
+
+`/hv-work` Step 13 and `/hv-ship` Step 8.5 share one trigger condition — capture learnings when at least one is true:
+
+- 2+ items resolved in the cycle
+- ≥5 files touched
+- A hard bug that took multiple debug cycles to land
+
+Skip for single-item fixes, pure mechanical work, and dependency bumps. Don't fire if `/hv-learn` already ran this session.
+
+`/hv-debug` Step 12 uses a different signal (root cause was non-obvious from reading the code alone) and stays inline; this section covers `/hv-work` and `/hv-ship` only.
 
 ## CLI Helpers
 
@@ -428,6 +463,7 @@ Controls whether skills *nudge* at decision points or *invoke the next skill dir
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope hv/foo` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
+| `hv-bootstrap` | Seed `.hv/` directories and data files (idempotent). Run from source bin during `/hv-init`; never overwrites existing files | `<source-bin>/hv-bootstrap` |
 | `hv-vision-add` | Mint a milestone ID, create `.hv/milestones/MNN.md`, append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
 | `hv-vision-status` | Set a milestone's status to `planned`, `active`, or `shipped` (updates frontmatter and overview line) | `.hv/bin/hv-vision-status M01 active` |
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
@@ -498,6 +534,26 @@ Third-party services (Stripe, Twilio, etc.) you don't control. Mock at the bound
 4. Repo-local `bin/` if the skill is running from a cloned repo
 
 If none of these resolve, `/hv-init` exits with a clear error. The scripts themselves are verified by `test/smoke.sh` in the repo — run it if you suspect a helper is misbehaving.
+
+## Capture vs. Go vs. Work Routing
+
+Three skills trigger on action-shaped phrases. Pick by **intent**, not by the verb the user typed:
+
+| The user wants to… | Use | Why |
+|---------------------|-----|-----|
+| Brain-dump items into the backlog without acting now | `/hv-capture` | Records only; no execution, no clean-tree guard |
+| Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`; speed-path question caps |
+| Implement an item that's already in `TODO.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
+| Pick the next thing from the backlog and execute | `/hv-next` | Reconciles → suggests → routes to `/hv-work` |
+
+**Rules of thumb:**
+
+- *"fix X"* / *"add Y"* / *"do Z"* — clear single thing, not yet captured → `/hv-go`.
+- A list of things, no immediate action, *"capture this"* / *"add to backlog"* → `/hv-capture`.
+- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"* → `/hv-work`.
+- *"what's next?"* / *"pick something"* / *"what should I work on?"* → `/hv-next`.
+
+When the intent is genuinely ambiguous, the cheapest path is `/hv-capture` — items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if the user actually wanted a backlog entry.
 
 ## Mixed-Input Routing
 
