@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Auto-detect the project version file and emit its current version as JSON.
+# Usage: hv-release-detect-version
+# Output: {"file": "<path>", "version": "<semver>", "kind": "<kind>"}
+# Exits 1 if no version file is found or parsing fails.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+
+def load_json(path):
+    return json.loads(Path(path).read_text())
+
+
+def infer_kind(filename):
+    name = Path(filename).name
+    if name == "plugin.json":
+        return "plugin-json"
+    if name.endswith(".json"):
+        return "package-json"
+    if name == "pyproject.toml":
+        return "pyproject"
+    if name == "Cargo.toml":
+        return "cargo"
+    return "plain"
+
+
+def parse_toml_version(text, sections):
+    """Find version = "x.y.z" inside one of the given section headings."""
+    for section in sections:
+        pattern = re.compile(
+            r"^\s*\[" + re.escape(section) + r"\s*\]\s*$",
+            re.MULTILINE,
+        )
+        m = pattern.search(text)
+        if not m:
+            continue
+        # Slice from section start to next [heading] or EOF
+        rest = text[m.end():]
+        next_section = re.search(r"^\s*\[", rest, re.MULTILINE)
+        block = rest[: next_section.start()] if next_section else rest
+        v = re.search(r'^version\s*=\s*"([^"]+)"', block, re.MULTILINE)
+        if v:
+            return v.group(1)
+    return None
+
+
+def read_version(filepath, kind):
+    path = Path(filepath)
+    text = path.read_text()
+
+    if kind in ("plugin-json", "package-json"):
+        data = json.loads(text)
+        v = data.get("version")
+        if v is None:
+            print(f"error: {filepath}: no version field found", file=sys.stderr)
+            sys.exit(1)
+        return v
+
+    if kind == "pyproject":
+        v = parse_toml_version(text, ["project", "tool.poetry"])
+        if v is None:
+            print(f"error: {filepath}: no version field found", file=sys.stderr)
+            sys.exit(1)
+        return v
+
+    if kind == "cargo":
+        v = parse_toml_version(text, ["package"])
+        if v is None:
+            print(f"error: {filepath}: no version field found", file=sys.stderr)
+            sys.exit(1)
+        return v
+
+    # plain
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    print(f"error: {filepath}: no version field found", file=sys.stderr)
+    sys.exit(1)
+
+
+# --- Step 1: check config override ---
+config_path = Path(".hv/config.json")
+if config_path.exists():
+    try:
+        cfg = json.loads(config_path.read_text())
+    except Exception:
+        cfg = {}
+    override = cfg.get("release", {}).get("versionFile")
+    if override:
+        p = Path(override)
+        if not p.exists():
+            print(f"error: release.versionFile = '{override}' does not exist", file=sys.stderr)
+            sys.exit(1)
+        kind = infer_kind(override)
+        version = read_version(p, kind)
+        print(json.dumps({"file": override, "version": version, "kind": kind}, indent=2))
+        sys.exit(0)
+
+# --- Step 2: auto-detect candidates in priority order ---
+CANDIDATES = [
+    (".claude-plugin/plugin.json", "plugin-json"),
+    ("package.json", "package-json"),
+    ("pyproject.toml", "pyproject"),
+    ("Cargo.toml", "cargo"),
+    ("VERSION", "plain"),
+    ("version.txt", "plain"),
+]
+
+for filepath, kind in CANDIDATES:
+    p = Path(filepath)
+    if p.exists():
+        version = read_version(p, kind)
+        print(json.dumps({"file": filepath, "version": version, "kind": kind}, indent=2))
+        sys.exit(0)
+
+print(
+    "error: no version file detected (set release.versionFile in .hv/config.json)",
+    file=sys.stderr,
+)
+sys.exit(1)
+PY
