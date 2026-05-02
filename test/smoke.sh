@@ -1877,4 +1877,136 @@ pass "T1+T2: composition from Layout B worktree path"
 [ "$(cd "$TMP" && "$BIN/hv-resolve-umbrella")" = "$TMP" ] || fail "single-repo cwd still resolves to its own .hv/"
 pass "single-repo backward compat: hv-resolve-umbrella still works"
 
+echo "umbrella mode S02 (--repo flags + reconcile + worktree-clear)"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+echo "web,api" | (cd "$UMB" && "$BIN/hv-umbrella-init" >/dev/null)
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add" hv/x B01)
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+assert d['active'][0]['repo'] is None, d
+assert d['active'][0]['branch'] == 'hv/x'
+"
+pass "T1: hv-status-add (no --repo) writes repo: null"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/x B01)
+(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/x B02)
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+pairs = sorted((e['branch'], e['repo']) for e in d['active'])
+assert pairs == [('hv/x', 'api'), ('hv/x', 'web')], pairs
+"
+pass "T1: hv-status-add (--repo web) and (--repo api) coexist on same branch"
+
+(cd "$UMB" && "$BIN/hv-status-add" --if-absent --repo web hv/x B01)
+COUNT=$(python3 -c "import json; print(len(json.load(open('$UMB/.hv/status.json'))['active']))")
+[ "$COUNT" = "2" ] || fail "if-absent should be no-op for existing (branch, repo); got count $COUNT"
+pass "T1: hv-status-add --if-absent --repo respects (branch, repo) uniqueness"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add" --repo web --if-absent hv/y B01)
+(cd "$UMB" && "$BIN/hv-status-add" --if-absent --repo api hv/y B02)
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+pairs = sorted((e['branch'], e['repo']) for e in d['active'])
+assert pairs == [('hv/y', 'api'), ('hv/y', 'web')], pairs
+"
+pass "T1: hv-status-add accepts --repo and --if-absent in either order"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add" hv/z B01)
+(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/z B02)
+(cd "$UMB" && "$BIN/hv-status-remove" hv/z)
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+pairs = [(e['branch'], e['repo']) for e in d['active']]
+assert pairs == [('hv/z', 'web')], pairs
+"
+pass "T1: hv-status-remove (no --repo) preserves umbrella entries"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/z B01)
+(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/z B02)
+(cd "$UMB" && "$BIN/hv-status-remove" --repo web hv/z)
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+pairs = [(e['branch'], e['repo']) for e in d['active']]
+assert pairs == [('hv/z', 'api')], pairs
+"
+pass "T1: hv-status-remove --repo web only removes web entry"
+
+(cd "$UMB/web" && git checkout -q -b hv/feat-merge && echo "x" > x.txt && git add x.txt && git -c user.email=t@t -c user.name=t commit -q -m "feat: x")
+WEB_HEAD_BEFORE=$(cd "$UMB/web" && git -c init.defaultBranch=main rev-parse main)
+(cd "$UMB" && printf 'merge: feat-merge\n\n- added x\n' | "$BIN/hv-merge" --repo web hv/feat-merge >/dev/null)
+WEB_HEAD_AFTER=$(cd "$UMB/web" && git rev-parse main)
+[ "$WEB_HEAD_BEFORE" != "$WEB_HEAD_AFTER" ] || fail "hv-merge --repo web did not advance web/main"
+if (cd "$UMB/web" && git rev-parse --verify hv/feat-merge >/dev/null 2>&1); then
+  fail "hv-merge --repo web did not delete the feature branch"
+fi
+[ ! -d "$UMB/.git" ] || fail "hv-merge --repo web should NOT create umbrella .git/"
+pass "T2: hv-merge --repo web lands the merge in web/.git/, not umbrella"
+
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB/web" && git checkout -q main && git branch hv/recon-live 2>/dev/null || true)
+(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/recon-live B01)
+(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/recon-dead B02)
+OUT=$(cd "$UMB" && "$BIN/hv-reconcile")
+echo "$OUT" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+na = d['needsAction']
+cl = d['cleaned']
+assert any(e['branch'] == 'hv/recon-live' and e.get('repo') == 'web' for e in na), na
+assert any(e['branch'] == 'hv/recon-dead' and e.get('repo') == 'api' for e in cl), cl
+"
+pass "T3: hv-reconcile output entries carry repo field"
+
+(cd "$UMB" && "$BIN/hv-status-add" --repo nonexistent hv/recon-x B03)
+OUT=$(cd "$UMB" && "$BIN/hv-reconcile")
+echo "$OUT" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+cl = d['cleaned']
+assert any(e.get('reason') == 'repo_unregistered' and e.get('repo') == 'nonexistent' for e in cl), cl
+"
+pass "T3: hv-reconcile flags entries pointing at unregistered repos"
+
+(cd "$UMB/web" && git checkout -q main && git branch hv/wt-x 2>/dev/null || true)
+mkdir -p "$UMB/.claude/worktrees/web"
+(cd "$UMB/web" && git worktree add "$UMB/.claude/worktrees/web/hv-wt-x" hv/wt-x >/dev/null 2>&1)
+[ -d "$UMB/.claude/worktrees/web/hv-wt-x" ] || fail "Layout B worktree setup failed"
+(cd "$UMB/web" && "$BIN/hv-worktree-clear" --repo web hv/wt-x)
+[ ! -d "$UMB/.claude/worktrees/web/hv-wt-x" ] || fail "Layout B worktree was not cleaned up"
+pass "T4: hv-worktree-clear --repo web removes Layout B worktree"
+(cd "$UMB/web" && git branch -D hv/wt-x >/dev/null 2>&1) || true
+
+OUT=$(cd "$TMP" && "$BIN/hv-reconcile")
+echo "$OUT" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+assert 'cleaned' in d and 'needsAction' in d
+for e in d['needsAction']:
+    assert e.get('repo') in (None, ''), e
+"
+pass "single-repo backward compat: hv-reconcile schema unchanged"
+
+cp "$TMP/.hv/status.json" "$TMP/.hv/status.json.bak"
+echo '{"active":[]}' > "$TMP/.hv/status.json"
+(cd "$TMP" && "$BIN/hv-status-add" hv/legacy L01)
+python3 -c "
+import json; d=json.load(open('$TMP/.hv/status.json'))
+e = d['active'][0]
+assert e['branch'] == 'hv/legacy' and e['repo'] is None, e
+"
+(cd "$TMP" && "$BIN/hv-status-remove" hv/legacy)
+python3 -c "
+import json; d=json.load(open('$TMP/.hv/status.json'))
+assert d['active'] == [], d
+"
+mv "$TMP/.hv/status.json.bak" "$TMP/.hv/status.json"
+pass "single-repo backward compat: hv-status-add and hv-status-remove without flags"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
