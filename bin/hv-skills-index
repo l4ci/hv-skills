@@ -1,28 +1,11 @@
-<!-- hv-knowledge-start -->
-## Project Knowledge
-
-Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
-
-- Build & Tooling
-- Documentation
-- Skill Authoring
-
-<!-- hv-knowledge-end -->
-
-<!-- hv-vision-start -->
-## Project Vision
-
-Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
-
-- **M01** — User-Guide Maintainer (/hv-docs) (depends: —)
-
-<!-- hv-vision-end -->
-
-## Working in this repo
-
-**Never edit anything inside `.hv/`.** That folder is the project's gitignored runtime — it gets regenerated when skills are updated (re-running `/hv-init` or a skill update copies fresh files from canonical `bin/` and re-seeds data). Any edit you make there will be overwritten on the next update, so it's wasted work and obscures intent. All real changes go in canonical sources: skill folders (`hv-*/SKILL.md`), `bin/`, `docs/`, `test/`, etc.
-
-<!-- hv-skills-start -->
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-skills-start --> block in CLAUDE.md with a fixed
+# canonical body — slash-command index + consult-point helpers. Body is static
+# (identical for every hv-skills-using project), so re-runs are idempotent.
+# Usage: hv-skills-index
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+"$HERE/hv-managed-block" skills --body-stdin <<'EOF'
 ## hv-skills
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
@@ -39,4 +22,4 @@ Before acting on work that touches a topic listed in `## Project Knowledge`, `##
 - `.hv/bin/hv-knowledge-query <topic>…`
 - `.hv/bin/hv-decisions-query <topic>…`
 - `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
-<!-- hv-skills-end -->
+EOF
