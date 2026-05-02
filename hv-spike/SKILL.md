@@ -47,12 +47,27 @@ A spike answers a *yes/no/conditional* question. Push back if the question is va
 
 Name the spike with a short kebab-case identifier (`sse-feasibility`, `auth-rotation`, `migration-cost`). The name becomes the branch suffix and the spike file's stem.
 
+## Step 2.5 (Start mode) — Resolve Sub-Repo (umbrella mode only)
+
+Skip this step entirely when umbrella mode is off (`.hv/repos.json` does not exist or has no entries).
+
+In umbrella mode, the spike branch must land in a specific sub-repo (the umbrella itself is often not a git repo at all). Determine `<repo>`:
+
+1. If the user named a sub-repo in their input (e.g. *"spike SSE feasibility in web"*) — use it.
+2. Else, run `.hv/bin/hv-resolve-repo` from the current cwd. If that succeeds, default to the resolved name.
+3. Else, ask via `AskUserQuestion`:
+   - **Header:** `"Repo"`
+   - **Question:** *"Which sub-repo should `spike/<name>` live in?"*
+   - **Options:** one per registered sub-repo (read names from `.hv/repos.json` via `load_repos()` or `cat .hv/repos.json`), single-select.
+
+Carry `<repo>` into Step 4's helper invocation as `--repo <repo>`. The spike file still lands at the umbrella's `.hv/spikes/<name>.md` — only the git branch lives in the sub-repo.
+
 ## Step 3 (Start mode) — Confirm Before Branching
 
 Before mutating git state, confirm with the user via `AskUserQuestion`:
 
 - **Header:** `"Spike"`
-- **Question:** *"Create branch `spike/<name>` and switch to it now?"*
+- **Question:** *"Create branch `spike/<name>` and switch to it now?"* (umbrella mode: *"Create branch `spike/<name>` in `<repo>` and switch to it now?"*)
 - **Options:**
   1. *"Yes, create and switch (Recommended)"* — *"Branches off current HEAD; you'll be on the spike branch immediately."*
   2. *"Create only, stay on this branch"* — *"Useful when you want to switch on your own time."*
@@ -63,20 +78,24 @@ Plain-text fallback: if the working tree is clean, default to "create and switch
 ## Step 4 (Start mode) — Create the Spike
 
 ```bash
+# Single-repo:
 BRANCH=$(.hv/bin/hv-spike-add <name> "<question>")
+# Umbrella mode — spike lives in <repo>:
+BRANCH=$(.hv/bin/hv-spike-add --repo <repo> <name> "<question>")
 ```
 
 The helper:
 
-- Creates branch `spike/<name>` off the current HEAD
+- Creates branch `spike/<name>` off the current HEAD (in the sub-repo's git history when `--repo` is set)
 - Writes `.hv/spikes/<name>.md` with frontmatter + question + section stubs
+- Spike file `.hv/spikes/<name>.md` lives at the umbrella root regardless of `--repo`; only the git branch lands in the sub-repo. The frontmatter records `repo: <name>` so `/hv-spike done` and listings know which sub-repo to operate against.
 
-If the user picked "create and switch" in Step 3, run `git checkout "$BRANCH"`.
+If the user picked "create and switch" in Step 3, run `git checkout "$BRANCH"` — in umbrella mode, `cd` into `<repo>` first (or `git -C <repo-path> checkout "$BRANCH"`).
 
 Compact handoff:
 
 ```
-Spike opened: spike/<name>
+Spike opened: spike/<name>           # umbrella: Spike opened: spike/<name> (in <repo>)
 Question: <one line>
 File: .hv/spikes/<name>.md
 
@@ -88,14 +107,19 @@ No further work in this skill — the user drives the experiment.
 
 ## Step 5 (Finish mode) — Read the Spike Branch
 
-Gather what was tried:
+Read `repo:` from `.hv/spikes/<name>.md`'s frontmatter first (parallel-load with the spike-file content). When set, run the `git log` / `git diff` calls in the sub-repo (resolve via `.hv/repos.json` / `load_repos()`); when unset, run them in the cwd. Inspect git either by `cd`-ing into the sub-repo before the call or by passing `git -C <sub-repo path>`:
 
 ```bash
+# Single-repo (no `repo:` in frontmatter) — run in cwd:
 git log spike/<name> --oneline
 git diff main...spike/<name> --stat
+
+# Umbrella mode (`repo: <name>` in frontmatter) — run against the sub-repo:
+git -C <sub-repo path> log spike/<name> --oneline
+git -C <sub-repo path> diff main...spike/<name> --stat
 ```
 
-Read `.hv/spikes/<name>.md` for the original question and any notes the user already wrote.
+Read `.hv/spikes/<name>.md` for the original question and any notes the user already wrote (the file always lives at the umbrella root, regardless of `repo:`).
 
 Ask the user for the verbal summary if they haven't already given one — what they learned, viable or not, and why.
 
@@ -132,3 +156,4 @@ If not viable or inconclusive, the spike is its own conclusion. Don't push to ca
 - **Honest reporting beats salvage.** A "not viable" conclusion is just as valuable as "viable".
 - **No stubs or partial work back to main.** Anything on main is real implementation.
 - **Spikes are scoped, not open-ended.** A spike open >2 weeks without a decision is stale — close it `inconclusive` and recapture if needed.
+- **Umbrella spikes are per-repo.** A spike's branch lives in the sub-repo named in its frontmatter `repo:` field; the spike file itself stays at the umbrella root.
