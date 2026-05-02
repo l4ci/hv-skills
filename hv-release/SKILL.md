@@ -51,7 +51,7 @@ Parse JSON output `{file, version, kind}`:
 
 - `file` — absolute path to the version-bearing file
 - `version` — current semver string (e.g., `1.10.0`)
-- `kind` — `plugin-json` | `package-json` | `pyproject-toml` | `cargo-toml` | `plain-file`
+- `kind` — `plugin-json` | `package-json` | `pyproject` | `cargo` | `plain`
 
 If exit 1, surface the stderr message verbatim and stop. If output indicates multiple candidates, use `release.versionFile` to disambiguate — document that the user should set it in `.hv/config.json`.
 
@@ -115,7 +115,7 @@ If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this i
 .hv/bin/hv-release-changelog-from-commits <range>
 ```
 
-Captures categorized Markdown (buckets: Breaking, New, Fixed, Changed, Documentation, Performance, Merged).
+Captures categorized Markdown (buckets in helper-emit order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the helper.
 
 Append stats line — run:
 
@@ -175,7 +175,7 @@ Skip in `--dry-run` mode; print what would be written instead.
 ## Step 9 — Update CHANGELOG.md
 
 ```bash
-.hv/bin/hv-release-update-changelog v<new_version> "$NOTES_FILE" [--path <release.changelogPath>]
+.hv/bin/hv-release-update-changelog <new_version> "$NOTES_FILE" [--path <release.changelogPath>]
 ```
 
 If exit 1 (version section already exists), surface the error and stop — do not proceed to commit.
