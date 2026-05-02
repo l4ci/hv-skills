@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Validate .hv/status.json against git state. Auto-remove stale entries (branch gone).
 # Emit JSON: { "cleaned": [...], "needsAction": [...] } so the agent can present clearly.
+# In umbrella mode, entries with a non-null `repo` are scoped to <umbrella>/<repo>/.
 # Usage: hv-reconcile
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 HV_BASE="$("$HERE/hv-base-branch")"
-export HV_BASE
+export HV_BASE HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
 from hvlib import load_json, dump_json_atomic
+
+HERE = os.environ["HERE"]
+UMBRELLA_BASE = os.environ["HV_BASE"]
 
 path = Path(".hv/status.json")
 if not path.exists():
@@ -19,24 +23,54 @@ if not path.exists():
 data = load_json(path, {"active": []})
 active = data.get("active", [])
 
-def git(*args):
-    r = subprocess.run(["git", *args], capture_output=True, text=True)
+def git(*args, cwd=None):
+    r = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd)
     return r.stdout.strip(), r.returncode
 
-# Determine a default base branch (resolved by hv-base-branch: main → master → trunk → origin/HEAD)
-base = os.environ["HV_BASE"]
+def repos_map():
+    p = Path(".hv/repos.json")
+    if not p.exists():
+        return {}
+    try:
+        rdata = json.loads(p.read_text())
+    except (ValueError, OSError):
+        return {}
+    out = {}
+    for entry in rdata.get("repos", []) or []:
+        name = entry.get("name", "")
+        rel = entry.get("path", "")
+        if name and rel:
+            out[name] = os.path.realpath(rel)
+    return out
+
+REPOS = repos_map()
+base_cache = {None: UMBRELLA_BASE}  # None key = umbrella cwd
 
 cleaned, needs_action, still_active = [], [], []
 for entry in active:
     branch = entry.get("branch")
+    repo = entry.get("repo")
     if not branch:
-        cleaned.append({"reason": "no_branch_field", "entry": entry})
+        cleaned.append({"reason": "no_branch_field", "repo": repo, "entry": entry})
         continue
 
-    out, _ = git("branch", "--list", branch)
+    git_cwd = None
+    if repo:
+        git_cwd = REPOS.get(repo)
+        if git_cwd is None:
+            cleaned.append({
+                "branch": branch,
+                "repo": repo,
+                "reason": "repo_unregistered",
+                "items": entry.get("items", []),
+            })
+            continue
+
+    out, _ = git("branch", "--list", branch, cwd=git_cwd)
     if not out:
         cleaned.append({
             "branch": branch,
+            "repo": repo,
             "reason": "branch_gone",
             "items": entry.get("items", []),
         })
@@ -47,13 +81,22 @@ for entry in active:
     if worktree_missing:
         entry = {**entry, "worktree": None}
 
+    if repo not in base_cache:
+        result = subprocess.run(
+            [f"{HERE}/hv-base-branch"],
+            capture_output=True, text=True, cwd=git_cwd,
+        )
+        base_cache[repo] = result.stdout.strip() if result.returncode == 0 else "main"
+    base = base_cache[repo]
+
     commit_count = 0
-    out, rc = git("rev-list", "--count", f"{base}..{branch}")
+    out, rc = git("rev-list", "--count", f"{base}..{branch}", cwd=git_cwd)
     if rc == 0 and out.isdigit():
         commit_count = int(out)
 
     needs_action.append({
         "branch": branch,
+        "repo": repo,
         "items": entry.get("items", []),
         "worktree": entry.get("worktree"),
         "startedAt": entry.get("startedAt"),

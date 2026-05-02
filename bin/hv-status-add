@@ -1,30 +1,39 @@
 #!/usr/bin/env bash
 # Add an active work entry to .hv/status.json.
-# Usage: hv-status-add [--if-absent] <branch> <item-id>[,<item-id>...] [worktree-path]
+# Usage: hv-status-add [--if-absent] [--repo <name>] <branch> <item-id>[,<item-id>...] [worktree-path]
 #   --if-absent  Only write if no entry for <branch> already exists (no-op if present).
+#   --repo       Tag entry with sub-repo name for umbrella mode; uniqueness becomes (branch, repo).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 IF_ABSENT=0
-if [ "${1:-}" = "--if-absent" ]; then IF_ABSENT=1; shift; fi
-BRANCH="${1:?usage: hv-status-add [--if-absent] <branch> <items> [worktree]}"
-ITEMS="${2:?usage: hv-status-add [--if-absent] <branch> <items> [worktree]}"
+REPO=""
+while :; do
+  case "${1:-}" in
+    --if-absent) IF_ABSENT=1; shift ;;
+    --repo) REPO="${2:-}"; shift 2 ;;
+    *) break ;;
+  esac
+done
+BRANCH="${1:?usage: hv-status-add [--if-absent] [--repo <name>] <branch> <items> [worktree]}"
+ITEMS="${2:?usage: hv-status-add [--if-absent] [--repo <name>] <branch> <items> [worktree]}"
 WORKTREE="${3:-}"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$ITEMS" "$WORKTREE" "$IF_ABSENT" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$ITEMS" "$WORKTREE" "$IF_ABSENT" "$REPO" <<'PY'
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from hvlib import load_json, update_json
-branch, items_csv, worktree, if_absent = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
+branch, items_csv, worktree, if_absent, repo = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1", sys.argv[5]
 path = Path(".hv/status.json")
 if if_absent:
     data = load_json(path, {"active": []})
-    if any(e.get("branch") == branch for e in data.get("active", [])):
+    if any(e.get("branch") == branch and (e.get("repo") or None) == (repo or None) for e in data.get("active", [])):
         sys.exit(0)
 def mutator(data):
     data.setdefault("active", [])
-    data["active"] = [e for e in data["active"] if e.get("branch") != branch]
+    data["active"] = [e for e in data["active"] if not (e.get("branch") == branch and (e.get("repo") or None) == (repo or None))]
     data["active"].append({
         "branch": branch,
+        "repo": repo or None,
         "items": [i.strip() for i in items_csv.split(",") if i.strip()],
         "worktree": worktree or None,
         "startedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

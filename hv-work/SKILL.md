@@ -105,11 +105,25 @@ Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity,
 
 After picking the branch name:
 
+**Single-repo:**
+
 ```bash
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] [worktree-path]
 ```
 
-Idempotent on branch name — call again with the worktree path once Step 5 creates it.
+**Umbrella mode** (when `umbrella.enabled` is true and items carry `Repos:`): parse the `Repos:` field from each item's TODO entry; all items in the wave must share a sub-repo (V1 = single-repo per wave). Pass it via `--repo`:
+
+```bash
+.hv/bin/hv-status-add --repo <repo-name> <branch> <ID1>,<ID2>[,...] [worktree-path]
+```
+
+Parse the `Repos:` field by grepping the item bullet from `.hv/TODO.md`:
+
+```bash
+grep -E "^- \*\*\[<ID>\]" .hv/TODO.md | grep -oE "Repos:\s*[a-zA-Z0-9_-]+" | head -1 | sed 's/Repos:\s*//'
+```
+
+Idempotent on `(branch, repo)` — call again with the worktree path once Step 5 creates it.
 
 ## Step 4 — Plan Tasks
 
@@ -137,17 +151,65 @@ From the conversation context:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
 
+## Step 4.5 — Umbrella Pre-Flight (when umbrella mode is on)
+
+If `umbrella.enabled` in `.hv/config.json` is true, every item in the planned wave MUST carry a `Repos:` tag pointing at a registered sub-repo in `.hv/repos.json`. Otherwise, `/hv-work` cannot route the work.
+
+**Gate check:**
+
+```bash
+python3 -c "
+import json, sys
+cfg = json.loads(open('.hv/config.json').read())
+print('on' if cfg.get('umbrella', {}).get('enabled') else 'off')
+"
+```
+
+If umbrella mode is **off**, skip this step entirely (single-repo path).
+
+If **on**:
+
+1. For each item ID in the wave, parse `Repos:` from `.hv/TODO.md`. If any item lacks a `Repos:` tag, **stop with this error**:
+
+   > Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it, or capture as multi-repo via M03 (deferred). Cannot route to a sub-repo.
+
+2. All items in the wave must share the same sub-repo name (V1 single-repo-per-wave). If they diverge, surface this error and ask the user to split into separate `/hv-work` runs:
+
+   > Error: items in this wave target different sub-repos: `<list>`. V1 supports one sub-repo per `/hv-work` run. Split into separate runs, or wait for M03 multi-repo support.
+
+3. Confirm the named sub-repo exists in `.hv/repos.json`. If not, error and point at `/hv-init`:
+
+   > Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `/hv-init` from the umbrella root to register sub-repos.
+
+4. **Walk-up convenience.** If `/hv-work` was invoked from a cwd that resolves to a registered sub-repo via `bin/hv-resolve-repo`, default that sub-repo as the wave's scope. Items whose `Repos:` differ from the resolved cwd repo trigger the same divergence error in (2).
+
+When the gate passes, carry the resolved sub-repo name forward to Step 5 (branch/worktree path) and Step 10 (merge/PR --repo flag).
+
 ## Step 5 — Create Branch or Worktree
 
 Choose a descriptive name (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
 
-**Branch isolation:**
+### Isolation guard (fires before any worker dispatch)
+
+Before any worker is dispatched, if the planned wave has **≥2 commit-producing parallel workers** AND `work.isolation == "branch"`, **abort fatally**:
+
+> Error: this wave plans to dispatch <N> parallel workers (<task IDs>) under branch isolation. The 2026-05-02 isolation decision in `.hv/DECISIONS.md` requires `work.isolation: "worktree"` for ≥2 parallel commit-producing workers in a single wave — branch isolation forces all workers to share `.git/index`, which races even on disjoint files.
+>
+> Resolve by either:
+> - Re-plan the wave to a single worker (sequential commits within one task).
+> - Run `/hv-config` and flip `work.isolation` to `"worktree"`.
+
+This guard is **fatal**, not warn-and-proceed. It fires regardless of umbrella mode.
+
+A wave is "commit-producing" by default; "read-only" workers (research, lint-only verifications, smoke validators that don't commit) are exempt — count only workers whose brief instructs them to stage and commit.
+
+### Branch creation (single-repo)
 
 ```bash
 git checkout -b <branch-name>
 ```
 
-**Worktree isolation:**
+### Worktree creation (single-repo)
 
 ```bash
 git branch <branch-name>
@@ -155,7 +217,28 @@ git worktree add .claude/worktrees/<branch-name> <branch-name>
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] .claude/worktrees/<branch-name>
 ```
 
-Orchestrator stays in the main worktree (retains `.hv/` access). Workers get the absolute worktree path in their briefs and work there.
+### Branch creation (umbrella mode)
+
+When the wave's resolved sub-repo is `<repo>` (from Step 4.5):
+
+```bash
+(cd <repo> && git checkout -b <branch-name>)
+.hv/bin/hv-status-add --repo <repo> <branch> <ID1>,<ID2>[,...]
+```
+
+The branch lands in `<umbrella>/<repo>/.git/`, not the umbrella's `.git/`.
+
+### Worktree creation (umbrella mode — Layout B)
+
+```bash
+(cd <repo> && git branch <branch-name>)
+git -C <repo> worktree add <umbrella>/.claude/worktrees/<repo>/<branch-name> <branch-name>
+.hv/bin/hv-status-add --repo <repo> <branch> <ID1>,<ID2>[,...] <umbrella>/.claude/worktrees/<repo>/<branch-name>
+```
+
+The worktree path lives at `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layout B); `git worktree add` is run from inside `<repo>` so the worktree is registered against that sub-repo's `.git/`. `hv-worktree-clear --repo` (cleanup helper) finds it via the same Layout B path.
+
+Orchestrator stays in the umbrella worktree (retains `.hv/` access). Workers get the absolute Layout B path in their briefs and work there.
 
 ## Step 6 — Dispatch Parallel Worker Agents
 
@@ -163,6 +246,7 @@ For each independent task, dispatch a subagent with the **worker** model:
 
 ```
 You are implementing Task N of [total].
+[UMBRELLA: "Sub-repo: <name>. Run all git operations from <absolute-sub-repo-path>; the umbrella's `.git/` is shared coordinator state, NOT your target."]
 [WORKTREE: "Working directory: <absolute-worktree-path>. cd there before any file operations."]
 
 **Goal:** [one sentence]
@@ -186,6 +270,8 @@ You are implementing Task N of [total].
 **Commit with message:**
 [exact commit message to use]
 ```
+
+**Umbrella mode notes:** when umbrella mode is on, the `[UMBRELLA: ...]` line replaces the WORKTREE line if the wave uses branch isolation; both lines appear together if the wave uses Layout B worktrees. The sub-repo path is the absolute path resolved via `.hv/repos.json` (single-repo callers ignore both lines). Workers MUST `cd` to the named directory before any `git` command — the orchestrator stays at the umbrella for `.hv/` access, so worker commands run in the umbrella's cwd by default and would target the wrong `.git/`.
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the commit message (agents commit themselves); read-first, minimal-diff, no unrelated changes.
 
@@ -234,7 +320,11 @@ Run per resolved item. Match by keyword overlap between task description and TOD
 **Direct merge:**
 
 ```bash
+# Single-repo:
 printf 'merge: <summary>\n\n- task 1 description\n- task 2 description\n' | .hv/bin/hv-merge <branch>
+
+# Umbrella mode:
+printf 'merge: <summary>\n\n- task 1 description\n- task 2 description\n' | .hv/bin/hv-merge --repo <repo> <branch>
 ```
 
 The helper removes any worktree for the branch, checks out main, merges `--no-ff` with the piped message, deletes the branch, and prints the merge commit's short hash.
@@ -242,8 +332,13 @@ The helper removes any worktree for the branch, checks out main, merges `--no-ff
 **PR:**
 
 ```bash
+# Single-repo:
 printf '## Summary\n- item 1\n- item 2\n\n## Items resolved\n- [B01] Title\n- [F03] Title\n\n## Test plan\n- [ ] ...\n' \
   | .hv/bin/hv-pr <branch> "<short title>"
+
+# Umbrella mode:
+printf '## Summary\n- item 1\n- item 2\n\n## Items resolved\n- [B01] Title\n- [F03] Title\n\n## Test plan\n- [ ] ...\n' \
+  | .hv/bin/hv-pr --repo <repo> <branch> "<short title>"
 ```
 
 The helper removes any worktree, pushes the branch with `-u`, and runs `gh pr create`. Share the PR URL with the user.

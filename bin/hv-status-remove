@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
-# Remove an active entry from .hv/status.json by branch name.
-# Usage: hv-status-remove <branch>
+# Remove an active entry from .hv/status.json by branch (and optional repo).
+# Usage: hv-status-remove [--repo <name>] <branch>
+#   --repo  Match only entries tagged with this sub-repo. Without --repo, only legacy
+#          entries (repo: null/missing) are removed; umbrella entries are preserved.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-BRANCH="${1:?usage: hv-status-remove <branch>}"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" <<'PY'
+REPO=""
+if [ "${1:-}" = "--repo" ]; then REPO="${2:-}"; shift 2; fi
+BRANCH="${1:?usage: hv-status-remove [--repo <name>] <branch>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$REPO" <<'PY'
 import sys
 from pathlib import Path
 from hvlib import load_json, dump_json_atomic
-branch = sys.argv[1]
+branch, repo = sys.argv[1], sys.argv[2]
 path = Path(".hv/status.json")
 if not path.exists():
     sys.exit(0)
 data = load_json(path, {"active": []})
 before = data.get("active", [])
-after = [e for e in before if e.get("branch") != branch]
+after = [e for e in before if not (e.get("branch") == branch and (e.get("repo") or None) == (repo or None))]
 if before == after:
     sys.exit(0)
 data["active"] = after
