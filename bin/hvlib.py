@@ -96,20 +96,23 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 
 
 def parse_todo_fields(line: str) -> dict[str, str]:
-    """Extract Detail/Related/Milestone fields from a TODO bullet line.
+    """Extract Detail/Related/Milestone/Repos fields from a TODO bullet line.
 
     Each field starts with `<Field>: ` and runs until the next field marker
     or end of line. Order-agnostic. Returns a dict with keys 'detail',
-    'related', 'milestone' — missing fields map to ''.
+    'related', 'milestone', 'repos' — missing fields map to ''.
 
     Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
-        => {"detail": "foo.", "related": "[F02].", "milestone": "M01"}
+        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": ""}
+    Example: parse_todo_fields("- **[F01] [Major] Title.** D. Detail: x. Milestone: M02 Repos: web")
+        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web"}
     """
-    fields = {"detail": "", "related": "", "milestone": ""}
+    fields = {"detail": "", "related": "", "milestone": "", "repos": ""}
     others = {
-        "detail": ["Related", "Milestone"],
-        "related": ["Detail", "Milestone"],
-        "milestone": ["Detail", "Related"],
+        "detail": ["Related", "Milestone", "Repos"],
+        "related": ["Detail", "Milestone", "Repos"],
+        "milestone": ["Detail", "Related", "Repos"],
+        "repos": ["Detail", "Related", "Milestone"],
     }
     for key in fields:
         cap = key.capitalize()
@@ -162,3 +165,25 @@ def update_json(path, default, mutator) -> None:
     data = load_json(path, default)
     result = mutator(data)
     dump_json_atomic(path, data if result is None else result)
+
+
+def load_repos(repos_path=".hv/repos.json") -> dict[str, str]:
+    """Load the umbrella sub-repo registry. Return a dict mapping each
+    registered name to its resolved absolute path. Empty dict if the file
+    is missing, unreadable, or has no entries.
+
+    `path` values in repos.json are stored relative to the umbrella root;
+    this helper resolves them via os.path.realpath against the cwd from
+    which the helper is called. Callers that may run from a different cwd
+    should resolve paths themselves and pass the absolute base.
+
+    Never raises — returns {} on any error.
+    """
+    data = load_json(repos_path, {"repos": []})
+    out: dict[str, str] = {}
+    for entry in data.get("repos", []) or []:
+        name = entry.get("name", "")
+        rel = entry.get("path", "")
+        if name and rel:
+            out[name] = os.path.realpath(rel)
+    return out

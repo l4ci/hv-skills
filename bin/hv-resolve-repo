@@ -9,28 +9,18 @@ COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)" || {
 }
 SUBREPO_ROOT="$(realpath "$(dirname "$COMMON_DIR")")"
 UMBRELLA="$("$(dirname "$0")/hv-resolve-umbrella")" || exit 1
-python3 - "$UMBRELLA" "$SUBREPO_ROOT" <<'PY'
-import json, os, sys
-from pathlib import Path
+HERE="$(cd "$(dirname "$0")" && pwd)"
+cd "$UMBRELLA"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SUBREPO_ROOT" <<'PY'
+import os, sys
+from hvlib import load_repos
 
-umbrella, subrepo_root = sys.argv[1], sys.argv[2]
-repos_path = Path(umbrella) / ".hv" / "repos.json"
-try:
-    data = json.loads(repos_path.read_text())
-    repos = data.get("repos", []) or []
-except (FileNotFoundError, ValueError, OSError):
-    repos = []
-
-for entry in repos:
-    rel = entry.get("path", "")
-    name = entry.get("name", "")
-    if not rel or not name:
-        continue
-    entry_real = os.path.realpath(os.path.join(umbrella, rel))
-    if entry_real == subrepo_root:
+subrepo_root = sys.argv[1]
+repos = load_repos()
+for name, path in repos.items():
+    if path == subrepo_root:
         print(name)
         sys.exit(0)
-
 sys.stderr.write("not inside a registered sub-repo\n")
 sys.exit(1)
 PY

@@ -18,27 +18,25 @@ if [ -z "$MSG" ]; then
   exit 1
 fi
 
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 resolve_repo_path() {
   local name="$1"
-  if [ ! -f .hv/repos.json ]; then
-    echo "error: --repo requires .hv/repos.json — run /hv-init from the umbrella root" >&2
-    exit 1
-  fi
-  python3 - "$name" <<'PY'
-import json, os, sys
+  PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$name" <<'PY'
+import sys
+from hvlib import load_repos
 name = sys.argv[1]
-data = json.loads(open(".hv/repos.json").read())
-for entry in data.get("repos", []) or []:
-    if entry.get("name") == name:
-        path = entry.get("path", "")
-        print(os.path.realpath(path))
-        sys.exit(0)
-sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
-sys.exit(1)
+repos = load_repos()
+if not repos:
+    sys.stderr.write("error: --repo requires .hv/repos.json with at least one entry — run /hv-init from the umbrella root\n")
+    sys.exit(1)
+p = repos.get(name)
+if not p:
+    sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
+    sys.exit(1)
+print(p)
 PY
 }
-
-BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -n "$REPO" ]; then
   REPO_PATH=$(resolve_repo_path "$REPO")

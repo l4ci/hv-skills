@@ -133,7 +133,7 @@ Route each stream's answer via the `Skill` tool. Pass the branch name and item I
 |--------|--------|
 | "Resume with `/hv-work`" | Invoke `hv-work` on the branch; if a handoff note was consumed, include its full content in the brief |
 | "Ship via `/hv-ship`" | Invoke `hv-ship` on the branch |
-| "Abandon branch" | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
+| "Abandon branch" | `git branch -D <branch>` then `.hv/bin/hv-status-remove [--repo <repo>] <branch>` (pass `--repo` when the active entry has a non-null `repo`) |
 | "Leave as-is" / "Leave handoff for later" | Print *"Skipped `<branch>`."* and continue |
 | "Open backlog" | Invoke `hv-next` |
 | "Stop here" | Print *"OK — run `/hv-resume` again when you're ready."* and exit |

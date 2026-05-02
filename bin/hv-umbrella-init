@@ -41,7 +41,7 @@ UMBRELLA_HAS_GIT=0
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$INPUT" "$UMBRELLA_HAS_GIT" "${FOUND[@]}" <<'PY'
 import json, os, sys
 from pathlib import Path
-from hvlib import load_json, dump_json_atomic
+from hvlib import load_json, dump_json_atomic, write_text_atomic
 
 raw_input, umbrella_has_git, *found = sys.argv[1:]
 umbrella_has_git = umbrella_has_git == "1"
@@ -90,7 +90,7 @@ if umbrella_has_git:
             out.append("")
         out.append("# ── hv umbrella ──")
         out.extend(missing)
-        gi.write_text("\n".join(out) + "\n")
+        write_text_atomic(gi, "\n".join(out) + "\n")
 
 # 8. JSON summary on stdout. Compact separators so verification greps match verbatim.
 print(json.dumps({"registered": names, "umbrellaIsGitRepo": umbrella_has_git}, separators=(",", ":")))

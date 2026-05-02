@@ -38,7 +38,9 @@ for entry in data.get("active", []):
         started = (entry.get("startedAt") or "")[:10]
         wt = entry.get("worktree")
         loc = f" in {wt}" if wt else ""
-        print(f"Active: {ids} on {branch}{loc} (since {started})")
+        repo = entry.get("repo")
+        repo_str = f" (repo: {repo})" if repo else ""
+        print(f"Active: {ids} on {branch}{loc}{repo_str} (since {started})")
 
 # Recent completions (top 3 from ## Completed)
 completed = section(content, "Completed")

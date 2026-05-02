@@ -61,7 +61,7 @@ Route each resolution:
 |--------|--------|
 | Ship via `/hv-ship` | Invoke `hv-ship` via the `Skill` tool with this branch |
 | Resume with `/hv-work` | Invoke `hv-work` on the existing branch |
-| Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove <branch>` |
+| Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove [--repo <repo>] <branch>` (pass `--repo` when the active entry has a non-null `repo`) |
 | Leave as-is | Print *"Skipped `<branch>` — still in `status.json`."* and continue |
 
 Plain-text fallback: *"Merge or open a PR?"* and *"Resume or abandon?"* — honor the user's free-text reply.

@@ -10,7 +10,7 @@ export HV_BASE HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
-from hvlib import load_json, dump_json_atomic
+from hvlib import load_json, dump_json_atomic, load_repos
 
 HERE = os.environ["HERE"]
 UMBRELLA_BASE = os.environ["HV_BASE"]
@@ -27,23 +27,7 @@ def git(*args, cwd=None):
     r = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd)
     return r.stdout.strip(), r.returncode
 
-def repos_map():
-    p = Path(".hv/repos.json")
-    if not p.exists():
-        return {}
-    try:
-        rdata = json.loads(p.read_text())
-    except (ValueError, OSError):
-        return {}
-    out = {}
-    for entry in rdata.get("repos", []) or []:
-        name = entry.get("name", "")
-        rel = entry.get("path", "")
-        if name and rel:
-            out[name] = os.path.realpath(rel)
-    return out
-
-REPOS = repos_map()
+REPOS = load_repos()
 base_cache = {None: UMBRELLA_BASE}  # None key = umbrella cwd
 
 cleaned, needs_action, still_active = [], [], []

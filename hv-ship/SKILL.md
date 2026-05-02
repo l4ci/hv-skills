@@ -53,8 +53,33 @@ If it's `main`/`master`/`trunk`, stop and tell the user to check out the feature
 
 ## Step 2 — Scope the Work
 
+Resolve the active entry's repo (umbrella mode; empty in single-repo projects):
+
 ```bash
-.hv/bin/hv-review-scope
+REPO=$(python3 -c "
+import json
+try:
+    data = json.loads(open('.hv/status.json').read())
+    branch = '<branch>'  # the branch /hv-ship is operating on
+    for e in data.get('active', []):
+        if e.get('branch') == branch:
+            print(e.get('repo') or '')
+            break
+except Exception:
+    pass
+" 2>/dev/null)
+```
+
+**Single-repo:**
+
+```bash
+.hv/bin/hv-review-scope <branch>
+```
+
+**Umbrella mode** (when `$REPO` is non-empty):
+
+```bash
+.hv/bin/hv-review-scope --repo "$REPO" <branch>
 ```
 
 Emits JSON with commits, touched files, referenced IDs, and matched TODO entries. Keep the JSON in memory — Step 4 needs it.
@@ -131,9 +156,19 @@ printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
 
 ## Step 7 — Update Status
 
+**Single-repo:**
+
 ```bash
 .hv/bin/hv-status-remove <branch>
 ```
+
+**Umbrella mode** (reuse `$REPO` from Step 2; re-derive if out of scope):
+
+```bash
+.hv/bin/hv-status-remove --repo "$REPO" <branch>
+```
+
+Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-resume` / `/hv-next`.
 
 Silently clears the entry if one existed. Harmless if not.
 

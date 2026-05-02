@@ -6,9 +6,22 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+import os
+from pathlib import Path
 from hvlib import load_json
-cfg = load_json('.hv/config.json', {})
-print(cfg.get('git', {}).get('baseBranch', ''))
+
+d = Path.cwd().resolve()
+while True:
+    cfg_path = d / '.hv' / 'config.json'
+    if cfg_path.exists():
+        cfg = load_json(cfg_path, {})
+        print(cfg.get('git', {}).get('baseBranch', ''))
+        break
+    if d == d.parent:
+        # reached fs root, no config found
+        print('')
+        break
+    d = d.parent
 " 2>/dev/null || true)
 if [ -n "$CONFIGURED" ] && git rev-parse --verify "$CONFIGURED" >/dev/null 2>&1; then
   echo "$CONFIGURED"

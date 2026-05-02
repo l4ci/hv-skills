@@ -2009,4 +2009,194 @@ assert d['active'] == [], d
 mv "$TMP/.hv/status.json.bak" "$TMP/.hv/status.json"
 pass "single-repo backward compat: hv-status-add and hv-status-remove without flags"
 
+echo "parse_todo_fields Repos field"
+RESULT=$(PYTHONPATH="$BIN" python3 -c "
+from hvlib import parse_todo_fields
+r = parse_todo_fields('- **[F01] [Major] T.** D. Detail: x. Milestone: M02 Repos: web')
+import json
+print(json.dumps(r, sort_keys=True))
+")
+EXPECTED='{"detail": "x.", "milestone": "M02", "related": "", "repos": "web"}'
+[ "$RESULT" = "$EXPECTED" ] || fail "parse_todo_fields Repos: expected $EXPECTED, got $RESULT"
+pass "parse_todo_fields captures Repos field without bleeding into Milestone"
+
+RESULT2=$(PYTHONPATH="$BIN" python3 -c "
+from hvlib import parse_todo_fields
+r = parse_todo_fields('- **[B07] [P1] T.** D. Milestone: M01')
+print(r['milestone'])
+")
+[ "$RESULT2" = "M01" ] || fail "parse_todo_fields Milestone without Repos: expected M01, got '$RESULT2'"
+pass "parse_todo_fields Milestone capture without Repos field unchanged"
+
+echo "hvlib.load_repos"
+mkdir lr-test && cd lr-test
+mkdir -p .hv web api
+cat > .hv/repos.json <<'EOF'
+{"repos": [{"name": "web", "path": "./web"}, {"name": "api", "path": "./api"}]}
+EOF
+RESULT=$(PYTHONPATH="$BIN" python3 -c "
+from hvlib import load_repos
+r = load_repos()
+print(sorted(r.keys()))
+")
+[ "$RESULT" = "['api', 'web']" ] || fail "load_repos keys: expected ['api', 'web'], got $RESULT"
+pass "load_repos returns name → path mapping"
+
+# Empty registry case
+echo '{"repos": []}' > .hv/repos.json
+EMPTY=$(PYTHONPATH="$BIN" python3 -c "from hvlib import load_repos; print(load_repos())")
+[ "$EMPTY" = "{}" ] || fail "load_repos empty registry: expected {}, got '$EMPTY'"
+pass "load_repos returns {} for empty registry"
+
+cd ..
+
+echo "hv-base-branch walks up to umbrella config"
+mkdir bb-walk && cd bb-walk
+# Create a fake umbrella with config.json, no git
+mkdir -p .hv subrepo
+cat > .hv/config.json <<'EOF'
+{"git": {"baseBranch": "develop"}}
+EOF
+# Create a sub-repo with its own git tree, no .hv/
+cd subrepo
+git init -q
+git config user.email t@t && git config user.name t
+git checkout -q -b develop 2>/dev/null || git branch -m develop
+echo "x" > f && git add f && git commit -q -m "seed"
+# From inside the sub-repo (no .hv/), hv-base-branch should find umbrella's develop
+RESULT=$("$BIN/hv-base-branch")
+[ "$RESULT" = "develop" ] || fail "hv-base-branch from sub-repo: expected develop, got '$RESULT'"
+pass "hv-base-branch walks up to umbrella .hv/config.json from sub-repo"
+cd ../..
+
+echo "hv-summary shows repo for umbrella active entries"
+mkdir sum-test && cd sum-test
+mkdir -p .hv
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+cat > .hv/MILESTONES.md <<'EOF'
+# Vision
+
+## Active milestones
+
+## Milestones
+EOF
+cat > .hv/status.json <<'EOF'
+{"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z", "repo": "web"}]}
+EOF
+echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
+OUT=$("$BIN/hv-summary")
+echo "$OUT" | grep -q "(repo: web)" || fail "hv-summary missing (repo: web): $OUT"
+pass "hv-summary shows (repo: <name>) for umbrella active entry"
+
+# And: legacy entry without repo doesn't show parenthetical
+cat > .hv/status.json <<'EOF'
+{"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
+EOF
+OUT=$("$BIN/hv-summary")
+if echo "$OUT" | grep -q "repo:"; then fail "hv-summary unexpectedly shows 'repo:' for non-umbrella entry: $OUT"; fi
+pass "hv-summary does not show repo: for legacy active entries"
+cd ..
+
+echo "hv-backlog In Progress Repo column"
+mkdir bl-test && cd bl-test
+mkdir -p .hv
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+- **[B01] [P1] Title.** Body.
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+cat > .hv/MILESTONES.md <<'EOF'
+# Vision
+
+## Active milestones
+
+## Milestones
+EOF
+echo '{"bugs":1,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
+
+# With umbrella entry: column should appear
+cat > .hv/status.json <<'EOF'
+{"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z", "repo": "web"}]}
+EOF
+OUT=$("$BIN/hv-backlog")
+echo "$OUT" | grep -q "| Repo |" || fail "hv-backlog missing Repo column: $OUT"
+pass "hv-backlog adds Repo column when active entry has repo"
+
+# Legacy entry: column should NOT appear
+cat > .hv/status.json <<'EOF'
+{"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
+EOF
+OUT=$("$BIN/hv-backlog")
+if echo "$OUT" | grep -q "| Repo |"; then fail "hv-backlog unexpectedly shows Repo column: $OUT"; fi
+pass "hv-backlog omits Repo column when no active entry has repo"
+cd ..
+
+echo "hv-preflight gates on repos.json under umbrella mode"
+mkdir pf-test && cd pf-test
+mkdir -p .hv/bin
+# Seed minimal required files
+echo "" > .hv/DECISIONS.md
+echo "" > .hv/TODO.md
+echo "" > .hv/KNOWLEDGE.md
+echo "" > .hv/MILESTONES.md
+echo "{}" > .hv/counters.json
+echo '{"active":[]}' > .hv/status.json
+# Copy hvlib.py + hv-preflight (preflight discovers helpers from its own dir's siblings)
+cp "$BIN/hvlib.py" .hv/bin/
+for f in "$BIN"/hv-*; do cp "$f" .hv/bin/ && chmod +x ".hv/bin/$(basename $f)"; done
+
+# Single-repo: no repos.json needed
+echo '{"umbrella": {"enabled": false}}' > .hv/config.json
+.hv/bin/hv-preflight && pass "hv-preflight passes single-repo without repos.json" || fail "hv-preflight failed single-repo"
+
+# Umbrella enabled, repos.json missing: exit 2
+echo '{"umbrella": {"enabled": true}}' > .hv/config.json
+if .hv/bin/hv-preflight 2>/dev/null; then fail "hv-preflight should fail with umbrella.enabled and missing repos.json"; fi
+RC=0; .hv/bin/hv-preflight 2>/dev/null || RC=$?
+[ "$RC" = "2" ] || fail "hv-preflight expected exit 2, got $RC"
+pass "hv-preflight exits 2 when umbrella.enabled and repos.json missing"
+
+# Umbrella enabled, repos.json with at least one entry: pass
+echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
+.hv/bin/hv-preflight && pass "hv-preflight passes with umbrella.enabled and valid repos.json" || fail "hv-preflight failed with valid repos.json"
+
+# Umbrella enabled, repos.json empty: exit 2
+echo '{"repos": []}' > .hv/repos.json
+if .hv/bin/hv-preflight 2>/dev/null; then fail "hv-preflight should fail with umbrella.enabled and empty repos.json"; fi
+RC=0; .hv/bin/hv-preflight 2>/dev/null || RC=$?
+[ "$RC" = "2" ] || fail "hv-preflight expected exit 2 for empty repos.json, got $RC"
+pass "hv-preflight exits 2 when umbrella.enabled and repos.json empty"
+cd ..
+
+echo "hv-resolve-umbrella detects deep stray .hv/"
+mkdir ru-deep && cd ru-deep
+# umbrella + sub-repo registered + DEEP stray .hv/ inside sub-repo's source tree
+mkdir -p .hv web/src/.hv
+cat > .hv/repos.json <<'EOF'
+{"repos": [{"name": "web", "path": "./web"}]}
+EOF
+cd web/src
+RC=0; "$BIN/hv-resolve-umbrella" 2>/dev/null || RC=$?
+[ "$RC" = "2" ] || fail "hv-resolve-umbrella deep stray expected exit 2, got $RC"
+pass "hv-resolve-umbrella exits 2 on deep stray .hv/ inside registered sub-repo"
+cd ../../..
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

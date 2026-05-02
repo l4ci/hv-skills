@@ -261,7 +261,7 @@ Read the existing file, merge only the keys the user answered (or Recommended de
 
 ```bash
 python3 - <<PY
-import json
+import json, os
 from pathlib import Path
 p = Path(".hv/config.json")
 cfg = json.loads(p.read_text())
@@ -270,15 +270,16 @@ cfg = json.loads(p.read_text())
 # Set only the keys from the STALE list; never overwrite existing values.
 cfg.setdefault("ship", {})["review"] = True   # or answered value
 
-# umbrella.enabled — silent default to False on upgrade. No migration prompt;
-# users opt in by re-running /hv-init from an umbrella, or via /hv-config.
-cfg.setdefault("umbrella", {})["enabled"] = False
+# umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
+# with "Yes" answers sets it to true). Default false on upgrade when the env var
+# is unset (no migration prompt for users who didn't re-run from a parent).
+cfg.setdefault("umbrella", {})["enabled"] = os.environ.get("UMBRELLA_MODE", "false") == "true"
 
 p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
 
-Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, write `False` silently with no prompt (the only way to flip it on is re-running `/hv-init` from an umbrella or editing via `/hv-config`).
+Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `False` when unset, `True` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`.
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 

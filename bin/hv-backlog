@@ -70,14 +70,23 @@ def title_of(item_id):
 out = []
 
 if active_entries:
+    show_repo = any(e.get("repo") for e in active_entries)
     out.append("### In Progress\n")
-    out.append("| ID | Title | Branch | Started |")
-    out.append("|----|-------|--------|---------|")
+    if show_repo:
+        out.append("| ID | Title | Branch | Repo | Started |")
+        out.append("|----|-------|--------|------|---------|")
+    else:
+        out.append("| ID | Title | Branch | Started |")
+        out.append("|----|-------|--------|---------|")
     for e in active_entries:
         branch = e.get("branch", "")
         started = (e.get("startedAt") or "")[:10]
+        repo = e.get("repo") or ""
         for iid in e.get("items", []):
-            out.append(f"| {iid} | {title_of(iid)} | {branch} | {started} |")
+            if show_repo:
+                out.append(f"| {iid} | {title_of(iid)} | {branch} | {repo} | {started} |")
+            else:
+                out.append(f"| {iid} | {title_of(iid)} | {branch} | {started} |")
     out.append("")
 
 def render_table(label, items, base_headers, row_fn):

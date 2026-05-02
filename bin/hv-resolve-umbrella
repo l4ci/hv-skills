@@ -38,7 +38,11 @@ for parent in candidates[1:]:
         if not rel:
             continue
         sub_real = os.path.realpath(os.path.join(parent, rel))
-        if sub_real == first_real:
+        try:
+            common = os.path.commonpath([first_real, sub_real])
+        except ValueError:
+            common = ""
+        if common == sub_real:
             sys.stderr.write(f"stray .hv/ inside registered sub-repo {name} — masking umbrella\n")
             sys.exit(2)
 

@@ -18,6 +18,34 @@ for f in DECISIONS.md TODO.md KNOWLEDGE.md MILESTONES.md counters.json config.js
   fi
 done
 
+UMBRELLA_ON=$(python3 -c "
+import json
+try:
+    cfg = json.loads(open('.hv/config.json').read())
+    print('1' if cfg.get('umbrella', {}).get('enabled') else '0')
+except Exception:
+    print('0')
+")
+if [ "$UMBRELLA_ON" = "1" ]; then
+  if [ ! -f "$HV/repos.json" ]; then
+    echo "uninitialized: umbrella.enabled is true but $HV/repos.json missing — re-run /hv-init from the umbrella root" >&2
+    exit 2
+  fi
+  REPOS_OK=$(python3 -c "
+import json
+try:
+    data = json.loads(open('.hv/repos.json').read())
+    repos = data.get('repos', []) or []
+    print('1' if any(e.get('name') and e.get('path') for e in repos) else '0')
+except Exception:
+    print('0')
+")
+  if [ "$REPOS_OK" != "1" ]; then
+    echo "uninitialized: $HV/repos.json is empty or malformed — re-run /hv-init from the umbrella root" >&2
+    exit 2
+  fi
+fi
+
 # Auto-discover helpers from the source bin/ directory (the one currently being
 # checked, alongside this script). Strips the bin/ prefix and skips hv-preflight
 # itself — preflight verifies every other helper, not itself.

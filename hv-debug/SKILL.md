@@ -207,8 +207,21 @@ If the fix doesn't hold → back to Step 6. Don't commit a partial fix.
 
 ```bash
 .hv/bin/hv-complete <ID> <commit-hash>
+```
+
+**Single-repo:**
+
+```bash
 .hv/bin/hv-status-remove <branch>
 ```
+
+**Umbrella mode** (when `umbrella.enabled` is true and the active entry has a non-null `repo`, derive it from `.hv/status.json` as `/hv-ship` does in its Step 2):
+
+```bash
+.hv/bin/hv-status-remove --repo <repo> <branch>
+```
+
+Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-resume` / `/hv-next`.
 
 ## Step 11 — Report
 

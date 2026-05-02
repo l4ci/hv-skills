@@ -14,8 +14,8 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
-| `hv-status-add` | Register an active work entry (idempotent on branch) | `.hv/bin/hv-status-add hv/foo B01,F02 .claude/worktrees/hv-foo` |
-| `hv-status-remove` | Clear an active entry by branch | `.hv/bin/hv-status-remove hv/foo` |
+| `hv-status-add` | Register an active work entry (idempotent on `(branch, repo)`) | `.hv/bin/hv-status-add [--repo <name>] hv/foo B01,F02 [worktree]` |
+| `hv-status-remove` | Clear an active entry by branch (or `(branch, repo)` in umbrella mode) | `.hv/bin/hv-status-remove [--repo <name>] hv/foo` |
 | `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON | `.hv/bin/hv-reconcile` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 | `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
@@ -37,11 +37,11 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
 | `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
 | `hv-base-branch` | Print the resolved base branch (`main`, `master`, `trunk`, or `origin/HEAD`) | `.hv/bin/hv-base-branch` |
-| `hv-worktree-clear <branch>` | Remove a non-main worktree that has `<branch>` checked out; silent if none | `.hv/bin/hv-worktree-clear hv/foo` |
-| `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge hv/foo` |
-| `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr hv/foo "title"` |
+| `hv-worktree-clear` | Remove a non-main worktree that has `<branch>` checked out; silent if none | `.hv/bin/hv-worktree-clear [--repo <name>] hv/foo` |
+| `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch — msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge [--repo <name>] hv/foo` |
+| `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr [--repo <name>] hv/foo "title"` |
 | `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
-| `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope hv/foo` |
+| `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope [--repo <name>] hv/foo` |
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
@@ -49,6 +49,9 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
+| `hv-umbrella-init` | Bootstrap an umbrella registry: scan child git repos, register a chosen subset (via stdin), write `.hv/repos.json` and append umbrella `.gitignore` lines | `echo "all" \| <source-bin>/hv-umbrella-init` |
+| `hv-resolve-umbrella` | Walk up from cwd to find the umbrella's `.hv/`; detect masking by stray `.hv/` inside a registered sub-repo | `.hv/bin/hv-resolve-umbrella` |
+| `hv-resolve-repo` | Identify which registered sub-repo cwd belongs to (incl. Layout B worktrees) | `.hv/bin/hv-resolve-repo` |
 | `hv-release-detect-version` | Auto-detect the version file and emit current version as JSON | `.hv/bin/hv-release-detect-version` |
 | `hv-release-bump-version` | Apply a semver bump (patch/minor/major or explicit) to a version file in-place | `.hv/bin/hv-release-bump-version plugin.json plugin-json minor` |
 | `hv-release-changelog-from-commits` | Categorize commits in a git range by Conventional Commits prefix → markdown | `.hv/bin/hv-release-changelog-from-commits v1.0.0..HEAD` |
@@ -87,6 +90,8 @@ and removes records whose branches no longer exist. It emits a JSON summary that
 skills use to avoid acting on stale context. `hv-summary` prints a human-readable
 snapshot of the same data: backlog counts, what's actively in progress, and the
 most recent completions.
+
+In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, including base-branch resolution per repo.
 
 ## Knowledge, vision, and decisions indexes
 
@@ -138,6 +143,8 @@ commits for referenced IDs and matching them against open TODO entries.
 `hv-review-scope` emits a richer JSON payload — commits, touched files,
 referenced IDs, and matched TODO entries — that the `/hv-review` skill consumes.
 
+All three helpers (`hv-merge`, `hv-pr`, `hv-review-scope`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
+
 ## Diagnostics
 
 `hv-preflight` verifies that `.hv/` is initialised and every expected helper is
@@ -161,6 +168,14 @@ other scripts.
 `hv-guard-clean` exits non-zero when the git working tree is dirty or the
 current directory is not inside a git repository. Skills call it as a safety
 check before making commits.
+
+## Umbrella mode helpers
+
+When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coordinates work across multiple sub-repos registered in `.hv/repos.json`. Three helpers manage that registry and the cwd-to-sub-repo resolution.
+
+`hv-umbrella-init` runs once during `/hv-init` Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and — if the umbrella is itself a git repo — appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
+
+`hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo) — exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
 
 ## Bootstrap (run during /hv-init only)
 
