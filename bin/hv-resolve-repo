@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Identify which registered sub-repo the current cwd belongs to (incl. Layout B worktrees).
+# Usage: hv-resolve-repo
+# Exits: 0 with name on stdout, 1 if not in a registered sub-repo
+set -euo pipefail
+COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)" || {
+  echo "not inside a registered sub-repo" >&2
+  exit 1
+}
+SUBREPO_ROOT="$(realpath "$(dirname "$COMMON_DIR")")"
+UMBRELLA="$("$(dirname "$0")/hv-resolve-umbrella")" || exit 1
+python3 - "$UMBRELLA" "$SUBREPO_ROOT" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+umbrella, subrepo_root = sys.argv[1], sys.argv[2]
+repos_path = Path(umbrella) / ".hv" / "repos.json"
+try:
+    data = json.loads(repos_path.read_text())
+    repos = data.get("repos", []) or []
+except (FileNotFoundError, ValueError, OSError):
+    repos = []
+
+for entry in repos:
+    rel = entry.get("path", "")
+    name = entry.get("name", "")
+    if not rel or not name:
+        continue
+    entry_real = os.path.realpath(os.path.join(umbrella, rel))
+    if entry_real == subrepo_root:
+        print(name)
+        sys.exit(0)
+
+sys.stderr.write("not inside a registered sub-repo\n")
+sys.exit(1)
+PY
