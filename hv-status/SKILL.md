@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-status — Quick State Glance
 
-Pure read — shows where the project stands without running git reconciliation, archival, or suggestions. Use this when the user wants to orient, not act.
-
 ## When to Use
 
 - *"What's the state of the backlog?"*

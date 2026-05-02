@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-docs — Public User-Guide Maintainer
 
-Scaffolds and maintains a public user guide under `<docs.path>/` (default `docs/`) for *consumers* of the project — CLI users, library callers, API clients, app users — not contributors. `.docsignore` and on-write secret scrub guard sensitive content.
-
 ## Modes
 
 | Detected when | Mode |

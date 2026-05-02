@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-refactor
 
-Run a full architectural refactor cycle on the current codebase.
-
 ## Configuration
 
 Read `.hv/config.json`:

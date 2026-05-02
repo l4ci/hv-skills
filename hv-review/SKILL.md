@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-review — Pre-Merge Review
 
-Read-only staff-engineer review of a feature branch against its original intent, project conventions, and obvious quality issues. No mutations, no commits — just a verdict.
-
 ## Configuration
 
 Read `.hv/config.json`:

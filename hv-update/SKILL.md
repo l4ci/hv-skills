@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-update — Check for hv-skills Updates
 
-Diagnose whether the installed hv-skills is current, and tell the user how to update if not. Never runs the update itself — too many install paths to get right automatically.
-
 ## When NOT to Use
 
 - You explicitly pinned to an older version → skip this

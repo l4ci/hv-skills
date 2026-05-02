@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-learn — Capture Session Learnings
 
-Distill durable knowledge from the current session into `.hv/KNOWLEDGE.md`, organized by topic, so it's available to future work.
-
 ## Step 1 — Preflight
 
 ```bash

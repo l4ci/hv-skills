@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-resume — Pick Up Where You Left Off
 
-Read-only reorientation. Surfaces active work, recent commits per branch, and backlog counts — then routes to the right next action. No mutation.
-
 ## When to Use
 
 - Right after `/clear` when you want to recover session context

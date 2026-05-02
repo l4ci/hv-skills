@@ -15,8 +15,6 @@ user-invocable: true
 
 # hv-ship — Finish a Feature Branch
 
-Turn the commits on the current feature branch into either a GitHub PR or a direct merge. Optionally runs `/hv-review` first so the diff gets a staff-engineer pass before it leaves your machine.
-
 ## Configuration
 
 Read `.hv/config.json`:

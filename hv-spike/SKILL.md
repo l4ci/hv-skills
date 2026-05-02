@@ -15,7 +15,7 @@ user-invocable: true
 
 # hv-spike — Throwaway Feasibility Experiment
 
-Answer a *specific feasibility question* on a dedicated `spike/<name>` branch. The branch is never merged — only the findings come back to main, in `.hv/spikes/<name>.md`. Code on the spike branch is reference, not product.
+**Code on the spike branch is reference, not product.**
 
 Two modes:
 

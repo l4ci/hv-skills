@@ -15,10 +15,6 @@ user-invocable: true
 
 # hv-go — Capture & Execute in One Pass
 
-Route a freshly-described bug, feature, or task straight into implementation. The item is still written to `TODO.md` with a real ID so history is preserved, but the `/hv-next` review step is skipped.
-
-**Use for** hot-path work — fixes you want done now, not queued. **Don't use for** brainstorming (`/hv-capture`) or picking from the backlog (`/hv-next`).
-
 ## Flow
 
 ```

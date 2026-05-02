@@ -15,7 +15,7 @@ user-invocable: true
 
 # hv-vision — Brainstorm Project Vision & Milestones
 
-Sit above the day-to-day backlog. The user describes where they want the project to go; this skill challenges that framing, grounds it in outside research, and produces a milestone plan with explicit dependencies. Multiple milestones can be active at once when they don't depend on each other.
+Multiple milestones can be active at once when they don't depend on each other.
 
 `MILESTONES.md` is the overview (vision paragraph, active list, one short section per milestone). `.hv/milestones/MNN.md` holds the full plan for each milestone (goal, acceptance criteria, rationale, open risks, research findings, free-form notes).
 
