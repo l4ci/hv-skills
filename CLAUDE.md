@@ -15,6 +15,7 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
 
 - **M01** — User-Guide Maintainer (/hv-docs) (depends: —)
+- **M02** — Umbrella Mode V1: coordinator at umbrella, work in sub-repos (depends: —)
 <!-- hv-vision-end -->
 
 ## Working in this repo
