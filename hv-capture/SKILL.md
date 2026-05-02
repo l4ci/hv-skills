@@ -125,6 +125,40 @@ Plain-text fallback: ask *"Tag with M01?"* once. If the reply is ambiguous, defa
 
 Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into Step 6's `Milestone:` suffix. If "No — leave untagged" was picked, omit the suffix entirely.
 
+## Step 4.6 — Tag Sub-Repo (when umbrella mode is on)
+
+If umbrella mode is enabled AND there's at least one registered sub-repo, ask the user which sub-repo each item belongs to. Otherwise skip this step silently.
+
+**Gate check:**
+
+```bash
+python3 -c "
+import json, sys
+try:
+    cfg = json.loads(open('.hv/config.json').read())
+    repos = json.loads(open('.hv/repos.json').read()).get('repos', [])
+except (FileNotFoundError, ValueError):
+    sys.exit(1)
+sys.exit(0 if cfg.get('umbrella', {}).get('enabled') and repos else 1)
+"
+```
+
+If exit code is non-zero, skip Step 4.6 entirely. Move on to Step 5.
+
+**When umbrella mode is on with registered repos**, use a single `AskUserQuestion` per captured item (or one batched call if all items share the same answer is obvious — e.g., the user said *"fix the navbar in web"*; you can pre-answer with `"web"` and skip the question). Otherwise:
+
+- **Header:** `"Repo"`
+- **Question:** *"Which sub-repo does this item belong to?"* (include the item's short title for context)
+- **Options** (single-select, one per registered repo):
+  - One option per `name` in `.hv/repos.json` (mark the most likely match `(Recommended)` if the item's text mentions a repo name)
+  - *"None / unsure — leave untagged"* (last option)
+
+Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged — V1 forbids forcing a guess. (`/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.)
+
+**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one registered repo, **auto-tag without asking** — the speed path uses the obvious answer. With ≥2 registered repos, the cap is **exempt for this single question** — silently skipping the tag would force `/hv-work` to bail later, which is worse than spending one question.
+
+Carry the chosen sub-repo name as a single string (V1 = single-repo-per-item) into Step 6's `Repos:` suffix. If "None / unsure" was picked, omit the suffix entirely.
+
 ## Step 5 — Handle Large Input
 
 If any item's input contains bulky raw data (crash dumps, stack traces, log output, specs, checklists, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
@@ -161,13 +195,13 @@ Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`
 
 **Entry formats:**
 
-- Bug: `- **[$ID] [Priority] Short title.** What happens, when, what should happen instead. Related: [F02], [T01] Milestone: M01`
-- Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03] Milestone: M02`
-- Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02] Milestone: M01, M03`
+- Bug: `- **[$ID] [Priority] Short title.** What happens, when, what should happen instead. Related: [F02], [T01] Milestone: M01 Repos: web`
+- Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03] Milestone: M02 Repos: api`
+- Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02] Milestone: M01, M03 Repos: web`
 
 With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
 
-**Field order:** title.description. then any combination of `Detail:`, `Related:`, and `Milestone:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5.
+**Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, and `Repos:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — single name in V1; parser tolerates a comma-separated list for forward-compat with M03).
 
 The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 
@@ -196,6 +230,11 @@ Bug with detail file:
 Feature tagged with the active milestone:
 ```markdown
 - **[F08] [Minor] OAuth token rotation.** Refresh tokens 5 minutes before expiry; transparent retry on 401. Milestone: M01
+```
+
+Feature tagged with sub-repo (umbrella mode):
+```markdown
+- **[F09] [Minor] Sticky header on scroll.** Keep the top nav fixed when the user scrolls past 100px. Milestone: M02 Repos: web
 ```
 
 Mixed input — user says *"the sidebar flickers on hover, also we should add keyboard shortcuts for the top 5 actions, and update the linter config to enable the new rules"*:
