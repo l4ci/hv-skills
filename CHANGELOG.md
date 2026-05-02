@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.13.0 — 2026-05-02
+
+**Umbrella Mode V1 — coordinate backlog and work across multiple sub-repos from a single `.hv/`.**
+
+## New
+
+- **Umbrella Mode foundation (M02-S01)** — opt-in detection, sub-repo registry (`.hv/repos.json`), and resolvers so a single `.hv/` can coordinate work across multiple repos. Adds `hv-umbrella-init`, `hv-resolve-umbrella`, `hv-resolve-repo` helpers; `hv-bootstrap` seeds an empty registry; `hv-init` Step 1.5 prompts for umbrella opt-in; `hv-config` exposes a toggle.
+- **Umbrella Mode command awareness (M02-S02)** — `--repo` flag plumbed through `hv-status-add`, `hv-status-remove`, `hv-merge`, `hv-pr`, `hv-worktree-clear`, and `hv-reconcile` (per-entry git scoping). `/hv-capture` Step 4.6 tags items with their target repo; `/hv-work` creates branches in the right sub-repo with isolation guards.
+
+## Changed
+
+- Refreshed CLAUDE.md managed blocks (decisions index, vision index — M02 marked active).
+- Fixed exec bit on `hv-resolve-repo`.
+
+## Documentation
+
+- New umbrella-mode user-guide page.
+
+## Stats
+
+24 commits, 18 files changed, +946 −46 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.12.2...v1.13.0
+
 ## v1.12.2 — 2026-05-02
 
 Single bugfix surfaced one release after `/hv-release` shipped.
