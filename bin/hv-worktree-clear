@@ -1,15 +1,39 @@
 #!/usr/bin/env bash
 # If a non-main worktree has <branch> checked out, remove it. Silent if none.
-# Usage: hv-worktree-clear <branch>
+# Usage: hv-worktree-clear [--repo <name>] <branch>
 # Always skips the main working tree (which `git worktree remove` refuses anyway).
 # This guard centralizes what was previously inline in hv-merge — see hv-pr,
 # which previously omitted it.
+# In umbrella mode (--repo set), the worktree's expected location is
+# <umbrella>/.claude/worktrees/<repo>/<branch> (Layout B). The primary awk
+# search still works there (it's repo-layout-agnostic); the Layout B path
+# check is a fallback for cases where the worktree is on disk but not
+# registered in .git/worktrees/.
 set -euo pipefail
-BRANCH="${1:?usage: hv-worktree-clear <branch>}"
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:-}"; shift 2
+fi
+BRANCH="${1:?usage: hv-worktree-clear [--repo <name>] <branch>}"
+
 WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
   /^worktree / { wt=substr($0, 10); count++ }
   $0 == "branch " b && count > 1 { print wt; exit }
 ')
+
+# Layout B fallback: when --repo is set and the awk search missed, try the
+# canonical Layout B path under the resolved umbrella.
+if [ -z "$WT" ] && [ -n "$REPO" ]; then
+  if UMBRELLA="$("$BIN_DIR/hv-resolve-umbrella" 2>/dev/null)"; then
+    LB_PATH="$UMBRELLA/.claude/worktrees/$REPO/$BRANCH"
+    if [ -d "$LB_PATH" ]; then
+      WT="$LB_PATH"
+    fi
+  fi
+fi
+
 if [ -n "$WT" ]; then
   git worktree remove "$WT"
 fi
