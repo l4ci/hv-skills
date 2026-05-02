@@ -46,6 +46,7 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
 | `hv-refactor-reset` | Zero `counters.json#since_refactor` (called by `/hv-refactor` after commit) | `.hv/bin/hv-refactor-reset` |
+| `hv-refactor-targets` | JSON: umbrella mode flag + `hasCode` for the umbrella + every registered sub-repo's name and abs path. Used by `/hv-refactor` Step 1.5 to ask the user which scope to refactor | `.hv/bin/hv-refactor-targets` |
 | `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
@@ -160,6 +161,7 @@ the number of features and bugs completed since the last refactor cycle —
 maintained imperatively: `hv-complete` increments it on every active→completed
 transition whose resolved commit's subject does not start with `refactor:`,
 and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
+`hv-refactor-targets` enumerates refactor targets — the umbrella's `hasCode` flag plus every registered sub-repo — so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
 
 `hv-backlog` renders the full TODO.md as sorted Markdown tables (In Progress,
 Bugs, Features, Tasks) — handy for a quick terminal overview or piping into

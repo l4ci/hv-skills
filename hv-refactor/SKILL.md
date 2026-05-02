@@ -23,6 +23,10 @@ Read `.hv/config.json`:
 - `models.worker` — implementation subagents (default `sonnet`)
 - `refactor.confirmBeforeExecute` — pause for user approval before executing fixes (default `true`; `false` for full autonomy)
 
+## Args
+
+- `--here` — skip Step 1.5 (umbrella scope detection); run the single-repo flow in cwd. Used internally by Step 1.5's fanout dispatch — each sub-agent invokes `/hv-refactor --here` after `cd`-ing into its target. Single-repo projects (umbrella.enabled false or unset) ignore the flag — the flow is identical with or without it.
+
 ## Flow
 
 Explore → Triage → Present *(checkpoint)* → Design competing approaches *(checkpoint)* → Fix in parallel → Verify → Re-fix on failures → Commit → Report
@@ -36,7 +40,7 @@ Every friction point gets one category — it drives the fix strategy:
 3. **Ports & Adapters** — your services across a network boundary (microservices, internal APIs). Define a port at the module boundary; deep module owns logic, transport is injected. Tests use an in-memory adapter; production uses the real one.
 4. **True external** — third-party services (Stripe, Twilio) you don't control. Mock at the boundary; tests provide the mock, production uses the real implementation.
 
-## Step 1 — Preflight & Guard
+## Step 1 — Preflight
 
 ```bash
 .hv/bin/hv-preflight
@@ -44,11 +48,157 @@ Every friction point gets one category — it drives the fix strategy:
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+The `hv-guard-clean` call moved from this step into Step 1.5's branches — fanout sub-agents run their own guard-cleans against their target trees, so the umbrella-level guard isn't needed (and would falsely fail when the umbrella is not a git repo).
+
+## Step 1.5 — Umbrella Scope (skip if `--here` was passed)
+
+Skip this step entirely if EITHER:
+- `--here` was passed to this invocation
+- `umbrella.enabled` is false in `.hv/config.json`
+
+In that case, run `hv-guard-clean` and proceed to Step 2 (single-repo flow):
+
 ```bash
 .hv/bin/hv-guard-clean "/hv-refactor"
 ```
 
-Non-zero exit = stop and surface the script's message. Do not proceed until clean.
+Otherwise, list refactor targets:
+
+```bash
+.hv/bin/hv-refactor-targets
+```
+
+Output JSON:
+
+```json
+{
+  "umbrella": {"hasCode": true|false},
+  "subRepos": [{"name": "<name>", "path": "<abs-path>"}, ...]
+}
+```
+
+If `subRepos` is empty (umbrella mode is on but no sub-repos are registered), proceed to Step 2 with the single-repo flow — the umbrella's tree is the only target.
+
+Otherwise, ask the user which scope to refactor via `AskUserQuestion`:
+
+- **Header:** `"Refactor scope"`
+- **Question:** *"Umbrella mode is on with N sub-repo(s): `<comma-separated names>`. Where should this refactor cycle run?"*
+- **Options** (single-select), conditional on `umbrella.hasCode`:
+  - When `hasCode == true`:
+    1. *"All sub-repos + umbrella (Recommended)"* — *"N+1 parallel cycles, one per sub-repo plus one for the umbrella's own tree."*
+    2. *"All sub-repos only"* — *"N parallel cycles. Skip the umbrella's own tree."*
+    3. *"Umbrella only"* — *"Refactor the umbrella's tree only; skip sub-repos."*
+    4. *"Pick a subset"* — *"Multi-select which sub-repos to include."*
+  - When `hasCode == false`:
+    1. *"All sub-repos (Recommended)"* — *"N parallel cycles, one per sub-repo."*
+    2. *"Pick a subset"* — *"Multi-select which sub-repos to include."*
+    3. *"Umbrella only"* — *"Refactor the umbrella's tree only (no code detected — likely no findings)."*
+
+Plain-text fallback: pick the Recommended option for the relevant `hasCode` state.
+
+If the user picks **"Pick a subset"**, follow up with a multiSelect:
+
+- **Header:** `"Sub-repos"`, `multiSelect: true`
+- **Question:** *"Which sub-repos to refactor?"*
+- **Options:** up to 4 sub-repos by name (alphabetical); if more than 4, list top 4 alphabetically and ask the user to name the rest in free text.
+
+### Branch — "Umbrella only"
+
+Run `hv-guard-clean` against the umbrella's tree if you skipped it earlier. Then proceed to Step 2 (single-repo flow). The umbrella's `.git/` (if it has one) receives the commit; if the umbrella isn't a git repo, hv-guard-clean exits 2 and this step stops.
+
+### Branch — fanout (any other scope: "All sub-repos", "All + umbrella", "Pick a subset")
+
+Build the target list. For each target, you'll dispatch one sub-agent via `Agent` IN A SINGLE MESSAGE (parallel).
+
+**Collect umbrella context for the sub-agents.** KNOWLEDGE.md and DECISIONS.md live only at the umbrella; sub-agents need their content embedded so they respect cross-repo conventions and decisions. Query the topics that may apply across the targets:
+
+```bash
+.hv/bin/hv-knowledge-query "<all topic names>"
+.hv/bin/hv-decisions-query "<all topic names>"
+```
+
+If unsure which topics apply, pass every topic from each file (read the `## Topic` headings and pass all of them). Capture the output as `KNOWLEDGE_BLOB` and `DECISIONS_BLOB` for embedding.
+
+**Dispatch sub-agents.** For each target (each chosen sub-repo, plus optionally the umbrella when "All + umbrella" was picked), build a single Agent call with this prompt template:
+
+```
+You are a /hv-refactor sub-agent operating on a single repo within an umbrella project. Run a focused refactor cycle for THIS REPO ONLY.
+
+Repo: <name>
+Path: <abs-path>
+Umbrella: <umbrella-abs-path>
+
+## Your steps
+
+1. cd <abs-path>
+
+2. Run `.hv/bin/hv-guard-clean` from this repo's bin path (it lives at <umbrella-abs-path>/.hv/bin/hv-guard-clean — call it as `<umbrella-abs-path>/.hv/bin/hv-guard-clean`). If the repo isn't a git repo or has uncommitted changes, stop and report "no changes" back.
+
+3. Run a focused refactor cycle equivalent to /hv-refactor's Steps 2-9 on THIS REPO:
+   a. Dispatch an exploration agent (orchestrator model: <orchestrator from config>) to explore THIS REPO ONLY for friction. Do not walk into the umbrella or other sub-repos.
+   b. Triage findings; classify simple vs structural; categorize dependencies (in-process / local-substitutable / ports-and-adapters / true-external).
+   c. For structural items, design competing approaches if the umbrella's `.hv/config.json` has `refactor.confirmBeforeExecute: true`; otherwise pick the recommended approach and proceed (the config file lives at the umbrella, not here — read `<umbrella-abs-path>/.hv/config.json`).
+   d. Dispatch parallel worker agents (worker model: <worker from config>) for the fixes. File-disjoint fixes run in parallel; same-file fixes go to one worker; sequential dependencies serialize.
+   e. Verify with a single verification agent (orchestrator model). Re-fix any FAIL verdicts.
+   f. Commit in this repo's `.git/`. One commit for the cycle. Stage modified files explicitly (no `git add -A`).
+
+4. Do NOT:
+   - Run `hv-refactor-reset` — the umbrella orchestrator does that once at the end.
+   - Modify the umbrella's `.hv/`, `.claude*/`, or any other sub-repo.
+   - Push or create PRs.
+
+## Context for THIS sub-cycle
+
+### Umbrella KNOWLEDGE.md (relevant topics)
+
+<KNOWLEDGE_BLOB>
+
+### Umbrella DECISIONS.md (full)
+
+<DECISIONS_BLOB>
+
+## Return
+
+A compact summary in EXACTLY this format:
+
+repo: <name>
+commit: <short hash, or "no changes" if the cycle found nothing to commit>
+items: <N>
+- <one-line item description 1>
+- <one-line item description 2>
+...
+```
+
+The orchestrator and worker model names embedded in the prompt come from the umbrella's `.hv/config.json` `models.orchestrator` / `models.worker` (defaults `opus` / `sonnet`).
+
+**Wait for all sub-agents to complete**, then aggregate.
+
+### After fanout returns
+
+1. Aggregate the per-repo summaries into a single umbrella-level report.
+2. Run `.hv/bin/hv-refactor-reset` ONCE.
+3. Print the aggregated report. Format:
+
+```
+Umbrella refactor cycle — N targets
+
+repo: web (commit a1b2c3d, 4 items)
+  - <item 1>
+  - <item 2>
+  ...
+
+repo: api (commit e4f5g6h, 2 items)
+  - <item 1>
+  - <item 2>
+
+repo: <umbrella-name> (no changes)
+
+(Counter reset.)
+```
+
+For sub-repos that returned "no changes", skip the bullet list — just note the result.
+
+**EXIT** — skip Steps 2-10 (those are the single-repo flow that umbrella fanout has already delegated to sub-agents).
 
 ## Step 2 — Explore with Orchestrator
 

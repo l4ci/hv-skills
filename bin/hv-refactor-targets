@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Emit refactor targets for the current project as JSON.
+# Single-repo mode: umbrella null, subRepos empty.
+# Umbrella mode: umbrella.hasCode flag + every registered sub-repo's name + abs path.
+# Used by /hv-refactor Step 1.5 to ask the user which scope to refactor.
+# Usage: hv-refactor-targets
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json, os
+from hvlib import load_json, load_repos
+
+cfg = load_json(".hv/config.json", {})
+enabled = bool(cfg.get("umbrella", {}).get("enabled"))
+
+if not enabled:
+    print(json.dumps({"umbrella": None, "subRepos": []}, indent=2))
+    raise SystemExit(0)
+
+repos = load_repos()
+sub_repos = [{"name": n, "path": p} for n, p in sorted(repos.items())]
+
+# Build the set of top-level directory names that belong to registered sub-repos.
+# load_repos returns absolute paths; we convert each to relpath against cwd and
+# take the first path component. Sub-repos that aren't under cwd at all are
+# skipped (they can't shadow umbrella top-level entries).
+cwd = os.path.realpath(".")
+sub_top_level = set()
+for r in sub_repos:
+    try:
+        rel = os.path.relpath(r["path"], cwd)
+    except ValueError:
+        continue
+    if rel and not rel.startswith(".."):
+        sub_top_level.add(rel.split(os.sep, 1)[0])
+
+ignore = {
+    ".git", ".hv", ".claude", ".claude-plugin",
+    ".gitignore", ".docsignore", ".stow-local-ignore", ".DS_Store",
+}
+
+has_code = False
+try:
+    for entry in os.listdir("."):
+        if entry in ignore or entry in sub_top_level:
+            continue
+        has_code = True
+        break
+except OSError:
+    pass
+
+print(json.dumps({
+    "umbrella": {"hasCode": has_code},
+    "subRepos": sub_repos,
+}, indent=2))
+PY

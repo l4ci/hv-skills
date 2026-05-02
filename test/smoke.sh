@@ -2303,4 +2303,53 @@ fi
 pass "hv-spike-add does not create branch when spike file already exists"
 cd ..
 
+echo "hv-refactor-targets"
+mkdir rt-test && cd rt-test
+mkdir -p .hv/bin
+cp "$BIN/hvlib.py" .hv/bin/
+cp "$BIN/hv-refactor-targets" .hv/bin/
+chmod +x .hv/bin/hv-refactor-targets
+
+# 1. Single-repo (umbrella.enabled = false): emits umbrella=null, subRepos=[]
+echo '{"umbrella": {"enabled": false}}' > .hv/config.json
+RESULT=$(.hv/bin/hv-refactor-targets)
+UMBRELLA=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['umbrella'])")
+[ "$UMBRELLA" = "None" ] || fail "single-repo: expected umbrella=null, got '$UMBRELLA'"
+SUB_COUNT=$(echo "$RESULT" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['subRepos']))")
+[ "$SUB_COUNT" = "0" ] || fail "single-repo: expected subRepos=[], got count=$SUB_COUNT"
+pass "hv-refactor-targets returns umbrella=null when umbrella.enabled is false"
+
+# 2. Umbrella with sub-repos: emits the registered list
+mkdir -p web api
+echo '{"umbrella": {"enabled": true}}' > .hv/config.json
+echo '{"repos": [{"name": "web", "path": "./web"}, {"name": "api", "path": "./api"}]}' > .hv/repos.json
+RESULT=$(.hv/bin/hv-refactor-targets)
+SUB_COUNT=$(echo "$RESULT" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['subRepos']))")
+[ "$SUB_COUNT" = "2" ] || fail "umbrella: expected 2 sub-repos, got $SUB_COUNT"
+NAMES=$(echo "$RESULT" | python3 -c "import json,sys; print(','.join(sorted(r['name'] for r in json.load(sys.stdin)['subRepos'])))")
+[ "$NAMES" = "api,web" ] || fail "umbrella: expected names api,web, got '$NAMES'"
+pass "hv-refactor-targets lists registered sub-repos in umbrella mode"
+
+# 3. Umbrella with no own code (only .hv/, registered sub-repos)
+HAS_CODE=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['umbrella']['hasCode'])")
+[ "$HAS_CODE" = "False" ] || fail "no-code umbrella: expected hasCode=false, got '$HAS_CODE'"
+pass "hv-refactor-targets reports hasCode=false when umbrella has only scaffolding + sub-repos"
+
+# 4. Add umbrella-level code → hasCode flips
+echo "x" > umbrella-thing.py
+RESULT=$(.hv/bin/hv-refactor-targets)
+HAS_CODE=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['umbrella']['hasCode'])")
+[ "$HAS_CODE" = "True" ] || fail "umbrella with code: expected hasCode=true, got '$HAS_CODE'"
+pass "hv-refactor-targets reports hasCode=true when umbrella has its own code file"
+
+# 5. Standard scaffolding (.gitignore) doesn't trigger hasCode by itself
+rm umbrella-thing.py
+echo "ignored-stuff" > .gitignore
+RESULT=$(.hv/bin/hv-refactor-targets)
+HAS_CODE=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['umbrella']['hasCode'])")
+[ "$HAS_CODE" = "False" ] || fail "scaffolding-only umbrella: expected hasCode=false, got '$HAS_CODE'"
+pass "hv-refactor-targets ignores standard scaffolding (.gitignore) when computing hasCode"
+
+cd ..
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
