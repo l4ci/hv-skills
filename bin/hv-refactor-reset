@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Zero counters.json#since_refactor — called by /hv-refactor after a successful
+# refactor: commit lands. Idempotent.
+# Usage: hv-refactor-reset
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from hvlib import update_json
+def reset(d):
+    d["since_refactor"] = {"features": 0, "bugs": 0}
+update_json(".hv/counters.json", {}, reset)
+PY

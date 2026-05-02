@@ -217,6 +217,12 @@ git commit -m "refactor: [N] architectural improvements
 
 If the project uses a build tool to regenerate project files (e.g. `xcodegen generate` for XcodeGen projects), run it before committing if any files were added or deleted.
 
+After the commit lands, zero the refactor-pressure counter so the next cycle starts fresh:
+
+```bash
+.hv/bin/hv-refactor-reset
+```
+
 ## Step 10 — Report to User
 
 After commit, give one compact summary. Example:

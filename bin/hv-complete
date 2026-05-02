@@ -2,6 +2,9 @@
 # Move item to ## Completed with strikethrough and metadata.
 # Idempotent: silent no-op if the ID is already completed.
 # Errors only if the ID is not present at all (typo guard).
+# Side effect: on the active→completed transition, bumps
+# counters.json#since_refactor.{features,bugs} unless the resolved commit's
+# subject starts with `refactor:` (those don't count toward refactor pressure).
 # Usage: hv-complete <ID> [commit-hash]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -9,8 +12,8 @@ ID="${1:?usage: hv-complete <ID> [commit-hash]}"
 HASH="${2:-$(git log --oneline -1 --format='%h' 2>/dev/null || echo unknown)}"
 DATE=$(date +%Y-%m-%d)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<'PY'
-import re, sys
-from hvlib import find_section, write_text_atomic
+import re, subprocess, sys
+from hvlib import find_section, write_text_atomic, update_json
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
@@ -20,7 +23,7 @@ completed = re.compile(r"^- ~~\*\*\[" + re.escape(id_s) + r"\].*~~\s+Done\s+\d{4
 
 m = active.search(content)
 if not m:
-    # Already completed → silent no-op (idempotent).
+    # Already completed → silent no-op (idempotent; do not re-bump counter).
     if completed.search(content):
         sys.exit(0)
     # Nowhere to be found → typo guard.
@@ -37,4 +40,15 @@ else:
     start, end = span
     content = content[:end].rstrip("\n") + "\n" + done + "\n" + content[end:]
 write_text_atomic(path, content)
+
+# Bump since_refactor counter unless this is a refactor: commit.
+kind_key = {"B": "bugs", "F": "features"}.get(id_s[:1])
+if kind_key:
+    subj = subprocess.run(["git", "log", "-1", "--format=%s", hash_s],
+                          capture_output=True, text=True)
+    if not (subj.returncode == 0 and subj.stdout.startswith("refactor:")):
+        def bump(d):
+            sr = d.setdefault("since_refactor", {"features": 0, "bugs": 0})
+            sr[kind_key] = sr.get(kind_key, 0) + 1
+        update_json(".hv/counters.json", {}, bump)
 PY

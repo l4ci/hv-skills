@@ -47,17 +47,23 @@ _(none active — set with `/hv-vision`)_
 ## Milestones
 EOF
 
-[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > "$HV/counters.json"
+[ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0,"since_refactor":{"features":0,"bugs":0}}' > "$HV/counters.json"
 
-# Migrate older counters.json that predates the milestones key.
+# Migrate older counters.json files to backfill keys added in later versions.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from pathlib import Path
 from hvlib import load_json, dump_json_atomic
 p = Path(".hv/counters.json")
 d = load_json(p, {})
+changed = False
 if "milestones" not in d:
     d["milestones"] = 0
+    changed = True
+if "since_refactor" not in d:
+    d["since_refactor"] = {"features": 0, "bugs": 0}
+    changed = True
+if changed:
     dump_json_atomic(p, d)
 PY
 

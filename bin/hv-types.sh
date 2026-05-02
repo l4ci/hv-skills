@@ -21,8 +21,9 @@
 #                        hv-vision-index (drift heal regex).
 #
 # Deliberately distinct from these helper-local classes (left untouched):
-#   - hv-refactor-age uses [BF] — counts shipped countable work only.
-#   - hv-plan-add uses [BFTS]    — accepts a Slice prefix not present in TODO.md.
+#   - hv-complete keys on [BF] when bumping counters.json#since_refactor —
+#     only countable work types pressure the next refactor cycle.
+#   - hv-plan-add uses [BFTS] — accepts a Slice prefix not present in TODO.md.
 #
 # Naming note: this file is "hv-types.sh" (not "_hv-types.sh") so that
 # `cp hv-* .hv/bin/` in /hv-init Step 2 picks it up. hv-preflight discovers

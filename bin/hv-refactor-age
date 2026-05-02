@@ -1,44 +1,15 @@
 #!/usr/bin/env bash
-# Count features/bugs completed since the last refactor pass.
-# Walks entries in .hv/TODO.md ## Completed and .hv/ARCHIVE.md, looks up each
-# entry's commit hash, and counts those whose commit message does NOT start
-# with "refactor:".
+# Print features/bugs completed since the last `refactor:` commit.
+# Reads .hv/counters.json — the field is maintained imperatively by
+# hv-complete (increments on non-refactor completions) and zeroed by
+# hv-refactor-reset at the end of a /hv-refactor cycle.
 # Usage: hv-refactor-age
 # Prints JSON: {"features": N, "bugs": M}
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json, re, subprocess
-from pathlib import Path
-from hvlib import section
-
-def is_refactor(h):
-    r = subprocess.run(["git", "log", "-1", "--format=%s", h],
-                       capture_output=True, text=True)
-    return r.returncode == 0 and r.stdout.startswith("refactor:")
-
-def completed_body(path):
-    if not path.exists():
-        return ""
-    content = path.read_text()
-    if path.name == "TODO.md":
-        return section(content, "Completed")
-    return content
-
-line_re = re.compile(r"\[([BF])\d+\].*?\[`([0-9a-f]+)`\]")
-f = b = 0
-for path in (Path(".hv/TODO.md"), Path(".hv/ARCHIVE.md")):
-    for line in completed_body(path).splitlines():
-        m = line_re.search(line)
-        if not m:
-            continue
-        kind, h = m.group(1), m.group(2)
-        if is_refactor(h):
-            continue
-        if kind == "F":
-            f += 1
-        else:
-            b += 1
-
-print(json.dumps({"features": f, "bugs": b}, indent=2))
+import json
+from hvlib import load_json
+sr = load_json(".hv/counters.json", {}).get("since_refactor", {"features": 0, "bugs": 0})
+print(json.dumps({"features": sr.get("features", 0), "bugs": sr.get("bugs", 0)}, indent=2))
 PY

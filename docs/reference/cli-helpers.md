@@ -45,6 +45,7 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
+| `hv-refactor-reset` | Zero `counters.json#since_refactor` (called by `/hv-refactor` after commit) | `.hv/bin/hv-refactor-reset` |
 | `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
@@ -141,9 +142,12 @@ are incomplete — useful as a guard at the top of scripts.
 `hv-update-check` queries the hv-skills GitHub releases and returns JSON with
 the current and latest version, install type, and the command to upgrade.
 
-`hv-refactor-age` counts non-refactor commits (features and bugs) since the most
-recent `refactor:` commit and returns JSON — the `/hv-refactor` skill uses this
-to decide whether a refactor pass is overdue.
+`hv-refactor-age` reads `counters.json#since_refactor` and returns JSON with
+the number of features and bugs completed since the last refactor cycle —
+`/hv-refactor` uses this to decide whether a pass is overdue. The counter is
+maintained imperatively: `hv-complete` increments it on every active→completed
+transition whose resolved commit's subject does not start with `refactor:`,
+and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
 
 `hv-backlog` renders the full TODO.md as sorted Markdown tables (In Progress,
 Bugs, Features, Tasks) — handy for a quick terminal overview or piping into
