@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Categorize commits in a git range by Conventional Commits prefix and emit markdown sections.
+# Usage: hv-release-changelog-from-commits <range>
+# Example: hv-release-changelog-from-commits v1.10.0..HEAD
+set -euo pipefail
+RANGE="${1:?usage: hv-release-changelog-from-commits <range>}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RANGE" <<'PY'
+import subprocess, re, sys
+
+range_arg = sys.argv[1]
+
+try:
+    result = subprocess.run(
+        ["git", "log", range_arg, "--pretty=format:%H%x09%s%x09%b%x1e", "--no-merges"],
+        check=True, capture_output=True, text=True,
+    )
+except subprocess.CalledProcessError as e:
+    sys.stderr.write(e.stderr)
+    sys.exit(1)
+
+raw = result.stdout
+
+BUCKET_ORDER = ["Breaking", "New", "Fixed", "Performance", "Changed", "Documentation", "Other"]
+buckets = {b: [] for b in BUCKET_ORDER}
+
+PREFIX_MAP = [
+    (re.compile(r"^feat(?:ure)?(\(.+?\))?:"),    "New"),
+    (re.compile(r"^fix(\(.+?\))?:"),              "Fixed"),
+    (re.compile(r"^perf(\(.+?\))?:"),             "Performance"),
+    (re.compile(r"^refactor(\(.+?\))?:"),         "Changed"),
+    (re.compile(r"^chore(\(.+?\))?:"),            "Changed"),
+    (re.compile(r"^style(\(.+?\))?:"),            "Changed"),
+    (re.compile(r"^docs(\(.+?\))?:"),             "Documentation"),
+    (re.compile(r"^test(\(.+?\))?:"),             None),   # skipped
+]
+
+def classify(subject):
+    for pattern, bucket in PREFIX_MAP:
+        m = pattern.match(subject)
+        if m:
+            return bucket, m
+    return "Other", None
+
+def strip_prefix(subject, m):
+    """Strip the prefix+scope from the subject; return (description, scope_or_None)."""
+    if m is None:
+        return subject, None
+    # full match covers e.g. "feat:" or "feat(api):"
+    after = subject[m.end():].strip()
+    # extract scope from group 1 if present: "(.+?)" captures "(api)"
+    scope_raw = m.group(1)  # e.g. "(api)" or None
+    scope = scope_raw.strip("()") if scope_raw else None
+    return after, scope
+
+def render(description, scope, short_hash):
+    if scope:
+        return f"- {description} ({scope}) (`{short_hash}`)"
+    return f"- {description} (`{short_hash}`)"
+
+records = raw.split("\x1e")
+commit_count = 0
+
+for record in records:
+    record = record.strip()
+    if not record:
+        continue
+    parts = record.split("\t", 2)
+    if len(parts) < 2:
+        continue
+    full_hash = parts[0].strip()
+    subject   = parts[1].strip()
+    body      = parts[2].strip() if len(parts) > 2 else ""
+
+    if not full_hash or not subject:
+        continue
+
+    commit_count += 1
+    short_hash = full_hash[:7]
+    bucket, m = classify(subject)
+
+    if bucket is not None:
+        description, scope = strip_prefix(subject, m)
+        line = render(description, scope, short_hash)
+        buckets[bucket].append(line)
+
+        # BREAKING CHANGE detection (case-insensitive)
+        if re.search(r"BREAKING CHANGE:", body, re.IGNORECASE) or re.search(r"BREAKING CHANGE:", subject, re.IGNORECASE):
+            buckets["Breaking"].append(line)
+
+if commit_count == 0:
+    sys.stderr.write("(no commits in range)\n")
+    sys.exit(0)
+
+output_parts = []
+for bucket in BUCKET_ORDER:
+    lines = buckets[bucket]
+    if not lines:
+        continue
+    output_parts.append(f"## {bucket}\n\n" + "\n".join(lines))
+
+if output_parts:
+    print("\n\n".join(output_parts))
+    print(f"\n## Stats\n\n{commit_count} commits.")
+PY
