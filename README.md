@@ -123,6 +123,7 @@ That's how every workflow starts and how most stay. The drift happens at three p
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
+| `/hv-release` | Cut a release: bump version, generate notes, tag, push, publish to GitHub/GitLab. |
 | `/hv-update` | Check for a newer hv-skills release on GitHub and print the exact update command for your install type |
 
 ## How it works
