@@ -45,6 +45,29 @@ On **Yes** — run `git init`, continue to Step 2, mention the created branch in
 
 Plain-text fallback: run `git init` straight through — it's the Recommended choice and reversible.
 
+## Step 1.5 — Umbrella Detection (Optional)
+
+If the current directory holds **two or more immediate child directories that are themselves git repos**, this is likely a multi-repo umbrella — `.hv/` should live here, but git operations should run inside the relevant sub-repo. Detect by scanning `*/.git`:
+
+```bash
+UMBRELLA_CANDIDATES=$(find . -maxdepth 2 -mindepth 2 -name .git -printf '%h\n' 2>/dev/null | sed 's|^\./||' | sort)
+UMBRELLA_COUNT=$(echo "$UMBRELLA_CANDIDATES" | grep -c . || true)
+```
+
+If `UMBRELLA_COUNT >= 2`, offer umbrella mode via `AskUserQuestion`. Skip silently for 0 or 1 — that's the single-repo path and Step 1's git check covers it.
+
+- **Header:** `"Umbrella"`
+- **Question:** *"Found multiple git repos here: <list>. Enable umbrella mode? (`.hv/` stays at this level; helpers operate per sub-repo.)"*
+- **Options** (single-select):
+  1. *"Yes, enable umbrella mode (Recommended)"* — *"Registers child repos via `hv-umbrella-init` after bootstrap. Sets `umbrella.enabled: true` in config."*
+  2. *"No, single-repo init"* — *"Skip umbrella; `/hv-init` proceeds as if the umbrella detection didn't fire. Existing single-repo behavior."*
+
+On **Yes** — set `UMBRELLA_MODE=true` and `UMBRELLA_REGISTER="all"` (or ask a follow-up multiSelect to pick a subset of `$UMBRELLA_CANDIDATES`; `"all"` is the simpler default). Continue to Step 2.
+
+On **No** — set `UMBRELLA_MODE=false`, continue to Step 2 unchanged.
+
+Plain-text fallback: if `UMBRELLA_COUNT >= 2`, default to **Yes** with `UMBRELLA_REGISTER="all"` — it's the Recommended path and reversible by re-running `/hv-init` then choosing No, or by toggling `umbrella.enabled` via `/hv-config`.
+
 ## Step 2 — Bootstrap & Install Helpers
 
 Resolve the source `bin/` from the installed plugin, then run `hv-bootstrap` to seed `.hv/` and copy every helper into `.hv/bin/`. Source resolution order: `$CLAUDE_PLUGIN_ROOT/bin/` first, then standard install locations, then a repo-local clone.
@@ -71,6 +94,16 @@ fi
 cp "$SRC"/hv-* "$SRC"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
+If Step 1.5 set `UMBRELLA_MODE=true`, register the sub-repos now (after bootstrap so `.hv/` exists):
+
+```bash
+if [ "${UMBRELLA_MODE:-false}" = "true" ]; then
+  echo "$UMBRELLA_REGISTER" | .hv/bin/hv-umbrella-init >/dev/null
+fi
+```
+
+The helper writes `.hv/repos.json` and (if the umbrella is itself a git repo) appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header. Idempotent — re-running `/hv-init` is safe.
+
 `hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
@@ -95,6 +128,7 @@ EXPECTED = [
     ("docs", "path"),
     ("docs", "autoCreate"),
     ("git", "baseBranch"),
+    ("umbrella", "enabled"),
 ]
 p = Path(".hv/config.json")
 if not p.exists():
@@ -200,8 +234,10 @@ Write the full resolved config:
 ```bash
 python3 - <<PY
 import json
+import os
 from pathlib import Path
-Path(".hv/config.json").write_text(json.dumps({
+umbrella_enabled = os.environ.get("UMBRELLA_MODE", "false").lower() == "true"
+cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>},
@@ -211,9 +247,13 @@ Path(".hv/config.json").write_text(json.dumps({
   "debug":    {"competingHypotheses": <Q4-debug>},
   "docs":     {"path": "docs", "autoCreate": True},
   "git":      {"baseBranch": ""}
-}, indent=2) + "\n")
+}
+cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled
+Path(".hv/config.json").write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
+
+Read `umbrella_enabled` from the `UMBRELLA_MODE` shell var Step 1.5 set (default `false` when single-repo). `UMBRELLA_MODE` must be exported (`export UMBRELLA_MODE=true`) before the heredoc runs so the Python subprocess inherits it.
 
 ### STALE write block
 
@@ -230,11 +270,15 @@ cfg = json.loads(p.read_text())
 # Set only the keys from the STALE list; never overwrite existing values.
 cfg.setdefault("ship", {})["review"] = True   # or answered value
 
+# umbrella.enabled — silent default to False on upgrade. No migration prompt;
+# users opt in by re-running /hv-init from an umbrella, or via /hv-config.
+cfg.setdefault("umbrella", {})["enabled"] = False
+
 p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
 
-Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present.
+Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, write `False` silently with no prompt (the only way to flip it on is re-running `/hv-init` from an umbrella or editing via `/hv-config`).
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
@@ -268,4 +312,6 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate}`, `git.baseBranch`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
+
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate}`, `git.baseBranch`, `umbrella.enabled`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
