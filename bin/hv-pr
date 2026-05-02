@@ -1,18 +1,53 @@
 #!/usr/bin/env bash
 # Push a branch and open a GitHub PR via gh. Cleans up any worktree first.
 # Reads PR body from stdin.
-# Usage: echo "body" | hv-pr <branch> <title>
+# Usage: echo "body" | hv-pr [--repo <name>] <branch> <title>
 # Prints: the PR URL.
 set -euo pipefail
-BRANCH="${1:?usage: hv-pr <branch> <title>  (body on stdin)}"
-TITLE="${2:?usage: hv-pr <branch> <title>  (body on stdin)}"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:?usage: hv-pr [--repo <name>] <branch> <title>  (body on stdin)}"
+  shift 2
+fi
+
+BRANCH="${1:?usage: hv-pr [--repo <name>] <branch> <title>  (body on stdin)}"
+TITLE="${2:?usage: hv-pr [--repo <name>] <branch> <title>  (body on stdin)}"
 BODY=$(cat)
 if [ -z "$BODY" ]; then
   echo "error: hv-pr expects PR body on stdin" >&2
   exit 1
 fi
 
-"$(dirname "$0")/hv-worktree-clear" "$BRANCH"
+resolve_repo_path() {
+  local name="$1"
+  if [ ! -f .hv/repos.json ]; then
+    echo "error: --repo requires .hv/repos.json — run /hv-init from the umbrella root" >&2
+    exit 1
+  fi
+  python3 - "$name" <<'PY'
+import json, os, sys
+name = sys.argv[1]
+data = json.loads(open(".hv/repos.json").read())
+for entry in data.get("repos", []) or []:
+    if entry.get("name") == name:
+        path = entry.get("path", "")
+        print(os.path.realpath(path))
+        sys.exit(0)
+sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
+sys.exit(1)
+PY
+}
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -n "$REPO" ]; then
+  REPO_PATH=$(resolve_repo_path "$REPO")
+  cd "$REPO_PATH"
+  "$BIN_DIR/hv-worktree-clear" --repo "$REPO" "$BRANCH"
+else
+  "$BIN_DIR/hv-worktree-clear" "$BRANCH"
+fi
 
 git push -u origin "$BRANCH"
 gh pr create --title "$TITLE" --body "$BODY"
