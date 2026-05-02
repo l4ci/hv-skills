@@ -24,6 +24,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 
 - [Review and ship](usage/review-and-ship.md) — `/hv-review` and `/hv-ship` gates
 - [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
+- [Decisions](usage/decisions.md) — `/hv-decide` and hard-boundary commitments in `DECISIONS.md`
 
 ### Vision and planning
 

@@ -170,7 +170,16 @@ flowchart LR
   KNOW -.consults.-> WORK
   KNOW -.consults.-> DEBUG
   KNOW -.consults.-> REVIEW
-  UPDATE["/hv-update"] -.checks.-> RELEASES[(GitHub releases)]
+  DECIDE["/hv-decide"] --> DECISIONS[(.hv/DECISIONS.md)]
+  DECISIONS -.consults.-> WORK
+  DECISIONS -.consults.-> DEBUG
+  DECISIONS -.consults.-> REVIEW
+  WORK -.post-cycle.-> DOCS["/hv-docs"]
+  SHIP -.post-cycle.-> DOCS
+  DOCS --> USERDOCS[(docs/)]
+  SHIP -.cut.-> RELEASE["/hv-release"]
+  RELEASE --> RELEASES[(GitHub releases)]
+  UPDATE["/hv-update"] -.checks.-> RELEASES
 ```
 
 Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth — `status.json` is just a cache, and `/hv-next` reconciles any drift.
@@ -199,6 +208,7 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 .hv/
 ├── TODO.md           # bugs, features, tasks, recent completions
 ├── KNOWLEDGE.md      # durable learnings, grouped by topic
+├── DECISIONS.md      # hard-boundary decisions with explicit forbids/permits
 ├── MILESTONES.md     # vision paragraph + milestone overview
 ├── ARCHIVE.md        # completions older than 5 days
 ├── counters.json     # auto-incrementing IDs

@@ -8,6 +8,7 @@
 |------|---------|
 | `TODO.md` | Active backlog — bugs, features, tasks, and recent completions |
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
+| `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
 | `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
@@ -19,6 +20,7 @@
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) — full plan with goal, acceptance, rationale, risks, research findings, notes |
 | `plans/` | Implementation plans keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
 | `spikes/` | Spike findings — one Markdown file per spike; the experimental code lives on the `spike/<name>` git branch and is never merged |
+| `handoff/` | `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-resume` |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
 ## TODO.md — active backlog
@@ -40,6 +42,14 @@ You can edit this file by hand — reorder items, bump priorities, or delete thi
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
 `/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics — this is how knowledge stays visible to the model across context clears without re-reading the full file.
+
+## DECISIONS.md — hard-boundary decisions
+
+`DECISIONS.md` records hard boundaries the project has committed to — sibling to `KNOWLEDGE.md`, but where knowledge is passive (gotchas, conventions), decisions are active commitments with explicit `forbids:` and `permits:` clauses. `/hv-decide` writes new entries; `/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision` consult them as constraints.
+
+A companion managed block in `CLAUDE.md` lists the current decision topics so the model can pull only the relevant entries on demand.
+
+See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and the difference between decisions and learnings.
 
 ## MILESTONES.md — vision and active milestones
 
@@ -94,6 +104,14 @@ See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for the full pl
 ## spikes/ — feasibility findings
 
 `spikes/` stores the written findings from `/hv-spike` runs — one Markdown file per spike summarising what was learned, what was tried, and what the recommendation is. The throwaway experimental code lives on its own `spike/<name>` git branch and is never merged.
+
+## handoff/ — pause notes
+
+When you run `/hv-pause`, the current state of the session — active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy — is written to `handoff/<branch>.md`. `/hv-resume` reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
+
+Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned — delete them by hand once the branch is shipped.
+
+See [../usage/pausing-and-resuming.md](../usage/pausing-and-resuming.md) for the pause/resume flow.
 
 ## ARCHIVE.md — old completions
 

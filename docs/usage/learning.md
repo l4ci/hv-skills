@@ -72,3 +72,12 @@ the topic headings in `KNOWLEDGE.md`. Each time `/hv-learn` runs it rewrites
 that block to reflect the current topic list. `/hv-work` reads this index at the
 start of a task to decide whether the task at hand warrants consulting
 `KNOWLEDGE.md` before planning begins.
+
+## Knowledge vs decisions
+
+If you find yourself wanting to write *"we will never X"* or *"X is forbidden in
+this codebase,"* that is a [decision](decisions.md), not a learning. Knowledge
+is advisory ("remember this if relevant"); decisions are hard boundaries
+(violations FAIL review). Use `/hv-decide` for the latter — it captures
+rule + why + forbids + permits and is consulted as a constraint by `/hv-work`,
+`/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision`.
