@@ -42,6 +42,8 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Pass the output through to the user verbatim. The helper emits 1-5 lines: backlog counts, any active work, recent completions, knowledge topics, archive size. Empty categories are omitted silently.
 
+**Umbrella mode.** Active entries display an inline `(repo: <name>)` suffix when their `repo` field is non-null; `bin/hv-backlog` (used elsewhere) renders a `Repo` column in the In Progress table when any active entry has a repo. Single-repo cycles see neither — the skill stays a pure pass-through, no umbrella-specific code path here.
+
 ## Rules
 
 - **Pass-through only.** Don't add commentary, don't fetch more state, don't suggest next actions — that's `/hv-next`'s job.

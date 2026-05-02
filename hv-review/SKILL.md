@@ -47,6 +47,8 @@ See `docs/reference/preflight.md` for exit-code handling.
 .hv/bin/hv-review-scope <branch>
 ```
 
+**Umbrella mode.** When the branch lives in a sub-repo, pass `--repo <name>` so git ops resolve there: `.hv/bin/hv-review-scope --repo <name> <branch>`. Determine `<name>` from the active stream's `repo` field in `.hv/status.json` (single match), or from `hv-resolve-repo` if invoked from inside the sub-repo's worktree. `TODO.md` / `ARCHIVE.md` lookups stay umbrella-flat — `hv-review-scope` reads them from the umbrella's `.hv/`, so no repo flag is needed for intent matching.
+
 If the user didn't name a branch, default to the current one. `hv-review-scope` emits JSON with:
 
 - `branch`, `base`, `commitCount`
