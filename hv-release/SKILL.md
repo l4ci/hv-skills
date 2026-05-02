@@ -39,7 +39,16 @@ Then verify:
 
 1. **Clean tree** — run `git status --porcelain`. If output is non-empty and `release.requireCleanTree` is `true` (default), stop: *"Working tree is dirty. Commit or stash changes first, or set `release.requireCleanTree: false`."* Show `git status -s` in the error.
 2. **On main/trunk** — `git rev-parse --abbrev-ref HEAD`. If not `main`, `master`, or `trunk`, stop with a one-liner.
-3. **HEAD pushed** — `git rev-parse HEAD` vs `git rev-parse @{u}`. If they differ, stop: *"HEAD is not pushed to origin. Run `git push` first."*
+3. **HEAD pushed** — `git rev-parse HEAD` vs `git rev-parse @{u}`. If they differ, branch on `autonomy.level` from `.hv/config.json`:
+
+   - `"auto"` or `"loop"` — silently run `git push origin <current-branch>` and continue. A release intends to ship the local commits; an unpushed HEAD is part of the release, not a pre-flight error.
+   - `"off"` (default) — use `AskUserQuestion`:
+     - **Header:** `"Unpushed"`
+     - **Question:** *"HEAD has unpushed commits. Push them as part of this release?"*
+     - **Options:**
+       1. `"Push and continue (Recommended)"` — runs `git push origin <current-branch>`, then proceed
+       2. `"Abort"` — stop without writing anything
+     - Plain-text fallback: *"Push and continue, or abort?"*
 
 ## Step 2 — Detect Version Source
 
@@ -116,6 +125,8 @@ If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this i
 ```
 
 Captures categorized Markdown (buckets in helper-emit order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the helper.
+
+**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1-2 bullets naming the most significant pieces (a merge commit, a follow-up fix). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The helper's job is the raw categorization; *editorial collapse is yours*.
 
 Append stats line — run:
 
