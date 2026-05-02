@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.12.1 — 2026-05-02
+
+Two follow-up improvements to `/hv-release` surfaced while dogfooding it for the v1.12.0 cut.
+
+## Changed
+
+- **Step 1 unpushed HEAD** — `autonomy: auto`/`loop` now silently runs `git push` and continues; `autonomy: off` prompts via `AskUserQuestion` (`Push and continue (Recommended)` / `Abort`). Removes the ceremonial "go push, then re-run me" friction — a release intends to ship the local commits.
+- **Step 6 dense-bucket compaction** — when a bucket has 3+ entries on the same theme, the orchestrator collapses them into a single summary line plus 1-2 highlight bullets (the merge commit, a follow-up fix). Buckets with fewer than 3 entries stay raw. The helper still emits raw categorization; editorial collapse is the skill's job.
+
+## Stats
+
+1 commit · 1 file · +12 / −1 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.12.0...v1.12.1
+
 ## v1.12.0 — 2026-05-02
 
 ## Highlights
