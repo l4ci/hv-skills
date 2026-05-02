@@ -58,6 +58,10 @@ Writes an implementation plan as a first-class artifact before `/hv-work` runs, 
 
 Runs a full architectural refactor cycle: explores the codebase for friction, classifies findings as simple or structural, and fixes everything. For structural changes it spawns parallel design agents with competing constraints, compares the results, and recommends the strongest approach before executing. Pauses for user confirmation before proceeding (configurable).
 
+## /hv-release
+
+Cuts a release end-to-end: bumps the project version (`major`/`minor`/`patch` or explicit semver), generates categorized release notes from commits since the last tag, prepends a section to `CHANGELOG.md` (creating it if absent), creates an annotated git tag, pushes commit + tag, and publishes a release on GitHub or GitLab when origin is set. Auto-detects the version source (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, plain `VERSION`); honors `release.versionFile` override.
+
 ## /hv-resume
 
 Reorients a fresh session or post-`/clear` context by reading active streams, recent commit subjects, and any handoff notes left by `/hv-pause`. Routes automatically to `/hv-work`, `/hv-ship`, or `/hv-next` depending on the state of each branch. See [pausing and resuming](../usage/pausing-and-resuming.md) for the full flow.

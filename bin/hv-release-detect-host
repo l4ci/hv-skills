@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Print remote hosting service kind based on origin URL.
+# Output: github | github-enterprise | gitlab | gitlab-self-hosted | none
+# Usage: hv-release-detect-host
+set -euo pipefail
+
+URL="$(git remote get-url origin 2>/dev/null || true)"
+
+if [ -z "$URL" ]; then
+  echo "none"
+  exit 0
+fi
+
+# Extract hostname from SSH shorthand (git@host:path), SSH full (ssh://git@host/path),
+# or HTTPS (https://host/path) forms.
+host="$(echo "$URL" | sed -E 's#^(https?://|ssh://)?(git@)?([^:/]+)[:/].*#\3#i')"
+
+# Lowercase for case-insensitive matching
+host="$(echo "$host" | tr '[:upper:]' '[:lower:]')"
+
+case "$host" in
+  github.com)
+    echo "github"
+    ;;
+  gitlab.com)
+    echo "gitlab"
+    ;;
+  # GitHub Enterprise: any hostname containing "github" that is not github.com.
+  # Matches: github.company.com, foo.github.com, ghe.company.com won't match
+  # (GHE hostnames are typically github.company.com or <company>.github.com).
+  *github*)
+    echo "github-enterprise"
+    ;;
+  # Self-hosted GitLab: hostname contains "gitlab" but is not gitlab.com.
+  # Matches: gitlab.example.com, foo.gitlab.example.com, gitlab.internal, etc.
+  *gitlab*)
+    echo "gitlab-self-hosted"
+    ;;
+  *)
+    echo "none"
+    ;;
+esac
+
+exit 0
