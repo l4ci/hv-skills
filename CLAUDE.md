@@ -45,6 +45,6 @@ Before acting on work that touches a topic listed in `## Project Knowledge`, `##
 
 Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:
 
-- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_
+- Architecture
 
 <!-- hv-decisions-end -->
