@@ -54,35 +54,83 @@ claude plugin install hv-skills
 You already have code. You want a workflow that captures the work piling up in your head, executes it cleanly, and remembers what it learns.
 
 ```bash
-/hv-init                                       # one-time setup
-/hv-capture "timer bug + keyboard shortcut"    # auto-classify, assign IDs
-/hv-next                                       # review backlog, pick next, route
-                                               # → /hv-work runs (parallel, atomic commits)
-/hv-ship                                       # review-gated PR or direct merge
-/hv-learn                                      # distill durable gotchas to KNOWLEDGE.md
+# 1. one-time setup — 5 questions, ≤30s, creates .hv/
+/hv-init
+
+# 2. brain-dump what's on your plate; the model classifies and assigns IDs
+/hv-capture "timer resets on tab refocus, dropdown overlaps on mobile, want a keyboard shortcut to toggle"
+# → [B01] timer reset on tab refocus     (Bug, P1, Major)
+# → [B02] mobile dropdown overlap        (Bug, P2, Cosmetic)
+# → [F01] toggle keyboard shortcut       (Feature, Minor)
+
+# 3. review the backlog; reconciles status.json against git, suggests next
+/hv-next
+# → suggests [B01] (P1 first); on confirm runs /hv-work [B01]
+#   orchestrator plans tasks → workers implement in parallel → atomic commit per task
+
+# 4. hot-path fix that shouldn't go through the queue
+/hv-go "rename SettingsPanel → PreferencesPanel and update imports"
+# → captures [T02] and implements in one pass — no /hv-next round-trip
+
+# 5. when /hv-work hits a real bug, run a debug cycle
+/hv-debug B02
+# → reproduce → hypothesize → verify hypothesis → fix → nudge /hv-learn
+
+# 6. ship — runs /hv-review (PASS / CONCERNS / FAIL) then GitHub PR or direct merge
+/hv-ship
+
+# 7. distill what was non-obvious into KNOWLEDGE.md (auto-consulted next time)
+/hv-learn
+# → "Hidden-tab pauses use document.visibilityState; setInterval is throttled"
+#   filed under "Performance & Rendering"
 ```
 
-After the first cycle you mostly live in `/hv-capture` (or `/hv-c`) and `/hv-next`. Use `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug` for real bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`. See [docs/getting-started.md](docs/getting-started.md) for a fuller walkthrough.
+Stepping away mid-cycle? `/hv-pause` writes a handoff note (hypothesis, next step, mid-edit files) so `/hv-resume` can pick up after `/clear`. See [docs/getting-started.md](docs/getting-started.md) for the fuller walkthrough.
 
 ### Path B — Start from (nearly) nothing
 
 You have an empty repo or a few sketches. You want to think about *where the project is going* before you ship anything, and keep that vision present as work progresses.
 
 ```bash
-/hv-init                                       # one-time setup
-/hv-vision                                     # Socratic discovery + web research
-                                               # → writes MILESTONES.md and per-milestone files
-                                               # → marks the first milestone active
-/hv-plan M01                                   # implementation plan for the first slice
-                                               # (or skip and let /hv-vision hand off to /hv-capture)
-/hv-capture "seed items for M01"               # populate the backlog with milestone-tagged items
-/hv-next                                       # active milestone scopes the picks
-                                               # → /hv-work runs against the plan
-/hv-ship                                       # ship M01 slice
-/hv-learn                                      # capture what was non-obvious
+# 1. one-time setup
+/hv-init
+
+# 2. brainstorm vision and milestones — Socratic discovery + web research + deliberate challenge
+/hv-vision
+# → MILESTONES.md: M01 active, M02 (depends: M01), M03 (depends: M01)
+# → .hv/milestones/M01.md: goal, acceptance, rationale, risks, research notes
+# → CLAUDE.md vision-index updated so /hv-next scopes picks to M01
+
+# 3. (optional) de-risk an unknown before committing — branch never merges
+/hv-spike sse-over-nginx
+# → spike/sse-over-nginx branch + .hv/spikes/sse-over-nginx.md (question, findings, decision)
+
+# 4. write the implementation plan for the first slice — /hv-work will consult it
+/hv-plan M01-S01
+# → .hv/plans/M01-S01.md: tasks with verifiable outcomes, named assumptions, open questions
+
+# 5. seed milestone-tagged items into the backlog
+/hv-capture "OAuth callback handler, secure token storage, refresh-token flow"
+# → [F02][F03][F04] all tagged Milestone: M01
+
+# 6. (optional) peek the orchestrator's intended approach before code lands
+/hv-assume F02
+# → reads M01-S01 plan, prints intended files / tests / assumptions / unknowns; nothing executes
+
+# 7. active milestone scopes picks; /hv-work consults the plan
+/hv-next
+# → suggests [F02]; runs /hv-work against M01-S01.md
+
+# 8. ship M01-S01; PR body links resolved IDs and the milestone
+/hv-ship
+
+# 9. capture what surfaced
+/hv-learn
+# → "PKCE callback timing varies in dev — gate on window.location.origin"
+#   filed under "Auth & Identity"
 ```
 
-When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. For risky pre-commitment questions ("can SSE work over our nginx?"), drop in `/hv-spike <name>` before `/hv-plan` — its branch never merges, only the findings come back. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
+When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
 
 ## FAQ
 
