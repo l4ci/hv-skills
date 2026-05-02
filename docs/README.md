@@ -34,6 +34,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 
 - [Configuration](usage/configuration.md) — every key in `.hv/config.json` and what it does
 - [Autonomy levels](usage/autonomy.md) — how `off` / `auto` / `loop` change skill chaining
+- [Umbrella mode](usage/umbrella-mode.md) — coordinator at umbrella, work in sub-repos (M02 V1)
 
 ### Reference
 
