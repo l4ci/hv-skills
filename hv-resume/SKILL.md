@@ -60,12 +60,21 @@ git log --no-merges --format='- %h %s' <base>..<branch> | head -5
 
 If `worktreeMissing: true`, note *"(worktree was cleaned up — run `/hv-work` to re-create)"*.
 
-**Check for a handoff note** from `/hv-pause`:
+**Check for a handoff note** from `/hv-pause`. Reconcile output gives us `.repo` per stream (may be `null`); resolve the path with a small ordered fallback so umbrella cycles read the `(branch, repo)`-keyed file while single-repo / pre-feature notes keep working:
 
 ```bash
-HANDOFF=".hv/handoff/<branch>.md"
-[ -f "$HANDOFF" ] && cat "$HANDOFF"
+# Reconcile output gives us .repo per stream (may be null).
+if [ -n "$REPO" ] && [ -f ".hv/handoff/${BRANCH}@${REPO}.md" ]; then
+  HANDOFF=".hv/handoff/${BRANCH}@${REPO}.md"
+elif [ -f ".hv/handoff/${BRANCH}.md" ]; then
+  HANDOFF=".hv/handoff/${BRANCH}.md"
+else
+  HANDOFF=""
+fi
+[ -n "$HANDOFF" ] && cat "$HANDOFF"
 ```
+
+The bare `<branch>.md` path is a **legacy fallback** — it covers single-repo cycles and any handoff files written before umbrella keying shipped. The umbrella-keyed `<branch>@<repo>.md` form is preferred whenever the stream has a non-null `repo`.
 
 If the note exists, the orchestrator paused this branch deliberately — treat it as the source of truth for *intent*, not just git. Extract the **Next planned step** and **Current hypothesis** sections; they drive routing in Step 5.
 
@@ -86,7 +95,7 @@ Emit one compact block, structured by stream. When a handoff note exists, surfac
 ```
 Active work:
 
-  `hv/fix-B07-timer-badge` — [B07] (paused 2026-04-18 14:32, 1 commit)
+  `hv/fix-B07-timer-badge` (web) — [B07] (paused 2026-04-18 14:32, 1 commit)
     - a1b2c3d fix: invalidate timer before badge update
     Handoff:
       Stage: mid-hypothesis verification for B07
@@ -101,6 +110,8 @@ Backlog: 4 bugs, 6 features, 2 tasks
 Active milestones: M01 — Auth foundation
 Knowledge: 5 topics
 ```
+
+The inline `(repo)` suffix appears only when the stream's `repo` field is non-null (umbrella mode). Single-repo streams print the branch alone, as the second example shows. This matches how `/hv-summary` and `/hv-backlog` display umbrella entries — keep it inline; don't break the repo onto its own line.
 
 Omit the `Active milestones` line if no milestone is active.
 
@@ -138,10 +149,13 @@ Route each stream's answer via the `Skill` tool. Pass the branch name and item I
 | "Open backlog" | Invoke `hv-next` |
 | "Stop here" | Print *"OK — run `/hv-resume` again when you're ready."* and exit |
 
-**Handoff consumption**: only delete `.hv/handoff/<branch>.md` when the user chose to resume that specific branch. For "Leave handoff for later" and every other non-resume answer, the note stays in place so the next `/hv-resume` surfaces it again:
+**Handoff consumption**: only delete the handoff file when the user chose to resume that specific branch. For "Leave handoff for later" and every other non-resume answer, the note stays in place so the next `/hv-resume` surfaces it again:
 
 ```bash
-rm .hv/handoff/<branch>.md   # only after dispatching /hv-work or /hv-debug
+# Mirror the path used in Step 3 — the variable was resolved there, so the rm
+# uses whichever path the read picked: umbrella-keyed if present, legacy
+# `<branch>.md` fallback otherwise.
+rm "$HANDOFF"   # only after dispatching /hv-work or /hv-debug
 ```
 
 ## Rules

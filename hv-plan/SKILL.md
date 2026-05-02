@@ -38,6 +38,8 @@ For an item target, read its `TODO.md` entry and overflow file (`.hv/<bugs|featu
 - Tag the item under an active milestone (then proceed)
 - Skip planning and use `/hv-go` for one-shot execution
 
+When the item carries a `Repos:` field, capture that value as the plan's target sub-repo so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).
+
 For a slice target, read `.hv/milestones/<MID>.md` for goal/acceptance/risks context.
 
 If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv-plan-show`), edit (skip to Step 4 with current content as the starting point), or replace (`hv-plan-rm` first, then re-create).
@@ -48,6 +50,7 @@ If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv
 - Items scoped to this milestone: `.hv/bin/hv-todo-by-milestone <MID>`
 - `.hv/<bugs|features|tasks>/<itemId>.md` — overflow detail for the item if any
 - Existing plans for this milestone: `.hv/bin/hv-plan-list <MID>`
+- For item targets carrying a `Repos:` field: resolve it to an absolute sub-repo path via `.hv/repos.json` (`load_repos()`). Skipped for slice / milestone targets and when umbrella mode is off.
 - Relevant `KNOWLEDGE.md` topics: `.hv/bin/hv-knowledge-query <topics…>`
 - Relevant `DECISIONS.md` topics: `.hv/bin/hv-decisions-query <topics…>` — committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
 - Recent git history: `git log --oneline -20`
@@ -89,12 +92,16 @@ Iterate until the user explicitly confirms.
 ## Step 6 — Write to Disk
 
 ```bash
-# Slice mode — auto-mint slice number:
+# Slice mode — auto-mint slice number (umbrella-flat, no --repo):
 KEY=$(.hv/bin/hv-plan-add <MID> slice "<title>")
 
-# Item mode — explicit unit ID:
+# Item mode — explicit unit ID; pass --repo for umbrella items:
 KEY=$(.hv/bin/hv-plan-add <MID> <itemId> "<title>")
+# or, if the item carries Repos: <name>
+KEY=$(.hv/bin/hv-plan-add --repo <name> <MID> <itemId> "<title>")
 ```
+
+Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode never sets `--repo`.
 
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
 
@@ -103,13 +110,16 @@ The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use 
 Compact summary:
 
 ```
-Plan written: M01-S01 — Auth foundation
+Plan written: M01-B07 — Auth foundation
+  Repo: web                              # omit when no repo tag
   Tasks: 4
   Open questions: 1
   Status: planned
 
-Next: /hv-work M01-S01 to execute, or /hv-assume M01-S01 to peek before running.
+Next: /hv-work M01-B07 to execute, or /hv-assume M01-B07 to peek before running.
 ```
+
+Include `Repo: <name>` only when the plan was tagged with a sub-repo (item targets with `Repos:` under umbrella mode). Slice and milestone plans omit the line entirely.
 
 If `/hv-work` is the natural next step and the user is ready, offer it as a one-line prompt rather than just printing the hint.
 

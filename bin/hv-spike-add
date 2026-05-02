@@ -1,55 +1,111 @@
 #!/usr/bin/env bash
 # Start a spike — creates branch spike/<name> and .hv/spikes/<name>.md.
 # Does NOT switch to the branch; the calling skill drives the UX.
-# Usage: hv-spike-add <name> "<question>"
+# Usage: hv-spike-add [--repo <name>] <name> "<question>"
 # Prints the branch name on stdout.
+#
+# Umbrella mode: when --repo <name> is set, the spike branch is created in
+# the resolved sub-repo's git history (via cd into that sub-repo) while the
+# spike file stays at the umbrella's .hv/spikes/<name>.md (umbrella-flat per
+# M02 acceptance) and gains a `repo: <name>` frontmatter line.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-NAME="${1:?usage: hv-spike-add <name> <question>}"
-QUESTION="${2:?usage: hv-spike-add <name> <question>}"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:?usage: hv-spike-add [--repo <name>] <name> <question>}"
+  shift 2
+fi
+
+NAME="${1:?usage: hv-spike-add [--repo <name>] <name> <question>}"
+QUESTION="${2:?usage: hv-spike-add [--repo <name>] <name> <question>}"
+
+# Capture BIN_DIR + umbrella cwd BEFORE any cd — sibling-helper paths and
+# the spike-file write must resolve against the umbrella, not the sub-repo.
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+UMBRELLA_CWD="$(pwd)"
 
 if ! [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
   echo "error: name must be lowercase alphanumeric + dashes, got '$NAME'" >&2
   exit 1
 fi
 
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "error: not a git repository" >&2
-  exit 1
-fi
+resolve_repo_path() {
+  local name="$1"
+  PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$name" <<'PY'
+import sys
+from hvlib import load_repos
+name = sys.argv[1]
+repos = load_repos()
+if not repos:
+    sys.stderr.write("error: --repo requires .hv/repos.json with at least one entry — run /hv-init from the umbrella root\n")
+    sys.exit(1)
+p = repos.get(name)
+if not p:
+    sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
+    sys.exit(1)
+print(p)
+PY
+}
 
 BRANCH="spike/$NAME"
-if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
-  echo "error: branch $BRANCH already exists" >&2
-  exit 1
-fi
-
 SPIKE_FILE=".hv/spikes/$NAME.md"
+
+# Validate spike-file path BEFORE any cd — it lives at the umbrella root.
 if [ -e "$SPIKE_FILE" ]; then
   echo "error: $SPIKE_FILE already exists" >&2
   exit 1
 fi
 
-git branch "$BRANCH"
+if [ -n "$REPO" ]; then
+  REPO_PATH=$(resolve_repo_path "$REPO")
+  (
+    cd "$REPO_PATH"
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+      echo "error: $REPO_PATH is not a git repository" >&2
+      exit 1
+    fi
+    if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+      echo "error: branch $BRANCH already exists in $REPO" >&2
+      exit 1
+    fi
+    git branch "$BRANCH"
+  )
+else
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "error: not a git repository" >&2
+    exit 1
+  fi
+  if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+    echo "error: branch $BRANCH already exists" >&2
+    exit 1
+  fi
+  git branch "$BRANCH"
+fi
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$NAME" "$QUESTION" "$BRANCH" <<'PY'
+# Spike file write happens at the umbrella cwd (we never cd'd in the parent
+# shell — git ops above ran in a subshell). Pass REPO through so the
+# heredoc can emit the optional `repo:` frontmatter line.
+cd "$UMBRELLA_CWD"
+PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$NAME" "$QUESTION" "$BRANCH" "$REPO" <<'PY'
 import sys
 from datetime import date
 from pathlib import Path
 from hvlib import write_text_atomic
 
-name, question, branch = sys.argv[1], sys.argv[2], sys.argv[3]
+name, question, branch, repo = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
 spikes_dir = Path(".hv/spikes")
 spikes_dir.mkdir(parents=True, exist_ok=True)
 
 spike_path = spikes_dir / f"{name}.md"
 
+repo_line = f"repo: {repo}\n" if repo else ""
+
 write_text_atomic(spike_path,
     f"""---
 name: {name}
 branch: {branch}
-status: open
+{repo_line}status: open
 created: {date.today().isoformat()}
 ---
 

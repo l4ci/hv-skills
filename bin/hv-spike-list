@@ -1,35 +1,56 @@
 #!/usr/bin/env bash
 # List spikes from .hv/spikes/*.md as JSON.
-# Each entry: { name, branch, status, created, branchExists }.
+# Each entry: { name, branch, repo, status, created, branchExists }.
+# In umbrella mode, branchExists is resolved per-repo: spikes carrying a
+# `repo:` frontmatter field are checked against that sub-repo's git store;
+# spikes without `repo:` (single-repo / pre-feature) fall back to cwd.
 # Usage: hv-spike-list
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RAW=$("$HERE/hv-fm-list" .hv/spikes name branch status created)
-python3 - "$RAW" <<'PY'
+RAW=$("$HERE/hv-fm-list" .hv/spikes name branch repo status created)
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RAW" <<'PY'
 import json, subprocess, sys
 from pathlib import Path
+from hvlib import load_repos
 
-def existing_spike_branches():
+def existing_spike_branches(cwd=None):
     try:
         out = subprocess.check_output(
             ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/spike/"],
             text=True,
+            cwd=cwd,
         )
         return set(line.strip() for line in out.splitlines() if line.strip())
     except (subprocess.CalledProcessError, FileNotFoundError):
         return set()
 
-existing = existing_spike_branches()
+spikes = json.loads(sys.argv[1])
+
+# Group spikes by repo. Empty string = "no repo" (cwd lookup).
+needed_repos = {fm.get("repo", "") for fm in spikes}
+repos = load_repos() if any(r for r in needed_repos) else {}
+
+# Resolve existing-branch sets lazily, one git call per group.
+existing_by_repo: dict[str, set[str]] = {}
+for repo in needed_repos:
+    if repo == "":
+        existing_by_repo[""] = existing_spike_branches()
+    else:
+        path = repos.get(repo)
+        existing_by_repo[repo] = existing_spike_branches(cwd=path) if path else set()
+
 items = []
-for fm in json.loads(sys.argv[1]):
+for fm in spikes:
     stem = Path(fm["_path"]).stem
     branch = fm.get("branch") or f"spike/{stem}"
+    repo = fm.get("repo", "")
     items.append({
-        "name":        fm.get("name") or stem,
-        "branch":      branch,
-        "status":      fm.get("status") or "open",
-        "created":     fm.get("created", ""),
-        "branchExists": branch in existing,
+        "name":         fm.get("name") or stem,
+        "branch":       branch,
+        "repo":         repo,
+        "status":       fm.get("status") or "open",
+        "created":      fm.get("created", ""),
+        "branchExists": branch in existing_by_repo.get(repo, set()),
     })
 print(json.dumps(items, indent=2))
 PY

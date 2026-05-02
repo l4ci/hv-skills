@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # List all plans from .hv/plans/*.md as JSON.
-# Each entry: { key, milestone, unit, unitKind, title, status, created }.
+# Each entry: { key, milestone, unit, unitKind, title, status, created, repo }.
 # Usage: hv-plan-list [milestone]
 #   With a milestone arg, returns only plans under that milestone.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILTER="${1:-}"
-RAW=$("$HERE/hv-fm-list" .hv/plans key milestone unit unitKind title status created)
+RAW=$("$HERE/hv-fm-list" .hv/plans key milestone unit unitKind title status created repo)
 python3 - "$RAW" "$FILTER" <<'PY'
 import json, sys
 from pathlib import Path
@@ -24,6 +24,7 @@ for fm in json.loads(sys.argv[1]):
         "title":     fm.get("title", ""),
         "status":    fm.get("status") or "planned",
         "created":   fm.get("created", ""),
+        "repo":      fm.get("repo", ""),
     })
 print(json.dumps(items, indent=2))
 PY
