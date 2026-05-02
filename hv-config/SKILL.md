@@ -66,7 +66,7 @@ print(f"  Confirm before refactor  {'on' if cfg.get('refactor',{}).get('confirmB
 print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
 print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHypotheses',False) else 'off'}")
 print(f"  Docs path                {cfg.get('docs',{}).get('path','docs')}")
-print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',True) else 'off'}")
+print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',False) else 'off'}")
 print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
 print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
 PY

@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 # Apply a semver bump to a version file in-place and print the new version.
-# Usage: hv-release-bump-version <file> <kind> <bump>
+# Usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>
 #   <kind>: plugin-json | package-json | pyproject | cargo | plain
 #   <bump>: patch | minor | major | X.Y.Z
 set -euo pipefail
+DRY_RUN=0
+if [ "${1:-}" = "--dry-run" ]; then
+  DRY_RUN=1
+  shift
+fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FILE="${1:?usage: hv-release-bump-version <file> <kind> <bump>}"
-KIND="${2:?usage: hv-release-bump-version <file> <kind> <bump>}"
-BUMP="${3:?usage: hv-release-bump-version <file> <kind> <bump>}"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$KIND" "$BUMP" <<'PY'
+FILE="${1:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
+KIND="${2:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
+BUMP="${3:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$KIND" "$BUMP" "$DRY_RUN" <<'PY'
 import re
 import sys
 from pathlib import Path
-from hvlib import load_json, dump_json_atomic, write_text_atomic
+from hvlib import load_json, dump_json_atomic, write_text_atomic, parse_toml_version
 
 KINDS = {"plugin-json", "package-json", "pyproject", "cargo", "plain"}
 BUMPS = {"patch", "minor", "major"}
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 file_arg, kind, bump = sys.argv[1], sys.argv[2], sys.argv[3]
+dry_run = sys.argv[4] == "1"
 
 # --- validate inputs ---
 if kind not in KINDS:
@@ -53,26 +59,15 @@ def read_current_version(p, k):
         return v
     content = p.read_text()
     if k == "pyproject":
-        for sec_pat in (r"^\[project\]\s*$", r"^\[tool\.poetry\]\s*$"):
-            sec_m = re.search(sec_pat, content, re.MULTILINE)
-            if sec_m:
-                next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
-                end = sec_m.end() + next_m.start() if next_m else len(content)
-                block = content[sec_m.end():end]
-                vm = re.search(r'^version\s*=\s*"([^"]*)"', block, re.MULTILINE)
-                if vm:
-                    return vm.group(1)
+        v = parse_toml_version(content, ["project", "tool.poetry"])
+        if v is not None:
+            return v
         print(f"error: {p}: no version field found", file=sys.stderr)
         sys.exit(1)
     if k == "cargo":
-        sec_m = re.search(r"^\[package\]\s*$", content, re.MULTILINE)
-        if sec_m:
-            next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
-            end = sec_m.end() + next_m.start() if next_m else len(content)
-            block = content[sec_m.end():end]
-            vm = re.search(r'^version\s*=\s*"([^"]*)"', block, re.MULTILINE)
-            if vm:
-                return vm.group(1)
+        v = parse_toml_version(content, ["package"])
+        if v is not None:
+            return v
         print(f"error: {p}: no version field found", file=sys.stderr)
         sys.exit(1)
     # plain
@@ -105,6 +100,10 @@ else:
         )
         sys.exit(1)
     new = bump
+
+if dry_run:
+    print(new)
+    sys.exit(0)
 
 # --- write new version ---
 if kind in ("plugin-json", "package-json"):

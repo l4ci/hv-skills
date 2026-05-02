@@ -245,7 +245,7 @@ cfg = {
   "ship":     {"review": <Q4-ship>},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
-  "docs":     {"path": "docs", "autoCreate": True},
+  "docs":     {"path": "docs", "autoCreate": False},
   "git":      {"baseBranch": ""}
 }
 cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled

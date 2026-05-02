@@ -24,6 +24,12 @@ if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
   exit 1
 fi
 
+SPIKE_FILE=".hv/spikes/$NAME.md"
+if [ -e "$SPIKE_FILE" ]; then
+  echo "error: $SPIKE_FILE already exists" >&2
+  exit 1
+fi
+
 git branch "$BRANCH"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$NAME" "$QUESTION" "$BRANCH" <<'PY'
@@ -38,9 +44,6 @@ spikes_dir = Path(".hv/spikes")
 spikes_dir.mkdir(parents=True, exist_ok=True)
 
 spike_path = spikes_dir / f"{name}.md"
-if spike_path.exists():
-    print(f"error: {spike_path} already exists", file=sys.stderr)
-    sys.exit(1)
 
 write_text_atomic(spike_path,
     f"""---

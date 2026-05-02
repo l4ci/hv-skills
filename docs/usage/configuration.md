@@ -31,7 +31,7 @@ Default config:
   },
   "docs": {
     "path": "docs",
-    "autoCreate": true
+    "autoCreate": false
   },
   "git": {
     "baseBranch": ""
@@ -128,14 +128,14 @@ Relative path (from the project root) to the documentation folder that `/hv-docs
 ## docs.autoCreate
 
 - **Type:** boolean
-- **Default:** `true`
+- **Default:** `false`
 
-Controls whether `/hv-docs` after-work mode automatically writes proposed doc updates without pausing for approval. When `true`, `/hv-docs` writes changes and reports what it did. When `false`, `/hv-docs` proposes changes and waits for your confirmation before writing.
+Controls whether `/hv-docs` after-work mode automatically writes proposed doc updates without pausing for approval. When `false` (the default), `/hv-docs` proposes changes and waits for your confirmation before writing — the safe propose-mode path. When `true`, `/hv-docs` writes changes and reports what it did. The `true` path will gain a Layer-3 LLM safety review before commit when M01-S03 ships; until then, `false` is the recommended default and `true` is opt-in.
 
 | Value | Behavior |
 |-------|----------|
-| `true` (default) | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. |
-| `false` | After-work mode proposes updates and waits for approval before writing. Safer when doc quality is critical or the agent is unfamiliar with your doc style. |
+| `false` (default) | After-work mode proposes updates and waits for approval before writing. Recommended until M01-S03 ships the auto-write safety review. |
+| `true` | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. Best paired with `git diff` review per cycle. |
 
 ## git.baseBranch
 

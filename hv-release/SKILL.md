@@ -95,15 +95,15 @@ If the user picks explicit, validate: must be valid semver and strictly greater 
 
 ## Step 4 — Compute New Version
 
-Apply the bump in-skill (no helper needed here — the actual file write happens in Step 8):
+Use the helper's `--dry-run` mode so version computation has one source of truth — Step 8 will repeat the call without `--dry-run` to actually write the file.
 
-- Parse `current` from Step 2 into `[major, minor, patch]` integers.
-- Apply bump:
-  - `patch` → `X.Y.Z+1`
-  - `minor` → `X.Y+1.0`
-  - `major` → `X+1.0.0`
-  - explicit → use as-is (already validated in Step 3)
-- Store as `new_version` for use in Steps 6, 7, 8, 9, 10, 11, 12, 13, 14.
+```bash
+new_version=$(.hv/bin/hv-release-bump-version --dry-run <file> <kind> <bump>)
+```
+
+`<file>` and `<kind>` come from Step 2; `<bump>` is `patch`, `minor`, `major`, or the explicit semver from Step 3. The helper validates the bump (must be valid semver and strictly greater than `current` for the explicit path) and prints the new version. If validation fails, the helper exits 1 with a message — surface it and stop.
+
+Store `new_version` for use in Steps 6, 7, 8, 9, 10, 11, 12, 13, 14.
 
 If BREAKING CHANGE commits were detected (Step 3 scan) but the user chose `patch` or `minor`, interject with `AskUserQuestion` before continuing:
 - **Header:** `"Breaking change detected"`
@@ -176,12 +176,12 @@ NOTES_FILE=$(mktemp /tmp/hv-release-notes.XXXXXX.md)
 ## Step 8 — Update Version File
 
 ```bash
-.hv/bin/hv-release-bump-version <file> <kind> <bump>
+written=$(.hv/bin/hv-release-bump-version <file> <kind> <bump>)
 ```
 
-Where `<bump>` is `patch`, `minor`, `major`, or the explicit version string from Step 3. Capture stdout (the new version written). Verify it matches `new_version` from Step 4; if not, stop with an error.
+Same arguments as Step 4's `--dry-run` call; this writes the file and prints the new version. Assert `written == new_version`; if they diverge, stop with an error (the file may be partially modified — surface the discrepancy and let the user investigate).
 
-Skip in `--dry-run` mode; print what would be written instead.
+Skip in the skill's `--dry-run` mode (different from the helper's flag); print what would be written instead.
 
 ## Step 9 — Update CHANGELOG.md
 

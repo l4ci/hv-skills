@@ -187,3 +187,34 @@ def load_repos(repos_path=".hv/repos.json") -> dict[str, str]:
         if name and rel:
             out[name] = os.path.realpath(rel)
     return out
+
+
+def parse_toml_version(text: str, sections: list[str]) -> str | None:
+    """Find `version = "x.y.z"` inside one of the given [section] headings
+    in `text` (TOML source). `sections` is checked in order; the first hit
+    wins. Returns the version string or None if no section matches or no
+    version field is present in any matching section.
+
+    The section heading match is anchored at line start, allows leading
+    whitespace, and tolerates trailing whitespace inside the brackets.
+    The version regex is anchored at line start of the section body
+    (after the heading, up to the next [heading] or EOF).
+
+    Used by hv-release-detect-version (read path) and hv-release-bump-version
+    (read path) to keep the regex/section-traversal logic identical.
+    """
+    for section in sections:
+        pattern = re.compile(
+            r"^\s*\[" + re.escape(section) + r"\s*\]\s*$",
+            re.MULTILINE,
+        )
+        m = pattern.search(text)
+        if not m:
+            continue
+        rest = text[m.end():]
+        next_section = re.search(r"^\s*\[", rest, re.MULTILINE)
+        block = rest[: next_section.start()] if next_section else rest
+        v = re.search(r'^version\s*=\s*"([^"]*)"', block, re.MULTILINE)
+        if v:
+            return v.group(1)
+    return None
