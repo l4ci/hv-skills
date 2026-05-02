@@ -1,18 +1,54 @@
 #!/usr/bin/env bash
 # Merge a feature branch into main/master. Cleans up any worktree first, then merges --no-ff and deletes the branch.
 # Reads the merge commit message from stdin.
-# Usage: echo "merge message" | hv-merge <branch>
+# Usage: echo "merge message" | hv-merge [--repo <name>] <branch>
 # Prints: the merge commit's short hash.
 set -euo pipefail
-BRANCH="${1:?usage: hv-merge <branch>  (merge message on stdin)}"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:?usage: hv-merge [--repo <name>] <branch>  (merge message on stdin)}"
+  shift 2
+fi
+
+BRANCH="${1:?usage: hv-merge [--repo <name>] <branch>  (merge message on stdin)}"
 MSG=$(cat)
 if [ -z "$MSG" ]; then
   echo "error: hv-merge expects merge message on stdin" >&2
   exit 1
 fi
 
-"$(dirname "$0")/hv-worktree-clear" "$BRANCH"
-MAIN=$("$(dirname "$0")/hv-base-branch")
+resolve_repo_path() {
+  local name="$1"
+  if [ ! -f .hv/repos.json ]; then
+    echo "error: --repo requires .hv/repos.json — run /hv-init from the umbrella root" >&2
+    exit 1
+  fi
+  python3 - "$name" <<'PY'
+import json, os, sys
+name = sys.argv[1]
+data = json.loads(open(".hv/repos.json").read())
+for entry in data.get("repos", []) or []:
+    if entry.get("name") == name:
+        path = entry.get("path", "")
+        print(os.path.realpath(path))
+        sys.exit(0)
+sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
+sys.exit(1)
+PY
+}
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -n "$REPO" ]; then
+  REPO_PATH=$(resolve_repo_path "$REPO")
+  cd "$REPO_PATH"
+  "$BIN_DIR/hv-worktree-clear" --repo "$REPO" "$BRANCH"
+  MAIN=$("$BIN_DIR/hv-base-branch")
+else
+  "$BIN_DIR/hv-worktree-clear" "$BRANCH"
+  MAIN=$("$BIN_DIR/hv-base-branch")
+fi
 
 git checkout -q "$MAIN"
 git merge --no-ff "$BRANCH" -m "$MSG"
