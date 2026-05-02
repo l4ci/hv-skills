@@ -238,11 +238,12 @@ Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
-## Step 4 — Seed CLAUDE.md Knowledge, Vision & Decisions Blocks
+## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed three managed blocks in `CLAUDE.md` (created if missing): knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), and decision topics (`/hv-decide`). `/hv-work` reads all three — knowledge as advisory context, milestones for scope, decisions as hard constraints.
+Seed four managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), and decision topics (`/hv-decide`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
 
 ```bash
+.hv/bin/hv-skills-index
 .hv/bin/hv-knowledge-index
 .hv/bin/hv-vision-index
 .hv/bin/hv-decisions-index
