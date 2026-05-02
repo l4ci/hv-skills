@@ -32,7 +32,7 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 **Review & ship** — `/hv-review`, `/hv-ship`
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only)
 **Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
-**Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`
+**Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
 Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
 
