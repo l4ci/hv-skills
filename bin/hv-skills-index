@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-skills-start --> block in CLAUDE.md with a fixed
+# canonical body — slash-command index + consult-point helpers. Body is static
+# (identical for every hv-skills-using project), so re-runs are idempotent.
+# Usage: hv-skills-index
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+"$HERE/hv-managed-block" skills --body-stdin <<'EOF'
+## hv-skills
+
+This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
+
+**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-next`, `/hv-status`, `/hv-resume`, `/hv-pause`
+**Plan & build** — `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
+**Review & ship** — `/hv-review`, `/hv-ship`
+**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only)
+**Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
+**Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`
+
+Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
+
+- `.hv/bin/hv-knowledge-query <topic>…`
+- `.hv/bin/hv-decisions-query <topic>…`
+- `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
+EOF
