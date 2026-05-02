@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Prepend a new release section to CHANGELOG.md (creating it if absent).
+# Idempotent: refuses if a section for this version already exists.
+# Usage: hv-release-update-changelog <version> <notes-file> [--path PATH]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+VERSION="${1:?usage: hv-release-update-changelog <version> <notes-file> [--path PATH]}"
+NOTES_FILE="${2:?usage: hv-release-update-changelog <version> <notes-file> [--path PATH]}"
+CHANGELOG_PATH="CHANGELOG.md"
+
+shift 2
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --path)
+      CHANGELOG_PATH="${2:?--path requires a value}"
+      shift 2
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$VERSION" "$NOTES_FILE" "$CHANGELOG_PATH" <<'PY'
+import re
+import sys
+import datetime
+from pathlib import Path
+from hvlib import write_text_atomic
+
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+
+version, notes_file_arg, changelog_path_arg = sys.argv[1], sys.argv[2], sys.argv[3]
+
+# --- validate args ---
+if not SEMVER_RE.match(version):
+    print(f"error: version '{version}' must match X.Y.Z (no pre-release suffix)", file=sys.stderr)
+    sys.exit(1)
+
+notes_path = Path(notes_file_arg)
+if not notes_path.exists():
+    print(f"error: notes file not found: {notes_file_arg}", file=sys.stderr)
+    sys.exit(1)
+
+changelog = Path(changelog_path_arg)
+
+# --- build new section ---
+today = datetime.date.today().isoformat()
+notes_body = notes_path.read_text().rstrip()
+new_section = f"## v{version} — {today}\n\n{notes_body}\n\n"
+
+# --- open / update changelog ---
+if not changelog.exists():
+    content = "# Changelog\n\n" + new_section
+    write_text_atomic(changelog, content)
+else:
+    content = changelog.read_text()
+
+    # idempotency check
+    if re.search(rf"^## v{re.escape(version)}\b", content, re.MULTILINE):
+        print(f"error: {changelog_path_arg} already has a section for v{version}", file=sys.stderr)
+        sys.exit(1)
+
+    # detect H1 heading at the start (ignoring leading blank lines)
+    h1_match = re.search(r"^#\s+\S", content.lstrip("\n"), re.MULTILINE)
+    # check if the H1 is actually at the very start of the file (after optional blank lines)
+    stripped_start = content.lstrip("\n")
+    if h1_match and stripped_start.startswith(h1_match.group(0)):
+        # find absolute position of H1 in original content
+        leading_blanks = len(content) - len(stripped_start)
+        h1_abs_match = re.search(r"^#\s+\S", content, re.MULTILINE)
+        h1_line_end = content.index("\n", h1_abs_match.start()) + 1  # position after H1 newline
+
+        # find the first blank line after H1
+        rest_after_h1 = content[h1_line_end:]
+        blank_match = re.search(r"^[ \t]*\n", rest_after_h1, re.MULTILINE)
+        if blank_match:
+            # insert after the blank line
+            insert_pos = h1_line_end + blank_match.end()
+            content = content[:insert_pos] + new_section + content[insert_pos:]
+        else:
+            # H1 followed by content immediately — insert with a blank line separator
+            content = content[:h1_line_end] + "\n" + new_section + content[h1_line_end:]
+    else:
+        # no H1 at top — prepend directly
+        content = new_section + content
+
+    write_text_atomic(changelog, content)
+
+print(changelog_path_arg)
+PY
