@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.12.2 — 2026-05-02
+
+Single bugfix surfaced one release after `/hv-release` shipped.
+
+## Fixed
+
+- **`bin/hv-skills-index` now lists `/hv-release` under Maintenance** (`b7ea9f8`). The helper has a hand-curated body (intentionally not auto-derived from `plugin.json` so the editorial categorization survives), and the F03 integration worker brief covered `plugin.json` + `slash-commands.md` + `cli-helpers.md` + `README.md` but missed this helper. Re-running `hv-skills-index` regenerates the managed `<!-- hv-skills -->` block in `CLAUDE.md`.
+
+Users on v1.12.0 / v1.12.1 saw a stale skills index; v1.12.2 corrects it. Captured the gap as a Skill Authoring learning so the next worker brief catches it.
+
+## Stats
+
+1 commit · 2 files · +2 / −2 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.12.1...v1.12.2
+
 ## v1.12.1 — 2026-05-02
 
 Two follow-up improvements to `/hv-release` surfaced while dogfooding it for the v1.12.0 cut.
