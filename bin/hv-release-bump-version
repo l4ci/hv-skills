@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# Apply a semver bump to a version file in-place and print the new version.
+# Usage: hv-release-bump-version <file> <kind> <bump>
+#   <kind>: plugin-json | package-json | pyproject | cargo | plain
+#   <bump>: patch | minor | major | X.Y.Z
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+FILE="${1:?usage: hv-release-bump-version <file> <kind> <bump>}"
+KIND="${2:?usage: hv-release-bump-version <file> <kind> <bump>}"
+BUMP="${3:?usage: hv-release-bump-version <file> <kind> <bump>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$KIND" "$BUMP" <<'PY'
+import re
+import sys
+from pathlib import Path
+from hvlib import load_json, dump_json_atomic, write_text_atomic
+
+KINDS = {"plugin-json", "package-json", "pyproject", "cargo", "plain"}
+BUMPS = {"patch", "minor", "major"}
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+
+file_arg, kind, bump = sys.argv[1], sys.argv[2], sys.argv[3]
+
+# --- validate inputs ---
+if kind not in KINDS:
+    print(f"error: unknown kind '{kind}' (known: {', '.join(sorted(KINDS))})", file=sys.stderr)
+    sys.exit(1)
+
+if bump not in BUMPS and not SEMVER_RE.match(bump):
+    print(f"error: bump must be patch|minor|major or X.Y.Z, got '{bump}'", file=sys.stderr)
+    sys.exit(1)
+
+path = Path(file_arg)
+if not path.exists():
+    print(f"error: file not found: {file_arg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def parse_semver(v):
+    m = SEMVER_RE.match(v)
+    if not m:
+        print(f"error: current version '{v}' is not X.Y.Z semver", file=sys.stderr)
+        sys.exit(1)
+    return tuple(int(x) for x in v.split("."))
+
+
+def read_current_version(p, k):
+    if k in ("plugin-json", "package-json"):
+        data = load_json(p, {})
+        v = data.get("version")
+        if v is None:
+            print(f"error: {p}: no version field found", file=sys.stderr)
+            sys.exit(1)
+        return v
+    content = p.read_text()
+    if k == "pyproject":
+        for sec_pat in (r"^\[project\]\s*$", r"^\[tool\.poetry\]\s*$"):
+            sec_m = re.search(sec_pat, content, re.MULTILINE)
+            if sec_m:
+                next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
+                end = sec_m.end() + next_m.start() if next_m else len(content)
+                block = content[sec_m.end():end]
+                vm = re.search(r'^version\s*=\s*"([^"]*)"', block, re.MULTILINE)
+                if vm:
+                    return vm.group(1)
+        print(f"error: {p}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    if k == "cargo":
+        sec_m = re.search(r"^\[package\]\s*$", content, re.MULTILINE)
+        if sec_m:
+            next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
+            end = sec_m.end() + next_m.start() if next_m else len(content)
+            block = content[sec_m.end():end]
+            vm = re.search(r'^version\s*=\s*"([^"]*)"', block, re.MULTILINE)
+            if vm:
+                return vm.group(1)
+        print(f"error: {p}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    # plain
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    print(f"error: {p}: no version field found", file=sys.stderr)
+    sys.exit(1)
+
+
+current = read_current_version(path, kind)
+cur_tuple = parse_semver(current)
+major, minor, patch = cur_tuple
+
+# --- compute new version ---
+if bump == "patch":
+    new = f"{major}.{minor}.{patch + 1}"
+elif bump == "minor":
+    new = f"{major}.{minor + 1}.0"
+elif bump == "major":
+    new = f"{major + 1}.0.0"
+else:
+    # explicit semver
+    new_tuple = parse_semver(bump)
+    if new_tuple <= cur_tuple:
+        print(
+            f"error: explicit version '{bump}' must be strictly greater than current '{current}'",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    new = bump
+
+# --- write new version ---
+if kind in ("plugin-json", "package-json"):
+    data = load_json(path, {})
+    data["version"] = new
+    dump_json_atomic(path, data)
+
+elif kind == "pyproject":
+    content = path.read_text()
+    replaced = False
+    for sec_pat in (r"^\[project\]\s*$", r"^\[tool\.poetry\]\s*$"):
+        sec_m = re.search(sec_pat, content, re.MULTILINE)
+        if not sec_m:
+            continue
+        next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
+        end = sec_m.end() + next_m.start() if next_m else len(content)
+        sec_body = content[sec_m.end():end]
+        new_body, n = re.subn(
+            r'(?m)^(version\s*=\s*)"[^"]*"',
+            rf'\1"{new}"',
+            sec_body,
+            count=1,
+        )
+        if n:
+            content = content[:sec_m.end()] + new_body + content[end:]
+            replaced = True
+            break
+    if not replaced:
+        print(f"error: {path}: no version field in section", file=sys.stderr)
+        sys.exit(1)
+    write_text_atomic(path, content)
+
+elif kind == "cargo":
+    content = path.read_text()
+    sec_m = re.search(r"^\[package\]\s*$", content, re.MULTILINE)
+    if not sec_m:
+        print(f"error: {path}: no version field in section", file=sys.stderr)
+        sys.exit(1)
+    next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
+    end = sec_m.end() + next_m.start() if next_m else len(content)
+    sec_body = content[sec_m.end():end]
+    new_body, n = re.subn(
+        r'(?m)^(version\s*=\s*)"[^"]*"',
+        rf'\1"{new}"',
+        sec_body,
+        count=1,
+    )
+    if not n:
+        print(f"error: {path}: no version field in section", file=sys.stderr)
+        sys.exit(1)
+    content = content[:sec_m.end()] + new_body + content[end:]
+    write_text_atomic(path, content)
+
+else:  # plain
+    write_text_atomic(path, new + "\n")
+
+print(new)
+PY
