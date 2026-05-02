@@ -414,6 +414,72 @@ LINE_MIN=$(echo "$OUT" | grep -n "| F20 " | head -1 | cut -d: -f1)
 [ "$LINE_COS" -lt "$LINE_MIN" ] || fail "Cosmetic not sorted before Minor (F21 at $LINE_COS, F20 at $LINE_MIN)"
 pass "backlog sorts bugs by priority and features by size"
 
+# Clusters: B11 ↔ F20 (mutual Related). Isolated items must not appear.
+echo "$OUT" | grep -q "^### Clusters" || fail "Clusters section missing: $OUT"
+echo "$OUT" | grep -qF "[B11] Crash on launch ↔ [F20] Quick-switch" \
+  || fail "expected B11↔F20 cluster line: $(echo "$OUT" | awk '/^### Clusters/,0')"
+CLUSTER_BLOCK=$(echo "$OUT" | awk '/^### Clusters/,0')
+echo "$CLUSTER_BLOCK" | grep -q "B10\|F21\|T30" \
+  && fail "isolated item leaked into Clusters: $CLUSTER_BLOCK"
+pass "backlog emits Clusters section for related items"
+
+# Triple cluster + isolated item: F22↔F23↔T30 form one component, comma-separated.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B90] [P1] Solo bug.** Desc.
+
+## Features
+- **[F90] [Minor] Hub.** Desc. Related: [F91], [T90]
+- **[F91] [Minor] Spoke.** Desc. Related: [F90]
+
+## Tasks
+- **[T90] Toolchain.** Desc. Related: [F90]
+
+## Completed
+EOF
+OUT=$("$BIN/hv-backlog")
+echo "$OUT" | grep -qF "[F90] Hub, [F91] Spoke, [T90] Toolchain" \
+  || fail "triple cluster not rendered with comma separator: $(echo "$OUT" | awk '/^### Clusters/,0')"
+pass "backlog renders 3+ member clusters with comma separator"
+
+# No-cluster fixture: must omit the section entirely.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B95] [P2] Lone bug.** Desc.
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+OUT=$("$BIN/hv-backlog")
+echo "$OUT" | grep -q "^### Clusters" \
+  && fail "Clusters section appeared with no related items: $OUT"
+pass "backlog omits Clusters section when nothing is related"
+
+# Restore the original fixture for the In-Progress assertions below.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B10] [P2] Minor glitch.** Desc.
+- **[B11] [P0] Crash on launch.** Desc. Related: [F20]
+
+## Features
+- **[F20] [Minor] Quick-switch.** Desc. Related: [B11]
+- **[F21] [Cosmetic] Tweak spacing.** Desc.
+
+## Tasks
+- **[T30] Update toolchain.** Desc.
+
+## Completed
+EOF
+
 # Active items should move to In Progress
 "$BIN/hv-status-add" hv/real-branch F20
 OUT=$("$BIN/hv-backlog")

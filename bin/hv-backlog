@@ -8,6 +8,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-types.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
+from collections import defaultdict
 from pathlib import Path
 from hvlib import section, load_json, parse_todo_fields
 
@@ -98,6 +99,45 @@ render_table("Features", features, ["ID", "Size", "Title", "Related"],
              lambda i: [i["id"], i["tag"], i["title"], i["related"]])
 render_table("Tasks", tasks, ["ID", "Title", "Related"],
              lambda i: [i["id"], i["title"], i["related"]])
+
+# Connected components across all backlog items (≥ 2 members).
+# Built from the original parsed lists so active items remain in the graph —
+# a backlog item related to an in-flight one is still useful context.
+all_items = (parse_items(section(content, "Bugs"))
+             + parse_items(section(content, "Features"))
+             + parse_items(section(content, "Tasks")))
+title_by_id = {i["id"]: i["title"] for i in all_items}
+adj = defaultdict(set)
+id_pat = re.compile(rf"\[({ITEM_CLASS}\d+)\]")
+for item in all_items:
+    iid = item["id"]
+    for rid in id_pat.findall(item["related"]):
+        if rid != iid and rid in title_by_id:
+            adj[iid].add(rid)
+            adj[rid].add(iid)
+
+seen, components = set(), []
+for iid in sorted(title_by_id):
+    if iid in seen:
+        continue
+    comp, queue = [], [iid]
+    while queue:
+        node = queue.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        comp.append(node)
+        queue.extend(adj.get(node, ()))
+    if len(comp) >= 2:
+        components.append(sorted(comp))
+components.sort(key=lambda c: c[0])
+
+if components:
+    out.append("### Clusters\n")
+    for comp in components:
+        sep = " ↔ " if len(comp) == 2 else ", "
+        out.append("- " + sep.join(f"[{cid}] {title_by_id[cid]}" for cid in comp))
+    out.append("")
 
 if not (active_entries or bugs or features or tasks):
     out.append("Backlog empty. Run /hv-capture to add items.")

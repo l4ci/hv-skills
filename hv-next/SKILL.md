@@ -74,13 +74,7 @@ Plain-text fallback: *"Merge or open a PR?"* and *"Resume or abandon?"* — hono
 
 Moves `## Completed` items older than 5 days to `ARCHIVE.md`. Silent — don't report the count.
 
-## Step 4 — Build Relationship Map
-
-Scan all items in `## Bugs`, `## Features`, `## Tasks` for `Related: [B01], [F02]` suffixes. Build a bidirectional map — if B03 lists `Related: [F02]`, F02 is also related to B03.
-
-Identify **clusters**: groups of 2+ connected items. These inform Step 6.
-
-## Step 4.5 — Read Active Milestones
+## Step 4 — Read Active Milestones
 
 ```bash
 .hv/bin/hv-vision-active
@@ -96,7 +90,7 @@ If at least one milestone is active, also gather items already tagged to each. *
 # …one per active milestone, all dispatched in the same response
 ```
 
-Carry the per-milestone ID set forward. Step 3 (`hv-archive-old`), Step 4.5 (`hv-vision-active` and the per-milestone reads above), and Step 5's `hv-backlog` can also share the same parallel batch — none of them mutate shared state, so there's no ordering constraint beyond the reconcile in Step 2.
+Carry the per-milestone ID set forward. Step 3 (`hv-archive-old`), Step 4 (`hv-vision-active` and the per-milestone reads above), and Step 5's `hv-backlog` can also share the same parallel batch — none of them mutate shared state, so there's no ordering constraint beyond the reconcile in Step 2.
 
 ## Step 5 — Present the Backlog
 
@@ -108,17 +102,9 @@ Prints pre-sorted markdown tables: "In Progress" (active items from `status.json
 
 **Always print the full helper output verbatim — every row, every section.** Do not summarize, truncate, omit rows, collapse sections, wrap in code fences, or replace with a count ("12 bugs pending"). The user invoked `/hv-next` specifically to *see* the backlog; a missing or shortened table defeats the command. This applies even if the table is long or a word-budget hint suggests otherwise — backlog tables are exempt from response-length limits.
 
-Then, if clusters exist from Step 4, add a brief note after the tables:
+`hv-backlog` emits a `### Clusters` section automatically when 2+ items are joined by `Related:` references — pairs render as `[A] ↔ [B]`, larger groups as comma-separated. The section is part of the verbatim output; don't reformat or restate it. You may add a single editorial line after a cluster if a tactical hint is genuinely useful (e.g. *"fix the bug before the feature"*) — otherwise leave the helper's output to stand on its own.
 
-```
-Clusters:
-  [F03] ↔ [B02] — fix the badge bug before or alongside the feature
-  [T01] → [F04] — toolchain update unblocks the feature
-```
-
-If no clusters exist, omit the section entirely.
-
-If Step 4.5 found active milestones, prefix the backlog with a one-line header so the user knows what's in focus:
+If Step 4 found active milestones, prefix the backlog with a one-line header so the user knows what's in focus:
 
 ```
 Active milestones: M01 — Auth foundation, M03 — Public API
@@ -138,7 +124,7 @@ Recommend using this priority order:
 6. Minor features — default when no urgent bugs
 7. Major features — only if nothing else is pending or the user asks
 
-**Milestone bias** — when Step 4.5 found active milestones, prefer items tagged to one of them at *every level except P0*. Concretely: within each priority/size band, items tagged to an active milestone come before untagged items, which come before items tagged to a non-active (planned) milestone. P0 bugs ignore this — production fires don't wait for the milestone schedule.
+**Milestone bias** — when Step 4 found active milestones, prefer items tagged to one of them at *every level except P0*. Concretely: within each priority/size band, items tagged to an active milestone come before untagged items, which come before items tagged to a non-active (planned) milestone. P0 bugs ignore this — production fires don't wait for the milestone schedule.
 
 If the active milestone has no captured items yet, surface that in the suggestion line — *"M01 has no items yet; consider running `/hv-capture` to seed it"* — and then suggest the best general-backlog item.
 
