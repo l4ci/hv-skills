@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Bootstrap an umbrella registry: scan immediate children for git repos, register a
+# chosen subset (via stdin), write .hv/repos.json, and manage umbrella .gitignore
+# if the umbrella is itself a git repo.
+# Usage: hv-umbrella-init   (reads one line from stdin: "all" | "none" | "name,name")
+# Exit codes: 0 success, 1 no immediate git children found
+set -euo pipefail
+
+# 1. Scan immediate children for `<child>/.git/` (dir or file — git worktrees use a file).
+FOUND=()
+for child in */; do
+  name="${child%/}"
+  if [ -e "$name/.git" ]; then
+    FOUND+=("$name")
+  fi
+done
+
+if [ "${#FOUND[@]}" -eq 0 ]; then
+  echo "no immediate git children found" >&2
+  exit 1
+fi
+
+# Sort alphabetically for stable diffs.
+IFS=$'\n' FOUND=($(printf '%s\n' "${FOUND[@]}" | sort)) ; unset IFS
+
+# 3. Prompt on stderr (stdout is reserved for the JSON summary).
+{
+  printf 'found git children: %s\n' "$(IFS=', '; echo "${FOUND[*]}")"
+  printf "register which? enter comma-separated names (or 'all' / 'none'):\n"
+} >&2
+
+# 4. Read one line from stdin (non-interactive friendly — no -p, no /dev/tty).
+read -r INPUT || INPUT=""
+
+mkdir -p .hv
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UMBRELLA_HAS_GIT=0
+[ -e .git ] && UMBRELLA_HAS_GIT=1
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$INPUT" "$UMBRELLA_HAS_GIT" "${FOUND[@]}" <<'PY'
+import json, os, sys
+from pathlib import Path
+from hvlib import load_json, dump_json_atomic
+
+raw_input, umbrella_has_git, *found = sys.argv[1:]
+umbrella_has_git = umbrella_has_git == "1"
+found_set = set(found)
+
+# 4. Parse stdin selection.
+sel = raw_input.strip()
+if sel == "all":
+    requested = list(found)
+elif sel == "" or sel == "none":
+    requested = []
+else:
+    requested = []
+    for n in (s.strip() for s in sel.split(",")):
+        if not n:
+            continue
+        if n in found_set:
+            requested.append(n)
+        else:
+            sys.stderr.write(f"warning: ignoring unknown name '{n}' (not an immediate git child)\n")
+
+# 6. Merge with existing repos.json — keep prior entries still present in `found`.
+repos_path = Path(".hv/repos.json")
+existing = load_json(repos_path, {"repos": []}).get("repos", []) or []
+prior_names = {e.get("name") for e in existing if e.get("name")}
+kept_prior = sorted(n for n in prior_names if n in found_set and n not in requested)
+if kept_prior:
+    sys.stderr.write(
+        f"warning: keeping prior registrations not in this run: {', '.join(kept_prior)}\n"
+    )
+
+names = sorted(set(requested) | set(kept_prior))
+repos = [{"name": n, "path": f"./{n}"} for n in names]
+dump_json_atomic(repos_path, {"repos": repos})
+
+# 7. If umbrella is a git repo, manage .gitignore (idempotent append-only).
+if umbrella_has_git:
+    gi = Path(".gitignore")
+    existing_lines = gi.read_text().splitlines() if gi.exists() else []
+    existing_set = set(existing_lines)
+    wanted = [".claude/", ".hv/"] + [f"/{n}/" for n in names]
+    missing = [w for w in wanted if w not in existing_set]
+    if missing:
+        out = list(existing_lines)
+        if out and out[-1] != "":
+            out.append("")
+        out.append("# ── hv umbrella ──")
+        out.extend(missing)
+        gi.write_text("\n".join(out) + "\n")
+
+# 8. JSON summary on stdout. Compact separators so verification greps match verbatim.
+print(json.dumps({"registered": names, "umbrellaIsGitRepo": umbrella_has_git}, separators=(",", ":")))
+PY

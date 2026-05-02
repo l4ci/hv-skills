@@ -69,6 +69,8 @@ PY
 
 [ -f "$HV/status.json" ] || echo '{"active":[]}' > "$HV/status.json"
 
+[ -f "$HV/repos.json" ] || echo '{"repos":[]}' > "$HV/repos.json"
+
 [ -f "$HV/config.json" ] || cat > "$HV/config.json" <<'EOF'
 {}
 EOF

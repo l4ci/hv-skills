@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Walk up from cwd to find umbrella .hv/; detect masking by stray .hv/ inside a registered sub-repo.
+# Usage: hv-resolve-umbrella
+# Exit codes: 0 found, 1 not found, 2 masking detected
+set -euo pipefail
+START="$(pwd -P)"
+DIR="$START"
+CANDIDATES=()
+while [ "$DIR" != "/" ]; do
+  if [ -d "$DIR/.hv" ]; then
+    CANDIDATES+=("$DIR")
+  fi
+  DIR="$(cd "$DIR/.." && pwd -P)"
+done
+if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+  echo "no umbrella .hv/ found" >&2
+  exit 1
+fi
+python3 - "${CANDIDATES[@]}" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+candidates = sys.argv[1:]
+first = candidates[0]
+
+# Look for a parent candidate whose repos.json registers `first` as a sub-repo.
+for parent in candidates[1:]:
+    repos_path = Path(parent) / ".hv" / "repos.json"
+    try:
+        data = json.loads(repos_path.read_text())
+        repos = data.get("repos", []) or []
+    except (FileNotFoundError, ValueError, OSError):
+        repos = []
+    first_real = os.path.realpath(first)
+    for entry in repos:
+        rel = entry.get("path", "")
+        name = entry.get("name", "")
+        if not rel:
+            continue
+        sub_real = os.path.realpath(os.path.join(parent, rel))
+        if sub_real == first_real:
+            sys.stderr.write(f"stray .hv/ inside registered sub-repo {name} — masking umbrella\n")
+            sys.exit(2)
+
+print(first)
+PY

@@ -1774,4 +1774,107 @@ pass "hv-release-detect-host returns none with no origin"
 rm -rf "$DH1"
 pass "hv-release-detect-host classifies github/gitlab/github-enterprise/gitlab-self-hosted/none"
 
+echo "umbrella mode (T1-T4)"
+
+# Build a synthetic umbrella with 3 independent git repos (NO submodules)
+UMB="$TMP/umbrella"
+mkdir -p "$UMB"/{web,api,shared} "$UMB/.hv"
+for r in web api shared; do
+  (cd "$UMB/$r" && git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init)
+done
+
+# T4: bootstrap seeds repos.json
+SEEDED=$(mktemp -d)
+(cd "$SEEDED" && bash "$BIN/hv-bootstrap" >/dev/null)
+[ -f "$SEEDED/.hv/repos.json" ] || fail "hv-bootstrap did not seed .hv/repos.json"
+python3 -c "import json; d=json.load(open('$SEEDED/.hv/repos.json')); assert d == {'repos':[]}, d" || fail "repos.json schema wrong"
+pass "T4: hv-bootstrap seeds .hv/repos.json with {\"repos\":[]}"
+rm -rf "$SEEDED"
+
+# T3: hv-umbrella-init scans children and writes registry
+echo "web,api" | (cd "$UMB" && "$BIN/hv-umbrella-init" >/dev/null)
+python3 -c "import json; d=json.load(open('$UMB/.hv/repos.json')); names=sorted(r['name'] for r in d['repos']); assert names==['api','web'], names" || fail "registry schema wrong"
+pass "T3: hv-umbrella-init writes sorted registry"
+
+# T3: idempotent re-run
+SHA_BEFORE=$(sha256sum "$UMB/.hv/repos.json" | cut -d' ' -f1)
+echo "web,api" | (cd "$UMB" && "$BIN/hv-umbrella-init" >/dev/null)
+SHA_AFTER=$(sha256sum "$UMB/.hv/repos.json" | cut -d' ' -f1)
+[ "$SHA_BEFORE" = "$SHA_AFTER" ] || fail "hv-umbrella-init not idempotent"
+pass "T3: hv-umbrella-init idempotent on repeat run"
+
+# T3: empty children dir exits 1
+EMPTY="$TMP/empty-umbrella" && mkdir -p "$EMPTY/.hv"
+if (cd "$EMPTY" && "$BIN/hv-umbrella-init" <<<"" >/dev/null 2>&1); then
+  fail "hv-umbrella-init should exit 1 on empty children"
+fi
+pass "T3: hv-umbrella-init exits 1 on empty children dir"
+
+# T1: walk-up from various positions
+[ "$(cd "$UMB" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from umbrella root"
+[ "$(cd "$UMB/web" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from sub-repo"
+mkdir -p "$UMB/web/src/components/deep"
+[ "$(cd "$UMB/web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from deep nested"
+pass "T1: hv-resolve-umbrella walks up correctly (3 cwd cases)"
+
+# T1: not found
+if (cd /tmp && "$BIN/hv-resolve-umbrella" >/dev/null 2>&1); then
+  fail "hv-resolve-umbrella should exit 1 in /tmp"
+fi
+pass "T1: hv-resolve-umbrella exits 1 when no .hv/ above cwd"
+
+# T1: symlink — pwd -P matters
+ln -sfn "$UMB/web" "$TMP/symlink-web"
+[ "$(cd "$TMP/symlink-web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up via symlink"
+rm -f "$TMP/symlink-web"
+pass "T1: hv-resolve-umbrella handles symlinked sub-repo paths"
+
+# T1: masking — stray .hv/ inside a registered sub-repo
+mkdir -p "$UMB/web/.hv"
+if (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null) | grep -q "masking"; then
+  pass "T1: hv-resolve-umbrella detects masking with stderr message"
+else
+  # stderr may not flow through subshell — check exit code instead
+  EC=0
+  (cd "$UMB/web" && "$BIN/hv-resolve-umbrella" >/dev/null 2>/dev/null) || EC=$?
+  [ "$EC" = "2" ] || fail "masking should exit 2, got $EC"
+  pass "T1: hv-resolve-umbrella detects masking (exit 2)"
+fi
+rmdir "$UMB/web/.hv"
+
+# T2: hv-resolve-repo from sub-repo
+[ "$(cd "$UMB/web" && "$BIN/hv-resolve-repo")" = "web" ] || fail "resolve-repo from web root"
+[ "$(cd "$UMB/api" && "$BIN/hv-resolve-repo")" = "api" ] || fail "resolve-repo from api root"
+pass "T2: hv-resolve-repo identifies registered sub-repo"
+
+# T2: deep dir
+[ "$(cd "$UMB/web/src/components/deep" && "$BIN/hv-resolve-repo")" = "web" ] || fail "resolve-repo from deep dir"
+pass "T2: hv-resolve-repo works from sub-repo deep dir"
+
+# T2: unregistered sub-repo (shared was not registered)
+if (cd "$UMB/shared" && "$BIN/hv-resolve-repo" >/dev/null 2>&1); then
+  fail "resolve-repo should exit 1 for shared (not registered)"
+fi
+pass "T2: hv-resolve-repo exits 1 for unregistered sub-repo"
+
+# T2: cwd outside any sub-repo
+if (cd "$UMB" && "$BIN/hv-resolve-repo" >/dev/null 2>&1); then
+  fail "resolve-repo should exit 1 from umbrella root"
+fi
+pass "T2: hv-resolve-repo exits 1 outside any sub-repo's git"
+
+# T1+T2: composition from Layout B worktree
+(cd "$UMB/web" && git worktree add "$UMB/.claude/worktrees/web/feat-x" -b hv/feat-x >/dev/null 2>&1)
+WT="$UMB/.claude/worktrees/web/feat-x"
+[ "$(cd "$WT" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from Layout B worktree"
+[ "$(cd "$WT" && "$BIN/hv-resolve-repo")" = "web" ] || fail "resolve-repo from Layout B worktree"
+pass "T1+T2: composition from Layout B worktree path"
+(cd "$UMB/web" && git worktree remove "$WT" >/dev/null 2>&1; git branch -D hv/feat-x >/dev/null 2>&1) || true
+
+# Single-repo backwards compat — existing fixtures must still pass.
+# This block runs in the parent $TMP (the original single-repo test fixture);
+# verify hv-resolve-umbrella still works there with no umbrella in scope.
+[ "$(cd "$TMP" && "$BIN/hv-resolve-umbrella")" = "$TMP" ] || fail "single-repo cwd still resolves to its own .hv/"
+pass "single-repo backward compat: hv-resolve-umbrella still works"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

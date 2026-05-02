@@ -68,6 +68,7 @@ print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHy
 print(f"  Docs path                {cfg.get('docs',{}).get('path','docs')}")
 print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',True) else 'off'}")
 print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
+print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
 PY
 ```
 
@@ -91,10 +92,11 @@ One `AskUserQuestion` call, multiSelect:
   9. *"Docs path — current: <path>"*
   10. *"Docs auto-create — current: <on|off>"*
   11. *"Git base branch — current: <branch|(auto-detect)>"*
+  12. *"Umbrella mode — current: <on|off>"*
 
 If the user selects nothing, print *"No changes."* and stop.
 
-Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the eleven names above.
+Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the twelve names above.
 
 ## Step 4 — Ask the Selected Questions
 
@@ -113,6 +115,9 @@ Build a single `AskUserQuestion` call containing **only** the questions for the 
 | Docs path | *"Which directory contains your project documentation?"* | Free text (default: `docs`) |
 | Docs auto-create | *"Should `/hv-docs` auto-write doc updates after work cycles?"* | On / Off |
 | Git base branch | *"Enter the base branch for this project, or leave blank to auto-detect (main / master / trunk / origin HEAD)."* | Free text (default: `""`) |
+| Umbrella mode | *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json` — registered repos remain.)"* | On / Off |
+
+When toggling **Off**, registered repos in `.hv/repos.json` remain — helpers will simply ignore umbrella mode until re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
 
 For each question, tag the matching option with `(current)`. If the user's current value doesn't match any option (custom config), don't tag any — every option is a real change.
 
@@ -146,6 +151,7 @@ cfg = json.loads(p.read_text())
 # cfg.setdefault("refactor", {})["confirmBeforeExecute"] = False
 # cfg.setdefault("autonomy", {})["level"] = "loop"
 # cfg.setdefault("debug", {})["competingHypotheses"] = True
+# cfg.setdefault("umbrella", {})["enabled"] = True
 
 p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
@@ -169,6 +175,12 @@ If the change has an immediate behavioral implication worth flagging (e.g. switc
 
 ```
   Note: loop mode chains /hv-work → /hv-learn → /hv-next automatically. Stops on empty backlog or guard failure.
+```
+
+If the user toggled `umbrella.enabled` **on** and `.hv/repos.json` has an empty `repos: []` array, append:
+
+```
+  Note: umbrella mode is on, but no sub-repos are registered. Run `/hv-init` from the umbrella root to register children.
 ```
 
 Keep notes short and only for state changes that materially alter how subsequent skills behave. Skip the note for cosmetic changes (model profile swap, single boolean flip).
