@@ -147,17 +147,20 @@ If exit code is non-zero, skip Step 4.6 entirely. Move on to Step 5.
 
 **When umbrella mode is on with registered repos**, use a single `AskUserQuestion` per captured item (or one batched call if all items share the same answer is obvious — e.g., the user said *"fix the navbar in web"*; you can pre-answer with `"web"` and skip the question). Otherwise:
 
-- **Header:** `"Repo"`
-- **Question:** *"Which sub-repo does this item belong to?"* (include the item's short title for context)
-- **Options** (single-select, one per registered repo):
+- **Header:** `"Repos"`
+- **Question:** *"Which sub-repo(s) does this item belong to?"* (include the item's short title for context)
+- **multiSelect:** `true`
+- **Options** (one per registered repo, plus the explicit untag option):
   - One option per `name` in `.hv/repos.json` (mark the most likely match `(Recommended)` if the item's text mentions a repo name)
   - *"None / unsure — leave untagged"* (last option)
 
-Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged — V1 forbids forcing a guess. (`/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.)
+Multi-select means the user can pick exactly one sub-repo (single-repo item), two or more (multi-repo item — `/hv-work` will create the same branch in each via `bin/hv-multi-branch-create`), or just *"None / unsure"* to leave the item untagged. If the user picks *"None / unsure"* alongside concrete repo names, treat the concrete picks as authoritative and ignore the untag option.
+
+Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged. (`/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.)
 
 **Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one registered repo, **auto-tag without asking** — the speed path uses the obvious answer. With ≥2 registered repos, the cap is **exempt for this single question** — silently skipping the tag would force `/hv-work` to bail later, which is worse than spending one question.
 
-Carry the chosen sub-repo name as a single string (V1 = single-repo-per-item) into Step 6's `Repos:` suffix. If "None / unsure" was picked, omit the suffix entirely.
+Carry the chosen sub-repo name(s) as a comma-separated string (e.g. `"web"` or `"web, api"`) into Step 6's `Repos:` suffix. If only *"None / unsure"* was picked (or nothing was picked), omit the suffix entirely.
 
 ## Step 5 — Handle Large Input
 
@@ -201,7 +204,7 @@ Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`
 
 With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
 
-**Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, and `Repos:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — single name in V1; parser tolerates a comma-separated list for forward-compat with M03).
+**Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, and `Repos:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — comma-separated list of registered sub-repos; a single name is the common case, two or more turns the item into a multi-repo dispatch via `/hv-work`).
 
 The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 

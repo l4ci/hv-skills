@@ -1981,6 +1981,16 @@ if (cd "$UMB" && "$BIN/hv-status-add-multi" --branch hv/m3-bad --items M03-S01 -
 fi
 pass "M03-T3: hv-status-add-multi rejects unregistered repos"
 
+# M03-T5: hv-capture/SKILL.md Step 4.6 declares multi-select for Repos
+grep -q "multiSelect:.*true" "$REPO/hv-capture/SKILL.md" \
+  || fail "hv-capture Step 4.6 must declare multiSelect: true for the Repos question"
+grep -q "comma-separated list of registered sub-repos" "$REPO/hv-capture/SKILL.md" \
+  || fail "hv-capture field-order line must say 'comma-separated list of registered sub-repos'"
+if grep -q "single name in V1" "$REPO/hv-capture/SKILL.md"; then
+  fail "hv-capture must no longer carry the 'single name in V1' qualifier"
+fi
+pass "M03-T5: hv-capture/SKILL.md Step 4.6 supports multi-repo Repos tagging"
+
 # Cleanup status.json so it doesn't pollute later assertions
 rm -f "$UMB/.hv/status.json"
 
