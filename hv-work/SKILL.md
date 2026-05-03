@@ -111,19 +111,29 @@ After picking the branch name:
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] [worktree-path]
 ```
 
-**Umbrella mode** (when `umbrella.enabled` is true and items carry `Repos:`): parse the `Repos:` field from each item's TODO entry; all items in the wave must share a sub-repo (V1 = single-repo per wave). Pass it via `--repo`:
+**Umbrella mode** (when `umbrella.enabled` is true and items carry `Repos:`): parse the `Repos:` field from each item's TODO entry. The value is a comma-separated CSV — single-repo items have one name (`Repos: web`), multi-repo items have two or more (`Repos: web, api`). All items in a wave must share the *same* set of repos.
+
+Single-repo wave: pass the one name via `--repo`:
 
 ```bash
 .hv/bin/hv-status-add --repo <repo-name> <branch> <ID1>,<ID2>[,...] [worktree-path]
 ```
 
+Multi-repo wave: register one entry per `(branch, repo)` pair via `hv-status-add-multi`:
+
+```bash
+.hv/bin/hv-status-add-multi --branch <branch> --items <ID1>,<ID2>[,...] --repos "<repos-csv>"
+```
+
 Parse the `Repos:` field by grepping the item bullet from `.hv/TODO.md`:
 
 ```bash
-grep -E "^- \*\*\[<ID>\]" .hv/TODO.md | grep -oE "Repos:\s*[a-zA-Z0-9_-]+" | head -1 | sed 's/Repos:\s*//'
+grep -E "^- \*\*\[<ID>\]" .hv/TODO.md | grep -oE "Repos:\s*[A-Za-z0-9_,\\s-]+" | head -1 | sed 's/Repos:\s*//' | sed 's/\s*$//'
 ```
 
-Idempotent on `(branch, repo)` — call again with the worktree path once Step 5 creates it.
+(The character class allows spaces and commas so multi-repo values like `web, api` are captured intact.) Hand the resulting CSV to `hv-resolve-repos` for validation; if it exits non-zero, surface the missing names and stop.
+
+Idempotent on `(branch, repo)` — call again with the worktree path(s) once Step 5 creates them.
 
 ## Step 4 — Plan Tasks
 
@@ -169,21 +179,27 @@ If umbrella mode is **off**, skip this step entirely (single-repo path).
 
 If **on**:
 
-1. For each item ID in the wave, parse `Repos:` from `.hv/TODO.md`. If any item lacks a `Repos:` tag, **stop with this error**:
+1. For each item ID in the wave, parse `Repos:` from `.hv/TODO.md`. The field is a CSV — one name for a single-repo item, two or more for a multi-repo item. If any item lacks a `Repos:` tag, **stop with this error**:
 
-   > Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it, or capture as multi-repo via M03 (deferred). Cannot route to a sub-repo.
+   > Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it. Cannot route to a sub-repo.
 
-2. All items in the wave must share the same sub-repo name (V1 single-repo-per-wave). If they diverge, surface this error and ask the user to split into separate `/hv-work` runs:
+2. All items in a wave must resolve to the *same* set of repos (compared as a set, order-independent). Single-repo and multi-repo items can't be mixed in one wave; two multi-repo items must list the same names. If they diverge, surface this error and ask the user to split into separate `/hv-work` runs:
 
-   > Error: items in this wave target different sub-repos: `<list>`. V1 supports one sub-repo per `/hv-work` run. Split into separate runs, or wait for M03 multi-repo support.
+   > Error: items in this wave target different sub-repo sets: `<set-a>` vs `<set-b>`. Split into separate `/hv-work` runs.
 
-3. Confirm the named sub-repo exists in `.hv/repos.json`. If not, error and point at `/hv-init`:
+3. Validate every name in the resolved set against `.hv/repos.json` via `hv-resolve-repos`:
+
+   ```bash
+   .hv/bin/hv-resolve-repos "<repos-csv>"
+   ```
+
+   If it exits 1 (unregistered name), error and point at `/hv-init`:
 
    > Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `/hv-init` from the umbrella root to register sub-repos.
 
-4. **Walk-up convenience.** If `/hv-work` was invoked from a cwd that resolves to a registered sub-repo via `bin/hv-resolve-repo`, default that sub-repo as the wave's scope. Items whose `Repos:` differ from the resolved cwd repo trigger the same divergence error in (2).
+4. **Walk-up convenience (single-repo only).** If `/hv-work` was invoked from a cwd that resolves to a registered sub-repo via `bin/hv-resolve-repo`, default that sub-repo as the wave's scope when items lack an explicit `Repos:` tag. Multi-repo items always come from the captured `Repos:` field — there's no cwd default for a multi-repo set.
 
-When the gate passes, carry the resolved sub-repo name forward to Step 5 (branch/worktree path) and Step 10 (merge/PR --repo flag).
+When the gate passes, carry the resolved sub-repo set forward to Step 5 (branch creation) and Step 10 (merge/PR).
 
 ## Step 5 — Create Branch or Worktree
 
@@ -217,9 +233,9 @@ git worktree add .claude/worktrees/<branch-name> <branch-name>
 .hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] .claude/worktrees/<branch-name>
 ```
 
-### Branch creation (umbrella mode)
+### Branch creation (umbrella mode — single-repo)
 
-When the wave's resolved sub-repo is `<repo>` (from Step 4.5):
+When the wave's resolved set has one sub-repo `<repo>` (from Step 4.5):
 
 ```bash
 (cd <repo> && git checkout -b <branch-name>)
@@ -227,6 +243,19 @@ When the wave's resolved sub-repo is `<repo>` (from Step 4.5):
 ```
 
 The branch lands in `<umbrella>/<repo>/.git/`, not the umbrella's `.git/`.
+
+### Branch creation (umbrella mode — multi-repo)
+
+When the wave's resolved set has two or more sub-repos:
+
+```bash
+.hv/bin/hv-multi-branch-create --branch <branch-name> --repos "<repos-csv>"
+.hv/bin/hv-status-add-multi --branch <branch-name> --items <ID1>,<ID2>[,...] --repos "<repos-csv>"
+```
+
+`hv-multi-branch-create` runs a precheck across every named repo first — if `<branch-name>` already exists in *any* of them, it exits 1 listing the colliding names *before* creating any branches. Only when the precheck passes does it run `git branch <branch-name>` (no checkout) in each repo. The orchestrator stays at the umbrella for `.hv/` access; workers in Step 6 each cd to their assigned sub-repo.
+
+Multi-repo waves under `work.isolation: "branch"` are safe by construction — each sub-repo has its own `.git/index`, so the [decisions / Skill Authoring / Parallel waves require worktree isolation] rule does not apply across repos. Multi-repo workers can run in parallel even under branch isolation, one per sub-repo.
 
 ### Worktree creation (umbrella mode — Layout B)
 
@@ -272,6 +301,8 @@ You are implementing Task N of [total].
 ```
 
 **Umbrella mode notes:** when umbrella mode is on, the `[UMBRELLA: ...]` line replaces the WORKTREE line if the wave uses branch isolation; both lines appear together if the wave uses Layout B worktrees. The sub-repo path is the absolute path resolved via `.hv/repos.json` (single-repo callers ignore both lines). Workers MUST `cd` to the named directory before any `git` command — the orchestrator stays at the umbrella for `.hv/` access, so worker commands run in the umbrella's cwd by default and would target the wrong `.git/`.
+
+**Multi-repo dispatch:** for a wave with `<N>` sub-repos in its resolved set, dispatch one worker per sub-repo, each with the sub-repo's name and absolute path in its `[UMBRELLA: ...]` line. Workers run in parallel — each repo has its own `.git/index`, so cross-repo parallelism doesn't trip the parallel-waves-require-worktree-isolation guard (which fires only when ≥2 workers share one `.git/`). Each worker's brief lists only the files in its own sub-repo; the orchestrator verifies each repo's commit independently in Step 7.
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the commit message (agents commit themselves); read-first, minimal-diff, no unrelated changes.
 

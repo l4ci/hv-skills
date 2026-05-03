@@ -2028,6 +2028,21 @@ grep -q "one line per repo for multi-repo items" "$REPO/hv-assume/SKILL.md" \
   || fail "hv-assume/SKILL.md peek must show one Repo line per sub-repo for multi-repo items"
 pass "M03-T6: hv-assume/SKILL.md peek renders one line per repo"
 
+# M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
+grep -q "hv-multi-branch-create" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference bin/hv-multi-branch-create for multi-repo branch creation"
+grep -q "hv-status-add-multi" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference bin/hv-status-add-multi for multi-repo status entries"
+grep -q "hv-resolve-repos" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference bin/hv-resolve-repos for multi-repo validation"
+if grep -q "M03 (deferred)" "$REPO/hv-work/SKILL.md"; then
+  fail "hv-work/SKILL.md must no longer say 'M03 (deferred)'"
+fi
+if grep -q "wait for M03 multi-repo support" "$REPO/hv-work/SKILL.md"; then
+  fail "hv-work/SKILL.md must no longer say 'wait for M03 multi-repo support'"
+fi
+pass "M03-T4: hv-work/SKILL.md documents multi-repo dispatch flow"
+
 # Cleanup status.json so it doesn't pollute later assertions
 rm -f "$UMB/.hv/status.json"
 
