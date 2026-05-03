@@ -187,6 +187,14 @@ Resolve a comma-separated `Repos:` list into a JSON array of `{name, path}` entr
 
 Exits 0 with JSON on stdout, 1 if any name is not registered in `.hv/repos.json` (stderr names the missing sub-repo). Single names and empty input are valid; the result is a list whose length matches the input.
 
+### hv-multi-branch-create
+
+Atomically create the same branch in every named sub-repo. Used by `/hv-work` when an item's `Repos:` field names two or more sub-repos.
+
+    hv-multi-branch-create --branch <name> --repos <repos-csv>
+
+Two phases. Phase 1 precheck: scans every named repo for `refs/heads/<branch>`; if any has it, exits 1 listing the colliding repo names on stderr — *no repos are modified*. Phase 2 create: runs `git branch <name>` (no checkout) in each repo. Unregistered repo names are rejected via `hv-resolve-repos` (exit 1, missing names on stderr).
+
 ## Bootstrap (run during /hv-init only)
 
 `hv-bootstrap` seeds the `.hv/` folder structure. Concretely it:

@@ -1906,6 +1906,38 @@ python3 -c "import json; d=json.load(open('$TMP/resolved-empty.json')); assert d
   || fail "hv-resolve-repos empty CSV must return []"
 pass "M03-T1: hv-resolve-repos handles empty CSV"
 
+# M03-T2: hv-multi-branch-create succeeds when branch is absent in all repos
+(cd "$UMB" && "$BIN/hv-multi-branch-create" --branch hv/m3-test --repos "web, api")
+git -C "$UMB/web" show-ref --verify --quiet refs/heads/hv/m3-test \
+  || fail "hv-multi-branch-create did not create branch in web"
+git -C "$UMB/api" show-ref --verify --quiet refs/heads/hv/m3-test \
+  || fail "hv-multi-branch-create did not create branch in api"
+pass "M03-T2: hv-multi-branch-create creates branch in every named repo"
+
+# Cleanup the branches before the collision test below
+git -C "$UMB/web" branch -D hv/m3-test >/dev/null
+git -C "$UMB/api" branch -D hv/m3-test >/dev/null
+
+# M03-T2: pre-existing branch in ANY named repo aborts before creating any
+git -C "$UMB/web" branch hv/m3-collide >/dev/null
+if (cd "$UMB" && "$BIN/hv-multi-branch-create" --branch hv/m3-collide --repos "web, api" 2>"$TMP/err" >/dev/null); then
+  fail "hv-multi-branch-create should exit 1 when branch exists in any repo"
+fi
+grep -q "web" "$TMP/err" || fail "hv-multi-branch-create error must name the colliding repo"
+if git -C "$UMB/api" show-ref --verify --quiet refs/heads/hv/m3-collide; then
+  fail "hv-multi-branch-create created branch in api despite collision in web"
+fi
+pass "M03-T2: hv-multi-branch-create aborts atomically on collision"
+
+# Cleanup
+git -C "$UMB/web" branch -D hv/m3-collide >/dev/null
+
+# M03-T2: unregistered repo name exits non-zero (delegated to hv-resolve-repos)
+if (cd "$UMB" && "$BIN/hv-multi-branch-create" --branch hv/m3-bad --repos "web, nonexistent" 2>/dev/null); then
+  fail "hv-multi-branch-create should fail on unregistered repo"
+fi
+pass "M03-T2: hv-multi-branch-create rejects unregistered repos"
+
 # Single-repo backwards compat — existing fixtures must still pass.
 # This block runs in the parent $TMP (the original single-repo test fixture);
 # verify hv-resolve-umbrella still works there with no umbrella in scope.
