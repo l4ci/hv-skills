@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.15.0 — 2026-05-03
+
+Multi-repo dispatch lands as one cohesive feature surface across 6 helpers and 4 skills, with `/hv-pause` now treating multi-repo waves as one logical handoff and a small refactor consolidating Repos: CSV validation.
+
+## New
+
+- **Multi-repo dispatch foundation (M03-S01).** A single backlog item with `Repos: a, b` now produces commits on `hv/<branch>` in every named sub-repo via one `/hv-work` invocation. Adds four new helpers (`hv-resolve-repos`, `hv-multi-branch-create`, `hv-status-add-multi`, plus `hvlib.parse_repos_csv`) and threads the multi-repo list through `hv-capture`, `hv-plan`, `hv-assume`, and `hv-work`. Single-repo path stays byte-identical.
+- `hv-pause` treats multi-repo waves as one logical pause set — no per-repo `AskUserQuestion`; one handoff file per `(branch, repo)`; combined wave confirmation. `cd` into a sub-repo to scope the pause to that one entry. ([F08], `7f5c242`)
+
+## Changed
+
+- consolidate Repos: CSV validation into hvlib (`192ff27`)
+- mark M01/M02 shipped, activate M03 (`8914492`)
+
+## Documentation
+
+- humanize README and docs/ prose (`17c3979`)
+
+## Stats
+
+10 commits, 33 files changed, +703 −263 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.14.0...v1.15.0
+
 ## v1.14.0 — 2026-05-03
 
 **Umbrella mode V1 (M02) substantively shipped: every read-side helper, plus `/hv-plan`, `/hv-spike`, `/hv-pause`, `/hv-assume`, `/hv-refactor` now route work to the resolved sub-repo. Single-repo behavior is unchanged.**
