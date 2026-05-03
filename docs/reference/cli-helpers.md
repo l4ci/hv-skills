@@ -179,6 +179,14 @@ When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coor
 
 `hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
 
+### hv-resolve-repos
+
+Resolve a comma-separated `Repos:` list into a JSON array of `{name, path}` entries. Used by multi-repo dispatch helpers to validate and locate every named sub-repo in one call.
+
+    hv-resolve-repos "<repos-csv>"
+
+Exits 0 with JSON on stdout, 1 if any name is not registered in `.hv/repos.json` (stderr names the missing sub-repo). Single names and empty input are valid; the result is a list whose length matches the input.
+
 ## Bootstrap (run during /hv-init only)
 
 `hv-bootstrap` seeds the `.hv/` folder structure. Concretely it:

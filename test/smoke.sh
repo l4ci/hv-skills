@@ -1871,6 +1871,41 @@ WT="$UMB/.claude/worktrees/web/feat-x"
 pass "T1+T2: composition from Layout B worktree path"
 (cd "$UMB/web" && git worktree remove "$WT" >/dev/null 2>&1; git branch -D hv/feat-x >/dev/null 2>&1) || true
 
+# M03-T1: hv-resolve-repos parses CSV and resolves names
+(cd "$UMB" && "$BIN/hv-resolve-repos" "web, api" > "$TMP/resolved.json")
+python3 -c "
+import json
+d = json.load(open('$TMP/resolved.json'))
+assert isinstance(d, list) and len(d) == 2, d
+names = sorted(r['name'] for r in d)
+assert names == ['api', 'web'], names
+for r in d:
+    assert r['path'].startswith('/'), r
+" || fail "hv-resolve-repos output schema wrong"
+pass "M03-T1: hv-resolve-repos returns JSON array of {name, path}"
+
+# M03-T1: single-name CSV returns 1-element array
+(cd "$UMB" && "$BIN/hv-resolve-repos" "web" > "$TMP/resolved-single.json")
+python3 -c "
+import json
+d = json.load(open('$TMP/resolved-single.json'))
+assert len(d) == 1 and d[0]['name'] == 'web', d
+" || fail "hv-resolve-repos single-name output wrong"
+pass "M03-T1: hv-resolve-repos accepts single name"
+
+# M03-T1: unregistered name exits 1 with clear stderr
+if (cd "$UMB" && "$BIN/hv-resolve-repos" "web, nonexistent" 2>"$TMP/err" >/dev/null); then
+  fail "hv-resolve-repos should exit 1 on unregistered name"
+fi
+grep -q "nonexistent" "$TMP/err" || fail "hv-resolve-repos error must name the missing sub-repo"
+pass "M03-T1: hv-resolve-repos exits 1 and names missing sub-repo"
+
+# M03-T1: empty CSV returns empty array, exit 0
+(cd "$UMB" && "$BIN/hv-resolve-repos" "" > "$TMP/resolved-empty.json")
+python3 -c "import json; d=json.load(open('$TMP/resolved-empty.json')); assert d == [], d" \
+  || fail "hv-resolve-repos empty CSV must return []"
+pass "M03-T1: hv-resolve-repos handles empty CSV"
+
 # Single-repo backwards compat — existing fixtures must still pass.
 # This block runs in the parent $TMP (the original single-repo test fixture);
 # verify hv-resolve-umbrella still works there with no umbrella in scope.
