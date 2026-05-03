@@ -1,24 +1,24 @@
 # Learning
 
-`/hv-learn` distills durable knowledge from a session into `KNOWLEDGE.md` so
-future runs don't rediscover the same gotchas.
+`/hv-learn` pulls durable knowledge out of a session and writes it to
+`KNOWLEDGE.md` so future runs don't rediscover the same gotchas.
 
 ## /hv-learn
 
 `/hv-learn` scans the current session, extracts non-obvious knowledge, groups
 the entries by topic, and writes them to `.hv/KNOWLEDGE.md`. After writing, it
 updates the managed `hv-knowledge` block in `CLAUDE.md` so the topic list stays
-in sync — `/hv-work` reads that index to know when the current task should
+in sync. `/hv-work` reads that index to decide when the current task should
 consult `KNOWLEDGE.md`.
 
 ## What gets captured (and what doesn't)
 
 **Captured:**
 
-- Gotchas — non-obvious failure modes
-- Conventions — project-specific patterns that aren't obvious from reading code
-- Constraints — invariants, compatibility rules
-- Debugging insights — root causes for hard-won bugs
+- Gotchas: non-obvious failure modes
+- Conventions: project-specific patterns that aren't obvious from reading code
+- Constraints: invariants, compatibility rules
+- Debugging insights: root causes for bugs that took real effort to track down
 - Decisions with rationale
 - Tool quirks
 
@@ -45,14 +45,14 @@ whose root cause wasn't obvious. Skip it for single-item fixes and mechanical
 changes where nothing worth re-using was learned.
 
 Skills nudge or auto-invoke `/hv-learn` depending on your
-[autonomy](autonomy.md) level — at lower autonomy levels you get a prompt; at
+[autonomy](autonomy.md) level. At lower autonomy levels you get a prompt; at
 higher levels the skill runs automatically at the end of a work cycle.
 
 ## Verification
 
 `learn.verify` in `.hv/config.json` controls a second-opinion pass. When set to
 `true`, `/hv-learn` dispatches a fresh Opus subagent that reads only the updated
-`KNOWLEDGE.md` diff — no session context — and judges each new bullet on four
+`KNOWLEDGE.md` diff (no session context) and judges each new bullet on four
 criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly
 topic'd, and non-duplicate. The verifier can demote weak entries, sharpen vague
 wording, re-file wrong-topic bullets, or delete restatements of existing
@@ -78,6 +78,6 @@ start of a task to decide whether the task at hand warrants consulting
 If you find yourself wanting to write *"we will never X"* or *"X is forbidden in
 this codebase,"* that is a [decision](decisions.md), not a learning. Knowledge
 is advisory ("remember this if relevant"); decisions are hard boundaries
-(violations FAIL review). Use `/hv-decide` for the latter — it captures
+(violations FAIL review). Use `/hv-decide` for the latter. It captures
 rule + why + forbids + permits and is consulted as a constraint by `/hv-work`,
 `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision`.

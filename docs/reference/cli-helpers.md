@@ -1,9 +1,9 @@
 # CLI helpers
 
 `.hv/bin/` contains bash scripts you can call directly when scripting against
-the backlog or extending hv-skills. Each helper is small, idempotent, and
-`python3`-based where JSON parsing is needed. `/hv-init` refreshes them every
-time you rerun it — the helpers evolve with hv-skills and are not a stable API.
+the backlog or extending hv-skills. The helpers are small and idempotent, and
+use `python3` where JSON parsing is needed. `/hv-init` refreshes them every
+time you rerun it. They evolve with hv-skills and are not a stable API.
 
 ## Quick reference
 
@@ -63,7 +63,7 @@ time you rerun it — the helpers evolve with hv-skills and are not a stable API
 
 `hv-next-id <namespace>` reads `.hv/counters.json`, increments the counter for
 the given namespace, writes it back, and prints the zero-padded ID (e.g. `B07`,
-`F03`, `T12`). It is safe to call concurrently — the write is atomic via a temp
+`F03`, `T12`). It is safe to call concurrently; the write is atomic via a temp
 file. Every skill that mints a new backlog item calls this first.
 
 `counters.json` lives at `.hv/counters.json` and is never overwritten by
@@ -75,14 +75,14 @@ file. Every skill that mints a new backlog item calls this first.
 `TODO.md`. `hv-complete` rewrites an open item as a struck-through `~~line~~`
 and moves it under `## Completed`, stamping it with the supplied git SHA.
 `hv-archive-old` sweeps `## Completed` entries older than N days into
-`ARCHIVE.md` to keep the working file lean. `hv-todo-by-milestone` lets you
-filter the backlog by milestone tag — see also [Knowledge and vision
+`ARCHIVE.md` to keep the working file short. `hv-todo-by-milestone` lets you
+filter the backlog by milestone tag; see also [Knowledge and vision
 indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 ## Status and reconciliation
 
 `hv-status-add` writes a branch record into `.hv/status.json` so the project
-knows a piece of work is in flight. It is idempotent — calling it twice for the
+knows a piece of work is in flight. It is idempotent: calling it twice for the
 same branch is safe. `hv-status-remove` drops the record when work merges or is
 abandoned.
 
@@ -92,21 +92,21 @@ skills use to avoid acting on stale context. `hv-summary` prints a human-readabl
 snapshot of the same data: backlog counts, what's actively in progress, and the
 most recent completions.
 
-In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, including base-branch resolution per repo.
+In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, with base-branch resolution per repo.
 
 ## Knowledge, vision, and decisions indexes
 
 `hv-knowledge-index` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`.
 `hv-knowledge-index` regenerates the `<!-- hv-knowledge-start -->` block in
 `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query`
-lets you pull specific topic sections out of `KNOWLEDGE.md` by name — useful
+pulls specific topic sections out of `KNOWLEDGE.md` by name, which is useful
 when scripting post-session summaries.
 
 `hv-decisions-index` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
-identically — the file structure, marker shape, and query semantics all mirror
+identically. The file structure, marker shape, and query semantics all mirror
 the knowledge helpers. The distinction is semantic: decisions are *active*
 hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
-where knowledge is *passive* gotchas captured by `/hv-learn`. See
+while knowledge is *passive* gotchas captured by `/hv-learn`. See
 [Decisions](../usage/decisions.md) for when to use which.
 
 The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints
@@ -135,36 +135,36 @@ so you can detect spikes whose branches were already deleted.
 `hv-merge` handles the full merge ceremony for a worktree branch: it removes the
 worktree, merges `--no-ff` into the current branch, and deletes the source
 branch. The commit message is read from stdin, so you can compose it before
-calling the helper. `hv-pr` does the equivalent for pull-request workflows —
-removes the worktree, pushes the branch, and calls `gh pr create` with a body
+calling the helper. `hv-pr` does the equivalent for pull-request workflows:
+remove the worktree, push the branch, and call `gh pr create` with a body
 read from stdin.
 
 `hv-ship-body` builds a standardised PR body for a branch by scanning its
 commits for referenced IDs and matching them against open TODO entries.
-`hv-review-scope` emits a richer JSON payload — commits, touched files,
-referenced IDs, and matched TODO entries — that the `/hv-review` skill consumes.
+`hv-review-scope` emits a richer JSON payload (commits, touched files,
+referenced IDs, and matched TODO entries) that the `/hv-review` skill consumes.
 
 All three helpers (`hv-merge`, `hv-pr`, `hv-review-scope`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
 
 ## Diagnostics
 
 `hv-preflight` verifies that `.hv/` is initialised and every expected helper is
-present. It exits `0` on success, `2` if the folder is missing, `3` if helpers
-are incomplete — useful as a guard at the top of scripts.
+present. It exits `0` on success, `2` if the folder is missing, and `3` if
+helpers are incomplete. Useful as a guard at the top of scripts.
 
 `hv-update-check` queries the hv-skills GitHub releases and returns JSON with
 the current and latest version, install type, and the command to upgrade.
 
 `hv-refactor-age` reads `counters.json#since_refactor` and returns JSON with
-the number of features and bugs completed since the last refactor cycle —
+the number of features and bugs completed since the last refactor cycle.
 `/hv-refactor` uses this to decide whether a pass is overdue. The counter is
 maintained imperatively: `hv-complete` increments it on every active→completed
 transition whose resolved commit's subject does not start with `refactor:`,
 and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
-`hv-refactor-targets` enumerates refactor targets — the umbrella's `hasCode` flag plus every registered sub-repo — so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
+`hv-refactor-targets` enumerates refactor targets (the umbrella's `hasCode` flag plus every registered sub-repo) so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
 
 `hv-backlog` renders the full TODO.md as sorted Markdown tables (In Progress,
-Bugs, Features, Tasks) — handy for a quick terminal overview or piping into
+Bugs, Features, Tasks). Handy for a quick terminal overview or piping into
 other scripts.
 
 `hv-guard-clean` exits non-zero when the git working tree is dirty or the
@@ -175,9 +175,9 @@ check before making commits.
 
 When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coordinates work across multiple sub-repos registered in `.hv/repos.json`. Three helpers manage that registry and the cwd-to-sub-repo resolution.
 
-`hv-umbrella-init` runs once during `/hv-init` Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and — if the umbrella is itself a git repo — appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
+`hv-umbrella-init` runs once during `/hv-init` Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and, if the umbrella is itself a git repo, appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
 
-`hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo) — exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
+`hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
 
 ## Bootstrap (run during /hv-init only)
 
@@ -190,7 +190,7 @@ When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coor
    `status.json`.
 3. Appends a `.hv/` entry to `.gitignore` if one is not already present.
 
-It does **not** copy helper scripts — that is `/hv-init`'s job. It is called by
+It does **not** copy helper scripts; that is `/hv-init`'s job. It is called by
 `/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and
 it never overwrites files that already exist. You do not normally need to call
-this directly; rerun `/hv-init` if you want to refresh the installation.
+this directly. Rerun `/hv-init` if you want to refresh the installation.

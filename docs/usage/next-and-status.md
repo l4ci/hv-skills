@@ -1,6 +1,6 @@
 # Picking next
 
-Three skills for orienting and choosing what to do next: `/hv-next` reconciles git state and suggests work, `/hv-status` is a fast read-only glance, and `/hv-assume` lets you peek at the orchestrator's plan before code lands.
+Three skills help you orient and pick what to do next. `/hv-next` reconciles git state and suggests work. `/hv-status` is a fast read-only glance. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
 
 ## /hv-next
 
@@ -8,11 +8,11 @@ Reconciles the backlog against actual git state, then suggests what to pick up.
 
 Before presenting results it:
 
-1. Validates active branches and worktrees against git — stale entries are cleaned automatically.
+1. Validates active branches and worktrees against git; stale entries are cleaned automatically.
 2. Archives completions older than five days to `ARCHIVE.md`.
 3. Builds a relationship map from `Related:` links and identifies clusters.
 4. Sorts the backlog by priority and size, with cluster notes.
-5. Suggests one item or a connected batch — P0 bugs jump the queue.
+5. Suggests one item or a connected batch. P0 bugs jump the queue.
 
 After you confirm the pick, `/hv-next` routes you to [running work](running-work.md) via `/hv-work`.
 
@@ -30,7 +30,7 @@ Items with a `Related:` field that share a cluster surface together so you can t
 
 ## /hv-status
 
-Read-only project state glance — no reconciliation, no suggestions, no writes.
+A read-only glance at project state. No reconciliation, no suggestions, no writes.
 
 Prints:
 
@@ -49,7 +49,7 @@ Use this to answer "where does the project stand?" before deciding whether to [c
 
 Output: a compact summary, e.g. `Backlog: 2 bugs · 5 features · 1 task | Active: B03 (branch hv/B03) | Recent: T07, F12, F11`.
 
-## /hv-assume — peek before you commit
+## /hv-assume: peek before you commit
 
 Prints the orchestrator's intended approach for an item before any code is written. Read-only: no writes, no commits.
 
@@ -66,10 +66,10 @@ Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 
 /hv-assume F08
 ```
 
-Output: specific file paths, test names, and function names the orchestrator would touch — not generic descriptions.
+Output: specific file paths, test names, and function names the orchestrator would touch, not generic descriptions.
 
 If a plan already exists at `.hv/plans/<key>.md`, the peek restates it. If no plan exists, this is an ad-hoc decomposition; consider `/hv-plan` when alignment needs to survive beyond the current session.
 
 ## How reconciliation keeps state honest
 
-The status cache is a speed optimisation — git is the source of truth. Each time you run `/hv-next` it checks which branches and worktrees actually exist: branches that were deleted become stale entries and are cleaned up automatically; worktrees that were removed are updated in kind. If state ever drifts — crashed session, manual git operations — the next `/hv-next` run repairs it without any manual intervention on your part.
+The status cache is a speed optimisation; git is the source of truth. Each time you run `/hv-next` it checks which branches and worktrees actually exist: branches that were deleted become stale entries and are cleaned up automatically; worktrees that were removed are updated in kind. If state drifts (crashed session, manual git operations), the next `/hv-next` run repairs it without any manual intervention on your part.

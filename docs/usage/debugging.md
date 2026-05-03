@@ -1,6 +1,6 @@
 # Debugging
 
-`/hv-debug` is for real bugs that need a systematic cycle — reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for `/hv-go` or `/hv-work` instead.
+`/hv-debug` is for real bugs that need a systematic cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for `/hv-go` or `/hv-work` instead.
 
 ## /hv-debug
 
@@ -14,9 +14,9 @@ The skill reads the `[B07]` entry in `TODO.md` and any associated detail file, c
 4. **Fix** — the worker model applies the fix. The reproducer must pass before the commit lands.
 5. **Commit** — a single atomic commit tagged `fix: … [B07]` so `/hv-ship` can close the loop.
 
-If the root cause was non-obvious — required extra verification rounds, contradicted the initial hypothesis, or touched a known-tricky subsystem — the skill nudges you to run `/hv-learn` so the insight lands in `KNOWLEDGE.md`.
+If the root cause was non-obvious (required extra verification rounds, contradicted the initial hypothesis, or touched a known-tricky subsystem), the skill nudges you to run `/hv-learn` so the insight lands in `KNOWLEDGE.md`.
 
-`/hv-debug` uses the same isolation mode (`branch` or `worktree`) and model configuration as `/hv-work`. It refuses to start on a dirty working tree — stash or commit first.
+`/hv-debug` uses the same isolation mode (`branch` or `worktree`) and model configuration as `/hv-work`. It refuses to start on a dirty working tree, so stash or commit first.
 
 ## The cycle
 
@@ -27,23 +27,23 @@ Here is what the session looks like from the outside:
 /hv-debug B07
 ```
 
-**Reproduce phase** — the skill runs the relevant test or writes a new failing one. You see something like:
+**Reproduce phase.** The skill runs the relevant test or writes a new failing one. You see something like:
 ```
 Reproducer: tests/test_parser.py::test_empty_input  FAILED
 ```
 
-**Hypothesis phase** — after reproduction the orchestrator surfaces a root cause candidate:
+**Hypothesis phase.** After reproduction the orchestrator surfaces a root cause candidate:
 ```
 Hypothesis: empty-string input bypasses the null-guard on line 42 because
   the guard tests `if not value` rather than `if value is None`.
 ```
 
-**Verify phase** — before touching code, the skill confirms the hypothesis holds (targeted read, probe, or narrow experiment). You see a short verification note:
+**Verify phase.** Before touching code, the skill confirms the hypothesis holds (targeted read, probe, or narrow experiment). You see a short verification note:
 ```
-Verified: `not ""` evaluates True — guard never fires for empty string.
+Verified: `not ""` evaluates True, so the guard never fires for empty string.
 ```
 
-**Fix and commit** — the worker model applies the minimal change, the reproducer is re-run, and the fix lands:
+**Fix and commit.** The worker model applies the minimal change, the reproducer is re-run, and the fix lands:
 ```
 fix: guard against empty-string input in parser [B07]
 ```
@@ -74,6 +74,6 @@ The `debug.competingHypotheses` config option (default `false`) controls whether
 | `false` (default) | Single hypothesis agent. Cheaper and faster; fine for most bugs where one angle is obviously primary. |
 | `true` | Three parallel hypothesis agents. Better framing diversity on hard bugs where the right angle isn't obvious upfront. Costs roughly 3× the orchestrator budget at the hypothesis step; latency stays similar because the agents run concurrently. |
 
-Turn it on when you have a class of bugs that consistently take multiple cycles to resolve. Keep it off when most bugs are single-cause and you don't want to pay for diversity you won't use.
+Turn it on when you have a class of bugs that consistently take multiple cycles to resolve. Keep it off when most bugs are single-cause and the diversity isn't worth paying for.
 
 See [configuration](configuration.md) for how to set this option.

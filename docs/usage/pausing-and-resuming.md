@@ -4,7 +4,7 @@ Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` wr
 
 ## /hv-pause
 
-`/hv-pause` captures the live state of a mid-session investigation into `.hv/handoff/<branch>.md` before you stop. Git commits carry code; the handoff note carries intent — the current hypothesis, the next planned step, files that are mid-edit, and gotchas discovered along the way.
+`/hv-pause` captures the live state of a mid-session investigation into `.hv/handoff/<branch>.md` before you stop. Git commits carry code. The handoff note carries intent: the current hypothesis, the next planned step, files that are mid-edit, and gotchas you ran into along the way.
 
 **Use it when:**
 
@@ -12,7 +12,7 @@ Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` wr
 - You're stepping away mid-[`/hv-work`](running-work.md) or mid-debug without a clean stopping point.
 - You want a long investigation to survive a session boundary.
 
-**What happens:** The skill resolves the active branch, asks how you want to handle uncommitted work (wip commit, stash, or leave dirty), then writes the handoff note. One note per branch — re-pausing overwrites the previous one.
+**What happens:** The skill resolves the active branch, asks how you want to handle uncommitted work (wip commit, stash, or leave dirty), then writes the handoff note. One note per branch; re-pausing overwrites the previous one.
 
 The note's shape looks like:
 
@@ -46,7 +46,7 @@ You don't need to manage this file directly. `/hv-resume` reads and deletes it.
 
 A typical recovery looks like this:
 
-1. You're mid-investigation on branch `hv/my-feature`, context is filling. You run `/hv-pause` — it writes `.hv/handoff/hv-my-feature.md` with your current hypothesis and the next step you were about to try.
+1. You're mid-investigation on branch `hv/my-feature`, context is filling. You run `/hv-pause`, which writes `.hv/handoff/hv-my-feature.md` with your current hypothesis and the next step you were about to try.
 2. You run `/clear`. All conversation context is gone.
 3. In the new session, you run `/hv-resume`.
 4. The skill reads `status.json`, validates active streams against git, finds the handoff note for `hv/my-feature`, and surfaces something like:
@@ -66,4 +66,4 @@ Handoff note found:
 
 ## When to /hv-pause vs just commit and walk away
 
-A clean commit is enough when the work is at a natural stopping point — a passing test, a completed subtask, a meaningful checkpoint that git state alone can describe. `/hv-pause` shines when you're mid-investigation: the live hypothesis, the half-written test, or the "I was about to try X" wouldn't survive a `/clear` from git state alone. If you'd have to re-read diffs and reconstruct your reasoning to know what to do next, pause first.
+A clean commit is enough when the work is at a natural stopping point: a passing test, a completed subtask, a checkpoint that git state alone can describe. `/hv-pause` is for the messy middle. The live hypothesis, the half-written test, the "I was about to try X" — none of that survives a `/clear` from git state alone. If you'd have to re-read diffs and reconstruct your reasoning to figure out what to do next, pause first.

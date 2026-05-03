@@ -16,21 +16,21 @@ For git-clone or GNU stow installs, see the [Install alternatives](../README.md#
 ## Initialize the project
 
 Run `/hv-init` once at the project root. It asks five questions (models, isolation, merge
-strategy, quality gates, autonomy level) with Recommended defaults highlighted — the defaults
-are sane, so accept them unless you have a specific reason to deviate.
+strategy, quality gates, autonomy level) with Recommended defaults highlighted. The defaults
+are reasonable; accept them unless you have a specific reason to change something.
 
 Two settings worth a second of thought:
 
-- **Isolation** — `branch` is fine for solo work; switch to `worktree` if you want `main`
-  untouched while agents run or plan to run parallel `/hv-work` sessions.
-- **Merge strategy** — `direct` for fast iteration; `pr` if your team requires GitHub review.
+- **Isolation.** `branch` is fine for solo work. Switch to `worktree` if you want `main`
+  untouched while agents run, or if you plan to run parallel `/hv-work` sessions.
+- **Merge strategy.** `direct` for fast iteration. `pr` if your team requires GitHub review.
 
-To change any setting later, run `/hv-config` — don't hand-edit the JSON files.
+To change any setting later, run `/hv-config`. Don't hand-edit the JSON files.
 
-## Your first cycle (Path A — drop into an existing project)
+## Your first cycle (Path A: drop into an existing project)
 
-You have code and work piling up. This loop captures it, executes it, and retains what was
-learned.
+You have code and work piling up. This loop captures it, executes it, and keeps the lessons
+around for next time.
 
 ```bash
 # 1. brain-dump — the model splits and classifies; nothing is curated by hand
@@ -61,7 +61,7 @@ learned.
 #   filed under "Performance & Rendering" → consulted by future /hv-work
 ```
 
-**Capture.** Don't curate — dump everything in one sentence. `/hv-capture` (or `/hv-c`)
+**Capture.** Don't curate. Dump everything in one sentence. `/hv-capture` (or `/hv-c`)
 splits the input into individual items, assigns IDs (`B0N` for bugs, `F0N` for features,
 `T0N` for tasks), and routes them to the correct `TODO.md` sections. Long logs or specs
 overflow into per-item files automatically.
@@ -69,7 +69,7 @@ overflow into per-item files automatically.
 **Pick and execute.** `/hv-next` reconciles `status.json` against actual git state, archives
 stale completions, and presents a sorted backlog. P0 bugs jump the queue. It suggests one
 item or batch, then routes to `/hv-work` after you confirm. For high-stakes picks, run
-`/hv-assume B01` first — it prints the intended files, tests, and assumptions before any
+`/hv-assume B01` first; it prints the intended files, tests, and assumptions before any
 code lands.
 
 **Ship.** `/hv-ship` runs a staff-engineer review (`/hv-review`) against the original intent
@@ -78,15 +78,15 @@ surface but proceed; PASS flows through.
 
 **Learn.** `/hv-learn` writes durable gotchas, conventions, and constraints into
 `KNOWLEDGE.md`, grouped by topic. A verifier judges each bullet for durability before it
-lands — vague restatements are skipped. If you find yourself wanting to encode a hard
-boundary ("never store tokens client-side"), use `/hv-decide` instead — see
+lands and skips vague restatements. If you want to encode a hard
+boundary like "never store tokens client-side", use `/hv-decide` instead. See
 [decisions](usage/decisions.md).
 
 After the second or third cycle you mostly live in `/hv-capture` and `/hv-next`. Other
 skills you'll reach for: `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug`
 for systematic bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`.
 
-## If you're starting from a sketch (Path B — vision-driven)
+## If you're starting from a sketch (Path B: vision-driven)
 
 You have an empty repo or a rough sketch and want to think about where the project is going
 before any code lands. The flow routes through `/hv-vision` and `/hv-plan` first, then

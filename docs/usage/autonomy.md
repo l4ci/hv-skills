@@ -23,20 +23,20 @@ Autonomy decides whether to invoke the next skill; the destination skill's own g
 The loop stops cleanly on any of:
 
 - `/hv-next` reports an empty backlog (no items in active milestone, no items in general backlog).
-- `/hv-work` Step 2 detects a genuinely ambiguous brief — invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
+- `/hv-work` Step 2 detects a genuinely ambiguous brief. Invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
 - A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
 - The user interrupts.
 
 ## When to flip it on
 
-`"auto"` is good when you want the natural endgame of each cycle (capture learnings, ship the fix) without typing the follow-up command. `"loop"` is good when you have a known queue you want drained — milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified — and you'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you don't want a long-running session of model spend without checkpoints.
+`"auto"` is good when you want the obvious follow-up step of each cycle (capture learnings, ship the fix) without typing the command yourself. `"loop"` is good when you have a known queue you want drained: milestone seed items, a pile of P2 bugs, a multi-day backlog that's well-specified. You'd rather inspect the result than steer each pick. Leave it `"off"` when you're exploring, when items in the backlog need different judgement calls, or when you'd rather not run a long session of model spend without checkpoints.
 
 ## Picking by phase
 
 A rough phase mapping:
 
-- **Exploring or steering** — use `"off"`. You're shaping the work, not draining a queue.
-- **Milestone in flight, plan is sketched** — use `"auto"`. The natural endgame of each cycle (learn, ship) is what you want; you still pick the next item yourself.
-- **Known queue, well-specified** — use `"loop"`. `/hv-next` picks and dispatches for you until the backlog is empty.
+- `"off"` for exploring or steering. You're shaping the work, not draining a queue.
+- `"auto"` once a milestone is in flight and a plan is sketched. The follow-up step of each cycle (learn, ship) gets handled; you still pick the next item.
+- `"loop"` for a known, well-specified queue. `/hv-next` picks and dispatches for you until the backlog is empty.
 
 See [vision and plans](vision-and-plans.md) for milestone-driven planning and [running work](running-work.md) for the work-cycle endpoints where autonomy fires.

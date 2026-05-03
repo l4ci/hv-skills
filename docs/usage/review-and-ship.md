@@ -4,7 +4,7 @@
 
 ## /hv-review
 
-`/hv-review` is a staff-engineer-level read of a feature branch before it leaves your machine. It is **read-only** — no commits, no mutations.
+`/hv-review` is a staff-engineer-level read of a feature branch before it leaves your machine. It is **read-only**: no commits, no mutations.
 
 The skill scopes the branch (commits, touched files, referenced item IDs), pulls relevant topics from `KNOWLEDGE.md`, and evaluates the diff on three axes:
 
@@ -20,7 +20,7 @@ It returns one of three verdicts, with file:line evidence where applicable:
 | `CONCERNS` | Issues found, but not blocking. You can proceed or fix first. |
 | `FAIL` | Something must be addressed before integration. |
 
-You can run `/hv-review` at any time on a branch — not only before shipping:
+You can run `/hv-review` at any time on a branch, not only before shipping:
 
 ```
 /hv-review
@@ -38,11 +38,11 @@ You can run `/hv-review` at any time on a branch — not only before shipping:
 
 The review gate behaves as follows:
 
-- `FAIL` — blocks integration; fix the branch and rerun `/hv-ship`.
-- `CONCERNS` — surfaced to you; you can proceed or address them first.
-- `PASS` — integration proceeds automatically.
+- `FAIL` blocks integration; fix the branch and rerun `/hv-ship`.
+- `CONCERNS` surfaces to you; you can proceed or address it first.
+- `PASS` lets integration run automatically.
 
-Use `/hv-ship` to integrate finished work. Complete the implementation cycle in [`/hv-work`](running-work.md) first — don't call `/hv-ship` mid-implementation.
+Use `/hv-ship` to integrate finished work. Complete the implementation cycle in [`/hv-work`](running-work.md) first; don't call `/hv-ship` mid-implementation.
 
 ## Direct merge vs GitHub PR
 
@@ -64,8 +64,8 @@ See [configuration](configuration.md) for the full `work` block.
 | Value | Behavior |
 |-------|---------|
 | `true` (default) | `/hv-review` runs first. `FAIL` blocks, `CONCERNS` surface but you can proceed, `PASS` flows through. |
-| `false` | Skips the review pass. Integration runs immediately. Use when you have already reviewed manually and want raw speed. |
+| `false` | Skips the review pass. Integration runs immediately. Use when you have already reviewed manually and want to skip the second pass. |
 
-The review gate is independent of the autonomy level — even under `autonomy: "loop"`, a `FAIL` verdict halts the chain until you fix the branch.
+The review gate is independent of the autonomy level. Even under `autonomy: "loop"`, a `FAIL` verdict halts the chain until you fix the branch.
 
 See [configuration](configuration.md) for the full `ship` block.

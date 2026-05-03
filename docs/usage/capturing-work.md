@@ -1,6 +1,6 @@
 # Capturing work
 
-`/hv-capture` records bugs, features, and tasks into `TODO.md` with auto-classification and auto-assigned IDs. No ceremony — paste a raw description, structured notes, or a mixed list and it sorts everything out.
+`/hv-capture` records bugs, features, and tasks into `TODO.md` with auto-classification and auto-assigned IDs. Paste a raw description, structured notes, or a mixed list and it sorts the rest out.
 
 ## /hv-capture
 
@@ -37,7 +37,7 @@ Telling `/hv-capture` *"the sidebar flickers on hover, also we should add keyboa
 - **[T06] Update linter config for new rules.** ...
 ```
 
-Each item gets its own ID type, its own section, and its own classification — regardless of how they arrived in a single message. Items created in the same batch can reference each other with `Related:` links.
+Each item gets its own ID type, section, and classification, regardless of how they arrived in a single message. Items created in the same batch can reference each other with `Related:` links.
 
 ## Detail files for large input
 
@@ -65,7 +65,7 @@ Any item can carry a `Related:` suffix linking it to other items:
 - **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
 ```
 
-Links are optional. `/hv-next` infers the reverse link automatically — you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [reviewing and picking work](next-and-status.md)).
+Links are optional. `/hv-next` infers the reverse link automatically, so you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [reviewing and picking work](next-and-status.md)).
 
 `/hv-capture` scans both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
 
@@ -75,4 +75,4 @@ Links are optional. `/hv-next` infers the reverse link automatically — you don
 
 ## What /hv-capture is not
 
-`/hv-capture` is a pure recording tool. It classifies and files — it doesn't act, doesn't validate the item, and doesn't deduplicate against existing entries. If you want to implement something immediately after capturing it, use [/hv-go](running-work.md) instead. If you want to pick up an already-filed item and implement it, use [/hv-work](running-work.md).
+`/hv-capture` is a pure recording tool. It classifies and files. It does not act, does not validate the item, and does not deduplicate against existing entries. If you want to implement something immediately after capturing it, use [/hv-go](running-work.md) instead. If you want to pick up an already-filed item and implement it, use [/hv-work](running-work.md).

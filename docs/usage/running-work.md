@@ -1,6 +1,6 @@
 # Implementing
 
-Items captured in `TODO.md` move to "merged" through `/hv-work` — an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
+Items captured in `TODO.md` move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
 
 ## /hv-work
 
@@ -19,7 +19,7 @@ Items captured in `TODO.md` move to "merged" through `/hv-work` — an orchestra
 
 ## One commit per task
 
-Each task lands as its own atomic commit — one item, one commit, tagged with the item ID:
+Each task lands as its own atomic commit. One item, one commit, tagged with the item ID:
 
 ```
 a1b2c3d fix: retry logic on network timeout [B03]
@@ -27,9 +27,9 @@ d4e5f6a feat: per-project theme support [F07]
 g7h8i9j task: update CI to Node 20 [T02]
 ```
 
-This gives you clean revert granularity (revert a single task without touching others), easy PR review (review task-by-task), and a predictable history that `/hv-ship` can read to build PR bodies automatically.
+That keeps reverts surgical (drop one task without touching others), makes PR review easier (read commit by commit), and leaves a predictable history that `/hv-ship` can read to build PR bodies automatically.
 
-## Isolation — branch vs. worktree
+## Isolation: branch vs. worktree
 
 Set `work.isolation` in `config.json`:
 
@@ -38,11 +38,11 @@ Set `work.isolation` in `config.json`:
 | `"branch"` (default) | Feature branch in the current worktree | Solo work, simple workflows |
 | `"worktree"` | Isolated directory under `.claude/worktrees/` | Parallel sessions, keep main clean while agents work |
 
-With `"branch"`, your main worktree switches to the feature branch for the duration of the run. With `"worktree"`, the main worktree stays on `main` — you can keep editing there while agents work in isolation.
+With `"branch"`, your main worktree switches to the feature branch for the duration of the run. With `"worktree"`, the main worktree stays on `main`, so you can keep editing there while agents work in isolation.
 
 For running multiple `/hv-work` sessions at the same time on different item batches, `"worktree"` is the right choice. See [parallel-work](parallel-work.md) for the full multi-session pattern.
 
-## /hv-go — speed-path for "do this one thing"
+## /hv-go — capture and run in one pass
 
 `/hv-go` is for when you have a specific fix in mind and want it done now, not queued.
 
@@ -53,7 +53,7 @@ For running multiple `/hv-work` sessions at the same time on different item batc
 
 The item still gets a real ID in `TODO.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands directly off to `/hv-work` after capture completes.
 
-By design, `/hv-go` caps the number of clarifying questions — it's built for the case where the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, `/hv-capture` first is safer.
+`/hv-go` caps the number of clarifying questions on purpose. It assumes the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, `/hv-capture` first is safer.
 
 **Flow:** clean-tree guard → capture via `/hv-capture` → work via `/hv-work`.
 
@@ -66,7 +66,7 @@ Three skills trigger on action-shaped phrases. Pick by **intent**, not by the ve
 | The user wants to… | Use | Why |
 |---------------------|-----|-----|
 | Brain-dump items into the backlog without acting now | `/hv-capture` | Records only; no execution, no clean-tree guard |
-| Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`; speed-path question cap |
+| Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`, with a low question cap |
 | Implement an item that's already in `TODO.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
 | Pick the next thing from the backlog and execute | `/hv-next` | Reconciles → suggests → routes to `/hv-work` |
 
@@ -77,7 +77,7 @@ Three skills trigger on action-shaped phrases. Pick by **intent**, not by the ve
 - Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"* → `/hv-work`.
 - *"what's next?"* / *"pick something"* / *"what should I work on?"* → `/hv-next`.
 
-When intent is ambiguous, the cheapest path is `/hv-capture` — items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
+When intent is ambiguous, the cheapest path is `/hv-capture`. Items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
 
 See [capturing work](capturing-work.md) for capture details and [reviewing and picking work](next-and-status.md) for how `/hv-next` selects and prioritizes.
 
@@ -90,4 +90,4 @@ After `/hv-work` finishes, `work.mergeStrategy` in `config.json` controls what h
 | `"direct"` (default) | Merges the branch to main with `--no-ff`, deletes the branch |
 | `"pr"` | Pushes the branch and creates a GitHub PR with a summary |
 
-The actual ship-time gates — review, preflight, PR body composition — live in [review and ship](review-and-ship.md).
+The actual ship-time gates (review, preflight, PR body composition) live in [review and ship](review-and-ship.md).

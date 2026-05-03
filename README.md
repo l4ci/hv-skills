@@ -2,7 +2,7 @@
 
 # hv-skills
 
-**Plan with intent, ship atomic commits, retain hard-won knowledge — a zero-dependency development workflow for Claude Code.**
+**A workflow for Claude Code that plans before coding, makes one commit per task, and keeps a project knowledge layer that survives `/clear`.**
 
 [![Release](https://img.shields.io/github/v/release/l4ci/hv-skills?color=blue&sort=semver)](https://github.com/l4ci/hv-skills/releases)
 [![License](https://img.shields.io/github/license/l4ci/hv-skills?color=green)](LICENSE)
@@ -18,22 +18,22 @@
 
 ## Why hv-skills?
 
-- **Plan with intent, not just intuition.** `/hv-vision` for milestones, `/hv-plan` for sign-off plans, `/hv-spike` for feasibility experiments, `/hv-assume` for pre-execution approach peeks. The plan exists before the code does.
-- **Ship atomic per-task commits.** Clean history, easy reverts; every commit lands one task with one verify step. Parallel workers, one orchestrator, no merge mess.
-- **Knowledge that compounds.** `/hv-learn` distills hard-won gotchas and conventions into `KNOWLEDGE.md`; `/hv-work`, `/hv-debug`, and `/hv-review` all consult it automatically on future runs.
-- **Your code, your `.hv/`, your machine.** No daemon, no MCP server, no cloud, no database. Bash + Python + Git + optionally `gh` — that's it.
-- **Survives `/clear`.** `/hv-pause` writes a handoff note (current hypothesis, next step, mid-edit files); `/hv-resume` picks up where you left off, even in a fresh session.
+- **Planning has its own commands.** `/hv-vision` for milestones, `/hv-plan` for slice-level plans you can sign off on, `/hv-spike` for feasibility experiments on a throwaway branch, `/hv-assume` for a peek at the orchestrator's approach before any code is written.
+- **Atomic per-task commits.** Each commit lands one task with one verify step, so reverts stay surgical. Workers run in parallel under a single orchestrator.
+- **Knowledge stays around.** `/hv-learn` writes gotchas and conventions into `KNOWLEDGE.md`, grouped by topic. Future runs of `/hv-work`, `/hv-debug`, and `/hv-review` read it back automatically, so you stop re-discovering the same problem three sessions in a row.
+- **Local-first.** Everything lives in `.hv/` under your project. No daemon, no MCP server, no cloud, no database. Just bash, Python, git, and optionally `gh`.
+- **Survives `/clear`.** `/hv-pause` writes a handoff note with your current hypothesis, next step, and mid-edit files. `/hv-resume` reads it back in a fresh session.
 
 ## Features
 
 |  |  |
 |---|---|
 | 📥 **Auto-classified capture** — bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | ⚡ **Parallel execution** — orchestrator plans, workers implement in parallel, one atomic commit per task |
-| 🌿 **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | 🧠 **Knowledge retention** — `/hv-learn` distills durable learnings; `/hv-work`, `/hv-debug`, and `/hv-review` all consult them |
+| 🌿 **Branch or worktree isolation** — main stays clean while agents work, run multiple sessions side by side | 🧠 **Knowledge retention** — `/hv-learn` writes durable learnings; `/hv-work`, `/hv-debug`, and `/hv-review` all consult them |
 | ♻️ **Backlog reconciliation** — `/hv-next` validates `status.json` against git state, auto-cleans stale entries | 🐛 **Systematic debugging** — `/hv-debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv-learn` |
 | 🚢 **Review-gated shipping** — `/hv-ship` runs `/hv-review` against original intent + conventions before PR or merge | 💾 **Context-clear recovery** — `/hv-resume` re-reads active streams with recent commits and routes you back to work |
 | 🔧 **Refactor cycles** — `/hv-refactor` explores friction, designs competing approaches, fixes in parallel | 🤝 **Graceful handoff** — `/hv-pause` writes what's in your head (hypothesis, next step, mid-edit files) so `/hv-resume` picks up after a `/clear` |
-| 🧭 **Vision & milestones** — `/hv-vision` brainstorms milestones with web research and deliberate challenge, then `/hv-next`, `/hv-resume`, `/hv-pause`, and `/hv-status` keep work scoped to the active set | 🔗 **Loose milestone tags** — items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
+| 🧭 **Vision & milestones** — `/hv-vision` brainstorms milestones using web research and a critique pass; `/hv-next`, `/hv-resume`, `/hv-pause`, and `/hv-status` keep work scoped to the active set | 🔗 **Loose milestone tags** — items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
 | 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main |
 | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
 | 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
@@ -48,11 +48,11 @@ claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
 ```
 
-`/hv-init` always comes first. It takes ≤30s, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with Recommended defaults highlighted, and creates `.hv/` with data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type directories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` — never hand-edit JSON.
+`/hv-init` always comes first. It takes about 30 seconds, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with sensible defaults preselected, and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type subdirectories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` rather than hand-editing JSON.
 
 ### Path A — Drop into an existing project
 
-You already have code. You want a workflow that captures the work piling up in your head, executes it cleanly, and remembers what it learns.
+You already have code. You want somewhere to put the bug list and feature ideas piling up in your head, a way to execute them without churn, and a record of what you learned along the way.
 
 ```bash
 # 1. one-time setup — 5 questions, ≤30s, creates .hv/
@@ -86,11 +86,11 @@ You already have code. You want a workflow that captures the work piling up in y
 #   filed under "Performance & Rendering"
 ```
 
-Stepping away mid-cycle? `/hv-pause` writes a handoff note (hypothesis, next step, mid-edit files) so `/hv-resume` can pick up after `/clear`. See [docs/getting-started.md](docs/getting-started.md) for the fuller walkthrough.
+Need to step away mid-cycle? `/hv-pause` writes a handoff note (hypothesis, next step, mid-edit files) so a fresh session running `/hv-resume` picks up where you left off. See [docs/getting-started.md](docs/getting-started.md) for the fuller walkthrough.
 
 ### Path B — Start from (nearly) nothing
 
-You have an empty repo or a few sketches. You want to think about *where the project is going* before you ship anything, and keep that vision present as work progresses.
+You have an empty repo or a few sketches. You want to think through where this is going before you start shipping, and have that vision stay visible while you work.
 
 ```bash
 # 1. one-time setup
@@ -131,21 +131,21 @@ You have an empty repo or a few sketches. You want to think about *where the pro
 #   filed under "Auth & Identity"
 ```
 
-When the milestone ships, mark it `shipped` (unblocks dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
+When the milestone ships, mark it `shipped` (which unblocks its dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
 
 ## FAQ
 
 **Why hv-skills over GSD?**
 
-GSD models projects as formal phases — discuss → plan → execute → verify → audit, each with its own agent and `.planning/` sign-off artifacts. That's the right shape for regulated work, hard requirements, or anywhere a defensible verification trail matters more than speed. hv-skills bets the other way: a tight `capture → next → work → ship → learn` loop, markdown artifacts you can edit by hand, no phase ceremony. Plan-as-artifact exists (`/hv-plan` writes one file per slice or item), but it's optional and ad-hoc rather than the spine of the workflow. Pick GSD if you want sign-off rigor; pick hv-skills if you want momentum and a knowledge layer that compounds across sessions.
+GSD models projects as formal phases: discuss, plan, execute, verify, audit. Each phase gets its own agent and `.planning/` sign-off artifacts. That's the right shape for regulated work, hard requirements, or anywhere a defensible verification trail matters more than speed. hv-skills runs differently: a tight `capture → next → work → ship → learn` loop with markdown artifacts you can edit by hand, and no phase ceremony unless you ask for it. Plan-as-artifact exists (`/hv-plan` writes one file per slice or item), but it's optional rather than the spine of the workflow. If you need sign-off rigor, GSD fits better. If you want a faster loop with knowledge that carries across sessions, that's what hv-skills is built for.
 
 **Why hv-skills over Octo?**
 
-Octo orchestrates multiple AI providers (Claude, Gemini, Codex) — debates, multi-AI consensus, 100-point PRD scoring across providers, the Double Diamond Discover/Define/Develop/Deliver pipeline. If your value comes from cross-model validation or multi-provider workflows, Octo is purpose-built for that. hv-skills is single-provider on purpose: it trades cross-AI debate for tight Claude Code integration (`AskUserQuestion`, subagent dispatch, branch/worktree isolation, atomic commits) and a workflow built to survive `/clear` via handoff notes. Pick Octo for AI-vs-AI; pick hv-skills for Claude Code, deeply.
+Octo orchestrates multiple AI providers (Claude, Gemini, Codex) for debates, consensus, 100-point PRD scoring across providers, and a Discover/Define/Develop/Deliver pipeline. If cross-model validation is where your value comes from, Octo is purpose-built for it. hv-skills is deliberately single-provider. Instead of cross-AI debate, it leans hard into Claude Code: `AskUserQuestion`, subagent dispatch, branch and worktree isolation, atomic commits, and handoff notes that survive `/clear`. Use Octo when you want multiple models second-guessing each other. Use hv-skills when you've decided on Claude Code and want the workflow built around it.
 
 **Why hv-skills over a TODO.md and good intentions?**
 
-That's how every workflow starts and how most stay. The drift happens at three places hv-skills addresses by design: (1) commits stop being atomic — one PR ends up touching six unrelated things; (2) knowledge stops compounding — you re-discover the same gotcha three sessions in a row because nothing reads it back; (3) sessions don't survive `/clear` — you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-resume` carry intent across context resets. If those three never bite you, stock Claude Code is fine. If they do, that's why hv-skills exists.
+Most workflows start that way and most stay there. Three things tend to drift, and hv-skills addresses each of them. (1) Commits stop being atomic — one PR ends up touching six unrelated things. (2) Knowledge stops accumulating — you re-discover the same gotcha three sessions in a row because nothing reads it back. (3) Sessions don't survive `/clear` — you lose the live hypothesis the moment you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-resume` carry intent across context resets. If none of those bite you in practice, stock Claude Code is genuinely fine. If they do, that's the gap hv-skills is filling.
 
 ## Skills
 
@@ -153,7 +153,7 @@ That's how every workflow starts and how most stay. The drift happens at three p
 |-------|-------------|
 | `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `counters.json`, `config.json`, `status.json`, and helpers |
 | `/hv-config` | Edit `.hv/config.json` interactively — checklist of current values, then native option pickers for each chosen key |
-| `/hv-vision` | Brainstorm a project's bigger vision and milestones — Socratic discovery, web research, deliberate challenge, then writes `MILESTONES.md` + per-milestone detail files |
+| `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-c` | Shortcut for `/hv-capture` |
 | `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
@@ -231,7 +231,7 @@ flowchart LR
   UPDATE["/hv-update"] -.checks.-> RELEASES
 ```
 
-Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth — `status.json` is just a cache, and `/hv-next` reconciles any drift.
+Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth; `status.json` is just a cache, and `/hv-next` reconciles any drift between the two.
 
 ## Configuration
 
@@ -251,7 +251,7 @@ Edit `.hv/config.json`:
 }
 ```
 
-Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off pending an LLM safety review, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent — see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). See [docs/usage/configuration.md](docs/usage/configuration.md) for every key and when to flip it.
+The defaults are conservative: branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off (pending an LLM safety review), no autonomous chaining. Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). For every key and when to flip it, see [docs/usage/configuration.md](docs/usage/configuration.md).
 
 ## Architecture
 
@@ -274,7 +274,7 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 └── bin/              # CLI helpers — see docs/reference/cli-helpers.md
 ```
 
-Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format. In umbrella mode the same `.hv/` lives at the umbrella root and coordinates work across sub-repos — see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md).
+Helpers collapse multi-step agent logic into single subprocess calls. That keeps the per-invocation context smaller and the output format consistent. In umbrella mode the same `.hv/` lives at the umbrella root and coordinates work across sub-repos; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md).
 
 ## Install alternatives
 
