@@ -1991,6 +1991,43 @@ if grep -q "single name in V1" "$REPO/hv-capture/SKILL.md"; then
 fi
 pass "M03-T5: hv-capture/SKILL.md Step 4.6 supports multi-repo Repos tagging"
 
+# M03-T6: hv-plan-add accepts comma-separated --repo and validates each name
+PLANS_TMP=$(mktemp -d)
+mkdir -p "$PLANS_TMP/.hv"
+cp -r "$UMB/.hv/repos.json" "$PLANS_TMP/.hv/repos.json"
+
+# Single name still works (backwards compat)
+(cd "$PLANS_TMP" && "$BIN/hv-plan-add" --repo web M99 B01 "single repo plan" >/dev/null)
+grep -q "^repo: web$" "$PLANS_TMP/.hv/plans/M99-B01.md" \
+  || fail "hv-plan-add single --repo did not write 'repo: web' frontmatter"
+pass "M03-T6: hv-plan-add accepts a single --repo name"
+
+# Multi-repo list writes joined frontmatter
+(cd "$PLANS_TMP" && "$BIN/hv-plan-add" --repo "web, api" M99 B02 "multi repo plan" >/dev/null)
+grep -q "^repo: web, api$" "$PLANS_TMP/.hv/plans/M99-B02.md" \
+  || fail "hv-plan-add multi --repo did not write 'repo: web, api' frontmatter"
+pass "M03-T6: hv-plan-add accepts comma-separated --repo and writes joined value"
+
+# Unregistered name in CSV is rejected; no plan file written
+if (cd "$PLANS_TMP" && "$BIN/hv-plan-add" --repo "web, nonexistent" M99 B03 "bad plan" 2>"$TMP/err" >/dev/null); then
+  fail "hv-plan-add should reject unregistered name in --repo CSV"
+fi
+[ -f "$PLANS_TMP/.hv/plans/M99-B03.md" ] && fail "hv-plan-add wrote plan file despite invalid --repo"
+grep -q "nonexistent" "$TMP/err" || fail "hv-plan-add error must name the unregistered sub-repo"
+pass "M03-T6: hv-plan-add rejects unregistered name in --repo CSV"
+
+rm -rf "$PLANS_TMP"
+
+# M03-T6: hv-plan/SKILL.md prose mentions multi-repo flow
+grep -q 'multi-repo items pass the full comma-list' "$REPO/hv-plan/SKILL.md" \
+  || fail "hv-plan/SKILL.md must explain multi-repo --repo flow"
+pass "M03-T6: hv-plan/SKILL.md documents multi-repo --repo"
+
+# M03-T6: hv-assume/SKILL.md peek shape supports multiple sub-repo lines
+grep -q "one line per repo for multi-repo items" "$REPO/hv-assume/SKILL.md" \
+  || fail "hv-assume/SKILL.md peek must show one Repo line per sub-repo for multi-repo items"
+pass "M03-T6: hv-assume/SKILL.md peek renders one line per repo"
+
 # Cleanup status.json so it doesn't pollute later assertions
 rm -f "$UMB/.hv/status.json"
 

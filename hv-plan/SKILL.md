@@ -38,7 +38,7 @@ For an item target, read its `TODO.md` entry and overflow file (`.hv/<bugs|featu
 - Tag the item under an active milestone (then proceed)
 - Skip planning and use `/hv-go` for one-shot execution
 
-When the item carries a `Repos:` field, capture that value as the plan's target sub-repo so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).
+When the item carries a `Repos:` field, capture that value as the plan's target sub-repo(s) so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Multi-repo items pass the full comma-list through (`--repo "web, api"`); the frontmatter key stays singular `repo:` and just carries the joined string. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).
 
 For a slice target, read `.hv/milestones/<MID>.md` for goal/acceptance/risks context.
 
@@ -99,9 +99,11 @@ KEY=$(.hv/bin/hv-plan-add <MID> slice "<title>")
 KEY=$(.hv/bin/hv-plan-add <MID> <itemId> "<title>")
 # or, if the item carries Repos: <name>
 KEY=$(.hv/bin/hv-plan-add --repo <name> <MID> <itemId> "<title>")
+# multi-repo items pass the full comma-list verbatim:
+KEY=$(.hv/bin/hv-plan-add --repo "web, api" <MID> <itemId> "<title>")
 ```
 
-Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode never sets `--repo`.
+Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode never sets `--repo`. Multi-repo items keep all names in one `--repo` argument; `hv-plan-add` validates each name against `.hv/repos.json` before writing the plan.
 
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
 
@@ -119,7 +121,7 @@ Plan written: M01-B07 — Auth foundation
 Next: /hv-work M01-B07 to execute, or /hv-assume M01-B07 to peek before running.
 ```
 
-Include `Repo: <name>` only when the plan was tagged with a sub-repo (item targets with `Repos:` under umbrella mode). Slice and milestone plans omit the line entirely.
+Include `Repo: <names>` only when the plan was tagged with a sub-repo (item targets with `Repos:` under umbrella mode). Render multi-repo plans with the joined list — e.g. `Repo: web, api`. Slice and milestone plans omit the line entirely.
 
 If `/hv-work` is the natural next step and the user is ready, offer it as a one-line prompt rather than just printing the hint.
 

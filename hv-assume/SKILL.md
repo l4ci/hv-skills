@@ -44,7 +44,7 @@ If the target is ambiguous, ask once. Do not auto-pick.
 - Relevant `DECISIONS.md` boundaries via `.hv/bin/hv-decisions-query <topics…>`
 - Recent git history: `git log --oneline -20`
 - Recent commits touching probable target files: `git log --oneline -- <path>`
-- For backlog-item targets: parse the entry's `Repos:` field (the value after `Repos:` up to the next field name — `Detail:`, `Related:`, `Milestone:` — or end-of-line). If umbrella mode is on (`.hv/config.json` `umbrella.enabled` is true OR `.hv/repos.json` exists with entries) AND the item carries a `Repos:` value, resolve it to an absolute sub-repo path via `.hv/repos.json` (same registry `load_repos()` reads — match the `name → path` mapping). Skip resolution for slice / milestone targets (umbrella-flat per M02 acceptance).
+- For backlog-item targets: parse the entry's `Repos:` field (the value after `Repos:` up to the next field name — `Detail:`, `Related:`, `Milestone:` — or end-of-line). If umbrella mode is on (`.hv/config.json` `umbrella.enabled` is true OR `.hv/repos.json` exists with entries) AND the item carries a `Repos:` value, resolve it to absolute sub-repo path(s) via `.hv/bin/hv-resolve-repos` (or `parse_repos_csv` + `load_repos()` for in-process callers — same registry). Multi-repo items resolve to a list; keep all entries for the peek render. Skip resolution for slice / milestone targets (umbrella-flat per M02 acceptance).
 
 **Issue these as parallel tool calls in a single response** — they're independent.
 
@@ -64,6 +64,7 @@ Approach
 
 Repo
   <name> (<absolute-sub-repo-path>)        # omit when single-repo or no Repos: tag
+  <name2> (<absolute-sub-repo-path-2>)     # one line per repo for multi-repo items
 
 Files I'd touch
   - <path>  — <reason>
@@ -92,7 +93,7 @@ If any of this is wrong, push back before /hv-work runs.
 
 Omit `Hard boundaries to respect` if no DECISIONS topics matched.
 
-Omit `Repo` entirely when umbrella mode is off, the target is a slice / milestone (umbrella-flat per M02 acceptance), or the item has no `Repos:` tag (single-repo projects under umbrella mode also skip). When present, render as `<name> (<absolute-path>)` resolved via `.hv/repos.json` — so the user can verify the dispatch target before `/hv-work` runs.
+Omit `Repo` entirely when umbrella mode is off, the target is a slice / milestone (umbrella-flat per M02 acceptance), or the item has no `Repos:` tag (single-repo projects under umbrella mode also skip). When present, render as `<name> (<absolute-path>)` resolved via `.hv/repos.json`. Multi-repo items render one indented line per resolved sub-repo under the `Repo` heading — so the user can verify every dispatch target before `/hv-work` runs.
 
 Be specific. *"I'd touch the auth code"* is useless — cite paths. If you don't know the path well enough to cite it, say so under Known unknowns.
 
