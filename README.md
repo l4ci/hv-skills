@@ -37,6 +37,7 @@
 | 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main |
 | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
 | 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
+| 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `TODO.md` at the umbrella; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
 
 ## Quickstarts
 
@@ -244,11 +245,13 @@ Edit `.hv/config.json`:
   "refactor": { "confirmBeforeExecute": true },
   "learn":    { "verify": true },
   "ship":     { "review": true },
+  "docs":     { "path": "docs",           "autoCreate": false },
+  "umbrella": { "enabled": false },
   "autonomy": { "level": "off" }
 }
 ```
 
-Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. See [docs/usage/configuration.md](docs/usage/configuration.md) for every key and when to flip it.
+Defaults favor clean integration (branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off pending an LLM safety review, no autonomous chaining). Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent — see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). See [docs/usage/configuration.md](docs/usage/configuration.md) for every key and when to flip it.
 
 ## Architecture
 
@@ -260,17 +263,18 @@ Defaults favor clean integration (branch isolation, direct merge, review gate on
 ├── MILESTONES.md     # vision paragraph + milestone overview
 ├── ARCHIVE.md        # completions older than 5 days
 ├── counters.json     # auto-incrementing IDs
-├── config.json       # models, isolation, merge, verify
-├── status.json       # active work streams
+├── config.json       # models, isolation, merge, verify, umbrella
+├── status.json       # active work streams (keyed by branch, or (branch, repo) in umbrella mode)
+├── repos.json        # umbrella mode only — registered sub-repos
 ├── bugs/ features/ tasks/   # overflow detail files
 ├── milestones/       # one detail file per milestone (M01.md, M02.md, ...)
 ├── plans/            # /hv-plan output (M01-S01.md slice plans, M01-B07.md item plans)
 ├── spikes/           # /hv-spike findings — one file per spike, branch lives in git
-├── handoff/          # /hv-pause notes, one per branch; /hv-resume consumes them
+├── handoff/          # /hv-pause notes; one per branch (or per (branch, repo) under umbrella)
 └── bin/              # CLI helpers — see docs/reference/cli-helpers.md
 ```
 
-Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format.
+Helpers collapse multi-step agent logic into single subprocess calls — less context consumed per invocation, consistent output format. In umbrella mode the same `.hv/` lives at the umbrella root and coordinates work across sub-repos — see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md).
 
 ## Install alternatives
 

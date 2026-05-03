@@ -19,9 +19,11 @@ Use umbrella mode when you maintain a small fleet of related repositories — `~
 | Aspect | Single-repo | Umbrella |
 |--------|-------------|----------|
 | `.hv/` location | Repo root | Umbrella root (one level up from sub-repos) |
-| Where helpers run git ops | The repo | The sub-repo for the current item (S02+) |
+| Where helpers run git ops | The repo | The sub-repo for the current item (resolved via `Repos:` tag or `--repo` flag) |
 | Worktree path | `<repo>/.claude/worktrees/<branch>` | `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layout B) |
-| Knowledge / decisions / vision | Per-repo | Shared at the umbrella |
+| `TODO.md`, `ARCHIVE.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md` | Per-repo | Shared at the umbrella |
+| `status.json` entries | Keyed by `branch` | Keyed by `(branch, repo)` |
+| `.hv/handoff/<branch>.md` | One per branch | `.hv/handoff/<branch>@<repo>.md` (one per branch+repo) |
 | Sub-repo git histories | n/a | Independent — no submodules, no version pinning |
 
 Single-repo behavior is **completely unchanged**. Umbrella-aware helpers gate on `umbrella.enabled === true` in `.hv/config.json`; without that flag, every skill behaves exactly as it did before.
@@ -42,7 +44,7 @@ myorg/                 # umbrella root
 │   ├── KNOWLEDGE.md
 │   ├── DECISIONS.md
 │   └── …
-├── .claude/           # worktrees land here in S02 (Layout B)
+├── .claude/           # worktrees land here (Layout B)
 ├── web/               # registered sub-repo (independent git)
 ├── api/               # registered sub-repo (independent git)
 └── shared/            # registered sub-repo (independent git)
@@ -63,12 +65,12 @@ The registry is a single JSON file at the umbrella's `.hv/repos.json`:
 }
 ```
 
-- `name` is the sub-repo's basename and the value `/hv-capture` will accept in S02's `Repos:` field.
+- `name` is the sub-repo's basename and the value `/hv-capture` accepts in the `Repos:` field on items.
 - `path` is relative to the umbrella root. Helpers canonicalize each entry via `realpath` at lookup time, so symlinked sub-repo paths resolve correctly.
 - Entries are sorted alphabetically for stable diffs.
 - No SHAs, no version pins. Sub-repos are **independent git repositories** — see `.hv/DECISIONS.md` (Architecture — "Umbrella mode does not use git submodules") for the rationale.
 
-To edit the registry in S01, re-run `/hv-init` from the umbrella. `hv-umbrella-init` is idempotent: a second run with the same selection is a no-op; a run with new names adds them; names you omit but were previously registered are kept (with a warning). A first-class registry editor in `/hv-config` is planned for S03.
+To edit the registry today, re-run `/hv-init` from the umbrella. `hv-umbrella-init` is idempotent: a second run with the same selection is a no-op; a run with new names adds them; names you omit but were previously registered are kept (with a warning). A first-class registry editor in `/hv-config` is planned.
 
 ## Resolvers — `hv-resolve-umbrella` and `hv-resolve-repo`
 
@@ -93,29 +95,39 @@ The walk-up uses `pwd -P` (the physical path), so symlinked sub-repo paths resol
 
 Both helpers are short bash + a small python heredoc; you can read them directly under `.hv/bin/`.
 
-## Worktrees in umbrella mode (preview)
+## Worktree layout
 
-In S02, when `/hv-work` lands umbrella support, worktrees will use **Layout B**:
+Umbrella worktrees use **Layout B**:
 
 ```
 <umbrella>/.claude/worktrees/<repo>/<branch>
 ```
 
-A single discovery point at the umbrella — `<umbrella>/.claude/worktrees/` — holds every active worktree across every sub-repo, grouped by repo. No `.gitignore` edits in the sub-repos.
+A single discovery point at the umbrella — `<umbrella>/.claude/worktrees/` — holds every active worktree across every sub-repo, grouped by repo. No `.gitignore` edits in the sub-repos. Single-repo mode keeps `<repo>/.claude/worktrees/<branch>` and is unaffected.
 
-This isn't implemented yet. Single-repo mode keeps `<repo>/.claude/worktrees/<branch>` and is unaffected.
+## Per-skill behavior
 
-## What's NOT in this release
+Most skills delegate umbrella resolution to underlying helpers and stay umbrella-flat at the prose level. The user-visible surface:
 
-S01 ships the foundation only. The following land later:
+- **`/hv-capture`** asks for `Repos:` when umbrella mode is on, accepting one or more registered names. Items can also be untagged (umbrella-flat — appropriate for cross-cutting tasks).
+- **`/hv-work`** reads `Repos:` from the item and runs the orchestrator + workers against the resolved sub-repo's `.git/`. The atomic commits land in that sub-repo's history; `status.json` records the entry as `(branch, repo)`.
+- **`/hv-go`** is a pass-through — `/hv-capture` and `/hv-work` handle umbrella resolution under it.
+- **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-resume` reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for streams that predate the change.
+- **`/hv-plan`** records the target sub-repo in plan frontmatter (`repo: <name>`) when invoked with `--repo` or when the item carries `Repos:`. Slice and milestone plans stay umbrella-flat.
+- **`/hv-spike`** runs the spike branch in the resolved sub-repo (`spike/<name>` lives in that repo's `.git/`); the spike file stays at `<umbrella>/.hv/spikes/<name>.md` with a `repo: <name>` frontmatter line.
+- **`/hv-assume`** displays the resolved sub-repo for items with `Repos:` in its peek output.
+- **`/hv-debug`** routes its single fix-commit to the sub-repo resolved from the bug's `Repos:` tag.
+- **`/hv-review`** scopes its branch inspection to the sub-repo via `hv-review-scope --repo <name>`; `TODO.md` and `ARCHIVE.md` lookups stay at the umbrella.
+- **`/hv-ship`** threads `--repo` through `hv-merge` / `hv-pr` so the merge or PR runs in the correct sub-repo.
+- **`/hv-status`** displays each in-progress entry with an inline `(repo: <name>)` suffix; `hv-backlog`'s In Progress table gains a `Repo` column when any active entry is umbrella-tagged.
+- **`/hv-refactor`** asks which scope to refactor — all sub-repos, all sub-repos plus the umbrella, the umbrella only, or a subset — then dispatches parallel sub-agents, each running a focused single-repo cycle in its target's `.git/`. The umbrella orchestrator aggregates per-repo summaries and resets the refactor counter once at the end.
 
-- `/hv-capture` doesn't yet ask `Repos:` — coming in S02.
-- `/hv-work` doesn't yet route a session to a sub-repo — coming in S02.
-- `status.json` doesn't yet key in-flight work by repo — coming in S02.
-- Multi-repo features (one item touching N sub-repos at once, linked PRs) — M03.
-- A registry editor in `/hv-config` (add/remove repos without re-running `/hv-init`) — S03.
+The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`. Without the flag, helpers operate on the cwd's git tree as in single-repo mode.
 
-For now: items continue to work as today, and the resolvers are available for any helper that wants to be umbrella-aware.
+## What's not yet in umbrella mode
+
+- **Multi-repo items.** One TODO item that fans out to commits in N sub-repos at once (with linked PRs) is on the M03 roadmap. Today, `Repos:` resolves to a single sub-repo per item.
+- **Registry editor in `/hv-config`.** Add/remove repos without re-running `/hv-init`. Planned.
 
 ## Footguns
 
