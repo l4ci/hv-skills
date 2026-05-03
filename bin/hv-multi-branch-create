@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Atomically create the same branch in every named sub-repo, OR exit 1
+# before any branch is created if the branch already exists in any of them.
+# Usage: hv-multi-branch-create --branch <name> --repos <repos-csv>
+# Exits: 0 on success (branch created in all repos), 1 on collision (lists
+#        colliding repo names on stderr, NO repos modified), 2 on usage
+#        error or unregistered repo (delegated to hv-resolve-repos).
+set -euo pipefail
+BRANCH=""
+REPOS=""
+while :; do
+  case "${1:-}" in
+    --branch) BRANCH="${2:?}"; shift 2 ;;
+    --repos) REPOS="${2:?}"; shift 2 ;;
+    *) break ;;
+  esac
+done
+[ -n "$BRANCH" ] || { echo "usage: hv-multi-branch-create --branch <name> --repos <csv>" >&2; exit 2; }
+[ -n "$REPOS" ] || { echo "usage: hv-multi-branch-create --branch <name> --repos <csv>" >&2; exit 2; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+RESOLVED=$("$HERE/hv-resolve-repos" "$REPOS") || exit $?
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" "$RESOLVED" <<'PY'
+import json, subprocess, sys
+
+branch, resolved_json = sys.argv[1], sys.argv[2]
+resolved = json.loads(resolved_json)
+
+# Phase 1 — precheck. Collect any repo where the branch already exists.
+collisions = []
+for entry in resolved:
+    r = subprocess.run(
+        ["git", "-C", entry["path"], "show-ref", "--verify", "--quiet",
+         f"refs/heads/{branch}"],
+    )
+    if r.returncode == 0:
+        collisions.append(entry["name"])
+
+if collisions:
+    sys.stderr.write(
+        f"branch {branch!r} already exists in: {', '.join(collisions)}\n"
+    )
+    sys.exit(1)
+
+# Phase 2 — create. Use `git branch <name>` (does NOT switch HEAD).
+for entry in resolved:
+    r = subprocess.run(
+        ["git", "-C", entry["path"], "branch", branch],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        sys.stderr.write(
+            f"failed to create {branch!r} in {entry['name']}: {r.stderr.strip()}\n"
+        )
+        sys.exit(1)
+PY

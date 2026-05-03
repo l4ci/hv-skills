@@ -179,6 +179,30 @@ When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coor
 
 `hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
 
+### hv-resolve-repos
+
+Resolve a comma-separated `Repos:` list into a JSON array of `{name, path}` entries. Used by multi-repo dispatch helpers to validate and locate every named sub-repo in one call.
+
+    hv-resolve-repos "<repos-csv>"
+
+Exits 0 with JSON on stdout, 1 if any name is not registered in `.hv/repos.json` (stderr names the missing sub-repo). Single names and empty input are valid; the result is a list whose length matches the input.
+
+### hv-multi-branch-create
+
+Atomically create the same branch in every named sub-repo. Used by `/hv-work` when an item's `Repos:` field names two or more sub-repos.
+
+    hv-multi-branch-create --branch <name> --repos <repos-csv>
+
+Two phases. Phase 1 precheck: scans every named repo for `refs/heads/<branch>`; if any has it, exits 1 listing the colliding repo names on stderr — *no repos are modified*. Phase 2 create: runs `git branch <name>` (no checkout) in each repo. Unregistered repo names are rejected via `hv-resolve-repos` (exit 1, missing names on stderr).
+
+### hv-status-add-multi
+
+Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv-work` wave. Loops `hv-status-add --repo <r>` once per name in `--repos`.
+
+    hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]
+
+`--worktrees` is optional; when given, its comma-list MUST match the length of `--repos` (paired by index). Unregistered repo names are rejected up front via `hv-resolve-repos` (no partial writes). `--if-absent` is forwarded to each underlying `hv-status-add` call.
+
 ## Bootstrap (run during /hv-init only)
 
 `hv-bootstrap` seeds the `.hv/` folder structure. Concretely it:

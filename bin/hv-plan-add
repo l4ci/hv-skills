@@ -30,10 +30,17 @@ if not re.fullmatch(r"M\d{2,}", milestone):
     sys.exit(1)
 
 if repo:
-    repos = load_repos()
-    if repo not in repos:
-        print(f"error: --repo {repo!r} not in .hv/repos.json", file=sys.stderr)
+    from hvlib import parse_repos_csv
+    names = parse_repos_csv(repo)
+    if not names:
+        print(f"error: --repo {repo!r} is empty after parsing", file=sys.stderr)
         sys.exit(1)
+    repos = load_repos()
+    missing = [n for n in names if n not in repos]
+    if missing:
+        print(f"error: --repo name(s) not in .hv/repos.json: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+    repo = ", ".join(names)
 
 plans_dir = Path(".hv/plans")
 plans_dir.mkdir(parents=True, exist_ok=True)

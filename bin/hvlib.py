@@ -124,6 +124,18 @@ def parse_todo_fields(line: str) -> dict[str, str]:
     return fields
 
 
+def parse_repos_csv(value: str) -> list[str]:
+    """Split a Repos: field value (comma-separated, optional spaces) into a
+    clean list of sub-repo names. Empty/whitespace-only inputs return [].
+    Duplicates are preserved in input order — caller dedupes if needed.
+
+    Example: parse_repos_csv("web, api") => ["web", "api"]
+    Example: parse_repos_csv("web,api,web") => ["web", "api", "web"]
+    Example: parse_repos_csv("") => []
+    """
+    return [s.strip() for s in value.split(",") if s.strip()]
+
+
 def load_json(path, default):
     """Read JSON from `path`. Return `default` if the file is missing or corrupt.
     Never raises. `path` may be a str or Path.
