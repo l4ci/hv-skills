@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.14.0 — 2026-05-03
+
+**Umbrella mode V1 (M02) substantively shipped: every read-side helper, plus `/hv-plan`, `/hv-spike`, `/hv-pause`, `/hv-assume`, `/hv-refactor` now route work to the resolved sub-repo. Single-repo behavior is unchanged.**
+
+## New
+
+Closes the M02 follow-up wave so the umbrella surface lands end-to-end across plan, spike, pause/resume, assume, and refactor. Items can carry a `Repos:` tag to route work to a registered sub-repo; helpers gain `--repo <name>` for direct calls.
+
+- `/hv-refactor` umbrella-aware fanout: asks which scope (all sub-repos, all + umbrella, umbrella only, subset) and dispatches parallel sub-agents per target (`3534415`).
+- `/hv-pause` handoff filenames key on `(branch, repo)` — `<branch>@<repo>.md` instead of `<branch>.md` so two sub-repos sharing a branch name don't clobber each other's notes (`de650e3`). `/hv-resume` reads the umbrella-keyed path with legacy fallback.
+- `/hv-spike --repo` runs the spike branch in the resolved sub-repo; spike file stays at the umbrella with a `repo:` frontmatter line (`973aba8`).
+- `/hv-plan --repo` records the target sub-repo in plan frontmatter (`c2c0915`).
+- `/hv-assume` peek displays the resolved sub-repo for items with `Repos:` (`56bc0d4`).
+
+## Changed
+
+- Architectural sweep: 11 improvements covering the umbrella read-side (`hv-base-branch` walk-up, `hv-review-scope --repo`, `hv-status-add/-remove --repo`, `hv-summary` / `hv-backlog` repo display, `hv-preflight` validates `repos.json`), plus umbrella-aware threading through `/hv-work`, `/hv-ship`, `/hv-debug` call sites (`d9afb4b`).
+- Architectural sweep: 5 improvements to release helpers (`hv-release-bump-version --dry-run`, `parse_toml_version` lifted to `hvlib`) and one default flip — `docs.autoCreate: true → false` for fresh `/hv-init` runs, pending the M01-S03 LLM safety review (existing configs unaffected) (`3c1bc02`).
+
+## Documentation
+
+- Umbrella-mode guide refresh: `docs/usage/umbrella-mode.md` rewritten for the shipped surface, dropping all "S01/S02" hedging; new "Per-skill behavior" section listing the umbrella behavior of every affected skill plus the helper `--repo` matrix (`0feaf8c`).
+- README updated: features grid gains an Umbrella mode row; config example shows `umbrella` and `docs` keys with `autoCreate: false`; architecture tree notes `repos.json` and `(branch, repo)` keying.
+- Skills surface in `docs/usage/`: prose-only umbrella documentation in `/hv-go`, `/hv-review`, `/hv-status` (`1f719c2`).
+- Earlier in the cycle: README quickstart + getting-started Path A and Path B walkthroughs got fleshed out (`d7442b8`, `475a394`); `/hv-decide`, `/hv-docs`, `/hv-release` surfaced in the README diagram and reference (`4cd20a7`).
+
+## Stats
+
+12 commits, 44 files changed, +1347 −308 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.13.0...v1.14.0
+
 ## v1.13.0 — 2026-05-02
 
 **Umbrella Mode V1 — coordinate backlog and work across multiple sub-repos from a single `.hv/`.**
