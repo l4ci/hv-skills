@@ -21,7 +21,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MILESTONE" "$UNIT" "$T
 import re, sys
 from datetime import date
 from pathlib import Path
-from hvlib import write_text_atomic, load_repos
+from hvlib import write_text_atomic
 
 milestone, unit_in, title, repo = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
@@ -30,13 +30,11 @@ if not re.fullmatch(r"M\d{2,}", milestone):
     sys.exit(1)
 
 if repo:
-    from hvlib import parse_repos_csv
-    names = parse_repos_csv(repo)
+    from hvlib import validate_repos
+    names, missing, _ = validate_repos(repo)
     if not names:
         print(f"error: --repo {repo!r} is empty after parsing", file=sys.stderr)
         sys.exit(1)
-    repos = load_repos()
-    missing = [n for n in names if n not in repos]
     if missing:
         print(f"error: --repo name(s) not in .hv/repos.json: {', '.join(missing)}", file=sys.stderr)
         sys.exit(1)

@@ -8,11 +8,9 @@ CSV="${1?usage: hv-resolve-repos <repos-csv>}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$CSV" <<'PY'
 import json, sys
-from hvlib import load_repos, parse_repos_csv
+from hvlib import validate_repos
 
-names = parse_repos_csv(sys.argv[1])
-repos = load_repos()
-missing = [n for n in names if n not in repos]
+names, missing, repos = validate_repos(sys.argv[1])
 if missing:
     sys.stderr.write(f"unregistered sub-repo(s): {', '.join(missing)}\n")
     sys.exit(1)

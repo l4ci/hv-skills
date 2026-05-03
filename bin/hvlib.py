@@ -136,6 +136,26 @@ def parse_repos_csv(value: str) -> list[str]:
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
+def validate_repos(csv: str) -> tuple[list[str], list[str], dict[str, str]]:
+    """Parse a Repos: CSV and validate every name against `.hv/repos.json`.
+    Returns (names, missing, repos) where:
+      - names    is the parsed list (may be empty if csv is whitespace-only)
+      - missing  is the subset of names not registered in repos.json
+      - repos    is the registry dict {name: abs-path} (empty if names is empty)
+
+    Side-effect-free — caller decides how to surface errors. Typical usage:
+
+        names, missing, repos = validate_repos(csv)
+        if not names: ...   # csv was empty
+        if missing: ...     # one or more names unregistered
+        # else: proceed with names + repos[name] for paths
+    """
+    names = parse_repos_csv(csv)
+    repos = load_repos() if names else {}
+    missing = [n for n in names if n not in repos]
+    return names, missing, repos
+
+
 def load_json(path, default):
     """Read JSON from `path`. Return `default` if the file is missing or corrupt.
     Never raises. `path` may be a str or Path.
