@@ -1938,6 +1938,52 @@ if (cd "$UMB" && "$BIN/hv-multi-branch-create" --branch hv/m3-bad --repos "web, 
 fi
 pass "M03-T2: hv-multi-branch-create rejects unregistered repos"
 
+# M03-T3: hv-status-add-multi creates one status entry per (branch, repo)
+rm -f "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add-multi" --branch hv/m3-foo --items M03-S01 --repos "web, api")
+python3 -c "
+import json
+d = json.load(open('$UMB/.hv/status.json'))
+active = d.get('active', [])
+keys = sorted((e['branch'], e['repo']) for e in active if e['branch'] == 'hv/m3-foo')
+assert keys == [('hv/m3-foo', 'api'), ('hv/m3-foo', 'web')], keys
+for e in active:
+    if e['branch'] == 'hv/m3-foo':
+        assert e['items'] == ['M03-S01'], e
+        assert e.get('worktree') is None, e
+" || fail "hv-status-add-multi did not create one entry per (branch, repo)"
+pass "M03-T3: hv-status-add-multi creates one status entry per repo"
+
+# M03-T3: --worktrees pairs paths with repos by index
+rm -f "$UMB/.hv/status.json"
+(cd "$UMB" && "$BIN/hv-status-add-multi" --branch hv/m3-bar --items M03-S01 \
+  --repos "web, api" --worktrees "/tmp/wt-web, /tmp/wt-api")
+python3 -c "
+import json
+d = json.load(open('$UMB/.hv/status.json'))
+pairs = sorted((e['repo'], e['worktree']) for e in d['active'] if e['branch'] == 'hv/m3-bar')
+assert pairs == [('api', '/tmp/wt-api'), ('web', '/tmp/wt-web')], pairs
+" || fail "hv-status-add-multi worktree pairing wrong"
+pass "M03-T3: hv-status-add-multi pairs --worktrees with --repos by index"
+
+# M03-T3: mismatched --worktrees length is a usage error
+rm -f "$UMB/.hv/status.json"
+if (cd "$UMB" && "$BIN/hv-status-add-multi" --branch hv/m3-baz --items M03-S01 \
+     --repos "web, api" --worktrees "/tmp/only-one" 2>/dev/null); then
+  fail "hv-status-add-multi should reject mismatched --worktrees length"
+fi
+pass "M03-T3: hv-status-add-multi rejects mismatched --worktrees length"
+
+# M03-T3: unregistered repo name exits non-zero
+rm -f "$UMB/.hv/status.json"
+if (cd "$UMB" && "$BIN/hv-status-add-multi" --branch hv/m3-bad --items M03-S01 --repos "web, nonexistent" 2>/dev/null); then
+  fail "hv-status-add-multi should reject unregistered repos"
+fi
+pass "M03-T3: hv-status-add-multi rejects unregistered repos"
+
+# Cleanup status.json so it doesn't pollute later assertions
+rm -f "$UMB/.hv/status.json"
+
 # Single-repo backwards compat — existing fixtures must still pass.
 # This block runs in the parent $TMP (the original single-repo test fixture);
 # verify hv-resolve-umbrella still works there with no umbrella in scope.

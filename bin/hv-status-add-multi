@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Register one status entry per (branch, repo) for a multi-repo /hv-work wave.
+# Usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]
+#   --worktrees  Optional. Comma-separated paths paired by index with --repos.
+#                If given, length MUST equal --repos length.
+# Exits: 0 on success, 1 on usage/length mismatch, propagates errors from
+#        hv-resolve-repos and hv-status-add.
+set -euo pipefail
+IF_ABSENT=""
+BRANCH=""
+ITEMS=""
+REPOS=""
+WORKTREES=""
+while :; do
+  case "${1:-}" in
+    --if-absent) IF_ABSENT="--if-absent"; shift ;;
+    --branch) BRANCH="${2:?}"; shift 2 ;;
+    --items) ITEMS="${2:?}"; shift 2 ;;
+    --repos) REPOS="${2:?}"; shift 2 ;;
+    --worktrees) WORKTREES="${2:?}"; shift 2 ;;
+    *) break ;;
+  esac
+done
+[ -n "$BRANCH" ] && [ -n "$ITEMS" ] && [ -n "$REPOS" ] || {
+  echo "usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]" >&2
+  exit 1
+}
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Validate names before doing anything else.
+"$HERE/hv-resolve-repos" "$REPOS" >/dev/null || exit $?
+
+# Split CSVs in python so trim/empty-handling matches parse_repos_csv exactly.
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REPOS" "$WORKTREES" <<'PY' > "${TMPDIR:-/tmp}/hv-mam-pairs.$$"
+import sys
+from hvlib import parse_repos_csv
+repos = parse_repos_csv(sys.argv[1])
+raw_w = sys.argv[2]
+wt = [s.strip() for s in raw_w.split(",")] if raw_w else []
+if wt and len(wt) != len(repos):
+    sys.stderr.write(
+        f"--worktrees length ({len(wt)}) must match --repos length ({len(repos)})\n"
+    )
+    sys.exit(1)
+for i, name in enumerate(repos):
+    w = wt[i] if wt else ""
+    print(f"{name}\t{w}")
+PY
+
+PAIRS_FILE="${TMPDIR:-/tmp}/hv-mam-pairs.$$"
+trap 'rm -f "$PAIRS_FILE"' EXIT
+
+while IFS=$'\t' read -r REPO WORKTREE; do
+  if [ -n "$WORKTREE" ]; then
+    "$HERE/hv-status-add" $IF_ABSENT --repo "$REPO" "$BRANCH" "$ITEMS" "$WORKTREE"
+  else
+    "$HERE/hv-status-add" $IF_ABSENT --repo "$REPO" "$BRANCH" "$ITEMS"
+  fi
+done < "$PAIRS_FILE"
