@@ -1,13 +1,74 @@
 #!/usr/bin/env bash
 # Exit 0 if git working tree is clean, 1 if dirty, 2 if not a git repo.
+# Umbrella-aware: when invoked from an umbrella root (no local repo, but a
+# `.hv/` with `umbrella.enabled: true` and a `repos.json`), walks every
+# registered sub-repo and reports any that are dirty or missing.
 # Usage: hv-guard-clean [context]   # context is printed in the warning
 set -euo pipefail
 CTX="${1:-this command}"
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
+
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "error: uncommitted changes — stash (\`git stash\`) or commit before running $CTX" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+HV_DIR="$(pwd -P)/.hv"
+if [ ! -d "$HV_DIR" ]; then
   echo "error: not a git repository — $CTX requires git" >&2
   exit 2
 fi
-if [ -n "$(git status --porcelain)" ]; then
-  echo "error: uncommitted changes — stash (\`git stash\`) or commit before running $CTX" >&2
+
+UMBRELLA_ON="$(python3 - "$HV_DIR" <<'PY'
+import json, sys
+from pathlib import Path
+try:
+    cfg = json.loads((Path(sys.argv[1]) / "config.json").read_text())
+    print("yes" if cfg.get("umbrella", {}).get("enabled") else "no")
+except Exception:
+    print("no")
+PY
+)"
+if [ "$UMBRELLA_ON" != "yes" ]; then
+  echo "error: not a git repository — $CTX requires git" >&2
+  exit 2
+fi
+
+REPOS_JSON="$HV_DIR/repos.json"
+if [ ! -f "$REPOS_JSON" ]; then
+  echo "error: umbrella mode is on but $REPOS_JSON is missing — run /hv-init from the umbrella root" >&2
+  exit 2
+fi
+
+DIRTY="$(python3 - "$REPOS_JSON" <<'PY'
+import json, subprocess, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text())
+dirty = []
+for entry in data.get("repos", []) or []:
+    name = entry.get("name", "")
+    rel = entry.get("path", "")
+    if not name or not rel:
+        continue
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", rel, "status", "--porcelain"],
+            stderr=subprocess.DEVNULL,
+        ).decode()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        dirty.append(f"{name} (not a git repo at {rel})")
+        continue
+    if out.strip():
+        dirty.append(name)
+print("\n".join(dirty))
+PY
+)"
+
+if [ -n "$DIRTY" ]; then
+  echo "error: uncommitted changes in sub-repo(s) — stash or commit before running $CTX:" >&2
+  echo "$DIRTY" | sed 's/^/  /' >&2
   exit 1
 fi
+exit 0
