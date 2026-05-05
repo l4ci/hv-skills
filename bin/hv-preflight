@@ -48,18 +48,20 @@ fi
 
 # Auto-discover helpers from the source bin/ directory (the one currently being
 # checked, alongside this script). Strips the bin/ prefix and skips hv-preflight
-# itself — preflight verifies every other helper, not itself.
+# itself — preflight verifies every other helper, not itself. Source +x bit
+# decides the check mode: executables need -x in .hv/bin/, libraries (e.g.
+# hv-types.sh) only need -f.
 SRC_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HELPERS=()
+missing=()
 for src in "$SRC_BIN"/hv-*; do
   [ -e "$src" ] || continue
   name="${src##*/}"
   [ "$name" = "hv-preflight" ] && continue
-  HELPERS+=("$name")
-done
-missing=()
-for h in "${HELPERS[@]}"; do
-  [ -x "$HV/bin/$h" ] || missing+=("$h")
+  if [ -x "$src" ]; then
+    [ -x "$HV/bin/$name" ] || missing+=("$name")
+  else
+    [ -f "$HV/bin/$name" ] || missing+=("$name")
+  fi
 done
 [ -f "$HV/bin/hvlib.py" ] || missing+=("hvlib.py")
 if [ ${#missing[@]} -gt 0 ]; then
