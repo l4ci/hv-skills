@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.15.1 — 2026-05-05
+
+Umbrella-aware tooling fixes — hv-guard-clean / hv-spike-add now handle umbrella-cwd properly, and hv-preflight no longer false-positive-flags sourced shell libraries on every release run.
+
+## Fixed
+
+- treat sourced shell libs as files, not executables (hv-preflight) (`007a473`)
+- umbrella-aware tooling for hv-guard-clean and hv-spike-add (bin) (`322cc0d`)
+
+## Stats
+
+2 commits, 3 files changed, +100 −10 lines
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.15.0...v1.15.1
+
 ## v1.15.0 — 2026-05-03
 
 Multi-repo dispatch lands as one cohesive feature surface across 6 helpers and 4 skills, with `/hv-pause` now treating multi-repo waves as one logical handoff and a small refactor consolidating Repos: CSV validation.
