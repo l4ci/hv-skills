@@ -571,6 +571,16 @@ echo "$OUT" | grep -q '"features": 0' || fail "reset failed, features != 0: $OUT
 echo "$OUT" | grep -q '"bugs": 0' || fail "reset failed, bugs != 0: $OUT"
 pass "hv-refactor-reset zeros since_refactor"
 
+# Scoped refactor subjects (refactor(scope):) also count as refactor commits.
+cat >> .hv/TODO.md <<'EOF'
+- **[F42] Scoped refactor feature.**
+EOF
+echo "r2" > r2.txt && git add r2.txt && git commit -q -m "refactor(hosts): consolidate"
+"$BIN/hv-complete" F42
+OUT=$("$BIN/hv-refactor-age")
+echo "$OUT" | grep -q '"features": 0' || fail "scoped refactor(scope): subject bumped counter, got: $OUT"
+pass "hv-complete recognises scoped refactor(scope): subjects"
+
 echo "hv-merge / hv-pr"
 # Check syntactic integrity — they should error cleanly without stdin input
 if echo "" | "$BIN/hv-merge" hv/real-branch 2>/dev/null; then
