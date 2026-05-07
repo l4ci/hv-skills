@@ -57,14 +57,31 @@ def read(p):
 
 corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
 
-def title_for(iid):
-    result = find_origin_bullet(corpus, iid)
-    return result[1] if result else None
+bullets = {iid: find_origin_bullet(corpus, iid) for iid in ordered}
 
 print("## Items resolved")
 print()
 for iid in ordered:
-    title = title_for(iid)
+    result = bullets[iid]
+    title = result[1] if result else None
     print(f"- [{iid}] {title}" if title else f"- [{iid}]")
 print()
+
+gh_re = re.compile(r"GH:\s*#(\d+)")
+gh_seen, gh_ordered = set(), []
+for iid in ordered:
+    result = bullets[iid]
+    if not result:
+        continue
+    line = result[0]
+    for match in gh_re.finditer(line):
+        num = match.group(1)
+        if num not in gh_seen:
+            gh_seen.add(num)
+            gh_ordered.append(num)
+
+if gh_ordered:
+    for num in gh_ordered:
+        print(f"Closes #{num}")
+    print()
 PY
