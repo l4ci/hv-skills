@@ -7,6 +7,8 @@
 # Prints the full plan key on stdout (e.g. "M01-S03" or "M01-B07").
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 REPO=""
 while :; do
   case "${1:-}" in

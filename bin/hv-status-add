@@ -5,6 +5,8 @@
 #   --repo       Tag entry with sub-repo name for umbrella mode; uniqueness becomes (branch, repo).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 IF_ABSENT=0
 REPO=""
 while :; do

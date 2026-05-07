@@ -3,6 +3,8 @@
 # Usage: hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 SECTION="${1:?usage: hv-append <section> <entry>}"
 ENTRY="${2:?usage: hv-append <section> <entry>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SECTION" "$ENTRY" <<'PY'
