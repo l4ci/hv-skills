@@ -46,7 +46,7 @@ kind_key = {"B": "bugs", "F": "features"}.get(id_s[:1])
 if kind_key:
     subj = subprocess.run(["git", "log", "-1", "--format=%s", hash_s],
                           capture_output=True, text=True)
-    if not (subj.returncode == 0 and subj.stdout.startswith("refactor:")):
+    if not (subj.returncode == 0 and re.match(r"^refactor[(:]", subj.stdout)):
         def bump(d):
             sr = d.setdefault("since_refactor", {"features": 0, "bugs": 0})
             sr[kind_key] = sr.get(kind_key, 0) + 1
