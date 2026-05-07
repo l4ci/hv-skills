@@ -621,6 +621,103 @@ pass "ship-body emits Summary + Items resolved with resolved titles"
 if "$BIN/hv-ship-body" main 2>/dev/null; then fail "ship-body should reject main (no commits vs base)"; fi
 pass "ship-body errors when base has no commits"
 
+# ship-body emits Closes #N for GH refs in resolved item bullets
+git checkout -q main
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B71] [P1] Has GH ref.** Something. GH: #42~~ Done 2026-04-18 [`ccc3333`]
+- ~~**[F71] [Minor] No GH ref.** Plain.~~ Done 2026-04-18 [`ddd4444`]
+EOF
+git add -A && git commit -q -m "seed gh-closes test" || true
+git checkout -q -b hv/ship-gh-closes
+echo g1 > g1.txt && git add g1.txt && git commit -q -m "fix: thing [B71]"
+echo g2 > g2.txt && git add g2.txt && git commit -q -m "feat: thing [F71]"
+git checkout -q main
+BODY=$("$BIN/hv-ship-body" hv/ship-gh-closes)
+echo "$BODY" | grep -q "^Closes #42$" || fail "ship-body missing Closes #42 line: $BODY"
+GH_LINES=$(echo "$BODY" | grep -c "^Closes #" || true)
+[ "$GH_LINES" = "1" ] || fail "ship-body expected 1 Closes line, got $GH_LINES: $BODY"
+pass "ship-body emits Closes #N from GH refs in TODO bullets"
+git checkout -q main
+git branch -D hv/ship-gh-closes >/dev/null 2>&1 || true
+rm -f g1.txt g2.txt
+
+# Negative case: no GH refs anywhere → no Closes lines.
+git checkout -q main
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B72] [P1] No ref.** Plain.~~ Done 2026-04-18 [`eee5555`]
+EOF
+git add -A && git commit -q -m "seed gh-closes negative" || true
+git checkout -q -b hv/ship-gh-noclose
+echo g3 > g3.txt && git add g3.txt && git commit -q -m "fix: thing [B72]"
+git checkout -q main
+BODY=$("$BIN/hv-ship-body" hv/ship-gh-noclose)
+if echo "$BODY" | grep -q "^Closes #"; then fail "ship-body emitted Closes line with no GH refs: $BODY"; fi
+pass "ship-body emits no Closes lines when no GH refs present"
+git checkout -q main
+git branch -D hv/ship-gh-noclose >/dev/null 2>&1 || true
+rm -f g3.txt
+
+# Dedup: two commits referencing the same ID emit a single Closes #N line.
+git checkout -q main
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B73] [P1] Has GH ref.** Something. GH: #99~~ Done 2026-04-18 [`fff6666`]
+EOF
+git add -A && git commit -q -m "seed gh-closes dedup" || true
+git checkout -q -b hv/ship-gh-dedup
+echo g4 > g4.txt && git add g4.txt && git commit -q -m "fix: thing one [B73]"
+echo g5 > g5.txt && git add g5.txt && git commit -q -m "fix: thing two [B73]"
+git checkout -q main
+BODY=$("$BIN/hv-ship-body" hv/ship-gh-dedup)
+DEDUP_LINES=$(echo "$BODY" | grep -c "^Closes #99$" || true)
+[ "$DEDUP_LINES" = "1" ] || fail "ship-body expected 1 Closes #99 line (dedup), got $DEDUP_LINES: $BODY"
+pass "ship-body dedups Closes #N across multiple commits referencing same ID"
+git checkout -q main
+git branch -D hv/ship-gh-dedup >/dev/null 2>&1 || true
+rm -f g4.txt g5.txt
+
+# Restore demo TODO state for downstream review-scope tests
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B70] [P1] Ship demo bug.** Broken badge.~~ Done 2026-04-18 [`aaa1111`]
+- ~~**[F70] [Minor] Ship demo feature.** Overlay.~~ Done 2026-04-18 [`bbb2222`]
+EOF
+git add -A && git commit -q -m "restore ship demo TODO" || true
+
 echo "hv-review-scope"
 OUT=$("$BIN/hv-review-scope" hv/ship-demo)
 echo "$OUT" | grep -q '"commitCount": 2' || fail "review-scope commitCount != 2: $OUT"
