@@ -344,6 +344,58 @@ echo "$OUTPUT" | grep -q '"branch": "hv/real-branch"' || fail "real branch not i
 echo "$OUTPUT" | grep -q '"hasCommits": true' || fail "hasCommits should be true"
 pass "reconcile reports real branch with commits"
 
+# todoDrift field is always present (empty when no drift)
+echo "$OUTPUT" | grep -q '"todoDrift"' || fail "reconcile output missing todoDrift field"
+pass "reconcile emits todoDrift field"
+
+echo "hv-todo-drift"
+TD_TMP="$(mktemp -d)"
+(
+  cd "$TD_TMP"
+  mkdir -p .hv/bin
+  cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B07] [P1] Pretend bug.** Desc.
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+  echo '{"repos": []}' > .hv/repos.json
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  git commit -q --allow-empty -m "fix: do thing [B07]"
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  OUT=$(.hv/bin/hv-todo-drift)
+  echo "$OUT" | grep -q '"id": "B07"' || fail "drift missing B07: $OUT"
+  pass "hv-todo-drift detects shipped-but-open ID"
+
+  # Completed (strikethrough) IDs are NOT drift — even if they appear in commits.
+  cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B07] [P1] Pretend bug.**~~ Done 2026-05-07 [`abc1234`]
+EOF
+  OUT2=$(.hv/bin/hv-todo-drift)
+  if echo "$OUT2" | grep -q '"id": "B07"'; then
+    fail "drift should not flag completed B07: $OUT2"
+  fi
+  pass "hv-todo-drift ignores completed IDs"
+)
+rm -rf "$TD_TMP"
+
 echo "hv-knowledge-query"
 cat > .hv/KNOWLEDGE.md <<'EOF'
 # Knowledge

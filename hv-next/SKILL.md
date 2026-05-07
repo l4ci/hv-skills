@@ -31,10 +31,13 @@ See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit 
 .hv/bin/hv-reconcile
 ```
 
-Validates `status.json` against git, auto-cleans stale entries (dead branches), nulls missing worktree paths, and emits JSON with two arrays:
+Validates `status.json` against git, auto-cleans stale entries (dead branches), nulls missing worktree paths, and emits JSON with three arrays:
 
 - `cleaned` — removed silently. No output needed.
 - `needsAction` — branch still exists. Fields: `branch`, `items`, `worktree`, `startedAt`, `hasCommits`, `commitCount`, `worktreeMissing`.
+- `todoDrift` — IDs that shipped in a commit subject but are still listed as open in TODO.md. Each entry: `id` and `commits[]` (each with `repo`, `hash`, `subject`).
+
+When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in TODO.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
 
 If `needsAction` is empty, produce no output and continue. Otherwise, use the `AskUserQuestion` tool so the user can resolve each stream with the host's native question UI. Batch up to 4 streams into one `AskUserQuestion` call; if there are more than 4, present the rest in a second call after the first resolves.
 

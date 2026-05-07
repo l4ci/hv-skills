@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Detect TODO.md drift from commit history. Walk `git log` per registered
+# sub-repo (or current cwd in single-repo mode), extract [B##]/[F##]/[T##]
+# tags from commit subjects, and flag IDs that appear in commits but are
+# still listed as open in .hv/TODO.md.
+#
+# Output: JSON to stdout — { "drift": [ { "id": "B07",
+#   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ] }
+# Empty array if no drift. Silent on missing TODO.md (exit 0, empty drift).
+# Usage: hv-todo-drift
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+export HERE
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json, os, re, subprocess, sys
+from pathlib import Path
+from hvlib import find_section, load_repos
+
+todo_path = Path(".hv/TODO.md")
+if not todo_path.exists():
+    print(json.dumps({"drift": []}))
+    sys.exit(0)
+
+content = todo_path.read_text()
+
+# Collect IDs that are still OPEN — bullets under ## Bugs / ## Features /
+# ## Tasks that match `- **[ID] ...` (no leading `~~` strikethrough). Items
+# under ## Completed are excluded by section selection.
+open_ids: set[str] = set()
+bullet = re.compile(r"^- \*\*\[([BFT]\d+)\]", re.MULTILINE)
+for section_name in ("Bugs", "Features", "Tasks"):
+    span = find_section(content, section_name)
+    if span is None:
+        continue
+    body = content[span[0]:span[1]]
+    for m in bullet.finditer(body):
+        open_ids.add(m.group(1))
+
+if not open_ids:
+    print(json.dumps({"drift": []}))
+    sys.exit(0)
+
+# Determine repo set: registered sub-repos in umbrella mode, else cwd-only.
+repos = load_repos()
+if repos:
+    targets = list(repos.items())  # [(name, abs-path), ...]
+else:
+    targets = [("", None)]  # single-repo mode — git -C None == default cwd
+
+tag_re = re.compile(r"\[([BFT]\d+)\]")
+
+# id -> list of commits in walk order (newest first from git log; we reverse later)
+hits: dict[str, list[dict]] = {}
+
+for name, path in targets:
+    cmd = ["git"]
+    if path is not None:
+        cmd += ["-C", path]
+    cmd += ["log", "--pretty=%H%x09%s"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        continue
+    for line in r.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        full_hash, subject = line.split("\t", 1)
+        ids_in_subject = set(tag_re.findall(subject))
+        for iid in ids_in_subject:
+            if iid not in open_ids:
+                continue
+            hits.setdefault(iid, []).append({
+                "repo": name,
+                "hash": full_hash[:7],
+                "subject": subject,
+            })
+
+# Build sorted output: IDs ascending, commits chronological (oldest first).
+drift = []
+for iid in sorted(hits.keys()):
+    drift.append({"id": iid, "commits": list(reversed(hits[iid]))})
+
+print(json.dumps({"drift": drift}, indent=2))
+PY
