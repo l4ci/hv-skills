@@ -5,6 +5,8 @@
 set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys

@@ -2,4 +2,7 @@
 # Regenerate the managed <!-- hv-decisions-start --> block in CLAUDE.md from .hv/DECISIONS.md topics.
 # Usage: hv-decisions-index
 set -euo pipefail
-exec "$(dirname "$0")/hv-managed-block" decisions
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+exec "$HERE/hv-managed-block" decisions

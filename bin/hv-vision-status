@@ -11,6 +11,8 @@ if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
     exit 1
 fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
 import os, re, sys
 from pathlib import Path

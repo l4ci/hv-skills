@@ -8,6 +8,8 @@
 # Usage: hv-complete <ID> [commit-hash]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 ID="${1:?usage: hv-complete <ID> [commit-hash]}"
 HASH="${2:-$(git log --oneline -1 --format='%h' 2>/dev/null || echo unknown)}"
 DATE=$(date +%Y-%m-%d)

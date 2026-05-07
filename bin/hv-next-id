@@ -3,6 +3,8 @@
 # Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
   bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;

@@ -5,6 +5,8 @@
 #          entries (repo: null/missing) are removed; umbrella entries are preserved.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 REPO=""
 if [ "${1:-}" = "--repo" ]; then REPO="${2:-}"; shift 2; fi
 BRANCH="${1:?usage: hv-status-remove [--repo <name>] <branch>}"

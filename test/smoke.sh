@@ -1410,6 +1410,7 @@ pass "hv-worktree-clear silently exits on missing branch; removes non-main workt
 MB_TMP="$(mktemp -d)"
 (
   cd "$MB_TMP"
+  mkdir -p .hv
   git init -q && git config user.email t@t && git config user.name t
   OUT=$("$BIN/hv-managed-block" knowledge)
   [ "$OUT" = "created" ] || { echo "FAIL: expected 'created', got '$OUT'"; exit 1; }
@@ -1436,6 +1437,7 @@ pass "hv-managed-block knowledge: creates, updates, and migrates legacy markers"
 BS_TMP="$(mktemp -d)"
 (
   cd "$BS_TMP"
+  mkdir -p .hv
   CUSTOM_BODY="## Project Decisions
 
 Custom intro.
@@ -2680,5 +2682,38 @@ HAS_CODE=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.std
 pass "hv-refactor-targets ignores standard scaffolding (.gitignore) when computing hasCode"
 
 cd ..
+
+echo "F10 self-locate: helpers work from a sub-cwd"
+# Install helpers at production-like .hv/bin/ so walk-up from BASH_SOURCE
+# lands on the test umbrella's .hv/, not the dev tree's .hv/.
+mkdir -p .hv/bin
+cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+mkdir -p subdir
+BEFORE_BUGS=$(python3 -c 'import json; print(json.load(open(".hv/counters.json"))["bugs"])')
+(
+  cd subdir
+  ID=$(../.hv/bin/hv-next-id bugs)
+  [ -n "$ID" ] || { echo "FAIL: hv-next-id from subdir produced empty"; exit 1; }
+  # The new ID lands in the umbrella's counters.json, not the subdir's.
+  [ ! -f .hv/counters.json ] || { echo "FAIL: hv-next-id created subdir/.hv/"; exit 1; }
+)
+[ -f .hv/counters.json ] || fail "self-locate: umbrella counters.json missing"
+AFTER_BUGS=$(python3 -c 'import json; print(json.load(open(".hv/counters.json"))["bugs"])')
+[ "$AFTER_BUGS" -gt "$BEFORE_BUGS" ] || fail "self-locate: umbrella counters.json bugs did not increment ($BEFORE_BUGS -> $AFTER_BUGS)"
+pass "hv-next-id self-locates from sub-cwd"
+
+(
+  cd subdir
+  ../.hv/bin/hv-summary >/dev/null
+)
+pass "hv-summary self-locates from sub-cwd"
+
+(
+  cd subdir
+  ../.hv/bin/hv-backlog >/dev/null
+)
+pass "hv-backlog self-locates from sub-cwd"
+
+rm -rf subdir .hv/bin
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

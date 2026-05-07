@@ -6,6 +6,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-types.sh"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 MID="${1:?usage: hv-todo-by-milestone <MID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
 import os, re, sys
