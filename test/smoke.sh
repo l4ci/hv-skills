@@ -2874,7 +2874,7 @@ EOF
 )
 rm -rf "$HI_TMP"
 
-echo "hv-issue-suggest --repo override"
+echo "hv-issue-suggest --upstream-repo override"
 HI2_TMP="$(mktemp -d)"
 (
   cd "$HI2_TMP"
@@ -2886,10 +2886,10 @@ exit 7
 EOF
   chmod +x stub-bin/gh
   set +e
-  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "x" --repo "fork/repo" <<<"y" 2>&1)
+  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "x" --upstream-repo "fork/repo" <<<"y" 2>&1)
   set -e
-  echo "$OUT" | grep -q "github.com/fork/repo" || fail "--repo override ignored: $OUT"
-  pass "hv-issue-suggest --repo override flows through to manual fallback URL"
+  echo "$OUT" | grep -q "github.com/fork/repo" || fail "--upstream-repo override ignored: $OUT"
+  pass "hv-issue-suggest --upstream-repo override flows through to manual fallback URL"
 )
 rm -rf "$HI2_TMP"
 

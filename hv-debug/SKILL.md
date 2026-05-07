@@ -189,13 +189,25 @@ Fix [B##]: <title>.
 - Preserve behavior for callers not affected by the bug.
 - Read the file before editing.
 
-**Commit with message:**
-fix: <short imperative> [B##]
+**Do NOT run `git add` or `git commit`.** Write the change to files only — orchestrator commits in Step 8.5.
+
+**Suggested commit message:** fix: <short imperative> [B##]
 
 <optional body with the root cause in 1-2 sentences>
 ```
 
-The worker reads, edits, stages, and commits in one pass. Standard `/hv-work` rules apply.
+The worker reads and edits in one pass. Orchestrator stages and commits in Step 8.5 — same write-only pattern as `/hv-work` Step 6 (default since F11). Hv-debug is single-worker by design, so the file-disjointness and parallel-commit concerns from `/hv-work` don't apply, but using one shared pattern keeps brief templates consistent across skills.
+
+## Step 8.5 — Commit (orchestrator)
+
+Stage exactly the files named in the worker's brief and commit with the suggested message:
+
+```bash
+git add <files-from-brief>
+git commit -m "fix: <short imperative> [B##]"
+```
+
+One commit for the bug. Don't `git add -A` — sweep risk if any sibling artifacts crept in. If the toolchain produced legitimate sibling files (e.g. Godot `.gd.uid`), follow the same sweep pattern as `/hv-work` Step 8.5: a separate `chore:` commit, not the same atomic unit as the fix.
 
 ## Step 9 — Verify the Fix
 
