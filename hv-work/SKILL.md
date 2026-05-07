@@ -36,7 +36,7 @@ Read `.hv/config.json`:
 ## Flow
 
 ```
-Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → Verify → TODO → Merge/PR → Status
+Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → Verify → Commit → TODO → Merge/PR → Status
 ```
 
 ## Step 1 — Preflight & Guard
@@ -207,6 +207,8 @@ Choose a descriptive name (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
 
 ### Isolation guard (fires before any worker dispatch)
 
+Under the default introduced in F11, workers write files only and the orchestrator commits per task in Step 7.5 — the index race the guard exists to prevent cannot occur because workers never touch `.git/`. The guard remains as defense-in-depth: it fires only when a brief explicitly asks workers to commit (the legacy / opt-in pattern below) and ≥2 such workers run in parallel under branch isolation.
+
 Before any worker is dispatched, if the planned wave has **≥2 commit-producing parallel workers** AND `work.isolation == "branch"`, **abort fatally**:
 
 > Error: this wave plans to dispatch <N> parallel workers (<task IDs>) under branch isolation. The 2026-05-02 isolation decision in `.hv/DECISIONS.md` requires `work.isolation: "worktree"` for ≥2 parallel commit-producing workers in a single wave — branch isolation forces all workers to share `.git/index`, which races even on disjoint files.
@@ -269,7 +271,7 @@ The worktree path lives at `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layou
 
 Orchestrator stays in the umbrella worktree (retains `.hv/` access). Workers get the absolute Layout B path in their briefs and work there.
 
-## Step 6 — Dispatch Parallel Worker Agents
+## Step 6 — Dispatch Worker Agents
 
 For each independent task, dispatch a subagent with the **worker** model:
 
@@ -296,35 +298,68 @@ You are implementing Task N of [total].
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]
 
-**Commit with message:**
-[exact commit message to use]
+**Do NOT run `git add` or `git commit`.** Write changes to files only. The orchestrator owns the commit phase (Step 7.5) — your job is to leave a clean working-tree diff matching the brief.
+
+**Suggested commit message:** [exact commit message — orchestrator uses this in Step 7.5]
+
+**On completion:** report the list of files you modified, plus any tool-generated siblings the toolchain produced, and confirm you did not stage or commit.
 ```
 
 **Umbrella mode notes:** when umbrella mode is on, the `[UMBRELLA: ...]` line replaces the WORKTREE line if the wave uses branch isolation; both lines appear together if the wave uses Layout B worktrees. The sub-repo path is the absolute path resolved via `.hv/repos.json` (single-repo callers ignore both lines). Workers MUST `cd` to the named directory before any `git` command — the orchestrator stays at the umbrella for `.hv/` access, so worker commands run in the umbrella's cwd by default and would target the wrong `.git/`.
 
 **Multi-repo dispatch:** for a wave with `<N>` sub-repos in its resolved set, dispatch one worker per sub-repo, each with the sub-repo's name and absolute path in its `[UMBRELLA: ...]` line. Workers run in parallel — each repo has its own `.git/index`, so cross-repo parallelism doesn't trip the parallel-waves-require-worktree-isolation guard (which fires only when ≥2 workers share one `.git/`). Each worker's brief lists only the files in its own sub-repo; the orchestrator verifies each repo's commit independently in Step 7.
 
-Rules for briefs: exact paths + line numbers; show the pattern to follow; name the commit message (agents commit themselves); read-first, minimal-diff, no unrelated changes.
+Rules for briefs: exact paths + line numbers; show the pattern to follow; name the suggested commit message; read-first, minimal-diff, no unrelated changes; workers do NOT stage or commit.
 
-Launch all independent agents in one message (parallel tool calls). Don't announce — just do it.
+Launch all independent agents in one message (parallel tool calls) — write-only workers don't race on `.git/index`, so this is safe under any isolation mode. Don't announce — just do it.
+
+### Alternative: legacy worker-commits (opt-in)
+
+When a wave touches files that overlap and write-only would racing on disk (rare — usually a planning failure that should be re-decomposed), or when an out-of-band tool requires a commit between worker steps, fall back to the legacy pattern: workers stage and commit themselves. Under this pattern:
+
+- **Single worker per wave under `work.isolation: "branch"`.** Multiple workers committing to the same `.git/index` is forbidden by the [decisions / Skill Authoring / Parallel waves require worktree isolation] rule. Either re-plan as N sequential single-worker waves on a shared branch (the M02 multi-feature pattern), or flip `work.isolation` to `"worktree"` so each worker has its own index.
+- **Brief includes `**Commit with message:** [exact text]`** — workers stage their own files and commit, one commit per task. Skip Step 7.5 (orchestrator-side commit) on this path.
+
+This path is documented for completeness; the default write-only pattern above is preferred for new work.
 
 ## Step 7 — Verify Each Completion
 
 Orchestrator verifies internally (don't narrate):
 
-1. Commit exists: `git log --oneline -1`
-2. Read modified files — changes match the brief
-3. Structural checks: grep for expected patterns, no regressions
+1. Inspect pending changes: `git status --porcelain` then `git diff` for the files the worker reported. (Legacy path: `git log --oneline -1` if the worker committed.)
+2. Read modified files — changes match the brief.
+3. Structural checks: grep for expected patterns, no regressions.
 
 **When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
 
 **PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
+## Step 7.5 — Commit per Task (orchestrator)
+
+Under the default write-only pattern, the orchestrator commits each verified task. One commit per task, sequential, in the order the tasks were dispatched.
+
+```bash
+git add <task-N-files>
+git commit -m "<suggested-message-from-task-N-brief>"
+```
+
+Rules:
+
+- **Stage exactly the files named in that task's brief.** No `git add -A`, no `git add .` — sweeping in another worker's changes breaks atomicity.
+- **One commit per task.** Even when two tasks share a wave, they get separate commits.
+- **Suggested commit message is the brief's `**Suggested commit message:**` line verbatim.** If verification surfaced a meaningful adjustment (e.g., a fix-up after a FAIL→re-dispatch loop), edit the message to reflect what landed.
+- **Worktree isolation.** Run from the worktree path — the orchestrator's cwd is the umbrella, but the commit must happen against the worktree's index. Use `git -C <worktree-path>` or change directory before staging.
+- **Umbrella / multi-repo.** Run each task's commit inside its target sub-repo (`git -C <umbrella>/<repo>` or `cd <repo>`). The orchestrator stays at the umbrella; each commit lands in the right `.git/`.
+
+**Skip this step entirely** when the wave used the legacy worker-commits path (Step 6 alternative) — workers already committed.
+
 ## Step 8 — Sequential Waves
 
-For dependent tasks: wait for wave 1 to complete and verify, then dispatch wave 2 with updated context. Same verification.
+For dependent tasks: wait for wave 1 to complete and verify, then dispatch wave 2 with updated context. Same verification. Wave 2 dispatches see a clean working tree because Step 7.5 already committed wave 1's tasks.
 
 ## Step 8.5 — Sweep Tool-Generated Siblings
+
+> Run AFTER Step 7.5 has committed each task — siblings get a `chore:` commit of their own, separate from the task commits.
 
 Workers create source files without triggering the toolchain, so sibling artifacts (Step 1 patterns) end up untracked. Sweep them now or the next `/hv-work` guard will refuse on a dirty tree:
 
@@ -450,4 +485,4 @@ Loop stops naturally when:
 - **Orchestrator plans and verifies; worker executes.** Never dispatch without a clear brief. Never trust completion without reading the result.
 - **Orchestrator owns `.hv/` state.** Only the orchestrator touches `status.json` and `TODO.md`. Workers focus on implementation.
 - **Isolation protects main.** Branch or worktree — never work directly on main.
-- **One commit per task.** Clean history, easy revert granularity.
+- **One commit per task, owned by the orchestrator.** Workers write files; the orchestrator commits per task. Clean history, easy revert granularity, no `.git/index` races.
