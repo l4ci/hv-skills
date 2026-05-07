@@ -9,15 +9,36 @@ case "$TYPE" in
   *) echo "error: unknown type '$TYPE'" >&2; exit 1 ;;
 esac
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TYPE" "$P" <<'PY'
+import re
 import sys
 from pathlib import Path
 from hvlib import update_json
+
 key, prefix = sys.argv[1], sys.argv[2]
-path = Path(".hv/counters.json")
+counters_path = Path(".hv/counters.json")
+
+def observed_max(prefix: str) -> int:
+    pat = re.compile(rf"\[{prefix}(\d+)\]")
+    highest = 0
+    for fname in (".hv/TODO.md", ".hv/ARCHIVE.md"):
+        p = Path(fname)
+        if not p.exists():
+            continue
+        for m in pat.finditer(p.read_text()):
+            n = int(m.group(1))
+            if n > highest:
+                highest = n
+    return highest
+
+obs_max = observed_max(prefix)
+
 result = []
 def mutator(d):
-    d[key] = d.get(key, 0) + 1
-    result.append(d[key])
-update_json(path, {}, mutator)
+    current = d.get(key, 0)
+    next_id = max(current, obs_max) + 1
+    d[key] = next_id
+    result.append(next_id)
+
+update_json(counters_path, {}, mutator)
 print(f"{prefix}{result[0]:02d}")
 PY
