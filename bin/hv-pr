@@ -21,6 +21,22 @@ fi
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Umbrella-cwd guard: refuse if no local .git/ but cwd is an umbrella root.
+if [ -z "$REPO" ] && [ ! -d .git ] && [ -d .hv ]; then
+  IS_UMBRELLA=$(python3 -c "
+import json
+try:
+    cfg = json.load(open('.hv/config.json'))
+    print('yes' if cfg.get('umbrella', {}).get('enabled') else 'no')
+except Exception:
+    print('no')
+" 2>/dev/null || echo "no")
+  if [ "$IS_UMBRELLA" = "yes" ]; then
+    echo "error: hv-pr from the umbrella root requires --repo <name> — pass the sub-repo whose branch should be PR'd" >&2
+    exit 1
+  fi
+fi
+
 resolve_repo_path() {
   local name="$1"
   PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$name" <<'PY'
