@@ -256,6 +256,8 @@ Branch on `autonomy.level`:
 - `"off"` — nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
+If the bug was rooted in hv-skills behavior (touched `bin/hv-*`, `hv-*/SKILL.md`, or `.hv/`), `/hv-learn`'s Step 8.5 will offer to file an upstream issue against `l4ci/hv-skills`.
+
 ## Step 12.5 — Decide (Nudge Only)
 
 If the fix codified a constraint (e.g., "never use timer-X here", "this surface only goes through controller-Y"), surface a one-liner. **Always nudge — never auto-invoke**, regardless of `autonomy.level`. Skip trivial fixes (single-line edit, obvious typo). Don't repeat in the session.

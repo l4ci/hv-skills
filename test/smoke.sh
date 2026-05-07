@@ -2849,4 +2849,48 @@ UMB_TMP="$(mktemp -d)"
 rm -rf "$UMB_TMP"
 pass "B02 umbrella-cwd guards: 6 helpers refuse cleanly or operate correctly"
 
+echo "hv-issue-suggest manual fallback when gh unavailable"
+HI_TMP="$(mktemp -d)"
+(
+  cd "$HI_TMP"
+  mkdir -p .hv/bin stub-bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  # Stub `gh` to a script that always fails so the helper takes the manual-fallback path,
+  # even on a host where the real gh is installed and authed.
+  cat > stub-bin/gh <<'EOF'
+#!/bin/sh
+exit 7
+EOF
+  chmod +x stub-bin/gh
+  set +e
+  OUT=$(PATH="$HI_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "test title" <<<"test body" 2>&1)
+  RC=$?
+  set -e
+  [ "$RC" = "1" ] || fail "expected exit 1 when gh fails: rc=$RC"
+  echo "$OUT" | grep -q "test title" || fail "manual fallback missing title: $OUT"
+  echo "$OUT" | grep -q "test body" || fail "manual fallback missing body: $OUT"
+  echo "$OUT" | grep -q "github.com/l4ci/hv-skills" || fail "manual fallback missing repo URL: $OUT"
+  pass "hv-issue-suggest prints manual fallback when gh unavailable"
+)
+rm -rf "$HI_TMP"
+
+echo "hv-issue-suggest --repo override"
+HI2_TMP="$(mktemp -d)"
+(
+  cd "$HI2_TMP"
+  mkdir -p .hv/bin stub-bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  cat > stub-bin/gh <<'EOF'
+#!/bin/sh
+exit 7
+EOF
+  chmod +x stub-bin/gh
+  set +e
+  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "x" --repo "fork/repo" <<<"y" 2>&1)
+  set -e
+  echo "$OUT" | grep -q "github.com/fork/repo" || fail "--repo override ignored: $OUT"
+  pass "hv-issue-suggest --repo override flows through to manual fallback URL"
+)
+rm -rf "$HI2_TMP"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
