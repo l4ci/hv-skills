@@ -23,6 +23,21 @@ while True:
         break
     d = d.parent
 " 2>/dev/null || true)
+# Umbrella-cwd guard: no local .git/, but .hv/ with umbrella.enabled: true.
+if [ -z "$CONFIGURED" ] && [ ! -d .git ] && [ -d .hv ]; then
+  IS_UMBRELLA=$(python3 -c "
+import json
+try:
+    cfg = json.load(open('.hv/config.json'))
+    print('yes' if cfg.get('umbrella', {}).get('enabled') else 'no')
+except Exception:
+    print('no')
+" 2>/dev/null || echo "no")
+  if [ "$IS_UMBRELLA" = "yes" ]; then
+    echo "error: hv-base-branch from the umbrella root has no base — invoke with cwd inside a sub-repo (e.g. \`git -C <repo>\`)" >&2
+    exit 1
+  fi
+fi
 if [ -n "$CONFIGURED" ] && git rev-parse --verify "$CONFIGURED" >/dev/null 2>&1; then
   echo "$CONFIGURED"
   exit 0
