@@ -68,6 +68,53 @@ echo "$COUNTERS" | grep -q '"features": 1' || fail "counters.features != 1: $COU
 echo "$COUNTERS" | grep -q '"milestones": 1' || fail "counters.milestones != 1: $COUNTERS"
 pass "counters persisted"
 
+# Self-heal: counter=2, but TODO has [B07] → next mint should be B08, not B03.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B07] [P1] Imported bug.** Desc.
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+ID5=$("$BIN/hv-next-id" bugs)
+[ "$ID5" = "B08" ] || fail "self-heal: expected B08 (max(2,7)+1), got $ID5"
+pass "hv-next-id self-heals when TODO has higher IDs than counter"
+
+# Self-heal: ARCHIVE.md is also scanned.
+cat > .hv/ARCHIVE.md <<'EOF'
+# Archive
+
+- ~~**[B15] [P1] Old bug.** Desc.~~ Done 2026-01-01 [`abc1234`]
+EOF
+ID6=$("$BIN/hv-next-id" bugs)
+[ "$ID6" = "B16" ] || fail "self-heal: expected B16 (ARCHIVE max=15), got $ID6"
+pass "hv-next-id scans ARCHIVE.md for self-heal"
+
+# Self-heal is per-prefix: features counter is unaffected by bugs traffic.
+ID7=$("$BIN/hv-next-id" features)
+[ "$ID7" = "F02" ] || fail "self-heal per-prefix: expected F02 (features counter still=1), got $ID7"
+pass "hv-next-id self-heal is per-prefix"
+
+# Reset state for downstream tests that expect a clean slate.
+rm -f .hv/ARCHIVE.md
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
+
 echo "hv-append"
 "$BIN/hv-append" "## Bugs" "- **[B01] [P1] First bug.** Desc."
 grep -q "\[B01\] \[P1\] First bug" .hv/TODO.md || fail "B01 not found in TODO.md"
