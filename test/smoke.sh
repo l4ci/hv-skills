@@ -416,6 +416,49 @@ echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
 echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
 pass "knowledge-query returns only requested topics"
 
+echo "hv-knowledge-stats"
+KS_TMP="$(mktemp -d)"
+(
+  cd "$KS_TMP"
+  mkdir -p .hv
+  cat > .hv/KNOWLEDGE.md <<'EOF'
+# Knowledge
+
+## Tiny
+
+- one bullet
+
+## Big
+
+EOF
+  # Append 30 bullets to ## Big so it crosses the threshold.
+  for i in $(seq 1 30); do echo "- bullet $i" >> .hv/KNOWLEDGE.md; done
+  mkdir -p .hv/bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  OUT=$(.hv/bin/hv-knowledge-stats)
+  echo "$OUT" | grep -q '"name": "Tiny"' || fail "stats missing Tiny: $OUT"
+  echo "$OUT" | grep -q '"name": "Big"' || fail "stats missing Big: $OUT"
+  BIG_BULLETS=$(echo "$OUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(t['bullets'] for t in d['topics'] if t['name']=='Big'))")
+  [ "$BIG_BULLETS" = "30" ] || fail "Big bullet count != 30: $BIG_BULLETS"
+  pass "hv-knowledge-stats counts bullets per topic"
+  TINY_BULLETS=$(echo "$OUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(t['bullets'] for t in d['topics'] if t['name']=='Tiny'))")
+  [ "$TINY_BULLETS" = "1" ] || fail "Tiny bullet count != 1: $TINY_BULLETS"
+  pass "hv-knowledge-stats handles tiny topics"
+)
+rm -rf "$KS_TMP"
+
+echo "hv-knowledge-stats no KNOWLEDGE.md"
+KS2_TMP="$(mktemp -d)"
+(
+  cd "$KS2_TMP"
+  mkdir -p .hv/bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  OUT=$(.hv/bin/hv-knowledge-stats)
+  echo "$OUT" | grep -q '"topics": \[\]' || fail "missing-file should yield empty: $OUT"
+  pass "hv-knowledge-stats silent-empty on missing KNOWLEDGE.md"
+)
+rm -rf "$KS2_TMP"
+
 echo "hv-decisions-query"
 cat > .hv/DECISIONS.md <<'EOF'
 # Decisions

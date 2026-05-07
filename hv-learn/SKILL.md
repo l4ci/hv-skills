@@ -54,6 +54,8 @@ Verification is **on by default**. Read `.hv/config.json` — if `learn.verify` 
 
 ## Step 5 — Merge into KNOWLEDGE.md
 
+Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`hv-knowledge-stats`-driven). It is informational only — the merge always proceeds.
+
 `.hv/KNOWLEDGE.md` is organized as:
 
 ```markdown
@@ -98,6 +100,14 @@ Captured 3 learnings into .hv/KNOWLEDGE.md:
 
 Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 ```
+
+**Topic-size nudge.** Run `.hv/bin/hv-knowledge-stats` and check the JSON. If any topic has `bullets >= 25` OR `bytes >= 10240`, append a single nudge line per offender to the confirm output:
+
+```
+Note: `<topic>` is large (<bullets> bullets, <bytes-as-KB-rounded-1dp> KB). Consider splitting it (e.g. `<topic>: <facet-A>` + `<topic>: <facet-B>`) to reduce per-query cost in /hv-work, /hv-debug, /hv-go, /hv-plan.
+```
+
+Format KB as `{bytes/1024:.1f}` (e.g. `9.8 KB` for 9876 bytes). Do not auto-split. Splitting is editorial; the user accepts or declines.
 
 If verification ran and passed, add a middle line: `Opus verification: PASS — all entries durable, sharp, correctly categorized.` If it returned `PASS_WITH_NOTES`, replace that line with a one-liner naming what was adjusted. If it failed, say so and stop.
 
