@@ -54,6 +54,8 @@ Verification is **on by default**. Read `.hv/config.json` — if `learn.verify` 
 
 ## Step 5 — Merge into KNOWLEDGE.md
 
+Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`hv-knowledge-stats`-driven). It is informational only — the merge always proceeds.
+
 `.hv/KNOWLEDGE.md` is organized as:
 
 ```markdown
@@ -99,7 +101,75 @@ Captured 3 learnings into .hv/KNOWLEDGE.md:
 Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 ```
 
+**Topic-size nudge.** Run `.hv/bin/hv-knowledge-stats` and check the JSON. If any topic has `bullets >= 25` OR `bytes >= 10240`, append a single nudge line per offender to the confirm output:
+
+```
+Note: `<topic>` is large (<bullets> bullets, <bytes-as-KB-rounded-1dp> KB). Consider splitting it (e.g. `<topic>: <facet-A>` + `<topic>: <facet-B>`) to reduce per-query cost in /hv-work, /hv-debug, /hv-go, /hv-plan.
+```
+
+Format KB as `{bytes/1024:.1f}` (e.g. `9.8 KB` for 9876 bytes). Do not auto-split. Splitting is editorial; the user accepts or declines.
+
 If verification ran and passed, add a middle line: `Opus verification: PASS — all entries durable, sharp, correctly categorized.` If it returned `PASS_WITH_NOTES`, replace that line with a one-liner naming what was adjusted. If it failed, say so and stop.
+
+## Step 8.5 — Suggest hv-skills issue (when applicable)
+
+This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing a public issue is high-stakes; the user presses the button.
+
+**Trigger heuristic.** Scan the just-captured bullets for any of:
+
+- A skill slash-command name: `/hv-init`, `/hv-config`, `/hv-capture`, `/hv-c`, `/hv-go`, `/hv-vision`, `/hv-next`, `/hv-status`, `/hv-resume`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-docs`, `/hv-refactor`, `/hv-update`, `/hv-release`.
+- A hv-skills helper path: `bin/hv-*` or `.hv/bin/hv-*` (regex `\b(?:\.hv/)?bin/hv-[a-z-]+`).
+- An `.hv/` artifact path: `.hv/TODO.md`, `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, `.hv/MILESTONES.md`, `.hv/status.json`, `.hv/config.json`, `.hv/handoff/`, `.hv/plans/`, `.hv/spikes/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`, `.hv/milestones/`.
+
+If no bullet matches any of those, skip the step silently.
+
+**Ask before filing.** When at least one bullet matches, use `AskUserQuestion`:
+
+- Header: `"Upstream"`
+- Question: *"This learning touches hv-skills behavior. File an issue on the hv-skills repo?"*
+- Options (single-select):
+  1. `"File a hv-skills issue (Recommended)"` — *"Pre-fill title + body and run `bin/hv-issue-suggest` to open the issue."*
+  2. `"Skip"` — *"No upstream issue; the local KNOWLEDGE bullet stands on its own."*
+
+Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
+
+**File the issue.** When the user picks "File":
+
+1. Compose title from the matching bullet's first sentence (truncate at the first period or 80 chars).
+2. Compose body — use this template, substituting in real values:
+   ```
+   ## What happened
+   <bullet text, verbatim>
+
+   ## Expected
+   <one-sentence inversion of the gotcha — what should have happened>
+
+   ## Context
+   - hv-skills version: <read from .claude-plugin/plugin.json or plugin.json — `"version": "X.Y.Z"`>
+   - Captured topic: <KNOWLEDGE.md topic name>
+   - Date: <today, YYYY-MM-DD>
+   ```
+3. Run the helper:
+   ```bash
+   printf '%s' "$BODY" | .hv/bin/hv-issue-suggest --title "$TITLE"
+   ```
+   - On exit 0 (gh available, issue filed): parse `url` and `number` from the JSON output.
+   - On exit 1 (manual fallback printed): show the helper's stdout to the user, then prompt once: *"Paste the issue number when you've filed it manually (or 'skip' to skip):"* Read the user's reply; if a number, use it; if "skip" or empty, abandon the tracking step.
+
+4. **Append the upstream marker to the bullet** in `.hv/KNOWLEDGE.md`. Use `Edit` to change the bullet's trailing comment from:
+   ```
+   - <bullet text> <!-- 2026-05-07 -->
+   ```
+   to:
+   ```
+   - <bullet text> <!-- 2026-05-07 --> Upstream: hv-skills#<N>
+   ```
+   Match the bullet exactly (including the date stamp) so the edit is unique.
+
+5. Add a final line to the Step 8 confirm output:
+   ```
+   Filed hv-skills#<N> for the <topic> bullet — https://github.com/l4ci/hv-skills/issues/<N>
+   ```
 
 ## Key Principles
 
