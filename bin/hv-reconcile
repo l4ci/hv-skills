@@ -5,7 +5,7 @@
 # Usage: hv-reconcile
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-HV_BASE="$("$HERE/hv-base-branch")"
+HV_BASE="$("$HERE/hv-base-branch" 2>/dev/null || echo "")"
 export HV_BASE HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
