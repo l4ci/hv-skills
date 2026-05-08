@@ -1,6 +1,6 @@
 ---
 name: hv-decide
-description: Capture a hard-boundary decision into .hv/DECISIONS.md — manually confirmed, never auto-invoked. Decisions differ from learnings in KNOWLEDGE.md by being active commitments with explicit forbids/permits. Use on "decide on X", "we're committing to X", "lock in the boundary that Y", or when a session has produced a constraint future work must respect.
+description: Capture a hard-boundary decision into .hv/DECISIONS.md — manually confirmed, never auto-invoked. Decisions differ from learnings in KNOWLEDGE.md by being active commitments with explicit forbids/permits. Use on "decide on X", "we're committing to X", "lock in the boundary that Y", or when a session has produced a constraint future work must respect. Accepts `--from-learning <topic>` to promote a hardened KNOWLEDGE.md learning into a decision, and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding.
 user-invocable: true
 ---
 
@@ -25,6 +25,16 @@ Distill an active commitment from the current session into `.hv/DECISIONS.md`, o
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+## Step 1.5 — Mode (default vs source-prefill)
+
+Inspect the invocation arguments and pick a mode for the rest of the run:
+
+- **No flag** — default mode. Step 2 elicits the candidate decision conversationally, as today.
+- **`--from-learning <topic>`** — Source-Prefill Mode (Learning). Carry `<topic>` forward; Step 2 branches into the source-prefill path and seeds the draft from `.hv/KNOWLEDGE.md`.
+- **`--from-spike <name>`** — Source-Prefill Mode (Spike). Carry `<name>` forward; Step 2 branches into the source-prefill path and seeds the draft from `.hv/spikes/<name>.md`.
+
+Both flags simultaneously is invalid — error with *"`/hv-decide` accepts at most one of `--from-learning <topic>` or `--from-spike <name>` per invocation."* and stop.
+
 ## Step 2 — Identify the Candidate Decision
 
 A decision is worth capturing if it is:
@@ -33,11 +43,47 @@ A decision is worth capturing if it is:
 - **Bounded** — it has a concrete shape: forbids X, permits Y.
 - **Justified** — there's a why behind it (past incident, deadline, stakeholder ask, strong preference).
 
+**Default mode.**
+
 If the user invoked `/hv-decide` with a clear candidate from the conversation, surface it. If not, ask:
 
 > "What boundary do you want to lock in? State it as one sentence — what the decision says."
 
 If after one round the user can't articulate **forbids** *or* **permits**, surface that — it's a signal this is a learning, not a decision. Suggest `/hv-learn` instead and stop. **Do not auto-invoke `/hv-learn`** — the user re-runs it deliberately.
+
+**`--from-learning <topic>` mode.**
+
+1. Run `.hv/bin/hv-knowledge-query "<topic>"` to load the topic section. If the helper output is empty, error: *"Topic `<topic>` not found in `.hv/KNOWLEDGE.md`. Run `.hv/bin/hv-knowledge-stats` to list topics."* and stop.
+2. Parse the matched topic's bullets. Each is a one-line `- <text> <!-- YYYY-MM-DD -->`.
+3. Pick the bullet to promote:
+   - **1 bullet** — use it directly, no question.
+   - **2-4 bullets** — call `AskUserQuestion` with header `"Bullet"` and question *"Which bullet from `<topic>` should become the decision?"*, one option per bullet. Truncate each option label to ≤80 chars; the option's description carries the full bullet text plus its date stamp.
+   - **5+ bullets** — call `AskUserQuestion` the same way but with the 4 most-recent bullets as options. The 4-cap (Skill Authoring: Conventions, 2026-05-08) makes a multiSelect chunked picker overkill for this volume — if the user wants a less-recent bullet, they re-run with a more specific topic.
+4. Draft the four parts from the picked bullet:
+   - **Rule** = the bullet's text (the user can edit in Step 3 / Step 5).
+   - **Why** = *"Promoted from KNOWLEDGE.md `<topic>` (<date>)."* plus any sub-bullet context attached to the picked bullet.
+   - **Forbids** = `_(user must articulate — a bullet is passive context, a decision needs an explicit prohibit)_`
+   - **Permits** = `_(user must articulate — anchors the boundary so it isn't over-applied)_`
+5. Surface to the user: *"Pre-filled rule and why from KNOWLEDGE.md. Now name the forbids and permits — those are what make this a decision, not a learning."* Block until the user replies, plug their answer into Forbids / Permits, then continue to Step 3.
+
+**`--from-spike <name>` mode.**
+
+1. Read `.hv/spikes/<name>.md`. If absent, error: *"Spike `<name>` not found at `.hv/spikes/<name>.md`. Run `.hv/bin/hv-spike-list` to see open and closed spikes."* and stop. (Spike files always live at `.hv/spikes/<name>.md` even in umbrella mode — the `repo:` frontmatter only points at the branch's git history.)
+2. Parse the spike file:
+   - YAML frontmatter (`status`, `created`, `finished`, optional `repo`).
+   - `## Question` — the original yes/no/conditional question.
+   - `## Decision` — the verdict (`viable` / `not viable` / `depends-on-X` / `inconclusive`).
+   - `## Recommended approach` — present iff verdict is `viable`.
+3. Refuse to promote `inconclusive` spikes. Print *"Spike `<name>` is `inconclusive` — not enough evidence for a decision. Add findings on the spike branch and re-run `/hv-spike done <name>`, then come back."* and stop.
+4. Draft the four parts from the spike content:
+   - **Rule** is verdict-driven:
+     - `viable` → *"Use `<X derived from question/recommended>` as the supported approach."*
+     - `not viable` → *"Do not use `<X derived from question>`."*
+     - `depends-on-X` → *"Use `<X>` only when `<the depends-on condition>`."*
+   - **Why** = the original `## Question` plus a 1-2 sentence summary of the spike's `## Findings` section. Keep it tight — most-impactful bullets only, one paragraph max.
+   - **Forbids** = `_(user must articulate — what specific patterns/files/approaches does this rule out?)_`
+   - **Permits** = `_(user must articulate — what alternatives stay allowed?)_`
+5. Surface the same prompt as the learning-mode path: *"Pre-filled rule and why from spike `<name>`. Now name the forbids and permits — those are what make this a decision, not a learning."* Block until the user replies, plug their answer into Forbids / Permits, then continue to Step 3.
 
 ## Step 3 — Compose the Four Parts
 
@@ -49,6 +95,8 @@ Every decision entry has four parts:
 4. **Permits** — concrete things this still allows (anchors the boundary so it's not over-applied)
 
 **Draft all four from conversation context.** Use a single `AskUserQuestion` call only when one of the four parts is genuinely ambiguous from context — otherwise show the assembled draft and let Step 5 handle approval.
+
+In source-prefill modes, Step 2 has already drafted rule/why/forbids/permits — Step 3 is the user's chance to redline the draft before Step 5's confirmation gate.
 
 ## Step 4 — Classify by Topic
 
@@ -135,3 +183,5 @@ If the entry created a new topic, prepend a line: *"New topic: `<topic>`."*
 - **Forbids and permits are required.** If you can't articulate both, it's a learning — redirect to `/hv-learn`.
 - **One sentence rule, one paragraph why.** If a decision needs more, link to a plan or knowledge entry.
 - **No verifier.** Manual confirmation is the verification.
+- **`--from-learning <topic>` and `--from-spike <name>` only seed the rule and why from the source artifact.** The forbids/permits are still user-articulated — that's what makes a decision a decision.
+- **`inconclusive` spikes can't be promoted.** Promotion requires a verdict the project is committing to.
