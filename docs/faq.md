@@ -4,7 +4,7 @@ Common questions about hv-skills.
 
 ## How is this different from a TODO file or issue tracker?
 
-That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv-skills tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-resume` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
+That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv-skills tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-next` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
 
 ## Why is `.hv/` gitignored by default?
 

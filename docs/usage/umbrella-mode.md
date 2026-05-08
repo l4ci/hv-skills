@@ -112,14 +112,13 @@ Most skills delegate umbrella resolution to underlying helpers and stay umbrella
 - **`/hv-capture`** asks for `Repos:` when umbrella mode is on, accepting one or more registered names. Items can also be untagged (umbrella-flat, appropriate for cross-cutting tasks).
 - **`/hv-work`** reads `Repos:` from the item and runs the orchestrator + workers against the resolved sub-repo's `.git/`. The atomic commits land in that sub-repo's history; `status.json` records the entry as `(branch, repo)`.
 - **`/hv-go`** is a pass-through; `/hv-capture` and `/hv-work` handle umbrella resolution under it.
-- **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-resume` reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for streams that predate the change.
+- **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-next` reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for streams that predate the change.
 - **`/hv-plan`** records the target sub-repo in plan frontmatter (`repo: <name>`) when invoked with `--repo` or when the item carries `Repos:`. Slice and milestone plans stay umbrella-flat.
 - **`/hv-spike`** runs the spike branch in the resolved sub-repo (`spike/<name>` lives in that repo's `.git/`); the spike file stays at `<umbrella>/.hv/spikes/<name>.md` with a `repo: <name>` frontmatter line.
 - **`/hv-assume`** displays the resolved sub-repo for items with `Repos:` in its peek output.
 - **`/hv-debug`** routes its single fix-commit to the sub-repo resolved from the bug's `Repos:` tag.
 - **`/hv-review`** scopes its branch inspection to the sub-repo via `hv-review-scope --repo <name>`; `TODO.md` and `ARCHIVE.md` lookups stay at the umbrella.
 - **`/hv-ship`** threads `--repo` through `hv-merge` / `hv-pr` so the merge or PR runs in the correct sub-repo.
-- **`/hv-status`** displays each in-progress entry with an inline `(repo: <name>)` suffix; `hv-backlog`'s In Progress table gains a `Repo` column when any active entry is umbrella-tagged.
 - **`/hv-refactor`** asks which scope to refactor (all sub-repos, all sub-repos plus the umbrella, the umbrella only, or a subset), then dispatches parallel sub-agents, each running a focused single-repo cycle in its target's `.git/`. The umbrella orchestrator aggregates per-repo summaries and resets the refactor counter once at the end.
 
 The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`, `hv-worktree-path`. Without the flag, helpers operate on the cwd's git tree as in single-repo mode.

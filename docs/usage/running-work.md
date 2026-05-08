@@ -79,7 +79,7 @@ Three skills trigger on action-shaped phrases. Pick by **intent**, not by the ve
 
 When intent is ambiguous, the cheapest path is `/hv-capture`. Items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
 
-See [capturing work](capturing-work.md) for capture details and [reviewing and picking work](next-and-status.md) for how `/hv-next` selects and prioritizes.
+See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how `/hv-next` selects and prioritizes.
 
 ## Merge or PR
 

@@ -11,13 +11,13 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 ### Capture and backlog
 
 - [Capturing work](usage/capturing-work.md) — `/hv-capture`, `/hv-c`, mixed input, related links, detail files
-- [Reviewing and picking work](usage/next-and-status.md) — `/hv-next`, `/hv-status`, `/hv-assume`
+- [Picking work](usage/picking-work.md) — `/hv-next`, `/hv-assume`
 
 ### Execution
 
 - [Running work](usage/running-work.md) — `/hv-work` parallel cycles, branch vs worktree isolation, `/hv-go` speed-path
 - [Debugging](usage/debugging.md) — `/hv-debug` systematic cycle
-- [Pausing and resuming](usage/pausing-and-resuming.md) — `/hv-pause`, `/hv-resume`, recovering after `/clear`
+- [Pausing and resuming](usage/pausing-and-resuming.md) — `/hv-pause`, recovering after `/clear`
 - [Parallel work](usage/parallel-work.md) — worktree mode, concurrent `/hv-work` sessions
 
 ### Shipping

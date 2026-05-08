@@ -55,10 +55,10 @@ streams as "In Progress" and skips those items when suggesting new work. If
 you run `/hv-next` while `/hv-work` is mid-update, the last writer wins; the
 next `/hv-next` run reconciles any drift by validating status against actual
 git state. For more on how `/hv-next` reads and updates status, see
-[reviewing and picking work](next-and-status.md).
+[picking work](picking-work.md).
 
 ## Caveats
 
 Don't run `/hv-init` or `/hv-config` from inside a worktree. Those write to
-`.hv/` and must run in the main worktree. `/hv-status`, `/hv-next`, and
-`/hv-work` are fine in either place.
+`.hv/` and must run in the main worktree. `/hv-next` and `/hv-work` are fine
+in either place.

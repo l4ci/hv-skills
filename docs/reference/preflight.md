@@ -24,7 +24,7 @@ Every default skill follows this pattern:
 
 ## Variants
 
-- **Observe-only skills** (`/hv-resume`, `/hv-pause`, `/hv-next`). These read state and route; they shouldn't auto-init for `2`. On exit `2`, surface a brief "nothing to show, `/hv-init` first" message and stop. On exit `3`, refresh via `hv-init` (helpers may be needed for the read).
+- **Observe-only skills** (`/hv-pause`, `/hv-next`). These read state and route; they shouldn't auto-init for `2`. On exit `2`, surface a brief "nothing to show, `/hv-init` first" message and stop. On exit `3`, refresh via `hv-init` (helpers may be needed for the read).
 - **`/hv-config`**. On exit `2`, the user clearly wants to configure the project, so invoke `hv-init` (which writes the initial config interactively) then stop. On exit `3`, refresh and continue.
 - **`/hv-update`** checks `gh` is on `PATH` *before* preflight; the GitHub-release check is the primary purpose, and a missing `gh` should fail fast before touching `.hv/`.
 - **`/hv-init`** is the bootstrapper itself; it doesn't run preflight.
