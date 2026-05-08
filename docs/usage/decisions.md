@@ -20,6 +20,21 @@ Run `/hv-decide` when you've reached a commitment. The skill drafts a four-part 
 
 If you can't articulate forbids or permits, the skill suggests `/hv-learn` instead and stops. It does not auto-invoke `/hv-learn`; you re-run it yourself.
 
+## Promoting a learning or spike into a decision
+
+When a `KNOWLEDGE.md` learning has hardened into a commitment, or a `/hv-spike` concluded with a verdict the project is committing to, you can seed the decision draft from the source artifact instead of retyping:
+
+| Flag | Source | Pre-fills |
+|------|--------|-----------|
+| `/hv-decide --from-learning <topic>` | A bullet under `<topic>` in `.hv/KNOWLEDGE.md` (the skill picks the bullet — auto when there's only one, picker when there are several) | Rule from the bullet; Why cites the topic + date stamp |
+| `/hv-decide --from-spike <name>` | `.hv/spikes/<name>.md` — question, decision, recommended approach | Rule keyed off the verdict (`viable` → "use it", `not viable` → "do not use it", `depends-on-X` → "use only when X"); Why summarizes the question + findings |
+
+Both flags only seed `Rule` and `Why`. You still articulate `Forbids` and `Permits` — that's what makes the entry a decision rather than a learning. The Step 5 confirmation gate still runs; nothing is written until you approve.
+
+`inconclusive` spikes can't be promoted — the verdict isn't a commitment yet. Add findings on the spike branch, re-run `/hv-spike done <name>`, then come back.
+
+`/hv-spike`'s Finish mode also nudges this flow automatically: when a spike concludes `viable`, `not viable`, or `depends-on-X`, the skill asks whether to promote the finding and dispatches `/hv-decide --from-spike <name>` if you say yes. See [spikes](spikes.md) for the full Finish-mode flow.
+
 ## Where decisions are consulted
 
 | Skill | When |
