@@ -632,6 +632,74 @@ echo "$FEAT_BLOCK" | grep -q "F20" && fail "active F20 leaked into Features tabl
 pass "active items excluded from Features section"
 "$BIN/hv-status-remove" hv/real-branch
 
+echo "hv-backlog --grep matches"
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B70] [P1] Database connection drops after timeout.** Network glitch handler.
+
+## Features
+- **[F70] [Cosmetic] Add loading spinner to dashboard.** Cosmetic UX polish.
+- **[F71] [Minor] Implement export to CSV.** Need a button on the dashboard view.
+
+## Tasks
+
+## Completed
+EOF
+echo '{"active":[]}' > .hv/status.json
+
+OUT=$("$BIN/hv-backlog" --grep dashboard)
+echo "$OUT" | grep -q "F70" || fail "F70 (matches 'dashboard') missing: $OUT"
+echo "$OUT" | grep -q "F71" || fail "F71 (matches 'dashboard') missing: $OUT"
+echo "$OUT" | grep -q "B70" && fail "B70 (no match) leaked: $OUT"
+pass "hv-backlog --grep filters by title/description substring"
+
+echo "hv-backlog --grep case-insensitive"
+OUT=$("$BIN/hv-backlog" --grep DASHBOARD)
+echo "$OUT" | grep -q "F70" || fail "case-insensitive 'DASHBOARD' should match: $OUT"
+pass "hv-backlog --grep is case-insensitive"
+
+echo "hv-backlog --grep matches ID"
+OUT=$("$BIN/hv-backlog" --grep B70)
+echo "$OUT" | grep -q "B70" || fail "ID match B70 missing: $OUT"
+echo "$OUT" | grep -q "F70" && fail "F70 leaked when grepping B70: $OUT"
+pass "hv-backlog --grep matches by ID"
+
+echo "hv-backlog --grep no matches"
+OUT=$("$BIN/hv-backlog" --grep nonexistent_xyz)
+echo "$OUT" | grep -q "No matches for pattern 'nonexistent_xyz'" || fail "expected 'No matches' message: $OUT"
+echo "$OUT" | grep -q "### Bugs" && fail "Bugs section should be empty/absent on no-match: $OUT"
+pass "hv-backlog --grep with no matches prints 'No matches' message"
+
+echo "hv-backlog --grep cluster"
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+- **[F80] [Minor] Auth refactor.** Wire OAuth. Related: [F81]
+- **[F81] [Minor] Token rotation.** Refresh JWT. Related: [F80]
+- **[F82] [Cosmetic] Unrelated thing.** Standalone.
+
+## Tasks
+
+## Completed
+EOF
+OUT=$("$BIN/hv-backlog" --grep "Auth refactor")
+echo "$OUT" | grep -q "F80" || fail "F80 missing in filtered output: $OUT"
+# Cluster section should show F80 ↔ F81 (both members, even though only F80 matched)
+echo "$OUT" | grep -qE "F80.*F81|F81.*F80" || fail "cluster should preserve both members: $OUT"
+echo "$OUT" | grep -q "F82" && fail "F82 (no match) should not appear: $OUT"
+pass "hv-backlog --grep filters clusters but preserves all members"
+
+echo "hv-backlog no-flag regression"
+OUT_FILTERED=$("$BIN/hv-backlog" --grep "")
+OUT_PLAIN=$("$BIN/hv-backlog")
+[ "$OUT_FILTERED" = "$OUT_PLAIN" ] || fail "empty --grep should equal no-flag output"
+pass "hv-backlog --grep '' equals unfiltered output"
+
 echo "hv-refactor-age / hv-complete counter / hv-refactor-reset"
 git checkout -q main
 # Reset to isolate this section from prior hv-complete calls in the suite.

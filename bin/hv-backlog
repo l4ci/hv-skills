@@ -2,12 +2,36 @@
 # Render pre-sorted backlog tables from .hv/TODO.md, excluding items active in status.json.
 # Output: markdown — "In Progress" + "Bugs" (P0/P1/P2) + "Features" (Cosmetic/Minor/Major) + "Tasks".
 # Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
-# Usage: hv-backlog
+# Usage: hv-backlog [--grep <pattern>]
+#   --grep <pattern>   Filter Bugs/Features/Tasks by case-insensitive substring against
+#                      each item's raw bullet line (matches ID, title, description, Related,
+#                      etc.). Clusters are kept if any member matches; In Progress is never
+#                      filtered.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-types.sh"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
+
+GREP_PATTERN=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --grep)
+      GREP_PATTERN="${2:-}"
+      shift 2
+      ;;
+    --grep=*)
+      GREP_PATTERN="${1#*=}"
+      shift
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+export GREP_PATTERN
+
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from collections import defaultdict
@@ -44,7 +68,7 @@ def parse_items(body):
         fields = parse_todo_fields(line)
         related = fields["related"].rstrip(".")
         milestones = ", ".join(re.findall(r"M\d+", fields["milestone"]))
-        items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones})
+        items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line})
     return items
 
 _open_bodies = dict(iter_open_sections(content))
@@ -56,6 +80,17 @@ prio = {"P0": 0, "P1": 1, "P2": 2, "": 3}
 size = {"Cosmetic": 0, "Minor": 1, "Major": 2, "": 3}
 bugs.sort(key=lambda x: prio.get(x["tag"], 3))
 features.sort(key=lambda x: size.get(x["tag"], 3))
+
+# --grep <pattern> filters Bugs/Features/Tasks rows by case-insensitive substring
+# against each item's full raw bullet line (ID, title, desc, Related, etc.).
+# In Progress is state and is never filtered. Clusters keep all members if any
+# member matched (cluster context is the value-add).
+_raw_pattern = os.environ.get("GREP_PATTERN", "")
+_pattern = _raw_pattern.lower()
+if _pattern:
+    bugs = [i for i in bugs if _pattern in i["raw"].lower()]
+    features = [i for i in features if _pattern in i["raw"].lower()]
+    tasks = [i for i in tasks if _pattern in i["raw"].lower()]
 
 def title_of(item_id):
     m = re.search(rf"\*\*\[{re.escape(item_id)}\][^*]*\*\*", content)
@@ -136,6 +171,10 @@ for iid in sorted(title_by_id):
         components.append(sorted(comp))
 components.sort(key=lambda c: c[0])
 
+if _pattern:
+    matched_ids = {i["id"] for i in all_items if _pattern in i["raw"].lower()}
+    components = [c for c in components if any(cid in matched_ids for cid in c)]
+
 if components:
     out.append("### Clusters\n")
     for comp in components:
@@ -144,7 +183,10 @@ if components:
     out.append("")
 
 if not (active_entries or bugs or features or tasks):
-    out.append("Backlog empty. Run /hv-capture to add items.")
+    if _pattern:
+        out.append(f"No matches for pattern '{_raw_pattern}'.")
+    else:
+        out.append("Backlog empty. Run /hv-capture to add items.")
 
 print("\n".join(out))
 PY
