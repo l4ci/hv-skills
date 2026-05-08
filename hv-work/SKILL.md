@@ -430,7 +430,7 @@ The helper removes any worktree, pushes the branch with `-u`, and runs `gh pr cr
 .hv/bin/hv-status-remove --repo <repo> <branch>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-resume` / `/hv-next`.
+Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 ## Step 12 — Report to User
 

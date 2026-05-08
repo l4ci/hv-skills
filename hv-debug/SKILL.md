@@ -233,7 +233,7 @@ If the fix doesn't hold → back to Step 6. Don't commit a partial fix.
 .hv/bin/hv-status-remove --repo <repo> <branch>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-resume` / `/hv-next`.
+Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 ## Step 11 — Report
 

@@ -33,7 +33,7 @@ Read `.hv/config.json`:
 
 - Work is still in progress → finish implementing via `/hv-work`
 - Nothing committed yet → clean up, then come back
-- You want to resume a paused branch → `/hv-resume`
+- You want to resume a paused branch → `/hv-next`
 
 ## Step 1 — Preflight
 
@@ -159,7 +159,7 @@ printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
 .hv/bin/hv-status-remove --repo "$REPO" <branch>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-resume` / `/hv-next`.
+Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 Silently clears the entry if one existed. Harmless if not.
 
