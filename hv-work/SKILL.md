@@ -231,8 +231,6 @@ A wave is "commit-producing" by default; "read-only" workers (research, lint-onl
 > **Forbids.** `/hv-work` dispatching ≥2 parallel workers in the same wave when `work.isolation == "branch"`; worker briefs that ask multiple agents to run `git add && git commit` against the same `.git/` concurrently; plan-as-artifact wave layouts that put 2+ commit-producing tasks in a single wave under branch isolation; suppressing the guard via env-var overrides or "just this once" exceptions.
 >
 > **Permits.** Parallel `/hv-work` waves under `work.isolation == "worktree"` (each worker has its own worktree, its own index); serial waves of size 1 under either isolation mode (no concurrent index access); multi-task waves where only ONE worker commits and the others are read-only (research, smoke-validate, lint-only verifications); the file-disjointness rule from `KNOWLEDGE.md` — this guard is **additive** to that one, not a replacement.
->
-> **Companion: F11 default.** When workers are write-only and the orchestrator commits each task sequentially in Step 7.5, this guard is technically unnecessary (no worker touches `.git/index`). The guard remains as defense-in-depth for the documented opt-in legacy path (workers stage and commit themselves) and for projects that haven't migrated to F11 default.
 
 ### Branch creation (single-repo)
 
@@ -325,7 +323,7 @@ You are implementing Task N of [total].
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the suggested commit message; read-first, minimal-diff, no unrelated changes; workers do NOT stage or commit.
 
-**Rename-task addendum.** When a task includes `git mv old new` (or equivalent file rename), the brief MUST instruct the worker to run `git grep -l "<old-name>" -- <scope>` before reporting completion and to extend coverage to every match the plan missed. The plan author's file enumerate is a hint, not ground truth — grep is. The orchestrator re-runs the same grep at Step 7 (verify); both layers catch enumerate gaps.
+**Rename-task addendum.** Briefs for `git mv old new` (or equivalent rename) tasks MUST carry the Step 4 grep step — instruct the worker to run `git grep -l "<old-name>" -- <scope>` before reporting and extend coverage to every match. Step 7 re-runs the same grep; both layers catch enumerate gaps.
 
 Launch all independent agents in one message (parallel tool calls) — write-only workers don't race on `.git/index`, so this is safe under any isolation mode. Don't announce — just do it.
 
@@ -345,7 +343,7 @@ Orchestrator verifies internally (don't narrate):
 1. Inspect pending changes: `git status --porcelain` then `git diff` for the files the worker reported. (Legacy path: `git log --oneline -1` if the worker committed.)
 2. Read modified files — changes match the brief.
 3. Structural checks: grep for expected patterns, no regressions.
-4. **Rename validation (when the task includes `git mv old new`).** Re-run `git grep -l "<old-name>" -- <scope>` after the worker reports. If grep returns files not in the worker's modified-file set, the plan's enumerate undercounted — dispatch a fix-up extending coverage to every match before staging. The plan is a hint; grep is ground truth.
+4. **Rename validation (Step 4 rename + link-sweep rule).** Re-run `git grep -l "<old-name>" -- <scope>`; files outside the worker's modified-file set → dispatch a fix-up to extend coverage before staging.
 
 **When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
 
