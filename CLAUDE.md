@@ -14,7 +14,7 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 
 Project milestones live in `.hv/MILESTONES.md`.
 
-_(no active milestones — 3 planned; set one active with `/hv-vision`)_
+_(no active milestones — all shipped or archived; run `/hv-vision` to plan more)_
 <!-- hv-vision-end -->
 
 ## Working in this repo
