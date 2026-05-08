@@ -66,7 +66,7 @@ On **Yes** — set `UMBRELLA_MODE=true` and `UMBRELLA_REGISTER="all"` (or ask a 
 
 On **No** — set `UMBRELLA_MODE=false`, continue to Step 2 unchanged.
 
-Plain-text fallback: if `UMBRELLA_COUNT >= 2`, default to **Yes** with `UMBRELLA_REGISTER="all"` — it's the Recommended path and reversible by re-running `/hv-init` then choosing No, or by toggling `umbrella.enabled` via `/hv-config`.
+Plain-text fallback: ask once textually — *"Found N git repos here: <list>. Enable umbrella mode? (yes/no)"* — and honor the user's reply. If the host can't render the question and no reply is captured, default to **No** with a one-line follow-up note: *"Skipping umbrella mode. Re-run `/hv-init` from this cwd to enable, or toggle `umbrella.enabled` via `/hv-config` later."* The default is **No** rather than Yes because `umbrella.enabled` is an opt-in feature flag — per the *Authoring conventions / Opt-in feature flags default to `false`* rule below, the cwd signal alone (multiple sub-repos detected) is not user approval; explicit user approval is required.
 
 > **Architecture rule — umbrella mode does not use git submodules.** Sub-repos under an umbrella are independent git repositories with no version-pinning at the umbrella level.
 >
