@@ -170,6 +170,23 @@ Route the answer:
 
 Plain-text fallback: *"Work on this?"* — honor yes/no/"pick specific IDs" replies.
 
+## Step 8 — Release Nudge
+
+Fires only on the *terminal* paths of /hv-next — when the user picks "Stop here" in Step 7 or when the backlog was empty (loop or off/auto). When Step 7 dispatches into /hv-work, /hv-assume, or /hv-plan, skip this step entirely — those skills run their own tails and the nudge would either be drowned out or surface again at the wrong time.
+
+```bash
+.hv/bin/hv-release-pending
+```
+
+Parse the JSON output. If `shouldNudge` is `false`, skip silently. If `true`, append one line to the user-facing output (after any "OK — run `/hv-next` again..." message):
+
+- When `reason == "commits"`: *"<commits> commits since <lastTag>; consider `/hv-release`."*
+- When `reason == "days"`: *"<commits> commits and <days> days since <lastTag>; consider `/hv-release`."*
+
+Keep it to one line. Don't expand into a paragraph or a checklist — the nudge is informational and the user might just dismiss it.
+
+If `lastTag == ""` (no tags yet — nothing has been released), skip silently. The first release is the user's call, not a system nudge.
+
 ## Rules
 
 - **No noise** — never report on a step that found nothing. Silence is signal.
