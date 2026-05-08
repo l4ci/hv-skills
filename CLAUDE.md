@@ -3,9 +3,12 @@
 
 Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
 
-- Build & Tooling
+- Build & Tooling: Helpers
+- Build & Tooling: Umbrella & Worktrees
+- Build & Tooling: Smoke & Plugin
 - Documentation
-- Skill Authoring
+- Skill Authoring: Conventions
+- Skill Authoring: Workers & Parallelism
 
 <!-- hv-knowledge-end -->
 
