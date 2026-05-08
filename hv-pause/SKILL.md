@@ -1,6 +1,6 @@
 ---
 name: hv-pause
-description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv-resume in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
+description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv-next in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
 user-invocable: true
 ---
 
@@ -9,13 +9,13 @@ user-invocable: true
 ```
 ════════════════════════════════════════════════════════════════════════
   💤  hv-pause  ·  write handoff note for clean pause
-  triggers: "pause", "hand off"  ·  pairs: hv-resume, hv-learn
+  triggers: "pause", "hand off"  ·  pairs: hv-next, hv-learn
 ════════════════════════════════════════════════════════════════════════
 ```
 
 # hv-pause — Graceful Session Pause
 
-`/hv-resume` reads and deletes the handoff note on the next session.
+`/hv-next` reads and deletes the handoff note on the next session.
 
 ## When to Use
 
@@ -92,7 +92,7 @@ Resolve milestone context first — if any active item carries a `Milestone:` ta
 - `repo` non-null (umbrella mode): `.hv/handoff/<branch>@<repo>.md`
 - `repo` null (single-repo / legacy): `.hv/handoff/<branch>.md`
 
-For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Next planned step**, and **Current hypothesis** content — only `Repo:` and the per-repo `Uncommitted work` artifact differ. Don't merge them into one combined file: `/hv-resume`'s lookup is keyed on `(branch, repo)`, so per-entry files keep that path symmetric and survive partial cleanup (one repo abandoned, others resumed).
+For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Next planned step**, and **Current hypothesis** content — only `Repo:` and the per-repo `Uncommitted work` artifact differ. Don't merge them into one combined file: `/hv-next`'s lookup is keyed on `(branch, repo)`, so per-entry files keep that path symmetric and survive partial cleanup (one repo abandoned, others resumed).
 
 Branch names already contain `/` (e.g. `hv/fix-X`) and `mkdir -p .hv/handoff` plus the branch path's nested dirs already cover that; the `@<repo>` suffix lives on the filename, not on a directory, so it can't collide with a literal subdirectory.
 
@@ -112,7 +112,7 @@ Fill each section from the current session — omit sections that don't apply, b
 
 ## Next planned step
 
-<one or two sentences — the concrete action /hv-resume should dispatch. Not a summary; a directive.>
+<one or two sentences — the concrete action /hv-next should dispatch. Not a summary; a directive.>
 
 ## Current hypothesis (if debugging)
 
@@ -125,14 +125,14 @@ Fill each section from the current session — omit sections that don't apply, b
 
 Use `Write` for each note (always overwrite — one handoff per `(branch, repo)` pair).
 
-These four sections are exactly what `/hv-resume` reads. Anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere: `git log` and `git status` carry recent commits and mid-edit paths; durable learnings go to `/hv-learn` via the Step 6 nudge.
+These four sections are exactly what `/hv-next` reads. Anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere: `git log` and `git status` carry recent commits and mid-edit paths; durable learnings go to `/hv-learn` via the Step 6 nudge.
 
 ## Step 5 — Pin Status
 
 Loop over the pause set:
 
 ```bash
-# Make sure status.json has each entry so /hv-resume finds them
+# Make sure status.json has each entry so /hv-next finds them
 .hv/bin/hv-status-add --if-absent [--repo <repo>] <branch> <item-ids> [worktree-path]
 ```
 
@@ -151,7 +151,7 @@ Stage: mid-hypothesis verification for [B07]
 Next: run the verification probe in MenuBarManager.swift:54
 Uncommitted: wip commit a1b2c3d
 
-Resume with `/hv-resume` in a fresh session.
+Resume with `/hv-next` in a fresh session.
 ```
 
 The `(web)` suffix is shown only in umbrella mode (when `<repo>` is non-null); single-repo cycles drop it and just print the branch.
@@ -167,7 +167,7 @@ Uncommitted:
   - web: wip commit a1b2c3d
   - api: clean tree
 
-Resume with `/hv-resume` in a fresh session.
+Resume with `/hv-next` in a fresh session.
 ```
 
 Stage / Next / Hypothesis are shared across the wave; Uncommitted is per-repo because each sub-repo's working tree is independent.
@@ -185,5 +185,5 @@ Skip if nothing non-obvious surfaced or `/hv-learn` already ran this session. Do
 - **Multi-repo waves are one logical pause.** When `status.json` holds multiple `(branch, repo)` entries from one `/hv-work` wave, `/hv-pause` treats them as a single unit by default — no `AskUserQuestion` to pick one repo. Scope the pause to a single sub-repo by `cd`-ing into it before invoking `/hv-pause`; cwd resolves to that repo and the other entries stay active.
 - **Umbrella handoff filenames key on `(branch, repo)`.** Two sub-repos sharing a branch name get separate handoff files at `.hv/handoff/<branch>@<repo>.md`; single-repo cycles keep `.hv/handoff/<branch>.md` unchanged.
 - **Never commit `.hv/handoff/`.** `.hv/` is gitignored, so this is automatic — but don't add an exception.
-- **`/hv-resume` owns cleanup.** Once resume has read and routed, it deletes the note. Don't self-delete here.
+- **`/hv-next` owns cleanup.** Once `/hv-next` has read and routed, it deletes the note. Don't self-delete here.
 - **No mutation beyond the handoff + optional wip/stash.** This skill's job is capture, not integration.
