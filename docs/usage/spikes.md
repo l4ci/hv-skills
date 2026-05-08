@@ -36,6 +36,8 @@ Honest reporting matters more than salvage. A `not viable` conclusion is just as
 
 The spike branch stays around as a reference but is never merged.
 
+After you mark the spike done, the skill asks one extra question when the verdict is `viable`, `not viable`, or `depends-on-X`: *"Promote the finding to a hard-boundary decision in `DECISIONS.md`?"* If you say yes, it dispatches `/hv-decide --from-spike <name>` — the spike's question, verdict, and recommended approach pre-fill the rule and why; you supply the forbids and permits that distinguish a decision from a learning. `inconclusive` spikes skip the prompt entirely. See [decisions](decisions.md) for the rule/why/forbids/permits structure.
+
 ## After the spike
 
 The findings feed back into whatever decision triggered the spike, typically a milestone or implementation plan. If the spike came out of a `/hv-vision` session, reference the spike file from the relevant milestone detail file (`.hv/milestones/M01.md`). If a `/hv-plan` depends on the verdict, call it out in the plan's named assumptions or open questions section.
