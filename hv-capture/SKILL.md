@@ -132,15 +132,14 @@ If umbrella mode is enabled AND there's at least one registered sub-repo, ask th
 **Gate check:**
 
 ```bash
-python3 -c "
-import json, sys
-try:
-    cfg = json.loads(open('.hv/config.json').read())
-    repos = json.loads(open('.hv/repos.json').read()).get('repos', [])
-except (FileNotFoundError, ValueError):
-    sys.exit(1)
-sys.exit(0 if cfg.get('umbrella', {}).get('enabled') and repos else 1)
+if [ "$(.hv/bin/hv-umbrella-on)" = "yes" ]; then
+  PYTHONPATH=.hv/bin python3 -c "
+from hvlib import load_repos
+import sys; sys.exit(0 if load_repos() else 1)
 "
+else
+  exit 1
+fi
 ```
 
 If exit code is non-zero, skip Step 4.6 entirely. Move on to Step 5.

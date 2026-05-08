@@ -9,19 +9,15 @@ SECTION="${1:?usage: hv-append <section> <entry>}"
 ENTRY="${2:?usage: hv-append <section> <entry>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SECTION" "$ENTRY" <<'PY'
 import sys
-from hvlib import write_text_atomic
+from hvlib import find_section, write_text_atomic
 sec, entry, path = sys.argv[1], sys.argv[2], ".hv/TODO.md"
-with open(path) as f: content = f.read()
-marker = sec + "\n"
-idx = content.find(marker)
-if idx == -1:
+name = sec[3:] if sec.startswith("## ") else sec
+content = open(path).read()
+span = find_section(content, name)
+if span is None:
     print(f"error: section '{sec}' not found", file=sys.stderr); sys.exit(1)
-after = idx + len(marker)
-nxt = content.find("\n## ", after)
-if nxt == -1:
-    content = content.rstrip("\n") + "\n" + entry + "\n"
-else:
-    before = content[:nxt].rstrip("\n")
-    content = before + "\n" + entry + "\n" + content[nxt:]
+start, end = span
+tail = "\n" + content[end:] if content[end:] else ""
+content = content[:end].rstrip("\n") + "\n" + entry + "\n" + tail
 write_text_atomic(path, content)
 PY

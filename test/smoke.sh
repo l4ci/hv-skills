@@ -1441,9 +1441,9 @@ echo "hv-types.sh source contract"
 # Source the file in a subshell and assert the exported env vars.
 ( . "$BIN/hv-types.sh"
   [ "$HV_ITEM_TYPES" = "BFT" ] || { echo "HV_ITEM_TYPES=$HV_ITEM_TYPES"; exit 1; }
-  [ "$HV_ALL_PREFIXES" = "BFTM" ] || { echo "HV_ALL_PREFIXES=$HV_ALL_PREFIXES"; exit 1; }
+  [ "$HV_OPEN_SECTIONS" = "Bugs|Features|Tasks" ] || { echo "HV_OPEN_SECTIONS=$HV_OPEN_SECTIONS"; exit 1; }
 ) || fail "hv-types.sh did not export expected values"
-pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_ALL_PREFIXES=BFTM"
+pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_OPEN_SECTIONS=Bugs|Features|Tasks"
 
 echo "## hv-base-branch + hv-worktree-clear + hv-managed-block + hv-fm-list (refactor)"
 

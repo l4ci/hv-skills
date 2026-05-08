@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Generic section-query — print the body of `## <topic>` sections from
+# .hv/KNOWLEDGE.md (key=knowledge) or .hv/DECISIONS.md (key=decisions).
+# Used by the typed wrappers hv-knowledge-query and hv-decisions-query;
+# typically called by /hv-work, /hv-debug, /hv-go, /hv-plan, /hv-refactor,
+# /hv-review, /hv-vision before touching topical work.
+#
+# Usage: hv-section-query <key> <topic>...
+#   <key>:    knowledge | decisions
+#   <topic>:  one or more topic names (case-insensitive)
+#   stdout:   matching sections, separated by blank line
+#   exit:     0 always (missing topics are silent)
+set -euo pipefail
+KEY="${1:?usage: hv-section-query <key> <topic>...}"
+shift
+[ $# -ge 1 ] || { echo "usage: hv-section-query <key> <topic>..." >&2; exit 1; }
+case "$KEY" in
+  knowledge) FILE=".hv/KNOWLEDGE.md" ;;
+  decisions) FILE=".hv/DECISIONS.md" ;;
+  *) echo "error: unknown key '$KEY' — expected one of: knowledge, decisions" >&2; exit 1 ;;
+esac
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$@" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import print_matching_sections
+
+file_path = Path(sys.argv[1])
+wanted = {t.strip().lower() for t in sys.argv[2:]}
+if not wanted:
+    sys.exit(0)
+if not file_path.exists():
+    sys.exit(0)
+print_matching_sections(file_path.read_text(), wanted)
+PY

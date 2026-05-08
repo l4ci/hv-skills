@@ -12,7 +12,7 @@ MID="${1:?usage: hv-todo-by-milestone <MID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
 import os, re, sys
 from pathlib import Path
-from hvlib import section, parse_todo_fields
+from hvlib import iter_open_sections, parse_todo_fields
 
 mid = sys.argv[1]
 todo = Path(".hv/TODO.md")
@@ -20,7 +20,7 @@ if not todo.exists():
     raise SystemExit(0)
 content = todo.read_text()
 
-body = section(content, "Bugs") + section(content, "Features") + section(content, "Tasks")
+body = "".join(b for _name, b in iter_open_sections(content))
 for line in body.splitlines():
     line = line.strip()
     if not line.startswith("- **["):

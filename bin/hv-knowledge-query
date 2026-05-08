@@ -1,20 +1,4 @@
 #!/usr/bin/env bash
-# Print specified topic sections from .hv/KNOWLEDGE.md (case-insensitive match).
-# Usage: hv-knowledge-query "Topic A" "Topic B" ...
-# Silent (exit 0) if KNOWLEDGE.md doesn't exist or no topics match.
-set -euo pipefail
-[ $# -ge 1 ] || { echo "usage: hv-knowledge-query <topic>..." >&2; exit 1; }
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
-import sys
-from pathlib import Path
-from hvlib import print_matching_sections
-
-wanted = {t.strip().lower() for t in sys.argv[1:]}
-path = Path(".hv/KNOWLEDGE.md")
-if not path.exists():
-    sys.exit(0)
-print_matching_sections(path.read_text(), wanted)
-PY
+# Print the matching ## Topic section(s) from .hv/KNOWLEDGE.md.
+# Usage: hv-knowledge-query <topic>...
+exec "$(dirname "$0")/hv-section-query" knowledge "$@"

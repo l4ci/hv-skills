@@ -12,7 +12,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from collections import defaultdict
 from pathlib import Path
-from hvlib import section, load_json, parse_todo_fields
+from hvlib import iter_open_sections, load_json, parse_todo_fields
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -53,9 +53,10 @@ def parse_items(body):
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones})
     return items
 
-bugs = [i for i in parse_items(section(content, "Bugs")) if i["id"] not in active_ids]
-features = [i for i in parse_items(section(content, "Features")) if i["id"] not in active_ids]
-tasks = [i for i in parse_items(section(content, "Tasks")) if i["id"] not in active_ids]
+_open_bodies = dict(iter_open_sections(content))
+bugs = [i for i in parse_items(_open_bodies.get("Bugs", "")) if i["id"] not in active_ids]
+features = [i for i in parse_items(_open_bodies.get("Features", "")) if i["id"] not in active_ids]
+tasks = [i for i in parse_items(_open_bodies.get("Tasks", "")) if i["id"] not in active_ids]
 
 prio = {"P0": 0, "P1": 1, "P2": 2, "": 3}
 size = {"Cosmetic": 0, "Minor": 1, "Major": 2, "": 3}
@@ -114,9 +115,7 @@ render_table("Tasks", tasks, ["ID", "Title", "Related"],
 # Connected components across all backlog items (≥ 2 members).
 # Built from the original parsed lists so active items remain in the graph —
 # a backlog item related to an in-flight one is still useful context.
-all_items = (parse_items(section(content, "Bugs"))
-             + parse_items(section(content, "Features"))
-             + parse_items(section(content, "Tasks")))
+all_items = [i for _name, body in iter_open_sections(content) for i in parse_items(body)]
 title_by_id = {i["id"]: i["title"] for i in all_items}
 adj = defaultdict(set)
 id_pat = re.compile(rf"\[({ITEM_CLASS}\d+)\]")

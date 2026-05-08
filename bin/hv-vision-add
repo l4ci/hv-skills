@@ -12,10 +12,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 hv_self_locate
 MID=$("$HERE/hv-next-id" milestones)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
-import re, sys
+import sys
 from datetime import date
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import append_to_section, write_text_atomic
 
 mid, title, summary, depends_csv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
@@ -72,11 +72,7 @@ section = (
     f"[Full plan: `.hv/milestones/{mid}.md`]\n"
 )
 
-if re.search(r"^## Milestones\s*$", content, re.MULTILINE):
-    content = content.rstrip("\n") + "\n" + section
-else:
-    content = content.rstrip("\n") + ("\n\n" if content.strip() else "") + "## Milestones\n" + section
-
+content = append_to_section(content, "Milestones", section)
 write_text_atomic(ms_path, content if content.endswith("\n") else content + "\n")
 print(mid)
 PY

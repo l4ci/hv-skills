@@ -168,14 +168,12 @@ If `umbrella.enabled` in `.hv/config.json` is true, every item in the planned wa
 **Gate check:**
 
 ```bash
-python3 -c "
-import json, sys
-cfg = json.loads(open('.hv/config.json').read())
-print('on' if cfg.get('umbrella', {}).get('enabled') else 'off')
-"
+.hv/bin/hv-umbrella-on
 ```
 
-If umbrella mode is **off**, skip this step entirely (single-repo path).
+Returns `yes` or `no`.
+
+If umbrella mode is **no**, skip this step entirely (single-repo path).
 
 If **on**:
 

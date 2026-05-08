@@ -79,6 +79,48 @@ def replace_section(content: str, name: str, new_body: str) -> str:
     return content[:start] + new_body + content[end:]
 
 
+def append_to_section(content: str, name: str, addition: str) -> str:
+    """Append `addition` to the body of `## <name>`, splicing it just before
+    the next `## ` heading (or at EOF if last). If the section is missing,
+    appends `## <name>\\n\\n<addition>` at end. Returns the updated text.
+
+    The caller controls layout via `addition` — typically `"\\n- new bullet\\n"`
+    or `"\\n### new milestone — Title\\n\\n**Status:** planned\\n…\\n"`.
+    """
+    span = find_section(content, name)
+    if span is None:
+        sep = "" if content.endswith("\n") else "\n"
+        return content.rstrip("\n") + "\n\n## " + name + "\n" + addition
+    start, end = span
+    body = content[start:end]
+    # Splice addition just before the next ## heading. If the body ends
+    # without a newline, ensure one is added; let `addition` control the
+    # rest of the layout.
+    if body.endswith("\n"):
+        return content[:start] + body + addition + content[end:]
+    else:
+        return content[:start] + body + "\n" + addition + content[end:]
+
+
+def iter_open_sections(content: str):
+    """Yield (section_name, body) pairs for each open-work section in
+    `content`, in the order defined by HV_OPEN_SECTIONS env var (default
+    "Bugs|Features|Tasks"). Sections that don't exist are skipped silently.
+
+    Body is the same string `find_section`/`section` would return — the
+    contents between the `## <name>` heading and the next `## ` heading or
+    EOF, with leading and trailing whitespace preserved.
+
+    Use this instead of hardcoding ("Bugs", "Features", "Tasks") in helpers
+    that scan the open backlog.
+    """
+    names = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
+    for name in names:
+        span = find_section(content, name)
+        if span is not None:
+            yield name, content[span[0]:span[1]]
+
+
 def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
     """Find the origin bullet for `iid` in `corpus` (typically TODO.md +
     ARCHIVE.md concatenated). The origin bullet is the line that introduces
