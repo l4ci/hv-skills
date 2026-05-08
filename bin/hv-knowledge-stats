@@ -11,6 +11,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 import re
 from pathlib import Path
+from hvlib import iter_topics
 
 path = Path(".hv/KNOWLEDGE.md")
 if not path.exists():
@@ -18,13 +19,8 @@ if not path.exists():
     raise SystemExit(0)
 
 content = path.read_text()
-parts = re.split(r"^(## .+)$", content, flags=re.MULTILINE)
-# parts alternates: [preamble, heading1, body1, heading2, body2, ...]
 topics = []
-for i in range(1, len(parts), 2):
-    heading = parts[i]
-    body = parts[i + 1] if i + 1 < len(parts) else ""
-    name = heading[3:].strip()
+for name, body in iter_topics(content):
     bullets = len(re.findall(r"^- ", body, re.MULTILINE))
     nbytes = len(body.encode("utf-8"))
     topics.append({"name": name, "bullets": bullets, "bytes": nbytes})

@@ -12,7 +12,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$THRESHOLD" <<'PY'
 import os, re, sys
 from datetime import date, timedelta
 from pathlib import Path
-from hvlib import find_section, write_text_atomic
+from hvlib import find_section, write_text_atomic, parse_done_line
 threshold = int(sys.argv[1])
 cutoff = date.today() - timedelta(days=threshold)
 
@@ -29,20 +29,14 @@ section = content[start:end]
 
 # Match only the canonical completed shape produced by hv-complete:
 #   - ~~**[ID] …**~~ Done YYYY-MM-DD [`hash`]
-# Item-type prefix class is HV_ITEM_TYPES (BFT), sourced from hv-types.sh.
 # Milestones (M-prefix) are never archived from TODO.md — they live in
 # MILESTONES.md with frontmatter status, not in ## Completed.
-cls = os.environ["HV_ITEM_TYPES"]
-pattern = re.compile(
-    rf"^(- ~~\*\*\[[{cls}]\d+\].*\*\*~~\s+Done\s+(\d{{4}})-(\d{{2}})-(\d{{2}})\s+\[`[^`]+`\])$",
-    re.MULTILINE,
-)
 old_lines, kept_lines = [], []
 for line in section.splitlines():
-    mm = pattern.match(line)
-    if mm:
-        y, mo, d = int(mm.group(2)), int(mm.group(3)), int(mm.group(4))
-        done_date = date(y, mo, d)
+    parsed = parse_done_line(line)
+    if parsed:
+        y, mo, d_part = (int(p) for p in parsed["date"].split("-"))
+        done_date = date(y, mo, d_part)
         if done_date < cutoff:
             old_lines.append(line)
             continue

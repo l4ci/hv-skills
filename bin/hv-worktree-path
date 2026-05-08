@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Print the canonical Layout B worktree path for a sub-repo branch:
+#     <umbrella>/.claude/worktrees/<repo>/<branch>
+# Used by hv-work to add the worktree, by hv-status-add to record it, and
+# by hv-worktree-clear to find a worktree on disk that may not be in
+# .git/worktrees/. Centralizes the path formula so all three sites stay
+# in sync if the layout ever changes.
+#
+# Usage: hv-worktree-path --repo <name> <branch>
+# Output: absolute path (no trailing slash, no newline-after — the script
+# uses `echo` so a single trailing newline is fine for shell capture).
+# Exits 1 on usage error or if the umbrella can't be resolved.
+set -euo pipefail
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "${1:-}" != "--repo" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+  echo "usage: hv-worktree-path --repo <name> <branch>" >&2
+  exit 1
+fi
+REPO="$2"
+BRANCH="$3"
+
+UMBRELLA="$("$BIN_DIR/hv-resolve-umbrella")"
+echo "$UMBRELLA/.claude/worktrees/$REPO/$BRANCH"

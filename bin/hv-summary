@@ -11,9 +11,7 @@ MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import section, iter_open_sections, load_json
-
-ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
+from hvlib import section, iter_open_sections, load_json, parse_done_line, iter_topics
 
 todo = Path(".hv/TODO.md")
 if not todo.exists():
@@ -47,7 +45,11 @@ for entry in data.get("active", []):
 
 # Recent completions (top 3 from ## Completed)
 completed = section(content, "Completed")
-pairs = re.findall(rf"(\[{ITEM_CLASS}\d+\])[^[\n]*?Done (\d{{4}}-\d{{2}}-\d{{2}})", completed)
+pairs = []
+for line in completed.splitlines():
+    parsed = parse_done_line(line.strip())
+    if parsed:
+        pairs.append((f"[{parsed['id']}]", parsed["date"]))
 if pairs:
     recent = pairs[:3]
     print("Recent: " + ", ".join(f"{iid} on {d}" for iid, d in recent))
@@ -61,7 +63,7 @@ if actives:
 # Knowledge topics
 k = Path(".hv/KNOWLEDGE.md")
 if k.exists():
-    topics = re.findall(r"^## (.+?)\s*$", k.read_text(), re.MULTILINE)
+    topics = [name for name, _body in iter_topics(k.read_text())]
     if topics:
         shown = topics[:4]
         suffix = ", ..." if len(topics) > 4 else ""
@@ -70,7 +72,7 @@ if k.exists():
 # Decisions topics
 d = Path(".hv/DECISIONS.md")
 if d.exists():
-    topics = re.findall(r"^## (.+?)\s*$", d.read_text(), re.MULTILINE)
+    topics = [name for name, _body in iter_topics(d.read_text())]
     if topics:
         shown = topics[:4]
         suffix = ", ..." if len(topics) > 4 else ""

@@ -71,7 +71,11 @@ read_version() {
   [ -z "$root" ] && { echo ""; return; }
   local mf="$root/.claude-plugin/plugin.json"
   [ -f "$mf" ] || { echo ""; return; }
-  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("version",""))' "$mf"
+  PYTHONPATH="$(cd "$(dirname "$0")" && pwd)${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from hvlib import load_json
+import sys
+print(load_json(sys.argv[1], {}).get('version', ''))
+" "$mf"
 }
 
 fetch_latest() {

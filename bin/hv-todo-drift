@@ -17,7 +17,7 @@ export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re, subprocess, sys
 from pathlib import Path
-from hvlib import iter_open_sections, load_repos
+from hvlib import iter_open_sections, load_repos, open_bullet_re
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
@@ -32,10 +32,10 @@ cls = os.environ["HV_ITEM_TYPES"]
 # ## Tasks that match `- **[ID] ...` (no leading `~~` strikethrough). Items
 # under ## Completed are excluded by section selection.
 open_ids: set[str] = set()
-bullet = re.compile(rf"^- \*\*\[([{cls}]\d+)\]", re.MULTILINE)
+bullet = open_bullet_re()
 for _name, body in iter_open_sections(content):
     for m in bullet.finditer(body):
-        open_ids.add(m.group(1))
+        open_ids.add(m.group("id"))
 
 if not open_ids:
     print(json.dumps({"drift": []}))

@@ -19,7 +19,7 @@ fi
 DATE=$(date +%Y-%m-%d)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<'PY'
 import re, subprocess, sys
-from hvlib import find_section, write_text_atomic, update_json
+from hvlib import find_section, write_text_atomic, update_json, format_done_line, parse_done_line
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
@@ -38,7 +38,7 @@ if not m:
 
 line = m.group(0)
 content = content[:m.start()] + content[m.end()+1:]
-done = f"- ~~{line[2:]}~~ Done {date_s} [`{hash_s}`]"
+done = format_done_line(line, date_s, hash_s)
 span = find_section(content, "Completed")
 if span is None:
     content = content.rstrip("\n") + "\n\n## Completed\n\n" + done + "\n"

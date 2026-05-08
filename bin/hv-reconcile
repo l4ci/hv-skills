@@ -5,12 +5,20 @@
 # `repo` are scoped to <umbrella>/<repo>/. The `todoDrift` field is populated
 # by hv-todo-drift — IDs whose tags appear in commit subjects but are still
 # listed as open in TODO.md. Helper failure => todoDrift: [] (don't fail
-# the whole reconcile).
+# the whole reconcile). Entries where noBase:true indicate the umbrella cwd
+# has no git repo; commitCount is 0 but is not meaningful for those entries.
 # Usage: hv-reconcile
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-HV_BASE="$("$HERE/hv-base-branch" 2>/dev/null || echo "")"
-export HV_BASE HERE
+UMBRELLA_ON=$("$HERE/hv-umbrella-on")
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  # In umbrella mode, the umbrella tree may legitimately not be a git repo;
+  # we don't compute commitCount for the umbrella cwd in that case.
+  HV_BASE=""
+else
+  HV_BASE="$("$HERE/hv-base-branch")"
+fi
+export HV_BASE HERE UMBRELLA_ON
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
@@ -18,6 +26,7 @@ from hvlib import load_json, dump_json_atomic, load_repos
 
 HERE = os.environ["HERE"]
 UMBRELLA_BASE = os.environ["HV_BASE"]
+UMBRELLA_ON = os.environ["UMBRELLA_ON"]
 
 def collect_todo_drift():
     try:
@@ -78,18 +87,22 @@ for entry in active:
     if worktree_missing:
         entry = {**entry, "worktree": None}
 
-    if repo not in base_cache:
-        result = subprocess.run(
-            [f"{HERE}/hv-base-branch"],
-            capture_output=True, text=True, cwd=git_cwd,
-        )
-        base_cache[repo] = result.stdout.strip() if result.returncode == 0 else "main"
-    base = base_cache[repo]
-
-    commit_count = 0
-    out, rc = git("rev-list", "--count", f"{base}..{branch}", cwd=git_cwd)
-    if rc == 0 and out.isdigit():
-        commit_count = int(out)
+    no_base = False
+    if repo is None and UMBRELLA_ON == "yes" and not UMBRELLA_BASE:
+        no_base = True
+        commit_count = 0
+    else:
+        if repo not in base_cache:
+            result = subprocess.run(
+                [f"{HERE}/hv-base-branch"],
+                capture_output=True, text=True, cwd=git_cwd,
+            )
+            base_cache[repo] = result.stdout.strip() if result.returncode == 0 else "main"
+        base = base_cache[repo]
+        commit_count = 0
+        out, rc = git("rev-list", "--count", f"{base}..{branch}", cwd=git_cwd)
+        if rc == 0 and out.isdigit():
+            commit_count = int(out)
 
     needs_action.append({
         "branch": branch,
@@ -100,6 +113,7 @@ for entry in active:
         "hasCommits": commit_count > 0,
         "commitCount": commit_count,
         "worktreeMissing": worktree_missing,
+        "noBase": no_base,
     })
     still_active.append(entry)
 

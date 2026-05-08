@@ -16,9 +16,11 @@ if [ "${#CANDIDATES[@]}" -eq 0 ]; then
   echo "no umbrella .hv/ found" >&2
   exit 1
 fi
-python3 - "${CANDIDATES[@]}" <<'PY'
-import json, os, sys
+_RESOLVE_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$_RESOLVE_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 - "${CANDIDATES[@]}" <<'PY'
+import os, sys
 from pathlib import Path
+from hvlib import load_json
 
 candidates = sys.argv[1:]
 first = candidates[0]
@@ -26,11 +28,8 @@ first = candidates[0]
 # Look for a parent candidate whose repos.json registers `first` as a sub-repo.
 for parent in candidates[1:]:
     repos_path = Path(parent) / ".hv" / "repos.json"
-    try:
-        data = json.loads(repos_path.read_text())
-        repos = data.get("repos", []) or []
-    except (FileNotFoundError, ValueError, OSError):
-        repos = []
+    data = load_json(repos_path, {"repos": []})
+    repos = data.get("repos", []) or []
     first_real = os.path.realpath(first)
     for entry in repos:
         rel = entry.get("path", "")

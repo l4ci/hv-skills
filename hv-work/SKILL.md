@@ -269,11 +269,12 @@ Multi-repo waves under `work.isolation: "branch"` are safe by construction — e
 
 ```bash
 (cd <repo> && git branch <branch-name>)
-git -C <repo> worktree add <umbrella>/.claude/worktrees/<repo>/<branch-name> <branch-name>
-.hv/bin/hv-status-add --repo <repo> <branch> <ID1>,<ID2>[,...] <umbrella>/.claude/worktrees/<repo>/<branch-name>
+WT_PATH="$(.hv/bin/hv-worktree-path --repo <repo> <branch-name>)"
+git -C <repo> worktree add "$WT_PATH" <branch-name>
+.hv/bin/hv-status-add --repo <repo> <branch> <ID1>,<ID2>[,...] "$WT_PATH"
 ```
 
-The worktree path lives at `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layout B); `git worktree add` is run from inside `<repo>` so the worktree is registered against that sub-repo's `.git/`. `hv-worktree-clear --repo` (cleanup helper) finds it via the same Layout B path.
+The worktree path lives at the path emitted by `.hv/bin/hv-worktree-path` (Layout B); `git worktree add` is run from inside `<repo>` so the worktree is registered against that sub-repo's `.git/`. `hv-worktree-clear --repo` (cleanup helper) finds it via the same Layout B path.
 
 Orchestrator stays in the umbrella worktree (retains `.hv/` access). Workers get the absolute Layout B path in their briefs and work there.
 

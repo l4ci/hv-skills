@@ -26,34 +26,34 @@ done
   exit 1
 }
 HERE="$(cd "$(dirname "$0")" && pwd)"
+export HERE
 
 # Validate names before doing anything else.
 "$HERE/hv-resolve-repos" "$REPOS" >/dev/null || exit $?
 
-# Split CSVs in python so trim/empty-handling matches parse_repos_csv exactly.
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REPOS" "$WORKTREES" <<'PY' > "${TMPDIR:-/tmp}/hv-mam-pairs.$$"
-import sys
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$IF_ABSENT" "$BRANCH" "$ITEMS" "$REPOS" "$WORKTREES" <<'PY'
+import subprocess, sys, os
 from hvlib import parse_repos_csv
-repos = parse_repos_csv(sys.argv[1])
-raw_w = sys.argv[2]
-wt = [s.strip() for s in raw_w.split(",")] if raw_w else []
+
+if_absent, branch, items, repos_csv, worktrees_csv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+HERE = os.environ["HERE"]
+
+repos = parse_repos_csv(repos_csv)
+wt = [s.strip() for s in worktrees_csv.split(",")] if worktrees_csv else []
 if wt and len(wt) != len(repos):
     sys.stderr.write(
         f"--worktrees length ({len(wt)}) must match --repos length ({len(repos)})\n"
     )
     sys.exit(1)
+
 for i, name in enumerate(repos):
-    w = wt[i] if wt else ""
-    print(f"{name}\t{w}")
+    argv = [f"{HERE}/hv-status-add"]
+    if if_absent:
+        argv.append(if_absent)
+    argv.extend(["--repo", name, branch, items])
+    if wt:
+        w = wt[i]
+        if w:
+            argv.append(w)
+    subprocess.run(argv, check=True)
 PY
-
-PAIRS_FILE="${TMPDIR:-/tmp}/hv-mam-pairs.$$"
-trap 'rm -f "$PAIRS_FILE"' EXIT
-
-while IFS=$'\t' read -r REPO WORKTREE; do
-  if [ -n "$WORKTREE" ]; then
-    "$HERE/hv-status-add" $IF_ABSENT --repo "$REPO" "$BRANCH" "$ITEMS" "$WORKTREE"
-  else
-    "$HERE/hv-status-add" $IF_ABSENT --repo "$REPO" "$BRANCH" "$ITEMS"
-  fi
-done < "$PAIRS_FILE"

@@ -47,7 +47,7 @@ else
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY'
 import sys, re
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import write_text_atomic, iter_topics
 
 REGISTRY = {
     "knowledge": {
@@ -74,10 +74,8 @@ cfg = REGISTRY[key]
 source = Path(cfg["source"])
 topics = []
 if source.exists():
-    for line in source.read_text().splitlines():
-        m = re.match(r"^##\s+(.+?)\s*$", line)
-        if m:
-            topics.append(m.group(1).strip())
+    for name, _body in iter_topics(source.read_text()):
+        topics.append(name)
 
 body = "\n".join(f"- {t}" for t in topics) if topics else cfg["empty"]
 

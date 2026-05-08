@@ -25,14 +25,9 @@ if [ "$UMBRELLA_ON" = "yes" ]; then
     echo "uninitialized: umbrella.enabled is true but $HV/repos.json missing — re-run /hv-init from the umbrella root" >&2
     exit 2
   fi
-  REPOS_OK=$(python3 -c "
-import json
-try:
-    data = json.loads(open('.hv/repos.json').read())
-    repos = data.get('repos', []) or []
-    print('1' if any(e.get('name') and e.get('path') for e in repos) else '0')
-except Exception:
-    print('0')
+  REPOS_OK=$(PYTHONPATH="$SRC_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from hvlib import load_repos
+print('1' if load_repos() else '0')
 ")
   if [ "$REPOS_OK" != "1" ]; then
     echo "uninitialized: $HV/repos.json is empty or malformed — re-run /hv-init from the umbrella root" >&2

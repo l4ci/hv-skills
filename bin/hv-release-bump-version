@@ -14,10 +14,12 @@ FILE="${1:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 KIND="${2:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 BUMP="${3:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$KIND" "$BUMP" "$DRY_RUN" <<'PY'
+import json
 import re
 import sys
 from pathlib import Path
-from hvlib import load_json, dump_json_atomic, write_text_atomic, parse_toml_version
+import hvlib
+from hvlib import read_version, write_version
 
 KINDS = {"plugin-json", "package-json", "pyproject", "cargo", "plain"}
 BUMPS = {"patch", "minor", "major"}
@@ -49,37 +51,22 @@ def parse_semver(v):
     return tuple(int(x) for x in v.split("."))
 
 
-def read_current_version(p, k):
-    if k in ("plugin-json", "package-json"):
-        data = load_json(p, {})
-        v = data.get("version")
-        if v is None:
-            print(f"error: {p}: no version field found", file=sys.stderr)
-            sys.exit(1)
-        return v
-    content = p.read_text()
-    if k == "pyproject":
-        v = parse_toml_version(content, ["project", "tool.poetry"])
-        if v is not None:
-            return v
-        print(f"error: {p}: no version field found", file=sys.stderr)
+def get_version_or_die(filepath, kind):
+    try:
+        v = hvlib.read_version(filepath, kind)
+    except FileNotFoundError:
+        print(f"error: {filepath}: file not found", file=sys.stderr)
         sys.exit(1)
-    if k == "cargo":
-        v = parse_toml_version(content, ["package"])
-        if v is not None:
-            return v
-        print(f"error: {p}: no version field found", file=sys.stderr)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"error: {filepath}: {e}", file=sys.stderr)
         sys.exit(1)
-    # plain
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    print(f"error: {p}: no version field found", file=sys.stderr)
-    sys.exit(1)
+    if v is None:
+        print(f"error: {filepath}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    return v
 
 
-current = read_current_version(path, kind)
+current = get_version_or_die(path, kind)
 cur_tuple = parse_semver(current)
 major, minor, patch = cur_tuple
 
@@ -106,59 +93,11 @@ if dry_run:
     sys.exit(0)
 
 # --- write new version ---
-if kind in ("plugin-json", "package-json"):
-    data = load_json(path, {})
-    data["version"] = new
-    dump_json_atomic(path, data)
-
-elif kind == "pyproject":
-    content = path.read_text()
-    replaced = False
-    for sec_pat in (r"^\[project\]\s*$", r"^\[tool\.poetry\]\s*$"):
-        sec_m = re.search(sec_pat, content, re.MULTILINE)
-        if not sec_m:
-            continue
-        next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
-        end = sec_m.end() + next_m.start() if next_m else len(content)
-        sec_body = content[sec_m.end():end]
-        new_body, n = re.subn(
-            r'(?m)^(version\s*=\s*)"[^"]*"',
-            rf'\1"{new}"',
-            sec_body,
-            count=1,
-        )
-        if n:
-            content = content[:sec_m.end()] + new_body + content[end:]
-            replaced = True
-            break
-    if not replaced:
-        print(f"error: {path}: no version field in section", file=sys.stderr)
-        sys.exit(1)
-    write_text_atomic(path, content)
-
-elif kind == "cargo":
-    content = path.read_text()
-    sec_m = re.search(r"^\[package\]\s*$", content, re.MULTILINE)
-    if not sec_m:
-        print(f"error: {path}: no version field in section", file=sys.stderr)
-        sys.exit(1)
-    next_m = re.search(r"^\[", content[sec_m.end():], re.MULTILINE)
-    end = sec_m.end() + next_m.start() if next_m else len(content)
-    sec_body = content[sec_m.end():end]
-    new_body, n = re.subn(
-        r'(?m)^(version\s*=\s*)"[^"]*"',
-        rf'\1"{new}"',
-        sec_body,
-        count=1,
-    )
-    if not n:
-        print(f"error: {path}: no version field in section", file=sys.stderr)
-        sys.exit(1)
-    content = content[:sec_m.end()] + new_body + content[end:]
-    write_text_atomic(path, content)
-
-else:  # plain
-    write_text_atomic(path, new + "\n")
+try:
+    hvlib.write_version(path, kind, new)
+except ValueError as e:
+    print(f"error: {e}", file=sys.stderr)
+    sys.exit(1)
 
 print(new)
 PY

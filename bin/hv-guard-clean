@@ -37,6 +37,8 @@ fi
 DIRTY="$(python3 - "$REPOS_JSON" <<'PY'
 import json, subprocess, sys
 from pathlib import Path
+# Intentionally no try/except: corrupt repos.json should crash loudly here
+# so the user is forced to fix it before any work cycle proceeds.
 data = json.loads(Path(sys.argv[1]).read_text())
 dirty = []
 for entry in data.get("repos", []) or []:

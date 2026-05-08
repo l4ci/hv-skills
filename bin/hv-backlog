@@ -12,9 +12,10 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from collections import defaultdict
 from pathlib import Path
-from hvlib import iter_open_sections, load_json, parse_todo_fields
+from hvlib import iter_open_sections, load_json, parse_todo_fields, open_bullet_re
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
+_open_re = open_bullet_re()
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
@@ -34,19 +35,12 @@ def parse_items(body):
     items = []
     for line in body.splitlines():
         line = line.strip()
-        if not line.startswith("- **["):
+        m = _open_re.match(line)
+        if not m:
             continue
-        idm = re.match(rf"- \*\*\[({ITEM_CLASS}\d+)\]", line)
-        if not idm:
-            continue
-        item_id = idm.group(1)
-        # Strip the ID+tag prefix so title parsing works even when titles contain periods.
-        # Entry format: "- **[ID] [tag] Title.** Desc..." or "- **[ID] Title.** Desc..."
-        after_id = re.sub(rf"^- \*\*\[{ITEM_CLASS}\d+\]\s*(?:\[(?:P[012]|Major|Minor|Cosmetic)\]\s*)?", "", line)
-        tagm = re.search(r"\[(P[012]|Major|Minor|Cosmetic)\]", line)
-        tag = tagm.group(1) if tagm else ""
-        titlem = re.match(r"(.+?)\.\*\*", after_id)
-        title = titlem.group(1).strip() if titlem else "?"
+        item_id = m.group("id")
+        tag = m.group("tag") or ""
+        title = m.group("title").strip().rstrip(".")
         fields = parse_todo_fields(line)
         related = fields["related"].rstrip(".")
         milestones = ", ".join(re.findall(r"M\d+", fields["milestone"]))

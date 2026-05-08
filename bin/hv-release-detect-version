@@ -10,55 +10,23 @@ import json
 import sys
 from pathlib import Path
 
-from hvlib import load_json, parse_toml_version
+import hvlib
+from hvlib import load_json, infer_version_kind, read_version
 
 
-def infer_kind(filename):
-    name = Path(filename).name
-    if name == "plugin.json":
-        return "plugin-json"
-    if name.endswith(".json"):
-        return "package-json"
-    if name == "pyproject.toml":
-        return "pyproject"
-    if name == "Cargo.toml":
-        return "cargo"
-    return "plain"
-
-
-def read_version(filepath, kind):
-    path = Path(filepath)
-    text = path.read_text()
-
-    if kind in ("plugin-json", "package-json"):
-        data = json.loads(text)
-        v = data.get("version")
-        if v is None:
-            print(f"error: {filepath}: no version field found", file=sys.stderr)
-            sys.exit(1)
-        return v
-
-    if kind == "pyproject":
-        v = parse_toml_version(text, ["project", "tool.poetry"])
-        if v is None:
-            print(f"error: {filepath}: no version field found", file=sys.stderr)
-            sys.exit(1)
-        return v
-
-    if kind == "cargo":
-        v = parse_toml_version(text, ["package"])
-        if v is None:
-            print(f"error: {filepath}: no version field found", file=sys.stderr)
-            sys.exit(1)
-        return v
-
-    # plain
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    print(f"error: {filepath}: no version field found", file=sys.stderr)
-    sys.exit(1)
+def get_version_or_die(filepath, kind):
+    try:
+        v = hvlib.read_version(filepath, kind)
+    except FileNotFoundError:
+        print(f"error: {filepath}: file not found", file=sys.stderr)
+        sys.exit(1)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"error: {filepath}: {e}", file=sys.stderr)
+        sys.exit(1)
+    if v is None:
+        print(f"error: {filepath}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    return v
 
 
 # --- Step 1: check config override ---
@@ -69,8 +37,8 @@ if override:
     if not p.exists():
         print(f"error: release.versionFile = '{override}' does not exist", file=sys.stderr)
         sys.exit(1)
-    kind = infer_kind(override)
-    version = read_version(p, kind)
+    kind = infer_version_kind(override)
+    version = get_version_or_die(p, kind)
     print(json.dumps({"file": override, "version": version, "kind": kind}, indent=2))
     sys.exit(0)
 
@@ -87,7 +55,7 @@ CANDIDATES = [
 for filepath, kind in CANDIDATES:
     p = Path(filepath)
     if p.exists():
-        version = read_version(p, kind)
+        version = get_version_or_die(p, kind)
         print(json.dumps({"file": filepath, "version": version, "kind": kind}, indent=2))
         sys.exit(0)
 

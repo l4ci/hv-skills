@@ -46,17 +46,12 @@ def print_matching_sections(content: str, wanted: set[str], out=None) -> None:
     """
     if out is None:
         out = sys.stdout
-    parts = re.split(r"^(## .+)$", content, flags=re.MULTILINE)
-    # parts alternates: [preamble, heading1, body1, heading2, body2, ...]
     first = True
-    for i in range(1, len(parts), 2):
-        heading = parts[i]
-        body = parts[i + 1] if i + 1 < len(parts) else ""
-        title = heading[3:].strip()
-        if title.lower() in wanted:
+    for name, body in iter_topics(content):
+        if name.lower() in wanted:
             if not first:
                 print(file=out)
-            print(heading, file=out)
+            print(f"## {name}", file=out)
             print(body.rstrip(), file=out)
             first = False
 
@@ -334,3 +329,191 @@ def parse_toml_version(text: str, sections: list[str]) -> str | None:
         if v:
             return v.group(1)
     return None
+
+
+def open_bullet_re() -> "re.Pattern":
+    """Return a compiled regex matching an open TODO bullet line. The character
+    class for the ID prefix is built from HV_ITEM_TYPES env (default "BFT"
+    after stripping the M, since milestones don't appear as bullets in open
+    sections). Captures four named groups:
+
+        - id      e.g. "B07" (full id, no brackets)
+        - tag     e.g. "P1" or "Major" (the bracketed tag after the id), or "" if absent
+        - title   the human-readable title up to the closing `**`
+        - rest    everything after the closing `**` (Detail/Related/Milestone/Repos blob)
+
+    Anchored at line start; matches:
+        - **[B07] [P1] Title.** Detail: ...
+        - **[F12] Title.**
+    Does NOT match strikethrough/done lines (those start with `- ~~**[`).
+    """
+    types = os.environ.get("HV_ITEM_TYPES", "BFT").replace("M", "")
+    return re.compile(
+        rf"^- \*\*\[(?P<id>[{types}]\d+)\](?:\s+\[(?P<tag>[^\]]+)\])?\s+(?P<title>[^*]+?)\*\*(?P<rest>.*)$",
+        re.MULTILINE,
+    )
+
+
+def parse_open_bullet(line: str) -> dict | None:
+    """Parse a single open bullet line. Returns a dict with id/tag/title/rest
+    keys (matching open_bullet_re named groups), or None if the line isn't an
+    open bullet. tag and rest default to "" when absent.
+    """
+    m = open_bullet_re().match(line.rstrip("\n"))
+    if not m:
+        return None
+    return {
+        "id": m.group("id"),
+        "tag": (m.group("tag") or "").strip(),
+        "title": m.group("title").strip().rstrip(".").strip(),
+        "rest": (m.group("rest") or "").strip(),
+    }
+
+
+def format_done_line(open_line: str, date_str: str, hash_short: str) -> str:
+    """Convert an open bullet line (starting with `- **[ID]...`) into the
+    canonical Done line (`- ~~**[ID]...**~~ Done DATE [`hash`]`). The input
+    must be an open bullet — the leading `- ` is preserved, the rest is
+    wrapped in `~~...~~`, and the suffix is appended.
+
+    No validation that `open_line` is well-formed; caller is responsible.
+    """
+    if not open_line.startswith("- "):
+        raise ValueError("expected line starting with '- '")
+    inner = open_line[2:].rstrip()
+    return f"- ~~{inner}~~ Done {date_str} [`{hash_short}`]"
+
+
+_DONE_LINE_RE = re.compile(
+    r"^- ~~(?P<inner>.+?)~~ Done (?P<date>\d{4}-\d{2}-\d{2}) \[`(?P<hash>[^`]+)`\]\s*$"
+)
+
+
+def parse_done_line(line: str) -> dict | None:
+    """Parse a Done line. Returns dict {id, inner, date, hash} or None.
+    `inner` is the content between `~~ ... ~~` (the original bullet body
+    without the leading `- ` and without the strikethrough wrapping).
+    `id` is extracted from the leading `**[ID] ...` of `inner`; "" if absent.
+    """
+    m = _DONE_LINE_RE.match(line.rstrip("\n"))
+    if not m:
+        return None
+    inner = m.group("inner")
+    id_m = re.match(r"\*\*\[([A-Z]\d+)\]", inner)
+    return {
+        "id": id_m.group(1) if id_m else "",
+        "inner": inner,
+        "date": m.group("date"),
+        "hash": m.group("hash"),
+    }
+
+
+def iter_topics(content: str):
+    """Yield (name, body) pairs for each `## Topic` heading in `content`, in
+    document order. `name` is the heading text with leading `## ` and trailing
+    whitespace stripped. `body` is the text from after the heading line up to
+    (but not including) the next `## ` heading or EOF — preserves leading
+    and trailing whitespace.
+
+    Use this instead of hand-rolling re.split / re.findall / re.match-per-line
+    when scanning KNOWLEDGE.md, DECISIONS.md, or any other doc that uses ##
+    headings as topic separators.
+
+    See find_section for the same warning about column-0 `## ` lines inside
+    code fences — they will be treated as topic boundaries here too.
+    """
+    parts = re.split(r"^(## .+)$", content, flags=re.MULTILINE)
+    # parts alternates: [preamble, heading1, body1, heading2, body2, ...]
+    for i in range(1, len(parts), 2):
+        heading = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        name = heading[3:].strip()
+        yield name, body
+
+
+def infer_version_kind(filepath) -> str:
+    """Return the manifest kind for a version-bearing file path. Filename-based.
+    Known kinds: plugin-json, package-json, pyproject, cargo, plain.
+    Caller decides whether the kind is supported.
+    """
+    name = Path(filepath).name
+    if name == "plugin.json":
+        return "plugin-json"
+    if name.endswith(".json"):
+        return "package-json"
+    if name == "pyproject.toml":
+        return "pyproject"
+    if name == "Cargo.toml":
+        return "cargo"
+    return "plain"
+
+
+def read_version(filepath, kind: str) -> str | None:
+    """Read the version string from a manifest. Returns the version, or None
+    if the file has no version field. Raises FileNotFoundError if the path
+    doesn't exist; raises json.JSONDecodeError if a JSON manifest is corrupt
+    (callers that prefer silent failure should wrap with hvlib.load_json
+    semantics — but for release-helper context, surfacing a hard error on
+    corrupt JSON is preferable).
+    """
+    path = Path(filepath)
+    text = path.read_text()
+    if kind in ("plugin-json", "package-json"):
+        data = json.loads(text)
+        return data.get("version")
+    if kind == "pyproject":
+        return parse_toml_version(text, ["project", "tool.poetry"])
+    if kind == "cargo":
+        return parse_toml_version(text, ["package"])
+    if kind == "plain":
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped
+        return None
+    raise ValueError(f"unknown version kind: {kind!r}")
+
+
+def write_version(filepath, kind: str, new_version: str) -> None:
+    """Write `new_version` into the manifest at `filepath` according to `kind`.
+    JSON manifests are rewritten with dump_json_atomic; TOML manifests have
+    only the `version = "..."` line in the relevant section replaced
+    (write_text_atomic); `plain` rewrites the file with `new_version + "\\n"`.
+    Raises FileNotFoundError if the file is missing; raises ValueError if the
+    target section/field can't be located.
+    """
+    path = Path(filepath)
+    if kind in ("plugin-json", "package-json"):
+        data = load_json(path, {})
+        data["version"] = new_version
+        dump_json_atomic(path, data)
+        return
+    if kind == "plain":
+        write_text_atomic(path, new_version + "\n")
+        return
+    if kind in ("pyproject", "cargo"):
+        sections = ["project", "tool.poetry"] if kind == "pyproject" else ["package"]
+        content = path.read_text()
+        for section_name in sections:
+            sec_pat = re.compile(
+                r"^\s*\[" + re.escape(section_name) + r"\s*\]\s*$",
+                re.MULTILINE,
+            )
+            sec_m = sec_pat.search(content)
+            if not sec_m:
+                continue
+            next_m = re.search(r"^\s*\[", content[sec_m.end():], re.MULTILINE)
+            end = sec_m.end() + next_m.start() if next_m else len(content)
+            sec_body = content[sec_m.end():end]
+            new_body, n = re.subn(
+                r'(?m)^(version\s*=\s*)"[^"]*"',
+                rf'\1"{new_version}"',
+                sec_body,
+                count=1,
+            )
+            if n:
+                content = content[:sec_m.end()] + new_body + content[end:]
+                write_text_atomic(path, content)
+                return
+        raise ValueError(f"{path}: no version field in section")
+    raise ValueError(f"unknown version kind: {kind!r}")

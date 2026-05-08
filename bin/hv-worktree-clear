@@ -26,11 +26,8 @@ WT=$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
 # Layout B fallback: when --repo is set and the awk search missed, try the
 # canonical Layout B path under the resolved umbrella.
 if [ -z "$WT" ] && [ -n "$REPO" ]; then
-  if UMBRELLA="$("$BIN_DIR/hv-resolve-umbrella" 2>/dev/null)"; then
-    LB_PATH="$UMBRELLA/.claude/worktrees/$REPO/$BRANCH"
-    if [ -d "$LB_PATH" ]; then
-      WT="$LB_PATH"
-    fi
+  if LB_PATH="$("$BIN_DIR/hv-worktree-path" --repo "$REPO" "$BRANCH" 2>/dev/null)" && [ -d "$LB_PATH" ]; then
+    WT="$LB_PATH"
   fi
 fi
 
