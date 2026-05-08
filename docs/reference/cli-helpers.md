@@ -53,7 +53,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
 | `hv-refactor-reset` | Zero `counters.json#since_refactor` (called by `/hv-refactor` after commit) | `.hv/bin/hv-refactor-reset` |
 | `hv-refactor-targets` | JSON: umbrella mode flag + `hasCode` for the umbrella + every registered sub-repo's name and abs path. Used by `/hv-refactor` Step 1.5 to ask the user which scope to refactor | `.hv/bin/hv-refactor-targets` |
-| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks) | `.hv/bin/hv-backlog` |
+| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks); `--grep <pattern>` filters by substring | `.hv/bin/hv-backlog --grep dashboard` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
 | `hv-umbrella-init` | Bootstrap an umbrella registry: scan child git repos, register a chosen subset (via stdin), write `.hv/repos.json` and append umbrella `.gitignore` lines | `echo "all" \| <source-bin>/hv-umbrella-init` |
@@ -178,7 +178,11 @@ and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
 
 `hv-backlog` renders the full TODO.md as sorted Markdown tables (In Progress,
 Bugs, Features, Tasks). Handy for a quick terminal overview or piping into
-other scripts.
+other scripts. Pass `--grep <pattern>` to filter Bugs / Features / Tasks rows
+by case-insensitive substring against each item's bullet line (matches across
+ID, title, description, and `Related:` tags). The In Progress section is
+state and is never filtered; the Clusters section keeps clusters whose any
+member matched, preserving all member IDs for context.
 
 `hv-guard-clean` exits non-zero when the git working tree is dirty or the
 current directory is not inside a git repository. Skills call it as a safety
