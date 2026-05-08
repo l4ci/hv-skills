@@ -140,6 +140,24 @@ Then mark the spike done:
 
 The helper sets `status: done` and `finished: <date>` in the spike file. The branch is left as-is — historical reference, never merged.
 
+## Step 6.5 (Finish mode) — Promote Finding to Decision (nudge)
+
+Read back the `Decision` field Step 6 just wrote. Skip this step entirely — no nudge, no question, no log — when the decision is `inconclusive` or empty. An inconclusive spike doesn't have enough evidence to be a hard boundary.
+
+When the decision is `viable`, `not viable`, or `depends-on-X`, ask via `AskUserQuestion`:
+
+- **Header:** `"Decide"`
+- **Question:** *"This spike concluded `<verdict>`. Promote the finding to a hard-boundary decision in `DECISIONS.md`?"* (substitute the verbatim verdict)
+- **Options:**
+  1. *"Yes, promote (Recommended)"* — *"Invoke `/hv-decide --from-spike <name>`. The spike's question + decision + recommended approach pre-fill the rule and why; you'll articulate the forbids/permits."*
+  2. *"Skip — keep finding in spike file only"* — *"No decision is captured. The finding stays in `.hv/spikes/<name>.md` for reference."*
+
+Plain-text fallback: *"Promote to a decision?"* — yes / no.
+
+On **Yes**, dispatch `hv-decide` via the `Skill` tool with `--from-spike <name>` as the argument, then continue to Step 7 once it returns.
+
+On **Skip**, print one line — *"Spike finding stays in `.hv/spikes/<name>.md`. Run `/hv-decide --from-spike <name>` later if you change your mind."* — then continue to Step 7.
+
 ## Step 7 (Finish mode) — Optional Follow-Up
 
 If the decision is `viable` and the user is ready to act, offer one of:
@@ -156,4 +174,5 @@ If not viable or inconclusive, the spike is its own conclusion. Don't push to ca
 - **Honest reporting beats salvage.** A "not viable" conclusion is just as valuable as "viable".
 - **No stubs or partial work back to main.** Anything on main is real implementation.
 - **Spikes are scoped, not open-ended.** A spike open >2 weeks without a decision is stale — close it `inconclusive` and recapture if needed.
+- **Spikes feed decisions, not the other way around.** A `viable` / `not viable` / `depends-on-X` finish is a natural moment to ask whether the conclusion is a commitment future work must respect; an `inconclusive` finish is not.
 - **Umbrella spikes are per-repo.** A spike's branch lives in the sub-repo named in its frontmatter `repo:` field; the spike file itself stays at the umbrella root.
