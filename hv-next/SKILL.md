@@ -178,10 +178,7 @@ Fires only on the *terminal* paths of /hv-next — when the user picks "Stop her
 .hv/bin/hv-release-pending
 ```
 
-Parse the JSON output. If `shouldNudge` is `false`, skip silently. If `true`, append one line to the user-facing output (after any "OK — run `/hv-next` again..." message):
-
-- When `reason == "commits"`: *"<commits> commits since <lastTag>; consider `/hv-release`."*
-- When `reason == "days"`: *"<commits> commits and <days> days since <lastTag>; consider `/hv-release`."*
+Parse the JSON output. If `shouldNudge` is `false`, skip silently. If `true`, append the helper's `message` field as a single line of output (after any "OK — run `/hv-next` again..." message). The helper renders the appropriate phrasing based on `reason`; the skill just prints it.
 
 Keep it to one line. Don't expand into a paragraph or a checklist — the nudge is informational and the user might just dismiss it.
 

@@ -230,10 +230,7 @@ After every successful ship, surface unreleased-commit accumulation so the user 
 
 Parse the JSON. If `shouldNudge` is `false`, skip silently. If `lastTag` is empty (no release ever cut), skip silently — the first release is the user's call.
 
-When the nudge fires, append one line to the Step 9 report block (after `Resolved: [...]`):
-
-- `reason == "commits"`: *"<commits> commits since <lastTag>; consider `/hv-release`."*
-- `reason == "days"`: *"<commits> commits and <days> days since <lastTag>; consider `/hv-release`."*
+When the nudge fires, append the helper's `message` field as one line in the Step 9 report block (after `Resolved: [...]`). The helper renders the phrasing; the skill just prints it.
 
 This step runs after BOTH PR and direct-merge flows; the trigger is "ship completed", not the integration mechanism.
 

@@ -14,12 +14,11 @@ FILE="${1:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 KIND="${2:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 BUMP="${3:?usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$KIND" "$BUMP" "$DRY_RUN" <<'PY'
-import json
 import re
 import sys
 from pathlib import Path
 import hvlib
-from hvlib import read_version, write_version
+from hvlib import get_version_or_die
 
 KINDS = {"plugin-json", "package-json", "pyproject", "cargo", "plain"}
 BUMPS = {"patch", "minor", "major"}
@@ -49,21 +48,6 @@ def parse_semver(v):
         print(f"error: current version '{v}' is not X.Y.Z semver", file=sys.stderr)
         sys.exit(1)
     return tuple(int(x) for x in v.split("."))
-
-
-def get_version_or_die(filepath, kind):
-    try:
-        v = hvlib.read_version(filepath, kind)
-    except FileNotFoundError:
-        print(f"error: {filepath}: file not found", file=sys.stderr)
-        sys.exit(1)
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"error: {filepath}: {e}", file=sys.stderr)
-        sys.exit(1)
-    if v is None:
-        print(f"error: {filepath}: no version field found", file=sys.stderr)
-        sys.exit(1)
-    return v
 
 
 current = get_version_or_die(path, kind)

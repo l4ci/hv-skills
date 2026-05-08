@@ -2,7 +2,9 @@
 # Report how many commits and days have elapsed since the last release tag.
 # Used by /hv-next and /hv-ship to decide whether to nudge the user toward /hv-release.
 # Output (single-line JSON on stdout):
-#   {"lastTag":"v1.16.0","commits":5,"days":1,"thresholdCommits":10,"thresholdDays":14,"shouldNudge":false,"reason":""}
+#   {"lastTag":"v1.16.0","commits":5,"days":1,"thresholdCommits":10,"thresholdDays":14,"shouldNudge":false,"reason":"","message":""}
+# When shouldNudge is true, "message" carries the rendered phrasing the skills
+# should print verbatim (plain text, no markdown decoration). When false, empty.
 # Exits 0 on all success paths (including "no tag yet"); exits 1 only on broken state.
 set -euo pipefail
 
@@ -36,6 +38,7 @@ if not last_tag:
         "thresholdDays": 14,
         "shouldNudge": False,
         "reason": "no-tag",
+        "message": "",
     }))
     raise SystemExit(0)
 
@@ -69,6 +72,18 @@ if commits > 0:
         should_nudge = True
         reason = "days"
 
+# Render the user-facing nudge phrasing once, here, so /hv-next and /hv-ship
+# don't reconstruct identical strings independently. Plain text — no markdown
+# decoration; skills can wrap/italicize if they want.
+if not should_nudge:
+    message = ""
+elif reason == "commits":
+    message = f"{commits} commits since {last_tag}; consider /hv-release."
+elif reason == "days":
+    message = f"{commits} commits and {int(days)} days since {last_tag}; consider /hv-release."
+else:
+    message = ""
+
 print(json.dumps({
     "lastTag": last_tag,
     "commits": commits,
@@ -77,5 +92,6 @@ print(json.dumps({
     "thresholdDays": threshold_days,
     "shouldNudge": should_nudge,
     "reason": reason,
+    "message": message,
 }))
 PY

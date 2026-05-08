@@ -11,38 +11,23 @@ set -euo pipefail
 
 REPO="l4ci/hv-skills"
 
+# Capture bin/ dir BEFORE any cd — sibling helpers must be invoked via $BIN_DIR.
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 resolve_root() {
-  if [ -n "${HV_INSTALL_ROOT:-}" ] && [ -d "$HV_INSTALL_ROOT" ]; then
-    echo "override|$HV_INSTALL_ROOT"
-    return
-  fi
-  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" ]; then
-    echo "plugin|$CLAUDE_PLUGIN_ROOT"
-    return
-  fi
-  for candidate in \
-    "$HOME"/.claude/plugins/*/hv-skills \
-    "$HOME"/.claude/plugins/hv-skills; do
-    if [ -f "$candidate/.claude-plugin/plugin.json" ]; then
-      echo "plugin|$candidate"
+  # Canonical resolver: bin/hv-resolve-plugin-root → hvlib.resolve_plugin_root.
+  # Returns "<kind>|<root>" or "none|" when nothing's found. Falls back to
+  # local stow-symlink and repo-clone walks below for cases the canonical
+  # resolver doesn't cover.
+  local out kind root
+  out="$("$BIN_DIR/hv-resolve-plugin-root")"
+  IFS='|' read -r kind root <<<"$out"
+  case "$kind" in
+    override|plugin|stow)
+      echo "$kind|$root"
       return
-    fi
-  done
-  # Claude Code plugin cache: pick the newest installed version.
-  for candidate in $(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/ 2>/dev/null | sort -Vr); do
-    if [ -f "$candidate.claude-plugin/plugin.json" ]; then
-      echo "plugin|${candidate%/}"
-      return
-    fi
-  done
-  for candidate in \
-    "$HOME"/.agents/skills/hv-skills \
-    "$HOME"/.agents/skills; do
-    if [ -f "$candidate/.claude-plugin/plugin.json" ]; then
-      echo "stow|$candidate"
-      return
-    fi
-  done
+      ;;
+  esac
   # Stow dev layout: individual skill dirs are symlinked into a skills root
   # (e.g. ~/.claude/skills/hv-update -> ~/Code/hv-skills/hv-update). Stow
   # doesn't symlink .claude-plugin/, so plugin.json doesn't sit under the
@@ -55,6 +40,7 @@ resolve_root() {
     if [ -L "$stow_link" ] && [ -d "$stow_link" ]; then
       # cd -P resolves the symlink so the following `..` strips the
       # physical target's last component, not the symlink path's.
+      local repo_root
       repo_root="$(cd -P "$stow_link" 2>/dev/null && cd .. && pwd -P)"
       if [ -n "$repo_root" ] && [ -f "$repo_root/.claude-plugin/plugin.json" ]; then
         echo "stow|$repo_root"
@@ -63,8 +49,7 @@ resolve_root() {
     fi
   done
   # Repo clone — walk up from this script.
-  SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-  for up in "$SELF_DIR" "$SELF_DIR/.." "$SELF_DIR/../.."; do
+  for up in "$BIN_DIR" "$BIN_DIR/.." "$BIN_DIR/../.."; do
     if [ -f "$up/.claude-plugin/plugin.json" ]; then
       echo "repo|$(cd "$up" && pwd)"
       return
@@ -78,7 +63,7 @@ read_version() {
   [ -z "$root" ] && { echo ""; return; }
   local mf="$root/.claude-plugin/plugin.json"
   [ -f "$mf" ] || { echo ""; return; }
-  PYTHONPATH="$(cd "$(dirname "$0")" && pwd)${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+  PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
 from hvlib import load_json
 import sys
 print(load_json(sys.argv[1], {}).get('version', ''))

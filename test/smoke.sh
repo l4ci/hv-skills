@@ -2982,6 +2982,7 @@ assert d['lastTag'] == '', d
 assert d['commits'] == 0, d
 assert d['shouldNudge'] is False, d
 assert d['reason'] == 'no-tag', d
+assert d['message'] == '', d
 " "$OUT" || fail "no-tag case: $OUT"
 )
 pass "hv-release-pending: no tag -> no nudge"
@@ -3002,6 +3003,7 @@ assert d['lastTag'] == 'v0.0.1', d
 assert d['commits'] == 3, d
 assert d['shouldNudge'] is False, d
 assert d['reason'] == '', d
+assert d['message'] == '', d
 " "$OUT" || fail "below-threshold case: $OUT"
 )
 pass "hv-release-pending: 3 commits past tag -> no nudge"
@@ -3022,6 +3024,7 @@ assert d['lastTag'] == 'v0.0.1', d
 assert d['commits'] == 11, d
 assert d['shouldNudge'] is True, d
 assert d['reason'] == 'commits', d
+assert d['message'] == '11 commits since v0.0.1; consider /hv-release.', d
 " "$OUT" || fail "above-commit-threshold case: $OUT"
 )
 pass "hv-release-pending: 11 commits past tag -> nudge (reason=commits)"
@@ -3044,6 +3047,7 @@ assert d['thresholdCommits'] == 5, d
 assert d['commits'] == 6, d
 assert d['shouldNudge'] is True, d
 assert d['reason'] == 'commits', d
+assert d['message'] == '6 commits since v0.0.1; consider /hv-release.', d
 " "$OUT" || fail "custom-threshold case: $OUT"
 )
 pass "hv-release-pending: custom nudgeAfterCommits=5 honored"

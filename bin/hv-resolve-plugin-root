@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Resolve the installed hv-skills plugin root. Wraps hvlib.resolve_plugin_root
+# so shell callers (hv-update-check, hv-version-check, future tooling) share
+# one resolver — see bin/hvlib.py for the canonical walk order.
+#
+# Usage:
+#   hv-resolve-plugin-root              # <kind>|<root>   (matches hv-update-check)
+#   hv-resolve-plugin-root --root-only  # <root>          (for hv-version-check)
+#   hv-resolve-plugin-root --bin        # <root>/bin      (for hv-init bootstrap)
+#
+# Exits 0 always — callers detect "not found" by an empty root portion of the
+# output (kind == "none" → root == "").
+set -euo pipefail
+
+MODE="default"
+case "${1:-}" in
+  --root-only) MODE="root-only" ;;
+  --bin)       MODE="bin" ;;
+  "")          MODE="default" ;;
+  *)
+    echo "usage: hv-resolve-plugin-root [--root-only|--bin]" >&2
+    exit 2
+    ;;
+esac
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+MODE="$MODE" PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import os
+import sys
+
+from hvlib import resolve_plugin_root
+
+root, kind = resolve_plugin_root()
+mode = os.environ["MODE"]
+
+if mode == "root-only":
+    sys.stdout.write(root)
+elif mode == "bin":
+    sys.stdout.write(f"{root}/bin" if root else "")
+else:
+    sys.stdout.write(f"{kind}|{root}")
+PY

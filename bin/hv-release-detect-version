@@ -10,23 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-import hvlib
-from hvlib import load_json, infer_version_kind, read_version
-
-
-def get_version_or_die(filepath, kind):
-    try:
-        v = hvlib.read_version(filepath, kind)
-    except FileNotFoundError:
-        print(f"error: {filepath}: file not found", file=sys.stderr)
-        sys.exit(1)
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"error: {filepath}: {e}", file=sys.stderr)
-        sys.exit(1)
-    if v is None:
-        print(f"error: {filepath}: no version field found", file=sys.stderr)
-        sys.exit(1)
-    return v
+from hvlib import get_version_or_die, infer_version_kind, load_json
 
 
 # --- Step 1: check config override ---

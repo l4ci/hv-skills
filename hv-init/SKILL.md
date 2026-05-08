@@ -81,21 +81,33 @@ Plain-text fallback: ask once textually — *"Found N git repos here: <list>. En
 Resolve the source `bin/` from the installed plugin, then run `hv-bootstrap` to seed `.hv/` and copy every helper into `.hv/bin/`. Source resolution order: `$CLAUDE_PLUGIN_ROOT/bin/` first, then standard install locations, then a repo-local clone.
 
 ```bash
+# Mirror of bin/hv-resolve-plugin-root --bin — kept inline for bootstrap
+# (hv-init runs before .hv/bin/ exists, so the helper isn't callable yet).
+# Order MUST match hvlib.resolve_plugin_root: HV_INSTALL_ROOT override,
+# CLAUDE_PLUGIN_ROOT, ~/.claude/plugins/*/hv-skills, ~/.claude/plugins/hv-skills,
+# ~/.claude/plugins/cache/hv-skills/hv-skills/<version>/, ~/.agents/skills/...
 SRC=""
-if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT/bin" ]; then
+if [ -n "${HV_INSTALL_ROOT:-}" ] && [ -d "$HV_INSTALL_ROOT/bin" ]; then
+  SRC="$HV_INSTALL_ROOT/bin"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT/bin" ]; then
   SRC="$CLAUDE_PLUGIN_ROOT/bin"
 else
   for candidate in \
     "$HOME"/.claude/plugins/*/hv-skills/bin \
-    "$HOME"/.claude/plugins/hv-skills/bin \
-    "$HOME"/.agents/skills/hv-skills/bin \
-    "$HOME"/.agents/skills/bin; do
+    "$HOME"/.claude/plugins/hv-skills/bin; do
     [ -d "$candidate" ] && SRC="$candidate" && break
   done
   # Claude Code plugin cache: pick the newest installed version.
   if [ -z "$SRC" ]; then
     SRC=$(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin 2>/dev/null | sort -V | tail -1)
     [ -d "$SRC" ] || SRC=""
+  fi
+  if [ -z "$SRC" ]; then
+    for candidate in \
+      "$HOME"/.agents/skills/hv-skills/bin \
+      "$HOME"/.agents/skills/bin; do
+      [ -d "$candidate" ] && SRC="$candidate" && break
+    done
   fi
 fi
 [ -z "$SRC" ] && { echo "error: could not locate hv-skills bin/ — set CLAUDE_PLUGIN_ROOT or install the plugin" >&2; exit 1; }

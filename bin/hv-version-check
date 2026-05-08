@@ -11,7 +11,9 @@
 #   hv-version-check --json   # always emit JSON
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Capture bin/ dir BEFORE any cd — sibling helpers must be invoked via $BIN_DIR.
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$BIN_DIR"
 # shellcheck disable=SC1091
 . "$HERE/hv-self-locate.sh"
 hv_self_locate || exit 0
@@ -31,28 +33,7 @@ except Exception:
 " || true)
 fi
 
-resolve_plugin_root() {
-  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" ]; then
-    echo "$CLAUDE_PLUGIN_ROOT"; return
-  fi
-  for cand in \
-    "$HOME"/.claude/plugins/*/hv-skills \
-    "$HOME"/.claude/plugins/hv-skills \
-    "$HOME"/.agents/skills/hv-skills \
-    "$HOME"/.agents/skills; do
-    if [ -f "$cand/.claude-plugin/plugin.json" ]; then
-      echo "$cand"; return
-    fi
-  done
-  for cand in $(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/ 2>/dev/null | sort -Vr); do
-    if [ -f "$cand.claude-plugin/plugin.json" ]; then
-      echo "${cand%/}"; return
-    fi
-  done
-  echo ""
-}
-
-ROOT=$(resolve_plugin_root)
+ROOT=$("$BIN_DIR/hv-resolve-plugin-root" --root-only)
 INSTALLED=""
 if [ -n "$ROOT" ]; then
   INSTALLED=$(python3 -c "

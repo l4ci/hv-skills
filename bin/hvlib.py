@@ -448,6 +448,113 @@ def infer_version_kind(filepath) -> str:
     return "plain"
 
 
+def get_version_or_die(filepath, kind: str) -> str:
+    """Read the version from `filepath` (kind per `infer_version_kind`), or
+    print a one-line error to stderr and `sys.exit(1)`. Wraps `read_version`
+    so release helpers don't have to repeat the same try/except dance.
+
+    Error messages match the prior inline implementation byte-for-byte:
+      - missing file        → "error: <path>: file not found"
+      - corrupt JSON / TOML → "error: <path>: <e>"
+      - no version field    → "error: <path>: no version field found"
+    """
+    try:
+        v = read_version(filepath, kind)
+    except FileNotFoundError:
+        print(f"error: {filepath}: file not found", file=sys.stderr)
+        sys.exit(1)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"error: {filepath}: {e}", file=sys.stderr)
+        sys.exit(1)
+    if v is None:
+        print(f"error: {filepath}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    return v
+
+
+def resolve_plugin_root() -> tuple[str, str]:
+    """Locate the installed hv-skills plugin root. Returns (root, kind) where
+    `kind` is one of "override", "plugin", "stow", or "none" and `root` is the
+    absolute path (or "" when kind == "none").
+
+    Resolution order, matching the historical shell resolvers in
+    bin/hv-update-check and bin/hv-version-check (which had drifted apart —
+    B12 was caused by the cache fallback being added to one but not the
+    other; this function consolidates the walk):
+
+      1. HV_INSTALL_ROOT env var (existing dir)         → ("override", root)
+         Note: this branch does NOT require .claude-plugin/plugin.json — it
+         matches hv-update-check's looser legacy behavior, used for tests
+         and airgapped overrides.
+      2. CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json  → ("plugin",   root)
+      3. ~/.claude/plugins/<marketplace>/hv-skills/.claude-plugin/plugin.json
+         and ~/.claude/plugins/hv-skills/.claude-plugin/plugin.json
+                                                        → ("plugin",   root)
+      4. ~/.claude/plugins/cache/hv-skills/hv-skills/<version>/, newest by
+         `pkg_resources`-style version sort, with plugin.json present
+                                                        → ("plugin",   root)
+      5. ~/.agents/skills/hv-skills/.claude-plugin/plugin.json
+         and ~/.agents/skills/.claude-plugin/plugin.json
+                                                        → ("stow",     root)
+      6. otherwise                                      → ("",         "none")
+
+    Never raises on missing dirs.
+    """
+    import glob
+
+    # 1. HV_INSTALL_ROOT override — matches hv-update-check's loose check
+    #    (just dir-exists, NOT plugin.json-required).
+    override = os.environ.get("HV_INSTALL_ROOT", "")
+    if override and os.path.isdir(override):
+        return (override, "override")
+
+    # 2. CLAUDE_PLUGIN_ROOT.
+    cpr = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    if cpr and os.path.isfile(os.path.join(cpr, ".claude-plugin", "plugin.json")):
+        return (cpr, "plugin")
+
+    home = os.path.expanduser("~")
+
+    # 3. Glob and literal under ~/.claude/plugins/.
+    candidates = sorted(glob.glob(os.path.join(home, ".claude/plugins/*/hv-skills")))
+    candidates.append(os.path.join(home, ".claude/plugins/hv-skills"))
+    for cand in candidates:
+        if os.path.isfile(os.path.join(cand, ".claude-plugin", "plugin.json")):
+            return (cand, "plugin")
+
+    # 4. Plugin cache: ~/.claude/plugins/cache/hv-skills/hv-skills/<version>/.
+    #    Sort versions descending (sort -V semantics) and pick the newest with
+    #    .claude-plugin/plugin.json. Use a tuple-of-ints sort over numeric
+    #    runs in the version string — stdlib-only, matches sort -V well
+    #    enough for typical semver-ish names.
+    cache_root = os.path.join(home, ".claude/plugins/cache/hv-skills/hv-skills")
+    if os.path.isdir(cache_root):
+        try:
+            versions = [v for v in os.listdir(cache_root)
+                        if os.path.isdir(os.path.join(cache_root, v))]
+        except OSError:
+            versions = []
+
+        def _vkey(v: str):
+            return tuple(int(p) for p in re.findall(r"\d+", v)) or (0,)
+
+        versions.sort(key=_vkey, reverse=True)
+        for v in versions:
+            cand = os.path.join(cache_root, v)
+            if os.path.isfile(os.path.join(cand, ".claude-plugin", "plugin.json")):
+                return (cand, "plugin")
+
+    # 5. ~/.agents/skills.
+    for cand in (
+        os.path.join(home, ".agents/skills/hv-skills"),
+        os.path.join(home, ".agents/skills"),
+    ):
+        if os.path.isfile(os.path.join(cand, ".claude-plugin", "plugin.json")):
+            return (cand, "stow")
+
+    return ("", "none")
+
+
 def read_version(filepath, kind: str) -> str | None:
     """Read the version string from a manifest. Returns the version, or None
     if the file has no version field. Raises FileNotFoundError if the path
