@@ -64,7 +64,11 @@ if active:
         "milestone via the `Milestone:` field where applicable."
     )
 elif items:
-    body = f"_(no active milestones — {len(items)} planned; set one active with `/hv-vision`)_"
+    planned = [i for i in items if i["status"] == "planned"]
+    if planned:
+        body = f"_(no active milestones — {len(planned)} planned; set one active with `/hv-vision`)_"
+    else:
+        body = "_(no active milestones — all shipped or archived; run `/hv-vision` to plan more)_"
     intro = "Project milestones live in `.hv/MILESTONES.md`."
 else:
     body = "_(no milestones yet — run `/hv-vision` to brainstorm)_"

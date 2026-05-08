@@ -79,28 +79,39 @@ Print the helper output verbatim — the user needs to see what they're editing.
 
 ## Step 3 — Pick Which Keys to Change
 
+The 13 configurable keys group into 4 categories; pick categories first, then drill into the keys in each. This two-stage flow keeps every question within `AskUserQuestion`'s 4-option UI cap.
+
+### Stage A — Pick categories
+
 One `AskUserQuestion` call, multiSelect:
 
 - **Header:** `"Edit"`
-- **Question:** *"Which settings do you want to change?"*
-- **Options** (multiSelect; substitute the live values from Step 2 into each label so the user sees what they're replacing):
-  1. *"Models — current: <profile>"*
-  2. *"Isolation — current: <branch|worktree>"*
-  3. *"Integration — current: <direct|pr>"*
-  4. *"Ship review — current: <on|off>"*
-  5. *"Verify learnings — current: <on|off>"*
-  6. *"Confirm before refactor — current: <on|off>"*
-  7. *"Autonomy — current: <off|auto|loop>"*
-  8. *"Competing hypotheses — current: <on|off>"*
-  9. *"Docs path — current: <path>"*
-  10. *"Docs auto-create — current: <on|off>"*
-  11. *"Docs after-work — current: <on|off>"*
-  12. *"Git base branch — current: <branch|(auto-detect)>"*
-  13. *"Umbrella mode — current: <on|off>"*
+- **Question:** *"Which areas of config do you want to edit?"*
+- **multiSelect:** `true`
+- **Options** (multiSelect):
+  1. *"Work — models, isolation, integration, autonomy"*
+  2. *"Quality gates — ship review, verify learnings, refactor confirm, competing hypotheses"*
+  3. *"Docs — path, auto-create, after-work"*
+  4. *"Other — umbrella mode, git base branch"*
 
 If the user selects nothing, print *"No changes."* and stop.
 
-Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the thirteen names above.
+### Stage B — Pick keys within each category
+
+For each category the user selected in Stage A, issue one `AskUserQuestion` call with the keys in that category. Substitute the live values from Step 2 into each option label so the user sees what they're replacing. Aggregate the picks across all category calls into a single set before Step 4.
+
+| Category | Keys (multiSelect, ≤4 per call) |
+|----------|---------------------------------|
+| Work | *"Models — current: <profile>"*, *"Isolation — current: <branch\|worktree>"*, *"Integration — current: <direct\|pr>"*, *"Autonomy — current: <off\|auto\|loop>"* |
+| Quality gates | *"Ship review — current: <on\|off>"*, *"Verify learnings — current: <on\|off>"*, *"Confirm before refactor — current: <on\|off>"*, *"Competing hypotheses — current: <on\|off>"* |
+| Docs | *"Docs path — current: <path>"*, *"Docs auto-create — current: <on\|off>"*, *"Docs after-work — current: <on\|off>"* |
+| Other | *"Umbrella mode — current: <on\|off>"*, *"Git base branch — current: <branch\|(auto-detect)>"* |
+
+If a Stage B call returns no selections (user picked the category in Stage A but skipped every key inside it), treat that category as a no-op — don't error.
+
+If every Stage B call returns no selections, print *"No changes."* and stop.
+
+Plain-text fallback: if the host doesn't surface `AskUserQuestion` options at all, ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the thirteen key names listed across the four categories above.
 
 ## Step 4 — Ask the Selected Questions
 
