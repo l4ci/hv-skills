@@ -17,6 +17,8 @@ user-invocable: true
 
 Change one or more configuration values without hand-editing JSON. Same option vocabulary as `/hv-init`, but you pick exactly which keys to change and the rest stay untouched.
 
+> **Authoring note (when adding a new flag):** boolean opt-in feature flags default to `false`. Owning skills flip them to `true` only via explicit user approval — never silently on first detection. `/hv-config` edits them explicitly. See the *Authoring rule* section in `hv-init/SKILL.md` for the full rule + exemptions.
+
 ## When to Use
 
 - Toggle a single setting — *"switch to worktree isolation"*, *"turn autonomy on loop"*

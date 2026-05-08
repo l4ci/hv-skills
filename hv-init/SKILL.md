@@ -228,6 +228,18 @@ If the user picked "Other" with custom text, honor it only if it's a valid value
 
 Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool.
 
+### Authoring rule — opt-in feature flags default to `false`
+
+When adding a new boolean config flag whose purpose is to enable additional skill behavior or auto-invocation:
+
+- **Default `false`** in both the FRESH write block and the STALE migration's setdefault.
+- **Never silently flip to `true`** anywhere — not on first detection, not on first invocation, not via cwd-inferred heuristics.
+- The owning skill flips the flag to `true` only via explicit user approval: first-run scaffold approval (the user opted in by approving), or `AskUserQuestion` on existing state with default "Leave off".
+- `/hv-config` edits the flag explicitly (the flag is never read-only).
+- **Exempt:** standard-on settings with opt-out semantics (e.g. `learn.verify: true`, `ship.review: true`) — these are not opt-in flags. Mode switches inside an already-enabled feature (e.g. `docs.autoCreate: false→true`) are also exempt.
+
+Codified after F15 introduced `docs.afterWork`. Without this rule, opt-in flags drift toward auto-flip-on-first-detect, which makes them on-by-default in practice — defeating the opt-in semantics. Mirror reminder lives in `hv-config/SKILL.md`.
+
 ### FRESH write block
 
 Write the full resolved config:
