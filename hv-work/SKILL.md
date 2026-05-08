@@ -157,7 +157,14 @@ From the conversation context:
    Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches.
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
-3. Group into dependency waves:
+3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan task pairs for the pattern *Task A renames a file (`git mv old new` or equivalent), Task B edits files that link to `old`*. The collision is on **shared written files** — when the link-sweep enumerates the renamed file itself or other files the rename task already edits, both tasks race on the index even when their stated mandates appear disjoint. Resolve at plan time by one of:
+
+   - **Merge** rename + link-sweep into one task (preferred when they're one logical change — one commit, atomic revert).
+   - **Split ownership cleanly**: rename task owns the file move plus edits to the renamed file's own content; link-sweep task owns link updates in all *other* files. No file appears in both tasks' modified-file sets.
+   - **Serialize across waves**: rename in wave N, link-sweep in wave N+1, so the sweep operates on settled paths.
+
+   For every rename, derive the incoming-link file set with `git grep -l "<old-name>" -- <scope>`; the plan author's enumerate is a hint, grep is ground truth. Re-run the same grep at verify time (Step 7) to catch files the plan missed.
+4. Group into dependency waves:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
 
@@ -318,6 +325,8 @@ You are implementing Task N of [total].
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the suggested commit message; read-first, minimal-diff, no unrelated changes; workers do NOT stage or commit.
 
+**Rename-task addendum.** When a task includes `git mv old new` (or equivalent file rename), the brief MUST instruct the worker to run `git grep -l "<old-name>" -- <scope>` before reporting completion and to extend coverage to every match the plan missed. The plan author's file enumerate is a hint, not ground truth — grep is. The orchestrator re-runs the same grep at Step 7 (verify); both layers catch enumerate gaps.
+
 Launch all independent agents in one message (parallel tool calls) — write-only workers don't race on `.git/index`, so this is safe under any isolation mode. Don't announce — just do it.
 
 ### Alternative: legacy worker-commits (opt-in)
@@ -336,6 +345,7 @@ Orchestrator verifies internally (don't narrate):
 1. Inspect pending changes: `git status --porcelain` then `git diff` for the files the worker reported. (Legacy path: `git log --oneline -1` if the worker committed.)
 2. Read modified files — changes match the brief.
 3. Structural checks: grep for expected patterns, no regressions.
+4. **Rename validation (when the task includes `git mv old new`).** Re-run `git grep -l "<old-name>" -- <scope>` after the worker reports. If grep returns files not in the worker's modified-file set, the plan's enumerate undercounted — dispatch a fix-up extending coverage to every match before staging. The plan is a hint; grep is ground truth.
 
 **When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
 
