@@ -47,6 +47,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope [--repo <name>] hv/foo` |
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
+| `hv-version-check` | Compare `.hv/config.json#hvSkills.version` with the currently-installed plugin version; nudge or JSON | `.hv/bin/hv-version-check` |
 | `hv-issue-suggest` | Open an upstream hv-skills issue via `gh` (or print a manual-fallback URL); reads body from stdin | `printf '%s' "$BODY" \| .hv/bin/hv-issue-suggest --title "Title"` |
 | `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
 | `hv-refactor-reset` | Zero `counters.json#since_refactor` (called by `/hv-refactor` after commit) | `.hv/bin/hv-refactor-reset` |
@@ -162,6 +163,8 @@ helpers are incomplete. Useful as a guard at the top of scripts.
 
 `hv-update-check` queries the hv-skills GitHub releases and returns JSON with
 the current and latest version, install type, and the command to upgrade.
+
+`hv-version-check` is the local sibling: it compares `.hv/config.json#hvSkills.version` (stamped at `/hv-init` time) with the currently-installed plugin's version. On drift it prints a one-line nudge; with `--json` it always emits `{stamped, installed, status}`. `bin/hv-preflight` calls it informationally on every preflight, so any skill that runs preflight surfaces the nudge to the user when the project's helpers have fallen behind the plugin. Distinct from `hv-update-check` — that one needs the network and compares installed vs latest GitHub release.
 
 `hv-refactor-age` reads `counters.json#since_refactor` and returns JSON with
 the number of features and bugs completed since the last refactor cycle.

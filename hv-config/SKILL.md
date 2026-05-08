@@ -72,10 +72,11 @@ print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',
 print(f"  Docs after-work          {'on' if cfg.get('docs',{}).get('afterWork',False) else 'off'}")
 print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
 print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
+print(f"  hv-skills version        {cfg.get('hvSkills',{}).get('version','') or '(unstamped)'}")
 PY
 ```
 
-Print the helper output verbatim — the user needs to see what they're editing.
+Print the helper output verbatim — the user needs to see what they're editing. `hv-skills version` is auto-stamped by `/hv-init`; not in the edit list.
 
 ## Step 3 — Pick Which Keys to Change
 

@@ -100,6 +100,16 @@ else
 fi
 [ -z "$SRC" ] && { echo "error: could not locate hv-skills bin/ — set CLAUDE_PLUGIN_ROOT or install the plugin" >&2; exit 1; }
 
+# Stamp the resolved plugin's version so Step 3 can record it in config.json.
+HV_PLUGIN_VERSION=$(python3 -c "
+import json
+try:
+    print(json.load(open('$SRC/../.claude-plugin/plugin.json')).get('version', ''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+export HV_PLUGIN_VERSION
+
 # Seed directories and data files (idempotent — never overwrites existing files).
 "$SRC/hv-bootstrap"
 
@@ -143,6 +153,7 @@ EXPECTED = [
     ("docs", "afterWork"),
     ("git", "baseBranch"),
     ("umbrella", "enabled"),
+    ("hvSkills", "version"),
 ]
 p = Path(".hv/config.json")
 if not p.exists():
@@ -299,6 +310,7 @@ cfg = {
   "git":      {"baseBranch": ""}
 }
 cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled
+cfg.setdefault("hvSkills", {})["version"] = os.environ.get("HV_PLUGIN_VERSION", "")
 Path(".hv/config.json").write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
@@ -330,11 +342,17 @@ cfg.setdefault("docs", {}).setdefault("afterWork", False)
 # is unset (no migration prompt for users who didn't re-run from a parent).
 cfg.setdefault("umbrella", {})["enabled"] = os.environ.get("UMBRELLA_MODE", "false") == "true"
 
+# hvSkills.version — re-stamped on every /hv-init so the project's recorded
+# version follows the currently-installed plugin. hv-preflight nudges to
+# re-init when the value drifts from the live plugin.
+cfg.setdefault("hvSkills", {})
+cfg["hvSkills"]["version"] = os.environ.get("HV_PLUGIN_VERSION", "")
+
 p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
 
-Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `False` when unset, `True` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`.
+Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `False` when unset, `True` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`. `hvSkills.version` is special-cased on the upgrade path too — STALE migration ALWAYS rewrites it from `HV_PLUGIN_VERSION`, even when the key is already present, because re-running `/hv-init` is the canonical way to clear drift. Other keys preserve user values; this one is auto-managed.
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
@@ -370,4 +388,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 
 If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `git.baseBranch`, `umbrella.enabled`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

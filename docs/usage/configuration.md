@@ -35,6 +35,9 @@ Default config:
   },
   "git": {
     "baseBranch": ""
+  },
+  "hvSkills": {
+    "version": ""
   }
 }
 ```
@@ -149,3 +152,18 @@ Override the base branch that `hv-base-branch` resolves to. When empty (the defa
 ```
 
 Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-review`, and `/hv-merge`) all call `hv-base-branch` and will pick up this override automatically.
+
+## hvSkills.version (auto-managed)
+
+- **Type:** string
+- **Default:** `""` (unstamped on first init if the plugin couldn't be resolved)
+
+Records the hv-skills plugin version that was installed when `/hv-init` last ran. Auto-managed: `/hv-init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
+
+`bin/hv-preflight` calls `bin/hv-version-check` after every `/hv-preflight` invocation. If the stamped value differs from the currently-installed plugin's version, preflight prints one informational line to stderr:
+
+```
+hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh helpers
+```
+
+Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release) — this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
