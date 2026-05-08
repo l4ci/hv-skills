@@ -26,6 +26,7 @@ Read from `.hv/config.json` (all keys optional — defaults apply if absent):
 | `release.tagPrefix` | `v` | Set to `""` for unprefixed tags |
 | `release.draft` | `false` | Pass `--draft` to `gh`/`glab` |
 | `release.requireCleanTree` | `true` | Set `false` to allow dirty releases (testing only) |
+| `release.confirmLargePushCommits` | `10` | Threshold (commits) above which auto/loop autonomy still confirms before pushing unpushed HEAD |
 
 ## Step 1 — Preflight & Guard
 
@@ -41,7 +42,15 @@ Then verify:
 2. **On main/trunk** — `git rev-parse --abbrev-ref HEAD`. If not `main`, `master`, or `trunk`, stop with a one-liner.
 3. **HEAD pushed** — `git rev-parse HEAD` vs `git rev-parse @{u}`. If they differ, branch on `autonomy.level` from `.hv/config.json`:
 
-   - `"auto"` or `"loop"` — silently run `git push origin <current-branch>` and continue. A release intends to ship the local commits; an unpushed HEAD is part of the release, not a pre-flight error.
+   - `"auto"` or `"loop"` — count unpushed commits via `git rev-list @{u}..HEAD --count`.
+     - If the count is < `release.confirmLargePushCommits` (default 10), silently run `git push origin <current-branch>` and continue. A release intends to ship the local commits; an unpushed HEAD is part of the release, not a pre-flight error.
+     - If the count is ≥ `release.confirmLargePushCommits`, interject ONE `AskUserQuestion` regardless of autonomy:
+       - **Header:** `"Large push"`
+       - **Question:** *"<N> unpushed commits about to be pushed as part of this release. Continue?"*
+       - **Options:**
+         1. `"Push and continue (Recommended)"` — runs `git push origin <current-branch>`, then proceed
+         2. `"Abort"` — stop without writing anything
+       - Plain-text fallback: *"Push <N> commits and continue, or abort?"*
    - `"off"` (default) — use `AskUserQuestion`:
      - **Header:** `"Unpushed"`
      - **Question:** *"HEAD has unpushed commits. Push them as part of this release?"*
@@ -260,6 +269,19 @@ Branch on output:
 Release title: `v<new_version> — <one-line summary>` where summary comes from Step 6.
 
 Skip in `--dry-run` mode; print the `gh`/`glab` command that would run.
+
+## Step 13.7 — Docs After-Work (Nudge or Auto-Invoke)
+
+Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
+
+When the flag is on, a release is a natural docs trigger — release notes and CHANGELOG entries are user-facing artifacts that often imply other docs (READMEs, getting-started guides, reference pages) need a refresh. Skip in `--dry-run` mode. Don't repeat in the same session.
+
+When triggered, branch on `autonomy.level`:
+
+- `"off"` — append one line to the Step 14 summary — *"Release shipped. Run `/hv-docs` to review and update public docs (after-work mode)."*
+- `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the new version, the bump type, and a one-line summary of what shipped (from Step 6's release notes title).
+
+If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
 
 ## Step 14 — Summary
 

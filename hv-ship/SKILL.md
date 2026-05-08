@@ -220,6 +220,25 @@ Resolved: [B01] [F03]
 
 If `/hv-review` surfaced concerns that the user proceeded through, append them one-liner at the end.
 
+## Step 9.5 — Release Nudge
+
+After every successful ship, surface unreleased-commit accumulation so the user can decide whether to cut a release before moving on.
+
+```bash
+.hv/bin/hv-release-pending
+```
+
+Parse the JSON. If `shouldNudge` is `false`, skip silently. If `lastTag` is empty (no release ever cut), skip silently — the first release is the user's call.
+
+When the nudge fires, append one line to the Step 9 report block (after `Resolved: [...]`):
+
+- `reason == "commits"`: *"<commits> commits since <lastTag>; consider `/hv-release`."*
+- `reason == "days"`: *"<commits> commits and <days> days since <lastTag>; consider `/hv-release`."*
+
+This step runs after BOTH PR and direct-merge flows; the trigger is "ship completed", not the integration mechanism.
+
+Skip silently if /hv-review FAILed (Step 3) and the ship was halted — there's nothing to release that hasn't already been released.
+
 ## Step 10 — Loop Continuation
 
 Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Report how many commits and days have elapsed since the last release tag.
+# Used by /hv-next and /hv-ship to decide whether to nudge the user toward /hv-release.
+# Output (single-line JSON on stdout):
+#   {"lastTag":"v1.16.0","commits":5,"days":1,"thresholdCommits":10,"thresholdDays":14,"shouldNudge":false,"reason":""}
+# Exits 0 on all success paths (including "no tag yet"); exits 1 only on broken state.
+set -euo pipefail
+
+# Resolve last tag (empty if no tags exist yet).
+LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+
+if [ -z "$LAST_TAG" ]; then
+  COMMITS=0
+  TAG_TS=0
+else
+  COMMITS="$(git rev-list "${LAST_TAG}..HEAD" --count)"
+  TAG_TS="$(git log -1 --format=%ct "$LAST_TAG")"
+fi
+
+LAST_TAG="$LAST_TAG" COMMITS="$COMMITS" TAG_TS="$TAG_TS" python3 - <<'PY'
+import json
+import os
+import time
+
+last_tag = os.environ["LAST_TAG"]
+commits = int(os.environ["COMMITS"])
+tag_ts = int(os.environ["TAG_TS"])
+
+# No tag → nothing to nudge about.
+if not last_tag:
+    print(json.dumps({
+        "lastTag": "",
+        "commits": 0,
+        "days": 0,
+        "thresholdCommits": 10,
+        "thresholdDays": 14,
+        "shouldNudge": False,
+        "reason": "no-tag",
+    }))
+    raise SystemExit(0)
+
+# Read thresholds from .hv/config.json (project-relative); fall back to defaults if
+# the file is missing or malformed.
+threshold_commits = 10
+threshold_days = 14
+try:
+    with open(".hv/config.json", "r") as f:
+        cfg = json.load(f)
+    rel = cfg.get("release", {})
+    if isinstance(rel.get("nudgeAfterCommits"), int):
+        threshold_commits = rel["nudgeAfterCommits"]
+    if isinstance(rel.get("nudgeAfterDays"), int):
+        threshold_days = rel["nudgeAfterDays"]
+except (FileNotFoundError, json.JSONDecodeError, OSError):
+    pass
+
+now = int(time.time())
+days = max(0, (now - tag_ts) // 86400)
+
+should_nudge = False
+reason = ""
+if commits > 0:
+    hit_commits = commits >= threshold_commits
+    hit_days = days >= threshold_days
+    if hit_commits:
+        should_nudge = True
+        reason = "commits"
+    elif hit_days:
+        should_nudge = True
+        reason = "days"
+
+print(json.dumps({
+    "lastTag": last_tag,
+    "commits": commits,
+    "days": int(days),
+    "thresholdCommits": threshold_commits,
+    "thresholdDays": threshold_days,
+    "shouldNudge": should_nudge,
+    "reason": reason,
+}))
+PY
