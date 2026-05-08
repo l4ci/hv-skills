@@ -2,42 +2,34 @@
 # Print the resolved base branch (main, master, trunk, or origin/HEAD).
 # Respects git.baseBranch in .hv/config.json when set.
 # Usage: hv-base-branch
-# Exits 1 with a stderr message if none can be resolved.
+# Exits 1 with a stderr message if none can be resolved or cwd lacks git.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-import os
+
+# Guard runs against user's actual cwd — must precede any cd.
+"$HERE/hv-require-git-context" "hv-base-branch"
+
+# Walk up from cwd (NOT from helper location) to find the umbrella config.
+# hv-self-locate.sh walks up from the helper's install dir, which finds the
+# wrong .hv/ when the helper runs from canonical source bin/ next to the
+# project's own .hv/. The user's cwd is the authoritative anchor here.
+CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from pathlib import Path
 from hvlib import load_json
-
 d = Path.cwd().resolve()
 while True:
-    cfg_path = d / '.hv' / 'config.json'
+    cfg_path = d / ".hv" / "config.json"
     if cfg_path.exists():
         cfg = load_json(cfg_path, {})
-        print(cfg.get('git', {}).get('baseBranch', ''))
+        print(cfg.get("git", {}).get("baseBranch", ""))
         break
     if d == d.parent:
-        # reached fs root, no config found
-        print('')
+        print("")
         break
     d = d.parent
-" 2>/dev/null || true)
-# Umbrella-cwd guard: no local .git/, but .hv/ with umbrella.enabled: true.
-if [ -z "$CONFIGURED" ] && [ ! -d .git ] && [ -d .hv ]; then
-  IS_UMBRELLA=$(python3 -c "
-import json
-try:
-    cfg = json.load(open('.hv/config.json'))
-    print('yes' if cfg.get('umbrella', {}).get('enabled') else 'no')
-except Exception:
-    print('no')
-" 2>/dev/null || echo "no")
-  if [ "$IS_UMBRELLA" = "yes" ]; then
-    echo "error: hv-base-branch from the umbrella root has no base — invoke with cwd inside a sub-repo (e.g. \`git -C <repo>\`)" >&2
-    exit 1
-  fi
-fi
+PY
+)
+
 if [ -n "$CONFIGURED" ] && git rev-parse --verify "$CONFIGURED" >/dev/null 2>&1; then
   echo "$CONFIGURED"
   exit 0

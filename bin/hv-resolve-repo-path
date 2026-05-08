@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Resolve a registered sub-repo NAME → absolute path via .hv/repos.json.
+# Symmetric helper to hv-resolve-repo (which maps cwd → name); this one is
+# name → path. Centralizes the resolve_repo_path heredoc inlined in
+# hv-merge, hv-pr, hv-spike-add, hv-review-scope.
+#
+# Usage: hv-resolve-repo-path <name>
+#   stdout: absolute path on success
+#   stderr: friendly error if registry empty or name unknown
+#   exit:   0 on success, 1 on error
+set -euo pipefail
+NAME="${1:?usage: hv-resolve-repo-path <name>}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$NAME" <<'PY'
+import sys
+from hvlib import load_repos
+name = sys.argv[1]
+repos = load_repos()
+if not repos:
+    sys.stderr.write("error: --repo requires .hv/repos.json with at least one entry — run /hv-init from the umbrella root\n")
+    sys.exit(1)
+p = repos.get(name)
+if not p:
+    sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
+    sys.exit(1)
+print(p)
+PY

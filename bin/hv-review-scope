@@ -15,36 +15,16 @@ if [ "${1:-}" = "--repo" ]; then
 fi
 
 if [ -n "$REPO" ]; then
-  REPO_PATH=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-from hvlib import load_repos
-import sys
-repos = load_repos()
-p = repos.get('$REPO')
-if not p:
-    sys.stderr.write(f\"error: --repo '$REPO' not registered in .hv/repos.json\n\")
-    sys.exit(1)
-print(p)
-")
+  REPO_PATH=$("$HERE/hv-resolve-repo-path" "$REPO")
   cd "$REPO_PATH"
 fi
 
 BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 
-# Umbrella-cwd guard: hv-review-scope needs git context (single-repo cwd or sub-repo).
-if [ ! -d .git ] && [ -d .hv ]; then
-  IS_UMBRELLA=$(python3 -c "
-import json
-try:
-    cfg = json.load(open('.hv/config.json'))
-    print('yes' if cfg.get('umbrella', {}).get('enabled') else 'no')
-except Exception:
-    print('no')
-" 2>/dev/null || echo "no")
-  if [ "$IS_UMBRELLA" = "yes" ]; then
-    echo "error: hv-review-scope from the umbrella root has no git context — invoke with cwd inside the sub-repo whose branch you're reviewing" >&2
-    exit 1
-  fi
-fi
+# Umbrella-cwd guard delegates to the centralized helper. Runs AFTER the
+# optional cd into a sub-repo, so a successful --repo resolution will have
+# put us into a real .git/ tree and the guard fast-paths.
+"$HERE/hv-require-git-context" "hv-review-scope" --repo-flag-supported
 
 BASE=$("$HERE/hv-base-branch")
 

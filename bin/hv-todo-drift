@@ -11,6 +11,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"
+. "$HERE/hv-types.sh"
 hv_self_locate
 export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
@@ -25,11 +26,13 @@ if not todo_path.exists():
 
 content = todo_path.read_text()
 
+cls = os.environ["HV_ITEM_TYPES"]
+
 # Collect IDs that are still OPEN — bullets under ## Bugs / ## Features /
 # ## Tasks that match `- **[ID] ...` (no leading `~~` strikethrough). Items
 # under ## Completed are excluded by section selection.
 open_ids: set[str] = set()
-bullet = re.compile(r"^- \*\*\[([BFT]\d+)\]", re.MULTILINE)
+bullet = re.compile(rf"^- \*\*\[([{cls}]\d+)\]", re.MULTILINE)
 for section_name in ("Bugs", "Features", "Tasks"):
     span = find_section(content, section_name)
     if span is None:
@@ -49,7 +52,7 @@ if repos:
 else:
     targets = [("", None)]  # single-repo mode — git -C None == default cwd
 
-tag_re = re.compile(r"\[([BFT]\d+)\]")
+tag_re = re.compile(rf"\[([{cls}]\d+)\]")
 
 # id -> list of commits in walk order (newest first from git log; we reverse later)
 hits: dict[str, list[dict]] = {}

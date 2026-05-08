@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Verify the cwd has git context. If we're at an umbrella root (no .git/ but
+# .hv/ exists with umbrella.enabled: true), exit 1 with a friendly error
+# pointing the user to a sub-repo. Otherwise return silently — caller
+# proceeds and will get a git-native error if cwd has no git at all.
+#
+# Usage: hv-require-git-context <tool-name> [--repo-flag-supported]
+#   <tool-name>         — calling tool, used in the error message
+#   --repo-flag-supported — if set, the message says "requires --repo <name>"
+#                           (use when the tool has a --repo opt to suggest);
+#                           otherwise "has no git context"
+set -euo pipefail
+TOOL="${1:?usage: hv-require-git-context <tool-name> [--repo-flag-supported]}"
+HAS_REPO_FLAG=""
+if [ "${2:-}" = "--repo-flag-supported" ]; then
+  HAS_REPO_FLAG="yes"
+fi
+
+# Fast path: cwd has git → caller has context.
+[ -d .git ] && exit 0
+
+# No git AND no .hv → caller's later git invocation will surface its own error.
+[ -d .hv ] || exit 0
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+IS_UMBRELLA=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from hvlib import load_json
+cfg = load_json(".hv/config.json", {})
+print("yes" if cfg.get("umbrella", {}).get("enabled") else "no")
+PY
+)
+
+if [ "$IS_UMBRELLA" = "yes" ]; then
+  if [ -n "$HAS_REPO_FLAG" ]; then
+    echo "error: $TOOL from the umbrella root requires --repo <name> — pass the sub-repo whose branch to operate on" >&2
+  else
+    echo "error: $TOOL from the umbrella root has no git context — invoke with cwd inside the sub-repo" >&2
+  fi
+  exit 1
+fi
+exit 0

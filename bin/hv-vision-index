@@ -22,7 +22,8 @@ active = [i for i in items if i["status"] == "active"]
 # 1) Refresh .hv/MILESTONES.md: per-section **Status:** lines + ## Active milestones
 ms_path = Path(".hv/MILESTONES.md")
 if ms_path.exists():
-    ms = ms_path.read_text()
+    original = ms_path.read_text()
+    ms = original
 
     # Heal each section's **Status:** line from frontmatter (drift insurance).
     for i in items:
@@ -49,7 +50,9 @@ if ms_path.exists():
         else:
             ms = ms.rstrip("\n") + "\n\n" + active_block
 
-    write_text_atomic(ms_path, ms if ms.endswith("\n") else ms + "\n")
+    candidate = ms if ms.endswith("\n") else ms + "\n"
+    if candidate != original:
+        write_text_atomic(ms_path, candidate)
 
 # 2) Render vision body for CLAUDE.md
 shipped_ids = {i["id"] for i in items if i["status"] == "shipped"}

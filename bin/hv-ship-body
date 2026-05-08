@@ -8,21 +8,7 @@ set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"
 BRANCH="${1:?usage: hv-ship-body <branch>}"
 
-# Umbrella-cwd guard: hv-ship-body needs git context (single-repo cwd or sub-repo).
-if [ ! -d .git ] && [ -d .hv ]; then
-  IS_UMBRELLA=$(python3 -c "
-import json
-try:
-    cfg = json.load(open('.hv/config.json'))
-    print('yes' if cfg.get('umbrella', {}).get('enabled') else 'no')
-except Exception:
-    print('no')
-" 2>/dev/null || echo "no")
-  if [ "$IS_UMBRELLA" = "yes" ]; then
-    echo "error: hv-ship-body from the umbrella root has no git context — invoke with cwd inside the sub-repo whose branch you're shipping" >&2
-    exit 1
-  fi
-fi
+"$(dirname "$0")/hv-require-git-context" "hv-ship-body"
 
 BASE=$("$(dirname "$0")/hv-base-branch")
 

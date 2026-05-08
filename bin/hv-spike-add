@@ -29,24 +29,6 @@ if ! [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
   exit 1
 fi
 
-resolve_repo_path() {
-  local name="$1"
-  PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - "$name" <<'PY'
-import sys
-from hvlib import load_repos
-name = sys.argv[1]
-repos = load_repos()
-if not repos:
-    sys.stderr.write("error: --repo requires .hv/repos.json with at least one entry — run /hv-init from the umbrella root\n")
-    sys.exit(1)
-p = repos.get(name)
-if not p:
-    sys.stderr.write(f"error: --repo {name} not found in .hv/repos.json\n")
-    sys.exit(1)
-print(p)
-PY
-}
-
 BRANCH="spike/$NAME"
 SPIKE_FILE=".hv/spikes/$NAME.md"
 
@@ -57,7 +39,7 @@ if [ -e "$SPIKE_FILE" ]; then
 fi
 
 if [ -n "$REPO" ]; then
-  REPO_PATH=$(resolve_repo_path "$REPO")
+  REPO_PATH=$("$BIN_DIR/hv-resolve-repo-path" "$REPO")
   (
     cd "$REPO_PATH"
     if ! git rev-parse --git-dir >/dev/null 2>&1; then
