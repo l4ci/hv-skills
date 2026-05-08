@@ -40,7 +40,7 @@ One-time setup that creates the `.hv/` folder with all required files and asks f
 
 ## /hv-learn
 
-Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. Captures gotchas, project conventions, constraints, debugging insights, and decisions with rationale; skips anything already obvious from reading the code. See [learning](../usage/learning.md) for the full flow.
+Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. Captures gotchas, project conventions, constraints, debugging insights, and decisions with rationale; skips anything already obvious from reading the code. After writing, asks once whether to file an `hv-skills` upstream issue (when a bullet describes hv-skills behavior) and once whether to contribute to [runlog.org](https://runlog.org) via `/runlog-author` (when a bullet is about an external dependency — third-party API, library, protocol). Both follow-ups are always manual, never auto-fired. See [learning](../usage/learning.md) for the full flow.
 
 ## /hv-next
 
