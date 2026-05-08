@@ -2965,4 +2965,89 @@ EOF
 )
 rm -rf "$HI2_TMP"
 
+echo "hv-release-pending"
+RP_TMP="$(mktemp -d)"
+
+# Case 1: no tags → no nudge, lastTag empty.
+(
+  cd "$RP_TMP"
+  mkdir no-tag && cd no-tag
+  git init -q && git config user.email t@t && git config user.name t
+  git commit -q --allow-empty -m "seed"
+  OUT=$("$BIN/hv-release-pending")
+  python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+assert d['lastTag'] == '', d
+assert d['commits'] == 0, d
+assert d['shouldNudge'] is False, d
+assert d['reason'] == 'no-tag', d
+" "$OUT" || fail "no-tag case: $OUT"
+)
+pass "hv-release-pending: no tag -> no nudge"
+
+# Case 2: tag + 3 commits, default thresholds → no nudge.
+(
+  cd "$RP_TMP"
+  mkdir below && cd below
+  git init -q && git config user.email t@t && git config user.name t
+  git commit -q --allow-empty -m "seed"
+  git tag v0.0.1
+  for i in 1 2 3; do git commit -q --allow-empty -m "c$i"; done
+  OUT=$("$BIN/hv-release-pending")
+  python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+assert d['lastTag'] == 'v0.0.1', d
+assert d['commits'] == 3, d
+assert d['shouldNudge'] is False, d
+assert d['reason'] == '', d
+" "$OUT" || fail "below-threshold case: $OUT"
+)
+pass "hv-release-pending: 3 commits past tag -> no nudge"
+
+# Case 3: tag + 11 commits → nudge, reason=commits.
+(
+  cd "$RP_TMP"
+  mkdir above && cd above
+  git init -q && git config user.email t@t && git config user.name t
+  git commit -q --allow-empty -m "seed"
+  git tag v0.0.1
+  for i in $(seq 1 11); do git commit -q --allow-empty -m "c$i"; done
+  OUT=$("$BIN/hv-release-pending")
+  python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+assert d['lastTag'] == 'v0.0.1', d
+assert d['commits'] == 11, d
+assert d['shouldNudge'] is True, d
+assert d['reason'] == 'commits', d
+" "$OUT" || fail "above-commit-threshold case: $OUT"
+)
+pass "hv-release-pending: 11 commits past tag -> nudge (reason=commits)"
+
+# Case 4: custom commit threshold via .hv/config.json.
+(
+  cd "$RP_TMP"
+  mkdir custom && cd custom
+  git init -q && git config user.email t@t && git config user.name t
+  git commit -q --allow-empty -m "seed"
+  git tag v0.0.1
+  for i in $(seq 1 6); do git commit -q --allow-empty -m "c$i"; done
+  mkdir -p .hv
+  echo '{"release":{"nudgeAfterCommits":5}}' > .hv/config.json
+  OUT=$("$BIN/hv-release-pending")
+  python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+assert d['thresholdCommits'] == 5, d
+assert d['commits'] == 6, d
+assert d['shouldNudge'] is True, d
+assert d['reason'] == 'commits', d
+" "$OUT" || fail "custom-threshold case: $OUT"
+)
+pass "hv-release-pending: custom nudgeAfterCommits=5 honored"
+
+rm -rf "$RP_TMP"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
