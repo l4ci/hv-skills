@@ -154,8 +154,10 @@ Route each stream's answer via the `Skill` tool. Pass the branch name and item I
 ```bash
 # Mirror the path used in Step 3 — the variable was resolved there, so the rm
 # uses whichever path the read picked: umbrella-keyed if present, legacy
-# `<branch>.md` fallback otherwise.
-rm "$HANDOFF"   # only after dispatching /hv-work or /hv-debug
+# `<branch>.md` fallback otherwise. `-f` is required because the dispatched
+# /hv-work may have already swept the handoff via hv-status-remove on its own
+# merge path; the rm here is a belt for the "consumed but no merge" case.
+rm -f "$HANDOFF"   # only after dispatching /hv-work or /hv-debug
 ```
 
 ## Rules

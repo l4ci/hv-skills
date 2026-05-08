@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Remove an active entry from .hv/status.json by branch (and optional repo).
+# Remove an active entry from .hv/status.json by branch (and optional repo),
+# and sweep the matching .hv/handoff/<branch>[@<repo>].md note so a stale handoff
+# from /hv-pause doesn't outlive the branch it was written against.
 # Usage: hv-status-remove [--repo <name>] <branch>
 #   --repo  Match only entries tagged with this sub-repo. Without --repo, only legacy
 #          entries (repo: null/missing) are removed; umbrella entries are preserved.
@@ -26,3 +28,13 @@ if before == after:
 data["active"] = after
 dump_json_atomic(path, data)
 PY
+# Sweep matching handoff note. Path encoding mirrors hv-pause:
+#   --repo set      → .hv/handoff/<branch>@<repo>.md   (umbrella keying)
+#   --repo unset    → .hv/handoff/<branch>.md          (single-repo / legacy)
+# `rm -f` is silent on missing files, so the sweep is a no-op when no handoff was paused.
+if [ -n "$REPO" ]; then
+  HANDOFF=".hv/handoff/${BRANCH}@${REPO}.md"
+else
+  HANDOFF=".hv/handoff/${BRANCH}.md"
+fi
+rm -f "$HANDOFF"
