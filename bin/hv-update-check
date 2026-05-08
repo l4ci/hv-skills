@@ -28,6 +28,13 @@ resolve_root() {
       return
     fi
   done
+  # Claude Code plugin cache: pick the newest installed version.
+  for candidate in $(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/ 2>/dev/null | sort -Vr); do
+    if [ -f "$candidate.claude-plugin/plugin.json" ]; then
+      echo "plugin|${candidate%/}"
+      return
+    fi
+  done
   for candidate in \
     "$HOME"/.agents/skills/hv-skills \
     "$HOME"/.agents/skills; do

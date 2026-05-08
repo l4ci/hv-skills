@@ -92,6 +92,11 @@ else
     "$HOME"/.agents/skills/bin; do
     [ -d "$candidate" ] && SRC="$candidate" && break
   done
+  # Claude Code plugin cache: pick the newest installed version.
+  if [ -z "$SRC" ]; then
+    SRC=$(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin 2>/dev/null | sort -V | tail -1)
+    [ -d "$SRC" ] || SRC=""
+  fi
 fi
 [ -z "$SRC" ] && { echo "error: could not locate hv-skills bin/ — set CLAUDE_PLUGIN_ROOT or install the plugin" >&2; exit 1; }
 

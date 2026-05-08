@@ -970,6 +970,33 @@ pass "update-check reports ahead when current > latest"
 
 rm -rf fake-install
 
+echo "hv-update-check Claude Code plugin cache layout"
+# Build a fake Claude Code plugin cache with two installed versions so we can
+# verify the resolver picks the newest by `sort -Vr` and reports it as plugin.
+XX_TMP="$(mktemp -d)"
+(
+  cd "$XX_TMP"
+  mkdir -p .hv/bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+
+  # Two sibling versions; 2.0.0 must win over 1.0.0 (and over a 1.10.0-style
+  # lexical winner — we use 2.0.0 to keep the assertion plain).
+  for v in 1.0.0 2.0.0; do
+    mkdir -p "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/.claude-plugin"
+    mkdir -p "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/bin"
+    cat > "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/.claude-plugin/plugin.json" <<EOF2
+{"name":"hv-skills","version":"$v"}
+EOF2
+  done
+
+  OUT=$(HOME="$XX_TMP/fake-home" HV_LATEST_VERSION=2.0.0 .hv/bin/hv-update-check)
+  echo "$OUT" | grep -q '"installType": "plugin"' || fail "cache-layout: installType != plugin: $OUT"
+  echo "$OUT" | grep -q '"currentVersion": "2.0.0"' || fail "cache-layout: currentVersion != 2.0.0: $OUT"
+  echo "$OUT" | grep -q '/2.0.0' || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
+  pass "hv-update-check resolves Claude Code plugin cache and picks newest version"
+)
+rm -rf "$XX_TMP"
+
 echo "hv-summary"
 # Reset to a known state and check the summary lines
 rm -f .hv/ARCHIVE.md
