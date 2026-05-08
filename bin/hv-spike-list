@@ -7,6 +7,8 @@
 # Usage: hv-spike-list
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
 RAW=$("$HERE/hv-fm-list" .hv/spikes name branch repo status created)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RAW" <<'PY'
 import json, subprocess, sys

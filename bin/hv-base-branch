@@ -9,26 +9,23 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Guard runs against user's actual cwd — must precede any cd.
 "$HERE/hv-require-git-context" "hv-base-branch"
 
-# Walk up from cwd (NOT from helper location) to find the umbrella config.
-# hv-self-locate.sh walks up from the helper's install dir, which finds the
-# wrong .hv/ when the helper runs from canonical source bin/ next to the
-# project's own .hv/. The user's cwd is the authoritative anchor here.
-CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+# hv-resolve-umbrella walks from cwd via `pwd -P`, so it correctly anchors on
+# the user's working directory rather than the helper's install dir, and
+# additionally detects masked sub-repo .hv/ shadows in umbrella mode. Falsy on
+# miss (exit 1) or masking (exit 2) → CONFIGURED stays empty → fall through.
+UMBRELLA=$("$HERE/hv-resolve-umbrella" 2>/dev/null || true)
+CONFIGURED=""
+if [ -n "$UMBRELLA" ]; then
+  CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$UMBRELLA" <<'PY'
+import sys
 from pathlib import Path
 from hvlib import load_json
-d = Path.cwd().resolve()
-while True:
-    cfg_path = d / ".hv" / "config.json"
-    if cfg_path.exists():
-        cfg = load_json(cfg_path, {})
-        print(cfg.get("git", {}).get("baseBranch", ""))
-        break
-    if d == d.parent:
-        print("")
-        break
-    d = d.parent
+cfg_path = Path(sys.argv[1]) / ".hv" / "config.json"
+cfg = load_json(cfg_path, {})
+print(cfg.get("git", {}).get("baseBranch", ""))
 PY
-)
+  )
+fi
 
 if [ -n "$CONFIGURED" ] && git rev-parse --verify "$CONFIGURED" >/dev/null 2>&1; then
   echo "$CONFIGURED"
