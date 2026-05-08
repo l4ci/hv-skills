@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.0.0 — 2026-05-08
+
+Hard-merge of `/hv-status` and `/hv-resume` into `/hv-next`. Single state-view entry point.
+
+## Breaking
+
+- `/hv-status` and `/hv-resume` are removed in favor of `/hv-next`. `/hv-next` now reads `/hv-pause` handoff notes for active streams and surfaces `Stage` / `Next planned step` / `Current hypothesis` inline alongside each stream — replacing the post-`/clear` `/hv-resume` flow. The lightweight glance from `/hv-status` is no longer offered as a separate command. Update muscle memory: anywhere you typed `/hv-status` or `/hv-resume`, type `/hv-next` instead. [F26]
+
+## Changed
+
+- `bin/hv-skills-index` heredoc body drops `/hv-status` and `/hv-resume` from the "Capture & pick" group. Existing projects must re-run `/hv-init` to refresh the managed `<!-- hv-skills-start -->` block in `CLAUDE.md`. [F26]
+- `docs/usage/next-and-status.md` is renamed to `docs/usage/picking-work.md` and rewritten to reflect the one-command world. [F26]
+
+## Removed
+
+- `hv-status/SKILL.md` and the `hv-status/` folder. [F26]
+- `hv-resume/SKILL.md` and the `hv-resume/` folder. [F26]
+
 ## v1.16.0 — 2026-05-08
 
 Knowledge-loop intelligence (stats + upstream-issue suggestion), `/hv-docs` after-work hook, and a 4-round architectural refactor centered on a sourceable umbrella resolver.

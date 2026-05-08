@@ -1,6 +1,6 @@
 # Pausing and resuming
 
-Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` writes what was in your head before you leave; `/hv-resume` picks it back up when you return.
+Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` writes what was in your head before you leave; `/hv-next` picks it back up when you return.
 
 ## /hv-pause
 
@@ -27,20 +27,13 @@ The note's shape looks like:
 ## Do not
 ```
 
-You don't need to manage this file directly. `/hv-resume` reads and deletes it.
+You don't need to manage this file directly. `/hv-next` reads and deletes it on resolve.
 
-## /hv-resume
+## /hv-next reads handoff notes
 
-`/hv-resume` reorients you at the start of a fresh session or right after a `/clear`. It reconciles active work streams against git (see [reviewing and picking work](next-and-status.md) for what reconciliation covers), enriches each stream with its recent commits, and checks for a handoff note from `/hv-pause`.
+When active streams exist, `/hv-next` reads any handoff note matching each stream and surfaces the **Stage**, **Next planned step**, and **Current hypothesis** inline. The path resolution mirrors `/hv-pause`'s write side: `.hv/handoff/<branch>@<repo>.md` for umbrella streams, with a fallback to `.hv/handoff/<branch>.md` for single-repo cycles or pre-umbrella handoffs.
 
-**What you see:** active streams with commit summaries, backlog counts, and a recommended next action.
-
-**Routing logic:**
-
-- Handoff note present → routes to `/hv-work` or `/hv-debug` with the note's "Next planned step" as the brief; note is deleted after you confirm
-- Branch looks complete → routes to [review and ship](review-and-ship.md)
-- Branch is mid-implementation → routes back to [running work](running-work.md)
-- Nothing in flight → routes to [reviewing and picking work](next-and-status.md)
+If a handoff is present, `/hv-next`'s per-stream question offers "Resume with `/hv-work`" as the recommended action — the handoff brief flows into the dispatched `/hv-work`, and the note is `rm -f`-ed once the user confirms the resume. "Leave handoff for later" preserves the file so the next `/hv-next` invocation surfaces it again.
 
 ## Recovering after /clear
 
@@ -48,7 +41,7 @@ A typical recovery looks like this:
 
 1. You're mid-investigation on branch `hv/my-feature`, context is filling. You run `/hv-pause`, which writes `.hv/handoff/hv-my-feature.md` with your current hypothesis and the next step you were about to try.
 2. You run `/clear`. All conversation context is gone.
-3. In the new session, you run `/hv-resume`.
+3. In the new session, you run `/hv-next`.
 4. The skill reads `status.json`, validates active streams against git, finds the handoff note for `hv/my-feature`, and surfaces something like:
 
 ```

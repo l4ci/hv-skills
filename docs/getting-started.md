@@ -84,7 +84,7 @@ boundary like "never store tokens client-side", use `/hv-decide` instead. See
 
 After the second or third cycle you mostly live in `/hv-capture` and `/hv-next`. Other
 skills you'll reach for: `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug`
-for systematic bug cycles, `/hv-pause` before stepping away, `/hv-resume` after `/clear`.
+for systematic bug cycles, `/hv-pause` before stepping away, `/hv-next` after `/clear`.
 
 ## If you're starting from a sketch (Path B: vision-driven)
 
@@ -136,7 +136,7 @@ for the full walkthrough.
 
 **Capture and backlog**
 - [Capturing work](usage/capturing-work.md)
-- [Reviewing and picking work](usage/next-and-status.md)
+- [Picking work](usage/picking-work.md)
 
 **Execution**
 - [Running work](usage/running-work.md)

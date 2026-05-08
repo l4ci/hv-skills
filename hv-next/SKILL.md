@@ -1,6 +1,6 @@
 ---
 name: hv-next
-description: Review the backlog, reconcile active work against git state, archive old completions, show sorted tables with relationship clusters, suggest the next item, and route to /hv-work. Use on "what should I work on", "pick up the next task", or when the user wants to see their backlog.
+description: Review the backlog, reconcile active work against git state, archive old completions, show sorted tables with relationship clusters, suggest the next item, and route to /hv-work. Detects handoff notes from /hv-pause on active streams (post-/clear reorientation flow). Use on "what should I work on", "where was I", "pick up the next task", "resume", or when the user wants to see their backlog.
 user-invocable: true
 ---
 
@@ -8,8 +8,8 @@ user-invocable: true
 
 ```
 ════════════════════════════════════════════════════════════════════════
-  👉  hv-next  ·  review backlog, suggest next item
-  triggers: "what's next", "what to do"  ·  pairs: hv-status, hv-work
+  👉  hv-next  ·  current state, handoff detection, next item
+  triggers: "what's next", "where was I", "resume"  ·  pairs: hv-pause, hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
 
@@ -39,7 +39,27 @@ Validates `status.json` against git, auto-cleans stale entries (dead branches), 
 
 When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in TODO.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
 
-If `needsAction` is empty, produce no output and continue. Otherwise, use the `AskUserQuestion` tool so the user can resolve each stream with the host's native question UI. Batch up to 4 streams into one `AskUserQuestion` call; if there are more than 4, present the rest in a second call after the first resolves.
+If `needsAction` is empty, produce no output and continue.
+
+**Read handoff notes per stream.** Before building the per-stream questions, resolve and read any `/hv-pause` handoff note for each `needsAction` entry. Reconcile output gives `.repo` per stream (may be `null`); the path resolves with an ordered fallback so umbrella streams pick up the `(branch, repo)`-keyed file while single-repo / pre-feature notes keep working:
+
+```bash
+# Per stream — reconcile output gives BRANCH and REPO (REPO may be empty)
+if [ -n "$REPO" ] && [ -f ".hv/handoff/${BRANCH}@${REPO}.md" ]; then
+  HANDOFF=".hv/handoff/${BRANCH}@${REPO}.md"
+elif [ -f ".hv/handoff/${BRANCH}.md" ]; then
+  HANDOFF=".hv/handoff/${BRANCH}.md"
+else
+  HANDOFF=""
+fi
+[ -n "$HANDOFF" ] && cat "$HANDOFF"
+```
+
+Issue these reads in parallel — one per stream — in the same tool-call batch as any other independent reads in this step. The bare `<branch>.md` form is a legacy fallback covering single-repo cycles and any handoff written before umbrella keying shipped; the umbrella-keyed `<branch>@<repo>.md` form is preferred whenever the stream has a non-null `repo`.
+
+For each stream that has a handoff, extract the **Stage**, **Next planned step**, and **Current hypothesis** sections — those drive the question text and routing below. Streams without a handoff note keep today's behavior unchanged.
+
+Otherwise, use the `AskUserQuestion` tool so the user can resolve each stream with the host's native question UI. Batch up to 4 streams into one `AskUserQuestion` call; if there are more than 4, present the rest in a second call after the first resolves.
 
 For each entry, build one question:
 
@@ -47,8 +67,13 @@ For each entry, build one question:
 - **Question:** context line describing the stream. Examples:
   - `hasCommits: true` — *"[B01], [F03] look complete on `hv/timer-fix` (3 commits). What should I do?"*
   - `hasCommits: false` — *"[F07] is in progress on `hv/auth-refresh` (started 2026-04-18, no commits yet). What should I do?"*
+  - Handoff present — *"`hv/auth-refresh` was paused mid-investigation: 'verify the OAuth callback path'. What should I do?"* (substitute the handoff's **Next planned step** as the verb phrase)
   - Append *" (worktree was cleaned up)"* to the question if `worktreeMissing: true`.
 - **Options** (single-select):
+  - **Handoff note present** (regardless of `hasCommits`):
+    1. "Resume with `/hv-work` (Recommended)" — *"Pick up using the handoff brief; the note will be consumed on dispatch."*
+    2. "Leave handoff for later" — *"No action now; the note stays in `.hv/handoff/` and surfaces again on next `/hv-next`."*
+    3. "Abandon" — *"Delete the branch, clear `status.json`, and remove the handoff note."*
   - `hasCommits: true`:
     1. "Ship via `/hv-ship` (Recommended)" — *"Run `/hv-ship` on the branch — runs review, then merges or opens a PR."*
     2. "Resume with `/hv-work`" — *"Keep adding to the branch."*
@@ -66,6 +91,8 @@ Route each resolution:
 | Resume with `/hv-work` | Invoke `hv-work` on the existing branch |
 | Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove [--repo <repo>] <branch>` (pass `--repo` when the active entry has a non-null `repo`) |
 | Leave as-is | Print *"Skipped `<branch>` — still in `status.json`."* and continue |
+| Resume with `/hv-work` (handoff arm) | Invoke `hv-work` via the `Skill` tool with the branch + the handoff content as the brief; then `rm -f` the handoff path. |
+| Leave handoff for later | Print *"Handoff for `<branch>` left in place — re-run `/hv-next` later."* and continue. |
 
 Plain-text fallback: *"Merge or open a PR?"* and *"Resume or abandon?"* — honor the user's free-text reply.
 
@@ -191,3 +218,4 @@ If `lastTag == ""` (no tags yet — nothing has been released), skip silently. T
 - **Pass full context to /hv-work** — include TODO.md descriptions so work doesn't re-read.
 - **Reference items by ID** — `[B01]`, `[F03]`, `[T02]` in suggestions and messages.
 - **Git is the source of truth** — if `status.json` disagrees with git state, trust git.
+- **Handoff consumption is per-stream, on resolve.** When the user picks "Resume with `/hv-work`" on a handoff arm, `rm -f` the handoff file *only* for that stream. "Leave handoff for later" preserves the file. Other streams' handoff files are not touched.

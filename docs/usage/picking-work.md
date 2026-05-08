@@ -1,6 +1,6 @@
-# Picking next
+# Picking work
 
-Three skills help you orient and pick what to do next. `/hv-next` reconciles git state and suggests work. `/hv-status` is a fast read-only glance. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
+Two skills help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any `/hv-pause` handoff note for active streams, presents the backlog, and suggests work. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
 
 ## /hv-next
 
@@ -27,27 +27,6 @@ Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P
 If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` will offer `/hv-assume` as a question option before routing to `/hv-work`.
 
 Items with a `Related:` field that share a cluster surface together so you can tackle them as a unit.
-
-## /hv-status
-
-A read-only glance at project state. No reconciliation, no suggestions, no writes.
-
-Prints:
-
-- Backlog counts (bugs / features / tasks)
-- Active work streams
-- Three most recent completions
-- Knowledge-topic count and archive size
-
-Use this to answer "where does the project stand?" before deciding whether to [capture more items](capturing-work.md), pick work, or wrap up a session. It is lighter than `/hv-next` because it skips git reconciliation entirely.
-
-**Example:**
-
-```
-/hv-status
-```
-
-Output: a compact summary, e.g. `Backlog: 2 bugs · 5 features · 1 task | Active: B03 (branch hv/B03) | Recent: T07, F12, F11`.
 
 ## /hv-assume: peek before you commit
 

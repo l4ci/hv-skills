@@ -117,7 +117,7 @@ This step is **always manual** — never auto-invoked, regardless of `autonomy.l
 
 **Trigger heuristic.** Scan the just-captured bullets for any of:
 
-- A skill slash-command name: `/hv-init`, `/hv-config`, `/hv-capture`, `/hv-c`, `/hv-go`, `/hv-vision`, `/hv-next`, `/hv-status`, `/hv-resume`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-docs`, `/hv-refactor`, `/hv-update`, `/hv-release`.
+- A skill slash-command name: `/hv-init`, `/hv-config`, `/hv-capture`, `/hv-c`, `/hv-go`, `/hv-vision`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-docs`, `/hv-refactor`, `/hv-update`, `/hv-release`.
 - A hv-skills helper path: `bin/hv-*` or `.hv/bin/hv-*` (regex `\b(?:\.hv/)?bin/hv-[a-z-]+`).
 - An `.hv/` artifact path: `.hv/TODO.md`, `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, `.hv/MILESTONES.md`, `.hv/status.json`, `.hv/config.json`, `.hv/handoff/`, `.hv/plans/`, `.hv/spikes/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`, `.hv/milestones/`.
 

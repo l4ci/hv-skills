@@ -20,7 +20,7 @@
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) — full plan with goal, acceptance, rationale, risks, research findings, notes |
 | `plans/` | Implementation plans keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
 | `spikes/` | Spike findings — one Markdown file per spike; the experimental code lives on the `spike/<name>` git branch and is never merged |
-| `handoff/` | `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-resume` |
+| `handoff/` | `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next` |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
 ## TODO.md — active backlog
@@ -57,7 +57,7 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
-A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next`, `/hv-resume`, and `/hv-pause` can scope their suggestions to what is actually in progress.
+A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next` and `/hv-pause` can scope their suggestions to what is actually in progress.
 
 ## counters.json — auto-incrementing IDs
 
@@ -79,7 +79,7 @@ See [../usage/configuration.md](../usage/configuration.md) for the full list of 
 
 `status.json` records which items are currently being worked on and which git branch or worktree each one lives in. It is written when work starts and cleared when work completes or is paused.
 
-See [../usage/next-and-status.md](../usage/next-and-status.md) for how `/hv-next` and `/hv-status` use this file to orient the model after a context clear.
+See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses this file to orient the model after a context clear.
 
 ## bin/ — CLI helpers
 
@@ -107,7 +107,7 @@ See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for the full pl
 
 ## handoff/ — pause notes
 
-When you run `/hv-pause`, the current state of the session (active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy) is written to `handoff/<branch>.md`. `/hv-resume` reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
+When you run `/hv-pause`, the current state of the session (active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy) is written to `handoff/<branch>.md`. `/hv-next` reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
 
 Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned; delete them by hand once the branch is shipped.
 

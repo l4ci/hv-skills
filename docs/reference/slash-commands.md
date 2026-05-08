@@ -4,7 +4,7 @@ Alphabetical reference of every `/hv-*` command.
 
 ## /hv-assume
 
-Prints the orchestrator's intended approach for an item, slice, or milestone (files it would touch, tests it would add, assumptions it is making, and known unknowns) without writing anything. Use it as a cheap gate before `/hv-work` for items where a wrong turn is expensive to undo. See [next and status](../usage/next-and-status.md) for how `/hv-next` surfaces it automatically for large or risky picks.
+Prints the orchestrator's intended approach for an item, slice, or milestone (files it would touch, tests it would add, assumptions it is making, and known unknowns) without writing anything. Use it as a cheap gate before `/hv-work` for items where a wrong turn is expensive to undo. See [picking work](../usage/picking-work.md) for how `/hv-next` surfaces it automatically for large or risky picks.
 
 ## /hv-c
 
@@ -44,7 +44,7 @@ Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, group
 
 ## /hv-next
 
-Reviews the backlog, reconciles active work against git state, archives old completions, and suggests what to work on next, then routes to `/hv-work` after confirmation. See [next and status](../usage/next-and-status.md) for the full flow.
+Reviews the backlog, reconciles active work against git state, archives old completions, and suggests what to work on next, then routes to `/hv-work` after confirmation. When active streams exist, also reads any handoff notes left by `/hv-pause` and surfaces Stage / Next planned step / Current hypothesis inline alongside each stream — this is the post-`/clear` reorientation flow. See [picking work](../usage/picking-work.md) for the full flow.
 
 ## /hv-pause
 
@@ -62,10 +62,6 @@ Runs a full architectural refactor cycle: explores the codebase for friction, cl
 
 Cuts a release end-to-end: bumps the project version (`major`/`minor`/`patch` or explicit semver), generates categorized release notes from commits since the last tag, prepends a section to `CHANGELOG.md` (creating it if absent), creates an annotated git tag, pushes commit + tag, and publishes a release on GitHub or GitLab when origin is set. Auto-detects the version source (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, plain `VERSION`); honors `release.versionFile` override.
 
-## /hv-resume
-
-Reorients a fresh session or post-`/clear` context by reading active streams, recent commit subjects, and any handoff notes left by `/hv-pause`. Routes automatically to `/hv-work`, `/hv-ship`, or `/hv-next` depending on the state of each branch. See [pausing and resuming](../usage/pausing-and-resuming.md) for the full flow.
-
 ## /hv-review
 
 Staff-engineer review of a feature branch before it leaves your machine: scopes the diff, pulls relevant `KNOWLEDGE.md` topics, and returns PASS / CONCERNS / FAIL with file-and-line evidence. Read-only; no mutations, no commits. See [review and ship](../usage/review-and-ship.md) for the full flow.
@@ -77,10 +73,6 @@ Finishes a feature branch: runs `/hv-review` (by default), builds a PR body from
 ## /hv-spike
 
 Throwaway feasibility experiment on a dedicated `spike/<name>` branch that is never merged. Answers a specific yes/no/conditional question and records question, what was tried, findings, and decision in `.hv/spikes/<name>.md`. See [spikes](../usage/spikes.md) for the full flow.
-
-## /hv-status
-
-Compact read-only project state glance: prints backlog counts, active work streams, the three most recent completions, knowledge-topic count, and archive size, then stops. Lighter than `/hv-next`; use it to orient before deciding what to do next. See [next and status](../usage/next-and-status.md) for context.
 
 ## /hv-update
 
