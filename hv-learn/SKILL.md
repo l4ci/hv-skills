@@ -171,6 +171,42 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    Filed hv-skills#<N> for the <topic> bullet — https://github.com/l4ci/hv-skills/issues/<N>
    ```
 
+## Step 8.6 — Suggest runlog entry (when applicable)
+
+This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing to a public registry is high-stakes; the user presses the button. Mirrors Step 8.5's shape but for the *inverse* signal: external dependencies (third-party APIs, libraries, protocols, OSS quirks), not hv-skills internals.
+
+**Trigger heuristic.** Scan the just-captured bullets for ANY of (literal union, not all):
+
+- The bullet's topic heading begins with one of these external-prone prefixes (case-insensitive): `Third-Party`, `Networking`, `Auth`, `Persistence`, `Deployment`.
+- The bullet body matches a protocol/transport token (case-insensitive, word-bounded): `OAuth`, `OIDC`, `JWT`, `SAML`, `WebSocket`, `SSE`, `gRPC`, `GraphQL`, `REST`, `HTTP/[12]`, `TLS`, `DNS`, `IMAP`, `SMTP`, `WebRTC`, `MQTT`, `AMQP`, `S3`.
+- The bullet body contains a surfaced external HTTP status code (word-bounded): `401`, `403`, `429`, `500`, `502`, `503`, `504`.
+- The bullet body names a third-party brand or library (case-insensitive, word-bounded): `anthropic`, `openai`, `claude`, `gpt`, `redis`, `postgres(?:ql)?`, `mysql`, `mongodb`, `elasticsearch`, `kafka`, `rabbitmq`, `stripe`, `twilio`, `sendgrid`, `cloudflare`, `aws`, `gcp`, `azure`, `terraform`, `kubernetes`, `docker`, `nginx`, `apache`, `envoy`.
+
+If no bullet matches any signal, skip the step silently. Match the union, not the intersection — one signal is enough to surface the prompt.
+
+**Mutual exclusivity with Step 8.5.** Step 8.5 (hv-skills issue) and Step 8.6 (runlog) are independent — a bullet can match neither, one, or both. When a bullet matches both, run Step 8.5 first and let Step 8.6 ask afterward; they route to different upstreams and shouldn't bundle.
+
+**Ask before dispatching.** When at least one bullet matches, use `AskUserQuestion`:
+
+- Header: `"Runlog"`
+- Question: *"This learning is about an external dependency. Contribute it to runlog.org via `/runlog-author`?"*
+- Options (single-select):
+  1. `"Run /runlog-author (Recommended)"` — *"Hand the matching bullet(s) to the runlog skill — drives the local Ed25519 verifier loop, then `runlog_submit`."*
+  2. `"Skip"` — *"No upstream contribution; the local KNOWLEDGE bullet stands on its own."*
+
+Plain-text fallback: *"Author a runlog entry?"* — honor yes/no.
+
+**Route the answer.**
+
+- **Run /runlog-author** — invoke the `runlog:runlog-author` skill via the `Skill` tool, naming the matching bullet(s) and the topic(s) in the brief so runlog-author has the right context. If the `Skill` tool errors that the skill is unknown (the runlog plugin isn't installed), surface one line — *"`/runlog-author` is not installed; install the runlog plugin to contribute back."* — and continue. Don't block /hv-learn on a missing peer skill.
+- **Skip** — print one line — *"Run `/runlog-author` later if you change your mind."* — and continue.
+
+When the dispatch ran, append one line to the Step 8 confirm output:
+
+```
+Ran /runlog-author for the <topic> bullet.
+```
+
 ## Key Principles
 
 - **Durable, not ephemeral.** If it only matters this week, it's a TODO. Use `/hv-capture`.

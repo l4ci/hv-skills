@@ -73,6 +73,14 @@ that block to reflect the current topic list. `/hv-work` reads this index at the
 start of a task to decide whether the task at hand warrants consulting
 `KNOWLEDGE.md` before planning begins.
 
+## Cross-skill: external dependencies feed runlog
+
+When a captured bullet is clearly about an external dependency — a third-party API quirk, a library bug, a protocol gotcha — `/hv-learn` asks once whether to also contribute the finding to [runlog.org](https://runlog.org) via `/runlog-author`. Trigger heuristic: the bullet's topic begins with `Third-Party`, `Networking`, `Auth`, `Persistence`, or `Deployment`, OR the body mentions a recognizable protocol (OAuth, JWT, WebSocket, gRPC, REST, S3, ...), an external HTTP status (401, 403, 429, 500-504), or a brand/library name (anthropic, openai, redis, postgres, kafka, stripe, aws, cloudflare, ...). If nothing matches, the step is silent.
+
+The nudge is always manual — `/hv-learn` never auto-files to runlog regardless of [autonomy](autonomy.md) level, since the contribution is a public artifact. Pick "Run /runlog-author" and the runlog skill drives its local Ed25519-signed verifier loop and submission; pick "Skip" and the bullet stays local. If the runlog plugin isn't installed, `/hv-learn` surfaces a one-line note and moves on without blocking.
+
+This is independent of the `hv-skills` upstream-issue suggestion (which fires for *internal* tool quirks). A bullet can match neither, one, or both — when it matches both, `/hv-learn` asks them in sequence, since they route to different upstreams.
+
 ## Knowledge vs decisions
 
 If you find yourself wanting to write *"we will never X"* or *"X is forbidden in
