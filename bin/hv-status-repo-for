@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Print the repo name for the active stream matching <branch> (umbrella mode),
+# or empty string if no match (single-repo or branch not active). Always
+# exits 0 — this is a lookup, not a validator.
+#
+# Replaces the inline `python3 -c` heredoc in hv-ship/SKILL.md Step 2 and
+# similar lookups documented in hv-debug/SKILL.md and hv-pause/SKILL.md.
+#
+# Usage: hv-status-repo-for <branch>
+#   stdout: repo name (umbrella) or empty (single-repo / not found)
+set -euo pipefail
+BRANCH="${1:?usage: hv-status-repo-for <branch>}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BRANCH" <<'PY'
+import sys
+from hvlib import load_json
+branch = sys.argv[1]
+data = load_json(".hv/status.json", {})
+for e in data.get("active", []) or []:
+    if e.get("branch") == branch:
+        print(e.get("repo") or "")
+        sys.exit(0)
+print("")
+PY

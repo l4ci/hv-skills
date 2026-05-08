@@ -125,13 +125,13 @@ Multi-repo wave: register one entry per `(branch, repo)` pair via `hv-status-add
 .hv/bin/hv-status-add-multi --branch <branch> --items <ID1>,<ID2>[,...] --repos "<repos-csv>"
 ```
 
-Parse the `Repos:` field by grepping the item bullet from `.hv/TODO.md`:
+Parse the `Repos:` field for each item using `hv-todo-field`:
 
 ```bash
-grep -E "^- \*\*\[<ID>\]" .hv/TODO.md | grep -oE "Repos:\s*[A-Za-z0-9_,\\s-]+" | head -1 | sed 's/Repos:\s*//' | sed 's/\s*$//'
+.hv/bin/hv-todo-field <ID> repos
 ```
 
-(The character class allows spaces and commas so multi-repo values like `web, api` are captured intact.) Hand the resulting CSV to `hv-resolve-repos` for validation; if it exits non-zero, surface the missing names and stop.
+This uses the canonical `parse_todo_fields` from hvlib, so multi-repo CSVs (`web, api`) are captured intact and the parser correctly handles `Detail:`/`Related:`/`Milestone:` boundaries that the old grep chain could over-eat. Hand the resulting CSV to `hv-resolve-repos` for validation; if it exits non-zero, surface the missing names and stop.
 
 Idempotent on `(branch, repo)` — call again with the worktree path(s) once Step 5 creates them.
 

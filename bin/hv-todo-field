@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Extract a single field (detail/related/milestone/repos) from the TODO
+# bullet of <ID>, using hvlib.parse_todo_fields. Replaces ad-hoc
+# grep|grep|sed|sed chains in skill prose.
+#
+# Usage: hv-todo-field <ID> <field>
+#   <field>: detail | related | milestone | repos
+#   stdout: field value (may be empty)
+#   exit:   0 on success (even if field empty), 1 on unknown ID or bad field
+set -euo pipefail
+ID="${1:?usage: hv-todo-field <ID> <field>}"
+FIELD="${2:?usage: hv-todo-field <ID> <field>}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import find_origin_bullet, parse_todo_fields
+
+iid, field = sys.argv[1], sys.argv[2]
+if field not in {"detail", "related", "milestone", "repos"}:
+    sys.stderr.write(f"error: {field} is not a valid field; pick one of detail/related/milestone/repos\n")
+    sys.exit(1)
+
+def read(p):
+    path = Path(p)
+    return path.read_text() if path.exists() else ""
+
+corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
+result = find_origin_bullet(corpus, iid)
+if result is None:
+    sys.stderr.write(f"error: [{iid}] not found in TODO.md or ARCHIVE.md\n")
+    sys.exit(1)
+
+line, _title = result
+fields = parse_todo_fields(line)
+print(fields.get(field, ""))
+PY

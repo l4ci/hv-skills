@@ -61,6 +61,24 @@ def print_matching_sections(content: str, wanted: set[str], out=None) -> None:
             first = False
 
 
+def replace_section(content: str, name: str, new_body: str) -> str:
+    """Replace the body of `## <name>` in `content` with `new_body`. Preserves
+    the heading line itself and surrounding whitespace. If the section is
+    missing, appends a new `## <name>` section at end (with a blank-line
+    separator). `new_body` should NOT include the heading; it's the content
+    that goes after it.
+
+    Designed for managed sections like `## Active milestones` in MILESTONES.md.
+    Returns the updated text.
+    """
+    span = find_section(content, name)
+    if span is None:
+        sep = "" if content.endswith("\n\n") else ("\n" if content.endswith("\n") else "\n\n")
+        return content.rstrip("\n") + "\n\n## " + name + "\n" + new_body
+    start, end = span
+    return content[:start] + new_body + content[end:]
+
+
 def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
     """Find the origin bullet for `iid` in `corpus` (typically TODO.md +
     ARCHIVE.md concatenated). The origin bullet is the line that introduces
@@ -154,6 +172,30 @@ def validate_repos(csv: str) -> tuple[list[str], list[str], dict[str, str]]:
     repos = load_repos() if names else {}
     missing = [n for n in names if n not in repos]
     return names, missing, repos
+
+
+def update_milestone_status_line(content: str, mid: str, new_status: str) -> str:
+    """Update the **Status:** line for milestone `mid` in `content` (typically
+    the body of .hv/MILESTONES.md) to `new_status`. Returns the updated text;
+    if the milestone's section or status line isn't present, returns `content`
+    unchanged.
+
+    The regex matches the canonical milestone block shape:
+        ### MID — Title
+        \\n
+        **Status:** <one of HV_MILESTONE_STATUSES>
+    Only the FIRST occurrence is replaced (count=1); the heading line and
+    surrounding whitespace are preserved.
+
+    `new_status` is not validated here — callers (hv-vision-status) validate
+    against HV_MILESTONE_STATUSES before invoking this helper.
+    """
+    statuses = os.environ.get("HV_MILESTONE_STATUSES", "planned|active|shipped|archived")
+    pattern = re.compile(
+        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:{statuses})",
+        re.MULTILINE,
+    )
+    return pattern.sub(rf"\g<1>{new_status}", content, count=1)
 
 
 def load_json(path, default):

@@ -56,18 +56,7 @@ If it's `main`/`master`/`trunk`, stop and tell the user to check out the feature
 Resolve the active entry's repo (umbrella mode; empty in single-repo projects):
 
 ```bash
-REPO=$(python3 -c "
-import json
-try:
-    data = json.loads(open('.hv/status.json').read())
-    branch = '<branch>'  # the branch /hv-ship is operating on
-    for e in data.get('active', []):
-        if e.get('branch') == branch:
-            print(e.get('repo') or '')
-            break
-except Exception:
-    pass
-" 2>/dev/null)
+REPO=$(.hv/bin/hv-status-repo-for <branch>)
 ```
 
 **Single-repo:**

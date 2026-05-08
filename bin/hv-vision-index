@@ -14,7 +14,7 @@ ITEMS_JSON="$("$HERE/hv-vision-list")"
 BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEMS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import find_section, replace_section, update_milestone_status_line, write_text_atomic
 
 items = json.loads(sys.argv[1])
 active = [i for i in items if i["status"] == "active"]
@@ -27,24 +27,18 @@ if ms_path.exists():
 
     # Heal each section's **Status:** line from frontmatter (drift insurance).
     for i in items:
-        section_pat = re.compile(
-            rf"(### {re.escape(i['id'])} — [^\n]+\n\n\*\*Status:\*\* )(?:{os.environ['HV_MILESTONE_STATUSES']})",
-            re.MULTILINE,
-        )
-        ms = section_pat.sub(rf"\g<1>{i['status']}", ms, count=1)
+        ms = update_milestone_status_line(ms, i["id"], i["status"])
 
     if active:
-        active_block = "## Active milestones\n\n" + "\n".join(
-            f"- {i['id']} — {i['title']}" for i in active
-        ) + "\n"
+        body = "\n".join(f"- {i['id']} — {i['title']}" for i in active)
     else:
-        active_block = "## Active milestones\n\n_(none active — set with `/hv-vision`)_\n"
+        body = "_(none active — set with `/hv-vision`)_"
 
-    section_pat = re.compile(r"^## Active milestones\s*\n(?:.*?\n)*?(?=^## |\Z)", re.MULTILINE)
-    if section_pat.search(ms):
-        ms = section_pat.sub(active_block + "\n", ms)
+    if find_section(ms, "Active milestones") is not None:
+        ms = replace_section(ms, "Active milestones", "\n" + body + "\n\n")
     else:
         msec = re.search(r"^## Milestones\s*$", ms, re.MULTILINE)
+        active_block = "## Active milestones\n\n" + body + "\n"
         if msec:
             ms = ms[:msec.start()].rstrip("\n") + "\n\n" + active_block + "\n" + ms[msec.start():]
         else:

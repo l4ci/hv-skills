@@ -55,20 +55,7 @@ if [ -n "$REPO" ]; then
 else
   if ! git rev-parse --git-dir >/dev/null 2>&1; then
     # Umbrella cwd? Give a friendly pointer instead of a bare git error.
-    HV_DIR="$UMBRELLA_CWD/.hv"
-    UMBRELLA_ON="no"
-    if [ -d "$HV_DIR" ]; then
-      UMBRELLA_ON="$(python3 - "$HV_DIR" <<'PY'
-import json, sys
-from pathlib import Path
-try:
-    cfg = json.loads((Path(sys.argv[1]) / "config.json").read_text())
-    print("yes" if cfg.get("umbrella", {}).get("enabled") else "no")
-except Exception:
-    print("no")
-PY
-)"
-    fi
+    UMBRELLA_ON="$("$BIN_DIR/hv-umbrella-on" "$UMBRELLA_CWD")"
     if [ "$UMBRELLA_ON" = "yes" ]; then
       NAMES="$(PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from hvlib import load_repos

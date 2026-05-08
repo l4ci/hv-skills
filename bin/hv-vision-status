@@ -14,9 +14,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
-import os, re, sys
+import re, sys
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import write_text_atomic, update_milestone_status_line
 
 mid, status = sys.argv[1], sys.argv[2]
 
@@ -35,11 +35,7 @@ write_text_atomic(detail, new)
 ms = Path(".hv/MILESTONES.md")
 if ms.exists():
     ms_content = ms.read_text()
-    pattern = re.compile(
-        rf"(### {re.escape(mid)} — [^\n]+\n\n\*\*Status:\*\* )(?:{os.environ['HV_MILESTONE_STATUSES']})",
-        re.MULTILINE,
-    )
-    updated = pattern.sub(rf"\g<1>{status}", ms_content, count=1)
+    updated = update_milestone_status_line(ms_content, mid, status)
     if updated != ms_content:
         write_text_atomic(ms, updated)
 PY

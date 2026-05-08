@@ -5,6 +5,7 @@
 set -euo pipefail
 
 HV=".hv"
+SRC_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -d "$HV" ]; then
   echo "uninitialized: .hv/ directory missing" >&2
@@ -18,15 +19,8 @@ for f in DECISIONS.md TODO.md KNOWLEDGE.md MILESTONES.md counters.json config.js
   fi
 done
 
-UMBRELLA_ON=$(python3 -c "
-import json
-try:
-    cfg = json.loads(open('.hv/config.json').read())
-    print('1' if cfg.get('umbrella', {}).get('enabled') else '0')
-except Exception:
-    print('0')
-")
-if [ "$UMBRELLA_ON" = "1" ]; then
+UMBRELLA_ON=$("$SRC_BIN/hv-umbrella-on")
+if [ "$UMBRELLA_ON" = "yes" ]; then
   if [ ! -f "$HV/repos.json" ]; then
     echo "uninitialized: umbrella.enabled is true but $HV/repos.json missing — re-run /hv-init from the umbrella root" >&2
     exit 2
@@ -51,7 +45,6 @@ fi
 # itself — preflight verifies every other helper, not itself. Source +x bit
 # decides the check mode: executables need -x in .hv/bin/, libraries (e.g.
 # hv-types.sh) only need -f.
-SRC_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 missing=()
 for src in "$SRC_BIN"/hv-*; do
   [ -e "$src" ] || continue
