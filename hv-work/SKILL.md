@@ -455,6 +455,19 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 > *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in."*
 
+## Step 13.7 — Docs After-Work (Nudge or Auto-Invoke)
+
+Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
+
+When the flag is on, trigger condition (same gating as Step 13): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+
+When triggered, branch on `autonomy.level`:
+
+- `"off"` — nudge *"User-facing changes shipped. Run `/hv-docs` to review and update public docs (after-work mode)."*
+- `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the after-work flow has the right context.
+
+If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
 ```bash

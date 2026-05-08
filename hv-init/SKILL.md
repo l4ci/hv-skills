@@ -127,6 +127,7 @@ EXPECTED = [
     ("debug", "competingHypotheses"),
     ("docs", "path"),
     ("docs", "autoCreate"),
+    ("docs", "afterWork"),
     ("git", "baseBranch"),
     ("umbrella", "enabled"),
 ]
@@ -245,7 +246,7 @@ cfg = {
   "ship":     {"review": <Q4-ship>},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
-  "docs":     {"path": "docs", "autoCreate": False},
+  "docs":     {"path": "docs", "autoCreate": False, "afterWork": False},
   "git":      {"baseBranch": ""}
 }
 cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled
@@ -269,6 +270,11 @@ cfg = json.loads(p.read_text())
 # Example: user answered Q4 "Review before ship" → ship.review was missing.
 # Set only the keys from the STALE list; never overwrite existing values.
 cfg.setdefault("ship", {})["review"] = True   # or answered value
+
+# docs.afterWork — silent default. No question; the toggle UX lives in
+# /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
+# the flag when the user approves a fresh scaffold).
+cfg.setdefault("docs", {}).setdefault("afterWork", False)
 
 # umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
@@ -315,4 +321,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 
 If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate}`, `git.baseBranch`, `umbrella.enabled`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `git.baseBranch`, `umbrella.enabled`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

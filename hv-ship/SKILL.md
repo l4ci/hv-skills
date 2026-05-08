@@ -184,6 +184,19 @@ When triggered, branch on `autonomy.level`:
 - `"off"` — append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the resolved IDs and touched files.
 
+## Step 8.6 — Docs After-Work (Nudge or Auto-Invoke)
+
+Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
+
+When the flag is on, trigger condition (same gating as Step 8.5): **2+ items resolved**, OR **≥5 files touched** (use the scope JSON's `touchedFiles` for the count), OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+
+When triggered, branch on `autonomy.level`:
+
+- `"off"` — append one line to the Step 9 report — *"User-facing changes shipped. Run `/hv-docs` to review and update public docs (after-work mode)."*
+- `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the resolved IDs and touched files so the after-work flow has the right context.
+
+If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+
 ## Step 9 — Report to User
 
 One compact block.
