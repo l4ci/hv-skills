@@ -190,6 +190,39 @@ TS2=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(
 pass "status-add --if-absent preserved startedAt when entry already exists"
 "$BIN/hv-status-remove" hv/ia-branch
 
+echo "hv-status-remove sweeps handoff note (B13)"
+mkdir -p .hv/handoff/hv
+# Single-repo: handoff at .hv/handoff/<branch>.md is swept on remove
+"$BIN/hv-status-add" hv/sw-single B01
+echo "stale" > .hv/handoff/hv/sw-single.md
+"$BIN/hv-status-remove" hv/sw-single
+[ ! -f .hv/handoff/hv/sw-single.md ] || fail "status-remove did not sweep single-repo handoff"
+pass "status-remove sweeps single-repo handoff at .hv/handoff/<branch>.md"
+
+# Idempotent: status-remove on a branch with no handoff is a silent no-op
+"$BIN/hv-status-add" hv/sw-no-handoff B02
+"$BIN/hv-status-remove" hv/sw-no-handoff
+pass "status-remove is silent when no handoff exists"
+
+# Umbrella keying: --repo sweeps .hv/handoff/<branch>@<repo>.md (and only that)
+mkdir -p .hv/handoff/hv
+echo "umbrella-web" > .hv/handoff/hv/sw-umb@web.md
+echo "single-fallback" > .hv/handoff/hv/sw-umb.md
+# A bare-call without --repo only matches legacy (repo:null) entries — and for
+# handoff sweep it must mirror that scope, touching only <branch>.md.
+"$BIN/hv-status-add" hv/sw-umb B03
+"$BIN/hv-status-remove" hv/sw-umb
+[ ! -f .hv/handoff/hv/sw-umb.md ] || fail "status-remove (no --repo) did not sweep legacy handoff"
+[ -f .hv/handoff/hv/sw-umb@web.md ] || fail "status-remove (no --repo) wrongly swept umbrella-keyed handoff"
+pass "status-remove (no --repo) sweeps only the legacy <branch>.md handoff"
+
+# --repo sweeps the umbrella-keyed handoff
+"$BIN/hv-status-add" --repo web hv/sw-umb B03
+"$BIN/hv-status-remove" --repo web hv/sw-umb
+[ ! -f .hv/handoff/hv/sw-umb@web.md ] || fail "status-remove --repo did not sweep umbrella-keyed handoff"
+pass "status-remove --repo sweeps the .hv/handoff/<branch>@<repo>.md handoff"
+rm -rf .hv/handoff
+
 echo "hv-archive-old"
 # Inject two completed items: one old, one recent
 python3 - <<'PY'
