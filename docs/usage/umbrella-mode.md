@@ -103,7 +103,7 @@ Umbrella worktrees use **Layout B**:
 <umbrella>/.claude/worktrees/<repo>/<branch>
 ```
 
-A single discovery point at the umbrella, `<umbrella>/.claude/worktrees/`, holds every active worktree across every sub-repo, grouped by repo. No `.gitignore` edits in the sub-repos. Single-repo mode keeps `<repo>/.claude/worktrees/<branch>` and is unaffected.
+A single discovery point at the umbrella, `<umbrella>/.claude/worktrees/`, holds every active worktree across every sub-repo, grouped by repo. No `.gitignore` edits in the sub-repos. Single-repo mode keeps `<repo>/.claude/worktrees/<branch>` and is unaffected. To resolve the canonical Layout B path for a `(repo, branch)` pair without hand-encoding it, call `.hv/bin/hv-worktree-path --repo <name> <branch>`.
 
 ## Per-skill behavior
 
@@ -122,7 +122,7 @@ Most skills delegate umbrella resolution to underlying helpers and stay umbrella
 - **`/hv-status`** displays each in-progress entry with an inline `(repo: <name>)` suffix; `hv-backlog`'s In Progress table gains a `Repo` column when any active entry is umbrella-tagged.
 - **`/hv-refactor`** asks which scope to refactor (all sub-repos, all sub-repos plus the umbrella, the umbrella only, or a subset), then dispatches parallel sub-agents, each running a focused single-repo cycle in its target's `.git/`. The umbrella orchestrator aggregates per-repo summaries and resets the refactor counter once at the end.
 
-The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`. Without the flag, helpers operate on the cwd's git tree as in single-repo mode.
+The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`, `hv-worktree-path`. Without the flag, helpers operate on the cwd's git tree as in single-repo mode.
 
 ## What's not yet in umbrella mode
 

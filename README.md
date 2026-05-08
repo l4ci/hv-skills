@@ -307,7 +307,7 @@ Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
 bash test/smoke.sh
 ```
 
-Exercises all `hv-*` helpers across 102 assertions. Exits non-zero on any failure.
+Exercises all `hv-*` helpers across 234 assertions. Exits non-zero on any failure.
 
 ## Contributing
 
