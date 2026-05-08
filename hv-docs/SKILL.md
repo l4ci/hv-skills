@@ -36,6 +36,10 @@ Read `.hv/config.json`:
 
 Missing keys fall back to defaults silently — `/hv-init` migration adds them on schema upgrade.
 
+> **Architecture rule — one `docs/` tree per project.** A single hv-skills project has exactly one `docs/` tree, located either at the umbrella root or inside one chosen sub-repo (recorded via `docs.repo` config when needed). Forbids: multiple `docs/` trees inside a single hv-skills project, per-sub-repo `docs/` *in addition to* an umbrella `docs/`, `/hv-docs` writing to more than one target. Permits: a single `docs/` at the umbrella root (cross-cutting docs); a single `docs/` inside one chosen sub-repo (when that sub-repo owns the project's public surface); cross-cutting documentation living in the chosen tree.
+>
+> **`docs/` is the public surface.** It's consumer-facing — contributor and contract content lives in the skill that owns it (`hv-*/SKILL.md`), not in a parallel reference file. Cross-refs from `docs/` and `README.md` point at `docs/` pages or specific SKILL.md files, never at a centralized internals doc.
+
 ## Step 1 — Preflight & First-Run Detection
 
 ```bash
@@ -130,6 +134,16 @@ Then ask via `AskUserQuestion`:
 Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed.
 
 On **Cancel** — print *"Scaffold cancelled. Run `/hv-docs` again whenever you're ready."* and exit.
+
+### Page-naming convention
+
+Tailored trees should follow this layout — already in use across hv-skills's own `docs/` and reusable for other projects:
+
+- **Spine** — top-level pages: `README.md` (TOC), `getting-started.md` (5-minute walkthrough), `faq.md` (common questions, optional).
+- **Phase-grouped usage pages** — `docs/usage/<verb-noun>.md`: examples — `next-and-status.md`, `running-work.md`, `pausing-and-resuming.md`, `review-and-ship.md`. The verb-noun shape keeps file names self-documenting and groups related actions.
+- **Reference material** — `docs/reference/`: full helper / command / config references — `slash-commands.md`, `cli-helpers.md`, `configuration.md`, etc. Reference pages are flat lists/tables; usage pages are narrative walkthroughs.
+
+When the tailored proposal in this step doesn't fit the convention (e.g., a CLI tool with no usage phases, or a library with API references but no walkthroughs), describe the deviation in one line in your proposal — *"This project ships only reference material; no `usage/` pages proposed."* — so the user sees the conscious choice.
 
 ## Step 5 — Scaffold on Approval
 

@@ -68,6 +68,14 @@ On **No** — set `UMBRELLA_MODE=false`, continue to Step 2 unchanged.
 
 Plain-text fallback: if `UMBRELLA_COUNT >= 2`, default to **Yes** with `UMBRELLA_REGISTER="all"` — it's the Recommended path and reversible by re-running `/hv-init` then choosing No, or by toggling `umbrella.enabled` via `/hv-config`.
 
+> **Architecture rule — umbrella mode does not use git submodules.** Sub-repos under an umbrella are independent git repositories with no version-pinning at the umbrella level.
+>
+> *Why.* Submodules add version-pin friction (surprise-checkouts when SHAs drift, manual `git submodule update` discipline) and couple sub-repo evolution to umbrella commits — the wrong dependency direction. hv-skills's wedge is shared **coordinator + knowledge + decisions** at the umbrella, not shared version state.
+>
+> **Forbids.** `git submodule add` anywhere in an umbrella tree; `.gitmodules` at the umbrella root; "umbrella commit pins sub-repo SHA" patterns; designs that synchronize or pin sub-repo versions through the umbrella.
+>
+> **Permits.** Independent sub-repos checked out side-by-side under the umbrella; registry via `.hv/repos.json` by absolute or relative path; each sub-repo evolving on its own branch/tag/release schedule; sub-repos that are themselves submodule-using internally — the boundary applies *between umbrella and direct children*, not inside any sub-repo.
+
 ## Step 2 — Bootstrap & Install Helpers
 
 Resolve the source `bin/` from the installed plugin, then run `hv-bootstrap` to seed `.hv/` and copy every helper into `.hv/bin/`. Source resolution order: `$CLAUDE_PLUGIN_ROOT/bin/` first, then standard install locations, then a repo-local clone.
@@ -228,7 +236,31 @@ If the user picked "Other" with custom text, honor it only if it's a valid value
 
 Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool.
 
-### Authoring rule — opt-in feature flags default to `false`
+## Authoring conventions
+
+These conventions constrain how new hv-skills (or new behavior in existing skills) is authored. They live here in `hv-init/SKILL.md` because /hv-init is the canonical entry point — the place a new author touches first when they ship a new flag, skill, or umbrella feature.
+
+### Skills are self-contained — no shared contract file
+
+Each skill owns its rules inline. A "shared contract" reference file (an old `GUIDE.md` was one) is a smell when every rule has a single owner. Audit the cross-refs before retaining a shared file: if each rule is already mirrored inline at the call site (preflight 3-exit codes, plain-text fallback, autonomy off/auto/loop dispatch, learn trigger thresholds, etc.), the central file is vestigial pointer-chasing. Build a shared file only when N≥3 callers need the same long rule verbatim.
+
+### Imperative rules in autonomy-aware steps must live inline at every dispatch point
+
+Steps that branch on `autonomy.level` (off/auto/loop) and dispatch the next skill via `Skill` ("no prompt, no confirmation, no 'want me to' question") must repeat the directive verbatim alongside each `Skill`-tool invocation. Readers don't chase cross-refs to a single source of truth, and the harness drifts toward asking when only the rule's name is at the dispatch site. Redundancy is cheaper than scattered authority.
+
+### User-volition gates enforced at exactly one point
+
+Manual confirmation gates (`/hv-decide`'s manual-only contract, the public-artifact gate in `/hv-learn` Step 8.5, etc.) must be enforced at exactly ONE point in a skill, never propagated across orchestrator + called skill. The gate is architecture-enforced — only the owning skill can ask the question, and no other skill dispatches the gated skill via `Skill`. Putting a confirmation check in a skill that other skills can invoke breaks the contract under autonomy.
+
+### Stage features across slices using pass-through stubs
+
+Multi-slice features ship the SHAPE early via pass-through stubs that explicitly name the future-slice wiring point (e.g. *"Layer-1 filter is a pass-through stub; `bin/hv-docs-filter` lands in M01-S03"*). This signals what consumers should NOT rely on yet. **Companion rule:** when the milestone flips to `shipped`, sweep all `M0X-S0Y` slice references — they were placeholders and become stale after merge.
+
+### Helper-centric V2-surface extension
+
+When scaling a feature surface from "single X" to "list of X" (e.g. one repo → many) across N skills, push parsing/validation/dispatch into `bin/` helpers and confine each SKILL.md edit to a single guard paragraph: *"if the value resolves to ≥2 entries, call helper-X; otherwise unchanged."* Single-X path stays byte-identical, multi-X complexity lives in code (exercised by smoke), per-skill prose stays ≤15 lines.
+
+### Opt-in feature flags default to `false`
 
 When adding a new boolean config flag whose purpose is to enable additional skill behavior or auto-invocation:
 

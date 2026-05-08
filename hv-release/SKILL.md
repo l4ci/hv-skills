@@ -220,6 +220,8 @@ Skip in `--dry-run` mode; print the tag command that would run.
 
 ## Step 12 — Push
 
+> **Manual gate — filing a public artifact.** Pushing the tag creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Step 7 (Review Notes) already gathered explicit user approval of the release notes; the push only fires after that approval.
+
 ```bash
 git push origin <current-branch> v<new_version>
 ```
@@ -229,6 +231,8 @@ Single call — pushes both the commit and the tag atomically. If this fails (e.
 Skip in `--dry-run` mode.
 
 ## Step 13 — Create Remote Release
+
+> **Manual gate — filing a public artifact.** Publishing the release on GitHub/GitLab creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The user already approved the release notes in Step 7; this step is downstream of that approval.
 
 ```bash
 .hv/bin/hv-release-detect-host

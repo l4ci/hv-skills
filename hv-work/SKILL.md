@@ -219,6 +219,14 @@ This guard is **fatal**, not warn-and-proceed. It fires regardless of umbrella m
 
 A wave is "commit-producing" by default; "read-only" workers (research, lint-only verifications, smoke validators that don't commit) are exempt — count only workers whose brief instructs them to stage and commit.
 
+> **Why this guard exists.** Caught on M02-S01 Wave 1: four parallel workers running under branch isolation produced two failure modes against the shared `.git/index` — `index.lock` collisions (poll-and-retry survived these), and an undetectable index-sweep where Worker A's staged file landed in Worker B's commit. T1's `bin/hv-resolve-umbrella` was orphaned that way; T4's worker had to `git reset --soft` and re-stage, the orchestrator re-committed T1 standalone, and the implementation history is now obscured by recovery commits. The fix is structural: each worker on its own worktree → its own index → no race.
+>
+> **Forbids.** `/hv-work` dispatching ≥2 parallel workers in the same wave when `work.isolation == "branch"`; worker briefs that ask multiple agents to run `git add && git commit` against the same `.git/` concurrently; plan-as-artifact wave layouts that put 2+ commit-producing tasks in a single wave under branch isolation; suppressing the guard via env-var overrides or "just this once" exceptions.
+>
+> **Permits.** Parallel `/hv-work` waves under `work.isolation == "worktree"` (each worker has its own worktree, its own index); serial waves of size 1 under either isolation mode (no concurrent index access); multi-task waves where only ONE worker commits and the others are read-only (research, smoke-validate, lint-only verifications); the file-disjointness rule from `KNOWLEDGE.md` — this guard is **additive** to that one, not a replacement.
+>
+> **Companion: F11 default.** When workers are write-only and the orchestrator commits each task sequentially in Step 7.5, this guard is technically unnecessary (no worker touches `.git/index`). The guard remains as defense-in-depth for the documented opt-in legacy path (workers stage and commit themselves) and for projects that haven't migrated to F11 default.
+
 ### Branch creation (single-repo)
 
 ```bash
