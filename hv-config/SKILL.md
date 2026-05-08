@@ -67,6 +67,7 @@ print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
 print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHypotheses',False) else 'off'}")
 print(f"  Docs path                {cfg.get('docs',{}).get('path','docs')}")
 print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',False) else 'off'}")
+print(f"  Docs after-work          {'on' if cfg.get('docs',{}).get('afterWork',False) else 'off'}")
 print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
 print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
 PY
@@ -91,12 +92,13 @@ One `AskUserQuestion` call, multiSelect:
   8. *"Competing hypotheses — current: <on|off>"*
   9. *"Docs path — current: <path>"*
   10. *"Docs auto-create — current: <on|off>"*
-  11. *"Git base branch — current: <branch|(auto-detect)>"*
-  12. *"Umbrella mode — current: <on|off>"*
+  11. *"Docs after-work — current: <on|off>"*
+  12. *"Git base branch — current: <branch|(auto-detect)>"*
+  13. *"Umbrella mode — current: <on|off>"*
 
 If the user selects nothing, print *"No changes."* and stop.
 
-Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the twelve names above.
+Plain-text fallback: ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the thirteen names above.
 
 ## Step 4 — Ask the Selected Questions
 
@@ -114,6 +116,7 @@ Build a single `AskUserQuestion` call containing **only** the questions for the 
 | Competing hypotheses | *"Dispatch 3 parallel hypothesis agents in `/hv-debug` Step 6? (Better diversity, ~3× orchestrator cost on every debug run.)"* | On / Off |
 | Docs path | *"Which directory contains your project documentation?"* | Free text (default: `docs`) |
 | Docs auto-create | *"Should `/hv-docs` auto-write doc updates after work cycles?"* | On / Off |
+| Docs after-work | *"Should `/hv-docs` run automatically after `/hv-work` and `/hv-ship` finish?"* | On / Off (Recommended) |
 | Git base branch | *"Enter the base branch for this project, or leave blank to auto-detect (main / master / trunk / origin HEAD)."* | Free text (default: `""`) |
 | Umbrella mode | *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json` — registered repos remain.)"* | On / Off |
 

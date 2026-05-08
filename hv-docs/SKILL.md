@@ -21,7 +21,7 @@ user-invocable: true
 |---|---|
 | `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) |
 | Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose doc updates) |
-| Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + reorganize, _M01-S04_) |
+| Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + reorganize) |
 | Manual invoke, no signal | First-run if `<docs.path>/` missing; else nudge |
 
 If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
@@ -31,9 +31,10 @@ If invoked in a not-yet-implemented mode, print one line citing the slice and ex
 Read `.hv/config.json`:
 
 - `docs.path` — relative path to the docs folder (default `"docs"`)
-- `docs.autoCreate` — whether after-work mode auto-writes (default `false`; consumed by M01-S02 onward, not this slice)
+- `docs.autoCreate` — whether after-work mode auto-writes (default `false`; when `true`, after-work commits go in without the per-batch approval gate)
+- `docs.afterWork` — whether `/hv-work` and `/hv-ship` invoke `/hv-docs` post-cycle (default `false`). Toggled via `/hv-config` or by running `/hv-docs` manually (first-run scaffold flips it `true` automatically; manual run on an existing `<docs.path>/` asks).
 
-Missing keys fall back to defaults silently — `/hv-init` migration adds them in M01-S05.
+Missing keys fall back to defaults silently — `/hv-init` migration adds them on schema upgrade.
 
 ## Step 1 — Preflight & First-Run Detection
 
@@ -50,7 +51,28 @@ Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs
 ```
 
 - **Empty or missing** → continue with first-run mode (Steps 2–6).
-- **Non-empty** → not a first-run scenario. Print one line: *"`<docs.path>/` already exists. After-work mode coming in M01-S02; restructure mode coming in M01-S04."* and exit.
+- **Non-empty** → not a first-run scenario. Branch on `docs.afterWork`:
+  - **Already `true`** → After-work mode is already enabled. Print *"`<docs.path>/` already exists and after-work mode is on. Re-running `/hv-docs` manually has no further effect; the flow auto-runs after `/hv-work` and `/hv-ship` cycles. Use `/hv-config` to toggle off."* and exit.
+  - **`false` (default)** → ask via `AskUserQuestion`:
+    - **Header:** `"After-work"`
+    - **Question:** *"`<docs.path>/` is initialized but `docs.afterWork` is off. Enable after-work mode? `/hv-work` and `/hv-ship` will then auto-invoke `/hv-docs` to propose doc updates after each cycle."*
+    - **Options** (single-select):
+      1. *"Enable (Recommended)"* — write `docs.afterWork: true` to `.hv/config.json`, print *"After-work mode enabled. `/hv-work` and `/hv-ship` will now invoke `/hv-docs` post-cycle."*, exit.
+      2. *"Leave off"* — exit without changes.
+    - Plain-text fallback: ask once. Default to "Leave off" if ambiguous (opt-in semantics — never silently flip a config flag the user didn't ask for).
+
+The config write uses a small Python heredoc:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+p = Path(".hv/config.json")
+cfg = json.loads(p.read_text())
+cfg.setdefault("docs", {})["afterWork"] = True
+p.write_text(json.dumps(cfg, indent=2) + "\n")
+PY
+```
 
 ## Step 2 — Read Project Signals
 
@@ -142,6 +164,8 @@ target/
 
 Make all writes idempotent — never overwrite an existing file.
 
+After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use the same Python heredoc shown in Step 1's manual-toggle branch. Skip silently if `docs.afterWork` is already `true`.
+
 ## Step 6 — Closing Summary
 
 Print a short summary block:
@@ -162,7 +186,7 @@ Next:
 
 ## After-work Flow
 
-This flow is invoked by `/hv-work` Step 13.5 / `/hv-ship` Step 8.6 (those wires land in M01-S05; this slice defines the SKILL.md side).
+This flow is invoked by `/hv-work` Step 13.7 and `/hv-ship` Step 8.6 — those steps gate on `docs.afterWork` (default `false`); when on, they dispatch `/hv-docs` via `Skill` post-cycle and pass the resolved item IDs + touched files. Manual invocation also runs this flow when `<docs.path>/` exists and the flag is on.
 
 ## Step A1 — Trigger Gate
 
@@ -175,7 +199,7 @@ If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print o
 In a **single parallel batch** (one tool-call response, multiple reads), gather:
 
 - `git log --oneline <last-docs-marker>..HEAD` — boundary is the last `docs:` commit's SHA. Fall back to last 20 commits if no `docs:` commit exists yet.
-- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; pass-through stub in this slice — `bin/hv-docs-filter` lands in M01-S03).
+- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; the orchestrator reads `.docsignore` and skips matching paths from the diff).
 - Current `<docs.path>/` tree (one-level listing) and each existing page's H1+H2 outline (`grep -E '^#{1,2} ' <page>`).
 
 ## Step A3 — Classify Changes
@@ -222,8 +246,6 @@ Draft a concrete before/after fragment per page using a simple unified-diff-shap
 
 Drafts should reference real file/section anchors (e.g., the H2 heading the edit lands under). No hallucinated content; if no concrete edit can be drafted, mark the entry "*needs prose — author yourself*" and skip it from the apply set.
 
-Layer-2 scrub on the final draft text is a **pass-through stub** in this slice — note: `bin/hv-docs-scrub` lands in M01-S03.
-
 ## Step A5 — Approval Gate
 
 Show all drafts in one batch (plain markdown — same as the first-run proposal in Step 4). Then ask via `AskUserQuestion`:
@@ -253,7 +275,7 @@ Resolves: [B07], [F03]
 
 `Resolves:` lists the item IDs of the work cycle that triggered this run (passed in by the calling skill's Skill-tool brief). If no IDs were passed (manual `/hv-docs` invocation), omit the `Resolves:` line.
 
-`autoCreate: true` (auto-write path) lands in M01-S03 and adds Layer-3 LLM safety review before commit. This slice ships propose-mode only.
+`autoCreate: true` (auto-write path, default `false`) skips the per-batch approval gate in Step A5 — drafts are written and committed directly. The propose-mode flow above still runs for review/manual-invoke.
 
 ## Key Principles
 
@@ -262,4 +284,4 @@ Resolves: [B07], [F03]
 - **`<docs.path>/README.md` is the spine.** Every other page links from there.
 - **`.docsignore` is the safety boundary.** Seeded with safe defaults; user extends.
 - **Don't narrate the discovery analysis.** It shapes the proposal silently.
-- **After-work runs in propose mode by default.** `docs.autoCreate: false` (the default) means every batch goes through user approval; `true` (auto-write + Layer-3 LLM review) lands in M01-S03.
+- **After-work runs in propose mode by default.** `docs.autoCreate: false` (the default) means every batch goes through user approval; `true` skips the approval gate and commits directly.
