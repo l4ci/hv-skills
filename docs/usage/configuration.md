@@ -140,6 +140,46 @@ Controls whether `/hv-docs` after-work mode automatically writes proposed doc up
 | `false` (default) | After-work mode proposes updates and waits for approval before writing. Recommended until M01-S03 ships the auto-write safety review. |
 | `true` | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. Best paired with `git diff` review per cycle. |
 
+## docs.afterWork
+
+- **Type:** boolean
+- **Default:** `false`
+
+Gate for the after-work docs flow. When `true`, the skills `/hv-work`, `/hv-ship`, and `/hv-release` trigger `/hv-docs` after their primary action completes — `/hv-work` and `/hv-ship` only on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger), `/hv-release` on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
+
+```json
+{ "docs": { "afterWork": true } }
+```
+
+Leave `false` while you're shaping docs by hand. Flip on once your docs structure is stable enough that `/hv-docs`'s propose-mode adds value rather than noise.
+
+## release.confirmLargePushCommits
+
+- **Type:** integer
+- **Default:** `10`
+
+Threshold for the number of unpushed commits above which `/hv-release` will interject one confirmation prompt before pushing, even under `autonomy.level: auto` or `loop`. Below the threshold, auto/loop autonomy silently pushes the unpushed range as part of the release (the existing speed-contract behavior). Above it, the skill always asks — releases that push 10+ commits are not the common case and the user usually wants a beat to confirm.
+
+```json
+{ "release": { "confirmLargePushCommits": 25 } }
+```
+
+Set higher to suppress the prompt for typical project velocities; set lower (e.g., `5`) for projects where every push is consequential.
+
+## release.nudgeAfterCommits
+
+- **Type:** integer
+- **Default:** `10`
+
+Number of commits since the last release tag at which `/hv-next` (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only — no skill is auto-invoked.
+
+## release.nudgeAfterDays
+
+- **Type:** integer
+- **Default:** `14`
+
+Companion to `release.nudgeAfterCommits`. The release nudge fires when EITHER threshold is reached — high-velocity projects hit the commits threshold first, slow-burn projects hit the days threshold first. Set one or both higher to suppress more aggressively, or lower to release more often.
+
 ## git.baseBranch
 
 - **Type:** string

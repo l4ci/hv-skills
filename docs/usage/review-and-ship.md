@@ -69,3 +69,13 @@ See [configuration](configuration.md) for the full `work` block.
 The review gate is independent of the autonomy level. Even under `autonomy: "loop"`, a `FAIL` verdict halts the chain until you fix the branch.
 
 See [configuration](configuration.md) for the full `ship` block.
+
+## Release nudges
+
+When you've accumulated commits since the last release tag, `/hv-next` (on terminal paths — when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
+
+```
+5 commits since v1.16.0; consider /hv-release.
+```
+
+The nudge fires when EITHER `release.nudgeAfterCommits` (default 10) OR `release.nudgeAfterDays` (default 14) is reached — see [configuration](configuration.md#releasenudgeaftercommits). It's informational; no skill is auto-invoked. The first release is always your call (no nudge fires while no tag exists).
