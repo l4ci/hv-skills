@@ -253,6 +253,10 @@ Edit `.hv/config.json`:
 
 The defaults are conservative: branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off (pending an LLM safety review), no autonomous chaining. Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). For every key and when to flip it, see [docs/usage/configuration.md](docs/usage/configuration.md).
 
+### Drift detection
+
+Every `bin/hv-preflight` (run by most hv-skills) compares the project's recorded `hvSkills.version` against the currently-installed plugin. On drift it prints one informational line nudging `/hv-init` so the project picks up new helpers. Under `autonomy.level: "auto"` or `"loop"`, `/hv-update` also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so the drift clears in one step.
+
 ## Architecture
 
 ```

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Compare .hv/config.json#hvSkills.version with the currently-installed
+# hv-skills plugin version. Emits a drift nudge or JSON. Always exits 0.
+#
+# Distinct from hv-update-check (which compares installed vs latest GitHub
+# release). This catches the case where the plugin updated but the project's
+# .hv/bin/ helpers are stale because /hv-init wasn't re-run.
+#
+# Usage:
+#   hv-version-check          # nudge to stdout on drift; silent otherwise
+#   hv-version-check --json   # always emit JSON
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$HERE/hv-self-locate.sh"
+hv_self_locate || exit 0
+
+JSON=0
+[ "${1:-}" = "--json" ] && JSON=1
+
+STAMPED=""
+if [ -f .hv/config.json ]; then
+  STAMPED=$(python3 -c "
+import json
+try:
+    cfg = json.load(open('.hv/config.json'))
+    print(cfg.get('hvSkills', {}).get('version', '') or '')
+except Exception:
+    pass
+" || true)
+fi
+
+resolve_plugin_root() {
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json" ]; then
+    echo "$CLAUDE_PLUGIN_ROOT"; return
+  fi
+  for cand in \
+    "$HOME"/.claude/plugins/*/hv-skills \
+    "$HOME"/.claude/plugins/hv-skills \
+    "$HOME"/.agents/skills/hv-skills \
+    "$HOME"/.agents/skills; do
+    if [ -f "$cand/.claude-plugin/plugin.json" ]; then
+      echo "$cand"; return
+    fi
+  done
+  for cand in $(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/ 2>/dev/null | sort -Vr); do
+    if [ -f "$cand.claude-plugin/plugin.json" ]; then
+      echo "${cand%/}"; return
+    fi
+  done
+  echo ""
+}
+
+ROOT=$(resolve_plugin_root)
+INSTALLED=""
+if [ -n "$ROOT" ]; then
+  INSTALLED=$(python3 -c "
+import json
+try:
+    print(json.load(open('$ROOT/.claude-plugin/plugin.json')).get('version', '') or '')
+except Exception:
+    pass
+" || true)
+fi
+
+STATUS="unknown"
+if [ -n "$STAMPED" ] && [ -n "$INSTALLED" ]; then
+  if [ "$STAMPED" = "$INSTALLED" ]; then
+    STATUS="match"
+  else
+    STATUS="drift"
+  fi
+fi
+
+if [ "$JSON" = "1" ]; then
+  STAMPED="$STAMPED" INSTALLED="$INSTALLED" STATUS="$STATUS" python3 -c "
+import json, os
+print(json.dumps({
+    'stamped': os.environ['STAMPED'],
+    'installed': os.environ['INSTALLED'],
+    'status': os.environ['STATUS'],
+}, indent=2))
+"
+elif [ "$STATUS" = "drift" ]; then
+  echo "hv-skills drift: project at $STAMPED, plugin at $INSTALLED — run /hv-init to refresh helpers"
+fi
+
+exit 0

@@ -57,4 +57,11 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 3
 fi
 
+# Informational drift nudge; never blocks. Stderr keeps callers using
+# command-substitution from accidentally consuming the line.
+if [ -x "$SRC_BIN/hv-version-check" ]; then
+  drift=$("$SRC_BIN/hv-version-check" 2>/dev/null || true)
+  [ -n "$drift" ] && echo "$drift" >&2
+fi
+
 exit 0
