@@ -7,8 +7,8 @@
 | Value | Behavior |
 |-------|----------|
 | `"off"` (default) | Skills surface a one-line suggestion at each decision point and stop. The user picks. Same hand-on-the-wheel feel as 1.5.x. |
-| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. The chain stops after the chained step — the user picks the next item themselves. |
-| `"loop"` | Auto chain plus loop continuation. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
+| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. After `/hv-update` reports `behind`, Step 4 asks once via `AskUserQuestion` and dispatches `/hv-init` on confirm so drift clears in one step. The chain stops after the chained step — the user picks the next item themselves. |
+| `"loop"` | Auto chain plus loop continuation. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. After `/hv-update` reports `behind`, Step 4 dispatches `/hv-init` unconditionally (no question) — if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
 
 ## What still gates the chain
 

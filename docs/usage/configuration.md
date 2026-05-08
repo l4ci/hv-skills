@@ -167,3 +167,5 @@ hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh
 ```
 
 Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release) — this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
+
+When `autonomy.level` is `"auto"` or `"loop"`, `/hv-update` Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.
