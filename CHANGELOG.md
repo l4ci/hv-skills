@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.16.0 — 2026-05-08
+
+Knowledge-loop intelligence (stats + upstream-issue suggestion), `/hv-docs` after-work hook, and a 4-round architectural refactor centered on a sourceable umbrella resolver.
+
+## New
+
+- wire `/hv-docs` after-work into `/hv-work` + `/hv-ship` behind `docs.afterWork` gate [F15] (`ef938f8`)
+- `/hv-learn` suggests filing an upstream `hv-skills` issue when a learning surfaces a tool gap [F14] (`754b3de`)
+- `hv-knowledge-stats` + fat-topic nudge in `/hv-learn` [F13] (`3bfd8fe`)
+- write-only workers + orchestrator-side commits as `/hv-work`'s default [F11] (`b6bb138`)
+- `hv-reconcile` scans commit history for TODO.md drift [F09] (`84a2c3c`)
+- `hv-self-locate.sh` — sourceable umbrella resolver, threaded through 25 state-only helpers [F10] (`5762b68`, `d16372b`)
+- umbrella-aware cwd guards on `hv-base-branch` / `hv-merge` / `hv-pr` / `hv-ship-body` / `hv-review-scope` [B02] (`e6fd4f6`)
+- `hv-ship-body` emits `Closes #N` from GH refs in TODO bodies [F12] (`d253140`)
+
+## Fixed
+
+- `hv-vision-index` counts only planned milestones in the elif body [B10] (`f8c39bc`)
+- `/hv-config` Step 3 picklist chunked into category + key stages [B11] (`4764342`)
+- `/hv-init` umbrella plain-text fallback now defaults to No, not Yes [T11] (`8ee7b7b`)
+- `chmod +x` in the git index for 9 helpers that were tracked as 100644 [B09] (`fc47e87`)
+- `hv-reconcile` tolerates upfront `hv-base-branch` failure [B02] (`c693ef5`)
+- `hv-complete` recognises scoped `refactor(scope):` subjects [B04] (`f8bcd47`)
+- `hv-next-id` self-heals against TODO / ARCHIVE drift [B03] (`5340bdd`)
+
+## Changed
+
+Four-round architectural refactor (`hv-refactor` rounds 1-4 + post-F11 alignment): tightened helper boundaries, removed redundant cwd assumptions, collapsed duplicated logic, and synced surrounding skills.
+
+- 5 + 4 + 6 + 8 architectural improvements across rounds 1-4 (`39e2e77`, `984c717`, `bb51256`, `b4d6a87`)
+- 3 architectural alignments after F11 [post-merge] (`7611eaf`)
+- `.hv/DECISIONS.md` cleared + redundant `KNOWLEDGE.md` entries swept (`0a3f76c`)
+- CLAUDE.md vision block refreshed after M03 shipped (`f35c11e`)
+
+## Documentation
+
+- post-round-4 sync (worktree-path helper, `reconcile noBase`, smoke count) (`a2413e5`)
+- inline cross-project rules from `.hv/` into SKILL.md prose [T12][T13][T14][T15][T16] (`6c50ec5`)
+- codify opt-in-flag rule in `hv-init` + `hv-config` SKILL.md (`10287e7`)
+
+## Stats
+
+26 commits, 72 files changed, +1781 −535 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.15.1...v1.16.0
+
 ## v1.15.1 — 2026-05-05
 
 Umbrella-aware tooling fixes — hv-guard-clean / hv-spike-add now handle umbrella-cwd properly, and hv-preflight no longer false-positive-flags sourced shell libraries on every release run.
