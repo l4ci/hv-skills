@@ -472,7 +472,7 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 > *"Did this cycle codify any boundaries (e.g., 'X always goes through Y', 'never use Z here')? Run `/hv-decide` to lock them in."*
 
-## Step 13.7 — Docs After-Work (Nudge or Auto-Invoke)
+## Step 13.6 — Docs After-Work (Nudge or Auto-Invoke)
 
 Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
 

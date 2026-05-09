@@ -270,7 +270,7 @@ Release title: `v<new_version> — <one-line summary>` where summary comes from 
 
 Skip in `--dry-run` mode; print the `gh`/`glab` command that would run.
 
-## Step 13.7 — Docs After-Work (Nudge or Auto-Invoke)
+## Step 13.5 — Docs After-Work (Nudge or Auto-Invoke)
 
 Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
 
