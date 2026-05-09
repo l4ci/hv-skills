@@ -3648,4 +3648,10 @@ trap 'rm -rf "$TMP" "$TMP2"' EXIT
 )
 echo "ok hv-bootstrap seeds map"
 
+# --- skill touchpoints reference map ------------------------------
+grep -q "hv-map-stats\|hv-map after-work" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
+grep -q "hv-map after-work" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map after-work"; exit 1; }
+grep -q "hv-map after-work" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map after-work"; exit 1; }
+echo "ok skill touchpoints (work/debug/go)"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

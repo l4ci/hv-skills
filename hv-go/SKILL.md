@@ -61,3 +61,4 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 - **Multiple items OK.** If the user mentioned 3 items, all get captured and all get passed to `/hv-work` as a batch.
 - **Delegate, don't duplicate.** Every capture rule lives in `/hv-capture`; every execution rule lives in `/hv-work`.
 - **Umbrella mode is automatic.** `/hv-capture` (Step 2) asks for `Repos:` when umbrella mode is on; `/hv-work` (Step 4) resolves that field to a sub-repo and runs git ops there. `/hv-go` itself stays a pass-through — it doesn't ask any umbrella-specific question. From inside a registered sub-repo, the cwd informs the default repo via `hv-resolve-repo`.
+- **Update project map.** Invoke `/hv-map after-work` if the change touched files belonging to a known subsystem.

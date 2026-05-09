@@ -169,6 +169,8 @@ From the conversation context:
 
    Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches.
 
+   - **Soft-cap check.** If `.hv/bin/hv-map-stats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["subsystems"]))'` exceeds the configured `map.softcap_subsystems` (default 20), print a one-line note: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
+
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan task pairs for the pattern *Task A renames a file (`git mv old new` or equivalent), Task B edits files that link to `old`*. The collision is on **shared written files** — when the link-sweep enumerates the renamed file itself or other files the rename task already edits, both tasks race on the index even when their stated mandates appear disjoint. Resolve at plan time by one of:
 
@@ -497,6 +499,10 @@ When triggered, branch on `autonomy.level`:
 - `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the after-work flow has the right context.
 
 If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+
+## Step 13.7 — Map After-Work
+
+- **Update project map.** Invoke `/hv-map after-work` for any subsystem whose `Key files / dirs` or `Entry points` overlap the files touched in this cycle. The map updates are staged as part of the cycle's final commit, not a separate commit.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
