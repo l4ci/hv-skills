@@ -2,7 +2,7 @@
 # Regenerate a managed <!-- hv-<key>-start -->...<!-- hv-<key>-end --> block in CLAUDE.md.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
-# Keys: knowledge | decisions | vision (vision is body-stdin only).
+# Keys: knowledge | decisions | vision | map (vision and map are body-stdin only).
 # Prints: created | updated | appended.
 set -euo pipefail
 KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"

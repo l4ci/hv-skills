@@ -3657,10 +3657,10 @@ echo "ok skill touchpoints (work/debug/go)"
 # --- status/next/resume reference hv-staleness --------------------
 # Note: hv-status and hv-resume were merged into hv-next (F26).
 # All three staleness checks now target hv-next/SKILL.md.
-grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness (covers hv-status)"; exit 1; }
-grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness (covers hv-resume)"; exit 1; }
-grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness"; exit 1; }
-grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"  || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
+grep -q "hv-staleness map" "$REPO/hv-next/SKILL.md"       || { echo "FAIL: hv-next missing staleness map"; exit 1; }
+grep -q "hv-staleness knowledge" "$REPO/hv-next/SKILL.md" || { echo "FAIL: hv-next missing staleness knowledge"; exit 1; }
+grep -q "hv-staleness todo" "$REPO/hv-next/SKILL.md"      || { echo "FAIL: hv-next missing staleness todo"; exit 1; }
+grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"          || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
 
 # --- end-to-end: scaffold + after-work bump + consolidate prep ----
@@ -3685,7 +3685,7 @@ created: 2026-05-09
 Capture flow.
 
 ## Entry points
-- bin/hv-bootstrap:1 — file exists in this fixture
+- bin/hv-bootstrap:1 — broken ref (file does not exist in fixture)
 EOF
   cat > .hv/map/work.md <<'EOF'
 ---
