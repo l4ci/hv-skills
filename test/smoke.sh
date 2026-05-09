@@ -3190,4 +3190,17 @@ for f in hv-status-add-multi hv-multi-branch-create; do
 done
 pass "F29: all --repo / --repos helpers use the strict \${2:?usage:...} extraction"
 
+echo "F30: walk-up helpers delegate to bin/hv-walk-up"
+# Structural guard: helpers that need to walk upward from a caller directory
+# must delegate to the canonical bin/hv-walk-up rather than reimplementing the
+# loop inline. Reverting to an inline `while [ "$dir" != "/" ]` walk drifts
+# masking semantics across callers.
+# See [F30] — Consolidate walk-up logic behind bin/hv-walk-up.
+for f in hv-self-locate.sh hv-resolve-umbrella; do
+  helper="$BIN/$f"
+  [ -f "$helper" ] || fail "F30: expected helper $f missing from bin/"
+  grep -q 'hv-walk-up' "$helper" || fail "F30: $f must invoke hv-walk-up (no inline walk-up loops)"
+done
+pass "F30: hv-self-locate.sh and hv-resolve-umbrella delegate to bin/hv-walk-up"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
