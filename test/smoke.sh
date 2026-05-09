@@ -3622,4 +3622,17 @@ mv .hv/map .hv/map.empty
 mv .hv/map.bak .hv/map
 echo "ok hv-map-index"
 
+# --- hv-staleness --------------------------------------------------
+# Capture (touched 2026-04-01) is older than 30 days from "today=2026-05-09";
+# work is touched 2026-05-09 and should not be flagged at days=30.
+out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-09)"
+echo "$out" | grep -q '^plan ' || { echo "FAIL: plan should be stale"; exit 1; }
+echo "$out" | grep -q '^work ' && { echo "FAIL: work should NOT be stale"; exit 1; }
+# days=0 lists all
+out="$("$BIN/hv-staleness" map --days 0 --today 2026-05-09)"
+[ "$(echo "$out" | wc -l)" -ge 2 ] || { echo "FAIL: days=0 should list all"; exit 1; }
+# Knowledge: KNOWLEDGE.md exists from bootstrap-style fixture; should not error
+"$BIN/hv-staleness" knowledge --days 0 >/dev/null
+echo "ok hv-staleness"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
