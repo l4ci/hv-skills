@@ -21,8 +21,12 @@ QUESTION="${2:?usage: hv-spike-add [--repo <name>] <name> <question>}"
 
 # Capture BIN_DIR + umbrella cwd BEFORE any cd — sibling-helper paths and
 # the spike-file write must resolve against the umbrella, not the sub-repo.
+# Route through hv-resolve-umbrella (→ hv-walk-up) so a single canonical
+# entry point owns "find the umbrella" — falls back to physical pwd when
+# the resolver can't locate a `.hv/` (no umbrella tree, or the resolver
+# detected a masking sub-repo).
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-UMBRELLA_CWD="$(pwd)"
+UMBRELLA_CWD="$("$BIN_DIR/hv-resolve-umbrella" 2>/dev/null || pwd -P)"
 
 if ! [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
   echo "error: name must be lowercase alphanumeric + dashes, got '$NAME'" >&2

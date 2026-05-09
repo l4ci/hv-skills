@@ -6,7 +6,10 @@
 set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-UMBRELLA_CWD="$(pwd)"
+# Route umbrella discovery through hv-resolve-umbrella (→ hv-walk-up) so a
+# single canonical entry point owns "find the umbrella" — falls back to
+# physical pwd when the resolver can't locate a `.hv/`.
+UMBRELLA_CWD="$("$HERE/hv-resolve-umbrella" 2>/dev/null || pwd -P)"
 
 REPO=""
 if [ "${1:-}" = "--repo" ]; then
