@@ -12,6 +12,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 
 - [Capturing work](usage/capturing-work.md) — `/hv-capture`, `/hv-c`, mixed input, related links, detail files
 - [Picking work](usage/picking-work.md) — `/hv-next`, `/hv-assume`
+- [Removing work](usage/removing-work.md) — `/hv-rm`, dry-run preview, batch removal, safety semantics
 
 ### Execution
 
