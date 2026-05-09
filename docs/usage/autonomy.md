@@ -8,7 +8,7 @@
 |-------|----------|
 | `"off"` (default) | Skills surface a one-line suggestion at each decision point and stop. The user picks. Same hand-on-the-wheel feel as 1.5.x. |
 | `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. After `/hv-update` reports `behind`, Step 4 asks once via `AskUserQuestion` and dispatches `/hv-init` on confirm so drift clears in one step. The chain stops after the chained step — the user picks the next item themselves. |
-| `"loop"` | Auto chain plus loop continuation. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. After `/hv-update` reports `behind`, Step 4 dispatches `/hv-init` unconditionally (no question) — if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
+| `"loop"` | Auto chain plus loop continuation, plus auto-pick on routine routing. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. Routine routing/tagging questions that present a clear `(Recommended)` option — milestone tagging in `/hv-capture`, reconcile resolution in `/hv-next`, CONCERNS routing in `/hv-ship`, scope and candidate gates in `/hv-refactor` — are silently auto-picked without prompting. Design decisions, manual public-artifact gates, and config flips still surface for explicit user input. After `/hv-update` reports `behind`, Step 4 dispatches `/hv-init` unconditionally (no question) — if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
 
 ## What still gates the chain
 
@@ -26,6 +26,16 @@ The loop stops cleanly on any of:
 - `/hv-work` Step 2 detects a genuinely ambiguous brief. Invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
 - A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
 - The user interrupts.
+
+## What loop mode auto-picks vs. surfaces
+
+In loop mode, AskUserQuestion calls fall into three buckets:
+
+- **Auto-picked silently** — routine routing/tagging questions where the `(Recommended)` option is the obvious right answer. Examples: which milestone to tag captured items with, whether to ship/resume a paused branch, where to send review concerns, which sub-repos to refactor. The loop proceeds as if you'd picked the Recommended option.
+- **Surfaced for design decisions** — when an `AskUserQuestion` covers a design pick with multiple plausible interpretations (a competing approach, a version-bump escalation), loop mode stops and asks. F32 (loop-mode auto-planning) extends this further with `[Auto:Loop]` decision logging when /hv-plan needs to resolve open questions, but until then design questions break the loop until you answer them.
+- **Always manual regardless of autonomy** — public-artifact gates and committed-boundary gates: `/hv-decide` approvals, `/hv-learn` issue/runlog filing, `/hv-ship` PR strategy, `/hv-release` push/publish gates. These honor their `**Manual gate — ...**` callout no matter what `autonomy.level` says.
+
+If a routine routing prompt does fire under loop mode, that's a sign the auto-pick branch is missing at that call site — file it as a bug.
 
 ## When to flip it on
 
