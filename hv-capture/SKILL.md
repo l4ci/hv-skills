@@ -123,6 +123,8 @@ Plain-text fallback: ask *"Tag with M01?"* once. If the reply is ambiguous, defa
 
 **Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one active milestone, **auto-tag without asking** — the speed path uses the obvious answer. With multiple active milestones, the cap is **exempt for this single question** — silently skipping the tag would orphan items from every milestone view, which is worse than spending one question. Ask the multi-active question above; this counts toward the cap, so spend remaining clarification budget carefully (often zero further questions).
 
+**Loop mode:** if `autonomy.level == "loop"`, auto-pick the Recommended milestone option without invoking AskUserQuestion. With one active milestone, that's *"Yes — tag all (Recommended)"* — tag the items with the active milestone. With multiple active milestones, that's the first-listed milestone (the option marked `(Recommended)` above). Loop mode treats milestone tagging as routine; the user's queue is the active milestone work, so tagging items into it is the obvious answer. This honors the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode."
+
 Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into Step 6's `Milestone:` suffix. If "No — leave untagged" was picked, omit the suffix entirely.
 
 ## Step 4.6 — Tag Sub-Repo (when umbrella mode is on)
@@ -158,6 +160,8 @@ Multi-select means the user can pick exactly one sub-repo (single-repo item), tw
 Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged. (`/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.)
 
 **Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one registered repo, **auto-tag without asking** — the speed path uses the obvious answer. With ≥2 registered repos, the cap is **exempt for this single question** — silently skipping the tag would force `/hv-work` to bail later, which is worse than spending one question.
+
+**Loop mode:** if `autonomy.level == "loop"`, auto-pick the Recommended sub-repo option when one option is marked `(Recommended)` (i.e., the item's text mentions a repo name and the option list flagged the obvious match). If no option carries `(Recommended)` — the item is ambiguous about which sub-repo it targets — fall through to AskUserQuestion or the Caller-cap path; this is exactly the kind of ambiguity that should surface, not be silently routed.
 
 Carry the chosen sub-repo name(s) as a comma-separated string (e.g. `"web"` or `"web, api"`) into Step 6's `Repos:` suffix. If only *"None / unsure"* was picked (or nothing was picked), omit the suffix entirely.
 
