@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Print a markdown summary of [Auto:Loop] decisions logged in .hv/DECISIONS.md
+# during the current loop session (footer date >= loopStartedAt date in
+# .hv/status.json). Used by terminal-path skills (e.g. /hv-ship, /hv-pause)
+# to surface auto-logged provisional decisions that still need user
+# articulation of Forbids/Permits.
+#
+# This is a lookup helper — exits 0 with empty stdout when no Auto:Loop entries match.
+#
+# Usage: hv-auto-decisions-since
+#   stdout: markdown block of matching entries, or empty
+#   exit:   0 always (lookup semantics)
+#
+# Output shape (when matches exist):
+#   ### Auto:Loop decisions this session
+#
+#   - **<Topic> · <Title>** — <date> · [Forbids/Permits unresolved]
+#   - **<Topic> · <Title>** — <date> · [Articulated]
+#
+# Status tags:
+#   [Forbids/Permits unresolved] — both sections still contain the
+#                                  "_(Unresolved — user must articulate)_" placeholder.
+#   [Partially articulated]      — exactly one of Forbids/Permits resolved.
+#   [Articulated]                — neither contains the placeholder.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import re
+import sys
+from pathlib import Path
+from hvlib import load_json, iter_topics
+
+status = load_json(Path(".hv/status.json"), {})
+loop_started_at = status.get("loopStartedAt", "") or ""
+if not loop_started_at:
+    # No active loop session — nothing to surface.
+    sys.exit(0)
+
+# Compare the date portion (YYYY-MM-DD) lexicographically; valid for ISO dates.
+since_date = loop_started_at.split("T", 1)[0]
+
+decisions_path = Path(".hv/DECISIONS.md")
+if not decisions_path.exists():
+    sys.exit(0)
+content = decisions_path.read_text()
+
+# Parse entries inside each topic. An entry begins at `### <Title>` and runs
+# until the next `### ` heading or end-of-topic-body.
+entry_split_re = re.compile(r"^### (.+)$", re.MULTILINE)
+footer_re = re.compile(
+    r"<!--\s*\[Auto:Loop\]\s+\S+\s+(\d{4}-\d{2}-\d{2})\b[^>]*-->"
+)
+unresolved_marker = "_(Unresolved — user must articulate)_"
+section_header_re = re.compile(
+    r"^\*\*(Forbids|Permits)\.\*\*\s*$", re.MULTILINE
+)
+
+
+def split_entries(body: str):
+    """Yield (title, entry_body) for each `### Title` block in `body`."""
+    parts = entry_split_re.split(body)
+    # parts: [preamble, title1, body1, title2, body2, ...]
+    for i in range(1, len(parts), 2):
+        title = parts[i].strip()
+        ebody = parts[i + 1] if i + 1 < len(parts) else ""
+        yield title, ebody
+
+
+def section_body(entry_body: str, name: str) -> str | None:
+    """Return the body of `**<name>.**` up to the next `**…**` header,
+    `<!--` comment, or `### ` heading. Returns None if missing."""
+    pattern = re.compile(
+        r"^\*\*" + re.escape(name) + r"\.\*\*\s*\n(.*?)(?=^\*\*\w+\.\*\*|^<!--|^### |\Z)",
+        re.DOTALL | re.MULTILINE,
+    )
+    m = pattern.search(entry_body)
+    return m.group(1) if m else None
+
+
+def status_tag(entry_body: str) -> str:
+    forbids = section_body(entry_body, "Forbids")
+    permits = section_body(entry_body, "Permits")
+    f_unresolved = forbids is not None and unresolved_marker in forbids
+    p_unresolved = permits is not None and unresolved_marker in permits
+    if f_unresolved and p_unresolved:
+        return "[Forbids/Permits unresolved]"
+    if f_unresolved or p_unresolved:
+        return "[Partially articulated]"
+    return "[Articulated]"
+
+
+matches = []  # (topic, title, date, tag)
+for topic_name, topic_body in iter_topics(content):
+    for title, ebody in split_entries(topic_body):
+        m = footer_re.search(ebody)
+        if not m:
+            continue
+        entry_date = m.group(1)
+        if entry_date < since_date:
+            continue
+        matches.append((topic_name, title, entry_date, status_tag(ebody)))
+
+if not matches:
+    sys.exit(0)
+
+out = ["### Auto:Loop decisions this session", ""]
+for topic, title, entry_date, tag in matches:
+    out.append(f"- **{topic} · {title}** — {entry_date} · {tag}")
+sys.stdout.write("\n".join(out) + "\n")
+PY
