@@ -10,8 +10,8 @@ BRANCH=""
 REPOS=""
 while :; do
   case "${1:-}" in
-    --branch) BRANCH="${2:?}"; shift 2 ;;
-    --repos) REPOS="${2:?}"; shift 2 ;;
+    --branch) BRANCH="${2:?usage: hv-multi-branch-create --branch <name> --repos <repos-csv>}"; shift 2 ;;
+    --repos) REPOS="${2:?usage: hv-multi-branch-create --branch <name> --repos <repos-csv>}"; shift 2 ;;
     *) break ;;
   esac
 done

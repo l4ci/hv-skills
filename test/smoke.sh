@@ -3170,4 +3170,24 @@ pass "hv-release-pending: custom nudgeAfterCommits=5 honored"
 
 rm -rf "$RP_TMP"
 
+echo "F29: --repo flag uses strict form"
+# Structural guard: every helper that parses a literal --repo / --repos flag
+# must extract the value with the loud form ${2:?usage:...} so a missing
+# argument errors out instead of silently defaulting and corrupting state
+# (e.g. status.json with repo:null when the caller meant a sub-repo).
+# See [F29] — Converge --repo flag parsing across helpers.
+for f in hv-merge hv-pr hv-review-scope hv-spike-add hv-status-add hv-status-remove hv-worktree-clear hv-worktree-path hv-plan-add; do
+  helper="$BIN/$f"
+  [ -f "$helper" ] || fail "F29: expected helper $f missing from bin/"
+  grep -q -- '--repo' "$helper" || fail "F29: $f no longer references --repo (canonical list stale?)"
+  grep -qE '\$\{2:\?usage:' "$helper" || fail "F29: $f --repo extraction must use \${2:?usage:...} strict form (no silent \${2:-})"
+done
+for f in hv-status-add-multi hv-multi-branch-create; do
+  helper="$BIN/$f"
+  [ -f "$helper" ] || fail "F29: expected helper $f missing from bin/"
+  grep -q -- '--repos' "$helper" || fail "F29: $f no longer references --repos (canonical list stale?)"
+  grep -qE '\$\{2:\?usage:' "$helper" || fail "F29: $f --repos extraction must use \${2:?usage:...} strict form (no silent \${2:-})"
+done
+pass "F29: all --repo / --repos helpers use the strict \${2:?usage:...} extraction"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

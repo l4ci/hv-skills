@@ -14,10 +14,10 @@ WORKTREES=""
 while :; do
   case "${1:-}" in
     --if-absent) IF_ABSENT="--if-absent"; shift ;;
-    --branch) BRANCH="${2:?}"; shift 2 ;;
-    --items) ITEMS="${2:?}"; shift 2 ;;
-    --repos) REPOS="${2:?}"; shift 2 ;;
-    --worktrees) WORKTREES="${2:?}"; shift 2 ;;
+    --branch) BRANCH="${2:?usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]}"; shift 2 ;;
+    --items) ITEMS="${2:?usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]}"; shift 2 ;;
+    --repos) REPOS="${2:?usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]}"; shift 2 ;;
+    --worktrees) WORKTREES="${2:?usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]}"; shift 2 ;;
     *) break ;;
   esac
 done

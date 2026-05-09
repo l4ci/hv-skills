@@ -13,12 +13,13 @@
 set -euo pipefail
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [ "${1:-}" != "--repo" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+if [ "${1:-}" != "--repo" ]; then
   echo "usage: hv-worktree-path --repo <name> <branch>" >&2
   exit 1
 fi
-REPO="$2"
-BRANCH="$3"
+REPO="${2:?usage: hv-worktree-path --repo <name> <branch>}"
+shift 2
+BRANCH="${1:?usage: hv-worktree-path --repo <name> <branch>}"
 
 UMBRELLA="$("$BIN_DIR/hv-resolve-umbrella")"
 echo "$UMBRELLA/.claude/worktrees/$REPO/$BRANCH"
