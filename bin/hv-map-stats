@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Print per-subsystem stats from .hv/map/ as JSON.
+# Usage: hv-map-stats
+# Output: {"subsystems": [{"name": "...", "bytes": N, "touched": "YYYY-MM-DD",
+#                         "entry_points": N, "broken_refs": N}, ...]}
+# Silent-empty {"subsystems": []} when .hv/map/ is missing.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+import re
+import subprocess
+from pathlib import Path
+from hvlib import iter_map_entries, section
+
+map_dir = Path(".hv/map")
+if not map_dir.is_dir():
+    print(json.dumps({"subsystems": []}, indent=2))
+    raise SystemExit(0)
+
+ENTRY_RE = re.compile(r"^- ([^:\s]+):(\d+)\b", re.MULTILINE)
+
+
+def git_mtime(path: Path) -> str | None:
+    try:
+        out = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cs", "--", str(path)],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return out or None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+subsystems = []
+for name, fm, body, path in iter_map_entries(str(map_dir)):
+    nbytes = path.stat().st_size
+    touched = fm.get("touched") or git_mtime(path) or ""
+    ep_block = section(body, "Entry points")
+    refs = ENTRY_RE.findall(ep_block)
+    broken = 0
+    for file_ref, lineno in refs:
+        p = Path(file_ref)
+        if not p.exists():
+            broken += 1
+            continue
+        try:
+            n = int(lineno)
+            line_count = sum(1 for _ in p.open())
+            if n < 1 or n > line_count:
+                broken += 1
+        except (OSError, ValueError):
+            broken += 1
+    subsystems.append({
+        "name": name,
+        "bytes": nbytes,
+        "touched": touched,
+        "entry_points": len(refs),
+        "broken_refs": broken,
+    })
+
+print(json.dumps({"subsystems": subsystems}, indent=2))
+PY

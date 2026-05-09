@@ -3573,4 +3573,33 @@ out="$("$BIN/hv-map-query" nonexistent)"
 [[ -z "$out" ]] || { echo "FAIL: hv-map-query missing should be empty, got: $out"; exit 1; }
 echo "ok hv-map-query"
 
+# --- hv-map-stats --------------------------------------------------
+# Add an entry-point referencing this very file to test the file:line check
+mkdir -p src
+echo "line1" > src/sample.txt
+echo "line2" >> src/sample.txt
+cat > .hv/map/work.md <<'EOF'
+---
+subsystem: work
+summary: Orchestrator-driven execution
+touched: 2026-05-09
+---
+
+## Entry points
+- src/sample.txt:2 — second line
+- src/missing.txt:42 — broken ref
+EOF
+out="$("$BIN/hv-map-stats")"
+echo "$out" | grep -q '"name": "capture"' || { echo "FAIL: stats missing capture"; exit 1; }
+echo "$out" | grep -q '"broken_refs"' || { echo "FAIL: stats missing broken_refs"; exit 1; }
+# work has 1 broken ref out of 2 entry points
+echo "$out" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+work = next(s for s in data["subsystems"] if s["name"] == "work")
+assert work["broken_refs"] == 1, work
+assert work["entry_points"] == 2, work
+'
+echo "ok hv-map-stats"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
