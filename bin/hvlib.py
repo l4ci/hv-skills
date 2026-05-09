@@ -581,6 +581,66 @@ def read_version(filepath, kind: str) -> str | None:
     raise ValueError(f"unknown version kind: {kind!r}")
 
 
+def parse_frontmatter(text: str) -> tuple[dict, str]:
+    """Parse a YAML-ish frontmatter block delimited by `---` lines.
+
+    Supports a flat key/value subset only:
+      - `key: value`
+      - `key: [a, b, c]` (inline list)
+    Returns ({}, original_text) when no frontmatter is present or it is
+    malformed. Never raises.
+    """
+    if not text.startswith("---\n") and not text.startswith("---\r\n"):
+        return {}, text
+    # Find closing ---
+    rest = text.split("\n", 1)[1] if "\n" in text else ""
+    end = re.search(r"^---\s*$", rest, re.MULTILINE)
+    if not end:
+        return {}, text
+    block = rest[: end.start()]
+    body = rest[end.end():].lstrip("\n")
+    fm: dict = {}
+    for raw in block.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if value.startswith("[") and value.endswith("]"):
+            inner = value[1:-1].strip()
+            fm[key] = [v.strip() for v in inner.split(",") if v.strip()] if inner else []
+        else:
+            fm[key] = value
+    return fm, body
+
+
+def iter_map_entries(map_dir):
+    """Yield (subsystem, frontmatter_dict, body, path) for each *.md file
+    in `map_dir` whose frontmatter has a `subsystem:` key. Files without
+    valid frontmatter are skipped silently. Sorted by subsystem name.
+    """
+    p = Path(map_dir)
+    if not p.is_dir():
+        return
+    entries = []
+    for md in sorted(p.glob("*.md")):
+        try:
+            text = md.read_text()
+        except OSError:
+            continue
+        fm, body = parse_frontmatter(text)
+        name = fm.get("subsystem")
+        if not name:
+            continue
+        entries.append((name, fm, body, md))
+    entries.sort(key=lambda e: e[0])
+    for entry in entries:
+        yield entry
+
+
 def write_version(filepath, kind: str, new_version: str) -> None:
     """Write `new_version` into the manifest at `filepath` according to `kind`.
     JSON manifests are rewritten with dump_json_atomic; TOML manifests have

@@ -3521,4 +3521,47 @@ EOFD
 rm -rf "$F32_TMP"
 pass "F32(h): hv-auto-decisions-since filter + lookup-empty"
 
+# --- hvlib: parse_frontmatter & iter_map_entries -------------------
+mkdir -p .hv/map
+cat > .hv/map/capture.md <<'EOF'
+---
+subsystem: capture
+summary: Captures items into TODO.md
+touched: 2026-05-09
+related-topics: [Skill Authoring]
+---
+
+## Purpose
+One paragraph.
+EOF
+cat > .hv/map/plan.md <<'EOF'
+---
+subsystem: plan
+summary: Plans before execution
+touched: 2026-04-01
+---
+body
+EOF
+# malformed: no frontmatter
+echo "no frontmatter here" > .hv/map/broken.md
+
+PYTHONPATH="$BIN" python3 - <<'PY'
+from hvlib import parse_frontmatter, iter_map_entries
+fm, body = parse_frontmatter(open(".hv/map/capture.md").read())
+assert fm["subsystem"] == "capture", fm
+assert fm["summary"] == "Captures items into TODO.md", fm
+assert "## Purpose" in body, body
+assert fm["related-topics"] == ["Skill Authoring"], fm
+
+# malformed body: empty frontmatter dict, full content as body
+fm2, body2 = parse_frontmatter(open(".hv/map/broken.md").read())
+assert fm2 == {}, fm2
+assert body2.strip() == "no frontmatter here", body2
+
+entries = list(iter_map_entries(".hv/map"))
+names = sorted(e[0] for e in entries)
+assert names == ["capture", "plan"], names  # malformed file is skipped
+PY
+echo "ok hvlib parse_frontmatter / iter_map_entries"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
