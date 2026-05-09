@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Append an [Auto:Loop] entry to .hv/DECISIONS.md under <topic> with placeholder
+# Forbids/Permits and a provenance footer. Creates the topic section if missing.
+# This is a mutator — exits 0 on success, 1 on argument errors. Idempotent on
+# (topic, rule-title): same args twice yields one entry.
+#
+# Usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+TOPIC="${1:?usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]}"
+RULE_TITLE="${2:?usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]}"
+WHY="${3:?usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]}"
+PLAN_KEY="${4:-}"
+ISO_DATE="${5:-}"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$RULE_TITLE" "$WHY" "$PLAN_KEY" "$ISO_DATE" <<'PY'
+import sys
+from datetime import date
+from pathlib import Path
+from hvlib import find_section, append_to_section, iter_topics, write_text_atomic
+
+topic, rule_title, why, plan_key, iso_date = sys.argv[1:6]
+if not iso_date:
+    iso_date = date.today().isoformat()
+
+path = Path(".hv/DECISIONS.md")
+content = path.read_text() if path.exists() else ""
+
+# Idempotency check: scan only the target topic's body for an exact-match
+# `### <rule-title>` heading. Append-only: never reorder existing entries.
+for name, body in iter_topics(content):
+    if name == topic:
+        for line in body.splitlines():
+            if line.strip() == f"### {rule_title}":
+                sys.exit(0)
+        break
+
+footer_bits = ["[Auto:Loop]"]
+if plan_key:
+    footer_bits.append(plan_key)
+footer_bits.append(iso_date)
+footer = " ".join(footer_bits) + " — review and articulate Forbids/Permits"
+
+entry = (
+    f"### {rule_title}\n"
+    f"\n"
+    f"*Why.* {why}\n"
+    f"\n"
+    f"**Forbids.**\n"
+    f"- _(Unresolved — user must articulate)_\n"
+    f"\n"
+    f"**Permits.**\n"
+    f"- _(Unresolved — user must articulate)_\n"
+    f"\n"
+    f"<!-- {footer} -->\n"
+)
+
+if find_section(content, topic) is None:
+    # Topic missing — append `## <topic>` and the entry at EOF, preserving
+    # any existing `# Decisions` header / intro paragraph.
+    sep = "" if content.endswith("\n") else "\n"
+    new_content = content.rstrip("\n") + "\n\n## " + topic + "\n\n" + entry
+else:
+    # Topic exists — splice the entry just before the next `## ` heading.
+    addition = "\n" + entry
+    new_content = append_to_section(content, topic, addition)
+
+if not new_content.endswith("\n"):
+    new_content += "\n"
+
+write_text_atomic(path, new_content)
+PY
