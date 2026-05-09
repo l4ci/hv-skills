@@ -70,7 +70,7 @@ Staff-engineer review of a feature branch before it leaves your machine: scopes 
 
 Removes a captured backlog item and cleans up all of its dependencies in one operation. Strips the item's entry from `TODO.md`, removes `Related:` cross-references that point to it from other items, deletes any matching detail file (`.hv/bugs/`, `.hv/features/`, `.hv/tasks/`) and plan file (`.hv/plans/`), and strips the item from `status.json`. Items that are currently active in `status.json` are refused unless `--force` is passed.
 
-Dry-run-by-default: the first pass always shows what would change, then an explicit `AskUserQuestion` confirmation gate must be cleared before any writes happen. Completed items are moved to `ARCHIVE.md` by default for traceability; pass `--scrub-archive` to delete them outright. Accepts one or more comma-separated IDs (e.g. `B07,F03`). See [removing work](../usage/removing-work.md) for the full flow.
+Dry-run-by-default: the first pass always shows what would change, then an explicit `AskUserQuestion` confirmation gate must be cleared before any writes happen. `ARCHIVE.md` is preserved by default as the historical record; pass `--scrub-archive` to also remove an archived entry and its cross-references there. Accepts one or more comma-separated IDs (e.g. `B07,F03`); validation is all-or-nothing — if any ID is unknown, the whole batch aborts before any write. See [removing work](../usage/removing-work.md) for the full flow.
 
 ## /hv-ship
 
