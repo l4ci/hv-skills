@@ -3602,4 +3602,24 @@ assert work["entry_points"] == 2, work
 '
 echo "ok hv-map-stats"
 
+# --- hv-map-index --------------------------------------------------
+[ -f CLAUDE.md ] || : > CLAUDE.md
+"$BIN/hv-map-index" >/dev/null
+grep -q '<!-- hv-map-start -->' CLAUDE.md || { echo "FAIL: map block not in CLAUDE.md"; exit 1; }
+grep -q '## Project Map' CLAUDE.md || { echo "FAIL: heading missing"; exit 1; }
+grep -q '\*\*capture\*\* — Captures items into TODO.md' CLAUDE.md || { echo "FAIL: capture summary missing"; exit 1; }
+# Idempotence
+sha1=$(sha1sum CLAUDE.md | cut -d' ' -f1)
+"$BIN/hv-map-index" >/dev/null
+sha2=$(sha1sum CLAUDE.md | cut -d' ' -f1)
+[ "$sha1" = "$sha2" ] || { echo "FAIL: hv-map-index not idempotent"; exit 1; }
+# Empty case: hide the block when .hv/map/ has no valid entries
+mv .hv/map .hv/map.bak
+mkdir .hv/map
+"$BIN/hv-map-index" >/dev/null
+grep -q '_(no subsystems yet' CLAUDE.md || { echo "FAIL: empty placeholder missing"; exit 1; }
+mv .hv/map .hv/map.empty
+mv .hv/map.bak .hv/map
+echo "ok hv-map-index"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

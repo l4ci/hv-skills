@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-map-start --> block in CLAUDE.md from
+# the frontmatter `summary:` of every .hv/map/<name>.md.
+# Usage: hv-map-index
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from pathlib import Path
+from hvlib import iter_map_entries
+
+heading = "## Project Map"
+intro = (
+    "Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). "
+    "Pull with `.hv/bin/hv-map-query <name>`."
+)
+
+entries = list(iter_map_entries(".hv/map"))
+if entries:
+    bullets = "\n".join(
+        f"- **{name}** — {fm.get('summary', '').strip() or '(no summary)'}"
+        for name, fm, _body, _path in entries
+    )
+else:
+    bullets = "- _(no subsystems yet — run `/hv-map first-run` to scaffold)_"
+
+print(f"{heading}\n\n{intro}\n\n{bullets}\n")
+PY
+)
+printf '%s' "$BODY" | "$HERE/hv-managed-block" map --body-stdin
