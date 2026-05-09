@@ -15,9 +15,9 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 <!-- hv-vision-start -->
 ## Project Vision
 
-Project milestones live in `.hv/MILESTONES.md`.
+Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
 
-_(no active milestones — all shipped or archived; run `/hv-vision` to plan more)_
+- **M04** — Helper-convention cleanup (depends: M02, M03)
 <!-- hv-vision-end -->
 
 ## Working in this repo
@@ -48,6 +48,7 @@ Before acting on work that touches a topic listed in `## Project Knowledge`, `##
 
 Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:
 
-- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_
+- Build & Tooling
+- Skill Authoring
 
 <!-- hv-decisions-end -->
