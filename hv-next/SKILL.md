@@ -59,6 +59,16 @@ Issue these reads in parallel — one per stream — in the same tool-call batch
 
 For each stream that has a handoff, extract the **Stage**, **Next planned step**, and **Current hypothesis** sections — those drive the question text and routing below. Streams without a handoff note keep today's behavior unchanged.
 
+**Loop mode:** if `autonomy.level == "loop"`, skip AskUserQuestion entirely and auto-pick each stream's Recommended option:
+
+- **Handoff note present** → `Resume with /hv-work` — invoke `hv-work` via the `Skill` tool with the branch + handoff content as the brief; `rm -f` the handoff path after dispatch.
+- **`hasCommits: true`** (no handoff) → `Ship via /hv-ship` — invoke `hv-ship` via the `Skill` tool with the branch.
+- **`hasCommits: false`** (no handoff) → `Resume with /hv-work` — invoke `hv-work` on the existing branch.
+
+Auto-picking Recommended is exactly what loop mode wants for routine reconcile resolutions: handoff streams resume on the brief, complete streams ship through their own review/PR gates, and incomplete streams keep accumulating commits. Per the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode." The downstream skills (`/hv-ship`, `/hv-work`) keep their own manual gates intact (review FAIL, PR strategy, etc.) — loop mode auto-picks the **routing** answer, not the **public-artifact** answer.
+
+After resolving every entry under loop mode, continue to Step 3 — do not surface "Skipped" lines, since nothing was skipped.
+
 Otherwise, use the `AskUserQuestion` tool so the user can resolve each stream with the host's native question UI. Batch up to 4 streams into one `AskUserQuestion` call; if there are more than 4, present the rest in a second call after the first resolves.
 
 For each entry, build one question:
