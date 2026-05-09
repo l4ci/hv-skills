@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Print "yes" if umbrella mode is enabled in .hv/config.json, "no" otherwise.
-# Reads cwd-relative by default; optional <dir> arg for callers that already
-# know the umbrella root (e.g. hv-spike-add captures UMBRELLA_CWD before any
-# cd and passes it).
+# Print "yes" if umbrella mode is in effect, "no" otherwise.
+# Returns "yes" iff .hv/repos.json registers >=1 sub-repo (data is truth;
+# the config flag is informational, not gating). Reads cwd-relative by
+# default; optional <dir> arg for callers that already know the umbrella
+# root (e.g. hv-spike-add captures UMBRELLA_CWD before any cd and passes it).
 #
 # Usage: hv-umbrella-on [<dir>]
 #   stdout: "yes" or "no"
@@ -13,8 +14,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$DIR" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import load_json
-cfg_path = Path(sys.argv[1]) / ".hv" / "config.json"
-cfg = load_json(cfg_path, {})
-print("yes" if cfg.get("umbrella", {}).get("enabled") else "no")
+from hvlib import load_repos
+repos_path = Path(sys.argv[1]) / ".hv" / "repos.json"
+repos = load_repos(repos_path) if repos_path.exists() else {}
+print("yes" if repos else "no")
 PY

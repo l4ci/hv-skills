@@ -19,20 +19,30 @@ for f in DECISIONS.md TODO.md KNOWLEDGE.md MILESTONES.md counters.json config.js
   fi
 done
 
+# Umbrella consistency check.
+#
+# Truth source for "is this an umbrella?" is .hv/repos.json (>=1 registered
+# repo) — see hv-umbrella-on. The config flag (umbrella.enabled) is
+# informational; we still flag the misconfig where the flag is set but the
+# data is missing or empty (that's an unfinished /hv-init).
+#
+# Cases:
+#   flag=true,  data missing/empty → exit 2 (config says umbrella, finish init)
+#   data present (any flag value)  → silent pass (data is umbrella regardless)
+#   flag=false, data absent        → silent pass (single-repo, skip)
+FLAG_ON=$(PYTHONPATH="$SRC_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+from hvlib import load_json
+cfg = load_json('$HV/config.json', {})
+print('1' if cfg.get('umbrella', {}).get('enabled') else '0')
+")
 UMBRELLA_ON=$("$SRC_BIN/hv-umbrella-on")
-if [ "$UMBRELLA_ON" = "yes" ]; then
+if [ "$FLAG_ON" = "1" ] && [ "$UMBRELLA_ON" != "yes" ]; then
   if [ ! -f "$HV/repos.json" ]; then
     echo "uninitialized: umbrella.enabled is true but $HV/repos.json missing — re-run /hv-init from the umbrella root" >&2
-    exit 2
-  fi
-  REPOS_OK=$(PYTHONPATH="$SRC_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-from hvlib import load_repos
-print('1' if load_repos() else '0')
-")
-  if [ "$REPOS_OK" != "1" ]; then
+  else
     echo "uninitialized: $HV/repos.json is empty or malformed — re-run /hv-init from the umbrella root" >&2
-    exit 2
   fi
+  exit 2
 fi
 
 # Auto-discover helpers from the source bin/ directory (the one currently being

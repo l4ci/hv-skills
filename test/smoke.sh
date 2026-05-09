@@ -2783,6 +2783,18 @@ if .hv/bin/hv-preflight 2>/dev/null; then fail "hv-preflight should fail with um
 RC=0; .hv/bin/hv-preflight 2>/dev/null || RC=$?
 [ "$RC" = "2" ] || fail "hv-preflight expected exit 2 for empty repos.json, got $RC"
 pass "hv-preflight exits 2 when umbrella.enabled and repos.json empty"
+
+# Umbrella DISABLED but repos.json valid: pass (data is truth; flag is informational).
+# Exercises the B15 fix — /hv-next must reconcile when repos.json is present
+# even if a stale config has umbrella.enabled: false.
+echo '{"umbrella": {"enabled": false}}' > .hv/config.json
+echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
+.hv/bin/hv-preflight && pass "hv-preflight passes with umbrella.enabled:false but valid repos.json (data is truth)" || fail "hv-preflight failed when repos.json valid but flag false"
+
+# Direct test of hv-umbrella-on: repos.json wins over the config flag.
+OUT=$(.hv/bin/hv-umbrella-on)
+[ "$OUT" = "yes" ] || fail "hv-umbrella-on expected 'yes' from repos.json regardless of config flag, got '$OUT'"
+pass "hv-umbrella-on returns 'yes' from repos.json regardless of config flag"
 cd ..
 
 echo "hv-resolve-umbrella detects deep stray .hv/"
@@ -2990,7 +3002,10 @@ UMB_TMP="$(mktemp -d)"
   cd "$UMB_TMP"
   mkdir -p .hv/bin
   echo '{"umbrella":{"enabled":true},"git":{"baseBranch":""}}' > .hv/config.json
-  echo '{"repos":[]}' > .hv/repos.json
+  # Umbrella signal of record is repos.json with >=1 entry (B15). The path
+  # need not exist on disk for this fixture — the helpers under test here
+  # don't dereference it; they just check whether umbrella mode is on.
+  echo '{"repos":[{"name":"web","path":"./web"}]}' > .hv/repos.json
   echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
   echo '{"active":[]}' > .hv/status.json
 
