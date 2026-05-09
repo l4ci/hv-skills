@@ -3564,4 +3564,13 @@ assert names == ["capture", "plan"], names  # malformed file is skipped
 PY
 echo "ok hvlib parse_frontmatter / iter_map_entries"
 
+# --- hv-map-query --------------------------------------------------
+out="$("$BIN/hv-map-query" capture)"
+[[ "$out" == *"## Purpose"* ]] || { echo "FAIL: hv-map-query body missing"; exit 1; }
+out="$("$BIN/hv-map-query" capture plan)"
+[[ "$out" == *"## Purpose"* && "$out" == *"body"* ]] || { echo "FAIL: hv-map-query multi"; exit 1; }
+out="$("$BIN/hv-map-query" nonexistent)"
+[[ -z "$out" ]] || { echo "FAIL: hv-map-query missing should be empty, got: $out"; exit 1; }
+echo "ok hv-map-query"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
