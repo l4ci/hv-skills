@@ -96,6 +96,8 @@ Otherwise, ask the user which scope to refactor via `AskUserQuestion`:
 
 Plain-text fallback: pick the Recommended option for the relevant `hasCode` state.
 
+**Loop mode:** if `autonomy.level == "loop"`, auto-pick the Recommended scope option without invoking AskUserQuestion. With `hasCode == true`, that's *"All sub-repos + umbrella (Recommended)"* — fan out to N+1 parallel cycles. With `hasCode == false`, that's *"All sub-repos (Recommended)"* — fan out to N parallel cycles. The "Pick a subset" follow-up never fires under loop. Per the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode."
+
 If the user picks **"Pick a subset"**, follow up with a multiSelect:
 
 - **Header:** `"Sub-repos"`, `multiSelect: true`
@@ -263,6 +265,8 @@ If the user picks "Pick a subset", follow up with a second `AskUserQuestion`:
 - **Options:** up to 4 candidates by label (e.g., `"SessionOrchestrator error propagation"`). If more than 4, list top 4 by impact and ask the user to name the rest in free text.
 
 Plain-text fallback: *"Proceed with all, a subset, or none?"*
+
+**Loop mode:** if `autonomy.level == "loop"` AND `confirmBeforeExecute == true`, auto-pick *"Fix all N (Recommended)"* without invoking AskUserQuestion — proceed with every candidate in parallel. The "Pick a subset" follow-up never fires under loop. Per the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode." When `confirmBeforeExecute == false` the gate is already skipped (existing behavior in the next paragraph), so this auto-pick is conditional on the gate firing in the first place.
 
 If `confirmBeforeExecute` is `false`: present the list for visibility, then proceed immediately with all items.
 
