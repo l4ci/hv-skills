@@ -2,7 +2,7 @@
 # List stale entries across MAP / KNOWLEDGE / TODO based on a days threshold.
 # Usage: hv-staleness <kind> [--days N] [--today YYYY-MM-DD]
 #   kind:    map | knowledge | todo
-#   --days:  threshold; entries strictly older than N days are listed (default 90)
+#   --days:  threshold; entries that are N or more days old are listed (default 90)
 #   --today: override today (test hook); defaults to today's date
 #   stdout:  one line per stale entry: "<name> <YYYY-MM-DD>"
 #   exit:    0 always
@@ -57,7 +57,7 @@ def git_mtime(path: Path) -> dt.date | None:
 def is_stale(d: dt.date | None) -> bool:
     if d is None:
         return False
-    return (today - d).days > days
+    return (today - d).days >= days
 
 
 def emit(name: str, d: dt.date | None) -> None:
