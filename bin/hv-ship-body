@@ -5,12 +5,16 @@
 # Usage: hv-ship-body <branch>
 # Prints: markdown body on stdout.
 set -euo pipefail
-. "$(dirname "$0")/hv-types.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Route umbrella discovery through hv-resolve-umbrella (mirrors hv-review-scope)
+# so TODO/ARCHIVE reads find the umbrella root, not a sub-repo cwd.
+UMBRELLA_CWD="$("$HERE/hv-resolve-umbrella" 2>/dev/null || pwd -P)"
+. "$HERE/hv-types.sh"
 BRANCH="${1:?usage: hv-ship-body <branch>}"
 
-"$(dirname "$0")/hv-require-git-context" "hv-ship-body"
+"$HERE/hv-require-git-context" "hv-ship-body"
 
-BASE=$("$(dirname "$0")/hv-base-branch")
+BASE=$("$HERE/hv-base-branch")
 
 git rev-parse --verify "$BRANCH" >/dev/null 2>&1 || {
   echo "error: branch '$BRANCH' not found" >&2
@@ -22,7 +26,8 @@ HV_SUBJECTS=$(git log --no-merges --format='%s' "$BASE..$BRANCH")
 HV_BODIES=$(git log --no-merges --format='%B' "$BASE..$BRANCH")
 export HV_SUBJECTS HV_BODIES
 
-export PYTHONPATH="$(dirname "$0")"
+export PYTHONPATH="$HERE"
+export UMBRELLA_CWD
 python3 - <<'PY'
 import os, re, sys
 from pathlib import Path
@@ -57,7 +62,8 @@ def read(p):
     path = Path(p)
     return path.read_text() if path.exists() else ""
 
-corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
+umbrella = os.environ.get("UMBRELLA_CWD", ".")
+corpus = read(os.path.join(umbrella, ".hv/TODO.md")) + "\n" + read(os.path.join(umbrella, ".hv/ARCHIVE.md"))
 
 bullets = {iid: find_origin_bullet(corpus, iid) for iid in ordered}
 

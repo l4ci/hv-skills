@@ -53,6 +53,12 @@ DIR="$START"
 CANDIDATES=()
 while [ "$DIR" != "/" ]; do
   if [ -d "$DIR/$MARKER" ]; then
+    if [ "$DETECT_MASKING" -eq 0 ]; then
+      # Fast path — default mode is the hot path (every hv_self_locate call).
+      # Return the first hit immediately without walking the full ancestry.
+      echo "$DIR"
+      exit 0
+    fi
     CANDIDATES+=("$DIR")
   fi
   DIR="$(cd "$DIR/.." 2>/dev/null && pwd -P)"
@@ -63,9 +69,9 @@ if [ "${#CANDIDATES[@]}" -eq 0 ]; then
   exit 1
 fi
 
-if [ "$DETECT_MASKING" -eq 1 ]; then
-  _RESOLVE_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  PYTHONPATH="$_RESOLVE_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 - "${CANDIDATES[@]}" <<'PY'
+# Only --detect-masking reaches here; default mode early-exited at the first hit.
+_RESOLVE_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$_RESOLVE_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 - "${CANDIDATES[@]}" <<'PY'
 import os, sys
 from pathlib import Path
 from hvlib import load_json
@@ -95,6 +101,3 @@ for parent in candidates[1:]:
 
 print(first)
 PY
-else
-  echo "${CANDIDATES[0]}"
-fi

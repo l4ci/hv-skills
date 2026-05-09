@@ -7,6 +7,7 @@
 #   --scrub-archive Also remove matching entries from .hv/ARCHIVE.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-types.sh"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 FORCE=0
@@ -49,7 +50,11 @@ TODO_PATH = Path(".hv/TODO.md")
 ARCHIVE_PATH = Path(".hv/ARCHIVE.md")
 STATUS_PATH = Path(".hv/status.json")
 
-TODO_ACTIVE_SECTIONS = ["Bugs", "Features", "Tasks", "Completed"]
+# Derive active sections from the canonical env var (single source of truth in
+# hv-types.sh). "Completed" is appended locally because it isn't an OPEN
+# section — hv-rm needs to scan it for done/strikethrough bullets too.
+_OPEN = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
+TODO_ACTIVE_SECTIONS = _OPEN + ["Completed"]
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,10 +89,15 @@ def infer_type_from_section(sec_name: str) -> str:
     mapping = {"Bugs": "bug", "Features": "feature", "Tasks": "task", "Completed": "completed"}
     return mapping.get(sec_name, "unknown")
 
+_TYPES = os.environ.get("HV_ITEM_TYPES", "BFT")
+_PREFIX_TO_SECTION = dict(zip(_TYPES, _OPEN))
+
 def infer_type_from_id(iid: str) -> str:
     prefix = iid[0].upper() if iid else ""
-    mapping = {"B": "bug", "F": "feature", "T": "task"}
-    return mapping.get(prefix, "unknown")
+    sec = _PREFIX_TO_SECTION.get(prefix)
+    if sec is None:
+        return "unknown"
+    return infer_type_from_section(sec)
 
 def detail_dir_for_id(iid: str) -> str:
     prefix = iid[0].upper() if iid else ""

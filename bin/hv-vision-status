@@ -39,3 +39,7 @@ if ms.exists():
     if updated != ms_content:
         write_text_atomic(ms, updated)
 PY
+
+# Regenerate CLAUDE.md vision block — status changes propagate atomically.
+# Without this, the agent's next session reads a stale "active milestones" set.
+"$HERE/hv-vision-index"
