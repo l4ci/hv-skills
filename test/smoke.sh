@@ -3663,4 +3663,63 @@ grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missi
 grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"  || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
 
+# --- end-to-end: scaffold + after-work bump + consolidate prep ----
+TMP3=$(mktemp -d)
+trap 'rm -rf "$TMP3" "$TMP" "$TMP2"' EXIT
+(
+  cd "$TMP3"
+  git init -q
+  git config user.email test@example.com
+  git config user.name Test
+  "$BIN/hv-bootstrap" >/dev/null
+  : > CLAUDE.md
+  cat > .hv/map/capture.md <<'EOF'
+---
+subsystem: capture
+summary: Captures items into TODO.md
+touched: 2026-05-09
+created: 2026-05-09
+---
+
+## Purpose
+Capture flow.
+
+## Entry points
+- bin/hv-bootstrap:1 — file exists in this fixture
+EOF
+  cat > .hv/map/work.md <<'EOF'
+---
+subsystem: work
+summary: Captures items into TODO.md  # near-duplicate summary
+touched: 2025-12-01
+created: 2025-12-01
+---
+
+## Purpose
+Work flow.
+EOF
+  "$BIN/hv-map-index" >/dev/null
+
+  python3 - <<'PY'
+from pathlib import Path
+p = Path(".hv/map/capture.md")
+text = p.read_text().replace("touched: 2026-05-09", "touched: 2026-05-10")
+p.write_text(text)
+PY
+  grep -q "touched: 2026-05-10" .hv/map/capture.md || { echo "FAIL: after-work bump"; exit 1; }
+
+  out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-10)"
+  echo "$out" | grep -q "^work " || { echo "FAIL: work should be stale at days=30"; exit 1; }
+
+  count=$("$BIN/hv-map-stats" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["subsystems"]))')
+  [ "$count" = "2" ] || { echo "FAIL: stats count $count != 2"; exit 1; }
+
+  "$BIN/hv-map-index" >/dev/null
+  sha1=$(sha1sum CLAUDE.md | cut -d' ' -f1)
+  "$BIN/hv-map-index" >/dev/null
+  sha2=$(sha1sum CLAUDE.md | cut -d' ' -f1)
+  [ "$sha1" = "$sha2" ] || { echo "FAIL: integration idempotence"; exit 1; }
+)
+echo "ok end-to-end map flow"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
