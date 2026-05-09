@@ -2,48 +2,12 @@
 # Walk up from cwd to find umbrella .hv/; detect masking by stray .hv/ inside a registered sub-repo.
 # Usage: hv-resolve-umbrella
 # Exit codes: 0 found, 1 not found, 2 masking detected
+#
+# Delegates to bin/hv-walk-up --detect-masking. Kept as a separate helper
+# for backwards compatibility — callers refer to hv-resolve-umbrella by name
+# across the codebase. The actual walk-up + masking algorithm lives in
+# hv-walk-up; this helper is a thin wrapper that pins the --detect-masking
+# behavior for umbrella-resolution use cases.
 set -euo pipefail
-START="$(pwd -P)"
-DIR="$START"
-CANDIDATES=()
-while [ "$DIR" != "/" ]; do
-  if [ -d "$DIR/.hv" ]; then
-    CANDIDATES+=("$DIR")
-  fi
-  DIR="$(cd "$DIR/.." && pwd -P)"
-done
-if [ "${#CANDIDATES[@]}" -eq 0 ]; then
-  echo "no umbrella .hv/ found" >&2
-  exit 1
-fi
-_RESOLVE_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHONPATH="$_RESOLVE_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 - "${CANDIDATES[@]}" <<'PY'
-import os, sys
-from pathlib import Path
-from hvlib import load_json
-
-candidates = sys.argv[1:]
-first = candidates[0]
-
-# Look for a parent candidate whose repos.json registers `first` as a sub-repo.
-for parent in candidates[1:]:
-    repos_path = Path(parent) / ".hv" / "repos.json"
-    data = load_json(repos_path, {"repos": []})
-    repos = data.get("repos", []) or []
-    first_real = os.path.realpath(first)
-    for entry in repos:
-        rel = entry.get("path", "")
-        name = entry.get("name", "")
-        if not rel:
-            continue
-        sub_real = os.path.realpath(os.path.join(parent, rel))
-        try:
-            common = os.path.commonpath([first_real, sub_real])
-        except ValueError:
-            common = ""
-        if common == sub_real:
-            sys.stderr.write(f"stray .hv/ inside registered sub-repo {name} — masking umbrella\n")
-            sys.exit(2)
-
-print(first)
-PY
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$HERE/hv-walk-up" --detect-masking

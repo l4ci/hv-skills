@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Walk up from an anchor directory to find a marker (default .hv/) and print
+# the absolute path of the containing directory.
+#
+# Usage: hv-walk-up [--anchor cwd|helper-dir] [--marker <name>] [--detect-masking]
+#
+#   --anchor      cwd (default) or helper-dir. helper-dir is documented but
+#                 exits 1 with an advisory: helper-dir anchoring requires the
+#                 BASH_SOURCE[1] of the calling helper, which is unavailable
+#                 to a subprocess. Sourceable callers should source
+#                 hv-self-locate.sh, which combines walk-up with the cwd
+#                 fast-path and HV_ORIG_PWD export.
+#   --marker      Marker directory name to find (default: .hv).
+#   --detect-masking  After finding the first marker, additionally check
+#                 every higher candidate's .hv/repos.json — if any registers
+#                 the first hit's tree as a sub-repo, the first hit is a
+#                 stray .hv/ inside that sub-repo, which masks the umbrella.
+#                 Exit 2 in that case.
+#
+# Output: absolute path of the directory containing the marker, on stdout.
+# Exit codes:
+#   0  found
+#   1  marker not found walking up from anchor (resolve helper — fails loud)
+#   2  --detect-masking: marker found but masked by a registered sub-repo
+#
+# This is a resolve helper — exits 1 when the marker isn't found.
+# Uses `cd "$d" 2>/dev/null && pwd -P` for symlink correctness (KNOWLEDGE.md
+# 2026-05-02: physical paths only).
+set -euo pipefail
+ANCHOR="cwd"
+MARKER=".hv"
+DETECT_MASKING=0
+while :; do
+  case "${1:-}" in
+    --anchor)        ANCHOR="${2:?usage: hv-walk-up [--anchor cwd|helper-dir] [--marker <name>] [--detect-masking]}"; shift 2 ;;
+    --marker)        MARKER="${2:?usage: hv-walk-up [--anchor cwd|helper-dir] [--marker <name>] [--detect-masking]}"; shift 2 ;;
+    --detect-masking) DETECT_MASKING=1; shift ;;
+    *) break ;;
+  esac
+done
+
+if [ "$ANCHOR" = "helper-dir" ]; then
+  echo "error: --anchor helper-dir requires sourcing (BASH_SOURCE[1]) — source hv-self-locate.sh instead" >&2
+  exit 1
+fi
+if [ "$ANCHOR" != "cwd" ]; then
+  echo "error: --anchor must be 'cwd' or 'helper-dir' (got '$ANCHOR')" >&2
+  exit 1
+fi
+
+START="$(pwd -P)"
+DIR="$START"
+CANDIDATES=()
+while [ "$DIR" != "/" ]; do
+  if [ -d "$DIR/$MARKER" ]; then
+    CANDIDATES+=("$DIR")
+  fi
+  DIR="$(cd "$DIR/.." 2>/dev/null && pwd -P)"
+done
+
+if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+  echo "error: no $MARKER found walking up from $START" >&2
+  exit 1
+fi
+
+if [ "$DETECT_MASKING" -eq 1 ]; then
+  _RESOLVE_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PYTHONPATH="$_RESOLVE_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 - "${CANDIDATES[@]}" <<'PY'
+import os, sys
+from pathlib import Path
+from hvlib import load_json
+
+candidates = sys.argv[1:]
+first = candidates[0]
+
+# Look for a parent candidate whose repos.json registers `first` as a sub-repo.
+for parent in candidates[1:]:
+    repos_path = Path(parent) / ".hv" / "repos.json"
+    data = load_json(repos_path, {"repos": []})
+    repos = data.get("repos", []) or []
+    first_real = os.path.realpath(first)
+    for entry in repos:
+        rel = entry.get("path", "")
+        name = entry.get("name", "")
+        if not rel:
+            continue
+        sub_real = os.path.realpath(os.path.join(parent, rel))
+        try:
+            common = os.path.commonpath([first_real, sub_real])
+        except ValueError:
+            common = ""
+        if common == sub_real:
+            sys.stderr.write(f"stray .hv/ inside registered sub-repo {name} — masking umbrella\n")
+            sys.exit(2)
+
+print(first)
+PY
+else
+  echo "${CANDIDATES[0]}"
+fi

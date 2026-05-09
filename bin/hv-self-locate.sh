@@ -17,11 +17,8 @@
 # Resolution order:
 #   1. cwd has .hv/ → no cd, fast path. Preserves the smoke-test contract
 #      (tests cd to $TMP and expect helpers to operate on $TMP/.hv/).
-#   2. else walk up from the calling helper's location (BASH_SOURCE[1])
-#      until a .hv/ sibling is found, then cd there. This works for the
-#      common umbrella case: invoker is in a sub-repo, helper script lives
-#      at <umbrella>/.hv/bin/<script>, walk-up of <umbrella>/.hv/bin yields
-#      <umbrella>/, which has .hv/ → cd <umbrella>.
+#   2. else delegate walk-up from BASH_SOURCE[1] to bin/hv-walk-up
+#      (subprocess), then cd to the resolved umbrella root.
 #   3. on exhaustion, return 1 with an error.
 #
 # Uses `cd "$d" && pwd -P` rather than `realpath` for portability and to
@@ -33,16 +30,16 @@ hv_self_locate() {
 
   [ -d ".hv" ] && return 0
 
-  local caller_dir candidate
+  local caller_dir result
   caller_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd -P)"
-  candidate="$caller_dir"
-  while [ "$candidate" != "/" ]; do
-    if [ -d "$candidate/.hv" ]; then
-      cd "$candidate"
-      return 0
-    fi
-    candidate="$(cd "$candidate/.." && pwd -P)"
-  done
+  # Delegate the walk-up to bin/hv-walk-up. We invoke it as a subprocess from
+  # the caller's helper directory (BASH_SOURCE[1] anchor) — hv-walk-up itself
+  # walks from its own cwd, so we cd to caller_dir first via the subprocess's
+  # own cwd. Resolve the bin path through the same caller_dir (siblings).
+  if result="$(cd "$caller_dir" && "$caller_dir/hv-walk-up" 2>/dev/null)"; then
+    cd "$result"
+    return 0
+  fi
   echo "error: hv_self_locate: no .hv/ found in ancestors of ${BASH_SOURCE[1]:-$0} or in cwd $HV_ORIG_PWD" >&2
   return 1
 }
