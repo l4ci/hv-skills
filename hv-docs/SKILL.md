@@ -200,7 +200,7 @@ Next:
 
 ## After-work Flow
 
-This flow is invoked by `/hv-work` Step 13.7 and `/hv-ship` Step 8.6 — those steps gate on `docs.afterWork` (default `false`); when on, they dispatch `/hv-docs` via `Skill` post-cycle and pass the resolved item IDs + touched files. Manual invocation also runs this flow when `<docs.path>/` exists and the flag is on.
+This flow is invoked by `/hv-work` Step 13.6 and `/hv-ship` Step 8.6 — those steps gate on `docs.afterWork` (default `false`); when on, they dispatch `/hv-docs` via `Skill` post-cycle and pass the resolved item IDs + touched files. Manual invocation also runs this flow when `<docs.path>/` exists and the flag is on.
 
 ## Step A1 — Trigger Gate
 
