@@ -343,6 +343,7 @@ cfg = {
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
   "docs":     {"path": "docs", "autoCreate": False, "afterWork": False},
+  "loop":     {"webResearch": False},
   "git":      {"baseBranch": ""}
 }
 cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled
@@ -372,6 +373,13 @@ cfg.setdefault("ship", {})["review"] = True   # or answered value
 # /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
 # the flag when the user approves a fresh scaffold).
 cfg.setdefault("docs", {}).setdefault("afterWork", False)
+
+# loop.webResearch — silent default. Gates whether /hv-plan --auto-loop
+# (F32) calls WebSearch when an open question references an external
+# library/API/protocol. Off by default per the opt-in-flags-default-false
+# rule — loop mode makes no external network calls without explicit user
+# opt-in via /hv-config.
+cfg.setdefault("loop", {}).setdefault("webResearch", False)
 
 # umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
@@ -424,4 +432,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 
 If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

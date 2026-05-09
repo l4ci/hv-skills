@@ -3377,4 +3377,148 @@ ARCHEOF
 rm -rf "$RM_TMP"
 pass "F36 hv-rm helper smoke"
 
+# ── F32: loop-mode auto-planning helpers + wiring ────────────────────────────
+echo "F32: loop-mode auto-planning helpers"
+
+# (a) /hv-plan SKILL.md exposes --auto-loop with the inline dispatch language.
+grep -q -- '--auto-loop' "$REPO/hv-plan/SKILL.md" \
+  || fail "F32: hv-plan/SKILL.md must document the --auto-loop flag"
+grep -q 'Auto-loop mode' "$REPO/hv-plan/SKILL.md" \
+  || fail "F32: hv-plan/SKILL.md must include the dedicated 'Auto-loop mode' section"
+
+# (b) /hv-work Step 4 carries the inline loop-mode auto-plan dispatch directive.
+grep -q 'Loop-mode auto-plan dispatch' "$REPO/hv-work/SKILL.md" \
+  || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-plan dispatch language"
+grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
+  || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
+
+# (c) Surfacing call sites — exactly /hv-next, /hv-pause, /hv-work invoke hv-auto-decisions-since.
+# (hv-plan/SKILL.md mentions the helper in prose only; the test below is for actual `.hv/bin/`-prefixed invocations.)
+SURFACING_SITES=$(grep -l '\.hv/bin/hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md \
+  | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
+  | sort -u | tr '\n' ' ' | sed 's/ $//')
+[ "$SURFACING_SITES" = "hv-next hv-pause hv-work" ] \
+  || fail "F32: .hv/bin/hv-auto-decisions-since invocation expected in exactly hv-next/hv-pause/hv-work, got '$SURFACING_SITES'"
+
+# (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
+grep -q 'hv-loop-stamp start' "$REPO/hv-next/SKILL.md" \
+  || fail "F32: hv-next/SKILL.md must call hv-loop-stamp start"
+grep -q 'hv-loop-stamp clear' "$REPO/hv-pause/SKILL.md" \
+  || fail "F32: hv-pause/SKILL.md must call hv-loop-stamp clear"
+grep -q 'hv-loop-stamp clear' "$REPO/hv-work/SKILL.md" \
+  || fail "F32: hv-work/SKILL.md must call hv-loop-stamp clear"
+
+# (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
+grep -q '"loop":.*"webResearch": False' "$REPO/hv-init/SKILL.md" \
+  || fail "F32: hv-init must seed loop.webResearch in the fresh config block"
+grep -q 'cfg.setdefault("loop", {}).setdefault("webResearch", False)' "$REPO/hv-init/SKILL.md" \
+  || fail "F32: hv-init must seed loop.webResearch in the STALE migration block"
+pass "F32: SKILL.md wiring + config defaults"
+
+# (f) hv-loop-stamp: start writes ISO timestamp; idempotent first-write; clear removes; read is silent-empty.
+F32_TMP="$(mktemp -d)"
+(
+  cd "$F32_TMP"
+  mkdir .hv
+  echo '{"active": []}' > .hv/status.json
+  # read on empty
+  OUT=$("$BIN/hv-loop-stamp" read)
+  [ -z "$OUT" ] || fail "F32(f): hv-loop-stamp read on unset must be empty, got '$OUT'"
+  # start writes
+  "$BIN/hv-loop-stamp" start
+  T1=$("$BIN/hv-loop-stamp" read)
+  echo "$T1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
+    || fail "F32(f): hv-loop-stamp start must write ISO timestamp, got '$T1'"
+  # idempotent first-write — second start must not overwrite
+  sleep 1
+  "$BIN/hv-loop-stamp" start
+  T2=$("$BIN/hv-loop-stamp" read)
+  [ "$T1" = "$T2" ] || fail "F32(f): hv-loop-stamp start must be idempotent first-write (T1='$T1' T2='$T2')"
+  # active array preserved
+  grep -q '"active": \[\]' .hv/status.json \
+    || fail "F32(f): hv-loop-stamp must preserve the active array"
+  # clear removes
+  "$BIN/hv-loop-stamp" clear
+  OUT=$("$BIN/hv-loop-stamp" read)
+  [ -z "$OUT" ] || fail "F32(f): hv-loop-stamp clear must remove loopStartedAt, got '$OUT'"
+)
+rm -rf "$F32_TMP"
+pass "F32(f): hv-loop-stamp start/clear/read"
+
+# (g) hv-auto-decision-log: writes placeholder template + footer; idempotent on (topic, rule-title).
+F32_TMP="$(mktemp -d)"
+(
+  cd "$F32_TMP"
+  mkdir .hv
+  echo "# Decisions" > .hv/DECISIONS.md
+  echo "" >> .hv/DECISIONS.md
+  "$BIN/hv-auto-decision-log" "Test Topic" "Test rule" "Because reasons" "M04-F32" "2026-05-09"
+  grep -q '## Test Topic' .hv/DECISIONS.md \
+    || fail "F32(g): topic header missing"
+  grep -q '### Test rule' .hv/DECISIONS.md \
+    || fail "F32(g): rule heading missing"
+  grep -q '_(Unresolved — user must articulate)_' .hv/DECISIONS.md \
+    || fail "F32(g): placeholder Forbids/Permits missing"
+  grep -q '\[Auto:Loop\] M04-F32 2026-05-09' .hv/DECISIONS.md \
+    || fail "F32(g): provenance footer missing or malformed"
+  # idempotent — second run must not duplicate the entry
+  "$BIN/hv-auto-decision-log" "Test Topic" "Test rule" "Because reasons" "M04-F32" "2026-05-09"
+  COUNT=$(grep -c '### Test rule' .hv/DECISIONS.md)
+  [ "$COUNT" = "1" ] || fail "F32(g): hv-auto-decision-log must be idempotent on (topic, rule-title), got $COUNT entries"
+)
+rm -rf "$F32_TMP"
+pass "F32(g): hv-auto-decision-log placeholder template + idempotent"
+
+# (h) hv-auto-decisions-since: filters by loopStartedAt date; lookup-empty when no match.
+F32_TMP="$(mktemp -d)"
+(
+  cd "$F32_TMP"
+  mkdir .hv
+  cat > .hv/status.json <<'EOFJ'
+{"active": [], "loopStartedAt": "2026-05-09T00:00:00Z"}
+EOFJ
+  cat > .hv/DECISIONS.md <<'EOFD'
+# Decisions
+
+## Topic A
+
+### Pre-loop rule
+
+*Why.* Decided yesterday.
+
+**Forbids.**
+- Specific thing.
+
+**Permits.**
+- Other thing.
+
+<!-- [Auto:Loop] M04-F32 2026-05-08 — review and articulate Forbids/Permits -->
+
+### In-loop rule
+
+*Why.* Decided today.
+
+**Forbids.**
+- _(Unresolved — user must articulate)_
+
+**Permits.**
+- _(Unresolved — user must articulate)_
+
+<!-- [Auto:Loop] M04-F32 2026-05-09 — review and articulate Forbids/Permits -->
+EOFD
+  OUT=$("$BIN/hv-auto-decisions-since")
+  echo "$OUT" | grep -q 'In-loop rule' \
+    || fail "F32(h): post-loopStart entry missing from output: $OUT"
+  echo "$OUT" | grep -q 'Pre-loop rule' \
+    && fail "F32(h): pre-loopStart entry must be filtered out: $OUT"
+  echo "$OUT" | grep -q 'Forbids/Permits unresolved' \
+    || fail "F32(h): unresolved status tag missing: $OUT"
+  # lookup-empty when loopStartedAt is unset
+  echo '{"active": []}' > .hv/status.json
+  OUT=$("$BIN/hv-auto-decisions-since")
+  [ -z "$OUT" ] || fail "F32(h): empty when loopStartedAt unset, got '$OUT'"
+)
+rm -rf "$F32_TMP"
+pass "F32(h): hv-auto-decisions-since filter + lookup-empty"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
