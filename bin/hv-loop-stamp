@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Read/write the loopStartedAt ISO timestamp in .hv/status.json.
+# Used by terminal-path skills to filter [Auto:Loop] decisions to "this loop session".
+#
+# Usage:
+#   hv-loop-stamp start   # mutator — first-write-only; writes loopStartedAt = current UTC ISO
+#                         # timestamp (second-precision, e.g. "2026-05-09T14:23:01Z").
+#                         # If already set, leaves the existing value untouched. Exit 0 always.
+#   hv-loop-stamp clear   # mutator — removes loopStartedAt from status.json. No-op if absent.
+#                         # Exit 0 always.
+#   hv-loop-stamp read    # lookup helper — exits 0 with empty stdout when loopStartedAt is unset.
+#                         # Otherwise prints the stored ISO timestamp.
+#
+# Timestamp format: UTC, second-precision, trailing "Z".
+#   Equivalent to: datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+#   Produced via:  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+#                  (timezone-aware idiom — same string, no DeprecationWarning)
+#   Example:       "2026-05-09T14:23:01Z"
+# Future code can rely on this exact shape.
+#
+# Only the loopStartedAt key is touched — the active array and any other top-level
+# keys in .hv/status.json are preserved verbatim.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+USAGE="usage: hv-loop-stamp <start|clear|read>"
+SUB="${1:?$USAGE}"
+case "$SUB" in
+  start|clear|read) ;;
+  *) echo "$USAGE" >&2; exit 2 ;;
+esac
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SUB" <<'PY'
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from hvlib import load_json, update_json
+
+sub = sys.argv[1]
+path = Path(".hv/status.json")
+
+if sub == "read":
+    data = load_json(path, {"active": []})
+    val = data.get("loopStartedAt")
+    if val:
+        sys.stdout.write(val + "\n")
+    sys.exit(0)
+
+if sub == "start":
+    def mutator(data):
+        data.setdefault("active", [])
+        # First-write-only: do not overwrite an existing loopStartedAt.
+        if data.get("loopStartedAt"):
+            return
+        data["loopStartedAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    update_json(path, {"active": []}, mutator)
+    sys.exit(0)
+
+if sub == "clear":
+    def mutator(data):
+        data.setdefault("active", [])
+        data.pop("loopStartedAt", None)
+    update_json(path, {"active": []}, mutator)
+    sys.exit(0)
+PY
