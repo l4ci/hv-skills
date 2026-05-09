@@ -75,6 +75,15 @@ If **any** path is a user change, stop with the original guard message — the u
 
 Don't narrate the sweep unless it happened; silent pass-through is the common case.
 
+**On any Step 1 guard failure that stops `/hv-work` (exit 2 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
+
+```bash
+.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the guard message when nonempty
+.hv/bin/hv-loop-stamp clear       # clear the session marker — the loop is broken and the next /hv-next entry will stamp a fresh start
+```
+
+If `hv-auto-decisions-since` produces no output, skip silently.
+
 ## Step 2 — Clarify Ambiguous Briefs (only when needed)
 
 If — and only if — the current brief is too thin to plan concrete tasks (missing scope, conflicting requirements, or two equally plausible interpretations), use the `AskUserQuestion` tool to resolve the ambiguity before touching any code. Otherwise skip this step entirely — the default is to proceed.
@@ -143,7 +152,11 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 .hv/bin/hv-plan-show <milestone>-<unit> 2>/dev/null
 ```
 
-If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it. If no plan exists, proceed with the steps below.
+If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
+
+**Loop-mode auto-plan dispatch.** When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), do **not** stop the loop on the missing plan. Instead, **dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool immediately — no prompt, no confirmation, no "want me to" question.** When the dispatched plan run returns, re-run the plan-as-artifact check above (the file now exists) and use the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition below. The Major-only gate is the F32 baseline; F34's uncertainty heuristic refines this trigger later.
+
+If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Minor/untagged item), proceed with the steps below.
 
 From the conversation context:
 

@@ -179,9 +179,20 @@ Suggested next: [ID] [Title] ([tag])
 
 Read `autonomy.level` from `.hv/config.json` (default `"off"`).
 
-**Loop mode auto-pick.** When `autonomy.level == "loop"`, skip the question entirely and invoke `hv-work` via the `Skill` tool with the suggested item(s) and their TODO descriptions. This is what sustains the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` loop. Print one line first so the user sees the pick: *"Loop: starting [ID] [Title]."*
+**Loop mode auto-pick.** When `autonomy.level == "loop"`, skip the question entirely and invoke `hv-work` via the `Skill` tool with the suggested item(s) and their TODO descriptions. This is what sustains the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` loop. Print one line first so the user sees the pick: *"Loop: starting [ID] [Title]."* Before dispatching, stamp the session start so terminal paths can later filter `[Auto:Loop]` decisions to this loop:
+
+```bash
+.hv/bin/hv-loop-stamp start   # idempotent — first-write only; preserves any existing timestamp
+```
 
 If Step 6 found nothing to suggest (empty backlog, no active milestone items), do **not** invoke `/hv-work`. Print *"Loop: backlog empty — stopping."* and exit. The user re-invokes `/hv-capture` or `/hv-vision` to seed more work.
+
+On this empty-backlog branch (terminal path), surface any `[Auto:Loop]` decisions logged during the just-ended loop so the user can articulate `Forbids/Permits` and remove the `<!-- [Auto:Loop] -->` footers in `DECISIONS.md`. Per the F19 terminal-path-only convention, surfacing fires *only* here and from `/hv-work` guard-fail / `/hv-pause` — not from any loop-internal step:
+
+```bash
+.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the "OK — run /hv-next again" line when nonempty
+.hv/bin/hv-loop-stamp clear       # clear the session marker once the user has seen the surface
+```
 
 **Off and auto modes.** Use the `AskUserQuestion` tool so the user picks with the host's native UI. Build a single question:
 

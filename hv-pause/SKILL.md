@@ -140,6 +140,17 @@ Pass `--repo <repo>` for entries with a non-null `repo`; omit it for legacy / si
 
 Idempotent — `--if-absent` skips the write if the entry already exists, preserving the original `startedAt` so "time in flight" stays accurate. The handoff note carries the pause timestamp separately.
 
+## Step 5.5 — Surface Auto:Loop Decisions
+
+`/hv-pause` is a terminal path — the user is about to leave the session. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-work` guard-fail), surface any `[Auto:Loop]` decisions logged during this loop session so the user can articulate `Forbids/Permits` and remove the `<!-- [Auto:Loop] -->` footers in `DECISIONS.md` before the session ends:
+
+```bash
+.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the Step 6 confirm block when nonempty
+.hv/bin/hv-loop-stamp clear       # clear the session marker so the next /hv-next loop entry stamps a fresh start
+```
+
+If `hv-auto-decisions-since` produces no output, skip silently — there's nothing to surface.
+
 ## Step 6 — Confirm
 
 One compact block. For single-entry pause sets:
