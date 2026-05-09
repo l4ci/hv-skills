@@ -152,6 +152,8 @@ Active milestones: M01 — Auth foundation, M03 — Public API
 
 (The `Milestone` column in `hv-backlog`'s tables already shows per-item tags when any are present — don't restate that.)
 
+- **Stale candidates** — print one summary line: `stale: map=$(.hv/bin/hv-staleness map --days 90 | wc -l), knowledge=N, todo=N`. Suppress kinds that report zero. Never blocks output.
+
 ## Step 6 — Suggest Next
 
 Recommend using this priority order:

@@ -3654,4 +3654,13 @@ grep -q "hv-map after-work" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug 
 grep -q "hv-map after-work" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map after-work"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 
+# --- status/next/resume reference hv-staleness --------------------
+# Note: hv-status and hv-resume were merged into hv-next (F26).
+# All three staleness checks now target hv-next/SKILL.md.
+grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness (covers hv-status)"; exit 1; }
+grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness (covers hv-resume)"; exit 1; }
+grep -q "hv-staleness" "$REPO/hv-next/SKILL.md"   || { echo "FAIL: hv-next missing staleness"; exit 1; }
+grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"  || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
+echo "ok status/next/resume/capture touchpoints"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
