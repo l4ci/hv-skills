@@ -3635,4 +3635,17 @@ out="$("$BIN/hv-staleness" map --days 0 --today 2026-05-09)"
 "$BIN/hv-staleness" knowledge --days 0 >/dev/null
 echo "ok hv-staleness"
 
+# --- hv-bootstrap seeds map ---------------------------------------
+TMP2=$(mktemp -d)
+trap 'rm -rf "$TMP" "$TMP2"' EXIT
+(
+  cd "$TMP2"
+  git init -q
+  "$BIN/hv-bootstrap" >/dev/null
+  [ -d .hv/map ] || { echo "FAIL: .hv/map not created"; exit 1; }
+  [ -f .hv/MAP.md ] || { echo "FAIL: .hv/MAP.md not seeded"; exit 1; }
+  grep -q "Project map" .hv/MAP.md || { echo "FAIL: .hv/MAP.md content missing"; exit 1; }
+)
+echo "ok hv-bootstrap seeds map"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

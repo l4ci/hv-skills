@@ -139,7 +139,7 @@ fi
 
 The helper writes `.hv/repos.json` and (if the umbrella is itself a git repo) appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header. Idempotent — re-running `/hv-init` is safe.
 
-`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `MILESTONES.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
+`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,map,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `MAP.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
 
@@ -409,6 +409,7 @@ Seed four managed blocks in `CLAUDE.md` (created if missing): the hv-skills slas
 .hv/bin/hv-knowledge-index
 .hv/bin/hv-vision-index
 .hv/bin/hv-decisions-index
+.hv/bin/hv-map-index
 ```
 
 Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
