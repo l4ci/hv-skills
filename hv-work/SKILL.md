@@ -152,7 +152,11 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 .hv/bin/hv-plan-show <milestone>-<unit> 2>/dev/null
 ```
 
-If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it. If no plan exists, proceed with the steps below.
+If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
+
+**Loop-mode auto-plan dispatch.** When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), do **not** stop the loop on the missing plan. Instead, **dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool immediately — no prompt, no confirmation, no "want me to" question.** When the dispatched plan run returns, re-run the plan-as-artifact check above (the file now exists) and use the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition below. The Major-only gate is the F32 baseline; F34's uncertainty heuristic refines this trigger later.
+
+If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Minor/untagged item), proceed with the steps below.
 
 From the conversation context:
 
