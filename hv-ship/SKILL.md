@@ -51,6 +51,17 @@ git rev-parse --abbrev-ref HEAD
 
 If it's `main`/`master`/`trunk`, stop and tell the user to check out the feature branch first.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Extract commits & items", description="Read branch commits and resolve linked TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (review skipped via config) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Preflight & branch check* — feature branch confirmed, not on main (Step 1)
+2. *Extract commits & items* — branch range read, item IDs resolved (Step 2)
+3. *Review* — `/hv-review` runs when `ship.review: true` (Step 3)
+4. *CONCERNS routing* — verdict-gated branch selection (Step 4)
+5. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
+6. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
+
 ## Step 2 — Scope the Work
 
 Resolve the active entry's repo (umbrella mode; empty in single-repo projects):
