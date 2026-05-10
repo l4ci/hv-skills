@@ -25,6 +25,16 @@ Review the project backlog, suggest what to tackle next, and execute it.
 
 See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop (no auto-init).
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Reconcile", description="Cross-check status.json against git state")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (empty backlog, no completions to archive) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Reconcile* — `status.json` cross-checked against git state (Step 2)
+2. *Archive* — completed items moved to `ARCHIVE.md` (Step 3)
+3. *Present backlog* — sorted tables and relationship clusters shown (Steps 4–5)
+4. *Suggest* — single recommended item picked (Step 6)
+5. *Execute* — `/hv-work` dispatched per autonomy + user choice (Step 7)
+
 ## Step 2 — Reconcile Active Work
 
 ```bash
