@@ -750,3 +750,145 @@ def write_version(filepath, kind: str, new_version: str) -> None:
                 return
         raise ValueError(f"{path}: no version field in section")
     raise ValueError(f"unknown version kind: {kind!r}")
+
+
+# ── TODO mutation helpers (extracted from bin/hv-rm) ──────────────────────────
+
+
+def find_bullet_in_content(content: str, iid: str, active_sections: list[str]) -> tuple[str | None, str | None]:
+    """Return (section_name, bullet_line) for iid in content, or (None, None).
+    `active_sections` is the ordered list of `## <name>` sections to scan
+    (typically Bugs, Features, Tasks, Completed)."""
+    # Match open bullets: - **[ID]...
+    open_pat = re.compile(
+        rf"^- \*\*\[{re.escape(iid)}\].*$",
+        re.MULTILINE,
+    )
+    # Match done/strikethrough bullets: - ~~**[ID]...~~ Done ...
+    done_pat = re.compile(
+        rf"^- ~~\*\*\[{re.escape(iid)}\].*$",
+        re.MULTILINE,
+    )
+    for sec_name in active_sections:
+        span = find_section(content, sec_name)
+        if span is None:
+            continue
+        body = content[span[0]:span[1]]
+        m = open_pat.search(body) or done_pat.search(body)
+        if m:
+            return (sec_name, m.group(0))
+    return (None, None)
+
+
+def infer_type_from_section(sec_name: str) -> str:
+    """Map a TODO section name to an item-type label.
+    Bugs→bug, Features→feature, Tasks→task, Completed→completed,
+    anything else→unknown."""
+    mapping = {"Bugs": "bug", "Features": "feature", "Tasks": "task", "Completed": "completed"}
+    return mapping.get(sec_name, "unknown")
+
+
+def infer_type_from_id(iid: str, prefix_to_section: dict[str, str]) -> str:
+    """Map an ID's first letter to an item-type label via the supplied
+    prefix-to-section mapping (e.g. {'B': 'Bugs', 'F': 'Features', 'T': 'Tasks'}).
+    Returns 'unknown' if the prefix isn't in the map."""
+    prefix = iid[0].upper() if iid else ""
+    sec = prefix_to_section.get(prefix)
+    if sec is None:
+        return "unknown"
+    return infer_type_from_section(sec)
+
+
+def detail_dir_for_id(iid: str) -> str:
+    """Map an ID's prefix to its detail directory under .hv/.
+    B→bugs, F→features, T→tasks, otherwise empty string."""
+    prefix = iid[0].upper() if iid else ""
+    mapping = {"B": "bugs", "F": "features", "T": "tasks"}
+    return mapping.get(prefix, "")
+
+
+def strip_bullet_from_content(content: str, bullet_line: str, sec_name: str) -> str:
+    """Remove `bullet_line` from `content` (re.MULTILINE escape) along
+    with one trailing blank line if present, to avoid double-blank-lines."""
+    # We need to remove the bullet and the trailing newline; if followed by a
+    # blank line, remove that too to avoid double-blank-lines.
+    escaped = re.escape(bullet_line)
+    # Match the line plus optional trailing blank line.
+    pat = re.compile(rf"^{escaped}\n(\n)?", re.MULTILINE)
+    return pat.sub(lambda m: "\n" if m.group(1) else "", content, count=1)
+
+
+def parse_related_ids(related_val: str) -> list[str]:
+    """Extract bracket IDs (e.g. F02, B05) from a Related: field value."""
+    return re.findall(r"\[([A-Z]\d+)\]", related_val)
+
+
+def remove_id_from_related_field(line: str, iid: str) -> str:
+    """Strip `[iid]` from the Related: field of `line`. If Related becomes
+    empty, drop the entire ` Related: ...` segment from the line.
+    Uses parse_todo_fields (already in hvlib)."""
+    fields = parse_todo_fields(line)
+    related_val = fields.get("related", "")
+    if not related_val:
+        return line
+
+    ids_in_related = parse_related_ids(related_val)
+    if iid not in ids_in_related:
+        return line
+
+    # Remove the ID from the list.
+    new_ids = [x for x in ids_in_related if x != iid]
+
+    if not new_ids:
+        # Drop the entire Related: segment.
+        # Match " Related: <value>" where <value> ends at the next field or EOL.
+        pat = re.compile(
+            r"\s+Related:\s+.+?(?=\s+(?:Detail|Milestone|Repos):|$)",
+        )
+        return pat.sub("", line).rstrip()
+    else:
+        # Rebuild Related value preserving spacing: "[A01], [B02]" style.
+        new_val = ", ".join(f"[{x}]" for x in new_ids)
+        # Replace the bracketed IDs in the existing Related: value.
+        # Strategy: replace the raw bracket-id sequence in the field substring.
+        old_pat = re.compile(r"(Related:\s+)(.+?)(?=\s+(?:Detail|Milestone|Repos):|$)")
+        def repl(m):
+            return m.group(1) + new_val
+        return old_pat.sub(repl, line)
+
+
+def collect_cross_refs(content: str, iid: str, sections: list[str]) -> list[tuple[str, str, str]]:
+    """For each ## section in `sections`, find bullets that reference `iid`
+    in their Related: field (excluding the iid's own origin bullet). Return
+    (sec_name, old_line, new_line) tuples — new_line is old_line with
+    `[iid]` stripped via remove_id_from_related_field."""
+    hits = []
+    origin_pat = re.compile(rf"^- (?:~~)?\*\*\[{re.escape(iid)}\]", re.MULTILINE)
+    for sec_name in sections:
+        span = find_section(content, sec_name)
+        if span is None:
+            continue
+        body = content[span[0]:span[1]]
+        for line in body.splitlines():
+            line_s = line.strip()
+            if not line_s.startswith("- "):
+                continue
+            # Skip the origin bullet itself.
+            if origin_pat.match(line_s):
+                continue
+            fields = parse_todo_fields(line_s)
+            related_ids = parse_related_ids(fields.get("related", ""))
+            if iid in related_ids:
+                new_line = remove_id_from_related_field(line_s, iid)
+                hits.append((sec_name, line_s, new_line))
+    return hits
+
+
+def apply_cross_ref_strips(content: str, xrefs: list[tuple[str, str, str]]) -> str:
+    """Apply cross-reference strips to `content`, replacing each old_line
+    with new_line.rstrip() in one pass per (sec, old, new) tuple."""
+    for _sec, old_line, new_line in xrefs:
+        # Replace the old line with new line (exact match, once).
+        escaped = re.escape(old_line)
+        content = re.sub(rf"^{escaped}$", new_line.rstrip(), content, count=1, flags=re.MULTILINE)
+    return content
