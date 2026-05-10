@@ -25,6 +25,16 @@ Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough cont
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Classify", description="Assign type/priority/size to each candidate")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (single item, no dedupe matches) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Mode / dispatch* — single brain-dump or per-item parsing path resolved (Step 2)
+2. *Classify* — type (bug / feature / task), priority, size assigned (Step 3)
+3. *Dedupe* — existing TODO entries scanned for overlap (Step 4)
+4. *Append* — entries written to `TODO.md` with milestone + repo tags (Steps 5–6)
+5. *Report* — compact summary printed (Step 7)
+
 ## Step 2 — Parse & Classify
 
 The user will provide a keyword, short phrase, or longer description — possibly covering multiple issues or mixing bugs with feature requests and tasks.
