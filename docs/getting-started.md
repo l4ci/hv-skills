@@ -82,6 +82,12 @@ lands and skips vague restatements. If you want to encode a hard
 boundary like "never store tokens client-side", use `/hv-decide` instead. See
 [decisions](usage/decisions.md).
 
+**Visible progress.** Multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`,
+`/hv-docs`, `/hv-refactor`, and others) declare a phase checklist via `TaskCreate` at the
+start of each run and tick each phase off as it lands. Long cycles stay legible — preflight,
+plan, dispatch, verify, commit, merge are discrete checkpoints rather than an undifferentiated
+stream of bash output. The checklist is silently skipped on hosts where the tool isn't loaded.
+
 After the second or third cycle you mostly live in `/hv-capture` and `/hv-next`. Other
 skills you'll reach for: `/hv-go` for hot-path fixes that don't need a queue, `/hv-debug`
 for systematic bug cycles, `/hv-pause` before stepping away, `/hv-next` after `/clear`.

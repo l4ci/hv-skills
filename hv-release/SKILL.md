@@ -59,6 +59,17 @@ Then verify:
        2. `"Abort"` — stop without writing anything
      - Plain-text fallback: *"Push and continue, or abort?"*
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Bump version", description="Apply major/minor/patch increment")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (`--dry-run` or origin missing for publish) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Preflight & guard* — clean tree, on main, HEAD pushed (Step 1)
+2. *Bump version* — version source detected and incremented (Steps 2–4)
+3. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
+4. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
+5. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
+6. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
+
 ## Step 2 — Detect Version Source
 
 ```bash

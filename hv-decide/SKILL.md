@@ -25,6 +25,16 @@ Distill an active commitment from the current session into `.hv/DECISIONS.md`, o
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Identify candidate", description="Surface the boundary the user wants to lock in (with the three-gate check)")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (three-gate refuses to promote) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Mode* — default vs `--from-learning` vs `--from-spike` resolved (Step 1.5)
+2. *Identify candidate* — boundary articulated; three-gate check passes (Step 2)
+3. *Compose four parts* — rule, *Why*, **Forbids**, **Permits** drafted (Step 3)
+4. *Confirmation gate* — manual user approval (never auto-invoked, Step 5)
+5. *Merge & index update* — append to `DECISIONS.md`, regenerate CLAUDE.md index (Steps 6–7)
+
 ## Step 1.5 — Mode (default vs source-prefill)
 
 Inspect the invocation arguments and pick a mode for the rest of the run:

@@ -45,6 +45,15 @@ On **Yes** — run `git init`, continue to Step 2, mention the created branch in
 
 Plain-text fallback: run `git init` straight through — it's the Recommended choice and reversible.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment & umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Detect* — environment + umbrella decision (Steps 1, 1.5)
+2. *Write artifacts* — bootstrap `.hv/` and install helpers (Step 2)
+3. *Configure* — interactive config (FRESH or STALE migration, Step 3)
+4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map indices (Step 4)
+
 ## Step 1.5 — Umbrella Detection (Optional)
 
 If the current directory holds **two or more immediate child directories that are themselves git repos**, this is likely a multi-repo umbrella — `.hv/` should live here, but git operations should run inside the relevant sub-repo. Detect by scanning `*/.git`:
@@ -281,6 +290,36 @@ Steps that branch on `autonomy.level` (off/auto/loop) and dispatch the next skil
 Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.hv/` state — `grep`, `Read`, `git log`, `TODO.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
 
 Codified from grill-with-docs (2026-05-10): *"If a question can be answered by exploring the codebase, explore the codebase instead."* Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08) — that one constrains the option list when asking is the right move; this one constrains whether to ask at all.
+
+### Surface multi-step skill progress with TaskCreate
+
+Skills with three or more distinct phases must declare a visible task list at the end of Step 1 via `TaskCreate`, then mark each phase `in_progress` when starting it and `completed` when its observable outcome lands. The user sees a checklist instead of unannotated bash output; the agent stays oriented across long cycles. Without this, every multi-step run looks identical in the transcript to a single-step nudge — progress is invisible until the final report.
+
+The block lives at the end of Step 1's body, never as a new `Step 1.5`. The decimal-step rule (`KNOWLEDGE.md` / `DECISIONS.md`, 2026-05-08) reserves `.5/.6/.7` slots for sequential additions; this convention is content within Step 1, not a new step. On hosts where `TaskCreate` is not loaded (non-Claude-Code platforms), the boilerplate self-skips silently — loading is conditional on `ToolSearch select:TaskCreate,TaskUpdate`.
+
+Per-site shape (adapt phase list per skill):
+
+> **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="<phase 1 name>", description="<phase 1 outcome>")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases get `completed` with the no-op reason in the description.
+>
+> Phases:
+>
+> 1. *<phase title>* — *<one-line outcome>*
+> 2. *<phase title>* — *<one-line outcome>*
+> *(skill-specific list — 3 to 7+ phases)*
+
+**Forbids.**
+- Adding the block to single-phase or trivial skills (Tier C: `hv-assume`, `hv-go`, `hv-c`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
+- Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
+- Cross-skill alignment of phase names — each skill's phase list reflects its own structure; phrasing is local to the SKILL.md.
+- Calling `TaskCreate` from inside subagent dispatches — the orchestrator owns the task list; workers focus on their assigned tasks and report back.
+
+**Permits.**
+- Per-site phase counts from 3 to 7+ — the rule fires at "multi-step", not a fixed number. Use phase boundaries that match the skill's natural structure, not the integer step count.
+- Per-site boilerplate prose variations — this is a cross-cutting autonomy-shaped rule; per the 2026-05-09 `KNOWLEDGE.md` entry on cross-cutting prose, byte-equivalent repetition of the shell across 18 sites is acceptable when phase lists dominate.
+- Phases that absorb decimal sub-steps (e.g. `/hv-work` 13.5/13.7 fold into one "post-cycle nudges" phase) — phase boundaries are coarser than step boundaries by design.
+- Tracking spawned waves as nested tasks via `addBlocks`/`addBlockedBy` when a skill orchestrates parallel work — `/hv-work` may use this for its dispatched waves.
+
+Codified from F37 (2026-05-10): rolled out across Tier S/A/B SKILL.md files (hv-init + 17 others). Tier C skills stay untouched. Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08): both make the host's UI primitives load-bearing for skill UX.
 
 ### Routine routing/tagging auto-picks Recommended in loop mode
 

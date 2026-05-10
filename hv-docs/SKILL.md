@@ -78,6 +78,18 @@ p.write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Mode select", description="Decide first-run / after-work / restructure based on docs/ state and config")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (after-work mode opt-out, no doc updates needed) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Mode select* — first-run / after-work / restructure resolved from `docs.path` state + config (Step 1)
+2. *Inspect docs/* — current pages and structure read (Step 2)
+3. *Discover topics* — touched files + recent commits scanned for doc-worthy changes (Step 3)
+4. *Propose plan* — doc updates drafted and shown to user (Step 4)
+5. *Write/update* — pages created or edited (Step 5)
+6. *Cross-link* — internal links and indices updated (Step 6)
+7. *Report* — summary printed, autonomy nudges fired
+
 ## Step 2 — Read Project Signals
 
 In a **single parallel batch** (one tool-call response, multiple reads), gather:

@@ -59,6 +59,18 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Non-zero = stop.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Reproduce", description="Reliably trigger the failure")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no smoke regressions) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Preflight & guard* — clean tree, bug ID resolved (Step 1)
+2. *Read item & knowledge* — TODO entry + KNOWLEDGE.md cross-ref loaded (Steps 2–3)
+3. *Reproduce* — failure triggers reliably from a known input (Step 4)
+4. *Hypothesize & verify* — claim is testable; evidence supports or refutes (Steps 5–6)
+5. *Fix & commit* — minimal diff, atomic commit with `[B##]` footer (Steps 7–9)
+6. *Smoke / regression* — no untouched-area breakage; existing tests pass (Step 10)
+7. *Learn nudge* — autonomy-aware learn/decide nudges (Steps 11–12.5)
+
 ## Step 2 — Resolve the Bug
 
 If the user named a `[B##]`:

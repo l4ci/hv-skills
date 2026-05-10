@@ -41,6 +41,16 @@ Read `.hv/config.json`:
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Read commits & items", description="Walk branch range and resolve referenced TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no items resolved, no convention overlap) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Read commits & items* — branch range walked, referenced item IDs collected (Step 2)
+2. *Intent match* — diff vs item titles and detail files compared (Step 3)
+3. *Convention check* — `KNOWLEDGE.md`/`DECISIONS.md` topics consulted for overlap (Step 4)
+4. *Quality pass* — staff-engineer review of the diff at large (Step 5)
+5. *Verdict* — PASS / CONCERNS / FAIL with structured findings (Step 6)
+
 ## Step 2 — Scope the Review
 
 ```bash

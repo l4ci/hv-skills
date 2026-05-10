@@ -29,6 +29,16 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Determine the mode silently via `.hv/bin/hv-vision-list`: empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Discovery", description="Socratic exploration of vision and stakes")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (Edit mode trimming a single milestone, web research disabled) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Discovery* — Socratic exploration of the vision and stakes (Steps 2–3)
+2. *Web research* — relevant external context surfaced (Step 4)
+3. *Challenge* — deliberate counter-position before committing (Step 5)
+4. *Write MILESTONES.md* — top-level roadmap drafted or amended (Step 6)
+5. *Per-milestone detail files* — `.hv/milestones/MNN.md` populated (Step 7)
+
 ## Step 2 — Load Context Silently
 
 Before opening the conversation, gather everything that should inform the brainstorm:
