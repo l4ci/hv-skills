@@ -3737,4 +3737,107 @@ assert fields2.get("subsystem") == "capture", f"subsystem={fields2.get('subsyste
 PY
 echo "ok parse_todo_fields handles Subsystem"
 
+echo "hv-uncertain"
+(
+  UTMP="$(mktemp -d)"
+  trap 'rm -rf "$UTMP"' EXIT
+  mkdir -p "$UTMP/.hv/bugs" "$UTMP/.hv/features" "$UTMP/.hv/tasks"
+  cd "$UTMP"
+
+  cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+- **[F50] [Major] Major no detail file.** Just a brief.
+- **[F51] [Major] Major zero backticks.** Plain prose with no identifiers. Milestone: M01
+- **[F52] [Major] Major with questions?** What about this? And this? Detail: see `code`. Milestone: M01
+- **[F53] [Major] Certain item.** Use `helper` and `hvlib` to do X. Milestone: M01
+- **[F54] [Minor] Minor item.** No detail file no backticks no markers. Milestone: M01
+
+## Tasks
+
+## Completed
+EOF
+
+  # F51: detail file present but contains zero backticks anywhere.
+  cat > .hv/features/F51.md <<'EOF'
+# F51 detail
+
+Plain prose. No code spans. Just words.
+EOF
+
+  # F52: detail file present with backticks; brief already has 2+ question marks.
+  cat > .hv/features/F52.md <<'EOF'
+# F52 detail
+
+Use `widget` and explain. Why?
+EOF
+
+  # F53: detail file present with backticks, no markers, 0 question marks.
+  cat > .hv/features/F53.md <<'EOF'
+# F53 detail
+
+Use `helper` and `hvlib`. Concrete plan, no uncertainty.
+EOF
+
+  # F54: detail file present with backticks; should still exit 1 (Minor).
+  cat > .hv/features/F54.md <<'EOF'
+# F54 detail
+
+Use `something` to do Y.
+EOF
+
+  # Item not in TODO -> exit 2.
+  set +e
+  out=$("$BIN/hv-uncertain" F99 2>&1); rc=$?
+  set -e
+  [ "$rc" = "2" ] || fail "hv-uncertain F99: expected exit 2, got $rc"
+  echo "$out" | grep -q "not found" || fail "hv-uncertain F99: missing 'not found' in stderr: $out"
+  pass "hv-uncertain returns 2 when item missing"
+
+  # F50: Major, no detail file -> exit 0 with "no detail file".
+  set +e
+  out=$("$BIN/hv-uncertain" F50); rc=$?
+  set -e
+  [ "$rc" = "0" ] || fail "hv-uncertain F50: expected exit 0, got $rc"
+  echo "$out" | grep -q "no detail file" || fail "hv-uncertain F50: missing 'no detail file': $out"
+  # F50 also has zero backticks, so unknown-surface should also fire.
+  echo "$out" | grep -q "no concrete identifiers" || fail "hv-uncertain F50: missing unknown-surface gate: $out"
+  pass "hv-uncertain F50 fires no-detail-file gate"
+
+  # F51: Major, detail file but zero backticks -> exit 0 with unknown-surface.
+  set +e
+  out=$("$BIN/hv-uncertain" F51); rc=$?
+  set -e
+  [ "$rc" = "0" ] || fail "hv-uncertain F51: expected exit 0, got $rc"
+  echo "$out" | grep -q "no concrete identifiers" || fail "hv-uncertain F51: missing unknown-surface: $out"
+  echo "$out" | grep -q "no detail file" && fail "hv-uncertain F51: should not fire no-detail-file: $out"
+  pass "hv-uncertain F51 fires unknown-surface gate"
+
+  # F52: Major, detail file + backticks but >=2 ? -> exit 0 with open-question signals.
+  set +e
+  out=$("$BIN/hv-uncertain" F52); rc=$?
+  set -e
+  [ "$rc" = "0" ] || fail "hv-uncertain F52: expected exit 0, got $rc"
+  echo "$out" | grep -q "multiple open-question signals" || fail "hv-uncertain F52: missing open-question gate: $out"
+  pass "hv-uncertain F52 fires multiple-open-question-signals gate"
+
+  # F53: Major, detail file + backticks + 0 ? + no markers -> exit 1 (certain).
+  set +e
+  out=$("$BIN/hv-uncertain" F53); rc=$?
+  set -e
+  [ "$rc" = "1" ] || fail "hv-uncertain F53: expected exit 1 (certain), got $rc; out=$out"
+  pass "hv-uncertain F53 returns 1 when certain"
+
+  # F54: Minor, regardless of other gates -> exit 1.
+  set +e
+  out=$("$BIN/hv-uncertain" F54); rc=$?
+  set -e
+  [ "$rc" = "1" ] || fail "hv-uncertain F54: expected exit 1 (Minor), got $rc; out=$out"
+  pass "hv-uncertain F54 returns 1 for Minor regardless of other gates"
+)
+echo "ok hv-uncertain"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
