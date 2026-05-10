@@ -3860,4 +3860,52 @@ done
 pass "Tier C SKILL.md files do not reference TaskCreate("
 echo "ok F37"
 
+echo "hvlib parse_term_entry / first_sentence"
+PYTHONPATH="$BIN" python3 - <<'PY'
+import sys
+from hvlib import parse_term_entry, first_sentence
+
+# Term body with all three fields
+body = """
+The canonical project queue — `.hv/TODO.md`. Items are zero-padded IDs
+([B01]/[F01]/[T01]).
+
+**Aliases:** task list, todo list
+**Not:** session state, handoff
+<!-- 2026-05-10 -->
+"""
+parsed = parse_term_entry(body)
+assert parsed["definition"].startswith("The canonical project queue"), \
+    f"definition wrong: {parsed['definition']!r}"
+assert parsed["aliases"] == ["task list", "todo list"], parsed["aliases"]
+assert parsed["nots"] == ["session state", "handoff"], parsed["nots"]
+
+# Term body with only definition + Aliases _none_
+body2 = """
+A signed Ed25519 cross-org registry entry.
+
+**Aliases:** _none_
+<!-- 2026-05-10 -->
+"""
+p2 = parse_term_entry(body2)
+assert p2["aliases"] == [], p2["aliases"]
+assert p2["nots"] == [], p2["nots"]
+assert "Ed25519" in p2["definition"]
+
+# first_sentence — short, fits in budget
+assert first_sentence("Hello world. Second.") == "Hello world."
+# first_sentence — over budget, ellipsis at word boundary
+long = "A" + " banana" * 40 + "."
+out = first_sentence(long, max_chars=40)
+assert out.endswith("…"), out
+assert len(out) <= 41, len(out)
+# first_sentence — no terminator
+assert first_sentence("no period here") == "no period here"
+# first_sentence — empty
+assert first_sentence("") == ""
+
+print("OK hvlib context helpers")
+PY
+pass "hvlib parse_term_entry + first_sentence"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
