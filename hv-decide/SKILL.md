@@ -43,6 +43,24 @@ A decision is worth capturing if it is:
 - **Bounded** — it has a concrete shape: forbids X, permits Y.
 - **Justified** — there's a why behind it (past incident, deadline, stakeholder ask, strong preference).
 
+**Three-gate trigger (pre-write check).**
+
+Active/Bounded/Justified is the conceptual definition; these three gates are the operational filter that catches preference choices that pass it. **All three must pass** for a candidate to proceed past Step 2 — across all modes (default, `--from-learning`, `--from-spike`):
+
+(a) **Hard to reverse.** Undoing the rule would require coordinated edits across many files, retraining habits, or migrating data. If undoing is `git revert` plus a small refactor, it's a preference, not a decision.
+
+(b) **Surprising without context.** A future contributor reading the code would not infer the rule from the existing patterns. If the rule is self-evident from the codebase — "we use TypeScript" in a TS-only repo, "tests live in `tests/`" in a project where every test already does — it's a convention the code already documents.
+
+(c) **Real trade-off.** Genuine alternatives existed and the project deliberately didn't pick them. If only one option was ever on the table, the "rule" is documenting a default, not a decision.
+
+If **any** gate fails, do **not** write to `DECISIONS.md`. Surface to the user:
+
+> "This reads like a [preference / convention / default] rather than a hard boundary — gate (X) failed. Run `/hv-learn` to capture it as durable knowledge instead, or leave it inline at the call site."
+
+Substitute the failing gate's letter for `(X)`. Suggest the redirect (`/hv-learn` if there's still a useful learning to capture, "leave inline" if it's just code-level) and stop. **Do not auto-invoke `/hv-learn`** — same manual-gate policy as the no-forbids/no-permits redirect below.
+
+Codified from grill-with-docs's ADR triggers — prevents `/hv-decide` bloat from preference choices that aren't actually hard boundaries.
+
 **Default mode.**
 
 If the user invoked `/hv-decide` with a clear candidate from the conversation, surface it. If not, ask:
