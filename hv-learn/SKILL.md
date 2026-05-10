@@ -23,6 +23,16 @@ user-invocable: true
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Scan session", description="Inspect transcript and recent commits for durable learnings")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no learnings found, verifier disabled by config) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Scan session* — transcript + recent commits sifted for durable gotchas (Step 2)
+2. *Classify topic* — each candidate matched to a `KNOWLEDGE.md` topic (Steps 3–4)
+3. *Merge into KNOWLEDGE.md* — entries appended under topic headings (Step 5)
+4. *Update CLAUDE.md index* — `hv-knowledge-index` regenerates the managed block (Step 6)
+5. *Verify (Opus)* — optional cold pass when `learn.verify: true` (Steps 7–8)
+
 ## Step 2 — Scan the Session for Learnings
 
 A learning is worth capturing if it would save a future `/hv-work` run from re-discovering it.
