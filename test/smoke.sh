@@ -4159,4 +4159,12 @@ grep -q "^# Context$" "$TMP_BOOT2/.hv/contexts/repo-a/CONTEXT.md" || fail "repo-
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-bootstrap umbrella scaffolding"
 
+echo "/hv-context skill registered + SKILL.md present"
+[ -f "$REPO/hv-context/SKILL.md" ] || fail "hv-context/SKILL.md missing"
+grep -q "name: hv-context" "$REPO/hv-context/SKILL.md" || fail "SKILL.md frontmatter missing name"
+grep -q "user-invocable: true" "$REPO/hv-context/SKILL.md" || fail "SKILL.md frontmatter missing user-invocable"
+grep -q "/hv-context" "$REPO/bin/hv-skills-index" || fail "/hv-context not in skills-index"
+grep -q "hv-context-query" "$REPO/bin/hv-skills-index" || fail "hv-context-query not in consult list"
+pass "/hv-context skill registered"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
