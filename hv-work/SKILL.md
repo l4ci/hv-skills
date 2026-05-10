@@ -84,6 +84,18 @@ Don't narrate the sweep unless it happened; silent pass-through is the common ca
 
 If `hv-auto-decisions-since` produces no output, skip silently.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Preflight & guard", description="Run hv-preflight and hv-guard-clean; sweep tool siblings if dirty")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (e.g. no `[Auto:Loop]` decisions to surface) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Preflight & guard* — clean tree + repo confirmed (Step 1)
+2. *Register status* — branch named, `hv-status-add` recorded (Steps 3, 5)
+3. *Plan tasks* — wave layout + briefs ready (Step 4)
+4. *Branch / worktree* — isolation set up per `work.isolation` (Step 5)
+5. *Dispatch & verify per wave* — workers run, orchestrator verifies each completion (Steps 6–8)
+6. *Commit + TODO + sweep* — per-task commits, TODO entries marked complete, tool siblings swept (Steps 7.5, 8.5, 9)
+7. *Merge/PR & report* — integration + status removal + summary + post-cycle nudges (Steps 10–15)
+
 ## Step 2 — Clarify Ambiguous Briefs (only when needed)
 
 If — and only if — the current brief is too thin to plan concrete tasks (missing scope, conflicting requirements, or two equally plausible interpretations), use the `AskUserQuestion` tool to resolve the ambiguity before touching any code. Otherwise skip this step entirely — the default is to proceed.
