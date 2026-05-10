@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Pre-merge scan for stale per-task scaffolding comments left over from
+# multi-task feature branches. Reads the diff between <base> and <branch>
+# and prints candidate matches as "<file>:<line>:<text>" — one per line.
+#
+# Lookup helper: empty stdout is a valid "no matches" answer.
+#
+# Empty stdout = no matches; the reviewer can skip the rubric item.
+# Non-empty stdout = candidates the reviewer must judge as real scaffolding
+# (a comment about a task that has shipped) or legitimate prose. The helper
+# does NOT decide — it surfaces.
+#
+# Pattern source: T25 spec — Task <N>, "in flight", "placeholder",
+# "added later", "not yet wired" — case-insensitive, word-boundary anchored.
+#
+# Usage: hv-review-scaffolding [--repo <name>] [<base> [<branch>]]
+#   <base>   defaults to hv-base-branch's resolution (typically main)
+#   <branch> defaults to the current HEAD's branch name
+#
+# Always exits 0. Empty stdout is a valid answer.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:?usage: hv-review-scaffolding [--repo <name>] [<base> [<branch>]]}"
+  shift 2
+fi
+
+if [ -n "$REPO" ]; then
+  REPO_PATH=$("$HERE/hv-resolve-repo-path" "$REPO")
+  cd "$REPO_PATH"
+fi
+
+BASE="${1:-$("$HERE/hv-base-branch" 2>/dev/null || echo main)}"
+BRANCH="${2:-$(git rev-parse --abbrev-ref HEAD)}"
+
+PYCODE='
+import re
+import sys
+
+pattern = re.compile(
+    r"\bTask\s+[0-9]+\b|\bin flight\b|\bplaceholder\b|\badded later\b|\bnot yet wired\b",
+    re.IGNORECASE,
+)
+
+current_file = None
+new_line = 0
+for raw in sys.stdin:
+    line = raw.rstrip("\n")
+    if line.startswith("+++ b/"):
+        current_file = line[6:]
+        new_line = 0
+        continue
+    if line.startswith("+++") or line.startswith("---"):
+        continue
+    m = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+    if m:
+        new_line = int(m.group(1))
+        continue
+    if line.startswith("+") and not line.startswith("+++"):
+        text = line[1:]
+        if pattern.search(text):
+            print(f"{current_file}:{new_line}:{text}")
+        new_line += 1
+    elif line.startswith(" "):
+        new_line += 1
+    # "-" lines do not advance new_line.
+'
+
+git diff "$BASE...$BRANCH" | python3 -c "$PYCODE"

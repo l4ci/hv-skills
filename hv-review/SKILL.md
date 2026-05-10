@@ -90,6 +90,16 @@ git diff <base>...<branch> -- <file>
 
 **Issue all the per-file `git diff` calls in parallel** — they're independent and serial calls add up fast on bigger branches. Keep a per-file diff map in memory for the reviewer brief.
 
+## Step 4.5 — Pre-flight Scaffolding Scan
+
+Multi-task feature branches sometimes ship comments that referenced earlier task numbers ("Umbrella behavior is added in Task 7 — for now --repo is parsed but ignored") even after the referenced task completed. Before dispatching the reviewer, run a deterministic diff scan:
+
+```bash
+.hv/bin/hv-review-scaffolding [--repo <name>] <base> <branch>
+```
+
+Empty stdout → no candidates, skip ahead to Step 5. Non-empty stdout → carry the matches forward as `**Possible stale scaffolding:**` evidence in the reviewer brief (Step 5). Do not auto-FAIL — the reviewer judges each match as real scaffolding or legitimate prose. The helper surfaces; the reviewer decides.
+
 ## Step 5 — Dispatch the Reviewer
 
 Dispatch a single review agent using the **orchestrator** model. Brief template:
@@ -113,6 +123,13 @@ Review the feature branch `<branch>` against base `<base>` before merge.
 **Hard boundaries (from DECISIONS.md):**
 <entries from hv-decisions-query, if any — full rule + forbids/permits>
 
+**Possible stale scaffolding (deterministic pre-flight grep):**
+<file:line>: <matched line text>
+<file:line>: <matched line text>
+...
+
+(Omit this section entirely when Step 4.5 produced no matches.)
+
 **Diff by file:**
 <file>
 ```diff
@@ -120,14 +137,15 @@ Review the feature branch `<branch>` against base `<base>` before merge.
 ```
 ...
 
-**Evaluate on three axes. For each, return PASS / CONCERN / FAIL with evidence.**
+**Evaluate on the rubric below. For each item, return PASS / CONCERN / FAIL with evidence.**
 
 1. **Intent match** — does the diff deliver what the TODO entries promise? Anything missing, anything scope-creeping?
 2. **Convention compliance** — does the diff respect the bullets from KNOWLEDGE.md? Any regressions on captured gotchas?
 3. **Obvious quality** — dead code, error swallowing, untested new branches, security smells, API contract breaks, performance cliffs. Not a full code review; focus on things the user would regret after merge.
+4. **Stale scaffolding** — for each entry in `**Possible stale scaffolding:**`, judge whether the matched line is a leftover *Task N* / *placeholder* / *not yet wired* / *added later* / *in flight* annotation that should have been removed once the corresponding work landed. Flag as CONCERN with the file:line if it reads like leftover scaffolding; PASS-and-skip if it's legitimate prose (e.g., a markdown placeholder section, a docstring describing user-visible "in flight" semantics, an enum value named `placeholder`, or a `Task <N>` mention in a per-task brief or test name). Many matches will be benign — the helper surfaces candidates, not verdicts.
 - **Decision violations.** Compare the diff against the `**Hard boundaries:**` block above. Any forbidden pattern present in the diff = FAIL.
 
-Return verdict as three labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
+Return verdict as labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
 
 **Final verdict** (on the last line, all caps): PASS | CONCERNS | FAIL
 - PASS — no concerns worth surfacing

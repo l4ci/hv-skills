@@ -54,6 +54,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-pr` | Cleanup worktree, push, `gh pr create` — body on stdin | `printf '%s' "$BODY" \| .hv/bin/hv-pr [--repo <name>] hv/foo "title"` |
 | `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope [--repo <name>] hv/foo` |
+| `hv-review-scaffolding` | Surface stale per-task scaffolding text in the branch diff (Task N, placeholder, in flight, added later, not yet wired); empty stdout = no matches | `.hv/bin/hv-review-scaffolding [--repo <name>] [<base> [<branch>]]` |
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-version-check` | Compare `.hv/config.json#hvSkills.version` with the currently-installed plugin version; nudge or JSON | `.hv/bin/hv-version-check` |
@@ -165,8 +166,9 @@ read from stdin.
 commits for referenced IDs and matching them against open TODO entries.
 `hv-review-scope` emits a richer JSON payload (commits, touched files,
 referenced IDs, and matched TODO entries) that the [`/hv-review`](../usage/review-and-ship.md) skill consumes.
+`hv-review-scaffolding` complements `hv-review-scope` with a deterministic regex sweep over the diff between base and branch, surfacing candidate stale scaffolding comments as `<file>:<line>:<text>` for the reviewer to judge.
 
-All three helpers (`hv-merge`, `hv-pr`, `hv-review-scope`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
+All four helpers (`hv-merge`, `hv-pr`, `hv-review-scope`, `hv-review-scaffolding`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
 
 ## Diagnostics
 
