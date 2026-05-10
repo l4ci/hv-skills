@@ -3978,4 +3978,15 @@ D_LINE=$(echo "$OUT5" | grep -n "^## decision$" | head -1 | cut -d: -f1)
 [ -n "$B_LINE" ] && [ -n "$D_LINE" ] && [ "$B_LINE" -lt "$D_LINE" ] || fail "hv-context-query document order not preserved"
 pass "hv-context-query"
 
+echo "hv-context-index"
+( cd "$TMP" && "$BIN/hv-context-index" >/dev/null )
+grep -q "<!-- hv-context-start -->" "$TMP/CLAUDE.md" || fail "hv-context-index didn't write block"
+grep -q "## Project Context" "$TMP/CLAUDE.md" || fail "hv-context-index missing heading"
+grep -q "\*\*backlog\*\* \*(aka task list)\*" "$TMP/CLAUDE.md" || fail "block missing aka parenthetical"
+grep -q "\*\*decision\*\* —" "$TMP/CLAUDE.md" || fail "block missing decision entry"
+# decision has Aliases _none_ → NO parenthetical
+grep -q "\*\*decision\*\* \*(aka" "$TMP/CLAUDE.md" && fail "decision should have no aka"
+grep -q "<!-- hv-context-end -->" "$TMP/CLAUDE.md" || fail "hv-context-index didn't close block"
+pass "hv-context-index single-repo block"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

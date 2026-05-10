@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-context-start -->...<!-- hv-context-end -->
+# block in CLAUDE.md from .hv/CONTEXT.md (and umbrella .hv/contexts/<repo>/
+# CONTEXT.md when applicable). Each line: term + (aka aliases) + first-sentence
+# gloss. Source files are always listed; in umbrella mode the active sub-repo
+# (resolved via hv-resolve-repo) is appended under a ### sub-heading.
+# Usage: hv-context-index
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+UMBRELLA_ON=$("$HERE/hv-umbrella-on")
+SUBREPO=""
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  SUBREPO=$("$HERE/hv-resolve-repo" 2>/dev/null || true)
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$UMBRELLA_ON" "$SUBREPO" <<'PY' | "$HERE/hv-managed-block" context --body-stdin
+import sys
+from pathlib import Path
+from hvlib import iter_topics, parse_term_entry, first_sentence
+
+umbrella_on, subrepo = sys.argv[1], sys.argv[2]
+
+def render_entries(path: Path) -> list:
+    if not path.exists():
+        return []
+    out = []
+    for name, body in iter_topics(path.read_text()):
+        parsed = parse_term_entry(body)
+        gloss = first_sentence(parsed["definition"])
+        aliases = parsed["aliases"]
+        aka = f" *(aka {', '.join(aliases)})*" if aliases else ""
+        if gloss:
+            out.append(f"- **{name}**{aka} — {gloss}")
+        else:
+            out.append(f"- **{name}**{aka}")
+    return out
+
+heading = "## Project Context"
+intro = (
+    "Domain terminology lives in `.hv/CONTEXT.md`. Use these canonical "
+    "names; if a term you're using conflicts (synonym or drift), call it "
+    "out."
+)
+
+shared_path = Path(".hv/CONTEXT.md")
+shared_entries = render_entries(shared_path)
+
+is_umbrella = umbrella_on == "yes"
+sub_entries = []
+if is_umbrella and subrepo:
+    sub_path = Path(f".hv/contexts/{subrepo}/CONTEXT.md")
+    sub_entries = render_entries(sub_path)
+
+lines = [heading, "", intro, ""]
+if not is_umbrella:
+    if shared_entries:
+        lines.extend(shared_entries)
+    else:
+        lines.append("- _(no terms yet — run `/hv-context` to capture domain terminology)_")
+else:
+    if shared_entries:
+        lines.extend(shared_entries)
+    else:
+        lines.append("- _(no umbrella-shared terms yet)_")
+    if subrepo:
+        lines.append("")
+        lines.append(f"### {subrepo}")
+        lines.append("")
+        if sub_entries:
+            lines.extend(sub_entries)
+        else:
+            lines.append(f"- _(no terms yet for {subrepo} — run `/hv-context` from this sub-repo)_")
+
+sys.stdout.write("\n".join(lines) + "\n")
+PY
