@@ -213,8 +213,8 @@ With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
 
 Example:
 ```
-Before: - [B07] Title (Pri:P1, Size:S, Files:bin/hv-x) Captured: 2026-05-09
-After:  - [B07] Title (Pri:P1, Size:S, Files:bin/hv-x, Subsystem:work) Captured: 2026-05-09
+Before: - **[B07] [P1] Title.** Description. Milestone: M01 Captured: 2026-05-09
+After:  - **[B07] [P1] Title.** Description. Milestone: M01 Subsystem: capture Captured: 2026-05-09
 ```
 
 The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.

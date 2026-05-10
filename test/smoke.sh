@@ -2615,7 +2615,7 @@ r = parse_todo_fields('- **[F01] [Major] T.** D. Detail: x. Milestone: M02 Repos
 import json
 print(json.dumps(r, sort_keys=True))
 ")
-EXPECTED='{"detail": "x.", "milestone": "M02", "related": "", "repos": "web"}'
+EXPECTED='{"detail": "x.", "milestone": "M02", "related": "", "repos": "web", "subsystem": ""}'
 [ "$RESULT" = "$EXPECTED" ] || fail "parse_todo_fields Repos: expected $EXPECTED, got $RESULT"
 pass "parse_todo_fields captures Repos field without bleeding into Milestone"
 
@@ -3721,5 +3721,20 @@ PY
   [ "$sha1" = "$sha2" ] || { echo "FAIL: integration idempotence"; exit 1; }
 )
 echo "ok end-to-end map flow"
+
+# --- parse_todo_fields handles Subsystem ---------------------------
+PYTHONPATH="$BIN" python3 - <<'PY'
+from hvlib import parse_todo_fields
+line = "- [B07] [P1] Title. Repos: web Subsystem: capture Captured: 2026-05-09"
+fields = parse_todo_fields(line)
+assert fields.get("repos") == "web", f"repos={fields.get('repos')!r}"
+assert fields.get("subsystem") == "capture", f"subsystem={fields.get('subsystem')!r}"
+
+line2 = "- [B07] [P1] Title. Milestone: M01 Subsystem: capture Captured: 2026-05-09"
+fields2 = parse_todo_fields(line2)
+assert fields2.get("milestone") == "M01", f"milestone={fields2.get('milestone')!r}"
+assert fields2.get("subsystem") == "capture", f"subsystem={fields2.get('subsystem')!r}"
+PY
+echo "ok parse_todo_fields handles Subsystem"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

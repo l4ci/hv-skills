@@ -151,23 +151,26 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 
 
 def parse_todo_fields(line: str) -> dict[str, str]:
-    """Extract Detail/Related/Milestone/Repos fields from a TODO bullet line.
+    """Extract Detail/Related/Milestone/Repos/Subsystem fields from a TODO bullet line.
 
     Each field starts with `<Field>: ` and runs until the next field marker
     or end of line. Order-agnostic. Returns a dict with keys 'detail',
-    'related', 'milestone', 'repos' — missing fields map to ''.
+    'related', 'milestone', 'repos', 'subsystem' — missing fields map to ''.
 
     Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
-        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": ""}
+        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": "", "subsystem": ""}
     Example: parse_todo_fields("- **[F01] [Major] Title.** D. Detail: x. Milestone: M02 Repos: web")
-        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web"}
+        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web", "subsystem": ""}
+    Example: parse_todo_fields("- **[B07] [P1] Title.** D. Repos: web Subsystem: capture Captured: 2026-05-09")
+        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture"}
     """
-    fields = {"detail": "", "related": "", "milestone": "", "repos": ""}
+    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": ""}
     others = {
-        "detail": ["Related", "Milestone", "Repos"],
-        "related": ["Detail", "Milestone", "Repos"],
-        "milestone": ["Detail", "Related", "Repos"],
-        "repos": ["Detail", "Related", "Milestone"],
+        "detail": ["Related", "Milestone", "Repos", "Subsystem", "Captured"],
+        "related": ["Detail", "Milestone", "Repos", "Subsystem", "Captured"],
+        "milestone": ["Detail", "Related", "Repos", "Subsystem", "Captured"],
+        "repos": ["Detail", "Related", "Milestone", "Subsystem", "Captured"],
+        "subsystem": ["Detail", "Related", "Milestone", "Repos", "Captured"],
     }
     for key in fields:
         cap = key.capitalize()
