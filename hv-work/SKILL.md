@@ -154,7 +154,19 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 
 If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
 
-**Loop-mode auto-plan dispatch.** When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), do **not** stop the loop on the missing plan. Instead, **dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool immediately — no prompt, no confirmation, no "want me to" question.** When the dispatched plan run returns, re-run the plan-as-artifact check above (the file now exists) and use the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition below. The Major-only gate is the F32 baseline; F34's uncertainty heuristic refines this trigger later.
+**Loop-mode auto-plan dispatch.** When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), do **not** stop the loop on the missing plan. Instead, run the uncertainty pre-flight described next, then dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool — no prompt, no confirmation, no "want me to" question. When the dispatched plan run returns, re-run the plan-as-artifact check above (the file now exists) and use the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition below.
+
+**Uncertainty pre-flight (F34, loop mode only).** Before the auto-plan dispatch, run:
+
+```bash
+.hv/bin/hv-uncertain <itemId>
+```
+
+The helper applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout); exit 1 = certain; exit 2 = error.
+
+When uncertain, **dispatch `/hv-assume <itemId>` via the `Skill` tool first** — no prompt, no confirmation. Its peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
+
+**Orchestrator-model contract (F35).** Both `/hv-assume` (when dispatched) and `/hv-plan --auto-loop` are invoked here via the `Skill` tool, which loads the dispatched skill inline in the current session. Since `/hv-work` itself runs in the orchestrator session under `models.orchestrator`, the dispatched skills inherit the orchestrator model — the peek and plan benefit from orchestrator-grade design judgment. If a future change moves either skill to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.hv/config.json`) to preserve this guarantee.
 
 If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Minor/untagged item), proceed with the steps below.
 

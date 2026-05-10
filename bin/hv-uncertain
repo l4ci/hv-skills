@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Determine whether an item warrants /hv-assume before /hv-plan in loop mode.
+# Exit 0: uncertain (peek warranted), with reason(s) on stdout, one per line.
+# Exit 1: certain (proceed direct to /hv-plan), no stdout.
+# Exit 2: error (item not found, TODO.md missing).
+# Usage: hv-uncertain <itemId>
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-types.sh"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+ITEM_ID="${1:?usage: hv-uncertain <itemId>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEM_ID" <<'PY'
+import re
+import sys
+from pathlib import Path
+from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re
+
+iid = sys.argv[1]
+todo = Path(".hv/TODO.md")
+if not todo.exists():
+    print("error: .hv/TODO.md not found", file=sys.stderr)
+    raise SystemExit(2)
+
+content = todo.read_text()
+_open_re = open_bullet_re()
+
+found_line = None
+for _name, body in iter_open_sections(content):
+    for raw in body.splitlines():
+        line = raw.strip()
+        m = _open_re.match(line)
+        if not m:
+            continue
+        if m.group("id") == iid:
+            found_line = line
+            break
+    if found_line is not None:
+        break
+
+if found_line is None:
+    print(f"error: item {iid} not found in TODO.md", file=sys.stderr)
+    raise SystemExit(2)
+
+fields = parse_todo_fields(found_line)
+# Size lives in the bracketed tag on the bullet, not in the trailing fields.
+m = _open_re.match(found_line)
+tag = (m.group("tag") or "").strip() if m else ""
+if tag.lower() != "major":
+    raise SystemExit(1)
+
+# Resolve detail file location by item-id letter.
+prefix_dir = {"B": "bugs", "F": "features", "T": "tasks"}.get(iid[0])
+detail_path = Path(f".hv/{prefix_dir}/{iid}.md") if prefix_dir else None
+
+body_text = found_line
+detail_exists = bool(detail_path and detail_path.exists())
+if detail_exists:
+    try:
+        body_text = body_text + "\n" + detail_path.read_text()
+    except OSError:
+        # Treat unreadable as missing for the purposes of gate (a).
+        detail_exists = False
+
+reasons = []
+
+# Gate (a): no detail file.
+if not detail_exists:
+    reasons.append("no detail file")
+
+# Gate (b): multiple open-question signals.
+qmark_count = body_text.count("?")
+markers = [
+    r"\bTBD\b",
+    r"\bunclear\b",
+    r"\bunsure\b",
+    r"\bopen question(s)?\b",
+    r"\bheuristic TBD\b",
+]
+marker_hit = any(re.search(p, body_text, re.IGNORECASE) for p in markers)
+if qmark_count >= 2 or marker_hit:
+    reasons.append("multiple open-question signals")
+
+# Gate (c): no backtick-delimited code spans.
+if not re.search(r"`[^`]+`", body_text):
+    reasons.append("no concrete identifiers (unknown surface)")
+
+if reasons:
+    for r in reasons:
+        print(r)
+    raise SystemExit(0)
+
+raise SystemExit(1)
+PY
