@@ -65,9 +65,9 @@ Any item can carry a `Related:` suffix linking it to other items:
 - **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
 ```
 
-Links are optional. `/hv-next` infers the reverse link automatically, so you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [picking work](picking-work.md)).
+Links are optional. [`/hv-next`](picking-work.md) infers the reverse link automatically, so you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [picking work](picking-work.md)).
 
-`/hv-capture` scans both `TODO.md` and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
+`/hv-capture` scans both [`TODO.md`](../reference/hv-folder.md) and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
 
 ## /hv-c — keystroke-saving alias
 

@@ -24,20 +24,20 @@ Each milestone carries one of four statuses:
 | `shipped` | Complete; unblocks any milestone that lists it as a dependency |
 | `archived` | Abandoned or superseded; does **not** unblock dependents |
 
-Multiple milestones can be `active` simultaneously when their dependencies allow. `/hv-next` prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag are never excluded entirely.
+Multiple milestones can be `active` simultaneously when their dependencies allow. [`/hv-next`](picking-work.md) prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag are never excluded entirely.
 
 Marking a milestone `shipped` immediately unblocks anything that depended on it. Marking it `archived` does not. Use `archived` for milestones you are intentionally dropping, not for ones that finished.
 
 ## /hv-plan — write the implementation plan
 
-`/hv-plan` writes a sign-off artifact for a milestone slice or a single backlog item before `/hv-work` runs. The plan lives at:
+`/hv-plan` writes a sign-off artifact for a milestone slice or a single backlog item before [`/hv-work`](running-work.md) runs. The plan lives at:
 
 - `.hv/plans/M01-S01.md` for a slice of milestone work
 - `.hv/plans/M01-B07.md` for a single item that warrants its own plan
 
 Each plan contains: goal in one sentence, approach in 3–6 sentences, tasks with observable behaviors and verify steps, named assumptions, and open questions. Tasks must fit one execution window. If they don't, split the plan. Every task requires a verify step; a task without one is not well-defined.
 
-When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` actively suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside `/hv-capture` when you finish seeding a freshly activated milestone.
+When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` actively suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
 
 ## When to use /hv-plan vs skipping it
 
@@ -49,7 +49,7 @@ A rough heuristic: if you would want to review the implementation approach befor
 
 ## Throwaway feasibility — /hv-spike
 
-When a milestone hinges on a question you cannot answer from the chair (*"can SSE work over our nginx setup?"*, *"is this library's threading model compatible with ours?"*), `/hv-spike` runs an experiment on a dedicated branch that never merges. Only the findings come back as a markdown record; the experimental code stays on the spike branch as reference. See [spikes](spikes.md) for the full flow.
+When a milestone hinges on a question you cannot answer from the chair (*"can SSE work over our nginx setup?"*, *"is this library's threading model compatible with ours?"*), [`/hv-spike`](spikes.md) runs an experiment on a dedicated branch that never merges. Only the findings come back as a markdown record; the experimental code stays on the spike branch as reference. See [spikes](spikes.md) for the full flow.
 
 ## Tagging items to milestones
 

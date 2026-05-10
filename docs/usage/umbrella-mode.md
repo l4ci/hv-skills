@@ -32,7 +32,7 @@ Single-repo behavior is **completely unchanged**. Umbrella-aware helpers gate on
 
 1. `cd` to the umbrella folder, the parent that contains your sub-repos as immediate children.
 2. Run `/hv-init`.
-3. When `/hv-init` detects two or more immediate git children, it offers umbrella mode via `AskUserQuestion`, listing the children it found.
+3. When [`/hv-init`](../reference/slash-commands.md#hv-init) detects two or more immediate git children, it offers umbrella mode via `AskUserQuestion`, listing the children it found.
 4. Accept. `/hv-init` calls `hv-umbrella-init`, which writes `.hv/repos.json` with the repos you chose and sets `umbrella.enabled: true` in `.hv/config.json`. If the umbrella itself is a git repo, `.gitignore` gains a `# ── hv umbrella ──` block listing `.claude/`, `.hv/`, and each registered sub-repo.
 
 The result looks like:
@@ -50,7 +50,7 @@ myorg/                 # umbrella root
 └── shared/            # registered sub-repo (independent git)
 ```
 
-To opt back out, run `/hv-config`, pick the umbrella row, and toggle off. The registry file is left intact — entries in `.hv/repos.json` remain on disk, helpers just stop consulting them until you toggle umbrella mode back on.
+To opt back out, run [`/hv-config`](configuration.md), pick the umbrella row, and toggle off. The registry file is left intact — entries in `.hv/repos.json` remain on disk, helpers just stop consulting them until you toggle umbrella mode back on.
 
 ## The registry — `.hv/repos.json`
 

@@ -4,7 +4,7 @@ Alphabetical reference of every `/hv-*` command.
 
 ## /hv-assume
 
-Prints the orchestrator's intended approach for an item, slice, or milestone (files it would touch, tests it would add, assumptions it is making, and known unknowns) without writing anything. Use it as a cheap gate before `/hv-work` for items where a wrong turn is expensive to undo. See [picking work](../usage/picking-work.md) for how `/hv-next` surfaces it automatically for large or risky picks.
+Prints the orchestrator's intended approach for an item, slice, or milestone (files it would touch, tests it would add, assumptions it is making, and known unknowns) without writing anything. Use it as a cheap gate before [`/hv-work`](../usage/running-work.md) for items where a wrong turn is expensive to undo. See [picking work](../usage/picking-work.md) for how `/hv-next` surfaces it automatically for large or risky picks.
 
 ## /hv-c
 
@@ -12,19 +12,19 @@ Shortcut alias for `/hv-capture`. Identical behavior; saves keystrokes when capt
 
 ## /hv-capture
 
-Captures bugs, features, and tasks into `TODO.md`. Auto-classifies each item, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features, and routes it to the correct section with a zero-padded auto-incrementing ID (`[B01]`, `[F01]`, `[T01]`). See [capturing work](../usage/capturing-work.md) for the full flow.
+Captures bugs, features, and tasks into [`TODO.md`](hv-folder.md). Auto-classifies each item, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features, and routes it to the correct section with a zero-padded auto-incrementing ID (`[B01]`, `[F01]`, `[T01]`). See [capturing work](../usage/capturing-work.md) for the full flow.
 
 ## /hv-config
 
-Interactive editor for `.hv/config.json`. Shows current values for all configurable fields, lets you pick which to change from a checklist, then asks each selected key using the same option vocabulary as `/hv-init`. Only the changed keys are written; everything else is left untouched.
+Interactive editor for [`.hv/config.json`](../usage/configuration.md). Shows current values for all configurable fields, lets you pick which to change from a checklist, then asks each selected key using the same option vocabulary as `/hv-init`. Only the changed keys are written; everything else is left untouched.
 
 ## /hv-debug
 
-Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, and mark complete. Uses the same isolation mode as `/hv-work` and nudges you toward `/hv-learn` when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
+Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, and mark complete. Uses the same isolation mode as `/hv-work` and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
 
 ## /hv-decide
 
-Captures a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked. Decisions differ from learnings in `KNOWLEDGE.md` by being active commitments with explicit forbids/permits; `/hv-work`, `/hv-debug`, `/hv-refactor`, and `/hv-review` consult them as constraints. Accepts `--from-learning <topic>` to promote a hardened `KNOWLEDGE.md` bullet into a decision (rule/why are pre-filled; you supply the forbids/permits) and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding the same way (`inconclusive` spikes are refused). See [decisions](../usage/decisions.md) for the full flow.
+Captures a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked. Decisions differ from learnings in `KNOWLEDGE.md` by being active commitments with explicit forbids/permits; `/hv-work`, `/hv-debug`, `/hv-refactor`, and [`/hv-review`](../usage/review-and-ship.md) consult them as constraints. Accepts `--from-learning <topic>` to promote a hardened `KNOWLEDGE.md` bullet into a decision (rule/why are pre-filled; you supply the forbids/permits) and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding the same way (`inconclusive` spikes are refused). See [decisions](../usage/decisions.md) for the full flow.
 
 ## /hv-docs
 
@@ -48,7 +48,7 @@ Maintains the AI-facing project map at `.hv/MAP.md` and `.hv/map/<subsystem>.md`
 
 ## /hv-next
 
-Reviews the backlog, reconciles active work against git state, archives old completions, and suggests what to work on next, then routes to `/hv-work` after confirmation. When active streams exist, also reads any handoff notes left by `/hv-pause` and surfaces Stage / Next planned step / Current hypothesis inline alongside each stream — this is the post-`/clear` reorientation flow. See [picking work](../usage/picking-work.md) for the full flow.
+Reviews the backlog, reconciles active work against git state, archives old completions, and suggests what to work on next, then routes to `/hv-work` after confirmation. When active streams exist, also reads any handoff notes left by [`/hv-pause`](../usage/pausing-and-resuming.md) and surfaces Stage / Next planned step / Current hypothesis inline alongside each stream — this is the post-`/clear` reorientation flow. See [picking work](../usage/picking-work.md) for the full flow.
 
 ## /hv-pause
 

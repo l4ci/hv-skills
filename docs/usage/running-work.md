@@ -1,6 +1,6 @@
 # Implementing
 
-Items captured in `TODO.md` move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
+Items captured in [`TODO.md`](../reference/hv-folder.md) move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
 
 ## /hv-work
 
@@ -15,7 +15,7 @@ Items captured in `TODO.md` move to "merged" through `/hv-work`, an orchestrator
 
 **Precondition:** refuses to start on a dirty working tree. Commit or stash first.
 
-**Status tracking:** registers in `.hv/status.json` at start so `/hv-next` in another session knows those items are in progress.
+**Status tracking:** registers in `.hv/status.json` at start so [`/hv-next`](picking-work.md) in another session knows those items are in progress.
 
 ## One commit per task
 
@@ -31,7 +31,7 @@ That keeps reverts surgical (drop one task without touching others), makes PR re
 
 ## Isolation: branch vs. worktree
 
-Set `work.isolation` in `config.json`:
+Set `work.isolation` in [`config.json`](configuration.md):
 
 | Mode | How it works | When to use |
 |------|-------------|-------------|
@@ -53,7 +53,7 @@ For running multiple `/hv-work` sessions at the same time on different item batc
 
 The item still gets a real ID in `TODO.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands directly off to `/hv-work` after capture completes.
 
-`/hv-go` caps the number of clarifying questions on purpose. It assumes the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, `/hv-capture` first is safer.
+`/hv-go` caps the number of clarifying questions on purpose. It assumes the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, [`/hv-capture`](capturing-work.md) first is safer.
 
 **Flow:** clean-tree guard → capture via `/hv-capture` → work via `/hv-work`.
 
