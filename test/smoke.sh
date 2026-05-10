@@ -451,6 +451,7 @@ pass "knowledge-query returns only requested topics"
 
 echo "hv-knowledge-stats"
 KS_TMP="$(mktemp -d)"
+trap 'rm -rf "$KS_TMP"' EXIT
 (
   cd "$KS_TMP"
   mkdir -p .hv
@@ -478,10 +479,11 @@ EOF
   [ "$TINY_BULLETS" = "1" ] || fail "Tiny bullet count != 1: $TINY_BULLETS"
   pass "hv-knowledge-stats handles tiny topics"
 )
-rm -rf "$KS_TMP"
+trap 'rm -rf "$TMP"' EXIT
 
 echo "hv-knowledge-stats no KNOWLEDGE.md"
 KS2_TMP="$(mktemp -d)"
+trap 'rm -rf "$KS2_TMP"' EXIT
 (
   cd "$KS2_TMP"
   mkdir -p .hv/bin
@@ -490,7 +492,7 @@ KS2_TMP="$(mktemp -d)"
   echo "$OUT" | grep -q '"topics": \[\]' || fail "missing-file should yield empty: $OUT"
   pass "hv-knowledge-stats silent-empty on missing KNOWLEDGE.md"
 )
-rm -rf "$KS2_TMP"
+trap 'rm -rf "$TMP"' EXIT
 
 echo "hv-decisions-query"
 cat > .hv/DECISIONS.md <<'EOF'
@@ -544,6 +546,7 @@ EOF
 echo "hv-bootstrap (DECISIONS.md seed)"
 # Fresh tmpdir so we test bootstrap on a truly clean slate
 BOOT_TMP="$(mktemp -d)"
+trap 'rm -rf "$BOOT_TMP"' EXIT
 cd "$BOOT_TMP"
 git init -q
 git config user.email t@t && git config user.name t
@@ -560,7 +563,7 @@ grep -q "user content marker" .hv/DECISIONS.md || fail "bootstrap overwrote exis
 pass "bootstrap idempotent — preserves existing DECISIONS.md content"
 
 cd "$TMP"
-rm -rf "$BOOT_TMP"
+trap 'rm -rf "$TMP"' EXIT
 
 echo "hv-backlog"
 # Seed a mix of items in TODO.md
