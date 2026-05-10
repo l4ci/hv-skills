@@ -30,6 +30,16 @@ Write a plan to disk that the user signs off on before `/hv-work` runs. The plan
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve target", description="Resolve the milestone-and-unit key from the invocation")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no detail file yet, single iteration sufficient) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Resolve target* — milestone-and-unit key extracted from args / cwd (Step 2)
+2. *Load context* — TODO entry, detail file, codebase greps gathered (Step 3)
+3. *Propose* — goal, approach, task decomposition drafted for the user (Step 4)
+4. *Iterate* — feedback rounds until alignment (Step 5)
+5. *Write* — plan persisted to `.hv/plans/<key>.md` (Step 6)
+
 ## Step 2 — Resolve Target
 
 The user's input may be:
