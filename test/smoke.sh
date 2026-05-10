@@ -4177,4 +4177,17 @@ for SK in hv-vision hv-work hv-debug hv-capture; do
 done
 pass "touchpoint skills consult CONTEXT"
 
+echo "hv-bootstrap single-repo doesn't create .hv/contexts/"
+TMP_NOC="$(mktemp -d)"
+trap 'rm -rf "$TMP_NOC"' EXIT
+( cd "$TMP_NOC" && "$BIN/hv-bootstrap" >/dev/null )
+[ ! -d "$TMP_NOC/.hv/contexts" ] || fail "single-repo should not create .hv/contexts/"
+# Also verify empty repos array doesn't trigger
+mkdir -p "$TMP_NOC/.hv"
+echo '{"repos":[]}' > "$TMP_NOC/.hv/repos.json"
+( cd "$TMP_NOC" && "$BIN/hv-bootstrap" >/dev/null )
+[ ! -d "$TMP_NOC/.hv/contexts" ] || fail "empty repos.json should not create .hv/contexts/"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-bootstrap single-repo doesn't create .hv/contexts/"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

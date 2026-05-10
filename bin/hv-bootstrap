@@ -104,7 +104,6 @@ fi
 # Umbrella scaffolding: when .hv/repos.json is present, seed per-sub-repo
 # context files and the umbrella CONTEXT-MAP.md. Idempotent.
 if [ -f "$HV/repos.json" ]; then
-  mkdir -p "$HV/contexts"
   python3 - "$HV" <<'PY'
 import json, os, sys
 hv = sys.argv[1]
@@ -113,6 +112,9 @@ try:
         repos = json.load(f).get("repos", [])
 except Exception:
     repos = []
+if not repos:
+    sys.exit(0)
+os.makedirs(f"{hv}/contexts", exist_ok=True)
 for entry in repos:
     name = entry.get("name", "")
     if not name:

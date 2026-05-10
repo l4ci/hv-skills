@@ -10,6 +10,8 @@
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
 | `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
+| `CONTEXT.md` | Domain glossary — one entry per term with definition, aliases, optional "not" clarifications. Source-of-truth for the `## Project Context` block in `CLAUDE.md`. Written by `/hv-context`. |
+| `MAP.md` + `map/<subsystem>.md` | Project map — AI-curated narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Written by `/hv-map`. |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
@@ -58,6 +60,27 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
 A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is actually in progress.
+
+## CONTEXT.md — domain glossary
+
+`CONTEXT.md` is the domain terminology dictionary for the project. Each entry is one term with:
+
+- A canonical **definition** (one or two sentences).
+- An optional **Aliases** list — informal synonyms the team uses.
+- An optional **Not** list — clarifications for terms that are easily confused with adjacent concepts.
+- A hidden date stamp (`<!-- YYYY-MM-DD -->`) tracking when the entry was last written.
+
+[`/hv-context`](../usage/context.md) adds and updates entries. The file is sorted alphabetically by term on every write. `/hv-init` inserts a managed `## Project Context` block in `CLAUDE.md` that lists the first sentence of each definition; that thin summary stays visible to the model without loading the full file.
+
+For umbrella projects, the umbrella-shared glossary lives in `.hv/CONTEXT.md` and per-sub-repo glossaries live in `.hv/contexts/<repo>/CONTEXT.md`. The combined view is maintained in `.hv/CONTEXT-MAP.md` by `hv-context-map`.
+
+See [../usage/context.md](../usage/context.md) for the full capture and query workflow.
+
+## MAP.md — project map
+
+`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv-map-query <name>`. `/hv-map` scaffolds the initial map (`first-run` mode), updates touched subsystems after work lands (`after-work`), and consolidates dormant entries (`consolidate`).
+
+A managed `## Project Map` block in `CLAUDE.md` surfaces the thin summary so the model can orient without loading detail files.
 
 ## counters.json — auto-incrementing IDs
 

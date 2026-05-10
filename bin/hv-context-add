@@ -6,16 +6,19 @@
 #                  [--repo <name|umbrella>] [--touch]
 #
 # Single-repo: writes to .hv/CONTEXT.md.
-# Umbrella behavior is added in Task 7 — for now --repo is parsed but ignored
-# (always writes to .hv/CONTEXT.md).
+# Umbrella: --repo umbrella → .hv/CONTEXT.md; --repo <name> → .hv/contexts/
+# <name>/CONTEXT.md (validated against .hv/repos.json); without --repo,
+# resolves the active sub-repo via hv-resolve-repo (errors with a hint when
+# cwd is at the umbrella root).
 #
 # Definition rules:
 #   - new term  → insert section alphabetically; today's date stamp
 #   - existing  → replace definition; union aliases; union nots; date stamp
 #                 preserved unless --touch; --not "" clears the Not list
 #
-# Refuses (non-zero) when an alias collides with an alias already attached to
-# a different term in any in-scope CONTEXT.md file.
+# Refuses (non-zero, exit 3) when an alias would collide with another term's
+# alias in the same target file. Cross-file alias-uniqueness in umbrella mode
+# is a deliberate non-goal in v1 — see follow-up [F##] when captured.
 set -euo pipefail
 
 TERM=""
