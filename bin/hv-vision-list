@@ -13,7 +13,9 @@ import json, re, sys
 from pathlib import Path
 items = []
 for fm in json.loads(sys.argv[1]):
-    depends = [d.strip() for d in re.findall(r"M\d+", fm.get("depends", ""))]
+    depends = fm.get("depends") or []
+    if isinstance(depends, str):
+        depends = re.findall(r"M\d+", depends)
     items.append({
         "id":      fm.get("id") or Path(fm["_path"]).stem,
         "title":   fm.get("title", ""),

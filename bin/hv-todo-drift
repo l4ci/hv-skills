@@ -15,9 +15,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 hv_self_locate
 export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json, os, re, subprocess, sys
+import json, os, subprocess, sys
 from pathlib import Path
-from hvlib import iter_open_sections, load_repos, open_bullet_re
+from hvlib import iter_open_sections, load_repos, open_bullet_re, find_item_ids
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
@@ -48,8 +48,6 @@ if repos:
 else:
     targets = [("", None)]  # single-repo mode — git -C None == default cwd
 
-tag_re = re.compile(rf"\[([{cls}]\d+)\]")
-
 # id -> list of commits in walk order (newest first from git log; we reverse later)
 hits: dict[str, list[dict]] = {}
 
@@ -65,7 +63,7 @@ for name, path in targets:
         if "\t" not in line:
             continue
         full_hash, subject = line.split("\t", 1)
-        ids_in_subject = set(tag_re.findall(subject))
+        ids_in_subject = set(find_item_ids(subject, cls))
         for iid in ids_in_subject:
             if iid not in open_ids:
                 continue

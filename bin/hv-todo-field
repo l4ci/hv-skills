@@ -13,19 +13,14 @@ FIELD="${2:?usage: hv-todo-field <ID> <field>}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" <<'PY'
 import sys
-from pathlib import Path
-from hvlib import find_origin_bullet, parse_todo_fields
+from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus
 
 iid, field = sys.argv[1], sys.argv[2]
 if field not in {"detail", "related", "milestone", "repos"}:
     sys.stderr.write(f"error: {field} is not a valid field; pick one of detail/related/milestone/repos\n")
     sys.exit(1)
 
-def read(p):
-    path = Path(p)
-    return path.read_text() if path.exists() else ""
-
-corpus = read(".hv/TODO.md") + "\n" + read(".hv/ARCHIVE.md")
+corpus = load_backlog_corpus(".")
 result = find_origin_bullet(corpus, iid)
 if result is None:
     sys.stderr.write(f"error: [{iid}] not found in TODO.md or ARCHIVE.md\n")

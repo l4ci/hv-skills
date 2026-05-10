@@ -101,7 +101,7 @@ Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch th
 
 Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
 
-- **Soft-cap check.** If `.hv/bin/hv-map-stats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["subsystems"]))'` exceeds the configured `map.softcap_subsystems` (default 20), print a one-line note: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
+- **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
 ## Step 4 — Branch or Worktree
 

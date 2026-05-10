@@ -30,8 +30,7 @@ export PYTHONPATH="$HERE"
 export UMBRELLA_CWD
 python3 - <<'PY'
 import os, re, sys
-from pathlib import Path
-from hvlib import find_origin_bullet
+from hvlib import find_origin_bullet, load_backlog_corpus, find_item_ids
 
 branch = os.environ["HV_BRANCH"]
 subjects = [l for l in os.environ["HV_SUBJECTS"].splitlines() if l.strip()]
@@ -47,23 +46,13 @@ for line in subjects:
     print(f"- {line.strip()}")
 print()
 
-id_re = re.compile(rf"\[([{os.environ['HV_ITEM_TYPES']}]\d{{2,}})\]")
-seen, ordered = set(), []
-for match in id_re.finditer(full):
-    iid = match.group(1)
-    if iid not in seen:
-        seen.add(iid)
-        ordered.append(iid)
+ordered = find_item_ids(full, os.environ["HV_ITEM_TYPES"])
 
 if not ordered:
     sys.exit(0)
 
-def read(p):
-    path = Path(p)
-    return path.read_text() if path.exists() else ""
-
 umbrella = os.environ.get("UMBRELLA_CWD", ".")
-corpus = read(os.path.join(umbrella, ".hv/TODO.md")) + "\n" + read(os.path.join(umbrella, ".hv/ARCHIVE.md"))
+corpus = load_backlog_corpus(umbrella)
 
 bullets = {iid: find_origin_bullet(corpus, iid) for iid in ordered}
 

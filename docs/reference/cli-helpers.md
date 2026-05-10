@@ -15,8 +15,12 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-rm` | Remove backlog item(s) — strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
+| `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
+| `hv-uncertain` | Determine whether an item warrants `/hv-assume` before `/hv-plan` in loop mode; exits 0 (uncertain, reasons on stdout) or 1 (certain) | `.hv/bin/hv-uncertain B07` |
 | `hv-status-add` | Register an active work entry (idempotent on `(branch, repo)`) | `.hv/bin/hv-status-add [--repo <name>] hv/foo B01,F02 [worktree]` |
 | `hv-status-remove` | Clear an active entry by branch (or `(branch, repo)` in umbrella mode) | `.hv/bin/hv-status-remove [--repo <name>] hv/foo` |
+| `hv-status-repo-for` | Print the repo name for the active stream matching a branch (umbrella mode); empty when not found; always exits 0 | `.hv/bin/hv-status-repo-for hv/foo` |
+| `hv-loop-stamp` | Read/write the `loopStartedAt` ISO timestamp in `status.json`; subcommands: `start` (first-write-only), `clear`, `read` | `.hv/bin/hv-loop-stamp start` |
 | `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON (entries flag `noBase: true` for the umbrella cwd when umbrella has no base branch) | `.hv/bin/hv-reconcile` |
 | `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open | `.hv/bin/hv-todo-drift` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
@@ -25,6 +29,10 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
+| `hv-auto-decision-log` | Append an `[Auto:Loop]` entry to `DECISIONS.md` under a topic; idempotent on `(topic, rule-title)` | `.hv/bin/hv-auto-decision-log "Architecture" "no direct DB writes" "keeps layer clean"` |
+| `hv-auto-decisions-since` | Print a markdown summary of `[Auto:Loop]` decisions logged since `loopStartedAt` in `status.json`; empty when none match | `.hv/bin/hv-auto-decisions-since` |
+| `hv-section-query <key> <topic>...` | Generic section query — print `## <topic>` bodies from `KNOWLEDGE.md`, `DECISIONS.md`, or `CONTEXT.md`; backing helper for the typed `*-query` wrappers | `.hv/bin/hv-section-query knowledge "Testing"` |
+| `hv-skills-index` | Regenerate the managed `<!-- hv-skills-start -->` block in `CLAUDE.md` with the canonical slash-command index (static body, idempotent) | `.hv/bin/hv-skills-index` |
 | `hv-context-query` | Print matching `## <term>` sections from `CONTEXT.md` (umbrella-aware: returns union of umbrella-shared + active sub-repo) | `.hv/bin/hv-context-query backlog session` |
 | `hv-context-index` | Regenerate the managed `hv-context` block in `CLAUDE.md` | `.hv/bin/hv-context-index` |
 | `hv-context-add` | Insert or update a term in `CONTEXT.md`; re-renders body alphabetically; exit 3 on alias collision, exit 4 on umbrella resolution failure | `.hv/bin/hv-context-add backlog --def "the canonical queue" --alias "todo list"` |
@@ -33,7 +41,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-map-index` | Regenerate the managed `hv-map` block in `CLAUDE.md` from `.hv/map/<name>.md` frontmatter `summary:` | `.hv/bin/hv-map-index` |
 | `hv-map-stats` | JSON: per-subsystem bytes, last-touched, entry-point counts, broken `file:line` refs | `.hv/bin/hv-map-stats` |
 | `hv-staleness` | List stale entries across MAP/KNOWLEDGE/TODO past a days threshold | `.hv/bin/hv-staleness map --days 90` |
-| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision` (`vision` is `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
+| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision`, `context`, `map`, `skills` (`vision`, `map`, and `skills` are `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
 | `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
 | `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
 | `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` | `.hv/bin/hv-vision-status M01 active` |
@@ -65,10 +73,14 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-refactor-targets` | JSON: umbrella mode flag + `hasCode` for the umbrella + every registered sub-repo's name and abs path. Used by `/hv-refactor` Step 1.5 to ask the user which scope to refactor | `.hv/bin/hv-refactor-targets` |
 | `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks); `--grep <pattern>` filters by substring | `.hv/bin/hv-backlog --grep dashboard` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
+| `hv-require-git-context` | Preflight: exit 1 with a friendly error if cwd is an umbrella root with no git context; silent on pass | `.hv/bin/hv-require-git-context hv-merge --repo-flag-supported` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
 | `hv-umbrella-init` | Bootstrap an umbrella registry: scan child git repos, register a chosen subset (via stdin), write `.hv/repos.json` and append umbrella `.gitignore` lines | `echo "all" \| <source-bin>/hv-umbrella-init` |
 | `hv-resolve-umbrella` | Walk up from cwd to find the umbrella's `.hv/`; detect masking by stray `.hv/` inside a registered sub-repo | `.hv/bin/hv-resolve-umbrella` |
 | `hv-resolve-repo` | Identify which registered sub-repo cwd belongs to (incl. Layout B worktrees) | `.hv/bin/hv-resolve-repo` |
+| `hv-resolve-repo-path` | Resolve a registered sub-repo name → absolute path via `.hv/repos.json`; symmetric counterpart to `hv-resolve-repo` | `.hv/bin/hv-resolve-repo-path web` |
+| `hv-umbrella-on` | Print `yes` if umbrella mode is active (`.hv/repos.json` registers ≥1 sub-repo), `no` otherwise; always exits 0 | `.hv/bin/hv-umbrella-on` |
+| `hv-walk-up` | Walk up from an anchor directory to find a marker (default `.hv/`) and print the containing directory's absolute path; `--detect-masking` checks for stray sub-repo `.hv/` | `.hv/bin/hv-walk-up --marker .hv --detect-masking` |
 | `hv-release-detect-version` | Auto-detect the version file and emit current version as JSON | `.hv/bin/hv-release-detect-version` |
 | `hv-release-bump-version` | Apply a semver bump (patch/minor/major or explicit) to a version file in-place | `.hv/bin/hv-release-bump-version plugin.json plugin-json minor` |
 | `hv-release-changelog-from-commits` | Categorize commits in a git range by Conventional Commits prefix → markdown | `.hv/bin/hv-release-changelog-from-commits v1.0.0..HEAD` |
@@ -96,6 +108,10 @@ and moves it under `## Completed`, stamping it with the supplied git SHA.
 filter the backlog by milestone tag; see also [Knowledge and vision
 indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
+`hv-todo-field` extracts a single named field (`detail`, `related`, `milestone`, or `repos`) from the TODO bullet of a given item ID. It replaces the ad-hoc `grep | sed` chains that skill prose previously inlined for the same purpose.
+
+`hv-uncertain` evaluates whether a backlog item warrants a `/hv-assume` pass before `/hv-plan` is run in loop mode. Exit 0 means the item is uncertain (reasons on stdout); exit 1 means it is clear enough to proceed directly to planning.
+
 ## Status and reconciliation
 
 `hv-status-add` writes a branch record into `.hv/status.json` so the project
@@ -113,6 +129,10 @@ In umbrella mode, every status helper accepts `--repo <name>` to scope the entry
 
 In umbrella mode the umbrella tree itself often has no base branch (it's a coordinator, not a working repo). When that happens, `hv-reconcile` skips `commitCount` for umbrella-cwd entries and stamps each with `noBase: true`. Skill flows that recommend Ship vs Resume vs Abandon should treat `noBase: true` as "indeterminate" rather than zero commits.
 
+`hv-status-repo-for` is a lightweight lookup: given a branch name it prints the `repo` field from the matching active stream entry (umbrella mode), or an empty string when the branch is not active or the project is single-repo. It always exits 0, making it safe to call without error handling in skill prose.
+
+`hv-loop-stamp` manages the `loopStartedAt` ISO timestamp in `status.json` that loop-mode skills use to scope auto-logged decisions to the current session. `start` writes the timestamp once (no-op if already set), `clear` removes it, and `read` prints the stored value (or empty stdout when unset).
+
 ## Knowledge, vision, and decisions indexes
 
 `hv-knowledge-index` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`.
@@ -129,6 +149,14 @@ the knowledge helpers. The distinction is semantic: decisions are *active*
 hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
 while knowledge is *passive* gotchas captured by `/hv-learn`. See
 [Decisions](../usage/decisions.md) for when to use which.
+
+`hv-auto-decision-log` writes an `[Auto:Loop]` entry into `DECISIONS.md` under a named topic. It is idempotent on `(topic, rule-title)` — calling it twice with the same arguments yields one entry. Used by loop-mode skills to record provisional decisions that still need user articulation of Forbids/Permits.
+
+`hv-auto-decisions-since` reads the `loopStartedAt` timestamp from `status.json` and prints a markdown summary of every `[Auto:Loop]` decision whose footer date falls on or after that date. It exits 0 with empty stdout when no entries match — terminal-path skills (`/hv-ship`, `/hv-pause`) use it to surface unresolved provisional decisions before closing out a loop session.
+
+`hv-section-query` is the shared backing helper for `hv-knowledge-query`, `hv-decisions-query`, and `hv-context-query`. Pass a key (`knowledge`, `decisions`, or `context`) and one or more topic names; it prints the matching `## <topic>` section bodies from the corresponding file. The typed wrappers are preferred for human use; `hv-section-query` is useful when scripting against multiple files in one call.
+
+`hv-skills-index` regenerates the `<!-- hv-skills-start -->` block in `CLAUDE.md` with the canonical slash-command index. The body is static and identical across every hv-skills project, so reruns are always idempotent. Called by `/hv-init` and `/hv-update` — you rarely need to invoke it directly.
 
 `hv-context-query` and `hv-context-index` operate on `.hv/CONTEXT.md` — the domain glossary written by [`/hv-context`](slash-commands.md#hv-context). In umbrella mode, `hv-context-query` returns the union of umbrella-shared and active-sub-repo terms (sub-repo entries win on name collision). `hv-context-index` regenerates the `<!-- hv-context-start -->` block in `CLAUDE.md`; when called from inside a sub-repo it includes a `### <repo>` sub-heading for sub-repo-scoped terms after the umbrella-shared block. `hv-context-add` is the write path: it inserts or updates a term, re-renders the file body alphabetically, and exits 3 on alias collision or 4 on umbrella resolution failure. `hv-context-map` regenerates `.hv/CONTEXT-MAP.md` (umbrella only). See [capturing terminology](../usage/context.md) and the [CONTEXT.md format reference](context-md.md).
 
@@ -201,6 +229,8 @@ member matched, preserving all member IDs for context.
 current directory is not inside a git repository. Skills call it as a safety
 check before making commits.
 
+`hv-require-git-context` is a companion preflight for umbrella-mode tools: if cwd is an umbrella root that has no `.git/` of its own, it exits 1 with a friendly error pointing the user to a sub-repo. Pass `--repo-flag-supported` when the calling tool has a `--repo` option to name in the error message. The helper is a no-op (silent exit 0) when cwd already has git context.
+
 ## Upstream issue helper
 
 `hv-issue-suggest` opens an issue against the hv-skills upstream repo when a learning or debug session surfaced a gotcha rooted in hv-skills behavior. The helper reads its body from stdin, takes a `--title` flag, and pre-fills the `gh issue create` call. If `gh` is missing or unauthed, it prints a manual-fallback block (URL + title + body) and exits 1 so the caller can show it to the user.
@@ -214,6 +244,12 @@ When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coor
 `hv-umbrella-init` runs once during [`/hv-init`](slash-commands.md#hv-init) Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and, if the umbrella is itself a git repo, appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
 
 `hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
+
+`hv-resolve-repo-path` is the symmetric counterpart: given a registered sub-repo *name*, it returns the absolute path from `.hv/repos.json`. It replaces the inline Python heredocs that `hv-merge`, `hv-pr`, `hv-spike-add`, and `hv-review-scope` previously duplicated for the same lookup. Exits 1 with a friendly error if the registry is empty or the name is not registered.
+
+`hv-umbrella-on` prints `yes` when umbrella mode is in effect (`.hv/repos.json` registers at least one sub-repo) and `no` otherwise. It always exits 0 and treats any read error as `no`. Accepts an optional `<dir>` argument for callers that already know the umbrella root path. Use it instead of inspecting `config.json` — the repos.json registry is the authoritative source of truth.
+
+`hv-walk-up` walks up from an anchor directory looking for a marker (default `.hv/`) and prints the absolute path of the directory that contains it. Pass `--detect-masking` to additionally check whether the found marker is a stray `.hv/` inside a registered sub-repo that masks an umbrella further up the tree (exits 2 in that case). Most callers should source `hv-self-locate.sh` instead, which combines the walk-up with the `HV_ORIG_PWD` export; `hv-walk-up` is exposed for scripts that need the raw walk-up primitive.
 
 ### hv-resolve-repos
 

@@ -36,10 +36,9 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from collections import defaultdict
 from pathlib import Path
-from hvlib import iter_open_sections, load_json, parse_todo_fields, open_bullet_re
+from hvlib import iter_open_sections, load_json, parse_todo_fields, active_items, parse_open_bullet
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
-_open_re = open_bullet_re()
 
 todo_path = Path(".hv/TODO.md")
 if not todo_path.exists():
@@ -52,19 +51,19 @@ active_entries, active_ids = [], set()
 data = load_json(status_path, {"active": []})
 for entry in data.get("active", []):
     active_entries.append(entry)
-    for i in entry.get("items", []):
+    for i in active_items(entry):
         active_ids.add(i)
 
 def parse_items(body):
     items = []
     for line in body.splitlines():
         line = line.strip()
-        m = _open_re.match(line)
-        if not m:
+        parsed = parse_open_bullet(line)
+        if parsed is None:
             continue
-        item_id = m.group("id")
-        tag = m.group("tag") or ""
-        title = m.group("title").strip().rstrip(".")
+        item_id = parsed.get("id")
+        tag = parsed.get("tag") or ""
+        title = parsed.get("title") or ""
         fields = parse_todo_fields(line)
         related = fields["related"].rstrip(".")
         milestones = ", ".join(re.findall(r"M\d+", fields["milestone"]))
@@ -114,7 +113,7 @@ if active_entries:
         branch = e.get("branch", "")
         started = (e.get("startedAt") or "")[:10]
         repo = e.get("repo") or ""
-        for iid in e.get("items", []):
+        for iid in active_items(e):
             if show_repo:
                 out.append(f"| {iid} | {title_of(iid)} | {branch} | {repo} | {started} |")
             else:

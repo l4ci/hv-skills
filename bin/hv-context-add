@@ -71,12 +71,9 @@ else
     TARGET=".hv/CONTEXT.md"
   elif [ -n "$TARGET_REPO" ]; then
     REGISTERED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-import json, sys
-try:
-    repos = json.load(open('.hv/repos.json')).get('repos', [])
-    print('1' if any(r.get('name') == sys.argv[1] for r in repos) else '0')
-except Exception:
-    print('0')
+import sys
+from hvlib import registered_repo_names
+print('1' if sys.argv[1] in registered_repo_names() else '0')
 " "$TARGET_REPO")
     [ "$REGISTERED" = "1" ] || { echo "error: sub-repo '$TARGET_REPO' not registered in .hv/repos.json" >&2; exit 4; }
     TARGET=".hv/contexts/$TARGET_REPO/CONTEXT.md"
@@ -104,14 +101,9 @@ if [ "$UMBRELLA_ON" = "yes" ]; then
       [ -f "$sub_file" ] || continue
       OTHERS="${OTHERS}${OTHERS:+:}$sub_file"
     done < <(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-import json
-try:
-    repos = json.load(open('.hv/repos.json')).get('repos', [])
-    for r in repos:
-        if r.get('name'):
-            print(r['name'])
-except Exception:
-    pass
+from hvlib import registered_repo_names
+for name in registered_repo_names():
+    print(name)
 ")
   else
     # Writing to a sub-repo file → scan umbrella-shared.

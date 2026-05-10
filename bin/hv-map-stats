@@ -11,9 +11,8 @@ hv_self_locate
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 import re
-import subprocess
 from pathlib import Path
-from hvlib import iter_map_entries, section
+from hvlib import iter_map_entries, section, git_mtime
 
 map_dir = Path(".hv/map")
 if not map_dir.is_dir():
@@ -21,19 +20,6 @@ if not map_dir.is_dir():
     raise SystemExit(0)
 
 ENTRY_RE = re.compile(r"^- ([^:\s]+):(\d+)\b", re.MULTILINE)
-
-
-def git_mtime(path: Path) -> str | None:
-    try:
-        out = subprocess.check_output(
-            ["git", "log", "-1", "--format=%cs", "--", str(path)],
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ).strip()
-        return out or None
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-
 
 subsystems = []
 for name, fm, body, path in iter_map_entries(str(map_dir)):

@@ -14,12 +14,12 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SPIKE" <<'PY'
 import re, sys
 from datetime import date
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import write_text_atomic, update_frontmatter_field
 
 p = Path(sys.argv[1])
 content = p.read_text()
-new = re.sub(r"^(status:\s*)\w+", r"\g<1>done", content, count=1, flags=re.MULTILINE)
-if new == content:
+new, found = update_frontmatter_field(content, "status", "done")
+if not found:
     print(f"error: status field not found in {p}", file=sys.stderr)
     sys.exit(1)
 

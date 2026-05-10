@@ -14,9 +14,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
-import re, sys
+import sys
 from pathlib import Path
-from hvlib import write_text_atomic, update_milestone_status_line
+from hvlib import write_text_atomic, update_frontmatter_field
 
 mid, status = sys.argv[1], sys.argv[2]
 
@@ -26,18 +26,12 @@ if not detail.exists():
     sys.exit(1)
 
 content = detail.read_text()
-new = re.sub(r"^(status:\s*)\w+", rf"\g<1>{status}", content, count=1, flags=re.MULTILINE)
-if new == content:
+new, found = update_frontmatter_field(content, "status", status)
+if not found:
     print(f"error: status field not found in {detail}", file=sys.stderr)
     sys.exit(1)
 write_text_atomic(detail, new)
-
-ms = Path(".hv/MILESTONES.md")
-if ms.exists():
-    ms_content = ms.read_text()
-    updated = update_milestone_status_line(ms_content, mid, status)
-    if updated != ms_content:
-        write_text_atomic(ms, updated)
+# hv-vision-index regenerates MILESTONES.md; no need to pre-write it.
 PY
 
 # Regenerate CLAUDE.md vision block — status changes propagate atomically.

@@ -55,7 +55,7 @@ Default thresholds (override in `.hv/config.json`):
 }
 ```
 
-When `bin/hv-map-stats` reports more subsystems than `softcap_subsystems`, `/hv-work`, `/hv-debug`, `/hv-go` print a one-line warning at start: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
+The soft-cap nudge runs via `.hv/bin/hv-map-cap-check`, invoked from /hv-debug, /hv-go, /hv-work. It emits a one-line warning to stderr when `bin/hv-map-stats` reports subsystem count at or above `softcap_subsystems`. Never blocks.
 
 ## Failure modes
 

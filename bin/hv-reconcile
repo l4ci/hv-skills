@@ -22,7 +22,7 @@ export HV_BASE HERE UMBRELLA_ON
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, subprocess, os, sys
 from pathlib import Path
-from hvlib import load_json, dump_json_atomic, load_repos
+from hvlib import load_json, dump_json_atomic, load_repos, active_items
 
 HERE = os.environ["HERE"]
 UMBRELLA_BASE = os.environ["HV_BASE"]
@@ -68,7 +68,7 @@ for entry in active:
                 "branch": branch,
                 "repo": repo,
                 "reason": "repo_unregistered",
-                "items": entry.get("items", []),
+                "items": active_items(entry),
             })
             continue
 
@@ -78,7 +78,7 @@ for entry in active:
             "branch": branch,
             "repo": repo,
             "reason": "branch_gone",
-            "items": entry.get("items", []),
+            "items": active_items(entry),
         })
         continue
 
@@ -107,7 +107,7 @@ for entry in active:
     needs_action.append({
         "branch": branch,
         "repo": repo,
-        "items": entry.get("items", []),
+        "items": active_items(entry),
         "worktree": entry.get("worktree"),
         "startedAt": entry.get("startedAt"),
         "hasCommits": commit_count > 0,

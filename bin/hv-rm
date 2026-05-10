@@ -43,6 +43,7 @@ from hvlib import (
     remove_id_from_related_field,
     collect_cross_refs,
     apply_cross_ref_strips,
+    active_items,
 )
 
 ids_csv, force_str, scrub_str = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -131,12 +132,7 @@ active_entries = status_data.get("active", [])
 active_hit = {}  # iid → entry dict
 for iid in raw_ids:
     for entry in active_entries:
-        items_raw = entry.get("items", [])
-        # items may be a list (as written by hv-status-add mutator) or a CSV string.
-        if isinstance(items_raw, list):
-            entry_ids = [i.strip() for i in items_raw if i.strip()]
-        else:
-            entry_ids = [i.strip() for i in str(items_raw).split(",") if i.strip()]
+        entry_ids = active_items(entry)
         if iid in entry_ids:
             active_hit[iid] = entry
             break
@@ -341,11 +337,7 @@ if any(plan["status_strip"] for plan in plans.values()):
         active = data.get("active", [])
         new_active = []
         for entry in active:
-            items_raw = entry.get("items", [])
-            if isinstance(items_raw, list):
-                entry_ids = [i.strip() for i in items_raw if i.strip()]
-            else:
-                entry_ids = [i.strip() for i in str(items_raw).split(",") if i.strip()]
+            entry_ids = active_items(entry)
             # Remove any of the IDs being deleted.
             remaining = [i for i in entry_ids if i not in raw_ids]
             if remaining:

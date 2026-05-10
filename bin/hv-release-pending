@@ -19,10 +19,12 @@ else
   TAG_TS="$(git log -1 --format=%ct "$LAST_TAG")"
 fi
 
-LAST_TAG="$LAST_TAG" COMMITS="$COMMITS" TAG_TS="$TAG_TS" python3 - <<'PY'
+HERE="$(cd "$(dirname "$0")" && pwd)"
+LAST_TAG="$LAST_TAG" COMMITS="$COMMITS" TAG_TS="$TAG_TS" PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 import os
 import time
+from hvlib import load_json
 
 last_tag = os.environ["LAST_TAG"]
 commits = int(os.environ["COMMITS"])
@@ -46,16 +48,12 @@ if not last_tag:
 # the file is missing or malformed.
 threshold_commits = 10
 threshold_days = 14
-try:
-    with open(".hv/config.json", "r") as f:
-        cfg = json.load(f)
-    rel = cfg.get("release", {})
-    if isinstance(rel.get("nudgeAfterCommits"), int):
-        threshold_commits = rel["nudgeAfterCommits"]
-    if isinstance(rel.get("nudgeAfterDays"), int):
-        threshold_days = rel["nudgeAfterDays"]
-except (FileNotFoundError, json.JSONDecodeError, OSError):
-    pass
+cfg = load_json(".hv/config.json", {})
+rel = cfg.get("release", {})
+if isinstance(rel.get("nudgeAfterCommits"), int):
+    threshold_commits = rel["nudgeAfterCommits"]
+if isinstance(rel.get("nudgeAfterDays"), int):
+    threshold_days = rel["nudgeAfterDays"]
 
 now = int(time.time())
 days = max(0, (now - tag_ts) // 86400)

@@ -19,7 +19,7 @@ fi
 DATE=$(date +%Y-%m-%d)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<'PY'
 import re, subprocess, sys
-from hvlib import find_section, write_text_atomic, update_json, format_done_line, parse_done_line
+from hvlib import find_section, write_text_atomic, update_json, format_done_line, parse_done_line, detail_dir_for_id
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
 path = ".hv/TODO.md"
 with open(path) as f: content = f.read()
@@ -50,7 +50,9 @@ write_text_atomic(path, content)
 # Bump since_refactor counter unless this is a refactor: commit.
 # Recognises all Conventional Commits refactor forms: plain, scoped,
 # breaking-change, and scoped+breaking-change (refactor(scope)!:).
-kind_key = {"B": "bugs", "F": "features"}.get(id_s[:1])
+dir_name = detail_dir_for_id(id_s)
+# Tasks don't carry a counter; skip the bump.
+kind_key = dir_name if dir_name != "tasks" else None
 if kind_key:
     subj = subprocess.run(["git", "log", "-1", "--format=%s", hash_s],
                           capture_output=True, text=True)

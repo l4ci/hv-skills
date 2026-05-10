@@ -14,7 +14,8 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEM_ID" <<'PY'
 import re
 import sys
 from pathlib import Path
-from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re
+import os
+from hvlib import parse_todo_fields, find_open_bullet, parse_open_bullet, detail_dir_for_id
 
 iid = sys.argv[1]
 todo = Path(".hv/TODO.md")
@@ -23,20 +24,10 @@ if not todo.exists():
     raise SystemExit(2)
 
 content = todo.read_text()
-_open_re = open_bullet_re()
 
-found_line = None
-for _name, body in iter_open_sections(content):
-    for raw in body.splitlines():
-        line = raw.strip()
-        m = _open_re.match(line)
-        if not m:
-            continue
-        if m.group("id") == iid:
-            found_line = line
-            break
-    if found_line is not None:
-        break
+sections_env = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
+sections_env = [s.strip() for s in sections_env if s.strip()]
+found_line = find_open_bullet(content, iid, sections_env)
 
 if found_line is None:
     print(f"error: item {iid} not found in TODO.md", file=sys.stderr)
@@ -44,13 +35,13 @@ if found_line is None:
 
 fields = parse_todo_fields(found_line)
 # Size lives in the bracketed tag on the bullet, not in the trailing fields.
-m = _open_re.match(found_line)
-tag = (m.group("tag") or "").strip() if m else ""
+parsed = parse_open_bullet(found_line)
+tag = parsed["tag"] if parsed else ""
 if tag.lower() != "major":
     raise SystemExit(1)
 
 # Resolve detail file location by item-id letter.
-prefix_dir = {"B": "bugs", "F": "features", "T": "tasks"}.get(iid[0])
+prefix_dir = detail_dir_for_id(iid)
 detail_path = Path(f".hv/{prefix_dir}/{iid}.md") if prefix_dir else None
 
 body_text = found_line

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Emit a nudge to stderr if the project map's subsystem count is at or above
+# the soft cap. Prints nothing (and exits 0) below the cap. Always exits 0
+# — this is a nudge, not a gate. Used by /hv-debug, /hv-go, /hv-work to
+# surface "you might want to /hv-map consolidate" without blocking flow.
+#
+# Always exits 0 — informational nudge, not a gate.
+#
+# Usage: hv-map-cap-check
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# Capture hv-map-stats output in bash before the python heredoc so we can
+# pass it on stdin — avoids subprocess-within-heredoc complexity.
+stats="$("$HERE/hv-map-stats" 2>/dev/null)" || stats='{"subsystems":[]}'
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$stats" <<'PY'
+import json, sys
+from hvlib import load_json
+
+cfg = load_json(".hv/config.json", {})
+cap = cfg.get("map", {}).get("softcap_subsystems", 20)
+
+try:
+    data = json.loads(sys.argv[1])
+except (json.JSONDecodeError, IndexError):
+    raise SystemExit(0)
+
+count = len(data.get("subsystems", []))
+if count >= cap:
+    print(
+        f"note: project map has {count} subsystems (cap {cap});"
+        f" consider /hv-map consolidate",
+        file=sys.stderr,
+    )
+PY

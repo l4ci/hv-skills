@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verify the cwd has git context. If we're at an umbrella root (no .git/ but
-# .hv/ exists with umbrella.enabled: true), exit 1 with a friendly error
+# .hv/ exists with >=1 repo in repos.json), exit 1 with a friendly error
 # pointing the user to a sub-repo. Otherwise return silently — caller
 # proceeds and will get a git-native error if cwd has no git at all.
 #
@@ -23,12 +23,7 @@ fi
 [ -d .hv ] || exit 0
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IS_UMBRELLA=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-from hvlib import load_json
-cfg = load_json(".hv/config.json", {})
-print("yes" if cfg.get("umbrella", {}).get("enabled") else "no")
-PY
-)
+IS_UMBRELLA="$("$HERE/hv-umbrella-on")"
 
 if [ "$IS_UMBRELLA" = "yes" ]; then
   if [ -n "$HAS_REPO_FLAG" ]; then

@@ -49,9 +49,8 @@ export HV_LOG HV_FILES HV_BODIES
 export PYTHONPATH="$HERE"
 export UMBRELLA_CWD
 python3 - <<'PY'
-import json, os, re
-from pathlib import Path
-from hvlib import find_origin_bullet
+import json, os
+from hvlib import find_origin_bullet, load_backlog_corpus, find_item_ids
 
 branch = os.environ["HV_BRANCH"]
 base = os.environ["HV_BASE"]
@@ -65,20 +64,10 @@ for line in log:
         h, s = line.split("\x1f", 1)
         commits.append({"hash": h, "subject": s})
 
-id_re = re.compile(rf"\[([{os.environ['HV_ITEM_TYPES']}]\d{{2,}})\]")
-seen, ordered = set(), []
-for match in id_re.finditer(full):
-    iid = match.group(1)
-    if iid not in seen:
-        seen.add(iid)
-        ordered.append(iid)
-
-def read(p):
-    path = Path(p)
-    return path.read_text() if path.exists() else ""
+ordered = find_item_ids(full, os.environ["HV_ITEM_TYPES"])
 
 umbrella = os.environ.get("UMBRELLA_CWD", ".")
-corpus = read(os.path.join(umbrella, ".hv/TODO.md")) + "\n" + read(os.path.join(umbrella, ".hv/ARCHIVE.md"))
+corpus = load_backlog_corpus(umbrella)
 
 def entry_for(iid):
     result = find_origin_bullet(corpus, iid)

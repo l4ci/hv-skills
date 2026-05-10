@@ -3,16 +3,21 @@
 # frontmatter, emit a JSON array of {field1, field2, ..., _path}.
 # Usage: hv-fm-list <dir> <field1> [<field2> ...]
 # Files without frontmatter are skipped. Missing fields → "".
+# Values from inline-list frontmatter (`depends: [a, b]`) emit as JSON arrays;
+# scalar values stay strings.
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}"
 DIR="${1:?usage: hv-fm-list <dir> <field1> [<field2> ...]}"
 shift
 if [ $# -eq 0 ]; then
   echo "usage: hv-fm-list <dir> <field1> [<field2> ...]" >&2
   exit 1
 fi
-python3 - "$DIR" "$@" <<'PY'
-import json, re, sys
+PYTHONPATH="$PYTHONPATH" python3 - "$DIR" "$@" <<'PY'
+import json, sys
 from pathlib import Path
+from hvlib import parse_frontmatter
 
 dir_ = Path(sys.argv[1])
 keys = sys.argv[2:]
@@ -21,14 +26,13 @@ items = []
 if dir_.exists():
     for path in sorted(dir_.glob("*.md")):
         text = path.read_text()
-        m = re.match(r"---\r?\n(.*?)\r?\n---", text, re.DOTALL)
-        if not m:
+        fm_dict, _body = parse_frontmatter(text)
+        if not fm_dict:
             continue
-        fm = m.group(1)
         entry = {}
         for key in keys:
-            mm = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*\r?$", fm, re.MULTILINE)
-            entry[key] = mm.group(1).strip() if mm else ""
+            val = fm_dict.get(key, "")
+            entry[key] = val
         entry["_path"] = str(path)
         items.append(entry)
 

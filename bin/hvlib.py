@@ -7,6 +7,7 @@ this from outside bin/. The functions here are stdlib-only and side-effect-free
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -114,6 +115,19 @@ def iter_open_sections(content: str):
         span = find_section(content, name)
         if span is not None:
             yield name, content[span[0]:span[1]]
+
+
+def find_item_ids(text: str, prefixes: str = "BFT") -> list[str]:
+    """Find all bracketed IDs like [B07], [F12], [T03] in `text`.
+    `prefixes` is typically os.environ.get("HV_ITEM_TYPES", "BFT") at the caller.
+    Returns a deduplicated list of full IDs (e.g. ["B07", "F12"]) in order of appearance.
+    """
+    pat = re.compile(r"\[([" + re.escape(prefixes) + r"])(\d{2,})\]")
+    seen: dict[str, None] = {}
+    for m in pat.finditer(text):
+        iid = m.group(1) + m.group(2)
+        seen[iid] = None
+    return list(seen.keys())
 
 
 def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
@@ -251,6 +265,42 @@ def load_json(path, default):
         return default
 
 
+def read_or_empty(path) -> str:
+    """Read a file's text, or return '' if it doesn't exist.
+    `path` may be a str or os.PathLike. Never raises on missing file.
+    """
+    try:
+        return Path(path).read_text()
+    except FileNotFoundError:
+        return ""
+
+
+def load_backlog_corpus(base_dir=".") -> str:
+    """Return TODO.md + ARCHIVE.md concatenated from <base_dir>/.hv/.
+    Used by ship-body, todo-field, and review-scope to look up an item ID
+    across active and archived backlog in one pass.
+    """
+    base = Path(base_dir)
+    return read_or_empty(base / ".hv" / "TODO.md") + "\n" + read_or_empty(base / ".hv" / "ARCHIVE.md")
+
+
+def git_mtime(path) -> "str | None":
+    """Return YYYY-MM-DD of the last git commit touching `path`, or None.
+    Returns None if git fails, the path is untracked, or the result is empty.
+    Callers that need a date object should parse via datetime.date.fromisoformat.
+    """
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%cs", "--", str(path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    out = result.stdout.strip()
+    return out if out else None
+
+
 def write_text_atomic(path, text: str) -> None:
     """Write `text` to `path` atomically (tmp + os.replace). Trailing
     newline is the caller's responsibility. `path` may be a str or Path.
@@ -301,6 +351,39 @@ def load_repos(repos_path=".hv/repos.json") -> dict[str, str]:
         if name and rel:
             out[name] = os.path.realpath(rel)
     return out
+
+
+def active_items(entry: dict) -> list[str]:
+    """Normalize entry["items"] to a list of strings.
+    Handles: list already → as-is; str (CSV) → split/strip; None/missing → [].
+    Consolidates isinstance(items_raw, list) branching in hv-rm / hv-summary.
+    """
+    raw = entry.get("items")
+    if isinstance(raw, list):
+        return list(raw)
+    if isinstance(raw, str):
+        return [s for s in (s.strip() for s in raw.split(",")) if s]
+    return []
+
+
+def find_active_entry(data: dict, branch: str, repo: "str | None" = None) -> "dict | None":
+    """Search data["active"] for an entry matching (branch, repo).
+    Repo matching uses canonicalizing coercion: (e.get("repo") or None) == (repo or None).
+    Returns the entry dict or None.
+    """
+    for entry in data.get("active", []) or []:
+        if entry.get("branch") != branch:
+            continue
+        if (entry.get("repo") or None) == (repo or None):
+            return entry
+    return None
+
+
+def registered_repo_names(repos_path=".hv/repos.json") -> list[str]:
+    """Return sorted list of registered sub-repo names from repos.json.
+    Wraps load_repos; returns [] if the file is missing or empty.
+    """
+    return sorted(load_repos(repos_path).keys())
 
 
 def parse_toml_version(text: str, sections: list[str]) -> str | None:
@@ -683,6 +766,29 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
     return fm, body
 
 
+def update_frontmatter_field(content: str, field: str, value: str) -> "tuple[str, bool]":
+    """Edit the first `<field>: <value>` pair in the YAML frontmatter block.
+    Returns (new_content, True) on success, (content, False) if no frontmatter
+    or the field is absent in the frontmatter. Substitution is confined to the
+    slice between the first two `---` lines.
+    """
+    if not (content.startswith("---\n") or content.startswith("---\r\n")):
+        return (content, False)
+    # Locate the closing --- of the frontmatter.
+    rest_start = content.index("\n") + 1
+    rest = content[rest_start:]
+    end_m = re.search(r"^---\s*$", rest, re.MULTILINE)
+    if not end_m:
+        return (content, False)
+    fm_slice = rest[: end_m.start()]
+    body_after = rest[end_m.start():]
+    pat = re.compile(rf"^({re.escape(field)}:\s*)\S+", re.MULTILINE)
+    new_fm, n = pat.subn(rf"\g<1>{value}", fm_slice, count=1)
+    if not n:
+        return (content, False)
+    return (content[:rest_start] + new_fm + body_after, True)
+
+
 def iter_map_entries(map_dir):
     """Yield (subsystem, frontmatter_dict, body, path) for each *.md file
     in `map_dir` whose frontmatter has a `subsystem:` key. Files without
@@ -778,6 +884,22 @@ def find_bullet_in_content(content: str, iid: str, active_sections: list[str]) -
         if m:
             return (sec_name, m.group(0))
     return (None, None)
+
+
+def find_open_bullet(content: str, iid: str, active_sections: list[str]) -> "str | None":
+    """Return the full open-bullet line for `iid` in any of `active_sections`.
+    Differs from find_bullet_in_content: returns just the line (not a tuple),
+    and scans open bullets only (not done/strikethrough lines).
+    Returns None if no open bullet is found.
+    """
+    bullet_re = open_bullet_re()
+    for sec_name, body in iter_open_sections(content):
+        if sec_name not in active_sections:
+            continue
+        for m in bullet_re.finditer(body):
+            if m.group("id") == iid:
+                return m.group(0)
+    return None
 
 
 def infer_type_from_section(sec_name: str) -> str:

@@ -194,7 +194,7 @@ From the conversation context:
 
    Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches. *It also queries `hv-context-query` for any domain term used in the TODO entry, and surfaces inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle.*
 
-   - **Soft-cap check.** If `.hv/bin/hv-map-stats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["subsystems"]))'` exceeds the configured `map.softcap_subsystems` (default 20), print a one-line note: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
+   - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan task pairs for the pattern *Task A renames a file (`git mv old new` or equivalent), Task B edits files that link to `old`*. The collision is on **shared written files** — when the link-sweep enumerates the renamed file itself or other files the rename task already edits, both tasks race on the index even when their stated mandates appear disjoint. Resolve at plan time by one of:

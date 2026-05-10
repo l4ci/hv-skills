@@ -11,7 +11,7 @@ MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import section, iter_open_sections, load_json, parse_done_line, iter_topics
+from hvlib import section, iter_open_sections, load_json, parse_done_line, iter_topics, active_items
 
 todo = Path(".hv/TODO.md")
 if not todo.exists():
@@ -34,7 +34,7 @@ print(f"Backlog: {pluralize(bugs, 'bug')}, {pluralize(features, 'feature')}, {pl
 # Active work
 data = load_json(".hv/status.json", {"active": []})
 for entry in data.get("active", []):
-        ids = ", ".join(entry.get("items", [])) or "?"
+        ids = ", ".join(active_items(entry)) or "?"
         branch = entry.get("branch", "?")
         started = (entry.get("startedAt") or "")[:10]
         wt = entry.get("worktree")

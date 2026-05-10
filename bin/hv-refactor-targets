@@ -8,16 +8,15 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os
-from hvlib import load_json, load_repos
+from hvlib import load_repos
 
-cfg = load_json(".hv/config.json", {})
-enabled = bool(cfg.get("umbrella", {}).get("enabled"))
+repos = load_repos()
+enabled = bool(repos)
 
 if not enabled:
     print(json.dumps({"umbrella": None, "subRepos": []}, indent=2))
     raise SystemExit(0)
 
-repos = load_repos()
 sub_repos = [{"name": n, "path": p} for n, p in sorted(repos.items())]
 
 # Build the set of top-level directory names that belong to registered sub-repos.
