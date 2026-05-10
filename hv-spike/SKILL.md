@@ -38,6 +38,17 @@ Determine the mode silently:
 
 In Finish mode, list existing open spikes via `.hv/bin/hv-spike-list` and ask which one if not specified.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Question", description="Sharpen the spike's yes/no question")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (Finish mode skips Question/Branch, Start mode skips Findings/Decision/Promote) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Question* — Start: yes/no/conditional question sharpened (Step 2)
+2. *Branch* — Start: `spike/<name>` created, scratch file seeded (Steps 2.5–4)
+3. *Investigate* — Start: experiment runs to a clear answer (between Start and Finish)
+4. *Findings* — Finish: spike file's findings section written from the branch state (Steps 5–6)
+5. *Decision* — Finish: verdict (yes / no / conditional / inconclusive) recorded (Step 6)
+6. *Promote / cleanup* — Finish: optional `/hv-decide --from-spike`, branch deleted (Steps 6.5–7)
+
 ## Step 2 (Start mode) — Sharpen the Question
 
 A spike answers a *yes/no/conditional* question. Push back if the question is vague:
