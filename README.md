@@ -24,6 +24,7 @@
 - **Local-first.** Everything lives in `.hv/` under your project. No daemon, no MCP server, no cloud, no database. Just bash, Python, git, and optionally `gh`.
 - **Survives `/clear`.** `/hv-pause` writes a handoff note with your current hypothesis, next step, and mid-edit files. `/hv-next` reads it back in a fresh session.
 - **Project map stays flat.** `/hv-map` maintains `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date — auto-bumped by `/hv-work` cycles and summarized into a thin `## Project Map` index in `CLAUDE.md` so always-on context stays small as the codebase grows.
+- **Vocabulary stays consistent.** `/hv-context` writes domain terms to `.hv/CONTEXT.md`. The `## Project Context` always-on block in `CLAUDE.md` carries term + aliases + first-sentence gloss so synonym/drift conflicts get flagged inline during work; sibling skills consult on demand via `hv-context-query`.
 
 ## Features
 
@@ -38,7 +39,7 @@
 | 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main |
 | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) |
 | 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
-| 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `TODO.md` at the umbrella; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
+| 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `TODO.md` at the umbrella with per-sub-repo `CONTEXT.md` under `.hv/contexts/<repo>/`; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
 | 📊 **Visible progress** — multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-docs`, `/hv-refactor`, …) declare a phase checklist via `TaskCreate` at start and tick each phase off as it lands; long cycles stay legible instead of scrolling past as a stream of bash output | 🛠️ **Codified authoring conventions** — `hv-init`'s `## Authoring conventions` lists the rules new hv-* skills must follow (autonomy-aware dispatch, opt-in flag defaults, `AskUserQuestion` limits, progress checklists), so contributions stay consistent without rediscovery |
 
 ## Quickstarts
@@ -153,7 +154,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 
 | Skill | Description |
 |-------|-------------|
-| `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
 | `/hv-config` | Edit `.hv/config.json` interactively — checklist of current values, then native option pickers for each chosen key |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
@@ -168,6 +169,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 | `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present |
 | `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit, nudge `/hv-learn` |
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
+| `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
 | `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
 | `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
