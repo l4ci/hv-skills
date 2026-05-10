@@ -4167,4 +4167,8 @@ grep -q "/hv-context" "$REPO/bin/hv-skills-index" || fail "/hv-context not in sk
 grep -q "hv-context-query" "$REPO/bin/hv-skills-index" || fail "hv-context-query not in consult list"
 pass "/hv-context skill registered"
 
+echo "/hv-init Step 4 mentions hv-context-index"
+grep -q "hv-context-index" "$REPO/hv-init/SKILL.md" || fail "/hv-init missing hv-context-index call"
+pass "/hv-init Step 4 mentions hv-context-index"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
