@@ -4055,6 +4055,7 @@ pass "hv-context-add — alias collision refused"
 
 echo "hv-context-map + hv-context-add umbrella"
 TMP_UMB="$(mktemp -d)"
+trap 'rm -rf "$TMP_UMB"' EXIT
 mkdir -p "$TMP_UMB/repo-a" "$TMP_UMB/repo-b"
 git -C "$TMP_UMB/repo-a" init -q
 git -C "$TMP_UMB/repo-a" config user.email t@t
@@ -4113,7 +4114,30 @@ set -e
 [ $RC2 -ne 0 ] || fail "implicit at umbrella root should fail without --repo"
 grep -q "pass --repo umbrella" "$TMP_UMB/err2" || fail "missing 'pass --repo umbrella' hint"
 
-rm -rf "$TMP_UMB"
+trap 'rm -rf "$TMP"' EXIT
 pass "hv-context umbrella mode (map + add --repo + implicit resolve)"
+
+echo "hv-context-query — umbrella mode resolves sub-repo via ORIG_CWD"
+TMP_UMQ="$(mktemp -d)"
+trap 'rm -rf "$TMP_UMQ"' EXIT
+mkdir -p "$TMP_UMQ/repo-a"
+git -C "$TMP_UMQ/repo-a" init -q
+git -C "$TMP_UMQ/repo-a" config user.email t@t
+git -C "$TMP_UMQ/repo-a" config user.name t
+( cd "$TMP_UMQ" && "$BIN/hv-bootstrap" >/dev/null )
+mkdir -p "$TMP_UMQ/.hv/contexts/repo-a"
+printf '# Context\n\n' > "$TMP_UMQ/.hv/contexts/repo-a/CONTEXT.md"
+cat > "$TMP_UMQ/.hv/repos.json" <<EOF
+{"repos":[{"name":"repo-a","path":"repo-a"}]}
+EOF
+( cd "$TMP_UMQ" && "$BIN/hv-context-add" shared-term --def "Lives in umbrella." --repo umbrella )
+( cd "$TMP_UMQ" && "$BIN/hv-context-add" sub-term --def "Lives in repo-a." --repo repo-a )
+# From inside repo-a, query should return BOTH umbrella-shared and sub-repo entries
+OUT=$( cd "$TMP_UMQ/repo-a" && "$BIN/hv-context-query" shared-term sub-term )
+echo "$OUT" | grep -q "^## shared-term$" || fail "hv-context-query missing umbrella term from sub-repo cwd"
+echo "$OUT" | grep -q "^## sub-term$" || fail "hv-context-query missing sub-repo term from sub-repo cwd"
+echo "$OUT" | grep -q "^> from: .hv/contexts/repo-a/CONTEXT.md$" || fail "hv-context-query missing sub-repo source attribution"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-context-query umbrella sub-repo cwd resolution"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
