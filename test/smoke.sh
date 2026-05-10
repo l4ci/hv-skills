@@ -3904,6 +3904,23 @@ assert first_sentence("no period here") == "no period here"
 # first_sentence — empty
 assert first_sentence("") == ""
 
+# first_sentence — trailing comma stripped at cut boundary
+# Text with no sentence terminator → full text is the "sentence"
+# max_chars=12: sentence[:12]="alpha beta, " → rsplit→ cut="alpha beta,"
+# rstrip(",;") strips the comma → "alpha beta…"
+comma_text = "alpha beta, gamma " + ("word " * 40)
+out_comma = first_sentence(comma_text, max_chars=12)
+assert out_comma == "alpha beta…", f"comma not stripped: {out_comma!r}"
+
+# Verify period NOT stripped: the narrowed rstrip(",;") preserves "." and ":"
+# where the old rstrip(".,;:") would have stripped them.
+# (Sentence-boundary "." is intercepted by the regex before reaching rstrip;
+#  this exercises the rstrip contract directly on hypothetical cut values.)
+assert "foo Mr.".rstrip(",;") == "foo Mr.", "trailing period must be preserved"
+assert "foo Mr.".rstrip(".,;:") == "foo Mr", "sanity: old rstrip strips trailing period"
+assert "bar:".rstrip(",;") == "bar:", "colon must be preserved"
+assert "bar:".rstrip(".,;:") == "bar", "sanity: old rstrip strips trailing colon"
+
 print("OK hvlib context helpers")
 PY
 pass "hvlib parse_term_entry + first_sentence"

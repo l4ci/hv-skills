@@ -494,7 +494,7 @@ def first_sentence(text: str, max_chars: int = 160) -> str:
     if len(sentence) <= max_chars:
         return sentence
     cut = sentence[:max_chars].rsplit(" ", 1)[0]
-    return cut.rstrip(".,;:") + "…"
+    return cut.rstrip(",;") + "…"
 
 
 def infer_version_kind(filepath) -> str:
