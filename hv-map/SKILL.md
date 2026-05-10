@@ -1,6 +1,7 @@
 ---
 name: hv-map
 description: Maintain the project map of subsystems under .hv/map/. Modes — first-run (scaffold), after-work (update touched subsystems), consolidate (merge stale/duplicate entries). Auto-invoked post-cycle by /hv-work, /hv-debug, /hv-go; run manually for first-run and consolidation.
+user-invocable: true
 ---
 
 # /hv-map — project map orchestrator

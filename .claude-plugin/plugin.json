@@ -37,6 +37,7 @@
     "./hv-learn",
     "./hv-docs",
     "./hv-refactor",
+    "./hv-map",
     "./hv-update",
     "./hv-release"
   ]

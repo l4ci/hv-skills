@@ -21,28 +21,23 @@ hv_self_locate || exit 0
 JSON=0
 [ "${1:-}" = "--json" ] && JSON=1
 
-STAMPED=""
-if [ -f .hv/config.json ]; then
-  STAMPED=$(python3 -c "
-import json
-try:
-    cfg = json.load(open('.hv/config.json'))
-    print(cfg.get('hvSkills', {}).get('version', '') or '')
-except Exception:
-    pass
-" || true)
-fi
+# Both reads use hvlib.load_json — silent fallback to default on missing/corrupt
+# JSON keeps the always-exit-0 contract; the bash `|| true` covers any other
+# python error (e.g. permission denied) so this helper never blocks a skill.
+export PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}"
+
+STAMPED=$(python3 -c "
+from hvlib import load_json
+print(load_json('.hv/config.json', {}).get('hvSkills', {}).get('version', '') or '')
+" 2>/dev/null || true)
 
 ROOT=$("$BIN_DIR/hv-resolve-plugin-root" --root-only)
 INSTALLED=""
 if [ -n "$ROOT" ]; then
   INSTALLED=$(python3 -c "
-import json
-try:
-    print(json.load(open('$ROOT/.claude-plugin/plugin.json')).get('version', '') or '')
-except Exception:
-    pass
-" || true)
+from hvlib import load_json
+print(load_json('$ROOT/.claude-plugin/plugin.json', {}).get('version', '') or '')
+" 2>/dev/null || true)
 fi
 
 STATUS="unknown"
