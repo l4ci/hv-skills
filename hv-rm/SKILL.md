@@ -25,6 +25,15 @@ The inverse of `/hv-capture`: remove one or more items from the backlog and clea
 
 See `docs/reference/preflight.md` for exit-code handling.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve IDs", description="Parse and validate each ID against TODO.md")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (user aborts at confirm, no cross-references found) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Resolve IDs* — args parsed, each ID matched to a TODO entry (Step 2)
+2. *Dry-run preview* — removal plan rendered, cross-references identified (Steps 3–4)
+3. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step 5)
+4. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Steps 6–7)
+
 ## Step 2 — Parse Arguments
 
 The argument passed to `/hv-rm` is a CSV of one or more IDs, for example `F36` or `B01,F03,T05`. Normalise whitespace around commas; treat `B01, F03` the same as `B01,F03`.
