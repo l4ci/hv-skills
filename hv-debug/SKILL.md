@@ -96,6 +96,7 @@ Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch th
 
 ```bash
 .hv/bin/hv-decisions-query "Architecture" "Testing"
+.hv/bin/hv-context-query "<terms from the bug report or the failing component>"
 ```
 
 Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
@@ -151,6 +152,7 @@ Investigate [B##]: <title>.
 **Relevant knowledge:**
 <bullets from hv-knowledge-query, if any>
 <entries from hv-decisions-query, if any — boundaries that rule out fix directions>
+<terms from hv-context-query, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
 
 [FRAMING — competing mode only: insert one lens prompt below]
 

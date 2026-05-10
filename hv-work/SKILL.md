@@ -189,9 +189,10 @@ From the conversation context:
    ```bash
    .hv/bin/hv-knowledge-query "Architecture" "Testing"
    .hv/bin/hv-decisions-query "Architecture" "Testing"
+   .hv/bin/hv-context-query "<terms appearing in the TODO entry or task plan>"
    ```
 
-   Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches.
+   Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching. Skip silently if nothing matches. *It also queries `hv-context-query` for any domain term used in the TODO entry, and surfaces inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle.*
 
    - **Soft-cap check.** If `.hv/bin/hv-map-stats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["subsystems"]))'` exceeds the configured `map.softcap_subsystems` (default 20), print a one-line note: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
 
@@ -345,6 +346,9 @@ You are implementing Task N of [total].
 
 **Hard boundaries:**
 [Relevant entries from hv-decisions-query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
+
+**Canonical terms:**
+[Relevant terms from hv-context-query — definition + aliases. Workers MUST use these canonical names in code/comments/commit messages where they apply; aliases are listed so divergent user phrasing in the TODO entry maps back to the right term.]
 
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]
