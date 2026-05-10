@@ -43,12 +43,48 @@ done
 [ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Capture cwd before hv_self_locate relocates us. Then pre-navigate to the
+# .hv/ root found by walking up from ORIG_CWD so that hv_self_locate
+# fast-paths and doesn't mistakenly resolve to the helper-binary's umbrella
+# (e.g. the dev tree when running smoke tests from a tmp sub-repo).
+ORIG_CWD="$(pwd -P)"
+if [ ! -d ".hv" ]; then
+  if _UMBRELLA_TMP="$(cd "$ORIG_CWD" && "$HERE/hv-walk-up" 2>/dev/null)"; then
+    cd "$_UMBRELLA_TMP"
+  fi
+fi
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 
-# Single-repo path. Umbrella support ships in Task 7; --repo flag is parsed
-# but ignored here.
-TARGET=".hv/CONTEXT.md"
+# Resolve target file. Umbrella detection via .hv/repos.json (canonical),
+# not directory presence.
+UMBRELLA_ON=$("$HERE/hv-umbrella-on")
+
+if [ "$UMBRELLA_ON" != "yes" ]; then
+  TARGET=".hv/CONTEXT.md"
+else
+  if [ "$TARGET_REPO" = "umbrella" ]; then
+    TARGET=".hv/CONTEXT.md"
+  elif [ -n "$TARGET_REPO" ]; then
+    REGISTERED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+import json, sys
+try:
+    repos = json.load(open('.hv/repos.json')).get('repos', [])
+    print('1' if any(r.get('name') == sys.argv[1] for r in repos) else '0')
+except Exception:
+    print('0')
+" "$TARGET_REPO")
+    [ "$REGISTERED" = "1" ] || { echo "error: sub-repo '$TARGET_REPO' not registered in .hv/repos.json" >&2; exit 4; }
+    TARGET=".hv/contexts/$TARGET_REPO/CONTEXT.md"
+  else
+    SUBREPO=$(cd "$ORIG_CWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
+    if [ -z "$SUBREPO" ]; then
+      echo "error: cwd is at umbrella root and --repo not set; pass --repo umbrella to write the umbrella-shared CONTEXT.md, or run from inside a sub-repo" >&2
+      exit 4
+    fi
+    TARGET=".hv/contexts/$SUBREPO/CONTEXT.md"
+  fi
+fi
 mkdir -p "$(dirname "$TARGET")"
 [ -f "$TARGET" ] || printf '# Context\n\n' > "$TARGET"
 
@@ -169,3 +205,6 @@ PY
 
 # Regenerate CLAUDE.md block. (hv-context-index uses cwd to resolve any active sub-repo.)
 "$HERE/hv-context-index" >/dev/null
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  "$HERE/hv-context-map" >/dev/null
+fi

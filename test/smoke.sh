@@ -4053,4 +4053,67 @@ grep -q "^## inbox$" "$TMP_CC/.hv/CONTEXT.md" && fail "inbox should not be writt
 rm -rf "$TMP_CC"
 pass "hv-context-add — alias collision refused"
 
+echo "hv-context-map + hv-context-add umbrella"
+TMP_UMB="$(mktemp -d)"
+mkdir -p "$TMP_UMB/repo-a" "$TMP_UMB/repo-b"
+git -C "$TMP_UMB/repo-a" init -q
+git -C "$TMP_UMB/repo-a" config user.email t@t
+git -C "$TMP_UMB/repo-a" config user.name t
+git -C "$TMP_UMB/repo-b" init -q
+git -C "$TMP_UMB/repo-b" config user.email t@t
+git -C "$TMP_UMB/repo-b" config user.name t
+( cd "$TMP_UMB" && "$BIN/hv-bootstrap" >/dev/null )
+mkdir -p "$TMP_UMB/.hv/contexts/repo-a" "$TMP_UMB/.hv/contexts/repo-b"
+printf '# Context\n\n' > "$TMP_UMB/.hv/contexts/repo-a/CONTEXT.md"
+printf '# Context\n\n' > "$TMP_UMB/.hv/contexts/repo-b/CONTEXT.md"
+cat > "$TMP_UMB/.hv/repos.json" <<EOF
+{"repos":[{"name":"repo-a","path":"repo-a"},{"name":"repo-b","path":"repo-b"}]}
+EOF
+
+# 7a. Explicit --repo umbrella writes to .hv/CONTEXT.md
+( cd "$TMP_UMB" && "$BIN/hv-context-add" session --def "An active work cycle." --repo umbrella )
+grep -q "^## session$" "$TMP_UMB/.hv/CONTEXT.md" || fail "umbrella write missing"
+
+# 7b. Explicit --repo repo-a writes to contexts/repo-a/CONTEXT.md
+( cd "$TMP_UMB" && "$BIN/hv-context-add" agent-loop --def "Loop in repo-a." --repo repo-a )
+grep -q "^## agent-loop$" "$TMP_UMB/.hv/contexts/repo-a/CONTEXT.md" || fail "repo-a write missing"
+grep -q "^## agent-loop$" "$TMP_UMB/.hv/CONTEXT.md" && fail "agent-loop should NOT be in umbrella"
+
+# 7c. Implicit (cwd inside repo-a) resolves via hv-resolve-repo
+( cd "$TMP_UMB/repo-a" && "$BIN/hv-context-add" prompt-stage --def "Stage in repo-a." )
+grep -q "^## prompt-stage$" "$TMP_UMB/.hv/contexts/repo-a/CONTEXT.md" || fail "implicit repo-a write missing"
+
+# 7d. CONTEXT-MAP.md regenerated
+[ -f "$TMP_UMB/.hv/CONTEXT-MAP.md" ] || fail "CONTEXT-MAP.md missing"
+grep -q "^# Context Map$" "$TMP_UMB/.hv/CONTEXT-MAP.md" || fail "CONTEXT-MAP missing header"
+grep -q "Umbrella-shared" "$TMP_UMB/.hv/CONTEXT-MAP.md" || fail "CONTEXT-MAP missing umbrella heading"
+grep -q "^## repo-a" "$TMP_UMB/.hv/CONTEXT-MAP.md" || fail "CONTEXT-MAP missing repo-a heading"
+grep -q "agent-loop" "$TMP_UMB/.hv/CONTEXT-MAP.md" || fail "CONTEXT-MAP missing repo-a term"
+grep -q "session" "$TMP_UMB/.hv/CONTEXT-MAP.md" || fail "CONTEXT-MAP missing umbrella term"
+
+# 7e. Block ordering in CLAUDE.md from inside repo-a: shared first, then ### repo-a
+( cd "$TMP_UMB/repo-a" && "$BIN/hv-context-index" >/dev/null )
+SHARED_LINE=$(grep -n "\*\*session\*\*" "$TMP_UMB/CLAUDE.md" | head -1 | cut -d: -f1)
+SUBHEAD_LINE=$(grep -n "^### repo-a" "$TMP_UMB/CLAUDE.md" | head -1 | cut -d: -f1)
+[ -n "$SHARED_LINE" ] && [ -n "$SUBHEAD_LINE" ] && [ "$SHARED_LINE" -lt "$SUBHEAD_LINE" ] || fail "umbrella-shared not before ### repo-a"
+
+# 7f. Unregistered --repo errors out
+set +e
+( cd "$TMP_UMB" && "$BIN/hv-context-add" foo --def "x." --repo nonexistent 2>"$TMP_UMB/err" )
+RC=$?
+set -e
+[ $RC -ne 0 ] || fail "unregistered --repo should fail"
+grep -q "not registered" "$TMP_UMB/err" || fail "missing 'not registered' message"
+
+# 7g. Implicit at umbrella root (no --repo, not in a sub-repo) errors with hint
+set +e
+( cd "$TMP_UMB" && "$BIN/hv-context-add" foo --def "x." 2>"$TMP_UMB/err2" )
+RC2=$?
+set -e
+[ $RC2 -ne 0 ] || fail "implicit at umbrella root should fail without --repo"
+grep -q "pass --repo umbrella" "$TMP_UMB/err2" || fail "missing 'pass --repo umbrella' hint"
+
+rm -rf "$TMP_UMB"
+pass "hv-context umbrella mode (map + add --repo + implicit resolve)"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
