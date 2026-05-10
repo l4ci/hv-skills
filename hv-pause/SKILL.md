@@ -37,6 +37,15 @@ user-invocable: true
 
 See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing to pause — `/hv-init` the project first."* and stop (no auto-init).
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Snapshot context", description="Capture hypothesis, next step, mid-edit files, uncommitted strategy")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no active stream, nothing in flight) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Snapshot context* — current hypothesis, next planned step, mid-edit files captured (Step 2)
+2. *Compose handoff* — narrative drafted for `/hv-resume` to pick up cleanly (Step 3)
+3. *Write to .hv/handoff/* — file persisted under the active branch's name (Step 4)
+4. *Report* — compact handoff summary printed (Step 5)
+
 ## Step 2 — Resolve the Pause Set
 
 Determine the set of `(branch, repo)` entries to pause. The set has size 1 for single-repo cycles or scoped umbrella pauses; size ≥ 2 when one `/hv-work` wave fanned out across sub-repos and the user wants to pause it as one logical unit.
