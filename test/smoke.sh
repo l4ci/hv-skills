@@ -4140,4 +4140,23 @@ echo "$OUT" | grep -q "^> from: .hv/contexts/repo-a/CONTEXT.md$" || fail "hv-con
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-context-query umbrella sub-repo cwd resolution"
 
+echo "hv-bootstrap umbrella scaffolding"
+TMP_BOOT2="$(mktemp -d)"
+trap 'rm -rf "$TMP_BOOT2"' EXIT
+mkdir -p "$TMP_BOOT2/repo-a"
+git -C "$TMP_BOOT2/repo-a" init -q
+git -C "$TMP_BOOT2/repo-a" config user.email t@t
+git -C "$TMP_BOOT2/repo-a" config user.name t
+mkdir -p "$TMP_BOOT2/.hv"
+cat > "$TMP_BOOT2/.hv/repos.json" <<EOF
+{"repos":[{"name":"repo-a","path":"repo-a"}]}
+EOF
+( cd "$TMP_BOOT2" && "$BIN/hv-bootstrap" >/dev/null )
+[ -f "$TMP_BOOT2/.hv/CONTEXT.md" ] || fail "umbrella bootstrap missing umbrella CONTEXT.md"
+[ -f "$TMP_BOOT2/.hv/contexts/repo-a/CONTEXT.md" ] || fail "umbrella bootstrap missing repo-a CONTEXT.md"
+[ -f "$TMP_BOOT2/.hv/CONTEXT-MAP.md" ] || fail "umbrella bootstrap missing CONTEXT-MAP.md"
+grep -q "^# Context$" "$TMP_BOOT2/.hv/contexts/repo-a/CONTEXT.md" || fail "repo-a CONTEXT.md missing header"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-bootstrap umbrella scaffolding"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
