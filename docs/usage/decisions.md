@@ -20,6 +20,8 @@ Run `/hv-decide` when you've reached a commitment. The skill drafts a four-part 
 
 If you can't articulate forbids or permits, the skill suggests `/hv-learn` instead and stops. It does not auto-invoke `/hv-learn`; you re-run it yourself.
 
+The skill also runs a three-gate pre-write check: a candidate must be (a) hard to reverse — undoing it would mean coordinated edits across many files, retraining habits, or migrating data; (b) surprising without context — a future contributor wouldn't infer the rule from existing patterns alone; and (c) the result of a real trade-off — genuine alternatives existed and the project deliberately didn't pick them. If any gate fails, the skill suggests `/hv-learn` (or "leave it inline at the call site") and stops without writing. The gates apply across the default, `--from-learning`, and `--from-spike` modes — all routes through `/hv-decide` go through the same filter.
+
 ## Promoting a learning or spike into a decision
 
 When a `KNOWLEDGE.md` learning has hardened into a commitment, or a `/hv-spike` concluded with a verdict the project is committing to, you can seed the decision draft from the source artifact instead of retyping:
