@@ -17,8 +17,9 @@
 #                 preserved unless --touch; --not "" clears the Not list
 #
 # Refuses (non-zero, exit 3) when an alias would collide with another term's
-# alias in the same target file. Cross-file alias-uniqueness in umbrella mode
-# is a deliberate non-goal in v1 — see follow-up [F##] when captured.
+# alias in the same scope. Single-repo: just the target file. Umbrella: target
+# file plus the companion(s) — umbrella-shared when writing to a sub-repo file,
+# or every sub-repo file when writing to umbrella.
 set -euo pipefail
 
 TERM=""
@@ -91,14 +92,43 @@ fi
 mkdir -p "$(dirname "$TARGET")"
 [ -f "$TARGET" ] || printf '# Context\n\n' > "$TARGET"
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" <<'PY'
+# Companion files to scan for cross-file alias collisions in umbrella mode.
+# Single-repo: empty (just the target). Umbrella: see helper header.
+OTHERS=""
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  if [ "$TARGET" = ".hv/CONTEXT.md" ]; then
+    # Writing to umbrella-shared → scan every sub-repo file listed in repos.json.
+    while IFS= read -r repo_name; do
+      [ -n "$repo_name" ] || continue
+      sub_file=".hv/contexts/$repo_name/CONTEXT.md"
+      [ -f "$sub_file" ] || continue
+      OTHERS="${OTHERS}${OTHERS:+:}$sub_file"
+    done < <(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+import json
+try:
+    repos = json.load(open('.hv/repos.json')).get('repos', [])
+    for r in repos:
+        if r.get('name'):
+            print(r['name'])
+except Exception:
+    pass
+")
+  else
+    # Writing to a sub-repo file → scan umbrella-shared.
+    if [ -f ".hv/CONTEXT.md" ]; then
+      OTHERS=".hv/CONTEXT.md"
+    fi
+  fi
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" "$OTHERS" <<'PY'
 import datetime as dt
 import re
 import sys
 from pathlib import Path
 from hvlib import iter_topics, parse_term_entry, write_text_atomic
 
-term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target = sys.argv[1:]
+term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target, others_raw = sys.argv[1:]
 target_path = Path(target)
 nots_provided = (nots_provided == "true")
 touch = (touch_flag == "true")
@@ -138,6 +168,28 @@ for other_key, info in existing.items():
             file=sys.stderr,
         )
         sys.exit(3)
+
+# Cross-file alias collision (umbrella mode only — others_raw is empty otherwise).
+other_paths = [p for p in others_raw.split(":") if p]
+for other_path_str in other_paths:
+    other_path = Path(other_path_str)
+    if not other_path.exists():
+        continue
+    other_text = other_path.read_text()
+    for other_name, other_body in iter_topics(other_text):
+        if other_name.lower() == key:
+            # Same-name term across files is the documented shadow behavior, not a collision.
+            continue
+        other_parsed = parse_term_entry(other_body)
+        other_aliases = {a.lower() for a in other_parsed["aliases"]}
+        collision = [a for a in new_aliases if a.lower() in other_aliases]
+        if collision:
+            print(
+                f"error: alias '{collision[0]}' is already an alias of term "
+                f"'{other_name}' in {other_path_str} — refuse to write",
+                file=sys.stderr,
+            )
+            sys.exit(3)
 
 if key in existing:
     prev = existing[key]

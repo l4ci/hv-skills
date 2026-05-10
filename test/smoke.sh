@@ -4117,6 +4117,57 @@ grep -q "pass --repo umbrella" "$TMP_UMB/err2" || fail "missing 'pass --repo umb
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-context umbrella mode (map + add --repo + implicit resolve)"
 
+echo "hv-context-add — cross-file alias collision (umbrella, both directions + same-name shadow allowed)"
+TMP_XCC="$(mktemp -d)"
+trap 'rm -rf "$TMP_XCC"' EXIT
+mkdir -p "$TMP_XCC/repo-a"
+git -C "$TMP_XCC/repo-a" init -q
+git -C "$TMP_XCC/repo-a" config user.email t@t
+git -C "$TMP_XCC/repo-a" config user.name t
+( cd "$TMP_XCC" && "$BIN/hv-bootstrap" >/dev/null )
+mkdir -p "$TMP_XCC/.hv/contexts/repo-a"
+printf '# Context\n\n' > "$TMP_XCC/.hv/CONTEXT.md"
+printf '# Context\n\n' > "$TMP_XCC/.hv/contexts/repo-a/CONTEXT.md"
+cat > "$TMP_XCC/.hv/repos.json" <<EOF
+{"repos":[{"name":"repo-a","path":"repo-a"}]}
+EOF
+
+# Direction A — umbrella-then-sub-repo:
+# Write alias on umbrella term, then attempt same alias on a different sub-repo term.
+( cd "$TMP_XCC" && "$BIN/hv-context-add" backlog --def "Umbrella backlog." --alias "task list" --repo umbrella )
+set +e
+( cd "$TMP_XCC" && "$BIN/hv-context-add" inbox --def "Sub-repo inbox." --alias "task list" --repo repo-a 2>"$TMP_XCC/err_a" )
+RC=$?
+set -e
+[ $RC -eq 3 ] || fail "cross-file collision (direction A) should exit 3, got $RC"
+grep -q "already an alias of term 'backlog'" "$TMP_XCC/err_a" || fail "direction A: missing collision error referencing 'backlog'"
+grep -q "^## inbox$" "$TMP_XCC/.hv/contexts/repo-a/CONTEXT.md" && fail "direction A: inbox should not be written on cross-file collision"
+
+# Direction B — sub-repo-then-umbrella (vice versa):
+# Reset both files, write alias on sub-repo term, then attempt same alias on a different umbrella term.
+printf '# Context\n\n' > "$TMP_XCC/.hv/CONTEXT.md"
+printf '# Context\n\n' > "$TMP_XCC/.hv/contexts/repo-a/CONTEXT.md"
+( cd "$TMP_XCC" && "$BIN/hv-context-add" inbox --def "Sub-repo inbox." --alias "task list" --repo repo-a )
+set +e
+( cd "$TMP_XCC" && "$BIN/hv-context-add" backlog --def "Umbrella backlog." --alias "task list" --repo umbrella 2>"$TMP_XCC/err_b" )
+RC=$?
+set -e
+[ $RC -eq 3 ] || fail "cross-file collision (direction B) should exit 3, got $RC"
+grep -q "already an alias of term 'inbox'" "$TMP_XCC/err_b" || fail "direction B: missing collision error referencing 'inbox'"
+grep -q "^## backlog$" "$TMP_XCC/.hv/CONTEXT.md" && fail "direction B: backlog should not be written on cross-file collision"
+
+# Same-name shadow allowed:
+# Reset both files. Write alias on umbrella term 'backlog', then write the same
+# alias on sub-repo term 'backlog' (same term name = shadow, not a collision).
+printf '# Context\n\n' > "$TMP_XCC/.hv/CONTEXT.md"
+printf '# Context\n\n' > "$TMP_XCC/.hv/contexts/repo-a/CONTEXT.md"
+( cd "$TMP_XCC" && "$BIN/hv-context-add" backlog --def "Umbrella backlog." --alias "task list" --repo umbrella )
+( cd "$TMP_XCC" && "$BIN/hv-context-add" backlog --def "Sub-repo backlog (shadow)." --alias "task list" --repo repo-a )
+grep -q "^## backlog$" "$TMP_XCC/.hv/contexts/repo-a/CONTEXT.md" || fail "same-name shadow: sub-repo backlog should be written"
+
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-context-add — cross-file alias collision (umbrella, both directions + same-name shadow allowed)"
+
 echo "hv-context-query — umbrella mode resolves sub-repo via ORIG_CWD"
 TMP_UMQ="$(mktemp -d)"
 trap 'rm -rf "$TMP_UMQ"' EXIT

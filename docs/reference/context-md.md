@@ -37,7 +37,7 @@ The header section (`# Context` + intro paragraph above the first `## ` heading)
 
 `hv-context-add` exits non-zero when:
 
-- A new alias collides with an alias already attached to a *different* term in the same scope (single-repo: just `.hv/CONTEXT.md`; umbrella: target file). Exit 3, stderr describes the collision.
+- A new alias collides with an alias already attached to a *different* term in the same scope (single-repo: just `.hv/CONTEXT.md`; umbrella: target file plus its companion — umbrella-shared when writing to a sub-repo file, or every sub-repo file when writing to umbrella). Exit 3, stderr describes the collision.
 - An umbrella resolution fails (unregistered sub-repo, or implicit at umbrella root with no `--repo`). Exit 4, stderr suggests the fix.
 
 Same-name updates are not refusals — re-running `hv-context-add` against an existing term replaces the definition and unions the aliases/nots.
