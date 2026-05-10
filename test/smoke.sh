@@ -3925,4 +3925,17 @@ print("OK hvlib context helpers")
 PY
 pass "hvlib parse_term_entry + first_sentence"
 
+echo "hv-bootstrap seeds CONTEXT.md"
+TMP_BOOT="$(mktemp -d)"
+( cd "$TMP_BOOT" && "$BIN/hv-bootstrap" >/dev/null )
+[ -f "$TMP_BOOT/.hv/CONTEXT.md" ] || fail "hv-bootstrap: missing .hv/CONTEXT.md"
+grep -q "^# Context$" "$TMP_BOOT/.hv/CONTEXT.md" || fail "CONTEXT.md missing header"
+grep -q "no terms yet" "$TMP_BOOT/.hv/CONTEXT.md" || fail "CONTEXT.md missing placeholder"
+# Idempotency: re-running doesn't overwrite existing content
+echo "manual marker" >> "$TMP_BOOT/.hv/CONTEXT.md"
+( cd "$TMP_BOOT" && "$BIN/hv-bootstrap" >/dev/null )
+grep -q "manual marker" "$TMP_BOOT/.hv/CONTEXT.md" || fail "hv-bootstrap clobbered existing CONTEXT.md"
+rm -rf "$TMP_BOOT"
+pass "hv-bootstrap seeds CONTEXT.md and is idempotent"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
