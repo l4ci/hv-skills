@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Generic section-query — print the body of `## <topic>` sections from
-# .hv/KNOWLEDGE.md (key=knowledge) or .hv/DECISIONS.md (key=decisions).
-# Used by the typed wrappers hv-knowledge-query and hv-decisions-query;
-# typically called by /hv-work, /hv-debug, /hv-go, /hv-plan, /hv-refactor,
-# /hv-review, /hv-vision before touching topical work.
+# .hv/KNOWLEDGE.md (key=knowledge), .hv/DECISIONS.md (key=decisions), or
+# .hv/CONTEXT.md (key=context).
+# Used by the typed wrappers hv-knowledge-query, hv-decisions-query, and
+# hv-context-query; typically called by /hv-work, /hv-debug, /hv-go,
+# /hv-plan, /hv-refactor, /hv-review, /hv-vision before touching topical work.
 #
 # Usage: hv-section-query <key> <topic>...
-#   <key>:    knowledge | decisions
+#   <key>:    knowledge | decisions | context
 #   <topic>:  one or more topic names (case-insensitive)
 #   stdout:   matching sections, separated by blank line
 #   exit:     0 always (missing topics are silent)
@@ -17,7 +18,8 @@ shift
 case "$KEY" in
   knowledge) FILE=".hv/KNOWLEDGE.md" ;;
   decisions) FILE=".hv/DECISIONS.md" ;;
-  *) echo "error: unknown key '$KEY' — expected one of: knowledge, decisions" >&2; exit 1 ;;
+  context)   FILE=".hv/CONTEXT.md" ;;
+  *) echo "error: unknown key '$KEY' — expected one of: knowledge, decisions, context" >&2; exit 1 ;;
 esac
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"

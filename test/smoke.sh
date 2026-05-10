@@ -3938,4 +3938,34 @@ grep -q "manual marker" "$TMP_BOOT/.hv/CONTEXT.md" || fail "hv-bootstrap clobber
 rm -rf "$TMP_BOOT"
 pass "hv-bootstrap seeds CONTEXT.md and is idempotent"
 
+echo "hv-context-query"
+mkdir -p "$TMP/.hv"
+cat > "$TMP/.hv/CONTEXT.md" <<'EOF'
+# Context
+
+## backlog
+
+The canonical project queue — `.hv/TODO.md`.
+
+**Aliases:** task list
+<!-- 2026-05-10 -->
+
+## decision
+
+A hard project boundary captured in `DECISIONS.md`.
+
+**Aliases:** _none_
+<!-- 2026-05-10 -->
+EOF
+OUT=$( cd "$TMP" && "$BIN/hv-context-query" backlog )
+echo "$OUT" | grep -q "^## backlog$" || fail "hv-context-query missing heading"
+echo "$OUT" | grep -q "canonical project queue" || fail "hv-context-query missing body"
+# Case-insensitive
+OUT2=$( cd "$TMP" && "$BIN/hv-context-query" Backlog )
+echo "$OUT2" | grep -q "canonical project queue" || fail "hv-context-query case-insensitive"
+# Unknown term returns empty + exit 0
+OUT3=$( cd "$TMP" && "$BIN/hv-context-query" nonexistent )
+[ -z "$OUT3" ] || fail "hv-context-query unknown term should be empty"
+pass "hv-context-query"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Print the matching ## <term> section(s) from .hv/CONTEXT.md (single-repo)
+# or umbrella + active sub-repo CONTEXT.md (umbrella mode).
+# Usage: hv-context-query <term>...
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# Single-repo path: just delegate to hv-section-query.
+if [ ! -d ".hv/contexts" ]; then
+  exec "$HERE/hv-section-query" context "$@"
+fi
+
+# Umbrella path: union of .hv/CONTEXT.md + (active sub-repo's CONTEXT.md if any).
+# Sub-repo entries override umbrella-shared entries with the same name.
+SUBREPO=""
+SUBREPO=$("$HERE/hv-resolve-repo" 2>/dev/null || true)
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SUBREPO" "$@" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import iter_topics
+
+subrepo = sys.argv[1]
+wanted = {t.strip().lower() for t in sys.argv[2:]}
+if not wanted:
+    sys.exit(0)
+
+sources: list[tuple[Path, str]] = []
+shared = Path(".hv/CONTEXT.md")
+if shared.exists():
+    sources.append((shared, "umbrella"))
+if subrepo:
+    sub = Path(f".hv/contexts/{subrepo}/CONTEXT.md")
+    if sub.exists():
+        sources.append((sub, subrepo))
+
+# Collect with later sources winning (sub-repo overrides umbrella).
+sections: dict[str, tuple[str, str, str]] = {}
+for path, _label in sources:
+    for name, body in iter_topics(path.read_text()):
+        if name.lower() in wanted:
+            sections[name.lower()] = (name, body, str(path))
+
+first = True
+for key in sorted(sections.keys()):
+    name, body, src = sections[key]
+    if not first:
+        print()
+    print(f"> from: {src}")
+    print(f"## {name}")
+    print(body.rstrip())
+    first = False
+PY
