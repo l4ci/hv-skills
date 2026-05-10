@@ -138,6 +138,8 @@ If `/hv-work` is the natural next step and the user is ready, offer it as a one-
 
 Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in loop mode when no plan exists for a Major + Milestone-tagged item — see `/hv-work`'s Step 4 dispatch directive for the trigger conditions and the inline `Skill`-tool dispatch language. This section describes the run shape once the flag is set; the dispatch decision lives at `/hv-work`'s call site (per the hv-init "Imperative rules in autonomy-aware steps must live inline at every dispatch point" convention).
 
+**Orchestrator-model contract.** `--auto-loop` makes design picks autonomously (no `AskUserQuestion`), so it depends on orchestrator-grade design judgment. The contract: this skill is invoked via the `Skill` tool from `/hv-work` Step 4, which loads it inline in `/hv-work`'s session. Since `/hv-work` runs under `models.orchestrator` (per `.hv/config.json`, default `opus`), `--auto-loop` inherits that model. If a future change moves the dispatch to the `Agent` tool, the call site MUST explicitly pass `model: orchestrator` (resolved from `.hv/config.json`) — running `--auto-loop` under the worker model would push design picks onto an execution-tuned model and degrade plan quality. The interactive (default) mode has no such constraint; it can run under any model since the user redlines via `AskUserQuestion`.
+
 ### Pipeline
 
 For each open question the orchestrator would normally surface to the user, run three steps in order:
