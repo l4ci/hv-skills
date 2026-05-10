@@ -3966,6 +3966,16 @@ echo "$OUT2" | grep -q "canonical project queue" || fail "hv-context-query case-
 # Unknown term returns empty + exit 0
 OUT3=$( cd "$TMP" && "$BIN/hv-context-query" nonexistent )
 [ -z "$OUT3" ] || fail "hv-context-query unknown term should be empty"
+# `> from:` prefix is always present, in single-repo mode too
+OUT4=$( cd "$TMP" && "$BIN/hv-context-query" backlog )
+echo "$OUT4" | grep -q "^> from: " || fail "hv-context-query missing > from: prefix"
+echo "$OUT4" | grep -q "^> from: .hv/CONTEXT.md$" || fail "hv-context-query single-repo prefix wrong"
+
+# Document order preserved when querying multiple terms (decision is later in the file than backlog)
+OUT5=$( cd "$TMP" && "$BIN/hv-context-query" decision backlog )
+B_LINE=$(echo "$OUT5" | grep -n "^## backlog$" | head -1 | cut -d: -f1)
+D_LINE=$(echo "$OUT5" | grep -n "^## decision$" | head -1 | cut -d: -f1)
+[ -n "$B_LINE" ] && [ -n "$D_LINE" ] && [ "$B_LINE" -lt "$D_LINE" ] || fail "hv-context-query document order not preserved"
 pass "hv-context-query"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
