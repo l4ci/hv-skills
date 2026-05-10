@@ -34,6 +34,15 @@ from hvlib import (
     dump_json_atomic,
     load_json,
     parse_todo_fields,
+    find_bullet_in_content,
+    infer_type_from_section,
+    infer_type_from_id,
+    detail_dir_for_id,
+    strip_bullet_from_content,
+    parse_related_ids,
+    remove_id_from_related_field,
+    collect_cross_refs,
+    apply_cross_ref_strips,
 )
 
 ids_csv, force_str, scrub_str = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -55,6 +64,8 @@ STATUS_PATH = Path(".hv/status.json")
 # section — hv-rm needs to scan it for done/strikethrough bullets too.
 _OPEN = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
 TODO_ACTIVE_SECTIONS = _OPEN + ["Completed"]
+_TYPES = os.environ.get("HV_ITEM_TYPES", "BFT")
+_PREFIX_TO_SECTION = dict(zip(_TYPES, _OPEN))
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,92 +74,6 @@ def read_file(path: Path) -> str:
         return path.read_text()
     return ""
 
-def find_bullet_in_content(content: str, iid: str) -> tuple[str | None, str | None]:
-    """Return (section_name, bullet_line) for iid in content, or (None, None)."""
-    # Match open bullets: - **[ID]...
-    open_pat = re.compile(
-        rf"^- \*\*\[{re.escape(iid)}\].*$",
-        re.MULTILINE,
-    )
-    # Match done/strikethrough bullets: - ~~**[ID]...~~ Done ...
-    done_pat = re.compile(
-        rf"^- ~~\*\*\[{re.escape(iid)}\].*$",
-        re.MULTILINE,
-    )
-    for sec_name in TODO_ACTIVE_SECTIONS:
-        span = find_section(content, sec_name)
-        if span is None:
-            continue
-        body = content[span[0]:span[1]]
-        m = open_pat.search(body) or done_pat.search(body)
-        if m:
-            return (sec_name, m.group(0))
-    return (None, None)
-
-def infer_type_from_section(sec_name: str) -> str:
-    mapping = {"Bugs": "bug", "Features": "feature", "Tasks": "task", "Completed": "completed"}
-    return mapping.get(sec_name, "unknown")
-
-_TYPES = os.environ.get("HV_ITEM_TYPES", "BFT")
-_PREFIX_TO_SECTION = dict(zip(_TYPES, _OPEN))
-
-def infer_type_from_id(iid: str) -> str:
-    prefix = iid[0].upper() if iid else ""
-    sec = _PREFIX_TO_SECTION.get(prefix)
-    if sec is None:
-        return "unknown"
-    return infer_type_from_section(sec)
-
-def detail_dir_for_id(iid: str) -> str:
-    prefix = iid[0].upper() if iid else ""
-    mapping = {"B": "bugs", "F": "features", "T": "tasks"}
-    return mapping.get(prefix, "")
-
-def strip_bullet_from_content(content: str, bullet_line: str, sec_name: str) -> str:
-    """Remove the bullet line (and any trailing blank line) from the section."""
-    # We need to remove the bullet and the trailing newline; if followed by a
-    # blank line, remove that too to avoid double-blank-lines.
-    escaped = re.escape(bullet_line)
-    # Match the line plus optional trailing blank line.
-    pat = re.compile(rf"^{escaped}\n(\n)?", re.MULTILINE)
-    return pat.sub(lambda m: "\n" if m.group(1) else "", content, count=1)
-
-def parse_related_ids(related_val: str) -> list[str]:
-    """Extract bracket IDs from a Related: field value like '[F02], [B05]'."""
-    return re.findall(r"\[([A-Z]\d+)\]", related_val)
-
-def remove_id_from_related_field(line: str, iid: str) -> str:
-    """Strip [iid] from the Related: field of `line`. If Related becomes empty,
-    drop the entire Related: segment from the line."""
-    fields = parse_todo_fields(line)
-    related_val = fields.get("related", "")
-    if not related_val:
-        return line
-
-    ids_in_related = parse_related_ids(related_val)
-    if iid not in ids_in_related:
-        return line
-
-    # Remove the ID from the list.
-    new_ids = [x for x in ids_in_related if x != iid]
-
-    if not new_ids:
-        # Drop the entire Related: segment.
-        # Match " Related: <value>" where <value> ends at the next field or EOL.
-        pat = re.compile(
-            r"\s+Related:\s+.+?(?=\s+(?:Detail|Milestone|Repos):|$)",
-        )
-        return pat.sub("", line).rstrip()
-    else:
-        # Rebuild Related value preserving spacing: "[A01], [B02]" style.
-        new_val = ", ".join(f"[{x}]" for x in new_ids)
-        # Replace the bracketed IDs in the existing Related: value.
-        # Strategy: replace the raw bracket-id sequence in the field substring.
-        old_pat = re.compile(r"(Related:\s+)(.+?)(?=\s+(?:Detail|Milestone|Repos):|$)")
-        def repl(m):
-            return m.group(1) + new_val
-        return old_pat.sub(repl, line)
-
 def find_plan_files(iid: str) -> list[Path]:
     """Scan .hv/plans/ for files whose stem ends in -<iid>."""
     plans_dir = Path(".hv/plans")
@@ -156,38 +81,6 @@ def find_plan_files(iid: str) -> list[Path]:
         return []
     matches = [p for p in plans_dir.iterdir() if p.suffix == ".md" and p.stem.endswith(f"-{iid}")]
     return sorted(matches)
-
-def collect_cross_refs(content: str, iid: str, sections: list[str]) -> list[tuple[str, str, str]]:
-    """Return list of (sec_name, bullet_line, new_bullet_line) for lines that
-    reference iid in their Related: field (and are NOT the item's own origin line)."""
-    hits = []
-    origin_pat = re.compile(rf"^- (?:~~)?\*\*\[{re.escape(iid)}\]", re.MULTILINE)
-    for sec_name in sections:
-        span = find_section(content, sec_name)
-        if span is None:
-            continue
-        body = content[span[0]:span[1]]
-        for line in body.splitlines():
-            line_s = line.strip()
-            if not line_s.startswith("- "):
-                continue
-            # Skip the origin bullet itself.
-            if origin_pat.match(line_s):
-                continue
-            fields = parse_todo_fields(line_s)
-            related_ids = parse_related_ids(fields.get("related", ""))
-            if iid in related_ids:
-                new_line = remove_id_from_related_field(line_s, iid)
-                hits.append((sec_name, line_s, new_line))
-    return hits
-
-def apply_cross_ref_strips(content: str, xrefs: list[tuple[str, str, str]]) -> str:
-    """Apply cross-reference removals to content in one pass."""
-    for _sec, old_line, new_line in xrefs:
-        # Replace the old line with new line (exact match, once).
-        escaped = re.escape(old_line)
-        content = re.sub(rf"^{escaped}$", new_line.rstrip(), content, count=1, flags=re.MULTILINE)
-    return content
 
 # ── validation pass: all IDs must exist before any write ─────────────────────
 
@@ -199,7 +92,7 @@ id_info = {}  # iid → {source, sec_name, bullet_line, item_type}
 
 for iid in raw_ids:
     # Try TODO first.
-    sec_name, bullet = find_bullet_in_content(todo_content, iid)
+    sec_name, bullet = find_bullet_in_content(todo_content, iid, TODO_ACTIVE_SECTIONS)
     if sec_name is not None:
         id_info[iid] = {
             "source": "todo",
@@ -213,7 +106,7 @@ for iid in raw_ids:
 
     # Fall through to ARCHIVE.
     if archive_content:
-        sec_name, bullet = find_bullet_in_content(archive_content, iid)
+        sec_name, bullet = find_bullet_in_content(archive_content, iid, TODO_ACTIVE_SECTIONS)
         if sec_name is not None:
             id_info[iid] = {
                 "source": "archive",
