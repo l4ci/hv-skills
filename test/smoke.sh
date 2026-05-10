@@ -4038,4 +4038,19 @@ pass "hv-context-add --not"
 
 rm -rf "$TMP_ADD"
 
+echo "hv-context-add — alias collision refused"
+TMP_CC="$(mktemp -d)"
+( cd "$TMP_CC" && "$BIN/hv-bootstrap" >/dev/null )
+( cd "$TMP_CC" && "$BIN/hv-context-add" backlog --def "Q." --alias "task list" )
+set +e
+( cd "$TMP_CC" && "$BIN/hv-context-add" inbox --def "I." --alias "task list" 2>"$TMP_CC/err" )
+RC=$?
+set -e
+[ $RC -ne 0 ] || fail "alias collision should exit non-zero"
+grep -q "already an alias of term 'backlog'" "$TMP_CC/err" || fail "missing collision error message"
+# Source file should NOT have been mutated
+grep -q "^## inbox$" "$TMP_CC/.hv/CONTEXT.md" && fail "inbox should not be written on collision"
+rm -rf "$TMP_CC"
+pass "hv-context-add — alias collision refused"
+
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
