@@ -25,6 +25,10 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
+| `hv-map-query` | Print selected subsystem detail file bodies from `.hv/map/` | `.hv/bin/hv-map-query capture work` |
+| `hv-map-index` | Regenerate the managed `hv-map` block in `CLAUDE.md` from `.hv/map/<name>.md` frontmatter `summary:` | `.hv/bin/hv-map-index` |
+| `hv-map-stats` | JSON: per-subsystem bytes, last-touched, entry-point counts, broken `file:line` refs | `.hv/bin/hv-map-stats` |
+| `hv-staleness` | List stale entries across MAP/KNOWLEDGE/TODO past a days threshold | `.hv/bin/hv-staleness map --days 90` |
 | `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision` (`vision` is `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
 | `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
 | `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |

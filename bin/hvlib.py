@@ -151,23 +151,26 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 
 
 def parse_todo_fields(line: str) -> dict[str, str]:
-    """Extract Detail/Related/Milestone/Repos fields from a TODO bullet line.
+    """Extract Detail/Related/Milestone/Repos/Subsystem fields from a TODO bullet line.
 
     Each field starts with `<Field>: ` and runs until the next field marker
     or end of line. Order-agnostic. Returns a dict with keys 'detail',
-    'related', 'milestone', 'repos' — missing fields map to ''.
+    'related', 'milestone', 'repos', 'subsystem' — missing fields map to ''.
 
     Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
-        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": ""}
+        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": "", "subsystem": ""}
     Example: parse_todo_fields("- **[F01] [Major] Title.** D. Detail: x. Milestone: M02 Repos: web")
-        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web"}
+        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web", "subsystem": ""}
+    Example: parse_todo_fields("- **[B07] [P1] Title.** D. Repos: web Subsystem: capture Captured: 2026-05-09")
+        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture"}
     """
-    fields = {"detail": "", "related": "", "milestone": "", "repos": ""}
+    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": ""}
     others = {
-        "detail": ["Related", "Milestone", "Repos"],
-        "related": ["Detail", "Milestone", "Repos"],
-        "milestone": ["Detail", "Related", "Repos"],
-        "repos": ["Detail", "Related", "Milestone"],
+        "detail": ["Related", "Milestone", "Repos", "Subsystem", "Captured"],
+        "related": ["Detail", "Milestone", "Repos", "Subsystem", "Captured"],
+        "milestone": ["Detail", "Related", "Repos", "Subsystem", "Captured"],
+        "repos": ["Detail", "Related", "Milestone", "Subsystem", "Captured"],
+        "subsystem": ["Detail", "Related", "Milestone", "Repos", "Captured"],
     }
     for key in fields:
         cap = key.capitalize()
@@ -579,6 +582,66 @@ def read_version(filepath, kind: str) -> str | None:
                 return stripped
         return None
     raise ValueError(f"unknown version kind: {kind!r}")
+
+
+def parse_frontmatter(text: str) -> tuple[dict, str]:
+    """Parse a YAML-ish frontmatter block delimited by `---` lines.
+
+    Supports a flat key/value subset only:
+      - `key: value`
+      - `key: [a, b, c]` (inline list)
+    Returns ({}, original_text) when no frontmatter is present or it is
+    malformed. Never raises.
+    """
+    if not text.startswith("---\n") and not text.startswith("---\r\n"):
+        return {}, text
+    # Find closing ---
+    rest = text.split("\n", 1)[1] if "\n" in text else ""
+    end = re.search(r"^---\s*$", rest, re.MULTILINE)
+    if not end:
+        return {}, text
+    block = rest[: end.start()]
+    body = rest[end.end():].lstrip("\n")
+    fm: dict = {}
+    for raw in block.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if value.startswith("[") and value.endswith("]"):
+            inner = value[1:-1].strip()
+            fm[key] = [v.strip() for v in inner.split(",") if v.strip()] if inner else []
+        else:
+            fm[key] = value
+    return fm, body
+
+
+def iter_map_entries(map_dir):
+    """Yield (subsystem, frontmatter_dict, body, path) for each *.md file
+    in `map_dir` whose frontmatter has a `subsystem:` key. Files without
+    valid frontmatter are skipped silently. Sorted by subsystem name.
+    """
+    p = Path(map_dir)
+    if not p.is_dir():
+        return
+    entries = []
+    for md in sorted(p.glob("*.md")):
+        try:
+            text = md.read_text()
+        except OSError:
+            continue
+        fm, body = parse_frontmatter(text)
+        name = fm.get("subsystem")
+        if not name:
+            continue
+        entries.append((name, fm, body, md))
+    entries.sort(key=lambda e: e[0])
+    for entry in entries:
+        yield entry
 
 
 def write_version(filepath, kind: str, new_version: str) -> None:

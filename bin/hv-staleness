@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# List stale entries across MAP / KNOWLEDGE / TODO based on a days threshold.
+# Usage: hv-staleness <kind> [--days N] [--today YYYY-MM-DD]
+#   kind:    map | knowledge | todo
+#   --days:  threshold; entries that are N or more days old are listed (default 90)
+#   --today: override today (test hook); defaults to today's date
+#   stdout:  one line per stale entry: "<name> <YYYY-MM-DD>"
+#   exit:    0 always
+set -euo pipefail
+KIND="${1:?usage: hv-staleness <kind> [--days N] [--today YYYY-MM-DD]}"
+shift
+DAYS=90
+TODAY=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --days) DAYS="$2"; shift 2 ;;
+    --today) TODAY="$2"; shift 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KIND" "$DAYS" "$TODAY" <<'PY'
+import datetime as dt
+import re
+import subprocess
+import sys
+from pathlib import Path
+from hvlib import iter_map_entries, iter_topics
+
+kind, days_s, today_s = sys.argv[1], sys.argv[2], sys.argv[3]
+days = int(days_s)
+today = dt.date.fromisoformat(today_s) if today_s else dt.date.today()
+
+
+def parse_date(s: str) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(s.strip())
+    except (ValueError, AttributeError):
+        return None
+
+
+def git_mtime(path: Path) -> dt.date | None:
+    try:
+        out = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cs", "--", str(path)],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return parse_date(out)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def is_stale(d: dt.date | None) -> bool:
+    if d is None:
+        return False
+    return (today - d).days >= days
+
+
+def emit(name: str, d: dt.date | None) -> None:
+    print(f"{name} {d.isoformat() if d else 'unknown'}")
+
+
+if kind == "map":
+    for name, fm, _body, path in iter_map_entries(".hv/map"):
+        d = parse_date(fm.get("touched", "")) or git_mtime(path)
+        if is_stale(d):
+            emit(name, d)
+elif kind == "knowledge":
+    p = Path(".hv/KNOWLEDGE.md")
+    if not p.exists():
+        sys.exit(0)
+    # KNOWLEDGE has no per-topic timestamps yet; fall back to file mtime.
+    d = git_mtime(p)
+    if is_stale(d):
+        for topic, _body in iter_topics(p.read_text()):
+            emit(topic, d)
+elif kind == "todo":
+    p = Path(".hv/TODO.md")
+    if not p.exists():
+        sys.exit(0)
+    # Match open bullets like "- [B07] Title (...) Captured: 2026-02-01"
+    captured_re = re.compile(r"^- \[([A-Z]\d+)\].*?Captured:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
+    for m in captured_re.finditer(p.read_text()):
+        d = parse_date(m.group(2))
+        if is_stale(d):
+            emit(m.group(1), d)
+else:
+    print(f"unknown kind: {kind}", file=sys.stderr)
+    sys.exit(1)
+PY

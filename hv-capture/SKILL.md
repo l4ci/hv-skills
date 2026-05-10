@@ -207,7 +207,15 @@ Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`
 
 With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
 
-**Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, and `Repos:`. Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — comma-separated list of registered sub-repos; a single name is the common case, two or more turns the item into a multi-repo dispatch via `/hv-work`).
+**Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, `Repos:`, and `Subsystem:` (optional). Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — comma-separated list of registered sub-repos; a single name is the common case, two or more turns the item into a multi-repo dispatch via `/hv-work`); `Subsystem:` is the project-map subsystem this item belongs to.
+
+**Subsystem inference (optional).** Scan filenames and skill references in the user's text against the entries in `.hv/map/` (or the `## Project Map` block in CLAUDE.md). If a match is clear — e.g. the user mentions `hv-work`, `bin/hv-staleness`, or `hv-map` — append `Subsystem: <name>` (the closest map entry name) to the captured row. If no confident match exists, omit the field entirely. **Never block or delay capture for a missing Subsystem.** The field is a soft hint for map hygiene, not a required tag.
+
+Example:
+```
+Before: - **[B07] [P1] Title.** Description. Milestone: M01 Captured: 2026-05-09
+After:  - **[B07] [P1] Title.** Description. Milestone: M01 Subsystem: capture Captured: 2026-05-09
+```
 
 The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 

@@ -88,6 +88,8 @@ Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch th
 
 Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
 
+- **Soft-cap check.** If `.hv/bin/hv-map-stats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["subsystems"]))'` exceeds the configured `map.softcap_subsystems` (default 20), print a one-line note: `note: project map has N subsystems (cap N); consider /hv-map consolidate`. Never blocks.
+
 ## Step 4 — Branch or Worktree
 
 Pick a descriptive name (e.g., `hv/fix-B07-timer-badge`).
@@ -269,6 +271,8 @@ Branch on `autonomy.level`:
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
 If the bug was rooted in hv-skills behavior (touched `bin/hv-*`, `hv-*/SKILL.md`, or `.hv/`), `/hv-learn`'s Step 8.5 will offer to file an upstream issue against `l4ci/hv-skills`.
+
+- **Update project map.** Invoke `/hv-map after-work` if the fix touched files belonging to a known subsystem.
 
 ## Step 12.5 — Decide (Nudge Only)
 

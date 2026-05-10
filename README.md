@@ -23,6 +23,7 @@
 - **Knowledge stays around.** `/hv-learn` writes gotchas and conventions into `KNOWLEDGE.md`, grouped by topic. Future runs of `/hv-work`, `/hv-debug`, and `/hv-review` read it back automatically, so you stop re-discovering the same problem three sessions in a row.
 - **Local-first.** Everything lives in `.hv/` under your project. No daemon, no MCP server, no cloud, no database. Just bash, Python, git, and optionally `gh`.
 - **Survives `/clear`.** `/hv-pause` writes a handoff note with your current hypothesis, next step, and mid-edit files. `/hv-next` reads it back in a fresh session.
+- **Project map stays flat.** `/hv-map` maintains `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date — auto-bumped by `/hv-work` cycles and summarized into a thin `## Project Map` index in `CLAUDE.md` so always-on context stays small as the codebase grows.
 
 ## Features
 
