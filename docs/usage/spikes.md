@@ -40,7 +40,7 @@ After you mark the spike done, the skill asks one extra question when the verdic
 
 ## After the spike
 
-The findings feed back into whatever decision triggered the spike, typically a milestone or implementation plan. If the spike came out of a `/hv-vision` session, reference the spike file from the relevant milestone detail file (`.hv/milestones/M01.md`). If a `/hv-plan` depends on the verdict, call it out in the plan's named assumptions or open questions section.
+The findings feed back into whatever decision triggered the spike, typically a milestone or implementation plan. If the spike came out of a [`/hv-vision`](vision-and-plans.md) session, reference the spike file from the relevant milestone detail file (`.hv/milestones/M01.md`). If a [`/hv-plan`](vision-and-plans.md) depends on the verdict, call it out in the plan's named assumptions or open questions section.
 
 See [vision and plans](vision-and-plans.md) for how spikes fit into the broader planning flow.
 

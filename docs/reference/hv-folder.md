@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-`/hv-init` creates this folder once per project. Everything inside is either Markdown or JSON, and the whole folder is gitignored by default. You can open and edit any file by hand whenever you need to.
+[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is either Markdown or JSON, and the whole folder is gitignored by default. You can open and edit any file by hand whenever you need to.
 
 ## Overview
 
@@ -25,7 +25,7 @@
 
 ## TODO.md — active backlog
 
-`TODO.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. `/hv-capture` appends new items; `/hv-next` reads it to suggest what to work on next.
+`TODO.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items; [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
 
 A typical entry looks like:
 
@@ -37,7 +37,7 @@ You can edit this file by hand: reorder items, bump priorities, or delete things
 
 ## KNOWLEDGE.md — durable learnings
 
-`KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries are grouped under free-form topic headings. `/hv-learn` appends new learnings at the end of a session.
+`KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries are grouped under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
 
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
@@ -45,7 +45,7 @@ See [../usage/learning.md](../usage/learning.md) for how to capture and review k
 
 ## DECISIONS.md — hard-boundary decisions
 
-`DECISIONS.md` records hard boundaries the project has committed to. It is the sibling of `KNOWLEDGE.md`, but where knowledge is passive (gotchas, conventions), decisions are active commitments with explicit `forbids:` and `permits:` clauses. `/hv-decide` writes new entries; `/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision` consult them as constraints.
+`DECISIONS.md` records hard boundaries the project has committed to. It is the sibling of `KNOWLEDGE.md`, but where knowledge is passive (gotchas, conventions), decisions are active commitments with explicit `forbids:` and `permits:` clauses. [`/hv-decide`](../usage/decisions.md) writes new entries; [`/hv-work`](../usage/running-work.md), [`/hv-debug`](../usage/debugging.md), [`/hv-plan`](../usage/vision-and-plans.md), [`/hv-refactor`](slash-commands.md#hv-refactor), [`/hv-review`](../usage/review-and-ship.md), and [`/hv-vision`](../usage/vision-and-plans.md) consult them as constraints.
 
 A companion managed block in `CLAUDE.md` lists the current decision topics so the model can pull only the relevant entries on demand.
 
@@ -57,7 +57,7 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
-A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next` and `/hv-pause` can scope their suggestions to what is actually in progress.
+A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is actually in progress.
 
 ## counters.json — auto-incrementing IDs
 
@@ -103,7 +103,7 @@ See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for the full pl
 
 ## spikes/ — feasibility findings
 
-`spikes/` stores the written findings from `/hv-spike` runs: one Markdown file per spike summarising what was learned, what was tried, and what the recommendation is. The throwaway experimental code lives on its own `spike/<name>` git branch and is never merged.
+`spikes/` stores the written findings from [`/hv-spike`](../usage/spikes.md) runs: one Markdown file per spike summarising what was learned, what was tried, and what the recommendation is. The throwaway experimental code lives on its own `spike/<name>` git branch and is never merged.
 
 ## handoff/ — pause notes
 

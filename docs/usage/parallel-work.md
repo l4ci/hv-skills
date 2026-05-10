@@ -1,6 +1,6 @@
 # Parallel work
 
-When `work.isolation` is set to `"worktree"`, you can run multiple `/hv-work`
+When `work.isolation` is set to `"worktree"`, you can run multiple [`/hv-work`](running-work.md)
 sessions side by side from separate terminals. Each session gets its own
 isolated directory and branch, so they never step on each other.
 
@@ -21,7 +21,7 @@ current worktree. The main worktree stays on `main` throughout.
 
 ## Two terminals, two streams
 
-Start each stream in its own terminal. `/hv-next` picks items that aren't
+Start each stream in its own terminal. [`/hv-next`](picking-work.md) picks items that aren't
 already in progress, so the two sessions naturally claim different work.
 
 **Terminal 1** picks `[B02]` and `[F01]`:
@@ -59,6 +59,6 @@ git state. For more on how `/hv-next` reads and updates status, see
 
 ## Caveats
 
-Don't run `/hv-init` or `/hv-config` from inside a worktree. Those write to
+Don't run [`/hv-init`](../reference/slash-commands.md#hv-init) or `/hv-config` from inside a worktree. Those write to
 `.hv/` and must run in the main worktree. `/hv-next` and `/hv-work` are fine
 in either place.

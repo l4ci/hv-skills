@@ -6,7 +6,7 @@
 
 `/hv-review` is a staff-engineer-level read of a feature branch before it leaves your machine. It is **read-only**: no commits, no mutations.
 
-The skill scopes the branch (commits, touched files, referenced item IDs), pulls relevant topics from `KNOWLEDGE.md`, and evaluates the diff on three axes:
+The skill scopes the branch (commits, touched files, referenced item IDs), pulls relevant topics from [`KNOWLEDGE.md`](learning.md), and evaluates the diff on three axes:
 
 - **Intent match** — does the diff deliver what the work items promised?
 - **Convention compliance** — does it respect captured gotchas and project rules?
@@ -34,7 +34,7 @@ You can run `/hv-review` at any time on a branch, not only before shipping:
 /hv-ship
 ```
 
-**Default flow:** preflight → review (if `ship.review` is `true`) → build PR body → open PR or merge → close resolved items.
+**Default flow:** [preflight](../reference/preflight.md) → review (if `ship.review` is `true`) → build PR body → open PR or merge → close resolved items.
 
 The review gate behaves as follows:
 
@@ -72,7 +72,7 @@ See [configuration](configuration.md) for the full `ship` block.
 
 ## Release nudges
 
-When you've accumulated commits since the last release tag, `/hv-next` (on terminal paths — when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
+When you've accumulated commits since the last release tag, [`/hv-next`](picking-work.md) (on terminal paths — when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
 
 ```
 5 commits since v1.16.0; consider /hv-release.

@@ -1,6 +1,6 @@
 # Configuration
 
-All settings live in `.hv/config.json`. Edit the file directly or run `/hv-config` for an interactive picker that offers four common profiles (Balanced, Premium, Fast, Minimal) that map to the values below.
+All settings live in [`.hv/config.json`](../reference/hv-folder.md). Edit the file directly or run `/hv-config` for an interactive picker that offers four common profiles (Balanced, Premium, Fast, Minimal) that map to the values below.
 
 Default config:
 
@@ -52,7 +52,7 @@ Default config:
 | `"sonnet"` | Fast execution — implementing well-specified tasks |
 | `"haiku"` | Quick, cheap — simple fixes, small tasks |
 
-`/hv-config` and `/hv-init` offer four ready-made profiles (Balanced, Premium, Fast, Minimal) that set both values at once.
+`/hv-config` and [`/hv-init`](../reference/slash-commands.md#hv-init) offer four ready-made profiles (Balanced, Premium, Fast, Minimal) that set both values at once.
 
 ## work.isolation — branch or worktree
 
@@ -63,11 +63,11 @@ Controls where skill work happens.
 | `"branch"` | Feature branch in current worktree | Solo work, simple workflows |
 | `"worktree"` | Isolated directory under `.claude/worktrees/` | Parallel work streams, keep main clean while agents work |
 
-Switch to `"worktree"` when you want multiple work streams in flight without context bleeding between them.
+Switch to `"worktree"` when you want multiple work streams in flight without context bleeding between them. See [parallel work](parallel-work.md) for the full pattern.
 
 ## work.mergeStrategy — direct or pr
 
-Controls how `/hv-ship` integrates completed work.
+Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 
 | Strategy | How it works | When to use |
 |----------|-------------|-------------|
@@ -76,11 +76,11 @@ Controls how `/hv-ship` integrates completed work.
 
 ## refactor.confirmBeforeExecute
 
-When `true` (default), `/hv-refactor` pauses for your approval after presenting its findings and again after you select a design. You review the proposed changes before anything is written. Set to `false` for full autonomy: `/hv-refactor` proceeds end-to-end without checkpoints.
+When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) pauses for your approval after presenting its findings and again after you select a design. You review the proposed changes before anything is written. Set to `false` for full autonomy: `/hv-refactor` proceeds end-to-end without checkpoints.
 
 ## learn.verify
 
-Controls whether `/hv-learn` runs a second-opinion pass on what it just wrote. The verifier is a fresh Opus sub-agent with no session context that reads only the updated `KNOWLEDGE.md` diff. It judges each new bullet on four criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly topic'd, and non-duplicate. It can demote weak entries, sharpen vague wording, re-file wrong-topic bullets, or delete restatements of existing knowledge.
+Controls whether [`/hv-learn`](learning.md) runs a second-opinion pass on what it just wrote. The verifier is a fresh Opus sub-agent with no session context that reads only the updated `KNOWLEDGE.md` diff. It judges each new bullet on four criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly topic'd, and non-duplicate. It can demote weak entries, sharpen vague wording, re-file wrong-topic bullets, or delete restatements of existing knowledge.
 
 | Value | Behavior |
 |-------|----------|
@@ -104,7 +104,7 @@ See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
 ## debug.competingHypotheses
 
-Controls whether `/hv-debug` Step 6 dispatches a single hypothesis agent or fans out three parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator deduplicates the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.
+Controls whether [`/hv-debug`](debugging.md) Step 6 dispatches a single hypothesis agent or fans out three parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator deduplicates the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.
 
 | Value | Behavior |
 |-------|----------|
@@ -122,7 +122,7 @@ Controls whether skills nudge or invoke the next skill directly. Three levels: `
 - **Type:** string
 - **Default:** `"docs"`
 
-Relative path (from the project root) to the documentation folder that `/hv-docs` reads and writes. Set this when your project keeps docs somewhere other than the default, for example `"documentation"`, `"site/content"`, or `"wiki"`.
+Relative path (from the project root) to the documentation folder that [`/hv-docs`](../reference/slash-commands.md#hv-docs) reads and writes. Set this when your project keeps docs somewhere other than the default, for example `"documentation"`, `"site/content"`, or `"wiki"`.
 
 ```json
 { "docs": { "path": "documentation" } }
@@ -145,7 +145,7 @@ Controls whether `/hv-docs` after-work mode automatically writes proposed doc up
 - **Type:** boolean
 - **Default:** `false`
 
-Gate for the after-work docs flow. When `true`, the skills `/hv-work`, `/hv-ship`, and `/hv-release` trigger `/hv-docs` after their primary action completes — `/hv-work` and `/hv-ship` only on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger), `/hv-release` on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
+Gate for the after-work docs flow. When `true`, the skills [`/hv-work`](running-work.md), `/hv-ship`, and [`/hv-release`](../reference/slash-commands.md#hv-release) trigger `/hv-docs` after their primary action completes — `/hv-work` and `/hv-ship` only on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger), `/hv-release` on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
 
 ```json
 { "docs": { "afterWork": true } }
@@ -171,7 +171,7 @@ Set higher to suppress the prompt for typical project velocities; set lower (e.g
 - **Type:** integer
 - **Default:** `10`
 
-Number of commits since the last release tag at which `/hv-next` (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only — no skill is auto-invoked.
+Number of commits since the last release tag at which [`/hv-next`](picking-work.md) (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only — no skill is auto-invoked.
 
 ## release.nudgeAfterDays
 
@@ -200,7 +200,7 @@ Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-rev
 
 Records the hv-skills plugin version that was installed when `/hv-init` last ran. Auto-managed: `/hv-init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
 
-`bin/hv-preflight` calls `bin/hv-version-check` after every `/hv-preflight` invocation. If the stamped value differs from the currently-installed plugin's version, preflight prints one informational line to stderr:
+[`bin/hv-preflight`](../reference/preflight.md) calls `bin/hv-version-check` after every `/hv-preflight` invocation. If the stamped value differs from the currently-installed plugin's version, preflight prints one informational line to stderr:
 
 ```
 hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh helpers
@@ -208,4 +208,4 @@ hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh
 
 Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release) — this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
 
-When `autonomy.level` is `"auto"` or `"loop"`, `/hv-update` Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.
+When `autonomy.level` is `"auto"` or `"loop"`, [`/hv-update`](../reference/slash-commands.md#hv-update) Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.

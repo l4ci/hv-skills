@@ -1,6 +1,6 @@
 # Removing work
 
-`/hv-rm` permanently removes one or more backlog entries from `TODO.md`, their associated files, and any cross-references to them. It is the inverse of `/hv-capture`.
+`/hv-rm` permanently removes one or more backlog entries from [`TODO.md`](../reference/hv-folder.md), their associated files, and any cross-references to them. It is the inverse of [`/hv-capture`](capturing-work.md).
 
 ## /hv-rm
 
@@ -65,7 +65,7 @@ GitHub issues must be closed upstream manually. `/hv-rm` has no knowledge of rem
 
 ## Safety semantics
 
-`/hv-rm` refuses to apply until you confirm. The confirmation gate runs even when `autonomy.level` is set to `loop` — removal is always a manual step.
+`/hv-rm` refuses to apply until you confirm. The confirmation gate runs even when [`autonomy.level`](autonomy.md) is set to `loop` — removal is always a manual step.
 
 Active items — items present in any `status.json` `items` array — are refused by default:
 

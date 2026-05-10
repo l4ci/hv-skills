@@ -84,7 +84,7 @@ file. Every skill that mints a new backlog item calls this first.
 ## Backlog manipulation
 
 `hv-append` inserts a formatted entry under the matching `##` section heading in
-`TODO.md`. `hv-complete` rewrites an open item as a struck-through `~~line~~`
+[`TODO.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`
 and moves it under `## Completed`, stamping it with the supplied git SHA.
 `hv-archive-old` sweeps `## Completed` entries older than N days into
 `ARCHIVE.md` to keep the working file short. `hv-todo-by-milestone` lets you
@@ -102,7 +102,7 @@ abandoned.
 and removes records whose branches no longer exist. It emits a JSON summary that
 skills use to avoid acting on stale context. `hv-summary` prints a human-readable
 snapshot of the same data: backlog counts, what's actively in progress, and the
-most recent completions. Its JSON output also includes a `todoDrift` array — IDs that appear in commit subjects (e.g. `[B07]`) but are still listed as open in `TODO.md`, with the most recent commit hash for each. `/hv-next` Step 2 surfaces this so users can `hv-complete` an entry that already shipped.
+most recent completions. Its JSON output also includes a `todoDrift` array — IDs that appear in commit subjects (e.g. `[B07]`) but are still listed as open in `TODO.md`, with the most recent commit hash for each. [`/hv-next`](../usage/picking-work.md) Step 2 surfaces this so users can `hv-complete` an entry that already shipped.
 
 In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, with base-branch resolution per repo.
 
@@ -116,7 +116,7 @@ In umbrella mode the umbrella tree itself often has no base branch (it's a coord
 pulls specific topic sections out of `KNOWLEDGE.md` by name, which is useful
 when scripting post-session summaries.
 
-`hv-knowledge-stats` reports the bullet count and byte size of each topic in `KNOWLEDGE.md` as JSON. `/hv-learn` Step 8 calls it after merging new bullets and prints a one-line nudge per topic that crosses 25 bullets or 10 KB, so editorial splits stay user-driven.
+`hv-knowledge-stats` reports the bullet count and byte size of each topic in `KNOWLEDGE.md` as JSON. [`/hv-learn`](../usage/learning.md) Step 8 calls it after merging new bullets and prints a one-line nudge per topic that crosses 25 bullets or 10 KB, so editorial splits stay user-driven.
 
 `hv-decisions-index` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
 identically. The file structure, marker shape, and query semantics all mirror
@@ -158,13 +158,13 @@ read from stdin.
 `hv-ship-body` builds a standardised PR body for a branch by scanning its
 commits for referenced IDs and matching them against open TODO entries.
 `hv-review-scope` emits a richer JSON payload (commits, touched files,
-referenced IDs, and matched TODO entries) that the `/hv-review` skill consumes.
+referenced IDs, and matched TODO entries) that the [`/hv-review`](../usage/review-and-ship.md) skill consumes.
 
 All three helpers (`hv-merge`, `hv-pr`, `hv-review-scope`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
 
 ## Diagnostics
 
-`hv-preflight` verifies that `.hv/` is initialised and every expected helper is
+[`hv-preflight`](preflight.md) verifies that `.hv/` is initialised and every expected helper is
 present. It exits `0` on success, `2` if the folder is missing, and `3` if
 helpers are incomplete. Useful as a guard at the top of scripts.
 
@@ -203,7 +203,7 @@ The upstream repo defaults to `l4ci/hv-skills`; pass `--upstream-repo <owner/rep
 
 When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coordinates work across multiple sub-repos registered in `.hv/repos.json`. Three helpers manage that registry and the cwd-to-sub-repo resolution.
 
-`hv-umbrella-init` runs once during `/hv-init` Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and, if the umbrella is itself a git repo, appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
+`hv-umbrella-init` runs once during [`/hv-init`](slash-commands.md#hv-init) Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and, if the umbrella is itself a git repo, appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
 
 `hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
 

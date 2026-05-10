@@ -1,6 +1,6 @@
 # Pausing and resuming
 
-Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` writes what was in your head before you leave; `/hv-next` picks it back up when you return.
+Long sessions hit `/clear`, get interrupted, or just need a stop. `/hv-pause` writes what was in your head before you leave; [`/hv-next`](picking-work.md) picks it back up when you return.
 
 ## /hv-pause
 

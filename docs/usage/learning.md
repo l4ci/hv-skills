@@ -6,9 +6,9 @@
 ## /hv-learn
 
 `/hv-learn` scans the current session, extracts non-obvious knowledge, groups
-the entries by topic, and writes them to `.hv/KNOWLEDGE.md`. After writing, it
+the entries by topic, and writes them to [`.hv/KNOWLEDGE.md`](../reference/hv-folder.md). After writing, it
 updates the managed `hv-knowledge` block in `CLAUDE.md` so the topic list stays
-in sync. `/hv-work` reads that index to decide when the current task should
+in sync. [`/hv-work`](running-work.md) reads that index to decide when the current task should
 consult `KNOWLEDGE.md`.
 
 ## What gets captured (and what doesn't)
@@ -88,4 +88,4 @@ this codebase,"* that is a [decision](decisions.md), not a learning. Knowledge
 is advisory ("remember this if relevant"); decisions are hard boundaries
 (violations FAIL review). Use `/hv-decide` for the latter. It captures
 rule + why + forbids + permits and is consulted as a constraint by `/hv-work`,
-`/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, and `/hv-vision`.
+[`/hv-debug`](debugging.md), [`/hv-plan`](vision-and-plans.md), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor), [`/hv-review`](review-and-ship.md), and [`/hv-vision`](vision-and-plans.md).

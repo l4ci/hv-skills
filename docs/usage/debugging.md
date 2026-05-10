@@ -1,12 +1,12 @@
 # Debugging
 
-`/hv-debug` is for real bugs that need a systematic cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for `/hv-go` or `/hv-work` instead.
+`/hv-debug` is for real bugs that need a systematic cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for [`/hv-go`](capturing-work.md) or [`/hv-work`](running-work.md) instead.
 
 ## /hv-debug
 
 Invoke with a bug ID: `/hv-debug B07`.
 
-The skill reads the `[B07]` entry in `TODO.md` and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
+The skill reads the `[B07]` entry in [`TODO.md`](../reference/hv-folder.md) and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
 
 1. **Reproduce** — runs the bug's existing test or writes a minimal failing reproducer.
 2. **Hypothesize** — the orchestrator model proposes a root cause based on the reproduction and project context.
@@ -14,7 +14,7 @@ The skill reads the `[B07]` entry in `TODO.md` and any associated detail file, c
 4. **Fix** — the worker model applies the fix. The reproducer must pass before the commit lands.
 5. **Commit** — a single atomic commit tagged `fix: … [B07]` so `/hv-ship` can close the loop.
 
-If the root cause was non-obvious (required extra verification rounds, contradicted the initial hypothesis, or touched a known-tricky subsystem), the skill nudges you to run `/hv-learn` so the insight lands in `KNOWLEDGE.md`.
+If the root cause was non-obvious (required extra verification rounds, contradicted the initial hypothesis, or touched a known-tricky subsystem), the skill nudges you to run [`/hv-learn`](learning.md) so the insight lands in `KNOWLEDGE.md`.
 
 `/hv-debug` uses the same isolation mode (`branch` or `worktree`) and model configuration as `/hv-work`. It refuses to start on a dirty working tree, so stash or commit first.
 

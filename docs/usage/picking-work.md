@@ -1,6 +1,6 @@
 # Picking work
 
-Two skills help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any `/hv-pause` handoff note for active streams, presents the backlog, and suggests work. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
+Two skills help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any [`/hv-pause`](pausing-and-resuming.md) handoff note for active streams, presents the backlog, and suggests work. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
 
 ## /hv-next
 
@@ -37,7 +37,7 @@ Output structure:
 - One-paragraph approach summary
 - Bulleted lists: *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*
 
-Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output and either push back, ask for a durable plan (`/hv-plan`), or proceed to [running work](running-work.md).
+Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output and either push back, ask for a durable plan ([`/hv-plan`](vision-and-plans.md)), or proceed to [running work](running-work.md).
 
 **Example:**
 
@@ -47,7 +47,7 @@ Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 
 
 Output: specific file paths, test names, and function names the orchestrator would touch, not generic descriptions.
 
-If a plan already exists at `.hv/plans/<key>.md`, the peek restates it. If no plan exists, this is an ad-hoc decomposition; consider `/hv-plan` when alignment needs to survive beyond the current session.
+If a plan already exists at [`.hv/plans/<key>.md`](../reference/hv-folder.md), the peek restates it. If no plan exists, this is an ad-hoc decomposition; consider `/hv-plan` when alignment needs to survive beyond the current session.
 
 ## How reconciliation keeps state honest
 

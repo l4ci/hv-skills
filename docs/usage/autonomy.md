@@ -37,7 +37,7 @@ In loop mode, AskUserQuestion calls fall into three buckets:
 
 If a routine routing prompt does fire under loop mode, that's a sign the auto-pick branch is missing at that call site — file it as a bug.
 
-**Loop-mode uncertainty pre-flight.** For Major + Milestone-tagged items in loop mode, `/hv-work` runs a structural-triple check before invoking `/hv-plan --auto-loop`: fires when the item has no detail file, the brief contains 2+ question marks or `TBD`/`unclear` markers, or the brief lacks any backticked identifiers (signaling "unknown surface"). When the check fires, `/hv-assume` runs first to surface the orchestrator's intended files, tests, and assumptions; the peek lands in the orchestrator session and informs the subsequent auto-plan. The check runs only in loop mode; off and auto modes still let you invoke `/hv-assume` and `/hv-plan` manually.
+**Loop-mode uncertainty pre-flight.** For Major + Milestone-tagged items in loop mode, [`/hv-work`](running-work.md) runs a structural-triple check before invoking [`/hv-plan`](vision-and-plans.md) `--auto-loop`: fires when the item has no detail file, the brief contains 2+ question marks or `TBD`/`unclear` markers, or the brief lacks any backticked identifiers (signaling "unknown surface"). When the check fires, [`/hv-assume`](picking-work.md) runs first to surface the orchestrator's intended files, tests, and assumptions; the peek lands in the orchestrator session and informs the subsequent auto-plan. The check runs only in loop mode; off and auto modes still let you invoke `/hv-assume` and `/hv-plan` manually.
 
 ## When to flip it on
 
