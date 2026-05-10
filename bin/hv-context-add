@@ -131,19 +131,19 @@ else:
 
 def build_section(name: str, definition: str, aliases: list[str], nots: list[str], date: str) -> str:
     aliases_line = f"**Aliases:** {', '.join(aliases)}" if aliases else "**Aliases:** _none_"
-    parts = [f"## {name}", definition, aliases_line]
+    parts = [f"## {name}", "", definition, "", aliases_line]
     if nots:
         parts.append(f"**Not:** {', '.join(nots)}")
-    parts.extend([f"<!-- {date} -->", ""])
+    parts.extend(["", f"<!-- {date} -->", ""])
     return "\n".join(parts)
 
-# Preserve everything above the first ## heading.
+# Preserve everything above the first ## heading, stripping any
+# "no terms yet" placeholder that bootstrap wrote — once any term exists
+# the placeholder should disappear.
 m = re.search(r"^## ", text, re.MULTILINE)
 header = text[:m.start()] if m else text
-if not header.endswith("\n"):
-    header += "\n"
-if not header.endswith("\n\n"):
-    header += "\n"
+header = re.sub(r"^_\(no terms yet[^)]*\)_\s*$\n?", "", header, flags=re.MULTILINE)
+header = header.rstrip() + "\n\n"
 
 merged: dict[str, dict] = {**existing}
 merged[key] = {

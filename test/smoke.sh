@@ -4000,11 +4000,12 @@ grep -q "^\*\*Aliases:\*\* task list, todo list$" "$TMP_ADD/.hv/CONTEXT.md" || f
 grep -q "^<!-- $(date +%Y-%m-%d) -->$" "$TMP_ADD/.hv/CONTEXT.md" || fail "date stamp missing"
 grep -q "<!-- hv-context-start -->" "$TMP_ADD/CLAUDE.md" || fail "index not regenerated"
 grep -q "\*\*backlog\*\* \*(aka task list, todo list)\*" "$TMP_ADD/CLAUDE.md" || fail "block missing entry"
+grep -q "no terms yet" "$TMP_ADD/.hv/CONTEXT.md" && fail "placeholder should be stripped after first term added"
 pass "hv-context-add — new term inserts + indexes"
 
 echo "hv-context-add — no aliases writes _none_"
 ( cd "$TMP_ADD" && "$BIN/hv-context-add" session --def "An active hv-skills work cycle." )
-grep -A2 "^## session$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "^\*\*Aliases:\*\* _none_$" || fail "missing _none_"
+grep -A4 "^## session$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "^\*\*Aliases:\*\* _none_$" || fail "missing _none_"
 pass "hv-context-add — empty aliases produce _none_"
 
 echo "hv-context-add — alphabetical insertion"
@@ -4015,24 +4016,24 @@ EXPECTED=$'alpha\nbacklog\nsession'
 pass "hv-context-add — alphabetical insertion"
 
 echo "hv-context-add — update existing (def replace, alias union, date preserved)"
-ORIG_DATE=$(grep -A4 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -oE '<!-- [0-9-]+ -->')
+ORIG_DATE=$(grep -A8 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -oE '<!-- [0-9-]+ -->' | head -1)
 ( cd "$TMP_ADD" && "$BIN/hv-context-add" backlog \
     --def "The canonical project queue, refined." \
     --alias "queue" )
-grep -A4 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "queue, refined" || fail "def not replaced"
-grep -A4 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "\*\*Aliases:\*\* task list, todo list, queue" || fail "aliases not unioned"
-grep -A4 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "$ORIG_DATE" || fail "date should be preserved without --touch"
+grep -A8 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "queue, refined" || fail "def not replaced"
+grep -A8 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "\*\*Aliases:\*\* task list, todo list, queue" || fail "aliases not unioned"
+grep -A8 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "$ORIG_DATE" || fail "date should be preserved without --touch"
 pass "hv-context-add — update preserves date, unions aliases"
 
 echo "hv-context-add — --touch updates the date"
 TODAY=$(date +%Y-%m-%d)
 ( cd "$TMP_ADD" && "$BIN/hv-context-add" backlog --def "X." --touch )
-grep -A4 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "<!-- $TODAY -->" || fail "--touch didn't bump date"
+grep -A8 "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "<!-- $TODAY -->" || fail "--touch didn't bump date"
 pass "hv-context-add --touch"
 
 echo "hv-context-add — --not field"
 ( cd "$TMP_ADD" && "$BIN/hv-context-add" zterm --def "Z thing." --not "X, Y" )
-grep -A5 "^## zterm$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "^\*\*Not:\*\* X, Y$" || fail "Not line missing"
+grep -A6 "^## zterm$" "$TMP_ADD/.hv/CONTEXT.md" | grep -q "^\*\*Not:\*\* X, Y$" || fail "Not line missing"
 pass "hv-context-add --not"
 
 rm -rf "$TMP_ADD"
