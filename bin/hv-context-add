@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+# Add or update a term in the appropriate CONTEXT.md.
+#
+# Usage:
+#   hv-context-add <term> --def <text> [--alias <a>,...] [--not <n>,...]
+#                  [--repo <name|umbrella>] [--touch]
+#
+# Single-repo: writes to .hv/CONTEXT.md.
+# Umbrella: --repo umbrella → .hv/CONTEXT.md; --repo <name> → .hv/contexts/
+# <name>/CONTEXT.md (validated against .hv/repos.json); without --repo,
+# resolves the active sub-repo via hv-resolve-repo (errors with a hint when
+# cwd is at the umbrella root).
+#
+# Definition rules:
+#   - new term  → insert section alphabetically; today's date stamp
+#   - existing  → replace definition; union aliases; union nots; date stamp
+#                 preserved unless --touch; --not "" clears the Not list
+#
+# Refuses (non-zero, exit 3) when an alias would collide with another term's
+# alias in the same target file. Cross-file alias-uniqueness in umbrella mode
+# is a deliberate non-goal in v1 — see follow-up [F##] when captured.
+set -euo pipefail
+
+TERM=""
+DEF=""
+ALIASES_RAW=""
+NOTS_RAW=""
+TARGET_REPO=""
+TOUCH="false"
+NOTS_PROVIDED="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --def)   DEF="$2"; shift 2 ;;
+    --alias) ALIASES_RAW="$2"; shift 2 ;;
+    --not)   NOTS_RAW="$2"; NOTS_PROVIDED="true"; shift 2 ;;
+    --repo)  TARGET_REPO="$2"; shift 2 ;;
+    --touch) TOUCH="true"; shift ;;
+    --) shift; break ;;
+    -*) echo "error: unknown flag $1" >&2; exit 2 ;;
+    *) [ -z "$TERM" ] && TERM="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
+  esac
+done
+
+[ -n "$TERM" ] || { echo "usage: hv-context-add <term> --def <text> [--alias …] [--not …] [--repo …] [--touch]" >&2; exit 2; }
+[ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Capture cwd before hv_self_locate relocates us. Then pre-navigate to the
+# .hv/ root found by walking up from ORIG_CWD so that hv_self_locate
+# fast-paths and doesn't mistakenly resolve to the helper-binary's umbrella
+# (e.g. the dev tree when running smoke tests from a tmp sub-repo).
+ORIG_CWD="$(pwd -P)"
+if [ ! -d ".hv" ]; then
+  if _UMBRELLA_TMP="$(cd "$ORIG_CWD" && "$HERE/hv-walk-up" 2>/dev/null)"; then
+    cd "$_UMBRELLA_TMP"
+  fi
+fi
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# Resolve target file. Umbrella detection via .hv/repos.json (canonical),
+# not directory presence.
+UMBRELLA_ON=$("$HERE/hv-umbrella-on")
+
+if [ "$UMBRELLA_ON" != "yes" ]; then
+  TARGET=".hv/CONTEXT.md"
+else
+  if [ "$TARGET_REPO" = "umbrella" ]; then
+    TARGET=".hv/CONTEXT.md"
+  elif [ -n "$TARGET_REPO" ]; then
+    REGISTERED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
+import json, sys
+try:
+    repos = json.load(open('.hv/repos.json')).get('repos', [])
+    print('1' if any(r.get('name') == sys.argv[1] for r in repos) else '0')
+except Exception:
+    print('0')
+" "$TARGET_REPO")
+    [ "$REGISTERED" = "1" ] || { echo "error: sub-repo '$TARGET_REPO' not registered in .hv/repos.json" >&2; exit 4; }
+    TARGET=".hv/contexts/$TARGET_REPO/CONTEXT.md"
+  else
+    SUBREPO=$(cd "$ORIG_CWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
+    if [ -z "$SUBREPO" ]; then
+      echo "error: cwd is at umbrella root and --repo not set; pass --repo umbrella to write the umbrella-shared CONTEXT.md, or run from inside a sub-repo" >&2
+      exit 4
+    fi
+    TARGET=".hv/contexts/$SUBREPO/CONTEXT.md"
+  fi
+fi
+mkdir -p "$(dirname "$TARGET")"
+[ -f "$TARGET" ] || printf '# Context\n\n' > "$TARGET"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" <<'PY'
+import datetime as dt
+import re
+import sys
+from pathlib import Path
+from hvlib import iter_topics, parse_term_entry, write_text_atomic
+
+term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target = sys.argv[1:]
+target_path = Path(target)
+nots_provided = (nots_provided == "true")
+touch = (touch_flag == "true")
+
+def split_csv(s: str) -> list[str]:
+    return [x.strip() for x in s.split(",") if x.strip()]
+
+new_aliases = split_csv(aliases_raw)
+new_nots = split_csv(nots_raw)
+
+text = target_path.read_text()
+existing: dict[str, dict] = {}
+order: list[str] = []
+for name, body in iter_topics(text):
+    parsed = parse_term_entry(body)
+    date_m = re.search(r"<!--\s*(\d{4}-\d{2}-\d{2})\s*-->", body)
+    existing[name.lower()] = {
+        "name": name,
+        "parsed": parsed,
+        "date": date_m.group(1) if date_m else None,
+    }
+    order.append(name)
+
+today = dt.date.today().isoformat()
+key = term.lower()
+
+# Alias-conflict check (cross-term within same file).
+for other_key, info in existing.items():
+    if other_key == key:
+        continue
+    other_aliases = {a.lower() for a in info["parsed"]["aliases"]}
+    collision = [a for a in new_aliases if a.lower() in other_aliases]
+    if collision:
+        print(
+            f"error: alias '{collision[0]}' is already an alias of term "
+            f"'{info['name']}' — refuse to write",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+if key in existing:
+    prev = existing[key]
+    merged_aliases: list[str] = []
+    seen: set[str] = set()
+    for a in prev["parsed"]["aliases"] + new_aliases:
+        al = a.lower()
+        if al not in seen:
+            seen.add(al)
+            merged_aliases.append(a)
+    if nots_provided:
+        merged_nots: list[str] = []
+        seen_n: set[str] = set()
+        for n in prev["parsed"]["nots"] + new_nots:
+            nl = n.lower()
+            if nl not in seen_n:
+                seen_n.add(nl)
+                merged_nots.append(n)
+    else:
+        merged_nots = list(prev["parsed"]["nots"])
+    date = today if touch else (prev["date"] or today)
+    new_def = definition
+    new_name = prev["name"]
+else:
+    merged_aliases = list(new_aliases)
+    merged_nots = list(new_nots)
+    date = today
+    new_def = definition
+    new_name = term
+
+def build_section(name: str, definition: str, aliases: list[str], nots: list[str], date: str) -> str:
+    aliases_line = f"**Aliases:** {', '.join(aliases)}" if aliases else "**Aliases:** _none_"
+    parts = [f"## {name}", "", definition, "", aliases_line]
+    if nots:
+        parts.append(f"**Not:** {', '.join(nots)}")
+    parts.extend(["", f"<!-- {date} -->", ""])
+    return "\n".join(parts)
+
+# Preserve everything above the first ## heading, stripping any
+# "no terms yet" placeholder that bootstrap wrote — once any term exists
+# the placeholder should disappear.
+m = re.search(r"^## ", text, re.MULTILINE)
+header = text[:m.start()] if m else text
+header = re.sub(r"^_\(no terms yet[^)]*\)_\s*$\n?", "", header, flags=re.MULTILINE)
+header = header.rstrip() + "\n\n"
+
+merged: dict[str, dict] = {**existing}
+merged[key] = {
+    "name": new_name,
+    "parsed": {"definition": new_def, "aliases": merged_aliases, "nots": merged_nots},
+    "date": date,
+}
+
+ordered_keys = sorted(merged.keys())
+sections = [
+    build_section(
+        merged[k]["name"],
+        merged[k]["parsed"]["definition"],
+        merged[k]["parsed"]["aliases"],
+        merged[k]["parsed"]["nots"],
+        merged[k]["date"] or today,
+    )
+    for k in ordered_keys
+]
+new_text = header + "\n".join(sections).rstrip() + "\n"
+write_text_atomic(target_path, new_text)
+PY
+
+# Regenerate CLAUDE.md block. (hv-context-index uses cwd to resolve any active sub-repo.)
+"$HERE/hv-context-index" >/dev/null
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  "$HERE/hv-context-map" >/dev/null
+fi

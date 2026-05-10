@@ -15,13 +15,14 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 **Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship`
-**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only)
+**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
 **Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
 **Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
-Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
+Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, `## Project Vision`, or `## Project Context`, pull only the relevant sections:
 
 - `.hv/bin/hv-knowledge-query <topic>…`
 - `.hv/bin/hv-decisions-query <topic>…`
+- `.hv/bin/hv-context-query <term>…`
 - `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
 EOF

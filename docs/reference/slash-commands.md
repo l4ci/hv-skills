@@ -26,6 +26,10 @@ Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize wit
 
 Captures a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked. Decisions differ from learnings in `KNOWLEDGE.md` by being active commitments with explicit forbids/permits; `/hv-work`, `/hv-debug`, `/hv-refactor`, and [`/hv-review`](../usage/review-and-ship.md) consult them as constraints. Accepts `--from-learning <topic>` to promote a hardened `KNOWLEDGE.md` bullet into a decision (rule/why are pre-filled; you supply the forbids/permits) and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding the same way (`inconclusive` spikes are refused). See [decisions](../usage/decisions.md) for the full flow.
 
+## /hv-context
+
+Captures or refines a domain term in `.hv/CONTEXT.md` — the project's canonical glossary. Accepts an explicit `<term> "<definition>"` invocation or fires inline when conversation produces an unambiguous definitional signal ("let's call this X", "by X I mean Y"). Writes one entry per term with definition, optional aliases, and optional "not" clarifications. In umbrella mode, resolves the target file from cwd; override with `--repo umbrella` or `--repo <name>`. See [capturing terminology](../usage/context.md) for the full flow.
+
 ## /hv-docs
 
 Manages the public documentation site under the configured `docs.path` directory. Handles creating, updating, and organizing docs pages so project documentation stays in sync with the codebase.

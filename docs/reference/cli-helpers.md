@@ -25,6 +25,10 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
+| `hv-context-query` | Print matching `## <term>` sections from `CONTEXT.md` (umbrella-aware: returns union of umbrella-shared + active sub-repo) | `.hv/bin/hv-context-query backlog session` |
+| `hv-context-index` | Regenerate the managed `hv-context` block in `CLAUDE.md` | `.hv/bin/hv-context-index` |
+| `hv-context-add` | Insert or update a term in `CONTEXT.md`; re-renders body alphabetically; exit 3 on alias collision, exit 4 on umbrella resolution failure | `.hv/bin/hv-context-add backlog --def "the canonical queue" --alias "todo list"` |
+| `hv-context-map` | Regenerate `.hv/CONTEXT-MAP.md` pointer index (umbrella only) | `.hv/bin/hv-context-map` |
 | `hv-map-query` | Print selected subsystem detail file bodies from `.hv/map/` | `.hv/bin/hv-map-query capture work` |
 | `hv-map-index` | Regenerate the managed `hv-map` block in `CLAUDE.md` from `.hv/map/<name>.md` frontmatter `summary:` | `.hv/bin/hv-map-index` |
 | `hv-map-stats` | JSON: per-subsystem bytes, last-touched, entry-point counts, broken `file:line` refs | `.hv/bin/hv-map-stats` |
@@ -124,6 +128,8 @@ the knowledge helpers. The distinction is semantic: decisions are *active*
 hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
 while knowledge is *passive* gotchas captured by `/hv-learn`. See
 [Decisions](../usage/decisions.md) for when to use which.
+
+`hv-context-query` and `hv-context-index` operate on `.hv/CONTEXT.md` — the domain glossary written by [`/hv-context`](slash-commands.md#hv-context). In umbrella mode, `hv-context-query` returns the union of umbrella-shared and active-sub-repo terms (sub-repo entries win on name collision). `hv-context-index` regenerates the `<!-- hv-context-start -->` block in `CLAUDE.md`; when called from inside a sub-repo it includes a `### <repo>` sub-heading for sub-repo-scoped terms after the umbrella-shared block. `hv-context-add` is the write path: it inserts or updates a term, re-renders the file body alphabetically, and exits 3 on alias collision or 4 on umbrella resolution failure. `hv-context-map` regenerates `.hv/CONTEXT-MAP.md` (umbrella only). See [capturing terminology](../usage/context.md) and the [CONTEXT.md format reference](context-md.md).
 
 The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints
 the next `MNN` ID, creates the milestone file, and appends its overview line to

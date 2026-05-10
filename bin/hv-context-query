@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Print the matching ## <term> section(s) from .hv/CONTEXT.md (single-repo)
+# or umbrella + active sub-repo CONTEXT.md (umbrella mode). Each section is
+# preceded by a `> from: <path>` line so callers know which file the entry
+# came from.
+# Usage: hv-context-query <term>...
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Pre-navigate to the .hv/ root found by walking up from the invocation cwd so
+# that hv_self_locate fast-paths and uses the correct umbrella (not the helper
+# binary's own dev tree when running from a tmp sub-repo in smoke tests).
+ORIG_CWD="$(pwd -P)"
+if [ ! -d ".hv" ]; then
+  if _UMBRELLA_TMP="$(cd "$ORIG_CWD" && "$HERE/hv-walk-up" 2>/dev/null)"; then
+    cd "$_UMBRELLA_TMP"
+  fi
+fi
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+UMBRELLA_ON=$("$HERE/hv-umbrella-on")
+SUBREPO=""
+if [ "$UMBRELLA_ON" = "yes" ]; then
+  SUBREPO=$(cd "$ORIG_CWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$UMBRELLA_ON" "$SUBREPO" "$@" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import iter_topics
+
+umbrella_on, subrepo = sys.argv[1], sys.argv[2]
+wanted = {t.strip().lower() for t in sys.argv[3:]}
+if not wanted:
+    sys.exit(0)
+
+# Sources in priority order (last source wins on collision).
+sources: list[tuple[Path, str]] = []
+shared = Path(".hv/CONTEXT.md")
+if shared.exists():
+    sources.append((shared, "umbrella" if umbrella_on == "yes" else "single"))
+if umbrella_on == "yes" and subrepo:
+    sub = Path(f".hv/contexts/{subrepo}/CONTEXT.md")
+    if sub.exists():
+        sources.append((sub, subrepo))
+
+# Collect with later sources winning. Preserve insertion order: umbrella file's
+# document order first, with sub-repo overrides slotting into the original key
+# position rather than re-sorting alphabetically.
+sections: dict[str, tuple[str, str, str]] = {}
+for path, label in sources:
+    for name, body in iter_topics(path.read_text()):
+        key = name.lower()
+        if key not in wanted:
+            continue
+        if key in sections and label not in ("umbrella", "single"):
+            sys.stderr.write(
+                f"note: {path}: sub-repo entry for '{name}' overrides umbrella\n"
+            )
+        sections[key] = (name, body, str(path))
+
+first = True
+for key, (name, body, src) in sections.items():
+    if not first:
+        print()
+    print(f"> from: {src}")
+    print(f"## {name}")
+    print(body.rstrip())
+    first = False
+PY

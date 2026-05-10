@@ -201,6 +201,8 @@ If any item's input contains bulky raw data (crash dumps, stack traces, log outp
 
 ## Step 6 — Write All Entries
 
+**Consult `## Project Context`.** Before composing the bullet, scan the always-on `## Project Context` block. If the user's phrasing maps to a canonical term (or one of its aliases), use the canonical name in the captured bullet so the backlog stays consistent with the rest of the project's vocabulary. If the captured idea introduces a *new* domain concept the user names explicitly, suggest `/hv-context <term>` after the capture commits — never auto-invoke.
+
 For each item, get the next ID and append the entry in a single command:
 
 ```bash

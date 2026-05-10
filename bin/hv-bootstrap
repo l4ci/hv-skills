@@ -43,6 +43,18 @@ AI-facing index of subsystems. Detail files live in `.hv/map/<name>.md` and are 
 Use `/hv-map` to scaffold (`first-run`), update touched subsystems (`after-work`), or consolidate dormant entries (`consolidate`).
 EOF
 
+[ -f "$HV/CONTEXT.md" ] || cat > "$HV/CONTEXT.md" <<'EOF'
+# Context
+
+Domain terminology for this project. Each entry is one term: a canonical
+definition, optional aliases (synonyms used informally), optional "not"
+clarifications. Use `/hv-context` to add or refine terms; `/hv-work`,
+`/hv-debug`, `/hv-vision`, and `/hv-capture` consult this file when their
+work touches a listed term.
+
+_(no terms yet — run `/hv-context` to capture domain terminology)_
+EOF
+
 [ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
 # Vision
 
@@ -87,6 +99,37 @@ if [ -f .gitignore ]; then
   grep -qxF '.hv/' .gitignore 2>/dev/null || printf '\n# ── hv backlog ──\n.hv/\n' >> .gitignore
 else
   printf '# ── hv backlog ──\n.hv/\n' > .gitignore
+fi
+
+# Umbrella scaffolding: when .hv/repos.json is present, seed per-sub-repo
+# context files and the umbrella CONTEXT-MAP.md. Idempotent.
+if [ -f "$HV/repos.json" ]; then
+  python3 - "$HV" <<'PY'
+import json, os, sys
+hv = sys.argv[1]
+try:
+    with open(f"{hv}/repos.json") as f:
+        repos = json.load(f).get("repos", [])
+except Exception:
+    repos = []
+if not repos:
+    sys.exit(0)
+os.makedirs(f"{hv}/contexts", exist_ok=True)
+for entry in repos:
+    name = entry.get("name", "")
+    if not name:
+        continue
+    d = f"{hv}/contexts/{name}"
+    os.makedirs(d, exist_ok=True)
+    p = f"{d}/CONTEXT.md"
+    if not os.path.exists(p):
+        with open(p, "w") as f:
+            f.write("# Context\n\n_(no terms yet — run `/hv-context` from this sub-repo to capture domain terminology)_\n")
+PY
+  # Regenerate CONTEXT-MAP.md if hv-context-map is reachable alongside.
+  if [ -x "$(dirname "$0")/hv-context-map" ]; then
+    "$(dirname "$0")/hv-context-map" || true
+  fi
 fi
 
 # Migrate KNOWLEDGE.md preamble from legacy /hv:X to /hv-X (Claude Code

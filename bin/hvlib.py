@@ -434,6 +434,69 @@ def iter_topics(content: str):
         yield name, body
 
 
+def parse_term_entry(body: str) -> dict:
+    """Extract definition, aliases, nots from a CONTEXT.md term section body.
+
+    Body is the text after `## <term>` up to the next `## ` heading (the same
+    string `iter_topics` yields). Recognized markers in the body:
+
+      - `**Aliases:** a, b, c`  (or `_none_` for empty list)
+      - `**Not:** x, y, z`      (optional; absent → empty list)
+      - `<!-- YYYY-MM-DD -->`   (date stamp; ignored here, parsed by callers)
+
+    Everything before the first marker line is the definition (whitespace-
+    stripped). The HTML date comment is treated as a marker (definition ends
+    above it) but its value is not parsed by this helper.
+
+    Returns: {"definition": str, "aliases": list[str], "nots": list[str]}
+    """
+    aliases: list[str] = []
+    nots: list[str] = []
+    def_lines: list[str] = []
+    seen_marker = False
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("**Aliases:**"):
+            value = stripped[len("**Aliases:**"):].strip()
+            if value and value != "_none_":
+                aliases = [a.strip() for a in value.split(",") if a.strip()]
+            seen_marker = True
+            continue
+        if stripped.startswith("**Not:**"):
+            value = stripped[len("**Not:**"):].strip()
+            if value:
+                nots = [n.strip() for n in value.split(",") if n.strip()]
+            seen_marker = True
+            continue
+        if stripped.startswith("<!--") and stripped.endswith("-->"):
+            seen_marker = True
+            continue
+        if not seen_marker:
+            def_lines.append(line)
+    definition = "\n".join(def_lines).strip()
+    return {"definition": definition, "aliases": aliases, "nots": nots}
+
+
+def first_sentence(text: str, max_chars: int = 160) -> str:
+    """Return the leading sentence of `text` (up to the first `.`, `!`, or `?`
+    followed by whitespace or EOL). If the result exceeds `max_chars`, hard-cut
+    at the last word boundary <= max_chars and append `…`. Never raises;
+    returns `""` for empty input.
+
+    Used by the CLAUDE.md `## Project Context` block renderer to derive a
+    one-line gloss from a term's full definition paragraph.
+    """
+    if not text:
+        return ""
+    text = text.strip()
+    m = re.search(r"[.!?](?:\s|$)", text)
+    sentence = text[:m.end()].rstrip() if m else text
+    if len(sentence) <= max_chars:
+        return sentence
+    cut = sentence[:max_chars].rsplit(" ", 1)[0]
+    return cut.rstrip(",;") + "…"
+
+
 def infer_version_kind(filepath) -> str:
     """Return the manifest kind for a version-bearing file path. Filename-based.
     Known kinds: plugin-json, package-json, pyproject, cargo, plain.

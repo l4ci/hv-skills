@@ -52,7 +52,7 @@ Phases:
 1. *Detect* — environment + umbrella decision (Steps 1, 1.5)
 2. *Write artifacts* — bootstrap `.hv/` and install helpers (Step 2)
 3. *Configure* — interactive config (FRESH or STALE migration, Step 3)
-4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map indices (Step 4)
+4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map, context indices (Step 4)
 
 ## Step 1.5 — Umbrella Detection (Optional)
 
@@ -447,7 +447,7 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed four managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), and decision topics (`/hv-decide`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
+Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (`/hv-map`), and domain-glossary terms (`/hv-context`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
 
 ```bash
 .hv/bin/hv-skills-index
@@ -455,6 +455,7 @@ Seed four managed blocks in `CLAUDE.md` (created if missing): the hv-skills slas
 .hv/bin/hv-vision-index
 .hv/bin/hv-decisions-index
 .hv/bin/hv-map-index
+.hv/bin/hv-context-index
 ```
 
 Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
@@ -466,7 +467,7 @@ Tell the user one compact block:
 ```
 Initialized .hv/ in <project>.
 Config: <summary — "defaults" if all Recommended, else a one-liner e.g. "Balanced models, worktree isolation, PR merges, verifier on">.
-Next: /hv-capture to add items, /hv-next to pick work, /hv-learn to save learnings.
+Next: /hv-capture to add items, /hv-next to pick work, /hv-context to capture domain terms, /hv-learn to save learnings.
 Edit .hv/config.json to change any of these later.
 ```
 
