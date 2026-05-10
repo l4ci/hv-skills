@@ -89,3 +89,7 @@ is advisory ("remember this if relevant"); decisions are hard boundaries
 (violations FAIL review). Use `/hv-decide` for the latter. It captures
 rule + why + forbids + permits and is consulted as a constraint by `/hv-work`,
 [`/hv-debug`](debugging.md), [`/hv-plan`](vision-and-plans.md), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor), [`/hv-review`](review-and-ship.md), and [`/hv-vision`](vision-and-plans.md).
+
+## See also
+
+- Sibling persistence skills: [`docs/usage/decisions.md`](decisions.md), [`docs/usage/context.md`](context.md)
