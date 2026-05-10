@@ -64,7 +64,7 @@ else:
     if shared_entries:
         lines.extend(shared_entries)
     else:
-        lines.append("- _(no umbrella-shared terms yet)_")
+        lines.append("- _(no umbrella-shared terms yet — run `/hv-context` to capture domain terminology)_")
     if subrepo:
         lines.append("")
         lines.append(f"### {subrepo}")
