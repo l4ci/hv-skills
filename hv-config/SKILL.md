@@ -39,6 +39,14 @@ Change one or more configuration values without hand-editing JSON. Same option v
 
 See `docs/reference/preflight.md` for exit-code handling. Variant: on exit `2`, invoke `hv-init` via `Skill` then stop — init writes the initial config interactively, so this skill has nothing to do afterward.
 
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Pick keys", description="Stage category-then-keys selection via AskUserQuestion")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (user picks no keys, all values valid first try) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Pick keys* — category-then-keys two-stage selection (Steps 2–3)
+2. *Validate* — new values normalized and checked against allowed sets (Step 4)
+3. *Write* — `.hv/config.json` updated; managed CLAUDE.md blocks regenerated if relevant (Steps 5–6)
+
 ## Step 2 — Read & Display Current Config
 
 ```bash
