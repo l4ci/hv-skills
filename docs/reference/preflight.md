@@ -24,8 +24,16 @@ Every default skill follows this pattern:
 
 ## Variants
 
-- **Observe-only skills** (`/hv-pause`, `/hv-next`). These read state and route; they shouldn't auto-init for `2`. On exit `2`, surface a brief "nothing to show, `/hv-init` first" message and stop. On exit `3`, refresh via `hv-init` (helpers may be needed for the read).
-- **`/hv-config`**. On exit `2`, the user clearly wants to configure the project, so invoke `hv-init` (which writes the initial config interactively) then stop. On exit `3`, refresh and continue.
+Three skills have skill-specific exit-2 behavior; their preflight step omits exit-code prose because the variant is captured here.
+
+| Skill | On exit `2` | On exit `3` |
+|-------|------------|------------|
+| `/hv-next` | Surface *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop. | Refresh via `hv-init` (helpers may be needed for the read). |
+| `/hv-pause` | Surface *"Nothing to pause — `/hv-init` the project first."* and stop. | Refresh via `hv-init`. |
+| `/hv-config` | Invoke `hv-init` via the `Skill` tool, then stop — init writes the initial config interactively, so this skill has nothing to do afterward. | Refresh via `hv-init` and continue. |
+
+Two more skills are structural variants:
+
 - **`/hv-update`** checks `gh` is on `PATH` *before* preflight; the GitHub-release check is the primary purpose, and a missing `gh` should fail fast before touching `.hv/`.
 - **`/hv-init`** is the bootstrapper itself; it doesn't run preflight.
 
@@ -44,3 +52,5 @@ Required data files under `.hv/`:
 Required helpers under `.hv/bin/`: every `hv-*` script alongside `hv-preflight` in the source `bin/` (auto-discovered, minus `hv-preflight` itself), plus `hvlib.py`.
 
 Source of truth: [`bin/hv-preflight`](../../bin/hv-preflight).
+
+Skill authors: see Variants table above before writing inline exit-2 prose in a SKILL.md — if the skill is a variant, the cite is enough.
