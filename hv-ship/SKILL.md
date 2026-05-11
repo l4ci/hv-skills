@@ -178,7 +178,7 @@ For each ID in the scope JSON's `referencedIds`:
 
 Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh.
 
-Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched** (use the scope JSON's `touchedFiles` for the count), OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+Apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug) — for the files count, use the scope JSON's `touchedFiles` field. Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
 
 When triggered, branch on `autonomy.level`:
 
@@ -189,7 +189,7 @@ When triggered, branch on `autonomy.level`:
 
 Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
 
-When the flag is on, trigger condition (same gating as Step 8.5): **2+ items resolved**, OR **≥5 files touched** (use the scope JSON's `touchedFiles` for the count), OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+When the flag is on, apply the same post-cycle trigger condition as Step 8.5 — see `references/post-cycle-trigger-gate.md`.
 
 When triggered, branch on `autonomy.level`:
 
