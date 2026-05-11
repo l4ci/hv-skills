@@ -60,18 +60,18 @@ Name the spike with a short kebab-case identifier (`sse-feasibility`, `auth-rota
 
 ## Step 2.5 (Start mode) — Resolve Sub-Repo (umbrella mode only)
 
-Skip this step entirely when umbrella mode is off (`.hv/repos.json` does not exist or has no entries).
+Skip this step entirely when umbrella mode is off (`hv-umbrella-on` returns `no`). See `references/umbrella-mode.md` for what umbrella mode means and how the registry works.
 
-In umbrella mode, the spike branch must land in a specific sub-repo (the umbrella itself is often not a git repo at all). Determine `<repo>`:
+In umbrella mode, the spike branch must land in a specific sub-repo (the umbrella root often is not a git repo at all). Resolve `<repo>` via the 3-step fallback codified in KNOWLEDGE 2026-05-02:
 
 1. If the user named a sub-repo in their input (e.g. *"spike SSE feasibility in web"*) — use it.
-2. Else, run `.hv/bin/hv-resolve-repo` from the current cwd. If that succeeds, default to the resolved name.
+2. Else, run `.hv/bin/hv-resolve-repo` from the current cwd; if it succeeds, default to the resolved name.
 3. Else, ask via `AskUserQuestion`:
    - **Header:** `"Repo"`
    - **Question:** *"Which sub-repo should `spike/<name>` live in?"*
-   - **Options:** one per registered sub-repo (read names from `.hv/repos.json` via `load_repos()` or `cat .hv/repos.json`), single-select.
+   - **Options:** one per registered sub-repo (read names from `.hv/repos.json` via `load_repos()`), single-select.
 
-Carry `<repo>` into Step 4's helper invocation as `--repo <repo>`. The spike file still lands at the umbrella's `.hv/spikes/<name>.md` — only the git branch lives in the sub-repo.
+Carry `<repo>` into Step 4's helper invocation as `--repo <repo>`. The spike file still lands at the umbrella's `.hv/spikes/<name>.md` — only the git branch lives in the sub-repo, per the umbrella-vs-sub-repo `.git/` distinction in `references/umbrella-mode.md`.
 
 ## Step 3 (Start mode) — Confirm Before Branching
 
