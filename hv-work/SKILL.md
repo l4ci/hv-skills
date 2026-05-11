@@ -246,7 +246,7 @@ A wave is "commit-producing" by default; "read-only" workers (research, lint-onl
 
 ### Branch / worktree creation
 
-Pick the pattern from `references/isolation-patterns.md` based on `work.isolation` (`"branch"` or `"worktree"` from `.hv/config.json`) and whether umbrella mode is on (Step 4.5 resolved the sub-repo set; carry it forward). The reference's decision table covers all five combinations: single-repo branch, single-repo worktree, umbrella sub-repo branch, umbrella sub-repo worktree (Layout B), umbrella multi-repo branch.
+Pick the pattern from `references/isolation-patterns.md` based on `work.isolation` (`"branch"` or `"worktree"` from `.hv/config.json`) and whether umbrella mode is on (Step 4.5 resolved the sub-repo set; carry it forward). The reference's decision table covers all five combinations: single-repo branch, single-repo worktree, umbrella sub-repo branch, umbrella sub-repo worktree (Layout B), umbrella multi-repo branch (via `.hv/bin/hv-multi-branch-create`, which runs an atomic precheck across every named repo before creating any branches).
 
 The most common case — single-repo, branch isolation — is just:
 

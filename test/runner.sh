@@ -12,6 +12,18 @@ TESTDIR="$REPO/test"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# Leak guard: snapshot $REPO/CLAUDE.md before any section runs. The
+# post-loop assertion below restores + fails if a section's helper walks
+# up past $TMP and rewrites the dev tree's CLAUDE.md. The check is
+# explicit-at-end (not EXIT-trap-based) because sections follow the
+# F38 local-trap convention and overwrite EXIT — see test/lib.sh.
+REPO_CLAUDE="$REPO/CLAUDE.md"
+REPO_CLAUDE_SNAP=""
+if [ -f "$REPO_CLAUDE" ]; then
+  REPO_CLAUDE_SNAP="$(mktemp)"
+  cp "$REPO_CLAUDE" "$REPO_CLAUDE_SNAP"
+fi
+
 cd "$TMP"
 mkdir -p .hv/bugs .hv/features .hv/tasks .hv/milestones
 
@@ -54,5 +66,16 @@ for f in "$TESTDIR/sections/"*.sh; do
   [ -f "$f" ] || continue
   source "$f"
 done
+
+# Leak guard assertion: if any section wrote to $REPO/CLAUDE.md, restore
+# from snapshot and fail. Smoke is supposed to be hermetic w.r.t. $TMP;
+# a diff here means a helper walked up past $TMP/.hv to the dev tree's.
+if [ -n "$REPO_CLAUDE_SNAP" ] && ! cmp -s "$REPO_CLAUDE_SNAP" "$REPO_CLAUDE"; then
+  printf '\n\033[31merror: smoke leaked into %s — restoring from snapshot\033[0m\n' "$REPO_CLAUDE" >&2
+  cp "$REPO_CLAUDE_SNAP" "$REPO_CLAUDE"
+  rm -f "$REPO_CLAUDE_SNAP"
+  exit 1
+fi
+[ -n "$REPO_CLAUDE_SNAP" ] && rm -f "$REPO_CLAUDE_SNAP"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
