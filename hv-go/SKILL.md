@@ -57,9 +57,5 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 
 ## Rules
 
-- **Capture is real.** IDs increment, entries land in `TODO.md`, detail files get written. Preserves audit trail.
-- **Multiple items OK.** If the user mentioned 3 items, all get captured and all get passed to `/hv-work` as a batch.
-- **Delegate, don't duplicate.** Every capture rule lives in `/hv-capture`; every execution rule lives in `/hv-work`.
-- **Umbrella mode is automatic.** `/hv-capture` (Step 2) asks for `Repos:` when umbrella mode is on; `/hv-work` (Step 4) resolves that field to a sub-repo and runs git ops there. `/hv-go` itself stays a pass-through — it doesn't ask any umbrella-specific question. From inside a registered sub-repo, the cwd informs the default repo via `hv-resolve-repo`.
-- **Update project map.** Invoke `/hv-map after-work` if the change touched files belonging to a known subsystem.
-- **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
+- **Delegate, don't duplicate.** Capture mechanics (ID minting, classification, detail files, `Repos:` tagging in umbrella mode) live in `/hv-capture`. Execution and post-cycle nudges (branch creation, worker dispatch, commits, `/hv-map after-work`, soft-cap check, `/hv-learn`) live in `/hv-work`. `/hv-go` is a pass-through orchestrator — it does not own any of these rules independently.
+- **Capture survives clean-tree guard failure.** Step 2 writes to gitignored `TODO.md` before Step 3's guard. If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
