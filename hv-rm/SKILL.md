@@ -30,9 +30,9 @@ See `docs/reference/preflight.md` for exit-code handling.
 Phases:
 
 1. *Resolve IDs* — args parsed, each ID matched to a TODO entry (Step 2)
-2. *Dry-run preview* — removal plan rendered, cross-references identified (Steps 3–4)
-3. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step 5)
-4. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Steps 6–7)
+2. *Dry-run preview* — removal plan rendered, cross-references identified (Step 3)
+3. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step 4)
+4. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Step 5)
 
 ## Step 2 — Parse Arguments
 
