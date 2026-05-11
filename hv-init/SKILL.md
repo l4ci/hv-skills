@@ -197,177 +197,29 @@ Branch on the output:
 - `FRESH` — no config yet. Ask all five questions below, then write the full config (FRESH write block).
 - `STALE:key1,key2,…` — upgrade path. Ask **only** the questions that map to the listed missing keys, then merge the answers into the existing file via the STALE write block — every value already in the file stays untouched.
 
-Call `AskUserQuestion` with just the applicable questions in one call. The "(Recommended)" option on each is the current default; selecting it (or "Other" with no alternative) writes the default value. The user can decline with the native "skip" — if that happens, write the Recommended defaults for the pending keys only.
+Call `AskUserQuestion` with the applicable questions in one call. Use the question wording and option vocabulary from [`docs/reference/config-options.md`](../docs/reference/config-options.md) — that page is the canonical source for Q1–Q5 labels, descriptions, and the mapping from answers to JSON config values. The reference also covers the `/hv-config` validation rules (Other-with-valid-value handling, plain-text fallback to Recommended defaults) so they need not be restated here.
 
-**Q1 — Models** (`header: "Models"`, single-select)
-
-> *"Which model profile should hv-skills use for orchestration and implementation?"*
-
-| Label | Description |
-|-------|-------------|
-| Balanced — Opus + Sonnet (Recommended) | Opus plans and verifies, Sonnet executes. Strong reasoning where it matters; fast execution elsewhere. |
-| Premium — Opus only | Opus for everything. Highest quality, highest cost. |
-| Fast — Sonnet only | Sonnet for both roles. Faster and cheaper; fine for well-specified tasks. |
-| Minimal — Sonnet + Haiku | Sonnet plans, Haiku executes. Cheapest. Best for mechanical, low-risk work. |
-
-**Q2 — Isolation** (`header: "Isolation"`, single-select)
-
-> *"How should `/hv-work` isolate changes from main?"*
-
-| Label | Description |
-|-------|-------------|
-| Branch (Recommended) | Feature branch in the current worktree. Simple, works everywhere. |
-| Worktree | Isolated directory under `.claude/worktrees/`. Lets you keep using main while agents work; supports parallel sessions. |
-
-**Q3 — Integration** (`header: "Integration"`, single-select)
-
-> *"How should `/hv-work` and `/hv-ship` integrate finished work?"*
-
-| Label | Description |
-|-------|-------------|
-| Direct merge (Recommended) | Merge into main with `--no-ff` and delete the branch. Fast solo iteration. |
-| GitHub PR | Push the branch and open a PR with `gh pr create`. Required for team review. |
-
-**Q4 — Quality gates** (`header: "Gates"`, `multiSelect: true`)
-
-> *"Which quality gates should run by default? (Uncheck anything you want off.)"*
-
-| Label | Description |
-|-------|-------------|
-| Review before ship (Recommended) | `/hv-ship` runs `/hv-review` first. FAIL blocks, CONCERNS ask, PASS flows through. |
-| Verify learnings (Recommended) | `/hv-learn` dispatches an Opus verifier for a cold pass on new entries. Knowledge quality compounds. |
-| Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
-| Competing hypotheses (debug) | `/hv-debug` dispatches 3 parallel hypothesis agents from different angles. Better diversity on hard bugs, ~3× orchestrator cost. |
-
-**Q5 — Autonomy** (`header: "Autonomy"`, single-select)
-
-> *"How autonomously should hv-skills chain to the next logical step?"*
-
-| Label | Description |
-|-------|-------------|
-| Off (Recommended) | Skills nudge with a one-line suggestion at decision points. You stay in the driver's seat. |
-| Auto chain | One-hop chaining: `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`, `/hv-ship` → `/hv-learn`, refactor threshold → `/hv-refactor`. Stops after the chained step. |
-| Full loop | Auto chain + after each cycle, invoke `/hv-next` and start the next item. Runs until the backlog drains, a guard fails, or a brief is genuinely ambiguous. |
-
-Map answers to config values:
-
-| Answer | Config |
-|--------|--------|
-| Q1 Balanced | `models: {orchestrator: "opus", worker: "sonnet"}` |
-| Q1 Premium | `models: {orchestrator: "opus", worker: "opus"}` |
-| Q1 Fast | `models: {orchestrator: "sonnet", worker: "sonnet"}` |
-| Q1 Minimal | `models: {orchestrator: "sonnet", worker: "haiku"}` |
-| Q2 Branch | `work.isolation: "branch"` |
-| Q2 Worktree | `work.isolation: "worktree"` |
-| Q3 Direct merge | `work.mergeStrategy: "direct"` |
-| Q3 GitHub PR | `work.mergeStrategy: "pr"` |
-| Q4 includes "Review before ship" | `ship.review: true` (else `false`) |
-| Q4 includes "Verify learnings" | `learn.verify: true` (else `false`) |
-| Q4 includes "Confirm before refactor" | `refactor.confirmBeforeExecute: true` (else `false`) |
-| Q4 includes "Competing hypotheses" | `debug.competingHypotheses: true` (else `false`) |
-| Q5 Off | `autonomy.level: "off"` |
-| Q5 Auto chain | `autonomy.level: "auto"` |
-| Q5 Full loop | `autonomy.level: "loop"` |
-
-If the user picked "Other" with custom text, honor it only if it's a valid value for that key (`"opus"/"sonnet"/"haiku"`, `"branch"/"worktree"`, `"direct"/"pr"`, `"off"/"auto"/"loop"`); otherwise silently fall back to the Recommended value.
-
-Plain-text fallback: write the Recommended defaults for any pending keys — don't stall the init on a missing tool.
+On `FRESH`, ask all five questions; on `STALE:k1,k2,…`, ask only the questions that map to the listed missing keys. The "(Recommended)" tag on each option is the install-time default; selecting it (or "Other" with no alternative) writes the default value. If the user declines via the native skip, write the Recommended defaults for the pending keys only.
 
 ## Authoring conventions
 
-These conventions constrain how new hv-skills (or new behavior in existing skills) is authored. They live here in `hv-init/SKILL.md` because /hv-init is the canonical entry point — the place a new author touches first when they ship a new flag, skill, or umbrella feature.
+The 9 conventions that constrain how new hv-skills (or new behavior in existing skills) are authored live in [`references/authoring-conventions.md`](../references/authoring-conventions.md). They live there (not inline here) so the rule set is one Read away for any skill author and isn't tangled with `/hv-init`'s own configuration logic. Skill authors writing or modifying any `hv-*/SKILL.md` consult that file before landing new behavior.
 
-### Skills are self-contained — no shared contract file
+Inventory (in order — see the reference for each rule's full body, *Why*, **Forbids**, **Permits**):
 
-Each skill owns its rules inline. A "shared contract" reference file (an old `GUIDE.md` was one) is a smell when every rule has a single owner. Audit the cross-refs before retaining a shared file: if each rule is already mirrored inline at the call site (preflight 3-exit codes, plain-text fallback, autonomy off/auto/loop dispatch, learn trigger thresholds, etc.), the central file is vestigial pointer-chasing. Build a shared file only when N≥3 callers need the same long rule verbatim.
+| # | Rule |
+|---|------|
+| 1 | Skills are self-contained — no shared contract file |
+| 2 | Imperative rules in autonomy-aware steps must live inline at every dispatch point |
+| 3 | Don't ask what the code can answer |
+| 4 | Surface multi-step skill progress with TaskCreate |
+| 5 | Routine routing/tagging auto-picks Recommended in loop mode |
+| 6 | User-volition gates enforced at exactly one point |
+| 7 | Stage features across slices using pass-through stubs |
+| 8 | Helper-centric V2-surface extension |
+| 9 | Opt-in feature flags default to `false` |
 
-### Imperative rules in autonomy-aware steps must live inline at every dispatch point
-
-Steps that branch on `autonomy.level` (off/auto/loop) and dispatch the next skill via `Skill` ("no prompt, no confirmation, no 'want me to' question") must repeat the directive verbatim alongside each `Skill`-tool invocation. Readers don't chase cross-refs to a single source of truth, and the harness drifts toward asking when only the rule's name is at the dispatch site. Redundancy is cheaper than scattered authority.
-
-### Don't ask what the code can answer
-
-Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.hv/` state — `grep`, `Read`, `git log`, `TODO.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
-
-Codified from grill-with-docs (2026-05-10): *"If a question can be answered by exploring the codebase, explore the codebase instead."* Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08) — that one constrains the option list when asking is the right move; this one constrains whether to ask at all.
-
-### Surface multi-step skill progress with TaskCreate
-
-Skills with three or more distinct phases must declare a visible task list at the end of Step 1 via `TaskCreate`, then mark each phase `in_progress` when starting it and `completed` when its observable outcome lands. The user sees a checklist instead of unannotated bash output; the agent stays oriented across long cycles. Without this, every multi-step run looks identical in the transcript to a single-step nudge — progress is invisible until the final report.
-
-The block lives at the end of Step 1's body, never as a new `Step 1.5`. The decimal-step rule (`KNOWLEDGE.md` / `DECISIONS.md`, 2026-05-08) reserves `.5/.6/.7` slots for sequential additions; this convention is content within Step 1, not a new step. On hosts where `TaskCreate` is not loaded (non-Claude-Code platforms), the boilerplate self-skips silently — loading is conditional on `ToolSearch select:TaskCreate,TaskUpdate`.
-
-Per-site shape (adapt phase list per skill):
-
-> **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="<phase 1 name>", description="<phase 1 outcome>")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases get `completed` with the no-op reason in the description.
->
-> Phases:
->
-> 1. *<phase title>* — *<one-line outcome>*
-> 2. *<phase title>* — *<one-line outcome>*
-> *(skill-specific list — 3 to 7+ phases)*
-
-**Forbids.**
-- Adding the block to single-phase or trivial skills (Tier C: `hv-assume`, `hv-go`, `hv-c`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
-- Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
-- Cross-skill alignment of phase names — each skill's phase list reflects its own structure; phrasing is local to the SKILL.md.
-- Calling `TaskCreate` from inside subagent dispatches — the orchestrator owns the task list; workers focus on their assigned tasks and report back.
-
-**Permits.**
-- Per-site phase counts from 3 to 7+ — the rule fires at "multi-step", not a fixed number. Use phase boundaries that match the skill's natural structure, not the integer step count.
-- Per-site boilerplate prose variations — this is a cross-cutting autonomy-shaped rule; per the 2026-05-09 `KNOWLEDGE.md` entry on cross-cutting prose, byte-equivalent repetition of the shell across 18 sites is acceptable when phase lists dominate.
-- Phases that absorb decimal sub-steps (e.g. `/hv-work` 13.5/13.7 fold into one "post-cycle nudges" phase) — phase boundaries are coarser than step boundaries by design.
-- Tracking spawned waves as nested tasks via `addBlocks`/`addBlockedBy` when a skill orchestrates parallel work — `/hv-work` may use this for its dispatched waves.
-
-Codified from F37 (2026-05-10): rolled out across Tier S/A/B SKILL.md files (hv-init + 17 others). Tier C skills stay untouched. Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08): both make the host's UI primitives load-bearing for skill UX.
-
-### Routine routing/tagging auto-picks Recommended in loop mode
-
-When `autonomy.level == "loop"`, AskUserQuestion calls that present a single clear `(Recommended)` option for **routine routing or tagging** must silently auto-pick the Recommended option without invoking AskUserQuestion. The host's question UI never fires; the skill proceeds as if the user picked the Recommended answer.
-
-This is what makes loop mode actually loop — a single "Tag with M01?" or "Resume vs ship?" prompt mid-queue stalls every subsequent item until the user types an answer. Loop mode's contract is "drain the queue until empty / guard / interrupt"; intermediate routine prompts violate it.
-
-Routine = the kind of question where the Recommended option is the obvious right answer, not a design pick. Examples: milestone tagging (`/hv-capture` Step 4.5), sub-repo tagging (`/hv-capture` Step 4.6), reconcile resolution (`/hv-next` Step 2 — resume / ship / leave), CONCERNS routing (`/hv-ship` Step 3 — "Address via /hv-work"), refactor scope and candidate gates.
-
-**Forbids.** Auto-picking on:
-- **Design decisions with open questions** — competing approaches, version-bump escalation, novel pattern choice. These belong to F32 (loop-mode auto-planning, with `[Auto:Loop]` decision logging). A `(Recommended)` flag on a design pick is a *suggestion*, not a routine answer; the loop must surface them.
-- **Manual gates that are never auto-invoked regardless of autonomy** — `/hv-decide` approvals, `/hv-learn` Step 8.5 issue filing, `/hv-learn` Step 9 runlog filing, `/hv-ship` Step 5 PR strategy, `/hv-release` push/publish gates. These have explicit `**Manual gate — ...**` callouts in their SKILL.md. Loop mode honors the gate — it does not auto-pick.
-- **Config-flip questions** — `/hv-init` initial setup, `/hv-config` edits, `/hv-docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
-
-**Permits.**
-- Routine routing/tagging with one clear Recommended option (the use cases listed above and any future analogue).
-- Sites that already implement the pattern explicitly (`/hv-next` Step 7 work-on-suggested-item, `/hv-update` Step 4 re-init) — same shape, already inline; new sites follow their lead.
-- Per-site phrasing variations — each site's loop branch states the auto-pick locally because the autonomy-rule-must-live-inline convention (above) forbids cross-refs to a single source of truth.
-
-The dispatch site should add a short loop branch alongside the existing `"off"` AskUserQuestion arm. Pattern (adapt phrasing per site):
-
-> **Loop mode:** when `autonomy.level == "loop"`, silently auto-pick the Recommended option without invoking AskUserQuestion — `<one-line summary of what gets dispatched>`.
-
-Codified after F33 caught loop-mode discontinuity from `/hv-capture` milestone tagging and `/hv-next` reconcile gates breaking the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` chain.
-
-### User-volition gates enforced at exactly one point
-
-Manual confirmation gates (`/hv-decide`'s manual-only contract, the public-artifact gate in `/hv-learn` Step 8.5, etc.) must be enforced at exactly ONE point in a skill, never propagated across orchestrator + called skill. The gate is architecture-enforced — only the owning skill can ask the question, and no other skill dispatches the gated skill via `Skill`. Putting a confirmation check in a skill that other skills can invoke breaks the contract under autonomy.
-
-### Stage features across slices using pass-through stubs
-
-Multi-slice features ship the SHAPE early via pass-through stubs that explicitly name the future-slice wiring point (e.g. *"Layer-1 filter is a pass-through stub; `bin/hv-docs-filter` lands in M01-S03"*). This signals what consumers should NOT rely on yet. **Companion rule:** when the milestone flips to `shipped`, sweep all `M0X-S0Y` slice references — they were placeholders and become stale after merge.
-
-### Helper-centric V2-surface extension
-
-When scaling a feature surface from "single X" to "list of X" (e.g. one repo → many) across N skills, push parsing/validation/dispatch into `bin/` helpers and confine each SKILL.md edit to a single guard paragraph: *"if the value resolves to ≥2 entries, call helper-X; otherwise unchanged."* Single-X path stays byte-identical, multi-X complexity lives in code (exercised by smoke), per-skill prose stays ≤15 lines.
-
-### Opt-in feature flags default to `false`
-
-When adding a new boolean config flag whose purpose is to enable additional skill behavior or auto-invocation:
-
-- **Default `false`** in both the FRESH write block and the STALE migration's setdefault.
-- **Never silently flip to `true`** anywhere — not on first detection, not on first invocation, not via cwd-inferred heuristics.
-- The owning skill flips the flag to `true` only via explicit user approval: first-run scaffold approval (the user opted in by approving), or `AskUserQuestion` on existing state with default "Leave off".
-- `/hv-config` edits the flag explicitly (the flag is never read-only).
-- **Exempt:** standard-on settings with opt-out semantics (e.g. `learn.verify: true`, `ship.review: true`) — these are not opt-in flags. Mode switches inside an already-enabled feature (e.g. `docs.autoCreate: false→true`) are also exempt.
-
-Codified after F15 introduced `docs.afterWork`. Without this rule, opt-in flags drift toward auto-flip-on-first-detect, which makes them on-by-default in practice — defeating the opt-in semantics. Mirror reminder lives in `hv-config/SKILL.md`.
+When adding a new rule to the convention set, edit `references/authoring-conventions.md` directly — not this SKILL.md. The inventory table above gets a new row in the same edit.
 
 ### FRESH write block
 
