@@ -130,7 +130,7 @@ If verification ran and passed, add a middle line: `Opus verification: PASS — 
 
 ## Step 8.5 — Suggest hv-skills issue (when applicable)
 
-This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing a public issue is high-stakes; the user presses the button.
+This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing a public issue is high-stakes; the user presses the button. See `references/manual-gates.md`.
 
 **Trigger heuristic.** Scan the just-captured bullets for any of:
 
@@ -186,7 +186,7 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
 
 ## Step 8.6 — Suggest runlog entry (when applicable)
 
-This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing to a public registry is high-stakes; the user presses the button. Mirrors Step 8.5's shape but for the *inverse* signal: external dependencies (third-party APIs, libraries, protocols, OSS quirks), not hv-skills internals.
+This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing to a public registry is high-stakes; the user presses the button. Mirrors Step 8.5's shape but for the *inverse* signal: external dependencies (third-party APIs, libraries, protocols, OSS quirks), not hv-skills internals. See `references/manual-gates.md`.
 
 **Trigger heuristic.** Scan the just-captured bullets for ANY of (literal union, not all):
 
