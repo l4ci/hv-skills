@@ -77,7 +77,7 @@ Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a 
 
 ## Step 4 — Capture the Diff
 
-The reviewer needs concrete diff content, not just file names. For each touched file (up to ~8 — more than that, ask the user which to focus on):
+The reviewer needs concrete diff content, not just file names. For each touched file (up to 8; with 9 or more, ask the user which to focus on):
 
 ```bash
 git diff <base>...<branch> -- <file>

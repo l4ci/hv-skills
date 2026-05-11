@@ -34,7 +34,7 @@ Determine the mode silently:
 
 - *"spike SSE for live updates"*, *"try X"*, *"feasibility check on Y"* → **Start mode**
 - *"spike done"*, *"finish the SSE spike"*, *"extract findings"* → **Finish mode**
-- Ambiguous → ask once
+- Neither set of triggers matches, or both match → ask once
 
 In Finish mode, list existing open spikes via `.hv/bin/hv-spike-list` and ask which one if not specified.
 
