@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Append text after the trailing <!-- date --> comment of a bullet in .hv/KNOWLEDGE.md.
+# The bullet is found by case-sensitive fragment match within the named topic.
+# Writer helper: exit 0 on successful write (or idempotent no-op);
+# exit 1 on missing argv, missing target, or other precondition error.
+#
+# Usage: hv-knowledge-amend --topic <T> --fragment <F> --append <text>
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+USAGE="usage: hv-knowledge-amend --topic <T> --fragment <F> --append <text>"
+
+TOPIC=""
+FRAGMENT=""
+APPEND_TEXT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --topic)
+      TOPIC="${2:?$USAGE}"
+      shift 2
+      ;;
+    --fragment)
+      FRAGMENT="${2:?$USAGE}"
+      shift 2
+      ;;
+    --append)
+      APPEND_TEXT="${2:?$USAGE}"
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$TOPIC" || -z "$FRAGMENT" || -z "$APPEND_TEXT" ]]; then
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+export _HV_KA_APPEND="$APPEND_TEXT"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$FRAGMENT" <<'PY'
+import os
+import sys
+from hvlib import read_or_empty, write_text_atomic, find_section
+
+topic = sys.argv[1]
+fragment = sys.argv[2]
+append_text = os.environ.get("_HV_KA_APPEND", "")
+
+content = read_or_empty(".hv/KNOWLEDGE.md")
+
+span = find_section(content, topic)
+if span is None:
+    print(f"error: topic '{topic}' not found in .hv/KNOWLEDGE.md", file=sys.stderr)
+    sys.exit(1)
+
+start, end = span
+section_body = content[start:end]
+
+# Find the first bullet line in the section body that contains fragment
+target_line = None
+for line in section_body.splitlines():
+    stripped = line.strip()
+    if stripped.startswith("- ") and fragment in stripped:
+        target_line = stripped
+        break
+
+if target_line is None:
+    print(f"error: no bullet in '{topic}' contains fragment '{fragment}'", file=sys.stderr)
+    sys.exit(1)
+
+# Build the amended line: append_text goes after the existing trailing content
+amended_line = target_line + " " + append_text
+
+# Replace the exact target line in the full content (scoped to section, but we
+# replace the first occurrence globally which will be in the right section since
+# the fragment search was already scoped to the section body — and we replace
+# using the exact line text).
+# To be safe, replace only within the section span.
+section_text = content[start:end]
+# Replace first occurrence of target_line in section_text
+idx = section_text.find(target_line)
+if idx == -1:
+    # Shouldn't happen since we found it above, but guard
+    print(f"error: internal: could not re-locate target line in section body", file=sys.stderr)
+    sys.exit(1)
+
+new_section_text = section_text[:idx] + amended_line + section_text[idx + len(target_line):]
+new_content = content[:start] + new_section_text + content[end:]
+
+write_text_atomic(".hv/KNOWLEDGE.md", new_content)
+PY
