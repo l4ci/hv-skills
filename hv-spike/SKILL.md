@@ -134,6 +134,14 @@ Read `.hv/spikes/<name>.md` for the original question and any notes the user alr
 
 Ask the user for the verbal summary if they haven't already given one — what they learned, viable or not, and why.
 
+**Fallback when the user stays silent.** Don't pause indefinitely and don't fabricate findings from intuition. Pivot to question-only mode via `AskUserQuestion`:
+
+- Pre-fill **What was tried** from the diff stat + commit log already gathered above — objective signals, no judgment required.
+- Ask one structured question for the decision: header `"Decision"`, single-select with options `"viable"`, `"not viable"`, `"depends on X"` (free-text X via "Other"), `"inconclusive"`.
+- If the user picks `viable`, follow up with one short free-text question for the recommended approach (one line); otherwise skip it and leave the field empty in Step 6.
+
+If even the structured question returns nothing usable (dismissed or empty), write `Decision: inconclusive` and `Findings:` listing only the observed diff/commit signals — never invent findings the user didn't confirm.
+
 ## Step 6 (Finish mode) — Write the Findings
 
 Use the `Edit` tool on `.hv/spikes/<name>.md` to fill in:
