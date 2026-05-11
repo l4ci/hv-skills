@@ -105,36 +105,9 @@ For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Nex
 
 Branch names already contain `/` (e.g. `hv/fix-X`) and `mkdir -p .hv/handoff` plus the branch path's nested dirs already cover that; the `@<repo>` suffix lives on the filename, not on a directory, so it can't collide with a literal subdirectory.
 
-Fill each section from the current session — omit sections that don't apply, but don't manufacture content.
+Compose the note from the template at `references/handoff-template.md` — fill each section from the current session, omit sections that don't apply, but don't manufacture content. The four sections in the template are exactly what `/hv-next` consumes.
 
-```markdown
-# Handoff — <branch>
-
-<!-- Paused YYYY-MM-DD HH:MM UTC -->
-
-## Working on
-
-- **Repo:** web                              <!-- omit when single-repo / no umbrella scope -->
-- **Items:** [B07], [F03]
-- **Milestone:** M01 — Auth foundation  <!-- omit if no active milestone or items aren't tagged -->
-- **Stage:** <e.g., "mid-hypothesis verification for B07", "implementing wave 2 of 3">
-
-## Next planned step
-
-<one or two sentences — the concrete action /hv-next should dispatch. Not a summary; a directive.>
-
-## Current hypothesis (if debugging)
-
-<the causal claim under test, with the verification probe that was about to run>
-
-## Uncommitted work
-
-<one of: "clean tree" / "stashed as `stash@{0}` — message: hv-pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
-```
-
-Use `Write` for each note (always overwrite — one handoff per `(branch, repo)` pair).
-
-These four sections are exactly what `/hv-next` reads. Anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere: `git log` and `git status` carry recent commits and mid-edit paths; durable learnings go to `/hv-learn` via the Step 6 nudge.
+Use `Write` for each note (always overwrite — one handoff per `(branch, repo)` pair). Durable learnings (gotchas, dead ends) belong in `/hv-learn` via the Step 6 nudge, not the handoff.
 
 ## Step 5 — Pin Status
 
