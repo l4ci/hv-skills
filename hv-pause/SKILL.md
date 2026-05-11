@@ -56,7 +56,7 @@ Determine the set of `(branch, repo)` entries to pause. The set has size 1 for s
    - **cwd resolves to a registered sub-repo** — pause set is the single matching `(branch, repo)` entry. The user explicitly scoped to one repo by `cd`-ing there; the other entries stay active.
    - **cwd doesn't resolve** (umbrella root or outside any sub-repo) — pause set is **all** matching entries, treated as one logical wave. Do not raise an `AskUserQuestion` — entries from a single `/hv-work` wave are paused together.
 4. **No match** — fall back to `git rev-parse --abbrev-ref HEAD` for the branch and pause set is `[(branch, null)]` (covers running `/hv-pause` before any `/hv-work` registered status).
-5. If the resolved branch is `main`/`master`/`trunk`, tell the user there's no feature work to pause and stop.
+5. If the resolved branch is the project base (run `.hv/bin/hv-guard-feature-branch <branch>` and check exit 1), tell the user there's no feature work to pause and stop.
 
 Steps 3–6 below operate on the pause set: single-entry sets keep today's behavior byte-for-byte; multi-entry wave sets loop the per-repo work and emit a single combined confirmation in Step 6.
 

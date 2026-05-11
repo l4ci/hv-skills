@@ -74,6 +74,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-refactor-targets` | JSON: umbrella mode flag + `hasCode` for the umbrella + every registered sub-repo's name and abs path. Used by `/hv-refactor` Step 1.5 to ask the user which scope to refactor | `.hv/bin/hv-refactor-targets` |
 | `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks); `--grep <pattern>` filters by substring | `.hv/bin/hv-backlog --grep dashboard` |
 | `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
+| `hv-guard-feature-branch` | Refuse to operate on the project's base branch (main/master/trunk/configured); exit 1 with stderr on the base, exit 0 on a feature branch | `.hv/bin/hv-guard-feature-branch` |
 | `hv-require-git-context` | Preflight: exit 1 with a friendly error if cwd is an umbrella root with no git context; silent on pass | `.hv/bin/hv-require-git-context hv-merge --repo-flag-supported` |
 | `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
 | `hv-umbrella-init` | Bootstrap an umbrella registry: scan child git repos, register a chosen subset (via stdin), write `.hv/repos.json` and append umbrella `.gitignore` lines | `echo "all" \| <source-bin>/hv-umbrella-init` |
