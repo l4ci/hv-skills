@@ -136,7 +136,7 @@ Then ask via `AskUserQuestion`:
   3. *"Minimal — `README.md` + `getting-started.md` only"*
   4. *"Cancel"* — don't scaffold; exit.
 
-Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed.
+Plain-text fallback: ask once in prose; default to Recommended on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
 
 On **Cancel** — print *"Scaffold cancelled. Run `/hv-docs` again whenever you're ready."* and exit.
 
@@ -277,7 +277,7 @@ Show all drafts in one batch (plain markdown — same as the first-run proposal 
   3. *"Skip"* — don't write anything; exit cleanly. Doesn't advance the `docs:` marker.
   4. *"Cancel"* — same as Skip in this slice; reserved for future-divergent semantics.
 
-Plain-text fallback: ask once in prose. If the answer is ambiguous, default to the Recommended option, name it explicitly, and proceed.
+Plain-text fallback: ask once in prose; default to Recommended on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
 
 ## Step A6 — Commit
 
