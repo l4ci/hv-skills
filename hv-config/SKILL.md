@@ -124,33 +124,17 @@ Plain-text fallback: if the host doesn't surface `AskUserQuestion` options at al
 
 ## Step 4 — Ask the Selected Questions
 
-Build a single `AskUserQuestion` call containing **only** the questions for the keys the user selected in Step 3. Each question reuses the option vocabulary from `/hv-init` — same labels, same descriptions — but tags the user's *current* value as `(current)` instead of marking the install-time default as `(Recommended)`. This way the user always sees what they're replacing without confusing it with what was originally recommended.
+Build a single `AskUserQuestion` call containing **only** the questions for the keys the user selected in Step 3. The question wording and option vocabulary live in [`docs/reference/config-options.md`](../docs/reference/config-options.md) — that page is the canonical source for both Q1–Q5 and the additional `/hv-config` keys (docs path, docs auto-create, docs after-work, git base branch, umbrella mode). Use the labels and descriptions from that reference verbatim.
 
-| Selected key | Question to ask | Options (single-select) |
-|--------------|-----------------|-------------------------|
-| Models | *"Which model profile should hv-skills use?"* | Balanced (Opus + Sonnet) / Premium (Opus only) / Fast (Sonnet only) / Minimal (Sonnet + Haiku) |
-| Isolation | *"How should `/hv-work` isolate changes from main?"* | Branch / Worktree |
-| Integration | *"How should `/hv-work` and `/hv-ship` integrate finished work?"* | Direct merge / GitHub PR |
-| Ship review | *"Run `/hv-review` before `/hv-ship` integrates?"* | On / Off |
-| Verify learnings | *"Run the Opus verifier on new `/hv-learn` entries?"* | On / Off |
-| Confirm before refactor | *"Pause for approval at `/hv-refactor` checkpoints?"* | On / Off |
-| Autonomy | *"How autonomously should hv-skills chain to the next logical step?"* | Off / Auto chain / Full loop |
-| Competing hypotheses | *"Dispatch 3 parallel hypothesis agents in `/hv-debug` Step 6? (Better diversity, ~3× orchestrator cost on every debug run.)"* | On / Off |
-| Docs path | *"Which directory contains your project documentation?"* | Free text (default: `docs`) |
-| Docs auto-create | *"Should `/hv-docs` auto-write doc updates after work cycles?"* | On / Off |
-| Docs after-work | *"Should `/hv-docs` run automatically after `/hv-work` and `/hv-ship` finish?"* | On / Off (Recommended) |
-| Git base branch | *"Enter the base branch for this project, or leave blank to auto-detect (main / master / trunk / origin HEAD)."* | Free text (default: `""`) |
-| Umbrella mode | *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json` — registered repos remain.)"* | On / Off |
+**Tag the user's current value as `(current)`.** Unlike `/hv-init` (which tags the install-time default as `(Recommended)`), `/hv-config` tags whichever option matches the user's current config value as `(current)` instead. This way the user always sees what they're replacing, not what was originally recommended.
 
-When toggling **Off**, registered repos in `.hv/repos.json` remain — helpers will simply ignore umbrella mode until re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
-
-For each question, tag the matching option with `(current)`. If the user's current value doesn't match any option (custom config), don't tag any — every option is a real change.
+If the user's current value doesn't match any option (custom config), don't tag any — every option is a real change.
 
 If the user picks the `(current)` option on a question, treat that key as a no-op — no write, no diff line.
 
-For descriptions on each option, copy the wording from `/hv-init` Q1–Q5 verbatim so users only learn the choices once. (See `hv-init/SKILL.md` Step 3 for the full descriptions.)
+**Umbrella toggling.** When toggling `umbrella.enabled` **Off**, registered repos in `.hv/repos.json` remain — helpers will simply ignore umbrella mode until re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
 
-Plain-text fallback: ask each selected key as a one-shot prompt, take the reply, validate it against the allowed values, fall back to current on invalid input.
+Plain-text fallback: ask each selected key as a one-shot prompt, take the reply, validate it against the allowed values listed in the reference, fall back to the current value on invalid input.
 
 ## Step 5 — Merge & Write
 
