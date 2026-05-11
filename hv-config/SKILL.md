@@ -154,33 +154,24 @@ Plain-text fallback: ask each selected key as a one-shot prompt, take the reply,
 
 ## Step 5 — Merge & Write
 
-Read the existing file, mutate only the keys the user changed, write back:
+For each key the user changed in Step 4, call the shared helper once. Other keys are preserved automatically — the helper reads, mutates the one path, writes atomically:
 
 ```bash
-python3 - <<PY
-import json
-from pathlib import Path
-p = Path(".hv/config.json")
-cfg = json.loads(p.read_text())
-
-# For each key the user changed in Step 4, do exactly one targeted assignment.
-# Use setdefault so existing keys in other sections aren't lost.
-# Examples (only run the lines that apply):
+# Examples (only run the lines that apply, one per key the user changed):
 #
-# cfg.setdefault("models", {})["orchestrator"] = "opus"
-# cfg.setdefault("models", {})["worker"] = "sonnet"
-# cfg.setdefault("work", {})["isolation"] = "worktree"
-# cfg.setdefault("work", {})["mergeStrategy"] = "pr"
-# cfg.setdefault("ship", {})["review"] = False
-# cfg.setdefault("learn", {})["verify"] = True
-# cfg.setdefault("refactor", {})["confirmBeforeExecute"] = False
-# cfg.setdefault("autonomy", {})["level"] = "loop"
-# cfg.setdefault("debug", {})["competingHypotheses"] = True
-# cfg.setdefault("umbrella", {})["enabled"] = True
-
-p.write_text(json.dumps(cfg, indent=2) + "\n")
-PY
+# .hv/bin/hv-config-set models.orchestrator opus
+# .hv/bin/hv-config-set models.worker sonnet
+# .hv/bin/hv-config-set work.isolation worktree
+# .hv/bin/hv-config-set work.mergeStrategy pr
+# .hv/bin/hv-config-set ship.review false
+# .hv/bin/hv-config-set learn.verify true
+# .hv/bin/hv-config-set refactor.confirmBeforeExecute false
+# .hv/bin/hv-config-set autonomy.level loop
+# .hv/bin/hv-config-set debug.competingHypotheses true
+# .hv/bin/hv-config-set umbrella.enabled true
 ```
+
+The helper parses each value as JSON (so `true`/`false`/numbers decode correctly); bare identifiers like `opus` / `loop` / `worktree` fall back to string. Run one call per key — do not batch.
 
 Rule: never write keys the user didn't pick. No full-file rewrite, no "while we're here let's also normalize". Targeted edits only.
 

@@ -65,17 +65,10 @@ Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs
       2. *"Leave off"* — exit without changes.
     - Plain-text fallback: ask once. Default to "Leave off" if ambiguous (opt-in semantics — never silently flip a config flag the user didn't ask for).
 
-The config write uses a small Python heredoc:
+The config write uses the shared helper:
 
 ```bash
-python3 - <<'PY'
-import json
-from pathlib import Path
-p = Path(".hv/config.json")
-cfg = json.loads(p.read_text())
-cfg.setdefault("docs", {})["afterWork"] = True
-p.write_text(json.dumps(cfg, indent=2) + "\n")
-PY
+.hv/bin/hv-config-set docs.afterWork true
 ```
 
 **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Mode select", description="Decide first-run / after-work / restructure based on docs/ state and config")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (after-work mode opt-out, no doc updates needed) get `completed` with the no-op reason in the description.
