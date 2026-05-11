@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Print files that reference <old-name>, one per line. Useful for spotting
+# rename + link-sweep collisions before grouping /hv-work tasks into waves:
+# given the OLD name being renamed, this is the incoming-link file set the
+# link-sweep task must own (or share carefully with the rename task).
+# Lookup helper: always exits 0 when ≥1 args are given. No matches, no repo,
+# and no scope hits are all silent (empty stdout, exit 0).
+# Usage: hv-plan-rename-check <old-name> [<scope>...]
+set -euo pipefail
+if [ "$#" -lt 1 ]; then
+  echo "usage: hv-plan-rename-check <old-name> [<scope>...]" >&2
+  exit 1
+fi
+NAME="$1"
+shift
+# git grep returns exit 1 when no matches; we want exit 0 always under lookup
+# semantics, so swallow with || true. The `-l` flag prints unique file names;
+# `--` separates pattern from pathspecs.
+if [ "$#" -gt 0 ]; then
+  git grep -l -- "$NAME" -- "$@" 2>/dev/null || true
+else
+  git grep -l -- "$NAME" 2>/dev/null || true
+fi
