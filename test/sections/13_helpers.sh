@@ -285,3 +285,64 @@ assert r['milestone'] == 'M01', f'milestone wrong reversed: {r}'
 " || fail "parse_todo_fields not order-agnostic"
 pass "parse_todo_fields extracts Detail/Related/Milestone in any order"
 
+echo "## hv-find-milestone-for-items"
+FM4I_TMP="$(mktemp -d)"
+(
+  cd "$FM4I_TMP"
+  mkdir -p .hv
+  cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B70] [P1] Single-tag bug.** Desc. Milestone: M01
+
+## Features
+- **[F70] [Minor] Multi-tag feature.** Desc. Milestone: M02, M10
+- **[F71] [Cosmetic] Untagged feature.** Just a tweak.
+
+## Tasks
+- **[T70] Plain task tagged M01.** Body. Milestone: M01
+
+## Completed
+- ~~**[F99] [Minor] Should not surface.** Desc. Milestone: M99~~ Done 2026-05-01 [`abc1234`]
+EOF
+
+  # 1. Unknown IDs → silent, exit 0
+  OUT=$("$BIN/hv-find-milestone-for-items" ZZ99) || fail "exit non-zero on unknown ID"
+  [ -z "$OUT" ] || fail "unknown ID produced output: '$OUT'"
+
+  # 2. Single tag
+  OUT=$("$BIN/hv-find-milestone-for-items" B70)
+  [ "$OUT" = "M01" ] || fail "single-tag wrong: '$OUT'"
+
+  # 3. Multi-tag
+  OUT=$("$BIN/hv-find-milestone-for-items" F70)
+  echo "$OUT" | grep -qx "M02" || fail "multi-tag missing M02: '$OUT'"
+  echo "$OUT" | grep -qx "M10" || fail "multi-tag missing M10: '$OUT'"
+
+  # 4. Dedup across input IDs sharing M01
+  OUT=$("$BIN/hv-find-milestone-for-items" B70 T70)
+  [ "$(echo "$OUT" | wc -l)" -eq 1 ] || fail "dedup failed: '$OUT'"
+  [ "$OUT" = "M01" ] || fail "dedup picked wrong value: '$OUT'"
+
+  # 5. Completed items don't surface
+  OUT=$("$BIN/hv-find-milestone-for-items" F99)
+  [ -z "$OUT" ] || fail "completed item leaked milestone: '$OUT'"
+
+  # 6. Untagged item is silent
+  OUT=$("$BIN/hv-find-milestone-for-items" F71)
+  [ -z "$OUT" ] || fail "untagged item leaked: '$OUT'"
+
+  # 7. Numeric sort: M01 < M02 < M10
+  OUT=$("$BIN/hv-find-milestone-for-items" B70 F70 T70)
+  EXPECTED=$(printf 'M01\nM02\nM10\n')
+  [ "$OUT" = "$EXPECTED" ] || fail "sort wrong: got '$OUT', want '$EXPECTED'"
+
+  # 8. No args → exit 1 with usage
+  if "$BIN/hv-find-milestone-for-items" 2>/dev/null; then
+    fail "no-args case exited 0"
+  fi
+)
+rm -rf "$FM4I_TMP"
+pass "hv-find-milestone-for-items: lookup semantics, dedup, sort, open-sections only"
+

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Print milestone IDs that the given TODO items are tagged with,
+# one per line, unique and numerically sorted. Scans only open sections
+# (## Bugs, ## Features, ## Tasks) — completed/archived items don't surface.
+# Lookup helper: always exits 0 when ≥1 args are given. Unknown IDs and
+# untagged items are silent skips, not errors.
+# Usage: hv-find-milestone-for-items <ID> [<ID>...]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-types.sh"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+if [ "$#" -lt 1 ]; then
+  echo "usage: hv-find-milestone-for-items <ID> [<ID>...]" >&2
+  exit 1
+fi
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
+import re, sys
+from pathlib import Path
+from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re
+
+ids_wanted = set(sys.argv[1:])
+todo = Path(".hv/TODO.md")
+if not todo.exists():
+    raise SystemExit(0)
+content = todo.read_text()
+_open_re = open_bullet_re()
+milestones = set()
+body = "".join(b for _name, b in iter_open_sections(content))
+for line in body.splitlines():
+    line = line.strip()
+    m = _open_re.match(line)
+    if not m or m.group("id") not in ids_wanted:
+        continue
+    val = parse_todo_fields(line)["milestone"]
+    if not val:
+        continue
+    for mid in re.findall(r"M\d+", val):
+        milestones.add(mid)
+for mid in sorted(milestones, key=lambda s: int(s[1:])):
+    print(mid)
+PY

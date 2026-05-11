@@ -94,7 +94,7 @@ Apply the chosen disposition **only to the dirty entries** (use `git -C <path> .
 mkdir -p .hv/handoff
 ```
 
-Resolve milestone context first — if any active item carries a `Milestone:` tag in `TODO.md` (grep the line for the captured ID), or if `.hv/bin/hv-vision-active` lists a single milestone, include it in the **Working on** block below. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
+Resolve milestone context first — pass the captured item IDs to `.hv/bin/hv-find-milestone-for-items <ID> [<ID>...]` to read their `Milestone:` tags. If the helper prints one or more milestones, include them in the **Working on** block below. If it prints nothing, fall back to `.hv/bin/hv-vision-active` — and if exactly one active milestone is listed, include that. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
 
 **Loop over the pause set — one handoff file per `(branch, repo)` entry.** The path encoding is unchanged from F05:
 
