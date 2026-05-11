@@ -35,7 +35,7 @@ user-invocable: true
 .hv/bin/hv-preflight
 ```
 
-See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing to pause — `/hv-init` the project first."* and stop (no auto-init).
+See `docs/reference/preflight.md` for exit-code handling.
 
 **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Snapshot context", description="Capture hypothesis, next step, mid-edit files, uncommitted strategy")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no active stream, nothing in flight) get `completed` with the no-op reason in the description.
 

@@ -23,7 +23,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 .hv/bin/hv-preflight
 ```
 
-See `docs/reference/preflight.md` for exit-code handling. Observe-only: on exit `2`, surface *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop (no auto-init).
+See `docs/reference/preflight.md` for exit-code handling.
 
 **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Reconcile", description="Cross-check status.json against git state")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (empty backlog, no completions to archive) get `completed` with the no-op reason in the description.
 
