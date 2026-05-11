@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Refuse to operate on the project's base branch (main/master/trunk/configured).
+# Resolve helper (per DECISIONS.md "Lookup vs. resolve") — exits 1 on the base
+# branch or when the precondition can't be checked; exits 0 on a feature branch.
+# Delegates base-branch resolution to hv-base-branch so umbrella-awareness and
+# `git.baseBranch` config behavior stay in one place.
+# Usage: hv-guard-feature-branch [<branch>]
+#   <branch>: optional; defaults to the current branch via git rev-parse
+#   stdout:  empty
+#   exit:    0 when on a feature branch; 1 with stderr otherwise
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Guard runs against the user's cwd — must precede any cd.
+"$HERE/hv-require-git-context" "hv-guard-feature-branch"
+
+if [ $# -gt 0 ] && [ -n "$1" ]; then
+  BRANCH="$1"
+else
+  BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+fi
+if [ -z "$BRANCH" ] || [ "$BRANCH" = "HEAD" ]; then
+  echo "error: hv-guard-feature-branch could not determine the current branch (detached HEAD?)" >&2
+  exit 1
+fi
+
+BASE="$("$HERE/hv-base-branch" 2>/dev/null || true)"
+if [ -z "$BASE" ]; then
+  # hv-base-branch couldn't resolve a base; fall back to the conventional set
+  # so the guard still has a sensible answer.
+  case "$BRANCH" in
+    main|master|trunk)
+      echo "error: refusing to operate on '$BRANCH' (no base configured but the branch name matches a conventional base); check out a feature branch first" >&2
+      exit 1
+      ;;
+  esac
+  exit 0
+fi
+
+if [ "$BRANCH" = "$BASE" ]; then
+  echo "error: refusing to operate on '$BRANCH' (project base branch); check out a feature branch first" >&2
+  exit 1
+fi
+exit 0

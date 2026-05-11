@@ -43,13 +43,13 @@ Read `.hv/config.json`:
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-Determine the current branch:
+Confirm a feature branch is checked out:
 
 ```bash
-git rev-parse --abbrev-ref HEAD
+.hv/bin/hv-guard-feature-branch
 ```
 
-If it's `main`/`master`/`trunk`, stop and tell the user to check out the feature branch first.
+Exit 1 (with the helper's stderr message naming the base branch) means the user is on `main`/`master`/`trunk` (or the configured base) — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
 
 **Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Extract commits & items", description="Read branch commits and resolve linked TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (review skipped via config) get `completed` with the no-op reason in the description.
 
