@@ -377,31 +377,9 @@ Run per resolved item. Match by keyword overlap between task description and TOD
 
 ## Step 10 — Merge or PR
 
-**Direct merge:**
+Use `work.mergeStrategy` from `.hv/config.json` to pick `hv-merge` (direct) or `hv-pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), helper contracts, and the Manual-gate rule for opening a PR.
 
-```bash
-# Single-repo:
-printf 'merge: <summary>\n\n- task 1 description\n- task 2 description\n' | .hv/bin/hv-merge <branch>
-
-# Umbrella mode:
-printf 'merge: <summary>\n\n- task 1 description\n- task 2 description\n' | .hv/bin/hv-merge --repo <repo> <branch>
-```
-
-The helper removes any worktree for the branch, checks out main, merges `--no-ff` with the piped message, deletes the branch, and prints the merge commit's short hash.
-
-**PR:**
-
-```bash
-# Single-repo:
-printf '## Summary\n- item 1\n- item 2\n\n## Items resolved\n- [B01] Title\n- [F03] Title\n\n## Test plan\n- [ ] ...\n' \
-  | .hv/bin/hv-pr <branch> "<short title>"
-
-# Umbrella mode:
-printf '## Summary\n- item 1\n- item 2\n\n## Items resolved\n- [B01] Title\n- [F03] Title\n\n## Test plan\n- [ ] ...\n' \
-  | .hv/bin/hv-pr --repo <repo> <branch> "<short title>"
-```
-
-The helper removes any worktree, pushes the branch with `-u`, and runs `gh pr create`. Share the PR URL with the user.
+When `work.mergeStrategy == "direct"` (or unset — the default), use `hv-merge`. When `work.mergeStrategy == "pr"`, use `hv-pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `/hv-config`; respect it silently.
 
 ## Step 11 — Update Status
 
