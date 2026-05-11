@@ -128,17 +128,10 @@ If a scope area is unclear, pick the most visible behavior change. Don't pad wit
 
 Check `work.mergeStrategy` in `.hv/config.json`.
 
-- If set to `"direct"` or `"pr"` and the user hasn't explicitly overridden in this session, use it silently.
-- If unset, or the user said something that suggests they want the other option, use `AskUserQuestion`:
-  - **Header:** `"Strategy"`
-  - **Question:** *"How should I integrate `<branch>`?"*
-  - **Options** (single-select):
-    1. Mark whichever matches `work.mergeStrategy` (or `"Direct merge"` if unset) with `(Recommended)`.
-    2. The other strategy as a peer option.
-    - `"Direct merge"` — *"Merge into main with `--no-ff` and delete the branch."*
-    - `"GitHub PR"` — *"Push and `gh pr create` with the body from Step 4."*
+- If set to `"direct"` or `"pr"` and the user hasn't explicitly overridden in this session, use it silently and skip to Step 6a or 6b accordingly.
+- If unset, or the user said something that suggests the other option, ask via `AskUserQuestion` using the Strategy picker shape in `references/merge-strategy-gate.md` (Header `"Strategy"`, Question *"How should I integrate `<branch>`?"*, two options with the matching strategy marked `(Recommended)`).
 
-Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"*
+Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* — see `references/ask-user-question-fallback.md` for canonical fallback mechanics.
 
 ## Step 6a — Open a PR
 
@@ -148,7 +141,7 @@ Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"*
 printf '%s' "$BODY" | .hv/bin/hv-pr <branch> "<short title>"
 ```
 
-Title rules: derived from the strongest commit subject, ≤70 chars, no `[B##]` tags. `hv-pr` removes any worktree, pushes with `-u`, runs `gh pr create`. Share the PR URL.
+Title rules and helper behavior — see `references/merge-strategy-gate.md` (Open a PR). Share the PR URL with the user.
 
 ## Step 6b — Direct Merge
 
@@ -156,7 +149,7 @@ Title rules: derived from the strongest commit subject, ≤70 chars, no `[B##]` 
 printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
 ```
 
-`hv-merge` removes any worktree, checks out main, merges `--no-ff`, deletes the branch, and prints the merge commit's short hash. Share the hash.
+Helper behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
 
 ## Step 7 — Update Status
 
