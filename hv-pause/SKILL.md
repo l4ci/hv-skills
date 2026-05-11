@@ -96,14 +96,9 @@ mkdir -p .hv/handoff
 
 Resolve milestone context first — pass the captured item IDs to `.hv/bin/hv-find-milestone-for-items <ID> [<ID>...]` to read their `Milestone:` tags. If the helper prints one or more milestones, include them in the **Working on** block below. If it prints nothing, fall back to `.hv/bin/hv-vision-active` — and if exactly one active milestone is listed, include that. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
 
-**Loop over the pause set — one handoff file per `(branch, repo)` entry.** The path encoding is unchanged from F05:
-
-- `repo` non-null (umbrella mode): `.hv/handoff/<branch>@<repo>.md`
-- `repo` null (single-repo / legacy): `.hv/handoff/<branch>.md`
+**Loop over the pause set — one handoff file per `(branch, repo)` entry.** Resolve each entry's write path via `.hv/bin/hv-resolve-handoff --write ${REPO:+--repo "$REPO"} "$BRANCH"`; the helper owns the canonical encoding (single-repo and `<branch>@<repo>` umbrella variants).
 
 For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Next planned step**, and **Current hypothesis** content — only `Repo:` and the per-repo `Uncommitted work` artifact differ. Don't merge them into one combined file: `/hv-next`'s lookup is keyed on `(branch, repo)`, so per-entry files keep that path symmetric and survive partial cleanup (one repo abandoned, others resumed).
-
-Branch names already contain `/` (e.g. `hv/fix-X`) and `mkdir -p .hv/handoff` plus the branch path's nested dirs already cover that; the `@<repo>` suffix lives on the filename, not on a directory, so it can't collide with a literal subdirectory.
 
 Compose the note from the template at `references/handoff-template.md` — fill each section from the current session, omit sections that don't apply, but don't manufacture content. The four sections in the template are exactly what `/hv-next` consumes.
 

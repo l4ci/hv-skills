@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Extract a single field (detail/related/milestone/repos) from the TODO
+# Extract a single field (detail/related/milestone/repos/subsystem) from the TODO
 # bullet of <ID>, using hvlib.parse_todo_fields. Replaces ad-hoc
 # grep|grep|sed|sed chains in skill prose.
 #
 # Usage: hv-todo-field <ID> <field>
-#   <field>: detail | related | milestone | repos
+#   <field>: detail | related | milestone | repos | subsystem
 #   stdout: field value (may be empty)
 #   exit:   0 on success (even if field empty), 1 on unknown ID or bad field
 set -euo pipefail
@@ -16,8 +16,8 @@ import sys
 from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus
 
 iid, field = sys.argv[1], sys.argv[2]
-if field not in {"detail", "related", "milestone", "repos"}:
-    sys.stderr.write(f"error: {field} is not a valid field; pick one of detail/related/milestone/repos\n")
+if field not in {"detail", "related", "milestone", "repos", "subsystem"}:
+    sys.stderr.write(f"error: {field} is not a valid field; pick one of detail/related/milestone/repos/subsystem\n")
     sys.exit(1)
 
 corpus = load_backlog_corpus(".")

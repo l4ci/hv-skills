@@ -183,7 +183,7 @@ target/
 
 Make all writes idempotent — never overwrite an existing file.
 
-After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use the same Python heredoc shown in Step 1's manual-toggle branch. Skip silently if `docs.afterWork` is already `true`.
+After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use `.hv/bin/hv-config-set docs.afterWork true` (same pattern as Step 1's manual-toggle branch). Skip silently if `docs.afterWork` is already `true`.
 
 ## Step 6 — Closing Summary
 

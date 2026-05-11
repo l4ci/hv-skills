@@ -33,4 +33,8 @@ for k in "${KINDS[@]}"; do
   [ "$n" -gt 0 ] && PARTS+=("$k=$n")
 done
 [ ${#PARTS[@]} -eq 0 ] && exit 0
-IFS=", "; echo "stale: ${PARTS[*]}"
+JOINED=""
+for p in "${PARTS[@]}"; do
+  JOINED="${JOINED:+$JOINED, }$p"
+done
+echo "stale: $JOINED"

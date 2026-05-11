@@ -366,19 +366,6 @@ def active_items(entry: dict) -> list[str]:
     return []
 
 
-def find_active_entry(data: dict, branch: str, repo: "str | None" = None) -> "dict | None":
-    """Search data["active"] for an entry matching (branch, repo).
-    Repo matching uses canonicalizing coercion: (e.get("repo") or None) == (repo or None).
-    Returns the entry dict or None.
-    """
-    for entry in data.get("active", []) or []:
-        if entry.get("branch") != branch:
-            continue
-        if (entry.get("repo") or None) == (repo or None):
-            return entry
-    return None
-
-
 def registered_repo_names(repos_path=".hv/repos.json") -> list[str]:
     """Return sorted list of registered sub-repo names from repos.json.
     Wraps load_repos; returns [] if the file is missing or empty.

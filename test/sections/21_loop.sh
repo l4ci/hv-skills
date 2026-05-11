@@ -262,6 +262,14 @@ case "$out" in
   "stale: map="*) ;;
   *) echo "FAIL: hv-stale-summary did not emit stale: map=N (got: $out)"; exit 1 ;;
 esac
+# Multi-kind case must use ", " separator (comma + space) per the documented format
+# Seed a stale TODO item so the todo kind also reports ≥1 stale at --days 0
+printf '\n- [T99] Stale task for separator test. Captured: 2026-01-01\n' >> .hv/TODO.md
+out_multi="$("$BIN/hv-stale-summary" --days 0 --today 2026-05-09 map todo)"
+case "$out_multi" in
+  "stale: map="*", todo="*) ;;
+  *) echo "FAIL: hv-stale-summary multi-kind separator wrong (expected ', '; got: $out_multi)"; exit 1 ;;
+esac
 # All-fresh: --days 999999 yields zero stale → empty output
 out="$("$BIN/hv-stale-summary" --days 999999 --today 2026-05-09)"
 [ -z "$out" ] || { echo "FAIL: hv-stale-summary should be silent when nothing is stale (got: $out)"; exit 1; }
