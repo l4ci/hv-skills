@@ -47,16 +47,6 @@ done
 [ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Capture cwd before hv_self_locate relocates us. Then pre-navigate to the
-# .hv/ root found by walking up from ORIG_CWD so that hv_self_locate
-# fast-paths and doesn't mistakenly resolve to the helper-binary's umbrella
-# (e.g. the dev tree when running smoke tests from a tmp sub-repo).
-ORIG_CWD="$(pwd -P)"
-if [ ! -d ".hv" ]; then
-  if _UMBRELLA_TMP="$(cd "$ORIG_CWD" && "$HERE/hv-walk-up" 2>/dev/null)"; then
-    cd "$_UMBRELLA_TMP"
-  fi
-fi
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 
@@ -78,7 +68,7 @@ print('1' if sys.argv[1] in registered_repo_names() else '0')
     [ "$REGISTERED" = "1" ] || { echo "error: sub-repo '$TARGET_REPO' not registered in .hv/repos.json" >&2; exit 4; }
     TARGET=".hv/contexts/$TARGET_REPO/CONTEXT.md"
   else
-    SUBREPO=$(cd "$ORIG_CWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
+    SUBREPO=$(cd "$HV_ORIG_PWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
     if [ -z "$SUBREPO" ]; then
       echo "error: cwd is at umbrella root and --repo not set; pass --repo umbrella to write the umbrella-shared CONTEXT.md, or run from inside a sub-repo" >&2
       exit 4

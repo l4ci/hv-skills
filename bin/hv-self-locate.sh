@@ -17,9 +17,15 @@
 # Resolution order:
 #   1. cwd has .hv/ → no cd, fast path. Preserves the smoke-test contract
 #      (tests cd to $TMP and expect helpers to operate on $TMP/.hv/).
-#   2. else delegate walk-up from BASH_SOURCE[1] to bin/hv-walk-up
-#      (subprocess), then cd to the resolved umbrella root.
-#   3. on exhaustion, return 1 with an error.
+#   2. walk up from cwd via bin/hv-walk-up (subprocess inherits cwd). cd
+#      to the result. This prefers the project the caller is *in* — when
+#      a dev-tree helper is invoked from inside a test umbrella's sub-cwd
+#      that lacks .hv/, the test's umbrella wins over the helper's own.
+#   3. walk up from BASH_SOURCE[1] (caller helper's bin/ dir) via the same
+#      subprocess. This is the fallback when cwd has no .hv/ ancestor —
+#      installed helpers at <umbrella>/.hv/bin/<script> still find their
+#      umbrella when the user runs them from an unrelated cwd.
+#   4. on exhaustion, return 1 with an error.
 #
 # Uses `cd "$d" && pwd -P` rather than `realpath` for portability and to
 # resolve through symlinks consistently (KNOWLEDGE.md 2026-05-02:
@@ -32,14 +38,21 @@ hv_self_locate() {
 
   local caller_dir result
   caller_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd -P)"
-  # Delegate the walk-up to bin/hv-walk-up. We invoke it as a subprocess from
-  # the caller's helper directory (BASH_SOURCE[1] anchor) — hv-walk-up itself
-  # walks from its own cwd, so we cd to caller_dir first via the subprocess's
-  # own cwd. Resolve the bin path through the same caller_dir (siblings).
+
+  # Try cwd-anchored walk-up first. hv-walk-up defaults to anchor=cwd; we
+  # invoke it without changing the subprocess cwd, so it walks up from
+  # $HV_ORIG_PWD.
+  if result="$("$caller_dir/hv-walk-up" 2>/dev/null)"; then
+    cd "$result"
+    return 0
+  fi
+
+  # Fall back to walking up from the caller helper's directory.
   if result="$(cd "$caller_dir" && "$caller_dir/hv-walk-up" 2>/dev/null)"; then
     cd "$result"
     return 0
   fi
-  echo "error: hv_self_locate: no .hv/ found in ancestors of ${BASH_SOURCE[1]:-$0} or in cwd $HV_ORIG_PWD" >&2
+
+  echo "error: hv_self_locate: no .hv/ found in ancestors of $HV_ORIG_PWD or ${BASH_SOURCE[1]:-$0}" >&2
   return 1
 }

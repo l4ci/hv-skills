@@ -107,9 +107,9 @@ pass "dirty tree rejected"
 rm dirtyfile
 
 echo "hv-guard-clean greenfield"
-TMP=$(mktemp -d)
+GF_TMP=$(mktemp -d)
 (
-  cd "$TMP"
+  cd "$GF_TMP"
   git init -q
   echo "spec" > briefing.md
   out=$("$BIN/hv-guard-clean" test 2>&1 || true)
@@ -118,7 +118,7 @@ TMP=$(mktemp -d)
     *) echo "[FAIL] greenfield message missing 'baseline': $out"; exit 1 ;;
   esac
 ) || fail "greenfield guard did not surface baseline-commit hint"
-rm -rf "$TMP"
+rm -rf "$GF_TMP"
 pass "greenfield tree surfaces baseline-commit hint"
 
 echo "hv-status-add / hv-status-remove"

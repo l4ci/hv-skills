@@ -7,22 +7,13 @@
 # Usage: hv-context-index
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Pre-navigate to the .hv/ root found by walking up from the invocation cwd so
-# that hv_self_locate fast-paths and uses the correct umbrella (not the helper
-# binary's own dev tree when running from a tmp sub-repo in smoke tests).
-ORIG_CWD="$(pwd -P)"
-if [ ! -d ".hv" ]; then
-  if _UMBRELLA_TMP="$(cd "$ORIG_CWD" && "$HERE/hv-walk-up" 2>/dev/null)"; then
-    cd "$_UMBRELLA_TMP"
-  fi
-fi
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 
 UMBRELLA_ON=$("$HERE/hv-umbrella-on")
 SUBREPO=""
 if [ "$UMBRELLA_ON" = "yes" ]; then
-  SUBREPO=$(cd "$ORIG_CWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
+  SUBREPO=$(cd "$HV_ORIG_PWD" && "$HERE/hv-resolve-repo" 2>/dev/null || true)
 fi
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$UMBRELLA_ON" "$SUBREPO" <<'PY' | "$HERE/hv-managed-block" context --body-stdin
