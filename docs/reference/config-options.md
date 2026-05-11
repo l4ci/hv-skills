@@ -137,5 +137,6 @@ Two rules govern how answers are coerced into config writes:
 A few keys are written without ever being asked:
 
 - `hvSkills.version` — stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not a user preference, not exposed in `/hv-config`.
+- `refactor.verifyCommands` — array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv-config-set refactor.verifyCommands '[...]'`.
 
 For the full per-key behavior — defaults, value semantics, and how each setting affects skill execution — see [`usage/configuration.md`](../usage/configuration.md).

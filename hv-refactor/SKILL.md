@@ -22,6 +22,7 @@ Read `.hv/config.json`:
 - `models.orchestrator` — exploration, design, and verification (default `opus`)
 - `models.worker` — implementation subagents (default `sonnet`)
 - `refactor.confirmBeforeExecute` — pause for user approval before executing fixes (default `true`; `false` for full autonomy)
+- `refactor.verifyCommands` — array of shell commands to run as CI-shape gates during Step 7 verification (default `[]` — read-only verification when empty)
 
 ## Args
 
@@ -267,12 +268,19 @@ Don't announce the dispatch — just do it. After parallel batch completes, disp
 
 ## Step 7 — Verify with Orchestrator
 
-Dispatch a single verification agent using the configured **orchestrator** model. For each fix, it reads the modified file and reports:
-- **PASS** — change is correct and complete
-- **FAIL** — something is wrong (with exact finding)
-- **CONCERN** — works but has a side effect worth knowing
+Read `refactor.verifyCommands` from `.hv/config.json`:
 
-The verification agent must read actual file content, not trust the fix summaries. Don't relay individual PASS verdicts to the user — only surface FAILs and CONCERNs.
+```bash
+python3 -c "import json,sys; print(json.dumps(json.load(open('.hv/config.json')).get('refactor',{}).get('verifyCommands',[])))"
+```
+
+Dispatch a single verification agent using the configured **orchestrator** model. For each fix, it reads the modified file and reports PASS / FAIL / CONCERN as before.
+
+**When `verifyCommands` is non-empty**, the agent's brief MUST include the command list and require it to execute every command verbatim, capturing exit code and stderr. Any non-zero exit MUST be reported as a FAIL with the failing command and its stderr inline. The agent reports PASS only when (a) all file reads check out AND (b) every gate command exited zero.
+
+**When `verifyCommands` is empty** (default), Step 7 runs file-read verification only — behavior unchanged from prior versions. No spurious "no commands configured" messages; silent pass-through is the common case.
+
+The verification agent must read actual file content (not just trust fix summaries) AND actually run the gate commands (not just report what it would run). Don't relay individual PASS verdicts to the user — only surface FAILs and CONCERNs.
 
 ## Step 8 — Handle Failures
 

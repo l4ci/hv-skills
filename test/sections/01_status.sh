@@ -106,6 +106,21 @@ if "$BIN/hv-guard-clean" test 2>/dev/null; then fail "guard should have rejected
 pass "dirty tree rejected"
 rm dirtyfile
 
+echo "hv-guard-clean greenfield"
+TMP=$(mktemp -d)
+(
+  cd "$TMP"
+  git init -q
+  echo "spec" > briefing.md
+  out=$("$BIN/hv-guard-clean" test 2>&1 || true)
+  case "$out" in
+    *baseline*) ;;
+    *) echo "[FAIL] greenfield message missing 'baseline': $out"; exit 1 ;;
+  esac
+) || fail "greenfield guard did not surface baseline-commit hint"
+rm -rf "$TMP"
+pass "greenfield tree surfaces baseline-commit hint"
+
 echo "hv-status-add / hv-status-remove"
 "$BIN/hv-status-add" hv/test-branch B02,F01
 grep -q '"branch": "hv/test-branch"' .hv/status.json || fail "status-add did not write entry"
