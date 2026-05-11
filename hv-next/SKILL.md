@@ -55,17 +55,11 @@ If `needsAction` is empty, produce no output and continue.
 
 ```bash
 # Per stream — reconcile output gives BRANCH and REPO (REPO may be empty)
-if [ -n "$REPO" ] && [ -f ".hv/handoff/${BRANCH}@${REPO}.md" ]; then
-  HANDOFF=".hv/handoff/${BRANCH}@${REPO}.md"
-elif [ -f ".hv/handoff/${BRANCH}.md" ]; then
-  HANDOFF=".hv/handoff/${BRANCH}.md"
-else
-  HANDOFF=""
-fi
+HANDOFF="$(.hv/bin/hv-resolve-handoff ${REPO:+--repo "$REPO"} "$BRANCH")"
 [ -n "$HANDOFF" ] && cat "$HANDOFF"
 ```
 
-Issue these reads in parallel — one per stream — in the same tool-call batch as any other independent reads in this step. The bare `<branch>.md` form is a legacy fallback covering single-repo cycles and any handoff written before umbrella keying shipped; the umbrella-keyed `<branch>@<repo>.md` form is preferred whenever the stream has a non-null `repo`.
+Issue the resolve+read pairs in parallel — one per stream — in the same tool-call batch as any other independent reads in this step. `hv-resolve-handoff` is a lookup helper: it probes `.hv/handoff/<branch>@<repo>.md` first (umbrella-keyed, preferred when `repo` is non-null) and falls back to `.hv/handoff/<branch>.md` (single-repo / legacy); empty stdout means no handoff exists for the stream.
 
 For each stream that has a handoff, extract the **Stage**, **Next planned step**, and **Current hypothesis** sections — those drive the question text and routing below. Streams without a handoff note keep today's behavior unchanged.
 
