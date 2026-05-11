@@ -17,7 +17,7 @@ user-invocable: true
 
 **No writes. No commits. No tool calls beyond reads.**
 
-**Orchestrator-model contract (loop mode).** When `/hv-work` invokes this skill in loop mode (via the F34 uncertainty pre-flight in `/hv-work` Step 4), the dispatch is via the `Skill` tool — the peek runs inline in `/hv-work`'s session and inherits its model. Since `/hv-work` runs under `models.orchestrator` (per `.hv/config.json`, default `opus`), the loop-mode peek benefits from orchestrator-grade design judgment. If a future change moves the dispatch to the `Agent` tool, the call site MUST explicitly pass `model: orchestrator` to preserve this. Manual invocations from `/hv-next` or the user's prompt are unconstrained — the user is in the loop and can correct any peek that under-performs.
+**Orchestrator-model contract (F35, loop mode).** When `/hv-work` invokes this skill in loop mode (via the F34 uncertainty pre-flight in `/hv-work` Step 4), the dispatch is via the `Skill` tool — the peek runs inline in `/hv-work`'s session and inherits its model. Since `/hv-work` runs under `models.orchestrator` (per `.hv/config.json`, default `opus`), the loop-mode peek benefits from orchestrator-grade design judgment. If a future change moves the dispatch to the `Agent` tool, the call site MUST explicitly pass `model: orchestrator` to preserve this. Manual invocations from `/hv-next` or the user's prompt are unconstrained — the user is in the loop and can correct any peek that under-performs.
 
 ## Step 1 — Preflight
 
