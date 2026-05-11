@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Set a single value in .hv/config.json at a dotted key path.
+# Resolve helper (per DECISIONS.md "Lookup vs. resolve") — exit 1 on write
+# failure or malformed dotted path; exit 0 on successful atomic write.
+# Other keys in the config are preserved untouched.
+# Usage: hv-config-set <dotted.key.path> <value>
+#   <dotted.key.path>: e.g. "docs.afterWork" or "models.orchestrator" or top-
+#                      level "version"; intermediate dicts are auto-created.
+#   <value>: parsed as JSON when possible (true/false/numbers/quoted strings/
+#            arrays/objects). Falls back to a raw string when JSON parse
+#            fails (so plain identifiers like "loop" or "opus" are stored
+#            as strings).
+#   stdout: empty on success
+#   exit:   0 on success; 1 with stderr on write failure / bad path
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+KEY_PATH="${1:?usage: hv-config-set <dotted.key.path> <value>}"
+VALUE="${2:?usage: hv-config-set <dotted.key.path> <value>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY_PATH" "$VALUE" <<'PY'
+import json
+import sys
+from pathlib import Path
+from hvlib import load_json, dump_json_atomic
+
+key_path, raw_value = sys.argv[1], sys.argv[2]
+segments = key_path.split(".")
+if not segments or any(s == "" for s in segments):
+    print(f"error: hv-config-set: malformed key path {key_path!r}", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    value = json.loads(raw_value)
+except json.JSONDecodeError:
+    value = raw_value
+
+cfg_path = Path(".hv/config.json")
+cfg = load_json(cfg_path, {})
+if not isinstance(cfg, dict):
+    print("error: hv-config-set: .hv/config.json is not a JSON object", file=sys.stderr)
+    sys.exit(1)
+
+cursor = cfg
+for seg in segments[:-1]:
+    nxt = cursor.get(seg)
+    if not isinstance(nxt, dict):
+        nxt = {}
+        cursor[seg] = nxt
+    cursor = nxt
+cursor[segments[-1]] = value
+
+try:
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    dump_json_atomic(cfg_path, cfg)
+except Exception as e:
+    print(f"error: hv-config-set: write failed: {e}", file=sys.stderr)
+    sys.exit(1)
+PY

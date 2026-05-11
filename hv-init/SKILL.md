@@ -401,47 +401,38 @@ Read `umbrella_enabled` from the `UMBRELLA_MODE` shell var Step 1.5 set (default
 
 ### STALE write block
 
-Read the existing file, merge only the keys the user answered (or Recommended defaults for any they skipped), preserve everything else:
+Loop over the keys from the STALE list — call the shared helper once per key, passing the answered or Recommended-default value. The helper preserves every other key already in the file:
 
 ```bash
-python3 - <<PY
-import json, os
-from pathlib import Path
-p = Path(".hv/config.json")
-cfg = json.loads(p.read_text())
-
 # Example: user answered Q4 "Review before ship" → ship.review was missing.
 # Set only the keys from the STALE list; never overwrite existing values.
-cfg.setdefault("ship", {})["review"] = True   # or answered value
+.hv/bin/hv-config-set ship.review true   # or answered value
 
 # docs.afterWork — silent default. No question; the toggle UX lives in
 # /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
 # the flag when the user approves a fresh scaffold).
-cfg.setdefault("docs", {}).setdefault("afterWork", False)
+.hv/bin/hv-config-set docs.afterWork false
 
 # loop.webResearch — silent default. Gates whether /hv-plan --auto-loop
 # (F32) calls WebSearch when an open question references an external
 # library/API/protocol. Off by default per the opt-in-flags-default-false
 # rule — loop mode makes no external network calls without explicit user
 # opt-in via /hv-config.
-cfg.setdefault("loop", {}).setdefault("webResearch", False)
+.hv/bin/hv-config-set loop.webResearch false
 
 # umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
 # is unset (no migration prompt for users who didn't re-run from a parent).
-cfg.setdefault("umbrella", {})["enabled"] = os.environ.get("UMBRELLA_MODE", "false") == "true"
+.hv/bin/hv-config-set umbrella.enabled "${UMBRELLA_MODE:-false}"
 
 # hvSkills.version — re-stamped on every /hv-init so the project's recorded
 # version follows the currently-installed plugin. hv-preflight nudges to
-# re-init when the value drifts from the live plugin.
-cfg.setdefault("hvSkills", {})
-cfg["hvSkills"]["version"] = os.environ.get("HV_PLUGIN_VERSION", "")
-
-p.write_text(json.dumps(cfg, indent=2) + "\n")
-PY
+# re-init when the value drifts from the live plugin. (Always re-written
+# on the upgrade path; never preserved.)
+.hv/bin/hv-config-set hvSkills.version "${HV_PLUGIN_VERSION:-}"
 ```
 
-Rule: for each missing key in the `STALE:` list, do exactly one `cfg.setdefault(section, {})[key] = value` write. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `False` when unset, `True` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`. `hvSkills.version` is special-cased on the upgrade path too — STALE migration ALWAYS rewrites it from `HV_PLUGIN_VERSION`, even when the key is already present, because re-running `/hv-init` is the canonical way to clear drift. Other keys preserve user values; this one is auto-managed.
+Rule: for each missing key in the `STALE:` list, run exactly one `hv-config-set <dotted.path> <value>` call. The helper preserves every other key in the file. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `false` when unset, `true` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`. `hvSkills.version` is special-cased on the upgrade path too — STALE migration ALWAYS rewrites it from `HV_PLUGIN_VERSION`, even when the key is already present, because re-running `/hv-init` is the canonical way to clear drift. Other keys preserve user values; this one is auto-managed.
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 

@@ -31,7 +31,7 @@ grep -q 'hv-loop-stamp clear' "$REPO/hv-work/SKILL.md" \
 # (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
 grep -q '"loop":.*"webResearch": False' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the fresh config block"
-grep -q 'cfg.setdefault("loop", {}).setdefault("webResearch", False)' "$REPO/hv-init/SKILL.md" \
+grep -q 'hv-config-set loop.webResearch false' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the STALE migration block"
 pass "F32: SKILL.md wiring + config defaults"
 
