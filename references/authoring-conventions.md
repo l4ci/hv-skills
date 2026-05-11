@@ -34,6 +34,17 @@ Per-site shape (adapt phase list per skill):
 > 2. *<phase title>* — *<one-line outcome>*
 > *(skill-specific list — 3 to 7+ phases)*
 
+**Observable outcome** is the detection predicate that says a phase is done. It must be mechanically verifiable, not subjective. Verifiable shapes:
+
+- A file exists at a named path — `[ -f .hv/plans/M01-S01.md ]`.
+- A command exits 0 — a helper returns success, a test passes, `hv-knowledge-merge` writes successfully.
+- A managed-block marker is present in a tracked file — `grep -q '<!-- hv-knowledge-end -->' CLAUDE.md`.
+- A status entry was added or removed — `.hv/status.json` lists / no longer lists the branch.
+- A commit landed — `git log --oneline -1 | grep -q <ID>`.
+- A user picked a recorded answer in `AskUserQuestion` — the chosen label is the outcome marker (e.g. *"user picked 'Write it' on the confirmation gate"*).
+
+Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the situation is clear"* — don't qualify. When a phase genuinely produces a subjective state (a UX flow approval, a design pick), name the user action or recorded decision that captures the approval rather than the inner state. Skill authors picking a phase outcome should ask: *"what would I `grep` or `[ ]` test for, from the next session, to know this phase finished?"* If the answer is "nothing concrete", the phase is too vague to track.
+
 **Forbids.**
 - Adding the block to single-phase or trivial skills (Tier C: `hv-assume`, `hv-go`, `hv-c`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
 - Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
