@@ -123,14 +123,7 @@ Run `hv-guard-clean` against the umbrella's tree if you skipped it earlier. Then
 
 Build the target list. For each target, you'll dispatch one sub-agent via `Agent` IN A SINGLE MESSAGE (parallel).
 
-**Collect umbrella context for the sub-agents.** KNOWLEDGE.md and DECISIONS.md live only at the umbrella; sub-agents need their content embedded so they respect cross-repo conventions and decisions. Query the topics that may apply across the targets:
-
-```bash
-.hv/bin/hv-knowledge-query "<all topic names>"
-.hv/bin/hv-decisions-query "<all topic names>"
-```
-
-If unsure which topics apply, pass every topic from each file (read the `## Topic` headings and pass all of them). Capture the output as `KNOWLEDGE_BLOB` and `DECISIONS_BLOB` for embedding.
+**Collect umbrella context for the sub-agents.** KNOWLEDGE.md and DECISIONS.md live only at the umbrella; sub-agents need their content embedded so they respect cross-repo conventions and decisions. Apply the canonical K+D query pattern (`references/knowledge-consult.md`) against the topics that may apply across the targets. If unsure which topics apply, pass every topic from each file (read the `## Topic` headings and pass all of them) — umbrella fanout has broader topic relevance than a per-step query. Capture the output as `KNOWLEDGE_BLOB` and `DECISIONS_BLOB` for embedding into each sub-agent prompt below.
 
 **Dispatch sub-agents.** For each target (each chosen sub-repo, plus optionally the umbrella when "All + umbrella" was picked), build a single Agent call with this prompt template:
 

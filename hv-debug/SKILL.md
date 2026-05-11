@@ -80,26 +80,19 @@ If the user named a `[B##]`:
 
 If the user described a symptom without an ID, invoke `hv-capture` via the `Skill` tool first so the bug gets logged — then resume here with the new ID.
 
-## Step 3 — Consult KNOWLEDGE.md
+## Step 3 — Consult KNOWLEDGE & DECISIONS
 
-Read the `hv-knowledge` block in `CLAUDE.md` for the current topic list. Pull topics that plausibly touch the symptom (e.g., `Networking`, `Persistence`, `Concurrency`):
+Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics that plausibly touch the symptom (e.g., `Networking`, `Persistence`, `Concurrency`, `Architecture`, `Testing`).
 
-```bash
-.hv/bin/hv-knowledge-query "Topic A" "Topic B"
-```
+Carry KNOWLEDGE bullets into Step 5's hypothesis brief. Carry DECISIONS entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted.
 
-Carry any bullets that look relevant into Step 5's hypothesis brief. Skip silently if nothing fits.
-
-## Step 3.5 — Consult DECISIONS.md
-
-Read the `hv-decisions` block in `CLAUDE.md`. For topics that plausibly touch the bug area, pull just those sections:
+## Step 3.5 — Vocabulary & soft-cap checks
 
 ```bash
-.hv/bin/hv-decisions-query "Architecture" "Testing"
 .hv/bin/hv-context-query "<terms from the bug report or the failing component>"
 ```
 
-Carry any relevant entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted. Skip silently if nothing looks relevant.
+Carry any matched terms into Step 6's hypothesis brief — canonical definitions help align bug-report phrasing to existing components.
 
 - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
