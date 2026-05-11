@@ -79,39 +79,14 @@ If the user invoked `/hv-decide` with a clear candidate from the conversation, s
 
 If after one round the user can't articulate **forbids** *or* **permits**, surface that — it's a signal this is a learning, not a decision. Suggest `/hv-learn` instead and stop. **Do not auto-invoke `/hv-learn`** — the user re-runs it deliberately.
 
-**`--from-learning <topic>` mode.**
+**Source-prefill modes (`--from-learning <topic>`, `--from-spike <name>`).** Both pre-fill the four-part draft from a source artifact and surface the same closing prompt. Full bodies live in `references/source-prefill.md`.
 
-1. Run `.hv/bin/hv-knowledge-query "<topic>"` to load the topic section. If the helper output is empty, error: *"Topic `<topic>` not found in `.hv/KNOWLEDGE.md`. Run `.hv/bin/hv-knowledge-stats` to list topics."* and stop.
-2. Parse the matched topic's bullets. Each is a one-line `- <text> <!-- YYYY-MM-DD -->`.
-3. Pick the bullet to promote:
-   - **1 bullet** — use it directly, no question.
-   - **2-4 bullets** — call `AskUserQuestion` with header `"Bullet"` and question *"Which bullet from `<topic>` should become the decision?"*, one option per bullet. Truncate each option label to ≤80 chars; the option's description carries the full bullet text plus its date stamp.
-   - **5+ bullets** — call `AskUserQuestion` the same way but with the 4 most-recent bullets as options. The 4-cap (Skill Authoring: Conventions, 2026-05-08) makes a multiSelect chunked picker overkill for this volume — if the user wants a less-recent bullet, they re-run with a more specific topic.
-4. Draft the four parts from the picked bullet:
-   - **Rule** = the bullet's text (the user can edit in Step 3 / Step 5).
-   - **Why** = *"Promoted from KNOWLEDGE.md `<topic>` (<date>)."* plus any sub-bullet context attached to the picked bullet.
-   - **Forbids** = `_(user must articulate — a bullet is passive context, a decision needs an explicit prohibit)_`
-   - **Permits** = `_(user must articulate — anchors the boundary so it isn't over-applied)_`
-5. Surface to the user: *"Pre-filled rule and why from KNOWLEDGE.md. Now name the forbids and permits — those are what make this a decision, not a learning."* Block until the user replies, plug their answer into Forbids / Permits, then continue to Step 3.
+| Mode | Section in `references/source-prefill.md` |
+|------|-------------------------------------------|
+| `--from-learning <topic>` | `## --from-learning <topic>` |
+| `--from-spike <name>`     | `## --from-spike <name>`     |
 
-**`--from-spike <name>` mode.**
-
-1. Read `.hv/spikes/<name>.md`. If absent, error: *"Spike `<name>` not found at `.hv/spikes/<name>.md`. Run `.hv/bin/hv-spike-list` to see open and closed spikes."* and stop. (Spike files always live at `.hv/spikes/<name>.md` even in umbrella mode — the `repo:` frontmatter only points at the branch's git history.)
-2. Parse the spike file:
-   - YAML frontmatter (`status`, `created`, `finished`, optional `repo`).
-   - `## Question` — the original yes/no/conditional question.
-   - `## Decision` — the verdict (`viable` / `not viable` / `depends-on-X` / `inconclusive`).
-   - `## Recommended approach` — present iff verdict is `viable`.
-3. Refuse to promote `inconclusive` spikes. Print *"Spike `<name>` is `inconclusive` — not enough evidence for a decision. Add findings on the spike branch and re-run `/hv-spike done <name>`, then come back."* and stop.
-4. Draft the four parts from the spike content:
-   - **Rule** is verdict-driven:
-     - `viable` → *"Use `<X derived from question/recommended>` as the supported approach."*
-     - `not viable` → *"Do not use `<X derived from question>`."*
-     - `depends-on-X` → *"Use `<X>` only when `<the depends-on condition>`."*
-   - **Why** = the original `## Question` plus a 1-2 sentence summary of the spike's `## Findings` section. Keep it tight — most-impactful bullets only, one paragraph max.
-   - **Forbids** = `_(user must articulate — what specific patterns/files/approaches does this rule out?)_`
-   - **Permits** = `_(user must articulate — what alternatives stay allowed?)_`
-5. Surface the same prompt as the learning-mode path: *"Pre-filled rule and why from spike `<name>`. Now name the forbids and permits — those are what make this a decision, not a learning."* Block until the user replies, plug their answer into Forbids / Permits, then continue to Step 3.
+After the mode runs and the user supplies Forbids/Permits, continue to Step 3.
 
 ## Step 3 — Compose the Four Parts
 
