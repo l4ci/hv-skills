@@ -105,99 +105,38 @@ For **features**, assign one of:
 
 ## Step 4.5 — Tag Active Milestone (when applicable)
 
-```bash
-.hv/bin/hv-vision-active
-```
+Use the milestone-tagging UX pattern in `references/milestone-tagging.md`. The pattern covers: the `hv-vision-active` gate, the one-active vs multiple-active question shapes (verbatim AskUserQuestion text), caller-cap handling for the `/hv-go` speed path, loop-mode auto-pick semantics, plain-text fallback, and the outcome mapping.
 
-If the helper prints nothing, no milestones are active — skip this step entirely.
-
-If exactly **one** milestone is active and there's no caller cap signaling speed, ask once:
-
-- **Header:** `"Milestone"`
-- **Question:** *"Tag these items with `<MID> — <title>`?"* (the active milestone's title)
-- **Options** (single-select):
-  1. *"Yes — tag all (Recommended)"*
-  2. *"No — leave untagged"*
-  3. *"Different milestone"* (free text — accept any `M\d+` value that exists)
-
-If **multiple** milestones are active, always ask via `AskUserQuestion` — there's no obvious default to auto-pick:
-
-- **Header:** `"Milestone"`
-- **Question:** *"Tag these items with which milestone?"*
-- **Options** (single-select):
-  1. One option per active milestone, labelled `<MID> — <title>` (title from each milestone file's frontmatter `title:`; mark the first listed `(Recommended)`)
-  2. *"None / unrelated — leave untagged"*
-  3. *"Different milestone"* (free text — accept any `M\d+` value that exists)
-
-Plain-text fallback: ask *"Tag with M01?"* once. If the reply is ambiguous, default to leaving untagged — under-tagging is recoverable; mis-tagging clutters the milestone view.
-
-**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one active milestone, **auto-tag without asking** — the speed path uses the obvious answer. With multiple active milestones, the cap is **exempt for this single question** — silently skipping the tag would orphan items from every milestone view, which is worse than spending one question. Ask the multi-active question above; this counts toward the cap, so spend remaining clarification budget carefully (often zero further questions).
-
-**Loop mode:** if `autonomy.level == "loop"`, auto-pick the Recommended milestone option without invoking AskUserQuestion. With one active milestone, that's *"Yes — tag all (Recommended)"* — tag the items with the active milestone. With multiple active milestones, that's the first-listed milestone (the option marked `(Recommended)` above). Loop mode treats milestone tagging as routine; the user's queue is the active milestone work, so tagging items into it is the obvious answer. This honors the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode."
-
-Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into Step 6's `Milestone:` suffix. If "No — leave untagged" was picked, omit the suffix entirely.
+Carry the chosen milestone(s) as a comma-separated list into Step 6's `Milestone:` suffix on the TODO entry. If the user picked the "leave untagged" option (or skipped the question), omit the suffix.
 
 ## Step 4.6 — Tag Sub-Repo (when umbrella mode is on)
 
-If umbrella mode is enabled AND there's at least one registered sub-repo, ask the user which sub-repo each item belongs to. Otherwise skip this step silently.
+Use the umbrella-mode gate from `references/umbrella-mode.md` — when `hv-umbrella-on` returns `yes` AND `.hv/repos.json` registers ≥1 sub-repo (the registry is the truth, not the config flag), ask which sub-repo(s) each item belongs to. Otherwise skip this step silently.
 
-**Gate check:**
-
-```bash
-if [ "$(.hv/bin/hv-umbrella-on)" = "yes" ]; then
-  PYTHONPATH=.hv/bin python3 -c "
-from hvlib import load_repos
-import sys; sys.exit(0 if load_repos() else 1)
-"
-else
-  exit 1
-fi
-```
-
-If exit code is non-zero, skip Step 4.6 entirely. Move on to Step 5.
-
-**When umbrella mode is on with registered repos**, use a single `AskUserQuestion` per captured item (or one batched call if all items share the same answer is obvious — e.g., the user said *"fix the navbar in web"*; you can pre-answer with `"web"` and skip the question). Otherwise:
+The question shape:
 
 - **Header:** `"Repos"`
 - **Question:** *"Which sub-repo(s) does this item belong to?"* (include the item's short title for context)
 - **multiSelect:** `true`
-- **Options** (one per registered repo, plus the explicit untag option):
+- **Options** (one per registered repo + an explicit untag option):
   - One option per `name` in `.hv/repos.json` (mark the most likely match `(Recommended)` if the item's text mentions a repo name)
   - *"None / unsure — leave untagged"* (last option)
 
-Multi-select means the user can pick exactly one sub-repo (single-repo item), two or more (multi-repo item — `/hv-work` will create the same branch in each via `bin/hv-multi-branch-create`), or just *"None / unsure"* to leave the item untagged. If the user picks *"None / unsure"* alongside concrete repo names, treat the concrete picks as authoritative and ignore the untag option.
+Multi-select means the user can pick one sub-repo (single-repo item), two or more (multi-repo item — `/hv-work` will create the same branch in each via `bin/hv-multi-branch-create`, see `references/umbrella-mode.md` *Branch creation*), or just *"None / unsure"* to leave the item untagged. If the user picks *"None / unsure"* alongside concrete repo names, treat the concrete picks as authoritative.
 
-Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged. (`/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.)
+Plain-text fallback: ask once. If the reply is ambiguous, default to leaving the item untagged — `/hv-work` will then refuse to dispatch the item with a clear error pointing back to `/hv-capture`.
 
-**Caller cap:** if the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one registered repo, **auto-tag without asking** — the speed path uses the obvious answer. With ≥2 registered repos, the cap is **exempt for this single question** — silently skipping the tag would force `/hv-work` to bail later, which is worse than spending one question.
+**Caller cap:** if invoked with the `(hv-go — cap clarification at 1-2 questions)` prefix and there's exactly one registered repo, auto-tag without asking. With ≥2 registered repos, the cap is exempt for this single question — silently skipping would force `/hv-work` to bail later.
 
-**Loop mode:** if `autonomy.level == "loop"`, auto-pick the Recommended sub-repo option when one option is marked `(Recommended)` (i.e., the item's text mentions a repo name and the option list flagged the obvious match). If no option carries `(Recommended)` — the item is ambiguous about which sub-repo it targets — fall through to AskUserQuestion or the Caller-cap path; this is exactly the kind of ambiguity that should surface, not be silently routed.
+**Loop mode:** if `autonomy.level == "loop"`, auto-pick the `(Recommended)` sub-repo option when one is flagged (item text mentions a repo name). If no option carries `(Recommended)` (item is ambiguous about sub-repo), fall through to AskUserQuestion or the caller-cap path; this is exactly the kind of ambiguity that should surface. Honors the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5).
 
-Carry the chosen sub-repo name(s) as a comma-separated string (e.g. `"web"` or `"web, api"`) into Step 6's `Repos:` suffix. If only *"None / unsure"* was picked (or nothing was picked), omit the suffix entirely.
+Carry the chosen sub-repo name(s) as a comma-separated string into Step 6's `Repos:` suffix on the TODO entry. If only *"None / unsure"* was picked (or nothing was picked), omit the suffix.
 
 ## Step 5 — Handle Large Input
 
-If any item's input contains bulky raw data (crash dumps, stack traces, log output, specs, checklists, config snippets, long reproduction steps, etc.) that would bloat the TODO entry beyond ~3 sentences:
+Use the detail-files pattern in `references/detail-files.md` when an item's input is bulky enough to bloat the TODO entry beyond ~3 sentences (crash dumps, stack traces, logs, specs, checklists, config snippets, long reproduction steps). The reference covers the markdown template, the ordering (get ID → write detail file → append TODO entry with `Detail:` reference), and the `Detail:` reference format.
 
-1. Get the ID first (Step 6 command), then write a detail file using that ID:
-
-```markdown
-# {ID}: Short title
-
-> Related TODO entry: `[{ID}]` in `.hv/TODO.md`
-
-## Summary
-
-{The same 1–3 sentence summary that goes into TODO.md}
-
-## Detail
-
-{Full user input — crash dump, stack trace, logs, specs, checklists, etc. Preserved verbatim or lightly formatted for readability.}
-```
-
-2. In the TODO.md entry, append a `Detail:` reference pointing to the file (see format below)
-
-**Skip this step entirely for items that fit comfortably in 1–3 sentences.** Most entries won't need a detail file.
+Skip this step entirely for items that fit comfortably in 1–3 sentences. Most entries won't need a detail file.
 
 ## Step 6 — Write All Entries
 
