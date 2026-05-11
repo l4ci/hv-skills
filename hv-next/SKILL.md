@@ -162,7 +162,7 @@ Active milestones: M01 — Auth foundation, M03 — Public API
 
 (The `Milestone` column in `hv-backlog`'s tables already shows per-item tags when any are present — don't restate that.)
 
-- **Stale candidates** — print one summary line: `stale: map=$(.hv/bin/hv-staleness map --days 90 | wc -l), knowledge=$(.hv/bin/hv-staleness knowledge --days 90 | wc -l), todo=$(.hv/bin/hv-staleness todo --days 90 | wc -l)`. Suppress kinds that report zero. Never blocks output.
+- **Stale candidates** — print one summary line via `.hv/bin/hv-stale-summary --days 90`. Helper outputs `stale: map=N, knowledge=M, todo=K` with zero-count kinds suppressed (and prints nothing if everything is fresh). Never blocks output.
 
 ## Step 6 — Suggest Next
 
