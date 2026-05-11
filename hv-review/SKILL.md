@@ -174,8 +174,10 @@ Verdict: CONCERNS
 
 The verdict is the entire product — return it and stop. Never ask a follow-up; the caller (the user, or `/hv-ship` when invoked) owns what happens next.
 
-- **PASS** — tell the user *"Ready to ship. Run `/hv-ship`."*
-- **CONCERNS** — print the concerns inline (already done in Step 6) and suggest the next move: *"Address via `/hv-work` and rerun `/hv-review`, or accept and ship via `/hv-ship`."* When invoked from `/hv-ship`, return the verdict; the parent owns the question (see `/hv-ship` Step 3).
+When invoked from `/hv-ship`, return the verdict; the parent runs consumer routing per `references/review-verdict-routing.md`. When invoked standalone, relay the verdict to the user using the *Producer-side relay* table in the reference — short summary:
+
+- **PASS** — *"Ready to ship. Run `/hv-ship`."*
+- **CONCERNS** — print the concerns inline (already done in Step 6), then suggest *"Address via `/hv-work` and rerun `/hv-review`, or accept and ship via `/hv-ship`."*
 - **FAIL** — tell the user the merge would regress. Suggest fixing via `/hv-work` or `/hv-debug`. Don't route to `/hv-ship`.
 
 ## Rules
