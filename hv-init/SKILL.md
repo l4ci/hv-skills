@@ -165,6 +165,7 @@ EXPECTED = [
     ("work", "isolation"),
     ("work", "mergeStrategy"),
     ("refactor", "confirmBeforeExecute"),
+    ("refactor", "verifyCommands"),
     ("learn", "verify"),
     ("ship", "review"),
     ("autonomy", "level"),
@@ -234,7 +235,7 @@ umbrella_enabled = os.environ.get("UMBRELLA_MODE", "false").lower() == "true"
 cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
-  "refactor": {"confirmBeforeExecute": <Q4-refactor>},
+  "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>},
   "ship":     {"review": <Q4-ship>},
   "autonomy": {"level": "<Q5>"},
@@ -271,6 +272,12 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # rule — loop mode makes no external network calls without explicit user
 # opt-in via /hv-config.
 .hv/bin/hv-config-set loop.webResearch false
+
+# refactor.verifyCommands — silent default. No question; user enables
+# by adding project CI-shape gates via `hv-config-set` or hand-editing
+# the config. Empty array preserves existing behavior (read-only
+# verification).
+.hv/bin/hv-config-set refactor.verifyCommands '[]'
 
 # umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
@@ -322,4 +329,4 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 
 If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.confirmBeforeExecute`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.

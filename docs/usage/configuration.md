@@ -80,6 +80,31 @@ Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 
 When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) pauses for your approval after presenting its findings and again after you select a design. You review the proposed changes before anything is written. Set to `false` for full autonomy: `/hv-refactor` proceeds end-to-end without checkpoints.
 
+## refactor.verifyCommands
+
+Array of shell commands that [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) Step 7 runs as CI-shape gates before committing. Default: `[]` (read-only verification, behavior unchanged).
+
+When non-empty, the Step 7 verifier executes each command in order and refuses to PASS unless every command exits zero. This catches formatter drift, import-sort failures, and type errors locally instead of on push — see [hv-skills #9](https://github.com/l4ci/hv-skills/issues/9) for the motivating incident.
+
+Example for a Python project using ruff + pytest:
+
+```json
+"refactor": {
+  "confirmBeforeExecute": false,
+  "verifyCommands": [
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+    "uv run pytest -q"
+  ]
+}
+```
+
+Commands run from the repo root (or, in umbrella mode, the sub-repo's root). Set via `hv-config-set` (which parses argv[2] as JSON):
+
+```bash
+.hv/bin/hv-config-set refactor.verifyCommands '["uv run ruff check .","uv run ruff format --check ."]'
+```
+
 ## learn.verify
 
 Controls whether [`/hv-learn`](learning.md) runs a second-opinion pass on what it just wrote. The verifier is a fresh Opus sub-agent with no session context that reads only the updated `KNOWLEDGE.md` diff. It judges each new bullet on four criteria: durable (not ephemeral), sharp (concrete claim, not vague), correctly topic'd, and non-duplicate. It can demote weak entries, sharpen vague wording, re-file wrong-topic bullets, or delete restatements of existing knowledge.

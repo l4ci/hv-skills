@@ -238,7 +238,7 @@ Edit `.hv/config.json`:
   "models":   { "orchestrator": "opus",   "worker": "sonnet" },
   "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
   "debug":    { "competingHypotheses": false },
-  "refactor": { "confirmBeforeExecute": true },
+  "refactor": { "confirmBeforeExecute": true, "verifyCommands": [] },
   "learn":    { "verify": true },
   "ship":     { "review": true },
   "docs":     { "path": "docs",           "autoCreate": false },
