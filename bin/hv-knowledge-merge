@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Insert a new bullet under ## <topic> in .hv/KNOWLEDGE.md.
+# Bullet format: - **<title>** — <body> <!-- YYYY-MM-DD -->
+# Atomic dedup by (topic, title): calling twice with the same --topic + --title
+# is a silent no-op (idempotent). Body comes via --body <text> or stdin.
+# Writer helper: exit 0 on successful write (or idempotent no-op);
+# exit 1 on missing argv, missing target, or other precondition error.
+#
+# Usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
+#        (body also accepted via stdin if --body not given)
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+USAGE="usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
+       (body also accepted via stdin if --body not given)"
+
+# Parse flags in bash
+TOPIC=""
+TITLE=""
+DATE_ARG=""
+BODY_ARG=""
+BODY_FROM_ARG=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --topic)
+      TOPIC="${2:?$USAGE}"
+      shift 2
+      ;;
+    --title)
+      TITLE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --date)
+      DATE_ARG="${2:?$USAGE}"
+      shift 2
+      ;;
+    --body)
+      BODY_ARG="${2:?$USAGE}"
+      BODY_FROM_ARG=1
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$TOPIC" || -z "$TITLE" ]]; then
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+# Read body from stdin if not supplied via --body
+if [[ "$BODY_FROM_ARG" -eq 0 ]]; then
+  BODY_ARG="$(cat)"
+fi
+
+export _HV_KM_BODY="$BODY_ARG"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$TITLE" "$DATE_ARG" "$BODY_FROM_ARG" <<PY
+import sys
+from datetime import date
+from hvlib import read_or_empty, write_text_atomic, find_section, replace_section
+
+topic = sys.argv[1]
+title = sys.argv[2]
+date_arg = sys.argv[3]
+body_from_arg = sys.argv[4] == "1"
+
+# Body was pre-read in bash; pass it through environment to avoid argv escaping issues
+import os
+body = os.environ.get("_HV_KM_BODY", "").rstrip("\n")
+
+iso_date = date_arg if date_arg else date.today().isoformat()
+
+content = read_or_empty(".hv/KNOWLEDGE.md")
+
+span = find_section(content, topic)
+if span is None:
+    print(f"error: topic '{topic}' not found in .hv/KNOWLEDGE.md", file=sys.stderr)
+    sys.exit(1)
+
+start, end = span
+section_body = content[start:end]
+
+# Dedup check: scan for an existing bullet whose title matches case-insensitively
+import re
+title_lower = title.lower()
+for line in section_body.splitlines():
+    stripped = line.strip()
+    if not stripped.startswith("- "):
+        continue
+    m = re.match(r"^- \*\*([^*]+)\*\*", stripped)
+    if m and m.group(1).lower() == title_lower:
+        print("already present", file=sys.stderr)
+        sys.exit(0)
+
+# Prepend new bullet at the top of the section body
+new_bullet = f"- **{title}** — {body} <!-- {iso_date} -->"
+
+# The section body starts right after the heading line (which ends with \n).
+# We want the bullet to be the first content line, preserving any leading blank line.
+# Strategy: insert after the leading newline(s) that follow the heading.
+# find_section gives us content[start:end] which begins right after the heading \n.
+# Typically the body is "\n- existing...\n" (blank line then bullets).
+# We insert as "\n- new bullet\n" at the top, keeping existing content.
+
+# Split the leading blank lines from the rest
+rest = section_body.lstrip("\n")
+leading_newlines = section_body[: len(section_body) - len(rest)]
+# Ensure at least one blank line before and after the new bullet
+new_body = "\n" + new_bullet + "\n" + rest
+if not new_body.endswith("\n"):
+    new_body += "\n"
+
+new_content = replace_section(content, topic, new_body)
+write_text_atomic(".hv/KNOWLEDGE.md", new_content)
+PY

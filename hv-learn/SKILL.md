@@ -72,20 +72,27 @@ Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`
 # Knowledge
 
 ## <Topic>
-- <learning> <!-- 2026-04-18 -->
-- <older learning>
+- **<Title>** — <learning body> <!-- 2026-04-18 -->
+- <older legacy learning without title>
 ```
 
-**Merge rules:**
+Each new bullet has a short bold `**Title**` (sentence-case, identifies the rule), an em-dash separator (` — `), the body, and a trailing date stamp. Existing bullets without a title are legacy — leave them as-is.
 
-- Preserve existing topics — never rewrite sections you didn't change
-- Insert new bullets at the top of their topic (newest first)
-- Stamp new bullets with today's absolute date as an HTML comment: `<!-- YYYY-MM-DD -->`
-- One line per bullet; use a sub-bullet only if longer context is essential
-- **Deduplicate:** skip restatements, or replace the older entry with the sharper wording
-- New topics go alphabetically, except `Build & Tooling` and `Architecture` may be pinned near the top
+For each captured bullet, call:
 
-Use `Edit` for surgical updates, not `Write`.
+```bash
+printf '%s' "$BODY" | .hv/bin/hv-knowledge-merge --topic "<Topic>" --title "<Short rule title>"
+```
+
+The helper handles insertion at the top of the topic, the date stamp, and atomic dedup by (topic, title) — calling it twice with the same title under the same topic is a silent no-op.
+
+**Pre-step rules (handle in prose, helper assumes them):**
+
+- **New topics:** the helper requires `## <Topic>` to already exist. If you're introducing a new topic, append the `## <Topic>` heading to `.hv/KNOWLEDGE.md` first (alphabetical order, except `Build & Tooling` and `Architecture` may be pinned near the top), then call `hv-knowledge-merge` to insert the first bullet.
+- **Sharpened wording:** the helper dedups on exact title match; it does NOT replace an older entry with sharper wording. If a captured learning is a sharper version of an existing bullet, use `Edit` to update the existing bullet directly, then skip the merge call for that learning.
+- **Preserve existing topics:** the helper writes only to the named topic's section. Other topics are untouched.
+
+`hv-knowledge-merge` is a writer helper — exit 0 on insert OR on idempotent no-op; exit 1 if the topic doesn't exist (handle topic creation first as above).
 
 ## Step 6 — Update CLAUDE.md Topic Index
 
@@ -166,15 +173,11 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    - On exit 0 (gh available, issue filed): parse `url` and `number` from the JSON output.
    - On exit 1 (manual fallback printed): show the helper's stdout to the user, then prompt once: *"Paste the issue number when you've filed it manually (or 'skip' to skip):"* Read the user's reply; if a number, use it; if "skip" or empty, abandon the tracking step.
 
-4. **Append the upstream marker to the bullet** in `.hv/KNOWLEDGE.md`. Use `Edit` to change the bullet's trailing comment from:
+4. **Append the upstream marker to the bullet** in `.hv/KNOWLEDGE.md`. Call:
+   ```bash
+   .hv/bin/hv-knowledge-amend --topic "<Topic>" --fragment "<unique body fragment>" --append "Upstream: hv-skills#<N>"
    ```
-   - <bullet text> <!-- 2026-05-07 -->
-   ```
-   to:
-   ```
-   - <bullet text> <!-- 2026-05-07 --> Upstream: hv-skills#<N>
-   ```
-   Match the bullet exactly (including the date stamp) so the edit is unique.
+   The fragment can be any case-sensitive substring of the bullet that uniquely identifies it within the topic — typically a distinctive word or phrase from the body. The helper appends ` Upstream: hv-skills#<N>` after the bullet's trailing `<!-- date -->` comment, leaving the rest of the file byte-identical.
 
 5. Add a final line to the Step 8 confirm output:
    ```

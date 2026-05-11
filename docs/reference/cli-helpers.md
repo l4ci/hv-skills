@@ -28,6 +28,8 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 | `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
 | `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
+| `hv-knowledge-merge` | Insert a `**Title** — body` bullet under `## <topic>` in `.hv/KNOWLEDGE.md`; atomic dedup by (topic, title) | `printf '%s' "$BODY" \| .hv/bin/hv-knowledge-merge --topic Testing --title "Mock TLS handshake"` |
+| `hv-knowledge-amend` | Append text after the trailing `<!-- date -->` comment of a bullet matched by (topic, fragment) | `.hv/bin/hv-knowledge-amend --topic Testing --fragment "TLS handshake" --append "Upstream: hv-skills#42"` |
 | `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
 | `hv-config-set` | Set a single value in `.hv/config.json` at a dotted key path; preserves other keys, writes atomically (resolve; JSON-parse value, fallback to string) | `.hv/bin/hv-config-set docs.afterWork true` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
@@ -150,6 +152,10 @@ In umbrella mode the umbrella tree itself often has no base branch (it's a coord
 `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query`
 pulls specific topic sections out of `KNOWLEDGE.md` by name, which is useful
 when scripting post-session summaries.
+
+`hv-knowledge-merge` adds a new bullet to `.hv/KNOWLEDGE.md` under an existing topic, with the schema `- **<Title>** — <body> <!-- YYYY-MM-DD -->`. Dedup is exact (case-insensitive) title match within the topic — calling the helper twice with the same `--topic` + `--title` is a silent no-op (idempotent). The body comes via `--body <text>` or stdin. Creating a new `## <Topic>` heading is the caller's job; the helper requires the topic to already exist.
+
+`hv-knowledge-amend` mutates an existing bullet in place, appending text after the trailing `<!-- date -->` comment. The bullet is found by case-sensitive fragment match within the named topic — pick a distinctive substring (typically a word or phrase from the body) so the match is unique. Used by `/hv-learn` Step 8.5 to attach the `Upstream: hv-skills#<N>` marker after filing an upstream issue.
 
 `hv-knowledge-stats` reports the bullet count and byte size of each topic in `KNOWLEDGE.md` as JSON. [`/hv-learn`](../usage/learning.md) Step 8 calls it after merging new bullets and prints a one-line nudge per topic that crosses 25 bullets or 10 KB, so editorial splits stay user-driven.
 

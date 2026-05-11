@@ -393,3 +393,107 @@ PRC_NON="$(mktemp -d)"
 rm -rf "$PRC_NON"
 pass "hv-plan-rename-check: lookup semantics, multi-file, scope filter, non-repo silence"
 
+echo "## hv-knowledge-merge"
+KM_TMP="$(mktemp -d)"
+(
+  cd "$KM_TMP"
+  mkdir -p .hv
+  cat > .hv/KNOWLEDGE.md <<'EOF'
+# Knowledge
+
+## Existing Topic
+
+- **Older rule** — body of the older rule. <!-- 2026-04-01 -->
+- legacy bullet without a title <!-- 2026-03-15 -->
+EOF
+
+  # 1. Missing args → exit 1
+  if "$BIN/hv-knowledge-merge" 2>/dev/null; then
+    fail "no-args exited 0"
+  fi
+  if "$BIN/hv-knowledge-merge" --topic "Existing Topic" 2>/dev/null; then
+    fail "missing --title exited 0"
+  fi
+
+  # 2. Missing topic → exit 1
+  if echo "body" | "$BIN/hv-knowledge-merge" --topic "Nonexistent" --title "X" 2>/dev/null; then
+    fail "missing topic exited 0"
+  fi
+
+  # 3. Successful insert prepends bullet at top of topic
+  echo "Fresh insight body." | "$BIN/hv-knowledge-merge" --topic "Existing Topic" --title "Fresh insight" --date 2026-05-11
+  head -10 .hv/KNOWLEDGE.md > /tmp/km_out
+  grep -q "^- \*\*Fresh insight\*\* — Fresh insight body\. <!-- 2026-05-11 -->" .hv/KNOWLEDGE.md || fail "insert wrong format"
+  # The new bullet must come BEFORE 'Older rule'
+  python3 -c "
+import sys
+content = open('.hv/KNOWLEDGE.md').read()
+fresh_idx = content.index('**Fresh insight**')
+older_idx = content.index('**Older rule**')
+assert fresh_idx < older_idx, f'Fresh insight ({fresh_idx}) should come before Older rule ({older_idx})'
+" || fail "ordering wrong: Fresh insight should be above Older rule"
+  # Legacy bullet preserved
+  grep -q "^- legacy bullet without a title <!-- 2026-03-15 -->" .hv/KNOWLEDGE.md || fail "legacy bullet lost"
+
+  # 4. Idempotent: calling with the same title is a silent no-op
+  COUNT_BEFORE=$(grep -c "^\- \*\*Fresh insight\*\*" .hv/KNOWLEDGE.md)
+  echo "Different body, same title." | "$BIN/hv-knowledge-merge" --topic "Existing Topic" --title "fresh insight" --date 2026-05-11
+  COUNT_AFTER=$(grep -c "^\- \*\*Fresh insight\*\*" .hv/KNOWLEDGE.md)
+  [ "$COUNT_BEFORE" = "$COUNT_AFTER" ] || fail "dedup failed: title repeated (count went from $COUNT_BEFORE to $COUNT_AFTER)"
+
+  # 5. --body flag alternative
+  "$BIN/hv-knowledge-merge" --topic "Existing Topic" --title "Body via flag" --body "Body passed inline." --date 2026-05-11
+  grep -q "^- \*\*Body via flag\*\* — Body passed inline\. <!-- 2026-05-11 -->" .hv/KNOWLEDGE.md || fail "--body flag wrong"
+)
+rm -rf "$KM_TMP"
+pass "hv-knowledge-merge: argv, missing topic, insert-at-top, idempotent dedup, --body flag"
+
+echo "## hv-knowledge-amend"
+KA_TMP="$(mktemp -d)"
+(
+  cd "$KA_TMP"
+  mkdir -p .hv
+  cat > .hv/KNOWLEDGE.md <<'EOF'
+# Knowledge
+
+## Topic A
+
+- **First rule** — body with unique fragment ALPHA. <!-- 2026-04-01 -->
+- **Second rule** — body with unique fragment BETA. <!-- 2026-04-02 -->
+
+## Topic B
+
+- **Third rule** — body with fragment GAMMA. <!-- 2026-04-03 -->
+EOF
+
+  # 1. Missing args → exit 1
+  if "$BIN/hv-knowledge-amend" 2>/dev/null; then
+    fail "no-args exited 0"
+  fi
+
+  # 2. Missing topic → exit 1
+  if "$BIN/hv-knowledge-amend" --topic "Nonexistent" --fragment "X" --append "Y" 2>/dev/null; then
+    fail "missing topic exited 0"
+  fi
+
+  # 3. No matching fragment → exit 1
+  if "$BIN/hv-knowledge-amend" --topic "Topic A" --fragment "NOTHING" --append "X" 2>/dev/null; then
+    fail "missing fragment exited 0"
+  fi
+
+  # 4. Successful append after the trailing date comment
+  "$BIN/hv-knowledge-amend" --topic "Topic A" --fragment "ALPHA" --append "Upstream: hv-skills#42"
+  grep -q "^- \*\*First rule\*\* — body with unique fragment ALPHA\. <!-- 2026-04-01 --> Upstream: hv-skills#42$" .hv/KNOWLEDGE.md || fail "append wrong (Topic A First rule)"
+
+  # 5. Other bullets and topics untouched
+  grep -q "^- \*\*Second rule\*\* — body with unique fragment BETA\. <!-- 2026-04-02 -->$" .hv/KNOWLEDGE.md || fail "Second rule changed unexpectedly"
+  grep -q "^- \*\*Third rule\*\* — body with fragment GAMMA\. <!-- 2026-04-03 -->$" .hv/KNOWLEDGE.md || fail "Topic B Third rule changed unexpectedly"
+
+  # 6. Fragment must be within the named topic (Topic B has GAMMA, calling with Topic A should miss)
+  if "$BIN/hv-knowledge-amend" --topic "Topic A" --fragment "GAMMA" --append "WRONG" 2>/dev/null; then
+    fail "fragment leaked across topics (Topic A should not match GAMMA from Topic B)"
+  fi
+)
+rm -rf "$KA_TMP"
+pass "hv-knowledge-amend: argv, missing topic, missing fragment, scoped append, other-bullet preservation"
+
