@@ -9,7 +9,13 @@ CTX="${1:-this command}"
 
 if git rev-parse --git-dir >/dev/null 2>&1; then
   if [ -n "$(git status --porcelain)" ]; then
-    echo "error: uncommitted changes — stash (\`git stash\`) or commit before running $CTX" >&2
+    if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+      echo "error: uncommitted changes on a fresh repo (no commits yet) — make a baseline commit before running $CTX:" >&2
+      echo "  git add -A && git commit -m \"chore: import initial files\"" >&2
+      echo "then re-run." >&2
+    else
+      echo "error: uncommitted changes — stash (\`git stash\`) or commit before running $CTX" >&2
+    fi
     exit 1
   fi
   exit 0

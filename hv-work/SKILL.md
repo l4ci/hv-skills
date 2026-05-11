@@ -73,6 +73,8 @@ git commit -m "chore: sweep tool-generated siblings before hv-work"
 
 If **any** path is a user change, stop with the original guard message — the user decides whether to stash, commit, or discard.
 
+**Greenfield variant.** On a fresh `git init`'d repo (no commits yet), `hv-guard-clean` emits a tailored message pointing at the `chore: import initial files` baseline commit. Run it and re-invoke — the guard then sees a clean tree.
+
 Don't narrate the sweep unless it happened; silent pass-through is the common case.
 
 **On any Step 1 guard failure that stops `/hv-work` (exit 2 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:

@@ -243,7 +243,9 @@ member matched, preserving all member IDs for context.
 
 `hv-guard-clean` exits non-zero when the git working tree is dirty or the
 current directory is not inside a git repository. Skills call it as a safety
-check before making commits.
+check before making commits. On a fresh repo with no commits yet, a dirty tree
+produces a tailored message naming the `chore: import initial files` baseline
+commit pattern instead of the generic stash-or-commit hint.
 
 `hv-require-git-context` is a companion preflight for umbrella-mode tools: if cwd is an umbrella root that has no `.git/` of its own, it exits 1 with a friendly error pointing the user to a sub-repo. Pass `--repo-flag-supported` when the calling tool has a `--repo` option to name in the error message. The helper is a no-op (silent exit 0) when cwd already has git context.
 
