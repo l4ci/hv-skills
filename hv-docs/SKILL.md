@@ -26,6 +26,8 @@ user-invocable: true
 
 If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
 
+`/hv-docs` and `/hv-map` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
+
 ## Configuration
 
 Read `.hv/config.json`:
@@ -142,13 +144,7 @@ On **Cancel** — print *"Scaffold cancelled. Run `/hv-docs` again whenever you'
 
 ### Page-naming convention
 
-Tailored trees should follow this layout — already in use across hv-skills's own `docs/` and reusable for other projects:
-
-- **Spine** — top-level pages: `README.md` (TOC), `getting-started.md` (5-minute walkthrough), `faq.md` (common questions, optional).
-- **Phase-grouped usage pages** — `docs/usage/<verb-noun>.md`: examples — `picking-work.md`, `running-work.md`, `pausing-and-resuming.md`, `review-and-ship.md`. The verb-noun shape keeps file names self-documenting and groups related actions.
-- **Reference material** — `docs/reference/`: full helper / command / config references — `slash-commands.md`, `cli-helpers.md`, `configuration.md`, etc. Reference pages are flat lists/tables; usage pages are narrative walkthroughs.
-
-When the tailored proposal in this step doesn't fit the convention (e.g., a CLI tool with no usage phases, or a library with API references but no walkthroughs), describe the deviation in one line in your proposal — *"This project ships only reference material; no `usage/` pages proposed."* — so the user sees the conscious choice.
+The tailored tree should follow the spine + usage + reference layout documented in `references/docs-conventions.md` (page-naming section). When the tailored proposal doesn't fit (e.g., a CLI tool with no usage phases, or a library with API references but no walkthroughs), describe the deviation in one line in your proposal — *"This project ships only reference material; no `usage/` pages proposed."* — so the user sees the conscious choice.
 
 ## Step 5 — Scaffold on Approval
 
@@ -160,28 +156,7 @@ For each proposed file, write it with:
 
 Write `<docs.path>/README.md` as a real index — TOC linking every other proposed page. This is the only page that ships with non-stub content (the TOC itself).
 
-Seed `.docsignore` at repo root if it doesn't already exist:
-
-```
-# hv-docs — never read these as source material for public docs
-.env
-.env.*
-**/secrets/**
-**/credentials*
-**/*.key
-**/*.pem
-**/internal/**
-**/private/**
-
-# Common build/dependency dirs (also kept out for noise reasons)
-node_modules/
-dist/
-build/
-.next/
-target/
-```
-
-Make all writes idempotent — never overwrite an existing file.
+Seed `.docsignore` at repo root if it doesn't already exist — use the template in `references/docs-conventions.md` (`.docsignore` seed section). Make all writes idempotent — never overwrite an existing file.
 
 After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use `.hv/bin/hv-config-set docs.afterWork true` (same pattern as Step 1's manual-toggle branch). Skip silently if `docs.afterWork` is already `true`.
 
@@ -209,7 +184,7 @@ This flow is invoked by `/hv-work` Step 13.6 and `/hv-ship` Step 8.6 — those s
 
 ## Step A1 — Trigger Gate
 
-Trigger condition (same as `/hv-learn`'s): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+Apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug). Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
 
 If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print one line: *"`/hv-docs` not yet initialized — run `/hv-docs` to scaffold."* and exit. Don't auto-scaffold mid-cycle.
 

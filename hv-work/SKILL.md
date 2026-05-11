@@ -414,7 +414,7 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 ## Step 13 — Learn (Nudge or Auto-Invoke)
 
-Trigger condition (same in all modes): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+Apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug). Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
 
 When triggered, branch on `autonomy.level`:
 
@@ -433,7 +433,7 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
 
-When the flag is on, trigger condition (same gating as Step 13): **2+ items resolved**, OR **≥5 files touched**, OR a **hard bug** that took multiple debug cycles. Skip entirely for single-item fixes and pure mechanical changes. Don't repeat in the same session.
+When the flag is on, apply the same post-cycle trigger condition as Step 13 — see `references/post-cycle-trigger-gate.md`.
 
 When triggered, branch on `autonomy.level`:
 
