@@ -120,3 +120,18 @@ UMB_TMP="$(mktemp -d)"
 )
 rm -rf "$UMB_TMP"
 pass "B02 umbrella-cwd guards: 6 helpers refuse cleanly or operate correctly"
+
+echo "F42 self-locate: cwd-anchored walk-up wins over BASH_SOURCE[1]"
+F42_TMP="$(mktemp -d)"
+trap 'rm -rf "$F42_TMP"' EXIT
+mkdir -p "$F42_TMP/.hv" "$F42_TMP/repo-a"
+echo '{"bugs":7,"features":0,"tasks":0,"milestones":0}' > "$F42_TMP/.hv/counters.json"
+(
+  cd "$F42_TMP/repo-a"
+  ID=$("$BIN/hv-next-id" bugs)
+  [ "$ID" = "B08" ] || { echo "FAIL: F42: hv-next-id from sub-cwd: expected B08 (test umbrella), got '$ID'"; exit 1; }
+)
+AFTER_BUGS=$(python3 -c 'import json; print(json.load(open("'"$F42_TMP/.hv/counters.json"'"))["bugs"])')
+[ "$AFTER_BUGS" = "8" ] || fail "F42: test umbrella counters.json not incremented (expected 8, got $AFTER_BUGS)"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-self-locate prefers cwd-anchored walk-up over BASH_SOURCE[1]"
