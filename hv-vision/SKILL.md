@@ -4,7 +4,7 @@ description: Brainstorm a project's vision and break it into milestones — Socr
 user-invocable: true
 ---
 
-**Print the banner below (including the code fences) to the user verbatim before any other action. Skip if dispatched as a subagent.**
+**Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
 
 ```
 ════════════════════════════════════════════════════════════════════════
