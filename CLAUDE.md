@@ -29,7 +29,7 @@ _(no active milestones — all shipped or archived; run `/hv-vision` to plan mor
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
 
-**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
+**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-next`, `/hv-status`, `/hv-resume`, `/hv-pause`
 **Plan & build** — `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship`
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only)
