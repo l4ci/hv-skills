@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Resolve the handoff-note path for a branch (optionally umbrella-keyed).
+#
+# This is a lookup helper (per DECISIONS.md "Lookup vs. resolve"); always
+# exits 0 in the success paths. Default read mode probes the filesystem with
+# umbrella-vs-flat fallback and prints the existing path on stdout — empty
+# stdout when no handoff exists. Write mode emits the canonical path without
+# probing, so callers can mkdir/write without a separate path computation.
+#
+# Usage: hv-resolve-handoff [--repo <name>] [--write] <branch>
+#   --repo:  optional sub-repo name (umbrella mode)
+#   --write: emit canonical write path without probing the filesystem
+#   stdout:  resolved handoff path; empty in read mode when no file exists
+#   exit:    0 on success (including read miss); 1 on usage error (stderr)
+set -euo pipefail
+REPO=""
+MODE="read"
+BRANCH=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) REPO="$2"; shift 2 ;;
+    --write) MODE="write"; shift ;;
+    -*) echo "unknown flag: $1" >&2; exit 1 ;;
+    *) BRANCH="$1"; shift ;;
+  esac
+done
+if [ -z "$BRANCH" ]; then
+  echo "usage: hv-resolve-handoff [--repo <name>] [--write] <branch>" >&2
+  exit 1
+fi
+if [ -n "$REPO" ]; then
+  UMBRELLA_PATH=".hv/handoff/${BRANCH}@${REPO}.md"
+else
+  UMBRELLA_PATH=""
+fi
+FLAT_PATH=".hv/handoff/${BRANCH}.md"
+if [ "$MODE" = "write" ]; then
+  if [ -n "$UMBRELLA_PATH" ]; then
+    echo "$UMBRELLA_PATH"
+  else
+    echo "$FLAT_PATH"
+  fi
+  exit 0
+fi
+# Read mode: probe filesystem, prefer umbrella-keyed, fall back to flat.
+if [ -n "$UMBRELLA_PATH" ] && [ -f "$UMBRELLA_PATH" ]; then
+  echo "$UMBRELLA_PATH"
+elif [ -f "$FLAT_PATH" ]; then
+  echo "$FLAT_PATH"
+fi
+exit 0

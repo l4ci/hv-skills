@@ -80,6 +80,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-resolve-umbrella` | Walk up from cwd to find the umbrella's `.hv/`; detect masking by stray `.hv/` inside a registered sub-repo | `.hv/bin/hv-resolve-umbrella` |
 | `hv-resolve-repo` | Identify which registered sub-repo cwd belongs to (incl. Layout B worktrees) | `.hv/bin/hv-resolve-repo` |
 | `hv-resolve-repo-path` | Resolve a registered sub-repo name → absolute path via `.hv/repos.json`; symmetric counterpart to `hv-resolve-repo` | `.hv/bin/hv-resolve-repo-path web` |
+| `hv-resolve-handoff` | Resolve handoff-note path with umbrella-vs-flat fallback (lookup; empty stdout when no handoff). Default reads the filesystem; `--write` emits the canonical write path without probing | `.hv/bin/hv-resolve-handoff --repo web hv/feature-x` |
 | `hv-umbrella-on` | Print `yes` if umbrella mode is active (`.hv/repos.json` registers ≥1 sub-repo), `no` otherwise; always exits 0 | `.hv/bin/hv-umbrella-on` |
 | `hv-walk-up` | Walk up from an anchor directory to find a marker (default `.hv/`) and print the containing directory's absolute path; `--detect-masking` checks for stray sub-repo `.hv/` | `.hv/bin/hv-walk-up --marker .hv --detect-masking` |
 | `hv-release-detect-version` | Auto-detect the version file and emit current version as JSON | `.hv/bin/hv-release-detect-version` |
