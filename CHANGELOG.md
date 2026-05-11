@@ -1,5 +1,66 @@
 # Changelog
 
+## v2.1.0 — 2026-05-11
+
+A substantial release bundling the never-tagged v2.0.0 work (breaking removal of `/hv-status` + `/hv-resume`) with major new features — `/hv-context` (project domain glossary), `/hv-map` (subsystem index for context-scaling), loop-mode auto-picks, TaskCreate progress checklists across 17 skills, and a large references/ extraction sweep.
+
+## Breaking
+
+- **`/hv-status` and `/hv-resume` removed — folded into `/hv-next`** ([F26]). Run `/hv-next` for backlog review + handoff detection in one command. CHANGELOG had a `v2.0.0` section for this work but no tag was ever cut; it ships in `v2.1.0`.
+
+## New
+
+- **`/hv-context` — project-level domain glossary** ([F38]) — capture and refine terms in `.hv/CONTEXT.md`, with umbrella support across sub-repos. Skill consulted from `/hv-vision`, `/hv-work`, `/hv-debug`, `/hv-capture`. New `hv-context-*` helpers (`add`, `index`, `query`, `map`) and scaffolding via `/hv-init`.
+- **`/hv-map` — subsystem index for context-scaling** — `.hv/MAP.md` + `.hv/map/` per-subsystem files with first-run, after-work, and consolidate modes. Auto-invoked from `/hv-work`, `/hv-debug`, `/hv-go`. Includes `hv-map-index`, `hv-map-query`, `hv-map-stats` helpers and stale-entry detection.
+- **`/hv-rm` — backlog item removal** ([F36]) — slash command + `bin/hv-rm` helper for clean TODO removal with handoff-note sweep.
+- **`/hv-plan --auto-loop` mode** ([F32]) — auto-planning for loop sessions, with `[Auto:Loop]` decision surfacing on terminal paths and a `hv-loop-stamp` tracker.
+- **Loop-mode auto-picks across skills** ([F33]) — `/hv-refactor`, `/hv-ship`, `/hv-next`, `/hv-capture` auto-pick the Recommended option in loop mode; codified as an `/hv-init` authoring convention.
+- **TaskCreate progress checklists in 17 skills** ([F37]) — visible per-phase progress for `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-docs`, `/hv-refactor`, `/hv-learn`, `/hv-decide`, `/hv-spike`, `/hv-vision`, `/hv-capture`, `/hv-next`, `/hv-pause`, `/hv-review`, `/hv-plan`, `/hv-config`, `/hv-rm`; plus the convention itself in `/hv-init`.
+- **Helper extraction sweep** ([F44]–[F50]) — inline shell replaced with dedicated `bin/` helpers: `hv-knowledge-merge`/`amend`, `hv-plan-rename-check`, `hv-find-milestone-for-items`, `hv-config-set`, `hv-guard-feature-branch`, `hv-resolve-handoff`, `hv-stale-summary`.
+- **`/hv-work` rename + link-sweep collision detection at plan time** ([F27]).
+- **`/hv-decide` source-prefill modes — `--from-learning`, `--from-spike`** ([F22]).
+- **`/hv-learn` nudges `/runlog-author` for external-dep learnings** ([F21]).
+- **`/hv-spike` nudges `/hv-decide` on viable / not-viable finish** ([F20]).
+- **Backlog `--grep <pattern>` filter** ([F25]).
+- **Release-flow polish** ([F17] [F19] [F23]) — release-pending nudge in post-ship + terminal paths, large-push gate, `docs.afterWork` hook, autonomy-aware `/hv-init` handoff after plugin upgrade, version-drift nudge in preflight.
+- **Pre-flight scaffolding scan for stale `Task-N` comments** ([T25]).
+- **Three-gate pre-write trigger for `/hv-decide`** ([F39]).
+- **Structural-triple uncertainty heuristic + `/hv-assume` pre-flight in loop-mode auto-plan dispatch** ([F34]).
+
+## Fixed
+
+- `/hv-rm` phase-list Step references aligned with body ([B17]).
+- `hv-umbrella-on` detects umbrella from `repos.json` instead of config flag ([B15]).
+- `/hv-next` frontmatter triggers aligned with banner ([B14]).
+- Handoff note swept on remove ([B13]).
+- Plugin-path resolver finds Claude Code cache layout ([B12]).
+- Cross-file alias collision scan for companion `CONTEXT.md` ([F43]).
+- Multiple `[F38]` polish fixes — umbrella detection, sub-repo resolve, abbreviation periods preserved at sentence cut, spec entry shape, empty placeholder strip.
+- `hv-staleness` uses `>=` so `--days 0` lists all entries.
+
+## Changed
+
+- **References extraction sweep** ([T19] [T28]–[T60]) — substantial prose moved from SKILL.md files into `references/` and `docs/reference/`: umbrella mode, isolation patterns, authoring conventions, config options, context-load protocol, knowledge-consult, manual gates, review-verdict routing, merge-strategy gate, banner preamble, ask-user-question fallback, persistence-trio spine, three-mode skill shape, detail files, milestone tagging, handoff template, source prefill, release hosts, update verdicts, observable outcomes, TaskCreate convention, plus iterate-loop and silence-fallback semantics. SKILL.md files now cite these references instead of repeating prose.
+- **`hvlib` consolidation + cap-check helper** — multiple architectural-improvement rollups consolidating pure-function helpers in `hvlib`.
+- **Smoke test split into runner + per-section files** ([T24]).
+- **Strict `--repo` extraction in 7 multi-flag helpers** ([F29]).
+- **`hv-resolve-umbrella` and `hv-self-locate.sh` delegate walk-up to `hv-walk-up`** ([F30]).
+- Various executable-bit fixes for new helpers in tracked mode.
+
+## Documentation
+
+- User-facing docs sweep — `/hv-context` usage + reference, `/hv-rm` usage page, autonomy loop-mode docs, F37 progress-checklist visibility notes, F35 orchestrator-model contract, CHANGELOG 2.0.0 breaking-removal section.
+- Numeric cutoffs replace vague adjectives across skills ([T52]).
+- Vague exploration prompts in `/hv-refactor` replaced with prioritization + stop condition ([T53]).
+- Iterate-loop semantics defined for `/hv-plan` Step 5 ([T54]).
+- Silence fallback defined for `/hv-spike` verbal-summary step ([T55]).
+
+## Stats
+
+267 commits, 177 files changed, +15688 −4275 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v1.16.0...v2.1.0
+
 ## v2.0.0 — 2026-05-08
 
 Hard-merge of `/hv-status` and `/hv-resume` into `/hv-next`. Single state-view entry point.
