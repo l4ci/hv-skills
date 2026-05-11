@@ -102,7 +102,7 @@ If enabled, invoke `hv-review` via the `Skill` tool for this branch. Pass throug
       2. "Ship anyway" — *"Proceed with the merge or PR despite the concerns."*
       3. "Stop" — *"Leave the branch as-is; no integration now."*
     - Plain-text fallback: *"Address first, ship anyway, or stop?"*
-  - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode" — the obvious answer for surfaced concerns is to address them. Review re-runs on the next `/hv-ship`; if the same concerns surface twice, that's a stop signal, but loop mode itself doesn't track this — the user interrupts when they see repeat findings. Note: a review FAIL still stops the loop unconditionally (a guard failure).
+  - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5) — the obvious answer for surfaced concerns is to address them. Review re-runs on the next `/hv-ship`; if the same concerns surface twice, that's a stop signal, but loop mode itself doesn't track this — the user interrupts when they see repeat findings. Note: a review FAIL still stops the loop unconditionally (a guard failure).
 - **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
 
 If `ship.review` is `false`, skip this step.

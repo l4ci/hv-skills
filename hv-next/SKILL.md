@@ -69,7 +69,7 @@ For each stream that has a handoff, extract the **Stage**, **Next planned step**
 - **`hasCommits: true`** (no handoff) → `Ship via /hv-ship` — invoke `hv-ship` via the `Skill` tool with the branch.
 - **`hasCommits: false`** (no handoff) → `Resume with /hv-work` — invoke `hv-work` on the existing branch.
 
-Auto-picking Recommended is exactly what loop mode wants for routine reconcile resolutions: handoff streams resume on the brief, complete streams ship through their own review/PR gates, and incomplete streams keep accumulating commits. Per the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode." The downstream skills (`/hv-ship`, `/hv-work`) keep their own manual gates intact (review FAIL, PR strategy, etc.) — loop mode auto-picks the **routing** answer, not the **public-artifact** answer.
+Auto-picking Recommended is exactly what loop mode wants for routine reconcile resolutions: handoff streams resume on the brief, complete streams ship through their own review/PR gates, and incomplete streams keep accumulating commits. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5). The downstream skills (`/hv-ship`, `/hv-work`) keep their own manual gates intact (review FAIL, PR strategy, etc.) — loop mode auto-picks the **routing** answer, not the **public-artifact** answer.
 
 After resolving every entry under loop mode, continue to Step 3 — do not surface "Skipped" lines, since nothing was skipped.
 
