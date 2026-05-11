@@ -25,7 +25,7 @@ Add or refine an entry in `.hv/CONTEXT.md` so future work uses the same canonica
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve term + definition", description="Surface the term name and a one-paragraph definition")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands.
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve term + definition", description="Surface the term name and a one-paragraph definition")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no existing term, single-repo mode skipping the umbrella ask) get `completed` with the no-op reason in the description.
 
 Phases:
 
@@ -33,7 +33,7 @@ Phases:
 2. *Check for conflicts* — existing entry surveyed; user picks keep/replace/merge if found (Step 3)
 3. *Write* — `bin/hv-context-add` writes the entry (Step 4)
 4. *Index* — `hv-context-add` regenerates the CLAUDE.md block (and `CONTEXT-MAP.md` in umbrella mode) (Step 4 cont.)
-5. *Commit* — single atomic commit (Step 5)
+5. *Confirm* — compact captured-block report (Step 5)
 
 ## Step 2 — Resolve Term and Definition
 
@@ -44,12 +44,7 @@ The argument forms determine whether `Step 2` asks any questions:
 - **Term only:** `/hv-context <term>` — ask for definition via `AskUserQuestion`; skip aliases/nots unless the user volunteers them.
 - **No args:** ask for term and definition in two single-question turns. **Don't ask what the codebase already implies** — skip aliases/nots prompts unless context (`KNOWLEDGE.md` topics, recent commits, current `## Project Context` block in `CLAUDE.md`) makes a candidate alias obvious; even then, propose inline rather than blocking on a question.
 
-In umbrella mode, target file resolution mirrors `hv-context-add` defaults:
-
-- `--repo umbrella` → `.hv/CONTEXT.md`
-- `--repo <name>` → `.hv/contexts/<name>/CONTEXT.md`
-- omitted, cwd inside a registered sub-repo → that sub-repo's file (resolved via `hv-resolve-repo`)
-- omitted, cwd at umbrella root → ask once: *"Capture this as an umbrella-shared term, or scope to a sub-repo?"* (`AskUserQuestion`, options: *Umbrella-shared (Recommended)*, one option per registered sub-repo)
+In umbrella mode, the target file depends on `--repo` and cwd — see `references/context-umbrella-scoping.md` for the resolution table. Single-repo mode always writes to `.hv/CONTEXT.md` and ignores `--repo`.
 
 ## Step 3 — Check for Conflicts
 
@@ -98,18 +93,7 @@ Invoke `bin/hv-context-add` with the resolved arguments. Example calls:
 
 `hv-context-add` regenerates the `## Project Context` managed block (and `.hv/CONTEXT-MAP.md` in umbrella mode) before exiting.
 
-## Step 5 — Commit
-
-Single atomic commit:
-
-```bash
-git add .hv/CONTEXT.md .hv/CONTEXT-MAP.md .hv/contexts/ CLAUDE.md
-git commit -m "docs(context): add <term>"
-```
-
-For an update use `docs(context): refine <term>`. Match the standard hv-skills "commit message OK?" flow used by `/hv-decide`. Don't include attribution beyond what hv-skills already adds.
-
-## Step 6 — Confirm
+## Step 5 — Confirm
 
 Tell the user, in one compact block, what was captured:
 
@@ -130,3 +114,4 @@ In umbrella mode, prepend the target file: *"Captured into .hv/contexts/repo-a/C
 - **One sentence's-worth of definition is fine.** The first sentence becomes the gloss in the CLAUDE.md block; longer definitions stay in CONTEXT.md but the gloss must stand alone.
 - **Aliases are user-stated only.** Don't propose aliases the user didn't ask for. Conflict-call-out (during a `/hv-work` cycle) can suggest "you used X — CONTEXT calls this Y" but only `/hv-context` writes them.
 - **No verifier.** Manual confirmation is the verification.
+- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
