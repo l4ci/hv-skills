@@ -53,41 +53,16 @@ Parses JSON output:
 
 ## Step 3 — Present Verdict
 
-One compact block. Adapt wording to `status`:
+Emit one compact block keyed by the `status` field from Step 2. Templates live in `references/update-verdicts.md` — substitute the JSON fields verbatim, no editorial massaging.
 
-**`current`:**
+| `status` | Template in `references/update-verdicts.md` |
+|----------|---------------------------------------------|
+| `current` | `## current` |
+| `behind`  | `## behind`  |
+| `ahead`   | `## ahead`   |
+| `unknown` | `## unknown` |
 
-```
-hv-skills 1.2.0 — up to date.
-Installed as plugin at ~/.claude/plugins/hv-skills.
-```
-
-**`behind`:**
-
-```
-hv-skills update available: 1.2.0 → 1.3.0
-Installed as plugin at ~/.claude/plugins/hv-skills.
-
-Update:
-  claude plugin update hv-skills
-
-After updating, run /hv-init in your project to refresh .hv/bin/ helpers.
-```
-
-**`ahead`:**
-
-```
-hv-skills 1.3.0 — ahead of the latest release (1.2.0).
-Likely a local dev build or unpushed repo clone.
-```
-
-**`unknown`:**
-
-```
-Could not determine update status.
-Current: <version or "unknown">
-Latest: <not reachable — check `gh auth status` or network>
-```
+Add new status values to both the helper and the reference together.
 
 ## Step 4 — Offer to Re-Init
 
