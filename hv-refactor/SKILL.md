@@ -121,92 +121,9 @@ Run `hv-guard-clean` against the umbrella's tree if you skipped it earlier. Then
 
 ### Branch — fanout (any other scope: "All sub-repos", "All + umbrella", "Pick a subset")
 
-Build the target list. For each target, you'll dispatch one sub-agent via `Agent` IN A SINGLE MESSAGE (parallel).
+The full fanout choreography — context collection, the per-target sub-agent prompt template, the parallel dispatch, the after-returns aggregation + counter reset + report — lives in `references/refactor-umbrella-fanout.md`. Run that flow end-to-end, then EXIT this skill (skip Steps 2–10).
 
-**Collect umbrella context for the sub-agents.** KNOWLEDGE.md and DECISIONS.md live only at the umbrella; sub-agents need their content embedded so they respect cross-repo conventions and decisions. Apply the canonical K+D query pattern (`references/knowledge-consult.md`) against the topics that may apply across the targets. If unsure which topics apply, pass every topic from each file (read the `## Topic` headings and pass all of them) — umbrella fanout has broader topic relevance than a per-step query. Capture the output as `KNOWLEDGE_BLOB` and `DECISIONS_BLOB` for embedding into each sub-agent prompt below.
-
-The umbrella concept — registry, resolution helpers, sub-repo `.git/` distinction — lives in `references/umbrella-mode.md`. This step's per-target dispatch carries those mechanics into each sub-agent's brief.
-
-**Dispatch sub-agents.** For each target (each chosen sub-repo, plus optionally the umbrella when "All + umbrella" was picked), build a single Agent call with this prompt template:
-
-```
-You are a /hv-refactor sub-agent operating on a single repo within an umbrella project. Run a focused refactor cycle for THIS REPO ONLY.
-
-Repo: <name>
-Path: <abs-path>
-Umbrella: <umbrella-abs-path>
-
-## Your steps
-
-1. cd <abs-path>
-
-2. Run `.hv/bin/hv-guard-clean` from this repo's bin path (it lives at <umbrella-abs-path>/.hv/bin/hv-guard-clean — call it as `<umbrella-abs-path>/.hv/bin/hv-guard-clean`). If the repo isn't a git repo or has uncommitted changes, stop and report "no changes" back.
-
-3. Run a focused refactor cycle equivalent to /hv-refactor's Steps 2-9 on THIS REPO:
-   a. Dispatch an exploration agent (orchestrator model: <orchestrator from config>) to explore THIS REPO ONLY for friction. Do not walk into the umbrella or other sub-repos.
-   b. Triage findings; classify simple vs structural; categorize dependencies (in-process / local-substitutable / ports-and-adapters / true-external).
-   c. For structural items, design competing approaches if the umbrella's `.hv/config.json` has `refactor.confirmBeforeExecute: true`; otherwise pick the recommended approach and proceed (the config file lives at the umbrella, not here — read `<umbrella-abs-path>/.hv/config.json`).
-   d. Dispatch parallel worker agents (worker model: <worker from config>) for the fixes. File-disjoint fixes run in parallel; same-file fixes go to one worker; sequential dependencies serialize.
-   e. Verify with a single verification agent (orchestrator model). Re-fix any FAIL verdicts.
-   f. Commit in this repo's `.git/`. One commit for the cycle. Stage modified files explicitly (no `git add -A`).
-
-4. Do NOT:
-   - Run `hv-refactor-reset` — the umbrella orchestrator does that once at the end.
-   - Modify the umbrella's `.hv/`, `.claude*/`, or any other sub-repo.
-   - Push or create PRs.
-
-## Context for THIS sub-cycle
-
-### Umbrella KNOWLEDGE.md (relevant topics)
-
-<KNOWLEDGE_BLOB>
-
-### Umbrella DECISIONS.md (full)
-
-<DECISIONS_BLOB>
-
-## Return
-
-A compact summary in EXACTLY this format:
-
-repo: <name>
-commit: <short hash, or "no changes" if the cycle found nothing to commit>
-items: <N>
-- <one-line item description 1>
-- <one-line item description 2>
-...
-```
-
-The orchestrator and worker model names embedded in the prompt come from the umbrella's `.hv/config.json` `models.orchestrator` / `models.worker` (defaults `opus` / `sonnet`).
-
-**Wait for all sub-agents to complete**, then aggregate.
-
-### After fanout returns
-
-1. Aggregate the per-repo summaries into a single umbrella-level report.
-2. Run `.hv/bin/hv-refactor-reset` ONCE.
-3. Print the aggregated report. Format:
-
-```
-Umbrella refactor cycle — N targets
-
-repo: web (commit a1b2c3d, 4 items)
-  - <item 1>
-  - <item 2>
-  ...
-
-repo: api (commit e4f5g6h, 2 items)
-  - <item 1>
-  - <item 2>
-
-repo: <umbrella-name> (no changes)
-
-(Counter reset.)
-```
-
-For sub-repos that returned "no changes", skip the bullet list — just note the result.
-
-**EXIT** — skip Steps 2-10 (those are the single-repo flow that umbrella fanout has already delegated to sub-agents).
+The reference's sub-agent prompt embeds `<orchestrator>` and `<worker>` placeholders — substitute from the umbrella's `.hv/config.json` `models.orchestrator` / `models.worker` (defaults `opus` / `sonnet`) before dispatch.
 
 ## Step 2 — Explore with Orchestrator
 
