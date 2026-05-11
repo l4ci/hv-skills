@@ -128,7 +128,7 @@ Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* — see `refer
 
 ## Step 6a — Open a PR
 
-> **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs.
+> **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs. See `references/manual-gates.md`.
 
 ```bash
 printf '%s' "$BODY" | .hv/bin/hv-pr <branch> "<short title>"
