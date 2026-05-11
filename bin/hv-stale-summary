@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Summarize stale-entry counts across MAP / KNOWLEDGE / TODO as one status line.
+# This is a lookup helper (per DECISIONS.md "Lookup vs. resolve"); always exit 0.
+# Empty stdout when all kinds report zero — no prefix line, no noise.
+# Usage: hv-stale-summary [--days N] [--today YYYY-MM-DD] [kind ...]
+#   kind:    one or more of: map | knowledge | todo (default: all three)
+#   --days:  threshold; passed through to hv-staleness (default 90)
+#   --today: override today; passed through to hv-staleness (test hook)
+#   stdout:  single line "stale: <k>=<n>[, <k>=<n>]..." (zero kinds suppressed);
+#            empty when no kind is stale.
+#   exit:    0 always (lookup helper)
+set -euo pipefail
+DAYS=90
+TODAY=""
+KINDS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --days) DAYS="$2"; shift 2 ;;
+    --today) TODAY="$2"; shift 2 ;;
+    map|knowledge|todo) KINDS+=("$1"); shift ;;
+    *) echo "unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+[ ${#KINDS[@]} -eq 0 ] && KINDS=(map knowledge todo)
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PARTS=()
+for k in "${KINDS[@]}"; do
+  if [ -n "$TODAY" ]; then
+    n=$("$HERE/hv-staleness" "$k" --days "$DAYS" --today "$TODAY" | wc -l | tr -d ' ')
+  else
+    n=$("$HERE/hv-staleness" "$k" --days "$DAYS" | wc -l | tr -d ' ')
+  fi
+  [ "$n" -gt 0 ] && PARTS+=("$k=$n")
+done
+[ ${#PARTS[@]} -eq 0 ] && exit 0
+IFS=", "; echo "stale: ${PARTS[*]}"

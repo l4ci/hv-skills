@@ -255,6 +255,18 @@ out="$("$BIN/hv-staleness" map --days 0 --today 2026-05-09)"
 "$BIN/hv-staleness" knowledge --days 0 >/dev/null
 echo "ok hv-staleness"
 
+# --- hv-stale-summary ---------------------------------------------
+# Wraps hv-staleness × 3 into one summary line; zero-kinds suppressed.
+out="$("$BIN/hv-stale-summary" --days 0 --today 2026-05-09 map)"
+case "$out" in
+  "stale: map="*) ;;
+  *) echo "FAIL: hv-stale-summary did not emit stale: map=N (got: $out)"; exit 1 ;;
+esac
+# All-fresh: --days 999999 yields zero stale → empty output
+out="$("$BIN/hv-stale-summary" --days 999999 --today 2026-05-09)"
+[ -z "$out" ] || { echo "FAIL: hv-stale-summary should be silent when nothing is stale (got: $out)"; exit 1; }
+echo "ok hv-stale-summary"
+
 # --- hv-bootstrap seeds map ---------------------------------------
 TMP2=$(mktemp -d)
 trap 'rm -rf "$TMP" "$TMP2"' EXIT
@@ -274,13 +286,11 @@ grep -q "hv-map after-work" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug 
 grep -q "hv-map after-work" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map after-work"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 
-# --- status/next/resume reference hv-staleness --------------------
+# --- status/next/resume reference hv-stale-summary ---------------
 # Note: hv-status and hv-resume were merged into hv-next (F26).
-# All three staleness checks now target hv-next/SKILL.md.
-grep -q "hv-staleness map" "$REPO/hv-next/SKILL.md"       || { echo "FAIL: hv-next missing staleness map"; exit 1; }
-grep -q "hv-staleness knowledge" "$REPO/hv-next/SKILL.md" || { echo "FAIL: hv-next missing staleness knowledge"; exit 1; }
-grep -q "hv-staleness todo" "$REPO/hv-next/SKILL.md"      || { echo "FAIL: hv-next missing staleness todo"; exit 1; }
-grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"          || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
+# hv-next now uses bin/hv-stale-summary as a single wrapper (F48).
+grep -q "hv-stale-summary" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
+grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
 
 # --- end-to-end: scaffold + after-work bump + consolidate prep ----
