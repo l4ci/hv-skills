@@ -78,7 +78,7 @@ Then ask discovery questions via `AskUserQuestion`. Tailor them to the mode:
   - Re-prioritize the active set
   - Explore a new direction the project should consider
 
-Plain-text fallback: ask the same question once in prose; if the answer is ambiguous, pick the Recommended interpretation, name it, and proceed.
+Plain-text fallback: ask the same question in prose; default to Recommended on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
 
 ## Step 4 — Web Research
 

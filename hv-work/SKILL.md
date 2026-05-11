@@ -118,7 +118,7 @@ When asking, use a single `AskUserQuestion` call with 1-3 questions. Each questi
 - Options map to concrete plans. Mark the most likely intent `(Recommended)`.
 - For conflicting items, use `multiSelect: true` and ask which subset to include in this run.
 
-Plain-text fallback: ask once. If the reply still doesn't resolve the ambiguity, pick the Recommended interpretation, state it explicitly in the dispatch brief, and proceed.
+Plain-text fallback: ask once; on ambiguity, default to Recommended and state it explicitly in the dispatch brief. See `references/ask-user-question-fallback.md`.
 
 **Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
 
