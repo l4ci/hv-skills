@@ -43,6 +43,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 - [Slash commands](reference/slash-commands.md) — alphabetical reference of all `/hv-*` commands
 - [The `.hv/` folder](reference/hv-folder.md) — files and directories created by `/hv-init`
 - [CLI helpers](reference/cli-helpers.md) — user-callable scripts in `.hv/bin/`
+- [Configuration options](reference/config-options.md) — questions `/hv-init` and `/hv-config` ask, with their option labels and descriptions
 
 ### Other
 
