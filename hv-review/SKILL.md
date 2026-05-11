@@ -71,12 +71,7 @@ If `commitCount` is 0, stop and tell the user.
 
 ## Step 3 — Consult KNOWLEDGE & DECISIONS
 
-Read the `hv-knowledge` block in `CLAUDE.md` to see available topics. Pick topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic). Then query both stores for those topics:
-
-```bash
-.hv/bin/hv-knowledge-query "Topic A" "Topic B"
-.hv/bin/hv-decisions-query "Topic A" "Topic B"
-```
+Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
 
 Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
 

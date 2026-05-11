@@ -61,14 +61,12 @@ If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv
 
 ## Step 3 — Load Context Silently
 
-- `.hv/milestones/<MID>.md` — full milestone plan
-- Items scoped to this milestone: `.hv/bin/hv-todo-by-milestone <MID>`
-- `.hv/<bugs|features|tasks>/<itemId>.md` — overflow detail for the item if any
+Apply the canonical pre-planning context-load protocol (`references/context-load-protocol.md`) — it lists the common reads (TODO entry, plan, milestone, milestone-scoped items via `hv-todo-by-milestone`, K+D queries, recent git history) and cites the K+D query mechanics. For this skill, the reads also include:
+
 - Existing plans for this milestone: `.hv/bin/hv-plan-list <MID>`
 - For item targets carrying a `Repos:` field: resolve it to an absolute sub-repo path via `.hv/repos.json` (`load_repos()`). Skipped for slice / milestone targets and when umbrella mode is off.
-- Relevant `KNOWLEDGE.md` topics: `.hv/bin/hv-knowledge-query <topics…>`
-- Relevant `DECISIONS.md` topics: `.hv/bin/hv-decisions-query <topics…>` — committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
-- Recent git history: `git log --oneline -20`
+
+DECISIONS matches are committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
 
 **Issue these as parallel tool calls in a single response** — they're independent. Form a picture; don't dump it.
 

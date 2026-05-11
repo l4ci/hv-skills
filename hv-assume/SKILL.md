@@ -39,13 +39,8 @@ If the target is ambiguous, ask once. Do not auto-pick.
 
 ## Step 3 — Load Context Silently
 
-- The item entry in `.hv/TODO.md` (and the overflow file at `.hv/<bugs|features|tasks>/<id>.md` if it exists)
-- The plan file at `.hv/plans/<key>.md` if one exists
-- Milestone context at `.hv/milestones/<MID>.md` if applicable
-- Relevant `KNOWLEDGE.md` topics via `.hv/bin/hv-knowledge-query <topics…>`
-- Relevant `DECISIONS.md` boundaries via `.hv/bin/hv-decisions-query <topics…>`
-- Recent git history: `git log --oneline -20`
-- Recent commits touching probable target files: `git log --oneline -- <path>`
+Apply the canonical pre-planning context-load protocol (`references/context-load-protocol.md`) — it lists the common reads (TODO entry, plan, milestone, K+D queries, recent git history) and the K+D query mechanics it cites. For this skill, the reads also include:
+
 - For backlog-item targets: parse the entry's `Repos:` field (the value after `Repos:` up to the next field name — `Detail:`, `Related:`, `Milestone:` — or end-of-line). If umbrella mode is on (`.hv/config.json` `umbrella.enabled` is true OR `.hv/repos.json` exists with entries) AND the item carries a `Repos:` value, resolve it to absolute sub-repo path(s) via `.hv/bin/hv-resolve-repos` (or `parse_repos_csv` + `load_repos()` for in-process callers — same registry). Multi-repo items resolve to a list; keep all entries for the peek render. Skip resolution for slice / milestone targets (umbrella-flat per M02 acceptance).
 
 **Issue these as parallel tool calls in a single response** — they're independent.
