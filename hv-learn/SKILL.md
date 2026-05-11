@@ -226,3 +226,4 @@ Ran /runlog-author for the <topic> bullet.
 - **Preserve existing structure.** Edit surgically; never regenerate the whole file.
 - **Sharp and short.** One sentence with a concrete claim. If you need a paragraph, link to code instead.
 - **Today's date.** Always stamp with the absolute current date.
+- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.

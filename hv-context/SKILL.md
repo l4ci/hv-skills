@@ -130,3 +130,4 @@ In umbrella mode, prepend the target file: *"Captured into .hv/contexts/repo-a/C
 - **One sentence's-worth of definition is fine.** The first sentence becomes the gloss in the CLAUDE.md block; longer definitions stay in CONTEXT.md but the gloss must stand alone.
 - **Aliases are user-stated only.** Don't propose aliases the user didn't ask for. Conflict-call-out (during a `/hv-work` cycle) can suggest "you used X — CONTEXT calls this Y" but only `/hv-context` writes them.
 - **No verifier.** Manual confirmation is the verification.
+- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
