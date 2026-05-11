@@ -36,13 +36,7 @@ Phases:
 
 ## Step 2 — Parse Arguments
 
-The argument passed to `/hv-rm` is a CSV of one or more IDs, for example `F36` or `B01,F03,T05`. Normalise whitespace around commas; treat `B01, F03` the same as `B01,F03`.
-
-If the argument is empty or missing, stop immediately with:
-
-> *"Provide one or more IDs, e.g. `/hv-rm F36` or `/hv-rm B01,F03`."*
-
-Carry the normalised CSV as `<CSV>` into the remaining steps.
+Pass the user's argument verbatim as `<CSV>` to `bin/hv-rm` in Step 3. The helper validates IDs (split-and-strip on commas — `B01, F03` and `B01,F03` resolve identically), exits 1 with a usage message on empty or missing argv, and exits 1 again on unknown IDs (not in TODO.md or ARCHIVE.md). No skill-side validation needed.
 
 ## Step 3 — Dry-Run Preview
 
