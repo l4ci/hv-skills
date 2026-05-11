@@ -14,6 +14,8 @@ Subsystems are AI-curated narratives describing one coherent area of the project
 
 ## Modes
 
+`/hv-map` and `/hv-docs` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
+
 ### Mode: first-run
 
 Run when `.hv/map/` is empty.

@@ -26,6 +26,8 @@ user-invocable: true
 
 If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
 
+`/hv-docs` and `/hv-map` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
+
 ## Configuration
 
 Read `.hv/config.json`:
