@@ -346,3 +346,50 @@ EOF
 rm -rf "$FM4I_TMP"
 pass "hv-find-milestone-for-items: lookup semantics, dedup, sort, open-sections only"
 
+echo "## hv-plan-rename-check"
+PRC_TMP="$(mktemp -d)"
+(
+  cd "$PRC_TMP"
+  git init -q
+  git config user.email t@t && git config user.name t
+
+  # 1. No args → exit 1
+  if "$BIN/hv-plan-rename-check" 2>/dev/null; then
+    fail "no-args case exited 0"
+  fi
+
+  # 2. Single-file match
+  printf 'line one referencing OLDNAME\n' > foo.txt
+  git add foo.txt && git commit -q -m seed
+  OUT=$("$BIN/hv-plan-rename-check" OLDNAME)
+  [ "$OUT" = "foo.txt" ] || fail "single-file match wrong: '$OUT'"
+
+  # 3. Multi-file match
+  printf 'also has OLDNAME here\n' > bar.md
+  printf 'unrelated content\n' > baz.txt
+  git add bar.md baz.txt && git commit -q -m "add more"
+  OUT=$("$BIN/hv-plan-rename-check" OLDNAME)
+  echo "$OUT" | grep -qx "foo.txt" || fail "multi-file missing foo.txt: '$OUT'"
+  echo "$OUT" | grep -qx "bar.md" || fail "multi-file missing bar.md: '$OUT'"
+  echo "$OUT" | grep -qx "baz.txt" && fail "matched unrelated baz.txt: '$OUT'"
+
+  # 4. No matches → silent, exit 0
+  OUT=$("$BIN/hv-plan-rename-check" NEVER_REFERENCED) || fail "no-match exit non-zero"
+  [ -z "$OUT" ] || fail "no-match produced output: '$OUT'"
+
+  # 5. Scope pathspec
+  OUT=$("$BIN/hv-plan-rename-check" OLDNAME '*.md')
+  [ "$OUT" = "bar.md" ] || fail "scope filter wrong: '$OUT'"
+)
+rm -rf "$PRC_TMP"
+
+# 6. Outside any git repo
+PRC_NON="$(mktemp -d)"
+(
+  cd "$PRC_NON"
+  OUT=$("$BIN/hv-plan-rename-check" ANYTHING) || fail "non-repo exit non-zero"
+  [ -z "$OUT" ] || fail "non-repo produced output: '$OUT'"
+)
+rm -rf "$PRC_NON"
+pass "hv-plan-rename-check: lookup semantics, multi-file, scope filter, non-repo silence"
+

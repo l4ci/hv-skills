@@ -203,7 +203,7 @@ From the conversation context:
    - **Split ownership cleanly**: rename task owns the file move plus edits to the renamed file's own content; link-sweep task owns link updates in all *other* files. No file appears in both tasks' modified-file sets.
    - **Serialize across waves**: rename in wave N, link-sweep in wave N+1, so the sweep operates on settled paths.
 
-   For every rename, derive the incoming-link file set with `git grep -l "<old-name>" -- <scope>`; the plan author's enumerate is a hint, grep is ground truth. Re-run the same grep at verify time (Step 7) to catch files the plan missed.
+   For every rename, derive the incoming-link file set with `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the helper is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
 4. Group into dependency waves:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
