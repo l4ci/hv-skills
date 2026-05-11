@@ -8,7 +8,7 @@ A post-cycle nudge or auto-dispatch fires when **at least one** of:
 
 - **2+ items resolved** in the cycle (counted by closed `[B##]`/`[F##]`/`[T##]` IDs across that cycle's commits).
 - **≥5 files touched** in the cycle (counted by the cycle's diff against its base — for `/hv-ship`, use the scope JSON's `touchedFiles` field).
-- A **hard bug** that took multiple debug cycles to root-cause (signaled by `/hv-debug` invocations within the same `/hv-work` session, or by the bug carrying a `Detail:` pointer to a `.hv/bugs/<id>.md` file with multiple hypothesis entries).
+- A **hard bug** that took 2 or more debug cycles to root-cause (signaled by 2+ `/hv-debug` invocations within the same `/hv-work` session, or by the bug carrying a `Detail:` pointer to a `.hv/bugs/<id>.md` file with 2 or more hypothesis entries).
 
 ## When the gate does NOT fire
 

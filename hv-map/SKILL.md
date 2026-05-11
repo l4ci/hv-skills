@@ -39,7 +39,7 @@ Auto-invoked at the end of `/hv-work`, `/hv-debug`, `/hv-go` when the cycle's pl
 
 Run on demand when the user asks ("consolidate the map", "clean up subsystems", or after a soft-cap warning).
 
-1. Read `bin/hv-map-stats` to find: stale entries (via `bin/hv-staleness map --days 90`), near-duplicates (any two summaries with cosine-similarity-by-shared-words ≥ 0.6 — fall back to substring overlap if too coarse), entries with high `broken_refs`.
+1. Read `bin/hv-map-stats` to find: stale entries (via `bin/hv-staleness map --days 90`), near-duplicates (any two summaries with cosine-similarity-by-shared-words ≥ 0.6 — fall back to substring overlap if too coarse), entries with `broken_refs ≥ 3`.
 2. Propose, in order: merges (two subsystems → one, with a chosen target name), archives (rename to `.hv/map/_archive/<name>-YYYY-MM-DD.md`), and entry-point fixes.
 3. Show the proposed changes; never auto-apply. On confirmation, perform them, run `bin/hv-map-index`, and commit: `chore: consolidate project map (<short reason>)`.
 4. Apply the same review to KNOWLEDGE topics and TODO items: print suggestions ("topic X has 1 bullet from 8 months ago — fold into Y?", "TODO Z idle 90+ days — archive?"). Suggest only; do not edit those files in this skill.

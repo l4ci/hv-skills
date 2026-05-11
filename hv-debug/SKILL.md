@@ -31,7 +31,7 @@ Read `.hv/config.json`:
 
 - You have a bug ID (`[B07]`) or a reproducer and want a proper cycle
 - Previous attempts failed or the symptom isn't obvious
-- The bug might produce a durable learning for `KNOWLEDGE.md`
+- The bug looks novel enough to be worth capturing in `KNOWLEDGE.md`
 
 ## When NOT to Use
 
@@ -84,7 +84,7 @@ If the user described a symptom without an ID, invoke `hv-capture` via the `Skil
 
 Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics that plausibly touch the symptom (e.g., `Networking`, `Persistence`, `Concurrency`, `Architecture`, `Testing`).
 
-Carry KNOWLEDGE bullets into Step 5's hypothesis brief. Carry DECISIONS entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries may rule out an entire fix direction before cycles are wasted.
+Carry KNOWLEDGE bullets into Step 5's hypothesis brief. Carry DECISIONS entries into Step 6's hypothesis brief under a `**Hard boundaries:**` block — boundaries rule out fix directions that violate them, so applying them up front avoids wasted cycles.
 
 ## Step 3.5 — Vocabulary & soft-cap checks
 

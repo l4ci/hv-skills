@@ -146,7 +146,7 @@ If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this i
 
 Captures categorized Markdown (buckets in helper-emit order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the helper.
 
-**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1-2 bullets naming the most significant pieces (a merge commit, a follow-up fix). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The helper's job is the raw categorization; *editorial collapse is yours*.
+**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1–2 bullets naming the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The helper's job is the raw categorization; *editorial collapse is yours*.
 
 Append stats line — run:
 
