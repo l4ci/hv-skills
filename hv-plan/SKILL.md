@@ -106,6 +106,12 @@ The user redlines. Common edits:
 
 Iterate until the user explicitly confirms.
 
+**Loop semantics:**
+
+- **Round budget — up to 5 iterations** of *propose → user redlines → re-propose*. After the 5th revision without an explicit confirmation, stop drafting further changes and surface *"We've been iterating for a while — is this plan close enough to ship, or should we step back and rescope?"*
+- **What counts as explicit confirmation** — a short affirmative reply directed at the plan: *yes*, *ship it*, *go*, *looks good*, *approved*, *lgtm*, *confirmed*, *do it*, or equivalent. Silence and topic-shift do **not** count — when the user pivots to a different question or stays quiet, ask *"Confirm this plan? (yes / changes)"* once and wait for a direct answer before Step 6 fires.
+- **Exit conditions** — (a) explicit confirmation → proceed to Step 6; (b) 5-round budget hit → halt drafting and surface the check-in above; (c) the user redirects scope so far that the original **Goal** no longer matches → restart from Step 4 with the new spec rather than retrofitting the existing plan.
+
 ## Step 6 — Write to Disk
 
 ```bash
