@@ -90,19 +90,12 @@ If `commitCount` is 0, tell the user the branch has no commits beyond the base a
 
 Read `ship.review` from `.hv/config.json`. Default `true`.
 
-If enabled, invoke `hv-review` via the `Skill` tool for this branch. Pass through the verdict:
+If enabled, invoke `hv-review` via the `Skill` tool for this branch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
 
-- **PASS** → continue to Step 4
-- **CONCERNS** → surface each concern, then route per `autonomy.level`:
-  - **`"off"` or `"auto"`** — use `AskUserQuestion`:
-    - **Header:** `"Concerns"`
-    - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
-    - **Options** (single-select):
-      1. "Address via `/hv-work` (Recommended)" — *"Route the concerns to `/hv-work` as a fix list; rerun `/hv-ship` after."*
-      2. "Ship anyway" — *"Proceed with the merge or PR despite the concerns."*
-      3. "Stop" — *"Leave the branch as-is; no integration now."*
-    - Plain-text fallback: *"Address first, ship anyway, or stop?"*
-  - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5) — the obvious answer for surfaced concerns is to address them. Review re-runs on the next `/hv-ship`; if the same concerns surface twice, that's a stop signal, but loop mode itself doesn't track this — the user interrupts when they see repeat findings. Note: a review FAIL still stops the loop unconditionally (a guard failure).
+- **PASS** → continue to Step 4.
+- **CONCERNS** → surface each concern, then branch on `autonomy.level`:
+  - **`"off"` or `"auto"`** — ask via `AskUserQuestion` with three options (Address via `/hv-work` Recommended / Ship anyway / Stop). See the reference for the canonical option labels, descriptions, and plain-text fallback.
+  - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5). A review FAIL still stops the loop unconditionally as a guard failure.
 - **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
 
 If `ship.review` is `false`, skip this step.
