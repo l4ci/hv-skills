@@ -258,28 +258,17 @@ Skip in `--dry-run` mode.
 .hv/bin/hv-release-detect-host
 ```
 
-Branch on output:
+Branch on the helper's `host` output. Host-specific command blocks live in `references/release-hosts.md` — substitute `<new_version>`, `$NOTES_FILE`, and the summary verbatim.
 
-- **`github` or `github-enterprise`** →
-  ```bash
-  gh release create v<new_version> \
-    --title "v<new_version> — <one-line summary>" \
-    --notes-file "$NOTES_FILE" \
-    [--draft]   # add when release.draft: true
-  ```
-  Capture the release URL.
+| `host` | Section in `references/release-hosts.md` |
+|--------|------------------------------------------|
+| `github`, `github-enterprise` | `## github or github-enterprise` |
+| `gitlab`, `gitlab-self-hosted` | `## gitlab or gitlab-self-hosted` |
+| `none`                        | `## none`                         |
 
-- **`gitlab` or `gitlab-self-hosted`** →
-  ```bash
-  glab release create v<new_version> --notes "$(cat "$NOTES_FILE")"
-  ```
-  If `glab` is not on the PATH, print: *"glab not found. Create the release manually: `glab release create v<new_version> --notes-file <path>`"* and continue (don't fail the whole flow).
+Add new host values to both the helper and the reference together.
 
-- **`none`** → print *"No recognized remote — skipping remote release creation."* and continue.
-
-Release title: `v<new_version> — <one-line summary>` where summary comes from Step 6.
-
-Skip in `--dry-run` mode; print the `gh`/`glab` command that would run.
+Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that would run.
 
 ## Step 13.5 — Docs After-Work (Nudge or Auto-Invoke)
 
