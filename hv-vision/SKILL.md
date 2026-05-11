@@ -41,16 +41,15 @@ Phases:
 
 ## Step 2 — Load Context Silently
 
-Before opening the conversation, gather everything that should inform the brainstorm:
+Apply the canonical pre-planning context-load protocol (`references/context-load-protocol.md`) — it lists the common reads (K+D queries, recent git history) and cites the K+D query mechanics. For this skill, the reads also include:
 
 - `.hv/MILESTONES.md` (current vision paragraph and overviews)
 - Every `.hv/milestones/M*.md` (full per-milestone plans — read whatever exists)
 - `.hv/TODO.md` (what's already on the backlog hints at the user's mental model)
-- `.hv/KNOWLEDGE.md` topics via `hv-knowledge-query` if any topic plausibly relates to the project's domain
-- `.hv/DECISIONS.md` topics via `hv-decisions-query` — committed boundaries constrain what milestones can promise; surface any conflict before proposing milestones
 - `.hv/CONTEXT.md` terms via `hv-context-query` — vision sessions are the highest-yield surface for canonical-term capture; consult so brainstorming uses existing terms, and treat user definitional signals (*"by X I mean…"*, *"let's call this X"*) as triggers for inline `hv-context-add` writes
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
-- Recent git history: `git log --oneline -20`
+
+DECISIONS matches are committed boundaries that constrain what milestones can promise; surface any conflict before proposing milestones.
 
 **Issue these as parallel tool calls in a single response** — they're independent, and load latency dominates this step. Don't dump the contents to the user; read them, form a picture, and use what's relevant in Step 3.
 
