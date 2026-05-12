@@ -90,6 +90,7 @@ Rules for the plan:
 - **Tasks fit one execution window.** A task too big to ship in one focused pass is two tasks.
 - **Every task has a verify step.** No verify = the task isn't well-defined.
 - **No half-implementations.** Each task results in real, runnable code — no stubs or placeholders.
+- **Tasks are vertical slivers, not horizontal layers.** Each task crosses every layer it needs to be observable — UI + logic + data together for one feature path, not "all UI first, all logic second". The **Observable behavior** requirement and the **No half-implementations** rule already enforce this implicitly; calling it out by name keeps slice plans from drifting into the horizontal anti-pattern that AI agents fall into by default. For a hotel-reservation slice: "Reserve" button is one task end-to-end; "Cancel" is a separate task end-to-end; "email confirmation" is a third. Not "build all the UI in T1, then all the controllers in T2, then all the persistence in T3."
 - **Name assumptions you'd otherwise leave implicit.** Forces the user to confirm or push back.
 - **List open questions you'd resolve mid-flight.** If they should be answered before `/hv-work` runs, ask now.
 
