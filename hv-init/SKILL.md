@@ -353,6 +353,15 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 
 If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
+**Version line.** Append one line to the summary block from `.hv/bin/hv-update-check`'s JSON, branched on `status`:
+
+- `current` → *"hv-skills `<currentVersion>` (latest)"*
+- `behind` → *"hv-skills `<currentVersion>` → `<latestVersion>` available — run `/hv-update`"*
+- `ahead` → *"hv-skills `<currentVersion>` (ahead of `<latestVersion>` — likely a dev install)"*
+- `unknown` (network failure, install-type detection failed, etc.) → *"hv-skills `<currentVersion>`"* (no freshness hint)
+
+The helper handles network access (via `gh`) and install-type resolution. Treat a non-zero exit or empty JSON as `unknown`. `hvSkills.version` in `.hv/config.json` carries the same `currentVersion` value — re-stamped this run.
+
 Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
 
 ## References
