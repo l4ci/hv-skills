@@ -14,6 +14,23 @@ Before presenting results it:
 4. Sorts the backlog by priority and size, with cluster notes.
 5. Suggests one item or a connected batch. P0 bugs jump the queue.
 
+```mermaid
+flowchart TD
+    A[/hv-next] --> B[Reconcile status.json vs git]
+    B --> C{Active streams?}
+    C -->|Yes| D[Read handoff notes per stream]
+    D --> E[Ask: resume / ship / abandon]
+    E --> F[Archive completions older than 5d]
+    C -->|No| F
+    F --> G[Present backlog tables + clusters]
+    G --> H[Suggest one item or batch]
+    H --> I{User picks…}
+    I -->|Start| J[/hv-work]
+    I -->|Peek first| K[/hv-assume]
+    I -->|Different pick| H
+    I -->|Stop| L[End]
+```
+
 After you confirm the pick, `/hv-next` routes you to [running work](running-work.md) via `/hv-work`.
 
 **Example:**
