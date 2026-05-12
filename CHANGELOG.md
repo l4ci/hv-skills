@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.3.1 — 2026-05-12
+
+Patch fix restoring /hv-brainstorm and /hv-context slash commands missing from v2.3.0's plugin manifest.
+
+## Fixed
+
+- Register `hv-brainstorm` and `hv-context` in `.claude-plugin/plugin.json` — both shipped in v2.3.0 with `SKILL.md` present on disk but unregistered, so Claude Code never loaded the slash commands. Also adds `/hv-brainstorm` to the canonical `bin/hv-skills-index` heredoc body, and re-syncs `CLAUDE.md` managed blocks (the stale skills block still referenced retired `/hv-status` + `/hv-resume`; map and context blocks were absent). (`4a21ee0`)
+
+## Documentation
+
+- README workflow diagram updated to include `/hv-brainstorm`, `/hv-context`, and `/hv-map`. (`ad6e148`)
+
+## Stats
+
+2 commits, 4 files changed, +38 −4 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v2.3.0...v2.3.1
+
 ## v2.3.0 — 2026-05-12
 
 New skill `/hv-brainstorm` for per-item design exploration, plus a sweep of helper classification headers across the `bin/` surface.
