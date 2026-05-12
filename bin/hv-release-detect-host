@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print remote hosting service kind based on origin URL.
+# Tool (lookup): always exits 0; prints hosting kind from origin URL.
 # Output: github | github-enterprise | gitlab | gitlab-self-hosted | none
 # Usage: hv-release-detect-host
 set -euo pipefail

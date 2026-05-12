@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Merge a feature branch into main/master. Cleans up any worktree first, then merges --no-ff and deletes the branch.
 # Reads the merge commit message from stdin.
+# Tool: exit 0 on successful merge; exit 1 on missing message or git error.
 # Usage: echo "merge message" | hv-merge [--repo <name>] <branch>
 # Prints: the merge commit's short hash.
 set -euo pipefail

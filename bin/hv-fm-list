@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Generic frontmatter-list helper. Glob <dir>/*.md, parse YAML-ish ---...---
 # frontmatter, emit a JSON array of {field1, field2, ..., _path}.
+# Tool: exit 0 on success, 1 on missing argv; pure read of frontmatter.
 # Usage: hv-fm-list <dir> <field1> [<field2> ...]
 # Files without frontmatter are skipped. Missing fields → "".
 # Values from inline-list frontmatter (`depends: [a, b]`) emit as JSON arrays;

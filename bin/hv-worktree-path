@@ -5,6 +5,7 @@
 # by hv-worktree-clear to find a worktree on disk that may not be in
 # .git/worktrees/. Centralizes the path formula so all three sites stay
 # in sync if the layout ever changes.
+# Tool: exit 0 with canonical path; exit 1 on usage error or umbrella resolution failure.
 #
 # Usage: hv-worktree-path --repo <name> <branch>
 # Output: absolute path (no trailing slash, no newline-after — the script

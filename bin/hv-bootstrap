@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Seed .hv/ directories and data files in the current directory.
 # Idempotent — never overwrites existing files. Safe to re-run.
+# Tool: seeds .hv/ directory structure; idempotent; exit 0 on success.
 # Called by /hv-init Step 2 from the source bin/ before .hv/bin/ exists.
 set -euo pipefail
 

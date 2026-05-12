@@ -3,6 +3,7 @@
 # the soft cap. Prints nothing (and exits 0) below the cap. Always exits 0
 # — this is a nudge, not a gate. Used by /hv-debug, /hv-go, /hv-work to
 # surface "you might want to /hv-map consolidate" without blocking flow.
+# Tool (nudge): always exits 0; emits advisory to stderr when at/above cap.
 #
 # Always exits 0 — informational nudge, not a gate.
 #

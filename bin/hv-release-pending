@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Report how many commits and days have elapsed since the last release tag.
 # Used by /hv-next and /hv-ship to decide whether to nudge the user toward /hv-release.
+# Tool (lookup): exit 0 on all success paths; exit 1 only on broken state.
 # Output (single-line JSON on stdout):
 #   {"lastTag":"v1.16.0","commits":5,"days":1,"thresholdCommits":10,"thresholdDays":14,"shouldNudge":false,"reason":"","message":""}
 # When shouldNudge is true, "message" carries the rendered phrasing the skills
