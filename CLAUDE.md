@@ -35,7 +35,7 @@ Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
 
 **Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
-**Plan & build** — `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
+**Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship`
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
 **Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
