@@ -17,6 +17,31 @@ Items captured in [`TODO.md`](../reference/hv-folder.md) move to "merged" throug
 
 **Status tracking:** registers in `.hv/status.json` at start so [`/hv-next`](picking-work.md) in another session knows those items are in progress.
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant O as Orchestrator
+    participant W1 as Worker 1
+    participant W2 as Worker 2
+    participant G as Git
+
+    U->>O: /hv-work [B03] [F07]
+    O->>G: clean-tree guard
+    O->>O: plan tasks into waves
+    O->>G: create branch hv/<slug>
+    par Wave 1 (parallel, write-only)
+        O->>W1: brief: edit files for Task A
+        O->>W2: brief: edit files for Task B
+    end
+    W1-->>O: report files modified
+    W2-->>O: report files modified
+    O->>O: verify diffs match briefs
+    O->>G: commit Task A
+    O->>G: commit Task B
+    O->>G: merge --no-ff (or open PR)
+    O-->>U: summary — branch landed
+```
+
 ## One commit per task
 
 Each task lands as its own atomic commit. One item, one commit, tagged with the item ID:
