@@ -23,6 +23,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`milestone-tagging.md`](milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. | `/hv-capture` |
 | [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`). | `/hv-context`, `/hv-decide`, `/hv-learn` |
 | [`post-cycle-trigger-gate.md`](post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). | `/hv-docs`, `/hv-ship`, `/hv-work` |
+| [`refactor-explore.md`](refactor-explore.md) | Exploration-agent prompt + categories + stop condition for `/hv-refactor` single-repo mode. | `/hv-refactor` |
 | [`refactor-umbrella-fanout.md`](refactor-umbrella-fanout.md) | Per-repo fan-out logic for `/hv-refactor` in umbrella mode. | `/hv-refactor` |
 | [`release-hosts.md`](release-hosts.md) | Release-host detection and routing (GitHub / GitLab / origin-less). | `/hv-release` |
 | [`review-verdict-routing.md`](review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. | `/hv-review`, `/hv-ship` |
