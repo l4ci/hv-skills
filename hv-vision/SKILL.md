@@ -17,7 +17,7 @@ user-invocable: true
 
 Multiple milestones can be active at once when they don't depend on each other.
 
-`MILESTONES.md` is the overview (vision paragraph, active list, one short section per milestone). `.hv/milestones/MNN.md` holds the full plan for each milestone (goal, acceptance criteria, rationale, open risks, research findings, free-form notes).
+`.hv/MILESTONES.md` opens with `# Milestones` as its H1, followed by a short vision paragraph as intro preamble, then `## Active milestones` and one short overview section per milestone. `.hv/milestones/MNN.md` holds the full plan for each milestone (goal, acceptance criteria, rationale, open risks, research findings, free-form notes).
 
 ## Step 1 — Preflight & Mode
 
@@ -191,7 +191,7 @@ The helper mints `MNN`, creates `.hv/milestones/MNN.md` with a stub plan, and ap
 
 **Activate / deactivate / retire:** call `.hv/bin/hv-vision-status MNN <planned|active|shipped|archived>` once per milestone whose status changed. Multi-active is supported — independent milestones (no shared dependencies) can run simultaneously. Use `archived` to retire a milestone that's no longer being pursued — its section stays in `MILESTONES.md` as a record but it drops out of the "Active milestones" header (same exclusion model as `shipped`). Note: `shipped` deps satisfy dependent milestones; `archived` deps do not, so a milestone blocked by an archived prerequisite stays blocked until the prerequisite is reframed.
 
-**Vision paragraph (Create mode only).** Replace the top-of-file placeholder in `MILESTONES.md` *"(no vision yet — run `/hv-vision` to brainstorm milestones)"* with 2–4 sentences that frame the project's why. In Edit mode, leave the paragraph alone unless the brainstorm meaningfully changed the framing.
+**Vision paragraph (Create mode only).** Replace the placeholder under the `# Milestones` H1 in `MILESTONES.md` — *"(no vision yet — run `/hv-vision` to brainstorm milestones)"* — with 2–4 sentences that frame the project's why. This preamble sits above `## Active milestones` and provides context for the milestone list. In Edit mode, leave the paragraph alone unless the brainstorm meaningfully changed the framing.
 
 **Refresh the index — once, at the end:**
 
