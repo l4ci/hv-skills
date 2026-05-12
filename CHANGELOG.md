@@ -1,5 +1,49 @@
 # Changelog
 
+## v2.2.0 — 2026-05-12
+
+Loop-mode improvements, smoke-test conventions, and a sweep of skill-prose hygiene — `/hv-config` gains a positional-args shortcut, `/hv-init` consolidates its greenfield prompts, and a `## References` index lands on every SKILL.md alongside a new `references/README.md`.
+
+## New
+
+- smoke section asserts bin/ executable mode is 100755 [F66] (test) (`c7f0f38`)
+- smoke section detects SKILL.md vs helper docstring drift [F65] (test) (`c44abb9`)
+- preamble convention scan in test/lib.sh [F62] (test) (`f1c0a3c`)
+- combine Step 1 + 1.5 into one AUQ for non-git umbrella greenfield [F58] (hv-init) (`d7266bc`)
+- add README.md index mapping references to consumers [F61] (references) (`acfe2f0`)
+- add ## References index section to every SKILL.md [F59] (skills) (`36ac537`)
+- positional-args shortcut for one-key edits [F57] (hv-config) (`cd96acb`)
+- tombstone consumed item plans at Step 9.5 [F54] (hv-work) (`11afbb5`)
+- cycle-counter + Step 7.5 fresh-context retry hand-off [F56] (hv-debug) (`d7716f0`)
+- walk up from cwd before BASH_SOURCE[1] [F42] (self-locate) (`648b1cc`)
+- execute project CI-shape gates in Step 7 verifier [B21] (refactor) (`d7df0ba`)
+- auto-split oversized KNOWLEDGE.md topics in auto/loop mode [F52] (hv-learn) (`6d62267`)
+
+## Fixed
+
+- hv-preflight cache-fallback glob loop instead of pipeline [B24] (`4e8fa7e`)
+- hv-preflight compares against upstream plugin bin/ to detect drift [B24] (`9bbee52`)
+- section 01 must not shadow runner-level $TMP [B22] (smoke) (`d2b4834`)
+- tailored greenfield message points at baseline commit [B20] (guard) (`7a726ba`)
+- name hv-multi-branch-create in SKILL.md [B18] (hv-work) (`db41d31`)
+
+## Changed
+
+- split oversize topics into faceted sub-topics [B23] (knowledge) (`b6bed2e`)
+
+## Documentation
+
+- note auto-tombstone of item plans after /hv-work [F54] (plans) (`11955df`)
+- name vertical slicing as a Step 4 rule [F53] (hv-plan) (`8f9e724`)
+- document Step 7.5 escalation [F56] (hv-debug) (`8fe5d8a`)
+- refresh hv-skills slash-command index (claude-md) (`ff014e2`)
+
+## Stats
+
+23 commits, 47 files changed, +747 −114 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v2.1.0...v2.2.0
+
 ## v2.1.0 — 2026-05-11
 
 A substantial release bundling the never-tagged v2.0.0 work (breaking removal of `/hv-status` + `/hv-resume`) with major new features — `/hv-context` (project domain glossary), `/hv-map` (subsystem index for context-scaling), loop-mode auto-picks, TaskCreate progress checklists across 17 skills, and a large references/ extraction sweep.
