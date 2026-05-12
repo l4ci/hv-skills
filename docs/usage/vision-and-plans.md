@@ -8,7 +8,7 @@ hv-skills supports planning above the day-to-day backlog. `/hv-vision` frames mi
 
 When the session ends, `/hv-vision` writes two things to disk:
 
-- `.hv/MILESTONES.md` — a vision paragraph, an active milestone list, and a one- to two-line overview of every milestone with its status and dependencies.
+- `.hv/MILESTONES.md` — an active milestone list and a one- to two-line overview of every milestone with its status and dependencies; the file opens with a vision intro paragraph as preamble.
 - `.hv/milestones/M01.md`, `M02.md`, … — one detail file per milestone with the goal, acceptance criteria, rationale, risks, and research findings.
 
 Run `/hv-vision` whenever the conversation is about strategy, not tactics — *"plan the next quarter"*, *"what's the bigger picture"*, *"create a roadmap"*, *"brainstorm milestones"*. Re-running it on a project that already has milestones enters edit mode automatically.

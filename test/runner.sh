@@ -39,7 +39,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 cat > .hv/MILESTONES.md <<'EOF'
-# Vision
+# Milestones
 
 _(no vision yet — run `/hv-vision` to brainstorm milestones)_
 

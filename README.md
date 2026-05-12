@@ -275,7 +275,7 @@ Every `bin/hv-preflight` (run by most hv-skills) compares the project's recorded
 ├── BACKLOG.md        # bugs, features, tasks, recent completions
 ├── KNOWLEDGE.md      # durable learnings, grouped by topic
 ├── DECISIONS.md      # hard-boundary decisions with explicit forbids/permits
-├── MILESTONES.md     # vision paragraph + milestone overview
+├── MILESTONES.md     # milestone overview (vision paragraph as intro)
 ├── ARCHIVE.md        # completions older than 5 days
 ├── counters.json     # auto-incrementing IDs
 ├── config.json       # models, isolation, merge, verify, umbrella

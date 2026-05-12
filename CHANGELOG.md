@@ -4,6 +4,10 @@
 
 ## Breaking
 
+- **MILESTONES.md H1 is now `# Milestones`** [F72]. Filename, sibling directory `.hv/milestones/`, and the file's H1 now all align on "milestones"; the vision paragraph is the file's intro preamble, not its primary content. Helpers, smoke fixtures, SKILL.md prose, and docs all flip in lockstep.
+
+  **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-rewrites `# Vision` H1s to `# Milestones` on first run, preserving body content byte-for-byte; idempotent on re-run.
+
 - **Renamed `.hv/TODO.md` → `.hv/BACKLOG.md`** [F71]. The file holds typed work items (bugs/features/tasks) plus recent completions across an entire project — it's a backlog, not a personal todo list. Helpers, smoke tests, SKILL.md files, and docs all flip in lockstep.
 
   **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-renames legacy `.hv/TODO.md` → `.hv/BACKLOG.md` on first run (idempotent — exit 0 on rename action OR no-op). A one-cycle reader fallback in `bin/hvlib.py` keeps projects working until they re-init; the fallback is silent and intended for removal in the next release.
