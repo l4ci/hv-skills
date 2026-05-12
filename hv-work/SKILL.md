@@ -95,7 +95,7 @@ Phases:
 3. *Plan tasks* — wave layout + briefs ready (Step 4)
 4. *Branch / worktree* — isolation set up per `work.isolation` (Step 5)
 5. *Dispatch & verify per wave* — workers run, orchestrator verifies each completion (Steps 6–8)
-6. *Commit + TODO + sweep* — per-task commits, TODO entries marked complete, tool siblings swept (Steps 7.5, 8.5, 9)
+6. *Commit + TODO + sweep* — per-task commits, TODO entries marked complete, item plans tombstoned, tool siblings swept (Steps 7.5, 8.5, 9, 9.5)
 7. *Merge/PR & report* — integration + status removal + summary + post-cycle nudges (Steps 10–15)
 
 ## Step 2 — Clarify Ambiguous Briefs (only when needed)
@@ -376,6 +376,29 @@ If a tool regenerates siblings only when the editor loads (e.g., Godot `class_na
 ```
 
 Run per resolved item. Match by keyword overlap between task description and TODO entry title. If unsure whether an item was addressed, leave it — don't move items you didn't work on.
+
+## Step 9.5 — Tombstone Consumed Item Plans
+
+For each item ID that `hv-complete` just resolved, remove its corresponding item plan if one was written:
+
+```bash
+# For each <ID> the cycle resolved (B07/F03/T11/…):
+MILESTONE=$(.hv/bin/hv-todo-field <ID> milestone)
+if [ -n "$MILESTONE" ] && [ -f ".hv/plans/${MILESTONE}-<ID>.md" ]; then
+  .hv/bin/hv-plan-rm "${MILESTONE}-<ID>"
+fi
+```
+
+Item plans (`.hv/plans/M01-B07.md`) describe how to ship one specific item. Once the cycle ships that item, the plan's task decomposition and assumptions are stale — truth now lives in code + commits. Leaving the file means a future cycle on the same key (e.g., re-opened work) re-reads pre-execution intent that no longer matches the implementation.
+
+Skip silently when:
+
+- The item carries no `Milestone:` tag — no plan key exists for it.
+- No plan file is at the resolved key — the `[ -f … ]` guard handles this (untagged items, items that one-shot through `/hv-go` or `/hv-work` without a written plan).
+
+**Slice plans (`M01-S01.md`) stay.** A slice covers multiple items; completing one item does not consume the slice plan. Slice cleanup is currently manual via `.hv/bin/hv-plan-rm <key>` once the user is done with the slice.
+
+`.hv/plans/` is gitignored, so the removal is a local-only file operation — no commit, no merge.
 
 ## Step 10 — Merge or PR
 
