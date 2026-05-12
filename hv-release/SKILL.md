@@ -126,9 +126,10 @@ new_version=$(.hv/bin/hv-release-bump-version --dry-run <file> <kind> <bump>)
 Store `new_version` for use in Steps 6, 7, 8, 9, 10, 11, 12, 13, 14.
 
 If BREAKING CHANGE commits were detected (Step 3 scan) but the user chose `patch` or `minor`, interject with `AskUserQuestion` before continuing:
-- **Header:** `"Breaking change detected"`
+- **Header:** `"Escalate"`
 - **Question:** *"Commits contain `BREAKING CHANGE:` footers but bump type is `<chosen>`. Escalate to major?"*
 - **Options:** `Escalate to major (Recommended)` / `Keep <chosen>` / `Abort`
+- Plain-text fallback: *"Escalate to major, keep <chosen>, or abort?"* — default to Recommended (Escalate to major) on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
 
 ## Step 5 — Detect Previous Tag
 

@@ -93,7 +93,7 @@ If `subRepos` is empty (umbrella mode is on but no sub-repos are registered), pr
 
 Otherwise, ask the user which scope to refactor via `AskUserQuestion`:
 
-- **Header:** `"Refactor scope"`
+- **Header:** `"Scope"`
 - **Question:** *"Umbrella mode is on with N sub-repo(s): `<comma-separated names>`. Where should this refactor cycle run?"*
 - **Options** (single-select), conditional on `umbrella.hasCode`:
   - When `hasCode == true`:
