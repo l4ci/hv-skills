@@ -62,3 +62,16 @@ grep -q 'per angle' "$REPO/hv-vision/SKILL.md" \
 grep -q 'references/subagent-dispatch.md' "$REPO/hv-vision/SKILL.md" \
   || fail "F73: hv-vision missing reference cite"
 pass "hv-vision retrofitted with context-bundle + research fan-out workers"
+
+echo "F73: hv-debug dispatch retrofits"
+grep -q 'reproduce worker' "$REPO/hv-debug/SKILL.md" \
+  || fail "F73: hv-debug Step 5 missing reproduce worker"
+grep -q 'verification worker' "$REPO/hv-debug/SKILL.md" \
+  || fail "F73: hv-debug Step 7 missing verification worker"
+grep -q -i 'when the repro is heavy' "$REPO/hv-debug/SKILL.md" \
+  || fail "F73: hv-debug Step 5 missing conditional dispatch criteria"
+grep -q -i 'when verification.*requires.*file reads' "$REPO/hv-debug/SKILL.md" \
+  || fail "F73: hv-debug Step 7 missing conditional dispatch criteria"
+grep -q 'references/subagent-dispatch.md' "$REPO/hv-debug/SKILL.md" \
+  || fail "F73: hv-debug missing reference cite"
+pass "hv-debug retrofitted with conditional reproduce + verify workers"
