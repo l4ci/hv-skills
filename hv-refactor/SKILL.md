@@ -128,42 +128,7 @@ The reference's sub-agent prompt embeds `<orchestrator>` and `<worker>` placehol
 
 ## Step 2 — Explore with Orchestrator
 
-Dispatch an exploration agent using the configured **orchestrator** model. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent walks the codebase with an explicit prioritization rule and stop condition, reads files in full, and reports every friction point with file name, line numbers, and why it matters.
-
-Prompt template for the exploration agent:
-```
-Explore [PROJECT] at [PATH]. Walk the codebase with this strategy:
-
-1. PRIORITIZATION — rank files by (inbound-import count desc, lines of
-   code desc, mtime desc). Read the top 20% in full; sample roughly one
-   in five from the bottom 80%. The interfaces that hurt most when
-   wrong are usually the most-imported.
-2. NEIGHBORHOOD EXPANSION — for each priority-read file, follow one hop
-   of imports and callers and read those too. Do NOT chase 2+ hops;
-   stop expanding when adjacency stops surfacing new friction
-   categories.
-
-Look for:
-- Shallow modules where the interface is nearly as complex as the impl
-- Concepts co-owned across multiple files that should live in one place
-- Silent failures — errors logged but not propagated or surfaced
-- State split across types in ways hard to reason about
-- Implicit assumptions baked into data transformations
-- Anything requiring 3+ files to understand one concept
-- Tightly-coupled modules with integration risk at their seams
-
-[If prior rounds exist]: Do NOT re-surface already-fixed issues: [list them].
-
-For every friction point report: file, approximate lines, the friction,
-why it matters, and the dependency category (in-process,
-local-substitutable, ports-and-adapters, or true external).
-
-STOP CONDITION — stop searching when either (a) 8–12 friction points
-have been surfaced across the categories above (the sweet spot for one
-/hv-refactor cycle), OR (b) 30+ files have been read with no new
-category in the last 5 reads, whichever fires first. Quality of the
-smallest fix list beats raw count — do not pad past 12.
-```
+Dispatch an exploration agent using the configured **orchestrator** model, with a prioritization rule (inbound-import count + LoC + mtime, top 20% read in full), a neighborhood-expansion rule (one hop), and a stop condition (8–12 friction points across the categories, or 30+ files read with no new category in the last 5). Full prompt template + categories list lives in `references/refactor-explore.md`.
 
 ## Step 3 — Triage, Categorize & Classify
 
@@ -357,4 +322,5 @@ Don't recap the exploration findings, the design alternatives, or the verificati
 
 - [`references/authoring-conventions.md`](../references/authoring-conventions.md) — Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold).
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/refactor-explore.md`](../references/refactor-explore.md) — Exploration-agent prompt + categories + stop condition used by `/hv-refactor` single-repo mode.
 - [`references/refactor-umbrella-fanout.md`](../references/refactor-umbrella-fanout.md) — Per-repo fan-out logic for `/hv-refactor` in umbrella mode.
