@@ -69,7 +69,7 @@ _(no terms yet — run `/hv-context` to capture domain terminology)_
 EOF
 
 [ -f "$HV/MILESTONES.md" ] || cat > "$HV/MILESTONES.md" <<'EOF'
-# Vision
+# Milestones
 
 _(no vision yet — run `/hv-vision` to brainstorm milestones)_
 
@@ -79,6 +79,20 @@ _(none active — set with `/hv-vision`)_
 
 ## Milestones
 EOF
+
+# Migrate existing MILESTONES.md files whose H1 is still "# Vision" → "# Milestones".
+# Rewrites only line 1 when it is exactly "# Vision"; all other content is preserved.
+# Idempotent: files already starting with "# Milestones" (or anything else) are untouched.
+if [ -f "$HV/MILESTONES.md" ] && [ "$(head -1 "$HV/MILESTONES.md")" = "# Vision" ]; then
+  python3 - <<'PY'
+from pathlib import Path
+p = Path(".hv/MILESTONES.md")
+lines = p.read_text().splitlines(keepends=True)
+if lines and lines[0].rstrip('\n') == "# Vision":
+    lines[0] = "# Milestones\n"
+    p.write_text("".join(lines))
+PY
+fi
 
 [ -f "$HV/counters.json" ] || echo '{"bugs":0,"features":0,"tasks":0,"milestones":0,"since_refactor":{"features":0,"bugs":0}}' > "$HV/counters.json"
 
