@@ -186,3 +186,8 @@ After all questions are resolved, write the plan to `.hv/plans/<key>.md` using t
 - **Open questions beat hidden assumptions.** Surface what you don't know.
 - **Tasks fit one execution.** If they don't, split.
 - **The plan key relates to a milestone.** Items without a milestone get tagged before planning.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/context-load-protocol.md`](../references/context-load-protocol.md) — K+D context loading sequence shared by every cycle-starting skill.

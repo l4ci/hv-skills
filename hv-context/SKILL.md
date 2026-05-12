@@ -115,3 +115,9 @@ In umbrella mode, prepend the target file: *"Captured into .hv/contexts/repo-a/C
 - **Aliases are user-stated only.** Don't propose aliases the user didn't ask for. Conflict-call-out (during a `/hv-work` cycle) can suggest "you used X — CONTEXT calls this Y" but only `/hv-context` writes them.
 - **No verifier.** Manual confirmation is the verification.
 - **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/context-umbrella-scoping.md`](../references/context-umbrella-scoping.md) — Umbrella-mode resolution for the `/hv-context` artifact.
+- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`).

@@ -16,3 +16,7 @@ user-invocable: true
 # hv-c
 
 Alias for `/hv-capture`. Invoke the `hv-capture` skill via the `Skill` tool, passing the user's arguments verbatim. Do not duplicate logic here.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.

@@ -220,3 +220,13 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 - **Don't investigate now** — just capture
 - **Confirm what you wrote** — show the user every entry you added, grouped by section
 - **Always increment counters** — even if you're unsure, every ID must be unique
+
+## References
+
+| Reference | Purpose |
+|-----------|---------|
+| [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). |
+| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`detail-files.md`](../references/detail-files.md) | Detail-file template used when an item's input exceeds 3 sentences. |
+| [`milestone-tagging.md`](../references/milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. |
+| [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

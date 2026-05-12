@@ -241,3 +241,9 @@ Ran /runlog-author for the <topic> bullet.
 - **Sharp and short.** One sentence with a concrete claim. If you need a paragraph, link to code instead.
 - **Today's date.** Always stamp with the absolute current date.
 - **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
+- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`).

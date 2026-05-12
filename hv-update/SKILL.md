@@ -112,3 +112,8 @@ Across projects: each project tracks its own `hvSkills.version`. Updating the pl
 - **Network-dependent.** If `gh` can't reach the API, report `unknown` and stop — don't retry on a loop.
 - **Honor dev builds.** An `ahead` status is not an error; contributors run that way.
 - **Helpers refresh is separate.** Upgrading the plugin does not rewrite `.hv/bin/` in existing projects. Step 4 nudges (off), asks (auto), or auto-dispatches `/hv-init` (loop) — but per project. Multi-project users still re-run `/hv-init` in each project explicitly.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/update-verdicts.md`](../references/update-verdicts.md) — Update-check verdicts and routing for `/hv-update`.

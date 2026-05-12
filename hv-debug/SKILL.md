@@ -330,3 +330,8 @@ If the fix codified a constraint (e.g., "never use timer-X here", "this surface 
 - **One fix, one commit.** Scope creep in debug commits masks the root cause later.
 - **The ID closes the loop.** The commit message carries `[B##]`; `hv-complete` moves the entry.
 - **Learn the non-obvious.** If this bug surprised you, it'll surprise the next person.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill.

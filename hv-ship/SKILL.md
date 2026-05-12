@@ -245,3 +245,15 @@ Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via
 - **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
 - **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
 - **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `TODO.md` entirely produce an error (exit 1). No grep needed.
+
+## References
+
+| Reference | Purpose |
+|-----------|---------|
+| [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
+| [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). |
+| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`manual-gates.md`](../references/manual-gates.md) | Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch). |
+| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
+| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). |
+| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. |

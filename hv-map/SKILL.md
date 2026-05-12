@@ -64,3 +64,7 @@ The soft-cap nudge runs via `.hv/bin/hv-map-cap-check`, invoked from /hv-debug, 
 - Missing/corrupted detail file: helpers skip silently with stderr warning. Re-create or fix manually; the file lives in `.hv/map/`.
 - Frontmatter `touched:` missing: hygiene falls back to git mtime.
 - New subsystem proposal during `after-work` declined by user: cycle commits without the map update; the area stays uncovered until next time.
+
+## References
+
+- [`references/three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) — Three-mode skill shape (first-run / after-work / restructure) used by `/hv-docs` and `/hv-map`.

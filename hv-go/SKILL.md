@@ -59,3 +59,7 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 
 - **Delegate, don't duplicate.** Capture mechanics (ID minting, classification, detail files, `Repos:` tagging in umbrella mode) live in `/hv-capture`. Execution and post-cycle nudges (branch creation, worker dispatch, commits, `/hv-map after-work`, soft-cap check, `/hv-learn`) live in `/hv-work`. `/hv-go` is a pass-through orchestrator — it does not own any of these rules independently.
 - **Capture survives clean-tree guard failure.** Step 2 writes to gitignored `TODO.md` before Step 3's guard. If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
