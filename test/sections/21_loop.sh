@@ -264,7 +264,7 @@ case "$out" in
 esac
 # Multi-kind case must use ", " separator (comma + space) per the documented format
 # Seed a stale TODO item so the todo kind also reports ≥1 stale at --days 0
-printf '\n- [T99] Stale task for separator test. Captured: 2026-01-01\n' >> .hv/TODO.md
+"$BIN/hv-append" "## Tasks" "- **[T99] Stale task for separator test.** Captured: 2026-01-01"
 out_multi="$("$BIN/hv-stale-summary" --days 0 --today 2026-05-09 map todo)"
 case "$out_multi" in
   "stale: map="*", todo="*) ;;
