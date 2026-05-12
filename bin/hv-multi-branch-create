@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Atomically create the same branch in every named sub-repo, OR exit 1
 # before any branch is created if the branch already exists in any of them.
+# Tool: exit 0 when branch created in all repos; exit 1 on collision.
 # Usage: hv-multi-branch-create --branch <name> --repos <repos-csv>
 # Exits: 0 on success (branch created in all repos), 1 on collision (lists
 #        colliding repo names on stderr, NO repos modified) or usage error;

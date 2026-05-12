@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Compare .hv/config.json#hvSkills.version with the currently-installed
 # hv-skills plugin version. Emits a drift nudge or JSON. Always exits 0.
+# Tool: always exits 0; emits drift nudge on stdout when stale.
 #
 # Distinct from hv-update-check (which compares installed vs latest GitHub
 # release). This catches the case where the plugin updated but the project's

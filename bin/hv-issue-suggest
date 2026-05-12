@@ -4,6 +4,7 @@
 # When `gh` is available and authed, files the issue and prints
 # {"url": "...", "number": N} on stdout (exit 0). Otherwise prints a
 # manual-fallback URL + title + body to stdout (exit 1).
+# Tool: exit 0 when gh files the issue; exit 1 on gh unavailable/unauthed.
 #
 # Usage:
 #   printf '%s' "$BODY" | hv-issue-suggest --title "Title" [--upstream-repo owner/repo]

@@ -2,6 +2,7 @@
 # Resolve the installed hv-skills plugin root. Wraps hvlib.resolve_plugin_root
 # so shell callers (hv-update-check, hv-version-check, future tooling) share
 # one resolver — see bin/hvlib.py for the canonical walk order.
+# Tool: exit 0 always; callers detect not-found via empty root in output.
 #
 # Usage:
 #   hv-resolve-plugin-root              # <kind>|<root>   (matches hv-update-check)

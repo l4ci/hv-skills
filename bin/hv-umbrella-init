@@ -2,6 +2,7 @@
 # Bootstrap an umbrella registry: scan immediate children for git repos, register a
 # chosen subset (via stdin), write .hv/repos.json, and manage umbrella .gitignore
 # if the umbrella is itself a git repo.
+# Tool: exit 0 on success; exit 1 when no immediate git children found.
 # Usage: hv-umbrella-init   (reads one line from stdin: "all" | "none" | "name,name")
 # Exit codes: 0 success, 1 no immediate git children found
 set -euo pipefail

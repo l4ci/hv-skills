@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Categorize commits in a git range by Conventional Commits prefix and emit markdown sections.
+# Tool: exit 0; emits markdown from git range; exit 1 on git error.
 # Usage: hv-release-changelog-from-commits <range>
 # Example: hv-release-changelog-from-commits v1.10.0..HEAD
 set -euo pipefail

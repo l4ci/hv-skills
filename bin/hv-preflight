@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Verify .hv/ is initialized and helpers are present.
+# Tool: exit 0 fully initialized; exit 2 uninitialized; exit 3 partial install.
 # Exit 0: fully initialized  |  Exit 2: uninitialized  |  Exit 3: partial install
 # Typical caller: `.hv/bin/hv-preflight || invoke hv-init via Skill tool`.
 # Compares against the upstream plugin bin/ when running from .hv/bin/ to catch

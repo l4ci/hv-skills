@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Auto-detect the project version file and emit its current version as JSON.
+# Tool: exit 0 with JSON when version file found; exit 1 when not found.
 # Usage: hv-release-detect-version
 # Output: {"file": "<path>", "version": "<semver>", "kind": "<kind>"}
 # Exits 1 if no version file is found or parsing fails.

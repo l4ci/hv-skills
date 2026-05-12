@@ -2,6 +2,7 @@
 # Scope a review: list commits, touched files, referenced IDs, and the
 # original TODO entries those IDs point at. Emits JSON so /hv-review can
 # build its agent brief in one step.
+# Tool: exit 0 with JSON scope; exit 1 on git error or missing branch.
 # Usage: hv-review-scope [--repo <name>] [branch]   # defaults to current branch in cwd, or in <name>'s sub-repo
 set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"

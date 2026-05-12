@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Push a branch and open a GitHub PR via gh. Cleans up any worktree first.
 # Reads PR body from stdin.
+# Tool: exit 0 on successful PR creation; exit 1 on missing body or gh error.
 # Usage: echo "body" | hv-pr [--repo <name>] <branch> <title>
 # Prints: the PR URL.
 set -euo pipefail
