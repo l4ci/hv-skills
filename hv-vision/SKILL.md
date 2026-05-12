@@ -201,6 +201,8 @@ Use `AskUserQuestion` with header `"Seed M01"` and three options:
 - `"Write first slice plan"` — write `M01-S01.md` as a durable plan before any items land
 - `"Skip for now"` — leave M01 empty; the user will populate later
 
+Plain-text fallback: ask once in prose; default to Recommended (Capture items) on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
+
 **Capture items** — invoke `/hv-capture` via the `Skill` tool:
 
 ```
