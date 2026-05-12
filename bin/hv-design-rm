@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Remove a design file.
+# Writer helper: exit 0 on successful removal; exit 1 when design ID not found.
+# Usage: hv-design-rm <ID>     (e.g. hv-design-rm F58)
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+ID="${1:?usage: hv-design-rm <ID>}"
+DESIGN=".hv/designs/${ID}.md"
+if [ ! -f "$DESIGN" ]; then
+  echo "error: $DESIGN not found" >&2
+  exit 1
+fi
+rm "$DESIGN"
