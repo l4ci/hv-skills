@@ -9,7 +9,7 @@
 | `BACKLOG.md` | Active backlog — bugs, features, tasks, and recent completions |
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
-| `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
+| `MILESTONES.md` | Milestone overview — one short section per milestone, with a vision intro paragraph and an active list |
 | `CONTEXT.md` | Domain glossary — one entry per term with definition, aliases, optional "not" clarifications. Source-of-truth for the `## Project Context` block in `CLAUDE.md`. Written by `/hv-context`. |
 | `MAP.md` + `map/<subsystem>.md` | Project map — AI-curated narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Written by `/hv-map`. |
 | `counters.json` | Auto-incrementing IDs for each item type |
@@ -53,9 +53,9 @@ A companion managed block in `CLAUDE.md` lists the current decision topics so th
 
 See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and the difference between decisions and learnings.
 
-## MILESTONES.md — vision and active milestones
+## MILESTONES.md — milestone overview
 
-`MILESTONES.md` holds the project's long-term vision: a short vision paragraph followed by a list of milestones, each with a one-paragraph overview. `/hv-vision` writes the initial version; you update it as the project evolves.
+`MILESTONES.md` is the milestone overview: a list of milestones, each with a one-paragraph overview and status, opened by a short vision intro paragraph as preamble. `/hv-vision` writes the initial version; you update it as the project evolves.
 
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
