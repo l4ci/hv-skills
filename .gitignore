@@ -4,3 +4,6 @@
 # Python bytecode (hvlib.py)
 __pycache__/
 *.pyc
+
+# Claude Code harness state (scheduled tasks, etc.)
+.claude/
