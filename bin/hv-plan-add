@@ -2,31 +2,44 @@
 # Create a plan file under .hv/plans/<milestone>-<unit>.md.
 # Writer helper: exit 0 on successful plan creation; exit 1 on usage error or conflict.
 # Usage:
-#   hv-plan-add [--repo <name>] <milestone> slice "<title>"        — mints next S<NN> for that milestone
-#   hv-plan-add [--repo <name>] <milestone> <itemId> "<title>"     — uses item ID (B07, F03, T11, S01, …) verbatim
-#   --repo  Tag plan with sub-repo name for umbrella mode; validated against .hv/repos.json.
+#   hv-plan-add [--repo <name>] [--design <path>] <milestone> slice "<title>"        — mints next S<NN> for that milestone
+#   hv-plan-add [--repo <name>] [--design <path>] <milestone> <itemId> "<title>"     — uses item ID (B07, F03, T11, S01, …) verbatim
+#   --repo    Tag plan with sub-repo name for umbrella mode; validated against .hv/repos.json.
+#   --design  Path to design artifact under .hv/designs/; recorded in plan frontmatter as a traceability pointer.
 # Prints the full plan key on stdout (e.g. "M01-S03" or "M01-B07").
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 REPO=""
+DESIGN=""
 while :; do
   case "${1:-}" in
-    --repo) REPO="${2:?usage: hv-plan-add [--repo <name>] <milestone> <unit-or-slice> <title>}"; shift 2 ;;
+    --repo) REPO="${2:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"; shift 2 ;;
+    --design) DESIGN="${2:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"; shift 2 ;;
     *) break ;;
   esac
 done
-MILESTONE="${1:?usage: hv-plan-add [--repo <name>] <milestone> <unit-or-slice> <title>}"
-UNIT="${2:?usage: hv-plan-add [--repo <name>] <milestone> <unit-or-slice> <title>}"
-TITLE="${3:?usage: hv-plan-add [--repo <name>] <milestone> <unit-or-slice> <title>}"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MILESTONE" "$UNIT" "$TITLE" "$REPO" <<'PY'
+if [ -n "$DESIGN" ]; then
+  case "$DESIGN" in
+    .hv/designs/*) ;;
+    *) echo "error: --design path must start with .hv/designs/, got '$DESIGN'" >&2; exit 1 ;;
+  esac
+  if [ ! -f "$DESIGN" ]; then
+    echo "error: --design file not found: $DESIGN" >&2
+    exit 1
+  fi
+fi
+MILESTONE="${1:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"
+UNIT="${2:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"
+TITLE="${3:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MILESTONE" "$UNIT" "$TITLE" "$REPO" "$DESIGN" <<'PY'
 import re, sys
 from datetime import date
 from pathlib import Path
 from hvlib import write_text_atomic
 
-milestone, unit_in, title, repo = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+milestone, unit_in, title, repo, design = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 
 if not re.fullmatch(r"M\d{2,}", milestone):
     print(f"error: milestone must look like M01/M02/…, got {milestone!r}", file=sys.stderr)
@@ -70,6 +83,7 @@ if plan_path.exists():
     sys.exit(1)
 
 repo_line = f"repo: {repo}\n" if repo else ""
+design_line = f"design: {design}\n" if design else ""
 
 write_text_atomic(plan_path,
     f"""---
@@ -77,7 +91,7 @@ key: {key}
 milestone: {milestone}
 unit: {unit}
 unitKind: {unit_kind}
-{repo_line}title: {title}
+{repo_line}{design_line}title: {title}
 status: planned
 created: {date.today().isoformat()}
 ---

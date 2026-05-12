@@ -65,6 +65,7 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 
 - Existing plans for this milestone: `.hv/bin/hv-plan-list <MID>`
 - For item targets carrying a `Repos:` field: resolve it to an absolute sub-repo path via `.hv/repos.json` (`load_repos()`). Skipped for slice / milestone targets and when umbrella mode is off.
+- For item targets whose ID matches `[BFT]\d{2,}`: `[ -f .hv/designs/<ID>.md ] && cat .hv/designs/<ID>.md` to load any design artifact from `/hv-brainstorm`. Skipped for slice targets. When a design artifact exists, it carries the negotiated Goal/Design/Approaches-considered — Step 4's proposal mirrors the design's chosen approach rather than re-exploring.
 
 DECISIONS matches are committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
 
@@ -128,6 +129,8 @@ KEY=$(.hv/bin/hv-plan-add --repo "web, api" <MID> <itemId> "<title>")
 ```
 
 Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode never sets `--repo`. Multi-repo items keep all names in one `--repo` argument; `hv-plan-add` validates each name against `.hv/repos.json` before writing the plan.
+
+When `.hv/designs/<ID>.md` exists for the plan's item, pass `--design .hv/designs/<ID>.md` to `hv-plan-add`. The plan's frontmatter records `design: .hv/designs/<ID>.md` as a traceability pointer.
 
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
 
