@@ -2,15 +2,55 @@
 
 ## Unreleased
 
+## v3.0.0 — 2026-05-12
+
+v3.0.0 reorganizes runtime data files: TODO.md → BACKLOG.md and the MILESTONES.md heading flips to `# Milestones`. Both auto-migrate on `/hv-init`; downstream users re-run init and continue. Also: subagent dispatch discipline gets a rulebook, /hv-init shows installed version on startup, /hv-next surfaces empty active milestones, and docs gain stateDiagram / flowchart / sequence visualizations.
+
 ## Breaking
+
+- **Renamed `.hv/TODO.md` → `.hv/BACKLOG.md`** [F71]. The file holds typed work items plus recent completions across an entire project — it's a backlog, not a personal todo list. Helpers, smoke, SKILL.md files, and docs all flip in lockstep.
+
+  **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-renames legacy `.hv/TODO.md` → `.hv/BACKLOG.md` on first run (idempotent — exit 0 on rename action OR no-op). A one-cycle reader fallback in `bin/hvlib.py` keeps projects working until they re-init; the fallback is silent and intended for removal in the next release.
 
 - **MILESTONES.md H1 is now `# Milestones`** [F72]. Filename, sibling directory `.hv/milestones/`, and the file's H1 now all align on "milestones"; the vision paragraph is the file's intro preamble, not its primary content. Helpers, smoke fixtures, SKILL.md prose, and docs all flip in lockstep.
 
   **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-rewrites `# Vision` H1s to `# Milestones` on first run, preserving body content byte-for-byte; idempotent on re-run.
 
-- **Renamed `.hv/TODO.md` → `.hv/BACKLOG.md`** [F71]. The file holds typed work items (bugs/features/tasks) plus recent completions across an entire project — it's a backlog, not a personal todo list. Helpers, smoke tests, SKILL.md files, and docs all flip in lockstep.
+## New
 
-  **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-renames legacy `.hv/TODO.md` → `.hv/BACKLOG.md` on first run (idempotent — exit 0 on rename action OR no-op). A one-cycle reader fallback in `bin/hvlib.py` keeps projects working until they re-init; the fallback is silent and intended for removal in the next release.
+- **Subagent dispatch discipline** [F73] — `/hv-next` Step 2–6 reads dispatch as a parallel worker wave; `/hv-vision` dispatches context-bundle + research workers; `/hv-debug` conditionally dispatches reproduce (Step 5) + verify (Step 7) workers. Authoring rulebook added under `references/subagent-dispatch.md`. Reduces orchestrator-side read pressure on cycle entry.
+- **`/hv-init` Step 5 shows installed version + freshness hint** [F70] — Reuses `hv-update-check`'s plugin-cache resolution to print the version string at init time so users see what shipped.
+- **`/hv-next` surfaces empty active milestones** [B25] — When an active milestone has zero captured items, the skill flags it inline instead of silently falling through to the general backlog. New helper `bin/hv-vision-empty-active` lists empty active milestone IDs.
+- **`hv-bootstrap` seeds MILESTONES.md with `# Milestones` H1 + in-place migration** [F72/T1] — the implementation backing the breaking change above.
+
+## Fixed
+
+- `/hv-c` suppresses its own banner so only `/hv-capture`'s shows [T72]
+- Smoke staleness fixture lives under `## Tasks` with canonical bullet [B27]
+- `parse_todo_fields` fixture includes the `Captured` field [B26]
+
+## Changed
+
+- **Reference-extraction sweep** [T65] — `/hv-work` Step 4 loop-mode plan-dispatch, Step 5 isolation-guard rationale, `/hv-debug` Step 6 hypothesize + Step 7.5 escalate, `/hv-refactor` Step 2 exploration + Step 5 competing-design — moved to shared `references/<topic>.md` files; SKILL.md files shrink in lockstep.
+- Bundled cleanup post-F71 (5 follow-up items)
+- `bin/hv-vision-empty-active` marked executable [B25]
+- `.claude/` harness state directory is gitignored
+
+## Documentation
+
+- **Lifecycle diagrams** [F74] — stateDiagram of session lifecycle, flowchart of `/hv-next` decision flow, sequence diagram of `/hv-work` lifecycle.
+- Reframe MILESTONES.md prose as the milestone overview with vision intro paragraph [F72/T3]
+- CLAUDE.md note on smoke cadence — full suite at ship/review, structural checks per task
+- Subagent-dispatch discipline plan + spec [F73]
+- /hv-init Step 5 reuse-of-hv-update-check note [F70]
+- cli-helpers + vision usage cover `hv-vision-empty-active` [B25]
+- List `/hv-brainstorm` under "Plan & build" (CLAUDE.md skills block)
+
+## Stats
+
+39 commits, 86 files changed, +1660 −414 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v2.3.1...v3.0.0
 
 ## v2.3.1 — 2026-05-12
 
