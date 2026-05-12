@@ -54,7 +54,11 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
 | `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
-| `hv-plan-add` | Create a plan file; mints next slice number when called with `slice` | `.hv/bin/hv-plan-add M01 slice "Auth foundation"` |
+| `hv-design-add` | Writer: create `.hv/designs/<ID>.md` from an item ID (`[BFT]\d{2,}`); exit 1 on bad ID or conflict | `.hv/bin/hv-design-add F12 "Archive command"` |
+| `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
+| `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
+| `hv-design-list` | Lookup: JSON of every design with id, title, status, created; always exits 0 | `.hv/bin/hv-design-list` |
+| `hv-plan-add` | Writer: create a plan file; mints next slice number when called with `slice`; accepts `--design <path>` to record a design artifact pointer in frontmatter | `.hv/bin/hv-plan-add [--design <path>] M01 slice "Auth foundation"` |
 | `hv-plan-list` | JSON: every plan with key, milestone, unit, title, status, created | `.hv/bin/hv-plan-list M01` |
 | `hv-plan-show` | Print a plan file's contents | `.hv/bin/hv-plan-show M01-S01` |
 | `hv-plan-rm` | Delete a plan file | `.hv/bin/hv-plan-rm M01-S01` |
@@ -185,11 +189,22 @@ also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`.
 
 `hv-todo-by-milestone` is covered in [Backlog manipulation](#backlog-manipulation).
 
+## Design helpers
+
+Designs live at `.hv/designs/<ID>.md` and are per-item: the ID must match `[BFT]\d{2,}` (e.g. `B07`, `F12`, `T11`). Milestone (`M01`) and slice (`S01`) IDs are rejected — project-level exploration belongs to `/hv-vision`, slice planning belongs to `/hv-plan`.
+
+`hv-design-add` is the writer: it mints `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and five empty sections (Goal, Design, Approaches considered, Open questions, Assumptions). It exits 1 on a bad ID or a pre-existing artifact. `hv-design-show` prints the file's contents and exits 1 when the artifact is missing. `hv-design-rm` deletes the file and exits 1 when the artifact is missing. `hv-design-list` returns JSON for every design with `id`, `title`, `status`, `created` — always exits 0, useful for dashboards and post-cycle audits.
+
+See [Brainstorming a design](../usage/brainstorm.md) for the user-facing flow these helpers back.
+
 ## Plan and spike helpers
 
 Plans live at `.hv/plans/<milestone>-<unit>.md`. `hv-plan-add` creates a plan
 file; passing `slice` as the unit makes it auto-increment the slice number
-(`S01`, `S02`, …). `hv-plan-list` returns JSON you can pipe into other tools.
+(`S01`, `S02`, …). The optional `--design <path>` flag records a `design:` pointer
+in the plan's frontmatter when a `.hv/designs/<ID>.md` artifact exists for the item;
+the path must start with `.hv/designs/` and the file must exist or the helper
+exits 1. `hv-plan-list` returns JSON you can pipe into other tools.
 `hv-plan-show` and `hv-plan-rm` are straightforward read/delete operations.
 
 Spikes live at `.hv/spikes/<name>.md` with a matching `spike/<name>` git branch.
