@@ -51,7 +51,17 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 
 DECISIONS matches are committed boundaries that constrain what milestones can promise; surface any conflict before proposing milestones.
 
-**Issue these as parallel tool calls in a single response** — they're independent, and load latency dominates this step. Don't dump the contents to the user; read them, form a picture, and use what's relevant in Step 3.
+**Dispatch a context-bundle worker** rather than issuing the reads on the orchestrator. Per `references/subagent-dispatch.md`, this step is read-heavy (≥3 file reads — `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/TODO.md`, `.hv/CONTEXT.md` query results, plus the root stack file) and the orchestrator only needs synthesis to do Step 3, not the raw text.
+
+Brief (haiku tier — this is mechanical aggregation):
+
+- **Goal:** Return a compact snapshot of the project's vision state.
+- **Inputs:** `.hv/MILESTONES.md`, `.hv/milestones/M*.md`, `.hv/TODO.md`, `README.md` (or whichever stack file exists), plus the output of `.hv/bin/hv-knowledge-query`, `.hv/bin/hv-decisions-query`, and `.hv/bin/hv-context-query` for vision-relevant topics (the orchestrator selects topics from the user's framing).
+- **Constraints:** Surface any DECISIONS conflict explicitly in the snapshot — committed boundaries that constrain milestone proposals must be visible to the orchestrator before Step 3.
+- **Return shape:** `{vision-paragraph, existing-milestones[], gaps[], hard-boundaries[], context-terms[]}` — bullets, not paragraphs, ≤200 words total.
+- **Word budget:** ≤200 words.
+
+The orchestrator uses the snapshot to ground the Step 3 framing paragraph. Definitional signals from the user (*"by X I mean…"*) still trigger inline `hv-context-add` writes on the orchestrator — that's a write, which stays per the reference.
 
 ## Step 3 — Frame & Discover
 
@@ -91,7 +101,19 @@ Before proposing milestones, ground the conversation in outside context. Use `We
 - Architectural or product patterns worth borrowing
 - Recent industry shifts that change the calculus
 
-Run 2–4 searches max — depth over breadth. **Issue all `WebSearch` calls (and any follow-up `WebFetch`s on the same wave) in parallel in a single response** — research is the latency bottleneck here, sequential calls add up. Pull in 3–5 concrete findings the user can react to. Each finding should be **actionable** in the milestone discussion: *"here's a pitfall to avoid in M01"*, *"here's a pattern worth borrowing"*, *"here's a competitor's mistake."*
+**Dispatch one research worker per angle** rather than running `WebSearch` calls on the orchestrator. Per `references/subagent-dispatch.md`, multi-angle research is fan-out work — angles are independent by definition, and each one produces its own block of `WebSearch` / `WebFetch` output that the orchestrator doesn't need to retain after synthesis.
+
+The orchestrator decomposes the framing from Step 3 into 3–5 research angles (by judgment, not a fixed count) — typically: competitive landscape, technical feasibility, user-need patterns, adjacent prior art. Dispatch one sonnet worker per angle in a single tool-call batch.
+
+Per-worker brief:
+
+- **Goal:** Return actionable findings on `<angle>` relevant to the project's framing.
+- **Inputs:** The framing summary from Step 3 (one paragraph), the angle name, and the project's apparent type.
+- **Constraints:** Findings must be **actionable** — *"pitfall to avoid in M01"*, *"pattern worth borrowing"*, *"competitor's mistake"*. Generic observations get cut. Cite sources.
+- **Return shape:** 3–5 findings, each: `{finding (one sentence), citation (URL + title), so-what (why it matters for milestone design)}`.
+- **Word budget:** ≤200 words per worker.
+
+After all workers return, the orchestrator merges to 3–5 concrete findings total (deduplicate across angles, keep the sharpest framing). Present inline with citations. If an angle yields nothing useful, say so and move on.
 
 Present findings inline with citations. If a search yields nothing useful, say so and move on — don't pad with generic observations.
 

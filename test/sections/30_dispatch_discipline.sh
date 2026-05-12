@@ -49,3 +49,16 @@ grep -q 'single parallel wave' "$REPO/hv-next/SKILL.md" \
 grep -q 'references/subagent-dispatch.md' "$REPO/hv-next/SKILL.md" \
   || fail "F73: hv-next missing reference cite"
 pass "hv-next retrofitted with parallel dispatch wave"
+
+echo "F73: hv-vision dispatch retrofits"
+grep -q 'context-bundle worker' "$REPO/hv-vision/SKILL.md" \
+  || fail "F73: hv-vision Step 2 missing context-bundle worker"
+grep -q 'haiku' "$REPO/hv-vision/SKILL.md" \
+  || fail "F73: hv-vision Step 2 missing haiku tier"
+grep -q 'research worker' "$REPO/hv-vision/SKILL.md" \
+  || fail "F73: hv-vision Step 4 missing research worker dispatch"
+grep -q 'per angle' "$REPO/hv-vision/SKILL.md" \
+  || fail "F73: hv-vision Step 4 missing per-angle fan-out"
+grep -q 'references/subagent-dispatch.md' "$REPO/hv-vision/SKILL.md" \
+  || fail "F73: hv-vision missing reference cite"
+pass "hv-vision retrofitted with context-bundle + research fan-out workers"
