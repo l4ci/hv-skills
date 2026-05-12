@@ -240,6 +240,10 @@ helpers are incomplete. Useful as a guard at the top of scripts.
 
 `hv-update-check` queries the hv-skills GitHub releases and returns JSON with
 the current and latest version, install type, and the command to upgrade.
+`/hv-init`'s Step 5 confirm reads the same JSON to append a one-line version +
+freshness hint to the init summary (`current` → `(latest)`, `behind` →
+`→ <latest> available — run /hv-update`, `ahead`/`unknown` fall back to a
+version-only line).
 
 `hv-version-check` is the local sibling: it compares `.hv/config.json#hvSkills.version` (stamped at `/hv-init` time) with the currently-installed plugin's version. On drift it prints a one-line nudge; with `--json` it always emits `{stamped, installed, status}`. `bin/hv-preflight` calls it informationally on every preflight, so any skill that runs preflight surfaces the nudge to the user when the project's helpers have fallen behind the plugin. Distinct from `hv-update-check` — that one needs the network and compares installed vs latest GitHub release.
 
