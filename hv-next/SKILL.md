@@ -181,6 +181,20 @@ Suggested next: [ID] [Title] ([tag])
 [Why this one — 1 sentence]
 ```
 
+**Brainstorm nudge.** Fires when the suggested item is a `[Major]` feature OR a `[P0]` bug AND `.hv/designs/<ID>.md` does NOT exist. Skip silently for `[Minor]` / `[Cosmetic]` features, `[P1]` / `[P2]` bugs, and any item that already has a design artifact (the design negotiation is done).
+
+Read `autonomy.level` from `.hv/config.json` (default `"off"`):
+
+```bash
+LEVEL=$(jq -r '.autonomy.level // "off"' .hv/config.json)
+```
+
+Branch inline (per the `hv-init` authoring convention on inline autonomy directives):
+
+- `"off"` — append one line to the suggestion block before Step 7's `AskUserQuestion` fires: *"This is a `[Major]` item without a design — consider `/hv-brainstorm [ID]` before `/hv-work`."* Substitute `[P0]` for the tag when the suggested item is a bug. The existing 4 options in Step 7 are unchanged — the nudge informs the user; the picklist still lets them route to `/hv-work` if they decline.
+- `"auto"` — invoke `hv-brainstorm` via the `Skill` tool with the suggested ID as `args`. Print *"Auto: starting /hv-brainstorm [ID] — re-running /hv-next once the design lands."* before the dispatch. When the brainstorm returns (design artifact at `.hv/designs/<ID>.md` written), re-run Step 6 — the freshly-written design will now satisfy the design-exists check and the suggestion proceeds without a second nudge.
+- `"loop"` — skip the nudge entirely. Loop mode is throughput and Socratic design exploration breaks the loop's pace; the loop already auto-picks `/hv-work` in Step 7.
+
 ## Step 7 — Confirm & Execute
 
 Read `autonomy.level` from `.hv/config.json` (default `"off"`).
