@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate .hv/CONTEXT-MAP.md from umbrella .hv/CONTEXT.md and per-sub-repo
 # .hv/contexts/<repo>/CONTEXT.md files. No-op when not in umbrella mode.
+# Atomic-merge helper: regenerates .hv/CONTEXT-MAP.md; exit 0 always (no-op outside umbrella mode).
 # Usage: hv-context-map
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

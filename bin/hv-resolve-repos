@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Resolve a comma-separated Repos: list into a JSON array of {name, path}.
+# Resolve helper: exits 1 when any name in the CSV is not registered.
 # Usage: hv-resolve-repos "<repos-csv>"
 # Exits: 0 with JSON array on stdout, 1 if any name not registered (lists
 #        missing names on stderr), 2 on usage error.

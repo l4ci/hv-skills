@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print the resolved base branch (main, master, trunk, or origin/HEAD).
+# Resolve helper: exits 1 with stderr if no base branch can be resolved or cwd lacks git.
 # Respects git.baseBranch in .hv/config.json when set.
 # Usage: hv-base-branch
 # Exits 1 with a stderr message if none can be resolved or cwd lacks git.

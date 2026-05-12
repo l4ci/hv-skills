@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Identify which registered sub-repo the current cwd belongs to (incl. Layout B worktrees).
+# Resolve helper: exits 1 when cwd is not inside a registered sub-repo.
 # Usage: hv-resolve-repo
 # Exits: 0 with name on stdout, 1 if not in a registered sub-repo
 set -euo pipefail

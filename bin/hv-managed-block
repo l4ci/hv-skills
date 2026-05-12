@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate a managed <!-- hv-<key>-start -->...<!-- hv-<key>-end --> block in CLAUDE.md.
+# Atomic-merge helper: regenerates a named managed block in CLAUDE.md; exit 0 on success, 1 on unknown key.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
 # Keys: knowledge | decisions | vision | map (vision and map are body-stdin only).
