@@ -14,6 +14,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`context-load-protocol.md`](context-load-protocol.md) | K+D context loading sequence shared by every cycle-starting skill. | `/hv-assume`, `/hv-plan`, `/hv-vision` |
 | [`context-umbrella-scoping.md`](context-umbrella-scoping.md) | Umbrella-mode resolution for the `/hv-context` artifact. | `/hv-context` |
 | [`debug-hypothesize.md`](debug-hypothesize.md) | Both-modes hypothesize choreography (brief template, single vs competing, per-axis divergence) for `/hv-debug` Step 6. | `/hv-debug` |
+| [`debug-escalate.md`](debug-escalate.md) | Fresh-context handoff brief template + dispatch mechanics + user-surfacing fallback for `/hv-debug` Step 7.5. | `/hv-debug` |
 | [`detail-files.md`](detail-files.md) | Detail-file template used when an item's input exceeds 3 sentences. | `/hv-capture` |
 | [`docs-conventions.md`](docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). | `/hv-docs` |
 | [`handoff-template.md`](handoff-template.md) | Handoff-note template written by `/hv-pause` and read by `/hv-next`. | `/hv-pause` |
