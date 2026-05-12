@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Breaking
+## Breaking
 
 - **Renamed `.hv/TODO.md` → `.hv/BACKLOG.md`** [F71]. The file holds typed work items (bugs/features/tasks) plus recent completions across an entire project — it's a backlog, not a personal todo list. Helpers, smoke tests, SKILL.md files, and docs all flip in lockstep.
 

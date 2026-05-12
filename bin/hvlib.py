@@ -306,8 +306,12 @@ def load_backlog_corpus(base_dir=".") -> str:
     if backlog.exists():
         primary = read_or_empty(backlog)
     else:
+        # XXX: remove in next release (post-F71). Silent one-cycle fallback so
+        # projects with legacy .hv/TODO.md keep working until they re-run /hv-init.
+        # The /hv-init flow auto-renames the file via hv-bootstrap; this branch
+        # only fires for projects that haven't re-init'd yet.
         primary = read_or_empty(hv / "TODO.md")
-    return primary + "\n" + read_or_empty(hv / "ARCHIVE.md")
+    return primary.rstrip("\n") + "\n" + read_or_empty(hv / "ARCHIVE.md")
 
 
 def git_mtime(path) -> "str | None":

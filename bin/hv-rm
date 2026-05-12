@@ -44,6 +44,7 @@ from hvlib import (
     collect_cross_refs,
     apply_cross_ref_strips,
     active_items,
+    update_json,
 )
 
 ids_csv, force_str, scrub_str = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -347,7 +348,6 @@ if any(plan["status_strip"] for plan in plans.values()):
             # else: drop the entry entirely.
         data["active"] = new_active
 
-    from hvlib import update_json
     update_json(STATUS_PATH, {"active": []}, mutator)
 
 # ── apply summary ─────────────────────────────────────────────────────────────

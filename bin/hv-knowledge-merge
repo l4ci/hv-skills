@@ -5,6 +5,7 @@
 # is a silent no-op (idempotent). Body comes via --body <text> or stdin.
 # Writer helper: exit 0 on successful write (or idempotent no-op);
 # exit 1 on missing argv, missing target, or other precondition error.
+# Emits 'wrote: <topic>' or 'noop: <topic>' to stderr.
 #
 # Usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
 #        (body also accepted via stdin if --body not given)
@@ -100,7 +101,7 @@ for line in section_body.splitlines():
         continue
     m = re.match(r"^- \*\*([^*]+)\*\*", stripped)
     if m and m.group(1).lower() == title_lower:
-        print("already present", file=sys.stderr)
+        print(f"noop: {topic} (title already present)", file=sys.stderr)
         sys.exit(0)
 
 # Prepend new bullet at the top of the section body
@@ -123,4 +124,5 @@ if not new_body.endswith("\n"):
 
 new_content = replace_section(content, topic, new_body)
 write_text_atomic(".hv/KNOWLEDGE.md", new_content)
+print(f"wrote: {topic} (title added)", file=sys.stderr)
 PY

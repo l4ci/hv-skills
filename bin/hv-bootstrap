@@ -21,7 +21,7 @@ elif [ -f "$HV/TODO.md" ] && [ -f "$HV/BACKLOG.md" ]; then
 fi
 
 [ -f "$HV/BACKLOG.md" ] || cat > "$HV/BACKLOG.md" <<'EOF'
-# TODO
+# Backlog
 
 ## Bugs
 
