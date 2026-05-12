@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Print IDs of active milestones that have 0 open backlog items, one per line.
+# Lookup helper: always exits 0; empty stdout when every active milestone has at least one open item.
+# Usage: hv-vision-empty-active
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+while IFS= read -r mid; do
+    items="$("$HERE/hv-todo-by-milestone" "$mid")"
+    if [[ -z "$items" ]]; then
+        printf '%s\n' "$mid"
+    fi
+done < <("$HERE/hv-vision-active")

@@ -157,6 +157,7 @@ Active milestones: M01 — Auth foundation, M03 — Public API
 (The `Milestone` column in `hv-backlog`'s tables already shows per-item tags when any are present — don't restate that.)
 
 - **Stale candidates** — print one summary line via `.hv/bin/hv-stale-summary --days 90`. Helper outputs `stale: map=N, knowledge=M, todo=K` with zero-count kinds suppressed (and prints nothing if everything is fresh). Never blocks output.
+- **Empty active milestones** — print one line per ID emitted by `.hv/bin/hv-vision-empty-active`: `empty-active: <MID> — no open items; ship with .hv/bin/hv-vision-status <MID> shipped.` Helper outputs one milestone ID per line; empty stdout means every active milestone still has open items (skip silently). Never blocks output.
 
 ## Step 6 — Suggest Next
 

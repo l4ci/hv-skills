@@ -26,6 +26,8 @@ Each milestone carries one of four statuses:
 
 Multiple milestones can be `active` simultaneously when their dependencies allow. [`/hv-next`](picking-work.md) prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag are never excluded entirely.
 
+When an active milestone has no open items remaining, `/hv-next` surfaces an empty-active notice so you know the milestone is ready to close. Run `.hv/bin/hv-vision-status <MID> shipped` to flip its status, which immediately unblocks any milestone that listed it as a dependency.
+
 Marking a milestone `shipped` immediately unblocks anything that depended on it. Marking it `archived` does not. Use `archived` for milestones you are intentionally dropping, not for ones that finished.
 
 ## /hv-plan — write the implementation plan

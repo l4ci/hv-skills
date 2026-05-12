@@ -430,3 +430,47 @@ if "$BIN/hv-vision-status" "$ARCH_ID" bogus 2>/dev/null; then
 fi
 pass "hv-vision-status rejects unknown status values"
 
+echo "hv-vision-empty-active"
+# Create a fresh milestone M04 and activate it for the three cases below.
+ID_M4=$("$BIN/hv-vision-add" "Empty-active test" "Scratch milestone for helper smoke.")
+"$BIN/hv-vision-status" "$ID_M4" active
+
+# Case A: active milestone WITH an open item → helper emits empty stdout.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B99] [P1] Scratch bug.** Desc. Milestone: M04
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+OUT_A=$("$BIN/hv-vision-empty-active")
+echo "$OUT_A" | grep -qx "$ID_M4" && fail "empty-active Case A: $ID_M4 should NOT appear when it has open items (got: '$OUT_A')"
+pass "hv-vision-empty-active: active milestone with open items emits empty stdout"
+
+# Case B: active milestone with ZERO open items → helper emits the ID.
+cat > .hv/TODO.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+OUT_B=$("$BIN/hv-vision-empty-active")
+echo "$OUT_B" | grep -qx "$ID_M4" || fail "empty-active Case B: $ID_M4 should appear when it has no open items (got: '$OUT_B')"
+pass "hv-vision-empty-active: active milestone with zero open items is reported"
+
+# Case C: no active milestones at all → helper emits empty stdout.
+"$BIN/hv-vision-status" "$ID_M4" shipped
+OUT_C=$("$BIN/hv-vision-empty-active")
+[ -z "$OUT_C" ] || fail "empty-active Case C: expected empty stdout when no active milestones, got: '$OUT_C'"
+pass "hv-vision-empty-active: no active milestones emits empty stdout"
+
