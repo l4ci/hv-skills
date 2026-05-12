@@ -6,7 +6,7 @@
 
 Invoke with a bug ID: `/hv-debug B07`.
 
-The skill reads the `[B07]` entry in [`TODO.md`](../reference/hv-folder.md) and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
+The skill reads the `[B07]` entry in [`BACKLOG.md`](../reference/hv-folder.md) and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
 
 1. **Reproduce** — runs the bug's existing test or writes a minimal failing reproducer.
 2. **Hypothesize** — the orchestrator model proposes a root cause based on the reproduction and project context.

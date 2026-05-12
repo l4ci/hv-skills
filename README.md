@@ -40,7 +40,7 @@
 | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands |
 | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) | 🔔 **Design nudges** — `/hv-capture` and `/hv-next` flag `[Major]` features and `[P0]` bugs with no design artifact and suggest `/hv-brainstorm` before planning |
 | 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
-| 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `TODO.md` at the umbrella with per-sub-repo `CONTEXT.md` under `.hv/contexts/<repo>/`; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
+| 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `BACKLOG.md` at the umbrella with per-sub-repo `CONTEXT.md` under `.hv/contexts/<repo>/`; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
 | 📊 **Visible progress** — multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-docs`, `/hv-refactor`, …) declare a phase checklist via `TaskCreate` at start and tick each phase off as it lands; long cycles stay legible instead of scrolling past as a stream of bash output | 🛠️ **Codified authoring conventions** — `hv-init`'s `## Authoring conventions` lists the rules new hv-* skills must follow (autonomy-aware dispatch, opt-in flag defaults, `AskUserQuestion` limits, progress checklists), so contributions stay consistent without rediscovery |
 
 ## Quickstarts
@@ -52,7 +52,7 @@ claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
 ```
 
-`/hv-init` always comes first. It takes about 30 seconds, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with sensible defaults preselected, and creates `.hv/` with the data files (`TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type subdirectories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` rather than hand-editing JSON.
+`/hv-init` always comes first. It takes about 30 seconds, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with sensible defaults preselected, and creates `.hv/` with the data files (`BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type subdirectories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` rather than hand-editing JSON.
 
 ### Path A — Drop into an existing project
 
@@ -155,7 +155,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 
 | Skill | Description |
 |-------|-------------|
-| `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-init` | Initialize `.hv/` with `BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
 | `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
@@ -187,12 +187,12 @@ flowchart LR
   VISION["/hv-vision"] --> MILES[(MILESTONES.md)]
   VISION -.optional.-> SPIKE["/hv-spike"]
   VISION -.routes.-> PLAN["/hv-plan"]
-  CAP["/hv-capture"] --> TODO[(TODO.md)]
+  CAP["/hv-capture"] --> BACKLOG[(BACKLOG.md)]
   CAP -.tag.-> MILES
   CAP -.nudges.-> BRAIN["/hv-brainstorm"]
-  GO["/hv-go"] --> TODO
+  GO["/hv-go"] --> BACKLOG
   GO -.one-pass.-> WORK
-  TODO --> NEXT["/hv-next"]
+  BACKLOG --> NEXT["/hv-next"]
   MILES -.scopes.-> NEXT
   NEXT -.suggests.-> ASSUME["/hv-assume"]
   NEXT -.suggests.-> PLAN
@@ -272,7 +272,7 @@ Every `bin/hv-preflight` (run by most hv-skills) compares the project's recorded
 
 ```
 .hv/
-├── TODO.md           # bugs, features, tasks, recent completions
+├── BACKLOG.md        # bugs, features, tasks, recent completions
 ├── KNOWLEDGE.md      # durable learnings, grouped by topic
 ├── DECISIONS.md      # hard-boundary decisions with explicit forbids/permits
 ├── MILESTONES.md     # vision paragraph + milestone overview

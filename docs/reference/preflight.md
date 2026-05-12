@@ -42,7 +42,7 @@ Two more skills are structural variants:
 Required data files under `.hv/`:
 
 - `DECISIONS.md`
-- `TODO.md`
+- `BACKLOG.md`
 - `KNOWLEDGE.md`
 - `MILESTONES.md`
 - `counters.json`

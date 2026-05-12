@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- **Renamed `.hv/TODO.md` → `.hv/BACKLOG.md`** [F71]. The file holds typed work items (bugs/features/tasks) plus recent completions across an entire project — it's a backlog, not a personal todo list. Helpers, smoke tests, SKILL.md files, and docs all flip in lockstep.
+
+  **Migration for end-users:** re-run `/hv-init` in any existing project. `hv-bootstrap` auto-renames legacy `.hv/TODO.md` → `.hv/BACKLOG.md` on first run (idempotent — exit 0 on rename action OR no-op). A one-cycle reader fallback in `bin/hvlib.py` keeps projects working until they re-init; the fallback is silent and intended for removal in the next release.
+
 ## v2.3.1 — 2026-05-12
 
 Patch fix restoring /hv-brainstorm and /hv-context slash commands missing from v2.3.0's plugin manifest.

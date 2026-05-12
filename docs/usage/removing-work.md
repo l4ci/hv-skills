@@ -1,6 +1,6 @@
 # Removing work
 
-`/hv-rm` permanently removes one or more backlog entries from [`TODO.md`](../reference/hv-folder.md), their associated files, and any cross-references to them. It is the inverse of [`/hv-capture`](capturing-work.md).
+`/hv-rm` permanently removes one or more backlog entries from [`BACKLOG.md`](../reference/hv-folder.md), their associated files, and any cross-references to them. It is the inverse of [`/hv-capture`](capturing-work.md).
 
 ## /hv-rm
 
@@ -28,10 +28,10 @@ The skill prints a structured preview:
 
 ```
 [F99] removal plan:
-  TODO entry: .hv/TODO.md ## Features (line removed)
+  TODO entry: .hv/BACKLOG.md ## Features (line removed)
     - **[F99] [Major] Redesign the splash screen.** ...
   Cross-references to strip: 1
-    .hv/TODO.md ## Bugs [B12]: Related: [F99] → (removed)
+    .hv/BACKLOG.md ## Bugs [B12]: Related: [F99] → (removed)
   Detail file: .hv/features/F99.md (delete)
   Plan files: 0
   ARCHIVE: untouched (use --scrub-archive to mirror)
@@ -50,8 +50,8 @@ The skill then asks for confirmation with three options — *Apply (Recommended)
 
 | Target | Default | With `--scrub-archive` |
 |--------|---------|------------------------|
-| `TODO.md` active entry | removed | removed |
-| `Related:` cross-references in active `TODO.md` | removed | removed |
+| `BACKLOG.md` active entry | removed | removed |
+| `Related:` cross-references in active `BACKLOG.md` | removed | removed |
 | `.hv/features/<ID>.md` / `.hv/bugs/<ID>.md` / `.hv/tasks/<ID>.md` | deleted if present | deleted if present |
 | `.hv/plans/<milestone>-<ID>.md` | deleted if present | deleted if present |
 | `status.json` active entry | stripped with `--force`; refused otherwise | same |

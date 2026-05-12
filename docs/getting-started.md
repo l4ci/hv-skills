@@ -63,7 +63,7 @@ around for next time.
 
 **Capture.** Don't curate. Dump everything in one sentence. `/hv-capture` (or `/hv-c`)
 splits the input into individual items, assigns IDs (`B0N` for bugs, `F0N` for features,
-`T0N` for tasks), and routes them to the correct `TODO.md` sections. Long logs or specs
+`T0N` for tasks), and routes them to the correct `BACKLOG.md` sections. Long logs or specs
 overflow into per-item files automatically.
 
 **Pick and execute.** `/hv-next` reconciles `status.json` against actual git state, archives

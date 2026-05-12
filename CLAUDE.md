@@ -66,7 +66,7 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 
 Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/bin/hv-map-query <name>`.
 
-- **capture** — Captures items into TODO.md
+- **capture** — Captures items into BACKLOG.md
 - **plan** — Plans before execution
 <!-- hv-map-end -->
 

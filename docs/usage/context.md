@@ -14,7 +14,7 @@ This is distinct from:
 `/hv-context` is the deliberate entry point. Useful invocation forms:
 
 ```text
-/hv-context backlog "the canonical project queue (.hv/TODO.md). Items are zero-padded IDs."
+/hv-context backlog "the canonical project queue (.hv/BACKLOG.md). Items are zero-padded IDs."
 /hv-context backlog "<def>" --alias "task list,todo list"
 /hv-context backlog "<refined def>" --touch
 /hv-context agent-loop "<def>" --repo repo-a       # umbrella sub-repo

@@ -36,8 +36,8 @@ The skill resolves `F12`, reads its TODO entry, queries relevant `KNOWLEDGE.md` 
 
 Once context is anchored, the skill proposes three approaches:
 
-1. **In-place TODO mutation.** `hv-archive` rewrites `TODO.md` directly. Simple, but conflicts with parallel `/hv-work` sessions.
-2. **Append-only journal.** Move resolved bullets into a dated section in `ARCHIVE.md`, leave `TODO.md` `## Completed` empty. Survives merge conflicts but loses some recency info.
+1. **In-place TODO mutation.** `hv-archive` rewrites `BACKLOG.md` directly. Simple, but conflicts with parallel `/hv-work` sessions.
+2. **Append-only journal.** Move resolved bullets into a dated section in `ARCHIVE.md`, leave `BACKLOG.md` `## Completed` empty. Survives merge conflicts but loses some recency info.
 3. **Two-phase: mark + sweep.** First pass tags bullets with `archived:` frontmatter, second pass moves them on a separate command. More steps, but reversible.
 
 You pick approach 2. The skill then drafts the design section by section — Goal, Design, Approaches considered, Open questions, Assumptions — each approved before moving on. When the artifact is complete, it lands at `.hv/designs/F12.md`.
