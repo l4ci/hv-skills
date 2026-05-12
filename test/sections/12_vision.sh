@@ -137,7 +137,7 @@ echo "hv-bootstrap"
 BOOT_DIR="$TMP/boot-test"
 mkdir -p "$BOOT_DIR"
 ( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-[ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "hv-bootstrap did not seed TODO.md"
+[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "hv-bootstrap did not seed BACKLOG.md"
 [ -f "$BOOT_DIR/.hv/KNOWLEDGE.md" ] || fail "hv-bootstrap did not seed KNOWLEDGE.md"
 [ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "hv-bootstrap did not seed MILESTONES.md"
 [ -f "$BOOT_DIR/.hv/counters.json" ] || fail "hv-bootstrap did not seed counters.json"
@@ -148,9 +148,9 @@ grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap c
 pass "hv-bootstrap seeds dirs, data files, and .gitignore"
 
 # Idempotency: re-running must not overwrite existing data.
-echo "user content" > "$BOOT_DIR/.hv/TODO.md"
+echo "user content" > "$BOOT_DIR/.hv/BACKLOG.md"
 ( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-grep -q "^user content$" "$BOOT_DIR/.hv/TODO.md" || fail "hv-bootstrap overwrote existing TODO.md"
+grep -q "^user content$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "hv-bootstrap overwrote existing BACKLOG.md"
 pass "hv-bootstrap is idempotent (preserves existing files)"
 
 # Counters migration: older counters.json without milestones key must gain it.
