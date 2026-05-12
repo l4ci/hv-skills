@@ -1,5 +1,37 @@
 # Changelog
 
+## v2.3.0 — 2026-05-12
+
+New skill `/hv-brainstorm` for per-item design exploration, plus a sweep of helper classification headers across the `bin/` surface.
+
+## Highlights
+
+- **New skill: `/hv-brainstorm`** — Socratic per-item design exploration before `/hv-plan`. Walks the user through 2-3 approaches with tradeoffs, builds a sectioned design artifact at `.hv/designs/<ID>.md`, hands off to `/hv-plan` as soft input. `/hv-capture` and `/hv-next` nudge for `[Major]` features and `[P0]` bugs without an existing design. `/hv-go` and loop autonomy intentionally skip brainstorm (speed-path / throughput). [F67]
+- **4 new helpers** under `bin/hv-design-*` (add / show / rm / list) — siblings of `hv-plan-*` adapted for the simpler per-item artifact path.
+- **Shared design-exploration reference** at `references/design-exploration.md` — extracts the Socratic + 2-3-approaches + sectioned-design choreography used by both `/hv-vision` (project scope) and `/hv-brainstorm` (item scope), with a 10-axis divergence table that prevents future "fix" attempts on intentional scope differences.
+
+## Changed
+
+- **Helper classification-header sweep** — 72 `bin/` helpers gained explicit Writer / Resolve / Lookup / Validator / Atomic-merge classification lines per the 2026-05-12 mutator-helpers decision. Lookups [T71a, 17], Writers [T71b, 19], Resolve+Validator+Atomic-merge [T71c, 17], Tool helpers [T71d, 19]. Clears the case-by-case ambiguity on exit-code semantics.
+- **AskUserQuestion pattern audit across hv-* skills** [T63] — fixed over-4-option lists and missing plain-text fallbacks.
+- **Plugin-source resolver centralization** [T66, T70] — `hv-preflight` and other drift-checking helpers now use the canonical `hv-resolve-plugin-root`; classification labels harmonized.
+- **Milestone parsing centralized in `bin/hvlib.py`** — deduped upsert + restored `hv-staleness` handling.
+- **`/hv-plan` reads design artifacts** [F67-T2] — `hv-plan-add --design <path>` flag; plan frontmatter carries the design pointer for traceability.
+
+## Fixed
+
+- **`hv-init` plugin-source resolver** [T69] — replaced `ls | sort | tail` with a glob loop to handle non-numeric directory names safely.
+
+## Documentation
+
+- **`/hv-brainstorm` user guide** at `docs/usage/brainstorm.md`; helper rows in `docs/reference/cli-helpers.md`; README features cell + skills row.
+
+## Stats
+
+16 commits · 97 files · +860 / −126 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v2.2.0...v2.3.0
+
 ## v2.2.0 — 2026-05-12
 
 Loop-mode improvements, smoke-test conventions, and a sweep of skill-prose hygiene — `/hv-config` gains a positional-args shortcut, `/hv-init` consolidates its greenfield prompts, and a `## References` index lands on every SKILL.md alongside a new `references/README.md`.
