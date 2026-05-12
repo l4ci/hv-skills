@@ -246,3 +246,8 @@ If `lastTag == ""` (no tags yet — nothing has been released), skip silently. T
 - **Reference items by ID** — `[B01]`, `[F03]`, `[T02]` in suggestions and messages.
 - **Git is the source of truth** — if `status.json` disagrees with git state, trust git.
 - **Handoff consumption is per-stream, on resolve.** When the user picks "Resume with `/hv-work`" on a handoff arm, `rm -f` the handoff file *only* for that stream. "Leave handoff for later" preserves the file. Other streams' handoff files are not touched.
+
+## References
+
+- [`references/authoring-conventions.md`](../references/authoring-conventions.md) — Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold).
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.

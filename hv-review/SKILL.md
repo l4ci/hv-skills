@@ -187,3 +187,9 @@ When invoked from `/hv-ship`, return the verdict; the parent runs consumer routi
 - **Scope is bounded.** Only the diff against the base is reviewed — don't wander into unchanged code.
 - **Call it honestly.** If conventions were violated but the user has a good reason, the reviewer still reports CONCERN — the user decides what to do.
 - **Don't re-run on a passed branch.** If the same scope was just reviewed in the session and came back PASS, skip Step 5 and report the cached verdict.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill.
+- [`references/review-verdict-routing.md`](../references/review-verdict-routing.md) — PASS / CONCERNS / FAIL routing for `/hv-review` consumers.

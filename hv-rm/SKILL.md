@@ -91,3 +91,7 @@ Use `/hv-rm` when:
 - ARCHIVE.md is preserved by default; `--scrub-archive` is opt-in.
 - Counters do not decrement — minted IDs stay claimed.
 - GH issue references are not touched; close upstream issues manually if needed.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.

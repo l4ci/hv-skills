@@ -279,3 +279,13 @@ Resolves: [B07], [F03]
 - **`.docsignore` is the safety boundary.** Seeded with safe defaults; user extends.
 - **Don't narrate the discovery analysis.** It shapes the proposal silently.
 - **After-work runs in propose mode by default.** `docs.autoCreate: false` (the default) means every batch goes through user approval; `true` skips the approval gate and commits directly.
+
+## References
+
+| Reference | Purpose |
+|-----------|---------|
+| [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
+| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). |
+| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). |
+| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-docs` and `/hv-map`. |

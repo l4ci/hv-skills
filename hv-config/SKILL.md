@@ -243,3 +243,7 @@ Keep notes short and only for state changes that materially alter how subsequent
 - **Cancellation is silent.** Empty selection or all-`(current)` answers exit with *"No changes."* — no warnings, no nags.
 - **One pass.** The skill asks once, writes once, reports once. To make further edits, the user re-invokes `/hv-config`.
 - **Positional args bypass selection, not validation.** `<key>` must match the canonical list exactly; `<value>` (when given) must match the allowed set from `docs/reference/config-options.md`. Unknown / invalid arguments stop the skill with an explicit error — never silently fall through to the guided flow.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.

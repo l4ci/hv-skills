@@ -111,3 +111,8 @@ The user reviews and either:
 - **Name assumptions.** The whole skill's value is making implicit choices visible.
 - **Stop after the peek.** No auto-continuation; the user's pushback is the point.
 - **Plan beats peek for high-stakes work.** Offer `/hv-plan` if the user wants something durable rather than ephemeral.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/context-load-protocol.md`](../references/context-load-protocol.md) — K+D context loading sequence shared by every cycle-starting skill.

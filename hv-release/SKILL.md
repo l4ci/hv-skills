@@ -318,3 +318,9 @@ In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 - Atomic writes only — all file mutations go through the helpers which use atomic write semantics.
 - Surface failures from any helper immediately; do not continue past a non-zero exit.
 - `--dry-run` skips all writes, commits, tags, and pushes — output shows what would happen.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
+- [`references/release-hosts.md`](../references/release-hosts.md) — Release-host detection and routing (GitHub / GitLab / origin-less).

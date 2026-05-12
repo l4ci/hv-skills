@@ -195,3 +195,8 @@ If not viable or inconclusive, the spike is its own conclusion. Don't push to ca
 - **Spikes are scoped, not open-ended.** A spike open >2 weeks without a decision is stale — close it `inconclusive` and recapture if needed.
 - **Spikes feed decisions, not the other way around.** A `viable` / `not viable` / `depends-on-X` finish is a natural moment to ask whether the conclusion is a commitment future work must respect; an `inconclusive` finish is not.
 - **Umbrella spikes are per-repo.** A spike's branch lives in the sub-repo named in its frontmatter `repo:` field; the spike file itself stays at the umbrella root.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/umbrella-mode.md`](../references/umbrella-mode.md) — Umbrella-mode helpers, registry shape, and `Repos:` field semantics.

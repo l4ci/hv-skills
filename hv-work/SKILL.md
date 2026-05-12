@@ -500,3 +500,15 @@ Loop stops naturally when:
 - **Orchestrator owns `.hv/` state.** Only the orchestrator touches `status.json` and `TODO.md`. Workers focus on implementation.
 - **Isolation protects main.** Branch or worktree — never work directly on main.
 - **One commit per task, owned by the orchestrator.** Workers write files; the orchestrator commits per task. Clean history, easy revert granularity, no `.git/index` races.
+
+## References
+
+| Reference | Purpose |
+|-----------|---------|
+| [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
+| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
+| [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
+| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
+| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). |
+| [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

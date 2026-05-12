@@ -352,3 +352,9 @@ Don't recap the exploration findings, the design alternatives, or the verificati
 - **Read before edit.** Every agent reads the target file before making changes.
 - **Verify before commit.** Never commit without orchestrator sign-off.
 - **Commit once** per run (not per fix) unless fixes are truly independent milestones.
+
+## References
+
+- [`references/authoring-conventions.md`](../references/authoring-conventions.md) — Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold).
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/refactor-umbrella-fanout.md`](../references/refactor-umbrella-fanout.md) — Per-repo fan-out logic for `/hv-refactor` in umbrella mode.

@@ -175,3 +175,8 @@ Skip if nothing non-obvious surfaced or `/hv-learn` already ran this session. Do
 - **Never commit `.hv/handoff/`.** `.hv/` is gitignored, so this is automatic — but don't add an exception.
 - **`/hv-next` owns cleanup.** Once `/hv-next` has read and routed, it deletes the note. Don't self-delete here.
 - **No mutation beyond the handoff + optional wip/stash.** This skill's job is capture, not integration.
+
+## References
+
+- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/handoff-template.md`](../references/handoff-template.md) — Handoff-note template written by `/hv-pause` and read by `/hv-next`.
