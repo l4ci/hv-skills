@@ -47,38 +47,14 @@ if [ "$FLAG_ON" = "1" ] && [ "$UMBRELLA_ON" != "yes" ]; then
   exit 2
 fi
 
-# Resolve upstream plugin bin/. Mirrors hv-init's inline resolver — kept inline
-# because when SRC_BIN == .hv/bin/, the "source" we compare against must be
-# the *upstream* plugin, not our own runtime mirror.
-UPSTREAM_BIN=""
-if [ -n "${HV_INSTALL_ROOT:-}" ] && [ -d "$HV_INSTALL_ROOT/bin" ]; then
-  UPSTREAM_BIN="$HV_INSTALL_ROOT/bin"
-elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT/bin" ]; then
-  UPSTREAM_BIN="$CLAUDE_PLUGIN_ROOT/bin"
-else
-  for candidate in \
-    "$HOME"/.claude/plugins/*/hv-skills/bin \
-    "$HOME"/.claude/plugins/hv-skills/bin; do
-    [ -d "$candidate" ] && UPSTREAM_BIN="$candidate" && break
-  done
-  if [ -z "$UPSTREAM_BIN" ]; then
-    # Glob loop, not `ls | sort | tail` — the latter aborts under
-    # set -e + pipefail when the glob misses (ls exits 2, propagates up
-    # the command substitution). Iteration order is lexicographic, so
-    # the last match wins — good enough since the cache normally holds
-    # one version at a time.
-    for cand in "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin; do
-      [ -d "$cand" ] && UPSTREAM_BIN="$cand"
-    done
-  fi
-  if [ -z "$UPSTREAM_BIN" ]; then
-    for candidate in \
-      "$HOME"/.agents/skills/hv-skills/bin \
-      "$HOME"/.agents/skills/bin; do
-      [ -d "$candidate" ] && UPSTREAM_BIN="$candidate" && break
-    done
-  fi
-fi
+# Resolve upstream plugin bin/. SRC_BIN points at the script's own dir, which
+# is .hv/bin/ (the runtime mirror) when invoked via the documented path; we
+# want the *upstream* plugin to compare against. Canonical resolver lives in
+# bin/hv-resolve-plugin-root → hvlib.resolve_plugin_root and covers the full
+# walk: HV_INSTALL_ROOT, CLAUDE_PLUGIN_ROOT, ~/.claude/plugins/*/hv-skills,
+# plugin cache, ~/.agents/skills. Lookup helper, always exits 0; empty
+# output means nothing found and we fall back to SRC_BIN.
+UPSTREAM_BIN="$("$SRC_BIN/hv-resolve-plugin-root" --bin 2>/dev/null || true)"
 
 # Pick the comparison source. Prefer upstream when it differs from SRC_BIN —
 # that's the case where SRC_BIN is .hv/bin/ (runtime mirror) and we need to
