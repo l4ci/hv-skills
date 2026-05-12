@@ -131,47 +131,9 @@ If you can't reproduce, surface that to the user: *"Can't reproduce — need [X]
 
 Read `debug.competingHypotheses` from `.hv/config.json` (default `false`).
 
-**Cycle-counter check.** Maintain a hypothesis-cycle counter for this bug — increment it on each entry to Step 6 (initial entry counts as 1). When the counter is `>= 3` and `debug.competingHypotheses` is `false`, do **not** dispatch a new hypothesis agent here; jump to **Step 7.5 (Escalate)** instead. The 3-cycle threshold reflects that one orchestrator context tends to accumulate enough failed-hypothesis weight by the 3rd cycle that fresh angles get harder to surface — better to hand off to a clean context than to grind. In competing-hypotheses mode the 3 parallel lenses already cover the diverse-angles pattern, so the threshold does not apply.
+**Cycle-counter check.** Maintain a hypothesis-cycle counter for this bug — increment on each entry to Step 6 (initial entry counts as 1). When the counter is `>= 3` AND `debug.competingHypotheses` is `false`, do **not** dispatch a new hypothesis agent — jump to **Step 7.5 (Escalate)** instead. One orchestrator context accumulates enough failed-hypothesis weight by the 3rd cycle that fresh angles get harder to surface; competing mode's 3 parallel lenses already cover the diverse-angles pattern, so the threshold does not apply there.
 
-Brief template (both modes use this):
-
-```
-Investigate [B##]: <title>.
-
-**Symptom:**
-<reproducer output, stack trace, or observed vs expected>
-
-**Entry point(s):**
-<file paths + line numbers you suspect are involved>
-
-**Relevant knowledge:**
-<bullets from hv-knowledge-query, if any>
-<entries from hv-decisions-query, if any — boundaries that rule out fix directions>
-<terms from hv-context-query, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
-
-[FRAMING — competing mode only: insert one lens prompt below]
-
-Read the code organically. Do not propose a fix yet.
-
-Return: ranked list of 2-3 hypotheses, each with
-  - the causal chain (what triggers what)
-  - the file:line evidence
-  - a concrete verification probe (code to read, a print statement to add, a test to run)
-```
-
-### Single hypothesis (default)
-
-Dispatch one orchestrator-model agent with no FRAMING line. Pick the top hypothesis; verify both if the top two are close.
-
-### Competing hypotheses (`debug.competingHypotheses: true`)
-
-Dispatch **3 parallel orchestrator-model agents** in one tool-call batch. Each gets a different framing lens:
-
-- **Recent-changes lens:** *"Start from recent commits — run `git log --oneline -20 -- <suspect paths>`. The bug likely correlates with something that changed; frame hypotheses around what was modified and why."*
-- **Data-shape lens:** *"Start from the values flowing through the suspect path. The bug likely arises when a value violates an implicit contract — null/empty, off-by-one, wrong type, stale cache, malformed upstream input. Trace data, not code."*
-- **Concurrency / lifecycle lens:** *"Start from timing and ordering. Likely a race window, ordering assumption, partial state, double-fire, listener registered twice, async resolution out of order, or a reference held past its lifetime. Look for state, not logic."*
-
-After all three return: deduplicate (same root cause from different angles → one hypothesis, keep sharper wording), pick the strongest regardless of lens (verify both if the top two are close), discard weak ones silently — don't relay every angle's output.
+Brief template (shared by both modes), single-mode dispatch (1 agent, no FRAMING), competing-mode dispatch (3 parallel agents with recent-changes / data-shape / concurrency-lifecycle lenses), and per-axis divergence table in `references/debug-hypothesize.md`.
 
 ## Step 7 — Verify
 
@@ -334,4 +296,5 @@ If the fix codified a constraint (e.g., "never use timer-X here", "this surface 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/debug-hypothesize.md`](../references/debug-hypothesize.md) — Both-modes hypothesize choreography (brief template, single vs competing dispatch, per-axis divergence table) for `/hv-debug` Step 6.
 - [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill.
