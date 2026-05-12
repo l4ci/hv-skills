@@ -189,13 +189,17 @@ flowchart LR
   VISION -.routes.-> PLAN["/hv-plan"]
   CAP["/hv-capture"] --> TODO[(TODO.md)]
   CAP -.tag.-> MILES
+  CAP -.nudges.-> BRAIN["/hv-brainstorm"]
   GO["/hv-go"] --> TODO
   GO -.one-pass.-> WORK
   TODO --> NEXT["/hv-next"]
   MILES -.scopes.-> NEXT
   NEXT -.suggests.-> ASSUME["/hv-assume"]
   NEXT -.suggests.-> PLAN
+  NEXT -.nudges.-> BRAIN
   NEXT --> WORK["/hv-work"]
+  BRAIN --> DESIGNS[(.hv/designs/)]
+  DESIGNS -.soft input.-> PLAN
   PLAN --> PLANS[(.hv/plans/)]
   PLANS -.consults.-> WORK
   ASSUME -.reads.-> PLANS
@@ -221,6 +225,15 @@ flowchart LR
   DECISIONS -.consults.-> WORK
   DECISIONS -.consults.-> DEBUG
   DECISIONS -.consults.-> REVIEW
+  CONTEXT["/hv-context"] --> CTX[(CONTEXT.md)]
+  CTX -.consults.-> VISION
+  CTX -.consults.-> CAP
+  CTX -.consults.-> WORK
+  CTX -.consults.-> DEBUG
+  WORK -.post-cycle.-> MAP["/hv-map"]
+  DEBUG -.post-cycle.-> MAP
+  GO -.post-cycle.-> MAP
+  MAP --> MAPS[(.hv/map/)]
   WORK -.post-cycle.-> DOCS["/hv-docs"]
   SHIP -.post-cycle.-> DOCS
   DOCS --> USERDOCS[(docs/)]
