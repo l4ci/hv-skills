@@ -131,6 +131,8 @@ If you can't reproduce, surface that to the user: *"Can't reproduce — need [X]
 
 Read `debug.competingHypotheses` from `.hv/config.json` (default `false`).
 
+**Cycle-counter check.** Maintain a hypothesis-cycle counter for this bug — increment it on each entry to Step 6 (initial entry counts as 1). When the counter is `>= 3` and `debug.competingHypotheses` is `false`, do **not** dispatch a new hypothesis agent here; jump to **Step 7.5 (Escalate)** instead. The 3-cycle threshold reflects that one orchestrator context tends to accumulate enough failed-hypothesis weight by the 3rd cycle that fresh angles get harder to surface — better to hand off to a clean context than to grind. In competing-hypotheses mode the 3 parallel lenses already cover the diverse-angles pattern, so the threshold does not apply.
+
 Brief template (both modes use this):
 
 ```
@@ -175,7 +177,41 @@ After all three return: deduplicate (same root cause from different angles → o
 
 Run the verification probe from Step 6 — read the specific code, add a temporary trace, or run the targeted test. Confirm the hypothesis before touching production code.
 
-If verification fails → the hypothesis is wrong. Go back to Step 6 with the new evidence. Don't fix-and-pray.
+If verification fails → the hypothesis is wrong. Go back to Step 6 with the new evidence (which re-runs the cycle-counter check and routes to Step 7.5 on the 3rd cycle). Don't fix-and-pray.
+
+## Step 7.5 — Escalate on Repeated Hypothesis Failures
+
+Fires only when Step 6's cycle-counter check trips (`counter >= 3`, single-hypothesis mode). The orchestrator's context now carries 2+ refuted hypotheses; the marginal value of dispatching another agent on the same context is low. Hand off to a fresh-context subagent instead.
+
+Synthesize a "for-next-agent" brief — every refuted hypothesis goes in, every file inspected without finding the root cause goes in, plus a one-line orchestrator read on why the loop did not converge:
+
+```
+Bug [B##]: <title>
+
+**Symptom:**
+<reproducer output — current as of last attempt>
+
+**Reproducer (self-rerunnable):**
+<exact command or test name from Step 5>
+
+**Hypotheses we tried and ruled out:**
+1. <claim 1> — verified at <file:line>, refuted by <evidence>
+2. <claim 2> — verified at <file:line>, refuted by <evidence>
+
+**Files inspected without finding root cause:**
+- <path>:<line range> — <one-line note on what we saw>
+
+**Suspected blockers (gut feel):**
+<one-line orchestrator read — e.g. "the symptom isn't where we're looking", "an interaction between subsystems we haven't traced">
+
+Read the code organically with a fresh perspective. Do not anchor to our prior hypotheses unless evidence forces you back to them. Return: a single best hypothesis with causal chain, file:line evidence, and a verification probe.
+```
+
+Dispatch a fresh subagent via `Agent` (`subagent_type: general-purpose`, model: `models.worker` from `.hv/config.json`) with the brief above and nothing else. The subagent has no transcript of the failed cycles — that is the point.
+
+When it returns, reset the cycle counter, carry its hypothesis into **Step 7** for verification, and continue the normal flow. If the fresh hypothesis also fails verification, do **not** loop a second fresh-context attempt — surface to the user instead:
+
+> *"3 hypothesis rounds + 1 fresh-context attempt all failed on [B##]. Bug needs human triage — share more context, sharpen the reproducer, or pair on it."*
 
 ## Step 8 — Fix (worker)
 
@@ -222,7 +258,7 @@ One commit for the bug. Don't `git add -A` — sweep risk if any sibling artifac
 
 Re-run the reproducer from Step 5. It must now pass (or the symptom must be gone). If the regression test is new, confirm it's in the suite and runs under the default test command.
 
-If the fix doesn't hold → back to Step 6. Don't commit a partial fix.
+If the fix doesn't hold → back to Step 6 (which re-runs the cycle-counter check). Don't commit a partial fix.
 
 ## Step 10 — Mark Complete
 
