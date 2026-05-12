@@ -123,9 +123,17 @@ else
     [ -d "$candidate" ] && SRC="$candidate" && break
   done
   # Claude Code plugin cache: pick the newest installed version.
+  # Glob loop, not `ls | sort -V | tail -1` — the latter aborts under
+  # set -euo pipefail when the glob misses (ls exits 2, propagates up the
+  # command substitution). Iteration order is lexicographic, so the last
+  # match wins — good enough since the cache normally holds one version
+  # at a time; mirrors bin/hv-preflight's idiom. The strict resolver in
+  # hvlib.resolve_plugin_root uses tuple-of-int version-sort for full
+  # accuracy across double-digit minors.
   if [ -z "$SRC" ]; then
-    SRC=$(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin 2>/dev/null | sort -V | tail -1)
-    [ -d "$SRC" ] || SRC=""
+    for cand in "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin; do
+      [ -d "$cand" ] && SRC="$cand"
+    done
   fi
   if [ -z "$SRC" ]; then
     for candidate in \
