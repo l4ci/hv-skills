@@ -37,15 +37,18 @@ Phases:
 
 ## Step 2 — Reconcile Active Work
 
-```bash
-.hv/bin/hv-reconcile
-```
+**Dispatch the Steps 2–6 read-heavy work as a single parallel wave.** Per `references/subagent-dispatch.md`, the reconcile + archive + per-milestone summary + relevance-query work is four independent operations on disjoint inputs. The orchestrator dispatches four workers in one tool-call batch and merges their returns before Step 5's backlog presentation: **Worker A** (reconcile active streams), **Worker B** (archive scan), **Worker C** (milestone summary), **Worker D** (relevance map).
 
-Validates `status.json` against git, auto-cleans stale entries (dead branches), nulls missing worktree paths, and emits JSON with three arrays:
+| Worker | Model | Inputs | Returns |
+|--------|-------|--------|---------|
+| **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's three JSON arrays: `cleaned` / `needsAction` / `todoDrift`, distilled). |
+| **Worker B — Archive scan** | haiku | `TODO.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
+| **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). |
+| **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `TODO.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
 
-- `cleaned` — removed silently. No output needed.
-- `needsAction` — branch still exists. Fields: `branch`, `items`, `worktree`, `startedAt`, `hasCommits`, `commitCount`, `worktreeMissing`.
-- `todoDrift` — IDs that shipped in a commit subject but are still listed as open in TODO.md. Each entry: `id` and `commits[]` (each with `repo`, `hash`, `subject`).
+Each brief uses the small-brief template from the reference: Goal · Inputs (paths/IDs only) · Constraints (cite the worktree-isolation rule when commit-producing waves are involved, though this wave is read-only) · Return shape (the table above) · Word budget ≤200 words.
+
+Aggregate the four returns into the working state used by Steps 3–6: drift IDs feed the `[ID] looks shipped on <hash>` lines below; archive output is silent (already moved); milestone map feeds the Step 5 header and the Step 6 milestone-bias check; relevance map feeds the Step 6 Suggested Next reasoning.
 
 When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in TODO.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
 
@@ -134,7 +137,7 @@ If at least one milestone is active, also gather items already tagged to each. *
 # …one per active milestone, all dispatched in the same response
 ```
 
-Carry the per-milestone ID set forward. Step 3 (`hv-archive-old`), Step 4 (`hv-vision-active` and the per-milestone reads above), and Step 5's `hv-backlog` can also share the same parallel batch — none of them mutate shared state, so there's no ordering constraint beyond the reconcile in Step 2.
+The per-milestone ID set arrives from Worker C of the Step 2 dispatch wave; Step 5's `hv-backlog` runs on the orchestrator after the wave returns, since its output is presented verbatim and doesn't benefit from worker synthesis.
 
 ## Step 5 — Present the Backlog
 

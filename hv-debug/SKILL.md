@@ -123,6 +123,18 @@ Reproducing before hypothesizing is non-negotiable. Options:
 2. **Write a failing test** — preferred when a test doesn't exist; lives in the test suite
 3. **Manual repro** — build/run the app and observe, only if no test path is possible
 
+**Dispatch a reproduce worker when the repro is heavy** — multi-MB output, multiple manual setup steps, or generating a failing test from scratch. Per `references/subagent-dispatch.md`, cheap repros (running an existing test that prints a 10-line stack trace, observing a single error in the dev server) stay on the orchestrator because the brief would cost more than the work.
+
+When the dispatch criterion fires, brief one sonnet worker:
+
+- **Goal:** Reproduce `[B##]` and return a concrete failure signal.
+- **Inputs:** The bug ID, the symptom description from the TODO entry, suspected file paths, the repro path (which option from 1–3 above).
+- **Constraints:** Return a structured verdict; do not propose a fix.
+- **Return shape:** `{reproduced: bool, observed-vs-expected, relevant-log-excerpts (≤30 lines, the load-bearing ones)}`.
+- **Word budget:** ≤200 words plus the log excerpts.
+
+The orchestrator uses the worker's verdict as the Step 6 brief's **Symptom:** field. The full log stays in the worker's context, not the orchestrator's.
+
 Don't proceed to Step 6 without a concrete failure signal — an error message, a wrong value, a stack trace.
 
 If you can't reproduce, surface that to the user: *"Can't reproduce — need [X] from you (repro steps, environment, seed data)."* Stop and wait.
@@ -140,6 +152,23 @@ Brief template (shared by both modes), single-mode dispatch (1 agent, no FRAMING
 Run the verification probe from Step 6 — read the specific code, add a temporary trace, or run the targeted test. Confirm the hypothesis before touching production code.
 
 If verification fails → the hypothesis is wrong. Go back to Step 6 with the new evidence (which re-runs the cycle-counter check and routes to Step 7.5 on the 3rd cycle). Don't fix-and-pray.
+
+**Dispatch a verification worker when verification itself requires file reads, searches across the codebase, or running a non-trivial test.** Per `references/subagent-dispatch.md`, single-line verifications (read one specific line and confirm a value) stay on the orchestrator because the brief would cost more than the read.
+
+When the dispatch criterion fires, brief one worker. Model tier follows the verification shape:
+
+- **opus** when the verdict requires judgment — *"does this code actually implement the claimed invariant?"*, *"is this contract upheld under the race window?"*.
+- **sonnet** when verification is pattern-matching across reads — *"does this symbol appear in any of these N files with the expected shape?"*.
+
+Brief:
+
+- **Goal:** Verify hypothesis `<hypothesis statement from Step 6>`.
+- **Inputs:** The hypothesis, the specific verification probe (code paths to read, test to run, trace to inspect), the file:line evidence from Step 6.
+- **Constraints:** Return a verdict, not a fix. If verification fails, surface the new evidence that disproves the hypothesis.
+- **Return shape:** `{verdict: confirmed|disproved|inconclusive, evidence-citations[]: {file, line, snippet}, new-evidence (if disproved): what the worker found that contradicts the hypothesis}`.
+- **Word budget:** ≤200 words.
+
+If the verdict is `disproved`, the orchestrator returns to Step 6 with the new evidence (which re-runs the cycle-counter check and routes to Step 7.5 on the 3rd cycle) — the existing behavior is unchanged; the worker is the new input source.
 
 ## Step 7.5 — Escalate on Repeated Hypothesis Failures
 
