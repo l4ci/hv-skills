@@ -7,7 +7,8 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 - Build & Tooling: Helper Idioms
 - Build & Tooling: Helper Composition & Observability
 - Build & Tooling: Umbrella & Worktrees
-- Build & Tooling: Smoke & Plugin
+- Build & Tooling: Smoke
+- Build & Tooling: Plugin & Dogfooding
 - Build & Tooling: Releases
 - Documentation
 - Skill Authoring: Prose & References
