@@ -20,7 +20,7 @@ Interactive editor for [`.hv/config.json`](../usage/configuration.md). Shows cur
 
 ## /hv-debug
 
-Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, and mark complete. Uses the same isolation mode as `/hv-work` and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
+Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, and mark complete. If the hypothesize → verify loop iterates 3 times without converging (single-hypothesis mode only), escalates to a fresh-context subagent with a "for-next-agent" brief rather than grinding the same context. Uses the same isolation mode as `/hv-work` and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
 
 ## /hv-decide
 

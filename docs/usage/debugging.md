@@ -65,6 +65,14 @@ Use `/hv-go` or `/hv-work` when:
 
 See [running work](running-work.md) for a full comparison of `/hv-go` and `/hv-work`.
 
+## When the cycle won't converge
+
+If the hypothesize → verify loop iterates 3 times without finding the root cause, `/hv-debug` automatically escalates: it synthesizes a brief listing the refuted hypotheses, files inspected, and suspected blockers, then dispatches a fresh subagent with no transcript of the failed attempts. The fresh context often surfaces angles the orchestrator's accumulated weight has blocked.
+
+If the fresh subagent's hypothesis also fails verification, `/hv-debug` surfaces to you rather than looping a second fresh-context attempt — at that point the bug needs human triage.
+
+The 3-cycle threshold applies only in single-hypothesis mode. With `debug.competingHypotheses: true`, the three parallel framing lenses already cover the diverse-angles pattern.
+
 ## Competing hypotheses
 
 The `debug.competingHypotheses` config option (default `false`) controls whether `/hv-debug` generates one hypothesis or fans out three parallel agents, each attacking the bug from a different angle (recent changes, data shape, concurrency/lifecycle).
