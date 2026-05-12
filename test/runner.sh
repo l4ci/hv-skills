@@ -60,6 +60,10 @@ git add -A && git commit -q -m "seed"
 # Source pass()/fail() so sections can use them.
 source "$TESTDIR/lib.sh"
 
+# F62 — static preamble scan: shadowing / trap-convention violations
+# in test/sections/*.sh fail fast before any section runs.
+check_section_conventions "$TESTDIR/sections" || exit 1
+
 # Source sections in alphabetical/numeric order. The numeric prefix is the
 # canonical ordering; new sections insert at the next free slot.
 for f in "$TESTDIR/sections/"*.sh; do
