@@ -27,3 +27,10 @@ if grep -qiE '(TBD|TODO|FIXME|XXX)' "$REPO/references/subagent-dispatch.md"; the
 fi
 
 pass "subagent-dispatch reference has all six sections and no placeholders"
+
+echo "F73: authoring-conventions citation"
+grep -q '^## Dispatch heavy work to subagents' "$REPO/references/authoring-conventions.md" \
+  || fail "F73: authoring-conventions.md missing 'Dispatch heavy work to subagents' rule"
+grep -q 'references/subagent-dispatch.md' "$REPO/references/authoring-conventions.md" \
+  || fail "F73: authoring-conventions.md missing cross-reference to subagent-dispatch.md"
+pass "authoring-conventions cites subagent-dispatch reference"
