@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Set a single value in .hv/config.json at a dotted key path.
-# Resolve helper (per DECISIONS.md "Lookup vs. resolve") — exit 1 on write
-# failure or malformed dotted path; exit 0 on successful atomic write.
+# Writer helper (per DECISIONS.md "Mutator helpers") — exit 0 on successful
+# atomic write OR idempotent no-op (value already equals target);
+# exit 1 on write failure, malformed dotted path, or missing argv.
 # Other keys in the config are preserved untouched.
 # Usage: hv-config-set <dotted.key.path> <value>
 #   <dotted.key.path>: e.g. "docs.afterWork" or "models.orchestrator" or top-

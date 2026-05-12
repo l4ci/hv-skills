@@ -2,6 +2,12 @@
 # Read/write the loopStartedAt ISO timestamp in .hv/status.json.
 # Used by terminal-path skills to filter [Auto:Loop] decisions to "this loop session".
 #
+# Classification (per DECISIONS.md):
+#   start, clear — Writer helper (Mutator decision): exit 0 on successful write
+#                  OR idempotent no-op; exit 1 on missing argv.
+#   read        — Lookup helper (Lookup vs. resolve decision): exit 0 always;
+#                  empty stdout when loopStartedAt is unset.
+#
 # Usage:
 #   hv-loop-stamp start   # mutator — first-write-only; writes loopStartedAt = current UTC ISO
 #                         # timestamp (second-precision, e.g. "2026-05-09T14:23:01Z").
