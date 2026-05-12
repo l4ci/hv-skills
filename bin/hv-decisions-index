@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate the managed <!-- hv-decisions-start --> block in CLAUDE.md from .hv/DECISIONS.md topics.
+# Atomic-merge helper: regenerates managed hv-decisions block in CLAUDE.md; exit 0 on success.
 # Usage: hv-decisions-index
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

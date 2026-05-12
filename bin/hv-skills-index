@@ -2,6 +2,7 @@
 # Regenerate the managed <!-- hv-skills-start --> block in CLAUDE.md with a fixed
 # canonical body — slash-command index + consult-point helpers. Body is static
 # (identical for every hv-skills-using project), so re-runs are idempotent.
+# Atomic-merge helper: regenerates managed hv-skills block in CLAUDE.md; exit 0 on success.
 # Usage: hv-skills-index
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

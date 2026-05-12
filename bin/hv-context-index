@@ -4,6 +4,7 @@
 # CONTEXT.md when applicable). Each line: term + (aka aliases) + first-sentence
 # gloss. Source files are always listed; in umbrella mode the active sub-repo
 # (resolved via hv-resolve-repo) is appended under a ### sub-heading.
+# Atomic-merge helper: regenerates managed hv-context block in CLAUDE.md; exit 0 on success.
 # Usage: hv-context-index
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

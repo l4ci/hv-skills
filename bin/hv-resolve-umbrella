@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Walk up from cwd to find umbrella .hv/; detect masking by stray .hv/ inside a registered sub-repo.
+# Resolve helper (thin wrapper via hv-walk-up): exits 1 when no umbrella .hv/ is found; exits 2 on masking.
 # Usage: hv-resolve-umbrella
 # Exit codes: 0 found, 1 not found, 2 masking detected
 #

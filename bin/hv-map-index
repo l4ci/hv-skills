@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate the managed <!-- hv-map-start --> block in CLAUDE.md from
 # the frontmatter `summary:` of every .hv/map/<name>.md.
+# Atomic-merge helper: regenerates managed hv-map block in CLAUDE.md from .hv/map/ frontmatter; exit 0.
 # Usage: hv-map-index
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

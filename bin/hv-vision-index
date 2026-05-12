@@ -4,6 +4,7 @@
 # .hv/MILESTONES.md from per-milestone frontmatter. Idempotent; preserves all
 # other content. Frontmatter is the single source of truth — running this
 # heals any drift in MILESTONES.md.
+# Atomic-merge helper: regenerates managed hv-vision block in CLAUDE.md and MILESTONES.md; exit 0.
 # Usage: hv-vision-index
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"

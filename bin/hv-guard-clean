@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Exit 0 if git working tree is clean, 1 if dirty, 2 if not a git repo.
+# Validator helper: exits 0 when working tree is clean; exits 1 if dirty; exits 2 if not a git repo.
 # Umbrella-aware: when invoked from an umbrella root (no local repo, but a
 # `.hv/` with `umbrella.enabled: true` and a `repos.json`), walks every
 # registered sub-repo and reports any that are dirty or missing.

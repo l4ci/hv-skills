@@ -2,6 +2,7 @@
 # Extract a single field (detail/related/milestone/repos/subsystem) from the TODO
 # bullet of <ID>, using hvlib.parse_todo_fields. Replaces ad-hoc
 # grep|grep|sed|sed chains in skill prose.
+# Resolve helper: exits 1 when ID is unknown or field name is invalid.
 #
 # Usage: hv-todo-field <ID> <field>
 #   <field>: detail | related | milestone | repos | subsystem

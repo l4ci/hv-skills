@@ -3,6 +3,7 @@
 # .hv/ exists with >=1 repo in repos.json), exit 1 with a friendly error
 # pointing the user to a sub-repo. Otherwise return silently — caller
 # proceeds and will get a git-native error if cwd has no git at all.
+# Validator helper: exits 0 when git context is present; exits 1 at umbrella root without git.
 #
 # Usage: hv-require-git-context <tool-name> [--repo-flag-supported]
 #   <tool-name>         — calling tool, used in the error message

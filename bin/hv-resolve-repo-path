@@ -3,6 +3,7 @@
 # Symmetric helper to hv-resolve-repo (which maps cwd → name); this one is
 # name → path. Centralizes the resolve_repo_path heredoc inlined in
 # hv-merge, hv-pr, hv-spike-add, hv-review-scope.
+# Resolve helper: exits 1 when name is unknown or registry is empty.
 #
 # Usage: hv-resolve-repo-path <name>
 #   stdout: absolute path on success

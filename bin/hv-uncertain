@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Determine whether an item warrants /hv-assume before /hv-plan in loop mode.
+# Resolve helper (tri-state): exits 0 when item is uncertain (peek warranted); exits 1 when certain; exits 2 on item-not-found error.
 # Exit 0: uncertain (peek warranted), with reason(s) on stdout, one per line.
 # Exit 1: certain (proceed direct to /hv-plan), no stdout.
 # Exit 2: error (item not found, TODO.md missing).
