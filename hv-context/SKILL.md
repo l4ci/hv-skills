@@ -39,7 +39,7 @@ Phases:
 
 The argument forms determine whether `Step 2` asks any questions:
 
-- **One-shot, fully-specified:** `/hv-context backlog "the canonical project queue (.hv/TODO.md)" --alias "task list,todo list" [--not "session state"] [--repo umbrella|<name>]` — skip to Step 3 with the values from args.
+- **One-shot, fully-specified:** `/hv-context backlog "the canonical project queue (.hv/BACKLOG.md)" --alias "task list,todo list" [--not "session state"] [--repo umbrella|<name>]` — skip to Step 3 with the values from args.
 - **Term + definition only:** `/hv-context <term> "<definition>"` — proceed to Step 3 with no aliases/nots; skip the optional-fields prompt.
 - **Term only:** `/hv-context <term>` — ask for definition via `AskUserQuestion`; skip aliases/nots unless the user volunteers them.
 - **No args:** ask for term and definition in two single-question turns. **Don't ask what the codebase already implies** — skip aliases/nots prompts unless context (`KNOWLEDGE.md` topics, recent commits, current `## Project Context` block in `CLAUDE.md`) makes a candidate alias obvious; even then, propose inline rather than blocking on a question.
@@ -72,7 +72,7 @@ Invoke `bin/hv-context-add` with the resolved arguments. Example calls:
 **Single-repo, new term:**
 ```bash
 .hv/bin/hv-context-add backlog \
-  --def "The canonical project queue (.hv/TODO.md). Items are zero-padded IDs ([B01]/[F01]/[T01])." \
+  --def "The canonical project queue (.hv/BACKLOG.md). Items are zero-padded IDs ([B01]/[F01]/[T01])." \
   --alias "task list,todo list"
 ```
 

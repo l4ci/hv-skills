@@ -172,7 +172,7 @@ For each ID in the scope JSON's `referencedIds`:
 .hv/bin/hv-complete <ID> <merge-or-last-commit-hash>
 ```
 
-`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `TODO.md` entirely) produce an error. No grep needed.
+`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed.
 
 ## Step 8.5 — Learn (Nudge or Auto-Invoke)
 
@@ -244,7 +244,7 @@ Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via
 - **Read-only until Step 6.** Review, scoping, and body generation never mutate anything.
 - **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
 - **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
-- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `TODO.md` entirely produce an error (exit 1). No grep needed.
+- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 1). No grep needed.
 
 ## References
 

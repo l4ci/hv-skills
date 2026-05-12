@@ -48,7 +48,7 @@ The user's input may be:
 - **A backlog item ID** (`B07`, `F03`, `T11`) — item mode; the plan key is `<milestone>-<itemId>`
 - **Free-form** (*"plan the auth foundation"*, *"for the OAuth work"*) — ask which milestone
 
-For an item target, read its `TODO.md` entry and overflow file (`.hv/<bugs|features|tasks>/<id>.md` if it exists) and look for a `Milestone:` field. That's the parent. If the item lacks a milestone tag, ask the user to either:
+For an item target, read its `BACKLOG.md` entry and overflow file (`.hv/<bugs|features|tasks>/<id>.md` if it exists) and look for a `Milestone:` field. That's the parent. If the item lacks a milestone tag, ask the user to either:
 
 - Tag the item under an active milestone (then proceed)
 - Skip planning and use `/hv-go` for one-shot execution

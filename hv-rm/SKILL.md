@@ -15,7 +15,7 @@ user-invocable: true
 
 # hv-rm — Remove Backlog Items
 
-The inverse of `/hv-capture`: remove one or more items from the backlog and clean up every trace — the TODO.md entry, Related cross-references, the detail file (`.hv/{bugs,features,tasks}/<ID>.md`), and any plan keyed to the item (`.hv/plans/<milestone>-<ID>.md`). The safe default is dry-run: every invocation previews what would change before touching anything. Items currently active in `status.json` are refused outright unless `--force` is passed, which strips them with a warning. The ARCHIVE.md historical record is preserved by default; pass `--scrub-archive` alongside `--force` to remove it too — opt-in only, since a removed item's ARCHIVE entry is the only audit trail left. Counters do not decrement — minted IDs stay claimed forever.
+The inverse of `/hv-capture`: remove one or more items from the backlog and clean up every trace — the BACKLOG.md entry, Related cross-references, the detail file (`.hv/{bugs,features,tasks}/<ID>.md`), and any plan keyed to the item (`.hv/plans/<milestone>-<ID>.md`). The safe default is dry-run: every invocation previews what would change before touching anything. Items currently active in `status.json` are refused outright unless `--force` is passed, which strips them with a warning. The ARCHIVE.md historical record is preserved by default; pass `--scrub-archive` alongside `--force` to remove it too — opt-in only, since a removed item's ARCHIVE entry is the only audit trail left. Counters do not decrement — minted IDs stay claimed forever.
 
 ## Step 1 — Preflight
 
@@ -25,7 +25,7 @@ The inverse of `/hv-capture`: remove one or more items from the backlog and clea
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve IDs", description="Parse and validate each ID against TODO.md")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (user aborts at confirm, no cross-references found) get `completed` with the no-op reason in the description.
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Resolve IDs", description="Parse and validate each ID against BACKLOG.md")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (user aborts at confirm, no cross-references found) get `completed` with the no-op reason in the description.
 
 Phases:
 
@@ -36,7 +36,7 @@ Phases:
 
 ## Step 2 — Parse Arguments
 
-Pass the user's argument verbatim as `<CSV>` to `bin/hv-rm` in Step 3. The helper validates IDs (split-and-strip on commas — `B01, F03` and `B01,F03` resolve identically), exits 1 with a usage message on empty or missing argv, and exits 1 again on unknown IDs (not in TODO.md or ARCHIVE.md). No skill-side validation needed.
+Pass the user's argument verbatim as `<CSV>` to `bin/hv-rm` in Step 3. The helper validates IDs (split-and-strip on commas — `B01, F03` and `B01,F03` resolve identically), exits 1 with a usage message on empty or missing argv, and exits 1 again on unknown IDs (not in BACKLOG.md or ARCHIVE.md). No skill-side validation needed.
 
 ## Step 3 — Dry-Run Preview
 
@@ -49,7 +49,7 @@ Run the helper with no `--force` flag; it defaults to dry-run and prints what wo
 Exit codes:
 
 - **0** — preview printed successfully. Surface the full stdout to the user verbatim, then continue to Step 4.
-- **1** — one of the IDs was not found in TODO.md or ARCHIVE.md, or an unrecognised flag was given. Surface the stderr message to the user verbatim and **stop** — do not proceed to Step 4.
+- **1** — one of the IDs was not found in BACKLOG.md or ARCHIVE.md, or an unrecognised flag was given. Surface the stderr message to the user verbatim and **stop** — do not proceed to Step 4.
 - **2** — one or more IDs are currently active in `status.json`. Surface the stderr message verbatim and inform the user: *"The item is active. Proceeding via Step 4 with `--force` will strip it from the active stream and leave a warning in the output."*
 
 ## Step 4 — Confirmation Gate

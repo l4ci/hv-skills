@@ -6,7 +6,7 @@ Used by `/hv-assume` Step 3, `/hv-plan` Step 3, `/hv-vision` Step 2, and `/hv-wo
 
 Run as a checklist. Items are ordered by broadening scope (target item → plan → milestone → repo-wide). Skip an item when its precondition doesn't apply — that's not a failure, that's the protocol.
 
-- **The target item entry** in `.hv/TODO.md` (when a specific backlog ID is the target) and its overflow detail file at `.hv/<bugs|features|tasks>/<id>.md` if one exists.
+- **The target item entry** in `.hv/BACKLOG.md` (when a specific backlog ID is the target) and its overflow detail file at `.hv/<bugs|features|tasks>/<id>.md` if one exists.
 - **The plan file** at `.hv/plans/<key>.md` if one exists for this work. Use:
 
   ```

@@ -42,15 +42,15 @@ Phases:
 | Worker | Model | Inputs | Returns |
 |--------|-------|--------|---------|
 | **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's three JSON arrays: `cleaned` / `needsAction` / `todoDrift`, distilled). |
-| **Worker B — Archive scan** | haiku | `TODO.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
+| **Worker B — Archive scan** | haiku | `BACKLOG.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
 | **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). |
-| **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `TODO.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
+| **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `BACKLOG.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
 
 Each brief uses the small-brief template from the reference: Goal · Inputs (paths/IDs only) · Constraints (cite the worktree-isolation rule when commit-producing waves are involved, though this wave is read-only) · Return shape (the table above) · Word budget ≤200 words.
 
 Aggregate the four returns into the working state used by Steps 3–6: drift IDs feed the `[ID] looks shipped on <hash>` lines below; archive output is silent (already moved); milestone map feeds the Step 5 header and the Step 6 milestone-bias check; relevance map feeds the Step 6 Suggested Next reasoning.
 
-When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in TODO.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
+When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in BACKLOG.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
 
 If `needsAction` is empty, produce no output and continue.
 
@@ -260,7 +260,7 @@ If `lastTag == ""` (no tags yet — nothing has been released), skip silently. T
 
 - **No noise** — never report on a step that found nothing. Silence is signal.
 - **Backlog table is mandatory** — Step 5 output must always reach the user in full. No row-count summaries, no "…and 8 more", no dropping sections, no placing the table inside a collapsed block. If the response would otherwise be trimmed, shorten *your* prose (suggestion, clusters, questions) before touching the table.
-- **Pass full context to /hv-work** — include TODO.md descriptions so work doesn't re-read.
+- **Pass full context to /hv-work** — include BACKLOG.md descriptions so work doesn't re-read.
 - **Reference items by ID** — `[B01]`, `[F03]`, `[T02]` in suggestions and messages.
 - **Git is the source of truth** — if `status.json` disagrees with git state, trust git.
 - **Handoff consumption is per-stream, on resolve.** When the user picks "Resume with `/hv-work`" on a handoff arm, `rm -f` the handoff file *only* for that stream. "Leave handoff for later" preserves the file. Other streams' handoff files are not touched.

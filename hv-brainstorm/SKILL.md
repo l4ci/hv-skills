@@ -50,13 +50,13 @@ Phases:
 
 Parse the item ID from the invocation. It must match `[BFT]\d{2,}`. Reject milestone IDs (`M01`) and slice IDs (`S01`) with: *"Error: /hv-brainstorm operates on a single backlog item. For project-level exploration use /hv-vision; for slice planning use /hv-plan."*
 
-Verify the item exists in `.hv/TODO.md`:
+Verify the item exists in `.hv/BACKLOG.md`:
 
 ```bash
 .hv/bin/hv-todo-field <ID> title
 ```
 
-Exit 1 from the helper means the ID is not in the backlog. Refuse with: *"Error: [<ID>] not found in TODO.md. Run /hv-capture first to add it."*
+Exit 1 from the helper means the ID is not in the backlog. Refuse with: *"Error: [<ID>] not found in BACKLOG.md. Run /hv-capture first to add it."*
 
 **Re-run check.** If `.hv/designs/<ID>.md` already exists, ask via `AskUserQuestion` (single-select, 3 options):
 

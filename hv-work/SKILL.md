@@ -1,6 +1,6 @@
 ---
 name: hv-work
-description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in TODO.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches worker subagents, verifies, commits atomically per task. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
 user-invocable: true
 ---
 
@@ -333,7 +333,7 @@ Non-sibling dirt → surface it; a worker produced unexpected changes and the or
 
 If a tool regenerates siblings only when the editor loads (e.g., Godot `class_name` → `.gd.uid`), force generation once in headless mode before the sweep (e.g., `godot --headless --editor --quit`). Capture project-specific commands in `KNOWLEDGE.md`.
 
-## Step 9 — Update TODO.md
+## Step 9 — Update BACKLOG.md
 
 ```bash
 .hv/bin/hv-complete <ID> <commit-hash>
@@ -461,7 +461,7 @@ Loop stops naturally when:
 
 - **No noise.** Report results, not process. Don't narrate steps that produced nothing.
 - **Orchestrator plans and verifies; worker executes.** Never dispatch without a clear brief. Never trust completion without reading the result.
-- **Orchestrator owns `.hv/` state.** Only the orchestrator touches `status.json` and `TODO.md`. Workers focus on implementation.
+- **Orchestrator owns `.hv/` state.** Only the orchestrator touches `status.json` and `BACKLOG.md`. Workers focus on implementation.
 - **Isolation protects main.** Branch or worktree — never work directly on main.
 - **One commit per task, owned by the orchestrator.** Workers write files; the orchestrator commits per task. Clean history, easy revert granularity, no `.git/index` races.
 
