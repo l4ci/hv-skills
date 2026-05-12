@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Mark a spike as finished — sets status: done and adds a finished date.
 # Findings/decision are written by the skill via Edit; this only flips state.
+# Writer helper: exit 0 on successful status flip; exit 1 when spike file not found.
 # Usage: hv-spike-finish <name>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

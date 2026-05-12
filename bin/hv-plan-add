@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Create a plan file under .hv/plans/<milestone>-<unit>.md.
+# Writer helper: exit 0 on successful plan creation; exit 1 on usage error or conflict.
 # Usage:
 #   hv-plan-add [--repo <name>] <milestone> slice "<title>"        — mints next S<NN> for that milestone
 #   hv-plan-add [--repo <name>] <milestone> <itemId> "<title>"     — uses item ID (B07, F03, T11, S01, …) verbatim

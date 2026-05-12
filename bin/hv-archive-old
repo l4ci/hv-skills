@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Move items from ## Completed in .hv/TODO.md to .hv/ARCHIVE.md if older than THRESHOLD days (default 5).
+# Writer helper: exit 0 always; silently no-ops when no items are old enough.
 # Usage: hv-archive-old [threshold-days]
 # Outputs: number of items moved (silent if 0)
 set -euo pipefail

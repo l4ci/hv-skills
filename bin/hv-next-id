@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Increment counter and return zero-padded ID.
+# Writer helper: exit 0 on successful counter increment; exit 1 on unknown type.
 # Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
