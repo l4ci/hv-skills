@@ -168,19 +168,7 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 
 If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
 
-**Loop-mode auto-plan dispatch.** When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), do **not** stop the loop on the missing plan. Instead, run the uncertainty pre-flight described next, then dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool — no prompt, no confirmation, no "want me to" question. When the dispatched plan run returns, re-run the plan-as-artifact check above (the file now exists) and use the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition below.
-
-**Uncertainty pre-flight (F34, loop mode only).** Before the auto-plan dispatch, run:
-
-```bash
-.hv/bin/hv-uncertain <itemId>
-```
-
-The helper applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout); exit 1 = certain; exit 2 = error.
-
-When uncertain, **dispatch `/hv-assume <itemId>` via the `Skill` tool first** — no prompt, no confirmation. Its peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
-
-**Orchestrator-model contract (F35).** Both `/hv-assume` (when dispatched) and `/hv-plan --auto-loop` are invoked here via the `Skill` tool, which loads the dispatched skill inline in the current session. Since `/hv-work` itself runs in the orchestrator session under `models.orchestrator`, the dispatched skills inherit the orchestrator model — the peek and plan benefit from orchestrator-grade design judgment. If a future change moves either skill to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.hv/config.json`) to preserve this guarantee.
+**Loop-mode auto-plan dispatch (F34 / F35).** In loop mode with a Major + Milestone-tagged item but no plan, `/hv-work` runs an uncertainty pre-flight (`hv-uncertain`), optionally dispatches `/hv-assume` first when uncertain, then dispatches `/hv-plan --auto-loop <milestone>-<itemId>` — all via the `Skill` tool so the dispatched skills inherit the orchestrator model. Off and auto modes skip this and fall through to manual decomposition. See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) for the full choreography.
 
 If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Minor/untagged item), proceed with the steps below.
 
@@ -191,13 +179,7 @@ From the conversation context:
    - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
-3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan task pairs for the pattern *Task A renames a file (`git mv old new` or equivalent), Task B edits files that link to `old`*. The collision is on **shared written files** — when the link-sweep enumerates the renamed file itself or other files the rename task already edits, both tasks race on the index even when their stated mandates appear disjoint. Resolve at plan time by one of:
-
-   - **Merge** rename + link-sweep into one task (preferred when they're one logical change — one commit, atomic revert).
-   - **Split ownership cleanly**: rename task owns the file move plus edits to the renamed file's own content; link-sweep task owns link updates in all *other* files. No file appears in both tasks' modified-file sets.
-   - **Serialize across waves**: rename in wave N, link-sweep in wave N+1, so the sweep operates on settled paths.
-
-   For every rename, derive the incoming-link file set with `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the helper is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
+3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan for rename / link-sweep task pairs that race on shared written files; resolve by merge, clean split-ownership, or serialize-across-waves. Use `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` as ground truth (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Detect rename + link-sweep collisions* for the resolution table.
 4. Group into dependency waves:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
