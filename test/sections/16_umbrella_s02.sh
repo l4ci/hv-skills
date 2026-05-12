@@ -137,7 +137,7 @@ r = parse_todo_fields('- **[F01] [Major] T.** D. Detail: x. Milestone: M02 Repos
 import json
 print(json.dumps(r, sort_keys=True))
 ")
-EXPECTED='{"detail": "x.", "milestone": "M02", "related": "", "repos": "web", "subsystem": ""}'
+EXPECTED='{"captured": "", "detail": "x.", "milestone": "M02", "related": "", "repos": "web", "subsystem": ""}'
 [ "$RESULT" = "$EXPECTED" ] || fail "parse_todo_fields Repos: expected $EXPECTED, got $RESULT"
 pass "parse_todo_fields captures Repos field without bleeding into Milestone"
 
