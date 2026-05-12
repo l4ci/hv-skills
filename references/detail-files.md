@@ -13,11 +13,11 @@ If any item's input contains bulky raw data that would push the TODO entry past 
 ```markdown
 # {ID}: Short title
 
-> Related TODO entry: `[{ID}]` in `.hv/TODO.md`
+> Related TODO entry: `[{ID}]` in `.hv/BACKLOG.md`
 
 ## Summary
 
-{The same 1–3 sentence summary that goes into TODO.md}
+{The same 1–3 sentence summary that goes into BACKLOG.md}
 
 ## Detail
 
@@ -40,6 +40,6 @@ Detail: .hv/<kind>/{ID}.md
 
 ## What this reference does NOT cover
 
-- **The TODO-entry write itself** — see hv-capture Step 6 inline.
+- **The BACKLOG-entry write itself** — see hv-capture Step 6 inline.
 - **Milestone tagging** — see `references/milestone-tagging.md`.
 - **Sub-repo tagging** — see hv-capture Step 4.6 inline / `references/umbrella-mode.md`.

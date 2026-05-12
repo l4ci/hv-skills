@@ -5,7 +5,7 @@ echo "hv-uncertain"
   mkdir -p "$UTMP/.hv/bugs" "$UTMP/.hv/features" "$UTMP/.hv/tasks"
   cd "$UTMP"
 
-  cat > .hv/TODO.md <<'EOF'
+  cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -128,7 +128,7 @@ from hvlib import parse_term_entry, first_sentence
 
 # Term body with all three fields
 body = """
-The canonical project queue — `.hv/TODO.md`. Items are zero-padded IDs
+The canonical project queue — `.hv/BACKLOG.md`. Items are zero-padded IDs
 ([B01]/[F01]/[T01]).
 
 **Aliases:** task list, todo list

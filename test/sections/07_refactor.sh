@@ -3,7 +3,7 @@ git checkout -q main
 # Reset to isolate this section from prior hv-complete calls in the suite.
 "$BIN/hv-refactor-reset"
 # Seed three active entries, then complete each against a real commit.
-cat >> .hv/TODO.md <<'EOF'
+cat >> .hv/BACKLOG.md <<'EOF'
 - **[F40] Feature done.**
 - **[B40] Bug fixed.**
 - **[F41] Refactor-driven feature.**
@@ -33,7 +33,7 @@ echo "$OUT" | grep -q '"bugs": 0' || fail "reset failed, bugs != 0: $OUT"
 pass "hv-refactor-reset zeros since_refactor"
 
 # Scoped refactor subjects (refactor(scope):) also count as refactor commits.
-cat >> .hv/TODO.md <<'EOF'
+cat >> .hv/BACKLOG.md <<'EOF'
 - **[F42] Scoped refactor feature.**
 EOF
 echo "r2" > r2.txt && git add r2.txt && git commit -q -m "refactor(hosts): consolidate"

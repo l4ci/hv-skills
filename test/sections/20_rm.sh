@@ -9,7 +9,7 @@ build_rm_fixture() {
   rm -rf "$root/.hv"
   mkdir -p "$root/.hv/features" "$root/.hv/tasks" "$root/.hv/bugs" "$root/.hv/plans"
 
-  cat > "$root/.hv/TODO.md" <<'FIXEOF'
+  cat > "$root/.hv/BACKLOG.md" <<'FIXEOF'
 # TODO
 
 ## Bugs
@@ -40,7 +40,7 @@ build_rm_fixture "$RM_TMP"
 # ── (a) dry-run exits 0, prints plan header and footer, TODO unchanged ───────
 (
   cd "$RM_TMP"
-  ORIG_TODO=$(cat .hv/TODO.md)
+  ORIG_TODO=$(cat .hv/BACKLOG.md)
   set +e
   OUT=$("$BIN/hv-rm" F01 2>/dev/null)
   RC=$?
@@ -50,9 +50,9 @@ build_rm_fixture "$RM_TMP"
     || { echo "FAIL F36(a): stdout missing '[F01] removal plan:': $OUT"; exit 1; }
   echo "$OUT" | grep -q 'dry-run — no files modified\.' \
     || { echo "FAIL F36(a): stdout missing 'dry-run — no files modified.': $OUT"; exit 1; }
-  NEW_TODO=$(cat .hv/TODO.md)
+  NEW_TODO=$(cat .hv/BACKLOG.md)
   [ "$ORIG_TODO" = "$NEW_TODO" ] \
-    || { echo "FAIL F36(a): dry-run must not modify TODO.md"; exit 1; }
+    || { echo "FAIL F36(a): dry-run must not modify BACKLOG.md"; exit 1; }
 )
 
 # ── (b) not-found exits 1, stderr contains 'not found' ──────────────────────
@@ -88,11 +88,11 @@ build_rm_fixture "$RM_TMP"
   set -e
   [ "$RC" = "0" ] || { echo "FAIL F36(d): --force should exit 0, got $RC"; exit 1; }
   # F01 entry removed from TODO.
-  grep -q '\[F01\]' .hv/TODO.md \
-    && { echo "FAIL F36(d): [F01] entry still in TODO.md after --force"; exit 1; }
+  grep -q '\[F01\]' .hv/BACKLOG.md \
+    && { echo "FAIL F36(d): [F01] entry still in BACKLOG.md after --force"; exit 1; }
   # Related: [F01] cross-ref on B01 stripped.
-  grep -q 'Related:.*\[F01\]' .hv/TODO.md \
-    && { echo "FAIL F36(d): Related: [F01] cross-ref still present in TODO.md"; exit 1; }
+  grep -q 'Related:.*\[F01\]' .hv/BACKLOG.md \
+    && { echo "FAIL F36(d): Related: [F01] cross-ref still present in BACKLOG.md"; exit 1; }
   # Detail file deleted.
   [ ! -f .hv/features/F01.md ] \
     || { echo "FAIL F36(d): .hv/features/F01.md still exists after --force"; exit 1; }
@@ -138,12 +138,12 @@ build_rm_fixture "$RM_TMP"
   RC=$?
   set -e
   [ "$RC" = "0" ] || { echo "FAIL F36(f): CSV batch should exit 0, got $RC"; exit 1; }
-  grep -q '\[B01\]' .hv/TODO.md \
-    && { echo "FAIL F36(f): [B01] still in TODO.md after batch removal"; exit 1; }
-  grep -q '\[T01\]' .hv/TODO.md \
-    && { echo "FAIL F36(f): [T01] still in TODO.md after batch removal"; exit 1; }
+  grep -q '\[B01\]' .hv/BACKLOG.md \
+    && { echo "FAIL F36(f): [B01] still in BACKLOG.md after batch removal"; exit 1; }
+  grep -q '\[T01\]' .hv/BACKLOG.md \
+    && { echo "FAIL F36(f): [T01] still in BACKLOG.md after batch removal"; exit 1; }
   # F01 must still be present.
-  grep -q '\[F01\]' .hv/TODO.md \
+  grep -q '\[F01\]' .hv/BACKLOG.md \
     || { echo "FAIL F36(f): [F01] was unexpectedly removed during B01,T01 batch"; exit 1; }
 )
 

@@ -2,13 +2,25 @@
 # Seed .hv/ directories and data files in the current directory.
 # Idempotent — never overwrites existing files. Safe to re-run.
 # Tool: seeds .hv/ directory structure; idempotent; exit 0 on success.
+# Mutator (writer): seeds .hv/ files idempotently and renames legacy .hv/TODO.md → .hv/BACKLOG.md if present. Exit 0 on rename action OR no-op; exit 1 only on missing precondition. Emits 'wrote: <path>' or 'noop: <path>' to stderr.
 # Called by /hv-init Step 2 from the source bin/ before .hv/bin/ exists.
 set -euo pipefail
 
 HV=".hv"
 mkdir -p "$HV"/{bugs,features,tasks,milestones,plans,spikes,map,bin}
 
-[ -f "$HV/TODO.md" ] || cat > "$HV/TODO.md" <<'EOF'
+# Legacy migration: if a legacy .hv/TODO.md exists AND .hv/BACKLOG.md does not,
+# rename it. Idempotent: both files present → prefer BACKLOG.md, emit 'noop:'
+# and continue (do NOT error). Only TODO.md present → rename and emit 'wrote:'.
+# Exit 0 in either branch per the mutator-exit-code decision.
+if [ -f "$HV/TODO.md" ] && [ ! -f "$HV/BACKLOG.md" ]; then
+  mv "$HV/TODO.md" "$HV/BACKLOG.md"
+  echo "wrote: $HV/BACKLOG.md (renamed from TODO.md)" >&2
+elif [ -f "$HV/TODO.md" ] && [ -f "$HV/BACKLOG.md" ]; then
+  echo "noop: $HV/BACKLOG.md (legacy $HV/TODO.md still present; not overwriting)" >&2
+fi
+
+[ -f "$HV/BACKLOG.md" ] || cat > "$HV/BACKLOG.md" <<'EOF'
 # TODO
 
 ## Bugs

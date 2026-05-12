@@ -21,7 +21,7 @@ Use umbrella mode when you maintain a small fleet of related repositories (say `
 | `.hv/` location | Repo root | Umbrella root (one level up from sub-repos) |
 | Where helpers run git ops | The repo | The sub-repo for the current item (resolved via `Repos:` tag or `--repo` flag) |
 | Worktree path | `<repo>/.claude/worktrees/<branch>` | `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layout B) |
-| `TODO.md`, `ARCHIVE.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md` | Per-repo | Shared at the umbrella |
+| `BACKLOG.md`, `ARCHIVE.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md` | Per-repo | Shared at the umbrella |
 | `status.json` entries | Keyed by `branch` | Keyed by `(branch, repo)` |
 | `.hv/handoff/<branch>.md` | One per branch | `.hv/handoff/<branch>@<repo>.md` (one per branch+repo) |
 | Sub-repo git histories | n/a | Independent — no submodules, no version pinning |
@@ -129,7 +129,7 @@ Most skills delegate umbrella resolution to underlying helpers and stay umbrella
 - **`/hv-spike`** runs the spike branch in the resolved sub-repo (`spike/<name>` lives in that repo's `.git/`); the spike file stays at `<umbrella>/.hv/spikes/<name>.md` with a `repo: <name>` frontmatter line.
 - **`/hv-assume`** displays the resolved sub-repo for items with `Repos:` in its peek output.
 - **`/hv-debug`** routes its single fix-commit to the sub-repo resolved from the bug's `Repos:` tag.
-- **`/hv-review`** scopes its branch inspection to the sub-repo via `hv-review-scope --repo <name>`; `TODO.md` and `ARCHIVE.md` lookups stay at the umbrella.
+- **`/hv-review`** scopes its branch inspection to the sub-repo via `hv-review-scope --repo <name>`; `BACKLOG.md` and `ARCHIVE.md` lookups stay at the umbrella.
 - **`/hv-ship`** threads `--repo` through `hv-merge` / `hv-pr` so the merge or PR runs in the correct sub-repo.
 - **`/hv-refactor`** asks which scope to refactor (all sub-repos, all sub-repos plus the umbrella, the umbrella only, or a subset), then dispatches parallel sub-agents, each running a focused single-repo cycle in its target's `.git/`. The umbrella orchestrator aggregates per-repo summaries and resets the refactor counter once at the end.
 

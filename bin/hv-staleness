@@ -71,7 +71,7 @@ elif kind == "knowledge":
         for topic, _body in iter_topics(p.read_text()):
             emit(topic, d)
 elif kind == "todo":
-    p = Path(".hv/TODO.md")
+    p = Path(".hv/BACKLOG.md")
     if not p.exists():
         sys.exit(0)
     # Scan open backlog bullets via the canonical helpers — the prior inline

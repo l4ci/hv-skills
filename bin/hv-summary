@@ -14,7 +14,7 @@ import json, os, re, sys
 from pathlib import Path
 from hvlib import section, iter_open_sections, load_json, parse_done_line, iter_topics, active_items
 
-todo = Path(".hv/TODO.md")
+todo = Path(".hv/BACKLOG.md")
 if not todo.exists():
     print("No .hv/ yet — run /hv-init.")
     raise SystemExit(0)

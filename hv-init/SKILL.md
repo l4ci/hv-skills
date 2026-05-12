@@ -1,6 +1,6 @@
 ---
 name: hv-init
-description: Initialize the .hv/ folder structure with TODO.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also seeds a managed knowledge-index block in CLAUDE.md so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
+description: Initialize the .hv/ folder structure with BACKLOG.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also seeds a managed knowledge-index block in CLAUDE.md so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
 user-invocable: true
 ---
 
@@ -172,7 +172,7 @@ fi
 
 The helper writes `.hv/repos.json` and (if the umbrella is itself a git repo) appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header. Idempotent — re-running `/hv-init` is safe.
 
-`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,map,bin}`, seeds `TODO.md` / `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `MAP.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
+`hv-bootstrap` creates `.hv/{bugs,features,tasks,milestones,plans,spikes,map,bin}`, seeds `BACKLOG.md` / `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `MAP.md` / `counters.json` / `status.json` if absent, adds `.hv/` to `.gitignore`, and runs the legacy preamble migration (`/hv:X` → `/hv-X` above the first `## Topic` heading). Data files are never overwritten. `config.json` is created interactively in the next step. All helpers require `python3`. See [`docs/reference/cli-helpers.md`](../docs/reference/cli-helpers.md) for the full helper reference.
 
 ## Step 3 — Configure (Interactive, with Upgrade Migration)
 
@@ -345,11 +345,11 @@ Next: /hv-capture to add items, /hv-next to pick work, /hv-context to capture do
 Edit .hv/config.json to change any of these later.
 ```
 
-If `.hv/TODO.md` already existed, say it was already initialized and helper scripts were refreshed. Then:
+If `.hv/BACKLOG.md` already existed, say it was already initialized and helper scripts were refreshed. Then:
 
 - **Config up-to-date** → drop the config line entirely; nothing was asked.
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
-- **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
+- **Config fresh (no existing `.hv/config.json` despite an existing `BACKLOG.md`)** → report as on a fresh init.
 
 If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 

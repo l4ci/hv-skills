@@ -20,7 +20,7 @@ This works for small teams. For larger ones a real issue tracker is usually a be
 
 ## What if I'm not using Claude Code?
 
-hv-skills is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, CLI helpers, and `TODO.md` format are agent-agnostic and work on their own; you can call the helpers from any shell. The slash commands themselves only run inside Claude Code.
+hv-skills is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, CLI helpers, and `BACKLOG.md` format are agent-agnostic and work on their own; you can call the helpers from any shell. The slash commands themselves only run inside Claude Code.
 
 Other agent harnesses with comparable primitives (Gemini CLI, some Copilot builds) may load the skills with reduced functionality. Where `AskUserQuestion` isn't available, those interactions fall back to plain text prompts instead of native UI. Don't expect full functionality outside Claude Code.
 

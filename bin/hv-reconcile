@@ -4,7 +4,7 @@
 # the agent can present clearly. In umbrella mode, entries with a non-null
 # `repo` are scoped to <umbrella>/<repo>/. The `todoDrift` field is populated
 # by hv-todo-drift — IDs whose tags appear in commit subjects but are still
-# listed as open in TODO.md. Helper failure => todoDrift: [] (don't fail
+# listed as open in BACKLOG.md. Helper failure => todoDrift: [] (don't fail
 # the whole reconcile). Entries where noBase:true indicate the umbrella cwd
 # has no git repo; commitCount is 0 but is not meaningful for those entries.
 # Writer helper: exit 0; auto-removes stale status entries and emits JSON summary.

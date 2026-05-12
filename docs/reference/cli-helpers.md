@@ -10,7 +10,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | Script | What it does | Example |
 |---|---|---|
 | `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
-| `hv-append` | Append entry to a section in TODO.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
+| `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
 | `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-rm` | Remove backlog item(s) — strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
@@ -114,7 +114,7 @@ file. Every skill that mints a new backlog item calls this first.
 ## Backlog manipulation
 
 `hv-append` inserts a formatted entry under the matching `##` section heading in
-[`TODO.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`
+[`BACKLOG.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`
 and moves it under `## Completed`, stamping it with the supplied git SHA.
 `hv-archive-old` sweeps `## Completed` entries older than N days into
 `ARCHIVE.md` to keep the working file short. `hv-todo-by-milestone` lets you
@@ -123,7 +123,7 @@ indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 `hv-todo-field` extracts a single named field (`detail`, `related`, `milestone`, or `repos`) from the TODO bullet of a given item ID. It replaces the ad-hoc `grep | sed` chains that skill prose previously inlined for the same purpose.
 
-`hv-find-milestone-for-items` answers the inverse of `hv-todo-by-milestone`: given a list of item IDs, it prints the milestone tags those items carry in TODO.md (unique, numerically sorted, open sections only — completed/archived items don't surface). Always exits 0; an unknown ID or untagged item is a silent skip, not an error.
+`hv-find-milestone-for-items` answers the inverse of `hv-todo-by-milestone`: given a list of item IDs, it prints the milestone tags those items carry in BACKLOG.md (unique, numerically sorted, open sections only — completed/archived items don't surface). Always exits 0; an unknown ID or untagged item is a silent skip, not an error.
 
 `hv-plan-rename-check` wraps `git grep -l "<old-name>" [-- <scope>...]` so `/hv-work` Step 4 #3 ("Detect rename + link-sweep collisions") can name the check at both plan time and verify time. Always exits 0; no matches, no repo, and out-of-scope inputs are all silent. The pathspec scope is passed through to git grep, so `*.md`-style globs work.
 
@@ -140,7 +140,7 @@ abandoned.
 and removes records whose branches no longer exist. It emits a JSON summary that
 skills use to avoid acting on stale context. `hv-summary` prints a human-readable
 snapshot of the same data: backlog counts, what's actively in progress, and the
-most recent completions. Its JSON output also includes a `todoDrift` array — IDs that appear in commit subjects (e.g. `[B07]`) but are still listed as open in `TODO.md`, with the most recent commit hash for each. [`/hv-next`](../usage/picking-work.md) Step 2 surfaces this so users can `hv-complete` an entry that already shipped.
+most recent completions. Its JSON output also includes a `todoDrift` array — IDs that appear in commit subjects (e.g. `[B07]`) but are still listed as open in `BACKLOG.md`, with the most recent commit hash for each. [`/hv-next`](../usage/picking-work.md) Step 2 surfaces this so users can `hv-complete` an entry that already shipped.
 
 In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, with base-branch resolution per repo.
 
@@ -255,7 +255,7 @@ transition whose resolved commit's subject does not start with `refactor:`,
 and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
 `hv-refactor-targets` enumerates refactor targets (the umbrella's `hasCode` flag plus every registered sub-repo) so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
 
-`hv-backlog` renders the full TODO.md as sorted Markdown tables (In Progress,
+`hv-backlog` renders the full BACKLOG.md as sorted Markdown tables (In Progress,
 Bugs, Features, Tasks). Handy for a quick terminal overview or piping into
 other scripts. Pass `--grep <pattern>` to filter Bugs / Features / Tasks rows
 by case-insensitive substring against each item's bullet line (matches across
@@ -321,7 +321,7 @@ Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv
 
 1. Creates subdirectories: `.hv/bin/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`,
    `.hv/milestones/`, `.hv/plans/`, `.hv/spikes/`.
-2. Writes initial data files (skipping any that already exist): `TODO.md`,
+2. Writes initial data files (skipping any that already exist): `BACKLOG.md`,
    `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `counters.json`,
    `status.json`.
 3. Appends a `.hv/` entry to `.gitignore` if one is not already present.

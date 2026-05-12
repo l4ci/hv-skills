@@ -22,7 +22,7 @@ echo "$COUNTERS" | grep -q '"milestones": 1' || fail "counters.milestones != 1: 
 pass "counters persisted"
 
 # Self-heal: counter=2, but TODO has [B07] → next mint should be B08, not B03.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -55,7 +55,7 @@ pass "hv-next-id self-heal is per-prefix"
 
 # Reset state for downstream tests that expect a clean slate.
 rm -f .hv/ARCHIVE.md
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -70,28 +70,28 @@ echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
 
 echo "hv-append"
 "$BIN/hv-append" "## Bugs" "- **[B01] [P1] First bug.** Desc."
-grep -q "\[B01\] \[P1\] First bug" .hv/TODO.md || fail "B01 not found in TODO.md"
+grep -q "\[B01\] \[P1\] First bug" .hv/BACKLOG.md || fail "B01 not found in BACKLOG.md"
 pass "bug appended to ## Bugs"
 
 "$BIN/hv-append" "## Features" "- **[F01] [Minor] First feature.** Desc."
-grep -q "\[F01\] \[Minor\] First feature" .hv/TODO.md || fail "F01 not found in TODO.md"
+grep -q "\[F01\] \[Minor\] First feature" .hv/BACKLOG.md || fail "F01 not found in BACKLOG.md"
 pass "feature appended to ## Features"
 
 echo "hv-complete"
 git add -A && git commit -q -m "add B01"
 HASH=$(git log --oneline -1 --format='%h')
 "$BIN/hv-complete" B01 "$HASH"
-grep -q "~~.*\[B01\].*~~ Done" .hv/TODO.md || fail "B01 not marked completed"
-grep -q "^- \*\*\[B01\]" .hv/TODO.md && fail "B01 still in active section"
+grep -q "~~.*\[B01\].*~~ Done" .hv/BACKLOG.md || fail "B01 not marked completed"
+grep -q "^- \*\*\[B01\]" .hv/BACKLOG.md && fail "B01 still in active section"
 pass "B01 moved to Completed with strikethrough"
 
 # Idempotent: running hv-complete again on an already-completed ID is a no-op.
 "$BIN/hv-complete" B01 "$HASH" >/dev/null 2>&1 || fail "second hv-complete errored on already-completed ID"
-COMPLETED_COUNT=$(grep -c "~~.*\[B01\].*~~ Done" .hv/TODO.md || true)
+COMPLETED_COUNT=$(grep -c "~~.*\[B01\].*~~ Done" .hv/BACKLOG.md || true)
 [ "$COMPLETED_COUNT" = "1" ] || fail "re-running hv-complete duplicated B01: found $COMPLETED_COUNT rows"
 pass "hv-complete is idempotent on already-completed ID"
 
-# Typo guard: an ID that is nowhere in TODO.md still errors out.
+# Typo guard: an ID that is nowhere in BACKLOG.md still errors out.
 if "$BIN/hv-complete" B99 "$HASH" 2>/dev/null; then
   fail "hv-complete should error on an unknown ID"
 fi
@@ -196,7 +196,7 @@ echo "hv-archive-old"
 python3 - <<'PY'
 from pathlib import Path
 from datetime import date, timedelta
-p = Path(".hv/TODO.md")
+p = Path(".hv/BACKLOG.md")
 c = p.read_text()
 old = (date.today() - timedelta(days=10)).strftime("%Y-%m-%d")
 recent = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -206,7 +206,7 @@ PY
 COUNT=$("$BIN/hv-archive-old" 5)
 [ "$COUNT" = "1" ] || fail "expected 1 archived, got '$COUNT'"
 grep -q "B99" .hv/ARCHIVE.md || fail "B99 not in ARCHIVE.md"
-grep -q "B99" .hv/TODO.md && fail "B99 still in TODO.md"
-grep -q "F99" .hv/TODO.md || fail "F99 should still be in TODO.md"
+grep -q "B99" .hv/BACKLOG.md && fail "B99 still in BACKLOG.md"
+grep -q "F99" .hv/BACKLOG.md || fail "F99 should still be in BACKLOG.md"
 pass "old item archived, recent item kept"
 

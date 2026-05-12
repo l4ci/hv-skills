@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # This is a resolve helper — exits 1 when an ID is not found in TODO+ARCHIVE.
-# Remove one or more captured items from .hv/TODO.md and clean up dependencies.
+# Remove one or more captured items from .hv/BACKLOG.md and clean up dependencies.
 # Usage: hv-rm [--dry-run] [--force] [--scrub-archive] <ID>[,<ID>...]
 #   --dry-run       Preview changes without writing (default behaviour).
 #   --force         Apply changes (remove entries, strip cross-refs, delete files).
@@ -56,7 +56,7 @@ if not raw_ids:
     print("error: no IDs provided", file=sys.stderr)
     sys.exit(1)
 
-TODO_PATH = Path(".hv/TODO.md")
+TODO_PATH = Path(".hv/BACKLOG.md")
 ARCHIVE_PATH = Path(".hv/ARCHIVE.md")
 STATUS_PATH = Path(".hv/status.json")
 
@@ -120,7 +120,7 @@ for iid in raw_ids:
             continue
 
     # Not found.
-    print(f"error: [{iid}] not found in .hv/TODO.md or .hv/ARCHIVE.md", file=sys.stderr)
+    print(f"error: [{iid}] not found in .hv/BACKLOG.md or .hv/ARCHIVE.md", file=sys.stderr)
     sys.exit(1)
 
 # ── active-stream guard ───────────────────────────────────────────────────────

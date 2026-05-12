@@ -290,7 +290,7 @@ FM4I_TMP="$(mktemp -d)"
 (
   cd "$FM4I_TMP"
   mkdir -p .hv
-  cat > .hv/TODO.md <<'EOF'
+  cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

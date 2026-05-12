@@ -146,7 +146,7 @@ mkdir -p .hv/map
 cat > .hv/map/capture.md <<'EOF'
 ---
 subsystem: capture
-summary: Captures items into TODO.md
+summary: Captures items into BACKLOG.md
 touched: 2026-05-09
 related-topics: [Skill Authoring]
 ---
@@ -169,7 +169,7 @@ PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import parse_frontmatter, iter_map_entries
 fm, body = parse_frontmatter(open(".hv/map/capture.md").read())
 assert fm["subsystem"] == "capture", fm
-assert fm["summary"] == "Captures items into TODO.md", fm
+assert fm["summary"] == "Captures items into BACKLOG.md", fm
 assert "## Purpose" in body, body
 assert fm["related-topics"] == ["Skill Authoring"], fm
 
@@ -227,7 +227,7 @@ echo "ok hv-map-stats"
 "$BIN/hv-map-index" >/dev/null
 grep -q '<!-- hv-map-start -->' CLAUDE.md || { echo "FAIL: map block not in CLAUDE.md"; exit 1; }
 grep -q '## Project Map' CLAUDE.md || { echo "FAIL: heading missing"; exit 1; }
-grep -q '\*\*capture\*\* — Captures items into TODO.md' CLAUDE.md || { echo "FAIL: capture summary missing"; exit 1; }
+grep -q '\*\*capture\*\* — Captures items into BACKLOG.md' CLAUDE.md || { echo "FAIL: capture summary missing"; exit 1; }
 # Idempotence
 sha1=$(sha1sum CLAUDE.md | cut -d' ' -f1)
 "$BIN/hv-map-index" >/dev/null
@@ -314,7 +314,7 @@ trap 'rm -rf "$TMP3" "$TMP" "$TMP2"' EXIT
   cat > .hv/map/capture.md <<'EOF'
 ---
 subsystem: capture
-summary: Captures items into TODO.md
+summary: Captures items into BACKLOG.md
 touched: 2026-05-09
 created: 2026-05-09
 ---
@@ -328,7 +328,7 @@ EOF
   cat > .hv/map/work.md <<'EOF'
 ---
 subsystem: work
-summary: Captures items into TODO.md  # near-duplicate summary
+summary: Captures items into BACKLOG.md  # near-duplicate summary
 touched: 2025-12-01
 created: 2025-12-01
 ---

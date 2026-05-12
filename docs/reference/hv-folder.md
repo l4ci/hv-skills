@@ -6,7 +6,7 @@
 
 | File | Purpose |
 |------|---------|
-| `TODO.md` | Active backlog — bugs, features, tasks, and recent completions |
+| `BACKLOG.md` | Active backlog — bugs, features, tasks, and recent completions |
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
 | `MILESTONES.md` | Vision paragraph, active milestone list, one short overview per milestone |
@@ -25,9 +25,9 @@
 | `handoff/` | `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next` |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
-## TODO.md — active backlog
+## BACKLOG.md — active backlog
 
-`TODO.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items; [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
+`BACKLOG.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items; [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
 
 A typical entry looks like:
 
@@ -90,7 +90,7 @@ A managed `## Project Map` block in `CLAUDE.md` surfaces the thin summary so the
 { "bug": 3, "feature": 7, "task": 12, "milestone": 2, "spike": 1 }
 ```
 
-You should not need to edit this by hand. If you ever manually delete items from `TODO.md`, the counters are safe to leave as-is; IDs are never reused.
+You should not need to edit this by hand. If you ever manually delete items from `BACKLOG.md`, the counters are safe to leave as-is; IDs are never reused.
 
 ## config.json — settings
 
@@ -110,7 +110,7 @@ See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses
 
 ## bugs/, features/, tasks/ — overflow detail files
 
-When a bug report, feature spec, or task description is too long to fit inline in `TODO.md`, the overflow content is stored in a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `TODO.md` entry links to it. This keeps `TODO.md` scannable while preserving full detail where it matters.
+When a bug report, feature spec, or task description is too long to fit inline in `BACKLOG.md`, the overflow content is stored in a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `BACKLOG.md` entry links to it. This keeps `BACKLOG.md` scannable while preserving full detail where it matters.
 
 You can create these files by hand or let `/hv-capture` handle it when you supply a long description.
 
@@ -138,7 +138,7 @@ See [../usage/pausing-and-resuming.md](../usage/pausing-and-resuming.md) for the
 
 ## ARCHIVE.md — old completions
 
-Completed items are moved from `TODO.md` to `ARCHIVE.md` automatically after they have been in the completed section for more than five days. This keeps `TODO.md` short without losing history. You can read `ARCHIVE.md` at any time; no skill reads it during normal operation.
+Completed items are moved from `BACKLOG.md` to `ARCHIVE.md` automatically after they have been in the completed section for more than five days. This keeps `BACKLOG.md` short without losing history. You can read `ARCHIVE.md` at any time; no skill reads it during normal operation.
 
 ## Why everything is gitignored
 

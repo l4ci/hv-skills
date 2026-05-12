@@ -45,18 +45,18 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 
 - `.hv/MILESTONES.md` (current vision paragraph and overviews)
 - Every `.hv/milestones/M*.md` (full per-milestone plans — read whatever exists)
-- `.hv/TODO.md` (what's already on the backlog hints at the user's mental model)
+- `.hv/BACKLOG.md` (what's already on the backlog hints at the user's mental model)
 - `.hv/CONTEXT.md` terms via `hv-context-query` — vision sessions are the highest-yield surface for canonical-term capture; consult so brainstorming uses existing terms, and treat user definitional signals (*"by X I mean…"*, *"let's call this X"*) as triggers for inline `hv-context-add` writes
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
 
 DECISIONS matches are committed boundaries that constrain what milestones can promise; surface any conflict before proposing milestones.
 
-**Dispatch a context-bundle worker** rather than issuing the reads on the orchestrator. Per `references/subagent-dispatch.md`, this step is read-heavy (≥3 file reads — `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/TODO.md`, `.hv/CONTEXT.md` query results, plus the root stack file) and the orchestrator only needs synthesis to do Step 3, not the raw text.
+**Dispatch a context-bundle worker** rather than issuing the reads on the orchestrator. Per `references/subagent-dispatch.md`, this step is read-heavy (≥3 file reads — `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/BACKLOG.md`, `.hv/CONTEXT.md` query results, plus the root stack file) and the orchestrator only needs synthesis to do Step 3, not the raw text.
 
 Brief (haiku tier — this is mechanical aggregation):
 
 - **Goal:** Return a compact snapshot of the project's vision state.
-- **Inputs:** `.hv/MILESTONES.md`, `.hv/milestones/M*.md`, `.hv/TODO.md`, `README.md` (or whichever stack file exists), plus the output of `.hv/bin/hv-knowledge-query`, `.hv/bin/hv-decisions-query`, and `.hv/bin/hv-context-query` for vision-relevant topics (the orchestrator selects topics from the user's framing).
+- **Inputs:** `.hv/MILESTONES.md`, `.hv/milestones/M*.md`, `.hv/BACKLOG.md`, `README.md` (or whichever stack file exists), plus the output of `.hv/bin/hv-knowledge-query`, `.hv/bin/hv-decisions-query`, and `.hv/bin/hv-context-query` for vision-relevant topics (the orchestrator selects topics from the user's framing).
 - **Constraints:** Surface any DECISIONS conflict explicitly in the snapshot — committed boundaries that constrain milestone proposals must be visible to the orchestrator before Step 3.
 - **Return shape:** `{vision-paragraph, existing-milestones[], gaps[], hard-boundaries[], context-terms[]}` — bullets, not paragraphs, ≤200 words total.
 - **Word budget:** ≤200 words.

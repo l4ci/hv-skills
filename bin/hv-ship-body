@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a PR body for a branch: "## Summary" (commit subjects) and
-# "## Items resolved" (IDs with titles pulled from TODO.md / ARCHIVE.md).
+# "## Items resolved" (IDs with titles pulled from BACKLOG.md / ARCHIVE.md).
 # Skips merge commits. Caller appends "## Test plan".
 # Tool: exit 0 with markdown body; exit 1 on missing branch or git error.
 # Usage: hv-ship-body <branch>

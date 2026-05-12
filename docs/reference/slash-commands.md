@@ -12,7 +12,7 @@ Shortcut alias for `/hv-capture`. Identical behavior; saves keystrokes when capt
 
 ## /hv-capture
 
-Captures bugs, features, and tasks into [`TODO.md`](hv-folder.md). Auto-classifies each item, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features, and routes it to the correct section with a zero-padded auto-incrementing ID (`[B01]`, `[F01]`, `[T01]`). See [capturing work](../usage/capturing-work.md) for the full flow.
+Captures bugs, features, and tasks into [`BACKLOG.md`](hv-folder.md). Auto-classifies each item, assigns priority (P0/P1/P2) for bugs and size (Major/Minor/Cosmetic) for features, and routes it to the correct section with a zero-padded auto-incrementing ID (`[B01]`, `[F01]`, `[T01]`). See [capturing work](../usage/capturing-work.md) for the full flow.
 
 ## /hv-config
 
@@ -36,7 +36,7 @@ Manages the public documentation site under the configured `docs.path` directory
 
 ## /hv-go
 
-Captures an item and immediately implements it in one pass. The item still gets a real ID in `TODO.md`, but the normal backlog-review round-trip is skipped. Use it when you describe a fix or feature and want it done now rather than queued. See [running work](../usage/running-work.md) for the full flow.
+Captures an item and immediately implements it in one pass. The item still gets a real ID in `BACKLOG.md`, but the normal backlog-review round-trip is skipped. Use it when you describe a fix or feature and want it done now rather than queued. See [running work](../usage/running-work.md) for the full flow.
 
 ## /hv-init
 
@@ -76,7 +76,7 @@ Staff-engineer review of a feature branch before it leaves your machine: scopes 
 
 ## /hv-rm
 
-Removes a captured backlog item and cleans up all of its dependencies in one operation. Strips the item's entry from `TODO.md`, removes `Related:` cross-references that point to it from other items, deletes any matching detail file (`.hv/bugs/`, `.hv/features/`, `.hv/tasks/`) and plan file (`.hv/plans/`), and strips the item from `status.json`. Items that are currently active in `status.json` are refused unless `--force` is passed.
+Removes a captured backlog item and cleans up all of its dependencies in one operation. Strips the item's entry from `BACKLOG.md`, removes `Related:` cross-references that point to it from other items, deletes any matching detail file (`.hv/bugs/`, `.hv/features/`, `.hv/tasks/`) and plan file (`.hv/plans/`), and strips the item from `status.json`. Items that are currently active in `status.json` are refused unless `--force` is passed.
 
 Dry-run-by-default: the first pass always shows what would change, then an explicit `AskUserQuestion` confirmation gate must be cleared before any writes happen. `ARCHIVE.md` is preserved by default as the historical record; pass `--scrub-archive` to also remove an archived entry and its cross-references there. Accepts one or more comma-separated IDs (e.g. `B07,F03`); validation is all-or-nothing — if any ID is unknown, the whole batch aborts before any write. See [removing work](../usage/removing-work.md) for the full flow.
 

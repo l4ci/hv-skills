@@ -75,7 +75,7 @@ Phases:
 
 If the user named a `[B##]`:
 
-- Read that line from `.hv/TODO.md`
+- Read that line from `.hv/BACKLOG.md`
 - If `Detail:` points at `.hv/bugs/B##.md`, read the detail file too
 
 If the user described a symptom without an ID, invoke `hv-capture` via the `Skill` tool first so the bug gets logged — then resume here with the new ID.

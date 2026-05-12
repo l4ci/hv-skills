@@ -1,6 +1,6 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into TODO.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in TODO use /hv-work.
+description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in BACKLOG use /hv-work.
 user-invocable: true
 ---
 
@@ -8,14 +8,14 @@ user-invocable: true
 
 ```
 ════════════════════════════════════════════════════════════════════════
-  📥  hv-capture  ·  capture work items into .hv/TODO.md
+  📥  hv-capture  ·  capture work items into .hv/BACKLOG.md
   triggers: "capture", "log bug"  ·  pairs: hv-go, hv-next
 ════════════════════════════════════════════════════════════════════════
 ```
 
 # hv-capture — Capture Work Items
 
-Quick-capture bugs, features, and tasks into `.hv/TODO.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
+Quick-capture bugs, features, and tasks into `.hv/BACKLOG.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
 
 ## Step 1 — Preflight
 
@@ -32,7 +32,7 @@ Phases:
 1. *Mode / dispatch* — single brain-dump or per-item parsing path resolved (Step 2)
 2. *Classify* — type (bug / feature / task), priority, size assigned (Step 3)
 3. *Dedupe* — existing TODO entries scanned for overlap (Step 4)
-4. *Append* — entries written to `TODO.md` with milestone + repo tags (Steps 5–6)
+4. *Append* — entries written to `BACKLOG.md` with milestone + repo tags (Steps 5–6)
 5. *Report* — compact summary printed (Step 7)
 
 ## Step 2 — Parse & Classify
@@ -168,7 +168,7 @@ Before: - **[B07] [P1] Title.** Description. Milestone: M01 Captured: 2026-05-09
 After:  - **[B07] [P1] Title.** Description. Milestone: M01 Subsystem: capture Captured: 2026-05-09
 ```
 
-The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/TODO.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
+The `Related:` suffix is optional — only add it when an item clearly relates to an existing entry. **Items created in the same batch can reference each other.** Scan `## Bugs`, `## Features`, and `## Tasks` in `.hv/BACKLOG.md` and also `.hv/ARCHIVE.md` (if it exists) for obvious connections before writing. Don't force links that aren't there.
 
 ### Examples
 

@@ -14,7 +14,7 @@ Steps that branch on `autonomy.level` (off/auto/loop) and dispatch the next skil
 
 ## Don't ask what the code can answer
 
-Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.hv/` state — `grep`, `Read`, `git log`, `TODO.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
+Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.hv/` state — `grep`, `Read`, `git log`, `BACKLOG.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
 
 Codified from grill-with-docs (2026-05-10): *"If a question can be answered by exploring the codebase, explore the codebase instead."* Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08) — that one constrains the option list when asking is the right move; this one constrains whether to ask at all.
 

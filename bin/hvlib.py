@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Canonical filename for the typed-item backlog (bugs / features / tasks).
+BACKLOG_FILE = "BACKLOG.md"
+
 
 def find_section(content: str, name: str) -> tuple[int, int] | None:
     """Locate the body of ## <name> in `content`. Return (start, end) byte
@@ -131,7 +134,7 @@ def find_item_ids(text: str, prefixes: str = "BFT") -> list[str]:
 
 
 def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
-    """Find the origin bullet for `iid` in `corpus` (typically TODO.md +
+    """Find the origin bullet for `iid` in `corpus` (typically BACKLOG.md +
     ARCHIVE.md concatenated). The origin bullet is the line that introduces
     the item (`- **[ID] ...`), not a `Related: [ID]` reference inside another
     bullet.
@@ -292,12 +295,19 @@ def read_or_empty(path) -> str:
 
 
 def load_backlog_corpus(base_dir=".") -> str:
-    """Return TODO.md + ARCHIVE.md concatenated from <base_dir>/.hv/.
+    """Return BACKLOG.md (or legacy TODO.md as a one-cycle fallback) + ARCHIVE.md
+    concatenated from <base_dir>/.hv/.
     Used by ship-body, todo-field, and review-scope to look up an item ID
     across active and archived backlog in one pass.
     """
     base = Path(base_dir)
-    return read_or_empty(base / ".hv" / "TODO.md") + "\n" + read_or_empty(base / ".hv" / "ARCHIVE.md")
+    hv = base / ".hv"
+    backlog = hv / BACKLOG_FILE
+    if backlog.exists():
+        primary = read_or_empty(backlog)
+    else:
+        primary = read_or_empty(hv / "TODO.md")
+    return primary + "\n" + read_or_empty(hv / "ARCHIVE.md")
 
 
 def git_mtime(path) -> "str | None":

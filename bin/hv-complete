@@ -22,7 +22,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" <<
 import re, subprocess, sys
 from hvlib import find_section, write_text_atomic, update_json, format_done_line, parse_done_line, detail_dir_for_id
 id_s, hash_s, date_s = sys.argv[1], sys.argv[2], sys.argv[3]
-path = ".hv/TODO.md"
+path = ".hv/BACKLOG.md"
 with open(path) as f: content = f.read()
 
 active = re.compile(r"^- \*\*\[" + re.escape(id_s) + r"\].*$", re.MULTILINE)

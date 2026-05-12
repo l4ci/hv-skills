@@ -7,7 +7,7 @@ pass "hv-merge rejects empty message"
 # Don't actually run hv-pr — no remote
 
 echo "regression: hv-backlog preserves periods in titles"
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Features
@@ -24,7 +24,7 @@ echo "$OUT" | grep -q "Add v1.2 support" || fail "title with period was truncate
 pass "backlog keeps mid-title periods intact"
 
 echo "regression: hv-archive-old always prints count"
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -42,7 +42,7 @@ pass "archive-old prints 0 when no items to move"
 echo "regression: hv-archive-old only archives canonical completed shape"
 FAKE_HASH="abc1234"
 OLD_DATE="2024-01-01"
-cat > .hv/TODO.md <<EOF
+cat > .hv/BACKLOG.md <<EOF
 # TODO
 
 ## Bugs
@@ -59,14 +59,14 @@ EOF
 COUNT=$("$BIN/hv-archive-old" 1)
 [ "$COUNT" = "1" ] || fail "expected 1 item archived, got '$COUNT'"
 grep -q "Fix login crash" .hv/ARCHIVE.md || fail "canonical bullet not found in ARCHIVE.md"
-grep -q "by accident" .hv/TODO.md || fail "free-form note was wrongly removed from TODO.md"
-! grep -q "Fix login crash" .hv/TODO.md || fail "canonical bullet still present in TODO.md"
+grep -q "by accident" .hv/BACKLOG.md || fail "free-form note was wrongly removed from BACKLOG.md"
+! grep -q "Fix login crash" .hv/BACKLOG.md || fail "canonical bullet still present in BACKLOG.md"
 pass "archive-old only moves canonical completed bullets"
 
 echo "hv-ship-body"
 # Fresh branch state for ship-body + review-scope
 git checkout -q main 2>/dev/null || true
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -97,7 +97,7 @@ pass "ship-body errors when base has no commits"
 
 # ship-body emits Closes #N for GH refs in resolved item bullets
 git checkout -q main
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -126,7 +126,7 @@ rm -f g1.txt g2.txt
 
 # Negative case: no GH refs anywhere → no Closes lines.
 git checkout -q main
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -151,7 +151,7 @@ rm -f g3.txt
 
 # Dedup: two commits referencing the same ID emit a single Closes #N line.
 git checkout -q main
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -177,7 +177,7 @@ git branch -D hv/ship-gh-dedup >/dev/null 2>&1 || true
 rm -f g4.txt g5.txt
 
 # Restore demo TODO state for downstream review-scope tests
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -207,7 +207,7 @@ pass "review-scope rejects base branch"
 # Regression: review-scope must attribute an ID to its OWN bullet, not to
 # another item that mentions the ID in a `Related:` suffix.
 git checkout -q main
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -237,7 +237,7 @@ rm -f r.txt
 # Regression: hv-ship-body must attribute an ID to its OWN bullet, not to
 # another item that mentions the ID in a `Related:` suffix.
 git checkout -q main
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

@@ -18,7 +18,7 @@ cat > "$TMP/.hv/CONTEXT.md" <<'EOF'
 
 ## backlog
 
-The canonical project queue — `.hv/TODO.md`.
+The canonical project queue — `.hv/BACKLOG.md`.
 
 **Aliases:** task list
 <!-- 2026-05-10 -->
@@ -66,7 +66,7 @@ echo "hv-context-add — single-repo new term"
 TMP_ADD="$(mktemp -d)"
 ( cd "$TMP_ADD" && "$BIN/hv-bootstrap" >/dev/null )
 ( cd "$TMP_ADD" && "$BIN/hv-context-add" backlog \
-    --def "The canonical project queue (.hv/TODO.md). Items are zero-padded IDs." \
+    --def "The canonical project queue (.hv/BACKLOG.md). Items are zero-padded IDs." \
     --alias "task list,todo list" )
 grep -q "^## backlog$" "$TMP_ADD/.hv/CONTEXT.md" || fail "missing ## backlog"
 grep -q "^\*\*Aliases:\*\* task list, todo list$" "$TMP_ADD/.hv/CONTEXT.md" || fail "aliases line wrong"

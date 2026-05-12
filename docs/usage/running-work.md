@@ -1,6 +1,6 @@
 # Implementing
 
-Items captured in [`TODO.md`](../reference/hv-folder.md) move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
+Items captured in [`BACKLOG.md`](../reference/hv-folder.md) move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
 
 ## /hv-work
 
@@ -76,7 +76,7 @@ For running multiple `/hv-work` sessions at the same time on different item batc
 /hv-go "add a Cmd+K shortcut to the project picker"
 ```
 
-The item still gets a real ID in `TODO.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands directly off to `/hv-work` after capture completes.
+The item still gets a real ID in `BACKLOG.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands directly off to `/hv-work` after capture completes.
 
 `/hv-go` caps the number of clarifying questions on purpose. It assumes the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, [`/hv-capture`](capturing-work.md) first is safer.
 
@@ -92,7 +92,7 @@ Three skills trigger on action-shaped phrases. Pick by **intent**, not by the ve
 |---------------------|-----|-----|
 | Brain-dump items into the backlog without acting now | `/hv-capture` | Records only; no execution, no clean-tree guard |
 | Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`, with a low question cap |
-| Implement an item that's already in `TODO.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
+| Implement an item that's already in `BACKLOG.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
 | Pick the next thing from the backlog and execute | `/hv-next` | Reconciles → suggests → routes to `/hv-work` |
 
 **Rules of thumb:**

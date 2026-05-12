@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Append entry to a section in .hv/TODO.md.
+# Append entry to a section in .hv/BACKLOG.md.
 # Writer helper: exit 0 on successful append, 1 on missing section or missing argv.
 # Usage: hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."
 set -euo pipefail
@@ -11,7 +11,7 @@ ENTRY="${2:?usage: hv-append <section> <entry>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SECTION" "$ENTRY" <<'PY'
 import sys
 from hvlib import find_section, write_text_atomic
-sec, entry, path = sys.argv[1], sys.argv[2], ".hv/TODO.md"
+sec, entry, path = sys.argv[1], sys.argv[2], ".hv/BACKLOG.md"
 name = sec[3:] if sec.startswith("## ") else sec
 content = open(path).read()
 span = find_section(content, name)
