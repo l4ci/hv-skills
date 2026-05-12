@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refuse to operate on the project's base branch (main/master/trunk/configured).
-# Resolve helper (per DECISIONS.md "Lookup vs. resolve") — exits 1 on the base
-# branch or when the precondition can't be checked; exits 0 on a feature branch.
+# Validator helper (per DECISIONS.md "Mutator helpers") — exits 0 on a feature
+# branch; exits 1 on the base branch or when the precondition can't be checked.
 # Delegates base-branch resolution to hv-base-branch so umbrella-awareness and
 # `git.baseBranch` config behavior stay in one place.
 # Usage: hv-guard-feature-branch [<branch>]
