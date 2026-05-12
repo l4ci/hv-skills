@@ -22,6 +22,10 @@
 # HV_MILESTONE_STATUSES — pipe-separated milestone status enum.
 #                        Used by hv-vision-status (validation) and
 #                        hv-vision-index (drift heal regex).
+# HV_MILESTONE_PREFIX  — single-letter prefix for milestone IDs (current "M").
+#                        Used by hvlib.parse_milestones, which extracts every
+#                        `<prefix>\d+` ID from arbitrary text (Milestone: field,
+#                        frontmatter depends:, etc.).
 #
 # Deliberately distinct from these helper-local classes (left untouched):
 #   - hv-complete keys on [BF] when bumping counters.json#since_refactor —
@@ -36,4 +40,5 @@
 HV_ITEM_TYPES="BFT"
 HV_OPEN_SECTIONS="Bugs|Features|Tasks"
 HV_MILESTONE_STATUSES="planned|active|shipped|archived"
-export HV_ITEM_TYPES HV_OPEN_SECTIONS HV_MILESTONE_STATUSES
+HV_MILESTONE_PREFIX="M"
+export HV_ITEM_TYPES HV_OPEN_SECTIONS HV_MILESTONE_STATUSES HV_MILESTONE_PREFIX

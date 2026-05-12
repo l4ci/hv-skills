@@ -37,7 +37,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re
 from collections import defaultdict
 from pathlib import Path
-from hvlib import iter_open_sections, load_json, parse_todo_fields, active_items, parse_open_bullet
+from hvlib import iter_open_sections, load_json, parse_todo_fields, active_items, parse_open_bullet, parse_milestones
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -67,7 +67,7 @@ def parse_items(body):
         title = parsed.get("title") or ""
         fields = parse_todo_fields(line)
         related = fields["related"].rstrip(".")
-        milestones = ", ".join(re.findall(r"M\d+", fields["milestone"]))
+        milestones = ", ".join(parse_milestones(fields["milestone"]))
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line})
     return items
 

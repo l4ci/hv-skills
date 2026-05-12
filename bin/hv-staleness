@@ -25,10 +25,9 @@ hv_self_locate
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KIND" "$DAYS" "$TODAY" <<'PY'
 import datetime as dt
-import re
 import sys
 from pathlib import Path
-from hvlib import iter_map_entries, iter_topics, git_mtime
+from hvlib import iter_map_entries, iter_topics, git_mtime, iter_open_sections, parse_todo_fields, open_bullet_re
 
 kind, days_s, today_s = sys.argv[1], sys.argv[2], sys.argv[3]
 days = int(days_s)
@@ -75,12 +74,21 @@ elif kind == "todo":
     p = Path(".hv/TODO.md")
     if not p.exists():
         sys.exit(0)
-    # Match open bullets like "- [B07] Title (...) Captured: 2026-02-01"
-    captured_re = re.compile(r"^- \[([A-Z]\d+)\].*?Captured:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
-    for m in captured_re.finditer(p.read_text()):
-        d = parse_date(m.group(2))
-        if is_stale(d):
-            emit(m.group(1), d)
+    # Scan open backlog bullets via the canonical helpers — the prior inline
+    # regex assumed `- [ID]` but the real shape is `- **[ID] [Tag] Title.** ...`.
+    bullet_re = open_bullet_re()
+    for _name, body in iter_open_sections(p.read_text()):
+        for line in body.splitlines():
+            line = line.strip()
+            bm = bullet_re.match(line)
+            if not bm:
+                continue
+            captured = parse_todo_fields(line).get("captured", "")
+            if not captured:
+                continue
+            d = parse_date(captured)
+            if is_stale(d):
+                emit(bm.group("id"), d)
 else:
     print(f"unknown kind: {kind}", file=sys.stderr)
     sys.exit(1)

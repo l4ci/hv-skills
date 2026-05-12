@@ -9,14 +9,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 RAW=$("$HERE/hv-fm-list" .hv/milestones id title status depends)
-python3 - "$RAW" <<'PY'
-import json, re, sys
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RAW" <<'PY'
+import json, sys
 from pathlib import Path
+from hvlib import parse_milestones
 items = []
 for fm in json.loads(sys.argv[1]):
     depends = fm.get("depends") or []
     if isinstance(depends, str):
-        depends = re.findall(r"M\d+", depends)
+        depends = parse_milestones(depends)
     items.append({
         "id":      fm.get("id") or Path(fm["_path"]).stem,
         "title":   fm.get("title", ""),

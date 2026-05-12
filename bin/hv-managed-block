@@ -16,38 +16,23 @@ if [ "$MODE" = "--body-stdin" ]; then
   trap 'rm -f "$_BODY_TMP"' EXIT
   cat > "$_BODY_TMP"
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" "$_BODY_TMP" <<'PY'
-import sys, re
+import sys
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import upsert_block
 
 key = sys.argv[1]
 body = Path(sys.argv[2]).read_text().rstrip("\n")
 
 block = f"<!-- hv-{key}-start -->\n{body}\n<!-- hv-{key}-end -->"
 
-claude = Path("CLAUDE.md")
-if not claude.exists():
-    write_text_atomic(claude, block + "\n")
-    print("created")
-else:
-    content = claude.read_text()
-    pattern = re.compile(
-        rf"<!-- hv-{re.escape(key)}-start -->.*?<!-- hv-{re.escape(key)}-end -->",
-        re.DOTALL,
-    )
-    if pattern.search(content):
-        content = pattern.sub(block, content)
-        write_text_atomic(claude, content)
-        print("updated")
-    else:
-        write_text_atomic(claude, content.rstrip() + "\n\n" + block + "\n")
-        print("appended")
+status = upsert_block(Path("CLAUDE.md"), key, block)
+print(status)
 PY
 else
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY'
-import sys, re
+import sys
 from pathlib import Path
-from hvlib import write_text_atomic, iter_topics
+from hvlib import iter_topics, upsert_block
 
 REGISTRY = {
     "knowledge": {
@@ -87,29 +72,7 @@ block = (
     f"<!-- hv-{key}-end -->"
 )
 
-claude = Path("CLAUDE.md")
-if not claude.exists():
-    write_text_atomic(claude, block + "\n")
-    print("created")
-else:
-    content = claude.read_text()
-    legacy = cfg.get("legacy_marker")
-    if legacy:
-        pattern = re.compile(
-            rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(legacy)}:start) -->.*?<!-- hv(?:-{re.escape(key)}-end|:{re.escape(legacy)}:end) -->",
-            re.DOTALL,
-        )
-    else:
-        pattern = re.compile(
-            rf"<!-- hv-{re.escape(key)}-start -->.*?<!-- hv-{re.escape(key)}-end -->",
-            re.DOTALL,
-        )
-    if pattern.search(content):
-        content = pattern.sub(block, content)
-        write_text_atomic(claude, content)
-        print("updated")
-    else:
-        write_text_atomic(claude, content.rstrip() + "\n\n" + block + "\n")
-        print("appended")
+status = upsert_block(Path("CLAUDE.md"), key, block, legacy_marker=cfg.get("legacy_marker"))
+print(status)
 PY
 fi

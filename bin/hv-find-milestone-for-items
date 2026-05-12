@@ -15,9 +15,9 @@ if [ "$#" -lt 1 ]; then
   exit 1
 fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
-import re, sys
+import sys
 from pathlib import Path
-from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re
+from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re, parse_milestones
 
 ids_wanted = set(sys.argv[1:])
 todo = Path(".hv/TODO.md")
@@ -35,7 +35,7 @@ for line in body.splitlines():
     val = parse_todo_fields(line)["milestone"]
     if not val:
         continue
-    for mid in re.findall(r"M\d+", val):
+    for mid in parse_milestones(val):
         milestones.add(mid)
 for mid in sorted(milestones, key=lambda s: int(s[1:])):
     print(mid)

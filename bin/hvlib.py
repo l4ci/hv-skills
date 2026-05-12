@@ -165,26 +165,27 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 
 
 def parse_todo_fields(line: str) -> dict[str, str]:
-    """Extract Detail/Related/Milestone/Repos/Subsystem fields from a TODO bullet line.
+    """Extract Detail/Related/Milestone/Repos/Subsystem/Captured fields from a TODO bullet line.
 
     Each field starts with `<Field>: ` and runs until the next field marker
     or end of line. Order-agnostic. Returns a dict with keys 'detail',
-    'related', 'milestone', 'repos', 'subsystem' — missing fields map to ''.
+    'related', 'milestone', 'repos', 'subsystem', 'captured' — missing fields map to ''.
 
     Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
         => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": "", "subsystem": ""}
     Example: parse_todo_fields("- **[F01] [Major] Title.** D. Detail: x. Milestone: M02 Repos: web")
         => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web", "subsystem": ""}
     Example: parse_todo_fields("- **[B07] [P1] Title.** D. Repos: web Subsystem: capture Captured: 2026-05-09")
-        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture"}
+        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture", "captured": "2026-05-09"}
     """
-    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": ""}
+    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": "", "captured": ""}
     others = {
         "detail": ["Related", "Milestone", "Repos", "Subsystem", "Captured"],
         "related": ["Detail", "Milestone", "Repos", "Subsystem", "Captured"],
         "milestone": ["Detail", "Related", "Repos", "Subsystem", "Captured"],
         "repos": ["Detail", "Related", "Milestone", "Subsystem", "Captured"],
         "subsystem": ["Detail", "Related", "Milestone", "Repos", "Captured"],
+        "captured": ["Detail", "Related", "Milestone", "Repos", "Subsystem"],
     }
     for key in fields:
         cap = key.capitalize()
@@ -226,6 +227,21 @@ def validate_repos(csv: str) -> tuple[list[str], list[str], dict[str, str]]:
     repos = load_repos() if names else {}
     missing = [n for n in names if n not in repos]
     return names, missing, repos
+
+
+def parse_milestones(text: str) -> list[str]:
+    """Extract every milestone ID (e.g. M01, M03) from arbitrary text.
+
+    Reads the prefix from the HV_MILESTONE_PREFIX env var (default 'M'),
+    which `bin/hv-types.sh` exports. Returns IDs in document order with
+    duplicates preserved; callers dedupe if needed.
+
+    Example: parse_milestones("M01, M03")        => ["M01", "M03"]
+    Example: parse_milestones("Milestone: M02")  => ["M02"]
+    Example: parse_milestones("")                => []
+    """
+    prefix = os.environ.get("HV_MILESTONE_PREFIX", "M")
+    return re.findall(rf"{re.escape(prefix)}\d+", text)
 
 
 def update_milestone_status_line(content: str, mid: str, new_status: str) -> str:
@@ -309,6 +325,43 @@ def write_text_atomic(path, text: str) -> None:
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(text)
     os.replace(tmp, p)
+
+
+def upsert_block(claude_path: Path, key: str, block: str, legacy_marker: str | None = None) -> str:
+    """Write `block` into `claude_path`, replacing any existing
+    <!-- hv-{key}-start -->...<!-- hv-{key}-end --> match (sub),
+    appending if no match is found (append), or creating the file with
+    just the block if it doesn't exist (create).
+
+    When `legacy_marker` is provided, the lookup pattern also matches
+    the legacy `hv:{legacy_marker}:start`/`hv:{legacy_marker}:end`
+    delimiter shape, so callers can migrate older blocks to the
+    canonical `hv-{key}-start`/`hv-{key}-end` form in-place.
+
+    Returns 'created' | 'updated' | 'appended' so callers can print
+    the same status string they did before.
+    """
+    if not claude_path.exists():
+        write_text_atomic(claude_path, block + "\n")
+        return "created"
+    content = claude_path.read_text()
+    if legacy_marker:
+        pattern = re.compile(
+            rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(legacy_marker)}:start) -->"
+            rf".*?"
+            rf"<!-- hv(?:-{re.escape(key)}-end|:{re.escape(legacy_marker)}:end) -->",
+            re.DOTALL,
+        )
+    else:
+        pattern = re.compile(
+            rf"<!-- hv-{re.escape(key)}-start -->.*?<!-- hv-{re.escape(key)}-end -->",
+            re.DOTALL,
+        )
+    if pattern.search(content):
+        write_text_atomic(claude_path, pattern.sub(block, content))
+        return "updated"
+    write_text_atomic(claude_path, content.rstrip() + "\n\n" + block + "\n")
+    return "appended"
 
 
 def dump_json_atomic(path, data) -> None:
