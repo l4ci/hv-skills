@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# List all designs from .hv/designs/*.md as JSON.
+# Lookup helper: always exits 0; empty JSON array when no designs.
+# Each entry: { id, title, status, created }.
+# Usage: hv-design-list
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+RAW=$("$HERE/hv-fm-list" .hv/designs id title status created)
+python3 - "$RAW" <<'PY'
+import json, sys
+from pathlib import Path
+items = []
+for fm in json.loads(sys.argv[1]):
+    items.append({
+        "id":      fm.get("id") or Path(fm["_path"]).stem,
+        "title":   fm.get("title", ""),
+        "status":  fm.get("status") or "draft",
+        "created": fm.get("created", ""),
+    })
+print(json.dumps(items, indent=2))
+PY

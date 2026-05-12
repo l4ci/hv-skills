@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Create a design file under .hv/designs/<ID>.md.
+# Writer helper: exit 0 on successful design creation; exit 1 on usage error or conflict.
+# Usage:
+#   hv-design-add <ID> "<title>"     — designs are per-item; ID matches [BFT]\d{2,}
+# Prints the ID on stdout on success.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+ID="${1:?usage: hv-design-add <ID> <title>}"
+TITLE="${2:?usage: hv-design-add <ID> <title>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$TITLE" <<'PY'
+import re, sys
+from datetime import date
+from pathlib import Path
+from hvlib import write_text_atomic
+
+item_id, title = sys.argv[1], sys.argv[2]
+
+if not re.fullmatch(r"[BFT]\d{2,}", item_id):
+    print(f"error: ID must match [BFT]\\d{{2,}} (e.g. B07, F03, T11); designs are per-item, not per-slice or per-milestone, got {item_id!r}", file=sys.stderr)
+    sys.exit(1)
+
+designs_dir = Path(".hv/designs")
+designs_dir.mkdir(parents=True, exist_ok=True)
+
+design_path = designs_dir / f"{item_id}.md"
+if design_path.exists():
+    print(f"error: {design_path} already exists", file=sys.stderr)
+    sys.exit(1)
+
+write_text_atomic(design_path,
+    f"""---
+id: {item_id}
+title: {title}
+status: draft
+created: {date.today().isoformat()}
+---
+
+# {item_id} — {title}
+
+## Goal
+
+_(one sentence — what shipping this design means)_
+
+## Design
+
+_(3–8 sentences — the chosen shape, the moving parts, where they live)_
+
+## Approaches considered
+
+_(2–3 alternatives weighed with Pros / Cons / Why this might or might not be the right answer)_
+
+## Open questions
+
+_(unresolved questions to answer before /hv-plan or during execution)_
+
+## Assumptions
+
+_(named assumptions made implicit by the chosen design)_
+"""
+)
+print(item_id)
+PY

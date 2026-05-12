@@ -214,6 +214,22 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 - **[T06] Update linter config for new rules.** Enable the recently added lint rules in the project config. Related: [B03]
 ```
 
+## Step 7 — Brainstorm Nudge
+
+Fires only when the captured batch includes at least one `[Major]` feature OR one `[P0]` bug. Skip silently for `[Minor]` / `[Cosmetic]` features and `[P1]` / `[P2]` bugs — design exploration is a poor fit for small contained work.
+
+Read `autonomy.level` from `.hv/config.json` (default `"off"`):
+
+```bash
+LEVEL=$(jq -r '.autonomy.level // "off"' .hv/config.json)
+```
+
+Branch inline (per the `hv-init` authoring convention on inline autonomy directives):
+
+- `"off"` — append one line to the capture report for each qualifying ID: *"Run `/hv-brainstorm [ID]` before `/hv-plan` to negotiate the design."* Place this line after any existing post-capture nudges (e.g., release-pending), separated by one blank line.
+- `"auto"` — invoke `hv-brainstorm` via the `Skill` tool with the qualifying ID as `args`. When the batch produced two or more qualifying IDs, dispatch one `Skill` call per ID in sequence — `/hv-brainstorm` is per-item by contract. Print *"Auto: starting /hv-brainstorm [ID]."* before each dispatch so the user sees the pick.
+- `"loop"` — skip entirely. Loop mode is throughput and Socratic design exploration breaks the loop's pace; the brainstorm-bypass is intentional.
+
 ## Rules
 
 - **Never remove or reorder existing entries** — append only

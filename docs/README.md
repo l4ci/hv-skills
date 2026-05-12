@@ -30,6 +30,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 ### Vision and planning
 
 - [Vision and plans](usage/vision-and-plans.md) — `/hv-vision`, `/hv-plan`, milestones
+- [Brainstorming a design](usage/brainstorm.md) — `/hv-brainstorm` per-item design exploration before `/hv-plan`
 - [Spikes](usage/spikes.md) — throwaway feasibility experiments via `/hv-spike`
 
 ### Configuration
