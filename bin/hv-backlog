@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Render pre-sorted backlog tables from .hv/TODO.md, excluding items active in status.json.
+# Render pre-sorted backlog tables from .hv/BACKLOG.md, excluding items active in status.json.
 # Lookup helper: always exits 0; empty output when backlog is empty.
 # Output: markdown — "In Progress" + "Bugs" (P0/P1/P2) + "Features" (Cosmetic/Minor/Major) + "Tasks".
 # Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
@@ -41,9 +41,9 @@ from hvlib import iter_open_sections, load_json, parse_todo_fields, active_items
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
-todo_path = Path(".hv/TODO.md")
+todo_path = Path(".hv/BACKLOG.md")
 if not todo_path.exists():
-    print("No .hv/TODO.md yet. Run /hv-init then /hv-capture.")
+    print("No .hv/BACKLOG.md yet. Run /hv-init then /hv-capture.")
     raise SystemExit(0)
 content = todo_path.read_text()
 

@@ -193,7 +193,7 @@ cd ../..
 echo "hv-summary shows repo for umbrella active entries"
 mkdir sum-test && cd sum-test
 mkdir -p .hv
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -231,7 +231,7 @@ cd ..
 echo "hv-backlog In Progress Repo column"
 mkdir bl-test && cd bl-test
 mkdir -p .hv
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -275,7 +275,7 @@ mkdir pf-test && cd pf-test
 mkdir -p .hv/bin
 # Seed minimal required files
 echo "" > .hv/DECISIONS.md
-echo "" > .hv/TODO.md
+echo "" > .hv/BACKLOG.md
 echo "" > .hv/KNOWLEDGE.md
 echo "" > .hv/MILESTONES.md
 echo "{}" > .hv/counters.json

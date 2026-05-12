@@ -1,6 +1,6 @@
 echo "hv-backlog"
-# Seed a mix of items in TODO.md
-cat > .hv/TODO.md <<'EOF'
+# Seed a mix of items in BACKLOG.md
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -35,7 +35,7 @@ echo "$CLUSTER_BLOCK" | grep -q "B10\|F21\|T30" \
 pass "backlog emits Clusters section for related items"
 
 # Triple cluster + isolated item: F22↔F23↔T30 form one component, comma-separated.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -56,7 +56,7 @@ echo "$OUT" | grep -qF "[F90] Hub, [F91] Spoke, [T90] Toolchain" \
 pass "backlog renders 3+ member clusters with comma separator"
 
 # No-cluster fixture: must omit the section entirely.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -74,7 +74,7 @@ echo "$OUT" | grep -q "^### Clusters" \
 pass "backlog omits Clusters section when nothing is related"
 
 # Restore the original fixture for the In-Progress assertions below.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -102,7 +102,7 @@ pass "active items excluded from Features section"
 "$BIN/hv-status-remove" hv/real-branch
 
 echo "hv-backlog --grep matches"
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -142,7 +142,7 @@ echo "$OUT" | grep -q "### Bugs" && fail "Bugs section should be empty/absent on
 pass "hv-backlog --grep with no matches prints 'No matches' message"
 
 echo "hv-backlog --grep cluster"
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

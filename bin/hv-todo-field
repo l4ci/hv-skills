@@ -24,7 +24,7 @@ if field not in {"detail", "related", "milestone", "repos", "subsystem"}:
 corpus = load_backlog_corpus(".")
 result = find_origin_bullet(corpus, iid)
 if result is None:
-    sys.stderr.write(f"error: [{iid}] not found in TODO.md or ARCHIVE.md\n")
+    sys.stderr.write(f"error: [{iid}] not found in BACKLOG.md or ARCHIVE.md\n")
     sys.exit(1)
 
 line, _title = result

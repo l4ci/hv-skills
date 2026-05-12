@@ -90,7 +90,7 @@ pass "vision-list marks ready when dependencies are shipped"
 echo "hv-todo-by-milestone / Milestone field on entries"
 # Reactivate M01 and tag a couple of TODO entries.
 "$BIN/hv-vision-status" M01 active >/dev/null
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -163,7 +163,7 @@ pass "hv-bootstrap migrates legacy counters.json"
 rm -rf "$BOOT_DIR"
 
 echo "hv-preflight"
-# Ensure all core data files exist (smoke setup creates TODO.md/counters.json/status.json;
+# Ensure all core data files exist (smoke setup creates BACKLOG.md/counters.json/status.json;
 # KNOWLEDGE.md got written by hv-knowledge-index; config.json is needed by preflight).
 [ -f .hv/config.json ] || echo '{}' > .hv/config.json
 
@@ -180,12 +180,12 @@ cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
 pass "preflight exits 0 when fully initialized"
 
 # 3. Missing core data file → exit 2 (uninitialized).
-mv .hv/TODO.md .hv/TODO.md.bak
+mv .hv/BACKLOG.md .hv/BACKLOG.md.bak
 rc=0
 "$BIN/hv-preflight" 2>/dev/null || rc=$?
 [ "$rc" = "2" ] || fail "expected exit 2 (uninitialized), got $rc"
 pass "preflight exits 2 when a data file is missing"
-mv .hv/TODO.md.bak .hv/TODO.md
+mv .hv/BACKLOG.md.bak .hv/BACKLOG.md
 
 # 4. Missing helper → exit 3 (stale install after plugin upgrade).
 rm .hv/bin/hv-summary
@@ -316,11 +316,11 @@ pass "hv-spike-finish rejects unknown name"
 git branch -D spike/sse-feasibility >/dev/null 2>&1 || true
 
 echo "items <-> milestones <-> plans triangle"
-# Reset TODO.md to a known state, mint a fresh bug ID via hv-next-id, append a
+# Reset BACKLOG.md to a known state, mint a fresh bug ID via hv-next-id, append a
 # Milestone-tagged entry, and verify the full chain: hv-todo-by-milestone picks
 # it up, hv-plan-add mints a plan keyed under the same milestone, hv-plan-list
 # surfaces it.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -360,7 +360,7 @@ pass "triangle: hv-plan-list M01 reports new plan with item unitKind"
 echo "hv-todo-by-milestone field-order regression"
 # Wave 1 made the regex order-agnostic. Guard against a future regression by
 # tagging Milestone: in three different positions: first, middle, last.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -382,7 +382,7 @@ pass "hv-todo-by-milestone is order-agnostic across Detail/Related/Milestone"
 
 echo "hv-backlog field-order regression"
 # Guard against parse_todo_fields regressions: Milestone before Related, and after.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -436,7 +436,7 @@ ID_M4=$("$BIN/hv-vision-add" "Empty-active test" "Scratch milestone for helper s
 "$BIN/hv-vision-status" "$ID_M4" active
 
 # Case A: active milestone WITH an open item → helper emits empty stdout.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -453,7 +453,7 @@ echo "$OUT_A" | grep -qx "$ID_M4" && fail "empty-active Case A: $ID_M4 should NO
 pass "hv-vision-empty-active: active milestone with open items emits empty stdout"
 
 # Case B: active milestone with ZERO open items → helper emits the ID.
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

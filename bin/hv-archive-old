@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Move items from ## Completed in .hv/TODO.md to .hv/ARCHIVE.md if older than THRESHOLD days (default 5).
+# Move items from ## Completed in .hv/BACKLOG.md to .hv/ARCHIVE.md if older than THRESHOLD days (default 5).
 # Writer helper: exit 0 always; silently no-ops when no items are old enough.
 # Usage: hv-archive-old [threshold-days]
 # Outputs: number of items moved (silent if 0)
@@ -17,7 +17,7 @@ from hvlib import find_section, write_text_atomic, parse_done_line
 threshold = int(sys.argv[1])
 cutoff = date.today() - timedelta(days=threshold)
 
-todo = Path(".hv/TODO.md")
+todo = Path(".hv/BACKLOG.md")
 if not todo.exists():
     sys.exit(0)
 content = todo.read_text()
@@ -30,7 +30,7 @@ section = content[start:end]
 
 # Match only the canonical completed shape produced by hv-complete:
 #   - ~~**[ID] …**~~ Done YYYY-MM-DD [`hash`]
-# Milestones (M-prefix) are never archived from TODO.md — they live in
+# Milestones (M-prefix) are never archived from BACKLOG.md — they live in
 # MILESTONES.md with frontmatter status, not in ## Completed.
 old_lines, kept_lines = [], []
 for line in section.splitlines():
@@ -44,7 +44,7 @@ for line in section.splitlines():
     kept_lines.append(line)
 
 if old_lines:
-    # Rebuild TODO.md
+    # Rebuild BACKLOG.md
     new_section = "\n".join(kept_lines)
     if not new_section.startswith("\n"):
         new_section = "\n" + new_section

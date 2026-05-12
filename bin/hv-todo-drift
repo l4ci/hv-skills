@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Detect TODO.md drift from commit history. Walk `git log` per registered
+# Detect BACKLOG.md drift from commit history. Walk `git log` per registered
 # sub-repo (or current cwd in single-repo mode), extract [B##]/[F##]/[T##]
 # tags from commit subjects, and flag IDs that appear in commits but are
-# still listed as open in .hv/TODO.md.
+# still listed as open in .hv/BACKLOG.md.
 # Lookup helper: always exits 0; emits {"drift":[]} when no drift.
 #
 # Output: JSON to stdout — { "drift": [ { "id": "B07",
 #   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ] }
-# Empty array if no drift. Silent on missing TODO.md (exit 0, empty drift).
+# Empty array if no drift. Silent on missing BACKLOG.md (exit 0, empty drift).
 # Usage: hv-todo-drift
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -20,7 +20,7 @@ import json, os, subprocess, sys
 from pathlib import Path
 from hvlib import iter_open_sections, load_repos, open_bullet_re, find_item_ids
 
-todo_path = Path(".hv/TODO.md")
+todo_path = Path(".hv/BACKLOG.md")
 if not todo_path.exists():
     print(json.dumps({"drift": []}))
     sys.exit(0)

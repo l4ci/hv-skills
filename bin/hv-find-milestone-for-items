@@ -20,7 +20,7 @@ from pathlib import Path
 from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re, parse_milestones
 
 ids_wanted = set(sys.argv[1:])
-todo = Path(".hv/TODO.md")
+todo = Path(".hv/BACKLOG.md")
 if not todo.exists():
     raise SystemExit(0)
 content = todo.read_text()

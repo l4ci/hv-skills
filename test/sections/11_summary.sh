@@ -1,7 +1,7 @@
 echo "hv-summary"
 # Reset to a known state and check the summary lines
 rm -f .hv/ARCHIVE.md
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

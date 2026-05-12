@@ -27,7 +27,7 @@ fi
 cd "$TMP"
 mkdir -p .hv/bugs .hv/features .hv/tasks .hv/milestones
 
-cat > .hv/TODO.md <<'EOF'
+cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

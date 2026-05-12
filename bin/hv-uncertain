@@ -3,7 +3,7 @@
 # Resolve helper (tri-state): exits 0 when item is uncertain (peek warranted); exits 1 when certain; exits 2 on item-not-found error.
 # Exit 0: uncertain (peek warranted), with reason(s) on stdout, one per line.
 # Exit 1: certain (proceed direct to /hv-plan), no stdout.
-# Exit 2: error (item not found, TODO.md missing).
+# Exit 2: error (item not found, BACKLOG.md missing).
 # Usage: hv-uncertain <itemId>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -19,9 +19,9 @@ import os
 from hvlib import parse_todo_fields, find_open_bullet, parse_open_bullet, detail_dir_for_id
 
 iid = sys.argv[1]
-todo = Path(".hv/TODO.md")
+todo = Path(".hv/BACKLOG.md")
 if not todo.exists():
-    print("error: .hv/TODO.md not found", file=sys.stderr)
+    print("error: .hv/BACKLOG.md not found", file=sys.stderr)
     raise SystemExit(2)
 
 content = todo.read_text()
@@ -31,7 +31,7 @@ sections_env = [s.strip() for s in sections_env if s.strip()]
 found_line = find_open_bullet(content, iid, sections_env)
 
 if found_line is None:
-    print(f"error: item {iid} not found in TODO.md", file=sys.stderr)
+    print(f"error: item {iid} not found in BACKLOG.md", file=sys.stderr)
     raise SystemExit(2)
 
 fields = parse_todo_fields(found_line)

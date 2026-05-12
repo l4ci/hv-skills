@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Single source of truth for the item-type regex character class.
-# Sourced — not executed — by helpers that need to scan TODO.md / ARCHIVE.md
+# Sourced — not executed — by helpers that need to scan BACKLOG.md / ARCHIVE.md
 # for backlog item IDs (B/F/T) and surface them in regex.
 #
 # When a 5th item type lands, edit ONE line below; every consumer picks it up
@@ -15,7 +15,7 @@
 #                        Used by hv-backlog, hv-summary, hv-ship-body,
 #                        hv-review-scope, hv-todo-by-milestone.
 # HV_OPEN_SECTIONS     — canonical "## <name>" headings under which open
-#                        backlog items live in TODO.md. Used by
+#                        backlog items live in BACKLOG.md. Used by
 #                        hvlib.iter_open_sections; consumers iterate this set
 #                        rather than re-deriving ("Bugs", "Features", "Tasks")
 #                        inline.
@@ -30,7 +30,7 @@
 # Deliberately distinct from these helper-local classes (left untouched):
 #   - hv-complete keys on [BF] when bumping counters.json#since_refactor —
 #     only countable work types pressure the next refactor cycle.
-#   - hv-plan-add uses [BFTS] — accepts a Slice prefix not present in TODO.md.
+#   - hv-plan-add uses [BFTS] — accepts a Slice prefix not present in BACKLOG.md.
 #
 # Naming note: this file is "hv-types.sh" (not "_hv-types.sh") so that
 # `cp hv-* .hv/bin/` in /hv-init Step 2 picks it up. hv-preflight discovers

@@ -24,7 +24,7 @@ TD_TMP="$(mktemp -d)"
 (
   cd "$TD_TMP"
   mkdir -p .hv/bin
-  cat > .hv/TODO.md <<'EOF'
+  cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -47,7 +47,7 @@ EOF
   pass "hv-todo-drift detects shipped-but-open ID"
 
   # Completed (strikethrough) IDs are NOT drift — even if they appear in commits.
-  cat > .hv/TODO.md <<'EOF'
+  cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
