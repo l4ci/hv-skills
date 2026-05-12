@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print the contents of a plan file.
+# Resolve helper: exits 1 when plan key not found; exits 0 with content on match.
 # Usage: hv-plan-show <key>     (e.g. hv-plan-show M01-S01)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

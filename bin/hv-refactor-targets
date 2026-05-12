@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Emit refactor targets for the current project as JSON.
+# Lookup helper: always exits 0; emits JSON.
 # Single-repo mode: umbrella null, subRepos empty.
 # Umbrella mode: umbrella.hasCode flag + every registered sub-repo's name + abs path.
 # Used by /hv-refactor Step 1.5 to ask the user which scope to refactor.

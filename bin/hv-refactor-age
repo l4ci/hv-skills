@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print features/bugs completed since the last `refactor:` commit.
+# Lookup helper: always exits 0; reads counters.json.
 # Reads .hv/counters.json — the field is maintained imperatively by
 # hv-complete (increments on non-refactor completions) and zeroed by
 # hv-refactor-reset at the end of a /hv-refactor cycle.

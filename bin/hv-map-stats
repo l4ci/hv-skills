@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print per-subsystem stats from .hv/map/ as JSON.
+# Lookup helper: exits 0 always; emits empty JSON when .hv/map/ missing.
 # Usage: hv-map-stats
 # Output: {"subsystems": [{"name": "...", "bytes": N, "touched": "YYYY-MM-DD",
 #                         "entry_points": N, "broken_refs": N}, ...]}

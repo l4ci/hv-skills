@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # List stale entries across MAP / KNOWLEDGE / TODO based on a days threshold.
+# Lookup helper: exits 0 always for valid args; exits 1 only on unrecognized arguments (usage error).
 # Usage: hv-staleness <kind> [--days N] [--today YYYY-MM-DD]
 #   kind:    map | knowledge | todo
 #   --days:  threshold; entries that are N or more days old are listed (default 90)

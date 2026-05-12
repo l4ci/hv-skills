@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # List all plans from .hv/plans/*.md as JSON.
+# Lookup helper: always exits 0; empty JSON array when no plans.
 # Each entry: { key, milestone, unit, unitKind, title, status, created, repo }.
 # Usage: hv-plan-list [milestone]
 #   With a milestone arg, returns only plans under that milestone.

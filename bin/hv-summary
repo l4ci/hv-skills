@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Print a compact project-state summary: backlog counts, active work,
 # recent completions, knowledge topics. Pure read — no git calls, no mutation.
+# Lookup helper: always exits 0; pure read, no mutation.
 # Usage: hv-summary
 set -euo pipefail
 . "$(dirname "$0")/hv-types.sh"

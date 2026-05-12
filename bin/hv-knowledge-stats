@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print bullet count and byte size per topic in .hv/KNOWLEDGE.md as JSON.
+# Lookup helper: exits 0 always; emits {"topics":[]} when KNOWLEDGE.md missing.
 # Usage: hv-knowledge-stats
 # Output: {"topics": [{"name": "Topic", "bullets": N, "bytes": N}, ...]}
 # Silent-empty {"topics": []} when KNOWLEDGE.md is missing.
