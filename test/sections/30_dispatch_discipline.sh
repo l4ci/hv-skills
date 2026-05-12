@@ -34,3 +34,18 @@ grep -q '^## Dispatch heavy work to subagents' "$REPO/references/authoring-conve
 grep -q 'references/subagent-dispatch.md' "$REPO/references/authoring-conventions.md" \
   || fail "F73: authoring-conventions.md missing cross-reference to subagent-dispatch.md"
 pass "authoring-conventions cites subagent-dispatch reference"
+
+echo "F73: hv-next dispatch wave"
+grep -q 'Worker A.*[Rr]econcile' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing Worker A (reconcile)"
+grep -q 'Worker B.*[Aa]rchive' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing Worker B (archive)"
+grep -q 'Worker C.*[Mm]ilestone' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing Worker C (milestone)"
+grep -q 'Worker D.*[Rr]elevance' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing Worker D (relevance)"
+grep -q 'single parallel wave' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing 'single parallel wave' phrasing"
+grep -q 'references/subagent-dispatch.md' "$REPO/hv-next/SKILL.md" \
+  || fail "F73: hv-next missing reference cite"
+pass "hv-next retrofitted with parallel dispatch wave"
