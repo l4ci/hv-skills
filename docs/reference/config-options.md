@@ -9,6 +9,18 @@ Two sources feed this vocabulary:
 
 The "(Recommended)" tag on each option marks the install-time default; `/hv-config` retags the user's *current* value as `(current)` instead, so users always see what they're replacing.
 
+## /hv-config invocation shapes
+
+`/hv-config` supports three positional invocation shapes, parsed in Step 1.5 of its skill flow (see `hv-config/SKILL.md`):
+
+| Shape | Behavior |
+|-------|----------|
+| `/hv-config` (no args) | Full guided flow — category checklist, then key checklist, then value pickers. |
+| `/hv-config <key>` | Jumps straight to the value picker for that key, skipping the category and key checklists. |
+| `/hv-config <key>=<value>` | Applies the value directly without any interactive prompts, then prints the one-line diff. |
+
+Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text) are enumerated in `hv-config/SKILL.md` Step 1.5. An unknown key or invalid value stops the skill with an explicit error — it does not fall through to the guided flow.
+
 ## Q1 — Models
 
 `header: "Models"`, single-select.

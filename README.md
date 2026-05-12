@@ -155,7 +155,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 | Skill | Description |
 |-------|-------------|
 | `/hv-init` | Initialize `.hv/` with `TODO.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
-| `/hv-config` | Edit `.hv/config.json` interactively — checklist of current values, then native option pickers for each chosen key |
+| `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-c` | Shortcut for `/hv-capture` |

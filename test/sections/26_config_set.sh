@@ -74,3 +74,19 @@ grep -q "hv-config-set" "$REPO/hv-docs/SKILL.md"   || fail "hv-docs missing hv-c
 grep -q "hv-config-set" "$REPO/hv-config/SKILL.md" || fail "hv-config missing hv-config-set call"
 grep -q "hv-config-set" "$REPO/hv-init/SKILL.md"   || fail "hv-init missing hv-config-set call"
 pass "hv-docs, hv-config, hv-init all reference the new helper"
+
+echo "hv-config positional-args invocation shapes"
+grep -q '## Step 1.5 — Parse Positional Arguments' "$REPO/hv-config/SKILL.md" || fail "hv-config missing Step 1.5"
+grep -qE 'work\.isolation=worktree|<key>=<value>' "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing positional-args syntax doc"
+grep -q 'models.orchestrator' "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing canonical key list"
+# Each canonical key should appear in Step 1.5's enumeration (12 base + the models pair = 14 keys)
+for key in models.orchestrator models.worker work.isolation work.mergeStrategy ship.review learn.verify refactor.confirmBeforeExecute debug.competingHypotheses autonomy.level docs.path docs.autoCreate docs.afterWork git.baseBranch umbrella.enabled; do
+  grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing key: $key"
+done
+pass "hv-config Step 1.5 documents all 14 canonical keys with positional-args syntax"
+
+echo "hv-config positional-args mentioned in docs + README"
+grep -q 'positional' "$REPO/docs/reference/config-options.md" || fail "config-options.md missing positional-args mention"
+grep -q 'positional\|<key>=<value>' "$REPO/docs/usage/configuration.md" || fail "configuration.md missing positional-args mention"
+grep -q '/hv-config <key>' "$REPO/README.md" || fail "README.md missing /hv-config <key> shortcut"
+pass "hv-config positional-args documented in docs + README"

@@ -1,6 +1,6 @@
 # Configuration
 
-All settings live in [`.hv/config.json`](../reference/hv-folder.md). Edit the file directly or run `/hv-config` for an interactive picker that offers four common profiles (Balanced, Premium, Fast, Minimal) that map to the values below.
+All settings live in [`.hv/config.json`](../reference/hv-folder.md). Edit the file directly or run `/hv-config` for an interactive picker that offers four common profiles (Balanced, Premium, Fast, Minimal) that map to the values below. `/hv-config <key>` jumps straight to the value picker for that key; `/hv-config <key>=<value>` applies the value directly.
 
 For the exact wording of the interactive picker's questions and option labels, see [Configuration options](../reference/config-options.md).
 

@@ -1,6 +1,6 @@
 ---
 name: hv-config
-description: Change hv-skills configuration interactively — pick which settings to edit from a checklist showing current values, then choose new values from the same options used at init. Use on "change config", "switch to worktree mode", "turn on autonomy", "edit settings".
+description: Change hv-skills configuration interactively — pick which settings to edit from a checklist showing current values, then choose new values from the same options used at init. Also supports positional shortcuts: `/hv-config <key>` jumps to the value picker, `/hv-config <key>=<value>` applies directly. Use on "change config", "switch to worktree mode", "turn on autonomy", "edit settings".
 user-invocable: true
 ---
 
@@ -24,6 +24,7 @@ Change one or more configuration values without hand-editing JSON. Same option v
 - Toggle a single setting — *"switch to worktree isolation"*, *"turn autonomy on loop"*
 - Adjust a few keys at once after the project has matured
 - You forgot the exact JSON path for a setting
+- Apply a single known value fast — `/hv-config work.isolation=worktree`
 
 ## When NOT to Use
 
@@ -43,9 +44,54 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Phases:
 
-1. *Pick keys* — category-then-keys two-stage selection (Steps 2–3)
-2. *Validate* — new values normalized and checked against allowed sets (Step 4)
-3. *Write* — `.hv/config.json` updated; managed CLAUDE.md blocks regenerated if relevant (Steps 5–6)
+1. *Parse positional args* — empty / `<key>` / `<key>=<value>` shapes resolved (Step 1.5)
+2. *Pick keys* — category-then-keys two-stage selection (Steps 2–3)
+3. *Validate* — new values normalized and checked against allowed sets (Step 4)
+4. *Write* — `.hv/config.json` updated; managed CLAUDE.md blocks regenerated if relevant (Steps 5–6)
+
+## Step 1.5 — Parse Positional Arguments
+
+Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
+
+| Shape | Behavior |
+|-------|----------|
+| Empty / whitespace only | Continue to Step 2 — full guided flow. |
+| `<key>` (no `=`) | Skip Step 2 and Step 3. Treat `<key>` as the single picked key; jump straight to Step 4. |
+| `<key>=<value>` | Skip Steps 2–4. Validate, apply directly via `hv-config-set`, jump to Step 6. |
+
+**Split on the FIRST `=` only.** Free-text keys (`docs.path`, `git.baseBranch`) may contain `=` in their values; later `=` characters belong to the value.
+
+**Trim whitespace** around the key and around the value. `docs.path=` (empty value after `=`) is valid for free-text keys and writes the empty string.
+
+**Validate `<key>`** against the canonical list. Valid keys (exact match required, case-sensitive):
+
+- `models.orchestrator`, `models.worker`
+- `work.isolation`, `work.mergeStrategy`
+- `ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`
+- `autonomy.level`
+- `docs.path`, `docs.autoCreate`, `docs.afterWork`
+- `git.baseBranch`
+- `umbrella.enabled`
+
+Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `/hv-config` with no arguments to see the full list."* Do **not** silently fall through to the guided flow — the positional invocation is an explicit ask for one specific key.
+
+**Validate `<value>`** when present, against the allowed values for that key from `docs/reference/config-options.md`:
+
+- Enum keys (`work.isolation`, `work.mergeStrategy`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options.
+- Boolean keys (`ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
+- Free-text keys (`docs.path`, `git.baseBranch`) — accept any value including the empty string.
+
+Invalid value → stop with: *"Error: `<value>` is not a valid value for `<key>`. Allowed: <comma-separated list from config-options.md>."*
+
+On the `<key>` (no `=`) path, carry the single key forward as the only picked key in Step 4 — that one question is asked, the user's answer is written, then jump to Step 6.
+
+On the `<key>=<value>` path, write directly:
+
+```bash
+.hv/bin/hv-config-set <key> <value>
+```
+
+Then jump to Step 6 to print the one-line diff.
 
 ## Step 2 — Read & Display Current Config
 
@@ -88,6 +134,8 @@ Print the helper output verbatim — the user needs to see what they're editing.
 
 ## Step 3 — Pick Which Keys to Change
 
+Skip this step entirely when Step 1.5 parsed a `<key>` or `<key>=<value>` argument — the key is already picked (or already written).
+
 The 13 configurable keys group into 4 categories; pick categories first, then drill into the keys in each. This two-stage flow keeps every question within `AskUserQuestion`'s 4-option UI cap.
 
 ### Stage A — Pick categories
@@ -123,6 +171,8 @@ If every Stage B call returns no selections, print *"No changes."* and stop.
 Plain-text fallback: if the host doesn't surface `AskUserQuestion` options at all, ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the thirteen key names listed across the four categories above.
 
 ## Step 4 — Ask the Selected Questions
+
+When Step 1.5 captured a single `<key>` (no `=`), this step asks only that key's question — one question, not the full set.
 
 Build a single `AskUserQuestion` call containing **only** the questions for the keys the user selected in Step 3. The question wording and option vocabulary live in [`docs/reference/config-options.md`](../docs/reference/config-options.md) — that page is the canonical source for both Q1–Q5 and the additional `/hv-config` keys (docs path, docs auto-create, docs after-work, git base branch, umbrella mode). Use the labels and descriptions from that reference verbatim.
 
@@ -192,3 +242,4 @@ Keep notes short and only for state changes that materially alter how subsequent
 - **Same vocabulary as `/hv-init`.** Don't invent new option labels — reuse Q1–Q5's wording so the choices are familiar.
 - **Cancellation is silent.** Empty selection or all-`(current)` answers exit with *"No changes."* — no warnings, no nags.
 - **One pass.** The skill asks once, writes once, reports once. To make further edits, the user re-invokes `/hv-config`.
+- **Positional args bypass selection, not validation.** `<key>` must match the canonical list exactly; `<value>` (when given) must match the allowed set from `docs/reference/config-options.md`. Unknown / invalid arguments stop the skill with an explicit error — never silently fall through to the guided flow.
