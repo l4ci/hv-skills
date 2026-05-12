@@ -55,6 +55,8 @@ DECISIONS matches are committed boundaries that constrain what milestones can pr
 
 ## Step 3 — Frame & Discover
 
+`/hv-vision` is the project-scope half of the design-exploration family — see `references/design-exploration.md` for the shared spine (Socratic discovery, propose before disk write, iterate before commit, write via helper, user-review gate) and the per-axis divergences. Vision's discovery is batched (single `AskUserQuestion` call with 2–3 questions in Create mode); brainstorm's is one-per-round. Both honor the same plain-text fallback rule.
+
 Open with one short paragraph (3–4 sentences max) summarizing what you see — the project's apparent shape, the existing milestones if any, the obvious gaps. This grounds the conversation; it's not a status report.
 
 Then ask discovery questions via `AskUserQuestion`. Tailor them to the mode:
@@ -246,3 +248,4 @@ Otherwise the run is done. Don't recap discovery, research, or the challenge rou
 - [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/context-load-protocol.md`](../references/context-load-protocol.md) — K+D context loading sequence shared by every cycle-starting skill.
+- [`references/design-exploration.md`](../references/design-exploration.md) — Shared spine (Socratic discovery, propose, iterate, write, user-review) and per-axis divergences with `/hv-brainstorm`.

@@ -88,18 +88,16 @@ DECISIONS matches are hard boundaries. If the brainstorm would violate any, surf
 
 ## Step 4 — Frame & Discover
 
-Socratic clarifying questions, one at a time. Use `AskUserQuestion` with one question per round, multi-choice preferred, ≤ 4 options per the picker cap. **Cap: 5 clarifying rounds**; after the fifth, switch to plain-text prose and stop counting picker rounds.
+Socratic clarifying questions via `AskUserQuestion`, one per round, multi-choice preferred (≤ 4 options per the picker cap). **Cap: 5 clarifying rounds**; after the fifth, switch to plain-text prose. Section gates (Step 6) and the final review (Step 9) are check-ins, not exploratory questions, and do **not** count against the budget. Plain-text fallback per `references/ask-user-question-fallback.md` — honor yes/no for binary cases, default to Recommended for routing cases.
 
-Section gates (Step 6) and the final review (Step 9) are check-ins, not exploratory questions, and do **not** count against the 5-question budget.
+`/hv-vision` is the project-scope sibling and uses batched discovery — see `references/design-exploration.md` for the family spine and divergence rationale.
 
-Good clarifying-question shapes:
+Good clarifying-question shapes for an item:
 
 - **Scope** — *"Does this need to handle umbrella sub-repos in V1, or is single-repo fine?"*
 - **Interaction** — *"Should this run automatically after /hv-capture, or only on explicit invocation?"*
 - **Gotcha boundaries** — *"What existing skill must this NOT touch?"*
 - **Failure modes** — *"What happens when <key precondition> is false?"*
-
-Plain-text fallback: ask once in prose; default rule per the site is honor yes/no for binary cases, default to Recommended for routing cases. See `references/ask-user-question-fallback.md`.
 
 **Spike handoff.** When a clarifying question or candidate approach needs code-touching evidence to answer (feasibility, library support, performance characteristics), surface:
 
@@ -116,19 +114,13 @@ Present 2 or 3 candidate approaches inline as plain markdown — not yet committ
 - **Cons** — 2-4 bullets on what it costs
 - **Why this might or might not be the right answer** — one sentence on the deciding factor
 
-Then ask the user to pick via `AskUserQuestion` (single-select, ≤ 4 options: one per approach plus *"Ask more questions first"* as an escape back to Step 4). Plain-text fallback: list the approach labels in prose and parse the reply against them; default rule: honor yes/no — silence means the user wants more discussion, not a pick.
+Frame each candidate around the item's detail file and the K+D+C findings from Step 3 — *"approach A reuses the helper pattern flagged in KNOWLEDGE"*, *"approach B violates the DECISION on X"*. Then ask the user to pick via `AskUserQuestion` (single-select, ≤ 4 options: one per approach plus *"Ask more questions first"* as an escape back to Step 4). Silence means more discussion, not a pick.
 
 The picked approach is the design. Carry it into Step 6.
 
 ## Step 6 — Sectioned Design with Per-Section Approval
 
-Draft the design one section at a time in this order: Goal → Design → Approaches considered → Open questions → Assumptions. Present each section inline, then ask via `AskUserQuestion` (single-select, 3 options):
-
-- **Approve this section**
-- **Suggest changes** — user redlines; restate; ask again
-- **Approve all remaining sections** — short-circuit Step 6 and jump to Step 7
-
-Plain-text fallback: `yes` / `changes` / `approve all`. Default rule: honor yes/no — silence does not approve, restate and re-ask.
+Draft the design one section at a time in this order: Goal → Design → Approaches considered → Open questions → Assumptions. See `references/design-exploration.md` for the shared approval shape (yes / changes / approve all remaining).
 
 Section content rules:
 
@@ -150,24 +142,15 @@ The helper creates `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `statu
 
 ## Step 8 — Self-Review
 
-Scan the written artifact in one pass for:
-
-- **Placeholders** — `_(placeholder)_`, `TBD`, `???`, empty sections
-- **Internal contradictions** — Step 5's chosen approach matches the Design section; Open questions don't conflict with Assumptions
-- **Scope creep** — every claim ties back to the item ID; nothing leaks into a sibling item or future milestone
-- **Ambiguous adjectives** — *"a few"*, *"many"*, *"high quality"*, *"reasonable"*. Replace with numbers or assertive verbs (per the 2026-05-11 KNOWLEDGE entry on soft adjectives).
-
-Surface findings in one block. If any landed, offer to revise — this is a check-in, not counted against the Step 4 budget.
+Scan per the shared shape — see `references/design-exploration.md` (placeholders, internal contradictions, scope creep, ambiguous adjectives). Item-specific check: every claim ties back to the item ID; nothing leaks into a sibling item or future milestone. Internal-contradiction check: Step 5's chosen approach matches the Design section; Open questions don't conflict with Assumptions.
 
 ## Step 9 — User Review Gate
 
-Print the final artifact (or invoke `.hv/bin/hv-design-show <ID>`) and ask via `AskUserQuestion` (single-select, 3 options):
+Print the final artifact (or invoke `.hv/bin/hv-design-show <ID>`) and ask via `AskUserQuestion` per the shared review-gate shape (see `references/design-exploration.md`). Item-specific routes:
 
 - **Approve and hand off to `/hv-plan`**
 - **Revise** — return to Step 6 with the user's redlines
 - **Stop here** — design is enough for now; no plan handoff
-
-Plain-text fallback: `approve` / `revise` / `stop`. Default rule: honor yes/no.
 
 ## Step 10 — Report
 
@@ -203,3 +186,4 @@ If the user picked *Stop here* → exit without a `/hv-plan` nudge.
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
+- [`references/design-exploration.md`](../references/design-exploration.md) — Shared spine (Socratic discovery, 2-3 approaches, sectioned design with per-section approval, self-review, user-review gate) used by `/hv-vision` and `/hv-brainstorm`.
