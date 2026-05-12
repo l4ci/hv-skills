@@ -54,6 +54,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
 | `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
+| `hv-vision-empty-active` | Print active milestone IDs with 0 open items, one per line | `.hv/bin/hv-vision-empty-active` |
 | `hv-design-add` | Writer: create `.hv/designs/<ID>.md` from an item ID (`[BFT]\d{2,}`); exit 1 on bad ID or conflict | `.hv/bin/hv-design-add F12 "Archive command"` |
 | `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
 | `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
@@ -183,9 +184,11 @@ while knowledge is *passive* gotchas captured by `/hv-learn`. See
 The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints
 the next `MNN` ID, creates the milestone file, and appends its overview line to
 `MILESTONES.md`. `hv-vision-status` updates both the file's frontmatter and the
-overview line atomically. `hv-vision-active`, `hv-vision-list`, and
-`hv-vision-index` let you query and refresh milestone state. `hv-vision-index`
+overview line atomically. `hv-vision-active`, `hv-vision-list`, `hv-vision-index`, and
+`hv-vision-empty-active` let you query and refresh milestone state. `hv-vision-index`
 also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`.
+`hv-vision-empty-active` prints active milestone IDs that have zero open TODO items,
+one per line; empty stdout is a valid answer and the helper always exits 0.
 
 `hv-todo-by-milestone` is covered in [Backlog manipulation](#backlog-manipulation).
 

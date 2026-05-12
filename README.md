@@ -135,7 +135,7 @@ You have an empty repo or a few sketches. You want to think through where this i
 #   filed under "Auth & Identity"
 ```
 
-When the milestone ships, mark it `shipped` (which unblocks its dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
+`/hv-next` flags any active milestone with no open items so you know when to flip it. When the milestone ships, mark it `shipped` (which unblocks its dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
 
 ## FAQ
 
