@@ -8,6 +8,7 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 - Build & Tooling: Helper Composition & Observability
 - Build & Tooling: Umbrella & Worktrees
 - Build & Tooling: Smoke & Plugin
+- Build & Tooling: Releases
 - Documentation
 - Skill Authoring: Prose & References
 - Skill Authoring: Workflows & Autonomy
@@ -33,17 +34,18 @@ Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
 
-**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-next`, `/hv-status`, `/hv-resume`, `/hv-pause`
+**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship`
-**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only)
+**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
 **Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
 **Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
-Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
+Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, `## Project Vision`, or `## Project Context`, pull only the relevant sections:
 
 - `.hv/bin/hv-knowledge-query <topic>…`
 - `.hv/bin/hv-decisions-query <topic>…`
+- `.hv/bin/hv-context-query <term>…`
 - `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
 <!-- hv-skills-end -->
 
@@ -56,3 +58,20 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 - Skill Authoring
 
 <!-- hv-decisions-end -->
+
+<!-- hv-map-start -->
+## Project Map
+
+Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/bin/hv-map-query <name>`.
+
+- **capture** — Captures items into TODO.md
+- **plan** — Plans before execution
+<!-- hv-map-end -->
+
+<!-- hv-context-start -->
+## Project Context
+
+Domain terminology lives in `.hv/CONTEXT.md`. Use these canonical names; if a term you're using conflicts (synonym or drift), call it out.
+
+- **prompt-stage** — Stage in repo-a.
+<!-- hv-context-end -->
