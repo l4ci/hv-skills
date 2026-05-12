@@ -29,6 +29,17 @@ The note's shape looks like:
 
 You don't need to manage this file directly. `/hv-next` reads and deletes it on resolve.
 
+```mermaid
+stateDiagram-v2
+    [*] --> Working: /hv-work or /hv-debug starts
+    Working --> Paused: /hv-pause writes handoff note
+    Paused --> Cleared: /clear or session ends
+    Cleared --> Resuming: /hv-next in new session
+    Resuming --> Working: handoff consumed (rm -f)
+    Paused --> Working: resume in same session
+    Working --> [*]: merge or PR
+```
+
 ## /hv-next reads handoff notes
 
 When active streams exist, `/hv-next` reads any handoff note matching each stream and surfaces the **Stage**, **Next planned step**, and **Current hypothesis** inline. The path resolution mirrors `/hv-pause`'s write side: `.hv/handoff/<branch>@<repo>.md` for umbrella streams, with a fallback to `.hv/handoff/<branch>.md` for single-repo cycles or pre-umbrella handoffs.
