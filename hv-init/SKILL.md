@@ -26,13 +26,34 @@ command -v git >/dev/null 2>&1 || { echo "error: git is required but not install
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required but not installed" >&2; exit 1; }
 ```
 
-Then check whether the current directory is a git repo:
+Then run both state checks before deciding which prompt (if any) to issue:
 
 ```bash
-git rev-parse --git-dir >/dev/null 2>&1
+# Is the cwd already a git repo?
+git rev-parse --git-dir >/dev/null 2>&1 && IS_GIT_REPO=true || IS_GIT_REPO=false
+
+# Are there 2+ immediate child git repos? (umbrella signal)
+UMBRELLA_CANDIDATES=$(find . -maxdepth 2 -mindepth 2 -name .git -printf '%h\n' 2>/dev/null | sed 's|^\./||' | sort)
+UMBRELLA_COUNT=$(echo "$UMBRELLA_CANDIDATES" | grep -c . || true)
 ```
 
-If yes, continue to Step 2. Otherwise offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor` all require git, so without a repo only the backlog-capture subset works. Use `AskUserQuestion`:
+Branch on the combination of `IS_GIT_REPO` and `UMBRELLA_COUNT`:
+
+**Case A — `IS_GIT_REPO=true` and `UMBRELLA_COUNT < 2`:** Continue silently to Step 2. No prompt.
+
+**Case B — `IS_GIT_REPO=true` and `UMBRELLA_COUNT >= 2`:** This is an existing git repo that also holds sub-repos. Offer umbrella mode via `AskUserQuestion`:
+
+- **Header:** `"Umbrella"`
+- **Question:** *"Found multiple git repos here: \<list\>. Enable umbrella mode? (`.hv/` stays at this level; helpers operate per sub-repo.)"*
+- **Options** (single-select):
+  1. *"Yes, enable umbrella mode (Recommended)"* — *"Registers child repos via `hv-umbrella-init` after bootstrap. Sets `umbrella.enabled: true` in config."*
+  2. *"No, single-repo init"* — *"Skip umbrella; `/hv-init` proceeds as if the umbrella detection didn't fire. Existing single-repo behavior."*
+
+On **Yes** — set `UMBRELLA_MODE=true` and `UMBRELLA_REGISTER="all"` (or ask a follow-up multiSelect to pick a subset of `$UMBRELLA_CANDIDATES`; `"all"` is the simpler default). Continue to Step 2. On **No** — set `UMBRELLA_MODE=false`, continue to Step 2 unchanged.
+
+Plain-text fallback: ask once textually — *"Found N git repos here: \<list\>. Enable umbrella mode? (yes/no)"* — and honor the user's reply. If no reply is captured, default to **No** with a one-line follow-up note: *"Skipping umbrella mode. Re-run `/hv-init` from this cwd to enable, or toggle `umbrella.enabled` via `/hv-config` later."* The default is **No** rather than Yes because `umbrella.enabled` is an opt-in feature flag — per the *Authoring conventions / Opt-in feature flags default to `false`* rule, the cwd signal alone is not user approval; explicit user approval is required.
+
+**Case C — `IS_GIT_REPO=false` and `UMBRELLA_COUNT < 2`:** This directory isn't a git repo and has at most 1 sub-repo. Offer to initialize one — `/hv-work`, `/hv-debug`, `/hv-ship`, and `/hv-refactor` all require git, so without a repo only the backlog-capture subset works. Use `AskUserQuestion`:
 
 - **Header:** `"Git"`
 - **Question:** *"This directory isn't a git repository. Initialize one?"*
@@ -41,41 +62,27 @@ If yes, continue to Step 2. Otherwise offer to initialize one — `/hv-work`, `/
   2. *"No, backlog-only"* — *"Skip init; capture/next/learn/status still work. Git skills fail until you init manually."*
   3. *"Stop"* — *"Cancel `/hv-init`."*
 
-On **Yes** — run `git init`, continue to Step 2, mention the created branch in the Step 5 summary. On **No** — continue but warn: *"Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail until you run `git init`."* On **Stop** — exit.
+On **Yes** — run `git init`, set `UMBRELLA_MODE=false`, continue to Step 2, mention the created branch in the Step 5 summary. On **No** — set `UMBRELLA_MODE=false`, continue but warn: *"Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail until you run `git init`."* On **Stop** — exit.
 
 Plain-text fallback: run `git init` straight through — it's the Recommended choice and reversible.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment & umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
+**Case D — `IS_GIT_REPO=false` and `UMBRELLA_COUNT >= 2`:** This is the non-git umbrella greenfield case. Both conditions are true simultaneously, so fold them into a single `AskUserQuestion` call instead of two separate prompts. Build a short candidate list for the question text — use the first 3 candidate names; if there are 4+, append *"and N more"* so the prompt stays readable. Use `AskUserQuestion`:
 
-Phases:
-
-1. *Detect* — environment + umbrella decision (Steps 1, 1.5)
-2. *Write artifacts* — bootstrap `.hv/` and install helpers (Step 2)
-3. *Configure* — interactive config (FRESH or STALE migration, Step 3)
-4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map, context indices (Step 4)
-
-## Step 1.5 — Umbrella Detection (Optional)
-
-If the current directory holds **two or more immediate child directories that are themselves git repos**, this is likely a multi-repo umbrella — `.hv/` should live here, but git operations should run inside the relevant sub-repo. Detect by scanning `*/.git`:
-
-```bash
-UMBRELLA_CANDIDATES=$(find . -maxdepth 2 -mindepth 2 -name .git -printf '%h\n' 2>/dev/null | sed 's|^\./||' | sort)
-UMBRELLA_COUNT=$(echo "$UMBRELLA_CANDIDATES" | grep -c . || true)
-```
-
-If `UMBRELLA_COUNT >= 2`, offer umbrella mode via `AskUserQuestion`. Skip silently for 0 or 1 — that's the single-repo path and Step 1's git check covers it.
-
-- **Header:** `"Umbrella"`
-- **Question:** *"Found multiple git repos here: <list>. Enable umbrella mode? (`.hv/` stays at this level; helpers operate per sub-repo.)"*
+- **Header:** `"Setup"`
+- **Question:** *"Found multiple git repos here: `<comma-separated list, max 3 names, plus 'and N more' if 4+>`. This directory isn't itself a git repo. How should `/hv-init` set up?"*
 - **Options** (single-select):
-  1. *"Yes, enable umbrella mode (Recommended)"* — *"Registers child repos via `hv-umbrella-init` after bootstrap. Sets `umbrella.enabled: true` in config."*
-  2. *"No, single-repo init"* — *"Skip umbrella; `/hv-init` proceeds as if the umbrella detection didn't fire. Existing single-repo behavior."*
+  1. *"Umbrella mode (Recommended)"* — *"Register the child repos via `hv-umbrella-init`; `.hv/` stays here. No `git init` at this level — the umbrella is intentionally a non-git wrapper."*
+  2. *"`git init` here, single-repo"* — *"Initialize this directory as a git repo; ignore sub-repos. Use this if the sub-repos are accidental (vendored, leftover clones)."*
+  3. *"Skip git, backlog-only"* — *"Don't `git init`, don't enable umbrella. Capture/next/learn/status work; `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-refactor` fail until you init manually."*
+  4. *"Stop"* — *"Cancel `/hv-init`."*
 
-On **Yes** — set `UMBRELLA_MODE=true` and `UMBRELLA_REGISTER="all"` (or ask a follow-up multiSelect to pick a subset of `$UMBRELLA_CANDIDATES`; `"all"` is the simpler default). Continue to Step 2.
+Routing per answer:
+- Option 1 (Umbrella) → set `UMBRELLA_MODE=true`, `UMBRELLA_REGISTER="all"`; continue to Step 2.
+- Option 2 (git init single-repo) → run `git init`, set `UMBRELLA_MODE=false`; mention the created branch in the Step 5 summary; continue to Step 2.
+- Option 3 (backlog-only) → set `UMBRELLA_MODE=false`; warn *"Warning: not a git repository. /hv-work, /hv-debug, /hv-ship, /hv-refactor will fail until you run `git init`."*; continue to Step 2.
+- Option 4 (Stop) → exit `/hv-init`.
 
-On **No** — set `UMBRELLA_MODE=false`, continue to Step 2 unchanged.
-
-Plain-text fallback: ask once textually — *"Found N git repos here: <list>. Enable umbrella mode? (yes/no)"* — and honor the user's reply. If the host can't render the question and no reply is captured, default to **No** with a one-line follow-up note: *"Skipping umbrella mode. Re-run `/hv-init` from this cwd to enable, or toggle `umbrella.enabled` via `/hv-config` later."* The default is **No** rather than Yes because `umbrella.enabled` is an opt-in feature flag — per the *Authoring conventions / Opt-in feature flags default to `false`* rule below, the cwd signal alone (multiple sub-repos detected) is not user approval; explicit user approval is required.
+Plain-text fallback: ask once textually — *"Found N git repos here: `<list>`. This directory isn't a git repo. (1) Umbrella mode, (2) git init here, (3) Skip git, (4) Stop?"* — and honor a number or first-word reply. If no reply is captured, default to **Option 1 (Umbrella)** with a one-line note: *"Defaulting to umbrella mode — `.hv/` will stay here and child repos will be registered. Re-run `/hv-init` to change."* The Recommended option is the default for a no-reply situation per the AUQ fallback convention (`references/ask-user-question-fallback.md`).
 
 > **Architecture rule — umbrella mode does not use git submodules.** Sub-repos under an umbrella are independent git repositories with no version-pinning at the umbrella level.
 >
@@ -84,6 +91,15 @@ Plain-text fallback: ask once textually — *"Found N git repos here: <list>. En
 > **Forbids.** `git submodule add` anywhere in an umbrella tree; `.gitmodules` at the umbrella root; "umbrella commit pins sub-repo SHA" patterns; designs that synchronize or pin sub-repo versions through the umbrella.
 >
 > **Permits.** Independent sub-repos checked out side-by-side under the umbrella; registry via `.hv/repos.json` by absolute or relative path; each sub-repo evolving on its own branch/tag/release schedule; sub-repos that are themselves submodule-using internally — the boundary applies *between umbrella and direct children*, not inside any sub-repo.
+
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment & umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
+
+Phases:
+
+1. *Detect* — environment + umbrella decision (Step 1)
+2. *Write artifacts* — bootstrap `.hv/` and install helpers (Step 2)
+3. *Configure* — interactive config (FRESH or STALE migration, Step 3)
+4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map, context indices (Step 4)
 
 ## Step 2 — Bootstrap & Install Helpers
 
@@ -138,7 +154,7 @@ export HV_PLUGIN_VERSION
 cp "$SRC"/hv-* "$SRC"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
 ```
 
-If Step 1.5 set `UMBRELLA_MODE=true`, register the sub-repos now (after bootstrap so `.hv/` exists):
+If Step 1 set `UMBRELLA_MODE=true`, register the sub-repos now (after bootstrap so `.hv/` exists):
 
 ```bash
 if [ "${UMBRELLA_MODE:-false}" = "true" ]; then
@@ -250,7 +266,7 @@ Path(".hv/config.json").write_text(json.dumps(cfg, indent=2) + "\n")
 PY
 ```
 
-Read `umbrella_enabled` from the `UMBRELLA_MODE` shell var Step 1.5 set (default `false` when single-repo). `UMBRELLA_MODE` must be exported (`export UMBRELLA_MODE=true`) before the heredoc runs so the Python subprocess inherits it.
+Read `umbrella_enabled` from the `UMBRELLA_MODE` shell var Step 1 set (default `false` when single-repo). `UMBRELLA_MODE` must be exported (`export UMBRELLA_MODE=true`) before the heredoc runs so the Python subprocess inherits it.
 
 ### STALE write block
 
@@ -279,7 +295,7 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # verification).
 .hv/bin/hv-config-set refactor.verifyCommands '[]'
 
-# umbrella.enabled — honor UMBRELLA_MODE from Step 1.5 (re-run from an umbrella
+# umbrella.enabled — honor UMBRELLA_MODE from Step 1 (re-run from an umbrella
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
 # is unset (no migration prompt for users who didn't re-run from a parent).
 .hv/bin/hv-config-set umbrella.enabled "${UMBRELLA_MODE:-false}"
@@ -291,7 +307,7 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 .hv/bin/hv-config-set hvSkills.version "${HV_PLUGIN_VERSION:-}"
 ```
 
-Rule: for each missing key in the `STALE:` list, run exactly one `hv-config-set <dotted.path> <value>` call. The helper preserves every other key in the file. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1.5 (default `false` when unset, `true` when the user opted in via Step 1.5's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`. `hvSkills.version` is special-cased on the upgrade path too — STALE migration ALWAYS rewrites it from `HV_PLUGIN_VERSION`, even when the key is already present, because re-running `/hv-init` is the canonical way to clear drift. Other keys preserve user values; this one is auto-managed.
+Rule: for each missing key in the `STALE:` list, run exactly one `hv-config-set <dotted.path> <value>` call. The helper preserves every other key in the file. Never touch keys that were already present. `umbrella.enabled` is a special case — when missing on upgrade, honor `UMBRELLA_MODE` from Step 1 (default `false` when unset, `true` when the user opted in via Step 1's prompt). Re-running `/hv-init` from an umbrella with the "Yes" answer is the only path that flips it on; manual flips also possible via `/hv-config`. `hvSkills.version` is special-cased on the upgrade path too — STALE migration ALWAYS rewrites it from `HV_PLUGIN_VERSION`, even when the key is already present, because re-running `/hv-init` is the canonical way to clear drift. Other keys preserve user values; this one is auto-managed.
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
@@ -327,7 +343,7 @@ If `.hv/TODO.md` already existed, say it was already initialized and helper scri
 - **Config migrated (STALE)** → replace the config line with *"Config migrated: added `<keys>` (Recommended)."* listing whichever keys were added.
 - **Config fresh (no existing `.hv/config.json` despite an existing `TODO.md`)** → report as on a fresh init.
 
-If `UMBRELLA_MODE=true` (Step 1.5 accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
+If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line to the summary block — *"Umbrella mode enabled — registered sub-repos: <list from `.hv/repos.json`>"* — read the list via `python3 -c 'import json; print(", ".join(r["name"] for r in json.load(open(".hv/repos.json"))["repos"]))'`. Otherwise omit.
 
 Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
 
