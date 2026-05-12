@@ -62,8 +62,14 @@ else
     [ -d "$candidate" ] && UPSTREAM_BIN="$candidate" && break
   done
   if [ -z "$UPSTREAM_BIN" ]; then
-    UPSTREAM_BIN=$(ls -d "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin 2>/dev/null | sort -V | tail -1)
-    [ -d "$UPSTREAM_BIN" ] || UPSTREAM_BIN=""
+    # Glob loop, not `ls | sort | tail` — the latter aborts under
+    # set -e + pipefail when the glob misses (ls exits 2, propagates up
+    # the command substitution). Iteration order is lexicographic, so
+    # the last match wins — good enough since the cache normally holds
+    # one version at a time.
+    for cand in "$HOME"/.claude/plugins/cache/hv-skills/hv-skills/*/bin; do
+      [ -d "$cand" ] && UPSTREAM_BIN="$cand"
+    done
   fi
   if [ -z "$UPSTREAM_BIN" ]; then
     for candidate in \
