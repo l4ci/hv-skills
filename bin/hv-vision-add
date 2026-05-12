@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Add a new milestone — mints ID via hv-next-id, creates .hv/milestones/MNN.md,
 # appends an overview entry to .hv/MILESTONES.md. Status starts as "planned".
+# Writer helper: exit 0 on successful milestone creation; exit 1 on missing argv.
 # Usage: hv-vision-add "<title>" "<summary>" [depends-csv]
 # Prints the new milestone ID on stdout.
 set -euo pipefail

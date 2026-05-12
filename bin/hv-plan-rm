@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Remove a plan file.
+# Writer helper: exit 0 on successful removal; exit 1 when plan key not found.
 # Usage: hv-plan-rm <key>     (e.g. hv-plan-rm M01-S01)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

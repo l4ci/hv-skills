@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Add an active work entry to .hv/status.json.
+# Writer helper: exit 0 on successful write OR idempotent no-op (--if-absent); exit 1 on missing argv.
 # Usage: hv-status-add [--if-absent] [--repo <name>] <branch> <item-id>[,<item-id>...] [worktree-path]
 #   --if-absent  Only write if no entry for <branch> already exists (no-op if present).
 #   --repo       Tag entry with sub-repo name for umbrella mode; uniqueness becomes (branch, repo).

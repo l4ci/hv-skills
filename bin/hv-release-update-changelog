@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepend a new release section to CHANGELOG.md (creating it if absent).
 # Idempotent: refuses if a section for this version already exists.
+# Writer helper: exit 0 on successful prepend; exit 1 if version section already exists.
 # Usage: hv-release-update-changelog <version> <notes-file> [--path PATH]
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

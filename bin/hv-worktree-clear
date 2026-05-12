@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # If a non-main worktree has <branch> checked out, remove it. Silent if none.
+# Writer helper: exit 0 always; silently no-ops if no worktree for branch.
 # Usage: hv-worktree-clear [--repo <name>] <branch>
 # Always skips the main working tree (which `git worktree remove` refuses anyway).
 # This guard centralizes what was previously inline in hv-merge — see hv-pr,

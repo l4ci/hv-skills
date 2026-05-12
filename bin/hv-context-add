@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Add or update a term in the appropriate CONTEXT.md.
+# Writer helper: exit 0 on successful write; exit 2 on usage error, 3 on alias collision, 4 on unregistered repo.
 #
 # Usage:
 #   hv-context-add <term> --def <text> [--alias <a>,...] [--not <n>,...]

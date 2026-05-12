@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Register one status entry per (branch, repo) for a multi-repo /hv-work wave.
+# Writer helper: exit 0 on success; exit 1 on usage error or length mismatch.
 # Usage: hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]
 #   --worktrees  Optional. Comma-separated paths paired by index with --repos.
 #                If given, length MUST equal --repos length.

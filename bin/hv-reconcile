@@ -7,6 +7,7 @@
 # listed as open in TODO.md. Helper failure => todoDrift: [] (don't fail
 # the whole reconcile). Entries where noBase:true indicate the umbrella cwd
 # has no git repo; commitCount is 0 but is not meaningful for those entries.
+# Writer helper: exit 0; auto-removes stale status entries and emits JSON summary.
 # Usage: hv-reconcile
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

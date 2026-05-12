@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Append entry to a section in .hv/TODO.md.
+# Writer helper: exit 0 on successful append, 1 on missing section or missing argv.
 # Usage: hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

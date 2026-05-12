@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Apply a semver bump to a version file in-place and print the new version.
+# Writer helper: exit 0 on successful bump; exit 1 on usage/parse error.
 # Usage: hv-release-bump-version [--dry-run] <file> <kind> <bump>
 #   <kind>: plugin-json | package-json | pyproject | cargo | plain
 #   <bump>: patch | minor | major | X.Y.Z

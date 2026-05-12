@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Start a spike — creates branch spike/<name> and .hv/spikes/<name>.md.
 # Does NOT switch to the branch; the calling skill drives the UX.
+# Writer helper: exit 0 on successful branch and file creation; exit 1 on conflict or missing args.
 # Usage: hv-spike-add [--repo <name>] <name> "<question>"
 # Prints the branch name on stdout.
 #

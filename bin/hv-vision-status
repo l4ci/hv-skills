@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Change a milestone's status — updates both the frontmatter in
 # .hv/milestones/MNN.md and the **Status:** line in .hv/MILESTONES.md.
+# Writer helper: exit 0 on successful status update; exit 1 on unknown ID or invalid status.
 # Usage: hv-vision-status <ID> <planned|active|shipped|archived>
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
