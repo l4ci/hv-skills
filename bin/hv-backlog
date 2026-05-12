@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Render pre-sorted backlog tables from .hv/TODO.md, excluding items active in status.json.
+# Lookup helper: always exits 0; empty output when backlog is empty.
 # Output: markdown — "In Progress" + "Bugs" (P0/P1/P2) + "Features" (Cosmetic/Minor/Major) + "Tasks".
 # Empty sections are omitted. Prints a placeholder if the whole backlog is empty.
 # Usage: hv-backlog [--grep <pattern>]

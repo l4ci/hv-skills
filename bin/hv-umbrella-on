@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print "yes" if umbrella mode is in effect, "no" otherwise.
+# Lookup helper: always exits 0 (errors treated as "no").
 # Returns "yes" iff .hv/repos.json registers >=1 sub-repo (data is truth;
 # the config flag is informational, not gating). Reads cwd-relative by
 # default; optional <dir> arg for callers that already know the umbrella

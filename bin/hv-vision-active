@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print IDs of active milestones, one per line. Silent if none active.
+# Lookup helper: always exits 0; empty stdout when no active milestones.
 # Usage: hv-vision-active
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

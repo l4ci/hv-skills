@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # List spikes from .hv/spikes/*.md as JSON.
+# Lookup helper: always exits 0; empty JSON array when no spikes.
 # Each entry: { name, branch, repo, status, created, branchExists }.
 # In umbrella mode, branchExists is resolved per-repo: spikes carrying a
 # `repo:` frontmatter field are checked against that sub-repo's git store;

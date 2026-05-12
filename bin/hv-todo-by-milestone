@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Print IDs of TODO items tagged with a given milestone, one per line.
+# Lookup helper: always exits 0; empty stdout when no items match.
 # Scans `## Bugs`, `## Features`, `## Tasks` (skips `## Completed`).
 # Items list multiple milestones via `Milestone: M01, M03`.
 # Usage: hv-todo-by-milestone <MID>

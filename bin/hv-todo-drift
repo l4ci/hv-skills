@@ -3,6 +3,7 @@
 # sub-repo (or current cwd in single-repo mode), extract [B##]/[F##]/[T##]
 # tags from commit subjects, and flag IDs that appear in commits but are
 # still listed as open in .hv/TODO.md.
+# Lookup helper: always exits 0; emits {"drift":[]} when no drift.
 #
 # Output: JSON to stdout — { "drift": [ { "id": "B07",
 #   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ] }
