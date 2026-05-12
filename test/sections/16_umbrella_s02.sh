@@ -205,7 +205,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 cat > .hv/MILESTONES.md <<'EOF'
-# Vision
+# Milestones
 
 ## Active milestones
 
@@ -245,7 +245,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 cat > .hv/MILESTONES.md <<'EOF'
-# Vision
+# Milestones
 
 ## Active milestones
 

@@ -8,7 +8,7 @@ d=json.load(open(p)); d['milestones']=0; json.dump(d,open(p,'w'))
 # Re-seed MILESTONES.md (earlier hv-knowledge-index test rewrote CLAUDE.md, but
 # MILESTONES.md is untouched).
 cat > .hv/MILESTONES.md <<'EOF'
-# Vision
+# Milestones
 
 Test project vision.
 
@@ -146,6 +146,10 @@ mkdir -p "$BOOT_DIR"
 grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "hv-bootstrap did not add .hv/ to .gitignore"
 grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap counters.json missing milestones key"
 pass "hv-bootstrap seeds dirs, data files, and .gitignore"
+
+HEADING=$(head -1 "$BOOT_DIR/.hv/MILESTONES.md")
+[ "$HEADING" = "# Milestones" ] || fail "hv-bootstrap seeded MILESTONES.md with wrong H1: '$HEADING' (want '# Milestones')"
+pass "hv-bootstrap seeds MILESTONES.md with '# Milestones' H1"
 
 # Idempotency: re-running must not overwrite existing data.
 echo "user content" > "$BOOT_DIR/.hv/BACKLOG.md"
