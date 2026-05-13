@@ -72,14 +72,15 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 - `docs.path`, `docs.autoCreate`, `docs.afterWork`
 - `git.baseBranch`
 - `umbrella.enabled`
+- `issues.label`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`
 
 Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `/hv-config` with no arguments to see the full list."* Do **not** silently fall through to the guided flow — the positional invocation is an explicit ask for one specific key.
 
 **Validate `<value>`** when present, against the allowed values for that key from `docs/reference/config-options.md`:
 
 - Enum keys (`work.isolation`, `work.mergeStrategy`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options.
-- Boolean keys (`ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
-- Free-text keys (`docs.path`, `git.baseBranch`) — accept any value including the empty string.
+- Boolean keys (`ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
+- Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`) — accept any value including the empty string.
 
 Invalid value → stop with: *"Error: `<value>` is not a valid value for `<key>`. Allowed: <comma-separated list from config-options.md>."*
 
@@ -126,6 +127,13 @@ print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',
 print(f"  Docs after-work          {'on' if cfg.get('docs',{}).get('afterWork',False) else 'off'}")
 print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
 print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
+iss = cfg.get('issues', {})
+prov = iss.get('providers', {})
+print(f"  Issues label             {iss.get('label','in-progress')}")
+print(f"  Issues auto-create label {'on' if iss.get('autoCreateLabel',True) else 'off'}")
+print(f"  Issues filter mine only  {'on' if iss.get('filterMineOnly',False) else 'off'}")
+print(f"  Issues GitHub provider   {'on' if prov.get('github',True) else 'off'}")
+print(f"  Issues GitLab provider   {'on' if prov.get('gitlab',True) else 'off'}")
 print(f"  hv-skills version        {cfg.get('hvSkills',{}).get('version','') or '(unstamped)'}")
 PY
 ```
@@ -136,22 +144,32 @@ Print the helper output verbatim — the user needs to see what they're editing.
 
 Skip this step entirely when Step 1.5 parsed a `<key>` or `<key>=<value>` argument — the key is already picked (or already written).
 
-The 13 configurable keys group into 4 categories; pick categories first, then drill into the keys in each. This two-stage flow keeps every question within `AskUserQuestion`'s 4-option UI cap.
+The 18 configurable keys group into 5 categories; pick categories first, then drill into the keys in each. This two-stage flow keeps every question within `AskUserQuestion`'s 4-option UI cap.
 
 ### Stage A — Pick categories
 
-One `AskUserQuestion` call, multiSelect:
+Two `AskUserQuestion` calls in sequence (both multiSelect), because 5 categories exceed the 4-option ceiling. Aggregate the picks from both calls before Stage B.
+
+**Call A1:**
 
 - **Header:** `"Edit"`
-- **Question:** *"Which areas of config do you want to edit?"*
+- **Question:** *"Which areas of config do you want to edit? (1 of 2)"*
 - **multiSelect:** `true`
-- **Options** (multiSelect):
+- **Options:**
   1. *"Work — models, isolation, integration, autonomy"*
   2. *"Quality gates — ship review, verify learnings, refactor confirm, competing hypotheses"*
   3. *"Docs — path, auto-create, after-work"*
   4. *"Other — umbrella mode, git base branch"*
 
-If the user selects nothing, print *"No changes."* and stop.
+**Call A2:**
+
+- **Header:** `"Edit"`
+- **Question:** *"Any further areas? (2 of 2)"*
+- **multiSelect:** `true`
+- **Options:**
+  1. *"Issues — label, auto-create label, filter mine only, providers"*
+
+If the user selects nothing across both calls, print *"No changes."* and stop.
 
 ### Stage B — Pick keys within each category
 
@@ -163,12 +181,13 @@ For each category the user selected in Stage A, issue one `AskUserQuestion` call
 | Quality gates | *"Ship review — current: <on\|off>"*, *"Verify learnings — current: <on\|off>"*, *"Confirm before refactor — current: <on\|off>"*, *"Competing hypotheses — current: <on\|off>"* |
 | Docs | *"Docs path — current: <path>"*, *"Docs auto-create — current: <on\|off>"*, *"Docs after-work — current: <on\|off>"* |
 | Other | *"Umbrella mode — current: <on\|off>"*, *"Git base branch — current: <branch\|(auto-detect)>"* |
+| Issues | Two calls (5 keys exceed cap): **call 1** — *"Issues label — current: <label>"*, *"Auto-create label — current: <on\|off>"*, *"Filter mine only — current: <on\|off>"*, *"GitHub provider — current: <on\|off>"*; **call 2** — *"GitLab provider — current: <on\|off>"* |
 
 If a Stage B call returns no selections (user picked the category in Stage A but skipped every key inside it), treat that category as a no-op — don't error.
 
 If every Stage B call returns no selections, print *"No changes."* and stop.
 
-Plain-text fallback: if the host doesn't surface `AskUserQuestion` options at all, ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation), or 'cancel' to exit."* — and parse the reply against the thirteen key names listed across the four categories above.
+Plain-text fallback: if the host doesn't surface `AskUserQuestion` options at all, ask once — *"Which settings do you want to change? List them by name (e.g. Autonomy, Isolation, Issues label), or 'cancel' to exit."* — and parse the reply against the eighteen key names listed across the five categories above.
 
 ## Step 4 — Ask the Selected Questions
 
@@ -203,6 +222,11 @@ For each key the user changed in Step 4, call the shared helper once. Other keys
 # .hv/bin/hv-config-set autonomy.level loop
 # .hv/bin/hv-config-set debug.competingHypotheses true
 # .hv/bin/hv-config-set umbrella.enabled true
+# .hv/bin/hv-config-set issues.label in-progress
+# .hv/bin/hv-config-set issues.autoCreateLabel true
+# .hv/bin/hv-config-set issues.filterMineOnly false
+# .hv/bin/hv-config-set issues.providers.github true
+# .hv/bin/hv-config-set issues.providers.gitlab true
 ```
 
 The helper parses each value as JSON (so `true`/`false`/numbers decode correctly); bare identifiers like `opus` / `loop` / `worktree` fall back to string. Run one call per key — do not batch.
