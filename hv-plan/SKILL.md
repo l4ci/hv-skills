@@ -71,6 +71,11 @@ DECISIONS matches are committed boundaries the plan must respect. If the plan wo
 
 **Issue these as parallel tool calls in a single response** — they're independent. Form a picture; don't dump it.
 
+**Plan-author cautions.**
+
+- **Grep before claims.** Validate the detail file's quantified claims (*"≥5 callers"*, *"9 helpers"*) with `grep` / `git grep` before drafting tasks. Detail files describe intent; the codebase is ground truth, and the gap between them is where stale plans get born.
+- **Re-resolve skill folder paths at write time.** A plan that names skill folders by path (e.g. `hv-status/SKILL.md`) goes stale within days if a consolidation cycle renames or merges them. `ls -d hv-<name>/` per cited skill before serializing tasks; the plan is a hint, the filesystem is ground truth.
+
 ## Step 4 — Propose the Plan
 
 **Under `--auto-loop`**, skip "Propose"/"Iterate" semantics entirely: run the auto-resolution pipeline below for every open question, build the final plan markdown directly, then go to Step 6. No AskUserQuestion call fires anywhere in the run. See `## Auto-loop mode` below for the pipeline.
@@ -92,6 +97,7 @@ Rules for the plan:
 - **Every task has a verify step.** No verify = the task isn't well-defined.
 - **No half-implementations.** Each task results in real, runnable code — no stubs or placeholders.
 - **Tasks are vertical slivers, not horizontal layers.** Each task crosses every layer it needs to be observable — UI + logic + data together for one feature path, not "all UI first, all logic second". The **Observable behavior** requirement and the **No half-implementations** rule already enforce this implicitly; calling it out by name keeps slice plans from drifting into the horizontal anti-pattern that AI agents fall into by default. For a hotel-reservation slice: "Reserve" button is one task end-to-end; "Cancel" is a separate task end-to-end; "email confirmation" is a third. Not "build all the UI in T1, then all the controllers in T2, then all the persistence in T3."
+- **Rename + incoming-link sweep is ONE task, not two.** Every file linking to a renamed target must update; co-scheduling rename + sweep in the same wave races on the index. Group rename + all incoming-link updates into one task, derive the file list from `git grep -l "<old-name>"` (the plan's enumeration is a hint, grep is ground truth).
 - **Name assumptions you'd otherwise leave implicit.** Forces the user to confirm or push back.
 - **List open questions you'd resolve mid-flight.** If they should be answered before `/hv-work` runs, ask now.
 
