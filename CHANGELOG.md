@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.1.0 — 2026-05-13
+
+Adds `/hv-undo` for guided rollback of the last `/hv-work` cycle, `/hv-issues` for syncing GitHub/GitLab issues into `BACKLOG.md` with round-trip closing, and the `--auto-loop` dispatch chain that runs Major + Milestone-tagged items autonomously through brainstorm → plan → work in loop mode.
+
+## New
+
+**`/hv-undo` — guided cycle rollback.** Resets the last `/hv-work` merge commit on the base branch and restores TODO entries via the new `hv-uncomplete` helper. Direct-merge cycles only (MVP); refuses on cycles with post-merge commits unless `--allow-post-merge` is passed. Dry-run preview by default; the slash command always asks before applying.
+
+**`/hv-issues` — pull upstream issues into BACKLOG.md.** Lists open GitHub or GitLab issues via a multiSelect picker, mints IDs, writes detail files, and appends entries carrying `GH: #N` or `GL: #N` cross-references. Five new helpers back the flow: `hv-issues-provider` (detect host), `hv-issues-list` (read), `hv-issues-imported` (dedupe), `hv-issues-label` (manual-gated `in-progress` upstream), `hv-issues-close` (round-trip closing).
+- `/hv-ship` auto-closes upstream issues on PR merge (`Closes #N` in body) and direct-push (manual gate).
+- `/hv-rm` de-tags the upstream label before removing an imported item (manual gate).
+
+**`--auto-loop` dispatch chain.** `/hv-brainstorm --auto-loop` and `/hv-work` Step 2/4 now wire together so loop-mode automation runs Major + Milestone-tagged items through research → plan → work without user gates between phases. `/hv-next` defers its design-nudge to the chain instead of interrupting it.
+
+**F75 self-prompting hardening.** Promoted five sets of authoring rules from `KNOWLEDGE.md` into canonical inline references across `/hv-work` (7 worker/parallelism gotchas), `/hv-plan` (3 plan-author gotchas), `/hv-learn` (`KNOWLEDGE.md` bullet schema), `/hv-init` (5 authoring conventions), and `/hv-decide` (source-prefill semantic-gap principle).
+
+## Changed
+
+- Executable mode set on the new `hv-undo` / `hv-uncomplete` helpers.
+- `CLAUDE.md` `hv-decisions` managed block refreshed (Documentation topic added).
+
+## Documentation
+
+- README slim-down + two new walkthroughs (`docs/walkthroughs/{greenfield,brownfield}-*.md`) + `docs/how-it-works.md` for the system mermaid + humanizer pass across all docs.
+- User guide for `/hv-undo`; skill table and index entries refreshed.
+- `--auto-loop` chain reflected in usage docs and the loop-dispatch reference.
+- `/hv-issues` user reference, README entry, and manual-gates inventory.
+
+## Stats
+
+32 commits, 61 files changed, +3518 −506 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v3.0.0...v3.1.0
+
 ## Unreleased
 
 ## v3.0.0 — 2026-05-12
