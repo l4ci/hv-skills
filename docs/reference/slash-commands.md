@@ -1,5 +1,39 @@
 # Slash commands
 
+Quick-reference table of every `/hv-*` command. Detailed entries follow below.
+
+| Skill | Description |
+|-------|-------------|
+| `/hv-init` | Initialize `.hv/` with `BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
+| `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
+| `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
+| `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
+| `/hv-c` | Shortcut for `/hv-capture` |
+| `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
+| `/hv-issues` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
+| `/hv-rm` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
+| `/hv-next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv-work` |
+| `/hv-pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-next` |
+| `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`) — task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
+| `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch — branch never merges, only findings come back as `.hv/spikes/<name>.md` |
+| `/hv-assume` | Read-only peek of the orchestrator's intended approach — files, tests, assumptions, unknowns; gates `/hv-work` for high-stakes work |
+| `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present |
+| `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, nudges `/hv-learn` |
+| `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
+| `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
+| `/hv-map` | Maintain `.hv/MAP.md` + `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date; auto-bumped post-cycle by `/hv-work`, `/hv-debug`, `/hv-go` |
+| `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
+| `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
+| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
+| `/hv-undo` | Guided rollback of the last `/hv-work` cycle — resets the merge commit, restores TODO entries; dry-run preview, manual confirmation, direct-merge cycles only |
+| `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
+| `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
+| `/hv-release` | Cut a release: bump version, generate notes, tag, push, publish to GitHub/GitLab |
+| `/hv-update` | Check for a newer hv-skills release on GitHub and print the exact update command for your install type |
+
+---
+
 Alphabetical reference of every `/hv-*` command.
 
 ## /hv-assume
