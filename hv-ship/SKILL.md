@@ -144,6 +144,56 @@ printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
 
 Helper behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
 
+## Step 6c — Close Upstream Issues (Direct-Push Path)
+
+This step runs only on the **direct-merge path** (after `hv-merge` returns a commit hash). Skip entirely on the PR path — `hv-ship-body` already emits `Closes #N` lines into the PR body, and GitHub/GitLab auto-close the issues on PR merge.
+
+**1. Identify candidates.**
+
+From the scope JSON's `referencedIds` (already in memory from Step 2), call:
+
+```bash
+.hv/bin/hv-issues-imported
+```
+
+Parse the JSON array. Filter to entries whose `item_id` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
+
+**2. Manual gate.**
+
+> **Manual gate — closing public upstream issues.** Closing the issues posts a tracking comment and changes their state on the remote — externally-visible. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The merge already happened; this step decides whether to close the upstream issues too. See `references/manual-gates.md`.
+
+**3. Ask the user.**
+
+Invoke `AskUserQuestion` (single-select, ≤4 options):
+
+- Header: `"Close"`
+- Question: *"Close N upstream issue(s) tied to the shipped items? (`<comma-separated list of #N>`)"*
+- Options: `"Yes, close all"`, `"Pick subset"`, `"No, leave open"`
+
+This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
+
+**4. On "Yes, close all":** dispatch parallel `hv-issues-close` calls (one per candidate, all in a single batch of tool calls):
+
+```bash
+.hv/bin/hv-issues-close --issue <N> --commit <merge-sha> --item <ID> [--repo <name>]
+```
+
+Pass `--repo` only in umbrella mode (`$REPO` non-empty from Step 2).
+
+**5. On "Pick subset":** invoke a second `AskUserQuestion` (multiSelect, ≤4 candidates per call; chunk if N>4):
+
+- Header: `"Pick issues"`
+- Question: *"Which issue(s) should be closed?"*
+- Options: one entry per candidate formatted as `"#N (item <ID>)"`
+
+Then dispatch parallel `hv-issues-close` calls for each selected entry as in step 4.
+
+**6. On "No, leave open":** print:
+
+```
+Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired.
+```
+
 ## Step 7 — Update Status
 
 **Single-repo:**

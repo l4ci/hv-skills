@@ -65,21 +65,21 @@ for iid in ordered:
     print(f"- [{iid}] {title}" if title else f"- [{iid}]")
 print()
 
-gh_re = re.compile(r"GH:\s*#(\d+)")
-gh_seen, gh_ordered = set(), []
+issue_re = re.compile(r"(?:GH|GL):\s*#(\d+)")
+issue_seen, issue_ordered = set(), []
 for iid in ordered:
     result = bullets[iid]
     if not result:
         continue
     line = result[0]
-    for match in gh_re.finditer(line):
+    for match in issue_re.finditer(line):
         num = match.group(1)
-        if num not in gh_seen:
-            gh_seen.add(num)
-            gh_ordered.append(num)
+        if num not in issue_seen:
+            issue_seen.add(num)
+            issue_ordered.append(num)
 
-if gh_ordered:
-    for num in gh_ordered:
+if issue_ordered:
+    for num in issue_ordered:
         print(f"Closes #{num}")
     print()
 PY

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Print issue-tracking provider based on origin URL.
+# Lookup helper: always exits 0; output is one of github / gitlab / unknown.
+# *github* matches github.com, github.company.com, *.github.com (any hostname
+# containing "github"). *gitlab* matches gitlab.com and any self-hosted GitLab.
+# Anything else, or no remote, prints unknown.
+#
+# Usage: hv-issues-provider [--repo <name>]
+#   --repo <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and
+#                  run from that directory instead of cwd.
+#   stdout: github | gitlab | unknown
+#   exit:   always 0
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Parse optional --repo flag
+REPO=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO="${2:?--repo requires a name argument}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# If --repo was given, switch into that sub-repo directory
+if [ -n "$REPO" ]; then
+  cd "$("$HERE/hv-resolve-repo-path" "$REPO")"
+fi
+
+URL="$(git remote get-url origin 2>/dev/null || true)"
+
+if [ -z "$URL" ]; then
+  echo "unknown"
+  exit 0
+fi
+
+# Extract hostname from SSH shorthand (git@host:path), SSH full (ssh://git@host/path),
+# or HTTPS (https://host/path) forms.
+host="$(echo "$URL" | sed -E 's#^(https?://|ssh://)?(git@)?([^:/]+)[:/].*#\3#i')"
+
+# Lowercase for case-insensitive matching
+host="$(echo "$host" | tr '[:upper:]' '[:lower:]')"
+
+case "$host" in
+  *github*)
+    echo "github"
+    ;;
+  *gitlab*)
+    echo "gitlab"
+    ;;
+  *)
+    echo "unknown"
+    ;;
+esac
+
+exit 0

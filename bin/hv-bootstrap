@@ -119,7 +119,17 @@ PY
 [ -f "$HV/repos.json" ] || echo '{"repos":[]}' > "$HV/repos.json"
 
 [ -f "$HV/config.json" ] || cat > "$HV/config.json" <<'EOF'
-{}
+{
+  "issues": {
+    "label": "in-progress",
+    "autoCreateLabel": true,
+    "filterMineOnly": false,
+    "providers": {
+      "github": true,
+      "gitlab": true
+    }
+  }
+}
 EOF
 
 if [ -f .gitignore ]; then

@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# Apply or remove a label on an upstream issue (GitHub via `gh`, GitLab via `glab`).
+# Mutator helper — exit 0 on successful write OR idempotent no-op (label already
+# present / already absent); exit 1 on bad args or hard CLI failure.
+# Auto-creates the label when absent if issues.autoCreateLabel is true (default true).
+#
+# Usage: hv-issues-label <apply|remove> --issue <N> --label <name> [--repo <name>]
+#   apply   Add label to the issue.
+#   remove  Remove label from the issue.
+#   --issue <N>     Issue number (required).
+#   --label <name>  Label name (required).
+#   --repo  <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and run
+#                   from that sub-repo directory. Required in umbrella mode; optional
+#                   in single-repo mode.
+#   stdout: empty on success
+#   exit:   0 on write or no-op; 1 on bad args or CLI failure
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=hv-self-locate.sh
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# ---------------------------------------------------------------------------
+# Parse subcommand + flags
+# ---------------------------------------------------------------------------
+if [[ $# -lt 1 ]]; then
+  echo "usage: hv-issues-label <apply|remove> --issue <N> --label <name> [--repo <name>]" >&2
+  exit 1
+fi
+
+SUBCMD="$1"; shift
+
+case "$SUBCMD" in
+  apply|remove) ;;
+  *)
+    echo "error: hv-issues-label: unknown subcommand '$SUBCMD' (expected apply or remove)" >&2
+    exit 1
+    ;;
+esac
+
+REPO=""
+ISSUE=""
+LABEL=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO="${2:?--repo requires a name argument}"
+      shift 2
+      ;;
+    --issue)
+      ISSUE="${2:?--issue requires a number argument}"
+      shift 2
+      ;;
+    --label)
+      LABEL="${2:?--label requires a label name}"
+      shift 2
+      ;;
+    *)
+      echo "error: hv-issues-label: unknown argument '$1'" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$ISSUE" ]]; then
+  echo "error: hv-issues-label: --issue is required" >&2
+  exit 1
+fi
+
+if [[ -z "$LABEL" ]]; then
+  echo "error: hv-issues-label: --label is required" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve sub-repo path (if --repo given)
+# ---------------------------------------------------------------------------
+REPO_PATH=""
+if [[ -n "$REPO" ]]; then
+  REPO_PATH="$("$HERE/hv-resolve-repo-path" "$REPO")"
+fi
+
+# ---------------------------------------------------------------------------
+# Detect provider
+# ---------------------------------------------------------------------------
+PROVIDER="$("$HERE/hv-issues-provider" ${REPO:+--repo "$REPO"})"
+
+# ---------------------------------------------------------------------------
+# Read issues.autoCreateLabel from .hv/config.json
+# (hv_self_locate has cd'd us to the umbrella root, so .hv/config.json is valid)
+# ---------------------------------------------------------------------------
+AUTO_CREATE=$(jq -r '.issues.autoCreateLabel // true' ".hv/config.json" 2>/dev/null || echo true)
+
+# ---------------------------------------------------------------------------
+# Helper: run a command optionally inside REPO_PATH
+# ---------------------------------------------------------------------------
+_run_in_repo() {
+  if [[ -n "$REPO_PATH" ]]; then
+    (cd "$REPO_PATH" && "$@")
+  else
+    "$@"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Branch on provider
+# ---------------------------------------------------------------------------
+case "$PROVIDER" in
+
+  github)
+    case "$SUBCMD" in
+      apply)
+        # Attempt to add the label; capture stderr to detect "label not found".
+        STDERR_TMP="$(mktemp)"
+        if ! _run_in_repo gh issue edit "$ISSUE" --add-label "$LABEL" 2>"$STDERR_TMP"; then
+          STDERR_CONTENT="$(cat "$STDERR_TMP")"
+          rm -f "$STDERR_TMP"
+          # If label doesn't exist on the repo and autoCreateLabel is enabled,
+          # create it then retry.
+          if [[ "$AUTO_CREATE" == "true" ]] && \
+             echo "$STDERR_CONTENT" | grep -qiE 'label|not found|could not'; then
+            _run_in_repo gh label create "$LABEL" --force
+            _run_in_repo gh issue edit "$ISSUE" --add-label "$LABEL"
+          else
+            echo "$STDERR_CONTENT" >&2
+            exit 1
+          fi
+        else
+          rm -f "$STDERR_TMP"
+        fi
+        ;;
+      remove)
+        # gh exits 0 and is silent when the label is not present — idempotent.
+        _run_in_repo gh issue edit "$ISSUE" --remove-label "$LABEL"
+        ;;
+    esac
+    ;;
+
+  gitlab)
+    case "$SUBCMD" in
+      apply)
+        # If autoCreateLabel is true, ensure the label exists first.
+        # glab label create exits non-zero on duplicate — swallow that.
+        if [[ "$AUTO_CREATE" == "true" ]]; then
+          _run_in_repo glab label create --name "$LABEL" 2>/dev/null || true
+        fi
+        _run_in_repo glab issue update "$ISSUE" --label "$LABEL"
+        ;;
+      remove)
+        # glab exits 0 when label not present — idempotent.
+        _run_in_repo glab issue update "$ISSUE" --unlabel "$LABEL"
+        ;;
+    esac
+    ;;
+
+  unknown)
+    echo "error: provider unknown; cannot label upstream issue" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

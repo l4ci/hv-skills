@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Index GH/GL cross-references across .hv/BACKLOG.md, .hv/ARCHIVE.md, and
+# per-item detail files (.hv/bugs/*.md, .hv/features/*.md, .hv/tasks/*.md).
+#
+# Lookup helper: always exits 0. Emits [] when no cross-references are found.
+#
+# Output schema — JSON array of objects:
+#   provider  "github" | "gitlab"
+#   repo      string (from Repos: field) or null if absent; multi-repo items
+#             emit one entry per repo from the CSV
+#   issue     int    (issue number)
+#   item_id   string (e.g. "F69", "B12")
+#   status    "open" | "archived"
+#
+# Used by /hv-issues to subtract already-imported issues from the picker.
+#
+# Usage: hv-issues-imported [--repo <name>]
+#   --repo <name>  Filter output to entries whose repo field matches <name>.
+#   stdout:        Pretty-printed JSON array.
+#   exit:          always 0
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# After hv_self_locate the cwd is the umbrella root; .hv/ is at ./hv/
+HV="$(pwd -P)/.hv"
+
+# Parse optional --repo flag
+REPO=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO="${2:?--repo requires a name argument}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HV" "$REPO" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+hv = Path(sys.argv[1])
+repo_filter = sys.argv[2] or None
+
+GH_RE = re.compile(r"GH:\s*#(\d+)")
+GL_RE = re.compile(r"GL:\s*#(\d+)")
+REPOS_RE = re.compile(r"Repos:\s*([^\n]+?)(?:\s+(?:Detail|Related|Milestone):|$)", re.MULTILINE)
+
+# Seen set for dedup: (provider, issue, item_id) → entry (prefer open over archived)
+STATUS_RANK = {"open": 0, "archived": 1}
+seen: dict[tuple[str, int, str], dict] = {}
+
+def register(provider: str, issue: int, item_id: str, repos: list[str | None], status: str) -> None:
+    """Register one entry per repo. Prefer open over archived on collision."""
+    for repo in repos:
+        key = (provider, issue, item_id, repo)
+        existing = seen.get(key)
+        if existing is None:
+            seen[key] = {"provider": provider, "repo": repo, "issue": issue,
+                          "item_id": item_id, "status": status}
+        else:
+            # Prefer open (lower rank) over archived
+            if STATUS_RANK[status] < STATUS_RANK[existing["status"]]:
+                seen[key] = {"provider": provider, "repo": repo, "issue": issue,
+                              "item_id": item_id, "status": status}
+
+def extract_repos(line: str) -> list[str | None]:
+    """Return list of repo names from Repos: field, or [None] if absent."""
+    m = REPOS_RE.search(line)
+    if not m:
+        return [None]
+    raw = m.group(1).strip()
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts if parts else [None]
+
+def extract_id_from_bullet(line: str) -> str | None:
+    """Extract item ID like F69, B12, T44 from a BACKLOG bullet."""
+    m = re.search(r"\[([BFT]\d+)\]", line)
+    return m.group(1) if m else None
+
+def scan_line(line: str, item_id: str, status: str) -> None:
+    repos = extract_repos(line)
+    for m in GH_RE.finditer(line):
+        register("github", int(m.group(1)), item_id, repos, status)
+    for m in GL_RE.finditer(line):
+        register("gitlab", int(m.group(1)), item_id, repos, status)
+
+def scan_backlog_file(path: Path, status: str, stop_at_completed: bool = False) -> None:
+    """Scan a BACKLOG-format file; open sections only (skip ## Completed)."""
+    try:
+        text = path.read_text()
+    except FileNotFoundError:
+        return
+
+    in_open_section = False
+    for line in text.splitlines():
+        # Track section headers
+        if line.startswith("## "):
+            heading = line[3:].strip().lower()
+            if stop_at_completed and heading == "completed":
+                in_open_section = False
+                continue
+            # Only scan Bugs / Features / Tasks (and generic sections in ARCHIVE)
+            in_open_section = True
+            continue
+
+        if not in_open_section:
+            continue
+
+        item_id = extract_id_from_bullet(line)
+        if not item_id:
+            continue
+
+        scan_line(line, item_id, status)
+
+def scan_detail_file(path: Path) -> None:
+    """Scan a per-item detail file; item_id derived from filename stem."""
+    try:
+        text = path.read_text()
+    except FileNotFoundError:
+        return
+    item_id = path.stem  # e.g. F69.md → F69
+    for line in text.splitlines():
+        scan_line(line, item_id, "open")
+
+# ── BACKLOG.md (open items only — skip ## Completed) ──────────────────────────
+scan_backlog_file(hv / "BACKLOG.md", status="open", stop_at_completed=True)
+
+# ── ARCHIVE.md (archived items) ───────────────────────────────────────────────
+scan_backlog_file(hv / "ARCHIVE.md", status="archived")
+
+# ── Per-item detail files ─────────────────────────────────────────────────────
+for subdir in ("bugs", "features", "tasks"):
+    detail_dir = hv / subdir
+    if detail_dir.is_dir():
+        for md in detail_dir.glob("*.md"):
+            scan_detail_file(md)
+
+# ── Build result list ─────────────────────────────────────────────────────────
+result = list(seen.values())
+
+# Apply --repo filter if requested
+if repo_filter:
+    result = [e for e in result if e.get("repo") == repo_filter]
+
+json.dump(result, sys.stdout, indent=2)
+print()
+PY
+
+exit 0

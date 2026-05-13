@@ -31,8 +31,9 @@ Phases:
 
 1. *Resolve IDs* — args parsed, each ID matched to a TODO entry (Step 2)
 2. *Dry-run preview* — removal plan rendered, cross-references identified (Step 3)
-3. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step 4)
-4. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Step 5)
+3. *De-tag upstream issues* — optional manual gate to remove the upstream label before local delete (Step 3.5)
+4. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step 4)
+5. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Step 5)
 
 ## Step 2 — Parse Arguments
 
@@ -51,6 +52,54 @@ Exit codes:
 - **0** — preview printed successfully. Surface the full stdout to the user verbatim, then continue to Step 4.
 - **1** — one of the IDs was not found in BACKLOG.md or ARCHIVE.md, or an unrecognised flag was given. Surface the stderr message to the user verbatim and **stop** — do not proceed to Step 4.
 - **2** — one or more IDs are currently active in `status.json`. Surface the stderr message verbatim and inform the user: *"The item is active. Proceeding via Step 4 with `--force` will strip it from the active stream and leave a warning in the output."*
+
+## Step 3.5 — De-tag Upstream Issues (manual gate)
+
+> **Manual gate — removing the upstream label.** Removing the `in-progress` label on the upstream issue is externally-visible — collaborators see the issue no longer claimed. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The item delete proceeds regardless; this step decides whether to clean up the label upstream too. See `references/manual-gates.md`.
+
+Run the lookup helper to discover cross-references for the items about to be removed:
+
+```bash
+.hv/bin/hv-issues-imported
+```
+
+The helper always exits 0 and emits a JSON array. Filter it to entries whose `item_id` is in the to-be-removed set (the `<CSV>` from Step 2):
+
+```bash
+# Example: CSV = "F69,B12"
+IDS_JSON=$(echo "<CSV>" | tr ',' '\n' | jq -Rn '[inputs | gsub("^\\s+|\\s+$"; "")]')
+REFS=$(
+  .hv/bin/hv-issues-imported \
+  | jq --argjson ids "$IDS_JSON" '[.[] | select(.item_id as $id | $ids | index($id) != null)]'
+)
+```
+
+Read the label name from config (default `"in-progress"`):
+
+```bash
+LABEL=$(jq -r '.issues.label // "in-progress"' .hv/config.json 2>/dev/null || echo "in-progress")
+```
+
+**If `$REFS` is an empty array (`[]`), skip the gate entirely and proceed to Step 4.**
+
+If `$REFS` is non-empty, surface the `AskUserQuestion` below. **In loop mode this question is still surfaced and never auto-picked — it is a manual gate.**
+
+- **Header:** `"De-tag"`
+- **Question:** `"Remove the \`<label>\` label on <N> upstream issue(s)? <list of #N>."`
+  (Substitute `<label>` from `$LABEL`, `<N>` from `$REFS | length`, and list each `#<issue>` from `$REFS`.)
+- **Options** (single-select):
+  1. `"Yes, remove the label upstream"` — for each entry in `$REFS`, call in parallel:
+     ```bash
+     .hv/bin/hv-issues-label remove --issue <issue> --label "$LABEL" [--repo <repo>]
+     ```
+     Include `--repo <repo>` only when the entry's `repo` field is non-null. Propagate exit 1 if any call fails.
+  2. `"No, just delete the item"` — print the warning below and continue:
+     ```
+     Note: upstream issues still carry the `<label>` label. Remove via
+     `gh issue edit <N> --remove-label <label>` or `glab issue update <N> --unlabel <label>` if desired.
+     ```
+
+Proceed to Step 4 regardless of which option was chosen.
 
 ## Step 4 — Confirmation Gate
 
@@ -82,7 +131,7 @@ Use `/hv-rm` when:
 - A spike or decision ruled out the approach the item depended on.
 - You simply changed your mind and the work is no longer worth doing.
 
-`/hv-rm` is the local inverse of `/hv-capture` — it does **not** close upstream GitHub issues. If the removed item has a linked GH issue, closing it is a manual gesture. Counters intentionally do not decrement; minted IDs remain claimed so there is never ambiguity about what `[F36]` referred to.
+`/hv-rm` is the local inverse of `/hv-capture` — it does **not** close upstream GitHub/GitLab issues. If the removed item has a linked issue, Step 3.5 offers to remove the `in-progress` label upstream; closing the issue itself is always manual. Counters intentionally do not decrement; minted IDs remain claimed so there is never ambiguity about what `[F36]` referred to.
 
 ## Rules
 
@@ -90,7 +139,7 @@ Use `/hv-rm` when:
 - Active-stream items (in `status.json`) are refused without `--force`; with `--force`, the ID is stripped and a warning surfaces in the output.
 - ARCHIVE.md is preserved by default; `--scrub-archive` is opt-in.
 - Counters do not decrement — minted IDs stay claimed.
-- GH issue references are not touched; close upstream issues manually if needed.
+- Upstream `in-progress` labels are removed only when the user approves the Step 3.5 manual gate; closing upstream issues is always manual.
 
 ## References
 

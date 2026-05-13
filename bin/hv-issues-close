@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# Close one upstream issue and post a tracking comment naming the shipping commit.
+# Mutator helper: exit 0 on successful close OR already-closed (no-op); exit 1 on
+# bad inputs, auth/CLI failure, or unknown provider.
+#
+# Usage: hv-issues-close --issue <N> --commit <sha> [--repo <name>] [--item <ID>]
+#   --issue  <N>     Issue number to close (required)
+#   --commit <sha>   Full or short commit SHA shipped for this item (required)
+#   --repo   <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and
+#                    run from that sub-repo directory (required in umbrella mode)
+#   --item   <ID>    Optional backlog item ID (e.g. F69, B07) — included in comment
+#   exit: 0 on success or no-op (already closed), 1 on precondition failure
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=hv-self-locate.sh
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# ---------------------------------------------------------------------------
+# Parse flags
+# ---------------------------------------------------------------------------
+REPO=""
+ISSUE=""
+COMMIT=""
+ITEM=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO="${2:?--repo requires a name argument}"
+      shift 2
+      ;;
+    --issue)
+      ISSUE="${2:?--issue requires a number argument}"
+      shift 2
+      ;;
+    --commit)
+      COMMIT="${2:?--commit requires a sha argument}"
+      shift 2
+      ;;
+    --item)
+      ITEM="${2:?--item requires an ID argument}"
+      shift 2
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# Validate required args
+# ---------------------------------------------------------------------------
+if [ -z "$ISSUE" ]; then
+  echo "error: --issue is required" >&2
+  exit 1
+fi
+
+if [ -z "$COMMIT" ]; then
+  echo "error: --commit is required" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve sub-repo path (if --repo given) — cd before git rev-parse
+# ---------------------------------------------------------------------------
+if [ -n "$REPO" ]; then
+  cd "$("$HERE/hv-resolve-repo-path" "$REPO")"
+fi
+
+# ---------------------------------------------------------------------------
+# Shorten commit SHA — validates it exists in the repo
+# ---------------------------------------------------------------------------
+SHA_SHORT="$(git rev-parse --short "$COMMIT" 2>/dev/null)" || {
+  echo "error: commit '$COMMIT' not found in current repository" >&2
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Build comment body
+# ---------------------------------------------------------------------------
+if [ -n "$ITEM" ]; then
+  BODY="Closed by hv-skills: shipped in ${SHA_SHORT} ([${ITEM}])"
+else
+  BODY="Closed by hv-skills: shipped in ${SHA_SHORT}"
+fi
+
+# ---------------------------------------------------------------------------
+# Detect provider
+# ---------------------------------------------------------------------------
+PROVIDER="$("$HERE/hv-issues-provider" ${REPO:+--repo "$REPO"})"
+
+# ---------------------------------------------------------------------------
+# Branch on provider
+# ---------------------------------------------------------------------------
+case "$PROVIDER" in
+  github)
+    if ! command -v gh >/dev/null 2>&1; then
+      echo "error: gh is not installed" >&2
+      exit 1
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+      echo "error: gh is not authenticated; run 'gh auth login'" >&2
+      exit 1
+    fi
+
+    # Idempotency check — GH states are uppercase
+    STATE="$(gh issue view "$ISSUE" --json state -q .state 2>/dev/null || echo "")"
+    if [ "$STATE" = "CLOSED" ]; then
+      exit 0
+    fi
+
+    # Single call: post closing comment and close atomically
+    gh issue close "$ISSUE" --comment "$BODY"
+    ;;
+
+  gitlab)
+    if ! command -v glab >/dev/null 2>&1; then
+      echo "error: glab is not installed" >&2
+      exit 1
+    fi
+    if ! glab auth status >/dev/null 2>&1; then
+      echo "error: glab is not authenticated; run 'glab auth login'" >&2
+      exit 1
+    fi
+
+    # Idempotency check — GL states are lowercase
+    STATE="$(glab issue view "$ISSUE" --output json 2>/dev/null | jq -r .state 2>/dev/null || echo "")"
+    if [ "$STATE" = "closed" ]; then
+      exit 0
+    fi
+
+    # Two calls: comment then close (glab issue close has no --message flag)
+    glab issue note "$ISSUE" --message "$BODY"
+    glab issue close "$ISSUE"
+    ;;
+
+  unknown)
+    echo "error: provider unknown; cannot close upstream issue" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

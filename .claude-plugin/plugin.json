@@ -21,6 +21,7 @@
     "./hv-config",
     "./hv-capture",
     "./hv-c",
+    "./hv-issues",
     "./hv-rm",
     "./hv-go",
     "./hv-vision",
