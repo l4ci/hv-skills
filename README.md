@@ -176,6 +176,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 | `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
 | `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
+| `/hv-undo` | Guided rollback of the last `/hv-work` cycle — resets the merge commit, restores TODO entries; dry-run preview, manual confirmation, direct-merge cycles only |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
 | `/hv-release` | Cut a release: bump version, generate notes, tag, push, publish to GitHub/GitLab. |

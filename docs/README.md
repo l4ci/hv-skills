@@ -24,6 +24,7 @@ Public user guide for hv-skills — a zero-dependency development workflow for C
 ### Shipping
 
 - [Review and ship](usage/review-and-ship.md) — `/hv-review` and `/hv-ship` gates
+- [Rolling back a cycle](usage/undo.md) — `/hv-undo` guided cycle rollback with dry-run preview and manual confirmation
 - [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
 - [Decisions](usage/decisions.md) — `/hv-decide` and hard-boundary commitments in `DECISIONS.md`
 
