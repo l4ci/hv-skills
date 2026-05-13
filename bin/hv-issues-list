@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# List open issues from the target provider (GitHub via `gh`, GitLab via `glab`),
+# normalized into a uniform JSON array.
+#
+# Lookup helper — exit 0 with [] when no issues or provider is unknown.
+# Exit 1 with stderr when the matching CLI is missing or unauthed (precondition
+# failure, NOT "empty result"). This disambiguates: empty answer ≠ broken setup.
+#
+# Usage: hv-issues-list [--repo <name>] [--label <name>] [--limit <N>]
+#   --repo  <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and
+#                   run from that sub-repo directory.
+#   --label <name>  Filter by label.
+#   --limit <N>     Max issues to fetch (default 30).
+#   stdout: JSON array — [{number, title, body, labels, url, author}, ...]
+#   exit:   0 on success (even empty), 1 on precondition failure
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=hv-self-locate.sh
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+# ---------------------------------------------------------------------------
+# Parse flags
+# ---------------------------------------------------------------------------
+REPO=""
+LABEL=""
+LIMIT=30
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo)
+      REPO="${2:?--repo requires a name argument}"
+      shift 2
+      ;;
+    --label)
+      LABEL="${2:?--label requires a name argument}"
+      shift 2
+      ;;
+    --limit)
+      LIMIT="${2:?--limit requires a numeric argument}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# Resolve sub-repo path (if --repo given)
+# ---------------------------------------------------------------------------
+REPO_PATH=""
+if [ -n "$REPO" ]; then
+  REPO_PATH="$("$HERE/hv-resolve-repo-path" "$REPO")"
+fi
+
+# ---------------------------------------------------------------------------
+# Detect provider
+# ---------------------------------------------------------------------------
+if [ -n "$REPO" ]; then
+  PROVIDER="$("$HERE/hv-issues-provider" --repo "$REPO")"
+else
+  PROVIDER="$("$HERE/hv-issues-provider")"
+fi
+
+# ---------------------------------------------------------------------------
+# Branch on provider
+# ---------------------------------------------------------------------------
+case "$PROVIDER" in
+  github)
+    if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+      echo "error: gh not installed or not authenticated" >&2
+      exit 1
+    fi
+
+    RAW="$(
+      if [ -n "$REPO_PATH" ]; then
+        (
+          cd "$REPO_PATH"
+          gh issue list \
+            --state open \
+            --json number,title,body,labels,url,author \
+            --limit "$LIMIT" \
+            ${LABEL:+--label "$LABEL"}
+        )
+      else
+        gh issue list \
+          --state open \
+          --json number,title,body,labels,url,author \
+          --limit "$LIMIT" \
+          ${LABEL:+--label "$LABEL"}
+      fi
+    )"
+
+    echo "$RAW" | jq 'map({
+      number,
+      title,
+      body,
+      labels: [.labels[].name],
+      url,
+      author: .author.login
+    })'
+    ;;
+
+  gitlab)
+    if ! command -v glab >/dev/null 2>&1 || ! glab auth status >/dev/null 2>&1; then
+      echo "error: glab not installed or not authenticated" >&2
+      exit 1
+    fi
+
+    RAW="$(
+      if [ -n "$REPO_PATH" ]; then
+        (
+          cd "$REPO_PATH"
+          glab issue list \
+            --opened \
+            --output json \
+            --per-page "$LIMIT" \
+            ${LABEL:+--label "$LABEL"}
+        )
+      else
+        glab issue list \
+          --opened \
+          --output json \
+          --per-page "$LIMIT" \
+          ${LABEL:+--label "$LABEL"}
+      fi
+    )"
+
+    echo "$RAW" | jq 'map({
+      number: .iid,
+      title,
+      body: .description,
+      labels: (.labels // []),
+      url: .web_url,
+      author: .author.username
+    })'
+    ;;
+
+  unknown)
+    echo "[]"
+    ;;
+esac
+
+exit 0
