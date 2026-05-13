@@ -76,7 +76,7 @@ Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`
 - <older legacy learning without title>
 ```
 
-Each new bullet has a short bold `**Title**` (sentence-case, identifies the rule), an em-dash separator (` — `), the body, and a trailing date stamp. Existing bullets without a title are legacy — leave them as-is.
+Each new bullet has a short bold `**Title**` (sentence-case, identifies the rule), an em-dash separator (em-dash U+2014, not a hyphen), the body, and a trailing ISO-8601 date stamp in an HTML comment (`<!-- YYYY-MM-DD -->`). The schema is normative — `bin/hv-knowledge-merge` dedups by (topic, title), so calling it twice with the same title under the same topic is a silent no-op. Sharper-wording replacement requires manual `Edit` on the existing bullet; the helper refuses to overwrite a title hit. Existing bullets without a title are legacy — leave them as-is.
 
 For each captured bullet, call:
 

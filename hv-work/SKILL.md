@@ -227,6 +227,8 @@ Orchestrator stays at the repo root (or umbrella root in umbrella mode); workers
 
 ## Step 6 — Dispatch Worker Agents
 
+**Dispatch vs orchestrator-direct.** When the wave is N near-identical mechanical inserts on disjoint files (e.g. an 18-site SKILL.md sweep), prefer orchestrator-direct parallel `Edit` calls over dispatching N write-only subagents — dispatch overhead exceeds the benefit when the orchestrator already has per-site content. Litmus: *"is this task one `Edit` against a uniquely-anchored `old_string`?"* — yes → inline; no → dispatch.
+
 For each independent task, dispatch a subagent with the **worker** model:
 
 ```
@@ -268,9 +270,15 @@ You are implementing Task N of [total].
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the suggested commit message; read-first, minimal-diff, no unrelated changes; workers do NOT stage or commit.
 
+**Cross-referencing parallel artifacts — pre-bake citations.** When two parallel workers author artifacts that cite each other, pre-specify the citation language in each brief; neither worker should need to read the other's output. Works for structural cross-references (cite by path + named role); serialize when citation must quote or restate.
+
+**Doc-writer + helper-writers in the same wave drifts.** Workers authoring docs that show helper output or signatures while sibling workers are writing those helpers will paraphrase the brief and drift from the real code. Pin exact signatures verbatim into the doc-brief, or serialize the doc writer after the helper commit so it reads the actual implementation.
+
 **Rename-task addendum.** Briefs for `git mv old new` (or equivalent rename) tasks MUST carry the Step 4 grep step — instruct the worker to run `git grep -l "<old-name>" -- <scope>` before reporting and extend coverage to every match. Step 7 re-runs the same grep; both layers catch enumerate gaps.
 
 Launch all independent agents in one message (parallel tool calls) — write-only workers don't race on `.git/index`, so this is safe under any isolation mode. Don't announce — just do it.
+
+**Edit-tool race in parallel same-file workers.** When parallel workers edit the same file at different ranges, an `Edit` call may report *"File has been modified since read"* after a sibling worker's edit invalidates the cached state. Mitigation: re-`Read` the file, re-run the same `Edit` with byte-identical `old_string` — do NOT regenerate `old_string` from scratch (risks sibling-edited content).
 
 ### Alternative: legacy worker-commits (opt-in)
 
@@ -285,10 +293,13 @@ This path is documented for completeness; the default write-only pattern above i
 
 Orchestrator verifies internally (don't narrate):
 
+Trust the diff, not the worker's narrative — when a worker re-enters files in a later wave, it can mis-attribute its own writes to an earlier wave even when the on-disk output is correct. Verification reads `git diff` and the resulting files; the worker's completion report is supplementary.
+
 1. Inspect pending changes: `git status --porcelain` then `git diff` for the files the worker reported. (Legacy path: `git log --oneline -1` if the worker committed.)
 2. Read modified files — changes match the brief.
 3. Structural checks: grep for expected patterns, no regressions.
 4. **Rename validation (Step 4 rename + link-sweep rule).** Re-run `git grep -l "<old-name>" -- <scope>`; files outside the worker's modified-file set → dispatch a fix-up to extend coverage before staging.
+5. **Claim-weight check on gap-fills.** When a worker fills a gap left by extraction (sparse carrier prose, missing rationale), expect plausible-sounding editorial that wasn't in the source. Verify the *claim weight* of any sentence the worker authored, not just structural shape — plausible ≠ sourced.
 
 **When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
 
@@ -307,6 +318,7 @@ Rules:
 
 - **Stage exactly the files named in that task's brief.** No `git add -A`, no `git add .` — sweeping in another worker's changes breaks atomicity.
 - **One commit per task.** Even when two tasks share a wave, they get separate commits.
+- **Same-file parallel carve-out.** When two parallel write-only workers edit DIFFERENT non-overlapping ranges of the SAME file, strict per-task commits would need fragile `git add -p`. Pragmatic carve-out: combine into ONE commit covering both task IDs in the message; revert granularity is preserved by the message, not the commit boundary.
 - **Suggested commit message is the brief's `**Suggested commit message:**` line verbatim.** If verification surfaced a meaningful adjustment (e.g., a fix-up after a FAIL→re-dispatch loop), edit the message to reflect what landed.
 - **Worktree isolation.** Run from the worktree path — the orchestrator's cwd is the umbrella, but the commit must happen against the worktree's index. Use `git -C <worktree-path>` or change directory before staging.
 - **Umbrella / multi-repo.** Run each task's commit inside its target sub-repo (`git -C <umbrella>/<repo>` or `cd <repo>`). The orchestrator stays at the umbrella; each commit lands in the right `.git/`.
