@@ -1,0 +1,108 @@
+# Rolling back a cycle
+
+`/hv-undo` is the inverse of [`/hv-work`](running-work.md)'s commit and completion steps. It resets the base branch past a cycle's merge commit, restores that cycle's TODO entries from `## Completed` back to their type sections, and decrements `since_refactor` counters that the cycle bumped. Default mode is a dry run with a structured preview; nothing is written until you confirm. MVP support covers direct-merge cycles only — cycles shipped through [`/hv-ship`](review-and-ship.md)'s PR path are refused.
+
+## /hv-undo
+
+```
+/hv-undo
+```
+
+With no arguments, `/hv-undo` targets the most recent `merge: ...` commit on the base branch. The skill prints a preview, asks for explicit confirmation, and only writes after you pick *Apply*. Pass `--cycle <hash>` to target a specific cycle (rare — useful when you've made unrelated commits since and want to roll back further with `--allow-post-merge`).
+
+## Worked example
+
+You finished `[F42]` an hour ago via [`/hv-work`](running-work.md), `/hv-ship` direct-merged it, and the entry is now in `## Completed`:
+
+```markdown
+## Completed
+- ~~**[F42] [Major] Inline preview for share links.**~~ landed 2026-05-13
+```
+
+You realize the preview implementation conflicts with a milestone constraint that landed yesterday. Run:
+
+```
+/hv-undo
+```
+
+The skill prints the rollback plan:
+
+```
+[F42] cycle rollback plan:
+  Subject: merge: F42 — inline preview for share links
+  Base:    main (will reset to 7c91a2e — one commit before merge)
+  Items:   [F42] (1)
+  Branch:  hv/F42-share-link-preview (already deleted by direct-merge — recreate with: git branch hv/F42-share-link-preview 4d2f8b1^2)
+  Status:  no active stream for this cycle
+  Handoff: no handoff file present
+  Plans:   no plan file present
+  Counters: since_refactor: 7 → 6
+
+dry-run — no files modified.
+```
+
+The skill then asks for confirmation through the standard *Apply* / *Cancel* picker. Pick *Apply* and the helper runs again with `--force`, applies the changes, and reports:
+
+```
+[F42] cycle rolled back: base reset to 7c91a2e, 1 TODO entry restored, counters decremented
+```
+
+Re-run [`/hv-next`](picking-work.md) and `[F42]` shows up under Features again, ready to be re-planned or replaced. The detail file at `.hv/features/F42.md` is untouched throughout — only the active backlog state and the merge commit moved. If you want to amend the item's description before re-running, edit the detail file directly and `/hv-next` will pick up the new wording on its next pass.
+
+## What gets rolled back vs. preserved
+
+`/hv-undo` rolls back the **merge commit on the base branch** (the base is reset to the commit immediately before it), the cycle's **TODO entries** (un-strikethroughed and moved from `## Completed` back to their original type sections under `## Features`, `## Bugs`, or `## Tasks`), and **`since_refactor` counters** (decremented once per non-refactor commit the cycle introduced).
+
+Preserved untouched: **`ARCHIVE.md`** historical entries (the rolled-back done-line was in `BACKLOG.md ## Completed`, not in `ARCHIVE.md`), the **git reflog** (the merge commit is still recoverable for 90 days via `git reflog`), and **git objects** generally (the merged branch's commits stay reachable through the reflog, so nothing is irretrievably lost in the short term).
+
+Not restored, by design: **handoff files** (`.hv/handoff/<branch>.md` are gitignored — they were lost when the branch was deleted at merge time), **plan files** (`.hv/plans/<key>.md` are gitignored — same story), and **the merged branch itself** (direct-merge deletes it at ship time). The dry-run preview prints the literal `git branch …` command needed to recreate the branch from `<merge>^2` if you want to keep iterating on the same line of work.
+
+## Safety semantics
+
+`/hv-undo` enforces four guards before it will apply anything.
+
+**Clean tree required.** A dirty working tree exits with code 2. Commit, stash, or discard your in-flight changes before rolling back — `git reset --hard` cannot run safely otherwise.
+
+**Base branch required.** `/hv-undo` must run on the base branch (whatever [`bin/hv-base-branch`](../reference/cli-helpers.md) returns — usually `main` or `master`). Running from a feature branch refuses with a pointer to switch first.
+
+**Post-merge guard.** If the base branch has commits past the cycle merge, `/hv-undo` refuses by default:
+
+```
+error: base has 2 commits past merge 4d2f8b1; pass --allow-post-merge to discard them, or git reset to before them first
+```
+
+Two ways to resolve. Either `git reset --hard <merge>` to drop the post-merge commits explicitly first, then re-run `/hv-undo`. Or pass `--allow-post-merge` to discard them as part of the rollback:
+
+```
+/hv-undo --allow-post-merge
+```
+
+The latter is fine when the post-merge commits are local and disposable; prefer the explicit reset when you want a clear two-step audit trail.
+
+Either path is destructive on the post-merge commits — they leave the active branch tip but remain recoverable through the reflog for 90 days. If any of those commits matter, cherry-pick them onto a feature branch before rolling back.
+
+**PR-mode refused.** Cycles shipped via [`/hv-ship`](review-and-ship.md)'s PR strategy can't be rolled back through `/hv-undo` — the PR's state on the remote is the source of truth for the merge, and rewriting local history doesn't undo a merged PR. Use `gh pr close <num>` for an open PR or `git revert <merge-sha>` for one that already landed.
+
+## Manual gate
+
+The confirmation step is asked every time, including when [`autonomy.level`](autonomy.md) is set to `loop`. This mirrors the destructive-gate convention [`/hv-rm`](removing-work.md) uses — `git reset --hard` is recoverable through the reflog only inside the 90-day window, and the gate guarantees a human signed off before the reset runs. No flag suppresses the prompt.
+
+## What `/hv-undo` is NOT for
+
+- Editing what landed — if the work is fine but needs a tweak, capture a new fix via [`/hv-go`](running-work.md) or [`/hv-capture`](capturing-work.md) + [`/hv-work`](running-work.md). Don't roll back just to redo.
+- Partial rollback — `/hv-undo` rolls the entire cycle back as a unit. If you want to revert one task from a multi-task cycle, `git revert <task-commit>` is the right tool.
+- Rolling back more than one cycle at once — invoke `/hv-undo` twice, confirming each step independently.
+- PR-mode cycles — see *Safety semantics* above; use `gh pr close` or `git revert` instead.
+
+## When to use
+
+- A landed cycle conflicts with a milestone constraint or decision that surfaced after the merge.
+- The work shipped against the wrong premise — the implementation is correct, but the item itself was wrong.
+- You want the cycle's `[Major]` feature back on the backlog under a new design — roll it back, capture the replacement, replan.
+- A direct-merge cycle landed on top of unrelated local commits you didn't mean to ship; combine `--allow-post-merge` with care.
+
+If only one task in a multi-task cycle is wrong, prefer `git revert <task-commit>` — it preserves the rest of the cycle's history and leaves the TODO entries archived.
+
+## Plain-text fallback
+
+On hosts where `AskUserQuestion` is unavailable, `/hv-undo` falls back to a plain-text prompt: `Apply rollback? (yes/no)`. The semantics are identical — nothing writes until you answer `yes`. The preview block above the prompt is the same structured plan rendered for the picker, so the decision surface is unchanged regardless of host.

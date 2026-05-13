@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# Undo the last (or a specified) /hv-work cycle on the base branch — reset
+# the merge commit, restore TODO entries via hv-uncomplete. Direct-merge
+# cycles only (MVP); refuses on non-merge commits and on cycles with
+# post-merge commits unless --allow-post-merge is passed.
+#
+# Writer + atomic-merge helper: exit 0 on successful undo OR idempotent
+# no-op (dry-run printed; nothing to undo); exit 1 on precondition error
+# (no cycle / not a merge / post-merge guard / invalid argv); exit 2 on
+# dirty tree.
+#
+# Usage: hv-undo [--cycle <hash>] [--force] [--allow-post-merge]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+CYCLE=""
+FORCE=0
+ALLOW_POST_MERGE=0
+while :; do
+  case "${1:-}" in
+    --cycle)
+      CYCLE="${2:?error: --cycle requires a commit hash}"
+      shift 2
+      ;;
+    --force) FORCE=1; shift ;;
+    --allow-post-merge) ALLOW_POST_MERGE=1; shift ;;
+    "") break ;;
+    --*) echo "error: unknown flag: ${1}" >&2; exit 1 ;;
+    *) echo "error: unexpected positional arg: ${1}" >&2; exit 1 ;;
+  esac
+done
+
+# Resolve base branch (defensive — may be invoked from a feature branch).
+BASE="$("$HERE/hv-base-branch")"
+
+# Must run on the base branch — branch ops below would silently misfire.
+CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+if [ "$CURRENT_BRANCH" != "$BASE" ]; then
+  echo "error: hv-undo must run on the base branch ($BASE), currently on ${CURRENT_BRANCH:-(detached HEAD)}" >&2
+  exit 1
+fi
+
+# Dirty-tree guard — apply path resets hard, so we refuse on uncommitted work
+# even in dry-run mode for symmetry with the apply contract.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "error: uncommitted changes — stash (\`git stash\`) or commit before running hv-undo" >&2
+  exit 2
+fi
+
+# Resolve target merge commit.
+if [ -n "$CYCLE" ]; then
+  if ! MERGE="$(git rev-parse --verify "${CYCLE}^{commit}" 2>/dev/null)"; then
+    echo "error: --cycle hash '$CYCLE' is not a valid commit" >&2
+    exit 1
+  fi
+  # Verify it's a merge commit (has 2+ parents).
+  PARENTS="$(git rev-list --parents -n 1 "$MERGE" | wc -w)"
+  if [ "$PARENTS" -lt 3 ]; then
+    echo "error: --cycle commit $CYCLE is not a merge commit" >&2
+    exit 1
+  fi
+else
+  MERGE="$(git log --first-parent --merges -1 --pretty='%H' "$BASE" 2>/dev/null || true)"
+  if [ -z "$MERGE" ]; then
+    echo "error: no merge commit found on $BASE" >&2
+    exit 1
+  fi
+fi
+
+SUBJECT="$(git log -1 --pretty='%s' "$MERGE")"
+case "$SUBJECT" in
+  "merge: "*) : ;;
+  *)
+    if [ -n "$CYCLE" ]; then
+      echo "error: --cycle commit $CYCLE has subject not matching '^merge: ' (subject: $SUBJECT)" >&2
+    else
+      echo "error: most recent merge on $BASE is not an hv-skills cycle merge (subject: $SUBJECT)" >&2
+    fi
+    exit 1
+    ;;
+esac
+
+MERGE_SHORT="$(git rev-parse --short "$MERGE")"
+PRE_MERGE="$(git rev-parse "${MERGE}^1")"
+PRE_MERGE_SHORT="$(git rev-parse --short "$PRE_MERGE")"
+CYCLE_TIP="$(git rev-parse "${MERGE}^2")"
+CYCLE_TIP_SHORT="$(git rev-parse --short "$CYCLE_TIP")"
+
+# Post-merge commits guard (commits on base after the target merge).
+POST_MERGE_LIST="$(git log --first-parent --oneline "${MERGE}..${BASE}" || true)"
+POST_MERGE_COUNT=0
+if [ -n "$POST_MERGE_LIST" ]; then
+  POST_MERGE_COUNT="$(printf '%s\n' "$POST_MERGE_LIST" | wc -l | tr -d ' ')"
+fi
+if [ "$POST_MERGE_COUNT" -gt 0 ] && [ "$ALLOW_POST_MERGE" -eq 0 ]; then
+  echo "error: $POST_MERGE_COUNT commit(s) on $BASE after the cycle merge — pass --allow-post-merge to discard them, or reset manually first" >&2
+  printf '%s\n' "$POST_MERGE_LIST" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+# PR-mode detection: refuse if a remote ref likely tracks the cycle's branch.
+# We can't recover the branch name from the merge commit (hv-merge stores
+# only `-m "<msg>"`), so we approximate by scanning remote refs for any
+# branch tip equal to the cycle tip (^2). If any remote ref matches, treat
+# this as PR-mode and refuse.
+PR_REMOTE_REFS="$(git for-each-ref --format='%(refname:short)' --points-at "$CYCLE_TIP" refs/remotes/ 2>/dev/null || true)"
+if [ -n "$PR_REMOTE_REFS" ]; then
+  echo "note: PR-mode cycle — rolling back upstream PRs is manual (gh pr close / git revert)" >&2
+  echo "       remote ref(s) at cycle tip:" >&2
+  printf '%s\n' "$PR_REMOTE_REFS" | sed 's/^/         /' >&2
+  exit 1
+fi
+
+# Cycle commits (everything on the merged branch, exclusive of the base side).
+CYCLE_HASHES="$(git log --pretty='%h' "${MERGE}^1..${MERGE}^2" 2>/dev/null || true)"
+
+# Resolve item IDs by matching cycle hashes against done-lines in BACKLOG/ARCHIVE.
+RESOLVED_IDS="$(
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 - "$CYCLE_HASHES" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import parse_done_line
+
+cycle_hashes = {h.strip() for h in sys.argv[1].splitlines() if h.strip()}
+
+def scan(path: Path):
+    if not path.exists():
+        return []
+    hits = []
+    for raw in path.read_text().splitlines():
+        d = parse_done_line(raw)
+        if not d:
+            continue
+        if d["hash"] in cycle_hashes and d["id"]:
+            hits.append(d["id"])
+    return hits
+
+ids = []
+seen = set()
+for p in (Path(".hv/BACKLOG.md"), Path(".hv/ARCHIVE.md")):
+    for iid in scan(p):
+        if iid not in seen:
+            seen.add(iid)
+            ids.append(iid)
+
+print("\n".join(ids))
+PY
+)"
+
+# Build dry-run block.
+POST_MERGE_NOTE=""
+if [ "$POST_MERGE_COUNT" -gt 0 ]; then
+  POST_MERGE_NOTE=", $POST_MERGE_COUNT commit(s) past the merge will be discarded"
+fi
+
+# Read array of IDs from RESOLVED_IDS (newline-delimited).
+ID_LIST=()
+if [ -n "$RESOLVED_IDS" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    ID_LIST+=("$line")
+  done <<< "$RESOLVED_IDS"
+fi
+
+section_for_id() {
+  case "$1" in
+    B*) echo "Bugs" ;;
+    F*) echo "Features" ;;
+    T*) echo "Tasks" ;;
+    *)  echo "Unknown" ;;
+  esac
+}
+
+echo "Undo plan for last cycle: $MERGE_SHORT"
+echo
+echo "Subject:  $SUBJECT"
+echo "Base:     $BASE will reset --hard ${MERGE_SHORT}^1 (currently ${MERGE_SHORT}${POST_MERGE_NOTE})"
+if [ "${#ID_LIST[@]}" -eq 0 ]; then
+  echo "Items:    none (cycle resolved no tracked items)"
+else
+  first=1
+  for iid in "${ID_LIST[@]}"; do
+    sec="$(section_for_id "$iid")"
+    if [ "$first" -eq 1 ]; then
+      echo "Items:    $iid will be restored to BACKLOG.md ($sec)"
+      first=0
+    else
+      echo "          $iid will be restored to BACKLOG.md ($sec)"
+    fi
+  done
+fi
+echo
+echo "Branch:   deleted by hv-merge; rerun \`git branch <name> ${MERGE_SHORT}^2\` to keep the work"
+echo "Status:   no active entry to clear (cycle already removed it)"
+echo "Handoff:  gitignored — not restorable"
+echo "Plans:    gitignored — not restorable"
+
+if [ "$FORCE" -eq 0 ]; then
+  echo
+  echo "Re-run with --force to apply."
+  exit 0
+fi
+
+# ── apply ────────────────────────────────────────────────────────────────────
+
+git reset --hard "${MERGE}^1" >/dev/null
+
+if [ "${#ID_LIST[@]}" -gt 0 ]; then
+  for iid in "${ID_LIST[@]}"; do
+    if ! "$HERE/hv-uncomplete" "$iid"; then
+      echo "error: hv-uncomplete failed for $iid — aborting remaining restores" >&2
+      exit 1
+    fi
+  done
+fi
+
+if [ "${#ID_LIST[@]}" -eq 0 ]; then
+  RESTORED="none"
+else
+  RESTORED="$(IFS=', '; echo "${ID_LIST[*]}")"
+fi
+echo
+echo "Undone cycle $MERGE_SHORT. Reset $BASE to $PRE_MERGE_SHORT. Restored: $RESTORED."

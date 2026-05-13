@@ -37,6 +37,7 @@
     "./hv-context",
     "./hv-review",
     "./hv-ship",
+    "./hv-undo",
     "./hv-learn",
     "./hv-docs",
     "./hv-refactor",

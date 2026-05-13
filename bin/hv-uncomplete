@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Restore a Done line from BACKLOG.md ## Completed (or .hv/ARCHIVE.md) back
+# to its active type section. Inverse of hv-complete.
+# Idempotent: silent no-op if the ID is already active in BACKLOG.md.
+# Side effect: on the completed→active transition, decrements
+# counters.json#since_refactor.{features,bugs} unless the resolved commit's
+# subject starts with `refactor:` (those didn't count toward refactor pressure).
+# Writer helper: exit 0 on successful restore OR idempotent no-op; exit 1 if ID is not present in BACKLOG.md (Completed) or ARCHIVE.md.
+# Usage: hv-uncomplete <ID>
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+ID="${1:?usage: hv-uncomplete <ID>}"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" <<'PY'
+import re, subprocess, sys
+from pathlib import Path
+from hvlib import (
+    find_section, write_text_atomic, update_json,
+    parse_done_line, detail_dir_for_id,
+)
+
+id_s = sys.argv[1]
+backlog_path = Path(".hv/BACKLOG.md")
+archive_path = Path(".hv/ARCHIVE.md")
+
+if not backlog_path.exists():
+    print(f"error: {backlog_path} not found", file=sys.stderr)
+    sys.exit(1)
+content = backlog_path.read_text()
+
+# Idempotent gate: if the ID is already active (outside ## Completed), no-op.
+completed_span = find_section(content, "Completed")
+active_re = re.compile(r"^- \*\*\[" + re.escape(id_s) + r"\]", re.MULTILINE)
+for m in active_re.finditer(content):
+    if completed_span is None or not (completed_span[0] <= m.start() < completed_span[1]):
+        print(f"noop: [{id_s}] already active in BACKLOG.md", file=sys.stderr)
+        sys.exit(0)
+
+# Search for the Done line — BACKLOG ## Completed first, then ARCHIVE.md.
+def find_done_in(text, id_target):
+    """Return (line, line_start, line_end_excl_newline) or None."""
+    pos = 0
+    for raw in text.split("\n"):
+        line_len = len(raw)
+        parsed = parse_done_line(raw)
+        if parsed and parsed["id"] == id_target:
+            return (raw, pos, pos + line_len)
+        pos += line_len + 1  # +1 for the consumed "\n"
+    return None
+
+source = None        # "backlog" | "archive"
+done_line = None
+done_parsed = None
+
+if completed_span is not None:
+    start, end = completed_span
+    hit = find_done_in(content[start:end], id_s)
+    if hit:
+        line, lstart, lend = hit
+        done_line = line
+        done_parsed = parse_done_line(line)
+        # Absolute offsets into `content`.
+        abs_start = start + lstart
+        abs_end = start + lend
+        # Strip the line plus its trailing newline (if present).
+        tail = content[abs_end:]
+        if tail.startswith("\n"):
+            abs_end += 1
+        content = content[:abs_start] + content[abs_end:]
+        source = "backlog"
+
+archive_content = None
+if source is None and archive_path.exists():
+    archive_content = archive_path.read_text()
+    hit = find_done_in(archive_content, id_s)
+    if hit:
+        line, lstart, lend = hit
+        done_line = line
+        done_parsed = parse_done_line(line)
+        tail = archive_content[lend:]
+        cut_end = lend
+        if tail.startswith("\n"):
+            cut_end += 1
+        archive_content = archive_content[:lstart] + archive_content[cut_end:]
+        source = "archive"
+
+if source is None:
+    print(f"error: [{id_s}] not found in BACKLOG.md (## Completed) or .hv/ARCHIVE.md",
+          file=sys.stderr)
+    sys.exit(1)
+
+# Reconstruct the active bullet line from the inner content.
+active_line = "- " + done_parsed["inner"]
+
+# Pick target section by ID prefix.
+dir_name = detail_dir_for_id(id_s)
+section_for = {"bugs": "Bugs", "features": "Features", "tasks": "Tasks"}
+target = section_for.get(dir_name)
+if target is None:
+    print(f"error: [{id_s}] has unsupported prefix (expected B/F/T)", file=sys.stderr)
+    sys.exit(1)
+
+# Splice active_line into the target section in (already-modified) `content`.
+span = find_section(content, target)
+if span is None:
+    # Create the section before ## Completed if present, else at EOF.
+    comp = find_section(content, "Completed")
+    block = f"## {target}\n{active_line}\n\n"
+    if comp is None:
+        content = content.rstrip("\n") + "\n\n" + block
+    else:
+        # Insert before the "## Completed" heading line. comp[0] is just
+        # after that heading; walk back to the start of "## Completed\n".
+        heading = "## Completed"
+        h_idx = content.rfind(heading, 0, comp[0])
+        content = content[:h_idx] + block + content[h_idx:]
+else:
+    s, e = span
+    body = content[s:e]
+    # If body has entries, separate with a blank line; otherwise place
+    # the bullet right under the heading.
+    has_entries = any(
+        ln.startswith("- ") for ln in body.splitlines()
+    )
+    if has_entries:
+        # Trim trailing blank lines from body, append our line, then
+        # re-add a single trailing blank line.
+        trimmed = body.rstrip("\n")
+        new_body = trimmed + "\n" + active_line + "\n\n"
+    else:
+        # Empty body (typically "\n" or "\n\n"). Place bullet directly
+        # under the heading with a trailing blank line.
+        new_body = "\n" + active_line + "\n\n"
+    content = content[:s] + new_body + content[e:]
+
+write_text_atomic(backlog_path, content)
+if source == "archive":
+    write_text_atomic(archive_path, archive_content)
+
+# Counter decrement: mirror hv-complete's bump in reverse. Skip for tasks
+# (no counter); skip when the original commit was a refactor: commit.
+kind_key = dir_name if dir_name != "tasks" else None
+if kind_key:
+    hash_s = done_parsed["hash"]
+    subj = subprocess.run(["git", "log", "-1", "--format=%s", hash_s],
+                          capture_output=True, text=True)
+    # Skip decrement silently if git can't resolve the hash (defensive).
+    if subj.returncode == 0 and not re.match(r"^refactor(\(.+?\))?!?:", subj.stdout):
+        def dec(d):
+            sr = d.setdefault("since_refactor", {"features": 0, "bugs": 0})
+            sr[kind_key] = max(0, sr.get(kind_key, 0) - 1)
+        update_json(".hv/counters.json", {}, dec)
+PY
