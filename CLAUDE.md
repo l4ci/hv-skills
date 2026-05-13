@@ -59,6 +59,7 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 
 - Build & Tooling
 - Skill Authoring
+- Documentation
 
 <!-- hv-decisions-end -->
 
