@@ -124,3 +124,74 @@ A skill author asking "what does compliance look like?" can read any one of the 
 **Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the hv-skills dispatch discipline is self-contained.
 
 **Permits.** Mixed tiers in a single wave (one haiku worker alongside three sonnet workers in the same turn). Opportunistic haiku usage declared inline in the brief without a config flag. Per-skill judgment on which steps trip the threshold — the rule sets a floor, not a ceiling.
+
+## Adjective thresholds in skill prose erode at the runtime model — bake the number at authoring time
+
+Prose like "a few", "many", "high X", "ambiguous", "might/may" forces the runtime LLM to invent a threshold every invocation. Two thoughtful readers can interpret the same adjective two ways. Before shipping, test each one: if the adjective could plausibly be read in opposite directions by two competent readers, replace it with (a) a number, (b) a conditional (*"when X happens, Y"*), or (c) an assertive verb.
+
+**Forbids.**
+- Shipping prose with vague quantity adjectives (*"a few"*, *"many"*, *"several"*) when a number or conditional would lock the threshold.
+- Shipping prose with vague intensity adjectives (*"high X"*, *"low X"*, *"common"*, *"rare"*) when the threshold matters for the rule's correctness.
+- Hedging verbs (*"might"*, *"may"*, *"could"*) in normative rules where the runtime needs a binary answer.
+
+**Permits.**
+- Adjectives in descriptive prose where no threshold is implied (*"a typical day"*, *"common workflow"*) — flavor doesn't trip the runtime if no rule fires off it.
+- Hedging in genuinely open situations that the rule explicitly flags as a known unknown.
+
+Codified during the T52 sweep across `hv-debug`, `hv-map`, `hv-release`, `hv-review`, `hv-spike`, and `references/post-cycle-trigger-gate.md` (six phrases replaced with concrete thresholds).
+
+## `AskUserQuestion` option list capped at 4
+
+`AskUserQuestion`'s option list is hard-capped at 4. Any SKILL.md picklist with N>4 silently degrades to plain-text fallback (the user has to type names back), defeating the native UX promised in the skill description.
+
+**Forbids.**
+- Designing a question with 5+ options on the assumption the host will scroll — the host won't; the array is rejected and the skill falls back to free text.
+- Compressing categories to fit 4 by merging unrelated answers — the merger destroys the picklist's semantic clarity.
+
+**Permits.**
+- Chunking into multiple sequential `AskUserQuestion` calls with ≤4 options each, `multiSelect: true` so the user picks across batches.
+- Two-stage flow: pick categories first (single multiSelect, ≤4), then drill into the keys within each chosen category in a second call.
+
+Codified during the `/hv-config` Step 3 fix (B11) where a 13-key picklist silently fell back to free text; resolved with category-then-keys staging.
+
+## Nudges on terminal/idle paths only
+
+When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/hv-next` → `/hv-work` → `/hv-ship` → `/hv-next` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.
+
+**Forbids.**
+- Firing the same nudge from a skill's tail when that skill auto-dispatches the next skill (the user never sees the message — it's overwritten by the dispatched skill's banner).
+- Firing the nudge from a dispatch path on the assumption *"users will see it eventually"* — they see the loudest, latest banner; intermediate nudges are noise.
+
+**Permits.**
+- Firing the nudge from the terminal branch of a routing skill (e.g. `/hv-next` Step 8 "Stop here" / empty-backlog) where the user is about to step away.
+- Firing the nudge from the post-ship report (`/hv-ship` Step 9.5) where the cycle ended and no auto-dispatch follows.
+
+Codified after F19's release-pending nudge: fires from `/hv-next` only on the "Stop here" / empty-backlog branch and from `/hv-ship`'s post-ship report, never from inside `/hv-work`'s tail (the most-frequent path, but always followed by a dispatch).
+
+## Helper docstring is the contract — SKILL.md prose paraphrasing drifts
+
+When a SKILL.md cites a helper (`bin/hv-*`), the helper's header docstring IS the contract; prose paraphrases drift. Before extracting or authoring prose ABOUT a helper, read its header — if the SKILL.md disagrees with the helper, the SKILL.md is wrong.
+
+**Forbids.**
+- Paraphrasing a helper's behavior in SKILL.md prose without reading the helper's header docstring first.
+- Inferring a helper's contract from how callers use it — callers can be wrong; the header is the source of truth.
+
+**Permits.**
+- Quoting the helper's header verbatim in the SKILL.md when the prose needs the exact contract.
+- Updating SKILL.md prose to match a helper after a helper's contract changes (the prose follows the code, not the other way around).
+
+Codified on T28: `hv-work/SKILL.md` Step 4.5 gated umbrella mode on `umbrella.enabled`, but `bin/hv-umbrella-on`'s header pinned the contract to `.hv/repos.json` presence. The header was authoritative; the SKILL.md was wrong.
+
+## Inventory table beside a citation when ≥4 sibling rules extracted
+
+When a SKILL.md extracts N≥4 sibling rules to a `references/` file, leave a one-column inventory table beside the citation. Readers scanning the SKILL.md see rule names without opening the reference; readers wanting the body click through.
+
+**Forbids.**
+- Citing a reference with 4+ extracted rules without an inventory — the reader has to open the file to know whether the rule they care about is there.
+- Restating the full rule body in the inventory — that defeats the extraction; the inventory is a TOC, not the content.
+
+**Permits.**
+- For ≤3 extracted rules, citing the reference inline without an inventory (the rule names fit in the citing sentence).
+- Inventory tables with extra columns (audience, complexity, etc.) when those columns help readers triage.
+
+Codified on T39: `hv-init/SKILL.md` "Authoring conventions" H2 grew a 9-row inventory table beside its `references/authoring-conventions.md` citation; the inventory itself is what triggered this rule's codification.

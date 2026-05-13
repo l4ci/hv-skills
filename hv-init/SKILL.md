@@ -243,6 +243,11 @@ Inventory (in order — see the reference for each rule's full body, *Why*, **Fo
 | 7 | Stage features across slices using pass-through stubs |
 | 8 | Helper-centric V2-surface extension |
 | 9 | Opt-in feature flags default to `false` |
+| 10 | Adjective thresholds in skill prose erode at the runtime model — bake the number at authoring time |
+| 11 | `AskUserQuestion` option list capped at 4 |
+| 12 | Nudges on terminal/idle paths only |
+| 13 | Helper docstring is the contract — SKILL.md prose paraphrasing drifts |
+| 14 | Inventory table beside a citation when ≥4 sibling rules extracted |
 
 When adding a new rule to the convention set, edit `references/authoring-conventions.md` directly — not this SKILL.md. The inventory table above gets a new row in the same edit.
 
