@@ -23,7 +23,7 @@ Autonomy decides whether to invoke the next skill; the destination skill's own g
 The loop stops cleanly on any of:
 
 - `/hv-next` reports an empty backlog (no items in active milestone, no items in general backlog).
-- `/hv-work` Step 2 detects a genuinely ambiguous brief. Invisible defaults across a queue defeat the loop's point. The user resolves and re-invokes `/hv-next` to continue.
+- `/hv-work` Step 2 detects a genuinely ambiguous brief on a non-Major or untagged item. (Major + Milestone-tagged items defer to Step 4's auto-dispatch chain, which auto-resolves design via `/hv-brainstorm --auto-loop` and plan via `/hv-plan --auto-loop` instead of stopping.) Invisible defaults across a queue defeat the loop's point for cheap items. The user resolves and re-invokes `/hv-next` to continue.
 - A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
 - The user interrupts.
 
@@ -37,7 +37,13 @@ In loop mode, AskUserQuestion calls fall into three buckets:
 
 If a routine routing prompt does fire under loop mode, that's a sign the auto-pick branch is missing at that call site — file it as a bug.
 
-**Loop-mode uncertainty pre-flight.** For Major + Milestone-tagged items in loop mode, [`/hv-work`](running-work.md) runs a structural-triple check before invoking [`/hv-plan`](vision-and-plans.md) `--auto-loop`: fires when the item has no detail file, the brief contains 2+ question marks or `TBD`/`unclear` markers, or the brief lacks any backticked identifiers (signaling "unknown surface"). When the check fires, [`/hv-assume`](picking-work.md) runs first to surface the orchestrator's intended files, tests, and assumptions; the peek lands in the orchestrator session and informs the subsequent auto-plan. The check runs only in loop mode; off and auto modes still let you invoke `/hv-assume` and `/hv-plan` manually.
+**Loop-mode auto-dispatch chain.** For Major + Milestone-tagged items in loop mode, [`/hv-work`](running-work.md) Step 4 runs a three-step research → plan chain before any worker dispatches:
+
+1. **Design pre-flight.** When `.hv/designs/<ID>.md` is absent, dispatch [`/hv-brainstorm`](#) `--auto-loop` — auto-resolves design questions (local-first → bounded web → placeholder), logs `[Auto:Loop]` decisions for fresh picks, writes the design with `auto: true` frontmatter.
+2. **Uncertainty pre-flight.** Run the structural-triple check (no detail file / 2+ question marks or `TBD`/`unclear` markers / no backticked identifiers). When uncertain, dispatch [`/hv-assume`](picking-work.md); the peek lands in the orchestrator session and informs the subsequent auto-plan.
+3. **Plan dispatch.** Dispatch [`/hv-plan`](vision-and-plans.md) `--auto-loop` — reads the design as soft input, auto-resolves open questions, writes the plan with `auto: true` frontmatter.
+
+The chain runs only in loop mode; off and auto modes still let you invoke `/hv-brainstorm`, `/hv-assume`, and `/hv-plan` manually.
 
 ## When to flip it on
 

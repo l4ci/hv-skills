@@ -197,7 +197,7 @@ Branch inline (per the `hv-init` authoring convention on inline autonomy directi
 
 - `"off"` — append one line to the suggestion block before Step 7's `AskUserQuestion` fires: *"This is a `[Major]` item without a design — consider `/hv-brainstorm [ID]` before `/hv-work`."* Substitute `[P0]` for the tag when the suggested item is a bug. The existing 4 options in Step 7 are unchanged — the nudge informs the user; the picklist still lets them route to `/hv-work` if they decline.
 - `"auto"` — invoke `hv-brainstorm` via the `Skill` tool with the suggested ID as `args`. Print *"Auto: starting /hv-brainstorm [ID] — re-running /hv-next once the design lands."* before the dispatch. When the brainstorm returns (design artifact at `.hv/designs/<ID>.md` written), re-run Step 6 — the freshly-written design will now satisfy the design-exists check and the suggestion proceeds without a second nudge.
-- `"loop"` — skip the nudge entirely. Loop mode is throughput and Socratic design exploration breaks the loop's pace; the loop already auto-picks `/hv-work` in Step 7.
+- `"loop"` — skip the nudge entirely. Design resolution happens downstream: `/hv-work` Step 4's auto-dispatch chain runs `/hv-brainstorm --auto-loop` for Major + Milestone-tagged items without a design before the plan dispatch, so the design phase lives in `/hv-work` under loop, not here.
 
 ## Step 7 — Confirm & Execute
 

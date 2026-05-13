@@ -6,9 +6,9 @@ grep -q -- '--auto-loop' "$REPO/hv-plan/SKILL.md" \
 grep -q 'Auto-loop mode' "$REPO/hv-plan/SKILL.md" \
   || fail "F32: hv-plan/SKILL.md must include the dedicated 'Auto-loop mode' section"
 
-# (b) /hv-work Step 4 carries the inline loop-mode auto-plan dispatch directive.
-grep -q 'Loop-mode auto-plan dispatch' "$REPO/hv-work/SKILL.md" \
-  || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-plan dispatch language"
+# (b) /hv-work Step 4 carries the inline loop-mode auto-dispatch chain directive (renamed under B28).
+grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
+  || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-dispatch chain language"
 grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
 
@@ -375,3 +375,26 @@ assert fields2.get("subsystem") == "capture", f"subsystem={fields2.get('subsyste
 PY
 echo "ok parse_todo_fields handles Subsystem"
 
+echo "B28: /hv-brainstorm --auto-loop dispatch chain"
+
+# (a) /hv-brainstorm SKILL.md exposes --auto-loop with the inline dispatch language.
+grep -q -- '--auto-loop' "$REPO/hv-brainstorm/SKILL.md" \
+  || fail "B28: hv-brainstorm/SKILL.md must document the --auto-loop flag"
+grep -q '## Auto-loop mode' "$REPO/hv-brainstorm/SKILL.md" \
+  || fail "B28: hv-brainstorm/SKILL.md must include the dedicated 'Auto-loop mode' section"
+
+# (b) /hv-work Step 4 carries the inline loop-mode auto-brainstorm dispatch directive.
+grep -q '/hv-brainstorm --auto-loop' "$REPO/hv-work/SKILL.md" \
+  || fail "B28: hv-work/SKILL.md must reference /hv-brainstorm --auto-loop dispatch"
+grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
+  || fail "B28: hv-work/SKILL.md must title Step 4 chain as 'Loop-mode auto-dispatch chain'"
+
+# (c) /hv-work Step 2 carve-out for Major + Milestone-tagged items defers to Step 4 chain.
+grep -q 'defer to Step 4' "$REPO/hv-work/SKILL.md" \
+  || fail "B28: hv-work/SKILL.md Step 2 must defer Major + Milestone-tagged ambiguity to Step 4 chain"
+
+# (d) references/loop-mode-plan-dispatch.md describes the design pre-flight.
+grep -q 'Design pre-flight' "$REPO/references/loop-mode-plan-dispatch.md" \
+  || fail "B28: references/loop-mode-plan-dispatch.md must include the Design pre-flight section"
+
+pass "B28: /hv-brainstorm --auto-loop dispatch chain is wired across SKILL.md + reference"

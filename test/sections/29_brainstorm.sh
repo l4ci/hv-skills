@@ -93,3 +93,15 @@ trap 'rm -rf "$PLN_TMP"' EXIT
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$PLN_TMP"
 pass "hv-plan-add --design records design pointer in frontmatter; rejects missing design path"
+
+echo "B28: hv-brainstorm --auto-loop frontmatter convention"
+
+# Auto-loop mode marks the design artifact with auto: true frontmatter (per hv-plan F32 convention).
+grep -q 'auto: true' "$REPO/hv-brainstorm/SKILL.md" \
+  || fail "B28: hv-brainstorm/SKILL.md must document 'auto: true' frontmatter under --auto-loop"
+
+# Auto-loop autonomy gate is wired in Step 1 (mode entered when flag is present under loop autonomy).
+grep -q 'AUTO_LOOP' "$REPO/hv-brainstorm/SKILL.md" \
+  || fail "B28: hv-brainstorm/SKILL.md must parse the --auto-loop flag in Step 1"
+
+pass "B28: hv-brainstorm --auto-loop frontmatter + autonomy gate wired"
