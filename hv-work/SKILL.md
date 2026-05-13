@@ -122,7 +122,10 @@ When asking, use a single `AskUserQuestion` call with 1-3 questions. Each questi
 
 Plain-text fallback: ask once; on ambiguity, default to Recommended and state it explicitly in the dispatch brief. See `references/ask-user-question-fallback.md`.
 
-**Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
+**Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), the routing depends on the item's shape:
+
+- **Major + Milestone-tagged item** — defer to Step 4's auto-dispatch chain. The chain auto-resolves design via `/hv-brainstorm --auto-loop` (writes a design artifact with `[Auto:Loop]` decisions for fresh picks), then runs the uncertainty pre-flight + plan dispatch (`/hv-plan --auto-loop`). Step 2 does not stop in this case — the chain owns design resolution under loop.
+- **Non-Major or untagged item** — **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
 
 ## Step 3 — Register in Status
 
@@ -168,7 +171,13 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 
 If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
 
-**Loop-mode auto-plan dispatch (F34 / F35).** In loop mode with a Major + Milestone-tagged item but no plan, `/hv-work` runs an uncertainty pre-flight (`hv-uncertain`), optionally dispatches `/hv-assume` first when uncertain, then dispatches `/hv-plan --auto-loop <milestone>-<itemId>` — all via the `Skill` tool so the dispatched skills inherit the orchestrator model. Off and auto modes skip this and fall through to manual decomposition. See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) for the full choreography.
+**Loop-mode auto-dispatch chain (B28 / F32 / F34 / F35).** In loop mode with a Major + Milestone-tagged item but no plan, `/hv-work` runs the full research → plan chain in three steps, all via the `Skill` tool so the dispatched skills inherit the orchestrator model:
+
+1. **Design pre-flight (B28).** If `.hv/designs/<itemId>.md` is absent, dispatch `/hv-brainstorm --auto-loop <itemId>`. The dispatched skill auto-resolves design questions (Local-first → Bounded web → Placeholder), logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<itemId>.md` with `auto: true` frontmatter. When a design already exists, this step is a no-op.
+2. **Uncertainty pre-flight (F34).** Run `.hv/bin/hv-uncertain <itemId>`. Exit 0 (uncertain, reasons on stdout) → dispatch `/hv-assume <itemId>`. Exit 1 (certain) → skip the peek.
+3. **Plan dispatch (F32 / F35).** Dispatch `/hv-plan --auto-loop <milestone>-<itemId>`. `/hv-plan` Step 3 reads the design artifact as soft input (already wired), and the auto-resolution pipeline writes the plan with all picks honored.
+
+After the chain returns, re-run the plan-as-artifact check at the top of this step — the plan now exists; use it as the orchestrator's plan. Off and auto modes skip this chain entirely and fall through to manual decomposition. See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) for the full choreography.
 
 If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Minor/untagged item), proceed with the steps below.
 
