@@ -81,6 +81,8 @@ If after one round the user can't articulate **forbids** *or* **permits**, surfa
 
 **Source-prefill modes (`--from-learning <topic>`, `--from-spike <name>`).** Both pre-fill the four-part draft from a source artifact and surface the same closing prompt. Full bodies live in `references/source-prefill.md`.
 
+The semantic gap is preserved by design — source-prefill seeds only fields it can authoritatively provide (rule, *Why*) from the source's content; destination-specific fields (**Forbids**, **Permits**) stay as `_(user must articulate)_` placeholders that block the merge until the user fills them. The principle generalizes to any "promote A → B" flow where B carries an active commitment A doesn't. Sources without a commitment (an `inconclusive` spike) are refused at the gate — promotion requires a verdict the project is committing to.
+
 | Mode | Section in `references/source-prefill.md` |
 |------|-------------------------------------------|
 | `--from-learning <topic>` | `## --from-learning <topic>` |
