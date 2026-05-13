@@ -8,9 +8,9 @@ Reconciles the backlog against actual git state, then suggests what to pick up.
 
 Before presenting results it:
 
-1. Validates active branches and worktrees against git; stale entries are cleaned automatically.
+1. Validates active branches and worktrees against git; stale entries get cleaned automatically.
 2. Archives completions older than five days to `ARCHIVE.md`.
-3. Builds a relationship map from `Related:` links and identifies clusters.
+3. Builds a relationship map from `Related:` links and finds clusters.
 4. Sorts the backlog by priority and size, with cluster notes.
 5. Suggests one item or a connected batch. P0 bugs jump the queue.
 
@@ -39,9 +39,9 @@ After you confirm the pick, `/hv-next` routes you to [running work](running-work
 /hv-next
 ```
 
-Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug) — fix auth token expiry`. You answer `y` (or pick a different item) and work begins.
+Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug) — fix auth token expiry`. Answer `y` (or pick a different item) and work begins.
 
-If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` will offer `/hv-assume` as a question option before routing to `/hv-work`.
+If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` offers `/hv-assume` as a question option before routing to `/hv-work`.
 
 Items with a `Related:` field that share a cluster surface together so you can tackle them as a unit.
 
@@ -54,7 +54,7 @@ Output structure:
 - One-paragraph approach summary
 - Bulleted lists: *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*
 
-Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output and either push back, ask for a durable plan ([`/hv-plan`](vision-and-plans.md)), or proceed to [running work](running-work.md).
+Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output, then push back, ask for a durable plan ([`/hv-plan`](vision-and-plans.md)), or proceed to [running work](running-work.md).
 
 **Example:**
 
@@ -64,8 +64,8 @@ Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 
 
 Output: specific file paths, test names, and function names the orchestrator would touch, not generic descriptions.
 
-If a plan already exists at [`.hv/plans/<key>.md`](../reference/hv-folder.md), the peek restates it. If no plan exists, this is an ad-hoc decomposition; consider `/hv-plan` when alignment needs to survive beyond the current session.
+If a plan already exists at [`.hv/plans/<key>.md`](../reference/hv-folder.md), the peek restates it. Without a plan, the output is an ad-hoc decomposition; reach for `/hv-plan` when alignment needs to survive beyond the current session.
 
 ## How reconciliation keeps state honest
 
-The status cache is a speed optimisation; git is the source of truth. Each time you run `/hv-next` it checks which branches and worktrees actually exist: branches that were deleted become stale entries and are cleaned up automatically; worktrees that were removed are updated in kind. If state drifts (crashed session, manual git operations), the next `/hv-next` run repairs it without any manual intervention on your part.
+The status cache is a speed optimisation; git is the source of truth. Each `/hv-next` run checks which branches and worktrees actually exist: deleted branches become stale entries and get cleaned up, removed worktrees get updated in kind. If state drifts (crashed session, manual git operations), the next `/hv-next` run repairs it without manual intervention.

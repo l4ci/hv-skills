@@ -1,25 +1,25 @@
 # Configuration options
 
-This page documents the questions `/hv-init` and `/hv-config` ask, with their exact option labels and descriptions. It's the option-vocabulary reference; for a concept-first walk through each config key, see [`usage/configuration.md`](../usage/configuration.md).
+This page documents the questions `/hv-init` and `/hv-config` ask, with their exact option labels and descriptions. For a concept-first walk through each config key, see [`usage/configuration.md`](../usage/configuration.md).
 
 Two sources feed this vocabulary:
 
 - **`/hv-init`** runs FRESH on first setup. It asks all five questions below (Q1–Q5) in one `AskUserQuestion` call, and writes the answers to `.hv/config.json`. On a STALE upgrade, it asks only the questions whose keys are missing.
 - **`/hv-config`** lets you edit individual keys later. Its Step 4 reuses the Q1–Q5 option vocabulary verbatim, plus five additional keys (docs path, docs auto-create, docs after-work, git base branch, umbrella mode) that `/hv-init` does not prompt for.
 
-The "(Recommended)" tag on each option marks the install-time default; `/hv-config` retags the user's *current* value as `(current)` instead, so users always see what they're replacing.
+The "(Recommended)" tag on each option marks the install-time default. `/hv-config` retags the user's *current* value as `(current)` instead, so users always see what they're replacing.
 
 ## /hv-config invocation shapes
 
-`/hv-config` supports three positional invocation shapes, parsed in Step 1.5 of its skill flow (see `hv-config/SKILL.md`):
+`/hv-config` supports three positional invocation shapes, parsed in Step 1.5 of its skill flow (see `hv-config/SKILL.md`).
 
 | Shape | Behavior |
 |-------|----------|
-| `/hv-config` (no args) | Full guided flow — category checklist, then key checklist, then value pickers. |
+| `/hv-config` (no args) | Full guided flow: category checklist, then key checklist, then value pickers. |
 | `/hv-config <key>` | Jumps straight to the value picker for that key, skipping the category and key checklists. |
 | `/hv-config <key>=<value>` | Applies the value directly without any interactive prompts, then prints the one-line diff. |
 
-Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text) are enumerated in `hv-config/SKILL.md` Step 1.5. An unknown key or invalid value stops the skill with an explicit error — it does not fall through to the guided flow.
+Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text) are enumerated in `hv-config/SKILL.md` Step 1.5. An unknown key or invalid value stops the skill with an explicit error; it does not fall through to the guided flow.
 
 ## Q1 — Models
 
@@ -105,7 +105,7 @@ Each Q1–Q5 answer maps to a single `key.path: value` write in `.hv/config.json
 
 ## Additional /hv-config keys
 
-`/hv-config` Step 4 also exposes five keys that `/hv-init` does not prompt for. Each reuses the Q1–Q5 option wording where it overlaps; the rest are simple toggles or free text.
+`/hv-config` Step 4 also exposes five keys that `/hv-init` does not prompt for. Each reuses the Q1–Q5 option wording where it overlaps; the rest are toggles or free text.
 
 ### Docs path
 
@@ -141,14 +141,14 @@ Free text. Default: `""` (auto-detect). Writes `git.baseBranch`.
 
 Two rules govern how answers are coerced into config writes:
 
-- **"Other" with custom text.** If the user picks `Other` and types a custom value, honor it only if it's a valid value for that key — `"opus"`/`"sonnet"`/`"haiku"` for models, `"branch"`/`"worktree"` for isolation, `"direct"`/`"pr"` for merge strategy, `"off"`/`"auto"`/`"loop"` for autonomy. Anything else silently falls back to the Recommended value.
+- **"Other" with custom text.** If the user picks `Other` and types a custom value, honor it only if it's a valid value for that key: `"opus"`/`"sonnet"`/`"haiku"` for models, `"branch"`/`"worktree"` for isolation, `"direct"`/`"pr"` for merge strategy, `"off"`/`"auto"`/`"loop"` for autonomy. Anything else silently falls back to the Recommended value.
 - **Plain-text fallback.** When `AskUserQuestion` isn't available (older harness, scripted run), the skill writes Recommended defaults for any pending keys rather than stalling. `/hv-config` Step 4 falls back to one-shot prompts per selected key, validates the reply against the allowed values, and falls back to the current value on invalid input.
 
 ## Not asked, just set
 
 A few keys are written without ever being asked:
 
-- `hvSkills.version` — stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not a user preference, not exposed in `/hv-config`.
+- `hvSkills.version` — stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not exposed in `/hv-config`.
 - `refactor.verifyCommands` — array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv-config-set refactor.verifyCommands '[...]'`.
 
-For the full per-key behavior — defaults, value semantics, and how each setting affects skill execution — see [`usage/configuration.md`](../usage/configuration.md).
+For the full per-key behavior (defaults, value semantics, and how each setting affects skill execution), see [`usage/configuration.md`](../usage/configuration.md).

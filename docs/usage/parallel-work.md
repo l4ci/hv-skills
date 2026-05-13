@@ -2,14 +2,14 @@
 
 When `work.isolation` is set to `"worktree"`, you can run multiple [`/hv-work`](running-work.md)
 sessions side by side from separate terminals. Each session gets its own
-isolated directory and branch, so they never step on each other.
+directory and branch, so they don't step on each other.
 
 ## When to use this
 
 - Long-running cycles you don't want to block on while other work proceeds.
-- Multiple independent feature tracks that shouldn't share a branch.
+- Independent feature tracks that shouldn't share a branch.
 - Keeping `main` clean while agents work in parallel.
-- Batching unrelated bug fixes that have nothing to gain from sharing context.
+- Batching unrelated bug fixes that gain nothing from sharing context.
 
 ## Setting it up
 
@@ -22,7 +22,7 @@ current worktree. The main worktree stays on `main` throughout.
 ## Two terminals, two streams
 
 Start each stream in its own terminal. [`/hv-next`](picking-work.md) picks items that aren't
-already in progress, so the two sessions naturally claim different work.
+already in progress, so the two sessions claim different work.
 
 **Terminal 1** picks `[B02]` and `[F01]`:
 
@@ -49,11 +49,11 @@ full `/hv-work` lifecycle.
 ## How status.json stays consistent
 
 Both orchestrators write to the same `.hv/status.json` in the main worktree,
-but each owns different entries (one per active branch), so there are no
-conflicts under normal operation. `/hv-next` in a third terminal sees both
+but each owns different entries (one per active branch), so they don't
+conflict under normal operation. `/hv-next` in a third terminal sees both
 streams as "In Progress" and skips those items when suggesting new work. If
 you run `/hv-next` while `/hv-work` is mid-update, the last writer wins; the
-next `/hv-next` run reconciles any drift by validating status against actual
+next `/hv-next` run reconciles drift by validating status against actual
 git state. For more on how `/hv-next` reads and updates status, see
 [picking work](picking-work.md).
 

@@ -1,17 +1,17 @@
 # Implementing
 
-Items captured in [`BACKLOG.md`](../reference/hv-folder.md) move to "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
+Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
 
 ## /hv-work
 
-`/hv-work` is the main implementation driver. The orchestrator plans the tasks, dispatches workers in parallel (one per task), verifies each result, then either merges to main or opens a PR depending on your `work.mergeStrategy`.
+`/hv-work` is the main implementation driver. The orchestrator plans tasks, dispatches workers in parallel (one per task), verifies each result, then either merges to main or opens a PR based on your `work.mergeStrategy`.
 
 **Trigger phrases:**
 
 - `/hv-work` — after `/hv-next` routes you here automatically
-- `/hv-work [B03]` — implement a specific item by ID
-- `/hv-work [B03] [F07]` — implement a batch of items together
-- `/hv-work "add retry logic to the upload pipeline"` — describe the work; it captures and executes
+- `/hv-work [B03]` to implement a specific item by ID
+- `/hv-work [B03] [F07]` to implement a batch of items together
+- `/hv-work "add retry logic to the upload pipeline"` describes the work; it captures and executes
 
 **Precondition:** refuses to start on a dirty working tree. Commit or stash first.
 
@@ -52,7 +52,7 @@ d4e5f6a feat: per-project theme support [F07]
 g7h8i9j task: update CI to Node 20 [T02]
 ```
 
-That keeps reverts surgical (drop one task without touching others), makes PR review easier (read commit by commit), and leaves a predictable history that `/hv-ship` can read to build PR bodies automatically.
+That keeps reverts surgical (drop one task without touching others), makes PR review easier (read commit by commit), and leaves a predictable history `/hv-ship` reads to build PR bodies automatically.
 
 ## Isolation: branch vs. worktree
 
@@ -65,26 +65,26 @@ Set `work.isolation` in [`config.json`](configuration.md):
 
 With `"branch"`, your main worktree switches to the feature branch for the duration of the run. With `"worktree"`, the main worktree stays on `main`, so you can keep editing there while agents work in isolation.
 
-For running multiple `/hv-work` sessions at the same time on different item batches, `"worktree"` is the right choice. See [parallel-work](parallel-work.md) for the full multi-session pattern.
+To run multiple `/hv-work` sessions at the same time on different item batches, pick `"worktree"`. See [parallel-work](parallel-work.md) for the multi-session pattern.
 
-## /hv-go — capture and run in one pass
+## /hv-go: capture and run in one pass
 
-`/hv-go` is for when you have a specific fix in mind and want it done now, not queued.
+Use `/hv-go` when you have a specific fix in mind and want it done now, not queued.
 
 ```
 /hv-go "fix the off-by-one in RingBuffer"
 /hv-go "add a Cmd+K shortcut to the project picker"
 ```
 
-The item still gets a real ID in `BACKLOG.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands directly off to `/hv-work` after capture completes.
+The item still gets a real ID in `BACKLOG.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands off to `/hv-work` after capture completes.
 
-`/hv-go` caps the number of clarifying questions on purpose. It assumes the requirement is already clear enough to act on. If you're still exploring or the scope is fuzzy, [`/hv-capture`](capturing-work.md) first is safer.
+`/hv-go` caps clarifying questions on purpose. It assumes the requirement is clear enough to act on. If you're still exploring or the scope is fuzzy, [`/hv-capture`](capturing-work.md) first is safer.
 
-**Flow:** clean-tree guard → capture via `/hv-capture` → work via `/hv-work`.
+**Flow:** clean-tree guard, capture via `/hv-capture`, work via `/hv-work`.
 
 `/hv-go` inherits all `/hv-capture` rules (classification, detail-file overflow, ID assignment) and all `/hv-work` rules (branch/worktree isolation, parallel workers, per-task commits).
 
-## Capture vs. Go vs. Work — picking the right entry
+## Capture vs. Go vs. Work: picking the right entry
 
 Three skills trigger on action-shaped phrases. Pick by **intent**, not by the verb typed:
 
@@ -97,12 +97,12 @@ Three skills trigger on action-shaped phrases. Pick by **intent**, not by the ve
 
 **Rules of thumb:**
 
-- *"fix X"* / *"add Y"* / *"do Z"* — clear single thing, not yet captured → `/hv-go`.
+- *"fix X"* / *"add Y"* / *"do Z"*: clear single thing, not yet captured → `/hv-go`.
 - A list of things, no immediate action, *"capture this"* / *"add to backlog"* → `/hv-capture`.
 - Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"* → `/hv-work`.
 - *"what's next?"* / *"pick something"* / *"what should I work on?"* → `/hv-next`.
 
-When intent is ambiguous, the cheapest path is `/hv-capture`. Items can always be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
+When intent is ambiguous, the cheapest path is `/hv-capture`. Items can be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
 
 See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how `/hv-next` selects and prioritizes.
 

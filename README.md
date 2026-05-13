@@ -10,7 +10,7 @@
 [![Stars](https://img.shields.io/github/stars/l4ci/hv-skills?style=social)](https://github.com/l4ci/hv-skills/stargazers)
 [![For Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2)](https://claude.com/claude-code)
 
-[Quickstarts](#quickstarts) · [FAQ](#faq) · [Skills](#skills) · [How it works](#how-it-works) · [Docs](docs/)
+[Install](#install) · [Walkthroughs](#walkthroughs) · [FAQ](#faq) · [Skills](#skills) · [How it works](docs/how-it-works.md) · [Docs](docs/)
 
 </div>
 
@@ -18,12 +18,12 @@
 
 ## Why hv-skills?
 
-- **Planning has its own commands.** `/hv-vision` for milestones, `/hv-brainstorm` for per-item design exploration before planning, `/hv-plan` for slice-level plans you can sign off on, `/hv-spike` for feasibility experiments on a throwaway branch, `/hv-assume` for a peek at the orchestrator's approach before any code is written.
+- **Planning has its own commands.** `/hv-vision` for milestones, `/hv-brainstorm` for per-item design exploration before planning, `/hv-plan` for slice-level plans you can sign off on, `/hv-spike` for feasibility experiments on a throwaway branch, `/hv-assume` to peek at the orchestrator's approach before any code is written.
 - **Atomic per-task commits.** Each commit lands one task with one verify step, so reverts stay surgical. Workers run in parallel under a single orchestrator.
 - **Knowledge stays around.** `/hv-learn` writes gotchas and conventions into `KNOWLEDGE.md`, grouped by topic. Future runs of `/hv-work`, `/hv-debug`, and `/hv-review` read it back automatically, so you stop re-discovering the same problem three sessions in a row.
 - **Local-first.** Everything lives in `.hv/` under your project. No daemon, no MCP server, no cloud, no database. Just bash, Python, git, and optionally `gh`.
 - **Survives `/clear`.** `/hv-pause` writes a handoff note with your current hypothesis, next step, and mid-edit files. `/hv-next` reads it back in a fresh session.
-- **Project map stays flat.** `/hv-map` maintains `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date — auto-bumped by `/hv-work` cycles and summarized into a thin `## Project Map` index in `CLAUDE.md` so always-on context stays small as the codebase grows.
+- **Project map stays flat.** `/hv-map` maintains `.hv/map/<subsystem>.md` waypoints (entry points, purpose, last-touched date), auto-bumped by `/hv-work` cycles and summarized into a thin `## Project Map` index in `CLAUDE.md` so always-on context stays small as the codebase grows.
 - **Vocabulary stays consistent.** `/hv-context` writes domain terms to `.hv/CONTEXT.md`. The `## Project Context` always-on block in `CLAUDE.md` carries term + aliases + first-sentence gloss so synonym/drift conflicts get flagged inline during work; sibling skills consult on demand via `hv-context-query`.
 
 ## Features
@@ -39,117 +39,41 @@
 | 💡 **Per-item design exploration** — `/hv-brainstorm` negotiates shape and tradeoffs for a single `[Major]` feature or `[P0]` bug before planning; writes `.hv/designs/<ID>.md` that `/hv-plan` reads as soft input | 📋 **Plan-as-artifact** — `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc |
 | 🧪 **Throwaway spikes** — `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main | 🔍 **Approach peek** — `/hv-assume` prints the orchestrator's intended files, tests, and assumptions before `/hv-work` runs, so corrections happen before code lands |
 | 🧰 **Local-first, gitignored** — `.hv/` lives with your code; commit it intentionally to share state, or keep it private (the default) | 🔔 **Design nudges** — `/hv-capture` and `/hv-next` flag `[Major]` features and `[P0]` bugs with no design artifact and suggest `/hv-brainstorm` before planning |
-| 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog; Major items auto-research via `/hv-brainstorm --auto-loop` → auto-plan → work) — quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
+| 🤖 **Autonomy levels** — `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog; Major items auto-research via `/hv-brainstorm --auto-loop` → auto-plan → work). Quality gates still apply | ⚙️ **Interactive config** — `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON |
 | 🌐 **Umbrella mode** — one coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `BACKLOG.md` at the umbrella with per-sub-repo `CONTEXT.md` under `.hv/contexts/<repo>/`; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out** — `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
-| 📊 **Visible progress** — multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-docs`, `/hv-refactor`, …) declare a phase checklist via `TaskCreate` at start and tick each phase off as it lands; long cycles stay legible instead of scrolling past as a stream of bash output | 🛠️ **Codified authoring conventions** — `hv-init`'s `## Authoring conventions` lists the rules new hv-* skills must follow (autonomy-aware dispatch, opt-in flag defaults, `AskUserQuestion` limits, progress checklists), so contributions stay consistent without rediscovery |
+| 📊 **Visible progress** — multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-docs`, `/hv-refactor`, …) declare a phase checklist via `TaskCreate` at start and tick each phase off as it lands, so long cycles stay legible instead of scrolling past as a stream of bash output | 🛠️ **Codified authoring conventions** — `hv-init`'s `## Authoring conventions` lists the rules new hv-* skills must follow (autonomy-aware dispatch, opt-in flag defaults, `AskUserQuestion` limits, progress checklists), so contributions stay consistent without rediscovery |
 
-## Quickstarts
-
-Install once, then pick the path that matches where you're starting from.
+## Install
 
 ```bash
 claude plugin marketplace add l4ci/hv-skills
 claude plugin install hv-skills
 ```
 
-`/hv-init` always comes first. It takes about 30 seconds, asks five questions (models, isolation, merge strategy, quality gates, autonomy level) with sensible defaults preselected, and creates `.hv/` with the data files (`BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`), per-type subdirectories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` rather than hand-editing JSON.
+`/hv-init` is the next step. About thirty seconds, five questions (models, isolation, merge strategy, quality gates, autonomy level) with sensible defaults preselected. Creates `.hv/` with the data files (`BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `DECISIONS.md`, `CONTEXT.md`), per-type subdirectories, the `hv-*` CLI helpers, and managed blocks in `CLAUDE.md`. To change settings later, run `/hv-config` rather than hand-editing JSON.
 
-### Path A — Drop into an existing project
+## Walkthroughs
 
-You already have code. You want somewhere to put the bug list and feature ideas piling up in your head, a way to execute them without churn, and a record of what you learned along the way.
+Two worked examples in the docs carry one concrete project end-to-end:
 
-```bash
-# 1. one-time setup — 5 questions, ≤30s, creates .hv/
-/hv-init
+- [Greenfield: from a brief to a shipped milestone](docs/walkthroughs/greenfield-from-brief.md) — empty repo plus a one-page brief, walked through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
+- [Brownfield: dropping hv-skills into an existing project](docs/walkthroughs/brownfield-existing-project.md) — established codebase with open GitHub issues and a mental bug list, walked through `/hv-map`, `/hv-issues`, `/hv-capture`, then a P0 cycle and a debug cycle.
 
-# 2. brain-dump what's on your plate; the model classifies and assigns IDs
-/hv-capture "timer resets on tab refocus, dropdown overlaps on mobile, want a keyboard shortcut to toggle"
-# → [B01] timer reset on tab refocus     (Bug, P1, Major)
-# → [B02] mobile dropdown overlap        (Bug, P2, Cosmetic)
-# → [F01] toggle keyboard shortcut       (Feature, Minor)
-
-# 3. review the backlog; reconciles status.json against git, suggests next
-/hv-next
-# → suggests [B01] (P1 first); on confirm runs /hv-work [B01]
-#   orchestrator plans tasks → workers implement in parallel → atomic commit per task
-
-# 4. hot-path fix that shouldn't go through the queue
-/hv-go "rename SettingsPanel → PreferencesPanel and update imports"
-# → captures [T02] and implements in one pass — no /hv-next round-trip
-
-# 5. when /hv-work hits a real bug, run a debug cycle
-/hv-debug B02
-# → reproduce → hypothesize → verify hypothesis → fix → nudge /hv-learn
-
-# 6. ship — runs /hv-review (PASS / CONCERNS / FAIL) then GitHub PR or direct merge
-/hv-ship
-
-# 7. distill what was non-obvious into KNOWLEDGE.md (auto-consulted next time)
-/hv-learn
-# → "Hidden-tab pauses use document.visibilityState; setInterval is throttled"
-#   filed under "Performance & Rendering"
-```
-
-Need to step away mid-cycle? `/hv-pause` writes a handoff note (hypothesis, next step, mid-edit files) so a fresh session running `/hv-next` picks up where you left off. See [docs/getting-started.md](docs/getting-started.md) for the fuller walkthrough.
-
-### Path B — Start from (nearly) nothing
-
-You have an empty repo or a few sketches. You want to think through where this is going before you start shipping, and have that vision stay visible while you work.
-
-```bash
-# 1. one-time setup
-/hv-init
-
-# 2. brainstorm vision and milestones — Socratic discovery + web research + deliberate challenge
-/hv-vision
-# → MILESTONES.md: M01 active, M02 (depends: M01), M03 (depends: M01)
-# → .hv/milestones/M01.md: goal, acceptance, rationale, risks, research notes
-# → CLAUDE.md vision-index updated so /hv-next scopes picks to M01
-
-# 3. (optional) de-risk an unknown before committing — branch never merges
-/hv-spike sse-over-nginx
-# → spike/sse-over-nginx branch + .hv/spikes/sse-over-nginx.md (question, findings, decision)
-
-# 4. write the implementation plan for the first slice — /hv-work will consult it
-/hv-plan M01-S01
-# → .hv/plans/M01-S01.md: tasks with verifiable outcomes, named assumptions, open questions
-
-# 5. seed milestone-tagged items into the backlog
-/hv-capture "OAuth callback handler, secure token storage, refresh-token flow"
-# → [F02][F03][F04] all tagged Milestone: M01
-
-# 6. (optional) peek the orchestrator's intended approach before code lands
-/hv-assume F02
-# → reads M01-S01 plan, prints intended files / tests / assumptions / unknowns; nothing executes
-
-# 7. active milestone scopes picks; /hv-work consults the plan
-/hv-next
-# → suggests [F02]; runs /hv-work against M01-S01.md
-
-# 8. ship M01-S01; PR body links resolved IDs and the milestone
-/hv-ship
-
-# 9. capture what surfaced
-/hv-learn
-# → "PKCE callback timing varies in dev — gate on window.location.origin"
-#   filed under "Auth & Identity"
-```
-
-`/hv-next` flags any active milestone with no open items so you know when to flip it. When the milestone ships, mark it `shipped` (which unblocks its dependents), then either run `/hv-vision` again to add more milestones or jump straight to the next active one. See [docs/usage/vision-and-plans.md](docs/usage/vision-and-plans.md) for the deeper walkthrough.
+For the five-minute condensed version see [Getting started](docs/getting-started.md).
 
 ## FAQ
 
 **Why hv-skills over GSD?**
 
-GSD models projects as formal phases: discuss, plan, execute, verify, audit. Each phase gets its own agent and `.planning/` sign-off artifacts. That's the right shape for regulated work, hard requirements, or anywhere a defensible verification trail matters more than speed. hv-skills runs differently: a tight `capture → next → work → ship → learn` loop with markdown artifacts you can edit by hand, and no phase ceremony unless you ask for it. Plan-as-artifact exists (`/hv-plan` writes one file per slice or item), but it's optional rather than the spine of the workflow. If you need sign-off rigor, GSD fits better. If you want a faster loop with knowledge that carries across sessions, that's what hv-skills is built for.
+GSD models projects as formal phases: discuss, plan, execute, verify, audit. Each phase gets its own agent and `.planning/` sign-off artifacts. That's the right shape for regulated work, hard requirements, or anywhere a defensible verification trail matters more than speed. hv-skills runs differently: a tight `capture → next → work → ship → learn` loop with markdown artifacts you can edit by hand, and no phase ceremony unless you ask for it. Plan-as-artifact exists (`/hv-plan` writes one file per slice or item), but it's optional rather than the spine of the workflow. If you need sign-off rigor, GSD fits better. If you want a faster loop with knowledge that carries across sessions, hv-skills is built for that.
 
 **Why hv-skills over Octo?**
 
-Octo orchestrates multiple AI providers (Claude, Gemini, Codex) for debates, consensus, 100-point PRD scoring across providers, and a Discover/Define/Develop/Deliver pipeline. If cross-model validation is where your value comes from, Octo is purpose-built for it. hv-skills is deliberately single-provider. Instead of cross-AI debate, it leans hard into Claude Code: `AskUserQuestion`, subagent dispatch, branch and worktree isolation, atomic commits, and handoff notes that survive `/clear`. Use Octo when you want multiple models second-guessing each other. Use hv-skills when you've decided on Claude Code and want the workflow built around it.
+Octo orchestrates multiple AI providers (Claude, Gemini, Codex) for debates, consensus, 100-point PRD scoring across providers, and a Discover/Define/Develop/Deliver pipeline. If cross-model validation is where your value comes from, Octo is purpose-built for it. hv-skills is deliberately single-provider. Instead of cross-AI debate it leans hard into Claude Code: `AskUserQuestion`, subagent dispatch, branch and worktree isolation, atomic commits, and handoff notes that survive `/clear`. Use Octo when you want multiple models second-guessing each other. Use hv-skills when you've decided on Claude Code and want the workflow built around it.
 
 **Why hv-skills over a TODO.md and good intentions?**
 
-Most workflows start that way and most stay there. Three things tend to drift, and hv-skills addresses each of them. (1) Commits stop being atomic — one PR ends up touching six unrelated things. (2) Knowledge stops accumulating — you re-discover the same gotcha three sessions in a row because nothing reads it back. (3) Sessions don't survive `/clear` — you lose the live hypothesis the moment you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-next` carry intent across context resets. If none of those bite you in practice, stock Claude Code is genuinely fine. If they do, that's the gap hv-skills is filling.
+Most workflows start that way and most stay there. Three things tend to drift, and hv-skills addresses each. (1) Commits stop being atomic: one PR ends up touching six unrelated things. (2) Knowledge stops accumulating: you re-discover the same gotcha three sessions in a row because nothing reads it back. (3) Sessions don't survive `/clear`: you lose the live hypothesis the moment you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-next` carry intent across context resets. If none of those bite you in practice, stock Claude Code is fine. If they do, that's the gap hv-skills fills.
 
 ## Skills
 
@@ -173,6 +97,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 | `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, nudges `/hv-learn` |
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
 | `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
+| `/hv-map` | Maintain `.hv/MAP.md` + `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date; auto-bumped post-cycle by `/hv-work`, `/hv-debug`, `/hv-go` |
 | `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
 | `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
@@ -184,67 +109,7 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 
 ## How it works
 
-```mermaid
-flowchart LR
-  VISION["/hv-vision"] --> MILES[(MILESTONES.md)]
-  VISION -.optional.-> SPIKE["/hv-spike"]
-  VISION -.routes.-> PLAN["/hv-plan"]
-  CAP["/hv-capture"] --> BACKLOG[(BACKLOG.md)]
-  CAP -.tag.-> MILES
-  CAP -.nudges.-> BRAIN["/hv-brainstorm"]
-  GO["/hv-go"] --> BACKLOG
-  GO -.one-pass.-> WORK
-  BACKLOG --> NEXT["/hv-next"]
-  MILES -.scopes.-> NEXT
-  NEXT -.suggests.-> ASSUME["/hv-assume"]
-  NEXT -.suggests.-> PLAN
-  NEXT -.nudges.-> BRAIN
-  NEXT --> WORK["/hv-work"]
-  BRAIN --> DESIGNS[(.hv/designs/)]
-  DESIGNS -.soft input.-> PLAN
-  PLAN --> PLANS[(.hv/plans/)]
-  PLANS -.consults.-> WORK
-  ASSUME -.reads.-> PLANS
-  ASSUME -.peeks.-> WORK
-  SPIKE --> SPIKES[(.hv/spikes/)]
-  WORK -.pause.-> PAUSE["/hv-pause"]
-  DEBUG -.pause.-> PAUSE
-  PAUSE --> HANDOFF[(.hv/handoff/)]
-  WORK --> COMMIT[(atomic commits)]
-  DEBUG["/hv-debug"] --> COMMIT
-  REFACTOR["/hv-refactor"] --> COMMIT
-  COMMIT -.review.-> REVIEW["/hv-review"]
-  REVIEW -.gate.-> SHIP["/hv-ship"]
-  SHIP --> PR[(PR / merge)]
-  WORK --> LEARN["/hv-learn"]
-  DEBUG -.nudge/auto.-> LEARN
-  SHIP -.loop.-> NEXT
-  LEARN --> KNOW[(KNOWLEDGE.md)]
-  KNOW -.consults.-> WORK
-  KNOW -.consults.-> DEBUG
-  KNOW -.consults.-> REVIEW
-  DECIDE["/hv-decide"] --> DECISIONS[(.hv/DECISIONS.md)]
-  DECISIONS -.consults.-> WORK
-  DECISIONS -.consults.-> DEBUG
-  DECISIONS -.consults.-> REVIEW
-  CONTEXT["/hv-context"] --> CTX[(CONTEXT.md)]
-  CTX -.consults.-> VISION
-  CTX -.consults.-> CAP
-  CTX -.consults.-> WORK
-  CTX -.consults.-> DEBUG
-  WORK -.post-cycle.-> MAP["/hv-map"]
-  DEBUG -.post-cycle.-> MAP
-  GO -.post-cycle.-> MAP
-  MAP --> MAPS[(.hv/map/)]
-  WORK -.post-cycle.-> DOCS["/hv-docs"]
-  SHIP -.post-cycle.-> DOCS
-  DOCS --> USERDOCS[(docs/)]
-  SHIP -.cut.-> RELEASE["/hv-release"]
-  RELEASE --> RELEASES[(GitHub releases)]
-  UPDATE["/hv-update"] -.checks.-> RELEASES
-```
-
-Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth; `status.json` is just a cache, and `/hv-next` reconciles any drift between the two.
+See [docs/how-it-works.md](docs/how-it-works.md) for the system diagram and how every skill connects to the artifacts it reads or writes.
 
 ## Configuration
 
@@ -264,7 +129,7 @@ Edit `.hv/config.json`:
 }
 ```
 
-The defaults are conservative: branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off (pending an LLM safety review), no autonomous chaining. Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). For every key and when to flip it, see [docs/usage/configuration.md](docs/usage/configuration.md).
+Defaults are conservative: branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off (pending an LLM safety review), no autonomous chaining. Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). For every key and when to flip it, see [docs/usage/configuration.md](docs/usage/configuration.md).
 
 ### Drift detection
 
@@ -291,7 +156,7 @@ Every `bin/hv-preflight` (run by most hv-skills) compares the project's recorded
 └── bin/              # CLI helpers — see docs/reference/cli-helpers.md
 ```
 
-Helpers collapse multi-step agent logic into single subprocess calls. That keeps the per-invocation context smaller and the output format consistent. In umbrella mode the same `.hv/` lives at the umbrella root and coordinates work across sub-repos; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md).
+Helpers collapse multi-step agent logic into single subprocess calls. Per-invocation context stays smaller and the output format stays consistent. In umbrella mode the same `.hv/` lives at the umbrella root and coordinates work across sub-repos; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md).
 
 ## Install alternatives
 

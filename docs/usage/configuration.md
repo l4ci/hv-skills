@@ -50,9 +50,9 @@ Default config:
 
 | Value | Best for |
 |-------|----------|
-| `"opus"` | Deep reasoning — planning, exploration, verification, design |
-| `"sonnet"` | Fast execution — implementing well-specified tasks |
-| `"haiku"` | Quick, cheap — simple fixes, small tasks |
+| `"opus"` | Deep reasoning: planning, exploration, verification, design |
+| `"sonnet"` | Fast execution of well-specified tasks |
+| `"haiku"` | Quick, cheap fixes and small tasks |
 
 `/hv-config` and [`/hv-init`](../reference/slash-commands.md#hv-init) offer four ready-made profiles (Balanced, Premium, Fast, Minimal) that set both values at once.
 
@@ -84,7 +84,7 @@ When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refact
 
 Array of shell commands that [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) Step 7 runs as CI-shape gates before committing. Default: `[]` (read-only verification, behavior unchanged).
 
-When non-empty, the Step 7 verifier executes each command in order and refuses to PASS unless every command exits zero. This catches formatter drift, import-sort failures, and type errors locally instead of on push — see [hv-skills #9](https://github.com/l4ci/hv-skills/issues/9) for the motivating incident.
+When non-empty, the Step 7 verifier executes each command in order and refuses to PASS unless every command exits zero. This catches formatter drift, import-sort failures, and type errors locally instead of on push. See [hv-skills #9](https://github.com/l4ci/hv-skills/issues/9) for the motivating incident.
 
 Example for a Python project using ruff + pytest:
 
@@ -112,9 +112,9 @@ Controls whether [`/hv-learn`](learning.md) runs a second-opinion pass on what i
 | Value | Behavior |
 |-------|----------|
 | `true` (default) | After writing, dispatches the verifier. Catches weak, duplicate, or wrong-topic entries before they accrete in `KNOWLEDGE.md`. Adds one Opus roundtrip per `/hv-learn` call. |
-| `false` | Skip the verifier. `/hv-learn` writes and reports. Fast, cheap. Use when you're iterating rapidly and the occasional weak entry is acceptable. |
+| `false` | Skip the verifier. `/hv-learn` writes and reports. Fast and cheap. Use when you're iterating rapidly and the occasional weak entry is acceptable. |
 
-A weak bullet consulted by 20 future `/hv-work` runs is worse than one extra Opus call now, so the default favors quality. Flip to `false` only when you're sure the noise doesn't matter.
+A weak bullet consulted by 20 future `/hv-work` runs is worse than one extra Opus call now, so the default favors quality. Flip to `false` only when the noise doesn't matter.
 
 See [learning](learning.md) for the full `/hv-learn` workflow.
 
@@ -136,9 +136,9 @@ Controls whether [`/hv-debug`](debugging.md) Step 6 dispatches a single hypothes
 | Value | Behavior |
 |-------|----------|
 | `false` (default) | Single hypothesis agent. Cheaper and faster; fine for most bugs where one angle is obviously primary. |
-| `true` | Three parallel hypothesis agents in one tool-call batch. Better diversity on hard bugs (the right framing isn't obvious upfront), at ~3× orchestrator cost on every `/hv-debug` run. Step 6 latency stays roughly the same since the agents run concurrently. |
+| `true` | Three parallel hypothesis agents in one tool-call batch. Better diversity on hard bugs where the right framing isn't obvious upfront, at ~3× orchestrator cost on every `/hv-debug` run. Step 6 latency stays roughly the same since the agents run concurrently. |
 
-Flip on when you have a class of bugs that consistently take multiple cycles to land. The diversity of framings is what makes the difference. Keep off when most bugs are single-cause and you're paying for cycles you don't need.
+Flip on when you have a class of bugs that consistently take multiple cycles to land. The diversity of framings makes the difference. Keep off when most bugs are single-cause and you're paying for cycles you don't need.
 
 ## autonomy.level
 
@@ -165,14 +165,14 @@ Controls whether `/hv-docs` after-work mode automatically writes proposed doc up
 | Value | Behavior |
 |-------|----------|
 | `false` (default) | After-work mode proposes updates and waits for approval before writing. Recommended until M01-S03 ships the auto-write safety review. |
-| `true` | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. Best paired with `git diff` review per cycle. |
+| `true` | After-work mode writes doc updates automatically. Fast; assumes you trust the agent's judgment on doc prose. Best paired with a `git diff` review per cycle. |
 
 ## docs.afterWork
 
 - **Type:** boolean
 - **Default:** `false`
 
-Gate for the after-work docs flow. When `true`, the skills [`/hv-work`](running-work.md), `/hv-ship`, and [`/hv-release`](../reference/slash-commands.md#hv-release) trigger `/hv-docs` after their primary action completes — `/hv-work` and `/hv-ship` only on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger), `/hv-release` on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
+Gate for the after-work docs flow. When `true`, the skills [`/hv-work`](running-work.md), `/hv-ship`, and [`/hv-release`](../reference/slash-commands.md#hv-release) trigger `/hv-docs` after their primary action completes. `/hv-work` and `/hv-ship` only fire on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger); `/hv-release` fires on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
 
 ```json
 { "docs": { "afterWork": true } }
@@ -185,7 +185,7 @@ Leave `false` while you're shaping docs by hand. Flip on once your docs structur
 - **Type:** integer
 - **Default:** `10`
 
-Threshold for the number of unpushed commits above which `/hv-release` will interject one confirmation prompt before pushing, even under `autonomy.level: auto` or `loop`. Below the threshold, auto/loop autonomy silently pushes the unpushed range as part of the release (the existing speed-contract behavior). Above it, the skill always asks — releases that push 10+ commits are not the common case and the user usually wants a beat to confirm.
+Threshold for the number of unpushed commits above which `/hv-release` will interject one confirmation prompt before pushing, even under `autonomy.level: auto` or `loop`. Below the threshold, auto/loop autonomy silently pushes the unpushed range as part of the release (the existing speed-contract behavior). Above it, the skill always asks. Releases that push 10+ commits are not the common case and the user usually wants a beat to confirm.
 
 ```json
 { "release": { "confirmLargePushCommits": 25 } }
@@ -198,14 +198,14 @@ Set higher to suppress the prompt for typical project velocities; set lower (e.g
 - **Type:** integer
 - **Default:** `10`
 
-Number of commits since the last release tag at which [`/hv-next`](picking-work.md) (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only — no skill is auto-invoked.
+Number of commits since the last release tag at which [`/hv-next`](picking-work.md) (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only; no skill is auto-invoked.
 
 ## release.nudgeAfterDays
 
 - **Type:** integer
 - **Default:** `14`
 
-Companion to `release.nudgeAfterCommits`. The release nudge fires when EITHER threshold is reached — high-velocity projects hit the commits threshold first, slow-burn projects hit the days threshold first. Set one or both higher to suppress more aggressively, or lower to release more often.
+Companion to `release.nudgeAfterCommits`. The release nudge fires when EITHER threshold is reached: high-velocity projects hit the commits threshold first, slow-burn projects hit the days threshold first. Set one or both higher to suppress more aggressively, or lower to release more often.
 
 ## git.baseBranch
 
@@ -233,6 +233,6 @@ Records the hv-skills plugin version that was installed when `/hv-init` last ran
 hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh helpers
 ```
 
-Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release) — this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
+Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release): this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
 
 When `autonomy.level` is `"auto"` or `"loop"`, [`/hv-update`](../reference/slash-commands.md#hv-update) Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.

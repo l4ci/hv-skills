@@ -1,6 +1,6 @@
 # Brainstorming a design
 
-`/hv-brainstorm` fills the gap between [`/hv-capture`](capturing-work.md) (records what to build) and [`/hv-plan`](vision-and-plans.md) (decomposes how to build it). It negotiates *whether this is the right thing and what shape it should take* for a single backlog item. The artifact lands at `.hv/designs/<ID>.md` and feeds `/hv-plan` as soft input — read when present, never required.
+`/hv-brainstorm` fills the gap between [`/hv-capture`](capturing-work.md) (records what to build) and [`/hv-plan`](vision-and-plans.md) (decomposes how to build it). It negotiates *whether this is the right thing and what shape it should take* for a single backlog item. The artifact lands at `.hv/designs/<ID>.md` and feeds `/hv-plan` as soft input: read when present, never required.
 
 ## When to run it
 
@@ -9,7 +9,7 @@
 - When the item's TODO entry is one sentence but the implementation isn't obvious.
 - When `/hv-capture` or `/hv-next` nudges you toward it (the nudge fires on `[Major]` and `[P0]` items that don't yet have a design artifact).
 
-Skip it when the item is `[Minor]`, `[Cosmetic]`, or a plain task with an obvious shape. Skip it when you already know exactly what you want to build — go straight to [`/hv-plan`](vision-and-plans.md) or [`/hv-work`](running-work.md).
+Skip it when the item is `[Minor]`, `[Cosmetic]`, or a plain task with an obvious shape. Skip it when you already know what you want to build — go straight to [`/hv-plan`](vision-and-plans.md) or [`/hv-work`](running-work.md).
 
 ## One example end-to-end
 
@@ -37,10 +37,10 @@ The skill resolves `F12`, reads its TODO entry, queries relevant `KNOWLEDGE.md` 
 Once context is anchored, the skill proposes three approaches:
 
 1. **In-place TODO mutation.** `hv-archive` rewrites `BACKLOG.md` directly. Simple, but conflicts with parallel `/hv-work` sessions.
-2. **Append-only journal.** Move resolved bullets into a dated section in `ARCHIVE.md`, leave `BACKLOG.md` `## Completed` empty. Survives merge conflicts but loses some recency info.
+2. **Append-only journal.** Move resolved bullets into a dated section in `ARCHIVE.md`, leave `BACKLOG.md` `## Completed` empty. Survives merge conflicts at the cost of some recency info.
 3. **Two-phase: mark + sweep.** First pass tags bullets with `archived:` frontmatter, second pass moves them on a separate command. More steps, but reversible.
 
-You pick approach 2. The skill then drafts the design section by section — Goal, Design, Approaches considered, Open questions, Assumptions — each approved before moving on. When the artifact is complete, it lands at `.hv/designs/F12.md`.
+You pick approach 2. The skill then drafts the design section by section (Goal, Design, Approaches considered, Open questions, Assumptions), each approved before moving on. When the artifact is complete, it lands at `.hv/designs/F12.md`.
 
 ## The artifact
 
@@ -99,17 +99,17 @@ The design is soft input: `/hv-plan` doesn't require it, and a plan can override
 
 If `.hv/designs/<ID>.md` already exists, `/hv-brainstorm` asks how to proceed:
 
-- **View** — print the artifact and exit.
-- **Edit** — open targeted sections and revise them in place.
-- **Replace** — start from scratch; the previous artifact is overwritten only after explicit confirm.
+- **View**: print the artifact and exit.
+- **Edit**: open targeted sections and revise them in place.
+- **Replace**: start from scratch; the previous artifact is overwritten only after explicit confirm.
 
 ## What it does not do
 
-- Project-level design stays with [`/hv-vision`](vision-and-plans.md) — milestones, multi-feature arcs, vision rewrites.
-- Code-touching feasibility experiments stay with [`/hv-spike`](spikes.md) — a throwaway branch that proves a thing works before the design hardens.
+- Project-level design stays with [`/hv-vision`](vision-and-plans.md): milestones, multi-feature arcs, vision rewrites.
+- Code-touching feasibility experiments stay with [`/hv-spike`](spikes.md): a throwaway branch that proves a thing works before the design hardens.
 - Implementation plan with task decomposition stays with [`/hv-plan`](vision-and-plans.md).
 - [`/hv-go`](running-work.md) always skips the brainstorm step; it's a single-pass capture-and-implement path for items with an obvious shape.
 
 ## Autonomy interaction
 
-Under `autonomy.level: "off"` (default), `/hv-capture` and `/hv-next` print a one-line nudge for `[Major]` features and `[P0]` bugs without a design artifact. Under `"auto"`, the nudge auto-invokes `/hv-brainstorm` before routing to `/hv-plan`. Under `"loop"`, `/hv-work` Step 4 dispatches `/hv-brainstorm --auto-loop <ID>` for Major + Milestone-tagged items without a design — the auto-loop mode resolves design picks via local-first (DECISIONS / KNOWLEDGE / CONTEXT / MILESTONES) → bounded web (when `loop.webResearch=true`) → placeholder, logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<ID>.md` with `auto: true` frontmatter. The user articulates Forbids/Permits on the logged decisions later via terminal-path surfacing. See [Autonomy levels](autonomy.md) for the full chaining rules.
+Under `autonomy.level: "off"` (default), `/hv-capture` and `/hv-next` print a one-line nudge for `[Major]` features and `[P0]` bugs without a design artifact. Under `"auto"`, the nudge auto-invokes `/hv-brainstorm` before routing to `/hv-plan`. Under `"loop"`, `/hv-work` Step 4 dispatches `/hv-brainstorm --auto-loop <ID>` for Major + Milestone-tagged items without a design. Auto-loop resolves design picks via local-first (DECISIONS / KNOWLEDGE / CONTEXT / MILESTONES) → bounded web (when `loop.webResearch=true`) → placeholder, logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<ID>.md` with `auto: true` frontmatter. The user articulates Forbids/Permits on the logged decisions later via terminal-path surfacing. See [Autonomy levels](autonomy.md) for the full chaining rules.

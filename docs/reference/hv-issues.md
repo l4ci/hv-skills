@@ -8,7 +8,7 @@ presents the remainder in a multiSelect picker. For each selected issue it mints
 an ID, writes a detail file with the upstream URL, and appends a BACKLOG.md
 entry carrying a `GH: #N` or `GL: #N` cross-reference. An optional manual-gated
 step applies an `in-progress` label upstream so collaborators see the issues are
-claimed. Round-trip closing is handled by `/hv-ship` — it emits `Closes #N`
+claimed. Round-trip closing is handled by `/hv-ship`: it emits `Closes #N`
 lines in PR bodies (auto-close on merge) and offers a manual-gated close prompt
 on the direct-push path.
 
@@ -19,7 +19,7 @@ on the direct-push path.
 - Periodically syncing upstream backlog signals into hv-skills.
 - Mixed-host umbrellas where different sub-repos live on GitHub and GitLab.
 
-Don't use it to describe work you're inventing from scratch — that's `/hv-capture`.
+Don't use it to describe work you're inventing from scratch; that's `/hv-capture`.
 
 ## Prerequisites
 
@@ -27,8 +27,8 @@ Don't use it to describe work you're inventing from scratch — that's `/hv-capt
 - **GitLab remotes:** `glab` installed and authenticated (`glab auth status`).
 
 Missing CLI for a detected provider → that repo is skipped with a one-line note;
-the rest proceed. Both CLIs are needed only in mixed-host umbrellas.
-`/hv-init` soft-warns when a remote is detected but its CLI is missing.
+the rest proceed. Both CLIs are needed only in mixed-host umbrellas. `/hv-init`
+soft-warns when a remote is detected but its CLI is missing.
 
 ## Config keys
 
@@ -62,15 +62,15 @@ Edit via `/hv-config` or directly:
    `enhancement` → Features, else Tasks) and default priority/size. Mint ID,
    write `.hv/<kind>/<ID>.md` with upstream URL footer, append BACKLOG.md entry
    with `GH: #N` / `GL: #N` cross-reference.
-7. **Manual gate — apply the `in-progress` label upstream** (see below).
+7. **Manual gate: apply the `in-progress` label upstream** (see below).
 8. **Compact report** — lists captured IDs, issue numbers, and label status.
 
 ## Manual gate
 
 Step 7 is a manual gate (see `references/manual-gates.md`). The user sees which
 issues will be labeled and confirms before any label is written upstream. Loop
-mode never auto-picks this step — the label change is externally visible;
-collaborators see the issues marked as claimed. Silence is not consent: the
+mode never auto-picks this step: the label change is externally visible, and
+collaborators see the issues marked as claimed. Silence is not consent — the
 default when a plain-text fallback is used is **skip** (opt-in-off).
 
 ## Round-trip closing
@@ -86,7 +86,7 @@ Captured items carry `GH: #N` / `GL: #N` in their BACKLOG.md body. On ship:
 ## Cleanup on remove
 
 `/hv-rm` Step 3.5 presents a manual-gated prompt to remove the upstream label
-when a captured item is removed without ever shipping — so the upstream issue
+when a captured item is removed without ever shipping, so the upstream issue
 isn't left permanently marked as claimed.
 
 ## Example
@@ -127,5 +127,5 @@ isn't left permanently marked as claimed.
 - `/hv-ship` — emits `Closes #N` in PR bodies and handles direct-push closing.
 - `/hv-rm` — optionally removes the upstream label when an imported item is
   deleted without shipping (Step 3.5 manual gate).
-- `bin/hv-issues-*` — the helpers underlying this skill (`hv-issues-provider`,
+- `bin/hv-issues-*` — helpers underlying this skill (`hv-issues-provider`,
   `hv-issues-list`, `hv-issues-imported`, `hv-issues-label`, `hv-issues-close`).

@@ -4,7 +4,7 @@ Common questions about hv-skills.
 
 ## How is this different from a TODO file or issue tracker?
 
-That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv-skills tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-next` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
+That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv-skills tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, `/hv-pause` and `/hv-next` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
 
 ## Why is `.hv/` gitignored by default?
 
@@ -14,9 +14,9 @@ If you want to share state with a team you can opt in by removing `.hv/` from `.
 
 ## Can I share `.hv/` with my team?
 
-Yes. Remove `.hv/` from `.gitignore` and commit the folder. A few things change once you do: item ID counters become shared, so coordinating ID numbering starts to matter; `status.json` reflects whoever last reconciled; and `KNOWLEDGE.md` ends up with team content rather than personal notes.
+Yes. Remove `.hv/` from `.gitignore` and commit the folder. A few things change once you do: item ID counters become shared, so coordinating ID numbering starts to matter; `status.json` reflects whoever last reconciled; `KNOWLEDGE.md` ends up with team content rather than personal notes.
 
-This works for small teams. For larger ones a real issue tracker is usually a better fit, since the file-based format doesn't have the conflict-resolution or permissions model that scales.
+This works for small teams. For larger ones a real issue tracker is usually a better fit, since the file-based format lacks the conflict-resolution or permissions model that scales.
 
 ## What if I'm not using Claude Code?
 
@@ -26,7 +26,7 @@ Other agent harnesses with comparable primitives (Gemini CLI, some Copilot build
 
 ## How do I update hv-skills when a new release ships?
 
-Run `/hv-update`. It detects your install type (plugin, repo clone, or stow), reads the current version, fetches the latest GitHub release, and prints the exact update command for your setup. It doesn't run the update itself, since there are too many install paths to get right automatically.
+Run `/hv-update`. It detects your install type (plugin, repo clone, or stow), reads the current version, fetches the latest GitHub release, and prints the exact update command for your setup. It doesn't run the update itself, since there are too many install paths to handle automatically.
 
 After updating, rerun `/hv-init` in each project to refresh `.hv/bin/` with any new helpers.
 

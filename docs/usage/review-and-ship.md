@@ -8,9 +8,9 @@
 
 The skill scopes the branch (commits, touched files, referenced item IDs), pulls relevant topics from [`KNOWLEDGE.md`](learning.md), and evaluates the diff on three axes:
 
-- **Intent match** — does the diff deliver what the work items promised?
-- **Convention compliance** — does it respect captured gotchas and project rules?
-- **Obvious quality** — dead code, swallowed errors, untested branches, security smells, contract breaks.
+- **Intent match**: does the diff deliver what the work items promised?
+- **Convention compliance**: does it respect captured gotchas and project rules?
+- **Obvious quality**: dead code, swallowed errors, untested branches, security smells, contract breaks.
 
 It returns one of three verdicts, with file:line evidence where applicable:
 
@@ -42,7 +42,7 @@ The review gate behaves as follows:
 - `CONCERNS` surfaces to you; you can proceed or address it first.
 - `PASS` lets integration run automatically.
 
-Use `/hv-ship` to integrate finished work. Complete the implementation cycle in [`/hv-work`](running-work.md) first; don't call `/hv-ship` mid-implementation.
+Use `/hv-ship` to integrate finished work. Finish the implementation cycle in [`/hv-work`](running-work.md) first; don't call `/hv-ship` mid-implementation.
 
 ## Direct merge vs GitHub PR
 
@@ -66,16 +66,16 @@ See [configuration](configuration.md) for the full `work` block.
 | `true` (default) | `/hv-review` runs first. `FAIL` blocks, `CONCERNS` surface but you can proceed, `PASS` flows through. |
 | `false` | Skips the review pass. Integration runs immediately. Use when you have already reviewed manually and want to skip the second pass. |
 
-The review gate is independent of the autonomy level. Even under `autonomy: "loop"`, a `FAIL` verdict halts the chain until you fix the branch.
+The review gate is independent of the autonomy level. Under `autonomy: "loop"`, a `FAIL` verdict still halts the chain until you fix the branch.
 
 See [configuration](configuration.md) for the full `ship` block.
 
 ## Release nudges
 
-When you've accumulated commits since the last release tag, [`/hv-next`](picking-work.md) (on terminal paths — when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
+Once you've accumulated commits since the last release tag, [`/hv-next`](picking-work.md) (on terminal paths, when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
 
 ```
 5 commits since v1.16.0; consider /hv-release.
 ```
 
-The nudge fires when EITHER `release.nudgeAfterCommits` (default 10) OR `release.nudgeAfterDays` (default 14) is reached — see [configuration](configuration.md#releasenudgeaftercommits). It's informational; no skill is auto-invoked. The first release is always your call (no nudge fires while no tag exists).
+The nudge fires when EITHER `release.nudgeAfterCommits` (default 10) OR `release.nudgeAfterDays` (default 14) is reached; see [configuration](configuration.md#releasenudgeaftercommits). It's informational; no skill is auto-invoked. The first release is always your call (no nudge fires while no tag exists).

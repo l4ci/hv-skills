@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is either Markdown or JSON, and the whole folder is gitignored by default. You can open and edit any file by hand whenever you need to.
+[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and the folder is gitignored by default. Open and edit any file by hand whenever you need to.
 
 ## Overview
 
@@ -27,7 +27,7 @@
 
 ## BACKLOG.md — active backlog
 
-`BACKLOG.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items; [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
+`BACKLOG.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items, and [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
 
 A typical entry looks like:
 
@@ -35,15 +35,15 @@ A typical entry looks like:
 - [ ] B03 — login redirect loops after OAuth token refresh
 ```
 
-You can edit this file by hand: reorder items, bump priorities, or delete things that are no longer relevant. The skills re-read it on every invocation, so any manual change takes effect immediately.
+Edit this file by hand whenever you want: reorder items, bump priorities, or delete things no longer relevant. The skills re-read it on every invocation, so any manual change takes effect immediately.
 
 ## KNOWLEDGE.md — durable learnings
 
-`KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries are grouped under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
+`KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries sit under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
 
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
-`/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics. That block is how knowledge stays visible to the model across context clears without re-reading the full file.
+`/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics. That block keeps knowledge visible to the model across context clears without re-reading the full file.
 
 ## DECISIONS.md — hard-boundary decisions
 
@@ -55,11 +55,11 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 
 ## MILESTONES.md — milestone overview
 
-`MILESTONES.md` is the milestone overview: a list of milestones, each with a one-paragraph overview and status, opened by a short vision intro paragraph as preamble. `/hv-vision` writes the initial version; you update it as the project evolves.
+`MILESTONES.md` lists the milestones, each with a one-paragraph overview and status, opened by a short vision intro paragraph as preamble. `/hv-vision` writes the initial version, and you update it as the project evolves.
 
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
-A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is actually in progress.
+A companion managed block in `CLAUDE.md` lists active milestones so `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is in progress.
 
 ## CONTEXT.md — domain glossary
 
@@ -70,7 +70,7 @@ A companion managed block in `CLAUDE.md` lists active milestones so that `/hv-ne
 - An optional **Not** list — clarifications for terms that are easily confused with adjacent concepts.
 - A hidden date stamp (`<!-- YYYY-MM-DD -->`) tracking when the entry was last written.
 
-[`/hv-context`](../usage/context.md) adds and updates entries. The file is sorted alphabetically by term on every write. `/hv-init` inserts a managed `## Project Context` block in `CLAUDE.md` that lists the first sentence of each definition; that thin summary stays visible to the model without loading the full file.
+[`/hv-context`](../usage/context.md) adds and updates entries. The file is sorted alphabetically by term on every write. `/hv-init` inserts a managed `## Project Context` block in `CLAUDE.md` that lists the first sentence of each definition, and that thin summary stays visible to the model without loading the full file.
 
 For umbrella projects, the umbrella-shared glossary lives in `.hv/CONTEXT.md` and per-sub-repo glossaries live in `.hv/contexts/<repo>/CONTEXT.md`. The combined view is maintained in `.hv/CONTEXT-MAP.md` by `hv-context-map`.
 
@@ -106,13 +106,13 @@ See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses
 
 ## bin/ — CLI helpers
 
-`bin/` contains small shell scripts that the skills rely on for safe, idempotent file mutations: appending a new item, marking an item complete, or fetching the next available ID. They are generated by `/hv-init` and are not intended to be called directly. See the [CLI helpers reference](./cli-helpers.md) for full documentation.
+`bin/` contains small shell scripts that the skills rely on for safe, idempotent file mutations: appending a new item, marking an item complete, or fetching the next available ID. `/hv-init` generates them, and they are not intended to be called directly. See the [CLI helpers reference](./cli-helpers.md) for full documentation.
 
 ## bugs/, features/, tasks/ — overflow detail files
 
-When a bug report, feature spec, or task description is too long to fit inline in `BACKLOG.md`, the overflow content is stored in a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `BACKLOG.md` entry links to it. This keeps `BACKLOG.md` scannable while preserving full detail where it matters.
+When a bug report, feature spec, or task description is too long to fit inline in `BACKLOG.md`, the overflow content goes into a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `BACKLOG.md` entry links to it. This keeps `BACKLOG.md` scannable while preserving full detail where it matters.
 
-You can create these files by hand or let `/hv-capture` handle it when you supply a long description.
+Create these files by hand, or let `/hv-capture` handle it when you supply a long description.
 
 ## milestones/ — per-milestone plans
 
@@ -132,7 +132,7 @@ See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for the full pl
 
 When you run `/hv-pause`, the current state of the session (active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy) is written to `handoff/<branch>.md`. `/hv-next` reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
 
-Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned; delete them by hand once the branch is shipped.
+Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned, so delete them by hand once the branch is shipped.
 
 See [../usage/pausing-and-resuming.md](../usage/pausing-and-resuming.md) for the pause/resume flow.
 

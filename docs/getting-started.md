@@ -16,8 +16,8 @@ For git-clone or GNU stow installs, see the [Install alternatives](../README.md#
 ## Initialize the project
 
 Run `/hv-init` once at the project root. It asks five questions (models, isolation, merge
-strategy, quality gates, autonomy level) with Recommended defaults highlighted. The defaults
-are reasonable; accept them unless you have a specific reason to change something.
+strategy, quality gates, autonomy level) with Recommended defaults highlighted. Accept the
+defaults unless you have a reason not to.
 
 Two settings worth a second of thought:
 
@@ -78,14 +78,13 @@ surface but proceed; PASS flows through.
 
 **Learn.** `/hv-learn` writes durable gotchas, conventions, and constraints into
 `KNOWLEDGE.md`, grouped by topic. A verifier judges each bullet for durability before it
-lands and skips vague restatements. If you want to encode a hard
-boundary like "never store tokens client-side", use `/hv-decide` instead. See
-[decisions](usage/decisions.md).
+lands and skips vague restatements. To encode a hard boundary like "never store tokens
+client-side", use `/hv-decide` instead. See [decisions](usage/decisions.md).
 
 **Visible progress.** Multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`,
 `/hv-docs`, `/hv-refactor`, and others) declare a phase checklist via `TaskCreate` at the
-start of each run and tick each phase off as it lands. Long cycles stay legible — preflight,
-plan, dispatch, verify, commit, merge are discrete checkpoints rather than an undifferentiated
+start of each run and tick each phase off as it lands. Long cycles stay legible: preflight,
+plan, dispatch, verify, commit, and merge are discrete checkpoints rather than an undifferentiated
 stream of bash output. The checklist is silently skipped on hosts where the tool isn't loaded.
 
 After the second or third cycle you mostly live in `/hv-capture` and `/hv-next`. Other
@@ -95,8 +94,8 @@ for systematic bug cycles, `/hv-pause` before stepping away, `/hv-next` after `/
 ## If you're starting from a sketch (Path B: vision-driven)
 
 You have an empty repo or a rough sketch and want to think about where the project is going
-before any code lands. The flow routes through `/hv-vision` and `/hv-plan` first, then
-joins the same execute → ship → learn loop.
+before any code lands. The flow routes through `/hv-vision` and `/hv-plan` first, then joins
+the same execute → ship → learn loop.
 
 ```bash
 # 1. brainstorm vision and milestones — Socratic discovery, web research, deliberate challenge

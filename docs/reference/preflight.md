@@ -1,12 +1,12 @@
 # Preflight reference
 
-Every skill calls `.hv/bin/hv-preflight` first. Here's what its exit codes mean and how skills should react.
+Every skill calls `.hv/bin/hv-preflight` first. Its exit codes and how skills should react are below.
 
 ## Exit codes
 
 | Code | Meaning | User state | Skill should |
 |------|---------|------------|--------------|
-| `0`  | Clean — `.hv/` exists, all required data files and helpers are present and current. | Fully initialized. | Proceed silently. |
+| `0`  | Clean — `.hv/` exists, all required data files and helpers are present. | Fully initialized. | Proceed silently. |
 | `2`  | Uninitialized — `.hv/` is missing, or one of the required data files (see below) is absent. | Project has not opted into hv-skills yet. | Tell the user they need to run `/hv-init` first, then **stop**. Do not auto-init; installation requires user consent. |
 | `3`  | Stale install — `.hv/` exists, but one or more helper binaries under `.hv/bin/` are missing (e.g. plugin upgraded, helpers haven't been re-copied). | Project is initialized but its helpers are outdated. | Invoke `hv-init` via the `Skill` tool to refresh, then continue from where preflight ran. |
 
@@ -24,7 +24,7 @@ Every default skill follows this pattern:
 
 ## Variants
 
-Three skills have skill-specific exit-2 behavior; their preflight step omits exit-code prose because the variant is captured here.
+Three skills have skill-specific exit-2 behavior. Their preflight step omits exit-code prose because the variant is captured here.
 
 | Skill | On exit `2` | On exit `3` |
 |-------|------------|------------|
@@ -34,7 +34,7 @@ Three skills have skill-specific exit-2 behavior; their preflight step omits exi
 
 Two more skills are structural variants:
 
-- **`/hv-update`** checks `gh` is on `PATH` *before* preflight; the GitHub-release check is the primary purpose, and a missing `gh` should fail fast before touching `.hv/`.
+- **`/hv-update`** checks `gh` is on `PATH` *before* preflight. The GitHub-release check is the primary purpose, so a missing `gh` fails fast before touching `.hv/`.
 - **`/hv-init`** is the bootstrapper itself; it doesn't run preflight.
 
 ## What hv-preflight checks
@@ -53,4 +53,4 @@ Required helpers under `.hv/bin/`: every `hv-*` script alongside `hv-preflight` 
 
 Source of truth: [`bin/hv-preflight`](../../bin/hv-preflight).
 
-Skill authors: see Variants table above before writing inline exit-2 prose in a SKILL.md — if the skill is a variant, the cite is enough.
+Skill authors: check the Variants table above before writing inline exit-2 prose in a SKILL.md. If the skill is a variant, the cite is enough.
