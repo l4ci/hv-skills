@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/hv-skills_logo.png" alt="hv-skills logo" width="160" />
+
 # hv-skills
 
 **A workflow for Claude Code that plans before coding, makes one commit per task, and keeps a project knowledge layer that survives `/clear`.**
