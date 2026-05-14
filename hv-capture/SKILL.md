@@ -218,17 +218,13 @@ Mixed input — user says *"the sidebar flickers on hover, also we should add ke
 
 Fires only when the captured batch includes at least one `[Major]` feature OR one `[P0]` bug. Skip silently for `[Minor]` / `[Cosmetic]` features and `[P1]` / `[P2]` bugs — design exploration is a poor fit for small contained work.
 
-Read `autonomy.level` from `.hv/config.json` (default `"off"`):
+Append one line to the capture report for each qualifying ID, in every autonomy mode (`off` / `auto` / `loop`):
 
-```bash
-LEVEL=$(jq -r '.autonomy.level // "off"' .hv/config.json)
-```
+> *"Run `/hv-brainstorm [ID]` before `/hv-plan` to negotiate the design."*
 
-Branch inline (per the `hv-init` authoring convention on inline autonomy directives):
+Place this line after any existing post-capture nudges (e.g., release-pending), separated by one blank line.
 
-- `"off"` — append one line to the capture report for each qualifying ID: *"Run `/hv-brainstorm [ID]` before `/hv-plan` to negotiate the design."* Place this line after any existing post-capture nudges (e.g., release-pending), separated by one blank line.
-- `"auto"` — invoke `hv-brainstorm` via the `Skill` tool with the qualifying ID as `args`. When the batch produced two or more qualifying IDs, dispatch one `Skill` call per ID in sequence — `/hv-brainstorm` is per-item by contract. Print *"Auto: starting /hv-brainstorm [ID]."* before each dispatch so the user sees the pick.
-- `"loop"` — skip entirely. Loop mode is throughput and Socratic design exploration breaks the loop's pace; the brainstorm-bypass is intentional.
+**Never invoke `/hv-brainstorm` from this skill.** Capture is pure intake; pulling the user into design exploration mid-brain-dump conflates two phases the workflow keeps separate. Autonomous advancement lives where "advance without asking" semantics belong: `/hv-next` Step 6 auto-dispatches `/hv-brainstorm` for the suggested item in `auto` mode, and `/hv-work` Step 4 auto-dispatches `/hv-brainstorm --auto-loop` for Major + Milestone-tagged items without a design in `loop` mode. The nudge line above is the bridge to either path.
 
 ## Rules
 
