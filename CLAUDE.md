@@ -3,27 +3,16 @@
 
 Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
 
-- Build & Tooling: Helper Authoring
-- Build & Tooling: Helper Idioms
-- Build & Tooling: Helper Composition & Observability
-- Build & Tooling: Umbrella & Worktrees
-- Build & Tooling: Smoke
-- Build & Tooling: Plugin & Dogfooding
-- Build & Tooling: Releases
-- Documentation
-- Skill Authoring: Prose & References
-- Skill Authoring: Workflows & Autonomy
-- Skill Authoring: Internals & Data
-- Skill Authoring: Workers & Parallelism
+- _(no topics yet — run `/hv-learn` to capture learnings)_
 
 <!-- hv-knowledge-end -->
 
 <!-- hv-vision-start -->
 ## Project Vision
 
-Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
+Project milestones live in `.hv/MILESTONES.md`.
 
-- **M05** — Skill-surface maintenance (depends: —)
+_(no milestones yet — run `/hv-vision` to brainstorm)_
 <!-- hv-vision-end -->
 
 ## Working in this repo
@@ -57,8 +46,7 @@ Before acting on work that touches a topic listed in `## Project Knowledge`, `##
 
 Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:
 
-- Build & Tooling
-- Skill Authoring
+- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_
 
 <!-- hv-decisions-end -->
 
@@ -67,8 +55,7 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 
 Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/bin/hv-map-query <name>`.
 
-- **capture** — Captures items into BACKLOG.md
-- **plan** — Plans before execution
+- _(no subsystems yet — run `/hv-map first-run` to scaffold)_
 <!-- hv-map-end -->
 
 <!-- hv-context-start -->
@@ -76,5 +63,5 @@ Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/
 
 Domain terminology lives in `.hv/CONTEXT.md`. Use these canonical names; if a term you're using conflicts (synonym or drift), call it out.
 
-- **prompt-stage** — Stage in repo-a.
+- _(no terms yet — run `/hv-context` to capture domain terminology)_
 <!-- hv-context-end -->
