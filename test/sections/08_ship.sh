@@ -292,7 +292,7 @@ echo so2 > so2.txt && git add so2.txt && git commit -q -m "feat: overlay [F70]"
 git checkout -q main
 
 BRIEF=$("$BIN/hv-second-opinion-brief" hv/second-opinion-demo)
-echo "$BRIEF" | grep -q "no prior conversation context" \
+echo "$BRIEF" | grep -qi "no prior conversation context" \
   || fail "second-opinion-brief missing fresh-context framing"
 echo "$BRIEF" | grep -q "^\*\*Goal" \
   || fail "second-opinion-brief missing Goal section"
