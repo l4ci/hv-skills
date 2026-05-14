@@ -26,6 +26,7 @@ Read `.hv/config.json`:
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly.
 - `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one.
+- The Iron Law counter persists at `.hv/debug/<session>.json` (session = current branch with `/` → `-`). Managed by `bin/hv-debug-counter`; survives `/clear` and session resumption.
 
 ## When to Use
 
@@ -42,7 +43,7 @@ Read `.hv/config.json`:
 ## Flow
 
 ```
-Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → Fix → Commit → Learn nudge
+Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → Fix → Commit → (Iron Law gate) → Learn nudge
 ```
 
 ## Step 1 — Preflight & Guard
@@ -68,8 +69,9 @@ Phases:
 3. *Reproduce* — failure triggers reliably from a known input (Step 4)
 4. *Hypothesize & verify* — claim is testable; evidence supports or refutes (Steps 5–6)
 5. *Fix & commit* — minimal diff, atomic commit with `[B##]` footer (Steps 7–9)
-6. *Smoke / regression* — no untouched-area breakage; existing tests pass (Step 10)
-7. *Learn nudge* — autonomy-aware learn/decide nudges (Steps 11–12.5)
+6. *Iron Law gate* — at 3 failed fixes, hard stop and surface (Step 9.5)
+7. *Smoke / regression* — no untouched-area breakage; existing tests pass (Step 10)
+8. *Learn nudge* — autonomy-aware learn/decide nudges (Steps 11–12.5)
 
 ## Step 2 — Resolve the Bug
 
@@ -114,6 +116,14 @@ git branch <branch-name>
 git worktree add .claude/worktrees/<branch-name> <branch-name>
 .hv/bin/hv-status-add <branch> <ID> .claude/worktrees/<branch-name>
 ```
+
+Initialize the per-session counter for the Iron Law (Step 9.5):
+
+```bash
+.hv/bin/hv-debug-counter init <ID>
+```
+
+Session ID is derived from the current branch (`/` → `-`); state lives in `.hv/debug/<session>.json`. Idempotent on re-entry.
 
 ## Step 5 — Reproduce
 
@@ -215,13 +225,66 @@ git commit -m "fix: <short imperative> [B##]"
 
 One commit for the bug. Don't `git add -A` — sweep risk if any sibling artifacts crept in. If the toolchain produced legitimate sibling files (e.g. Godot `.gd.uid`), follow the same sweep pattern as `/hv-work` Step 8.5: a separate `chore:` commit, not the same atomic unit as the fix.
 
+Record the attempt in the Iron Law counter so Step 9 can detect repeat failures:
+
+```bash
+.hv/bin/hv-debug-counter record-attempt --hypothesis "<one-line hypothesis from Step 6>" --commit "$(git rev-parse --short HEAD)"
+```
+
 ## Step 9 — Verify the Fix
 
 Re-run the reproducer from Step 5. It must now pass (or the symptom must be gone). If the regression test is new, confirm it's in the suite and runs under the default test command.
 
-If the fix doesn't hold → back to Step 6 (which re-runs the cycle-counter check). Don't commit a partial fix.
+If the fix holds, record the win:
+
+```bash
+.hv/bin/hv-debug-counter pass
+```
+
+If the fix doesn't hold, mark this attempt failed and check the Iron Law threshold:
+
+```bash
+FAILED_FIXES=$(.hv/bin/hv-debug-counter fail)
+```
+
+- `FAILED_FIXES < 3` — back to Step 6 (which re-runs the in-context hypothesis cycle counter). Don't commit a partial fix.
+- `FAILED_FIXES >= 3` — jump to **Step 9.5 (Iron Law hard stop)**. Do NOT loop back to Step 6.
+
+## Step 9.5 — Iron Law Hard Stop
+
+Fires when `hv-debug-counter fail` returns `>= 3`. Three committed fix attempts have failed to resolve the bug — continuing to dispatch more workers in the same session burns context without converging. Iron Law: hard stop, no further attempts.
+
+Print the fail-loud summary verbatim to the user:
+
+```bash
+.hv/bin/hv-debug-counter summary
+```
+
+Then surface — do NOT dispatch a fresh-context worker (Step 7.5's escalation belongs to the hypothesis-cycle counter; this is a stricter, terminal gate). Suggest the user:
+
+- Run `/hv-pause` to leave a handoff note and step away (a fresh session reads the persisted counter file and can decide whether to wipe it or continue).
+- Or re-open the bug from a different angle — the symptom may be in a subsystem the past three hypotheses haven't touched.
+
+Do NOT call `hv-status-remove` here — the branch and status entry stay so the user can resume. Do NOT call `hv-complete` — the bug is not fixed.
+
+This is a terminal path. Surface any `[Auto:Loop]` decisions before halting:
+
+```bash
+.hv/bin/hv-auto-decisions-since
+.hv/bin/hv-loop-stamp clear
+```
+
+Loop mode (`autonomy.level == "loop"`): the Iron Law breaks the loop. Do not auto-dispatch `/hv-next` or any continuation skill. The loop stops here; the user re-engages by hand.
 
 ## Step 10 — Mark Complete
+
+Clear the Iron Law counter for this session:
+
+```bash
+.hv/bin/hv-debug-counter clear
+```
+
+Then mark the item complete:
 
 ```bash
 .hv/bin/hv-complete <ID> <commit-hash>
@@ -287,6 +350,7 @@ If the fix codified a constraint (e.g., "never use timer-X here", "this surface 
 ## Key Principles
 
 - **Reproduce before hypothesizing, verify before fixing.** No fix-and-pray.
+- **Iron Law: no fix without a hypothesis; hard stop at 3 failed fixes.** The hypothesis is logged with each attempt; three committed fixes that don't hold trigger Step 9.5 — no more attempts, surface to the user.
 - **Hypothesis is a claim, not a description.** "X causes Y because Z" — testable.
 - **One fix, one commit.** Scope creep in debug commits masks the root cause later.
 - **The ID closes the loop.** The commit message carries `[B##]`; `hv-complete` moves the entry.
