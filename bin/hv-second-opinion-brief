@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Build a fresh-eyes second-opinion brief for a branch — minimal context
+# (goal + commits + diff) so a no-prior-context subagent can find blind
+# spots the contextualized /hv-review reviewer naturalizes.
+#
+# Differentiator from hv-review-scope (which emits structured JSON for the
+# full staff-engineer review): this helper emits a single markdown brief
+# ready to feed to a fresh `general-purpose` Agent, deliberately omits
+# KNOWLEDGE.md / DECISIONS.md / conventions, and frames the rubric
+# adversarially ("find what's wrong").
+#
+# Tool: exit 0 with markdown brief on stdout; exit 1 on git/branch error,
+# exit 2 when the branch has no commits beyond base.
+# Usage: hv-second-opinion-brief [--repo <name>] <branch>
+set -euo pipefail
+. "$(dirname "$0")/hv-types.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+UMBRELLA_CWD="$("$HERE/hv-resolve-umbrella" 2>/dev/null || pwd -P)"
+
+REPO=""
+if [ "${1:-}" = "--repo" ]; then
+  REPO="${2:?usage: hv-second-opinion-brief [--repo <name>] <branch>}"
+  shift 2
+fi
+
+if [ -n "$REPO" ]; then
+  REPO_PATH=$("$HERE/hv-resolve-repo-path" "$REPO")
+  cd "$REPO_PATH"
+fi
+
+BRANCH="${1:?usage: hv-second-opinion-brief [--repo <name>] <branch>}"
+
+"$HERE/hv-require-git-context" "hv-second-opinion-brief" --repo-flag-supported
+
+BASE=$("$HERE/hv-base-branch")
+
+if [ "$BRANCH" = "$BASE" ]; then
+  echo "error: cannot second-opinion base branch '$BASE' against itself" >&2
+  exit 1
+fi
+git rev-parse --verify "$BRANCH" >/dev/null 2>&1 || {
+  echo "error: branch '$BRANCH' not found" >&2
+  exit 1
+}
+
+# Reuse hv-review-scope for commits/intents/touched files — the JSON shape
+# is the single source of truth for "what's in this branch."
+SCOPE_ARGS=()
+[ -n "$REPO" ] && SCOPE_ARGS+=(--repo "$REPO")
+SCOPE_ARGS+=("$BRANCH")
+SCOPE_JSON=$("$HERE/hv-review-scope" "${SCOPE_ARGS[@]}")
+
+COMMIT_COUNT=$(printf '%s' "$SCOPE_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["commitCount"])')
+if [ "$COMMIT_COUNT" = "0" ]; then
+  echo "error: branch '$BRANCH' has no commits beyond '$BASE'" >&2
+  exit 2
+fi
+
+export HV_BRANCH="$BRANCH" HV_BASE="$BASE" HV_SCOPE_JSON="$SCOPE_JSON"
+python3 - <<'PY'
+import json, os, subprocess
+
+scope = json.loads(os.environ["HV_SCOPE_JSON"])
+branch = os.environ["HV_BRANCH"]
+base = os.environ["HV_BASE"]
+
+print("You are reviewing a feature branch with NO prior conversation context.")
+print("You receive only the goal and the diff. Your job: find what's wrong.")
+print()
+print("A staff-engineer reviewer with full project context already evaluated this branch.")
+print("Your value is the blind spot — the issue the contextualized reviewer naturalized")
+print("because it knew \"why.\" Reason from the diff alone, as if you'd never seen this")
+print("project before.")
+print()
+print(f"**Branch:** `{branch}` ({scope['commitCount']} commits vs `{base}`)")
+print()
+
+print("**Goal (what the diff claims to accomplish):**")
+if scope["intents"]:
+    for it in scope["intents"]:
+        print(f"- [{it['id']}] {it['title']} — {it['entry']}")
+else:
+    print("- (no linked TODO items — judge against commit subjects only)")
+print()
+
+print("**Commits:**")
+for c in scope["commits"]:
+    print(f"- `{c['hash']}` {c['subject']}")
+print()
+
+print("**Diff:**")
+print()
+for path in scope["touchedFiles"]:
+    diff = subprocess.run(
+        ["git", "diff", f"{base}...{branch}", "--", path],
+        capture_output=True, text=True, check=False,
+    ).stdout
+    print(f"### `{path}`")
+    print()
+    print("```diff")
+    print(diff.rstrip("\n"))
+    print("```")
+    print()
+
+print("## Evaluate")
+print()
+print("Return PASS / CONCERN / FAIL with file:line evidence for each issue.")
+print()
+print("1. **Goal match** — does the diff deliver the stated goal? Missing pieces,")
+print("   scope creep, off-target work? Compare commit subjects to goal text.")
+print("2. **Obvious quality** — dead code, error swallowing, untested new branches,")
+print("   security smells, API contract breaks, performance cliffs, leaky abstractions,")
+print("   off-by-one errors, missing edge cases visible in the diff.")
+print("3. **Fresh-eyes inconsistencies** — what would surprise a reader who has no")
+print("   project context? Names that don't match what they do, comments that")
+print("   contradict the code, dead-flag-style stubs, suspicious silence on a code")
+print("   path the rest of the diff treats as load-bearing.")
+print()
+print("Be specific: file:line for every concern. Rank by severity. If unsure, say so")
+print("— a fresh reviewer flagging an honest uncertainty is more useful than a")
+print("confident hand-wave.")
+print()
+print("**Final verdict** (on the last line, all caps, no other text): PASS | CONCERNS | FAIL")
+print("- PASS — nothing worth surfacing")
+print("- CONCERNS — works, but flag before merge")
+print("- FAIL — merge would regress behavior, break the goal, or violate sane practice")
+PY

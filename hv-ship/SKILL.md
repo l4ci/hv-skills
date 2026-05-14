@@ -21,6 +21,7 @@ Read `.hv/config.json`:
 
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
+- `ship.secondOpinion` — `false` (default) skips the fresh-eyes gate; `true` runs a no-prior-context adversarial review after `/hv-review` passes
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
 
 ## When to Use
@@ -58,9 +59,10 @@ Phases:
 1. *Preflight & branch check* — feature branch confirmed, not on main (Step 1)
 2. *Extract commits & items* — branch range read, item IDs resolved (Step 2)
 3. *Review* — `/hv-review` runs when `ship.review: true` (Step 3)
-4. *CONCERNS routing* — verdict-gated branch selection (Step 4)
-5. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
-6. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
+4. *Second-opinion gate* — fresh-eyes adversarial review when `ship.secondOpinion: true` (Step 3.5)
+5. *CONCERNS routing* — verdict-gated branch selection (Step 4)
+6. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
+7. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
 
 ## Step 2 — Scope the Work
 
@@ -99,6 +101,45 @@ If enabled, invoke `hv-review` via the `Skill` tool for this branch. Route on th
 - **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
 
 If `ship.review` is `false`, skip this step.
+
+## Step 3.5 — Second-Opinion Gate (opt-in)
+
+Read `ship.secondOpinion` from `.hv/config.json`. Default `false`. If `false`, skip this step entirely.
+
+When `true`, dispatch a fresh subagent with **no prior conversation context** and give it only the diff plus the stated goal. The /hv-review reviewer (Step 3) shares context with the work it produced — the same conventions, the same KNOWLEDGE bullets, the same plan. A reviewer with that context naturalizes blind spots. A reviewer without it must reason from the diff alone, catching what the contextualized reviewer normalized.
+
+Skip the gate when any of these apply (no work to second-opinion):
+
+- Step 3 was skipped (`ship.review: false`) AND the user hasn't explicitly asked for a second opinion this session — the trade-off is the user already opted out of pre-merge review.
+- Step 3 returned **FAIL** — already stopped above.
+- Step 3 returned **CONCERNS** and the user chose "Ship anyway" — they already accepted residual risk; a second adversarial pass would re-litigate the decision.
+
+Otherwise, run the gate:
+
+```bash
+.hv/bin/hv-second-opinion-brief [--repo "$REPO"] <branch>
+```
+
+(Pass `--repo "$REPO"` in umbrella mode using the value from Step 2.)
+
+The helper emits a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
+
+Dispatch the brief to a **fresh subagent**:
+
+- `Agent` tool, `subagent_type: "general-purpose"` (default — fresh context, no inherited project memory)
+- `model: "sonnet"` — the MVP is same-model-fresh-context per F04's note that cross-model (Codex/Gemini) is the gold standard but not the cheap MVP
+- Prompt: the brief's stdout verbatim
+- `description: "Second-opinion review of <branch>"`
+
+The agent returns a markdown report. Parse the last non-empty line for the all-caps verdict (`PASS` / `CONCERNS` / `FAIL`).
+
+Route the verdict per `references/review-verdict-routing.md` — same contract as Step 3:
+
+- **PASS** → continue to Step 4 silently.
+- **CONCERNS** → surface each concern, then branch on `autonomy.level` exactly as in Step 3. Label the surfaced concerns "Second-opinion concerns" so the user can distinguish them from /hv-review's output.
+- **FAIL** → stop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
+
+The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
 
 ## Step 4 — Build the PR Body
 

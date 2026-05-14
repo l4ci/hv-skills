@@ -67,7 +67,7 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 
 - `models.orchestrator`, `models.worker`
 - `work.isolation`, `work.mergeStrategy`
-- `ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`
+- `ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`
 - `autonomy.level`
 - `docs.path`, `docs.autoCreate`, `docs.afterWork`
 - `git.baseBranch`
@@ -79,7 +79,7 @@ Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `
 **Validate `<value>`** when present, against the allowed values for that key from `docs/reference/config-options.md`:
 
 - Enum keys (`work.isolation`, `work.mergeStrategy`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options.
-- Boolean keys (`ship.review`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
+- Boolean keys (`ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
 - Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`) — accept any value including the empty string.
 
 Invalid value → stop with: *"Error: `<value>` is not a valid value for `<key>`. Allowed: <comma-separated list from config-options.md>."*
@@ -118,6 +118,7 @@ print(f"  Models                   {profile(o, w)} ({o} + {w})")
 print(f"  Isolation                {cfg.get('work',{}).get('isolation','branch')}")
 print(f"  Integration              {cfg.get('work',{}).get('mergeStrategy','direct')}")
 print(f"  Ship review              {'on' if cfg.get('ship',{}).get('review',True) else 'off'}")
+print(f"  Ship second-opinion      {'on' if cfg.get('ship',{}).get('secondOpinion',False) else 'off'}")
 print(f"  Verify learnings         {'on' if cfg.get('learn',{}).get('verify',True) else 'off'}")
 print(f"  Confirm before refactor  {'on' if cfg.get('refactor',{}).get('confirmBeforeExecute',True) else 'off'}")
 print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
@@ -178,7 +179,7 @@ For each category the user selected in Stage A, issue one `AskUserQuestion` call
 | Category | Keys (multiSelect, ≤4 per call) |
 |----------|---------------------------------|
 | Work | *"Models — current: <profile>"*, *"Isolation — current: <branch\|worktree>"*, *"Integration — current: <direct\|pr>"*, *"Autonomy — current: <off\|auto\|loop>"* |
-| Quality gates | *"Ship review — current: <on\|off>"*, *"Verify learnings — current: <on\|off>"*, *"Confirm before refactor — current: <on\|off>"*, *"Competing hypotheses — current: <on\|off>"* |
+| Quality gates | Two calls (5 keys exceed cap): **call 1** — *"Ship review — current: <on\|off>"*, *"Ship second-opinion — current: <on\|off>"*, *"Verify learnings — current: <on\|off>"*, *"Confirm before refactor — current: <on\|off>"*; **call 2** — *"Competing hypotheses — current: <on\|off>"* |
 | Docs | *"Docs path — current: <path>"*, *"Docs auto-create — current: <on\|off>"*, *"Docs after-work — current: <on\|off>"* |
 | Other | *"Umbrella mode — current: <on\|off>"*, *"Git base branch — current: <branch\|(auto-detect)>"* |
 | Issues | Two calls (5 keys exceed cap): **call 1** — *"Issues label — current: <label>"*, *"Auto-create label — current: <on\|off>"*, *"Filter mine only — current: <on\|off>"*, *"GitHub provider — current: <on\|off>"*; **call 2** — *"GitLab provider — current: <on\|off>"* |

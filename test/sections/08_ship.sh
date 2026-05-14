@@ -269,3 +269,67 @@ rm -f r2.txt
 git branch -D hv/ship-demo >/dev/null 2>&1 || true
 rm -f ship1.txt ship2.txt
 
+echo "hv-second-opinion-brief"
+# Re-seed the ship-demo branch + TODO state for the second-opinion brief test.
+git checkout -q main
+cat > .hv/BACKLOG.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B70] [P1] Ship demo bug.** Broken badge.~~ Done 2026-04-18 [`aaa1111`]
+- ~~**[F70] [Minor] Ship demo feature.** Overlay.~~ Done 2026-04-18 [`bbb2222`]
+EOF
+git add -A && git commit -q -m "seed second-opinion demo" || true
+git checkout -q -b hv/second-opinion-demo
+echo so1 > so1.txt && git add so1.txt && git commit -q -m "fix: badge invalidation [B70]"
+echo so2 > so2.txt && git add so2.txt && git commit -q -m "feat: overlay [F70]"
+git checkout -q main
+
+BRIEF=$("$BIN/hv-second-opinion-brief" hv/second-opinion-demo)
+echo "$BRIEF" | grep -q "no prior conversation context" \
+  || fail "second-opinion-brief missing fresh-context framing"
+echo "$BRIEF" | grep -q "^\*\*Goal" \
+  || fail "second-opinion-brief missing Goal section"
+echo "$BRIEF" | grep -q "\[B70\] Ship demo bug" \
+  || fail "second-opinion-brief missing B70 in goal"
+echo "$BRIEF" | grep -q "\[F70\] Ship demo feature" \
+  || fail "second-opinion-brief missing F70 in goal"
+echo "$BRIEF" | grep -q "^\*\*Commits" \
+  || fail "second-opinion-brief missing Commits section"
+echo "$BRIEF" | grep -q "fix: badge invalidation" \
+  || fail "second-opinion-brief missing commit subject"
+echo "$BRIEF" | grep -q "^\*\*Diff" \
+  || fail "second-opinion-brief missing Diff section"
+echo "$BRIEF" | grep -q "so1.txt" \
+  || fail "second-opinion-brief missing per-file diff path"
+echo "$BRIEF" | grep -q "PASS | CONCERNS | FAIL" \
+  || fail "second-opinion-brief missing verdict-instruction"
+if echo "$BRIEF" | grep -qi "KNOWLEDGE\.md\|DECISIONS\.md\|hard boundaries\|known gotchas"; then
+  fail "second-opinion-brief leaked KNOWLEDGE/DECISIONS context (must be diff+goal only)"
+fi
+pass "second-opinion-brief emits goal+commits+diff with no project-context leak"
+
+if "$BIN/hv-second-opinion-brief" main 2>/dev/null; then
+  fail "second-opinion-brief should reject base branch"
+fi
+pass "second-opinion-brief rejects base branch"
+
+# Zero-commit branch — helper exits 2 with a clear error
+git checkout -q -b hv/second-opinion-empty
+git checkout -q main
+if "$BIN/hv-second-opinion-brief" hv/second-opinion-empty 2>/dev/null; then
+  fail "second-opinion-brief should reject zero-commit branch"
+fi
+pass "second-opinion-brief rejects branch with no commits beyond base"
+git branch -D hv/second-opinion-empty >/dev/null 2>&1 || true
+
+# Cleanup
+git branch -D hv/second-opinion-demo >/dev/null 2>&1 || true
+rm -f so1.txt so2.txt
+
