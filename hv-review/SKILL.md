@@ -41,7 +41,7 @@ Read `.hv/config.json`:
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Read commits & items", description="Walk branch range and resolve referenced TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no items resolved, no convention overlap) get `completed` with the no-op reason in the description.
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Read commits and items", description="Walk branch range and resolve referenced TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no items resolved, no convention overlap) get `completed` with the no-op reason in the description.
 
 Phases:
 

@@ -195,3 +195,18 @@ When a SKILL.md extracts N≥4 sibling rules to a `references/` file, leave a on
 - Inventory tables with extra columns (audience, complexity, etc.) when those columns help readers triage.
 
 Codified on T39: `hv-init/SKILL.md` "Authoring conventions" H2 grew a 9-row inventory table beside its `references/authoring-conventions.md` citation; the inventory itself is what triggered this rule's codification.
+
+## Avoid `&` in `TaskCreate`/`TodoWrite` payloads
+
+Claude Code's TUI HTML-escapes task titles for rendering but never decodes — strings containing `&` show up as the literal entity `&amp;` in the task list view. Workaround until the upstream renderer is fixed: in any `TaskCreate(subject=…)`, `TaskCreate(activeForm=…)`, `TaskUpdate(...)`, or `TodoWrite(...)` payload (in examples in skill prose or in actual calls), use `and` or `+` instead of `&`. The substitution is purely cosmetic; both renderings parse identically.
+
+**Forbids.**
+- Ampersand in any `subject`, `description`, or `activeForm` string in `TaskCreate`/`TodoWrite`/`TaskUpdate` payloads — including the example strings embedded in skill prose under the *Surface multi-step skill progress with TaskCreate* convention.
+- Workarounds using `&amp;` or `&` in payloads to "pre-encode" — the bug isn't in encoding; the renderer escapes whatever it sees, so pre-encoded forms double-escape.
+
+**Permits.**
+- `&` elsewhere in prose, code blocks, or shell commands — the bug is scoped to task-list payloads, not all skill content.
+- Topic headings like `## Build & Tooling` in `KNOWLEDGE.md` — those aren't TaskCreate payloads.
+- `+` as the connector where it reads naturally (e.g. *"Commit + TODO + smoke"*) — already used elsewhere; renders correctly.
+
+Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `hv-init`, `hv-ship`, `hv-review`, `hv-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.

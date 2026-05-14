@@ -92,7 +92,7 @@ Plain-text fallback: ask once textually — *"Found N git repos here: `<list>`. 
 >
 > **Permits.** Independent sub-repos checked out side-by-side under the umbrella; registry via `.hv/repos.json` by absolute or relative path; each sub-repo evolving on its own branch/tag/release schedule; sub-repos that are themselves submodule-using internally — the boundary applies *between umbrella and direct children*, not inside any sub-repo.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment & umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment and umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
 
 Phases:
 
@@ -249,6 +249,7 @@ Inventory (in order — see the reference for each rule's full body, *Why*, **Fo
 | 12 | Nudges on terminal/idle paths only |
 | 13 | Helper docstring is the contract — SKILL.md prose paraphrasing drifts |
 | 14 | Inventory table beside a citation when ≥4 sibling rules extracted |
+| 15 | Avoid `&` in `TaskCreate`/`TodoWrite` payloads |
 
 When adding a new rule to the convention set, edit `references/authoring-conventions.md` directly — not this SKILL.md. The inventory table above gets a new row in the same edit.
 
