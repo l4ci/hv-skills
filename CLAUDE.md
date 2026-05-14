@@ -3,7 +3,7 @@
 
 Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
 
-- _(no topics yet — run `/hv-learn` to capture learnings)_
+- Build & Tooling
 
 <!-- hv-knowledge-end -->
 
