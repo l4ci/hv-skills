@@ -86,7 +86,7 @@ Don't narrate the sweep unless it happened; silent pass-through is the common ca
 
 If `hv-auto-decisions-since` produces no output, skip silently.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Preflight & guard", description="Run hv-preflight and hv-guard-clean; sweep tool siblings if dirty")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (e.g. no `[Auto:Loop]` decisions to surface) get `completed` with the no-op reason in the description.
+**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Preflight and guard", description="Run hv-preflight and hv-guard-clean; sweep tool siblings if dirty")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (e.g. no `[Auto:Loop]` decisions to surface) get `completed` with the no-op reason in the description.
 
 Phases:
 
