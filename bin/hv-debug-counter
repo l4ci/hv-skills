@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# Manage .hv/debug/<session>.json — persistent fix-attempt counter for /hv-debug Iron Law.
+# Session derived from current git branch (/ → -). Writer helper: atomic JSON updates.
+# Usage:
+#   hv-debug-counter init <bug_id>
+#   hv-debug-counter record-attempt --hypothesis <text> --commit <hash>
+#   hv-debug-counter fail
+#   hv-debug-counter pass
+#   hv-debug-counter show
+#   hv-debug-counter summary
+#   hv-debug-counter clear
+#   hv-debug-counter inc-cycle
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+SUBCMD="${1:-}"
+if [ -z "$SUBCMD" ]; then
+  echo "usage: hv-debug-counter <subcommand> [args]" >&2
+  echo "subcommands: init, record-attempt, fail, pass, show, summary, clear, inc-cycle" >&2
+  exit 1
+fi
+shift
+
+# Derive session from git branch (/ → -)
+SESSION="$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')" || {
+  echo "error: hv-debug-counter must be run from within a git repository" >&2
+  exit 1
+}
+if [ -z "$SESSION" ]; then
+  echo "error: could not determine current git branch" >&2
+  exit 1
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SUBCMD" "$SESSION" "$@" <<'PY'
+import argparse
+import datetime
+import sys
+from pathlib import Path
+from hvlib import load_json, dump_json_atomic, update_json
+
+subcmd = sys.argv[1]
+session = sys.argv[2]
+rest = sys.argv[3:]
+
+session_dir = Path(".hv/debug")
+session_path = session_dir / f"{session}.json"
+
+DEFAULT = {
+    "session": session,
+    "bug_id": "",
+    "started_at": "",
+    "failed_fixes": 0,
+    "hypothesis_cycles": 0,
+    "attempts": [],
+}
+
+
+def now_iso():
+    return datetime.datetime.now(datetime.UTC).isoformat()
+
+
+def require_session():
+    if not session_path.exists():
+        print(f"error: no debug session file at {session_path} — run 'hv-debug-counter init <bug_id>' first", file=sys.stderr)
+        sys.exit(1)
+
+
+if subcmd == "init":
+    if len(rest) < 1:
+        print("usage: hv-debug-counter init <bug_id>", file=sys.stderr)
+        sys.exit(1)
+    bug_id = rest[0]
+    # Idempotent — leave alone if already exists
+    if session_path.exists():
+        sys.exit(0)
+    session_dir.mkdir(parents=True, exist_ok=True)
+    data = {
+        "session": session,
+        "bug_id": bug_id,
+        "started_at": now_iso(),
+        "failed_fixes": 0,
+        "hypothesis_cycles": 0,
+        "attempts": [],
+    }
+    dump_json_atomic(session_path, data)
+
+elif subcmd == "record-attempt":
+    require_session()
+    parser = argparse.ArgumentParser(prog="hv-debug-counter record-attempt")
+    parser.add_argument("--hypothesis", required=True)
+    parser.add_argument("--commit", required=True)
+    args = parser.parse_args(rest)
+
+    result_n = [None]
+
+    def add_attempt(data):
+        n = len(data.get("attempts", [])) + 1
+        data.setdefault("attempts", []).append({
+            "n": n,
+            "started_at": now_iso(),
+            "hypothesis": args.hypothesis,
+            "commit": args.commit,
+            "outcome": "pending",
+        })
+        result_n[0] = n
+
+    update_json(session_path, DEFAULT, add_attempt)
+    print(result_n[0])
+
+elif subcmd == "fail":
+    require_session()
+
+    result_count = [None]
+
+    def mark_failed(data):
+        attempts = data.get("attempts", [])
+        if not attempts:
+            print("error: no attempts recorded yet", file=sys.stderr)
+            sys.exit(1)
+        last = attempts[-1]
+        if last.get("outcome") != "pending":
+            print(f"error: last attempt outcome is '{last.get('outcome')}', not 'pending'", file=sys.stderr)
+            sys.exit(1)
+        last["outcome"] = "failed"
+        last["ended_at"] = now_iso()
+        data["failed_fixes"] = data.get("failed_fixes", 0) + 1
+        result_count[0] = data["failed_fixes"]
+
+    update_json(session_path, DEFAULT, mark_failed)
+    print(result_count[0])
+
+elif subcmd == "pass":
+    require_session()
+
+    def mark_passed(data):
+        attempts = data.get("attempts", [])
+        if not attempts:
+            print("error: no attempts recorded yet", file=sys.stderr)
+            sys.exit(1)
+        last = attempts[-1]
+        if last.get("outcome") != "pending":
+            print(f"error: last attempt outcome is '{last.get('outcome')}', not 'pending'", file=sys.stderr)
+            sys.exit(1)
+        last["outcome"] = "passed"
+        last["ended_at"] = now_iso()
+
+    update_json(session_path, DEFAULT, mark_passed)
+
+elif subcmd == "show":
+    if not session_path.exists():
+        sys.exit(1)
+    print(session_path.read_text(), end="")
+
+elif subcmd == "summary":
+    require_session()
+    data = load_json(session_path, DEFAULT)
+    bug_id = data.get("bug_id", "?")
+    failed = data.get("failed_fixes", 0)
+    attempts = data.get("attempts", [])
+
+    lines = [
+        f"# Iron Law triggered for [{bug_id}]",
+        "",
+        f"{failed} fix attempt{'s' if failed != 1 else ''} failed to resolve the bug. Halting.",
+        "",
+        "## Attempts",
+        "",
+    ]
+    for a in attempts:
+        hyp = a.get("hypothesis", "")
+        if len(hyp) > 120:
+            hyp = hyp[:117] + "..."
+        commit = a.get("commit", "unknown")
+        lines.append(f"{a['n']}. {commit} — {hyp}")
+
+    lines += [
+        "",
+        "## Next steps",
+        "",
+        "- Run `/hv-pause` to leave a handoff note and step away.",
+        "- Or re-read the symptom — the root cause is likely in a different subsystem than the hypotheses so far have explored.",
+        f"- Counter persists in `.hv/debug/{session}.json` — delete it manually if you want a fresh start on the same branch.",
+    ]
+    print("\n".join(lines))
+
+elif subcmd == "clear":
+    if session_path.exists():
+        session_path.unlink()
+    # Idempotent — silent no-op if absent
+
+elif subcmd == "inc-cycle":
+    require_session()
+
+    result_cycle = [None]
+
+    def inc_cycle(data):
+        data["hypothesis_cycles"] = data.get("hypothesis_cycles", 0) + 1
+        result_cycle[0] = data["hypothesis_cycles"]
+
+    update_json(session_path, DEFAULT, inc_cycle)
+    print(result_cycle[0])
+
+else:
+    print(f"error: unknown subcommand '{subcmd}'", file=sys.stderr)
+    print("subcommands: init, record-attempt, fail, pass, show, summary, clear, inc-cycle", file=sys.stderr)
+    sys.exit(1)
+PY
