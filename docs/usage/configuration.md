@@ -129,6 +129,21 @@ Controls whether `/hv-ship` runs a review pass before integrating.
 
 See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
+## ship.secondOpinion
+
+Controls whether `/hv-ship` runs a second adversarial review with a fresh subagent after `/hv-review` passes. `/hv-review` shares the project's context (conventions, KNOWLEDGE, plan) with the work it produced — a reviewer with that context naturalizes blind spots. A fresh subagent with only the diff + the goal has to reason from scratch and catches what the contextualized reviewer normalized.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | `/hv-ship` skips the gate. `/hv-review` alone gates merges. |
+| `true` | After `/hv-review` returns PASS, `/hv-ship` dispatches a fresh `general-purpose` Sonnet subagent with the goal + diff only (no KNOWLEDGE/DECISIONS/conventions) and an adversarial framing. Returns PASS/CONCERNS/FAIL via the same routing as `/hv-review`. |
+
+The gate is opt-in because it adds one Sonnet roundtrip per ship and most cycles don't need it. Enable when you ship work that touches load-bearing surfaces (release tooling, security paths, data migrations) and want a second pair of eyes that genuinely don't know what they're "supposed to" see.
+
+Same-model-fresh-context is the cheap MVP; cross-model second-opinions (Codex/Gemini/etc.) are the gold standard but not currently wired.
+
+See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
+
 ## debug.competingHypotheses
 
 Controls whether [`/hv-debug`](debugging.md) Step 6 dispatches a single hypothesis agent or fans out three parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator deduplicates the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.

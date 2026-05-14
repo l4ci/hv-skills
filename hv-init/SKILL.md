@@ -192,6 +192,7 @@ EXPECTED = [
     ("refactor", "verifyCommands"),
     ("learn", "verify"),
     ("ship", "review"),
+    ("ship", "secondOpinion"),
     ("autonomy", "level"),
     ("debug", "competingHypotheses"),
     ("docs", "path"),
@@ -266,7 +267,7 @@ cfg = {
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>},
-  "ship":     {"review": <Q4-ship>},
+  "ship":     {"review": <Q4-ship>, "secondOpinion": False},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
   "docs":     {"path": "docs", "autoCreate": False, "afterWork": False},
@@ -289,6 +290,12 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Example: user answered Q4 "Review before ship" → ship.review was missing.
 # Set only the keys from the STALE list; never overwrite existing values.
 .hv/bin/hv-config-set ship.review true   # or answered value
+
+# ship.secondOpinion — silent default. No question; opt-in feature flag
+# (Rule 9) gating the fresh-eyes pre-merge gate in /hv-ship Step 3.5.
+# Users enable via /hv-config when they want a no-prior-context adversarial
+# review in addition to /hv-review.
+.hv/bin/hv-config-set ship.secondOpinion false
 
 # docs.afterWork — silent default. No question; the toggle UX lives in
 # /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
@@ -367,7 +374,7 @@ If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line
 
 The helper handles network access (via `gh`) and install-type resolution. Treat a non-zero exit or empty JSON as `unknown`. `hvSkills.version` in `.hv/config.json` carries the same `currentVersion` value — re-stamped this run.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.review`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.{review,secondOpinion}`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
 
 ## References
 
