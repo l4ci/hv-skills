@@ -92,7 +92,7 @@ If `commitCount` is 0, tell the user the branch has no commits beyond the base a
 
 Read `ship.review` from `.hv/config.json`. Default `true`.
 
-If enabled, invoke `hv-review` via the `Skill` tool for this branch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
+If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as a fifth checklist item — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
 
 - **PASS** → continue to Step 4.
 - **CONCERNS** → surface each concern, then branch on `autonomy.level`:
