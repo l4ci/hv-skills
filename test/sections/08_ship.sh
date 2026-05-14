@@ -329,6 +329,13 @@ fi
 pass "second-opinion-brief rejects branch with no commits beyond base"
 git branch -D hv/second-opinion-empty >/dev/null 2>&1 || true
 
+# Schema parity — brief's commit count matches hv-review-scope JSON's commitCount.
+# Catches silent drift if hv-review-scope's schema changes without the brief noticing.
+SCOPE_COUNT=$("$BIN/hv-review-scope" hv/second-opinion-demo | python3 -c 'import json,sys;print(json.load(sys.stdin)["commitCount"])')
+BRIEF_COMMITS=$("$BIN/hv-second-opinion-brief" hv/second-opinion-demo | grep -cE '^- `[a-f0-9]+` ')
+[ "$SCOPE_COUNT" = "$BRIEF_COMMITS" ] || fail "schema drift: hv-review-scope reports $SCOPE_COUNT commits but hv-second-opinion-brief lists $BRIEF_COMMITS"
+pass "second-opinion-brief commit count matches hv-review-scope JSON (schema parity)"
+
 # Cleanup
 git branch -D hv/second-opinion-demo >/dev/null 2>&1 || true
 rm -f so1.txt so2.txt

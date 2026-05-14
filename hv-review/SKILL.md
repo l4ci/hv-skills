@@ -46,13 +46,13 @@ See `docs/reference/preflight.md` for exit-code handling.
 Phases:
 
 1. *Read commits and items* — branch range walked, referenced item IDs collected (Step 2)
-2. *Resolve plans* — milestone-keyed `.hv/plans/<milestone>-<ID>.md` located for each referenced item (Step 2.5)
-3. *Capture context* — diff, KNOWLEDGE / DECISIONS topics, scaffolding pre-scan (Steps 3, 4, 4.5)
-4. *Stage 1 — Spec compliance* — diff evaluated against `PLAN.md` outcomes; short-circuit on FAIL (Step 4.7)
-5. *Stage 2 — Code quality* — staff-engineer review, gated on Stage 1 PASS or CONCERNS (Step 5)
-6. *Verdict* — combined PASS / CONCERNS / FAIL with structured findings (Step 6)
+2. *Resolve plans* — milestone-keyed `.hv/plans/<milestone>-<ID>.md` located for each referenced item (Step 3)
+3. *Capture context* — diff, KNOWLEDGE / DECISIONS topics, scaffolding pre-scan (Steps 4, 5, 6)
+4. *Stage 1 — Spec compliance* — diff evaluated against `PLAN.md` outcomes; short-circuit on FAIL (Step 7)
+5. *Stage 2 — Code quality* — staff-engineer review, gated on Stage 1 PASS or CONCERNS (Step 8)
+6. *Verdict* — combined PASS / CONCERNS / FAIL with structured findings (Step 9)
 
-**Stage opt-out (power users).** When invoked with `--stage spec`, run only Stage 1 (Steps 2, 2.5, 4, 4.7) and skip Step 5. When invoked with `--stage quality`, skip Steps 2.5 and 4.7 and run only Stage 2 — the legacy single-pass behavior. No `--stage` arg = run both stages with short-circuit gating (the default).
+**Stage opt-out (power users).** When invoked with `--stage spec`, run only Stage 1 (Steps 2, 3, 5, 7) and skip Step 8. When invoked with `--stage quality`, skip Steps 3 and 7 and run only Stage 2 — the legacy single-pass behavior. No `--stage` arg = run both stages with short-circuit gating (the default).
 
 ## Step 2 — Scope the Review
 
@@ -72,7 +72,7 @@ If the user didn't name a branch, default to the current one. `hv-review-scope` 
 
 If `commitCount` is 0, stop and tell the user.
 
-## Step 2.5 — Resolve Plans for Referenced Items
+## Step 3 — Resolve Plans for Referenced Items
 
 For each `intent` in the scope JSON's `intents` array, resolve its milestone-keyed plan if one exists. The plan content is Stage 1's input alongside the diff.
 
@@ -84,17 +84,17 @@ MILESTONE=$(.hv/bin/hv-todo-field <ID> milestone)
 
 Issue the `hv-todo-field` and `hv-plan-show` calls in parallel — one pair per `referencedId` — and collect a `plans` map: `{ID -> plan-content-or-empty}`. Untagged items (no `Milestone:` field) and items with no plan file produce empty entries — those items don't contribute to Stage 1.
 
-**No-plan fallback.** If every entry in `plans` is empty (no referenced item has a plan file), Stage 1 cannot run as a meaningful spec check. Print one informational line — *"No plans found for referenced items; skipping Stage 1 (spec compliance). Running Stage 2 only."* — and proceed directly to Step 3 (effectively `--stage quality` behavior). The user may have skipped `/hv-plan` for this branch (e.g. `/hv-go` shortcut); that's legitimate, not an error.
+**No-plan fallback.** If every entry in `plans` is empty (no referenced item has a plan file), Stage 1 cannot run as a meaningful spec check. Print one informational line — *"No plans found for referenced items; skipping Stage 1 (spec compliance). Running Stage 2 only."* — and proceed directly to Step 4 (effectively `--stage quality` behavior). The user may have skipped `/hv-plan` for this branch (e.g. `/hv-go` shortcut); that's legitimate, not an error.
 
 When `--stage quality` is set, skip this step entirely — Stage 1 won't run.
 
-## Step 3 — Consult KNOWLEDGE & DECISIONS
+## Step 4 — Consult KNOWLEDGE & DECISIONS
 
 Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
 
 Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
 
-## Step 4 — Capture the Diff
+## Step 5 — Capture the Diff
 
 The reviewer needs concrete diff content, not just file names. For each touched file (up to 8; with 9 or more, ask the user which to focus on):
 
@@ -104,7 +104,7 @@ git diff <base>...<branch> -- <file>
 
 **Issue all the per-file `git diff` calls in parallel** — they're independent and serial calls add up fast on bigger branches. Keep a per-file diff map in memory for the reviewer brief.
 
-## Step 4.5 — Pre-flight Scaffolding Scan
+## Step 6 — Pre-flight Scaffolding Scan
 
 Multi-task feature branches sometimes ship comments that referenced earlier task numbers ("Umbrella behavior is added in Task 7 — for now --repo is parsed but ignored") even after the referenced task completed. Before dispatching the reviewer, run a deterministic diff scan:
 
@@ -112,11 +112,11 @@ Multi-task feature branches sometimes ship comments that referenced earlier task
 .hv/bin/hv-review-scaffolding [--repo <name>] <base> <branch>
 ```
 
-Empty stdout → no candidates, skip ahead to Step 4.7. Non-empty stdout → carry the matches forward as `**Possible stale scaffolding:**` evidence in the Stage 2 reviewer brief (Step 5). Do not auto-FAIL — the reviewer judges each match as real scaffolding or legitimate prose. The helper surfaces; the reviewer decides.
+Empty stdout → no candidates, skip ahead to Step 7. Non-empty stdout → carry the matches forward as `**Possible stale scaffolding:**` evidence in the Stage 2 reviewer brief (Step 8). Do not auto-FAIL — the reviewer judges each match as real scaffolding or legitimate prose. The helper surfaces; the reviewer decides.
 
-## Step 4.7 — Stage 1: Dispatch Spec-Compliance Reviewer
+## Step 7 — Stage 1: Dispatch Spec-Compliance Reviewer
 
-Skip this step entirely when `--stage quality` is set, OR when Step 2.5's `plans` map is empty (no-plan fallback already printed).
+Skip this step entirely when `--stage quality` is set, OR when Step 3's `plans` map is empty (no-plan fallback already printed).
 
 Dispatch a focused spec-compliance reviewer using the **orchestrator** model. Stage 1 has a narrow input: the diff + the resolved `PLAN.md` content per referenced item. KNOWLEDGE / DECISIONS / scaffolding stay out of this brief — Stage 1 answers *"does the diff fulfill what the plan promised?"* and nothing else. Shorter brief, smaller token budget, faster verdict.
 
@@ -174,23 +174,21 @@ For each item with a plan, return PASS / CONCERN / FAIL with evidence:
 
 | Verdict | Route |
 |---------|-------|
-| `SPEC-PASS` | Continue to Step 5 (Stage 2). Carry the per-item evidence forward into the final report. |
-| `SPEC-CONCERNS` | Continue to Step 5 (Stage 2). The combined verdict in Step 6 may still be CONCERNS or FAIL depending on Stage 2's findings — Stage 1 concerns alone don't decide the merge. |
-| `SPEC-FAIL` | **Short-circuit.** Skip Step 5 entirely. Jump to Step 6 to emit a Stage-1-only verdict block. Stage 2 doesn't run — no point burning a deeper review on a diff that doesn't match intent. |
+| `SPEC-PASS` | Continue to Step 8 (Stage 2). Carry the per-item evidence forward into the final report. |
+| `SPEC-CONCERNS` | Continue to Step 8 (Stage 2). The combined verdict in Step 9 may still be CONCERNS or FAIL depending on Stage 2's findings — Stage 1 concerns alone don't decide the merge. |
+| `SPEC-FAIL` | **Short-circuit.** Skip Step 8 entirely. Jump to Step 9 to emit a Stage-1-only verdict block. Stage 2 doesn't run — no point burning a deeper review on a diff that doesn't match intent. |
 
-**Why short-circuit on FAIL only.** SPEC-CONCERNS means the work is *mostly* delivered but with surfaceable gaps — Stage 2 still has signal to add (a CONCERN diff might also have a security smell). SPEC-FAIL means the diff is fundamentally off-target — running Stage 2 wastes tokens on a result the user will reject anyway.
+When `--stage spec` is set, always jump to Step 9 after Stage 1 (no Stage 2 regardless of verdict).
 
-When `--stage spec` is set, always jump to Step 6 after Stage 1 (no Stage 2 regardless of verdict).
+## Step 8 — Stage 2: Dispatch Code-Quality Reviewer
 
-## Step 5 — Stage 2: Dispatch Code-Quality Reviewer
-
-Skip this step entirely when `--stage spec` is set, OR when Stage 1 returned `SPEC-FAIL` (short-circuit applied in Step 4.7).
-
-When Stage 1 was skipped (no-plan fallback or `--stage quality`), Stage 2 absorbs the intent-match rubric — see the *legacy intent-match* note below.
+Skip this step entirely when `--stage spec` is set, OR when Stage 1 returned `SPEC-FAIL` (short-circuit applied in Step 7).
 
 Dispatch a single code-quality reviewer using the **orchestrator** model. Stage 2 owns code quality, conventions, stale scaffolding, and silent-failure detection. Intent / spec compliance lives in Stage 1 and is NOT re-evaluated here — the brief tells the reviewer to skip it.
 
-Brief template:
+**Use Variant A when Stage 1 ran (SPEC-PASS or SPEC-CONCERNS). Use Variant B when Stage 1 was skipped (no-plan fallback or `--stage quality`).**
+
+### Variant A — Stage 2 with Stage 1 (Stage 1 ran with SPEC-PASS or SPEC-CONCERNS)
 
 ```
 Stage 2 / 2 — code-quality review of `<branch>` against base `<base>`.
@@ -203,9 +201,6 @@ scaffolding, silent failures.
 
 **Stage 1 verdict (context — do not re-evaluate):**
 <SPEC-PASS or SPEC-CONCERNS — paste the Stage 1 evidence block verbatim>
-
-(Omit the Stage 1 block when Stage 1 was skipped — no-plan fallback or `--stage quality`.
-In that case, add the *legacy intent-match* item to the rubric below as item #0.)
 
 **Commits:**
 <hash> <subject>
@@ -228,7 +223,7 @@ In that case, add the *legacy intent-match* item to the rubric below as item #0.
 <file:line>: <matched line text>
 ...
 
-(Omit this section entirely when Step 4.5 produced no matches.)
+(Omit this section entirely when Step 6 produced no matches.)
 
 **Diff by file:**
 <file>
@@ -245,7 +240,62 @@ In that case, add the *legacy intent-match* item to the rubric below as item #0.
 4. **Silent failure check** — for every verification claim in the diff (new test, smoke section, assertion, helper-output check), apply the four-question rubric: (a) what does this verify concretely? (b) is the asserted-on shape the same shape the real consumer reads? (c) was the new code path actually exercised? (d) if you deleted the new code, would the assertion still pass? If any answer is *no* or *unclear*, flag the claim as `SILENT-FAIL` with file:line and a one-sentence explanation. Treat `SILENT-FAIL` flags as CONCERNS in the verdict — they don't break the build alone, but the user sees them before merging. Full rubric and patterns in `references/silent-failure-hunter.md`.
 - **Decision violations.** Compare the diff against the `**Hard boundaries:**` block above. Any forbidden pattern present in the diff = FAIL.
 
-**Legacy intent-match (only when Stage 1 was skipped — no-plan fallback or `--stage quality`).** Prepend as rubric item #0: *"Intent match — does the diff deliver what the TODO entries promise? Anything missing, anything scope-creeping?"* When Stage 1 ran, OMIT this item entirely.
+Return verdict as labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
+
+**Final verdict** (on the last line, all caps): QUALITY-PASS | QUALITY-CONCERNS | QUALITY-FAIL
+- QUALITY-PASS — no concerns worth surfacing
+- QUALITY-CONCERNS — works, but surfaces should be flagged before merge
+- QUALITY-FAIL — merge would regress behavior, violate a hard boundary, or break a convention
+```
+
+### Variant B — Stage 2 standalone (Stage 1 was skipped via no-plan fallback or `--stage quality`)
+
+```
+Stage 2 / 2 — code-quality review of `<branch>` against base `<base>`.
+
+Stage 1 (spec compliance) was skipped for this review. Evaluate intent
+match as the first rubric item, then assess quality: conventions, edge
+cases, security smells, performance cliffs, stale scaffolding, silent
+failures.
+
+**Commits:**
+<hash> <subject>
+<hash> <subject>
+...
+
+**Items being resolved:**
+- [B07] Timer badge shows stale duration — "<full intent line from TODO>"
+- [F03] Quick-switch projects — "<full intent line from TODO>"
+
+**Relevant project conventions (from KNOWLEDGE.md):**
+- <bullet 1>
+- <bullet 2>
+
+**Hard boundaries (from DECISIONS.md):**
+<entries from hv-decisions-query, if any — full rule + forbids/permits>
+
+**Possible stale scaffolding (deterministic pre-flight grep):**
+<file:line>: <matched line text>
+<file:line>: <matched line text>
+...
+
+(Omit this section entirely when Step 6 produced no matches.)
+
+**Diff by file:**
+<file>
+```diff
+<diff content>
+```
+...
+
+**Evaluate on the rubric below. For each item, return PASS / CONCERN / FAIL with evidence.**
+
+1. **Intent match** — does the diff deliver what the TODO entries promise? Anything missing, anything scope-creeping?
+2. **Convention compliance** — does the diff respect the bullets from KNOWLEDGE.md? Any regressions on captured gotchas?
+3. **Obvious quality** — dead code, error swallowing, untested new branches, security smells, API contract breaks, performance cliffs. Not a full code review; focus on things the user would regret after merge.
+4. **Stale scaffolding** — for each entry in `**Possible stale scaffolding:**`, judge whether the matched line is a leftover *Task N* / *placeholder* / *not yet wired* / *added later* / *in flight* annotation that should have been removed once the corresponding work landed. Flag as CONCERN with the file:line if it reads like leftover scaffolding; PASS-and-skip if it's legitimate prose (e.g., a markdown placeholder section, a docstring describing user-visible "in flight" semantics, an enum value named `placeholder`, or a `Task <N>` mention in a per-task brief or test name). Many matches will be benign — the helper surfaces candidates, not verdicts.
+5. **Silent failure check** — for every verification claim in the diff (new test, smoke section, assertion, helper-output check), apply the four-question rubric: (a) what does this verify concretely? (b) is the asserted-on shape the same shape the real consumer reads? (c) was the new code path actually exercised? (d) if you deleted the new code, would the assertion still pass? If any answer is *no* or *unclear*, flag the claim as `SILENT-FAIL` with file:line and a one-sentence explanation. Treat `SILENT-FAIL` flags as CONCERNS in the verdict — they don't break the build alone, but the user sees them before merging. Full rubric and patterns in `references/silent-failure-hunter.md`.
+- **Decision violations.** Compare the diff against the `**Hard boundaries:**` block above. Any forbidden pattern present in the diff = FAIL.
 
 Return verdict as labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
 
@@ -255,7 +305,7 @@ Return verdict as labeled sections. Be specific: file:line for every concern. Ra
 - QUALITY-FAIL — merge would regress behavior, violate a hard boundary, or break a convention
 ```
 
-## Step 6 — Combine Verdicts and Relay
+## Step 9 — Combine Verdicts and Relay
 
 Compute the combined verdict from Stage 1's `SPEC-*` and Stage 2's `QUALITY-*` outputs. Worst-of mapping — FAIL beats CONCERNS beats PASS:
 
@@ -338,7 +388,7 @@ Review: `hv/foo` → main (3 commits, 5 files)
 Verdict: PASS
 ```
 
-## Step 7 — Route Based on Verdict
+## Step 10 — Route Based on Verdict
 
 The verdict is the entire product — return it and stop. Never ask a follow-up; the caller (the user, or `/hv-ship` when invoked) owns what happens next.
 
@@ -354,8 +404,8 @@ When invoked from `/hv-ship`, return the verdict; the parent runs consumer routi
 - **Evidence over opinion.** Every concern must cite file:line or commit hash.
 - **Scope is bounded.** Only the diff against the base is reviewed — don't wander into unchanged code.
 - **Call it honestly.** If conventions were violated but the user has a good reason, the reviewer still reports CONCERN — the user decides what to do.
-- **Don't re-run on a passed branch.** If the same scope was just reviewed in the session and came back PASS, skip Steps 4.7 and 5 and report the cached verdict.
-- **Stage gating is asymmetric.** SPEC-FAIL short-circuits Stage 2 (no value in burning a quality pass on an off-target diff). SPEC-CONCERNS does NOT short-circuit — Stage 2 still adds signal (a CONCERN diff might also have quality issues). QUALITY-FAIL doesn't change Stage 1's verdict — they're orthogonal axes combined worst-of in Step 6.
+- **Don't re-run on a passed branch.** If the same scope was just reviewed in the session and came back PASS, skip Steps 7 and 8 and report the cached verdict.
+- **Stage gating: see Step 9 worst-of table.** SPEC-FAIL short-circuits Stage 2; otherwise both stages run and Step 9 combines worst-of.
 
 ## References
 

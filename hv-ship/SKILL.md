@@ -52,7 +52,7 @@ Confirm a feature branch is checked out:
 
 Exit 1 (with the helper's stderr message naming the base branch) means the user is on `main`/`master`/`trunk` (or the configured base) — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Extract commits and items", description="Read branch commits and resolve linked TODO IDs")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (review skipped via config) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -92,13 +92,15 @@ If `commitCount` is 0, tell the user the branch has no commits beyond the base a
 
 Read `ship.review` from `.hv/config.json`. Default `true`.
 
-If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as a fifth checklist item — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
+If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as the silent-failure rubric item (the dedicated SILENT-FAIL check in /hv-review's Stage 2 brief) — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
 
 - **PASS** → continue to Step 4.
 - **CONCERNS** → surface each concern, then branch on `autonomy.level`:
   - **`"off"` or `"auto"`** — ask via `AskUserQuestion` with three options (Address via `/hv-work` Recommended / Ship anyway / Stop). See the reference for the canonical option labels, descriptions, and plain-text fallback.
   - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5). A review FAIL still stops the loop unconditionally as a guard failure.
 - **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
+
+**Capture the choice.** When the verdict is CONCERNS and the user picks via `AskUserQuestion`, remember the answer in this cycle's working state as `REVIEW_CHOICE` (one of `address`, `ship-anyway`, `stop`). Step 3.5 reads `REVIEW_CHOICE` to skip the second-opinion gate when the user already accepted CONCERNS; Step 9 reads it to decide whether to append the "concerns the user proceeded through" line. Loop mode auto-picks `address` per the verdict-routing reference.
 
 If `ship.review` is `false`, skip this step.
 
@@ -112,7 +114,7 @@ Skip the gate when any of these apply (no work to second-opinion):
 
 - Step 3 was skipped (`ship.review: false`) AND the user hasn't explicitly asked for a second opinion this session — the trade-off is the user already opted out of pre-merge review.
 - Step 3 returned **FAIL** — already stopped above.
-- Step 3 returned **CONCERNS** and the user chose "Ship anyway" — they already accepted residual risk; a second adversarial pass would re-litigate the decision.
+- Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — they already accepted residual risk; a second adversarial pass would re-litigate the decision.
 
 Otherwise, run the gate:
 
@@ -136,7 +138,7 @@ The agent returns a markdown report. Parse the last non-empty line for the all-c
 Route the verdict per `references/review-verdict-routing.md` — same contract as Step 3:
 
 - **PASS** → continue to Step 4 silently.
-- **CONCERNS** → surface each concern, then branch on `autonomy.level` exactly as in Step 3. Label the surfaced concerns "Second-opinion concerns" so the user can distinguish them from /hv-review's output.
+- **CONCERNS** → surface each concern with the label "Second-opinion concerns" (per the carrier-label convention in `references/review-verdict-routing.md`), then route per the reference's Consumer routing table.
 - **FAIL** → stop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
 
 The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
@@ -308,7 +310,7 @@ Merged `hv/demo` into main — commit a1b2c3d
 Resolved: [B01] [F03]
 ```
 
-If `/hv-review` surfaced concerns that the user proceeded through, append them one-liner at the end.
+If `REVIEW_CHOICE == ship-anyway`, append the concerns one-liner at the end of the report.
 
 ## Step 9.5 — Release Nudge
 

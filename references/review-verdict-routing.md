@@ -1,6 +1,6 @@
 # Review verdict routing
 
-`/hv-review` emits one of three verdicts on its final line, all caps — `PASS`, `CONCERNS`, or `FAIL`. Callers route on the verdict. Currently duplicated across `hv-review/SKILL.md` Step 7 (producer-side relay for standalone runs) and `hv-ship/SKILL.md` Step 3 (consumer-side routing); this reference is the canonical home. Any future skill that gates on a pre-merge review consumes the same contract.
+`/hv-review` emits one of three verdicts on its final line, all caps — `PASS`, `CONCERNS`, or `FAIL`. Callers route on the verdict. Currently duplicated across `hv-review/SKILL.md` Step 10 (producer-side relay for standalone runs) and `hv-ship/SKILL.md` Step 3 (consumer-side routing); this reference is the canonical home. Any future skill that gates on a pre-merge review consumes the same contract.
 
 ## Verdict semantics
 
@@ -46,6 +46,12 @@ When `/hv-review` is invoked from `/hv-ship`, the parent owns the routing — re
 - **`hv-review/SKILL.md` Step 5 (reviewer brief)** — the exact rubric text the reviewer evaluates against (intent match, convention compliance, etc.) is the producer's prompt-engineering content, not the verdict-routing pattern. Stays inline.
 - **`hv-ship/SKILL.md` Step 3 (ship.review gate)** — the `ship.review` config check, the *"If `ship.review` is `false`, skip"* guard, and the cycle position (between commit-bundling and PR-body composition) are skill-local carriers. Stays inline.
 - **The `AskUserQuestion` call site itself** — the call lives at the consumer's step; only the option text and routing logic extract to this reference.
+
+## Carrier-label override
+
+When a non-canonical caller of this routing (e.g. `/hv-ship` Step 3.5 second-opinion gate, or any future producer that emits the same PASS/CONCERNS/FAIL verdict shape) surfaces concerns, the caller MAY label them with a carrier prefix so the user can distinguish them from the primary `/hv-review` concerns in a session that runs both.
+
+Convention: prefix surfaced concern lines with the producer's name and a dash, e.g. *"Second-opinion concerns:"* before listing the bullets. The routing logic (Consumer routing above) is unchanged — only the prose label differs. Codified for `/hv-ship` Step 3.5 second-opinion gate (F04); future producers follow the same shape.
 
 ## See also
 
