@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Extract a single field (detail/related/milestone/repos/subsystem) from the TODO
+# Extract a single field (title/detail/related/milestone/repos/subsystem) from the TODO
 # bullet of <ID>, using hvlib.parse_todo_fields. Replaces ad-hoc
 # grep|grep|sed|sed chains in skill prose.
 # Resolve helper: exits 1 when ID is unknown or field name is invalid.
 #
 # Usage: hv-todo-field <ID> <field>
-#   <field>: detail | related | milestone | repos | subsystem
+#   <field>: title | detail | related | milestone | repos | subsystem
 #   stdout: field value (may be empty)
 #   exit:   0 on success (even if field empty), 1 on unknown ID or bad field
 set -euo pipefail
@@ -17,8 +17,8 @@ import sys
 from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus
 
 iid, field = sys.argv[1], sys.argv[2]
-if field not in {"detail", "related", "milestone", "repos", "subsystem"}:
-    sys.stderr.write(f"error: {field} is not a valid field; pick one of detail/related/milestone/repos/subsystem\n")
+if field not in {"title", "detail", "related", "milestone", "repos", "subsystem"}:
+    sys.stderr.write(f"error: {field} is not a valid field; pick one of title/detail/related/milestone/repos/subsystem\n")
     sys.exit(1)
 
 corpus = load_backlog_corpus(".")
@@ -27,7 +27,10 @@ if result is None:
     sys.stderr.write(f"error: [{iid}] not found in BACKLOG.md or ARCHIVE.md\n")
     sys.exit(1)
 
-line, _title = result
-fields = parse_todo_fields(line)
-print(fields.get(field, ""))
+line, title = result
+if field == "title":
+    print(title)
+else:
+    fields = parse_todo_fields(line)
+    print(fields.get(field, ""))
 PY
