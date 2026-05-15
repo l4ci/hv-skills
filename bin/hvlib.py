@@ -167,6 +167,11 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
     return (line, title)
 
 
+# Single source of truth for TODO field names recognised by parse_todo_fields
+# and used by remove_id_from_related_field. Add new fields here only.
+_TODO_FIELD_NAMES = ("Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured")
+
+
 def parse_todo_fields(line: str) -> dict[str, str]:
     """Extract Detail/Related/Milestone/Repos/Subsystem/Captured fields from a TODO bullet line.
 
@@ -182,17 +187,9 @@ def parse_todo_fields(line: str) -> dict[str, str]:
         => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture", "captured": "2026-05-09"}
     """
     fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": "", "captured": ""}
-    others = {
-        "detail": ["Related", "Milestone", "Repos", "Subsystem", "Captured"],
-        "related": ["Detail", "Milestone", "Repos", "Subsystem", "Captured"],
-        "milestone": ["Detail", "Related", "Repos", "Subsystem", "Captured"],
-        "repos": ["Detail", "Related", "Milestone", "Subsystem", "Captured"],
-        "subsystem": ["Detail", "Related", "Milestone", "Repos", "Captured"],
-        "captured": ["Detail", "Related", "Milestone", "Repos", "Subsystem"],
-    }
     for key in fields:
         cap = key.capitalize()
-        end_lookahead = "|".join(others[key])
+        end_lookahead = "|".join(n for n in _TODO_FIELD_NAMES if n != cap)
         pat = re.compile(rf"\b{cap}:\s*(.+?)(?=\s+(?:{end_lookahead}):|$)")
         m = pat.search(line)
         if m:
@@ -1020,11 +1017,12 @@ def remove_id_from_related_field(line: str, iid: str) -> str:
     # Remove the ID from the list.
     new_ids = [x for x in ids_in_related if x != iid]
 
+    _related_end = "|".join(n for n in _TODO_FIELD_NAMES if n != "Related")
     if not new_ids:
         # Drop the entire Related: segment.
         # Match " Related: <value>" where <value> ends at the next field or EOL.
         pat = re.compile(
-            r"\s+Related:\s+.+?(?=\s+(?:Detail|Milestone|Repos):|$)",
+            rf"\s+Related:\s+.+?(?=\s+(?:{_related_end}):|$)",
         )
         return pat.sub("", line).rstrip()
     else:
@@ -1032,7 +1030,7 @@ def remove_id_from_related_field(line: str, iid: str) -> str:
         new_val = ", ".join(f"[{x}]" for x in new_ids)
         # Replace the bracketed IDs in the existing Related: value.
         # Strategy: replace the raw bracket-id sequence in the field substring.
-        old_pat = re.compile(r"(Related:\s+)(.+?)(?=\s+(?:Detail|Milestone|Repos):|$)")
+        old_pat = re.compile(rf"(Related:\s+)(.+?)(?=\s+(?:{_related_end}):|$)")
         def repl(m):
             return m.group(1) + new_val
         return old_pat.sub(repl, line)
