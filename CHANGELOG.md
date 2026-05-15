@@ -1,5 +1,32 @@
 # Changelog
 
+## v3.4.0 — 2026-05-15
+
+Skill audit pass — checklist gate keeps version-file drift from sneaking past releases, plus seven skill descriptions get explicit triggers and the macOS smoke flake is fixed.
+
+## New
+
+- **Per-project release checklist gate at Step 1.5** of `/hv-release` (`fe15afc`). Walks `.hv/RELEASE.md` (override via `release.checklistPath`) — each `- [ ]` line is a gate the skill asks about before bumping the version. Items ending in `(manual)` always interject even under `autonomy.level: auto`/`loop`. Designed to catch drift like the `marketplace.json` version gap surfaced by the audit — by adding an item, not by patching the skill.
+
+## Fixed
+
+- Stale `/hv-resume` reference in `hv-pause/SKILL.md` (folded into `/hv-next` back in v2.1.0 / F26), `marketplace.json` versions stuck at `2.0.0` while `plugin.json` was `3.3.0`, and five skill descriptions (`hv-learn`, `hv-capture`, `hv-qa`, `hv-rm`, `hv-undo`) that lacked explicit "Use when..." trigger phrasing for the Skills router (`22940d3`).
+- Two pre-existing smoke flakes (`98e6b2c`): macOS `$TMP` from `mktemp -d` returning `/var/folders/...` while helpers using `pwd -P` returned `/private/var/folders/...` (broke section 15 walk-up); and section 21's `set -e + pipefail` silently killing the runner when a grep matched nothing instead of reaching the `|| fail` diagnostic. The second fix surfaced unrelated `[F32]` drift — `bin/hv-auto-decisions-since` exists but no skill invokes it; tracked separately.
+
+## Changed
+
+- `CLAUDE.md` template grew an `hv-qa` managed block from the rollout in `v3.3.0` (`bed82d8`).
+
+## Documentation
+
+- `docs/usage/configuration.md` gained a `release.checklistPath` section, `docs/usage/review-and-ship.md` gained a "Release checklist" section, and `docs/reference/slash-commands.md`'s `/hv-release` description picked up the gate (`e9e6131`).
+
+## Stats
+
+5 commits, 14 files changed, +125 −19 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v3.3.0...v3.4.0
+
 ## v3.3.0 — 2026-05-15
 
 **hv-qa: product-level QA gate, plus user-guide catch-up on F02–F08.**
