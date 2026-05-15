@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.3.0 — 2026-05-15
+
+**hv-qa: product-level QA gate, plus user-guide catch-up on F02–F08.**
+
+## New
+
+- add /hv-qa skill for product-level testing (qa) (`5a250db`)
+
+## Fixed
+
+- hvlib resolve_plugin_root validates CLAUDE_PLUGIN_ROOT name [B05] (bin) (`b521f7e`)
+- cross-platform mtime in 01_status.sh (test) (`7125c52`)
+- hv-todo-field accepts 'title' field [B04] (bin) (`d1c0572`)
+
+## Changed
+
+- humanizer pass — strip AI-flavored tells from fresh sections (docs) (`06d2eab`)
+- route hv-status-remove through hv-resolve-handoff, refresh references README (`c4263ef`)
+- consolidate boilerplate citations, document missing helpers, add hv-map banner (`13fd598`)
+- single source of truth for TODO field names in hvlib (`bd89910`)
+
+## Documentation
+
+- sync user guide with /hv-qa rollout + F02/F03/F04/F07/F08 (`a90896c`)
+
+## Stats
+
+9 commits, 48 files changed, +849 −109 lines
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v3.2.0...v3.3.0
+
 ## v3.2.0 — 2026-05-15
 
 **v3.2.0 — Knowledge promotion lifecycle, two-stage review, debug Iron Law**
