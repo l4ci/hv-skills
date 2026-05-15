@@ -42,7 +42,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 Phases:
 
 1. *Snapshot context* — current hypothesis, next planned step, mid-edit files captured (Step 2)
-2. *Compose handoff* — narrative drafted for `/hv-resume` to pick up cleanly (Step 3)
+2. *Compose handoff* — narrative drafted for `/hv-next` to surface on resume (Step 3)
 3. *Write to .hv/handoff/* — file persisted under the active branch's name (Step 4)
 4. *Report* — compact handoff summary printed (Step 5)
 

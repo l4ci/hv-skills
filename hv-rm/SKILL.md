@@ -1,6 +1,6 @@
 ---
 name: hv-rm
-description: Remove a captured backlog item and clean up its dependencies — strips the TODO entry, removes Related cross-references, deletes the detail file (.hv/{bugs,features,tasks}/<ID>.md), removes any plan keyed to it (.hv/plans/<milestone>-<ID>.md), and refuses if the item is active in status.json. Defaults to a dry-run preview; the slash command always asks before applying. Inverse of /hv-capture.
+description: Remove a captured backlog item and clean up its dependencies. Use on "/hv-rm <ID>", "drop this item", "delete [B07]", "remove that backlog entry", or when an item is duplicate, obsolete, or out of scope. Strips the TODO entry, removes Related cross-references, deletes the detail file (.hv/{bugs,features,tasks}/<ID>.md), removes any plan keyed to it (.hv/plans/<milestone>-<ID>.md), and refuses if the item is active in status.json. Defaults to a dry-run preview; the slash command always asks before applying. Inverse of /hv-capture.
 user-invocable: true
 ---
 
