@@ -126,3 +126,10 @@ new_content = replace_section(content, topic, new_body)
 write_text_atomic(".hv/KNOWLEDGE.md", new_content)
 print(f"wrote: {topic} (title added)", file=sys.stderr)
 PY
+
+# F03 — initialize the sidecar tier entry for the new bullet.
+# Idempotent: if the entry already exists, the helper silent no-ops.
+# Fault-tolerant: if hv-knowledge-tier is missing (older install), we
+# still report success — the bullet landed. F03-aware projects pick up
+# the entry on the next hv-knowledge-migrate run.
+"$HERE/hv-knowledge-tier" --init --topic "$TOPIC" --title "$TITLE" 2>/dev/null || true
