@@ -38,7 +38,7 @@ Also parse `AUTO_LOOP`: scan `$ARGUMENTS` (the skill `args` value) for the liter
 - **`LEVEL != "loop"` (off/auto) AND `AUTO_LOOP=true`** — reject with *"Error: `--auto-loop` is loop-mode only; remove the flag or set `autonomy.level=loop` via `/hv-config`."* and exit 1.
 - **`LEVEL != "loop"` AND `AUTO_LOOP=false`** — normal interactive flow (today's path); proceed to Step 2.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below. Mark each `in_progress` when starting and `completed` when its observable outcome lands.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

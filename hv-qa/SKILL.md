@@ -85,7 +85,7 @@ Run when `.hv/qa/` is empty for the active scope (umbrella: per-repo; single-rep
 
 Tier S — banner already printed above.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below. Mark each `in_progress` when starting, `completed` when its observable outcome lands.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

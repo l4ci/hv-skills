@@ -51,7 +51,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 The `hv-guard-clean` call moved from this step into Step 1.5's branches — fanout sub-agents run their own guard-cleans against their target trees, so the umbrella-level guard isn't needed (and would falsely fail when the umbrella is not a git repo).
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Explore", description="Scan codebase for friction signals via fanout sub-agents")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no friction found, user aborts at confirm) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

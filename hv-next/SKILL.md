@@ -25,7 +25,7 @@ Review the project backlog, suggest what to tackle next, and execute it.
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Reconcile", description="Cross-check status.json against git state")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (empty backlog, no completions to archive) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -213,10 +213,7 @@ If Step 6 found nothing to suggest (empty backlog, no active milestone items), d
 
 On this empty-backlog branch (terminal path), surface any `[Auto:Loop]` decisions logged during the just-ended loop so the user can articulate `Forbids/Permits` and remove the `<!-- [Auto:Loop] -->` footers in `DECISIONS.md`. Per the F19 terminal-path-only convention, surfacing fires *only* here and from `/hv-work` guard-fail / `/hv-pause` — not from any loop-internal step:
 
-```bash
-.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the "OK — run /hv-next again" line when nonempty
-.hv/bin/hv-loop-stamp clear       # clear the session marker once the user has seen the surface
-```
+Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the "OK — run /hv-next again" line.
 
 **Off and auto modes.** Use the `AskUserQuestion` tool so the user picks with the host's native UI. Build a single question:
 

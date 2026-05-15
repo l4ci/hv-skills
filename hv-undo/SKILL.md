@@ -25,7 +25,7 @@ The inverse of `/hv-work`'s commit + completion steps: reset the most recent `me
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect cycle", description="Identify the most recent merge: commit on base branch via dry-run")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (user cancels at confirm, helper errors in Step 2) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

@@ -26,6 +26,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-status-repo-for` | Print the repo name for the active stream matching a branch (umbrella mode); empty when not found; always exits 0 | `.hv/bin/hv-status-repo-for hv/foo` |
 | `hv-loop-stamp` | Read/write the `loopStartedAt` ISO timestamp in `status.json`; subcommands: `start` (first-write-only), `clear`, `read` | `.hv/bin/hv-loop-stamp start` |
 | `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON (entries flag `noBase: true` for the umbrella cwd when umbrella has no base branch) | `.hv/bin/hv-reconcile` |
+| `hv-debug-counter` | Manage the persistent fix-attempt counter for `/hv-debug` Iron Law; subcommands: `init`, `record-attempt`, `fail`, `pass`, `show`, `summary`, `clear`, `inc-cycle` | `.hv/bin/hv-debug-counter show` |
 | `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open | `.hv/bin/hv-todo-drift` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 | `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
@@ -33,6 +34,10 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-merge` | Insert a `**Title** — body` bullet under `## <topic>` in `.hv/KNOWLEDGE.md`; atomic dedup by (topic, title) | `printf '%s' "$BODY" \| .hv/bin/hv-knowledge-merge --topic Testing --title "Mock TLS handshake"` |
 | `hv-knowledge-amend` | Append text after the trailing `<!-- date -->` comment of a bullet matched by (topic, fragment) | `.hv/bin/hv-knowledge-amend --topic Testing --fragment "TLS handshake" --append "Upstream: hv-skills#42"` |
 | `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
+| `hv-knowledge-tier` | F03 per-bullet `{tier, hits, lastSeen}` state manager in `.hv/knowledge-tier.json`; subcommands: `--get`, `--set`, `--init`, `--inc`, `--list` | `.hv/bin/hv-knowledge-tier --list --tier provisional` |
+| `hv-knowledge-hit` | Register a hit on a queried KNOWLEDGE bullet; auto-promotes `provisional → confirmed` when hits reach threshold (default 3); skips promotion if a contradiction is pending | `.hv/bin/hv-knowledge-hit --topic Testing --title "Mock TLS handshake"` |
+| `hv-knowledge-migrate` | One-shot migration: stamp every existing titled KNOWLEDGE bullet as `provisional` in the F03 sidecar; idempotent no-op on re-run | `.hv/bin/hv-knowledge-migrate` |
+| `hv-knowledge-contradiction` | Manage the pending-contradictions queue at `.hv/knowledge-contradictions.json`; gates auto-promotion when a correction overlaps a queried bullet | `.hv/bin/hv-knowledge-contradiction --list` |
 | `hv-config-set` | Set a single value in `.hv/config.json` at a dotted key path; preserves other keys, writes atomically (resolve; JSON-parse value, fallback to string) | `.hv/bin/hv-config-set docs.afterWork true` |
 | `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
@@ -77,6 +82,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
 | `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope [--repo <name>] hv/foo` |
 | `hv-review-scaffolding` | Surface stale per-task scaffolding text in the branch diff (Task N, placeholder, in flight, added later, not yet wired); empty stdout = no matches | `.hv/bin/hv-review-scaffolding [--repo <name>] [<base> [<branch>]]` |
+| `hv-second-opinion-brief` | Build an adversarial fresh-eyes brief (goal + commits + diff) for a branch, formatted for a no-prior-context subagent to find blind spots | `.hv/bin/hv-second-opinion-brief hv/foo` |
 | `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
 | `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
 | `hv-version-check` | Compare `.hv/config.json#hvSkills.version` with the currently-installed plugin version; nudge or JSON | `.hv/bin/hv-version-check` |
@@ -108,6 +114,8 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-release-update-changelog` | Prepend a release section to CHANGELOG.md, creating it if absent (idempotent) | `.hv/bin/hv-release-update-changelog 1.2.0 notes.md` |
 | `hv-release-detect-host` | Detect remote hosting kind (github / gitlab / -enterprise / -self-hosted / none) | `.hv/bin/hv-release-detect-host` |
 | `hv-release-pending` | Emit JSON `{lastTag, commits, days, thresholdCommits, thresholdDays, shouldNudge, reason}` for "is it time to /hv-release?" gating | `.hv/bin/hv-release-pending` |
+| `hv-qa-index` | Regenerate the managed `<!-- hv-qa-start -->` block in `CLAUDE.md` from `summary:` frontmatter of every `.hv/qa/<target>.md` | `.hv/bin/hv-qa-index` |
+| `hv-qa-query` | Print the body (minus frontmatter) of named QA target files from `.hv/qa/`; missing targets are silent; always exits 0 | `.hv/bin/hv-qa-query hv-skills` |
 
 ## ID and counter helpers
 

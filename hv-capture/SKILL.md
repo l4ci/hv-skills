@@ -25,7 +25,7 @@ Quick-capture bugs, features, and tasks into `.hv/BACKLOG.md` with just enough c
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Classify", description="Assign type/priority/size to each candidate")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (single item, no dedupe matches) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

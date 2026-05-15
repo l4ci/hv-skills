@@ -4,6 +4,15 @@ description: Maintain the project map of subsystems under .hv/map/. Modes — fi
 user-invocable: true
 ---
 
+**Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
+
+```
+════════════════════════════════════════════════════════════════════════
+  🗺️  hv-map  ·  project map of subsystems
+  triggers: "/hv-map", "consolidate the map", "clean up subsystems"  ·  pairs: hv-work, hv-docs
+════════════════════════════════════════════════════════════════════════
+```
+
 # /hv-map — project map orchestrator
 
 Subsystems are AI-curated narratives describing one coherent area of the project. The system has three layers (see spec `docs/superpowers/specs/2026-05-09-context-scaling-map-design.md`):

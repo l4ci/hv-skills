@@ -92,7 +92,7 @@ Plain-text fallback: ask once textually — *"Found N git repos here: `<list>`. 
 >
 > **Permits.** Independent sub-repos checked out side-by-side under the umbrella; registry via `.hv/repos.json` by absolute or relative path; each sub-repo evolving on its own branch/tag/release schedule; sub-repos that are themselves submodule-using internally — the boundary applies *between umbrella and direct children*, not inside any sub-repo.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Detect environment and umbrella", description="Verify git/python3, scan for sub-repos")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no umbrella, config already up-to-date) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

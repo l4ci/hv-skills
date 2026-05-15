@@ -60,7 +60,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Non-zero = stop.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Reproduce", description="Reliably trigger the failure")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no smoke regressions) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -269,10 +269,7 @@ Do NOT call `hv-status-remove` here — the branch and status entry stay so the 
 
 This is a terminal path. Surface any `[Auto:Loop]` decisions before halting:
 
-```bash
-.hv/bin/hv-auto-decisions-since
-.hv/bin/hv-loop-stamp clear
-```
+Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty).
 
 Loop mode (`autonomy.level == "loop"`): the Iron Law breaks the loop. Do not auto-dispatch `/hv-next` or any continuation skill. The loop stops here; the user re-engages by hand.
 

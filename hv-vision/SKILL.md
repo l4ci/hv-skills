@@ -29,7 +29,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Determine the mode silently via `.hv/bin/hv-vision-list`: empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Discovery", description="Socratic exploration of vision and stakes")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (Edit mode trimming a single milestone, web research disabled) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

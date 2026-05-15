@@ -37,7 +37,7 @@ user-invocable: true
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Snapshot context", description="Capture hypothesis, next step, mid-edit files, uncommitted strategy")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (no active stream, nothing in flight) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -121,12 +121,7 @@ Idempotent — `--if-absent` skips the write if the entry already exists, preser
 
 `/hv-pause` is a terminal path — the user is about to leave the session. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-work` guard-fail), surface any `[Auto:Loop]` decisions logged during this loop session so the user can articulate `Forbids/Permits` and remove the `<!-- [Auto:Loop] -->` footers in `DECISIONS.md` before the session ends:
 
-```bash
-.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the Step 6 confirm block when nonempty
-.hv/bin/hv-loop-stamp clear       # clear the session marker so the next /hv-next loop entry stamps a fresh start
-```
-
-If `hv-auto-decisions-since` produces no output, skip silently — there's nothing to surface.
+Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the Step 6 confirm block.
 
 ## Step 6 — Confirm
 

@@ -79,14 +79,9 @@ Don't narrate the sweep unless it happened; silent pass-through is the common ca
 
 **On any Step 1 guard failure that stops `/hv-work` (exit 2 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
 
-```bash
-.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches; print verbatim above the guard message when nonempty
-.hv/bin/hv-loop-stamp clear       # clear the session marker — the loop is broken and the next /hv-next entry will stamp a fresh start
-```
+Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the guard message.
 
-If `hv-auto-decisions-since` produces no output, skip silently.
-
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Preflight and guard", description="Run hv-preflight and hv-guard-clean; sweep tool siblings if dirty")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (e.g. no `[Auto:Loop]` decisions to surface) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

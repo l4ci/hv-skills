@@ -38,7 +38,7 @@ Determine the mode silently:
 
 In Finish mode, list existing open spikes via `.hv/bin/hv-spike-list` and ask which one if not specified.
 
-**Initialize task list.** When `TaskCreate` is loaded (load via `ToolSearch select:TaskCreate,TaskUpdate` if not), create one task per phase below — e.g. `TaskCreate(subject="Question", description="Sharpen the spike's yes/no question")`. Mark each `in_progress` when starting and `completed` when its observable outcome lands; short-circuited phases (Finish mode skips Question/Branch, Start mode skips Findings/Decision/Promote) get `completed` with the no-op reason in the description.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
