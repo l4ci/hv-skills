@@ -110,7 +110,7 @@ See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses
 
 ## bugs/, features/, tasks/ — overflow detail files
 
-When a bug report, feature spec, or task description is too long to fit inline in `BACKLOG.md`, the overflow content goes into a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `BACKLOG.md` entry links to it. This keeps `BACKLOG.md` scannable while preserving full detail where it matters.
+When a bug report, feature spec, or task description is too long to fit inline in `BACKLOG.md`, the overflow content goes into a separate file in the matching subdirectory (e.g. `bugs/B03.md`). The `BACKLOG.md` entry links to it. This keeps `BACKLOG.md` scannable while preserving full detail.
 
 Create these files by hand, or let `/hv-capture` handle it when you supply a long description.
 

@@ -8,7 +8,7 @@
 
 ### Stage 1 — spec compliance
 
-Stage 1 answers exactly one question: *"does the diff fulfill the outcomes promised by the plan?"* The reviewer reads only the diff plus the resolved `.hv/plans/<key>.md` content for each referenced item — no `KNOWLEDGE.md`, no `DECISIONS.md`, no convention checks. Tighter brief, smaller budget, faster verdict.
+Stage 1 answers exactly one question: *"does the diff fulfill the outcomes promised by the plan?"* The reviewer reads only the diff plus the resolved `.hv/plans/<key>.md` content for each referenced item — no `KNOWLEDGE.md`, no `DECISIONS.md`, no convention checks. Tighter brief, faster verdict.
 
 Stage 1 verdict prefixes:
 
@@ -45,7 +45,7 @@ The final line of the report is the combined verdict — `PASS` / `CONCERNS` / `
 
 ### Stage opt-out
 
-Power users can run only one stage:
+To run only one stage:
 
 ```
 /hv-review --stage spec      # only Stage 1
@@ -73,13 +73,13 @@ The review gate behaves as follows:
 
 ### Second-opinion gate (opt-in)
 
-When `ship.secondOpinion: true` and `/hv-review` returned `PASS`, `/hv-ship` dispatches a fresh subagent with **no prior conversation context** and gives it only the diff plus the stated goal. `/hv-review` shares the project's context (conventions, `KNOWLEDGE.md`, plan) with the work it produced — a reviewer with that context naturalizes blind spots. A reviewer without it must reason from the diff alone, catching what the contextualized reviewer normalized.
+When `ship.secondOpinion: true` and `/hv-review` returned `PASS`, `/hv-ship` dispatches a fresh subagent with **no prior conversation context** and gives it only the diff plus the stated goal. `/hv-review` shares the project's context (conventions, `KNOWLEDGE.md`, plan) with the work it produced — a reviewer with that context normalizes blind spots. A reviewer without it must reason from the diff alone, catching what the contextualized reviewer let pass.
 
-Returns `PASS` / `CONCERNS` / `FAIL` and routes through the same verdict logic as `/hv-review`. Skipped if the user already accepted CONCERNS in Step 3 (no value in re-litigating). Opt-in because it adds one fresh-context roundtrip per ship and most cycles don't need it. Enable when shipping load-bearing surfaces (release tooling, security paths, data migrations). See [`ship.secondOpinion`](configuration.md#shipsecondopinion).
+Returns `PASS` / `CONCERNS` / `FAIL` and routes through the same verdict logic as `/hv-review`. Skipped if the user already accepted CONCERNS in Step 3 (no value in re-litigating). Opt-in because it adds one fresh-context roundtrip per ship and most cycles don't need it. Enable when shipping release tooling, security paths, or data migrations. See [`ship.secondOpinion`](configuration.md#shipsecondopinion).
 
 ### QA gate (opt-in)
 
-When `ship.qa: true`, `/hv-ship` invokes [`/hv-qa run`](qa.md) between review and the merge step. `/hv-review` and the second-opinion gate answer *"does the diff make sense"*; `/hv-qa` answers the orthogonal question — *"does the product actually work"* — by executing the per-target strategy in `.hv/qa/<target>.md` (Playwright, smoke, lighthouse, axe, ZAP, contract tests).
+When `ship.qa: true`, `/hv-ship` invokes [`/hv-qa run`](qa.md) between review and the merge step. `/hv-review` and the second-opinion gate answer *"does the diff make sense"*; `/hv-qa` answers *"does the product actually work"* by executing the per-target strategy in `.hv/qa/<target>.md` (Playwright, smoke, lighthouse, axe, ZAP, contract tests).
 
 Verdict routes per `qa.gate`:
 

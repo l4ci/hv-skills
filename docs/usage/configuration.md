@@ -157,7 +157,7 @@ Controls whether `/hv-ship` runs a second adversarial review with a fresh subage
 
 The gate is opt-in because it adds one Sonnet roundtrip per ship and most cycles don't need it. Enable when you ship work that touches load-bearing surfaces (release tooling, security paths, data migrations) and want a second pair of eyes that genuinely don't know what they're "supposed to" see.
 
-Same-model-fresh-context is the cheap MVP; cross-model second-opinions (Codex/Gemini/etc.) are the gold standard but not currently wired.
+Same-model-fresh-context is the cheap MVP; cross-model second-opinions (Codex/Gemini/etc.) would be stronger but aren't currently wired.
 
 See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 

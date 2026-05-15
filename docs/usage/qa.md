@@ -1,8 +1,8 @@
 # Product QA
 
-`/hv-qa` answers a question `/hv-review` cannot: *"does the product actually work?"* Where `/hv-review` reads commits and the diff, `/hv-qa` executes runners against the built artifact — Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares.
+`/hv-qa` answers a question `/hv-review` cannot: *"does the product actually work?"* `/hv-review` reads commits and the diff; `/hv-qa` executes runners against the built artifact — Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares.
 
-The two skills are deliberately separate. They never call each other. `/hv-ship` may invoke both, each behind its own opt-in config flag.
+The two skills are separate and never call each other. `/hv-ship` may invoke both, each behind its own opt-in config flag.
 
 ## Per-target strategy files
 
@@ -38,7 +38,7 @@ Strategies are written once via `/hv-qa first-run`, which probes the repo for te
 | `CONCERNS` | Findings worth surfacing but not blocking; usability or non-critical regressions |
 | `FAIL` | One or more executable checks failed against their pass criteria |
 
-A fourth shape, `INFRA-FAIL`, surfaces when required infra is missing (dev server down, binary not installed, creds absent). QA can't run; treat it as advisory rather than as a quality signal.
+A fourth shape, `INFRA-FAIL`, surfaces when required infra is missing (dev server down, binary not installed, creds absent). QA can't run; treat it as advisory, not as a quality signal.
 
 ## Invocation
 
