@@ -711,10 +711,15 @@ def resolve_plugin_root() -> tuple[str, str]:
     if override and os.path.isdir(override):
         return (override, "override")
 
-    # 2. CLAUDE_PLUGIN_ROOT.
+    # 2. CLAUDE_PLUGIN_ROOT — only when the manifest's `name` is hv-skills.
+    #    Claude Code points CLAUDE_PLUGIN_ROOT at whatever plugin owns the
+    #    current invocation; a session driven by another plugin (e.g.
+    #    context-mode) must not be mistaken for an hv-skills install root.
     cpr = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    if cpr and os.path.isfile(os.path.join(cpr, ".claude-plugin", "plugin.json")):
-        return (cpr, "plugin")
+    if cpr:
+        mf = os.path.join(cpr, ".claude-plugin", "plugin.json")
+        if os.path.isfile(mf) and load_json(mf, {}).get("name") == "hv-skills":
+            return (cpr, "plugin")
 
     home = os.path.expanduser("~")
 
