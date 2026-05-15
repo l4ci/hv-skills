@@ -66,3 +66,11 @@ Domain terminology lives in `.hv/CONTEXT.md`. Use these canonical names; if a te
 
 - _(no terms yet — run `/hv-context` to capture domain terminology)_
 <!-- hv-context-end -->
+
+<!-- hv-qa-start -->
+## Project QA
+
+QA strategies live in `.hv/QA.md` (detail in `.hv/qa/<target>.md`). Pull with `.hv/bin/hv-qa-query <target>`. `/hv-qa run` consumes these; the skill never hardcodes runners.
+
+- _(no QA strategy yet — run `/hv-qa first-run` to scaffold)_
+<!-- hv-qa-end -->
