@@ -132,9 +132,12 @@ grep -q '"branch": "hv/test-branch"' .hv/status.json && fail "status-remove did 
 pass "status-remove cleared entry"
 
 echo "hv-status-remove no-op when branch absent"
-MTIME_BEFORE=$(stat -c %Y .hv/status.json)
+# Cross-platform mtime read — `stat -c %Y` is GNU-only (Linux); macOS BSD stat
+# uses `-f %m`. Python is hermetic across both and already a smoke-suite hard
+# dep (helpers require python3 — see hv-bootstrap).
+MTIME_BEFORE=$(python3 -c "import os; print(int(os.path.getmtime('.hv/status.json')))")
 "$BIN/hv-status-remove" hv/no-such-branch
-MTIME_AFTER=$(stat -c %Y .hv/status.json)
+MTIME_AFTER=$(python3 -c "import os; print(int(os.path.getmtime('.hv/status.json')))")
 [ "$MTIME_BEFORE" = "$MTIME_AFTER" ] || fail "status-remove rewrote status.json for absent branch"
 pass "status-remove skipped rewrite for absent branch"
 
