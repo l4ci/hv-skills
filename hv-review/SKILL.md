@@ -32,6 +32,7 @@ Read `.hv/config.json`:
 - Code is still in flight → finish implementing via `/hv-work`
 - You want to change code based on the review → `/hv-refactor` or a fresh `/hv-work` run
 - Nothing committed yet → there's nothing to review
+- You want product-level evidence (does it actually work? perf budgets met? a11y clean? smoke tests green?) → `/hv-qa run`. `/hv-review` reasons from commits and diff; it does not run the product.
 
 ## Step 1 — Preflight
 

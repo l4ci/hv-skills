@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Print the body (minus frontmatter) of named QA target files in .hv/qa/.
+# Usage: hv-qa-query <target>...
+#   stdout: matching bodies, separated by blank line, in argument order
+#   exit:   0 always (missing targets are silent)
+set -euo pipefail
+[ $# -ge 1 ] || { echo "usage: hv-qa-query <target>..." >&2; exit 1; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import parse_frontmatter
+
+first = True
+for name in sys.argv[1:]:
+    path = Path(".hv/qa") / f"{name}.md"
+    if not path.exists():
+        continue
+    _, body = parse_frontmatter(path.read_text())
+    body = body.rstrip("\n")
+    if not body:
+        continue
+    if not first:
+        print()
+    print(body)
+    first = False
+PY

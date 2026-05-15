@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Regenerate the managed <!-- hv-qa-start --> block in CLAUDE.md from
+# the frontmatter `summary:` of every .hv/qa/<target>.md.
+# Atomic-merge helper: exit 0.
+# Usage: hv-qa-index
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from pathlib import Path
+from hvlib import parse_frontmatter
+
+heading = "## Project QA"
+intro = (
+    "QA strategies live in `.hv/QA.md` (detail in `.hv/qa/<target>.md`). "
+    "Pull with `.hv/bin/hv-qa-query <target>`. "
+    "`/hv-qa run` consumes these; the skill never hardcodes runners."
+)
+
+qa_dir = Path(".hv/qa")
+entries = []
+if qa_dir.is_dir():
+    for path in sorted(qa_dir.glob("*.md")):
+        name = path.stem
+        fm, _body = parse_frontmatter(path.read_text())
+        entries.append((name, fm))
+
+if entries:
+    bullets = "\n".join(
+        f"- **{name}** ({fm.get('surface', '?').strip() or '?'}) — "
+        f"{fm.get('summary', '').strip() or '(no summary)'}"
+        for name, fm in entries
+    )
+else:
+    bullets = "- _(no QA strategy yet — run `/hv-qa first-run` to scaffold)_"
+
+print(f"{heading}\n\n{intro}\n\n{bullets}\n")
+PY
+)
+printf '%s' "$BODY" | "$HERE/hv-managed-block" qa --body-stdin
