@@ -151,5 +151,6 @@ A few keys are written without ever being asked:
 - `hvSkills.version` — stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not exposed in `/hv-config`.
 - `refactor.verifyCommands` — array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv-config-set refactor.verifyCommands '[...]'`.
 - `ship.secondOpinion` — opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv-config-set ship.secondOpinion true` or via `/hv-config` (Quality gates category, call 1).
+- `learn.promoteThreshold` — F03 knowledge-lifecycle auto-promotion threshold. Integer ≥ 0; silent default `3`. Set via `hv-config-set learn.promoteThreshold <N>` when a project wants stricter or looser confidence gating. See [`usage/configuration.md`](../usage/configuration.md#learnpromotethreshold).
 
 For the full per-key behavior (defaults, value semantics, and how each setting affects skill execution), see [`usage/configuration.md`](../usage/configuration.md).

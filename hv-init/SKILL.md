@@ -191,6 +191,7 @@ EXPECTED = [
     ("refactor", "confirmBeforeExecute"),
     ("refactor", "verifyCommands"),
     ("learn", "verify"),
+    ("learn", "promoteThreshold"),
     ("ship", "review"),
     ("ship", "secondOpinion"),
     ("autonomy", "level"),
@@ -267,7 +268,7 @@ cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
-  "learn":    {"verify": <Q4-learn>},
+  "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
   "ship":     {"review": <Q4-ship>, "secondOpinion": False},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
@@ -297,6 +298,12 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Users enable via /hv-config when they want a no-prior-context adversarial
 # review in addition to /hv-review.
 .hv/bin/hv-config-set ship.secondOpinion false
+
+# learn.promoteThreshold — silent default. No question; integer knob
+# (default 3) gating F03 knowledge-lifecycle auto-promotion. Users adjust
+# via /hv-config or hv-config-set when they want stricter (5+) or looser
+# (1-2) confidence thresholds.
+.hv/bin/hv-config-set learn.promoteThreshold 3
 
 # docs.afterWork — silent default. No question; the toggle UX lives in
 # /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
@@ -375,7 +382,7 @@ If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line
 
 The helper handles network access (via `gh`) and install-type resolution. Treat a non-zero exit or empty JSON as `unknown`. `hvSkills.version` in `.hv/config.json` carries the same `currentVersion` value — re-stamped this run.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.verify`, `ship.{review,secondOpinion}`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.{verify,promoteThreshold}`, `ship.{review,secondOpinion}`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
 
 ## References
 

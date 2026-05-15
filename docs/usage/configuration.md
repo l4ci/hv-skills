@@ -118,6 +118,23 @@ A weak bullet consulted by 20 future `/hv-work` runs is worse than one extra Opu
 
 See [learning](learning.md) for the full `/hv-learn` workflow.
 
+## learn.promoteThreshold
+
+Controls the F03 knowledge promotion lifecycle: how many `hv-knowledge-hit` events a `provisional` bullet must accumulate before auto-promotion to `confirmed`. Integer ≥ 0; default `3`.
+
+A "hit" registers when `/hv-work` or `/hv-review` consumes the bullet during a cycle's K+D consult (the bullet shows up in a worker brief's `Known gotchas:` section) AND the user doesn't push back with a correction that overlaps the bullet's body. The threshold is the cycle count after which the project decides the bullet has earned `confirmed` status — `hv-knowledge-query` drops the `(provisional)` suffix and the bullet flows into consumers indistinguishable from established knowledge.
+
+| Value | Behavior |
+|-------|----------|
+| `3` (default) | Auto-promote at the third clean hit. Catches durable bullets after a small handful of validated consults. |
+| `≥4` | Stricter — bullets earn `confirmed` only after more validation. Use when you've seen weak bullets sneak through to `confirmed` too quickly. |
+| `1` or `2` | Looser — almost every new bullet auto-promotes on first or second consult. Use when manual `/hv-learn --promote` flow feels heavy. |
+| `0` | Auto-promote on `hv-knowledge-merge` itself — effectively disables the `provisional` tier. Defeats the lifecycle's purpose; included for completeness only. |
+
+Pending contradictions block auto-promotion regardless of hit count. The user must resolve them via `/hv-learn` Step 9 (Demote / Keep / Defer) before the bullet can flow forward.
+
+See [learning](learning.md) for the full `/hv-learn` workflow.
+
 ## ship.review
 
 Controls whether `/hv-ship` runs a review pass before integrating.

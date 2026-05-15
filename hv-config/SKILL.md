@@ -68,6 +68,7 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 - `models.orchestrator`, `models.worker`
 - `work.isolation`, `work.mergeStrategy`
 - `ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`
+- `learn.promoteThreshold`
 - `autonomy.level`
 - `docs.path`, `docs.autoCreate`, `docs.afterWork`
 - `git.baseBranch`
@@ -81,6 +82,7 @@ Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `
 - Enum keys (`work.isolation`, `work.mergeStrategy`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options.
 - Boolean keys (`ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
 - Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`) — accept any value including the empty string.
+- Integer keys (`learn.promoteThreshold`) — accept any non-negative integer (≥0) as a string of digits. Anything else (negative, non-numeric, decimal) is invalid.
 
 Invalid value → stop with: *"Error: `<value>` is not a valid value for `<key>`. Allowed: <comma-separated list from config-options.md>."*
 
