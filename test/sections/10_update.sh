@@ -45,6 +45,20 @@ EOF2
   echo "$OUT" | grep -q '"currentVersion": "2.0.0"' || fail "cache-layout: currentVersion != 2.0.0: $OUT"
   echo "$OUT" | grep -q '/2.0.0' || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
   pass "hv-update-check resolves Claude Code plugin cache and picks newest version"
+
+  # [B05] CLAUDE_PLUGIN_ROOT pointing at a non-hv-skills plugin must NOT be
+  # honored — Claude Code sets it to whatever plugin is the active context, so
+  # a cross-plugin invocation would otherwise resolve to the wrong install.
+  # Resolver must validate plugin.json's `name` and fall through on mismatch.
+  mkdir -p "$XX_TMP/wrong-plugin/.claude-plugin"
+  cat > "$XX_TMP/wrong-plugin/.claude-plugin/plugin.json" <<'EOF2'
+{"name":"context-mode","version":"1.0.89"}
+EOF2
+  OUT=$(CLAUDE_PLUGIN_ROOT="$XX_TMP/wrong-plugin" HOME="$XX_TMP/fake-home" \
+        HV_LATEST_VERSION=2.0.0 .hv/bin/hv-update-check)
+  echo "$OUT" | grep -q '"currentVersion": "2.0.0"' || fail "cache-layout: wrong CLAUDE_PLUGIN_ROOT leaked through: $OUT"
+  echo "$OUT" | grep -q 'context-mode' && fail "cache-layout: installRoot points at non-hv-skills plugin: $OUT"
+  pass "hv-update-check ignores CLAUDE_PLUGIN_ROOT when its plugin.json name != hv-skills"
 )
 rm -rf "$XX_TMP"
 
