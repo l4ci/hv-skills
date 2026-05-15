@@ -97,6 +97,7 @@ Phases:
 5. *Dispatch & verify per wave* — workers run, orchestrator verifies each completion (Steps 6–8)
 6. *Commit + TODO + sweep* — per-task commits, TODO entries marked complete, item plans tombstoned, tool siblings swept (Steps 7.5, 8.5, 9, 9.5)
 7. *Merge/PR & report* — integration + status removal + summary + post-cycle nudges (Steps 10–15)
+8. *Knowledge lifecycle* — hit-tracking and contradiction logging (Steps 2.5, 4)
 
 ## Step 2 — Clarify Ambiguous Briefs (only when needed)
 
@@ -126,6 +127,22 @@ Plain-text fallback: ask once; on ambiguity, default to Recommended and state it
 
 - **Major + Milestone-tagged item** — defer to Step 4's auto-dispatch chain. The chain auto-resolves design via `/hv-brainstorm --auto-loop` (writes a design artifact with `[Auto:Loop]` decisions for fresh picks), then runs the uncertainty pre-flight + plan dispatch (`/hv-plan --auto-loop`). Step 2 does not stop in this case — the chain owns design resolution under loop.
 - **Non-Major or untagged item** — **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
+
+## Step 2.5 — Detect Knowledge-vs-Correction Contradictions (F03 lifecycle)
+
+**Detect knowledge-vs-correction contradictions (F03 lifecycle).** When Step 2's `AskUserQuestion` produces a user response that contradicts the cycle's framing (the user picks "Pick different items", supplies an "Other" free-text correction that pushes back on a stated assumption, or otherwise redlines the planned direction), check whether the user's correction text overlaps with any bullet returned by Step 4's eventual K+D query.
+
+V1 overlap heuristic — simple case-insensitive substring match: for each candidate bullet from the K+D query, extract its body text; if a meaningful fragment (≥4 contiguous lowercase words) from the bullet appears in the user's correction text, the bullet is a contradiction candidate. Log via:
+
+```bash
+.hv/bin/hv-knowledge-contradiction --add --topic <T> --title <S> --text "<first 200 chars of correction>"
+```
+
+Process candidates in parallel — append calls are append-only and don't race. `/hv-learn` Step 9 surfaces these candidates at session end and asks per-bullet whether to demote.
+
+Edge case: this step only fires when Step 2 actually surfaced an AskUserQuestion AND the user provided a non-Recommended answer. The Step 4 query happens later — so this detection ALSO fires later, comparing the now-loaded bullets against the earlier correction. Practical sequencing: cache the correction text in the cycle's working memory at Step 2, then run the overlap check after Step 4's K+D returns matches.
+
+Skip silently when Step 2 was skipped (no clarification needed).
 
 ## Step 3 — Register in Status
 
@@ -186,6 +203,8 @@ From the conversation context:
 1. **Consult knowledge + decisions.** Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics inferred from the planned work areas. Also run `.hv/bin/hv-context-query "<terms appearing in the TODO entry or task plan>"` for any domain term used in the TODO entry, and surface inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle. Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching.
 
    - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
+
+   **Register hits on consumed bullets (F03 lifecycle).** For every bullet `hv-knowledge-query` returned that the orchestrator actually used to shape this cycle's plan (each bullet that lands in a Step 6 brief's `**Known gotchas:**` section), call `.hv/bin/hv-knowledge-hit --topic <T> --title <S>` once. The helper increments the hit counter; provisional bullets auto-promote to confirmed once they reach `learn.promoteThreshold` (default 3) hits without a pending contradiction. Issue the hit calls as parallel tool calls in a single batch — they're independent and the latency is per-bullet bash overhead. Don't register hits for bullets that DIDN'T survive into the briefs — un-used queries shouldn't earn credit. Silent on success.
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. **Detect rename + link-sweep collisions.** Before grouping into waves, scan for rename / link-sweep task pairs that race on shared written files; resolve by merge, clean split-ownership, or serialize-across-waves. Use `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` as ground truth (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Detect rename + link-sweep collisions* for the resolution table.
