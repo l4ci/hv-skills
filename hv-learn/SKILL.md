@@ -32,6 +32,96 @@ Phases:
 3. *Merge into KNOWLEDGE.md* — entries appended under topic headings (Step 5)
 4. *Update CLAUDE.md index* — `hv-knowledge-index` regenerates the managed block (Step 6)
 5. *Verify (Opus)* — optional cold pass when `learn.verify: true` (Steps 7–8)
+6. *Contradictions* — pending demotion candidates surfaced per-bullet at session end (Step 9)
+
+**Args parsing.** Before running the phases above, inspect the `args` value passed at invocation. If `args` contains any of the following flags, skip Steps 2–8 and jump directly to Step 1.5:
+
+- `--promote <topic> "<title>"` — promote one bullet to `confirmed`, bypassing discovery
+- `--deprecate <topic> "<title>"` — demote one bullet to `deprecated`, bypassing discovery
+- `--amend <topic> "<title>"` — rewrite the body of one bullet, preserving tier + hits
+
+If none of those flags are present, proceed with the normal discovery flow (Steps 2 onward).
+
+## Step 1.5 — Manual Override
+
+This step fires only when a manual flag (`--promote`, `--deprecate`, or `--amend`) was detected in the args.
+
+### `--promote <topic> "<title>"`
+
+Sets the bullet's tier to `confirmed`, bypassing the hit-threshold path.
+
+Shell command shape:
+```bash
+.hv/bin/hv-knowledge-tier --set --topic "<topic>" --title "<title>" --tier confirmed
+```
+
+`--set` always writes the new tier (idempotent — promoting an already-confirmed bullet is a no-op in effect). Report one line:
+
+```
+Promoted: <topic> :: <title> → confirmed
+```
+
+Then exit (skip remaining steps).
+
+### `--deprecate <topic> "<title>"`
+
+Sets the bullet's tier to `deprecated`.
+
+Shell command shape:
+```bash
+.hv/bin/hv-knowledge-tier --set --topic "<topic>" --title "<title>" --tier deprecated
+```
+
+Report one line:
+
+```
+Deprecated: <topic> :: <title> → deprecated
+```
+
+**Important:** manual deprecations do NOT touch the contradictions queue. Do NOT call `bin/hv-knowledge-contradiction --clear` here — the queue is for heuristic candidates only, not for manually declared deprecations.
+
+Then exit (skip remaining steps).
+
+### `--amend <topic> "<title>"`
+
+Rewrites the body of one bullet while preserving its tier and hits in the sidecar.
+
+**V1 limitation:** the current `hv-knowledge-amend` helper APPENDS to the bullet body rather than replacing it in-place. Full rewrite-in-place is a follow-up (tracked as a known V1 gap). For V1, the user should craft a body suffix that reads well when appended.
+
+Flow:
+1. Prompt the user via `AskUserQuestion` for the new body suffix:
+   - Header: `"Amend bullet"`
+   - Question: *"Enter the text to append to `<topic> :: <title>` (V1: appends to existing body):"*
+   - Free-text field (single-line or multi-line).
+   - In loop-mode (`autonomy.level: loop`), this is an error — `--amend` requires explicit body input from the user; print `"Error: --amend requires user-provided body — cannot auto-pick in loop mode."` and exit 1.
+2. Call:
+   ```bash
+   .hv/bin/hv-knowledge-amend --topic "<topic>" --fragment "<unique fragment from existing title>" --append "<new body suffix>"
+   ```
+   The `--fragment` can be the title text itself (it is unique by (topic, title)).
+3. The sidecar entry is left untouched — tier and hits are preserved.
+4. Read back the current tier and hits via `hv-knowledge-tier --get --topic "<topic>" --title "<title>"` and report:
+
+```
+Amended: <topic> :: <title> (tier=<tier>, hits=<hits> preserved)
+```
+
+Then exit (skip remaining steps).
+
+## Step 1.6 — Migration Hook
+
+On every `/hv-learn` invocation (including manual-override paths), run:
+
+```bash
+.hv/bin/hv-knowledge-migrate
+```
+
+This stamps every existing bullet `provisional` in the sidecar (`.hv/knowledge-tier.json`) if the sidecar hasn't been initialized yet. The helper is idempotent — re-runs print `nothing to migrate` and exit 0. So firing this unconditionally is cheap.
+
+- If entries were migrated: print one line — `Migrated N bullets to provisional`.
+- If already up-to-date: silent (suppress the helper's "nothing to migrate" stdout).
+
+This ensures that `--promote`, `--deprecate`, `--amend`, and all discovery-path calls operate against a populated sidecar.
 
 ## Step 2 — Scan the Session for Learnings
 
@@ -233,6 +323,43 @@ When the dispatch ran, append one line to the Step 8 confirm output:
 ```
 Ran /runlog-author for the <topic> bullet.
 ```
+
+## Step 9 — Process Contradiction Candidates
+
+Read pending contradictions:
+
+```bash
+.hv/bin/hv-knowledge-contradiction --list
+```
+
+Parse the JSON array. If empty, skip this step silently.
+
+For each candidate `{topic, title, correctionText, loggedAt}`, surface via `AskUserQuestion`:
+
+- **Header:** `"Demote?"`
+- **Question:** *"This learning was implicated by user feedback during the session: `<correctionText>`. Demote `<topic> :: <title>` to `deprecated`?"*
+- **Options** (single-select):
+  1. *"Demote (Recommended)"* — call `hv-knowledge-tier --set --topic <T> --title <S> --tier deprecated`
+  2. *"Keep — false positive"* — leave tier unchanged
+  3. *"Defer to next session"* — keep candidate in the queue
+
+**Loop-mode auto-pick:** *"Defer to next session"* — per the manual-gate rule that demotions need user confirmation (same principle as Step 8.5).
+
+**V1 simplification:** after processing ALL candidates (regardless of per-candidate choice), call:
+
+```bash
+.hv/bin/hv-knowledge-contradiction --clear
+```
+
+This clears the entire queue. Fine-grained deferral (keeping only deferred items) is a V2 polish.
+
+Track results in the Step 8 confirm output as:
+
+```
+Cleared N contradictions: <demoted-count> demoted, <skipped-count> skipped
+```
+
+(Where "skipped" covers both "Keep — false positive" and "Defer to next session" choices.)
 
 ## Key Principles
 

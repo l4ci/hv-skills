@@ -51,6 +51,7 @@ Phases:
 4. *Stage 1 — Spec compliance* — diff evaluated against `PLAN.md` outcomes; short-circuit on FAIL (Step 7)
 5. *Stage 2 — Code quality* — staff-engineer review, gated on Stage 1 PASS or CONCERNS (Step 8)
 6. *Verdict* — combined PASS / CONCERNS / FAIL with structured findings (Step 9)
+7. *Knowledge lifecycle* — register hits on consumed bullets via hv-knowledge-hit (Step 4)
 
 **Stage opt-out (power users).** When invoked with `--stage spec`, run only Stage 1 (Steps 2, 3, 5, 7) and skip Step 8. When invoked with `--stage quality`, skip Steps 3 and 7 and run only Stage 2 — the legacy single-pass behavior. No `--stage` arg = run both stages with short-circuit gating (the default).
 
@@ -93,6 +94,8 @@ When `--stage quality` is set, skip this step entirely — Stage 1 won't run.
 Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics that plausibly touch the changed areas based on `touchedFiles` and commit subjects — infer liberally (e.g., a file under `Networking/` → the `Networking` topic).
 
 Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
+
+**Register hits on consumed bullets (F03 lifecycle).** For every bullet `hv-knowledge-query` returned that gets carried into the reviewer brief's `**Relevant project conventions (from KNOWLEDGE.md):**` section, call `.hv/bin/hv-knowledge-hit --topic <T> --title <S>` once. The helper increments the hit counter; provisional bullets auto-promote to confirmed once they reach `learn.promoteThreshold` (default 3) hits without a pending contradiction. Issue the hit calls as parallel tool calls in a single batch — they're independent and bash-bound. Bullets returned by the query but pruned from the brief (the reviewer didn't need them) don't earn a hit. Silent on success.
 
 ## Step 5 — Capture the Diff
 

@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Register a "hit" for a KNOWLEDGE.md bullet — increments the hit counter
+# and auto-promotes provisional → confirmed when hits reach the threshold
+# (config: learn.promoteThreshold, default 3). Skips auto-promotion if the
+# bullet has a pending contradiction. Called by /hv-work and /hv-review
+# after consuming a queried bullet.
+# Writer helper: exit 0 on success; exit 1 on argv error.
+# Usage: hv-knowledge-hit --topic <T> --title <S>
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+USAGE="usage: hv-knowledge-hit --topic <T> --title <S>"
+
+TOPIC=""
+TITLE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --topic)
+      TOPIC="${2:?$USAGE}"
+      shift 2
+      ;;
+    --title)
+      TITLE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$TOPIC" || -z "$TITLE" ]]; then
+  echo "error: --topic and --title are required" >&2
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+# Step 1: increment hits via canonical sidecar writer
+"$HERE/hv-knowledge-tier" --inc --topic "$TOPIC" --title "$TITLE"
+
+# Step 2: read back the new state
+STATE="$("$HERE/hv-knowledge-tier" --get --topic "$TOPIC" --title "$TITLE")"
+
+# Step 3: evaluate auto-promotion using Python stdlib
+export _HV_KH_TOPIC="$TOPIC"
+export _HV_KH_TITLE="$TITLE"
+export _HV_KH_STATE="$STATE"
+export _HV_KH_BIN="$HERE"
+
+python3 - <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+topic  = os.environ["_HV_KH_TOPIC"]
+title  = os.environ["_HV_KH_TITLE"]
+state  = json.loads(os.environ["_HV_KH_STATE"])
+here   = os.environ["_HV_KH_BIN"]
+
+# Read promotion threshold from config
+threshold = 3
+config_path = Path(".hv/config.json")
+if config_path.exists():
+    try:
+        cfg = json.loads(config_path.read_text())
+        val = cfg.get("learn", {}).get("promoteThreshold")
+        if isinstance(val, int) and val > 0:
+            threshold = val
+    except Exception:
+        pass  # default to 3
+
+tier = state.get("tier", "provisional")
+hits = state.get("hits", 0)
+
+# Only consider auto-promotion when provisional and at threshold
+if tier != "provisional" or hits < threshold:
+    sys.exit(0)
+
+# Outstanding contradiction check
+contradictions_path = Path(".hv/knowledge-contradictions.json")
+if contradictions_path.exists():
+    try:
+        cdata = json.loads(contradictions_path.read_text())
+        pending = cdata.get("pending", [])
+        for entry in pending:
+            if entry.get("topic") == topic and entry.get("title") == title:
+                print(
+                    f"skip-auto-promote: {topic} :: {title} has pending contradiction",
+                    file=sys.stderr,
+                )
+                sys.exit(0)
+    except Exception:
+        pass  # treat as no contradictions
+
+# Auto-promote to confirmed
+import subprocess
+result = subprocess.run(
+    [f"{here}/hv-knowledge-tier", "--set", "--topic", topic, "--title", title, "--tier", "confirmed"],
+    capture_output=True,
+    text=True,
+)
+if result.returncode != 0:
+    print(result.stderr, end="", file=sys.stderr)
+    sys.exit(result.returncode)
+
+print(
+    f"auto-promoted: {topic} :: {title} (hits={hits}, threshold={threshold})",
+    file=sys.stderr,
+)
+PY

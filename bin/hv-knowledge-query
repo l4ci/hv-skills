@@ -1,5 +1,126 @@
 #!/usr/bin/env bash
-# Print the matching ## Topic section(s) from .hv/KNOWLEDGE.md.
-# Lookup helper (thin wrapper): always exits 0; missing topics are silent.
-# Usage: hv-knowledge-query <topic>...
-exec "$(dirname "$0")/hv-section-query" knowledge "$@"
+# Print matching ## Topic section(s) from .hv/KNOWLEDGE.md with tier-aware
+# filtering. Hides `deprecated` bullets by default; suffixes ` (provisional)`
+# onto bullets still on probation; emits `confirmed` bullets unchanged.
+# Reads tier state from the F03 sidecar at .hv/knowledge-tier.json via
+# `hv-knowledge-tier --list`. When the sidecar is missing or empty (older
+# project, pre-F03 rollout), all bullets emit unfiltered.
+#
+# Lookup helper: always exits 0; missing topics are silent.
+# Usage: hv-knowledge-query [--include-deprecated] [--tier <T>] <topic>...
+#   --include-deprecated  emit deprecated bullets too (still suffixed)
+#   --tier <T>            filter to only the named tier
+#                         (provisional|confirmed|deprecated)
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+INCLUDE_DEPRECATED=0
+TIER_FILTER=""
+TOPICS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --include-deprecated)
+      INCLUDE_DEPRECATED=1
+      shift
+      ;;
+    --tier)
+      TIER_FILTER="${2:?--tier requires a value}"
+      case "$TIER_FILTER" in
+        provisional|confirmed|deprecated) ;;
+        *) echo "error: --tier must be one of: provisional, confirmed, deprecated" >&2; exit 1 ;;
+      esac
+      shift 2
+      ;;
+    --help|-h)
+      grep '^# ' "$0" | sed 's/^# //'
+      exit 0
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do TOPICS+=("$1"); shift; done
+      ;;
+    *)
+      TOPICS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+[ "${#TOPICS[@]}" -ge 1 ] || exit 0
+
+# Collect the sidecar state once; emit empty JSON when the helper / file
+# is missing so the Python below treats it as "no tier info, emit raw".
+SIDECAR_JSON=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
+[ -z "$SIDECAR_JSON" ] && SIDECAR_JSON="[]"
+
+export HV_SIDECAR_JSON="$SIDECAR_JSON"
+export HV_INCLUDE_DEPRECATED="$INCLUDE_DEPRECATED"
+export HV_TIER_FILTER="$TIER_FILTER"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - ".hv/KNOWLEDGE.md" "${TOPICS[@]}" <<'PY'
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from hvlib import iter_topics
+
+file_path = Path(sys.argv[1])
+wanted = {t.strip().lower() for t in sys.argv[2:]}
+if not wanted or not file_path.exists():
+    sys.exit(0)
+
+include_deprecated = os.environ.get("HV_INCLUDE_DEPRECATED", "0") == "1"
+tier_filter = os.environ.get("HV_TIER_FILTER", "") or None
+
+try:
+    entries = json.loads(os.environ.get("HV_SIDECAR_JSON", "[]"))
+except json.JSONDecodeError:
+    entries = []
+tier_by_key = {
+    (e["topic"], e["title"]): e["tier"]
+    for e in entries
+    if isinstance(e, dict) and "topic" in e and "title" in e and "tier" in e
+}
+
+content = file_path.read_text()
+
+bullet_re = re.compile(
+    r"^- \*\*(?P<title>[^*]+)\*\* — (?P<body>.*?)(?P<trail>\s*<!-- \d{4}-\d{2}-\d{2}\s*-->\s*)$"
+)
+
+first = True
+for name, body in iter_topics(content):
+    if name.lower() not in wanted:
+        continue
+
+    out_lines = []
+    for line in body.splitlines():
+        m = bullet_re.match(line.rstrip())
+        if not m:
+            out_lines.append(line)
+            continue
+
+        title = m.group("title").strip()
+        tier = tier_by_key.get((name, title))
+
+        if tier_filter is not None and tier != tier_filter:
+            continue
+
+        if tier == "deprecated" and not include_deprecated:
+            continue
+
+        if tier == "provisional":
+            new_body = f"{m.group('body')} (provisional)"
+            line = f"- **{title}** — {new_body}{m.group('trail')}"
+
+        out_lines.append(line)
+
+    if not first:
+        print()
+    print(f"## {name}")
+    print("\n".join(out_lines).rstrip())
+    first = False
+PY

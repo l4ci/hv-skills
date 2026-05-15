@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# Reader/writer for the F03 knowledge-lifecycle sidecar at .hv/knowledge-tier.json.
+# Manages per-bullet {tier, hits, lastSeen} state keyed by (topic, title).
+# Lookup/writer helper: exit 0 on success (or idempotent no-op);
+# exit 1 on schema mismatch or invalid argv.
+# Usage: hv-knowledge-tier --get|--set|--init|--inc|--list [flags]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+USAGE="usage: hv-knowledge-tier --get|--set|--init|--inc|--list [flags]
+  --get  --topic <T> --title <S>
+  --set  --topic <T> --title <S> --tier <provisional|confirmed|deprecated>
+  --init --topic <T> --title <S>
+  --inc  --topic <T> --title <S>
+  --list [--tier <provisional|confirmed|deprecated>]"
+
+CMD=""
+TOPIC=""
+TITLE=""
+TIER_ARG=""
+LIST_TIER=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --get)
+      CMD="get"
+      shift
+      ;;
+    --set)
+      CMD="set"
+      shift
+      ;;
+    --init)
+      CMD="init"
+      shift
+      ;;
+    --inc)
+      CMD="inc"
+      shift
+      ;;
+    --list)
+      CMD="list"
+      shift
+      ;;
+    --topic)
+      TOPIC="${2:?$USAGE}"
+      shift 2
+      ;;
+    --title)
+      TITLE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --tier)
+      # Used both for --set and for --list filter
+      if [[ "$CMD" == "list" ]]; then
+        LIST_TIER="${2:?$USAGE}"
+      else
+        TIER_ARG="${2:?$USAGE}"
+      fi
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$CMD" ]]; then
+  echo "error: one of --get, --set, --init, --inc, --list is required" >&2
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+# For commands other than list, topic and title are required
+if [[ "$CMD" != "list" ]]; then
+  if [[ -z "$TOPIC" || -z "$TITLE" ]]; then
+    echo "error: --topic and --title are required for --$CMD" >&2
+    echo "$USAGE" >&2
+    exit 1
+  fi
+fi
+
+# For --set, --tier is required
+if [[ "$CMD" == "set" && -z "$TIER_ARG" ]]; then
+  echo "error: --tier is required for --set" >&2
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+export _HV_KT_CMD="$CMD"
+export _HV_KT_TOPIC="$TOPIC"
+export _HV_KT_TITLE="$TITLE"
+export _HV_KT_TIER="$TIER_ARG"
+export _HV_KT_LIST_TIER="$LIST_TIER"
+
+python3 - <<'PY'
+import json
+import os
+import sys
+from datetime import date
+from pathlib import Path
+
+SIDECAR = Path(".hv/knowledge-tier.json")
+SIDECAR_TMP = Path(".hv/knowledge-tier.json.tmp")
+VALID_TIERS = {"provisional", "confirmed", "deprecated"}
+
+cmd        = os.environ["_HV_KT_CMD"]
+topic      = os.environ.get("_HV_KT_TOPIC", "")
+title      = os.environ.get("_HV_KT_TITLE", "")
+tier_arg   = os.environ.get("_HV_KT_TIER", "")
+list_tier  = os.environ.get("_HV_KT_LIST_TIER", "")
+today      = date.today().isoformat()
+
+
+def load():
+    if not SIDECAR.exists():
+        return {"version": 1, "entries": {}}
+    data = json.loads(SIDECAR.read_text())
+    if data.get("version") != 1:
+        got = data.get("version", "<missing>")
+        print(
+            f"error: knowledge-tier.json schema version mismatch — expected 1, got {got}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return data
+
+
+def save(data):
+    SIDECAR_TMP.write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(SIDECAR_TMP, SIDECAR)
+
+
+def make_key(t, s):
+    return f"{t}::{s}"
+
+
+if cmd == "get":
+    data = load()
+    key = make_key(topic, title)
+    entry = data["entries"].get(key)
+    if entry is None:
+        print("{}")
+    else:
+        print(json.dumps({"tier": entry["tier"], "hits": entry["hits"], "lastSeen": entry["lastSeen"]}))
+
+elif cmd == "set":
+    if tier_arg not in VALID_TIERS:
+        print(
+            f"error: invalid tier '{tier_arg}' — must be one of provisional, confirmed, deprecated",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    data = load()
+    key = make_key(topic, title)
+    if key in data["entries"]:
+        data["entries"][key]["tier"] = tier_arg
+    else:
+        data["entries"][key] = {"tier": tier_arg, "hits": 0, "lastSeen": today}
+    save(data)
+
+elif cmd == "init":
+    data = load()
+    key = make_key(topic, title)
+    if key in data["entries"]:
+        # Idempotent no-op
+        pass
+    else:
+        data["entries"][key] = {"tier": "provisional", "hits": 0, "lastSeen": today}
+        save(data)
+
+elif cmd == "inc":
+    data = load()
+    key = make_key(topic, title)
+    if key in data["entries"]:
+        data["entries"][key]["hits"] += 1
+        data["entries"][key]["lastSeen"] = today
+    else:
+        data["entries"][key] = {"tier": "provisional", "hits": 1, "lastSeen": today}
+    save(data)
+
+elif cmd == "list":
+    data = load()
+    result = []
+    for key, entry in data["entries"].items():
+        if "::" not in key:
+            continue
+        t, s = key.split("::", 1)
+        if list_tier and entry["tier"] != list_tier:
+            continue
+        result.append({
+            "topic": t,
+            "title": s,
+            "tier": entry["tier"],
+            "hits": entry["hits"],
+            "lastSeen": entry["lastSeen"],
+        })
+    print(json.dumps(result, indent=2))
+
+else:
+    print(f"error: unknown command: {cmd}", file=sys.stderr)
+    sys.exit(1)
+PY

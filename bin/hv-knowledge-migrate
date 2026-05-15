@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# One-shot migration: stamp every existing **titled** bullet in
+# .hv/KNOWLEDGE.md as `provisional` in the F03 sidecar (.hv/knowledge-tier.json).
+# Legacy bullets without **Title** prefix are skipped (no schema key).
+# Idempotent — re-running is a no-op.
+# Writer helper: exit 0 always.
+# Usage: hv-knowledge-migrate
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+KM=".hv/KNOWLEDGE.md"
+if [[ ! -f "$KM" ]]; then
+  echo "no KNOWLEDGE.md — nothing to migrate" >&2
+  exit 0
+fi
+
+TIER_BIN="$HERE/hv-knowledge-tier"
+
+export _HV_MIGRATE_TIER_BIN="$TIER_BIN"
+export _HV_MIGRATE_KM="$KM"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from hvlib import iter_topics
+
+km_path = Path(os.environ["_HV_MIGRATE_KM"])
+tier_bin = os.environ["_HV_MIGRATE_TIER_BIN"]
+sidecar = Path(".hv/knowledge-tier.json")
+
+content = km_path.read_text()
+
+# Load existing entries once to count new vs. existing
+def load_entries():
+    if not sidecar.exists():
+        return {}
+    data = json.loads(sidecar.read_text())
+    return data.get("entries", {})
+
+bullet_re = re.compile(r"^- \*\*(?P<title>.+?)\*\* — ")
+
+pairs = []
+for topic, body in iter_topics(content):
+    for line in body.splitlines():
+        m = bullet_re.match(line)
+        if m:
+            pairs.append((topic, m.group("title")))
+
+if not pairs:
+    print("nothing to migrate — all bullets already tracked")
+    sys.exit(0)
+
+entries_before = load_entries()
+new_count = 0
+
+for topic, title in pairs:
+    key = f"{topic}::{title}"
+    if key not in entries_before:
+        subprocess.run(
+            [tier_bin, "--init", "--topic", topic, "--title", title],
+            check=True,
+        )
+        new_count += 1
+    # else: already exists, --init would be a no-op anyway; skip for counting
+
+if new_count == 0:
+    print("nothing to migrate — all bullets already tracked")
+else:
+    print(f"migrated {new_count} entries to provisional")
+PY

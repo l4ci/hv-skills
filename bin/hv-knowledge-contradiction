@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Manage the pending-contradictions queue at .hv/knowledge-contradictions.json.
+# /hv-work and /hv-review --add candidates when user corrections overlap with
+# queried KNOWLEDGE bullets. /hv-learn --list / --clear processes them at
+# session end. hv-knowledge-hit --has gates auto-promotion when pending.
+# Writer/lookup helper: exit 0 on success (or empty queue);
+# exit 1 on argv error, schema mismatch, or --has miss.
+# Usage: hv-knowledge-contradiction --add|--list|--clear|--has [flags]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+QUEUE_PATH = Path(".hv/knowledge-contradictions.json")
+EXPECTED_VERSION = 1
+
+
+def load_queue():
+    if not QUEUE_PATH.exists():
+        return {"version": EXPECTED_VERSION, "pending": []}
+    raw = QUEUE_PATH.read_text()
+    data = json.loads(raw)
+    v = data.get("version")
+    if v != EXPECTED_VERSION:
+        print(
+            f"error: knowledge-contradictions.json schema version mismatch"
+            f" — expected {EXPECTED_VERSION}, got {v}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return data
+
+
+def atomic_write(data):
+    QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(QUEUE_PATH) + ".tmp"
+    Path(tmp).write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(tmp, str(QUEUE_PATH))
+
+
+def cmd_add(args):
+    topic = title = text = None
+    i = 0
+    while i < len(args):
+        if args[i] == "--topic" and i + 1 < len(args):
+            topic = args[i + 1]; i += 2
+        elif args[i] == "--title" and i + 1 < len(args):
+            title = args[i + 1]; i += 2
+        elif args[i] == "--text" and i + 1 < len(args):
+            text = args[i + 1]; i += 2
+        else:
+            i += 1
+    if not topic or not title or text is None:
+        print("error: --add requires --topic <T> --title <S> --text <correction>", file=sys.stderr)
+        sys.exit(1)
+    data = load_queue()
+    entry = {
+        "topic": topic,
+        "title": title,
+        "correctionText": text,
+        "loggedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    data["pending"].append(entry)
+    atomic_write(data)
+
+
+def cmd_list():
+    data = load_queue()
+    print(json.dumps(data["pending"], indent=2))
+
+
+def cmd_clear():
+    data = load_queue()
+    data["pending"] = []
+    atomic_write(data)
+
+
+def cmd_has(args):
+    topic = title = None
+    i = 0
+    while i < len(args):
+        if args[i] == "--topic" and i + 1 < len(args):
+            topic = args[i + 1]; i += 2
+        elif args[i] == "--title" and i + 1 < len(args):
+            title = args[i + 1]; i += 2
+        else:
+            i += 1
+    if not topic or not title:
+        print("error: --has requires --topic <T> --title <S>", file=sys.stderr)
+        sys.exit(1)
+    data = load_queue()
+    for entry in data["pending"]:
+        if entry.get("topic") == topic and entry.get("title") == title:
+            sys.exit(0)
+    sys.exit(1)
+
+
+argv = sys.argv[1:]
+if not argv:
+    print("error: subcommand required: --add | --list | --clear | --has", file=sys.stderr)
+    sys.exit(1)
+
+subcmd = argv[0]
+rest = argv[1:]
+
+if subcmd == "--add":
+    cmd_add(rest)
+elif subcmd == "--list":
+    cmd_list()
+elif subcmd == "--clear":
+    cmd_clear()
+elif subcmd == "--has":
+    cmd_has(rest)
+else:
+    print(f"error: unknown subcommand '{subcmd}' — use --add | --list | --clear | --has", file=sys.stderr)
+    sys.exit(1)
+PY
