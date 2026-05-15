@@ -29,13 +29,8 @@ if before == after:
 data["active"] = after
 dump_json_atomic(path, data)
 PY
-# Sweep matching handoff note. Path encoding mirrors hv-pause:
-#   --repo set      → .hv/handoff/<branch>@<repo>.md   (umbrella keying)
-#   --repo unset    → .hv/handoff/<branch>.md          (single-repo / legacy)
-# `rm -f` is silent on missing files, so the sweep is a no-op when no handoff was paused.
-if [ -n "$REPO" ]; then
-  HANDOFF=".hv/handoff/${BRANCH}@${REPO}.md"
-else
-  HANDOFF=".hv/handoff/${BRANCH}.md"
-fi
+# Sweep matching handoff note. Path resolved via hv-resolve-handoff --write
+# (canonical encoding owner — also used by hv-pause). `rm -f` is silent on
+# missing files, so the sweep is a no-op when no handoff was paused.
+HANDOFF=$("$HERE/hv-resolve-handoff" --write ${REPO:+--repo "$REPO"} "$BRANCH")
 rm -f "$HANDOFF"
