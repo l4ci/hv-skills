@@ -34,6 +34,8 @@ flowchart LR
   REFACTOR["/hv-refactor"] --> COMMIT
   COMMIT -.review.-> REVIEW["/hv-review"]
   REVIEW -.gate.-> SHIP["/hv-ship"]
+  SHIP -.ship.qa.-> QA["/hv-qa"]
+  QA -.strategy.-> QASTRAT[(.hv/qa/)]
   SHIP --> PR[(PR / merge)]
   SHIP -.rollback.-> UNDO["/hv-undo"]
   UNDO -.restores.-> BACKLOG
@@ -75,7 +77,7 @@ Everything Claude reads or mutates lives under `.hv/` in your project. Git is th
 
 **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce → hypothesize → verify → fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction. `/hv-pause` writes a handoff note when the context window is filling, so a fresh `/hv-next` session picks up cleanly.
 
-**Ship.** `/hv-review` reads the branch diff, resolved item IDs, and matching `KNOWLEDGE.md` topics and returns `PASS` / `CONCERNS` / `FAIL`. `/hv-ship` builds an ID-linked PR body or direct-merges based on configured strategy. `/hv-undo` rolls back the last direct-merge cycle in one operation, restoring TODO entries.
+**Ship.** `/hv-review` runs a two-stage pass over the branch — Stage 1 checks the diff against `PLAN.md` (spec compliance), Stage 2 checks code-quality plus a silent-failure-hunter rubric and `DECISIONS.md` violations — and returns `PASS` / `CONCERNS` / `FAIL`. `/hv-qa` answers the orthogonal question, *"does the product actually work?"*, by running per-target strategies (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners. `/hv-ship` builds an ID-linked PR body or direct-merges based on configured strategy, with two opt-in gates layered after `/hv-review`: a fresh-eyes second-opinion review (`ship.secondOpinion`) and a product QA run (`ship.qa`). `/hv-undo` rolls back the last direct-merge cycle in one operation, restoring TODO entries.
 
 **Persist.** `/hv-learn` writes durable session learnings to `KNOWLEDGE.md`, verified before they land. `/hv-decide` captures hard-boundary commitments to `DECISIONS.md` with explicit forbids and permits. `/hv-context` captures domain terms to `CONTEXT.md` (the project's canonical glossary). `/hv-map` keeps a thin subsystem map current, auto-bumped post-cycle. `/hv-docs` keeps the public docs in sync with the code.
 

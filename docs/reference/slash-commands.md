@@ -19,13 +19,14 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch — branch never merges, only findings come back as `.hv/spikes/<name>.md` |
 | `/hv-assume` | Read-only peek of the orchestrator's intended approach — files, tests, assumptions, unknowns; gates `/hv-work` for high-stakes work |
 | `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present |
-| `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, nudges `/hv-learn` |
+| `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, hard-stops via the Iron Law after 3 failed committed fixes, nudges `/hv-learn` |
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
 | `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
 | `/hv-map` | Maintain `.hv/MAP.md` + `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date; auto-bumped post-cycle by `/hv-work`, `/hv-debug`, `/hv-go` |
 | `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
-| `/hv-review` | Staff-engineer review of a branch vs original intent + `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL |
-| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default |
+| `/hv-review` | Two-stage review of a branch (Stage 1 spec-compliance vs `PLAN.md`, Stage 2 code-quality with silent-failure-hunter + decision-violations) vs `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL. Short-circuits Stage 2 on Stage 1 `FAIL` |
+| `/hv-qa` | Product-level QA: executes per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; emits PASS / CONCERNS / FAIL. Modes — first-run / run / restructure |
+| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates |
 | `/hv-undo` | Guided rollback of the last `/hv-work` cycle — resets the merge commit, restores TODO entries; dry-run preview, manual confirmation, direct-merge cycles only |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
@@ -54,7 +55,7 @@ Interactive editor for [`.hv/config.json`](../usage/configuration.md). Shows cur
 
 ## /hv-debug
 
-Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, mark complete. If the hypothesize → verify loop iterates 3 times without converging (single-hypothesis mode only), escalates to a fresh-context subagent with a "for-next-agent" brief rather than grinding the same context. Uses the same isolation mode as `/hv-work`, and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
+Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, mark complete. Two circuit breakers: (1) if the hypothesize → verify loop iterates 3 times without converging (single-hypothesis mode only), escalates to a fresh-context subagent with a "for-next-agent" brief; (2) if 3 committed fixes fail to resolve the reproducer (counter persisted at `.hv/debug/<session>.json`, survives `/clear`), the Iron Law fires a hard stop — no further agents, surface to the user. Uses the same isolation mode as `/hv-work`, and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
 
 ## /hv-decide
 
@@ -99,6 +100,10 @@ Stops mid-session by writing a handoff note to `.hv/handoff/<branch>.md` that ca
 ## /hv-plan
 
 Writes an implementation plan before `/hv-work` runs, keyed under a milestone and unit (e.g. `M01-S01`). Tasks must fit one execution window and each requires a verifiable outcome. `/hv-work` consults the plan automatically if one exists. See [vision and plans](../usage/vision-and-plans.md) for the full flow.
+
+## /hv-qa
+
+Product-level QA: runs the per-target strategy declared in `.hv/qa/<target>.md` and emits a scored verdict. `/hv-qa` does NOT read commits or the diff — that's `/hv-review`'s job. It runs the built artifact: Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the strategy declares, grouped into executable and audit pillars. Three modes — `first-run` (probe surfaces, propose strategy), `run` (execute, score, verdict), `restructure` (audit strategy files). Returns `PASS` / `CONCERNS` / `FAIL`, or `INFRA-FAIL` when required infra is missing. Invoked from `/hv-ship` when `ship.qa: true`; route on verdict gated by `qa.gate` (`"advisory"` reports only, `"blocking"` halts on `FAIL`). See [product QA](../usage/qa.md) for the full flow.
 
 ## /hv-refactor
 

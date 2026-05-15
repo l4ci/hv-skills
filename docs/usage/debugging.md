@@ -67,11 +67,28 @@ See [running work](running-work.md) for a full comparison of `/hv-go` and `/hv-w
 
 ## When the cycle won't converge
 
+`/hv-debug` has two distinct circuit breakers — one for hypotheses that won't verify, one for fixes that won't hold. They count different things and trigger at different points in the cycle.
+
+### Fresh-context escalation (hypothesize → verify won't converge)
+
 If the hypothesize → verify loop iterates 3 times without finding the root cause, `/hv-debug` automatically escalates: it synthesizes a brief listing the refuted hypotheses, files inspected, and suspected blockers, then dispatches a fresh subagent with no transcript of the failed attempts. The fresh context often surfaces angles the orchestrator's accumulated weight has blocked.
 
 If the fresh subagent's hypothesis also fails verification, `/hv-debug` surfaces to you rather than looping a second fresh-context attempt; at that point the bug needs human triage.
 
 The 3-cycle threshold applies only in single-hypothesis mode. With `debug.competingHypotheses: true`, the three parallel framing lenses already cover the diverse-angles pattern.
+
+### Iron Law: hard stop at 3 failed fixes
+
+A second, stricter gate catches the case where hypotheses *do* converge — fixes get committed — but the bug keeps coming back. Every committed fix that fails to resolve the reproducer increments a per-session counter persisted at `.hv/debug/<session>.json` (session keyed by current branch, with `/` → `-`). The counter survives `/clear` and resumption.
+
+At 3 failed fix attempts, the Iron Law fires: hard stop, no further attempts in this session. `/hv-debug` prints a fail-loud summary of every refuted hypothesis and committed fix, then surfaces — it does NOT dispatch a fresh-context worker (that's the hypothesis-cycle gate above, which targets a different failure mode). Three committed fixes that don't hold mean the framing of the bug needs human triage, not more agents.
+
+Suggested next steps from the hard stop:
+
+- Run [`/hv-pause`](pausing-and-resuming.md) to leave a handoff note and step away. A fresh session reads the persisted counter and can decide whether to wipe it or continue.
+- Or re-open the bug from a different angle — the symptom may be in a subsystem the past three hypotheses haven't touched.
+
+The branch and `status.json` entry stay intact so you can resume. The Iron Law breaks `autonomy.level: "loop"`: the loop stops at the hard stop and the user re-engages by hand. The counter clears on a successful fix so subsequent bugs start at zero.
 
 ## Competing hypotheses
 
