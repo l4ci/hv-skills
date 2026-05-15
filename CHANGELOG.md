@@ -1,5 +1,41 @@
 # Changelog
 
+## v3.2.0 — 2026-05-15
+
+**v3.2.0 — Knowledge promotion lifecycle, two-stage review, debug Iron Law**
+
+## New
+
+- **Knowledge promotion lifecycle ([F03]).** Bullets now carry tier sidecars (provisional → confirmed via hit-count threshold, configurable via `learn.promoteThreshold`). New helpers: `hv-knowledge-tier`, `hv-knowledge-hit`, `hv-knowledge-migrate`, `hv-knowledge-merge` (sidecar-init), `hv-knowledge-query` (tier-aware), `hv-knowledge-contradiction` (pending-demotion queue). `/hv-learn` gained manual flags + contradiction queue; `/hv-work` and `/hv-review` track hits on consumed bullets.
+- **Two-stage `/hv-review` ([F07] + [F08]).** Spec-compliance pass first, then code-quality pass. `silent-failure-hunter` rubric added to `/hv-review` and `/hv-ship`.
+- **Second-opinion gate before merge in `/hv-ship` ([F04]).**
+- **Iron Law hard stop in `/hv-debug` ([F02]).** `/hv-debug` now bails after 3 failed fixes via the new `hv-debug-counter` helper.
+- **Static SKILL.md validator + GitHub Actions workflow ([F06]).**
+- **Manual `/hv-docs` routes to after-work flow ([F09]).** Re-invoking `/hv-docs` when docs exist and `docs.afterWork` is on now checks docs against recent changes instead of no-op'ing. Step A1 trigger gate is bypassed on manual entry.
+
+## Fixed
+
+- Sweep `&` from `TaskCreate` payloads and codify the rule ([T01]).
+- Case-insensitive grep for fresh-context framing in smoke ([F04]).
+- `/hv-capture` brainstorm nudge: always nudge, never auto-dispatch ([B01]).
+
+## Changed
+
+- Cleaned review/ship surface friction post-F04/F07/F08.
+- Indexed `Architecture` and `Build & Tooling` topics in CLAUDE.md.
+- Removed obsolete `docs/superpowers/` plans and specs.
+
+## Documentation
+
+- Restructured README around five lanes; split install + architecture into own pages.
+- Added hv-skills logo to header.
+
+## Stats
+
+30 commits, 46 files changed, +2381 −7082 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v3.1.0...v3.2.0
+
 ## v3.1.0 — 2026-05-13
 
 Adds `/hv-undo` for guided rollback of the last `/hv-work` cycle, `/hv-issues` for syncing GitHub/GitLab issues into `BACKLOG.md` with round-trip closing, and the `--auto-loop` dispatch chain that runs Major + Milestone-tagged items autonomously through brainstorm → plan → work in loop mode.
