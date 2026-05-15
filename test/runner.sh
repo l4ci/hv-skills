@@ -9,7 +9,10 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$REPO/bin"
 TESTDIR="$REPO/test"
-TMP="$(mktemp -d)"
+# macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
+# Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
+# from helpers like hv-resolve-umbrella (which would otherwise mismatch on Darwin).
+TMP="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$TMP"' EXIT
 
 # Leak guard: snapshot $REPO/CLAUDE.md before any section runs. The
