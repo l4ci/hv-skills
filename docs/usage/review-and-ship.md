@@ -127,3 +127,22 @@ Once you've accumulated commits since the last release tag, [`/hv-next`](picking
 ```
 
 The nudge fires when EITHER `release.nudgeAfterCommits` (default 10) OR `release.nudgeAfterDays` (default 14) is reached; see [configuration](configuration.md#releasenudgeaftercommits). It's informational; no skill is auto-invoked. The first release is always your call (no nudge fires while no tag exists).
+
+## Release checklist
+
+`/hv-release` walks a per-project checklist (`.hv/RELEASE.md` by default) as a preflight gate at Step 1.5 — before the version bump, before any writes. Each `- [ ]` line is one gate. Released-once-forgotten-forever drift like a sibling version file going stale, a missing CHANGELOG humanization pass, or an infra rollout step nobody owns ends up here — the skill itself stays generic.
+
+```markdown
+# Release Checklist
+
+- [ ] `.claude-plugin/marketplace.json` versions match the new `plugin.json` version
+- [ ] CI is green on the release branch
+- [ ] Migration notes for users on the prior version are written
+- [ ] Push staging migration (manual)
+```
+
+For each gate the skill asks: *Yes, continue* / *Fix now and continue* / *Skip this item* / *Abort release*. Skipped items show up in the post-release summary so the release record stays honest. Items ending in `(manual)` always interject even under `autonomy.level: auto` or `loop` — useful for sensitive gates that should not auto-acknowledge.
+
+When the file is absent, the skill offers to scaffold a starter under `autonomy.level: off`, or silently skips the gate under `auto`/`loop` (don't interrupt unattended runs). See [`release.checklistPath`](configuration.md#releasechecklistpath) to override the path.
+
+The file is gitignored by default — each contributor maintains their own. If you want a shared checklist, drop `.hv/` (or just `.hv/RELEASE.md`) from `.gitignore` and commit it like any other source file.

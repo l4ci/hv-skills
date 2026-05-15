@@ -1,6 +1,6 @@
 ---
 name: hv-undo
-description: Guided rollback of the last /hv-work cycle on the base branch — resets the merge commit, restores TODO entries to their type sections, refuses on cycles with post-merge commits unless --allow-post-merge is passed. Direct-merge cycles only (MVP); PR-mode is detected and refused with a manual-recovery pointer. Defaults to a dry-run preview; the slash command always asks before applying. Inverse of /hv-work's commit + completion steps.
+description: Guided rollback of the last /hv-work cycle on the base branch. Use on "/hv-undo", "roll back the last cycle", "revert that merge", "undo /hv-work", or right after a bad /hv-work cycle landed on the base branch. Resets the merge commit, restores TODO entries to their type sections, refuses on cycles with post-merge commits unless --allow-post-merge is passed. Direct-merge cycles only (MVP); PR-mode is detected and refused with a manual-recovery pointer. Defaults to a dry-run preview; the slash command always asks before applying. Inverse of /hv-work's commit + completion steps.
 user-invocable: true
 ---
 

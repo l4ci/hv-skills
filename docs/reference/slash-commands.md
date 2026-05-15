@@ -30,7 +30,7 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-undo` | Guided rollback of the last `/hv-work` cycle — resets the merge commit, restores TODO entries; dry-run preview, manual confirmation, direct-merge cycles only |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
-| `/hv-release` | Cut a release: bump version, generate notes, tag, push, publish to GitHub/GitLab |
+| `/hv-release` | Cut a release: walk per-project checklist, bump version, generate notes, tag, push, publish to GitHub/GitLab |
 | `/hv-update` | Check for a newer hv-skills release on GitHub and print the exact update command for your install type |
 
 ---
@@ -111,7 +111,9 @@ Runs an architectural refactor cycle: explores the codebase for friction, classi
 
 ## /hv-release
 
-Cuts a release end-to-end: bumps the project version (`major`/`minor`/`patch` or explicit semver), generates categorized release notes from commits since the last tag, prepends a section to `CHANGELOG.md` (creating it if absent), creates an annotated git tag, pushes commit + tag, and publishes a release on GitHub or GitLab when origin is set. Auto-detects the version source (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, plain `VERSION`), and honors `release.versionFile` override.
+Cuts a release end-to-end: walks the project's release checklist (`.hv/RELEASE.md` by default; override via `release.checklistPath`) as a preflight gate, bumps the project version (`major`/`minor`/`patch` or explicit semver), generates categorized release notes from commits since the last tag, prepends a section to `CHANGELOG.md` (creating it if absent), creates an annotated git tag, pushes commit + tag, and publishes a release on GitHub or GitLab when origin is set. Auto-detects the version source (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, plain `VERSION`), and honors `release.versionFile` override.
+
+The checklist file is per-project and gitignored — see [release checklist](../usage/review-and-ship.md#release-checklist) for the format. When absent, the skill offers to scaffold a starter (under `autonomy.level: off`) or silently skips the gate (under `auto`/`loop`). Items ending in `(manual)` always interject even in unattended modes.
 
 ## /hv-review
 

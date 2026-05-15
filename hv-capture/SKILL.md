@@ -1,6 +1,6 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Records only — for an immediate fix use /hv-go; for items already in BACKLOG use /hv-work.
+description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Use when the user brain-dumps work, says "capture", "add to backlog", "note this bug", "/hv-capture", "/hv-c", or describes a problem without asking for an immediate fix. Records only — for an immediate fix use /hv-go; for items already in BACKLOG use /hv-work.
 user-invocable: true
 ---
 

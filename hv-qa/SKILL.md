@@ -1,6 +1,6 @@
 ---
 name: hv-qa
-description: QA the built product — not the diff. Detects testing surfaces per repo (web, API, CLI, mobile, lib), picks runners (Playwright, smoke, contract, lighthouse, ZAP, axe), and produces a scored report with executable pass/fail results plus audit-style usability findings. Strategy is per-repo in .hv/qa/<repo>.md so the skill never hardcodes "browser". Modes — first-run (probe + propose strategy), run (execute strategy, emit verdict), restructure (audit strategy files). Opt-in gate via ship.qa.
+description: QA the built product — not the diff. Use on "/hv-qa", "run QA", "test the feature", "validate the build", before ship as a gate, or on first cycle to scaffold a per-repo strategy. Detects testing surfaces per repo (web, API, CLI, mobile, lib), picks runners (Playwright, smoke, contract, lighthouse, ZAP, axe), and produces a scored report with executable pass/fail results plus audit-style usability findings. Strategy is per-repo in .hv/qa/<repo>.md so the skill never hardcodes "browser". Modes — first-run (probe + propose strategy), run (execute strategy, emit verdict), restructure (audit strategy files). Opt-in gate via ship.qa.
 user-invocable: true
 ---
 

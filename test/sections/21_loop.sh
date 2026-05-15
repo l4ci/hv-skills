@@ -14,9 +14,9 @@ grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
 
 # (c) Surfacing call sites — exactly /hv-next, /hv-pause, /hv-work invoke hv-auto-decisions-since.
 # (hv-plan/SKILL.md mentions the helper in prose only; the test below is for actual `.hv/bin/`-prefixed invocations.)
-SURFACING_SITES=$(grep -l '\.hv/bin/hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md \
+SURFACING_SITES=$(grep -l '\.hv/bin/hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
   | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
-  | sort -u | tr '\n' ' ' | sed 's/ $//')
+  | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
 [ "$SURFACING_SITES" = "hv-next hv-pause hv-work" ] \
   || fail "F32: .hv/bin/hv-auto-decisions-since invocation expected in exactly hv-next/hv-pause/hv-work, got '$SURFACING_SITES'"
 
