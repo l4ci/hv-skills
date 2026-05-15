@@ -36,6 +36,7 @@
     "./hv-decide",
     "./hv-context",
     "./hv-review",
+    "./hv-qa",
     "./hv-ship",
     "./hv-undo",
     "./hv-learn",

@@ -22,6 +22,7 @@ Read `.hv/config.json`:
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
 - `ship.secondOpinion` — `false` (default) skips the fresh-eyes gate; `true` runs a no-prior-context adversarial review after `/hv-review` passes
+- `ship.qa` — `false` (default) skips product QA; `true` runs `/hv-qa run` after `/hv-review` (and `secondOpinion`) and before merge/PR. Routed per `qa.gate` (`"advisory"` reports only; `"blocking"` halts on FAIL).
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
 
 ## When to Use
@@ -60,9 +61,10 @@ Phases:
 2. *Extract commits & items* — branch range read, item IDs resolved (Step 2)
 3. *Review* — `/hv-review` runs when `ship.review: true` (Step 3)
 4. *Second-opinion gate* — fresh-eyes adversarial review when `ship.secondOpinion: true` (Step 3.5)
-5. *CONCERNS routing* — verdict-gated branch selection (Step 4)
-6. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
-7. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
+5. *QA gate* — product `/hv-qa run` when `ship.qa: true` (Step 3.75)
+6. *CONCERNS routing* — verdict-gated branch selection (Step 4)
+7. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
+8. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
 
 ## Step 2 — Scope the Work
 
@@ -142,6 +144,34 @@ Route the verdict per `references/review-verdict-routing.md` — same contract a
 - **FAIL** → stop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
 
 The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
+
+## Step 3.75 — QA Gate (opt-in)
+
+Read `ship.qa` from `.hv/config.json`. Default `false`. If `false`, skip this step entirely.
+
+`/hv-review` (Step 3) and the second-opinion gate (Step 3.5) answer *"does the diff make sense"* — both reason from commits and diff. They do not run the product. `/hv-qa` answers the orthogonal question — *"does the product actually work"* — by executing the per-target strategy in `.hv/qa/<target>.md` (Playwright, smoke, lighthouse, axe, ZAP, contract tests, whatever the target's strategy declares). The two gates are deliberately separate; this step layers QA in after diff-level review without merging them.
+
+Skip the gate when any of these apply (no work to QA, or already short-circuited):
+
+- Step 3 returned **FAIL** — already stopped above.
+- Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — the user already accepted residual risk; QA findings on the same diff are unlikely to change that decision. Loop mode picks `address` instead, which never reaches this step.
+- `.hv/qa/` is empty for the active target (single-repo: no `.hv/qa/*.md`; umbrella: no `.hv/qa/<REPO>.md`) — surface a one-line note *"`ship.qa: true` but no QA strategy for `<scope>`. Run `/hv-qa first-run` to bootstrap, or set `ship.qa: false` to skip."* and continue to Step 4 without running QA.
+
+Otherwise, invoke `/hv-qa run` via the `Skill` tool, scoped to the resolved repo in umbrella mode:
+
+- Single-repo: `Skill(skill="hv-skills:hv-qa", args="run")`.
+- Umbrella: `Skill(skill="hv-skills:hv-qa", args="run --repo $REPO")`.
+
+`/hv-qa` emits one of three verdicts on its final line, all caps — `PASS`, `CONCERNS`, or `FAIL`. Route per `references/review-verdict-routing.md`, **gated by `qa.gate`**:
+
+| `qa.gate` | `PASS` | `CONCERNS` | `FAIL` |
+|---|---|---|---|
+| `"advisory"` (default) | continue to Step 4 silently | surface findings with carrier label *"QA concerns:"*; continue to Step 4 | surface findings with carrier label *"QA concerns:"*; continue to Step 4 (the ship is not blocked — advisory means advisory) |
+| `"blocking"` | continue to Step 4 silently | surface findings, branch on `autonomy.level` (same shape as Step 3): off/auto → `AskUserQuestion` Address-via-`/hv-work` (Recommended) / Ship anyway / Stop; loop → auto-pick `address` and re-invoke `/hv-work` then `/hv-ship` | stop; surface findings; user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats `FAIL` as a guard failure (loop stops). |
+
+Surface QA concerns with the carrier label *"QA concerns:"* per `references/review-verdict-routing.md` (Carrier-label override) — keeps them visually distinct from `/hv-review` concerns and second-opinion concerns in a single ship pass.
+
+The gate runs after Step 3.5 because there's no point spinning up infra-bound QA runs on a diff that the contextualized or fresh-eyes reviewers already failed. It runs before Step 4 because QA findings may change the PR body's framing (test-plan adjustments, follow-up tasks). When `INFRA-FAIL` returns from `/hv-qa` (dev server / creds / binary missing), treat it as advisory — surface the missing requirements as a note and continue. QA can't run, but ship shouldn't break because the dev server happened to be down.
 
 ## Step 4 — Build the PR Body
 

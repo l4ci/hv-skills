@@ -194,6 +194,9 @@ EXPECTED = [
     ("learn", "promoteThreshold"),
     ("ship", "review"),
     ("ship", "secondOpinion"),
+    ("ship", "qa"),
+    ("qa", "gate"),
+    ("qa", "afterWork"),
     ("autonomy", "level"),
     ("debug", "competingHypotheses"),
     ("docs", "path"),
@@ -269,7 +272,8 @@ cfg = {
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
-  "ship":     {"review": <Q4-ship>, "secondOpinion": False},
+  "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
+  "qa":       {"gate": "advisory", "afterWork": False},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
   "docs":     {"path": "docs", "autoCreate": False, "afterWork": False},
@@ -310,6 +314,23 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # the flag when the user approves a fresh scaffold).
 .hv/bin/hv-config-set docs.afterWork false
 
+# ship.qa — silent default. Opt-in feature flag (Rule 9) gating the
+# /hv-qa product-QA gate in /hv-ship Step 3.75. Off because QA runs are
+# slow and may require infra (dev server, creds). Users enable via
+# /hv-config when they want every ship to consult product-level checks.
+.hv/bin/hv-config-set ship.qa false
+
+# qa.gate — silent default. "advisory" emits the verdict but never halts;
+# "blocking" halts /hv-ship on FAIL when ship.qa is true. Default
+# advisory keeps QA findings informational; users opt into blocking via
+# /hv-config when their workflow can tolerate the slower gate.
+.hv/bin/hv-config-set qa.gate advisory
+
+# qa.afterWork — silent default. Opt-in feature flag (Rule 9) gating
+# whether /hv-work invokes /hv-qa run post-cycle on touched watch globs.
+# Off because QA is heavy; users enable in tight feedback-loop projects.
+.hv/bin/hv-config-set qa.afterWork false
+
 # loop.webResearch — silent default. Gates whether /hv-plan --auto-loop
 # (F32) calls WebSearch when an open question references an external
 # library/API/protocol. Off by default per the opt-in-flags-default-false
@@ -341,7 +362,7 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (`/hv-map`), and domain-glossary terms (`/hv-context`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
+Seed seven managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (`/hv-map`), domain-glossary terms (`/hv-context`), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
 
 ```bash
 .hv/bin/hv-skills-index
@@ -350,6 +371,7 @@ Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash
 .hv/bin/hv-decisions-index
 .hv/bin/hv-map-index
 .hv/bin/hv-context-index
+.hv/bin/hv-qa-index
 ```
 
 Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
