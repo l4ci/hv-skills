@@ -22,7 +22,7 @@ user-invocable: true
 | `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) |
 | Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose doc updates) |
 | Invoked by `/hv-refactor`, or `/hv-docs restructure` | Restructure (audit + reorganize) |
-| Manual invoke, no signal | First-run if `<docs.path>/` missing; else nudge |
+| Manual invoke, no signal | First-run if `<docs.path>/` missing; else after-work in manual mode (gate bypassed — manual invocation is itself the trigger) |
 
 If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
 
@@ -58,7 +58,7 @@ Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs
 
 - **Empty or missing** → continue with first-run mode (Steps 2–6).
 - **Non-empty** → not a first-run scenario. Branch on `docs.afterWork`:
-  - **Already `true`** → After-work mode is already enabled. Print *"`<docs.path>/` already exists and after-work mode is on. Re-running `/hv-docs` manually has no further effect; the flow auto-runs after `/hv-work` and `/hv-ship` cycles. Use `/hv-config` to toggle off."* and exit.
+  - **Already `true`** → After-work mode is already enabled. **Route to the After-work flow (Step A1 onward) as manual mode** — the user re-invoked `/hv-docs` precisely to check whether docs are still aligned with recent changes, which is what after-work does. Print one line first so the user sees the routing: *"After-work mode is on. Checking docs against changes since the last `docs:` commit."* Then proceed to Step A1; the trigger gate is bypassed on this manual entry (see Step A1).
   - **`false` (default)** → ask via `AskUserQuestion`:
     - **Header:** `"After-work"`
     - **Question:** *"`<docs.path>/` is initialized but `docs.afterWork` is off. Enable after-work mode? `/hv-work` and `/hv-ship` will then auto-invoke `/hv-docs` to propose doc updates after each cycle."*
@@ -180,11 +180,13 @@ Next:
 
 ## After-work Flow
 
-This flow is invoked by `/hv-work` Step 13.6 and `/hv-ship` Step 8.6 — those steps gate on `docs.afterWork` (default `false`); when on, they dispatch `/hv-docs` via `Skill` post-cycle and pass the resolved item IDs + touched files. Manual invocation also runs this flow when `<docs.path>/` exists and the flag is on.
+This flow is invoked by `/hv-work` Step 13.6 and `/hv-ship` Step 8.6 — those steps gate on `docs.afterWork` (default `false`); when on, they dispatch `/hv-docs` via `Skill` post-cycle and pass the resolved item IDs + touched files. **Manual invocation** also runs this flow when `<docs.path>/` exists and the flag is on (Step 1 routes here); on that path the Step A1 trigger gate is bypassed because the manual re-invocation is itself the trigger, and Step A6's `Resolves:` line is omitted (no upstream cycle brief to cite).
 
 ## Step A1 — Trigger Gate
 
-Apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug). Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
+For **post-cycle dispatches** (called via `Skill` from `/hv-work` Step 13.6 or `/hv-ship` Step 8.6), apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug). Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
+
+**Manual entry bypasses the gate.** When Step 1 routed here (user re-invoked `/hv-docs` directly, no upstream cycle brief), skip the trigger condition entirely — the manual re-invocation is the trigger. Proceed straight to Step A2.
 
 If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print one line: *"`/hv-docs` not yet initialized — run `/hv-docs` to scaffold."* and exit. Don't auto-scaffold mid-cycle.
 
