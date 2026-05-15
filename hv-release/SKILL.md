@@ -1,6 +1,6 @@
 ---
 name: hv-release
-description: Cut a release — bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, and publish a release on GitHub or GitLab if origin is set. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
+description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a preflight gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, and publish a release on GitHub or GitLab if origin is set. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
 user-invocable: true
 ---
 
@@ -23,6 +23,7 @@ Read from `.hv/config.json` (all keys optional — defaults apply if absent):
 |---|---|---|
 | `release.versionFile` | (auto-detect) | Explicit path override; skips auto-detect search |
 | `release.changelogPath` | `CHANGELOG.md` | Project-root relative |
+| `release.checklistPath` | `.hv/RELEASE.md` | Per-project release checklist walked in Step 1.5; absent = offer scaffold |
 | `release.tagPrefix` | `v` | Set to `""` for unprefixed tags |
 | `release.draft` | `false` | Pass `--draft` to `gh`/`glab` |
 | `release.requireCleanTree` | `true` | Set `false` to allow dirty releases (testing only) |
@@ -64,11 +65,61 @@ Then verify:
 Phases:
 
 1. *Preflight & guard* — clean tree, on main, HEAD pushed (Step 1)
-2. *Bump version* — version source detected and incremented (Steps 2–4)
-3. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
-4. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
-5. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
-6. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
+2. *Project checklist* — walk `.hv/RELEASE.md` items as gates (Step 1.5)
+3. *Bump version* — version source detected and incremented (Steps 2–4)
+4. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
+5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
+6. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
+7. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
+
+## Step 1.5 — Project Checklist
+
+Per-project release steps that aren't (and shouldn't be) hardcoded into the skill — sibling version files, lockfiles, docs version refs, infra rollouts, anything project-specific. Lives in `release.checklistPath` (default `.hv/RELEASE.md`). Gitignored — local to each contributor.
+
+Skip the whole step in `--dry-run` mode (print the parsed items and `DRY RUN — checklist walk skipped.` instead).
+
+**File absent.** Branch on `autonomy.level` from `.hv/config.json`:
+
+- `"off"` (default) — `AskUserQuestion`:
+  - **Header:** `"Checklist"`
+  - **Question:** *"No `<release.checklistPath>` found. Scaffold a starter checklist now, or continue without?"*
+  - **Options** (single-select):
+    1. `Scaffold starter (Recommended)` — write the template below, open it for the user to edit, then re-read and walk it
+    2. `Continue without` — note it in the Step 14 summary as *"no project checklist"*; continue to Step 2
+    3. `Abort`
+  - Plain-text fallback: *"Scaffold checklist, continue without, or abort?"*
+- `"auto"` or `"loop"` — skip silently. No checklist means no gate; do not interrupt unattended runs to scaffold one.
+
+**Starter template** (write verbatim on Scaffold):
+
+```markdown
+# Release Checklist
+
+Each `- [ ]` line is a gate `/hv-release` walks before bumping the version. Edit freely — nothing here is hardcoded. Items marked `- [x]` are ignored. Append `(manual)` to any item that must interject even in `autonomy.level: auto`/`loop`.
+
+- [ ] Sibling version-bearing files are in sync (e.g., `.claude-plugin/marketplace.json`, lockfiles, docs version refs)
+- [ ] CI is green on the release branch
+- [ ] Migration notes for users on the prior version are written
+
+(Add project-specific items below.)
+```
+
+**File present.** Parse every line matching `^\s*-\s+\[\s*\]\s+(.+)$` as a gate (in file order). Lines matching `- [x]` are skipped. If zero gates, print *"Checklist has no open items — continuing."* and proceed.
+
+For each gate, branch on `autonomy.level`:
+
+- `"off"` — always interject:
+  - **Header:** `"Checklist"`
+  - **Question:** *"Checklist item: \<text\>. Done?"*
+  - **Options** (single-select):
+    1. `Yes, continue (Recommended)` — proceed to next item
+    2. `Fix it now and continue` — pause for the user; re-ask the same item afterward
+    3. `Skip this item` — note in the Step 14 summary as `skipped: <text>`
+    4. `Abort release` — stop with *"Release aborted at checklist item: \<text\>. Nothing written."*
+  - Plain-text fallback: *"Done, fix now, skip, or abort?"*
+- `"auto"` or `"loop"` — auto-acknowledge items whose text does **not** end with `(manual)`; interject (using the off-mode prompt above) for items that do. This lets users mark sensitive items (`Push staging migration (manual)`) as always-confirmed even in unattended runs.
+
+After all gates pass, continue to Step 2.
 
 ## Step 2 — Detect Version Source
 
@@ -294,8 +345,11 @@ Released v<new_version>
   Commit:   <commit-SHA>
   CHANGELOG: <release.changelogPath>
   Remote:   <release-URL or "skipped">
+  Checklist: <N> done / <M> skipped (or "no project checklist" / "skipped in dry-run")
   [No previous tag — full history used as range.]   ← only when no prev tag
 ```
+
+If any checklist items were skipped, append a `Skipped checklist items:` block listing each on its own line.
 
 In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 
@@ -310,6 +364,8 @@ In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 - **CHANGELOG section already exists for this version** — helper exits 1 at Step 9; surface the error and stop.
 - **Existing CHANGELOG.md without `# Changelog` header** — helper preserves existing content; inserts after H1 if present, else prepends.
 - **Compare URL when no previous tag** — omit the `Full changelog:` line from the notes.
+- **Checklist absent in `auto`/`loop`** — silently skip Step 1.5; do not interrupt unattended runs to scaffold. The Step 14 summary notes *"no project checklist"*.
+- **Checklist item user-skipped** — proceed, but list the skipped text under `Skipped checklist items:` in the Step 14 summary so the release record is honest.
 
 ## Rules
 
@@ -319,6 +375,7 @@ In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 - Atomic writes only — all file mutations go through the helpers which use atomic write semantics.
 - Surface failures from any helper immediately; do not continue past a non-zero exit.
 - `--dry-run` skips all writes, commits, tags, and pushes — output shows what would happen.
+- Never hardcode project-specific release steps into the skill — they live in `release.checklistPath` per project. Step 1.5 walks the file; the skill itself stays generic.
 
 ## References
 
