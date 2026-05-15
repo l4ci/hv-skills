@@ -161,6 +161,39 @@ Same-model-fresh-context is the cheap MVP; cross-model second-opinions (Codex/Ge
 
 See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
+## ship.qa
+
+Controls whether `/hv-ship` invokes [`/hv-qa run`](qa.md) between `/hv-review` (and the optional second-opinion gate) and the merge/PR step. `/hv-review` answers *"does this diff make sense"*; `/hv-qa` answers *"does the product actually work"* by executing the per-target strategy in `.hv/qa/<target>.md`.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | `/hv-ship` skips QA. Diff-level review alone gates merges. |
+| `true` | After `/hv-review` (and second-opinion if on), `/hv-ship` calls `/hv-qa run` scoped to the active repo. QA findings route per `qa.gate`. If no strategy file exists for the active scope, `/hv-ship` surfaces a one-line note pointing at `/hv-qa first-run` and proceeds without QA. |
+
+The gate is opt-in because product QA needs strategy files (`/hv-qa first-run` bootstraps them) and often binds to infra — dev server, sandbox creds, runners installed. Most cycles don't need it. Enable for repos that have a QA strategy wired up and where regressions cost more than the runner time.
+
+## qa.gate
+
+Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Independent of the `/hv-review` verdict routing.
+
+| Value | Behavior |
+|-------|----------|
+| `"advisory"` (default) | All verdicts surface findings (PASS silently, CONCERNS / FAIL with the `QA concerns:` carrier label) and continue to merge / PR. Advisory means advisory — the ship is never blocked on QA. |
+| `"blocking"` | PASS continues silently. CONCERNS branches on `autonomy.level` (off / auto: `AskUserQuestion` Address / Ship anyway / Stop; loop: auto-pick Address). FAIL stops the ship; user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats FAIL as a guard failure (loop stops). |
+
+`INFRA-FAIL` (dev server / creds / binary missing) is always treated as advisory regardless of `qa.gate`. Missing infrastructure isn't a quality signal; ship shouldn't break because the dev server happened to be down. The missing requirements surface as a note and the ship continues.
+
+## qa.afterWork
+
+Controls whether `/hv-work` invokes `/hv-qa run` post-cycle when touched files match a target's `Watch globs`.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | `/hv-work` never invokes `/hv-qa`. QA only runs from `/hv-ship` (when `ship.qa: true`) or manual `/hv-qa run`. |
+| `true` | After `/hv-work` finishes a cycle, if any touched file matches a `Watch globs` entry in a `.hv/qa/<target>.md` strategy, `/hv-qa run` fires scoped to that target. Verdict is advisory at this stage — the cycle is already complete — but findings surface for the next session. |
+
+Skip turning this on until you have stable strategies and want continuous coverage on every cycle. Otherwise the noise of running runners on every commit outweighs the value.
+
 ## debug.competingHypotheses
 
 Controls whether [`/hv-debug`](debugging.md) Step 6 dispatches a single hypothesis agent or fans out three parallel agents from different angles (recent-changes, data-shape, concurrency-lifecycle). The orchestrator deduplicates the ranked outputs and picks the strongest hypothesis regardless of which agent surfaced it.

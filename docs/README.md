@@ -29,7 +29,8 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 
 ### Shipping
 
-- [Review and ship](usage/review-and-ship.md) — `/hv-review` and `/hv-ship` gates
+- [Review and ship](usage/review-and-ship.md) — `/hv-review` two-stage pass and `/hv-ship` gates (second-opinion, QA)
+- [Product QA](usage/qa.md) — `/hv-qa` per-target strategy files and the `ship.qa` gate
 - [Rolling back a cycle](usage/undo.md): `/hv-undo` guided rollback, dry-run preview, manual confirmation
 - [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
 - [Decisions](usage/decisions.md) — `/hv-decide` and hard-boundary commitments in `DECISIONS.md`

@@ -37,6 +37,45 @@ Entries are grouped under short topic headings such as `Build & Tooling`,
 top. New entries carry an HTML-comment date stamp (`<!-- YYYY-MM-DD -->`) so
 you can tell at a glance how fresh a piece of knowledge is.
 
+## Promotion lifecycle
+
+`KNOWLEDGE.md` bullets carry a tier — `provisional`, `confirmed`, or `deprecated` — tracked in a sidecar (`.hv/knowledge-tier.json`) along with a hit counter. Tiers separate "we wrote this down once" from "we've validated this repeatedly in real cycles."
+
+| Tier | Meaning |
+|------|---------|
+| `provisional` | Default for new bullets. Same advisory weight as before, but not yet load-bearing. |
+| `confirmed` | Promoted after `learn.promoteThreshold` clean hits (default 3) or manually via `/hv-learn --promote`. |
+| `deprecated` | Manually marked stale via `/hv-learn --deprecate`, or auto-flagged for review when a contradiction lands. |
+
+### Hit tracking
+
+Every time [`/hv-work`](running-work.md) or `/hv-review` consults a bullet and the consuming step actually uses it (not just reads past it), the bullet's hit counter increments via `bin/hv-knowledge-hit`. Hits accumulate across sessions — the counter is durable.
+
+At the `learn.promoteThreshold` mark, a `provisional` bullet auto-promotes to `confirmed`. Two skip conditions: the bullet already has a pending contradiction (auto-promotion stays blocked until you resolve it), or the threshold is `0` (in which case `provisional` is bypassed entirely on insert — a config choice, not a normal mode).
+
+See [`learn.promoteThreshold`](configuration.md#learnpromotethreshold) for tuning.
+
+### Contradiction queue
+
+When `/hv-work` or `/hv-review` consumes a `confirmed` bullet and observes behavior that contradicts it (the rule said X, the code or test shows ¬X), the bullet lands in `.hv/knowledge-contradictions.json` rather than getting silently demoted. Mid-cycle is the wrong moment to commit to a demotion — the contradiction might be the bug under investigation, not a stale truth.
+
+`/hv-learn` reads the queue at the start of a session and prompts for each pending entry:
+
+1. *Demote (Recommended)* — flips the bullet to `deprecated`.
+2. *Keep — false positive* — leaves the tier unchanged.
+
+Either choice clears the entry from the queue.
+
+### Manual lifecycle flags
+
+Three explicit flags bypass the heuristic flow when you already know what you want:
+
+- `/hv-learn --promote <topic> "<title>"` — sets the bullet to `confirmed` without waiting for hits. Use for a brand-new lesson you trust on the strength of the session that produced it.
+- `/hv-learn --deprecate <topic> "<title>"` — marks `deprecated`. Manual deprecations do NOT touch the contradiction queue — that queue is for heuristic candidates only.
+- `/hv-learn --amend <topic> "<title>"` — rewrites the body of one bullet while preserving its tier and hits. Use when you want sharper wording without resetting the validation history.
+
+All three operate on `(topic, title)` pairs. The tier sidecar is the source of truth for the lifecycle state; `KNOWLEDGE.md` itself stays human-readable without tier annotations.
+
 ## When to invoke
 
 Invoke `/hv-learn` after a session that surfaced discoveries: two or more
