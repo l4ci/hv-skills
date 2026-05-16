@@ -87,7 +87,7 @@ Pull the picture in parallel — these reads are independent and latency-bound:
 - Detail file: `.hv/bugs/<ID>.md`, `.hv/features/<ID>.md`, or `.hv/tasks/<ID>.md` (read whichever exists)
 - `.hv/bin/hv-knowledge-query <topic>` for topics inferred from the TODO entry and detail file
 - `.hv/bin/hv-decisions-query <topic>` for the same topics — committed boundaries the design must respect
-- `.hv/bin/hv-context-query <term>` for any domain terms the item references
+- `.hv/bin/hv-glossary-read <term>` for any domain terms the item references
 
 **Issue all of these as parallel tool calls in a single response.** Don't narrate the loading. Form a picture; carry findings forward into Steps 4 and 5.
 
@@ -198,7 +198,7 @@ Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in
 
 For each clarifying question that Step 4 would normally surface to the user, and for each Step 5 approach pick, run three steps in order:
 
-1. **Local-first.** Grep `DECISIONS.md` / `MILESTONES.md` / `KNOWLEDGE.md` / `CONTEXT.md` via `hv-decisions-query` / `hv-knowledge-query` / `hv-context-query` on the question's topic keywords. If a matching commitment exists, the answer is "honor the existing commitment" — do **not** log a new `[Auto:Loop]` entry; the existing commitment IS the record.
+1. **Local-first.** Grep `DECISIONS.md` / `MILESTONES.md` / `KNOWLEDGE.md` via `hv-decisions-query` / `hv-knowledge-query`, and `hv-glossary-read` for any domain terms, on the question's topic keywords. If a matching commitment exists, the answer is "honor the existing commitment" — do **not** log a new `[Auto:Loop]` entry; the existing commitment IS the record.
 2. **Bounded web (opt-in).** If unmatched AND the question references an external library, API, or protocol (anything outside the F14 hv-skills surface scan: `/hv-(\w+)`, `bin/hv-*`, `.hv/*` artifacts), AND `loop.webResearch == true` in `.hv/config.json` (default `false`), call `WebSearch` with a budget of **2 queries per question, 6 queries per design**. Block on results; no async fetch.
 3. **Placeholder fallback.** If still unresolved, retain the question literally in the written design's "Open questions" section with `_(Unresolved — surfaced for review)_` after the question text. The auto-write proceeds — never stop the loop.
 

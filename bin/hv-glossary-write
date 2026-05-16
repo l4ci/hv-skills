@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# Add or update a term entry in the ## Glossary topic of .hv/KNOWLEDGE.md.
+# Writer helper: exit 0 on successful write; exit 2 on usage error, 3 on alias collision.
+#
+# Usage:
+#   hv-glossary-write <term> --def <text> [--alias <a>,...] [--not <n>,...] [--touch]
+#
+# Single-repo only. Umbrella support (per-sub-repo Glossary) is F21.
+#
+# Entry format inside .hv/KNOWLEDGE.md `## Glossary`:
+#   - **<term>** — <definition>
+#     - **Aliases:** X, Y    (or _none_ if empty)
+#     - **Not:** Z           (line omitted when empty)
+#     <!-- YYYY-MM-DD -->
+#
+# Definition rules:
+#   - new term  → insert nested-bullet alphabetically; today's date stamp
+#   - existing  → replace definition; union aliases; union nots; date stamp
+#                 preserved unless --touch; --not "" clears the Not list
+#
+# Refuses (exit 3) when an alias would collide with another term's alias in the
+# same Glossary topic (cross-term uniqueness).
+#
+# Regenerates the CLAUDE.md hv-knowledge block on success (Glossary surfaces
+# as a topic name through hv-knowledge-index — terms themselves are not listed).
+set -euo pipefail
+
+TERM=""
+DEF=""
+ALIASES_RAW=""
+NOTS_RAW=""
+TOUCH="false"
+NOTS_PROVIDED="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --def)   DEF="$2"; shift 2 ;;
+    --alias) ALIASES_RAW="$2"; shift 2 ;;
+    --not)   NOTS_RAW="$2"; NOTS_PROVIDED="true"; shift 2 ;;
+    --touch) TOUCH="true"; shift ;;
+    --) shift; break ;;
+    -*) echo "error: unknown flag $1" >&2; exit 2 ;;
+    *) [ -z "$TERM" ] && TERM="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
+  esac
+done
+
+[ -n "$TERM" ] || { echo "usage: hv-glossary-write <term> --def <text> [--alias …] [--not …] [--touch]" >&2; exit 2; }
+[ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+TARGET=".hv/KNOWLEDGE.md"
+[ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" <<'PY'
+import datetime as dt
+import re
+import sys
+from pathlib import Path
+from hvlib import find_section, replace_section, write_text_atomic
+
+term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target = sys.argv[1:]
+target_path = Path(target)
+nots_provided = (nots_provided == "true")
+touch = (touch_flag == "true")
+
+def split_csv(s: str) -> list[str]:
+    return [x.strip() for x in s.split(",") if x.strip()]
+
+new_aliases = split_csv(aliases_raw)
+new_nots = split_csv(nots_raw)
+
+text = target_path.read_text()
+span = find_section(text, "Glossary")
+if span is None:
+    print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
+    sys.exit(2)
+start, end = span
+glossary_body = text[start:end]
+
+
+def parse_glossary_entries(body: str) -> tuple[list[dict], str]:
+    """Parse nested-bullet term entries from the Glossary body.
+
+    Each entry shape:
+        - **<term>** — <definition>
+          - **Aliases:** X, Y
+          - **Not:** Z              (optional)
+          <!-- YYYY-MM-DD -->       (optional but conventional)
+
+    Returns (entries, leading) where leading is the prose between the heading
+    and the first entry (or the placeholder line). entries preserves document
+    order.
+    """
+    lines = body.splitlines(keepends=True)
+    i = 0
+    leading: list[str] = []
+    while i < len(lines):
+        if re.match(r"^- \*\*", lines[i]):
+            break
+        leading.append(lines[i])
+        i += 1
+    entries: list[dict] = []
+    while i < len(lines):
+        line = lines[i]
+        m = re.match(r"^- \*\*([^*]+)\*\*\s*(?:—\s*(.*))?\s*$", line)
+        if not m:
+            i += 1
+            continue
+        name = m.group(1).strip()
+        first_line_rest = (m.group(2) or "").rstrip()
+        def_parts: list[str] = []
+        if first_line_rest:
+            def_parts.append(first_line_rest)
+        aliases: list[str] = []
+        nots: list[str] = []
+        date: str | None = None
+        i += 1
+        while i < len(lines):
+            sub = lines[i]
+            # End of entry: next top-level bullet or end of body.
+            if re.match(r"^- \*\*", sub):
+                break
+            stripped = sub.strip()
+            if not stripped:
+                i += 1
+                continue
+            m_al = re.match(r"^- \*\*Aliases:\*\*\s*(.*)$", stripped)
+            if m_al:
+                value = m_al.group(1).strip()
+                if value and value != "_none_":
+                    aliases = [a.strip() for a in value.split(",") if a.strip()]
+                i += 1
+                continue
+            m_no = re.match(r"^- \*\*Not:\*\*\s*(.*)$", stripped)
+            if m_no:
+                value = m_no.group(1).strip()
+                if value:
+                    nots = [n.strip() for n in value.split(",") if n.strip()]
+                i += 1
+                continue
+            m_dt = re.match(r"^<!--\s*(\d{4}-\d{2}-\d{2})\s*-->\s*$", stripped)
+            if m_dt:
+                date = m_dt.group(1)
+                i += 1
+                continue
+            # Continuation of definition (multi-line def is uncommon but supported).
+            if stripped.startswith("- "):
+                # Unknown nested-bullet kind; ignore it conservatively (don't lose data — wrap into def).
+                def_parts.append(stripped)
+            else:
+                def_parts.append(stripped)
+            i += 1
+        entries.append({
+            "name": name,
+            "definition": " ".join(def_parts).strip(),
+            "aliases": aliases,
+            "nots": nots,
+            "date": date,
+        })
+    leading_text = "".join(leading)
+    return entries, leading_text
+
+
+entries, leading = parse_glossary_entries(glossary_body)
+by_key = {e["name"].lower(): e for e in entries}
+today = dt.date.today().isoformat()
+key = term.lower()
+
+# Cross-term alias-collision check within Glossary.
+for other_key, info in by_key.items():
+    if other_key == key:
+        continue
+    other_aliases = {a.lower() for a in info["aliases"]}
+    collision = [a for a in new_aliases if a.lower() in other_aliases]
+    if collision:
+        print(
+            f"error: alias '{collision[0]}' is already an alias of term "
+            f"'{info['name']}' — refuse to write",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+if key in by_key:
+    prev = by_key[key]
+    merged_aliases: list[str] = []
+    seen: set[str] = set()
+    for a in prev["aliases"] + new_aliases:
+        al = a.lower()
+        if al not in seen:
+            seen.add(al)
+            merged_aliases.append(a)
+    if nots_provided:
+        merged_nots: list[str] = []
+        seen_n: set[str] = set()
+        for n in prev["nots"] + new_nots:
+            nl = n.lower()
+            if nl not in seen_n:
+                seen_n.add(nl)
+                merged_nots.append(n)
+    else:
+        merged_nots = list(prev["nots"])
+    date = today if touch else (prev["date"] or today)
+    new_def = definition
+    new_name = prev["name"]
+else:
+    merged_aliases = list(new_aliases)
+    merged_nots = list(new_nots)
+    date = today
+    new_def = definition
+    new_name = term
+
+by_key[key] = {
+    "name": new_name,
+    "definition": new_def,
+    "aliases": merged_aliases,
+    "nots": merged_nots,
+    "date": date,
+}
+
+
+def build_entry(e: dict) -> str:
+    lines = [f"- **{e['name']}** — {e['definition']}"]
+    aliases_value = ", ".join(e["aliases"]) if e["aliases"] else "_none_"
+    lines.append(f"  - **Aliases:** {aliases_value}")
+    if e["nots"]:
+        lines.append(f"  - **Not:** {', '.join(e['nots'])}")
+    lines.append(f"  <!-- {e['date'] or today} -->")
+    return "\n".join(lines)
+
+
+ordered_keys = sorted(by_key.keys())
+rendered = "\n\n".join(build_entry(by_key[k]) for k in ordered_keys)
+
+# Drop the "no terms yet" placeholder once any term exists.
+leading_clean = re.sub(
+    r"^_\(no terms yet[^)]*\)_\s*$\n?",
+    "",
+    leading,
+    flags=re.MULTILINE,
+)
+leading_clean = leading_clean.rstrip("\n")
+new_body = ("\n" + leading_clean.strip() + "\n\n" if leading_clean.strip() else "\n") + rendered + "\n"
+new_text = replace_section(text, "Glossary", new_body)
+write_text_atomic(target_path, new_text)
+print(f"wrote: Glossary/{new_name}", file=sys.stderr)
+PY
+
+# Regenerate the hv-knowledge CLAUDE.md managed block so the topic list
+# stays current (Glossary surfaces automatically since it's just a topic).
+"$HERE/hv-knowledge-index" >/dev/null

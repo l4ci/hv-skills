@@ -43,7 +43,7 @@ A recent path-encoding helper audit confirmed why: when load steps drift between
 
 Each calling skill adds its own reads inline. The protocol lists only the common subset. Concretely:
 
-- `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/CONTEXT.md` (via `hv-context-query`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
+- `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` (via `hv-glossary-read`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
 - `/hv-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `.hv/bin/hv-resolve-repos` when umbrella mode is on).
 - `/hv-plan` Step 3 adds `.hv/bin/hv-plan-list <MID>` to see existing plans under the milestone.
 

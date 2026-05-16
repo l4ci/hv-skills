@@ -91,7 +91,7 @@ Carry KNOWLEDGE bullets into Step 5's hypothesis brief. Carry DECISIONS entries 
 ## Step 3.5 — Vocabulary & soft-cap checks
 
 ```bash
-.hv/bin/hv-context-query "<terms from the bug report or the failing component>"
+.hv/bin/hv-glossary-read "<terms from the bug report or the failing component>"
 ```
 
 Carry any matched terms into Step 6's hypothesis brief — canonical definitions help align bug-report phrasing to existing components.
