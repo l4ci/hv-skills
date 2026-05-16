@@ -262,7 +262,7 @@ If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Mi
 
 From the conversation context:
 
-1. **Consult knowledge + decisions.** Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics inferred from the planned work areas. Also run `.hv/bin/hv-context-query "<terms appearing in the TODO entry or task plan>"` for any domain term used in the TODO entry, and surface inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle. Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching.
+1. **Consult knowledge + decisions.** Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics inferred from the planned work areas. Also run `.hv/bin/hv-glossary-read "<terms appearing in the TODO entry or task plan>"` for any domain term used in the TODO entry (terms live in `.hv/KNOWLEDGE.md`'s `## Glossary` topic), and surface inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle. Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching.
 
    - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
@@ -342,7 +342,7 @@ You are implementing Task N of [total].
 [Relevant entries from hv-decisions-query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
 
 **Canonical terms:**
-[Relevant terms from hv-context-query — definition + aliases. Workers MUST use these canonical names in code/comments/commit messages where they apply; aliases are listed so divergent user phrasing in the TODO entry maps back to the right term.]
+[Relevant terms from hv-glossary-read — definition + aliases. Workers MUST use these canonical names in code/comments/commit messages where they apply; aliases are listed so divergent user phrasing in the TODO entry maps back to the right term.]
 
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]

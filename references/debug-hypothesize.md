@@ -16,7 +16,7 @@ Investigate [B##]: <title>.
 **Relevant knowledge:**
 <bullets from hv-knowledge-query, if any>
 <entries from hv-decisions-query, if any — boundaries that rule out fix directions>
-<terms from hv-context-query, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
+<terms from hv-glossary-read, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
 
 [FRAMING — competing mode only: insert one lens prompt below]
 

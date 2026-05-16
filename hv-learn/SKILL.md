@@ -36,6 +36,7 @@ Phases:
 
 **Args parsing.** Before running the phases above, inspect the `args` value passed at invocation. If `args` contains any of the following flags, skip Steps 2–8 and jump directly to Step 1.5:
 
+- `--term <name>` — capture a domain term into the `## Glossary` topic of `.hv/KNOWLEDGE.md` (folds the former `/hv-context` flow); requires `--def`, accepts `--alias`, `--not`, `--touch`
 - `--promote <topic> "<title>"` — promote one bullet to `confirmed`, bypassing discovery
 - `--deprecate <topic> "<title>"` — demote one bullet to `deprecated`, bypassing discovery
 - `--amend <topic> "<title>"` — rewrite the body of one bullet, preserving tier + hits
@@ -44,7 +45,31 @@ If none of those flags are present, proceed with the normal discovery flow (Step
 
 ## Step 1.5 — Manual Override
 
-This step fires only when a manual flag (`--promote`, `--deprecate`, or `--amend`) was detected in the args.
+This step fires only when a manual flag (`--term`, `--promote`, `--deprecate`, or `--amend`) was detected in the args.
+
+### `--term <name>`
+
+Captures a domain term into the pinned `## Glossary` topic of `.hv/KNOWLEDGE.md`. Folds the former `/hv-context` capture flow; `/hv-context` was removed in v4.0.
+
+**Required:** `--def "<text>"` — one-paragraph canonical definition (single paragraph, no nested headings).
+**Optional:** `--alias "a, b, c"` (comma-separated synonyms), `--not "x, y"` (near-miss disambiguators), `--touch` (force-bump the date stamp on an existing-term update).
+
+Shell command shape:
+```bash
+.hv/bin/hv-glossary-write "<name>" --def "<text>" [--alias "..."] [--not "..."] [--touch]
+```
+
+Reads the existing Glossary topic, performs cross-term alias-collision uniqueness check, inserts (alphabetically) or updates the entry, regenerates the CLAUDE.md `<!-- hv-knowledge-start -->` block. Exit 3 on alias collision (an alias matches one already attached to a different term in Glossary); on collision, surface the helper's stderr and stop without writing.
+
+Definitional-signal autowrite — when the user phrases something like *"by X I mean Y"*, *"let's call this X"*, or *"X means Y"* during a normal session (not via the explicit `--term` flag), the orchestrator may invoke this same helper inline without going through `/hv-learn`. The flag form is the user-facing entry point; the inline form keeps the trio's old conversational-write behavior alive.
+
+Report one line:
+
+```
+Captured term: <name> in .hv/KNOWLEDGE.md ## Glossary
+```
+
+Then exit (skip remaining steps).
 
 ### `--promote <topic> "<title>"`
 
@@ -367,10 +392,10 @@ Cleared N contradictions: <demoted-count> demoted, <skipped-count> skipped
 - **Preserve existing structure.** Edit surgically; never regenerate the whole file.
 - **Sharp and short.** One sentence with a concrete claim. If you need a paragraph, link to code instead.
 - **Today's date.** Always stamp with the absolute current date.
-- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
+- **Sibling persistence skills.** `/hv-learn` (with `--term <name>` for Glossary entries) and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`. `/hv-context` was folded into `/hv-learn --term` in v4.0.
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
-- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`).
+- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.

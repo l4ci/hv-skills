@@ -62,4 +62,4 @@ Both flags only seed `Rule` and `Why`. You still articulate `Forbids` and `Permi
 
 - [`/hv-decide` skill](../../hv-decide/SKILL.md) for the capture flow itself
 - [Knowledge index](../reference/cli-helpers.md#knowledge-and-vision-indexes) for the parallel pattern used by `/hv-learn`
-- Sibling persistence skills: [`docs/usage/learning.md`](learning.md), [`docs/usage/context.md`](context.md)
+- Sibling persistence skill: [`docs/usage/learning.md`](learning.md) — covers both topic-bullet learnings and `--term <name>` Glossary capture (folded from the former `/hv-context` in v4.0)

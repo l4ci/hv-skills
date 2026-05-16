@@ -10,7 +10,6 @@
 | `KNOWLEDGE.md` | Durable learnings grouped by topic — gotchas, conventions, constraints |
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
 | `MILESTONES.md` | Milestone overview — one short section per milestone, with a vision intro paragraph and an active list |
-| `CONTEXT.md` | Domain glossary — one entry per term with definition, aliases, optional "not" clarifications. Source-of-truth for the `## Project Context` block in `CLAUDE.md`. Written by `/hv-context`. |
 | `MAP.md` + `map/<subsystem>.md` | Project map — AI-facing narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Hand-authored; `touched:` auto-bumped by cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`). |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
@@ -37,13 +36,15 @@ A typical entry looks like:
 
 Edit this file by hand whenever you want: reorder items, bump priorities, or delete things no longer relevant. The skills re-read it on every invocation, so any manual change takes effect immediately.
 
-## KNOWLEDGE.md — durable learnings
+## KNOWLEDGE.md — durable learnings + glossary
 
 `KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries sit under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
 
+One topic is special-cased: `## Glossary` holds domain-terminology entries as nested bullets (`- **<term>** — <definition>` with indented `**Aliases:**` / optional `**Not:**` / date stamp). The Glossary topic is pinned at `/hv-init` time; entries are written via `/hv-learn --term <name>` (helper `hv-glossary-write`) and read via `hv-glossary-read <term>`. The F03 tier lifecycle skips Glossary — terms are canonical, not probationary.
+
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
-`/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics. That block keeps knowledge visible to the model across context clears without re-reading the full file.
+`/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics (`Glossary` surfaces here like any other topic). That block keeps knowledge visible to the model across context clears without re-reading the full file.
 
 ## DECISIONS.md — hard-boundary decisions
 
@@ -60,21 +61,6 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
 A companion managed block in `CLAUDE.md` lists active milestones so `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is in progress.
-
-## CONTEXT.md — domain glossary
-
-`CONTEXT.md` is the domain terminology dictionary for the project. Each entry is one term with:
-
-- A canonical **definition** (one or two sentences).
-- An optional **Aliases** list — informal synonyms the team uses.
-- An optional **Not** list — clarifications for terms that are easily confused with adjacent concepts.
-- A hidden date stamp (`<!-- YYYY-MM-DD -->`) tracking when the entry was last written.
-
-[`/hv-context`](../usage/context.md) adds and updates entries. The file is sorted alphabetically by term on every write. `/hv-init` inserts a managed `## Project Context` block in `CLAUDE.md` that lists the first sentence of each definition, and that thin summary stays visible to the model without loading the full file.
-
-For umbrella projects, the umbrella-shared glossary lives in `.hv/CONTEXT.md` and per-sub-repo glossaries live in `.hv/contexts/<repo>/CONTEXT.md`. The combined view is maintained in `.hv/CONTEXT-MAP.md` by `hv-context-map`.
-
-See [../usage/context.md](../usage/context.md) for the full capture and query workflow.
 
 ## MAP.md — project map
 

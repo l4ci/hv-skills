@@ -19,7 +19,6 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present. Pass `--preview <ID>` for a read-only peek of the intended approach (files, tests, assumptions, unknowns) that gates high-stakes work without writing anything |
 | `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, hard-stops via the Iron Law after 3 failed committed fixes, nudges `/hv-learn` |
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
-| `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
 | `/hv-review` | Two-stage review of a branch (Stage 1 spec-compliance vs `PLAN.md`, Stage 2 code-quality with silent-failure-hunter + decision-violations) vs `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL. Short-circuits Stage 2 on Stage 1 `FAIL` |
 | `/hv-qa` | Product-level QA: executes per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; emits PASS / CONCERNS / FAIL. Modes — first-run / run / restructure |
 | `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates. Flags: `--undo` (guided rollback of the last cycle on the base branch) and `--docs` (public-docs maintenance — first-run / after-work / restructure modes; auto-fires inline at ship time when `docs.afterWork: true`) |
@@ -47,10 +46,6 @@ Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize wit
 ## /hv-decide
 
 Captures a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked. Decisions differ from learnings in `KNOWLEDGE.md` by being commitments with explicit forbids/permits; `/hv-work`, `/hv-debug`, `/hv-refactor`, and [`/hv-review`](../usage/review-and-ship.md) consult them as constraints. Accepts `--from-learning <topic>` to promote a hardened `KNOWLEDGE.md` bullet into a decision (rule/why are pre-filled; you supply the forbids/permits), and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding the same way (`inconclusive` spikes are refused). See [decisions](../usage/decisions.md) for the full flow.
-
-## /hv-context
-
-Captures or refines a domain term in `.hv/CONTEXT.md`, the project's glossary. Accepts an explicit `<term> "<definition>"` invocation, or fires inline when conversation produces an unambiguous definitional signal ("let's call this X", "by X I mean Y"). Writes one entry per term with definition, optional aliases, and optional "not" clarifications. In umbrella mode, resolves the target file from cwd; override with `--repo umbrella` or `--repo <name>`. See [capturing terminology](../usage/context.md) for the full flow.
 
 ## /hv-go
 

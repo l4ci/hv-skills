@@ -362,7 +362,7 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed seven managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), domain-glossary terms (`/hv-context`), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
+Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics including the pinned `## Glossary` term store (`/hv-learn`, `/hv-learn --term`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
 
 ```bash
 .hv/bin/hv-skills-index
@@ -370,7 +370,6 @@ Seed seven managed blocks in `CLAUDE.md` (created if missing): the hv-skills sla
 .hv/bin/hv-vision-index
 .hv/bin/hv-decisions-index
 .hv/bin/hv-map-index
-.hv/bin/hv-context-index
 .hv/bin/hv-qa-index
 ```
 
@@ -383,7 +382,7 @@ Tell the user one compact block:
 ```
 Initialized .hv/ in <project>.
 Config: <summary — "defaults" if all Recommended, else a one-liner e.g. "Balanced models, worktree isolation, PR merges, verifier on">.
-Next: /hv-capture to add items, /hv-next to pick work, /hv-context to capture domain terms, /hv-learn to save learnings.
+Next: /hv-capture to add items, /hv-next to pick work, /hv-learn to save learnings, /hv-learn --term <name> for glossary terms.
 Edit .hv/config.json to change any of these later.
 ```
 

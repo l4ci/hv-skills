@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Print matching term entries from the ## Glossary topic of .hv/KNOWLEDGE.md.
+# Each printed block is preceded by a `> from: .hv/KNOWLEDGE.md (## Glossary)`
+# line so callers can distinguish glossary hits from regular knowledge bullets.
+#
+# Usage: hv-glossary-read <term>...
+#   Case-insensitive match against the term name.
+#   Document order preserved when multiple terms are queried.
+#   Unknown terms produce no output and exit 0.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+[ $# -ge 1 ] || { echo "usage: hv-glossary-read <term>..." >&2; exit 1; }
+
+TARGET=".hv/KNOWLEDGE.md"
+[ -f "$TARGET" ] || exit 0
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TARGET" "$@" <<'PY'
+import re
+import sys
+from pathlib import Path
+from hvlib import find_section
+
+target = Path(sys.argv[1])
+wanted = {t.strip().lower() for t in sys.argv[2:]}
+if not wanted:
+    sys.exit(0)
+
+text = target.read_text()
+span = find_section(text, "Glossary")
+if span is None:
+    sys.exit(0)
+start, end = span
+body = text[start:end]
+
+# Split the body into per-entry blocks by top-level `- **<name>**` boundaries.
+lines = body.splitlines(keepends=True)
+i = 0
+entries: list[tuple[str, str]] = []
+while i < len(lines):
+    m = re.match(r"^- \*\*([^*]+)\*\*", lines[i])
+    if not m:
+        i += 1
+        continue
+    name = m.group(1).strip()
+    block_lines = [lines[i]]
+    i += 1
+    while i < len(lines):
+        if re.match(r"^- \*\*", lines[i]):
+            break
+        block_lines.append(lines[i])
+        i += 1
+    entries.append((name, "".join(block_lines).rstrip("\n")))
+
+printed = False
+for name, block in entries:
+    if name.lower() not in wanted:
+        continue
+    if printed:
+        print()
+    print("> from: .hv/KNOWLEDGE.md (## Glossary)")
+    print(block)
+    printed = True
+PY

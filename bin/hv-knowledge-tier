@@ -88,6 +88,16 @@ if [[ "$CMD" != "list" ]]; then
   fi
 fi
 
+# Glossary topic is special-cased — terms aren't tier-eligible (they're canonical
+# names, not probationary observations). Skip all per-bullet ops for it; --list
+# filters Glossary out below as defense in depth.
+if [[ "$CMD" != "list" && "$TOPIC" == "Glossary" ]]; then
+  if [[ "$CMD" == "get" ]]; then
+    echo "{}"
+  fi
+  exit 0
+fi
+
 # For --set, --tier is required
 if [[ "$CMD" == "set" && -z "$TIER_ARG" ]]; then
   echo "error: --tier is required for --set" >&2
@@ -194,6 +204,10 @@ elif cmd == "list":
         if "::" not in key:
             continue
         t, s = key.split("::", 1)
+        # Glossary terms are not tier-eligible — filter defensively in case
+        # an older sidecar carried entries from before the skip was added.
+        if t == "Glossary":
+            continue
         if list_tier and entry["tier"] != list_tier:
             continue
         result.append({
