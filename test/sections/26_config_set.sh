@@ -78,8 +78,8 @@ pass "hv-ship Docs Mode, hv-config, hv-init all reference the new helper"
 echo "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
 grep -E '\| Manual invoke.*after-work.*manual mode' "$REPO/hv-ship/SKILL.md" >/dev/null \
   || fail "F09: hv-ship Docs Mode Modes row for manual invocation doesn't reflect after-work in manual mode"
-grep -q "Route to the After-work flow" "$REPO/hv-ship/SKILL.md" \
-  || fail "F09: hv-ship Docs Mode Step D1 'Already true' branch doesn't route to after-work flow"
+grep -q "Route to the After-work sub-flow" "$REPO/hv-ship/SKILL.md" \
+  || fail "F09: hv-ship Docs Mode Step D1 'Already true' branch doesn't route to after-work sub-flow"
 grep -q "Manual entry bypasses the gate" "$REPO/hv-ship/SKILL.md" \
   || fail "F09: hv-ship Docs Mode Step D-A1 missing manual-entry bypass clause"
 # Old no-op text must not survive

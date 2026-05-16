@@ -1,6 +1,6 @@
 echo "F24: hv-uncomplete + hv-undo helpers"
 # Behaviour guard for bin/hv-uncomplete and bin/hv-undo.
-# See [F24] — /hv-undo guided rollback of the last /hv-work cycle.
+# See [F24] — `/hv-ship --undo` guided rollback of the last /hv-work cycle.
 
 UNDO_TMP="$(mktemp -d)"
 trap 'rm -rf "$UNDO_TMP"' EXIT

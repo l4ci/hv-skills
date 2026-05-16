@@ -440,7 +440,7 @@ Pass the helper's stdout to the user verbatim. Then continue to Step U5.
 
 ### Step U5 — Report
 
-Print the engine's final summary line as-is. Do **not** invoke `/hv-learn`, `/hv-docs`, `/hv-refactor`, or `/hv-next` — Undo Mode is terminal. The user re-runs `/hv-next` themselves to see the restored backlog.
+Print the engine's final summary line as-is. Do **not** invoke `/hv-learn`, `/hv-ship --docs`, `/hv-refactor`, or `/hv-next` — Undo Mode is terminal. The user re-runs `/hv-next` themselves to see the restored backlog.
 
 ### When to Use Undo Mode
 

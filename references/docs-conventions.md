@@ -42,6 +42,6 @@ The seed is conservative — the user extends it for project-specific paths afte
 
 ## What this reference does NOT cover
 
-- **First-run vs. after-work mode selection.** Lives inline in `/hv-docs/SKILL.md` Step 1 (mode detection branches on `<docs.path>/` state + `docs.afterWork`).
+- **First-run vs. after-work mode selection.** Lives inline in `hv-ship/SKILL.md` Step D1 of Docs Mode (mode detection branches on `<docs.path>/` state + `docs.afterWork`).
 - **The post-cycle trigger gate** (2+ items / ≥5 files / hard bug). Lives in `references/post-cycle-trigger-gate.md` — shared with `/hv-work` and `/hv-ship`.
 - **The three-mode skeleton shared with `/hv-map`.** Lives in `references/three-mode-skill-shape.md` — covers the family-level shape and intentional divergences.
