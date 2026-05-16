@@ -71,7 +71,7 @@ Everything Claude reads or mutates lives under `.hv/` in your project. Git is th
 
 ## The five lanes
 
-**Capture.** `/hv-capture` (alias `/hv-c`) is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-go` collapses capture and execute into a single pass for hot-path fixes. `/hv-issues` syncs open GitHub or GitLab issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-rm` removes a captured item and cleans up its dependencies.
+**Capture.** `/hv-capture` is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-go` collapses capture and execute into a single pass for hot-path fixes. `/hv-issues` syncs open GitHub or GitLab issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-rm` removes a captured item and cleans up its dependencies.
 
 **Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-assume` previews the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
 
