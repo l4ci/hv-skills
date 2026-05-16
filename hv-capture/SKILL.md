@@ -192,6 +192,8 @@ With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
 
 **Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, `Repos:`, and `Subsystem:` (optional). Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — comma-separated list of registered sub-repos; a single name is the common case, two or more turns the item into a multi-repo dispatch via `/hv-work`); `Subsystem:` is the project-map subsystem this item belongs to.
 
+**`Since:` is auto-stamped.** `hv-append` appends ` Since: <short-hash>` (HEAD at capture time) to every new bullet that doesn't already carry the field, when invoked inside a git repo with at least one commit. The Since anchor lets `hv-todo-drift` ignore commits older than capture — prevents false-positives when IDs are reused across machine syncs. Don't include `Since:` in the entry string manually; let `hv-append` stamp it.
+
 **Subsystem inference (optional).** Scan filenames and skill references in the user's text against the entries in `.hv/map/` (or the `## Project Map` block in CLAUDE.md). If a match is clear — e.g. the user mentions `hv-work`, `bin/hv-staleness`, or `hv-map` — append `Subsystem: <name>` (the closest map entry name) to the captured row. If no confident match exists, omit the field entirely. **Never block or delay capture for a missing Subsystem.** The field is a soft hint for map hygiene, not a required tag.
 
 Example:

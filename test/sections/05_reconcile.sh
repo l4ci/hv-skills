@@ -67,6 +67,111 @@ EOF
 )
 rm -rf "$TD_TMP"
 
+echo "hv-todo-drift Since-anchor"
+SA_TMP="$(mktemp -d)"
+(
+  cd "$SA_TMP"
+  mkdir -p .hv/bin
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  echo '{"repos": []}' > .hv/repos.json
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  git commit -q --allow-empty -m "init"
+
+  # Scenario A: ID-reuse simulation. Old commit ships [B07], then a new
+  # [B07] is captured AFTER. The new bullet's Since anchor must hide the
+  # old commit from drift detection.
+  git commit -q --allow-empty -m "feat: old shipment [B07]"
+  git commit -q --allow-empty -m "chore: anchor pin"
+  ANCHOR="$(git rev-parse --short HEAD)"
+  cat > .hv/BACKLOG.md <<EOF
+# TODO
+
+## Bugs
+- **[B07] [P1] Newcomer at this ID.** Body. Since: $ANCHOR
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+  OUT=$(.hv/bin/hv-todo-drift)
+  if echo "$OUT" | grep -q '"id": "B07"'; then
+    fail "drift should NOT flag pre-anchor commit for new [B07]: $OUT"
+  fi
+  pass "hv-todo-drift skips commits older than Since: anchor"
+
+  # Scenario B: a NEW commit referencing the same ID, AFTER the anchor,
+  # MUST still trigger drift (the anchor is a floor, not a mute).
+  git commit -q --allow-empty -m "feat: real shipment [B07]"
+  OUT_B=$(.hv/bin/hv-todo-drift)
+  echo "$OUT_B" | grep -q '"id": "B07"' || fail "drift missed post-anchor commit: $OUT_B"
+  pass "hv-todo-drift detects commits newer than Since: anchor"
+
+  # Scenario C: legacy entry (no Since:) preserves full-log behavior.
+  cat > .hv/BACKLOG.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B07] [P1] Legacy entry.** No Since field.
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+  OUT_C=$(.hv/bin/hv-todo-drift)
+  echo "$OUT_C" | grep -q '"id": "B07"' || fail "legacy (no Since) should still drift: $OUT_C"
+  pass "hv-todo-drift legacy entries keep full-log behavior"
+
+  # Scenario D: hv-append auto-stamps Since on fresh captures.
+  cat > .hv/BACKLOG.md <<'EOF'
+# TODO
+
+## Bugs
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+  HEAD_AT_CAP="$(git rev-parse --short HEAD)"
+  .hv/bin/hv-append "## Bugs" "- **[B08] [P2] Auto-stamp.** Body."
+  grep -q "Since: $HEAD_AT_CAP" .hv/BACKLOG.md || { cat .hv/BACKLOG.md; fail "hv-append did not auto-stamp Since"; }
+  pass "hv-append auto-stamps Since: <HEAD> on fresh bullets"
+
+  # Scenario E: hv-backfill-since stamps open bullets lacking Since;
+  # second invocation is idempotent (no output, no double-stamp).
+  cat > .hv/BACKLOG.md <<'EOF'
+# TODO
+
+## Bugs
+- **[B09] [P1] Needs backfill.** Body.
+
+## Features
+
+## Tasks
+
+## Completed
+- ~~**[B07] [P1] Completed item.**~~ Done 2026-05-07 [`abc1234`]
+EOF
+  COUNT=$(.hv/bin/hv-backfill-since)
+  [ "$COUNT" = "1" ] || fail "backfill should report 1 stamped, got: $COUNT"
+  HEAD_BF="$(git rev-parse --short HEAD)"
+  grep -q "Since: $HEAD_BF" .hv/BACKLOG.md || { cat .hv/BACKLOG.md; fail "backfill did not write Since"; }
+  # Completed items must NOT be touched
+  grep -q "Since:.*Completed item" .hv/BACKLOG.md && fail "backfill touched ## Completed entry"
+  pass "hv-backfill-since stamps open bullets lacking Since:"
+  COUNT2=$(.hv/bin/hv-backfill-since)
+  [ -z "$COUNT2" ] || fail "backfill not idempotent — re-ran with count: $COUNT2"
+  pass "hv-backfill-since is idempotent"
+)
+rm -rf "$SA_TMP"
+
 echo "hv-knowledge-query"
 cat > .hv/KNOWLEDGE.md <<'EOF'
 # Knowledge

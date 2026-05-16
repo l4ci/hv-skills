@@ -169,24 +169,28 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 
 # Single source of truth for TODO field names recognised by parse_todo_fields
 # and used by remove_id_from_related_field. Add new fields here only.
-_TODO_FIELD_NAMES = ("Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured")
+_TODO_FIELD_NAMES = ("Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured", "Since")
 
 
 def parse_todo_fields(line: str) -> dict[str, str]:
-    """Extract Detail/Related/Milestone/Repos/Subsystem/Captured fields from a TODO bullet line.
+    """Extract Detail/Related/Milestone/Repos/Subsystem/Captured/Since fields from a TODO bullet line.
 
     Each field starts with `<Field>: ` and runs until the next field marker
     or end of line. Order-agnostic. Returns a dict with keys 'detail',
-    'related', 'milestone', 'repos', 'subsystem', 'captured' — missing fields map to ''.
+    'related', 'milestone', 'repos', 'subsystem', 'captured', 'since' — missing fields map to ''.
+
+    `Since:` holds the short commit hash of HEAD at capture time; hv-todo-drift
+    uses it to ignore commits older than capture, preventing false-positives
+    when IDs are reused across machine syncs.
 
     Example: parse_todo_fields("- **[B01] [P1] Title.** Body. Detail: foo. Related: [F02]. Milestone: M01")
-        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": "", "subsystem": ""}
-    Example: parse_todo_fields("- **[F01] [Major] Title.** D. Detail: x. Milestone: M02 Repos: web")
-        => {"detail": "x.", "related": "", "milestone": "M02", "repos": "web", "subsystem": ""}
+        => {"detail": "foo.", "related": "[F02].", "milestone": "M01", "repos": "", "subsystem": "", "since": ""}
+    Example: parse_todo_fields("- **[F01] [Major] Title.** D. Milestone: M02 Repos: web Since: a1b2c3d")
+        => {"detail": "", "related": "", "milestone": "M02", "repos": "web", "subsystem": "", "since": "a1b2c3d"}
     Example: parse_todo_fields("- **[B07] [P1] Title.** D. Repos: web Subsystem: capture Captured: 2026-05-09")
-        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture", "captured": "2026-05-09"}
+        => {"detail": "", "related": "", "milestone": "", "repos": "web", "subsystem": "capture", "captured": "2026-05-09", "since": ""}
     """
-    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": "", "captured": ""}
+    fields = {"detail": "", "related": "", "milestone": "", "repos": "", "subsystem": "", "captured": "", "since": ""}
     for key in fields:
         cap = key.capitalize()
         end_lookahead = "|".join(n for n in _TODO_FIELD_NAMES if n != cap)

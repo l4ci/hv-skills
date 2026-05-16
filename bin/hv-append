@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Append entry to a section in .hv/BACKLOG.md.
+# Auto-stamps `Since: <short-hash>` (HEAD at capture time) on bullets that
+# don't already carry the field, when invoked inside a git repo with at
+# least one commit. The Since anchor lets hv-todo-drift ignore commits
+# older than capture (prevents ID-reuse false-positives across machine syncs).
 # Writer helper: exit 0 on successful append, 1 on missing section or missing argv.
 # Usage: hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."
 set -euo pipefail
@@ -8,6 +12,14 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 hv_self_locate
 SECTION="${1:?usage: hv-append <section> <entry>}"
 ENTRY="${2:?usage: hv-append <section> <entry>}"
+
+# Auto-stamp Since: <short-hash> when entry is a bullet without it AND HEAD exists.
+if [[ "$ENTRY" == "- "* ]] && [[ "$ENTRY" != *"Since:"* ]]; then
+  if SINCE_HASH="$(git rev-parse --short HEAD 2>/dev/null)" && [ -n "$SINCE_HASH" ]; then
+    ENTRY="$ENTRY Since: $SINCE_HASH"
+  fi
+fi
+
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SECTION" "$ENTRY" <<'PY'
 import sys
 from hvlib import find_section, write_text_atomic
