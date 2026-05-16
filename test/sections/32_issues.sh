@@ -60,9 +60,9 @@ echo "Section 32: manual-gate callouts in SKILL.md files"
 grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
   "$REPO/hv-issues/SKILL.md" || fail "hv-issues/SKILL.md missing manual-gate callout (Step 7)"
 
-# hv-rm/SKILL.md — Step 3.5 de-tag gate
+# hv-capture/SKILL.md — Step R3 de-tag gate (folded from /hv-rm in F14)
 grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
-  "$REPO/hv-rm/SKILL.md" || fail "hv-rm/SKILL.md missing manual-gate callout (Step 3.5)"
+  "$REPO/hv-capture/SKILL.md" || fail "hv-capture/SKILL.md missing manual-gate callout (Remove Mode Step R3)"
 
 # hv-ship/SKILL.md — Step 6c direct-push close gate
 grep -q "Step 6c" "$REPO/hv-ship/SKILL.md" || \
@@ -70,7 +70,7 @@ grep -q "Step 6c" "$REPO/hv-ship/SKILL.md" || \
 grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
   "$REPO/hv-ship/SKILL.md" || fail "hv-ship/SKILL.md missing manual-gate callout (Step 6c)"
 
-pass "3 manual-gate callouts present in hv-issues/SKILL.md, hv-rm/SKILL.md, hv-ship/SKILL.md"
+pass "3 manual-gate callouts present in hv-issues/SKILL.md, hv-capture/SKILL.md (Remove Mode), hv-ship/SKILL.md"
 
 # === references/manual-gates.md inventory rows (T11 must land before these pass) ===
 echo "Section 32: manual-gates.md inventory rows"
@@ -78,8 +78,8 @@ echo "Section 32: manual-gates.md inventory rows"
 [ "$(grep -c '/hv-issues' "$REPO/references/manual-gates.md")" -ge 1 ] || \
   fail "manual-gates.md missing /hv-issues row (T11 not yet landed?)"
 
-grep -q 'Step 3\.5\|hv-rm.*de-tag\|de-tag.*hv-rm' "$REPO/references/manual-gates.md" || \
-  fail "manual-gates.md missing hv-rm Step 3.5 row (T11 not yet landed?)"
+grep -q 'Step R3\|hv-capture --remove.*de-tag\|de-tag.*hv-capture --remove' "$REPO/references/manual-gates.md" || \
+  fail "manual-gates.md missing /hv-capture --remove Step R3 row"
 
 grep -q 'Step 6c\|direct-push close' "$REPO/references/manual-gates.md" || \
   fail "manual-gates.md missing hv-ship Step 6c row (T11 not yet landed?)"

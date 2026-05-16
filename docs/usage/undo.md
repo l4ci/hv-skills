@@ -85,7 +85,7 @@ Either path is destructive on the post-merge commits. They leave the active bran
 
 ## Manual gate
 
-The confirmation step is asked every time, including when [`autonomy.level`](autonomy.md) is set to `loop`. This mirrors the destructive-gate convention [`/hv-rm`](removing-work.md) uses: `git reset --hard` is recoverable through the reflog only inside the 90-day window, and the gate guarantees a human signed off before the reset runs. No flag suppresses the prompt.
+The confirmation step is asked every time, including when [`autonomy.level`](autonomy.md) is set to `loop`. This mirrors the destructive-gate convention [`/hv-capture --remove`](removing-work.md) uses: `git reset --hard` is recoverable through the reflog only inside the 90-day window, and the gate guarantees a human signed off before the reset runs. No flag suppresses the prompt.
 
 ## What `/hv-undo` is NOT for
 

@@ -85,9 +85,9 @@ Captured items carry `GH: #N` / `GL: #N` in their BACKLOG.md body. On ship:
 
 ## Cleanup on remove
 
-`/hv-rm` Step 3.5 presents a manual-gated prompt to remove the upstream label
-when a captured item is removed without ever shipping, so the upstream issue
-isn't left permanently marked as claimed.
+`/hv-capture --remove` Step R3 presents a manual-gated prompt to remove the
+upstream label when a captured item is removed without ever shipping, so the
+upstream issue isn't left permanently marked as claimed.
 
 ## Example
 
@@ -125,7 +125,7 @@ isn't left permanently marked as claimed.
 
 - `/hv-capture` — brain-dump counterpart; use when the item originates locally.
 - `/hv-ship` — emits `Closes #N` in PR bodies and handles direct-push closing.
-- `/hv-rm` — optionally removes the upstream label when an imported item is
-  deleted without shipping (Step 3.5 manual gate).
+- `/hv-capture --remove` — optionally removes the upstream label when an
+  imported item is deleted without shipping (Step R3 manual gate).
 - `bin/hv-issues-*` — helpers underlying this skill (`hv-issues-provider`,
   `hv-issues-list`, `hv-issues-imported`, `hv-issues-label`, `hv-issues-close`).

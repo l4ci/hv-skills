@@ -11,7 +11,7 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
 | `/hv-issues` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
-| `/hv-rm` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
+| `/hv-capture --remove` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
 | `/hv-next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv-work` |
 | `/hv-pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-next` |
 | `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`) — task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
@@ -109,7 +109,7 @@ The checklist file is per-project and gitignored — see [release checklist](../
 
 Staff-engineer review of a feature branch before it leaves your machine: scopes the diff, pulls relevant `KNOWLEDGE.md` topics, returns PASS / CONCERNS / FAIL with file-and-line evidence. Read-only; no mutations, no commits. See [review and ship](../usage/review-and-ship.md) for the full flow.
 
-## /hv-rm
+## /hv-capture --remove
 
 Removes a captured backlog item and cleans up its dependencies in one operation. Strips the item's entry from `BACKLOG.md`, removes `Related:` cross-references that point to it from other items, deletes any matching detail file (`.hv/bugs/`, `.hv/features/`, `.hv/tasks/`) and plan file (`.hv/plans/`), and strips the item from `status.json`. Items currently active in `status.json` are refused unless `--force` is passed.
 
