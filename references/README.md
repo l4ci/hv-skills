@@ -10,7 +10,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 |-----------|---------|----------|
 | [`ask-user-question-fallback.md`](ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. | `/hv-brainstorm`, `/hv-capture` (`--from-*`), `/hv-init`, `/hv-release`, `/hv-ship`, `/hv-vision`, `/hv-work` |
 | [`authoring-conventions.md`](authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). | `/hv-capture`, `/hv-init`, `/hv-next`, `/hv-refactor`, `/hv-ship` |
-| [`banner-preamble.md`](banner-preamble.md) | Banner-print rule shared by every skill. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-context`, `/hv-debug`, `/hv-decide`, `/hv-go`, `/hv-init`, `/hv-learn`, `/hv-map`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-update`, `/hv-vision`, `/hv-work` |
+| [`banner-preamble.md`](banner-preamble.md) | Banner-print rule shared by every skill. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-context`, `/hv-debug`, `/hv-decide`, `/hv-go`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-update`, `/hv-vision`, `/hv-work` |
 | [`context-load-protocol.md`](context-load-protocol.md) | K+D context loading sequence shared by every cycle-starting skill. | `/hv-plan`, `/hv-vision`, `/hv-work` (including `--preview`) |
 | [`context-umbrella-scoping.md`](context-umbrella-scoping.md) | Umbrella-mode resolution for the `/hv-context` artifact. | `/hv-context` |
 | [`debug-hypothesize.md`](debug-hypothesize.md) | Both-modes hypothesize choreography (brief template, single vs competing, per-axis divergence) for `/hv-debug` Step 6. | `/hv-debug` |
@@ -38,7 +38,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`subagent-dispatch.md`](subagent-dispatch.md) | Cross-skill rulebook for when and how skills push work into subagents instead of the orchestrator thread. | `/hv-debug`, `/hv-next`, `/hv-qa`, `/hv-vision` |
 | [`task-list-init.md`](task-list-init.md) | Canonical task-list initialization block cited by every skill with three or more phases. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-context`, `/hv-debug`, `/hv-decide`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
 | [`terminal-loop-surface.md`](terminal-loop-surface.md) | Canonical bash block for surfacing `[Auto:Loop]` decisions from terminal-path skills before halting. | `/hv-debug`, `/hv-next`, `/hv-pause`, `/hv-work` |
-| [`three-mode-skill-shape.md`](three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship` (Docs Mode) and `/hv-map`. | `/hv-map`, `/hv-qa`, `/hv-ship` |
+| [`three-mode-skill-shape.md`](three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship` (Docs Mode) and `/hv-qa`. | `/hv-qa`, `/hv-ship` |
 | [`umbrella-mode.md`](umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. | `/hv-capture`, `/hv-qa`, `/hv-spike`, `/hv-work` |
 | [`update-verdicts.md`](update-verdicts.md) | Update-check verdicts and routing for `/hv-update`. | `/hv-update` |
 

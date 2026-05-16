@@ -9,10 +9,9 @@ The example project is **Pinpoint**, an internal incident dashboard. Node and Re
 ```mermaid
 flowchart LR
   REPO[(existing repo<br/>+ open GH issues)] --> INIT["/hv-init"]
-  INIT --> MAP["/hv-map<br/>first-run"]
+  INIT --> SUBS[(.hv/map/<br/>6 subsystem files,<br/>hand-authored)]
   INIT --> ISSUES["/hv-capture --from-github"]
   INIT --> CAP["/hv-capture"]
-  MAP --> SUBS[(.hv/map/<br/>6 subsystems)]
   ISSUES --> BACKLOG[(BACKLOG.md)]
   CAP --> BACKLOG
   BACKLOG --> NEXT["/hv-next"]
@@ -38,31 +37,50 @@ Same five questions as a greenfield setup. For an existing repo I usually flip t
 
 `/hv-init` writes `.hv/` and the managed blocks in `CLAUDE.md`. It doesn't read your code. That happens next.
 
-## Step 2 — /hv-map first-run
+## Step 2 — Scaffold the project map by hand
 
-`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. `/hv-map` first-run is a one-shot scaffold.
+`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. The project map lives in `.hv/map/<name>.md` — one Markdown file per coherent area of the codebase, hand-authored. `/hv-init` already created the empty `.hv/map/` directory in Step 1; you fill it in now.
 
-```bash
-$ /hv-map
-```
-
-It asks: *first-run scaffold, after-work update, or consolidate?* Pick first-run. It walks the repo, identifies entry points (servers, CLIs, tests, build scripts), and proposes a subsystem breakdown. For Pinpoint:
+For Pinpoint you spend ten minutes sketching out:
 
 ```
-Proposed subsystems:
-  - api          server/api/* (Express routes, request validation)
-  - dashboard    web/src/dashboard/* (React dashboard pages)
-  - alerts       server/alerts/* (rule engine, dedup, escalation)
-  - integrations server/integrations/{datadog,pagerduty,slack}/*
-  - storage      server/storage/* (Postgres pool, migrations)
-  - shared       shared/* (cross-cutting types, utils)
-
-Write 6 subsystem files to .hv/map/? [y/N]
+.hv/map/
+  api.md           server/api/*           (Express routes, request validation)
+  dashboard.md     web/src/dashboard/*    (React dashboard pages)
+  alerts.md        server/alerts/*        (rule engine, dedup, escalation)
+  integrations.md  server/integrations/*  (Datadog, PagerDuty, Slack)
+  storage.md       server/storage/*       (Postgres pool, migrations)
+  shared.md        shared/*               (cross-cutting types, utils)
 ```
 
-You confirm. Each file gets a one-paragraph *Purpose*, an *Entry points* section pointing at `file:line` waypoints, and a `summary:` frontmatter field that gets pulled into the always-on `## Project Map` block in `CLAUDE.md`.
+Each file is short. A typical one:
 
-The map isn't exhaustive. Just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `last-touched` date bumped automatically (`after-work` mode runs as a post-cycle step). Over time you'll run `/hv-map consolidate` when subsystems drift or duplicate.
+```markdown
+---
+subsystem: alerts
+summary: Rule engine that ingests events, dedups, and escalates to integrations.
+touched: 2026-05-16
+created: 2026-05-16
+---
+
+## Purpose
+Rule-based alerting. Reads events, evaluates rules, dedups within a window, and escalates via integrations.
+
+## Entry points
+- server/alerts/engine.js:14 — main rule loop
+- server/alerts/dedup.js:8 — dedup key + window logic
+
+## Key files / dirs
+- server/alerts/
+
+## Conventions specific here
+- Severity is normalized at the integration boundary, not at storage time.
+
+## Notes / gotchas
+- Dedup window is hardcoded; per-rule windows are on the backlog.
+```
+
+Run `.hv/bin/hv-map-index` once after writing the files; it pulls each file's `summary:` into the always-on `## Project Map` block in `CLAUDE.md`. The map isn't exhaustive — just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `touched:` date bumped automatically and the always-on block is regenerated. When subsystems drift or duplicate later, edit or retire the relevant `.hv/map/<name>.md` files by hand.
 
 ## Step 3 — /hv-capture --from-github (optional)
 

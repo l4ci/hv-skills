@@ -362,7 +362,7 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed seven managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (`/hv-map`), domain-glossary terms (`/hv-context`), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
+Seed seven managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics (`/hv-learn`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), domain-glossary terms (`/hv-context`), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic.
 
 ```bash
 .hv/bin/hv-skills-index

@@ -2,7 +2,7 @@
 # Emit a nudge to stderr if the project map's subsystem count is at or above
 # the soft cap. Prints nothing (and exits 0) below the cap. Always exits 0
 # — this is a nudge, not a gate. Used by /hv-debug, /hv-go, /hv-work to
-# surface "you might want to /hv-map consolidate" without blocking flow.
+# surface "you might want to consolidate .hv/map/ entries" without blocking flow.
 # Tool (nudge): always exits 0; emits advisory to stderr when at/above cap.
 #
 # Always exits 0 — informational nudge, not a gate.
@@ -33,7 +33,7 @@ count = len(data.get("subsystems", []))
 if count >= cap:
     print(
         f"note: project map has {count} subsystems (cap {cap});"
-        f" consider /hv-map consolidate",
+        f" consider merging or retiring stale .hv/map/<name>.md entries",
         file=sys.stderr,
     )
 PY

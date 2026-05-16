@@ -11,7 +11,7 @@
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits — active commitments future work must respect |
 | `MILESTONES.md` | Milestone overview — one short section per milestone, with a vision intro paragraph and an active list |
 | `CONTEXT.md` | Domain glossary — one entry per term with definition, aliases, optional "not" clarifications. Source-of-truth for the `## Project Context` block in `CLAUDE.md`. Written by `/hv-context`. |
-| `MAP.md` + `map/<subsystem>.md` | Project map — AI-curated narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Written by `/hv-map`. |
+| `MAP.md` + `map/<subsystem>.md` | Project map — AI-facing narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Hand-authored; `touched:` auto-bumped by cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`). |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
 | `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
@@ -78,7 +78,7 @@ See [../usage/context.md](../usage/context.md) for the full capture and query wo
 
 ## MAP.md — project map
 
-`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv-map-query <name>`. `/hv-map` scaffolds the initial map (`first-run` mode), updates touched subsystems after work lands (`after-work`), and consolidates dormant entries (`consolidate`).
+`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv-map-query <name>`. Write `.hv/map/<name>.md` files by hand as you discover subsystems — one file per coherent area, with `subsystem:`/`summary:`/`touched:` frontmatter and free-form body sections (Purpose, Entry points, Key files / dirs, Conventions, Notes / gotchas). Cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle when their changes overlap a subsystem's key files or entry points, and regenerate the always-on `## Project Map` block in `CLAUDE.md` via `.hv/bin/hv-map-index`. When subsystems drift or duplicate, edit or retire `.hv/map/<name>.md` entries directly; the index helper picks up the change on the next run.
 
 A managed `## Project Map` block in `CLAUDE.md` surfaces the thin summary so the model can orient without loading detail files.
 

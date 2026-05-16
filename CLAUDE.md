@@ -31,7 +31,7 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
-**Vision & maps** — `/hv-vision`, `/hv-map`, `/hv-refactor`
+**Vision & maps** — `/hv-vision`, `/hv-refactor`
 **Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
 Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, `## Project Vision`, or `## Project Context`, pull only the relevant sections:
@@ -56,7 +56,7 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 
 Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/bin/hv-map-query <name>`.
 
-- _(no subsystems yet — run `/hv-map first-run` to scaffold)_
+- _(no subsystems yet — write `.hv/map/<name>.md` as you discover subsystems)_
 <!-- hv-map-end -->
 
 <!-- hv-context-start -->

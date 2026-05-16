@@ -1,6 +1,6 @@
 # Banner preamble
 
-A code-fenced label every user-invocable hv-* skill prints verbatim at the top of its run, so the user can see at a glance which skill is active, what it does, and which triggers and pairs it carries. Consumed by the user-invocable SKILL.md files across the *Capture & pick*, *Plan & build*, *Review & ship*, *Persist*, *Vision & docs*, and *Maintenance* categories (see `README.md` for the current grouping). `hv-map` currently omits the banner despite being user-invocable — pre-existing inconsistency, not addressed by this reference. Each consumer's preamble line cites this file.
+A code-fenced label every user-invocable hv-* skill prints verbatim at the top of its run, so the user can see at a glance which skill is active, what it does, and which triggers and pairs it carries. Consumed by the user-invocable SKILL.md files across the *Capture & pick*, *Plan & build*, *Review & ship*, *Persist*, *Vision & docs*, and *Maintenance* categories (see `README.md` for the current grouping). Each consumer's preamble line cites this file.
 
 ## The rule
 
@@ -54,4 +54,3 @@ From `hv-next/SKILL.md`:
 
 - **Per-skill banner content** (emoji, name, tagline, triggers, pairs) — stays inline in each SKILL.md as a carrier artifact.
 - **Banner-data style conventions** (which emoji to pick, how to phrase triggers, length budgets) — out of scope; pick by visual cue from sibling skills.
-- **Skills that omit the banner** — `hv-map/SKILL.md` currently has no banner despite being user-invocable; pre-existing inconsistency, not addressed here.
