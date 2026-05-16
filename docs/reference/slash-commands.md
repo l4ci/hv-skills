@@ -10,7 +10,7 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
 | `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
-| `/hv-issues` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
+| `/hv-capture --from-github` / `--from-gitlab` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
 | `/hv-capture --remove` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
 | `/hv-next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv-work` |
 | `/hv-pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-next` |
@@ -67,9 +67,9 @@ Captures an item and immediately implements it in one pass. The item still gets 
 
 One-time setup that creates the `.hv/` folder with all required files and asks five configuration questions (model profile, isolation mode, merge strategy, quality gates, autonomy level). Re-running on an existing project never re-prompts for keys that already exist. New schema keys added by upgrades trigger a migration for only the missing keys. See also [getting started](../getting-started.md).
 
-## /hv-issues
+## /hv-capture --from-github / --from-gitlab
 
-Pulls open issues from GitHub or GitLab into `BACKLOG.md` via a multiSelect picker. Lists candidates from the upstream repo(s), subtracts ones already imported, mints IDs for the rest, writes detail files with the upstream URL, and appends entries carrying a `GH: #N` or `GL: #N` cross-reference. An optional manual-gated step applies an `in-progress` label upstream. Round-trip closing is handled separately by `/hv-ship`, which emits `Closes #N` in PR bodies and offers a manual-gated close prompt on direct-push. See [the hv-issues reference](hv-issues.md) for prerequisites and umbrella-mode semantics.
+Pulls open issues from GitHub or GitLab into `BACKLOG.md` via a multiSelect picker (provider chosen by the flag). Lists candidates from the upstream repo(s), subtracts ones already imported, mints IDs for the rest, writes detail files with the upstream URL, and appends entries carrying a `GH: #N` or `GL: #N` cross-reference. An optional manual-gated step applies an `in-progress` label upstream. Round-trip closing is handled separately by `/hv-ship`, which emits `Closes #N` in PR bodies and offers a manual-gated close prompt on direct-push. See [the upstream-issues reference](hv-issues.md) for prerequisites and umbrella-mode semantics.
 
 ## /hv-learn
 

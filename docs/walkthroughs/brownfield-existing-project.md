@@ -10,7 +10,7 @@ The example project is **Pinpoint**, an internal incident dashboard. Node and Re
 flowchart LR
   REPO[(existing repo<br/>+ open GH issues)] --> INIT["/hv-init"]
   INIT --> MAP["/hv-map<br/>first-run"]
-  INIT --> ISSUES["/hv-issues"]
+  INIT --> ISSUES["/hv-capture --from-github"]
   INIT --> CAP["/hv-capture"]
   MAP --> SUBS[(.hv/map/<br/>6 subsystems)]
   ISSUES --> BACKLOG[(BACKLOG.md)]
@@ -64,12 +64,12 @@ You confirm. Each file gets a one-paragraph *Purpose*, an *Entry points* section
 
 The map isn't exhaustive. Just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `last-touched` date bumped automatically (`after-work` mode runs as a post-cycle step). Over time you'll run `/hv-map consolidate` when subsystems drift or duplicate.
 
-## Step 3 — /hv-issues (optional)
+## Step 3 — /hv-capture --from-github (optional)
 
-If your project has open GitHub or GitLab issues, sync them into `BACKLOG.md` rather than retyping them by hand.
+If your project has open GitHub or GitLab issues, sync them into `BACKLOG.md` rather than retyping them by hand. Use `--from-github` for GitHub repos, `--from-gitlab` for GitLab.
 
 ```bash
-$ /hv-issues
+$ /hv-capture --from-github
 ```
 
 `hv-issues-provider` detects whether your origin points at GitHub or GitLab. `hv-issues-list` fetches open issues from the right provider. `hv-issues-imported` checks what's already been pulled, so re-running the skill never double-imports. What's left shows up as a multiSelect picker:
