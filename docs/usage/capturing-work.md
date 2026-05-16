@@ -71,4 +71,4 @@ Links are optional. [`/hv-next`](picking-work.md) infers the reverse link automa
 
 ## What /hv-capture is not
 
-`/hv-capture` is a pure recording tool. It classifies and files. It does not act, validate the item, or deduplicate against existing entries. To implement something immediately after capturing it, use [/hv-go](running-work.md). To pick up an already-filed item and implement it, use [/hv-work](running-work.md). To remove a captured item that turned out to be a duplicate or wrong-premise, use [/hv-rm](removing-work.md).
+`/hv-capture` is a pure recording tool. It classifies and files. It does not act, validate the item, or deduplicate against existing entries. To implement something immediately after capturing it, use [/hv-go](running-work.md). To pick up an already-filed item and implement it, use [/hv-work](running-work.md). To remove a captured item that turned out to be a duplicate or wrong-premise, use [`/hv-capture --remove`](removing-work.md).

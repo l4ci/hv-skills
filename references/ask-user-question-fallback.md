@@ -28,7 +28,7 @@ The three rules in the wild today — read these as illustration, not as authori
 
 - **Honor yes/no** — `/hv-learn` issue-file gate (*"File a hv-skills issue?"*), `/hv-spike` promote-to-decision gate (*"Promote to a decision?"*), `/hv-pause` uncommitted-work stance (*"Wrap them in a `wip:` commit, stash them, or leave them in place?"*).
 - **Default to Recommended** — `/hv-work` plan-shape ambiguity (one Recommended interpretation among several equally-valid plans), `/hv-docs` route picks (first-run / after-work / restructure), `/hv-vision` brainstorm-vs-edit picks.
-- **Default to opt-in-off / cancel** — `/hv-init` umbrella opt-in (default **No** because `umbrella.enabled` is an opt-in flag), `/hv-rm` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/hv-decide` write gate (only `yes` / `write` commits the decision), `/hv-docs` after-work mode opt-in (default **Leave off**), `/hv-update` dispatch gate (default off on ambiguous reply).
+- **Default to opt-in-off / cancel** — `/hv-init` umbrella opt-in (default **No** because `umbrella.enabled` is an opt-in flag), `/hv-capture --remove` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/hv-decide` write gate (only `yes` / `write` commits the decision), `/hv-docs` after-work mode opt-in (default **Leave off**), `/hv-update` dispatch gate (default off on ambiguous reply).
 
 ## Why three rules and not one
 

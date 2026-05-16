@@ -276,15 +276,15 @@ commit pattern instead of the generic stash-or-commit hint.
 
 The upstream repo defaults to `l4ci/hv-skills`; pass `--upstream-repo <owner/repo>` (or set the `HV_UPSTREAM_REPO` env var) to target a fork. `/hv-learn` Step 8.5 uses this helper after the user explicitly opts in — filing a public issue is always a manual user-volition gate, never auto-invoked.
 
-## Issue tracker sync (`/hv-issues`)
+## Issue tracker sync (`/hv-capture --from-github` / `--from-gitlab`)
 
-Distinct from the upstream-issue helper above. These five helpers back the project-level [`/hv-issues`](slash-commands.md#hv-issues) flow that pulls open GitHub/GitLab issues into `BACKLOG.md` with round-trip closing via `/hv-ship`. They all accept `--repo <name>` in umbrella mode to scope the call to a registered sub-repo.
+Distinct from the upstream-issue helper above. These five helpers back the project-level [`/hv-capture --from-github` / `--from-gitlab`](slash-commands.md#hv-capture---from-github----from-gitlab) flow that pulls open GitHub/GitLab issues into `BACKLOG.md` with round-trip closing via `/hv-ship`. They all accept `--repo <name>` in umbrella mode to scope the call to a registered sub-repo.
 
 `hv-issues-provider` detects whether the active git origin points at GitHub or GitLab, printing `github`, `gitlab`, or `unknown`. The match is hostname-based (`github*` → github, `gitlab*` → gitlab), so self-hosted and enterprise instances resolve correctly. Always exits 0 — `unknown` is a valid result, not an error.
 
 `hv-issues-list` is the read path: it shells out to `gh issue list --state open` or `glab issue list --opened`, normalizes the output, and emits a uniform JSON array regardless of provider. Optional `--label <name>` and `--limit <N>` flags pass through to the underlying CLI. An empty result (`[]`) and a missing CLI are distinguished: empty list exits 0, but a missing or unauthed `gh`/`glab` exits 1 with a stderr message — skills should treat exit 1 as "fix your setup," not "nothing to do."
 
-`hv-issues-imported` is the dedupe index: it scans `BACKLOG.md`, `ARCHIVE.md`, and every per-item detail file under `.hv/bugs/`, `.hv/features/`, `.hv/tasks/` for `GH: #N` or `GL: #N` cross-references and emits JSON tagged with provider, issue number, item ID, and the resolved `Repos:` value (multi-repo items emit one entry per sub-repo). `/hv-issues` subtracts this set from `hv-issues-list` output so already-imported issues are never re-offered.
+`hv-issues-imported` is the dedupe index: it scans `BACKLOG.md`, `ARCHIVE.md`, and every per-item detail file under `.hv/bugs/`, `.hv/features/`, `.hv/tasks/` for `GH: #N` or `GL: #N` cross-references and emits JSON tagged with provider, issue number, item ID, and the resolved `Repos:` value (multi-repo items emit one entry per sub-repo). `/hv-capture --from-github` / `--from-gitlab` subtracts this set from `hv-issues-list` output so already-imported issues are never re-offered.
 
 `hv-issues-label` is the writer for upstream labeling — typically `in-progress` after import so collaborators see the issue is claimed. `apply` and `remove` are both idempotent (no-op on the already-present / already-absent transitions). When `issues.autoCreateLabel` is true in `.hv/config.json` (default), it creates the label upstream if absent rather than failing.
 

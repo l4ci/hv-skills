@@ -1,11 +1,11 @@
 # Removing work
 
-`/hv-rm` permanently removes backlog entries from [`BACKLOG.md`](../reference/hv-folder.md), their associated files, and any cross-references. It's the inverse of [`/hv-capture`](capturing-work.md).
+`/hv-capture --remove` permanently removes backlog entries from [`BACKLOG.md`](../reference/hv-folder.md), their associated files, and any cross-references. It's the local inverse of plain [`/hv-capture`](capturing-work.md).
 
-## /hv-rm
+## /hv-capture --remove
 
 ```
-/hv-rm F99
+/hv-capture --remove F99
 ```
 
 Default mode is a dry run. The skill shows what would change and asks for confirmation before writing anything. Nothing is modified until you say yes.
@@ -21,7 +21,7 @@ You captured a feature two days ago:
 Later you find it's a duplicate of `[F42]`. Run:
 
 ```
-/hv-rm F99
+/hv-capture --remove F99
 ```
 
 The skill prints a structured preview:
@@ -61,11 +61,11 @@ The skill then asks for confirmation with three options: *Apply (Recommended)*, 
 
 Counters never decrement. An ID removed today won't be reissued to a different item tomorrow; gaps in the sequence are intentional and prevent ID collisions in git history.
 
-Close GitHub issues upstream manually. `/hv-rm` has no knowledge of remote trackers.
+Close GitHub issues upstream manually. `/hv-capture --remove` has no knowledge of remote trackers.
 
 ## Safety semantics
 
-`/hv-rm` refuses to apply until you confirm. The confirmation gate runs even when [`autonomy.level`](autonomy.md) is set to `loop`; removal is always a manual step.
+`/hv-capture --remove` refuses to apply until you confirm. The confirmation gate runs even when [`autonomy.level`](autonomy.md) is set to `loop`; removal is always a manual step.
 
 Active items (items present in any `status.json` `items` array) are refused by default:
 
@@ -80,7 +80,7 @@ Pass `--force` to override. With `--force`, the ID is stripped from the entry's 
 Remove multiple items in one pass by separating IDs with commas:
 
 ```
-/hv-rm B01,F03,T05
+/hv-capture --remove B01,F03,T05
 ```
 
 Validation is all-or-nothing. If any ID in the list is unknown or invalid, the entire batch aborts before any write. Fix the offending ID and re-run.
@@ -96,10 +96,10 @@ The dry-run preview lists every item in the batch so you can review the full sco
 
 If an item is done rather than unwanted, use [/hv-work](running-work.md) to complete it. Completed items are archived, not removed.
 
-## What /hv-rm is not
+## What /hv-capture --remove is not
 
-`/hv-rm` isn't a soft-delete or an undo mechanism. Once applied, the entry is gone from the active backlog. `ARCHIVE.md` keeps a historical record by default; `--scrub-archive` erases it there too.
+`/hv-capture --remove` isn't a soft-delete or an undo mechanism. Once applied, the entry is gone from the active backlog. `ARCHIVE.md` keeps a historical record by default; `--scrub-archive` erases it there too.
 
-`/hv-rm` doesn't close GitHub issues. Close upstream issues manually after removing a backlog entry.
+`/hv-capture --remove` doesn't close GitHub issues. Close upstream issues manually after removing a backlog entry.
 
-`/hv-rm --force` only removes the backlog record for an active item. It won't delete the branch, revert commits, or discard work in progress. To abandon a branch, use git directly after removing the backlog entry.
+`/hv-capture --remove --force` only removes the backlog record for an active item. It won't delete the branch, revert commits, or discard work in progress. To abandon a branch, use git directly after removing the backlog entry.

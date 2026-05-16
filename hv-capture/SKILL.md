@@ -1,6 +1,6 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Use when the user brain-dumps work, says "capture", "add to backlog", "note this bug", "/hv-capture", or describes a problem without asking for an immediate fix. Records only — for an immediate fix use /hv-go; for items already in BACKLOG use /hv-work.
+description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Also supports `--remove <ID>[,<ID>...]` to delete captured items and clean up cross-references (dry-run + confirmation gate), and `--from-github` / `--from-gitlab` to pull open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-refs and round-trip closing via `/hv-ship`. Use when the user brain-dumps work, says "capture", "add to backlog", "note this bug", "/hv-capture", "remove [B07]", "delete this entry", "drop this item", "/hv-rm", "import issues", "pull open issues from GitHub", "list issues", "/hv-issues", or describes a problem without asking for an immediate fix. Records only — for an immediate fix use /hv-go; for items already in BACKLOG use /hv-work.
 user-invocable: true
 ---
 
@@ -13,9 +13,9 @@ user-invocable: true
 ════════════════════════════════════════════════════════════════════════
 ```
 
-# hv-capture — Capture Work Items
+# hv-capture — Capture & Manage Work Items
 
-Quick-capture bugs, features, and tasks into `.hv/BACKLOG.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass.
+Quick-capture bugs, features, and tasks into `.hv/BACKLOG.md` with just enough context to act on them later. Handles multiple items and mixed types in one pass. Two management flags reach into the backlog after capture: `--remove <ID>` strips an item and its dependencies (the local inverse of capture), and `--from-github` / `--from-gitlab` pull open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-references (round-trip closing happens via `/hv-ship`).
 
 ## Step 1 — Preflight
 
@@ -27,13 +27,45 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
-Phases:
+Phases differ by mode (see Step 1.5):
+
+**Capture mode (default):**
 
 1. *Mode / dispatch* — single brain-dump or per-item parsing path resolved (Step 2)
 2. *Classify* — type (bug / feature / task), priority, size assigned (Step 3)
 3. *Dedupe* — existing TODO entries scanned for overlap (Step 4)
 4. *Append* — entries written to `BACKLOG.md` with milestone + repo tags (Steps 5–6)
 5. *Report* — compact summary printed (Step 7)
+
+**Remove mode (`--remove`):**
+
+1. *Resolve IDs* — args parsed, each ID matched to a TODO entry (Step R1)
+2. *Dry-run preview* — removal plan rendered, cross-references identified (Step R2)
+3. *De-tag upstream issues* — optional manual gate to remove the upstream label before local delete (Step R3)
+4. *Confirm* — three-option `AskUserQuestion` gate (apply / abort / customize) (Step R4)
+5. *Apply removals + cross-ref sweep* — TODO entries deleted, detail files removed, cross-references swept (Step R5)
+
+**Import mode (`--from-github` / `--from-gitlab`):**
+
+1. *Resolve repos* — target repo set determined (Step I1)
+2. *Discover candidates* — open issues fetched per repo, already-imported subtracted (Steps I2–I3)
+3. *Pick issues* — user selects which issues to capture (Step I4)
+4. *Capture* — IDs minted, detail files written, BACKLOG.md entries appended (Step I5)
+5. *Label upstream* — `in-progress` label applied behind the manual gate (Step I6)
+6. *Report* — compact summary printed (Step I7)
+
+## Step 1.5 — Mode Dispatch
+
+Inspect the first argument and route to the right mode:
+
+| First arg | Mode | Routes to |
+|-----------|------|-----------|
+| `--remove <ID>[,<ID>...]` | Remove items from the backlog | [Remove Mode](#remove-mode) (Step R1+) |
+| `--from-github` | Pull GitHub issues into the backlog | [Import Mode](#import-mode) (Step I1+) |
+| `--from-gitlab` | Pull GitLab issues into the backlog | [Import Mode](#import-mode) (Step I1+) |
+| (anything else / nothing) | Capture from user input | Step 2 onward (capture flow below) |
+
+`--from-github` and `--from-gitlab` set the provider filter for Import Mode; in umbrella mode the resolved sub-repo set determines which repos are scanned (the flag still picks the provider type within those repos). The capture-mode flow is the default — when no flag is present, the user's text is parsed for items. Skip the entire `## Step 2 — Step 7` block when routing to a non-capture mode.
 
 ## Step 2 — Parse & Classify
 
@@ -226,12 +258,301 @@ Place this line after any existing post-capture nudges (e.g., release-pending), 
 
 **Never invoke `/hv-brainstorm` from this skill.** Capture is pure intake; pulling the user into design exploration mid-brain-dump conflates two phases the workflow keeps separate. Autonomous advancement lives where "advance without asking" semantics belong: `/hv-next` Step 6 auto-dispatches `/hv-brainstorm` for the suggested item in `auto` mode, and `/hv-work` Step 4 auto-dispatches `/hv-brainstorm --auto-loop` for Major + Milestone-tagged items without a design in `loop` mode. The nudge line above is the bridge to either path.
 
+---
+
+## Remove Mode
+
+The inverse of the capture flow above: remove one or more items from the backlog and clean up every trace — the BACKLOG.md entry, Related cross-references, the detail file (`.hv/{bugs,features,tasks}/<ID>.md`), and any plan keyed to the item (`.hv/plans/<milestone>-<ID>.md`). The safe default is dry-run: every invocation previews what would change before touching anything. Items currently active in `status.json` are refused outright unless `--force` is passed, which strips them with a warning. The ARCHIVE.md historical record is preserved by default; pass `--scrub-archive` alongside `--force` to remove it too — opt-in only, since a removed item's ARCHIVE entry is the only audit trail left. Counters do not decrement — minted IDs stay claimed forever.
+
+### Step R1 — Parse Arguments
+
+Pass the user's argument verbatim as `<CSV>` to `bin/hv-rm` in Step R2. The helper validates IDs (split-and-strip on commas — `B01, F03` and `B01,F03` resolve identically), exits 1 with a usage message on empty or missing argv, and exits 1 again on unknown IDs (not in BACKLOG.md or ARCHIVE.md). No skill-side validation needed.
+
+### Step R2 — Dry-Run Preview
+
+Run the helper with no `--force` flag; it defaults to dry-run and prints what would change:
+
+```bash
+.hv/bin/hv-rm <CSV>
+```
+
+Exit codes:
+
+- **0** — preview printed successfully. Surface the full stdout to the user verbatim, then continue to Step R3.
+- **1** — one of the IDs was not found in BACKLOG.md or ARCHIVE.md, or an unrecognised flag was given. Surface the stderr message to the user verbatim and **stop** — do not proceed to Step R3.
+- **2** — one or more IDs are currently active in `status.json`. Surface the stderr message verbatim and inform the user: *"The item is active. Proceeding via Step R4 with `--force` will strip it from the active stream and leave a warning in the output."*
+
+### Step R3 — De-tag Upstream Issues (manual gate)
+
+> **Manual gate — removing the upstream label.** Removing the `in-progress` label on the upstream issue is externally-visible — collaborators see the issue no longer claimed. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The item delete proceeds regardless; this step decides whether to clean up the label upstream too. See `references/manual-gates.md`.
+
+Run the lookup helper to discover cross-references for the items about to be removed:
+
+```bash
+.hv/bin/hv-issues-imported
+```
+
+The helper always exits 0 and emits a JSON array. Filter it to entries whose `item_id` is in the to-be-removed set (the `<CSV>` from Step R1):
+
+```bash
+# Example: CSV = "F69,B12"
+IDS_JSON=$(echo "<CSV>" | tr ',' '\n' | jq -Rn '[inputs | gsub("^\\s+|\\s+$"; "")]')
+REFS=$(
+  .hv/bin/hv-issues-imported \
+  | jq --argjson ids "$IDS_JSON" '[.[] | select(.item_id as $id | $ids | index($id) != null)]'
+)
+```
+
+Read the label name from config (default `"in-progress"`):
+
+```bash
+LABEL=$(jq -r '.issues.label // "in-progress"' .hv/config.json 2>/dev/null || echo "in-progress")
+```
+
+**If `$REFS` is an empty array (`[]`), skip the gate entirely and proceed to Step R4.**
+
+If `$REFS` is non-empty, surface the `AskUserQuestion` below. **In loop mode this question is still surfaced and never auto-picked — it is a manual gate.**
+
+- **Header:** `"De-tag"`
+- **Question:** `"Remove the \`<label>\` label on <N> upstream issue(s)? <list of #N>."`
+  (Substitute `<label>` from `$LABEL`, `<N>` from `$REFS | length`, and list each `#<issue>` from `$REFS`.)
+- **Options** (single-select):
+  1. `"Yes, remove the label upstream"` — for each entry in `$REFS`, call in parallel:
+     ```bash
+     .hv/bin/hv-issues-label remove --issue <issue> --label "$LABEL" [--repo <repo>]
+     ```
+     Include `--repo <repo>` only when the entry's `repo` field is non-null. Propagate exit 1 if any call fails.
+  2. `"No, just delete the item"` — print the warning below and continue:
+     ```
+     Note: upstream issues still carry the `<label>` label. Remove via
+     `gh issue edit <N> --remove-label <label>` or `glab issue update <N> --unlabel <label>` if desired.
+     ```
+
+Proceed to Step R4 regardless of which option was chosen.
+
+### Step R4 — Confirmation Gate
+
+Use a single `AskUserQuestion` call. Show the dry-run output above the question so the user can review the plan before committing.
+
+- **Header:** `"Apply"`
+- **Question:** `"Apply this removal plan for <CSV>?"`
+- **Options** (single-select):
+  1. `"Apply (Recommended)"` — runs `.hv/bin/hv-rm --force <CSV>`. Strips the TODO entry and Related cross-references; ARCHIVE entries stay intact as the historical record.
+  2. `"Apply + scrub ARCHIVE"` — runs `.hv/bin/hv-rm --force --scrub-archive <CSV>`. Same as Apply, plus removes the ARCHIVE.md historical entry and strips any Related cross-references there too.
+  3. `"Cancel"` — print *"No changes."* and stop; nothing is written.
+
+Plain-text fallback (when `AskUserQuestion` is not available): ask once — *"Apply changes? (yes/no/scrub-archive)"* — `yes` → Apply; `scrub-archive` → Apply + scrub ARCHIVE; anything else → Cancel.
+
+> Per the `hv-init` authoring convention "manual gates that are destructive or file public artifacts are never auto-invoked regardless of autonomy", the confirmation gate always surfaces to the user — loop mode does not accelerate it.
+
+### Step R5 — Apply (when not Cancel)
+
+Invoke the chosen helper command. The helper prints a per-ID summary line for each item processed. Pass the full output through to the user verbatim. Then stop — do not nudge any other skill.
+
+### When to Use Remove Mode
+
+Use `--remove` when:
+
+- An item was captured as a duplicate and the original already covers it.
+- The underlying premise turned out to be wrong — the bug doesn't exist, or the feature was based on a misunderstanding.
+- Another item's implementation made this one obsolete before it was started.
+- The item was captured against the wrong project context (wrong repo, wrong milestone scope).
+- A spike or decision ruled out the approach the item depended on.
+- You simply changed your mind and the work is no longer worth doing.
+
+`--remove` is the local inverse of capture — it does **not** close upstream GitHub/GitLab issues. If the removed item has a linked issue, Step R3 offers to remove the `in-progress` label upstream; closing the issue itself is always manual. Counters intentionally do not decrement; minted IDs remain claimed so there is never ambiguity about what `[F36]` referred to.
+
+---
+
+## Import Mode
+
+Inventory-driven capture: fetch open issues from the upstream GitHub or GitLab repo(s), subtract ones already in the backlog, let the user pick which to capture, mint IDs, write detail files, and apply an `in-progress` label upstream behind a manual gate. The provider is fixed by the dispatching flag — `--from-github` scans GitHub repos, `--from-gitlab` scans GitLab repos. Round-trip closing is handled separately by `/hv-ship` and `bin/hv-issues-close`.
+
+### Step I1 — Resolve Target Repo Set
+
+Read `issues.providers.github` and `issues.providers.gitlab` from `.hv/config.json`; if the provider matching the invoking flag is `false`, stop with: *"Provider disabled: set `issues.providers.<github|gitlab>` to `true` in `.hv/config.json` to enable."*
+
+**Single-repo mode:** when `.hv/bin/hv-umbrella-on` prints `no` (or `.hv/repos.json` registers 0 sub-repos), target is cwd's repo. Skip the picker and proceed to Step I2 with that single target. If the cwd's `hv-issues-provider` doesn't match the dispatching flag (e.g. user passed `--from-github` but cwd is a GitLab repo), stop with: *"Provider mismatch: --from-<flag> requires a <flag> remote; cwd resolves to <other>."*
+
+**Umbrella mode:** when `.hv/bin/hv-umbrella-on` prints `yes` AND `.hv/repos.json` registers ≥1 sub-repo:
+
+- Read sub-repo names from `.hv/repos.json`.
+- Filter to those whose `hv-issues-provider --repo <name>` matches the dispatching flag (mismatched repos are silently dropped — they live on a different provider).
+- Present the matching set in an AskUserQuestion (multiSelect) chunked to ≤4 options at a time. Header `"Repos"`. Question: *"Which sub-repos to pull issues from?"*. One option per filtered repo name; mark all `(Recommended)` when no single repo is obviously favored.
+- Include a *"All repos"* option (first option, `Recommended`) and a *"None / cancel"* option (last option).
+- **Loop mode:** when `autonomy.level == "loop"`, silently auto-pick the `(Recommended)` option (all repos) without invoking AskUserQuestion — loop mode drains the queue.
+- Plain-text fallback: ask once — *"Which repos? (all / <name> / none)"* — `all` picks all; a repo name picks that one; anything ambiguous defaults to all repos.
+- If 0 sub-repos resolve after the pick, fall through to single-repo mode.
+
+### Step I2 — Discover Candidates Per Repo
+
+For each target repo, dispatch a **parallel tool-call batch** (all three calls in a single turn):
+
+```bash
+.hv/bin/hv-issues-provider [--repo <name>]
+.hv/bin/hv-issues-list [--repo <name>] [--label <issues.label>]
+.hv/bin/hv-issues-imported [--repo <name>]
+```
+
+Read `issues.filterMineOnly` from `.hv/config.json`. When `true`, also pass `--label @me` to `hv-issues-list` — the helper accepts `--label` for filtering; use the value literally (`@me` is a GitHub convention; for GitLab client-side filter the author field after fetching).
+
+Read `issues.label` from `.hv/config.json` (default `"in-progress"`) — this is the label that will be applied in Step I6. Do NOT pass it to `hv-issues-list` as a filter; it is the target label, not a source filter.
+
+Exit-code handling per repo:
+
+- `hv-issues-provider` always exits 0. If it prints anything other than the dispatching provider, skip that repo with: `skipped: <repo> — provider mismatch`.
+- `hv-issues-list` exits 0 on success (even empty). If it exits 1 (CLI missing or unauthed), skip that repo with: `skipped: <repo> — <stderr from hv-issues-list>`.
+- `hv-issues-imported` always exits 0.
+
+Never hard-fail the whole step on a single repo failure. Continue with the repos that succeeded.
+
+### Step I3 — Subtract Already-Imported Issues
+
+For each repo, filter the `hv-issues-list` output against the `hv-issues-imported` index.
+
+An issue is already imported when a `(provider, repo, issue_number)` triple from `hv-issues-imported` matches. For single-repo mode, `repo` is `null` in the imported index — match on `(provider, issue_number)` only.
+
+Count and report: *"Repo `<name>`: N candidates, K already imported — showing M."*
+
+If the total remaining candidates across all repos is 0, print:
+
+> Nothing to capture — all open issues are already in BACKLOG.md or ARCHIVE.md.
+
+Then stop.
+
+### Step I4 — Show Candidates and Pick
+
+Present candidates in AskUserQuestion (multiSelect) chunked to ≤4 issues at a time. For each chunk:
+
+- **Header:** `"Issues"`
+- **Question:** `"Which issues to capture? (<range> of <total>)"`
+- **Options** (one per candidate): label `"#<N>: <title truncated to 60 chars>"`, description `"<labels-list> · by @<author> · <url>"`.
+- When there is only one chunk (≤4 candidates), omit the range indicator from the question: `"Which issues to capture?"`.
+
+Plain-text fallback: ask once — *"Which issue numbers to capture? (comma-separated, e.g. 12,47,83, or 'none')"* — parse the reply as a comma-separated list of issue numbers; `none` or empty → stop.
+
+**Loop mode:** when `autonomy.level == "loop"`, auto-pick all remaining candidates without invoking AskUserQuestion — loop mode captures everything not already imported. Per the manual-gate rule below, loop mode still surfaces Step I6.
+
+### Step I5 — Classify and Capture Each Pick
+
+For each selected issue:
+
+**I5a — Classify section from remote labels.**
+
+| Remote label | Section |
+|---|---|
+| `bug`, `kind/bug` | `## Bugs` |
+| `enhancement`, `feature`, `kind/feature` | `## Features` |
+| anything else (or no labels) | `## Tasks` |
+
+When a label maps unambiguously to a section, classify silently (no question). When none of the labels match any classifier key, default to `## Tasks` silently.
+
+**I5b — Assign priority / size.**
+
+- Bugs classified from `bug`/`kind/bug` → default `[P1]` silently. Ask only when the issue body suggests `[P0]` (crash, data loss, production outage language) or `[P2]` (cosmetic, wording).
+- Features classified from enhancement/feature → default `[Minor]` silently. Ask when the body describes clearly `[Major]` scope (new screens, significant rework, multi-repo).
+- Tasks → no tag.
+
+When asking is warranted: one AskUserQuestion per pick (single-select, ≤4 options). Header: `"Classify #<N>"`. Question: `"Priority / size for '<title>'?"`. Options: up to 4 choices relevant to the section (e.g. for Bugs: `"[P0] — crash / data loss"`, `"[P1] — broken feature (Recommended)"`, `"[P2] — cosmetic / edge case"`, `"Leave default"`).
+
+**Loop mode:** when `autonomy.level == "loop"`, skip classification AskUserQuestion calls entirely — use the silent defaults above for every issue.
+
+**I5c — Mint ID and write detail file.**
+
+```bash
+ID=$(.hv/bin/hv-next-id <bugs|features|tasks>)
+```
+
+Write `.hv/<bugs|features|tasks>/<ID>.md` with the issue body as markdown passthrough, followed by:
+
+```markdown
+---
+**Upstream:** <url>
+**Captured from:** <provider> #<N>
+```
+
+**I5d — Append BACKLOG.md entry.**
+
+```bash
+.hv/bin/hv-append "## <Section>" "- **[<ID>] [<Tag>] <Title>.** <first-sentence-or-two-of-body>. Detail: \`.hv/<kind>/<ID>.md\` <provider-tag> Repos: <name>"
+```
+
+Where `<provider-tag>` is `GH: #<N>` for GitHub or `GL: #<N>` for GitLab. Omit `Repos: <name>` in single-repo mode. Omit `[<Tag>]` for Tasks (no priority/size tag).
+
+Entry shapes:
+
+- Bug: `- **[B##] [P1] Title.** First sentence of body. Detail: `.hv/bugs/B##.md` GH: #N Repos: <name>`
+- Feature: `- **[F##] [Minor] Title.** First sentence of body. Detail: `.hv/features/F##.md` GL: #N Repos: <name>`
+- Task: `- **[T##] Title.** First sentence of body. Detail: `.hv/tasks/T##.md` GH: #N Repos: <name>`
+
+Process all selected issues serially in this step (mint → write detail → append) to avoid counter collisions from parallel ID minting.
+
+### Step I6 — Apply the `in-progress` Label Upstream
+
+> **Manual gate — labeling upstream issues.** Applying the `in-progress` label (or the configured `issues.label` value) upstream is externally-visible state — collaborators see the issues marked as claimed. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may stage which issues to label, but the user confirms before any label is written. See `references/manual-gates.md`.
+
+Read `issues.label` from `.hv/config.json` (default `"in-progress"`). Present a single AskUserQuestion (single-select):
+
+- **Header:** `"Label upstream"`
+- **Question:** `"Apply \`<label>\` to these <N> issues upstream?"` followed by a summary list of picked issue titles and numbers.
+- **Options:**
+  1. `"Yes — apply \`<label>\` to all (Recommended)"`
+  2. `"No — skip labeling"`
+
+Plain-text fallback: ask once — *"Apply `<label>` to these issues upstream? (yes/no)"* — `yes` applies; anything else skips. Default: skip (opt-in-off — this is externally-visible state; silence is not consent).
+
+On **Yes**: fan out parallel `.hv/bin/hv-issues-label` calls — one per picked issue:
+
+```bash
+.hv/bin/hv-issues-label apply --issue <N> --label <label> [--repo <name>]
+```
+
+On any `hv-issues-label` failure (exit 1), print the error inline and continue with remaining issues — do not abort.
+
+On **No**: print *"Labeling skipped. Issues are captured in BACKLOG.md but not marked upstream."* and continue to Step I7.
+
+**Loop mode:** auto-picking `Yes` is **forbidden** here. This is a manual gate — externally-visible state requires user confirmation. In loop mode, surface the AskUserQuestion and pause the loop until the user resolves it. This matches the `/hv-ship` Step 6a pattern: loop mode never auto-picks acceptance-of-risk answers.
+
+### Step I7 — Compact Report
+
+```
+Captured <N> issues:
+- [ID1] Title 1 (GH #42 → in-progress)
+- [ID2] Title 2 (GL #7 → in-progress)
+Skipped <K> issues (already imported).
+```
+
+When the label step was skipped (user picked "No" or fallback defaulted to skip), replace `→ in-progress` with `→ not labeled` for each pick.
+
+When repos were skipped in Step I2 (provider mismatch or missing CLI), append a `Skipped repos:` section listing each with its reason.
+
+---
+
 ## Rules
+
+**Capture mode:**
 
 - **Never remove or reorder existing entries** — append only
 - **Don't investigate now** — just capture
 - **Confirm what you wrote** — show the user every entry you added, grouped by section
 - **Always increment counters** — even if you're unsure, every ID must be unique
+
+**Remove mode:**
+
+- Default is dry-run; `--force` is the only way to apply changes.
+- Active-stream items (in `status.json`) are refused without `--force`; with `--force`, the ID is stripped and a warning surfaces in the output.
+- ARCHIVE.md is preserved by default; `--scrub-archive` is opt-in.
+- Counters do not decrement — minted IDs stay claimed.
+- Upstream `in-progress` labels are removed only when the user approves the Step R3 manual gate; closing upstream issues is always manual.
+
+**Import mode:**
+
+- Issues already in BACKLOG.md or ARCHIVE.md are never re-imported. Index by `GH: #N` / `GL: #N` via `hv-issues-imported`. The triple `(provider, repo, issue_number)` is the uniqueness key.
+- Label application is always behind the manual gate (Step I6). No `autonomy.level` value bypasses it.
+- Loop mode auto-picks routine routing answers (which repo(s) to pull from, which issues to capture) but never the label-application gate.
+- Writes to `.hv/BACKLOG.md` (gitignored runtime) — no commits are produced. Captured items move forward via `/hv-work` like any other item.
+- The `GH: #N` cross-reference on the BACKLOG entry is the signal `hv-ship-body` uses to emit `Closes #N` in PR bodies (F12). Include it exactly.
+- `issues.providers.github` / `issues.providers.gitlab` config flags gate provider access per-type. When a flag is `false`, the matching `--from-<provider>` flag stops with a config error.
 
 ## References
 
@@ -240,5 +561,6 @@ Place this line after any existing post-capture nudges (e.g., release-pending), 
 | [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). |
 | [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
 | [`detail-files.md`](../references/detail-files.md) | Detail-file template used when an item's input exceeds 3 sentences. |
+| [`manual-gates.md`](../references/manual-gates.md) | Manual-gate callout shape (Step R3 de-tag, Step R4 apply gate, Step I6 label upstream). |
 | [`milestone-tagging.md`](../references/milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. |
 | [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

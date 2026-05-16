@@ -20,8 +20,6 @@
     "./hv-init",
     "./hv-config",
     "./hv-capture",
-    "./hv-issues",
-    "./hv-rm",
     "./hv-go",
     "./hv-vision",
     "./hv-brainstorm",

@@ -30,9 +30,9 @@ Sites with multi-paragraph prose (e.g. `/hv-learn` Steps 8.5 and 9) may use the 
 | `/hv-ship` | Step 6a | Opening a GitHub PR | Pushes the branch and creates a public PR via `gh pr create`. |
 | `/hv-release` | Step 8 (Push tag) | Pushing the annotated git tag | Tag becomes visible on the remote. |
 | `/hv-release` | Step 9 (Publish release) | Creating the GitHub/GitLab release | Creates a release page tied to the tag. |
-| `/hv-issues` | Step 7 (Apply label upstream) | Applying the `in-progress` label to upstream issues | Public label change on the remote; collaborators see issues marked as claimed. |
+| `/hv-capture --from-github` / `--from-gitlab` | Step I6 (Apply label upstream) | Applying the `in-progress` label to upstream issues | Public label change on the remote; collaborators see issues marked as claimed. |
 | `/hv-ship` | Step 6c (Direct-push close) | Closing upstream issues after direct merge | Posts a tracking comment and changes issue state on the remote. |
-| `/hv-rm` | Step 3.5 (De-tag upstream) | Removing the `in-progress` label upstream | Public label change on the remote when a captured item is removed. |
+| `/hv-capture --remove` | Step R3 (De-tag upstream) | Removing the `in-progress` label upstream | Public label change on the remote when a captured item is removed. |
 
 `/hv-ship` Step 3's *"Ship anyway"* option (in the CONCERNS-routing AskUserQuestion) is conceptually a manual gate too — see `references/review-verdict-routing.md` for why loop mode auto-picks *"Address via /hv-work"* but never *"Ship anyway"*. The pattern is the same: acceptance of risk is the user's choice; routing toward safe is not.
 

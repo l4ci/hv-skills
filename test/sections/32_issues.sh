@@ -56,13 +56,19 @@ pass "hv-issues-provider classifies github/gitlab/unknown across 5 fixtures"
 # === SKILL.md manual-gate callouts (T7, T8, T9) ===
 echo "Section 32: manual-gate callouts in SKILL.md files"
 
-# hv-issues/SKILL.md — Step 7 labeling gate
-grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
-  "$REPO/hv-issues/SKILL.md" || fail "hv-issues/SKILL.md missing manual-gate callout (Step 7)"
+# hv-capture/SKILL.md — Step I6 labeling gate (folded from /hv-issues in F16)
+grep -q "Step I6" "$REPO/hv-capture/SKILL.md" || \
+  fail "hv-capture/SKILL.md missing Step I6 (Import Mode label gate)"
 
-# hv-rm/SKILL.md — Step 3.5 de-tag gate
-grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
-  "$REPO/hv-rm/SKILL.md" || fail "hv-rm/SKILL.md missing manual-gate callout (Step 3.5)"
+# hv-capture/SKILL.md — Step R3 de-tag gate (folded from /hv-rm in F14)
+grep -q "Step R3" "$REPO/hv-capture/SKILL.md" || \
+  fail "hv-capture/SKILL.md missing Step R3 (Remove Mode de-tag gate)"
+
+# Both gates share the canonical callout phrasing — verify it's present at least twice
+gate_count=$(grep -c '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
+  "$REPO/hv-capture/SKILL.md")
+[ "$gate_count" -ge 2 ] || \
+  fail "hv-capture/SKILL.md has $gate_count manual-gate callouts, expected ≥2 (Step R3 + Step I6)"
 
 # hv-ship/SKILL.md — Step 6c direct-push close gate
 grep -q "Step 6c" "$REPO/hv-ship/SKILL.md" || \
@@ -70,21 +76,21 @@ grep -q "Step 6c" "$REPO/hv-ship/SKILL.md" || \
 grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
   "$REPO/hv-ship/SKILL.md" || fail "hv-ship/SKILL.md missing manual-gate callout (Step 6c)"
 
-pass "3 manual-gate callouts present in hv-issues/SKILL.md, hv-rm/SKILL.md, hv-ship/SKILL.md"
+pass "3 manual-gate callouts present in hv-capture/SKILL.md (Step R3 + Step I6), hv-ship/SKILL.md (Step 6c)"
 
 # === references/manual-gates.md inventory rows (T11 must land before these pass) ===
 echo "Section 32: manual-gates.md inventory rows"
 
-[ "$(grep -c '/hv-issues' "$REPO/references/manual-gates.md")" -ge 1 ] || \
-  fail "manual-gates.md missing /hv-issues row (T11 not yet landed?)"
+grep -q 'Step I6\|hv-capture --from-.*label\|label.*hv-capture --from' "$REPO/references/manual-gates.md" || \
+  fail "manual-gates.md missing /hv-capture --from-* Step I6 row"
 
-grep -q 'Step 3\.5\|hv-rm.*de-tag\|de-tag.*hv-rm' "$REPO/references/manual-gates.md" || \
-  fail "manual-gates.md missing hv-rm Step 3.5 row (T11 not yet landed?)"
+grep -q 'Step R3\|hv-capture --remove.*de-tag\|de-tag.*hv-capture --remove' "$REPO/references/manual-gates.md" || \
+  fail "manual-gates.md missing /hv-capture --remove Step R3 row"
 
 grep -q 'Step 6c\|direct-push close' "$REPO/references/manual-gates.md" || \
   fail "manual-gates.md missing hv-ship Step 6c row (T11 not yet landed?)"
 
-pass "manual-gates.md inventory has rows for the 3 new gates"
+pass "manual-gates.md inventory has rows for the 3 manual gates"
 
 # === hv-issues-imported smoke ===
 echo "Section 32: hv-issues-imported smoke"

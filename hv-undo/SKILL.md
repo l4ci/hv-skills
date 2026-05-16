@@ -9,7 +9,7 @@ user-invocable: true
 ```
 ════════════════════════════════════════════════════════════════════════
   ↩️  hv-undo  ·  guided rollback of the last /hv-work cycle
-  triggers: "undo last cycle", "roll back the merge"  ·  pairs: hv-work, hv-rm
+  triggers: "undo last cycle", "roll back the merge"  ·  pairs: hv-work, hv-capture
 ════════════════════════════════════════════════════════════════════════
 ```
 

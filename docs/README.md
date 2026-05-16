@@ -12,13 +12,13 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 ### Walkthroughs
 
 - [Greenfield — from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md): empty repo plus a one-page brief, taken end-to-end through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`
-- [Brownfield — dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open issues and a mental bug list, walked through `/hv-map`, `/hv-issues`, `/hv-capture`, then a P0 cycle plus a debug cycle
+- [Brownfield — dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open issues and a mental bug list, walked through `/hv-map`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle
 
 ### Capture and backlog
 
 - [Capturing work](usage/capturing-work.md) — `/hv-capture`, mixed input, related links, detail files
 - [Picking work](usage/picking-work.md) — `/hv-next`, `/hv-work --preview`
-- [Removing work](usage/removing-work.md): `/hv-rm`, dry-run preview, batch removal, safety semantics
+- [Removing work](usage/removing-work.md): `/hv-capture --remove`, dry-run preview, batch removal, safety semantics
 
 ### Execution
 
@@ -54,7 +54,7 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 - [The `.hv/` folder](reference/hv-folder.md) — files and directories created by `/hv-init`
 - [CLI helpers](reference/cli-helpers.md) — user-callable scripts in `.hv/bin/`
 - [Configuration options](reference/config-options.md) — the questions `/hv-init` and `/hv-config` ask, with their option labels
-- [`/hv-issues` reference](reference/hv-issues.md) — pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
+- [`/hv-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md) — pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
 - [`CONTEXT.md` reference](reference/context-md.md) — file format and lifecycle of the project glossary
 - [Preflight](reference/preflight.md) — what `.hv/bin/hv-preflight` checks before each skill, plus exit-code meanings
 
