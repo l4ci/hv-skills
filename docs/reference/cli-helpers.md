@@ -30,7 +30,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open. Respects per-bullet `Since:` anchor (skips commits older than capture time, so reused IDs don't false-flag) | `.hv/bin/hv-todo-drift` |
 | `hv-backfill-since` | Stamp `Since: <HEAD-short-hash>` on every open TODO bullet lacking the field; idempotent (re-runs are silent no-ops). Used after upgrading to silence legacy entries that pre-date auto-stamping | `.hv/bin/hv-backfill-since` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
-| `hv-knowledge-index` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-knowledge-index` |
+| `hv-managed-block knowledge` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-managed-block knowledge` |
 | `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
 | `hv-knowledge-merge` | Insert a `**Title** — body` bullet under `## <topic>` in `.hv/KNOWLEDGE.md`; atomic dedup by (topic, title) | `printf '%s' "$BODY" \| .hv/bin/hv-knowledge-merge --topic Testing --title "Mock TLS handshake"` |
 | `hv-knowledge-amend` | Append text after the trailing `<!-- date -->` comment of a bullet matched by (topic, fragment) | `.hv/bin/hv-knowledge-amend --topic Testing --fragment "TLS handshake" --append "Upstream: hv-skills#42"` |
@@ -40,7 +40,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-migrate` | One-shot migration: stamp every existing titled KNOWLEDGE bullet as `provisional` in the F03 sidecar; idempotent no-op on re-run | `.hv/bin/hv-knowledge-migrate` |
 | `hv-knowledge-contradiction` | Manage the pending-contradictions queue at `.hv/knowledge-contradictions.json`; gates auto-promotion when a correction overlaps a queried bullet | `.hv/bin/hv-knowledge-contradiction --list` |
 | `hv-config-set` | Set a single value in `.hv/config.json` at a dotted key path; preserves other keys, writes atomically (resolve; JSON-parse value, fallback to string) | `.hv/bin/hv-config-set docs.afterWork true` |
-| `hv-decisions-index` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-decisions-index` |
+| `hv-managed-block decisions` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-managed-block decisions` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
 | `hv-auto-decision-log` | Append an `[Auto:Loop]` entry to `DECISIONS.md` under a topic; idempotent on `(topic, rule-title)` | `.hv/bin/hv-auto-decision-log "Architecture" "no direct DB writes" "keeps layer clean"` |
 | `hv-auto-decisions-since` | Print a markdown summary of `[Auto:Loop]` decisions logged since `loopStartedAt` in `status.json`; empty when none match | `.hv/bin/hv-auto-decisions-since` |
@@ -164,7 +164,7 @@ In umbrella mode the umbrella tree itself often has no base branch (it's a coord
 
 ## Knowledge, vision, and decisions indexes
 
-`hv-knowledge-index` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`. `hv-knowledge-index` regenerates the `<!-- hv-knowledge-start -->` block in `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query` pulls specific topic sections out of `KNOWLEDGE.md` by name, useful when scripting post-session summaries.
+`hv-managed-block knowledge` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`. `hv-managed-block knowledge` regenerates the `<!-- hv-knowledge-start -->` block in `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query` pulls specific topic sections out of `KNOWLEDGE.md` by name, useful when scripting post-session summaries.
 
 `hv-knowledge-merge` adds a new bullet to `.hv/KNOWLEDGE.md` under an existing topic, with the schema `- **<Title>** — <body> <!-- YYYY-MM-DD -->`. Dedup is exact (case-insensitive) title match within the topic; calling the helper twice with the same `--topic` + `--title` is a silent no-op (idempotent). The body comes via `--body <text>` or stdin. Creating a new `## <Topic>` heading is the caller's job; the helper requires the topic to already exist.
 
@@ -172,7 +172,7 @@ In umbrella mode the umbrella tree itself often has no base branch (it's a coord
 
 `hv-knowledge-stats` reports the bullet count and byte size of each topic in `KNOWLEDGE.md` as JSON. [`/hv-learn`](../usage/learning.md) Step 8 calls it after merging new bullets and prints a one-line nudge per topic that crosses 25 bullets or 10 KB, so editorial splits stay user-driven.
 
-`hv-decisions-index` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
+`hv-managed-block decisions` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
 identically. The file structure, marker shape, and query semantics all mirror
 the knowledge helpers. The distinction is semantic: decisions are *active*
 hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
@@ -187,7 +187,7 @@ while knowledge is *passive* gotchas captured by `/hv-learn`. See
 
 `hv-skills-index` regenerates the `<!-- hv-skills-start -->` block in `CLAUDE.md` with the canonical slash-command index. The body is static and identical across every hv-skills project, so reruns are always idempotent. Called by `/hv-init` and `/hv-update`; you rarely need to invoke it directly.
 
-`hv-glossary-read` and `hv-glossary-write` operate on the `## Glossary` topic of `.hv/KNOWLEDGE.md` — the project glossary written via [`/hv-learn --term <name>`](slash-commands.md#hv-learn). Term entries are nested bullets under the Glossary topic: `- **<term>** — <definition>` followed by an indented `**Aliases:**` line, an optional `**Not:**` line, and a date stamp. `hv-glossary-read <term>...` prints matching entries (case-insensitive) prefixed with `> from: .hv/KNOWLEDGE.md (## Glossary)`. `hv-glossary-write <term> --def <text> [--alias ...] [--not ...] [--touch]` inserts or updates a term within the Glossary topic; alphabetical insertion is preserved; exit 3 on alias collision with another term in the same Glossary. The Glossary topic is special-cased — `hv-knowledge-tier` skips it (terms aren't tier-eligible), and `hv-knowledge-index` surfaces it like any other topic in the CLAUDE.md `## Project Knowledge` index. Umbrella-mode per-sub-repo glossaries are deferred to F21.
+`hv-glossary-read` and `hv-glossary-write` operate on the `## Glossary` topic of `.hv/KNOWLEDGE.md` — the project glossary written via [`/hv-learn --term <name>`](slash-commands.md#hv-learn). Term entries are nested bullets under the Glossary topic: `- **<term>** — <definition>` followed by an indented `**Aliases:**` line, an optional `**Not:**` line, and a date stamp. `hv-glossary-read <term>...` prints matching entries (case-insensitive) prefixed with `> from: .hv/KNOWLEDGE.md (## Glossary)`. `hv-glossary-write <term> --def <text> [--alias ...] [--not ...] [--touch]` inserts or updates a term within the Glossary topic; alphabetical insertion is preserved; exit 3 on alias collision with another term in the same Glossary. The Glossary topic is special-cased — `hv-knowledge-tier` skips it (terms aren't tier-eligible), and `hv-managed-block knowledge` surfaces it like any other topic in the CLAUDE.md `## Project Knowledge` index. Umbrella-mode per-sub-repo glossaries are deferred to F21.
 
 The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints the next `MNN` ID, creates the milestone file, and appends its overview line to `MILESTONES.md`. `hv-vision-status` updates both the file's frontmatter and the overview line atomically. `hv-vision-active`, `hv-vision-list`, `hv-vision-index`, and `hv-vision-empty-active` let you query and refresh milestone state. `hv-vision-index` also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`. `hv-vision-empty-active` prints active milestone IDs that have zero open TODO items, one per line; empty stdout is a valid answer and the helper always exits 0.
 

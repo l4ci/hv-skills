@@ -3,7 +3,7 @@ HI_TMP="$(mktemp -d)"
 (
   cd "$HI_TMP"
   mkdir -p .hv/bin stub-bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   # Stub `gh` to a script that always fails so the helper takes the manual-fallback path,
   # even on a host where the real gh is installed and authed.
   cat > stub-bin/gh <<'EOF'
@@ -28,7 +28,7 @@ HI2_TMP="$(mktemp -d)"
 (
   cd "$HI2_TMP"
   mkdir -p .hv/bin stub-bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   cat > stub-bin/gh <<'EOF'
 #!/bin/sh
 exit 7

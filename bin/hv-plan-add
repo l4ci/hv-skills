@@ -10,6 +10,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"
+. "$HERE/hv-types.sh"
 hv_self_locate
 REPO=""
 DESIGN=""
@@ -34,12 +35,13 @@ MILESTONE="${1:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone>
 UNIT="${2:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"
 TITLE="${3:?usage: hv-plan-add [--repo <name>] [--design <path>] <milestone> <unit-or-slice> <title>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MILESTONE" "$UNIT" "$TITLE" "$REPO" "$DESIGN" <<'PY'
-import re, sys
+import os, re, sys
 from datetime import date
 from pathlib import Path
 from hvlib import write_text_atomic
 
 milestone, unit_in, title, repo, design = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+_plannable = os.environ.get("HV_PLANNABLE_TYPES", "BFTS")
 
 if not re.fullmatch(r"M\d{2,}", milestone):
     print(f"error: milestone must look like M01/M02/…, got {milestone!r}", file=sys.stderr)
@@ -70,7 +72,7 @@ if unit_in == "slice":
     unit = f"S{next_n:02d}"
     unit_kind = "slice"
 else:
-    if not re.fullmatch(r"[BFTS]\d{2,}", unit_in):
+    if not re.fullmatch(rf"[{_plannable}]\d{{2,}}", unit_in):
         print(f"error: unit must be 'slice' or an ID like B07/F03/T11/S02, got {unit_in!r}", file=sys.stderr)
         sys.exit(1)
     unit = unit_in

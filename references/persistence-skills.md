@@ -19,8 +19,8 @@ Every persistence skill (and `/hv-learn`'s `--term` mode) follows:
    - `/hv-learn --term` → `bin/hv-glossary-write`
    - `/hv-decide` → `Edit` directly on `.hv/DECISIONS.md` (no helper today)
 6. **Regenerates the managed CLAUDE.md block** via an index helper. The block is the always-on signal to read-side skills:
-   - `/hv-learn` (both modes) → `bin/hv-knowledge-index` (`--term` runs it internally via `hv-glossary-write`; Glossary surfaces as a topic name in the Knowledge index automatically)
-   - `/hv-decide` → `bin/hv-decisions-index`
+   - `/hv-learn` (both modes) → `bin/hv-managed-block knowledge` (`--term` runs it internally via `hv-glossary-write`; Glossary surfaces as a topic name in the Knowledge index automatically)
+   - `/hv-decide` → `bin/hv-managed-block decisions`
 7. **Confirms via a compact block** — *"Captured `<artifact>` into `.hv/<FILE>.md`… Updated CLAUDE.md `<block>` block."* Match the shape; don't recap the plan.
 
 The duo does **not** commit. `.hv/` is gitignored, so the only tracked write is `CLAUDE.md`; the duo leaves it as a working-tree diff and lets the caller (the user, or a parent `/hv-work` cycle) commit. Aligning here matters — the duo is dispatched in sequence under `autonomy.level: loop`, so a per-skill commit would fragment what should be one summary commit.

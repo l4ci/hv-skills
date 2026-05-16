@@ -17,18 +17,21 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 
+# shellcheck source=hv-issues-common.sh
+. "$HERE/hv-issues-common.sh"
+
 # ---------------------------------------------------------------------------
 # Parse flags
 # ---------------------------------------------------------------------------
-REPO=""
 ISSUE=""
 COMMIT=""
 ITEM=""
 
+hv_issues_parse_repo_flag "$@"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
-      REPO="${2:?--repo requires a name argument}"
       shift 2
       ;;
     --issue)
@@ -66,9 +69,7 @@ fi
 # ---------------------------------------------------------------------------
 # Resolve sub-repo path (if --repo given) — cd before git rev-parse
 # ---------------------------------------------------------------------------
-if [ -n "$REPO" ]; then
-  cd "$("$HERE/hv-resolve-repo-path" "$REPO")"
-fi
+hv_issues_cd_to_repo
 
 # ---------------------------------------------------------------------------
 # Shorten commit SHA — validates it exists in the repo
@@ -90,7 +91,7 @@ fi
 # ---------------------------------------------------------------------------
 # Detect provider
 # ---------------------------------------------------------------------------
-PROVIDER="$("$HERE/hv-issues-provider" ${REPO:+--repo "$REPO"})"
+hv_issues_detect_provider
 
 # ---------------------------------------------------------------------------
 # Branch on provider

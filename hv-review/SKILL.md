@@ -96,7 +96,7 @@ Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with t
 
 Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
 
-**Register hits on consumed bullets (F03 lifecycle).** For every bullet `hv-knowledge-query` returned that gets carried into the reviewer brief's `**Relevant project conventions (from KNOWLEDGE.md):**` section, call `.hv/bin/hv-knowledge-hit --topic <T> --title <S>` once. The helper increments the hit counter; provisional bullets auto-promote to confirmed once they reach `learn.promoteThreshold` (default 3) hits without a pending contradiction. Issue the hit calls as parallel tool calls in a single batch — they're independent and bash-bound. Bullets returned by the query but pruned from the brief (the reviewer didn't need them) don't earn a hit. Silent on success.
+> **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After building the reviewer brief, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in the brief's `**Relevant project conventions (from KNOWLEDGE.md):**` section, call `.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch. Bullets returned but pruned before the brief don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
 
 ## Step 5 — Capture the Diff
 

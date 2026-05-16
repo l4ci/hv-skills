@@ -41,7 +41,7 @@ EOF
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
   git commit -q --allow-empty -m "fix: do thing [B07]"
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   OUT=$(.hv/bin/hv-todo-drift)
   echo "$OUT" | grep -q '"id": "B07"' || fail "drift missing B07: $OUT"
   pass "hv-todo-drift detects shipped-but-open ID"
@@ -72,7 +72,7 @@ SA_TMP="$(mktemp -d)"
 (
   cd "$SA_TMP"
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   echo '{"repos": []}' > .hv/repos.json
   git init -q
   git config user.email t@t && git config user.name t
@@ -211,7 +211,7 @@ EOF
   # Append 30 bullets to ## Big so it crosses the threshold.
   for i in $(seq 1 30); do echo "- bullet $i" >> .hv/KNOWLEDGE.md; done
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   OUT=$(.hv/bin/hv-knowledge-stats)
   echo "$OUT" | grep -q '"name": "Tiny"' || fail "stats missing Tiny: $OUT"
   echo "$OUT" | grep -q '"name": "Big"' || fail "stats missing Big: $OUT"
@@ -230,7 +230,7 @@ trap 'rm -rf "$KS2_TMP"' EXIT
 (
   cd "$KS2_TMP"
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   OUT=$(.hv/bin/hv-knowledge-stats)
   echo "$OUT" | grep -q '"topics": \[\]' || fail "missing-file should yield empty: $OUT"
   pass "hv-knowledge-stats silent-empty on missing KNOWLEDGE.md"

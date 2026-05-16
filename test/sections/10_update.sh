@@ -28,7 +28,7 @@ XX_TMP="$(mktemp -d)"
 (
   cd "$XX_TMP"
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
 
   # Two sibling versions; 2.0.0 must win over 1.0.0 (and over a 1.10.0-style
   # lexical winner — we use 2.0.0 to keep the assertion plain).
@@ -67,7 +67,7 @@ XX_TMP="$(mktemp -d)"
 (
   cd "$XX_TMP"
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
 
   # Test 1: no .hv/config.json → silent, exit 0.
   rm -f .hv/config.json

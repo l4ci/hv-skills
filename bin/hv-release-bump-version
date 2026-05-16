@@ -19,9 +19,9 @@ import re
 import sys
 from pathlib import Path
 import hvlib
-from hvlib import get_version_or_die
+from hvlib import VERSION_KIND_REGISTRY, get_version_or_die
 
-KINDS = {"plugin-json", "package-json", "pyproject", "cargo", "plain"}
+KINDS = set(VERSION_KIND_REGISTRY)
 BUMPS = {"patch", "minor", "major"}
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 

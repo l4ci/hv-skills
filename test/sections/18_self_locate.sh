@@ -51,7 +51,7 @@ echo "F10 self-locate: helpers work from a sub-cwd"
 # Install helpers at production-like .hv/bin/ so walk-up from BASH_SOURCE
 # lands on the test umbrella's .hv/, not the dev tree's .hv/.
 mkdir -p .hv/bin
-cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+install_helpers
 mkdir -p subdir
 BEFORE_BUGS=$(python3 -c 'import json; print(json.load(open(".hv/counters.json"))["bugs"])')
 (

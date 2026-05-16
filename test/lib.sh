@@ -19,6 +19,15 @@
 pass() { printf '  \033[32mOK\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 
+# F22 canonical mirror — strips stale helpers before copying fresh from $BIN.
+# Mirrors hv-init/SKILL.md Step 2. Callers must have $BIN set (runner provides it)
+# and .hv/bin/ already mkdir'd. Two-step delete-then-copy is intentional; matches
+# production semantics so smoke catches rename-regressions.
+install_helpers() {
+  find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib.py' \) -type f -delete
+  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+}
+
 # F62 — preamble convention scan. Reads every test/sections/*.sh and fails
 # if any forbidden pattern is found. Catches the class of regressions where
 # per-section drift would shadow runner state or violate the F38 local-trap
