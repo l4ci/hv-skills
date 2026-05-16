@@ -3,7 +3,7 @@
 # Atomic-merge helper: regenerates a named managed block in CLAUDE.md; exit 0 on success, 1 on unknown key.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
-# Keys: knowledge | decisions | vision | map | qa | context (vision, map, qa, context are body-stdin only).
+# Keys: knowledge | decisions | vision | map | qa (vision, map, qa are body-stdin only).
 # Prints: created | updated | appended.
 set -euo pipefail
 KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"

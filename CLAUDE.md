@@ -30,15 +30,15 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 **Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
-**Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
+**Persist** — `/hv-learn` (durable knowledge; `--term <name>` for glossary), `/hv-decide` (hard boundaries — manual only)
 **Vision & maps** — `/hv-vision`, `/hv-refactor`
 **Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
-Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, `## Project Vision`, or `## Project Context`, pull only the relevant sections:
+Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
 
 - `.hv/bin/hv-knowledge-query <topic>…`
 - `.hv/bin/hv-decisions-query <topic>…`
-- `.hv/bin/hv-context-query <term>…`
+- `.hv/bin/hv-glossary-read <term>…` (terms live as nested-bullet entries under `## Glossary` in `.hv/KNOWLEDGE.md`)
 - `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
 <!-- hv-skills-end -->
 
@@ -58,14 +58,6 @@ Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/
 
 - _(no subsystems yet — write `.hv/map/<name>.md` as you discover subsystems)_
 <!-- hv-map-end -->
-
-<!-- hv-context-start -->
-## Project Context
-
-Domain terminology lives in `.hv/CONTEXT.md`. Use these canonical names; if a term you're using conflicts (synonym or drift), call it out.
-
-- _(no terms yet — run `/hv-context` to capture domain terminology)_
-<!-- hv-context-end -->
 
 <!-- hv-qa-start -->
 ## Project QA
