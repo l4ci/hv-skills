@@ -27,11 +27,11 @@ Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
 
-**Capture & pick** — `/hv-capture`, `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
+**Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
-**Review & ship** — `/hv-review`, `/hv-ship`
+**Review & ship** — `/hv-review`, `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
-**Vision & docs** — `/hv-vision`, `/hv-docs`, `/hv-refactor`
+**Vision & maps** — `/hv-vision`, `/hv-map`, `/hv-refactor`
 **Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-release`
 
 Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, `## Project Vision`, or `## Project Context`, pull only the relevant sections:

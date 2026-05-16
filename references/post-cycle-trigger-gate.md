@@ -1,6 +1,6 @@
 # Post-cycle trigger gate
 
-Used by `/hv-work` Step 13 (Learn) + Step 13.7 (Docs After-Work), `/hv-ship` Step 8.5 (Learn) + Step 8.6 (Docs After-Work), and `/hv-docs` Step A1 (Trigger Gate). Five sites share the same trigger condition byte-for-byte — extracted here so the rule has a single source of truth.
+Used by `/hv-work` Step 13 (Learn) + Step 13.6 (Docs After-Work), `/hv-ship` Step 8.5 (Learn) + Step 8.6 (Docs After-Work) + Step D-A1 (Docs Mode Trigger Gate). Four sites share the same trigger condition byte-for-byte — extracted here so the rule has a single source of truth.
 
 ## The condition
 

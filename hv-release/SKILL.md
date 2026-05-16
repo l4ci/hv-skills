@@ -324,16 +324,16 @@ Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that woul
 
 ## Step 13.5 — Docs After-Work (Nudge or Auto-Invoke)
 
-Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
+Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
 
 When the flag is on, a release is a natural docs trigger — release notes and CHANGELOG entries are user-facing artifacts that often imply other docs (READMEs, getting-started guides, reference pages) need a refresh. Skip in `--dry-run` mode. Don't repeat in the same session.
 
 When triggered, branch on `autonomy.level`:
 
-- `"off"` — append one line to the Step 14 summary — *"Release shipped. Run `/hv-docs` to review and update public docs (after-work mode)."*
-- `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the new version, the bump type, and a one-line summary of what shipped (from Step 6's release notes title).
+- `"off"` — append one line to the Step 14 summary — *"Release shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
+- `"auto"` or `"loop"` — **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the new version, the bump type, and a one-line summary of what shipped (from Step 6's release notes title).
 
-If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
 
 ## Step 14 — Summary
 

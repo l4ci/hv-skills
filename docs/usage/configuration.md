@@ -214,7 +214,7 @@ Controls whether skills nudge or invoke the next skill directly. Three levels: `
 - **Type:** string
 - **Default:** `"docs"`
 
-Relative path (from the project root) to the documentation folder that [`/hv-docs`](../reference/slash-commands.md#hv-docs) reads and writes. Set this when your project keeps docs somewhere other than the default, for example `"documentation"`, `"site/content"`, or `"wiki"`.
+Relative path (from the project root) to the documentation folder that [`/hv-ship --docs`](../reference/slash-commands.md#hv-ship) reads and writes. Set this when your project keeps docs somewhere other than the default, for example `"documentation"`, `"site/content"`, or `"wiki"`.
 
 ```json
 { "docs": { "path": "documentation" } }
@@ -225,7 +225,7 @@ Relative path (from the project root) to the documentation folder that [`/hv-doc
 - **Type:** boolean
 - **Default:** `false`
 
-Controls whether `/hv-docs` after-work mode automatically writes proposed doc updates without pausing for approval. When `false` (the default), `/hv-docs` proposes changes and waits for your confirmation before writing. That's the safe propose-mode path. When `true`, `/hv-docs` writes changes and reports what it did. The `true` path will gain a Layer-3 LLM safety review before commit when M01-S03 ships; until then, `false` is the recommended default and `true` is opt-in.
+Controls whether `/hv-ship --docs` after-work mode automatically writes proposed doc updates without pausing for approval. When `false` (the default), the after-work flow proposes changes and waits for your confirmation before writing. That's the safe propose-mode path. When `true`, it writes changes and reports what it did. The `true` path will gain a Layer-3 LLM safety review before commit when M01-S03 ships; until then, `false` is the recommended default and `true` is opt-in.
 
 | Value | Behavior |
 |-------|----------|
@@ -237,13 +237,13 @@ Controls whether `/hv-docs` after-work mode automatically writes proposed doc up
 - **Type:** boolean
 - **Default:** `false`
 
-Gate for the after-work docs flow. When `true`, the skills [`/hv-work`](running-work.md), `/hv-ship`, and [`/hv-release`](../reference/slash-commands.md#hv-release) trigger `/hv-docs` after their primary action completes. `/hv-work` and `/hv-ship` only fire on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger); `/hv-release` fires on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-docs` directly.
+Gate for the after-work docs flow. When `true`, the skills [`/hv-work`](running-work.md), `/hv-ship`, and [`/hv-release`](../reference/slash-commands.md#hv-release) trigger the docs after-work flow after their primary action completes. `/hv-work` and `/hv-ship` only fire on cycles that resolve 2+ items or touch 5+ files (small fixes don't trigger); `/hv-release` fires on every successful release (release notes are inherently user-facing). Under `autonomy.level: off`, the trigger is a one-line nudge in the terminal report; under `auto` or `loop`, the skill auto-dispatches `/hv-ship --docs` directly (or runs the after-work flow inline if called from `/hv-ship` itself).
 
 ```json
 { "docs": { "afterWork": true } }
 ```
 
-Leave `false` while you're shaping docs by hand. Flip on once your docs structure is stable enough that `/hv-docs`'s propose-mode adds value rather than noise.
+Leave `false` while you're shaping docs by hand. Flip on once your docs structure is stable enough that `/hv-ship --docs`'s propose-mode adds value rather than noise.
 
 ## release.checklistPath
 

@@ -13,7 +13,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
 | `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
-| `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
+| `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; engine for `/hv-ship --undo`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-rm` | Remove backlog item(s) — strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
@@ -148,7 +148,7 @@ indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 `hv-uncomplete` is the inverse of `hv-complete`: it lifts a struck-through entry out of `## Completed` (or `ARCHIVE.md`) and restores it to its original type section. Calling it on an ID that is already active is a silent no-op. On the completed→active transition it also rewinds `counters.json#since_refactor` for items whose resolved commit subject did not start with `refactor:`, mirroring `hv-complete`'s accounting. Used by `hv-undo` during cycle rollback; safe to call directly for one-off restorations.
 
-`hv-undo` is the CLI entry point for the [`/hv-undo`](slash-commands.md#hv-undo) skill. It resets the last `/hv-work` merge commit on the base branch and restores each TODO via `hv-uncomplete`, all in one transaction. Direct-merge cycles only (MVP); refuses on cycles with post-merge commits unless `--allow-post-merge` is passed, and refuses on a dirty tree (exit 2). Defaults to a dry-run preview; the slash command always asks before applying.
+`hv-undo` is the CLI engine for the [`/hv-ship --undo`](slash-commands.md#hv-ship) mode. It resets the last `/hv-work` merge commit on the base branch and restores each TODO via `hv-uncomplete`, all in one transaction. Direct-merge cycles only (MVP); refuses on cycles with post-merge commits unless `--allow-post-merge` is passed, and refuses on a dirty tree (exit 2). Defaults to a dry-run preview; the slash command always asks before applying.
 
 ## Status and reconciliation
 

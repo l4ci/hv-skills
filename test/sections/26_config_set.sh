@@ -69,24 +69,24 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CFG_TMP"
 pass "hv-config-set top-level / nested / idempotent / typed values / preservation / errors / autocreate"
 
-echo "hv-docs / hv-config / hv-init reference hv-config-set"
-grep -q "hv-config-set" "$REPO/hv-docs/SKILL.md"   || fail "hv-docs missing hv-config-set call"
+echo "hv-ship (Docs Mode) / hv-config / hv-init reference hv-config-set"
+grep -q "hv-config-set" "$REPO/hv-ship/SKILL.md"   || fail "hv-ship Docs Mode missing hv-config-set call"
 grep -q "hv-config-set" "$REPO/hv-config/SKILL.md" || fail "hv-config missing hv-config-set call"
 grep -q "hv-config-set" "$REPO/hv-init/SKILL.md"   || fail "hv-init missing hv-config-set call"
-pass "hv-docs, hv-config, hv-init all reference the new helper"
+pass "hv-ship Docs Mode, hv-config, hv-init all reference the new helper"
 
-echo "F09: hv-docs manual entry routes to after-work flow with gate bypass"
-grep -E '\| Manual invoke.*after-work.*manual mode' "$REPO/hv-docs/SKILL.md" >/dev/null \
-  || fail "F09: hv-docs Modes row for manual invocation doesn't reflect after-work in manual mode"
-grep -q "Route to the After-work flow" "$REPO/hv-docs/SKILL.md" \
-  || fail "F09: hv-docs Step 1 'Already true' branch doesn't route to after-work flow"
-grep -q "Manual entry bypasses the gate" "$REPO/hv-docs/SKILL.md" \
-  || fail "F09: hv-docs Step A1 missing manual-entry bypass clause"
+echo "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
+grep -E '\| Manual invoke.*after-work.*manual mode' "$REPO/hv-ship/SKILL.md" >/dev/null \
+  || fail "F09: hv-ship Docs Mode Modes row for manual invocation doesn't reflect after-work in manual mode"
+grep -q "Route to the After-work sub-flow" "$REPO/hv-ship/SKILL.md" \
+  || fail "F09: hv-ship Docs Mode Step D1 'Already true' branch doesn't route to after-work sub-flow"
+grep -q "Manual entry bypasses the gate" "$REPO/hv-ship/SKILL.md" \
+  || fail "F09: hv-ship Docs Mode Step D-A1 missing manual-entry bypass clause"
 # Old no-op text must not survive
-if grep -q "Re-running .*hv-docs.* manually has no further effect" "$REPO/hv-docs/SKILL.md"; then
-  fail "F09: stale 'no further effect' no-op text still present in hv-docs/SKILL.md"
+if grep -q "Re-running .*hv-docs.* manually has no further effect" "$REPO/hv-ship/SKILL.md"; then
+  fail "F09: stale 'no further effect' no-op text still present in hv-ship/SKILL.md Docs Mode"
 fi
-pass "F09: hv-docs manual entry routes to after-work flow with gate bypass"
+pass "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
 
 echo "hv-config positional-args invocation shapes"
 grep -q '## Step 1.5 — Parse Positional Arguments' "$REPO/hv-config/SKILL.md" || fail "hv-config missing Step 1.5"
