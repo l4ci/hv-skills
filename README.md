@@ -30,6 +30,8 @@
 
 💾 **Persist.** `/hv-learn` writes durable session learnings to `KNOWLEDGE.md`, verified before they land. The same skill captures domain terms via `/hv-learn --term <name>`, landing them as nested-bullet entries under the pinned `## Glossary` topic of `KNOWLEDGE.md`. `/hv-decide` captures hard-boundary commitments to `DECISIONS.md` with explicit forbids and permits. The project map (`.hv/map/<name>.md` files describing subsystems) is hand-authored; cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle on matched subsystems. `/hv-ship --docs` keeps the public docs in sync with the code (inline at ship time or via the manual `--docs` flag).
 
+> **Upgrading from v3?** Run `/hv-migrate v4` after install. See the [v4.0 announcement](docs/announcements/v4-0.md).
+
 ## Install
 
 ```bash
