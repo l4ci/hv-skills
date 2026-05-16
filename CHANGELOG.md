@@ -2,21 +2,54 @@
 
 ## v4.0.0 — unreleased
 
-**The Loop, simplified.** Breaking removal of `/hv-context` plus seven other skills folded into composite surfaces (full announcement lands with M01's marketing pass — F20). This stub captures the F18 fold; subsequent F19/F21/F22 commits will extend the v4.0 entry as they ship.
+**Claude that doesn't forget.** Twenty commands left. You know what they all do. v4.0 cuts eight commands (28 → 20), routes each to a flag on a surviving skill, and ships `/hv-migrate v4` as the safety net. The wedge — `KNOWLEDGE.md` + `DECISIONS.md` + handoff-across-`/clear` — is unchanged; the loop around it just got smaller.
 
-## Breaking
+See [`docs/announcements/v4-0.md`](docs/announcements/v4-0.md) for the long-form post.
 
-- **`/hv-context` removed.** The skill is folded into `/hv-learn --term <name>` ([F18]). Domain terms now live as nested-bullet entries under a pinned `## Glossary` topic in `.hv/KNOWLEDGE.md` instead of a separate `.hv/CONTEXT.md` file. The capture surface — `--def`, `--alias`, `--not`, `--touch` — is preserved on the flag. Existing projects use `/hv-migrate v4` ([F19], in progress) to port `.hv/CONTEXT.md` into the new Glossary topic; new projects start with the pinned topic via `/hv-init`. Helpers renamed: `bin/hv-context-add → bin/hv-glossary-write`, `bin/hv-context-query → bin/hv-glossary-read`. Removed: `bin/hv-context-index`, `bin/hv-context-map`, `hv-context/` skill folder, the `<!-- hv-context-start -->` block in `CLAUDE.md`. Umbrella-mode per-sub-repo Glossary is deferred to F21.
+## Breaking — eight cuts, every cut has a successor
+
+| Removed | Replaced by |
+|---|---|
+| `/hv-c` | type `/hv-capture` ([F11]) |
+| `/hv-assume` | `/hv-work --preview <ID>` ([F15]) |
+| `/hv-rm` | `/hv-capture --remove <ID>` ([F14]) |
+| `/hv-undo` | `/hv-ship --undo` ([F13]) |
+| `/hv-issues` | `/hv-capture --from-github` / `--from-gitlab` ([F16]) |
+| `/hv-context` | `/hv-learn --term <name>` ([F18]) |
+| `/hv-map` | folded into `/hv-init` first-run + cycle-skill after-work updates ([F12]) |
+| `/hv-docs` | `/hv-ship --docs` + auto-trigger when `docs/` exists ([F17]) |
+
+**Migration.** Run `/hv-migrate v4` in any v3 project to rewrite `.hv/BACKLOG.md`, `.hv/plans/*`, `.hv/designs/*`, `.hv/handoff/*`, `.hv/qa/*`, and the project `CLAUDE.md` from v3-shape names to v4-shape names. Dry-run is default; `--apply` writes. Idempotent. Touched files backed up to `.hv/migrate-backup/<timestamp>/` first. No deprecation window — the codemod is the safety net.
 
 ## New
 
-- **`/hv-learn --term <name>`** ([F18]) — captures a domain term into the `## Glossary` topic of `.hv/KNOWLEDGE.md` with the same flag shape the old `/hv-context` used. Conflict-gated: refuses on alias collision with another term in the Glossary.
-- **`hv-glossary-write --batch <manifest>`** ([F18 T9]) — atomic multi-term import from a tab-separated manifest (`term \t def \t aliases \t nots`). The whole batch is validated against existing entries AND intra-batch uniqueness before any write; on alias collision the entire batch is refused (exit 3) with a multi-line conflict summary. F19's codemod consumes this.
-- **Pinned `## Glossary` topic in fresh `KNOWLEDGE.md`** ([F18 T3]) — `bin/hv-bootstrap` writes the topic header on `/hv-init` so single-repo projects start with a Glossary destination.
+- **`/hv-migrate v4`** ([F19]) — version-keyed codemod for v3 → v4 project state. Rewrites the eight old command names across `.hv/` artifacts + `CLAUDE.md`; migrates `.hv/CONTEXT.md` content into the pinned `## Glossary` topic in `.hv/KNOWLEDGE.md`; sweeps orphan `bin/` helpers from older installs. Smoke section 37 adds 10 assertions across dry-run, `--apply`, idempotent re-run, the CONTEXT-to-Glossary migration, and the orphan-bin sweep.
+- **`/hv-init` mirrors canonical `bin/`** ([F22]) — Step 2 strips stale helpers from the project's `.hv/bin/` before copying the new manifest, so v3 → v4 upgrades on existing projects don't leave orphan binaries. Smoke section 38 adds 6 assertions.
+- **`/hv-learn --term <name>`** ([F18]) — captures domain terms into the pinned `## Glossary` topic of `.hv/KNOWLEDGE.md` with the same `--def` / `--alias` / `--not` / `--touch` shape the old `/hv-context` carried. Conflict-gated: refuses on alias collision with another term in the Glossary. `hv-glossary-write --batch <manifest>` ([F18 T9]) ships alongside for the migrate codemod's atomic import path — the whole batch is validated against existing entries AND intra-batch uniqueness before any write.
+- **Pinned `## Glossary` topic in fresh `KNOWLEDGE.md`** ([F18 T3]) — `bin/hv-bootstrap` writes the topic header on `/hv-init` so new projects start with a Glossary destination.
+- **`docs/announcements/v4-0.md`** ([F20]) — the long-form release post: two-part essay covering the wedge (KNOWLEDGE/DECISIONS/handoff) and the cut (eight commands routed to flags). Receipts table at the close, SCOPE section naming what hv-skills will not become.
+- **Upgrade banner in `README.md`** ([F20]) — single line above the Install section pointing v3 users to `/hv-migrate v4`.
+
+## Changed
+
+- **Helper preamble consolidation** ([F24]) — `bin/hv-preamble.sh` lands as a single-line source for the `hv-self-locate` preamble convention, then 62 helpers migrate to it across three batches. Removes ~600 lines of duplicated boilerplate; every helper now sources one canonical preamble instead of carrying its own.
+- **`bin/hvlib.py` architectural cleanup** — three rounds of refactor land in v4.0: 3 architectural improvements (Round 1, `942785a`), dead `hv_repo_flag_parse` export dropped (Round 2, `bc5d6a9`), and `hvlib_io` + `hvlib_version` extracted from the monolith (Round 3, `9dc158a`). Backward-compatible wildcard re-exports preserve every existing `PYTHONPATH`-heredoc caller. The full 1077-LoC → 6-module split ([F25]) carries through subsequent v4.x releases.
+- **Phase A architectural sweep** (`c84ae3e`) — 8 architectural improvements consolidating helper boundaries that surfaced during F18/F19 work.
+
+## Removed
+
+- Eight `hv-*/` skill folders (`hv-c`, `hv-assume`, `hv-rm`, `hv-undo`, `hv-issues`, `hv-context`, `hv-map`, `hv-docs`), their orphan `bin/` helpers (`hv-context-{index,map}`, the old `hv-rm` engine, etc.), their `docs/usage/` pages, their entries in `plugin.json` / `marketplace.json` / `bin/hv-skills-index`, and their `<!-- hv-*-start -->` blocks in `CLAUDE.md`. Grep for the eight names in canonical sources returns zero matches.
+
+## Documentation
+
+- New: `docs/announcements/v4-0.md` — long-form release post ([F20]).
+- README: cut-command refs removed from "The five lanes" prose and the features grid; upgrade banner added above Install ([F20]).
+- `docs/usage/` pages for cut commands merged into the successor's page where the surface survives as a flag (`undo.md`, `decisions.md` cross-reference, etc.).
+- `bin/hv-skills-index` heredoc body trimmed to the 20-command surface plus `/hv-migrate`.
 
 ## Stats
 
-Pending — F19/F20/F21/F22 still to ship.
+Pending — final stats roll up at tag time.
 
 ## v3.4.0 — 2026-05-15
 
