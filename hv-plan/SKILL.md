@@ -151,7 +151,7 @@ Plan written: M01-B07 — Auth foundation
   Open questions: 1
   Status: planned
 
-Next: /hv-work M01-B07 to execute, or /hv-assume M01-B07 to peek before running.
+Next: /hv-work M01-B07 to execute, or /hv-work --preview M01-B07 to peek before running.
 ```
 
 Include `Repo: <names>` only when the plan was tagged with a sub-repo (item targets with `Repos:` under umbrella mode). Render multi-repo plans with the joined list — e.g. `Repo: web, api`. Slice and milestone plans omit the line entirely.

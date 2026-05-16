@@ -1,6 +1,6 @@
 # Picking work
 
-Two skills help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any [`/hv-pause`](pausing-and-resuming.md) handoff note for active streams, presents the backlog, and suggests work. `/hv-assume` lets you peek at the orchestrator's plan before code lands.
+Two flows help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any [`/hv-pause`](pausing-and-resuming.md) handoff note for active streams, presents the backlog, and suggests work. `/hv-work --preview <ID>` lets you peek at the orchestrator's plan before code lands.
 
 ## /hv-next
 
@@ -26,7 +26,7 @@ flowchart TD
     G --> H[Suggest one item or batch]
     H --> I{User picks…}
     I -->|Start| J[/hv-work]
-    I -->|Peek first| K[/hv-assume]
+    I -->|Peek first| K[/hv-work --preview]
     I -->|Different pick| H
     I -->|Stop| L[End]
 ```
@@ -41,11 +41,11 @@ After you confirm the pick, `/hv-next` routes you to [running work](running-work
 
 Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug) — fix auth token expiry`. Answer `y` (or pick a different item) and work begins.
 
-If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` offers `/hv-assume` as a question option before routing to `/hv-work`.
+If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` offers `/hv-work --preview` as a question option before routing to `/hv-work`.
 
 Items with a `Related:` field that share a cluster surface together so you can tackle them as a unit.
 
-## /hv-assume: peek before you commit
+## /hv-work --preview: peek before you commit
 
 Prints the orchestrator's intended approach for an item before any code is written. Read-only: no writes, no commits.
 
@@ -54,12 +54,12 @@ Output structure:
 - One-paragraph approach summary
 - Bulleted lists: *Files I'd touch*, *Files I'd create*, *Tests I'd add*, *Assumptions I'm making*, *Known unknowns*
 
-Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output, then push back, ask for a durable plan ([`/hv-plan`](vision-and-plans.md)), or proceed to [running work](running-work.md).
+Use it as a cheap gate before `/hv-work` on size-Major-or-larger items or P0/P1 bugs, where corrections after the fact are expensive. Review the output, then push back, ask for a durable plan ([`/hv-plan`](vision-and-plans.md)), or proceed to [running work](running-work.md) by re-invoking `/hv-work` without the flag.
 
 **Example:**
 
 ```
-/hv-assume F08
+/hv-work --preview F08
 ```
 
 Output: specific file paths, test names, and function names the orchestrator would touch, not generic descriptions.

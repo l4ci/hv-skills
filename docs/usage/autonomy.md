@@ -40,10 +40,10 @@ If a routine routing prompt does fire under loop mode, that's a sign the auto-pi
 **Loop-mode auto-dispatch chain.** For Major + Milestone-tagged items in loop mode, [`/hv-work`](running-work.md) Step 4 runs a three-step research → plan chain before any worker dispatches:
 
 1. **Design pre-flight.** When `.hv/designs/<ID>.md` is absent, dispatch [`/hv-brainstorm`](#) `--auto-loop`. Auto-resolves design questions (local-first → bounded web → placeholder), logs `[Auto:Loop]` decisions for fresh picks, writes the design with `auto: true` frontmatter.
-2. **Uncertainty pre-flight.** Run the structural-triple check (no detail file / 2+ question marks or `TBD`/`unclear` markers / no backticked identifiers). When uncertain, dispatch [`/hv-assume`](picking-work.md); the peek lands in the orchestrator session and informs the subsequent auto-plan.
+2. **Uncertainty pre-flight.** Run the structural-triple check (no detail file / 2+ question marks or `TBD`/`unclear` markers / no backticked identifiers). When uncertain, run [`/hv-work --preview`](picking-work.md) inline; the peek lands in the orchestrator session and informs the subsequent auto-plan.
 3. **Plan dispatch.** Dispatch [`/hv-plan`](vision-and-plans.md) `--auto-loop`. Reads the design as soft input, auto-resolves open questions, writes the plan with `auto: true` frontmatter.
 
-The chain runs only in loop mode; off and auto modes still let you invoke `/hv-brainstorm`, `/hv-assume`, and `/hv-plan` manually.
+The chain runs only in loop mode; off and auto modes still let you invoke `/hv-brainstorm`, `/hv-work --preview`, and `/hv-plan` manually.
 
 ## When to flip it on
 

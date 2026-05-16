@@ -39,6 +39,73 @@ Read `.hv/config.json`:
 Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → Verify → Commit → TODO → Merge/PR → Status
 ```
 
+## Preview Mode (`--preview`)
+
+When invoked as `/hv-work --preview <target>` (or with `--preview` anywhere in the args), the skill enters **read-only preview mode** — it produces the same approach peek the formerly-separate `/hv-assume` skill emitted, then stops. No writes, no commits, no helper calls beyond reads. Steps 1–15 are bypassed.
+
+The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `M01-B07`), or a milestone (`M01`). Ambiguous → ask once; do not auto-pick.
+
+**Procedure:**
+
+1. **Preflight only** — `.hv/bin/hv-preflight`. No guard, no status registration.
+2. **Load context silently** per [`references/context-load-protocol.md`](../references/context-load-protocol.md). Issue all reads in parallel. For backlog-item targets under umbrella mode: parse the entry's `Repos:` field (`hv-todo-field <ID> repos`); when umbrella mode is on (`.hv/bin/hv-umbrella-on` returns `yes`) and the item carries a `Repos:` value, resolve to absolute sub-repo path(s) via `.hv/bin/hv-resolve-repos`. Multi-repo items resolve to a list — keep all entries for the render. Skip repo resolution for slice / milestone targets (umbrella-flat per M02 acceptance). If `hv-decisions-query` returns matches, surface them in the peek's "Hard boundaries to respect" section (between "Files I'd create" and "Tests I'd add") — one line each: `- <decision title> — <one-line summary>`. The user's job during review is to spot conflicts before code lands.
+3. **Produce the peek.** Print this structure to chat. **Nothing else** — no preamble, no recap of what context you read:
+
+   ```
+   Peek for <target>:
+
+   Approach
+     <one paragraph — the shape of what I'd do and why this over alternatives>
+
+   Repo
+     <name> (<absolute-sub-repo-path>)        # omit when single-repo or no Repos: tag
+     <name2> (<absolute-sub-repo-path-2>)     # one line per repo for multi-repo items
+
+   Files I'd touch
+     - <path>  — <reason>
+     - <path>  — <reason>
+
+   Files I'd create
+     - <path>  — <reason>
+
+   Hard boundaries to respect
+     - <decision title>  — <one-line summary>
+     - <decision title>  — <one-line summary>
+
+   Tests I'd add
+     - <test name or location>  — <what it verifies>
+
+   Assumptions I'm making
+     - <named assumption that, if wrong, changes the approach>
+     - <named assumption that, if wrong, changes the approach>
+
+   Known unknowns
+     - <thing I'd resolve mid-flight>  (will pause if unresolvable)
+     - <thing I'd resolve mid-flight>  (will pause if unresolvable)
+
+   If any of this is wrong, push back before /hv-work runs.
+   ```
+
+   Omit `Hard boundaries to respect` if no DECISIONS topics matched. Omit `Repo` entirely when umbrella mode is off, the target is a slice / milestone, or the item has no `Repos:` tag. When present, render as `<name> (<absolute-path>)` resolved via `.hv/repos.json`. Multi-repo items render one indented line per resolved sub-repo — so the user can verify every dispatch target before `/hv-work` runs.
+
+   Be specific. *"I'd touch the auth code"* is useless — cite paths. If you don't know the path well enough to cite it, say so under Known unknowns.
+
+4. **Stop.** Do **not** auto-invoke `/hv-work` (without `--preview`), write a plan, or take any action. The user reviews and either:
+
+   - Says *"go"* — they invoke `/hv-work <target>` themselves (without `--preview`).
+   - Pushes back — they redirect, you restate the peek with corrections.
+   - Asks for a written plan — offer `/hv-plan <target>`.
+
+**Key principles for preview mode:**
+
+- **Pure read.** No writes, no commits, no helper calls beyond reads.
+- **Be specific.** Generic peeks are useless. Cite paths, test names, function names.
+- **Name assumptions.** The whole mode's value is making implicit choices visible.
+- **Stop after the peek.** No auto-continuation; the user's pushback is the point.
+- **Plan beats peek for high-stakes work.** Offer `/hv-plan` if the user wants something durable rather than ephemeral.
+
+**Orchestrator-model contract (F35, loop mode).** When `/hv-work` Step 4's F34 uncertainty pre-flight needs a peek, it runs this Preview Mode procedure **inline** (not via recursive `Skill` dispatch) — the peek inherits the orchestrator model since the cycle is already running under it. The Step 4 chain reads the peek output from chat context and proceeds to `/hv-plan --auto-loop`. Manual invocations from `/hv-next` or the user's prompt (`/hv-work --preview <ID>`) are unconstrained — the user is in the loop and can correct any peek that under-performs.
+
 ## Step 1 — Preflight & Guard
 
 ```bash
@@ -186,7 +253,7 @@ If a plan exists, **use it as the orchestrator's plan** — its task decompositi
 **Loop-mode auto-dispatch chain (B28 / F32 / F34 / F35).** In loop mode with a Major + Milestone-tagged item but no plan, `/hv-work` runs the full research → plan chain in three steps, all via the `Skill` tool so the dispatched skills inherit the orchestrator model:
 
 1. **Design pre-flight (B28).** If `.hv/designs/<itemId>.md` is absent, dispatch `/hv-brainstorm --auto-loop <itemId>`. The dispatched skill auto-resolves design questions (Local-first → Bounded web → Placeholder), logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<itemId>.md` with `auto: true` frontmatter. When a design already exists, this step is a no-op.
-2. **Uncertainty pre-flight (F34).** Run `.hv/bin/hv-uncertain <itemId>`. Exit 0 (uncertain, reasons on stdout) → dispatch `/hv-assume <itemId>`. Exit 1 (certain) → skip the peek.
+2. **Uncertainty pre-flight (F34).** Run `.hv/bin/hv-uncertain <itemId>`. Exit 0 (uncertain, reasons on stdout) → run the **Preview Mode** procedure (above) inline with `<itemId>` as the target; the peek prints to chat and lands in the orchestrator's session context. Exit 1 (certain) → skip the peek.
 3. **Plan dispatch (F32 / F35).** Dispatch `/hv-plan --auto-loop <milestone>-<itemId>`. `/hv-plan` Step 3 reads the design artifact as soft input (already wired), and the auto-resolution pipeline writes the plan with all picks honored.
 
 After the chain returns, re-run the plan-as-artifact check at the top of this step — the plan now exists; use it as the orchestrator's plan. Off and auto modes skip this chain entirely and fall through to manual decomposition. See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) for the full choreography.

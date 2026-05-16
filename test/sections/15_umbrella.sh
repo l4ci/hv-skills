@@ -247,10 +247,10 @@ grep -q 'multi-repo items pass the full comma-list' "$REPO/hv-plan/SKILL.md" \
   || fail "hv-plan/SKILL.md must explain multi-repo --repo flow"
 pass "M03-T6: hv-plan/SKILL.md documents multi-repo --repo"
 
-# M03-T6: hv-assume/SKILL.md peek shape supports multiple sub-repo lines
-grep -q "one line per repo for multi-repo items" "$REPO/hv-assume/SKILL.md" \
-  || fail "hv-assume/SKILL.md peek must show one Repo line per sub-repo for multi-repo items"
-pass "M03-T6: hv-assume/SKILL.md peek renders one line per repo"
+# M03-T6: hv-work/SKILL.md Preview Mode peek shape supports multiple sub-repo lines
+grep -q "one line per repo for multi-repo items" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md Preview Mode peek must show one Repo line per sub-repo for multi-repo items"
+pass "M03-T6: hv-work/SKILL.md Preview Mode peek renders one line per repo"
 
 # M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
 grep -q "hv-multi-branch-create" "$REPO/hv-work/SKILL.md" \

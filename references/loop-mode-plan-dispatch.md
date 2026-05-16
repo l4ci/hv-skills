@@ -24,11 +24,11 @@ Before the auto-plan dispatch, `/hv-work` runs:
 
 The helper applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout); exit 1 = certain; exit 2 = error.
 
-When uncertain, **dispatch `/hv-assume <itemId>` via the `Skill` tool first** — no prompt, no confirmation. Its peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
+When uncertain, **run the `/hv-work` Preview Mode procedure inline** with `<itemId>` as the target — no prompt, no confirmation. The peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
 
 ## Orchestrator-model contract (F35)
 
-All three dispatched skills — `/hv-brainstorm --auto-loop`, `/hv-assume` (when dispatched), and `/hv-plan --auto-loop` — are invoked via the `Skill` tool, which loads each inline in the current session. Since `/hv-work` itself runs in the orchestrator session under `models.orchestrator`, the dispatched skills inherit the orchestrator model — the design, peek, and plan benefit from orchestrator-grade judgment. If a future change moves any of these to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.hv/config.json`) to preserve this guarantee.
+The two dispatched skills — `/hv-brainstorm --auto-loop` and `/hv-plan --auto-loop` — are invoked via the `Skill` tool, which loads each inline in the current session. The Preview Mode peek (when uncertain) runs inline inside `/hv-work`'s own session — no dispatch, no Skill call. Since `/hv-work` itself runs in the orchestrator session under `models.orchestrator`, both the dispatched skills AND the inline peek benefit from orchestrator-grade judgment. If a future change moves any of the dispatched skills to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.hv/config.json`) to preserve this guarantee.
 
 ## Detect rename + link-sweep collisions
 

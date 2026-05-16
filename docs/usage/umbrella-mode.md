@@ -127,7 +127,7 @@ Most skills delegate umbrella resolution to underlying helpers and stay umbrella
 - **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-next` reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for older streams.
 - **`/hv-plan`** records the target sub-repo in plan frontmatter (`repo: <name>`) when invoked with `--repo` or when the item carries `Repos:`. Slice and milestone plans stay umbrella-flat.
 - **`/hv-spike`** runs the spike branch in the resolved sub-repo (`spike/<name>` lives in that repo's `.git/`); the spike file stays at `<umbrella>/.hv/spikes/<name>.md` with a `repo: <name>` frontmatter line.
-- **`/hv-assume`** displays the resolved sub-repo for items with `Repos:` in its peek output.
+- **`/hv-work --preview`** displays the resolved sub-repo for items with `Repos:` in its peek output.
 - **`/hv-debug`** routes its single fix-commit to the sub-repo resolved from the bug's `Repos:` tag.
 - **`/hv-review`** scopes its branch inspection to the sub-repo via `hv-review-scope --repo <name>`. `BACKLOG.md` and `ARCHIVE.md` lookups stay at the umbrella.
 - **`/hv-ship`** threads `--repo` through `hv-merge` / `hv-pr` so the merge or PR runs in the correct sub-repo.

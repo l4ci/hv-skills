@@ -46,7 +46,7 @@ Per-site shape (adapt phase list per skill):
 Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the situation is clear"* — don't qualify. When a phase genuinely produces a subjective state (a UX flow approval, a design pick), name the user action or recorded decision that captures the approval rather than the inner state. Skill authors picking a phase outcome should ask: *"what would I `grep` or `[ ]` test for, from the next session, to know this phase finished?"* If the answer is "nothing concrete", the phase is too vague to track.
 
 **Forbids.**
-- Adding the block to single-phase or trivial skills (Tier C: `hv-assume`, `hv-go`, `hv-c`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
+- Adding the block to single-phase or trivial skills (Tier C: `hv-go`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
 - Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
 - Cross-skill alignment of phase names — each skill's phase list reflects its own structure; phrasing is local to the SKILL.md.
 - Calling `TaskCreate` from inside subagent dispatches — the orchestrator owns the task list; workers focus on their assigned tasks and report back.

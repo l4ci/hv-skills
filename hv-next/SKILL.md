@@ -221,7 +221,7 @@ Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (s
 - **Question:** *"Work on the suggested item(s)?"* (substitute "items" for a batch)
 - **Options** (single-select). Build the list dynamically — option 1 is always present, options 2 and 3 are conditional, options 4–5 always close the list:
   1. `"Start [ID] (Recommended)"` — *"Invoke `/hv-work` with the suggested item(s) and their TODO descriptions."* (list IDs in the label if it's a batch, else the single ID)
-  2. `"Peek approach first (/hv-assume)"` — *"Print the orchestrator's intended files, tests, and assumptions; nothing executes."* — **include when** the suggested pick is a size-Major feature, a P0/P1 bug, or a multi-item batch.
+  2. `"Peek approach first (/hv-work --preview)"` — *"Print the orchestrator's intended files, tests, and assumptions; nothing executes."* — **include when** the suggested pick is a size-Major feature, a P0/P1 bug, or a multi-item batch.
   3. `"Write a plan first (/hv-plan)"` — *"Open `/hv-plan` to write a milestone-keyed plan; `/hv-work` will consult it later."* — **include when** the suggested pick is size-Major **and** no plan exists at `.hv/plans/<milestone>-<unit>.md`. Skip the option silently if the item has no `Milestone:` tag (no plan key without a milestone).
   4. `"Pick different items"` — *"Choose from the backlog yourself."*
   5. `"Stop here"` — *"No execution now; just leave me with the backlog view."*
@@ -231,7 +231,7 @@ Route the answer:
 | Answer | Action |
 |--------|--------|
 | Start (Recommended) | Invoke `hv-work` via the `Skill` tool with the selected items + their TODO entries |
-| Peek approach first | Invoke `hv-assume` via the `Skill` tool with the suggested item ID(s); after the peek prints, the user re-invokes `/hv-next` or `/hv-work` themselves |
+| Peek approach first | Invoke `hv-work` via the `Skill` tool with `--preview <ID>` for the suggested item ID(s); after the peek prints, the user re-invokes `/hv-next` or `/hv-work` themselves |
 | Write a plan first | Invoke `hv-plan` via the `Skill` tool with the milestone tag and item ID; once the plan is written, suggest `/hv-work <milestone>-<id>` as the natural next step |
 | Pick different items | Second `AskUserQuestion` call with a `multiSelect: true` question listing up to 4 alternative items (or ask the user to name them if the backlog has more than 4). Then invoke `hv-work` on the chosen set |
 | Stop here | Print *"OK — run `/hv-next` again when you're ready."* and exit |
@@ -241,7 +241,7 @@ Plain-text fallback: *"Work on this?"* — honor yes/no/"pick specific IDs" repl
 
 ## Step 8 — Release Nudge
 
-Fires only on the *terminal* paths of /hv-next — when the user picks "Stop here" in Step 7 or when the backlog was empty (loop or off/auto). When Step 7 dispatches into /hv-work, /hv-assume, or /hv-plan, skip this step entirely — those skills run their own tails and the nudge would either be drowned out or surface again at the wrong time.
+Fires only on the *terminal* paths of /hv-next — when the user picks "Stop here" in Step 7 or when the backlog was empty (loop or off/auto). When Step 7 dispatches into /hv-work (with or without `--preview`) or /hv-plan, skip this step entirely — those skills run their own tails and the nudge would either be drowned out or surface again at the wrong time.
 
 ```bash
 .hv/bin/hv-release-pending
