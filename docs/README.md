@@ -32,9 +32,8 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 - [Review and ship](usage/review-and-ship.md) — `/hv-review` two-stage pass and `/hv-ship` gates (second-opinion, QA)
 - [Product QA](usage/qa.md) — `/hv-qa` per-target strategy files and the `ship.qa` gate
 - [Rolling back a cycle](usage/undo.md): `/hv-ship --undo` guided rollback, dry-run preview, manual confirmation
-- [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`
+- [Learning](usage/learning.md) — `/hv-learn` and `KNOWLEDGE.md`, including `--term <name>` for the project Glossary
 - [Decisions](usage/decisions.md) — `/hv-decide` and hard-boundary commitments in `DECISIONS.md`
-- [Capturing terminology](usage/context.md) — `/hv-context` and the project glossary in `CONTEXT.md`
 
 ### Vision and planning
 
@@ -55,7 +54,6 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 - [CLI helpers](reference/cli-helpers.md) — user-callable scripts in `.hv/bin/`
 - [Configuration options](reference/config-options.md) — the questions `/hv-init` and `/hv-config` ask, with their option labels
 - [`/hv-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md) — pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
-- [`CONTEXT.md` reference](reference/context-md.md) — file format and lifecycle of the project glossary
 - [Preflight](reference/preflight.md) — what `.hv/bin/hv-preflight` checks before each skill, plus exit-code meanings
 
 ### Other

@@ -190,10 +190,10 @@ If the entry created a new topic, prepend a line: *"New topic: `<topic>`."*
 - **No verifier.** Manual confirmation is the verification.
 - **`--from-learning <topic>` and `--from-spike <name>` only seed the rule and why from the source artifact.** The forbids/permits are still user-articulated — that's what makes a decision a decision.
 - **`inconclusive` spikes can't be promoted.** Promotion requires a verdict the project is committing to.
-- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
+- **Sibling persistence skills.** `/hv-learn` and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`. `/hv-learn` carries two modes: passive topic-bullet learnings and `--term <name>` for Glossary entries (folded from the former `/hv-context` in v4.0).
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`).
+- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.
 - [`references/source-prefill.md`](../references/source-prefill.md) — Source-prefill / promote-between-artifacts semantics for `/hv-decide`.

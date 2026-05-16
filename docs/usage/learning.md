@@ -131,4 +131,4 @@ rule + why + forbids + permits and is consulted as a constraint by `/hv-work`,
 
 ## See also
 
-- Sibling persistence skills: [`docs/usage/decisions.md`](decisions.md), [`docs/usage/context.md`](context.md)
+- Sibling persistence skill: [`docs/usage/decisions.md`](decisions.md)

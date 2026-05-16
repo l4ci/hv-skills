@@ -46,4 +46,4 @@ Skills that import / generate / one-shot transform (e.g., `/hv-release` cuts a t
 
 - `references/post-cycle-trigger-gate.md` — the shared `2+/5+/hard-bug` trigger used by Docs Mode after-work (and by `/hv-work` and `/hv-ship` for the post-cycle `/hv-learn` and `/hv-ship --docs` dispatches).
 - `references/authoring-conventions.md` — the Tier S/C distinction that explains the authoring tier picks above.
-- `references/persistence-skills.md` — the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`) shares a different spine. Persistence skills capture one entry at a time; three-mode skills curate a body of entries over time. The two families don't overlap.
+- `references/persistence-skills.md` — the persistence duo (`/hv-learn` for topic bullets and `--term` Glossary entries, plus `/hv-decide`) shares a different spine. Persistence skills capture one entry at a time; three-mode skills curate a body of entries over time. The two families don't overlap.

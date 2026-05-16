@@ -392,10 +392,10 @@ Cleared N contradictions: <demoted-count> demoted, <skipped-count> skipped
 - **Preserve existing structure.** Edit surgically; never regenerate the whole file.
 - **Sharp and short.** One sentence with a concrete claim. If you need a paragraph, link to code instead.
 - **Today's date.** Always stamp with the absolute current date.
-- **Sibling persistence skills.** `/hv-context`, `/hv-learn`, and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`.
+- **Sibling persistence skills.** `/hv-learn` (with `--term <name>` for Glossary entries) and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`. `/hv-context` was folded into `/hv-learn --term` in v4.0.
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
-- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence trio (`/hv-context`, `/hv-learn`, `/hv-decide`).
+- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.

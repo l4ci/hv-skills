@@ -1,5 +1,23 @@
 # Changelog
 
+## v4.0.0 — unreleased
+
+**The Loop, simplified.** Breaking removal of `/hv-context` plus seven other skills folded into composite surfaces (full announcement lands with M01's marketing pass — F20). This stub captures the F18 fold; subsequent F19/F21/F22 commits will extend the v4.0 entry as they ship.
+
+## Breaking
+
+- **`/hv-context` removed.** The skill is folded into `/hv-learn --term <name>` ([F18]). Domain terms now live as nested-bullet entries under a pinned `## Glossary` topic in `.hv/KNOWLEDGE.md` instead of a separate `.hv/CONTEXT.md` file. The capture surface — `--def`, `--alias`, `--not`, `--touch` — is preserved on the flag. Existing projects use `/hv-migrate v4` ([F19], in progress) to port `.hv/CONTEXT.md` into the new Glossary topic; new projects start with the pinned topic via `/hv-init`. Helpers renamed: `bin/hv-context-add → bin/hv-glossary-write`, `bin/hv-context-query → bin/hv-glossary-read`. Removed: `bin/hv-context-index`, `bin/hv-context-map`, `hv-context/` skill folder, the `<!-- hv-context-start -->` block in `CLAUDE.md`. Umbrella-mode per-sub-repo Glossary is deferred to F21.
+
+## New
+
+- **`/hv-learn --term <name>`** ([F18]) — captures a domain term into the `## Glossary` topic of `.hv/KNOWLEDGE.md` with the same flag shape the old `/hv-context` used. Conflict-gated: refuses on alias collision with another term in the Glossary.
+- **`hv-glossary-write --batch <manifest>`** ([F18 T9]) — atomic multi-term import from a tab-separated manifest (`term \t def \t aliases \t nots`). The whole batch is validated against existing entries AND intra-batch uniqueness before any write; on alias collision the entire batch is refused (exit 3) with a multi-line conflict summary. F19's codemod consumes this.
+- **Pinned `## Glossary` topic in fresh `KNOWLEDGE.md`** ([F18 T3]) — `bin/hv-bootstrap` writes the topic header on `/hv-init` so single-repo projects start with a Glossary destination.
+
+## Stats
+
+Pending — F19/F20/F21/F22 still to ship.
+
 ## v3.4.0 — 2026-05-15
 
 Skill audit pass — checklist gate keeps version-file drift from sneaking past releases, plus seven skill descriptions get explicit triggers and the macOS smoke flake is fixed.
