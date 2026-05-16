@@ -29,7 +29,6 @@
     "./hv-pause",
     "./hv-plan",
     "./hv-spike",
-    "./hv-assume",
     "./hv-work",
     "./hv-debug",
     "./hv-decide",

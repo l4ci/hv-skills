@@ -20,7 +20,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
 | `hv-find-milestone-for-items` | Lookup the milestones tagged on a list of TODO item IDs; prints unique sorted M-IDs (one per line); always exits 0 | `.hv/bin/hv-find-milestone-for-items B07 F03` |
 | `hv-plan-rename-check` | List files that reference `<old-name>` (wraps `git grep -l`); used at plan + verify time for rename + link-sweep collision detection; always exits 0 | `.hv/bin/hv-plan-rename-check OldName.swift` |
-| `hv-uncertain` | Determine whether an item warrants `/hv-assume` before `/hv-plan` in loop mode; exits 0 (uncertain, reasons on stdout) or 1 (certain) | `.hv/bin/hv-uncertain B07` |
+| `hv-uncertain` | Determine whether an item warrants `/hv-work --preview` before `/hv-plan` in loop mode; exits 0 (uncertain, reasons on stdout) or 1 (certain) | `.hv/bin/hv-uncertain B07` |
 | `hv-status-add` | Register an active work entry (idempotent on `(branch, repo)`) | `.hv/bin/hv-status-add [--repo <name>] hv/foo B01,F02 [worktree]` |
 | `hv-status-remove` | Clear an active entry by branch (or `(branch, repo)` in umbrella mode) | `.hv/bin/hv-status-remove [--repo <name>] hv/foo` |
 | `hv-status-repo-for` | Print the repo name for the active stream matching a branch (umbrella mode); empty when not found; always exits 0 | `.hv/bin/hv-status-repo-for hv/foo` |
@@ -143,7 +143,7 @@ indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 `hv-plan-rename-check` wraps `git grep -l "<old-name>" [-- <scope>...]` so `/hv-work` Step 4 #3 ("Detect rename + link-sweep collisions") can name the check at both plan time and verify time. Always exits 0; no matches, no repo, and out-of-scope inputs are all silent. The pathspec scope is passed through to git grep, so `*.md`-style globs work.
 
-`hv-uncertain` evaluates whether a backlog item warrants a `/hv-assume` pass before `/hv-plan` runs in loop mode. Exit 0 means the item is uncertain (reasons on stdout); exit 1 means it is clear enough to proceed directly to planning.
+`hv-uncertain` evaluates whether a backlog item warrants a `/hv-work --preview` pass before `/hv-plan` runs in loop mode. Exit 0 means the item is uncertain (reasons on stdout); exit 1 means it is clear enough to proceed directly to planning.
 
 `hv-uncomplete` is the inverse of `hv-complete`: it lifts a struck-through entry out of `## Completed` (or `ARCHIVE.md`) and restores it to its original type section. Calling it on an ID that is already active is a silent no-op. On the completed→active transition it also rewinds `counters.json#since_refactor` for items whose resolved commit subject did not start with `refactor:`, mirroring `hv-complete`'s accounting. Used by `hv-undo` during cycle rollback; safe to call directly for one-off restorations.
 

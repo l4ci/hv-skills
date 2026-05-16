@@ -1,6 +1,6 @@
 # Context-load protocol
 
-Used by `/hv-assume` Step 3, `/hv-plan` Step 3, `/hv-vision` Step 2, and `/hv-work` Step 4 — the silent context load that runs before the skill proposes anything to the user. The goal: read everything that informs the planned action in parallel, form a picture, then act.
+Used by `/hv-work` (Step 4 for the normal flow, Preview Mode Step 2 for the peek), `/hv-plan` Step 3, and `/hv-vision` Step 2 — the silent context load that runs before the skill proposes anything to the user. The goal: read everything that informs the planned action in parallel, form a picture, then act.
 
 ## The canonical reads
 
@@ -44,7 +44,7 @@ A recent path-encoding helper audit confirmed why: when load steps drift between
 Each calling skill adds its own reads inline. The protocol lists only the common subset. Concretely:
 
 - `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/CONTEXT.md` (via `hv-context-query`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
-- `/hv-assume` Step 3 adds Repos: parsing for umbrella items (resolves via `.hv/bin/hv-resolve-repos` when umbrella mode is on).
+- `/hv-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `.hv/bin/hv-resolve-repos` when umbrella mode is on).
 - `/hv-plan` Step 3 adds `.hv/bin/hv-plan-list <MID>` to see existing plans under the milestone.
 
 ## What to do with the loaded context

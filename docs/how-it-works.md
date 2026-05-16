@@ -15,7 +15,7 @@ flowchart LR
   GO -.one-pass.-> WORK
   BACKLOG --> NEXT["/hv-next"]
   MILES -.scopes.-> NEXT
-  NEXT -.suggests.-> ASSUME["/hv-assume"]
+  NEXT -.suggests.-> PREVIEW["/hv-work --preview"]
   NEXT -.suggests.-> PLAN
   NEXT -.nudges.-> BRAIN
   NEXT --> WORK["/hv-work"]
@@ -23,8 +23,8 @@ flowchart LR
   DESIGNS -.soft input.-> PLAN
   PLAN --> PLANS[(.hv/plans/)]
   PLANS -.consults.-> WORK
-  ASSUME -.reads.-> PLANS
-  ASSUME -.peeks.-> WORK
+  PREVIEW -.reads.-> PLANS
+  PREVIEW -.peeks.-> WORK
   SPIKE --> SPIKES[(.hv/spikes/)]
   WORK -.pause.-> PAUSE["/hv-pause"]
   DEBUG -.pause.-> PAUSE
@@ -73,7 +73,7 @@ Everything Claude reads or mutates lives under `.hv/` in your project. Git is th
 
 **Capture.** `/hv-capture` is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-go` collapses capture and execute into a single pass for hot-path fixes. `/hv-issues` syncs open GitHub or GitLab issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-rm` removes a captured item and cleans up its dependencies.
 
-**Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-assume` previews the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
+**Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-work --preview <ID>` previews the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
 
 **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce → hypothesize → verify → fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction. `/hv-pause` writes a handoff note when the context window is filling, so a fresh `/hv-next` session picks up cleanly.
 

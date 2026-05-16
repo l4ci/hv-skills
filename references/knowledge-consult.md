@@ -1,6 +1,6 @@
 # Knowledge & decisions consult
 
-Used by `/hv-debug` Step 3+3.5, `/hv-refactor` (umbrella-fanout context-collect step), `/hv-review` Step 3, and indirectly by `references/context-load-protocol.md` (which composes this pattern into a wider load list for `/hv-assume`, `/hv-plan`, `/hv-vision`, `/hv-work`).
+Used by `/hv-debug` Step 3+3.5, `/hv-refactor` (umbrella-fanout context-collect step), `/hv-review` Step 3, and indirectly by `references/context-load-protocol.md` (which composes this pattern into a wider load list for `/hv-plan`, `/hv-vision`, `/hv-work` — including `/hv-work --preview`).
 
 The pattern is one pair of helper calls plus carrier semantics. Skills point here so the call-site logic lives in one place.
 
