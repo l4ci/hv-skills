@@ -26,19 +26,8 @@ set -euo pipefail
 # After hv_self_locate the cwd is the umbrella root; .hv/ is at ./hv/
 HV="$(pwd -P)/.hv"
 
-# Parse optional --repo flag
-REPO=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --repo)
-      REPO="${2:?--repo requires a name argument}"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
+. "$HERE/hv-issues-common.sh"
+hv_issues_parse_repo_flag "$@"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HV" "$REPO" <<'PY'
 import json, re, sys

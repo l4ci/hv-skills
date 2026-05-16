@@ -6,6 +6,9 @@
 # Prints: the merge commit's short hash.
 set -euo pipefail
 
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$BIN_DIR/hv-repo-flag.sh"
+
 REPO=""
 if [ "${1:-}" = "--repo" ]; then
   REPO="${2:?usage: hv-merge [--repo <name>] <branch>  (merge message on stdin)}"
@@ -19,23 +22,8 @@ if [ -z "$MSG" ]; then
   exit 1
 fi
 
-BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# Umbrella-cwd guard: refuse if no local .git/ but cwd is an umbrella root.
-# Only check when --repo wasn't provided; the resolve path takes care of that case.
-if [ -z "$REPO" ]; then
-  "$BIN_DIR/hv-require-git-context" "hv-merge" --repo-flag-supported
-fi
-
-if [ -n "$REPO" ]; then
-  REPO_PATH=$("$BIN_DIR/hv-resolve-repo-path" "$REPO")
-  cd "$REPO_PATH"
-  "$BIN_DIR/hv-worktree-clear" --repo "$REPO" "$BRANCH"
-  MAIN=$("$BIN_DIR/hv-base-branch")
-else
-  "$BIN_DIR/hv-worktree-clear" "$BRANCH"
-  MAIN=$("$BIN_DIR/hv-base-branch")
-fi
+hv_repo_flag_prepare "$BIN_DIR" "hv-merge" "$BRANCH"
+MAIN=$("$BIN_DIR/hv-base-branch")
 
 git checkout -q "$MAIN"
 git merge --no-ff "$BRANCH" -m "$MSG"

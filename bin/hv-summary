@@ -4,8 +4,8 @@
 # Lookup helper: always exits 0; pure read, no mutation.
 # Usage: hv-summary
 set -euo pipefail
-. "$(dirname "$0")/hv-types.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
 MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys

@@ -4,6 +4,7 @@
 # Writer helper: exit 0 on successful status update; exit 1 on unknown ID or invalid status.
 # Usage: hv-vision-status <ID> <planned|active|shipped|archived>
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
 ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
 NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
@@ -11,7 +12,6 @@ if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
     echo "error: status must be one of: $HV_MILESTONE_STATUSES" >&2
     exit 1
 fi
-. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
 import sys
 from pathlib import Path

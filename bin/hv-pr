@@ -6,6 +6,9 @@
 # Prints: the PR URL.
 set -euo pipefail
 
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$BIN_DIR/hv-repo-flag.sh"
+
 REPO=""
 if [ "${1:-}" = "--repo" ]; then
   REPO="${2:?usage: hv-pr [--repo <name>] <branch> <title>  (body on stdin)}"
@@ -20,19 +23,7 @@ if [ -z "$BODY" ]; then
   exit 1
 fi
 
-BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-if [ -z "$REPO" ]; then
-  "$BIN_DIR/hv-require-git-context" "hv-pr" --repo-flag-supported
-fi
-
-if [ -n "$REPO" ]; then
-  REPO_PATH=$("$BIN_DIR/hv-resolve-repo-path" "$REPO")
-  cd "$REPO_PATH"
-  "$BIN_DIR/hv-worktree-clear" --repo "$REPO" "$BRANCH"
-else
-  "$BIN_DIR/hv-worktree-clear" "$BRANCH"
-fi
+hv_repo_flag_prepare "$BIN_DIR" "hv-pr" "$BRANCH"
 
 git push -u origin "$BRANCH"
 gh pr create --title "$TITLE" --body "$BODY"
