@@ -38,6 +38,10 @@ EOF
 Durable learnings captured from sessions — gotchas, conventions, constraints, and hard-won debugging insights. Grouped by topic, newest first within each topic.
 
 Use `/hv-learn` at the end of a session to capture new learnings. `/hv-work` consults this file when its topics are relevant to the task.
+
+## Glossary
+
+_(no terms yet — use `/hv-learn --term <name>` to capture project terminology)_
 EOF
 
 [ -f "$HV/DECISIONS.md" ] || cat > "$HV/DECISIONS.md" <<'EOF'
