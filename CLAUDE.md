@@ -11,9 +11,9 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 <!-- hv-vision-start -->
 ## Project Vision
 
-Project milestones live in `.hv/MILESTONES.md`.
+Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
 
-_(no milestones yet — run `/hv-vision` to brainstorm)_
+- **M01** — "v4.0: The Loop, simplified" (depends: —)
 <!-- hv-vision-end -->
 
 ## Working in this repo
@@ -27,7 +27,7 @@ _(no milestones yet — run `/hv-vision` to brainstorm)_
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — the gitignored runtime that gets regenerated on skill updates; never edit it by hand. Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) only.
 
-**Capture & pick** — `/hv-capture` (alias `/hv-c`), `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
+**Capture & pick** — `/hv-capture`, `/hv-go`, `/hv-rm`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-assume`, `/hv-work`, `/hv-debug`
 **Review & ship** — `/hv-review`, `/hv-ship`
 **Persist** — `/hv-learn` (durable knowledge), `/hv-decide` (hard boundaries — manual only), `/hv-context` (terminology glossary)
@@ -47,7 +47,7 @@ Before acting on work that touches a topic listed in `## Project Knowledge`, `##
 
 Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:
 
-- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_
+- Architecture
 
 <!-- hv-decisions-end -->
 

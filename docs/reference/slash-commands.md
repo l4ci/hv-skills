@@ -9,7 +9,6 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
 | `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section |
-| `/hv-c` | Shortcut for `/hv-capture` |
 | `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
 | `/hv-issues` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
 | `/hv-rm` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
@@ -40,10 +39,6 @@ Alphabetical reference of every `/hv-*` command.
 ## /hv-assume
 
 Prints the orchestrator's intended approach for an item, slice, or milestone (files it would touch, tests it would add, assumptions it is making, and known unknowns) without writing anything. Use it as a cheap gate before [`/hv-work`](../usage/running-work.md) when a wrong turn is expensive to undo. See [picking work](../usage/picking-work.md) for how `/hv-next` surfaces it automatically for large or risky picks.
-
-## /hv-c
-
-Shortcut alias for `/hv-capture`. Identical behavior, saves keystrokes when capturing is frequent. See [capturing work](../usage/capturing-work.md) for the full flow.
 
 ## /hv-capture
 
