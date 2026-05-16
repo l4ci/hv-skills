@@ -17,10 +17,8 @@
 # Empty array if no drift. Silent on missing BACKLOG.md (exit 0, empty drift).
 # Usage: hv-todo-drift
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-hv_self_locate
 export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, subprocess, sys

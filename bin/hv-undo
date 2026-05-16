@@ -11,9 +11,7 @@
 #
 # Usage: hv-undo [--cycle <hash>] [--force] [--allow-post-merge]
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 CYCLE=""
 FORCE=0

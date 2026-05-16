@@ -6,10 +6,8 @@
 #   --force         Apply changes (remove entries, strip cross-refs, delete files).
 #   --scrub-archive Also remove matching entries from .hv/ARCHIVE.md.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
 FORCE=0
 SCRUB_ARCHIVE=0
 while :; do

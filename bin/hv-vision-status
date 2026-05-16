@@ -11,9 +11,7 @@ if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
     echo "error: status must be one of: $HV_MILESTONE_STATUSES" >&2
     exit 1
 fi
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
 import sys
 from pathlib import Path

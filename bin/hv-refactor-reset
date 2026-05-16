@@ -4,9 +4,7 @@
 # Writer helper: exit 0 always; zeroes counters.json#since_refactor (idempotent).
 # Usage: hv-refactor-reset
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from hvlib import update_json
 def reset(d):

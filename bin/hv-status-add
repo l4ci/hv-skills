@@ -5,9 +5,7 @@
 #   --if-absent  Only write if no entry for <branch> already exists (no-op if present).
 #   --repo       Tag entry with sub-repo name for umbrella mode; uniqueness becomes (branch, repo).
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 IF_ABSENT=0
 REPO=""
 while :; do

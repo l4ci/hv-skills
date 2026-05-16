@@ -23,9 +23,7 @@ case "$KEY" in
   decisions) FILE=".hv/DECISIONS.md" ;;
   *) echo "error: unknown key '$KEY' — expected one of: knowledge, decisions" >&2; exit 1 ;;
 esac
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$FILE" "$@" <<'PY'
 import sys
 from pathlib import Path

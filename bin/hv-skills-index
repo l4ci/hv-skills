@@ -5,9 +5,7 @@
 # Atomic-merge helper: regenerates managed hv-skills block in CLAUDE.md; exit 0 on success.
 # Usage: hv-skills-index
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 "$HERE/hv-managed-block" skills --body-stdin <<'EOF'
 ## hv-skills
 

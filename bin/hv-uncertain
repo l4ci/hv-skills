@@ -6,10 +6,8 @@
 # Exit 2: error (item not found, BACKLOG.md missing).
 # Usage: hv-uncertain <itemId>
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
 ITEM_ID="${1:?usage: hv-uncertain <itemId>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEM_ID" <<'PY'
 import re

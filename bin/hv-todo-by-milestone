@@ -5,10 +5,8 @@
 # Items list multiple milestones via `Milestone: M01, M03`.
 # Usage: hv-todo-by-milestone <MID>
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
 MID="${1:?usage: hv-todo-by-milestone <MID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
 import sys
