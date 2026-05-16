@@ -22,15 +22,17 @@ for f in DECISIONS.md BACKLOG.md KNOWLEDGE.md MILESTONES.md counters.json config
   fi
 done
 
-# Umbrella consistency check.
+# Umbrella consistency check (advisory only — never blocks).
 #
-# Truth source for "is this an umbrella?" is .hv/repos.json (>=1 registered
-# repo) — see hv-umbrella-on. The config flag (umbrella.enabled) is
-# informational; we still flag the misconfig where the flag is set but the
-# data is missing or empty (that's an unfinished /hv-init).
+# Canonical gate: hv-umbrella-on reads .hv/repos.json (>=1 registered repo).
+# Per DECISIONS.md > Architecture > "Persistence-trio scoping under umbrella
+# mode": "data is truth; the config flag is informational, not gating."
+# A mismatch (flag=true, data absent/empty) means /hv-init was not completed;
+# emit a warning so the user knows, then continue. Do NOT exit 2 here —
+# that posture was stricter than the DECISIONS rule permits.
 #
 # Cases:
-#   flag=true,  data missing/empty → exit 2 (config says umbrella, finish init)
+#   flag=true,  data missing/empty → warn to stderr, continue (advisory)
 #   data present (any flag value)  → silent pass (data is umbrella regardless)
 #   flag=false, data absent        → silent pass (single-repo, skip)
 FLAG_ON=$(PYTHONPATH="$SRC_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
@@ -41,11 +43,11 @@ print('1' if cfg.get('umbrella', {}).get('enabled') else '0')
 UMBRELLA_ON=$("$SRC_BIN/hv-umbrella-on")
 if [ "$FLAG_ON" = "1" ] && [ "$UMBRELLA_ON" != "yes" ]; then
   if [ ! -f "$HV/repos.json" ]; then
-    echo "uninitialized: umbrella.enabled is true but $HV/repos.json missing — re-run /hv-init from the umbrella root" >&2
+    echo "warn: umbrella.enabled=true but $HV/repos.json missing — run /hv-init from umbrella root to register, or set umbrella.enabled=false" >&2
   else
-    echo "uninitialized: $HV/repos.json is empty or malformed — re-run /hv-init from the umbrella root" >&2
+    echo "warn: umbrella.enabled=true but no sub-repos in $HV/repos.json — run /hv-init from umbrella root to register, or set umbrella.enabled=false" >&2
   fi
-  exit 2
+  # No exit — mismatch is informational per DECISIONS.md
 fi
 
 # Resolve upstream plugin bin/. SRC_BIN points at the script's own dir, which

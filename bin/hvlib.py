@@ -873,6 +873,128 @@ def iter_map_entries(map_dir):
         yield entry
 
 
+def _read_version_json(filepath: str) -> "str | None":
+    return json.loads(Path(filepath).read_text()).get("version")
+
+
+def _write_version_json(filepath: str, new_version: str) -> None:
+    data = load_json(filepath, {})
+    data["version"] = new_version
+    dump_json_atomic(filepath, data)
+
+
+def _read_version_pyproject(filepath: str) -> "str | None":
+    return parse_toml_version(Path(filepath).read_text(), ["project", "tool.poetry"])
+
+
+def _write_version_toml(filepath: str, new_version: str, sections: list) -> None:
+    path = Path(filepath)
+    content = path.read_text()
+    for section_name in sections:
+        sec_pat = re.compile(
+            r"^\s*\[" + re.escape(section_name) + r"\s*\]\s*$",
+            re.MULTILINE,
+        )
+        sec_m = sec_pat.search(content)
+        if not sec_m:
+            continue
+        next_m = re.search(r"^\s*\[", content[sec_m.end():], re.MULTILINE)
+        end = sec_m.end() + next_m.start() if next_m else len(content)
+        sec_body = content[sec_m.end():end]
+        new_body, n = re.subn(
+            r'(?m)^(version\s*=\s*)"[^"]*"',
+            rf'\1"{new_version}"',
+            sec_body,
+            count=1,
+        )
+        if n:
+            content = content[:sec_m.end()] + new_body + content[end:]
+            write_text_atomic(path, content)
+            return
+    raise ValueError(f"{filepath}: no version field in section")
+
+
+def _write_version_pyproject(filepath: str, new_version: str) -> None:
+    _write_version_toml(filepath, new_version, ["project", "tool.poetry"])
+
+
+def _read_version_cargo(filepath: str) -> "str | None":
+    return parse_toml_version(Path(filepath).read_text(), ["package"])
+
+
+def _write_version_cargo(filepath: str, new_version: str) -> None:
+    _write_version_toml(filepath, new_version, ["package"])
+
+
+def _read_version_plain(filepath: str) -> "str | None":
+    for line in Path(filepath).read_text().splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _write_version_plain(filepath: str, new_version: str) -> None:
+    write_text_atomic(filepath, new_version + "\n")
+
+
+# Version-file registry. Single source of truth for "what is a version file".
+# Each entry: {filenames (tuple), parser, writer}.
+# Adding a new kind = one entry here, no shell-side changes needed.
+VERSION_KIND_REGISTRY = {
+    "plugin-json": {
+        "filenames": (".claude-plugin/plugin.json",),
+        "parser": _read_version_json,
+        "writer": _write_version_json,
+    },
+    "package-json": {
+        "filenames": ("package.json",),
+        "parser": _read_version_json,
+        "writer": _write_version_json,
+    },
+    "pyproject": {
+        "filenames": ("pyproject.toml",),
+        "parser": _read_version_pyproject,
+        "writer": _write_version_pyproject,
+    },
+    "cargo": {
+        "filenames": ("Cargo.toml",),
+        "parser": _read_version_cargo,
+        "writer": _write_version_cargo,
+    },
+    "plain": {
+        "filenames": ("VERSION", "version.txt"),
+        "parser": _read_version_plain,
+        "writer": _write_version_plain,
+    },
+}
+
+
+def detect_version_kind(cwd=".") -> "tuple[str, str, str] | None":
+    """Return (kind_name, filename, version_string) for the first kind that
+    matches a file in cwd, in VERSION_KIND_REGISTRY order. Within a kind,
+    the first matching filename wins (supports multi-filename kinds like plain).
+    Returns None if no version file is present.
+    """
+    for name, entry in VERSION_KIND_REGISTRY.items():
+        for fname in entry["filenames"]:
+            path = Path(cwd) / fname
+            if path.exists():
+                version = entry["parser"](str(path))
+                return (name, fname, version)
+    return None
+
+
+def write_version_for_kind(kind: str, new_version: str, cwd=".") -> None:
+    """Write `new_version` to the kind's canonical (first) filename.
+    Raises KeyError if kind is unknown.
+    """
+    entry = VERSION_KIND_REGISTRY[kind]
+    fname = entry["filenames"][0]
+    path = Path(cwd) / fname
+    entry["writer"](str(path), new_version)
+
+
 def write_version(filepath, kind: str, new_version: str) -> None:
     """Write `new_version` into the manifest at `filepath` according to `kind`.
     JSON manifests are rewritten with dump_json_atomic; TOML manifests have

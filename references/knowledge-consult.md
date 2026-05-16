@@ -27,6 +27,38 @@ The two helpers return different *kinds* of content and the calling skill must h
 
 **DECISIONS entries are hard boundaries.** Pass the FULL entry to the consumer — rule, *Why*, **Forbids**, **Permits** — not just the title. The calling skill MUST treat them as constraints, not suggestions. If the planned action would violate a decision, stop and surface to the user before proceeding. Do not paper over a violation by rewording or scoping it away.
 
+## Hit-register after consumption (F03 lifecycle)
+
+**This step is mandatory whenever the calling skill carries bullets into a downstream brief.** Skip only when `hv-knowledge-query` returned nothing or all returned bullets were pruned before the brief was written.
+
+After building the brief, identify which KNOWLEDGE bullets actually landed in it. For each, call:
+
+```bash
+.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"
+```
+
+Where `<T>` is the exact `## Topic` heading from `hv-knowledge-query`'s output and `<title>` is the bold **title** text on that bullet (the text between `**` and `** —`).
+
+**Worked example.** Suppose `hv-knowledge-query "Architecture"` returned:
+
+```
+## Architecture
+
+- **Always route network calls through NetworkClient** — raw URLSession is forbidden outside the client layer. <!-- 2024-01-10 -->
+- **Avoid force-unwrap in production paths** — use guard/let or explicit error propagation. (provisional) <!-- 2024-03-05 -->
+```
+
+And both bullets survived into the brief's `**Known gotchas:**` section. Register both in one parallel batch:
+
+```
+Bash: .hv/bin/hv-knowledge-hit --topic "Architecture" --title "Always route network calls through NetworkClient"
+Bash: .hv/bin/hv-knowledge-hit --topic "Architecture" --title "Avoid force-unwrap in production paths"
+```
+
+Issue all calls **in a single parallel tool-call batch** — the helper is append-only (no shared mutable state) so concurrent calls don't race. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3) without a pending contradiction.
+
+**Only register bullets that survived into the brief.** Bullets returned by the query but pruned before they reached a `**Known gotchas:**` / `**Relevant project conventions:**` section don't earn credit — unused queries shouldn't drive promotion.
+
 ## Skip silently on empty
 
 Either helper can legitimately return no rows. That is not an error; it means no topic in the registry matched the arguments. Carry only what matched into the downstream brief — do not insert empty headings, placeholder "(none)" lines, or apology prose.

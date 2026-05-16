@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from hvlib import get_version_or_die, infer_version_kind, load_json
+from hvlib import detect_version_kind, get_version_or_die, infer_version_kind, load_json
 
 
 # --- Step 1: check config override ---
@@ -27,26 +27,20 @@ if override:
     print(json.dumps({"file": override, "version": version, "kind": kind}, indent=2))
     sys.exit(0)
 
-# --- Step 2: auto-detect candidates in priority order ---
-CANDIDATES = [
-    (".claude-plugin/plugin.json", "plugin-json"),
-    ("package.json", "package-json"),
-    ("pyproject.toml", "pyproject"),
-    ("Cargo.toml", "cargo"),
-    ("VERSION", "plain"),
-    ("version.txt", "plain"),
-]
+# --- Step 2: auto-detect candidates in priority order (via VERSION_KIND_REGISTRY) ---
+result = detect_version_kind(".")
+if result is None:
+    print(
+        "error: no version file detected (set release.versionFile in .hv/config.json)",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
-for filepath, kind in CANDIDATES:
-    p = Path(filepath)
-    if p.exists():
-        version = get_version_or_die(p, kind)
-        print(json.dumps({"file": filepath, "version": version, "kind": kind}, indent=2))
-        sys.exit(0)
+kind, filepath, version = result
+if version is None:
+    print(f"error: {filepath}: no version field found", file=sys.stderr)
+    sys.exit(1)
 
-print(
-    "error: no version file detected (set release.versionFile in .hv/config.json)",
-    file=sys.stderr,
-)
-sys.exit(1)
+print(json.dumps({"file": filepath, "version": version, "kind": kind}, indent=2))
+sys.exit(0)
 PY

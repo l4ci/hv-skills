@@ -30,7 +30,7 @@ Phases:
 1. *Scan session* — transcript + recent commits sifted for durable gotchas (Step 2)
 2. *Classify topic* — each candidate matched to a `KNOWLEDGE.md` topic (Steps 3–4)
 3. *Merge into KNOWLEDGE.md* — entries appended under topic headings (Step 5)
-4. *Update CLAUDE.md index* — `hv-knowledge-index` regenerates the managed block (Step 6)
+4. *Update CLAUDE.md index* — `hv-managed-block knowledge` regenerates the managed block (Step 6)
 5. *Verify (Opus)* — optional cold pass when `learn.verify: true` (Steps 7–8)
 6. *Contradictions* — pending demotion candidates surfaced per-bullet at session end (Step 9)
 
@@ -212,7 +212,7 @@ The helper handles insertion at the top of the topic, the date stamp, and atomic
 ## Step 6 — Update CLAUDE.md Topic Index
 
 ```bash
-.hv/bin/hv-knowledge-index
+.hv/bin/hv-managed-block knowledge
 ```
 
 Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
@@ -250,7 +250,7 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
   3. Append `## <Topic>: <FacetA>` and `## <Topic>: <FacetB>` headings to `.hv/KNOWLEDGE.md` immediately before the old `## <Topic>` heading.
   4. Move each bullet under its new heading via `Edit` — preserve the bullet body byte-identical including the trailing `<!-- date -->`.
   5. Remove the now-empty old `## <Topic>` heading.
-  6. Re-run `.hv/bin/hv-knowledge-index` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
+  6. Re-run `.hv/bin/hv-managed-block knowledge` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
   7. Append one line to the confirm output: `Auto-split <topic> → <topic>: <FacetA> + <topic>: <FacetB> — N → A+B bullets.`
 
   Format KB as `{bytes/1024:.1f}` in any size figures appearing in the confirm line. Split each offender at most once per session — a topic that re-trips the threshold mid-session is a planning failure, not a re-split target.

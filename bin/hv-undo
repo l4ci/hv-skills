@@ -49,6 +49,50 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 2
 fi
 
+# Detect HEAD commit shape before attempting undo.
+# Only run this check when no explicit --cycle hash was supplied (the explicit
+# path validates the named commit directly, not HEAD).
+if [ -z "$CYCLE" ]; then
+  HEAD_PARENTS=$(git rev-list --parents -1 HEAD | wc -w | tr -d ' ')
+  HEAD_MSG=$(git log -1 --pretty=%s HEAD)
+
+  case "$HEAD_PARENTS" in
+    3)
+      # 2 parents — merge commit. Current MVP path handles this.
+      # If it looks like a GitHub PR merge, note it and fall through normally.
+      case "$HEAD_MSG" in
+        "Merge pull request "*)
+          : # PR merged via "Create a merge commit" — 2-parent, undo supported.
+          ;;
+      esac
+      ;;
+    2)
+      # 1 parent — fast-forward, squash-merge, or rebase-merge. Not supported.
+      cat >&2 <<'EOF'
+hv-undo: HEAD is not a merge commit — undo not supported for this shape.
+
+Likely caused by: squash-merge, rebase-merge, or direct push without /hv-ship.
+
+Manual revert options:
+  git revert HEAD               # creates a revert commit (preserves history)
+  git reset --hard HEAD~1       # discards last commit (destructive — be sure)
+
+If this was a PR merged via squash on GitHub, use git revert on the squashed
+commit to preserve history.
+If this was /hv-ship --pr, the PR merge normally produces a 2-parent commit
+when GitHub's "Create a merge commit" option is used — check your repo's merge
+strategy. Squash/rebase merge on GitHub produces a 1-parent commit that
+hv-undo cannot reverse automatically.
+EOF
+      exit 2
+      ;;
+    *)
+      echo "hv-undo: unexpected HEAD shape ($HEAD_PARENTS parents) — manual investigation required" >&2
+      exit 2
+      ;;
+  esac
+fi
+
 # Resolve target merge commit.
 if [ -n "$CYCLE" ]; then
   if ! MERGE="$(git rev-parse --verify "${CYCLE}^{commit}" 2>/dev/null)"; then

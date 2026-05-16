@@ -59,7 +59,7 @@ grep -q "^- \*\*backlog\*\* — " "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "missing b
 grep -q "^  - \*\*Aliases:\*\* task list, todo list$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "aliases line wrong"
 grep -q "^  <!-- $(date +%Y-%m-%d) -->$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "date stamp missing"
 grep -q "no terms yet" "$TMP_ADD/.hv/KNOWLEDGE.md" && fail "placeholder should be stripped after first term added"
-# CLAUDE.md picks up Glossary via the hv-knowledge-index regeneration
+# CLAUDE.md picks up Glossary via the hv-managed-block knowledge regeneration
 grep -q "<!-- hv-knowledge-start -->" "$TMP_ADD/CLAUDE.md" || fail "knowledge block missing"
 grep -q "^- Glossary$" "$TMP_ADD/CLAUDE.md" || fail "Glossary topic not surfaced in CLAUDE.md"
 pass "hv-glossary-write — new term inserts + indexes"

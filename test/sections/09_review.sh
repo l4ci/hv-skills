@@ -7,7 +7,7 @@ trap 'rm -rf "$SCAF_TMP"' EXIT
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
   mkdir -p .hv/bin
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  install_helpers
   # Seed main with a benign file
   echo "ok" > a.txt
   git add a.txt && git commit -q -m "init"

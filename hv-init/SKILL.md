@@ -373,9 +373,9 @@ Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash
 
 ```bash
 .hv/bin/hv-skills-index
-.hv/bin/hv-knowledge-index
+.hv/bin/hv-managed-block knowledge
 .hv/bin/hv-vision-index
-.hv/bin/hv-decisions-index
+.hv/bin/hv-managed-block decisions
 .hv/bin/hv-map-index
 .hv/bin/hv-qa-index
 ```

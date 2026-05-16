@@ -2,9 +2,13 @@
 # Print "yes" if umbrella mode is in effect, "no" otherwise.
 # Lookup helper: always exits 0 (errors treated as "no").
 # Returns "yes" iff .hv/repos.json registers >=1 sub-repo (data is truth;
-# the config flag is informational, not gating). Reads cwd-relative by
-# default; optional <dir> arg for callers that already know the umbrella
-# root (e.g. hv-spike-add captures UMBRELLA_CWD before any cd and passes it).
+# the config flag is informational, not gating). This is the canonical gate
+# for "is umbrella mode on?" — all other callers delegate here or mirror
+# this exact logic. See DECISIONS.md > Architecture > "Persistence-trio
+# scoping under umbrella mode": "data is truth; the config flag is
+# informational, not gating". Reads cwd-relative by default; optional <dir>
+# arg for callers that already know the umbrella root (e.g. hv-spike-add
+# captures UMBRELLA_CWD before any cd and passes it).
 #
 # Usage: hv-umbrella-on [<dir>]
 #   stdout: "yes" or "no"

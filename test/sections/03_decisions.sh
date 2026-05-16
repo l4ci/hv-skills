@@ -1,4 +1,4 @@
-echo "hv-decisions-index"
+echo "hv-managed-block decisions"
 mkdir -p .hv
 cat > .hv/DECISIONS.md <<'EOF'
 # Decisions
@@ -19,7 +19,7 @@ Integration tests must hit a real database.
 **Forbids.** Mock DB libraries in tests/integration.
 **Permits.** Mocks elsewhere.
 EOF
-"$BIN/hv-decisions-index" >/dev/null
+"$BIN/hv-managed-block" decisions >/dev/null
 grep -q "<!-- hv-decisions-start -->" CLAUDE.md || fail "hv-decisions managed block not in CLAUDE.md"
 grep -q "## Project Decisions" CLAUDE.md || fail "Project Decisions heading missing"
 grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Architecture" || fail "Architecture topic missing in decisions block"
@@ -27,7 +27,7 @@ grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Testing" || fai
 pass "decisions managed block created with topics"
 
 # Re-running should update in place, not duplicate
-"$BIN/hv-decisions-index" >/dev/null
+"$BIN/hv-managed-block" decisions >/dev/null
 COUNT_DEC=$(grep -c "hv-decisions-start" CLAUDE.md)
 [ "$COUNT_DEC" = "1" ] || fail "decisions managed block duplicated"
 pass "decisions block updated in place"
@@ -38,7 +38,7 @@ cat > .hv/DECISIONS.md <<'EOF'
 
 Hard boundaries for this project.
 EOF
-"$BIN/hv-decisions-index" >/dev/null
+"$BIN/hv-managed-block" decisions >/dev/null
 grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "no decisions yet" || fail "empty-state placeholder missing"
 pass "decisions block handles empty file"
 

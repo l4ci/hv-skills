@@ -20,17 +20,20 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/hv-self-locate.sh"
 hv_self_locate
 
+# shellcheck source=hv-issues-common.sh
+. "$HERE/hv-issues-common.sh"
+
 # ---------------------------------------------------------------------------
 # Parse flags
 # ---------------------------------------------------------------------------
-REPO=""
 LABEL=""
 LIMIT=30
+
+hv_issues_parse_repo_flag "$@"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
-      REPO="${2:?--repo requires a name argument}"
       shift 2
       ;;
     --label)
@@ -50,19 +53,12 @@ done
 # ---------------------------------------------------------------------------
 # Resolve sub-repo path (if --repo given)
 # ---------------------------------------------------------------------------
-REPO_PATH=""
-if [ -n "$REPO" ]; then
-  REPO_PATH="$("$HERE/hv-resolve-repo-path" "$REPO")"
-fi
+hv_issues_resolve_repo_path
 
 # ---------------------------------------------------------------------------
 # Detect provider
 # ---------------------------------------------------------------------------
-if [ -n "$REPO" ]; then
-  PROVIDER="$("$HERE/hv-issues-provider" --repo "$REPO")"
-else
-  PROVIDER="$("$HERE/hv-issues-provider")"
-fi
+hv_issues_detect_provider
 
 # ---------------------------------------------------------------------------
 # Branch on provider

@@ -27,10 +27,10 @@
 #                        `<prefix>\d+` ID from arbitrary text (Milestone: field,
 #                        frontmatter depends:, etc.).
 #
-# Deliberately distinct from these helper-local classes (left untouched):
-#   - hv-complete keys on [BF] when bumping counters.json#since_refactor —
-#     only countable work types pressure the next refactor cycle.
-#   - hv-plan-add uses [BFTS] — accepts a Slice prefix not present in BACKLOG.md.
+# HV_COUNTABLE_TYPES   — types tracked in counters.json since_refactor (B,F).
+#                        Used by: hv-complete (only B/F resolutions count).
+# HV_PLANNABLE_TYPES   — types that can carry a milestone plan (B,F,T,S=Slice).
+#                        Used by: hv-plan-add (validates plan-key format).
 #
 # Naming note: this file is "hv-types.sh" (not "_hv-types.sh") so that
 # `cp hv-* .hv/bin/` in /hv-init Step 2 picks it up. hv-preflight discovers
@@ -38,7 +38,9 @@
 # same glob (it's a sourced lib, but `/hv-init` chmods it +x alongside the
 # executables, so the `[ -x ]` check passes).
 HV_ITEM_TYPES="BFT"
+HV_COUNTABLE_TYPES="BF"
+HV_PLANNABLE_TYPES="BFTS"
 HV_OPEN_SECTIONS="Bugs|Features|Tasks"
 HV_MILESTONE_STATUSES="planned|active|shipped|archived"
 HV_MILESTONE_PREFIX="M"
-export HV_ITEM_TYPES HV_OPEN_SECTIONS HV_MILESTONE_STATUSES HV_MILESTONE_PREFIX
+export HV_ITEM_TYPES HV_COUNTABLE_TYPES HV_PLANNABLE_TYPES HV_OPEN_SECTIONS HV_MILESTONE_STATUSES HV_MILESTONE_PREFIX

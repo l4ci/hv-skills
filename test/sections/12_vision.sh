@@ -5,7 +5,7 @@ import json
 p='.hv/counters.json'
 d=json.load(open(p)); d['milestones']=0; json.dump(d,open(p,'w'))
 "
-# Re-seed MILESTONES.md (earlier hv-knowledge-index test rewrote CLAUDE.md, but
+# Re-seed MILESTONES.md (earlier hv-managed-block knowledge test rewrote CLAUDE.md, but
 # MILESTONES.md is untouched).
 cat > .hv/MILESTONES.md <<'EOF'
 # Milestones
@@ -168,7 +168,7 @@ rm -rf "$BOOT_DIR"
 
 echo "hv-preflight"
 # Ensure all core data files exist (smoke setup creates BACKLOG.md/counters.json/status.json;
-# KNOWLEDGE.md got written by hv-knowledge-index; config.json is needed by preflight).
+# KNOWLEDGE.md got written by hv-managed-block knowledge; config.json is needed by preflight).
 [ -f .hv/config.json ] || echo '{}' > .hv/config.json
 
 # 1. Helpers not yet installed in .hv/bin → exit 3 (partial install).
@@ -179,7 +179,7 @@ pass "preflight exits 3 when helpers missing from .hv/bin"
 
 # 2. Install all helpers into .hv/bin, everything present → exit 0.
 mkdir -p .hv/bin
-cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+install_helpers
 "$BIN/hv-preflight" >/dev/null 2>&1 || fail "preflight failed on fully initialized project"
 pass "preflight exits 0 when fully initialized"
 
