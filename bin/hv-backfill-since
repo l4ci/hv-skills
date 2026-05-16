@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Stamp `Since: <current-HEAD-short-hash>` on every open bullet in
+# .hv/BACKLOG.md that lacks the field. Idempotent — items already carrying
+# Since: are left untouched. Used to silence drift false-positives on
+# entries captured before hv-append started auto-stamping.
+# Writer helper: exit 0 always; prints the count of items stamped to stdout
+# (silent when zero), or fails fast with a clear error when not in a git
+# repo with at least one commit.
+# Usage: hv-backfill-since
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+. "$HERE/hv-types.sh"
+hv_self_locate
+
+if ! HEAD_HASH="$(git rev-parse --short HEAD 2>/dev/null)" || [ -z "$HEAD_HASH" ]; then
+  echo "error: not in a git repo with a HEAD commit — cannot backfill Since:" >&2
+  exit 1
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HEAD_HASH" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import (
+    iter_open_sections,
+    open_bullet_re,
+    parse_todo_fields,
+    write_text_atomic,
+)
+
+head = sys.argv[1]
+todo = Path(".hv/BACKLOG.md")
+if not todo.exists():
+    sys.exit(0)
+
+content = todo.read_text()
+bullet = open_bullet_re()
+stamped = 0
+edits: list[tuple[int, int, str]] = []  # (line-start, line-end, new-line)
+
+# Walk per open section so we don't touch ## Completed entries.
+for _name, body in iter_open_sections(content):
+    section_start = content.index(body)
+    for m in bullet.finditer(body):
+        line = m.group(0)
+        fields = parse_todo_fields(line)
+        if fields.get("since", "").strip():
+            continue
+        new_line = f"{line.rstrip()} Since: {head}"
+        abs_start = section_start + m.start()
+        abs_end = section_start + m.end()
+        edits.append((abs_start, abs_end, new_line))
+        stamped += 1
+
+if edits:
+    # Apply edits back-to-front so earlier offsets stay valid.
+    edits.sort(key=lambda e: e[0], reverse=True)
+    for start, end, new_line in edits:
+        content = content[:start] + new_line + content[end:]
+    write_text_atomic(todo, content)
+
+if stamped:
+    print(stamped)
+PY

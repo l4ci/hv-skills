@@ -5,6 +5,13 @@
 # still listed as open in .hv/BACKLOG.md.
 # Lookup helper: always exits 0; emits {"drift":[]} when no drift.
 #
+# Per-ID `Since:` anchor: when an open bullet carries `Since: <short-hash>`,
+# only commits reachable from `<since>..HEAD` (per repo) can flag that ID
+# as drift. Commits older than the anchor are skipped — prevents
+# false-positives when IDs get reused across machine syncs. Items without
+# `Since:` fall back to full-log behavior (backwards-compatible for legacy
+# entries written before the anchor existed).
+#
 # Output: JSON to stdout — { "drift": [ { "id": "B07",
 #   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ] }
 # Empty array if no drift. Silent on missing BACKLOG.md (exit 0, empty drift).
@@ -18,7 +25,13 @@ export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, subprocess, sys
 from pathlib import Path
-from hvlib import iter_open_sections, load_repos, open_bullet_re, find_item_ids
+from hvlib import (
+    iter_open_sections,
+    load_repos,
+    open_bullet_re,
+    find_item_ids,
+    parse_todo_fields,
+)
 
 todo_path = Path(".hv/BACKLOG.md")
 if not todo_path.exists():
@@ -31,12 +44,19 @@ cls = os.environ["HV_ITEM_TYPES"]
 
 # Collect IDs that are still OPEN — bullets under ## Bugs / ## Features /
 # ## Tasks that match `- **[ID] ...` (no leading `~~` strikethrough). Items
-# under ## Completed are excluded by section selection.
+# under ## Completed are excluded by section selection. Also harvest each
+# open bullet's `Since:` anchor (empty when not present).
 open_ids: set[str] = set()
+since_by_id: dict[str, str] = {}
 bullet = open_bullet_re()
 for _name, body in iter_open_sections(content):
     for m in bullet.finditer(body):
-        open_ids.add(m.group("id"))
+        iid = m.group("id")
+        open_ids.add(iid)
+        fields = parse_todo_fields(m.group(0))
+        since = fields.get("since", "").strip()
+        if since:
+            since_by_id[iid] = since
 
 if not open_ids:
     print(json.dumps({"drift": []}))
@@ -49,10 +69,40 @@ if repos:
 else:
     targets = [("", None)]  # single-repo mode — git -C None == default cwd
 
+
+def reachable_set(since: str, cwd) -> set[str] | None:
+    """Set of full-hash commits in `<since>..HEAD` for `cwd`.
+    Returns None when `since` doesn't resolve to a commit in this repo —
+    caller treats that as "anchor unknown here, skip all matches"."""
+    cmd = ["git"]
+    if cwd is not None:
+        cmd += ["-C", cwd]
+    verify = subprocess.run(
+        cmd + ["cat-file", "-e", f"{since}^{{commit}}"],
+        capture_output=True, text=True,
+    )
+    if verify.returncode != 0:
+        return None
+    r = subprocess.run(
+        cmd + ["rev-list", f"{since}..HEAD"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None
+    return {h for h in r.stdout.split() if h}
+
+
 # id -> list of commits in walk order (newest first from git log; we reverse later)
 hits: dict[str, list[dict]] = {}
 
 for name, path in targets:
+    # Pre-compute the reachable set per unique Since anchor in this repo,
+    # so each anchor's `rev-list` call runs at most once per repo.
+    reach_cache: dict[str, set[str] | None] = {}
+    for iid, anchor in since_by_id.items():
+        if anchor not in reach_cache:
+            reach_cache[anchor] = reachable_set(anchor, path)
+
     cmd = ["git"]
     if path is not None:
         cmd += ["-C", path]
@@ -68,6 +118,11 @@ for name, path in targets:
         for iid in ids_in_subject:
             if iid not in open_ids:
                 continue
+            anchor = since_by_id.get(iid)
+            if anchor:
+                reach = reach_cache.get(anchor)
+                if reach is None or full_hash not in reach:
+                    continue  # commit predates the anchor (or anchor unknown here)
             hits.setdefault(iid, []).append({
                 "repo": name,
                 "hash": full_hash[:7],
