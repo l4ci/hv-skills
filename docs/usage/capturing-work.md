@@ -69,10 +69,6 @@ Links are optional. [`/hv-next`](picking-work.md) infers the reverse link automa
 
 `/hv-capture` scans both [`BACKLOG.md`](../reference/hv-folder.md) and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
 
-## /hv-c: keystroke-saving alias
-
-`/hv-c` is a shortcut for `/hv-capture`. Identical behavior, fewer characters. Use it when capturing frequently and you want to stay in flow.
-
 ## What /hv-capture is not
 
 `/hv-capture` is a pure recording tool. It classifies and files. It does not act, validate the item, or deduplicate against existing entries. To implement something immediately after capturing it, use [/hv-go](running-work.md). To pick up an already-filed item and implement it, use [/hv-work](running-work.md). To remove a captured item that turned out to be a duplicate or wrong-premise, use [/hv-rm](removing-work.md).
