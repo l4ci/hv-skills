@@ -3,25 +3,7 @@
 # Callers must have set BIN_DIR before sourcing. set -euo pipefail must be active.
 #
 # Exports:
-#   hv_repo_flag_parse   — sets REPO from "$@" when --repo is first arg (else empty)
 #   hv_repo_flag_prepare — runs guard + resolve + cd + worktree-clear bifurcation
-
-# ---------------------------------------------------------------------------
-# hv_repo_flag_parse
-#
-# Inspect "$@" for a leading --repo <name> pair. Sets REPO to the name when
-# present, empty string when absent. Does NOT shift the caller's positional
-# params — caller must `shift 2` itself when REPO is non-empty.
-#
-# Usage:  hv_repo_flag_parse "$@"
-#         [ -n "$REPO" ] && shift 2
-# ---------------------------------------------------------------------------
-hv_repo_flag_parse() {
-  REPO=""
-  if [ "${1:-}" = "--repo" ]; then
-    REPO="${2:?--repo requires a name argument}"
-  fi
-}
 
 # ---------------------------------------------------------------------------
 # hv_repo_flag_prepare
@@ -33,7 +15,7 @@ hv_repo_flag_parse() {
 #   $2  CALLER_NAME — name passed to hv-require-git-context (e.g. "hv-pr")
 #   $3  BRANCH      — branch name forwarded to hv-worktree-clear
 #
-# Reads:  REPO (set by hv_repo_flag_parse or by the caller directly)
+# Reads:  REPO (set by the caller directly)
 # Sets:   nothing (side-effects only: cd, helper invocations)
 # ---------------------------------------------------------------------------
 hv_repo_flag_prepare() {
