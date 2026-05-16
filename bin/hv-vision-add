@@ -8,9 +8,7 @@ set -euo pipefail
 TITLE="${1:?usage: hv-vision-add <title> <summary> [depends-csv]}"
 SUMMARY="${2:?usage: hv-vision-add <title> <summary> [depends-csv]}"
 DEPENDS="${3:-}"
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 MID=$("$HERE/hv-next-id" milestones)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
 import sys

@@ -3,9 +3,7 @@
 # Resolve helper: exits 1 when plan key not found; exits 0 with content on match.
 # Usage: hv-plan-show <key>     (e.g. hv-plan-show M01-S01)
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 KEY="${1:?usage: hv-plan-show <key>}"
 PLAN=".hv/plans/${KEY}.md"
 if [ ! -f "$PLAN" ]; then

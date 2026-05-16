@@ -3,9 +3,7 @@
 # Resolve helper: exits 1 when design ID not found; exits 0 with content on match.
 # Usage: hv-design-show <ID>     (e.g. hv-design-show F58)
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 ID="${1:?usage: hv-design-show <ID>}"
 DESIGN=".hv/designs/${ID}.md"
 if [ ! -f "$DESIGN" ]; then

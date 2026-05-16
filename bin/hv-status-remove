@@ -7,9 +7,7 @@
 #   --repo  Match only entries tagged with this sub-repo. Without --repo, only legacy
 #          entries (repo: null/missing) are removed; umbrella entries are preserved.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 REPO=""
 if [ "${1:-}" = "--repo" ]; then REPO="${2:?usage: hv-status-remove [--repo <name>] <branch>}"; shift 2; fi
 BRANCH="${1:?usage: hv-status-remove [--repo <name>] <branch>}"

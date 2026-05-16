@@ -8,9 +8,7 @@
 #   Document order preserved when multiple terms are queried.
 #   Unknown terms produce no output and exit 0.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 [ $# -ge 1 ] || { echo "usage: hv-glossary-read <term>..." >&2; exit 1; }
 

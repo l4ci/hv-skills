@@ -5,9 +5,7 @@
 #   exit:   0 always (missing subsystems are silent)
 set -euo pipefail
 [ $# -ge 1 ] || { echo "usage: hv-map-query <subsystem>..." >&2; exit 1; }
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
 import sys
 from pathlib import Path

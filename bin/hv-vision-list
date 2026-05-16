@@ -5,9 +5,7 @@
 # `ready` = no dependency is unshipped (true for shipped/active too if deps OK).
 # Usage: hv-vision-list
 set -euo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 RAW=$("$HERE/hv-fm-list" .hv/milestones id title status depends)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RAW" <<'PY'
 import json, sys

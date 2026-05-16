@@ -23,9 +23,7 @@
 #   [Partially articulated]      — exactly one of Forbids/Permits resolved.
 #   [Articulated]                — neither contains the placeholder.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import re

@@ -16,10 +16,7 @@
 #   exit:   0 on write or no-op; 1 on bad args or CLI failure
 set -euo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=hv-self-locate.sh
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 # shellcheck source=hv-issues-common.sh
 . "$HERE/hv-issues-common.sh"

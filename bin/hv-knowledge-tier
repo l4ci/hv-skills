@@ -5,9 +5,7 @@
 # exit 1 on schema mismatch or invalid argv.
 # Usage: hv-knowledge-tier --get|--set|--init|--inc|--list [flags]
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 USAGE="usage: hv-knowledge-tier --get|--set|--init|--inc|--list [flags]
   --get  --topic <T> --title <S>

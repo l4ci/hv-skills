@@ -6,10 +6,8 @@
 # untagged items are silent skips, not errors.
 # Usage: hv-find-milestone-for-items <ID> [<ID>...]
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
 if [ "$#" -lt 1 ]; then
   echo "usage: hv-find-milestone-for-items <ID> [<ID>...]" >&2
   exit 1

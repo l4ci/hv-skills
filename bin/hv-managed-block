@@ -8,9 +8,7 @@
 set -euo pipefail
 KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"
 MODE="${2:-}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 if [ "$MODE" = "--body-stdin" ]; then
   _BODY_TMP=$(mktemp)

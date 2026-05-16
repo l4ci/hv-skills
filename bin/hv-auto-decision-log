@@ -6,9 +6,7 @@
 #
 # Usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 TOPIC="${1:?usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]}"
 RULE_TITLE="${2:?usage: hv-auto-decision-log <topic> <rule-title> <why-text> [<plan-key>] [<iso-date>]}"

@@ -8,10 +8,8 @@
 # Writer helper: exit 0 on successful write OR idempotent no-op; exit 1 if ID is not present at all.
 # Usage: hv-complete <ID> [commit-hash]
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-hv_self_locate
 ID="${1:?usage: hv-complete <ID> [commit-hash]}"
 HASH="${2:-$(git log --oneline -1 --format='%h' 2>/dev/null || true)}"
 if [ -z "$HASH" ]; then
