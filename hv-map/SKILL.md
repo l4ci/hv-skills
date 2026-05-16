@@ -23,7 +23,7 @@ Subsystems are AI-curated narratives describing one coherent area of the project
 
 ## Modes
 
-`/hv-map` and `/hv-docs` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
+`/hv-map` and `/hv-ship`'s Docs Mode (`--docs`) share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
 
 ### Mode: first-run
 
@@ -76,4 +76,4 @@ The soft-cap nudge runs via `.hv/bin/hv-map-cap-check`, invoked from /hv-debug, 
 
 ## References
 
-- [`references/three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) — Three-mode skill shape (first-run / after-work / restructure) used by `/hv-docs` and `/hv-map`.
+- [`references/three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) — Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship`'s Docs Mode and `/hv-map`.

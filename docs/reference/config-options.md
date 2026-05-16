@@ -115,13 +115,13 @@ Free text. Default: `docs`. Writes `docs.path`.
 
 ### Docs auto-create
 
-> *"Should `/hv-docs` auto-write doc updates after work cycles?"*
+> *"Should `/hv-ship --docs` auto-write doc updates after work cycles?"*
 
 `On` / `Off`. Writes `docs.autoCreate`.
 
 ### Docs after-work
 
-> *"Should `/hv-docs` run automatically after `/hv-work` and `/hv-ship` finish?"*
+> *"Should `/hv-ship --docs` run automatically after `/hv-work` and `/hv-ship` finish?"*
 
 `On` / `Off` (Recommended `Off`). Writes `docs.afterWork`.
 

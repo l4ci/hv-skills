@@ -310,7 +310,7 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 .hv/bin/hv-config-set learn.promoteThreshold 3
 
 # docs.afterWork — silent default. No question; the toggle UX lives in
-# /hv-config (interactive checklist) and /hv-docs first-run (auto-flips
+# /hv-config (interactive checklist) and /hv-ship --docs first-run (auto-flips
 # the flag when the user approves a fresh scaffold).
 .hv/bin/hv-config-set docs.afterWork false
 

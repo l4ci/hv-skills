@@ -70,7 +70,7 @@ Routine = the kind of question where the Recommended option is the obvious right
 **Forbids.** Auto-picking on:
 - **Design decisions with open questions** — competing approaches, version-bump escalation, novel pattern choice. These belong to F32 (loop-mode auto-planning, with `[Auto:Loop]` decision logging). A `(Recommended)` flag on a design pick is a *suggestion*, not a routine answer; the loop must surface them.
 - **Manual gates that are never auto-invoked regardless of autonomy** — `/hv-decide` approvals, `/hv-learn` Step 8.5 issue filing, `/hv-learn` Step 9 runlog filing, `/hv-ship` Step 5 PR strategy, `/hv-release` push/publish gates. These have explicit `**Manual gate — ...**` callouts in their SKILL.md. Loop mode honors the gate — it does not auto-pick.
-- **Config-flip questions** — `/hv-init` initial setup, `/hv-config` edits, `/hv-docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
+- **Config-flip questions** — `/hv-init` initial setup, `/hv-config` edits, `/hv-ship --docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
 
 **Permits.**
 - Routine routing/tagging with one clear Recommended option (the use cases listed above and any future analogue).
@@ -89,7 +89,7 @@ Manual confirmation gates (`/hv-decide`'s manual-only contract, the public-artif
 
 ## Stage features across slices using pass-through stubs
 
-Multi-slice features ship the SHAPE early via pass-through stubs that explicitly name the future-slice wiring point (e.g. *"Layer-1 filter is a pass-through stub; `bin/hv-docs-filter` lands in M01-S03"*). This signals what consumers should NOT rely on yet. **Companion rule:** when the milestone flips to `shipped`, sweep all `M0X-S0Y` slice references — they were placeholders and become stale after merge.
+Multi-slice features ship the SHAPE early via pass-through stubs that explicitly name the future-slice wiring point (e.g. *"Layer-1 filter is a pass-through stub; the substantive helper lands in M01-S03"*). This signals what consumers should NOT rely on yet. **Companion rule:** when the milestone flips to `shipped`, sweep all `M0X-S0Y` slice references — they were placeholders and become stale after merge.
 
 ## Helper-centric V2-surface extension
 

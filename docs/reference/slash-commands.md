@@ -21,11 +21,9 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
 | `/hv-context` | Capture or refine a domain term in `.hv/CONTEXT.md` — the project's canonical glossary; consulted by `/hv-work`, `/hv-debug`, `/hv-vision`, `/hv-capture` |
 | `/hv-map` | Maintain `.hv/MAP.md` + `.hv/map/<subsystem>.md` waypoints — entry points, purpose, last-touched date; auto-bumped post-cycle by `/hv-work`, `/hv-debug`, `/hv-go` |
-| `/hv-docs` | Scaffold and maintain a public-facing user guide under `docs/` — discovery, scaffold, post-cycle proposals, and restructure modes |
 | `/hv-review` | Two-stage review of a branch (Stage 1 spec-compliance vs `PLAN.md`, Stage 2 code-quality with silent-failure-hunter + decision-violations) vs `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL. Short-circuits Stage 2 on Stage 1 `FAIL` |
 | `/hv-qa` | Product-level QA: executes per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; emits PASS / CONCERNS / FAIL. Modes — first-run / run / restructure |
-| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates |
-| `/hv-undo` | Guided rollback of the last `/hv-work` cycle — resets the merge commit, restores TODO entries; dry-run preview, manual confirmation, direct-merge cycles only |
+| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates. Flags: `--undo` (guided rollback of the last cycle on the base branch) and `--docs` (public-docs maintenance — first-run / after-work / restructure modes; auto-fires inline at ship time when `docs.afterWork: true`) |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
 | `/hv-release` | Cut a release: walk per-project checklist, bump version, generate notes, tag, push, publish to GitHub/GitLab |
@@ -54,10 +52,6 @@ Captures a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, n
 ## /hv-context
 
 Captures or refines a domain term in `.hv/CONTEXT.md`, the project's glossary. Accepts an explicit `<term> "<definition>"` invocation, or fires inline when conversation produces an unambiguous definitional signal ("let's call this X", "by X I mean Y"). Writes one entry per term with definition, optional aliases, and optional "not" clarifications. In umbrella mode, resolves the target file from cwd; override with `--repo umbrella` or `--repo <name>`. See [capturing terminology](../usage/context.md) for the full flow.
-
-## /hv-docs
-
-Manages the public documentation site under the configured `docs.path` directory. Creates, updates, and organizes docs pages so project documentation stays in sync with the codebase.
 
 ## /hv-go
 
@@ -119,13 +113,14 @@ Dry-run-by-default: the first pass shows what would change, then an explicit `As
 
 Finishes a feature branch: runs `/hv-review` (by default), builds a PR body from commit subjects and resolved item IDs, then either opens a GitHub PR or merges directly based on configured strategy. Clears the `status.json` entry and closes referenced items on completion. See [review and ship](../usage/review-and-ship.md).
 
+Two modes folded in via flags:
+
+- `/hv-ship --undo` — guided rollback of the last `/hv-work` cycle on the base branch. Resets the merge commit and restores the cycle's TODO entries to their type sections in `BACKLOG.md`. Direct-merge cycles only (MVP); PR-mode cycles refused with a manual-recovery pointer. Refuses on cycles that have post-merge commits unless `--allow-post-merge` is passed. Defaults to a dry-run preview; the slash command always asks for explicit confirmation before applying. See [rolling back a cycle](../usage/undo.md) for the full flow.
+- `/hv-ship --docs` — public-docs maintainer. Scaffolds `<docs.path>/` on first run (discovery + tailored tree + interactive approval), proposes doc updates in after-work mode, or audits and reorganizes in restructure mode (`/hv-ship --docs restructure`). Auto-fires inline at ship time when `docs.afterWork: true` and the post-cycle trigger condition matches.
+
 ## /hv-spike
 
 Throwaway feasibility experiment on a dedicated `spike/<name>` branch that is never merged. Answers a specific yes/no/conditional question and records question, what was tried, findings, and decision in `.hv/spikes/<name>.md`. See [spikes](../usage/spikes.md).
-
-## /hv-undo
-
-Guided rollback of the last `/hv-work` cycle on the base branch: resets the merge commit and restores the cycle's TODO entries to their type sections in `BACKLOG.md`. Direct-merge cycles only (MVP). PR-mode cycles are detected and refused with a manual-recovery pointer. Refuses on cycles that have post-merge commits unless `--allow-post-merge` is passed. Defaults to a dry-run preview; the slash command always asks for explicit confirmation before applying. Inverse of `/hv-work`'s commit + completion steps. See [rolling back a cycle](../usage/undo.md) for the full flow.
 
 ## /hv-update
 

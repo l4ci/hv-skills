@@ -522,16 +522,16 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 ## Step 13.6 — Docs After-Work (Nudge or Auto-Invoke)
 
-Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-docs` manually once.
+Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
 
 When the flag is on, apply the same post-cycle trigger condition as Step 13 — see `references/post-cycle-trigger-gate.md`.
 
 When triggered, branch on `autonomy.level`:
 
-- `"off"` — nudge *"User-facing changes shipped. Run `/hv-docs` to review and update public docs (after-work mode)."*
-- `"auto"` or `"loop"` — **dispatch `hv-docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the after-work flow has the right context.
+- `"off"` — nudge *"User-facing changes shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
+- `"auto"` or `"loop"` — **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the after-work flow has the right context.
 
-If `<docs.path>/` doesn't exist or is empty, `/hv-docs`'s after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
 
 ## Step 13.7 — Map After-Work
 
