@@ -9,10 +9,8 @@
 #                      etc.). Clusters are kept if any member matches; In Progress is never
 #                      filtered.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
 
 GREP_PATTERN=""
 while [ $# -gt 0 ]; do

@@ -5,9 +5,7 @@
 #   hv-design-add <ID> "<title>"     — designs are per-item; ID matches [BFT]\d{2,}
 # Prints the ID on stdout on success.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 ID="${1:?usage: hv-design-add <ID> <title>}"
 TITLE="${2:?usage: hv-design-add <ID> <title>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$TITLE" <<'PY'

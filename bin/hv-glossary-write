@@ -56,9 +56,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 TARGET=".hv/KNOWLEDGE.md"
 [ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }

@@ -8,10 +8,8 @@
 # repo with at least one commit.
 # Usage: hv-backfill-since
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-hv_self_locate
 
 if ! HEAD_HASH="$(git rev-parse --short HEAD 2>/dev/null)" || [ -z "$HEAD_HASH" ]; then
   echo "error: not in a git repo with a HEAD commit — cannot backfill Since:" >&2

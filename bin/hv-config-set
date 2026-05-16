@@ -14,9 +14,7 @@
 #   stdout: empty on success
 #   exit:   0 on success; 1 with stderr on write failure / bad path
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 KEY_PATH="${1:?usage: hv-config-set <dotted.key.path> <value>}"
 VALUE="${2:?usage: hv-config-set <dotted.key.path> <value>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY_PATH" "$VALUE" <<'PY'
