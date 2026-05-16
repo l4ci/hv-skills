@@ -56,7 +56,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from hvlib import iter_topics, parse_term_entry, write_text_atomic
+from hvlib import iter_topics, load_repos, parse_term_entry, write_text_atomic
 
 APPLY = os.environ["_HV_MIGRATE_APPLY"] == "true"
 VERBOSE = os.environ["_HV_MIGRATE_VERBOSE"] == "true"
@@ -167,18 +167,15 @@ def check_safety_preconditions() -> None:
     except ValueError:
         die(f"refusing: .hv/config.json version '{version}' is not parseable.", 1)
 
-    # (d) umbrella project — defer to F21
-    if REPOS_PATH.exists():
-        try:
-            repos = json.loads(REPOS_PATH.read_text())
-        except json.JSONDecodeError:
-            repos = {}
-        if repos:
-            die(
-                "refusing: umbrella project detected (.hv/repos.json carries sub-repos). "
-                "Umbrella support for /hv-migrate is deferred to F21.",
-                1,
-            )
+    # (d) umbrella project — defer to F21. Canonical detection: load_repos()
+    # returns a non-empty dict only when sub-repos are registered. The bootstrap
+    # default ({"repos":[]}) yields {} → not umbrella.
+    if REPOS_PATH.exists() and load_repos(str(REPOS_PATH)):
+        die(
+            "refusing: umbrella project detected (.hv/repos.json carries sub-repos). "
+            "Umbrella support for /hv-migrate is deferred to F21.",
+            1,
+        )
 
 
 def check_f18_dependency() -> None:
