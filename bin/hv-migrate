@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+# One-shot v3 → v4 codemod. Rewrites references to 8 commands cut by M01,
+# migrates .hv/CONTEXT.md terms into .hv/KNOWLEDGE.md (## Glossary) via F18's
+# `hv-glossary-write --batch`, and removes stale `.hv/bin/hv-context-*` files
+# left by the cuts. `--dry-run` is default; `--apply` writes; `--verbose` adds
+# per-file diffs. Idempotent — a clean second `--apply` rewrites zero files.
+# Writer helper: exit 0 on success; exit 1 on safety-precondition refusal,
+# 2 on usage error, 3 on F18 dependency failure.
+#
+# Usage:
+#   hv-migrate v4 [--apply] [--verbose]
+#   hv-migrate v4 --help
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/hv-self-locate.sh"
+hv_self_locate
+
+VERSION=""
+APPLY="false"
+VERBOSE="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --apply)   APPLY="true"; shift ;;
+    --verbose) VERBOSE="true"; shift ;;
+    --dry-run) APPLY="false"; shift ;;   # explicit no-op for symmetry
+    --help|-h)
+      sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    -*) echo "error: unknown flag $1" >&2; exit 2 ;;
+    *) [ -z "$VERSION" ] && VERSION="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
+  esac
+done
+
+if [ -z "$VERSION" ]; then
+  echo "error: version arg required (e.g., 'hv-migrate v4')" >&2
+  exit 2
+fi
+if [ "$VERSION" != "v4" ]; then
+  echo "error: only 'v4' supported at this hv-skills version (got '$VERSION')" >&2
+  exit 2
+fi
+
+export _HV_MIGRATE_APPLY="$APPLY"
+export _HV_MIGRATE_VERBOSE="$VERBOSE"
+export _HV_MIGRATE_GLOSSARY_WRITE="$HERE/hv-glossary-write"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import datetime as dt
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from hvlib import iter_topics, parse_term_entry, write_text_atomic
+
+APPLY = os.environ["_HV_MIGRATE_APPLY"] == "true"
+VERBOSE = os.environ["_HV_MIGRATE_VERBOSE"] == "true"
+GLOSSARY_WRITE = os.environ["_HV_MIGRATE_GLOSSARY_WRITE"]
+
+ROOT = Path.cwd()
+
+# Eight rewrite rules from F19 detail. Word-boundary safe.
+# Tuple: (pattern, replacement_or_None, description). None replacement = manual review.
+REWRITE_RULES = [
+    (re.compile(r"/hv-c\b"),       "/hv-capture",          "auto"),
+    (re.compile(r"/hv-assume\b"),  "/hv-work --preview",   "auto"),
+    (re.compile(r"/hv-rm\b"),      "/hv-capture --remove", "auto"),
+    (re.compile(r"/hv-undo\b"),    "/hv-ship --undo",      "auto"),
+    (re.compile(r"/hv-context\b"), "/hv-learn --term",     "auto"),
+    (re.compile(r"/hv-docs\b"),    "/hv-ship --docs",      "auto"),
+    (re.compile(r"/hv-issues\b"),  None, "ambiguous — could be --from-github or --from-gitlab"),
+    (re.compile(r"/hv-map\b"),     None, "ambiguous — could be --init --map (first-run) or delete-the-line"),
+]
+
+# Scan scope per F19 design. Static paths + globs.
+STATIC_PATHS = [
+    Path(".hv/BACKLOG.md"),
+    Path(".hv/MILESTONES.md"),
+    Path(".hv/KNOWLEDGE.md"),
+    Path(".hv/DECISIONS.md"),
+    Path("CLAUDE.md"),
+]
+GLOB_DIRS = [
+    (".hv/plans",     "*.md"),
+    (".hv/designs",   "*.md"),
+    (".hv/handoffs",  "*.md"),  # design name
+    (".hv/handoff",   "*.md"),  # actual dir name (singular, used by hv-pause)
+    (".hv/qa",        "*.md"),
+    (".hv/milestones","*.md"),
+]
+
+CONTEXT_PATH = Path(".hv/CONTEXT.md")
+REPOS_PATH   = Path(".hv/repos.json")
+CONFIG_PATH  = Path(".hv/config.json")
+
+# .hv/bin/ files orphaned by the F18 fold.
+REMOVED_BINARIES = [
+    "hv-context-add",
+    "hv-context-index",
+    "hv-context-map",
+    "hv-context-query",
+]
+
+
+def die(msg: str, code: int = 1) -> None:
+    print(f"error: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def check_safety_preconditions() -> None:
+    # (b) running inside an existing backup directory
+    cwd = str(ROOT.resolve())
+    if "/.hv/migrate-backup/" in cwd or cwd.endswith("/.hv/migrate-backup"):
+        die("refusing: cwd is inside .hv/migrate-backup/. Run from project root.", 1)
+
+    # (a) working tree has uncommitted changes outside .hv/
+    try:
+        r = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        die("refusing: not inside a git repo (or git unavailable).", 1)
+    dirty_outside_hv = []
+    for line in r.stdout.splitlines():
+        # porcelain format: "XY path" (XY two chars, then space)
+        if len(line) < 4:
+            continue
+        path = line[3:].strip()
+        # Rename lines look like "R  old -> new"; check the destination.
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        if path.startswith(".hv/"):
+            continue
+        dirty_outside_hv.append(path)
+    if dirty_outside_hv:
+        die(
+            "refusing: uncommitted changes outside .hv/:\n  " +
+            "\n  ".join(dirty_outside_hv) +
+            "\nCommit or stash these before running /hv-migrate v4.",
+            1,
+        )
+
+    # (c) .hv/config.json version present and >= 3.0
+    if not CONFIG_PATH.exists():
+        die("refusing: .hv/config.json missing — run /hv-init first.", 1)
+    try:
+        cfg = json.loads(CONFIG_PATH.read_text())
+    except json.JSONDecodeError as e:
+        die(f"refusing: .hv/config.json is not valid JSON ({e}).", 1)
+    version = cfg.get("version", "")
+    if not version:
+        die("refusing: .hv/config.json has no 'version' field — run /hv-init.", 1)
+    major = version.split(".", 1)[0]
+    try:
+        if int(major) < 3:
+            die(
+                f"refusing: project hv-skills version is {version} (pre-3.0). "
+                "Bring it current with /hv-init before /hv-migrate v4.",
+                1,
+            )
+    except ValueError:
+        die(f"refusing: .hv/config.json version '{version}' is not parseable.", 1)
+
+    # (d) umbrella project — defer to F21
+    if REPOS_PATH.exists():
+        try:
+            repos = json.loads(REPOS_PATH.read_text())
+        except json.JSONDecodeError:
+            repos = {}
+        if repos:
+            die(
+                "refusing: umbrella project detected (.hv/repos.json carries sub-repos). "
+                "Umbrella support for /hv-migrate is deferred to F21.",
+                1,
+            )
+
+
+def check_f18_dependency() -> None:
+    """Verify hv-glossary-write supports --batch (F18 obligation)."""
+    gw = Path(GLOSSARY_WRITE)
+    if not gw.exists():
+        die(
+            "refusing: F18 dependency missing — bin/hv-glossary-write not found. "
+            "F19 cannot ship without F18's --batch API.",
+            3,
+        )
+    # Static check — the helper's arg parser carries `--batch` literally.
+    # Cheaper and more reliable than probing (probes hit per-cwd preconditions).
+    if "--batch" not in gw.read_text():
+        die(
+            "refusing: F18 dependency stale — bin/hv-glossary-write missing --batch mode. "
+            "Reinstall hv-skills to pick up F18.",
+            3,
+        )
+
+
+def iter_scan_targets():
+    """Yield every existing file in the scan scope."""
+    seen = set()
+    for p in STATIC_PATHS:
+        if p.exists() and str(p) not in seen:
+            seen.add(str(p))
+            yield p
+    for d, pat in GLOB_DIRS:
+        base = Path(d)
+        if not base.is_dir():
+            continue
+        for f in sorted(base.glob(pat)):
+            if str(f) not in seen:
+                seen.add(str(f))
+                yield f
+
+
+def rewrite_text(text: str, file_repr: str):
+    """Apply all 8 rules to `text`. Return (new_text, count, manual_reviews).
+    manual_reviews is a list of "file:line: rule — reason" strings."""
+    auto_count = 0
+    manual = []
+    # First pass: collect manual-review locations BEFORE rewriting so line numbers reflect input.
+    for pattern, repl, desc in REWRITE_RULES:
+        if repl is not None:
+            continue
+        for i, line in enumerate(text.splitlines(), start=1):
+            if pattern.search(line):
+                manual.append(f"{file_repr}:{i}: {pattern.pattern[1:]} — {desc}")
+    # Second pass: apply auto rewrites.
+    new_text = text
+    for pattern, repl, desc in REWRITE_RULES:
+        if repl is None:
+            continue
+        new_text, n = pattern.subn(repl, new_text)
+        auto_count += n
+    return new_text, auto_count, manual
+
+
+def unified_diff(old: str, new: str, label: str) -> str:
+    import difflib
+    return "".join(difflib.unified_diff(
+        old.splitlines(keepends=True),
+        new.splitlines(keepends=True),
+        fromfile=label,
+        tofile=label + " (rewritten)",
+    ))
+
+
+def plan_context_migration():
+    """Inspect .hv/CONTEXT.md. Return dict describing what migration would do.
+
+    Result shape:
+      {"action": "none"|"delete"|"migrate", "terms": [...], "tsv": str|None,
+       "msg": str}
+    """
+    if not CONTEXT_PATH.exists():
+        return {"action": "none", "terms": [], "tsv": None, "msg": "no CONTEXT.md"}
+    content = CONTEXT_PATH.read_text()
+    terms = []
+    for name, body in iter_topics(content):
+        entry = parse_term_entry(body)
+        if entry["definition"]:
+            terms.append({
+                "term": name,
+                "def":  entry["definition"],
+                "aliases": entry["aliases"],
+                "nots":    entry["nots"],
+            })
+    if not terms:
+        return {
+            "action": "delete",
+            "terms": [],
+            "tsv": None,
+            "msg": "placeholder only — file will be removed (no terms to migrate)",
+        }
+    # Build TSV manifest. Definitions may span multiple lines; flatten to single line
+    # (hv-glossary-write batch mode is line-oriented; definitions wrap is fine).
+    rows = ["# auto-generated by /hv-migrate v4 from .hv/CONTEXT.md"]
+    for t in terms:
+        def_flat = " ".join(t["def"].split())
+        rows.append("\t".join([
+            t["term"],
+            def_flat,
+            ", ".join(t["aliases"]),
+            ", ".join(t["nots"]),
+        ]))
+    return {
+        "action": "migrate",
+        "terms": terms,
+        "tsv": "\n".join(rows) + "\n",
+        "msg": f"will migrate {len(terms)} term(s) to .hv/KNOWLEDGE.md (Glossary)",
+    }
+
+
+def apply_context_migration(plan, backup_root: Path) -> None:
+    if plan["action"] == "none":
+        return
+    # Always back up first.
+    dest = backup_root / "CONTEXT.md"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(CONTEXT_PATH, dest)
+    if plan["action"] == "migrate":
+        with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False) as f:
+            f.write(plan["tsv"])
+            manifest = f.name
+        try:
+            r = subprocess.run(
+                [GLOSSARY_WRITE, "--batch", manifest],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                die(
+                    f"CONTEXT migration failed (hv-glossary-write --batch exit {r.returncode}):\n"
+                    f"{r.stderr}\n"
+                    f"CONTEXT.md backed up at {dest}; not deleted. Resolve the conflict and re-run.",
+                    3,
+                )
+        finally:
+            Path(manifest).unlink(missing_ok=True)
+    CONTEXT_PATH.unlink()
+
+
+def plan_removed_binaries():
+    paths = []
+    for name in REMOVED_BINARIES:
+        p = Path(".hv/bin") / name
+        if p.exists():
+            paths.append(p)
+    return paths
+
+
+def apply_removed_binaries(paths, backup_root: Path) -> None:
+    for p in paths:
+        dest = backup_root / "bin" / p.name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(p, dest)
+        p.unlink()
+
+
+def main():
+    check_safety_preconditions()
+    check_f18_dependency()
+
+    rewrites = []          # list of {path, original, new, count}
+    manual_review = []      # flat list of strings
+
+    for path in iter_scan_targets():
+        try:
+            original = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        new_text, count, reviews = rewrite_text(original, str(path))
+        manual_review.extend(reviews)
+        if count > 0:
+            rewrites.append({
+                "path": path,
+                "original": original,
+                "new": new_text,
+                "count": count,
+            })
+
+    ctx_plan = plan_context_migration()
+    bin_plan = plan_removed_binaries()
+
+    nothing_to_do = (
+        not rewrites
+        and ctx_plan["action"] == "none"
+        and not bin_plan
+    )
+
+    # Always print summary; verbose adds per-file diffs.
+    mode = "apply" if APPLY else "dry-run"
+    print(f"/hv-migrate v4 ({mode})")
+    print()
+
+    files_touched = len(rewrites)
+    refs_rewritten = sum(r["count"] for r in rewrites)
+    print(f"  files scanned:      {sum(1 for _ in iter_scan_targets())}")
+    print(f"  files rewritten:    {files_touched}")
+    print(f"  references rewritten: {refs_rewritten}")
+    print(f"  manual review:      {len(manual_review)}")
+    print(f"  CONTEXT.md:         {ctx_plan['msg']}")
+    print(f"  removed binaries:   {len(bin_plan)}")
+    print()
+
+    if VERBOSE and rewrites:
+        print("— per-file diffs —")
+        for r in rewrites:
+            print(unified_diff(r["original"], r["new"], str(r["path"])))
+        print()
+
+    if rewrites:
+        print("— rewrites —")
+        for r in rewrites:
+            print(f"  {r['path']}  ({r['count']} reference(s))")
+        print()
+
+    if manual_review:
+        print("— manual review —")
+        for m in manual_review:
+            print(f"  {m}")
+        print()
+
+    if bin_plan:
+        print("— removed binaries —")
+        for p in bin_plan:
+            print(f"  {p}")
+        print()
+
+    if nothing_to_do:
+        print("noop: project is already on v4 (no rewrites, no CONTEXT.md, no stale bins).")
+        sys.exit(0)
+
+    if not APPLY:
+        print("Run with --apply to write the changes above.")
+        sys.exit(0)
+
+    # APPLY path — back up first, then write.
+    ts = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+    backup_root = Path(".hv/migrate-backup") / ts
+    backup_root.mkdir(parents=True, exist_ok=True)
+
+    for r in rewrites:
+        backup_dest = backup_root / r["path"]
+        backup_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(r["path"], backup_dest)
+        write_text_atomic(r["path"], r["new"])
+
+    if ctx_plan["action"] != "none":
+        apply_context_migration(ctx_plan, backup_root)
+
+    if bin_plan:
+        apply_removed_binaries(bin_plan, backup_root)
+
+    print(f"applied. backup at: {backup_root}")
+
+
+if __name__ == "__main__":
+    main()
+PY
