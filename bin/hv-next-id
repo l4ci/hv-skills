@@ -3,9 +3,7 @@
 # Writer helper: exit 0 on successful counter increment; exit 1 on unknown type.
 # Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
   bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;

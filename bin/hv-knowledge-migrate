@@ -6,9 +6,7 @@
 # Writer helper: exit 0 always.
 # Usage: hv-knowledge-migrate
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 KM=".hv/KNOWLEDGE.md"
 if [[ ! -f "$KM" ]]; then

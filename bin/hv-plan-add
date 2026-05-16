@@ -8,10 +8,8 @@
 #   --design  Path to design artifact under .hv/designs/; recorded in plan frontmatter as a traceability pointer.
 # Prints the full plan key on stdout (e.g. "M01-S03" or "M01-B07").
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
-hv_self_locate
 REPO=""
 DESIGN=""
 while :; do

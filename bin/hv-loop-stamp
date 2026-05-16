@@ -27,9 +27,7 @@
 # Only the loopStartedAt key is touched — the active array and any other top-level
 # keys in .hv/status.json are preserved verbatim.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 USAGE="usage: hv-loop-stamp <start|clear|read>"
 SUB="${1:?$USAGE}"
 case "$SUB" in

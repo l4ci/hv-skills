@@ -4,9 +4,7 @@
 # Atomic-merge helper: regenerates managed hv-map block in CLAUDE.md from .hv/map/ frontmatter; exit 0.
 # Usage: hv-map-index
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from pathlib import Path

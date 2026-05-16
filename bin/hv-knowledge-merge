@@ -10,9 +10,7 @@
 # Usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
 #        (body also accepted via stdin if --body not given)
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/hv-self-locate.sh"
-hv_self_locate
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 USAGE="usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
        (body also accepted via stdin if --body not given)"
