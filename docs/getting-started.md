@@ -29,7 +29,7 @@ To change any setting later, run `/hv-config`. Don't hand-edit the JSON files.
 Two end-to-end walkthroughs carry one concrete project from brief to shipped milestone:
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md) — empty repo plus a one-page brief, walked through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md) — established codebase with open GitHub issues and a mental bug list, walked through `/hv-map`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
+- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md) — established codebase with open GitHub issues and a mental bug list, walked through `/hv-init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
 
 Pick whichever matches where your project is today and follow it skill-by-skill.
 

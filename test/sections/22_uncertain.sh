@@ -105,7 +105,7 @@ echo "F37: TaskCreate progress-checklist convention"
 TIER_SAB_F37=(hv-init hv-work hv-debug hv-ship hv-release \
               hv-refactor hv-learn hv-decide hv-spike hv-vision \
               hv-capture hv-next hv-pause hv-review hv-plan hv-config)
-TIER_C_F37=(hv-go hv-update hv-map)
+TIER_C_F37=(hv-go hv-update)
 
 for skill in "${TIER_SAB_F37[@]}"; do
   grep -q "TaskCreate(" "$REPO/$skill/SKILL.md" \

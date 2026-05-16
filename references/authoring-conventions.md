@@ -46,7 +46,7 @@ Per-site shape (adapt phase list per skill):
 Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the situation is clear"* — don't qualify. When a phase genuinely produces a subjective state (a UX flow approval, a design pick), name the user action or recorded decision that captures the approval rather than the inner state. Skill authors picking a phase outcome should ask: *"what would I `grep` or `[ ]` test for, from the next session, to know this phase finished?"* If the answer is "nothing concrete", the phase is too vague to track.
 
 **Forbids.**
-- Adding the block to single-phase or trivial skills (Tier C: `hv-go`, `hv-update`, `hv-map`) — the checklist UX is overhead when there's nothing to tick off.
+- Adding the block to single-phase or trivial skills (Tier C: `hv-go`, `hv-update`) — the checklist UX is overhead when there's nothing to tick off.
 - Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
 - Cross-skill alignment of phase names — each skill's phase list reflects its own structure; phrasing is local to the SKILL.md.
 - Calling `TaskCreate` from inside subagent dispatches — the orchestrator owns the task list; workers focus on their assigned tasks and report back.
@@ -138,7 +138,7 @@ Prose like "a few", "many", "high X", "ambiguous", "might/may" forces the runtim
 - Adjectives in descriptive prose where no threshold is implied (*"a typical day"*, *"common workflow"*) — flavor doesn't trip the runtime if no rule fires off it.
 - Hedging in genuinely open situations that the rule explicitly flags as a known unknown.
 
-Codified during the T52 sweep across `hv-debug`, `hv-map`, `hv-release`, `hv-review`, `hv-spike`, and `references/post-cycle-trigger-gate.md` (six phrases replaced with concrete thresholds).
+Codified during the T52 sweep across `hv-debug`, `hv-release`, `hv-review`, `hv-spike`, and `references/post-cycle-trigger-gate.md` (six phrases replaced with concrete thresholds).
 
 ## `AskUserQuestion` option list capped at 4
 

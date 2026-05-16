@@ -6,7 +6,7 @@ This is distinct from:
 
 - **`.hv/KNOWLEDGE.md`** (`/hv-learn`): passive *gotchas, conventions, constraints*. What you wish you'd known.
 - **`.hv/DECISIONS.md`** (`/hv-decide`): active *boundaries with forbids/permits*. What the project has committed to.
-- **`.hv/MAP.md`** (`/hv-map`): *subsystems*. Where things live.
+- **`.hv/MAP.md`** + `.hv/map/<name>.md`: *subsystems*. Where things live.
 - **`.hv/CONTEXT.md`**: *vocabulary*. What things are called.
 
 ## Capturing a term

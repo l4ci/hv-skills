@@ -289,9 +289,9 @@ trap 'rm -rf "$TMP" "$TMP2"' EXIT
 echo "ok hv-bootstrap seeds map"
 
 # --- skill touchpoints reference map ------------------------------
-grep -q "hv-map-stats\|hv-map after-work" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
-grep -q "hv-map after-work" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map after-work"; exit 1; }
-grep -q "hv-map after-work" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map after-work"; exit 1; }
+grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
+grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
+grep -q "post-cycle map\|hv-map-index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 
 # --- status/next/resume reference hv-stale-summary ---------------

@@ -535,7 +535,7 @@ If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work f
 
 ## Step 13.7 — Map After-Work
 
-- **Update project map.** Invoke `/hv-map after-work` for any subsystem whose `Key files / dirs` or `Entry points` overlap the files touched in this cycle. The map updates are staged as part of the cycle's final commit, not a separate commit.
+- **Update project map.** For any `.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap files touched in this cycle, bump `touched:` to today in the frontmatter; refresh `summary:` if the cycle's intent changed it; add new entry points where helpful. Don't rewrite untouched sections. After editing, run `.hv/bin/hv-map-index` to regenerate the `## Project Map` block in `CLAUDE.md`. Stage the updates as part of the cycle's final commit — no separate commit. Skip silently when no map entry matches.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 

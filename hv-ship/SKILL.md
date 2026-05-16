@@ -480,7 +480,7 @@ Use `/hv-ship --undo` when:
 
 If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
 
-Docs Mode and `/hv-map` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
+Docs Mode and `/hv-qa` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
 
 > **Architecture rule — one `docs/` tree per project.** A single hv-skills project has exactly one `docs/` tree, located either at the umbrella root or inside one chosen sub-repo (recorded via `docs.repo` config when needed). Forbids: multiple `docs/` trees inside a single hv-skills project, per-sub-repo `docs/` *in addition to* an umbrella `docs/`, Docs Mode writing to more than one target. Permits: a single `docs/` at the umbrella root (cross-cutting docs); a single `docs/` inside one chosen sub-repo (when that sub-repo owns the project's public surface); cross-cutting documentation living in the chosen tree.
 >
@@ -755,4 +755,4 @@ Resolves: [B07], [F03]
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). |
 | [`review-verdict-routing.md`](../references/review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. |
 | [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). Consumed by Docs Mode. |
-| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-map`. Docs Mode follows this skeleton. |
+| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. Docs Mode follows this skeleton. |

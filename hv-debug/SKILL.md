@@ -336,7 +336,7 @@ Branch on `autonomy.level`:
 
 If the bug was rooted in hv-skills behavior (touched `bin/hv-*`, `hv-*/SKILL.md`, or `.hv/`), `/hv-learn`'s Step 8.5 will offer to file an upstream issue against `l4ci/hv-skills`.
 
-- **Update project map.** Invoke `/hv-map after-work` if the fix touched files belonging to a known subsystem.
+- **Update project map.** If the fix touched files belonging to a known subsystem (`.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap the changes), bump `touched:` to today in that file's frontmatter and run `.hv/bin/hv-map-index`. Stage with the cycle's final commit. Skip silently when no map entry matches.
 
 ## Step 12.5 — Decide (Nudge Only)
 

@@ -253,7 +253,7 @@ transition whose resolved commit's subject does not start with `refactor:`,
 and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
 `hv-refactor-targets` enumerates refactor targets (the umbrella's `hasCode` flag plus every registered sub-repo) so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
 
-`hv-map-cap-check` is an advisory nudge: it emits a one-line message to stderr when the project map's subsystem count meets or exceeds the soft cap (see `.hv/config.json#map.softCapSubsystems`), and stays silent below. It always exits 0, never a gate, only a hint. `/hv-debug`, `/hv-go`, and `/hv-work` call it post-cycle so users see "you might want to `/hv-map consolidate`" without ever being blocked.
+`hv-map-cap-check` is an advisory nudge: it emits a one-line message to stderr when the project map's subsystem count meets or exceeds the soft cap (see `.hv/config.json#map.softCapSubsystems`), and stays silent below. It always exits 0, never a gate, only a hint. `/hv-debug`, `/hv-go`, and `/hv-work` call it post-cycle so users see "you might want to consolidate `.hv/map/` entries" without ever being blocked.
 
 `hv-backlog` renders the full BACKLOG.md as sorted Markdown tables (In Progress,
 Bugs, Features, Tasks). Handy for a quick terminal overview or piping into
