@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.0.1 — 2026-05-17
+
+Three-round refactor cleanup in `bin/` plus a humanizer and FAQ polish pass on the v4.0 announcement artifacts.
+
+## Changed
+
+- Consolidate `hv-design-rm` and `hv-plan-rm` shared removal logic into new `bin/hv-artifact-rm.sh` (`hv_artifact_rm`) — thin wrappers, behavior preserved byte-for-byte (`06c8bd6`)
+- `hv-skills-index` includes `/hv-qa` in the Review & ship line; regenerating CLAUDE.md also re-syncs a stale Maintenance line that had drifted (`038ea56`)
+- Remove dead code from `hvlib.py` — drop `registered_repo_names` (zero callers) and the legacy `TODO.md` fallback in `load_backlog_corpus` that F71 self-flagged for removal (`5dd2fce`)
+
+## Documentation
+
+Post-v4.0 announcement polish: humanizer pass on the release artifacts, README leads with the wedge framing, new FAQ entry on stacking hv-skills with Superpowers, comparison corrections (Octo URL, provider list, GSD phase enumeration), and a new `references/humanizing-prose.md` cited from `/hv-release` and `/hv-ship`.
+
+## Stats
+
+9 commits, 15 files changed, +192 −102 lines
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.0.0...v4.0.1
+
 ## v4.0.0 — 2026-05-17
 
 Twenty commands left. You know what they all do. v4.0 cuts eight commands (28 → 20) and routes each to a flag on a surviving skill. `/hv-migrate v4` rewrites v3 projects in place. KNOWLEDGE.md, DECISIONS.md, and the handoff-across-`/clear` flow are unchanged; the loop around them got smaller.
