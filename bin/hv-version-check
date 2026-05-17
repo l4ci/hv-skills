@@ -28,8 +28,8 @@ JSON=0
 export PYTHONPATH="$BIN_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
 STAMPED=$(python3 -c "
-from hvlib import load_json
-print(load_json('.hv/config.json', {}).get('hvSkills', {}).get('version', '') or '')
+from hvlib import load_config
+print(load_config().get('hvSkills', {}).get('version', '') or '')
 " 2>/dev/null || true)
 
 ROOT=$("$BIN_DIR/hv-resolve-plugin-root" --root-only)

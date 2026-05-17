@@ -17,9 +17,9 @@ stats="$("$HERE/hv-map-stats" 2>/dev/null)" || stats='{"subsystems":[]}'
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$stats" <<'PY'
 import json, sys
-from hvlib import load_json
+from hvlib import load_config
 
-cfg = load_json(".hv/config.json", {})
+cfg = load_config()
 cap = cfg.get("map", {}).get("softcap_subsystems", 20)
 
 try:

@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "entries": {
+    "Architecture::Extend an existing reviewer brief instead of dispatching a parallel pass": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-15"
+    },
+    "Build & Tooling::`git branch -d` refuses on stale remote-tracking refs": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-15"
+    },
+    "Build & Tooling::git checkout -b inherits HEAD's lead over base": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-15"
+    },
+    "Architecture::Multi-mode skill folds use prefixed step keys (R/I), not renumbering": {
+      "tier": "provisional",
+      "hits": 1,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::EnterWorktree branches from origin/main; rebase onto local main before editing": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::Worktree .hv/ is gitignored \u2014 run state helpers from main repo path": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::TODO field additions require three synchronized edits": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::hv-append is the chokepoint for derived BACKLOG fields": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::ID-based drift detection must anchor in commit-graph state": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::bg-isolation guard blocks main-thread Edits under /hv-work branch isolation": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Skill folds need quadruple-update: SKILL.md, smoke assertions, references, plugin.json": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Inline-fold drops slash-command surface; composite-fold preserves it as a flag mode": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Composite-fold deletion scope: orphan helpers + public docs are the predictable miss": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Atomic-batch helpers validate the whole batch before any write": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::Smoke sections run only inside the runner; standalone needs an env-prep wrapper": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::Generic dispatchers accumulate dead-letter keys when typed wrappers grow own parsers": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Use load_repos() for umbrella detection \u2014 never truthy-test raw repos.json": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::Smoke fixtures for dirty-tree-refusing helpers redirect stderr into $TMP_*/.hv/": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::hv-preflight opens a smoke-failure window during major-version transitions": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Architecture::Helper preamble naming convention: *-preamble.sh auto-invokes; *-locate.sh stays library": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::Bootstrap-stage helpers can't depend on hv-preamble.sh \u2014 keep the canonical exception list": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-16"
+    }
+  }
+}

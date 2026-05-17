@@ -59,3 +59,44 @@ def update_json(path, default, mutator) -> None:
     data = load_json(path, default)
     result = mutator(data)
     dump_json_atomic(path, data if result is None else result)
+
+
+def _deep_merge(base, override):
+    """Recursively merge override into base. Nested dicts merge by key;
+    scalars, lists, and type mismatches use the override value.
+    Returns a new dict — does not mutate inputs.
+    """
+    if not isinstance(base, dict) or not isinstance(override, dict):
+        return override
+    out = dict(base)
+    for k, v in override.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_config(config_path=".hv/config.json", default=None):
+    """Read project config with optional per-developer local overrides.
+
+    Reads `config_path` (default `.hv/config.json`) and deep-merges
+    `<dirname>/config.local.json` on top when present. The local file is
+    gitignored — it carries per-developer or per-machine overrides
+    (typically `autonomy.level`, model preferences) without touching the
+    shared committed config.
+
+    Both files are JSON objects. Nested keys merge recursively; scalars
+    and arrays in the local file replace the base entirely.
+
+    `default` (when both files are missing or corrupt) defaults to `{}`.
+    Never raises.
+    """
+    if default is None:
+        default = {}
+    p = Path(config_path)
+    base = load_json(p, default)
+    local = load_json(p.parent / "config.local.json", None)
+    if local is None:
+        return base
+    return _deep_merge(base, local)

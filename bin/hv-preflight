@@ -36,8 +36,8 @@ done
 #   data present (any flag value)  → silent pass (data is umbrella regardless)
 #   flag=false, data absent        → silent pass (single-repo, skip)
 FLAG_ON=$(PYTHONPATH="$SRC_BIN${PYTHONPATH:+:$PYTHONPATH}" python3 -c "
-from hvlib import load_json
-cfg = load_json('$HV/config.json', {})
+from hvlib import load_config
+cfg = load_config('$HV/config.json')
 print('1' if cfg.get('umbrella', {}).get('enabled') else '0')
 ")
 UMBRELLA_ON=$("$SRC_BIN/hv-umbrella-on")

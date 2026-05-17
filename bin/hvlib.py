@@ -13,7 +13,7 @@ from pathlib import Path
 
 # Re-exports — keep `from hvlib import X` working for callers.
 from hvlib_io import (
-    load_json, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
+    load_json, load_config, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
 )
 from hvlib_version import (
     parse_toml_version, infer_version_kind, get_version_or_die, read_version,

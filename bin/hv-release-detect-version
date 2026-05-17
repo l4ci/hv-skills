@@ -11,11 +11,11 @@ import json
 import sys
 from pathlib import Path
 
-from hvlib import detect_version_kind, get_version_or_die, infer_version_kind, load_json
+from hvlib import detect_version_kind, get_version_or_die, infer_version_kind, load_config
 
 
 # --- Step 1: check config override ---
-cfg = load_json(".hv/config.json", {})
+cfg = load_config()
 override = cfg.get("release", {}).get("versionFile")
 if override:
     p = Path(override)

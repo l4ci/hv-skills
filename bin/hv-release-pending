@@ -25,7 +25,7 @@ LAST_TAG="$LAST_TAG" COMMITS="$COMMITS" TAG_TS="$TAG_TS" PYTHONPATH="$HERE${PYTH
 import json
 import os
 import time
-from hvlib import load_json
+from hvlib import load_config
 
 last_tag = os.environ["LAST_TAG"]
 commits = int(os.environ["COMMITS"])
@@ -46,10 +46,10 @@ if not last_tag:
     raise SystemExit(0)
 
 # Read thresholds from .hv/config.json (project-relative); fall back to defaults if
-# the file is missing or malformed.
+# the file is missing or malformed. Honors .hv/config.local.json overrides.
 threshold_commits = 10
 threshold_days = 14
-cfg = load_json(".hv/config.json", {})
+cfg = load_config()
 rel = cfg.get("release", {})
 if isinstance(rel.get("nudgeAfterCommits"), int):
     threshold_commits = rel["nudgeAfterCommits"]

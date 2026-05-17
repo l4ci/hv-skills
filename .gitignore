@@ -1,5 +1,16 @@
 # ── hv backlog ──
-.hv/
+# Track .hv/ content (knowledge, decisions, backlog, milestones, designs,
+# plans, spikes, per-item detail). Only ignore the parts that are
+# machine-specific, regenerated, or per-developer local overrides.
+
+# Regenerated mirror of canonical bin/ on every /hv-init
+.hv/bin/
+# Active-work tracking (per-developer, branch-aware)
+.hv/status.json
+# Umbrella sub-repo registry (absolute paths, machine-specific)
+.hv/repos.json
+# Per-developer config overrides — deep-merged on top of config.json by load_config()
+.hv/config.local.json
 
 # Python bytecode (hvlib.py)
 __pycache__/

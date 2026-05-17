@@ -20,9 +20,9 @@ if [ -n "$UMBRELLA" ]; then
   CONFIGURED=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$UMBRELLA" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import load_json
+from hvlib import load_config
 cfg_path = Path(sys.argv[1]) / ".hv" / "config.json"
-cfg = load_json(cfg_path, {})
+cfg = load_config(cfg_path)
 print(cfg.get("git", {}).get("baseBranch", ""))
 PY
   )
