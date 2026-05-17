@@ -207,6 +207,8 @@ Prints `## Summary` and `## Items resolved`. Capture the output, then append a `
 
 If a scope area is unclear, pick the most visible behavior change. Don't pad with generic checks.
 
+**Run the self-audit before Step 5.** The PR body lands on GitHub/GitLab and stays in the PR history; the `## Summary` text is the first thing a reviewer reads. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to the assembled body silently — show the post-audit draft, not the pre-audit one.
+
 ## Step 5 — Pick Strategy
 
 Check `work.mergeStrategy` in `.hv/config.json`.
@@ -685,6 +687,8 @@ Draft a concrete before/after fragment per page using a simple unified-diff-shap
 ```
 
 Drafts should reference real file/section anchors (e.g., the H2 heading the edit lands under). No hallucinated content; if no concrete edit can be drafted, mark the entry "*needs prose — author yourself*" and skip it from the apply set.
+
+**Run the self-audit before Step D-A5 displays the drafts.** Doc-page edits ship to `<docs.path>/` and are the project's public surface. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to every `+` line in the draft fragments silently — show the post-audit drafts, not the pre-audit ones. The audit applies to *added* prose only; `-` lines are existing content and stay untouched.
 
 ### Step D-A5 — Approval Gate
 

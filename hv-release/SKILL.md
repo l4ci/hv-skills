@@ -222,6 +222,8 @@ Append `**Full changelog:** <compare-url>` to the notes (or omit if no prev tag 
 
 Prepend a model-written one-line summary scoped to the top 2-3 themes from the buckets. This summary also becomes the release title suffix in Step 13.
 
+**Run the self-audit before Step 7 displays the draft.** Compact bucket summaries, the prepended one-line summary, and any other model-written prose in the notes are user-facing artifacts that ship to GitHub/GitLab and live in CHANGELOG.md indefinitely. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to the assembled notes silently — the user sees the post-audit draft, not the pre-audit one.
+
 ## Step 7 — Review Notes
 
 Display the full notes draft to the user, then use `AskUserQuestion`:
