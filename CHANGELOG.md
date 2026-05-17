@@ -1,5 +1,40 @@
 # Changelog
 
+## v4.1.0 — 2026-05-17
+
+`.hv/` is now tracked by default — backlog, knowledge, decisions, plans, designs, milestones, and per-item detail travel with the repo from the first commit. Six paths stay gitignored: `.hv/bin/` (regenerated mirror), `.hv/status.json` and `.hv/repos.json` (per-developer runtime), `.hv/config.local.json` (per-developer overrides, deep-merged on top of `config.json` by `load_config()`), `.hv/handoff/` (per-developer scratch), and `.hv/qa-runs/` (bulky artifacts).
+
+This flips the v4.0 default. To keep the whole `.hv/` private — solo work, or experimentation that isn't ready to share — add a blanket `.hv/` line to `.gitignore` before your first commit. Projects upgrading from v4.0.x have the legacy line stripped automatically on the next `/hv-init` so the new per-file pattern takes effect.
+
+## New
+
+- **`.hv/config.local.json` — per-developer config overrides.** New `load_config()` helper in `bin/hvlib_io.py` reads `.hv/config.json` and deep-merges `.hv/config.local.json` on top when present. Drop a JSON file at `.hv/config.local.json` to override `autonomy.level`, model preferences, or any other setting for your machine without committing it to the team default. Migrated six Python callers (`hv-release-pending`, `hv-release-detect-version`, `hv-version-check`, `hv-map-cap-check`, `hv-preflight`, `hv-base-branch`); shell-side reads (jq in `hv-issues-label`, raw Path in `hv-knowledge-hit`) keep their current behavior pending a follow-up.
+- **`bin/hv-bootstrap` writes the new per-file gitignore pattern** under a `# ── hv-skills ──` header. Legacy blanket `.hv/` lines in `.gitignore` are migrated off automatically.
+
+## Changed
+
+- **`bin/hv-skills-index` heredoc rewritten** to describe the new partial-tracking model. The heredoc ships into every consumer's `CLAUDE.md`, so existing projects see the updated framing the next time their managed block is regenerated.
+- **`hv-work` Step 9.5 now commits backlog/plan tombstones** before merge/PR. Under blanket-ignore these writes were invisible; under the partial-tracking model they leave a dirty tree, so the step explicitly closes the loop with a `chore: close <IDs>` commit.
+- **20+ docs and SKILL.md files** updated to reflect "shared by default" framing — `README.md`, `docs/reference/hv-folder.md` (gains a `config.local.json` section), `docs/faq.md`, `docs/usage/{configuration,decisions,review-and-ship,undo}.md`, `docs/walkthroughs/{greenfield-from-brief,brownfield-existing-project}.md`, and `references/persistence-skills.md`.
+
+## Fixed
+
+- **`/hv-init` install glob now copies all hvlib modules.** The v4.0 split of `hvlib.py` into `hvlib_io.py` and `hvlib_version.py` left the install pattern matching only `hvlib.py`; `from hvlib import …` exploded on `from hvlib_io import …` for any project initialized after the split. Glob is now `hvlib*.py` in `hv-init/SKILL.md`, `test/lib.sh`, and three section fixtures. 38_init_mirror gained explicit assertions for the split modules.
+- **`hv-summary`, `hv-vision-index`, `hv-vision-status` sourced `hv-types.sh` via a relative path AFTER `hv-preamble.sh` cd'd to the umbrella root** — broke whenever invoked from a sub-cwd. Switched to the absolute `$HERE` the preamble exports.
+- **`hv-pause` and `hv-work` SKILL.md now invoke `hv-loop-stamp clear`** on their terminal paths. F32 wiring was promised in prose but the explicit invocations had never landed; smoke caught the orphaned helper.
+- **15 tier S/A/B SKILL.md files updated `TaskCreate` → `TaskCreate(…)`** to match the F37 progress-checklist convention test.
+- **`README.md` gained the `/hv-config <key>` positional-shortcut mention** the F26 positional-args test expected.
+
+## Documentation
+
+- Smoke runner pins `HV_INSTALL_ROOT` and per-section cwd, plus extends the leak guard to snap+restore tracked `.hv/` files (not just `CLAUDE.md`). Section-level test drift across 10_update, 16_umbrella_s02, 21_loop, 31_backlog_migration, 33_undo brought back in line with current product behavior.
+
+## Stats
+
+2 commits, 89 files changed, +1914 −134 lines
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.0.1...v4.1.0
+
 ## v4.0.1 — 2026-05-17
 
 Three-round refactor cleanup in `bin/` plus a humanizer and FAQ polish pass on the v4.0 announcement artifacts.
