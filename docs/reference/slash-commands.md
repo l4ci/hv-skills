@@ -5,7 +5,7 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | Skill | Description |
 |-------|-------------|
 | `/hv-init` | Initialize `.hv/` with `BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
-| `/hv-migrate v4` | One-shot codemod for v3 → v4 upgrades — rewrites cut-command references across `.hv/` and project `CLAUDE.md`, migrates `.hv/CONTEXT.md` terms into `KNOWLEDGE.md` (`## Glossary`), removes stale `bin/hv-context-*`. Dry-run default; `--apply` writes; idempotent; refuses umbrella mode (F21) |
+| `/hv-migrate v4` | One-shot codemod for v3 → v4 upgrades. Rewrites cut-command references across `.hv/` and the project `CLAUDE.md`, migrates `.hv/CONTEXT.md` terms into `KNOWLEDGE.md` (`## Glossary`), removes stale `bin/hv-context-*`. Dry-run default; `--apply` writes; idempotent; refuses umbrella mode (F21) |
 | `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
 | `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
@@ -66,7 +66,7 @@ Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, group
 
 ## /hv-migrate
 
-One-shot codemod for v3 → v4 upgrades, versioned via the required `v4` arg. Rewrites references to 8 commands cut by M01 (`/hv-c`, `/hv-assume`, `/hv-rm`, `/hv-undo`, `/hv-context`, `/hv-docs`, `/hv-issues`, `/hv-map`) across `BACKLOG.md`, plans, designs, handoffs, qa, milestones, `KNOWLEDGE.md`, `DECISIONS.md`, and the project `CLAUDE.md`. Migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (`## Glossary`) and removes stale `bin/hv-context-*` files. `--dry-run` is the default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Backs up every touched file to `.hv/migrate-backup/<timestamp>/` before any write. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, umbrella projects (F21), or when run inside an existing backup directory.
+One-shot codemod for v3 → v4 upgrades, versioned via the required `v4` arg. Rewrites references to 8 commands cut by M01 (`/hv-c`, `/hv-assume`, `/hv-rm`, `/hv-undo`, `/hv-context`, `/hv-docs`, `/hv-issues`, `/hv-map`) across `BACKLOG.md`, plans, designs, handoffs, qa, milestones, `KNOWLEDGE.md`, `DECISIONS.md`, and the project `CLAUDE.md`. Migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (`## Glossary`) and removes stale `bin/hv-context-*` files. `--dry-run` is the default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent: a clean second `--apply` rewrites zero files. Backs up every touched file to `.hv/migrate-backup/<timestamp>/` before any write. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, umbrella projects (F21), or when run inside an existing backup directory.
 
 ## /hv-next
 
