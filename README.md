@@ -4,7 +4,7 @@
 
 # hv-skills
 
-**A workflow for Claude Code that plans before coding, makes one commit per task, and keeps a project knowledge layer that survives `/clear`.**
+**A project memory layer for Claude Code: KNOWLEDGE.md, DECISIONS.md, and a handoff note that survives `/clear`. With a loop around them that captures, works, reviews, and ships.**
 
 [![Release](https://img.shields.io/github/v/release/l4ci/hv-skills?color=blue&sort=semver)](https://github.com/l4ci/hv-skills/releases)
 [![License](https://img.shields.io/github/license/l4ci/hv-skills?color=green)](LICENSE)
@@ -18,17 +18,17 @@
 
 ---
 
-## The five lanes
+## The wedge and the loop
+
+💾 **Persist (the wedge).** This is why hv-skills exists. Three files outlive every `/clear`. `KNOWLEDGE.md` carries durable learnings (written by `/hv-learn`, verified before they land, auto-consulted by future `/hv-work` / `/hv-debug` / `/hv-review` runs). `DECISIONS.md` carries hard-boundary commitments (captured by `/hv-decide` with explicit forbids and permits). A handoff note carries the live hypothesis: `/hv-pause` writes current state mid-investigation (current hypothesis, next step, files mid-edit) so the next `/hv-next` after `/clear` picks up exactly where you left off. `/hv-learn --term <name>` lands domain terms under a pinned `## Glossary` topic in `KNOWLEDGE.md`. The project map (hand-authored `.hv/map/<name>.md` files) is bumped by cycle skills post-cycle. `/hv-ship --docs` keeps public docs in sync with the code.
 
 📥 **Capture.** `/hv-capture` is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-go` collapses capture and execute into a single pass for hot-path fixes. `/hv-capture --from-github` / `--from-gitlab` syncs open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-capture --remove <ID>` is the local inverse: it strips a captured item and cleans up its dependencies behind a dry-run preview and confirmation gate.
 
 🧭 **Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-work --preview <ID>` previews the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
 
-⚡ **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce → hypothesize → verify → fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction. `/hv-pause` writes a handoff note when the context window is filling, so a fresh `/hv-next` session picks up cleanly.
+⚡ **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce → hypothesize → verify → fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction.
 
 🚢 **Ship.** `/hv-review` reads the branch diff, resolved item IDs, and matching `KNOWLEDGE.md` topics across a two-stage pass (spec compliance → code quality) and returns `PASS` / `CONCERNS` / `FAIL`. `/hv-qa` answers the orthogonal question, *"does the product actually work?"*, by executing per-target runners (Playwright, smoke, lighthouse, axe, ZAP, contract tests) from `.hv/qa/<target>.md`. `/hv-ship` builds an ID-linked PR body or direct-merges based on configured strategy; opt-in gates layer in a fresh-eyes second-opinion review and a product QA run before integration. `/hv-ship --undo` rolls back the last direct-merge cycle in one operation, restoring TODO entries.
-
-💾 **Persist.** `/hv-learn` writes durable session learnings to `KNOWLEDGE.md`, verified before they land. The same skill captures domain terms via `/hv-learn --term <name>`, landing them as nested-bullet entries under the pinned `## Glossary` topic of `KNOWLEDGE.md`. `/hv-decide` captures hard-boundary commitments to `DECISIONS.md` with explicit forbids and permits. The project map (`.hv/map/<name>.md` files describing subsystems) is hand-authored; cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle on matched subsystems. `/hv-ship --docs` keeps the public docs in sync with the code (inline at ship time or via the manual `--docs` flag).
 
 > **Upgrading from v3?** Run `/hv-migrate v4` after install. See the [v4.0 announcement](docs/announcements/v4-0.md).
 
@@ -92,7 +92,7 @@ Octo orchestrates up to eight AI providers (Codex, Gemini, Copilot, Qwen, Ollama
 
 **Why hv-skills over a TODO.md and good intentions?**
 
-Most workflows start that way and most stay there. Three things tend to drift, and hv-skills addresses each. (1) Commits stop being atomic: one PR ends up touching six unrelated things. (2) Knowledge stops accumulating: you re-discover the same gotcha three sessions in a row because nothing reads it back. (3) Sessions don't survive `/clear`: you lose the live hypothesis the moment you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, and `/hv-pause` / `/hv-next` carry intent across context resets. If none of those bite you in practice, stock Claude Code is fine. If they do, that's the gap hv-skills fills.
+Most workflows start that way and most stay there. Three things tend to drift, and hv-skills addresses each. (1) Knowledge stops accumulating: you re-discover the same gotcha three sessions in a row because nothing reads it back. (2) Sessions don't survive `/clear`: you lose the live hypothesis the moment you step away. (3) Commits stop being atomic: one PR ends up touching six unrelated things. `/hv-learn` writes durable gotchas that future runs auto-consult, `/hv-pause` / `/hv-next` carry intent across context resets, and `/hv-work` enforces atomic per-task commits. If none of those bite you in practice, stock Claude Code is fine. If they do, that's the gap hv-skills fills.
 
 ## Testing
 
