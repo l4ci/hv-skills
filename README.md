@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/hv-skills_logo.png" alt="hv-skills logo" width="160" />
+<img src="docs/hv-skills_logo.png" alt="hv-skills logo" width="80" />
 
 # hv-skills
 
