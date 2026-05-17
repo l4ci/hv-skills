@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Audit candidate capture titles against repo state — surface evidence that
+# items may already be shipped under different IDs. Cheap heuristics only:
+# distinctive-token grep against `git log` subjects + filesystem path checks.
+# Accepts titles as positional args (one title per arg).
+# Lookup helper (tri-state): exits 0 when nothing looks shipped, exits 2 when
+# at least one title has plausible ship evidence (stdout carries the report),
+# exits 1 on usage errors. The skill caller decides whether to block or warn.
+# Usage: hv-capture-audit <title> [<title>...]
+set -euo pipefail
+# Bootstrap helper: operates against cwd's git repo (whatever the caller cd'd
+# into). Does NOT source hv-preamble.sh because the audit must follow the
+# caller's cwd — in umbrella mode the skill cd's into the target sub-repo
+# before invoking, so the audit should grep that sub-repo's commits, not
+# walk up to the umbrella's `.hv/` parent.
+
+python3 - "$@" <<'PY'
+import os
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+STOPWORDS = set("""
+the a an and or but in on at to for of with by from into through during before after
+above below between against is are was were be been being have has had do does did will
+would should could may might can must this that these those then than when where why how
+all any both each few more most other some such no not only own same so too very just now
+add fix update remove change support allow enable disable new old via use using used
+should would could
+""".split())
+
+TOKEN_RE = re.compile(r"`([^`]+)`|([A-Za-z][A-Za-z0-9_./-]{2,})")
+
+
+def repo_root():
+    try:
+        return Path(subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True, stderr=subprocess.DEVNULL,
+        ).strip())
+    except subprocess.CalledProcessError:
+        return Path(os.getcwd())
+
+
+def extract_tokens(title):
+    distinctive = []
+    common = []
+    for m in TOKEN_RE.finditer(title):
+        tok = m.group(1) if m.group(1) else m.group(2)
+        low = tok.lower()
+        if low in STOPWORDS:
+            continue
+        is_quoted = bool(m.group(1))
+        has_special = any(c in tok for c in "-_/.")
+        if is_quoted or has_special:
+            distinctive.append(tok)
+        elif len(tok) >= 4:
+            common.append(low)
+    seen_d = set()
+    distinctive = [t for t in distinctive if not (t in seen_d or seen_d.add(t))]
+    seen_c = set()
+    common = [t for t in common if not (t in seen_c or seen_c.add(t))]
+    return distinctive, common
+
+
+def grep_commits(token, limit=10):
+    try:
+        out = subprocess.check_output(
+            ["git", "log", "--oneline", f"--grep={token}", "-i", f"-{limit}"],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError:
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def path_exists(token, root):
+    p = token.strip("`").lstrip("/")
+    if not ("/" in p or "." in p):
+        return None
+    if " " in p:
+        return None
+    target = root / p
+    if target.exists():
+        return str(target.relative_to(root))
+    return None
+
+
+def audit_title(title, root):
+    distinctive, common = extract_tokens(title)
+    commits = {}
+    paths = []
+    for tok in distinctive:
+        hit = path_exists(tok, root)
+        if hit:
+            paths.append((tok, hit))
+    # Search commits for every non-stopword token. Distinctive tokens
+    # weight matches more, but a commit hit by ≥2 common tokens is still
+    # plausible evidence — pure-prose titles ("Implement Driver for postgres
+    # backend") need that path because they have no distinctive tokens.
+    for tok in distinctive + common:
+        for line in grep_commits(tok):
+            sha = line.split(maxsplit=1)[0]
+            entry = commits.setdefault(sha, {"subject": line, "tokens": []})
+            entry["tokens"].append(tok)
+    strong, medium = [], []
+    for sha, info in commits.items():
+        uniq = list(dict.fromkeys(info["tokens"]))
+        d_hits = [t for t in uniq if t in distinctive]
+        # STRONG: ≥3 unique token hits, OR ≥2 distinctive hits.
+        # MEDIUM: ≥2 unique hits with at least one distinctive, OR ≥2 common-only hits.
+        if len(uniq) >= 3 or len(d_hits) >= 2:
+            strong.append({"hash": sha, "subject": info["subject"], "tokens": uniq})
+        elif len(uniq) >= 2:
+            medium.append({"hash": sha, "subject": info["subject"], "tokens": uniq})
+    return {
+        "title": title,
+        "distinctive": distinctive,
+        "strong": strong[:3],
+        "medium": medium[:3],
+        "paths": paths,
+    }
+
+
+def main():
+    titles = [a for a in sys.argv[1:] if a.strip()]
+    if not titles:
+        print("usage: hv-capture-audit <title> [<title>...]", file=sys.stderr)
+        sys.exit(1)
+    root = repo_root()
+    any_hit = False
+    for r in (audit_title(t, root) for t in titles):
+        hits = r["strong"] + r["medium"] + r["paths"]
+        if not hits:
+            continue
+        any_hit = True
+        print(f"=== {r['title']} ===")
+        for h in r["strong"]:
+            print(f"  [STRONG] {h['subject']}  (tokens: {', '.join(h['tokens'])})")
+        for h in r["medium"]:
+            print(f"  [MEDIUM] {h['subject']}  (tokens: {', '.join(h['tokens'])})")
+        for tok, hit in r["paths"]:
+            print(f"  [PATH]   {tok} → {hit}")
+        print()
+    sys.exit(2 if any_hit else 0)
+
+
+if __name__ == "__main__":
+    main()
+PY

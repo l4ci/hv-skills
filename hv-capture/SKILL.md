@@ -32,10 +32,11 @@ Phases differ by mode (see Step 1.5):
 **Capture mode (default):**
 
 1. *Mode / dispatch* — single brain-dump or per-item parsing path resolved (Step 2)
-2. *Classify* — type (bug / feature / task), priority, size assigned (Step 3)
-3. *Dedupe* — existing TODO entries scanned for overlap (Step 4)
-4. *Append* — entries written to `BACKLOG.md` with milestone + repo tags (Steps 5–6)
-5. *Report* — compact summary printed (Step 7)
+2. *Audit code state* — when capturing from a milestone spec, surface candidates that look shipped (Step 2.5)
+3. *Classify* — type (bug / feature / task), priority, size assigned (Step 3)
+4. *Dedupe* — existing TODO entries scanned for overlap (Step 4)
+5. *Append* — entries written to `BACKLOG.md` with milestone + repo tags (Steps 5–6)
+6. *Report* — compact summary printed (Step 7)
 
 **Remove mode (`--remove`):**
 
@@ -85,6 +86,57 @@ The user will provide a keyword, short phrase, or longer description — possibl
 | `## Bugs` | Broken behavior — something that worked and stopped, or doesn't work as expected |
 | `## Features` | New or enhanced behavior — something that doesn't exist yet but should |
 | `## Tasks` | Chores and maintenance — refactoring, dependency updates, docs, CI, cleanup |
+
+## Step 2.5 — Audit Against Code State (milestone-spec capture only)
+
+Fires only when the input is a capture *from a milestone spec* — i.e., the user's text references one of:
+
+- An `M<NN>` tag (e.g., *"capture items from M04"*, *"seed M01 from the milestone spec"*)
+- A path to a milestone file (`.hv/milestones/M04.md`, `milestones/M01.md`)
+
+If neither pattern is present, skip this step entirely — ordinary brain-dump capture doesn't need the audit. Detection regexes: `M\d{1,2}\b` for the tag, `milestones/M\d{1,2}\.md` for the path.
+
+**Why this step exists.** Milestone specs drift behind code state. A spec written months ago enumerates acceptance criteria that have since shipped under different IDs. Capturing those criteria as fresh items creates duplicate work and — under `autonomy.level: loop` — silently dispatches `/hv-work` against already-done work. The audit catches the drift before items land in the backlog. (Captured from real-session F27 incident: 11 captures from a stale milestone spec, 10 already shipped under different IDs, loop mode dispatched on one.)
+
+**Run the audit.** Pass each parsed title (Step 2's output) as a positional arg:
+
+```bash
+.hv/bin/hv-capture-audit "<title 1>" "<title 2>" [...]
+```
+
+Exit codes:
+
+- **0** — no ship evidence for any title. Continue to Step 3 silently.
+- **2** — at least one title has plausible ship evidence; stdout carries the report (one `===` block per matching title, with `[STRONG]` / `[MEDIUM]` / `[PATH]` lines).
+- **1** — usage error (no titles supplied). Surface and stop.
+
+**On exit 2, surface the audit report to the user and ask per matching title.**
+
+Print the helper's stdout verbatim first, then route by `autonomy.level`:
+
+- **`"loop"`** — auto-skip every flagged title. Print one line per skipped title: *"Skipped `<title>` — ship evidence in `<top-match-hash>`."* Continue to Step 3 with the surviving titles. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" — invisible captures of already-shipped work is exactly what the loop must NOT do.
+- **`"off"` / `"auto"`** — use `AskUserQuestion` to resolve each flagged title. Batch up to 4 flagged titles into one call; if more, present the rest in a second call after the first resolves.
+
+For each flagged title, build one question:
+
+- **Header:** `"Item N"` (with N = 1-based index within the flagged batch)
+- **Question:** *"`<short-title>` looks shipped — `<top-match-hash>` `<top-match-subject>`. What now?"*
+- **Options** (single-select):
+  1. *"Skip this item (Recommended)"* — drop the title from this capture run; don't append.
+  2. *"Capture anyway"* — the user has reviewed the matches and confirms this item is genuinely distinct (e.g., the prior commit was an incomplete first pass). Proceed with appending.
+  3. *"Stop the whole capture"* — abort the entire capture. The user reconciles the milestone spec via `/hv-vision` or rewrites it by hand before retrying.
+
+Route each resolution:
+
+| Answer | Action |
+|--------|--------|
+| Skip (Recommended) | Remove the title from the survivors list; continue with the rest |
+| Capture anyway | Keep the title in the survivors list; continue |
+| Stop the whole capture | Exit `/hv-capture` immediately, print *"Capture aborted — reconcile the milestone spec before retrying."*, do not write anything to BACKLOG.md |
+
+Plain-text fallback: *"Skip, capture anyway, or stop?"* per flagged item.
+
+**Carry the survivors list into Step 3 and onward.** Filtered titles never reach `## Bugs` / `## Features` / `## Tasks`.
 
 ## Step 3 — Gather Context
 
