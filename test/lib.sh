@@ -24,8 +24,8 @@ fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 # and .hv/bin/ already mkdir'd. Two-step delete-then-copy is intentional; matches
 # production semantics so smoke catches rename-regressions.
 install_helpers() {
-  find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib.py' \) -type f -delete
-  cp "$BIN"/hv-* "$BIN"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+  find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib*.py' \) -type f -delete
+  cp "$BIN"/hv-* "$BIN"/hvlib*.py .hv/bin/ && chmod +x .hv/bin/hv-*
 }
 
 # F62 — preamble convention scan. Reads every test/sections/*.sh and fails

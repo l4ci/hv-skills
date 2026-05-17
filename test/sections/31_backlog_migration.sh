@@ -27,22 +27,26 @@ grep -q "^# TODO$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "content was not preserved
 [ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "BACKLOG.md missing after idempotent second run"
 pass "hv-bootstrap renames legacy TODO.md → BACKLOG.md, idempotent"
 
-# ── (c) Reader fallback — load_backlog_corpus reads legacy TODO.md when BACKLOG.md absent ──
+# ── (c) Reader contract — load_backlog_corpus reads BACKLOG.md only ──
+# The legacy TODO.md fallback was removed in v4.1 (F71 self-flagged it for
+# removal once the rename shipped in v4.0). Preflight gates on BACKLOG.md
+# presence — the fallback was unreachable in practice. Reader test now
+# verifies the corpus reflects what's at BACKLOG.md, not the legacy path.
 rm -rf "$BOOT_DIR"
 mkdir -p "$BOOT_DIR/.hv"
-cat > "$BOOT_DIR/.hv/TODO.md" <<'EOF'
-# TODO
+cat > "$BOOT_DIR/.hv/BACKLOG.md" <<'EOF'
+# BACKLOG
 
 ## Bugs
 
-- **[B99] [P1] Legacy test bug.** Body.
+- **[B99] [P1] Reader-contract test bug.** Body.
 EOF
 PYTHONPATH="$BIN" python3 -c "
 from hvlib import load_backlog_corpus
 corpus = load_backlog_corpus('$BOOT_DIR')
-assert 'B99' in corpus, f'load_backlog_corpus did not include legacy TODO.md content; corpus={corpus!r}'
-" || fail "load_backlog_corpus did not read legacy TODO.md when BACKLOG.md absent"
-pass "load_backlog_corpus reads legacy TODO.md when BACKLOG.md absent"
+assert 'B99' in corpus, f'load_backlog_corpus did not include BACKLOG.md content; corpus={corpus!r}'
+" || fail "load_backlog_corpus did not read BACKLOG.md"
+pass "load_backlog_corpus reads BACKLOG.md (legacy TODO.md fallback removed in v4.1)"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 rm -rf "$BOOT_DIR"

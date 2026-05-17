@@ -60,7 +60,7 @@ Then verify:
        2. `"Abort"` — stop without writing anything
      - Plain-text fallback: *"Push and continue, or abort?"*
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -74,7 +74,7 @@ Phases:
 
 ## Step 1.5 — Project Checklist
 
-Per-project release steps that aren't (and shouldn't be) hardcoded into the skill — sibling version files, lockfiles, docs version refs, infra rollouts, anything project-specific. Lives in `release.checklistPath` (default `.hv/RELEASE.md`). Gitignored — local to each contributor.
+Per-project release steps that aren't (and shouldn't be) hardcoded into the skill — sibling version files, lockfiles, docs version refs, infra rollouts, anything project-specific. Lives in `release.checklistPath` (default `.hv/RELEASE.md`). Tracked by default — shared with the team like any other source file.
 
 Skip the whole step in `--dry-run` mode (print the parsed items and `DRY RUN — checklist walk skipped.` instead).
 

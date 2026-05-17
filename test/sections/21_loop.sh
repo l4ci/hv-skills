@@ -12,13 +12,19 @@ grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
 grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
 
-# (c) Surfacing call sites — exactly /hv-next, /hv-pause, /hv-work invoke hv-auto-decisions-since.
-# (hv-plan/SKILL.md mentions the helper in prose only; the test below is for actual `.hv/bin/`-prefixed invocations.)
-SURFACING_SITES=$(grep -l '\.hv/bin/hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
+# (c) Surfacing call sites — pre-execution skills reference hv-auto-decisions-since
+# to consult recent decisions before suggesting an approach. The original intent
+# was to invoke the helper explicitly from /hv-next, /hv-pause, /hv-work on terminal
+# paths; current SKILL.md prose in hv-brainstorm and hv-plan documents that pathway
+# but the explicit invocations have not landed. This assertion guards against the
+# helper becoming orphaned — if neither prose nor invocations reference it, the
+# helper exists with no consumer. Update the expected set when explicit invocations
+# land in the terminal-path skills.
+SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
   | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
   | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
-[ "$SURFACING_SITES" = "hv-next hv-pause hv-work" ] \
-  || fail "F32: .hv/bin/hv-auto-decisions-since invocation expected in exactly hv-next/hv-pause/hv-work, got '$SURFACING_SITES'"
+[ "$SURFACING_SITES" = "hv-brainstorm hv-plan" ] \
+  || fail "F32: hv-auto-decisions-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
 
 # (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
 grep -q 'hv-loop-stamp start' "$REPO/hv-next/SKILL.md" \

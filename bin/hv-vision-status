@@ -5,7 +5,7 @@
 # Usage: hv-vision-status <ID> <planned|active|shipped|archived>
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
+. "$HERE/hv-types.sh"
 ID="${1:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
 NEW_STATUS="${2:?usage: hv-vision-status <ID> <planned|active|shipped|archived>}"
 if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then

@@ -148,7 +148,13 @@ Don't narrate the sweep unless it happened; silent pass-through is the common ca
 
 Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the guard message.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+After surfacing, clear the loop timestamp so the next loop session starts fresh:
+
+```bash
+.hv/bin/hv-loop-stamp clear   # no-op when loopStartedAt is already unset
+```
+
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -464,7 +470,16 @@ Skip silently when:
 
 **Slice plans (`M01-S01.md`) stay.** A slice covers multiple items; completing one item does not consume the slice plan. Slice cleanup is currently manual via `.hv/bin/hv-plan-rm <key>` once the user is done with the slice.
 
-`.hv/plans/` is gitignored, so the removal is a local-only file operation — no commit, no merge.
+**Commit the close-the-loop changes before merge/PR.** `.hv/BACKLOG.md` (updated by `hv-complete` in Step 9) and `.hv/plans/<key>.md` removals (above) are tracked under the partial-ignore model, so they leave a dirty tree. Step 10's merge/PR refuses on a dirty tree (or silently loses the diffs across the checkout), so stage and commit them here as one "close the loop" commit:
+
+```bash
+if ! git diff --quiet -- .hv/ 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard .hv/)" ]; then
+  git add .hv/
+  git commit -m "chore: close <IDs> — backlog + plan tombstones"
+fi
+```
+
+Single commit per cycle keeps the loop atomic: the implementation commits ship the code; this final commit closes the backlog and removes consumed plans in one diff that mirrors the cycle's scope.
 
 ## Step 10 — Merge or PR
 

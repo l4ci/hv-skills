@@ -5,7 +5,10 @@
 # Usage: hv-summary
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
+# hv-preamble.sh exports HERE (absolute path) AND cd's to umbrella root, so
+# subsequent relative dirname-BASH_SOURCE resolution breaks. Use $HERE for
+# any further sibling sources.
+. "$HERE/hv-types.sh"
 MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys

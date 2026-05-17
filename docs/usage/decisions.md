@@ -54,9 +54,9 @@ Both flags only seed `Rule` and `Why`. You still articulate `Forbids` and `Permi
 
 [`/hv-work`](running-work.md) and [`/hv-debug`](debugging.md) end with an optional nudge: *"Did this cycle codify any boundaries? Run `/hv-decide` to lock them in."* The nudge fires regardless of [`autonomy.level`](autonomy.md), since decisions are your call.
 
-## File location and gitignore
+## File location
 
-`.hv/DECISIONS.md` lives under `.hv/`, which is gitignored by default (consistent with the rest of the local backlog). If your team wants shared decisions, edit `.gitignore` to include `!.hv/DECISIONS.md`.
+`.hv/DECISIONS.md` is tracked by default, so decisions travel with the repo alongside `KNOWLEDGE.md` and `BACKLOG.md`. To keep decisions private, add `.hv/DECISIONS.md` to `.gitignore`.
 
 ## See also
 

@@ -51,7 +51,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 The `hv-guard-clean` call moved from this step into Step 1.5's branches — fanout sub-agents run their own guard-cleans against their target trees, so the umbrella-level guard isn't needed (and would falsely fail when the umbrella is not a git repo).
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

@@ -37,8 +37,8 @@ echo "not a helper" > .hv/bin/README.txt
 # the resolved plugin root; in the smoke we point at the repo's canonical
 # bin/ via $BIN.
 SRC="$BIN"
-find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib.py' \) -type f -delete
-cp "$SRC"/hv-* "$SRC"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib*.py' \) -type f -delete
+cp "$SRC"/hv-* "$SRC"/hvlib*.py .hv/bin/ && chmod +x .hv/bin/hv-*
 
 # Assert: stale helpers stripped.
 [ ! -f .hv/bin/hv-context-add ] || fail "stale hv-context-add not removed by mirror"
@@ -49,6 +49,14 @@ pass "F22 mirror — stale hv-* helpers stripped before copy"
 [ -f .hv/bin/hvlib.py ] || fail "hvlib.py missing after mirror"
 grep -q '# old hvlib' .hv/bin/hvlib.py && fail "stale hvlib.py was not replaced by canonical copy"
 pass "F22 mirror — stale hvlib.py replaced by canonical copy"
+
+# Assert: split-out hvlib modules land too. hvlib.py imports from hvlib_io and
+# hvlib_version at import time, so all three must travel together — the glob
+# `hvlib*.py` catches them. Regression guard against the v4.0 split-bug where
+# only hvlib.py was copied and `import hvlib` exploded on `from hvlib_io import …`.
+[ -f .hv/bin/hvlib_io.py ] || fail "hvlib_io.py missing after mirror (the hvlib* glob must catch split modules)"
+[ -f .hv/bin/hvlib_version.py ] || fail "hvlib_version.py missing after mirror (the hvlib* glob must catch split modules)"
+pass "F22 mirror — split hvlib_io.py + hvlib_version.py travel with hvlib.py"
 
 # Assert: canonical helpers landed and are executable.
 [ -x .hv/bin/hv-bootstrap ] || fail "canonical hv-bootstrap missing or not executable post-mirror"
@@ -66,8 +74,8 @@ pass "F22 mirror — non-hv- files outside filter survive"
 pass "F22 mirror — subdirectories outside filter survive"
 
 # Assert: re-running the mirror is idempotent — no error, no churn.
-find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib.py' \) -type f -delete
-cp "$SRC"/hv-* "$SRC"/hvlib.py .hv/bin/ && chmod +x .hv/bin/hv-*
+find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib*.py' \) -type f -delete
+cp "$SRC"/hv-* "$SRC"/hvlib*.py .hv/bin/ && chmod +x .hv/bin/hv-*
 [ -x .hv/bin/hv-bootstrap ] || fail "idempotent re-mirror dropped canonical helpers"
 pass "F22 mirror — idempotent re-run leaves canonical bin/ intact"
 

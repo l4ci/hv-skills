@@ -70,7 +70,7 @@ Confirm a feature branch is checked out:
 
 Exit 1 (with the helper's stderr message naming the base branch) means the user is on `main`/`master`/`trunk` (or the configured base) — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -384,7 +384,7 @@ Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via
 
 The /hv-ship banner already printed at Step 0; Undo Mode runs from the same skill invocation.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -519,7 +519,7 @@ The config write uses the shared helper:
 .hv/bin/hv-config-set docs.afterWork true
 ```
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

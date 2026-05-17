@@ -1,7 +1,7 @@
 echo "hv-refactor-targets"
 mkdir rt-test && cd rt-test
 mkdir -p .hv/bin
-cp "$BIN/hvlib.py" .hv/bin/
+cp "$BIN"/hvlib*.py .hv/bin/
 cp "$BIN/hv-refactor-targets" .hv/bin/
 chmod +x .hv/bin/hv-refactor-targets
 

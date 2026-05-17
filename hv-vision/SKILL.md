@@ -29,7 +29,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Determine the mode silently via `.hv/bin/hv-vision-list`: empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 

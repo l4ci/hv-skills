@@ -124,10 +124,36 @@ PY
 }
 EOF
 
+# Partial-tracking gitignore: most of .hv/ travels with the repo so team
+# members share backlog/knowledge/decisions/plans/designs context. Only
+# machine-specific or regenerated paths are ignored.
+IGNORE_LINES=(
+  '# ── hv-skills ──'
+  '.hv/bin/'
+  '.hv/status.json'
+  '.hv/repos.json'
+  '.hv/config.local.json'
+  '.hv/handoff/'
+  '.hv/qa-runs/'
+)
 if [ -f .gitignore ]; then
-  grep -qxF '.hv/' .gitignore 2>/dev/null || printf '\n# ── hv backlog ──\n.hv/\n' >> .gitignore
+  missing=0
+  for line in "${IGNORE_LINES[@]:1}"; do
+    grep -qxF "$line" .gitignore 2>/dev/null || missing=1
+  done
+  if [ "$missing" = 1 ]; then
+    printf '\n' >> .gitignore
+    for line in "${IGNORE_LINES[@]}"; do printf '%s\n' "$line" >> .gitignore; done
+  fi
+  # Legacy migration: a project upgrading from v4.0.x or earlier may carry a
+  # blanket `.hv/` line. Strip it so the new per-file pattern takes effect
+  # (the per-file rules above are stricter and produce the intended subset).
+  if grep -qxF '.hv/' .gitignore 2>/dev/null; then
+    tmp="$(mktemp)"
+    grep -vxF '.hv/' .gitignore > "$tmp" && mv "$tmp" .gitignore
+  fi
 else
-  printf '# ── hv backlog ──\n.hv/\n' > .gitignore
+  for line in "${IGNORE_LINES[@]}"; do printf '%s\n' "$line" >> .gitignore; done
 fi
 
 # Umbrella scaffolding: per-sub-repo glossary support is deferred to F21

@@ -23,7 +23,7 @@ Every persistence skill (and `/hv-learn`'s `--term` mode) follows:
    - `/hv-decide` → `bin/hv-managed-block decisions`
 7. **Confirms via a compact block** — *"Captured `<artifact>` into `.hv/<FILE>.md`… Updated CLAUDE.md `<block>` block."* Match the shape; don't recap the plan.
 
-The duo does **not** commit. `.hv/` is gitignored, so the only tracked write is `CLAUDE.md`; the duo leaves it as a working-tree diff and lets the caller (the user, or a parent `/hv-work` cycle) commit. Aligning here matters — the duo is dispatched in sequence under `autonomy.level: loop`, so a per-skill commit would fragment what should be one summary commit.
+The duo does **not** commit. `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, and `CLAUDE.md` are all tracked under the partial-ignore model, so the duo leaves three working-tree diffs and lets the caller (the user, or a parent `/hv-work` cycle) commit them as one summary. Aligning here matters — the duo is dispatched in sequence under `autonomy.level: loop`, so a per-skill commit would fragment what should be one summary commit.
 
 ## Topic-classification rule (hv-learn topic bullets ↔ hv-decide)
 

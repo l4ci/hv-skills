@@ -8,7 +8,7 @@
 # Usage: hv-vision-index
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$(dirname "${BASH_SOURCE[0]}")/hv-types.sh"
+. "$HERE/hv-types.sh"
 ITEMS_JSON="$("$HERE/hv-vision-list")"
 BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEMS_JSON" <<'PY'
 import json, os, re, sys

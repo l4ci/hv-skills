@@ -37,7 +37,7 @@ user-invocable: true
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
@@ -123,6 +123,12 @@ Idempotent — `--if-absent` skips the write if the entry already exists, preser
 
 Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the Step 6 confirm block.
 
+After surfacing, clear the loop timestamp so the next loop session starts fresh:
+
+```bash
+.hv/bin/hv-loop-stamp clear   # no-op when loopStartedAt is already unset
+```
+
 ## Step 6 — Confirm
 
 One compact block. For single-entry pause sets:
@@ -167,7 +173,7 @@ Skip if nothing non-obvious surfaced or `/hv-learn` already ran this session. Do
 - **One note per `(branch, repo)`.** Overwrite on re-pause; don't accumulate stale notes.
 - **Multi-repo waves are one logical pause.** When `status.json` holds multiple `(branch, repo)` entries from one `/hv-work` wave, `/hv-pause` treats them as a single unit by default — no `AskUserQuestion` to pick one repo. Scope the pause to a single sub-repo by `cd`-ing into it before invoking `/hv-pause`; cwd resolves to that repo and the other entries stay active.
 - **Umbrella handoff filenames key on `(branch, repo)`.** Two sub-repos sharing a branch name get separate handoff files at `.hv/handoff/<branch>@<repo>.md`; single-repo cycles keep `.hv/handoff/<branch>.md` unchanged.
-- **Never commit `.hv/handoff/`.** `.hv/` is gitignored, so this is automatic — but don't add an exception.
+- **Never commit `.hv/handoff/`.** Handoff notes are per-developer scratch — `/hv-init` adds `.hv/handoff/` to `.gitignore` for this reason. Don't add a tracking exception; let `/hv-next` consume the note locally.
 - **`/hv-next` owns cleanup.** Once `/hv-next` has read and routed, it deletes the note. Don't self-delete here.
 - **No mutation beyond the handoff + optional wip/stash.** This skill's job is capture, not integration.
 

@@ -252,7 +252,7 @@ Leave `false` while you're shaping docs by hand. Flip on once your docs structur
 
 Path to the project's release checklist — a flat markdown file with `- [ ]` items that `/hv-release` walks as gates before bumping the version (Step 1.5). Each open checkbox becomes an `AskUserQuestion` interjection: *Yes, continue* / *Fix now and continue* / *Skip* / *Abort*. Items marked `- [x]` are ignored. Items whose text ends with `(manual)` always interject even under `autonomy.level: auto` or `loop` — use this for sensitive gates (staging migrations, infra rollouts) that need attention regardless of autonomy.
 
-The file is per-project and gitignored — each contributor maintains their own. When absent under `autonomy.level: off`, the skill offers to scaffold a starter template; under `auto` or `loop`, the skill silently skips the gate rather than interrupt an unattended run.
+The file is per-project and tracked by default, so the checklist is shared with the team. When absent under `autonomy.level: off`, the skill offers to scaffold a starter template; under `auto` or `loop`, the skill silently skips the gate rather than interrupt an unattended run. To keep the checklist per-contributor instead, add it to `.gitignore`.
 
 The skill itself stays generic — no release step is hardcoded. Drift like a forgotten sibling-version-file bump (e.g. the marketplace.json that went stale by two majors) gets caught by adding an item, not by patching the skill.
 
@@ -260,7 +260,7 @@ The skill itself stays generic — no release step is hardcoded. Drift like a fo
 { "release": { "checklistPath": "docs/RELEASE-CHECKLIST.md" } }
 ```
 
-Override the path if your project prefers a tracked location (then drop `.hv/RELEASE.md` from `.gitignore` if you want shared visibility — by default the checklist is local-only).
+Override the path if your project prefers a different location — by default the checklist is tracked at `.hv/RELEASE.md` and shared with the team.
 
 ## release.confirmLargePushCommits
 

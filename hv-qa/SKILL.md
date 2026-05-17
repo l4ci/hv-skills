@@ -200,7 +200,7 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 
 - **Strategy is data; runners are dispatched.** The skill never hardcodes Playwright, smoke, axe, or anything else. Every command comes from `.hv/qa/<target>.md`.
 - **Three pillars, three shapes.** Performance + security = executable, pass/fail. Usability = audit, severity-ranked. Don't pretend usability is testable.
-- **Read-only on `run`.** The verdict is the entire product. Never edit code; never stage. Artifacts write under `.hv/qa-runs/<timestamp>/`, gitignored.
+- **Read-only on `run`.** The verdict is the entire product. Never edit code; never stage. Artifacts write under `.hv/qa-runs/<timestamp>/` — gitignored by default (bulky and regeneratable from `qa/<target>.md`).
 - **Infra-fail fast.** Missing dev server, missing creds, missing binary → halt before running anything. Partial QA produces false confidence.
 - **Evidence over opinion.** Every audit finding cites file:line, screenshot path, or a reproducer command. Vibes don't ship.
 - **Stay separate from `/hv-review`.** Never read commits or diffs. If you find yourself wanting to, the request belongs to `/hv-review`.

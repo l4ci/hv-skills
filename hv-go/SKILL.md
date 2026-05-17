@@ -33,7 +33,7 @@ See `docs/reference/preflight.md` for exit-code handling.
 
 Invoke `hv-capture` via the `Skill` tool. Prefix the args passed to capture with `(hv-go — cap clarification at 1-2 questions)` so capture applies the speed-path question limit; then pass the user's input verbatim. `hv-capture` handles classification, ID assignment, detail files, and the `BACKLOG.md` write.
 
-Capture runs before the clean-tree guard on purpose: `BACKLOG.md` lives under gitignored `.hv/`, so capture never dirties the tree. If Step 3 then fails, the item is safely on the backlog and the user can run `/hv-work` after cleaning up instead of re-describing it.
+Capture runs before the clean-tree guard on purpose: `BACKLOG.md` lives under `.hv/`, which the clean-tree guard treats as a separate concern from the code paths it inspects, so capture never blocks Step 3. If Step 3 then fails, the item is safely on the backlog and the user can run `/hv-work` after cleaning up instead of re-describing it.
 
 Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 4.
 
@@ -58,7 +58,7 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 ## Rules
 
 - **Delegate, don't duplicate.** Capture mechanics (ID minting, classification, detail files, `Repos:` tagging in umbrella mode) live in `/hv-capture`. Execution and post-cycle nudges (branch creation, worker dispatch, commits, post-cycle map bump via `hv-map-index`, soft-cap check, `/hv-learn`) live in `/hv-work`. `/hv-go` is a pass-through orchestrator — it does not own any of these rules independently.
-- **Capture survives clean-tree guard failure.** Step 2 writes to gitignored `BACKLOG.md` before Step 3's guard. If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
+- **Capture survives clean-tree guard failure.** Step 2 writes to `.hv/BACKLOG.md` before Step 3's guard, which inspects code paths (not `.hv/`). If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
 
 ## References
 

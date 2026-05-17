@@ -137,7 +137,7 @@ r = parse_todo_fields('- **[F01] [Major] T.** D. Detail: x. Milestone: M02 Repos
 import json
 print(json.dumps(r, sort_keys=True))
 ")
-EXPECTED='{"captured": "", "detail": "x.", "milestone": "M02", "related": "", "repos": "web", "subsystem": ""}'
+EXPECTED='{"captured": "", "detail": "x.", "milestone": "M02", "related": "", "repos": "web", "since": "", "subsystem": ""}'
 [ "$RESULT" = "$EXPECTED" ] || fail "parse_todo_fields Repos: expected $EXPECTED, got $RESULT"
 pass "parse_todo_fields captures Repos field without bleeding into Milestone"
 
@@ -280,31 +280,34 @@ echo "" > .hv/KNOWLEDGE.md
 echo "" > .hv/MILESTONES.md
 echo "{}" > .hv/counters.json
 echo '{"active":[]}' > .hv/status.json
-# Copy hvlib.py + hv-preflight (preflight discovers helpers from its own dir's siblings)
-cp "$BIN/hvlib.py" .hv/bin/
+# Copy hvlib*.py (hvlib.py + split-out hvlib_io.py / hvlib_version.py) + hv-preflight
+# (preflight discovers helpers from its own dir's siblings; hvlib.py imports from the
+# split modules at import time so all three must travel together)
+cp "$BIN"/hvlib*.py .hv/bin/
 for f in "$BIN"/hv-*; do cp "$f" .hv/bin/ && chmod +x ".hv/bin/$(basename $f)"; done
 
 # Single-repo: no repos.json needed
 echo '{"umbrella": {"enabled": false}}' > .hv/config.json
 .hv/bin/hv-preflight && pass "hv-preflight passes single-repo without repos.json" || fail "hv-preflight failed single-repo"
 
-# Umbrella enabled, repos.json missing: exit 2
+# Umbrella enabled, repos.json missing: ADVISORY (warn to stderr, exit 0).
+# Per DECISIONS.md > Architecture > "Persistence-trio scoping under umbrella
+# mode": data is truth; the config flag is informational. Earlier versions
+# of preflight blocked here; the rule was relaxed to advisory in v3.x.
 echo '{"umbrella": {"enabled": true}}' > .hv/config.json
-if .hv/bin/hv-preflight 2>/dev/null; then fail "hv-preflight should fail with umbrella.enabled and missing repos.json"; fi
-RC=0; .hv/bin/hv-preflight 2>/dev/null || RC=$?
-[ "$RC" = "2" ] || fail "hv-preflight expected exit 2, got $RC"
-pass "hv-preflight exits 2 when umbrella.enabled and repos.json missing"
+WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json missing"
+echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about umbrella mismatch, got: $WARN"
+pass "hv-preflight warns advisory when umbrella.enabled and repos.json missing"
 
-# Umbrella enabled, repos.json with at least one entry: pass
+# Umbrella enabled, repos.json with at least one entry: pass (silent)
 echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
 .hv/bin/hv-preflight && pass "hv-preflight passes with umbrella.enabled and valid repos.json" || fail "hv-preflight failed with valid repos.json"
 
-# Umbrella enabled, repos.json empty: exit 2
+# Umbrella enabled, repos.json empty: ADVISORY (warn to stderr, exit 0).
 echo '{"repos": []}' > .hv/repos.json
-if .hv/bin/hv-preflight 2>/dev/null; then fail "hv-preflight should fail with umbrella.enabled and empty repos.json"; fi
-RC=0; .hv/bin/hv-preflight 2>/dev/null || RC=$?
-[ "$RC" = "2" ] || fail "hv-preflight expected exit 2 for empty repos.json, got $RC"
-pass "hv-preflight exits 2 when umbrella.enabled and repos.json empty"
+WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json empty"
+echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about empty repos.json, got: $WARN"
+pass "hv-preflight warns advisory when umbrella.enabled and repos.json empty"
 
 # Umbrella DISABLED but repos.json valid: pass (data is truth; flag is informational).
 # Exercises the B15 fix — /hv-next must reconcile when repos.json is present

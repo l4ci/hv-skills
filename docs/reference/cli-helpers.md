@@ -338,7 +338,11 @@ Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv
 2. Writes initial data files (skipping any that already exist): `BACKLOG.md`,
    `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `counters.json`,
    `status.json`.
-3. Appends a `.hv/` entry to `.gitignore` if one is not already present.
+3. Appends per-file ignores to `.gitignore` under a `# ── hv-skills ──`
+   header (when any are missing): `.hv/bin/`, `.hv/status.json`,
+   `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, and
+   `.hv/qa-runs/`. Migrates legacy blanket `.hv/` lines off the same file.
+   The rest of `.hv/` is tracked.
 
 It does **not** copy helper scripts; that is `/hv-init`'s job. It is called by
 `/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and

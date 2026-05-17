@@ -145,4 +145,4 @@ For each gate the skill asks: *Yes, continue* / *Fix now and continue* / *Skip t
 
 When the file is absent, the skill offers to scaffold a starter under `autonomy.level: off`, or silently skips the gate under `auto`/`loop` (don't interrupt unattended runs). See [`release.checklistPath`](configuration.md#releasechecklistpath) to override the path.
 
-The file is gitignored by default — each contributor maintains their own. If you want a shared checklist, drop `.hv/` (or just `.hv/RELEASE.md`) from `.gitignore` and commit it like any other source file.
+The file is tracked by default, so the release checklist is shared with the team like any other source file. To keep it per-contributor instead, add `.hv/RELEASE.md` to `.gitignore`.

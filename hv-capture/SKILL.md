@@ -25,7 +25,7 @@ Quick-capture bugs, features, and tasks into `.hv/BACKLOG.md` with just enough c
 
 See `docs/reference/preflight.md` for exit-code handling.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases differ by mode (see Step 1.5):
 
@@ -604,7 +604,7 @@ When repos were skipped in Step I2 (provider mismatch or missing CLI), append a 
 - Issues already in BACKLOG.md or ARCHIVE.md are never re-imported. Index by `GH: #N` / `GL: #N` via `hv-issues-imported`. The triple `(provider, repo, issue_number)` is the uniqueness key.
 - Label application is always behind the manual gate (Step I6). No `autonomy.level` value bypasses it.
 - Loop mode auto-picks routine routing answers (which repo(s) to pull from, which issues to capture) but never the label-application gate.
-- Writes to `.hv/BACKLOG.md` (gitignored runtime) — no commits are produced. Captured items move forward via `/hv-work` like any other item.
+- Writes to `.hv/BACKLOG.md` — no commits are produced. Captured items move forward via `/hv-work` like any other item, which bundles backlog updates into the cycle's close-the-loop commit.
 - The `GH: #N` cross-reference on the BACKLOG entry is the signal `hv-ship-body` uses to emit `Closes #N` in PR bodies (F12). Include it exactly.
 - `issues.providers.github` / `issues.providers.gitlab` config flags gate provider access per-type. When a flag is `false`, the matching `--from-<provider>` flag stops with a config error.
 

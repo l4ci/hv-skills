@@ -40,7 +40,10 @@ XX_TMP="$(mktemp -d)"
 EOF2
   done
 
-  OUT=$(HOME="$XX_TMP/fake-home" HV_LATEST_VERSION=2.0.0 .hv/bin/hv-update-check)
+  # Unset HV_INSTALL_ROOT for this run — runner.sh exports it for preflight
+  # comparisons, but here we want the cache-layout resolver to run unbiased
+  # so it can pick up the fake-home/.claude/plugins/cache/... layout.
+  OUT=$(unset HV_INSTALL_ROOT; HOME="$XX_TMP/fake-home" HV_LATEST_VERSION=2.0.0 .hv/bin/hv-update-check)
   echo "$OUT" | grep -q '"installType": "plugin"' || fail "cache-layout: installType != plugin: $OUT"
   echo "$OUT" | grep -q '"currentVersion": "2.0.0"' || fail "cache-layout: currentVersion != 2.0.0: $OUT"
   echo "$OUT" | grep -q '/2.0.0' || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
@@ -54,7 +57,7 @@ EOF2
   cat > "$XX_TMP/wrong-plugin/.claude-plugin/plugin.json" <<'EOF2'
 {"name":"context-mode","version":"1.0.89"}
 EOF2
-  OUT=$(CLAUDE_PLUGIN_ROOT="$XX_TMP/wrong-plugin" HOME="$XX_TMP/fake-home" \
+  OUT=$(unset HV_INSTALL_ROOT; CLAUDE_PLUGIN_ROOT="$XX_TMP/wrong-plugin" HOME="$XX_TMP/fake-home" \
         HV_LATEST_VERSION=2.0.0 .hv/bin/hv-update-check)
   echo "$OUT" | grep -q '"currentVersion": "2.0.0"' || fail "cache-layout: wrong CLAUDE_PLUGIN_ROOT leaked through: $OUT"
   echo "$OUT" | grep -q 'context-mode' && fail "cache-layout: installRoot points at non-hv-skills plugin: $OUT"
@@ -83,7 +86,7 @@ EOF2
   cat > .hv/config.json <<'EOF2'
 {"hvSkills":{"version":"1.0.0"}}
 EOF2
-  OUT=$(HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check)
+  OUT=$(unset HV_INSTALL_ROOT; HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check)
   echo "$OUT" | grep -q '1.0.0' || fail "drift: missing stamped 1.0.0: $OUT"
   echo "$OUT" | grep -q '2.0.0' || fail "drift: missing installed 2.0.0: $OUT"
   echo "$OUT" | grep -q '/hv-init' || fail "drift: missing /hv-init nudge: $OUT"
@@ -93,12 +96,12 @@ EOF2
   cat > .hv/config.json <<'EOF2'
 {"hvSkills":{"version":"2.0.0"}}
 EOF2
-  OUT=$(HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check)
+  OUT=$(unset HV_INSTALL_ROOT; HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check)
   [ -z "$OUT" ] || fail "match: expected silence, got: $OUT"
   pass "hv-version-check is silent when stamped == installed"
 
   # Test 4: --json always emits JSON with required keys.
-  OUT=$(HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check --json)
+  OUT=$(unset HV_INSTALL_ROOT; HOME="$XX_TMP/fake-home" .hv/bin/hv-version-check --json)
   echo "$OUT" | grep -q '"stamped"' || fail "--json: missing stamped key: $OUT"
   echo "$OUT" | grep -q '"installed"' || fail "--json: missing installed key: $OUT"
   echo "$OUT" | grep -q '"status"' || fail "--json: missing status key: $OUT"

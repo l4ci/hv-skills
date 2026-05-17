@@ -282,7 +282,11 @@ PYEOF
     || { echo "FAIL F24(f): dry-run moved HEAD"; exit 1; }
 ) || exit 1
 
-# ── (g) hv-undo: no merge commit on base → exit 1, stderr 'no merge' ────────
+# ── (g) hv-undo: orphan HEAD (no parents) → exit 2, stderr 'unexpected HEAD shape' ──
+# The fixture builds a single seed commit (no parents). hv-undo's HEAD-shape
+# detection catches this case at exit 2 ("unexpected HEAD shape (1 parents)")
+# before reaching the merge-lookup branch. Earlier expectation of exit 1
+# 'no merge' fired only when HEAD was a real non-merge commit with 1 parent.
 (
   cd "$UNDO_TMP"
   build_undo_fixture "$UNDO_TMP"
@@ -290,9 +294,9 @@ PYEOF
   ERR=$("$BIN/hv-undo" 2>&1 >/dev/null)
   RC=$?
   set -e
-  [ "$RC" = "1" ] || { echo "FAIL F24(g): expected exit 1, got $RC"; exit 1; }
-  echo "$ERR" | grep -qi 'no merge' \
-    || { echo "FAIL F24(g): stderr missing 'no merge': '$ERR'"; exit 1; }
+  [ "$RC" = "2" ] || { echo "FAIL F24(g): expected exit 2, got $RC"; exit 1; }
+  echo "$ERR" | grep -qi 'unexpected HEAD shape\|not a merge' \
+    || { echo "FAIL F24(g): stderr missing 'unexpected HEAD shape': '$ERR'"; exit 1; }
 ) || exit 1
 
 # ── (h) hv-undo: dirty tree → exit 2 ─────────────────────────────────────────
@@ -331,14 +335,16 @@ PYEOF
     echo "FAIL F24(i): [F03] still present under ## Completed after rollback"; exit 1
   fi
 
-  # (j) Re-run on the now-rolled-back tree: no merge commit remains, exit 1.
+  # (j) Re-run on the now-rolled-back tree: HEAD is a 1-parent commit (seed
+  # parent), so hv-undo's HEAD-shape detection bails at exit 2 with the
+  # "HEAD is not a merge commit" message before reaching the merge-lookup.
   set +e
   ERR=$("$BIN/hv-undo" 2>&1 >/dev/null)
   RC=$?
   set -e
-  [ "$RC" = "1" ] || { echo "FAIL F24(j): post-apply expected exit 1, got $RC"; exit 1; }
-  echo "$ERR" | grep -qi 'no merge' \
-    || { echo "FAIL F24(j): stderr missing 'no merge' on post-apply re-run: '$ERR'"; exit 1; }
+  [ "$RC" = "2" ] || { echo "FAIL F24(j): post-apply expected exit 2, got $RC"; exit 1; }
+  echo "$ERR" | grep -qi 'not a merge\|no merge\|unexpected HEAD shape' \
+    || { echo "FAIL F24(j): stderr missing expected hv-undo error on post-apply re-run: '$ERR'"; exit 1; }
 ) || exit 1
 
 # ── (k) hv-undo: non-`merge:` subject refused → exit 1 ──────────────────────

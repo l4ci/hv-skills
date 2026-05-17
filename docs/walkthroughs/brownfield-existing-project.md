@@ -272,4 +272,4 @@ What you notice over time is that the same class of gotcha stops recurring. Thre
 
 ## What changes structurally
 
-You don't have to refactor anything to adopt hv-skills. The only structural addition is `.hv/` (gitignored by default) and a managed block in `CLAUDE.md`. Your existing build, tests, deploy pipeline, and code layout stay the same. The map and the knowledge accumulate from how you already work (debug, fix, ship), except now the loop leaves a trace that future cycles consult automatically.
+You don't have to refactor anything to adopt hv-skills. The only structural addition is `.hv/` (tracked by default, with six machine-specific paths gitignored) and a managed block in `CLAUDE.md`. Your existing build, tests, deploy pipeline, and code layout stay the same. The map and the knowledge accumulate from how you already work (debug, fix, ship), except now the loop leaves a trace that future cycles consult automatically.

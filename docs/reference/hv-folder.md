@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and the folder is gitignored by default. Open and edit any file by hand whenever you need to.
+[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default — only six machine-specific or regenerated paths are gitignored. Use the skill helpers to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
 
 ## Overview
 
@@ -12,16 +12,20 @@
 | `MILESTONES.md` | Milestone overview — one short section per milestone, with a vision intro paragraph and an active list |
 | `MAP.md` + `map/<subsystem>.md` | Project map — AI-facing narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Hand-authored; `touched:` auto-bumped by cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`). |
 | `counters.json` | Auto-incrementing IDs for each item type |
-| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level |
-| `status.json` | Active work streams — which items are being worked on, on which branch/worktree |
-| `bin/` | CLI helpers — `hv-next-id`, `hv-append`, `hv-complete`, … |
+| `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level (team-shared defaults) |
+| `config.local.json` | _(gitignored)_ Per-developer config overrides — deep-merged on top of `config.json` by `load_config()`. Use for `autonomy.level`, model preferences, or any setting that varies per machine. |
+| `status.json` | _(gitignored)_ Active work streams — which items are being worked on, on which branch/worktree (per-developer) |
+| `repos.json` | _(gitignored, umbrella mode only)_ Sub-repo registry with absolute paths — machine-specific |
+| `bin/` | _(gitignored)_ CLI helpers — `hv-next-id`, `hv-append`, `hv-complete`, … Regenerated mirror of canonical `bin/`, overwritten on every `/hv-init` |
 | `bugs/` | Overflow detail files for large bug reports |
 | `features/` | Overflow detail files for large feature specs |
 | `tasks/` | Overflow detail files for large task descriptions |
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) — full plan with goal, acceptance, rationale, risks, research findings, notes |
 | `plans/` | Implementation plans keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
 | `spikes/` | Spike findings — one Markdown file per spike; the experimental code lives on the `spike/<name>` git branch and is never merged |
-| `handoff/` | `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next` |
+| `handoff/` | _(gitignored)_ `/hv-pause` notes — one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next`. Per-developer scratch. |
+| `qa-runs/` | _(gitignored)_ Timestamped `/hv-qa` run artifacts — bulky, regeneratable from the strategy in `qa/<target>.md` |
+| `RELEASE.md` | Release checklist — `- [ ]` items `/hv-release` walks as gates before bumping version. Tracked, shared with the team. |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
 ## BACKLOG.md — active backlog
@@ -126,8 +130,34 @@ See [../usage/pausing-and-resuming.md](../usage/pausing-and-resuming.md) for the
 
 Completed items are moved from `BACKLOG.md` to `ARCHIVE.md` automatically after they have been in the completed section for more than five days. This keeps `BACKLOG.md` short without losing history. You can read `ARCHIVE.md` at any time; no skill reads it during normal operation.
 
-## Why everything is gitignored
+## What's tracked and what's gitignored
 
-The backlog is local to your machine by design. Keeping `.hv/` out of version control means each developer has their own view of the work without merge conflicts or accidental exposure of notes and spike findings.
+The backlog is shared by default — state travels with the repo so collaborators see the same `BACKLOG.md`, learn from the same `KNOWLEDGE.md`, and respect the same `DECISIONS.md`. Six paths stay gitignored because they're machine-specific, per-developer, or regenerated on demand:
 
-If you want to share backlog state with a team (for example, to hand off work or keep a shared list of open items), you can opt in by removing `.hv/` from `.gitignore` and committing the folder. The default keeps it private.
+| Path | Why ignored |
+|------|-------------|
+| `.hv/bin/` | Regenerated mirror of canonical `bin/`; overwritten on every `/hv-init` |
+| `.hv/status.json` | Per-developer active-work tracking, branch-aware |
+| `.hv/repos.json` | Umbrella sub-repo registry with absolute paths (machine-specific) |
+| `.hv/config.local.json` | Per-developer config overrides (see below) |
+| `.hv/handoff/` | Per-developer `/hv-pause` scratch notes |
+| `.hv/qa-runs/` | Bulky timestamped `/hv-qa` artifacts; regeneratable |
+
+`/hv-init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
+
+### `config.local.json` — per-developer overrides
+
+Drop a JSON file at `.hv/config.local.json` to override any setting from `.hv/config.json` for your machine only. `load_config()` (in `bin/hvlib_io.py`) deep-merges it on top of the shared config — nested keys merge recursively; scalars and arrays replace. Example:
+
+```json
+{
+  "autonomy": { "level": "off" },
+  "models": { "worker": "haiku" }
+}
+```
+
+This overrides `autonomy.level` and `models.worker` while inheriting every other key (including `models.orchestrator`) from the shared `config.json`. Typical uses: per-developer autonomy preferences, model selection for cost or latency, or experimenting with a setting without committing it to the team default.
+
+### Opting out — fully private backlog
+
+If you'd rather keep the whole `.hv/` folder private (solo development, or experimentation that isn't ready to share), add a blanket `.hv/` line to `.gitignore` before your first commit. The pattern is supported but is no longer the default.

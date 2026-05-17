@@ -55,7 +55,7 @@ Re-run [`/hv-next`](picking-work.md) and `[F42]` shows up under Features again, 
 
 Preserved untouched: **`ARCHIVE.md`** historical entries (the rolled-back done-line was in `BACKLOG.md ## Completed`, not in `ARCHIVE.md`), the **git reflog** (the merge commit is still recoverable for 90 days via `git reflog`), and **git objects** generally — the merged branch's commits stay reachable through the reflog, so nothing is irretrievably lost in the short term.
 
-Not restored, by design: **handoff files** (`.hv/handoff/<branch>.md` are gitignored, so they were lost when the branch was deleted at merge time), **plan files** (`.hv/plans/<key>.md` are gitignored; same story), and **the merged branch itself** (direct-merge deletes it at ship time). The dry-run preview prints the literal `git branch …` command needed to recreate the branch from `<merge>^2` if you want to keep iterating on the same line of work.
+Not restored, by design: **handoff files** (`.hv/handoff/<branch>.md` are gitignored per-developer scratch and were lost when the branch was deleted at merge time), **plan files** (`.hv/plans/<key>.md` are tracked, so they survive on `main` after the ship commit — but an unmerged feature-branch plan is unrecoverable once the branch is gone), and **the merged branch itself** (direct-merge deletes it at ship time). The dry-run preview prints the literal `git branch …` command needed to recreate the branch from `<merge>^2` if you want to keep iterating on the same line of work.
 
 ## Safety semantics
 
