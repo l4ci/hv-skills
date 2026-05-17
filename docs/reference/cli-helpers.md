@@ -10,6 +10,8 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | Script | What it does | Example |
 |---|---|---|
 | `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
+| `hv-capture-audit` | Surface ship-evidence per candidate title before milestone-spec capture; exit 2 with `[STRONG]`/`[MEDIUM]`/`[PATH]` report when any title looks already shipped, exit 0 when clean | `.hv/bin/hv-capture-audit "Title 1" "Title 2"` |
+| `hv-migrate` | v3 → v4 codemod: rewrite cut-command references, migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins; `--dry-run` default, `--apply` writes, backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
 | `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
 | `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
