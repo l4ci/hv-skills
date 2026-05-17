@@ -8,7 +8,11 @@
 # exits 1 on usage errors. The skill caller decides whether to block or warn.
 # Usage: hv-capture-audit <title> [<title>...]
 set -euo pipefail
-. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+# Bootstrap helper: operates against cwd's git repo (whatever the caller cd'd
+# into). Does NOT source hv-preamble.sh because the audit must follow the
+# caller's cwd — in umbrella mode the skill cd's into the target sub-repo
+# before invoking, so the audit should grep that sub-repo's commits, not
+# walk up to the umbrella's `.hv/` parent.
 
 python3 - "$@" <<'PY'
 import os
@@ -92,22 +96,24 @@ def audit_title(title, root):
         hit = path_exists(tok, root)
         if hit:
             paths.append((tok, hit))
+    # Search commits for every non-stopword token. Distinctive tokens
+    # weight matches more, but a commit hit by ≥2 common tokens is still
+    # plausible evidence — pure-prose titles ("Implement Driver for postgres
+    # backend") need that path because they have no distinctive tokens.
+    for tok in distinctive + common:
         for line in grep_commits(tok):
             sha = line.split(maxsplit=1)[0]
             entry = commits.setdefault(sha, {"subject": line, "tokens": []})
             entry["tokens"].append(tok)
-    for tok in common:
-        for line in grep_commits(tok):
-            sha = line.split(maxsplit=1)[0]
-            if sha in commits:
-                commits[sha]["tokens"].append(tok)
     strong, medium = [], []
     for sha, info in commits.items():
         uniq = list(dict.fromkeys(info["tokens"]))
         d_hits = [t for t in uniq if t in distinctive]
-        if len(uniq) >= 2 or len(d_hits) >= 2:
+        # STRONG: ≥3 unique token hits, OR ≥2 distinctive hits.
+        # MEDIUM: ≥2 unique hits with at least one distinctive, OR ≥2 common-only hits.
+        if len(uniq) >= 3 or len(d_hits) >= 2:
             strong.append({"hash": sha, "subject": info["subject"], "tokens": uniq})
-        elif d_hits:
+        elif len(uniq) >= 2:
             medium.append({"hash": sha, "subject": info["subject"], "tokens": uniq})
     return {
         "title": title,
