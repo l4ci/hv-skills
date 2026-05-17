@@ -283,22 +283,12 @@ def update_milestone_status_line(content: str, mid: str, new_status: str) -> str
 
 
 def load_backlog_corpus(base_dir=".") -> str:
-    """Return BACKLOG.md (or legacy TODO.md as a one-cycle fallback) + ARCHIVE.md
-    concatenated from <base_dir>/.hv/.
+    """Return BACKLOG.md + ARCHIVE.md concatenated from <base_dir>/.hv/.
     Used by ship-body, todo-field, and review-scope to look up an item ID
     across active and archived backlog in one pass.
     """
-    base = Path(base_dir)
-    hv = base / ".hv"
-    backlog = hv / BACKLOG_FILE
-    if backlog.exists():
-        primary = read_or_empty(backlog)
-    else:
-        # XXX: remove in next release (post-F71). Silent one-cycle fallback so
-        # projects with legacy .hv/TODO.md keep working until they re-run /hv-init.
-        # The /hv-init flow auto-renames the file via hv-bootstrap; this branch
-        # only fires for projects that haven't re-init'd yet.
-        primary = read_or_empty(hv / "TODO.md")
+    hv = Path(base_dir) / ".hv"
+    primary = read_or_empty(hv / BACKLOG_FILE)
     return primary.rstrip("\n") + "\n" + read_or_empty(hv / "ARCHIVE.md")
 
 
@@ -389,13 +379,6 @@ def active_items(entry: dict) -> list[str]:
     if isinstance(raw, str):
         return [s for s in (s.strip() for s in raw.split(",")) if s]
     return []
-
-
-def registered_repo_names(repos_path=".hv/repos.json") -> list[str]:
-    """Return sorted list of registered sub-repo names from repos.json.
-    Wraps load_repos; returns [] if the file is missing or empty.
-    """
-    return sorted(load_repos(repos_path).keys())
 
 
 def open_bullet_re() -> "re.Pattern":
