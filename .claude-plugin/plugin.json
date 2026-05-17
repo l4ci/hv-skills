@@ -1,6 +1,6 @@
 {
   "name": "hv-skills",
-  "version": "3.4.0",
+  "version": "4.0.0",
   "description": "Plan with intent, ship atomic commits, retain hard-won knowledge \u2014 a zero-dependency development workflow for Claude Code.",
   "author": {
     "name": "l4ci"

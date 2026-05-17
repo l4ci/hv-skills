@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.0.0 — unreleased
+## v4.0.0 — 2026-05-17
 
 **Claude that doesn't forget.** Twenty commands left. You know what they all do. v4.0 cuts eight commands (28 → 20), routes each to a flag on a surviving skill, and ships `/hv-migrate v4` as the safety net. The wedge — `KNOWLEDGE.md` + `DECISIONS.md` + handoff-across-`/clear` — is unchanged; the loop around it just got smaller.
 
@@ -49,7 +49,9 @@ See [`docs/announcements/v4-0.md`](docs/announcements/v4-0.md) for the long-form
 
 ## Stats
 
-Pending — final stats roll up at tag time.
+57 commits, 169 files changed, +4379 −3008 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v3.4.0...v4.0.0
 
 ## v3.4.0 — 2026-05-15
 
