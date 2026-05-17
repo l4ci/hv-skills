@@ -105,6 +105,26 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-16"
+    },
+    "Build & Tooling::hv-migrate --apply bumps the version stamp on every path, including nothing_to_do": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-17"
+    },
+    "Architecture::Codemod mention/usage safety: code spans + helper-path tokens + structural block deletes": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-17"
+    },
+    "Build & Tooling::Standalone smoke fixtures for preamble-sourcing helpers need .hv/ in the tempdir": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-17"
+    },
+    "Architecture::Deprecated-managed-block strip uses explicit allowlist, not heuristic 'not in v4 set'": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-17"
     }
   }
 }

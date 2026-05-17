@@ -4,7 +4,9 @@
 Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
 
 - Architecture
-- Build & Tooling
+- Build & Tooling: Helpers & migrations
+- Build & Tooling: Smoke testing
+- Build & Tooling: Git & isolation
 
 <!-- hv-knowledge-end -->
 
