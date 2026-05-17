@@ -43,5 +43,6 @@
   "qa": {
     "gate": "advisory",
     "afterWork": false
-  }
+  },
+  "version": "3.3.0"
 }
