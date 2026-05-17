@@ -18,3 +18,11 @@ __pycache__/
 
 # Claude Code harness state (scheduled tasks, etc.)
 .claude/
+
+# ── hv-skills ──
+.hv/bin/
+.hv/status.json
+.hv/repos.json
+.hv/config.local.json
+.hv/handoff/
+.hv/qa-runs/
