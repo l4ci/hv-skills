@@ -11,7 +11,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 |---|---|---|
 | `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
 | `hv-capture-audit` | Surface ship-evidence per candidate title before milestone-spec capture; exit 2 with `[STRONG]`/`[MEDIUM]`/`[PATH]` report when any title looks already shipped, exit 0 when clean | `.hv/bin/hv-capture-audit "Title 1" "Title 2"` |
-| `hv-migrate` | v3 → v4 codemod: rewrite cut-command references, migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins; `--dry-run` default, `--apply` writes, backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
+| `hv-migrate` | v3 → v4 codemod: rewrite cut-command references (skips fenced code, inline code, and helper-path tokens), migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins, strip orphan v3 managed blocks from `CLAUDE.md`, and stamp `hvSkills.version` so `hv-preflight` reflects the post-migration state; reads the version from nested `hvSkills.version` with a top-level `version` fallback; `--dry-run` default, `--apply` writes (also bumps the stamp on the noop path), backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
 | `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
 | `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
@@ -56,7 +56,8 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-map-cap-check` | Emit a one-line nudge to stderr when subsystem count meets or exceeds the soft cap; silent below; always exits 0 (advisory, not a gate) | `.hv/bin/hv-map-cap-check` |
 | `hv-staleness` | List stale entries across MAP/KNOWLEDGE/TODO past a days threshold | `.hv/bin/hv-staleness map --days 90` |
 | `hv-stale-summary` | One-line summary wrapping hv-staleness × 3 (map/knowledge/todo); zero-kinds suppressed | `.hv/bin/hv-stale-summary --days 90` |
-| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision`, `context`, `map`, `skills` (`vision`, `map`, and `skills` are `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
+| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md`; keys: `knowledge`, `decisions`, `vision`, `map`, `qa`, `skills` (`vision`, `map`, `qa`, and `skills` are `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
+| `hv-managed-block --strip-deprecated` | Remove orphan v3 managed blocks from `CLAUDE.md` whose key is in `DEPRECATED_KEYS` (currently `context`, from the F18 cut). Idempotent: silent no-op on a clean file. Invoked by `/hv-init` Step 4 and `/hv-migrate v4 --apply` to scrub leftover blocks during upgrades. | `.hv/bin/hv-managed-block --strip-deprecated` |
 | `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
 | `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
 | `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` | `.hv/bin/hv-vision-status M01 active` |
