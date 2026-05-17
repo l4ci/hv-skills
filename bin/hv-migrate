@@ -42,6 +42,8 @@ fi
 export _HV_MIGRATE_APPLY="$APPLY"
 export _HV_MIGRATE_VERBOSE="$VERBOSE"
 export _HV_MIGRATE_GLOSSARY_WRITE="$HERE/hv-glossary-write"
+export _HV_MIGRATE_RESOLVE_PLUGIN="$HERE/hv-resolve-plugin-root"
+export _HV_MIGRATE_MANAGED_BLOCK="$HERE/hv-managed-block"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import datetime as dt
@@ -59,6 +61,8 @@ from hvlib import iter_topics, load_repos, parse_term_entry, write_text_atomic
 APPLY = os.environ["_HV_MIGRATE_APPLY"] == "true"
 VERBOSE = os.environ["_HV_MIGRATE_VERBOSE"] == "true"
 GLOSSARY_WRITE = os.environ["_HV_MIGRATE_GLOSSARY_WRITE"]
+RESOLVE_PLUGIN = os.environ["_HV_MIGRATE_RESOLVE_PLUGIN"]
+MANAGED_BLOCK = os.environ["_HV_MIGRATE_MANAGED_BLOCK"]
 
 ROOT = Path.cwd()
 
@@ -151,7 +155,11 @@ def check_safety_preconditions() -> None:
         cfg = json.loads(CONFIG_PATH.read_text())
     except json.JSONDecodeError as e:
         die(f"refusing: .hv/config.json is not valid JSON ({e}).", 1)
-    version = cfg.get("version", "")
+    # B07: nested-first read with legacy top-level fallback.
+    # /hv-init writes hvSkills.version (canonical v4 location); v3 projects
+    # stamped the top-level "version" key. Tolerate both so fresh v4 inits
+    # (hvSkills.version only) don't dead-end here.
+    version = cfg.get("hvSkills", {}).get("version", "") or cfg.get("version", "")
     if not version:
         die("refusing: .hv/config.json has no 'version' field — run /hv-init.", 1)
     major = version.split(".", 1)[0]
@@ -212,25 +220,103 @@ def iter_scan_targets():
                 yield f
 
 
+def _compute_skip_mask(text: str) -> list[tuple[int, int]]:
+    """Return (start, end) byte ranges in `text` where rewrites must NOT apply.
+    Covers fenced code blocks, inline code spans, and helper-path tokens like
+    `hv-map-query` or `.hv/bin/hv-foo` — anything that's a literal helper
+    name (multi-segment kebab containing hv-) rather than a slash-command
+    usage. The mask is a guard against B09 defect 2 false-positives."""
+    masks: list[tuple[int, int]] = []
+    # Fenced code blocks: ```...```  (DOTALL so they span lines)
+    for m in re.finditer(r"```.*?```", text, re.DOTALL):
+        masks.append((m.start(), m.end()))
+    # Inline code spans: `...`  (no newlines inside)
+    for m in re.finditer(r"`[^`\n]+`", text):
+        masks.append((m.start(), m.end()))
+    # Helper-path tokens: multi-segment names like `hv-map-query` or paths
+    # like `.hv/bin/hv-foo`. The regex requires `hv-` followed by two or more
+    # word-char segments separated by hyphens, optionally prefixed by a path.
+    # This catches B09 defect 2b (substring false-match on hv-map-query) while
+    # leaving bare slash-commands like `/hv-context` untouched (only one segment).
+    for m in re.finditer(r"(?:[\w./]+/)?\bhv-\w+(?:-\w+)+", text):
+        masks.append((m.start(), m.end()))
+    return masks
+
+
+def _overlaps_any(start: int, end: int, masks: list[tuple[int, int]]) -> bool:
+    """True if [start, end) overlaps any mask range."""
+    return any(not (end <= s or e <= start) for s, e in masks)
+
+
 def rewrite_text(text: str, file_repr: str):
     """Apply all 8 rules to `text`. Return (new_text, count, manual_reviews).
-    manual_reviews is a list of "file:line: rule — reason" strings."""
-    auto_count = 0
-    manual = []
-    # First pass: collect manual-review locations BEFORE rewriting so line numbers reflect input.
+
+    B09 defect 2 mitigation: skip matches inside fenced/inline code spans
+    and inside helper-path tokens. This prevents corrupting self-documenting
+    mentions in BACKLOG/KNOWLEDGE entries and substring false-matches like
+    `/hv-map\b` hitting inside `hv-map-query`.
+
+    `manual_reviews` is a list of "file:line: rule — reason" strings.
+    """
+    masks = _compute_skip_mask(text)
+    # Build (line_no, line_start_byte) index so we can map any byte offset
+    # back to a 1-based line number for the manual_review output.
+    line_starts: list[int] = [0]
+    for i, ch in enumerate(text):
+        if ch == "\n":
+            line_starts.append(i + 1)
+
+    def byte_to_lineno(offset: int) -> int:
+        # Binary search for the largest line_starts entry <= offset.
+        lo, hi = 0, len(line_starts)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if line_starts[mid] <= offset:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo  # 1-based: line_starts[0] = 0 maps to line 1
+
+    # First pass: collect manual-review locations BEFORE rewriting so line
+    # numbers reflect input. Skip matches that fall inside the mask.
+    manual: list[str] = []
     for pattern, repl, desc in REWRITE_RULES:
         if repl is not None:
             continue
-        for i, line in enumerate(text.splitlines(), start=1):
-            if pattern.search(line):
-                manual.append(f"{file_repr}:{i}: {pattern.pattern[1:]} — {desc}")
-    # Second pass: apply auto rewrites.
+        for m in pattern.finditer(text):
+            if _overlaps_any(m.start(), m.end(), masks):
+                continue
+            lineno = byte_to_lineno(m.start())
+            manual.append(f"{file_repr}:{lineno}: {pattern.pattern[1:]} — {desc}")
+
+    # Second pass: apply auto rewrites, skipping masked matches. We process
+    # each rule by walking matches and substituting only the unmasked ones,
+    # rebuilding the text in one pass per rule. Mask offsets stay valid
+    # within a single rule's pass because we recompute the mask after each
+    # rule (substitutions can shift byte positions).
     new_text = text
+    auto_count = 0
     for pattern, repl, desc in REWRITE_RULES:
         if repl is None:
             continue
-        new_text, n = pattern.subn(repl, new_text)
-        auto_count += n
+        # Recompute mask against the current text — earlier rules may have
+        # shifted offsets. This is O(rules × text-size), but rules count is
+        # small and text size is bounded by the scan scope.
+        rule_masks = _compute_skip_mask(new_text)
+        out: list[str] = []
+        last = 0
+        n_subs = 0
+        for m in pattern.finditer(new_text):
+            if _overlaps_any(m.start(), m.end(), rule_masks):
+                # Leave the original match in place.
+                continue
+            out.append(new_text[last:m.start()])
+            out.append(repl)
+            last = m.end()
+            n_subs += 1
+        out.append(new_text[last:])
+        new_text = "".join(out)
+        auto_count += n_subs
     return new_text, auto_count, manual
 
 
@@ -316,6 +402,47 @@ def apply_context_migration(plan, backup_root: Path) -> None:
         finally:
             Path(manifest).unlink(missing_ok=True)
     CONTEXT_PATH.unlink()
+
+
+def resolve_installed_version() -> str:
+    """Return the installed plugin's version from .claude-plugin/plugin.json,
+    or empty string if it can't be resolved. Never raises."""
+    try:
+        r = subprocess.run(
+            [RESOLVE_PLUGIN, "--root-only"],
+            capture_output=True, text=True, check=False,
+        )
+        root = r.stdout.strip()
+        if not root:
+            return ""
+        plugin_json = Path(root) / ".claude-plugin" / "plugin.json"
+        if not plugin_json.exists():
+            return ""
+        return json.loads(plugin_json.read_text()).get("version", "") or ""
+    except Exception:
+        return ""
+
+
+def stamp_version(new_version: str) -> bool:
+    """Write hvSkills.version = new_version into .hv/config.json, preserving
+    every other key. Drops the legacy top-level "version" field if present —
+    v4 housekeeping; the nested location is canonical going forward.
+
+    Returns True when the file changed (caller can print a bump line), False
+    when the stamp is already canonical (nested matches new_version AND no
+    legacy top-level key remains) — keeps idempotent re-runs silent.
+    Silent no-op when new_version is empty (resolver couldn't find the plugin)."""
+    if not new_version:
+        return False
+    cfg = json.loads(CONFIG_PATH.read_text())
+    current = cfg.get("hvSkills", {}).get("version", "")
+    legacy_present = "version" in cfg
+    if current == new_version and not legacy_present:
+        return False
+    cfg.setdefault("hvSkills", {})["version"] = new_version
+    cfg.pop("version", None)
+    write_text_atomic(CONFIG_PATH, json.dumps(cfg, indent=2) + "\n")
+    return True
 
 
 def plan_removed_binaries():
@@ -407,6 +534,14 @@ def main():
 
     if nothing_to_do:
         print("noop: project is already on v4 (no rewrites, no CONTEXT.md, no stale bins).")
+        # B08: even when no rewrites happened, --apply still bumps the version
+        # stamp so hv-preflight reflects post-migration state. Without this the
+        # user runs a clean --apply that "did nothing" yet preflight keeps
+        # nagging — the original B08 symptom.
+        if APPLY:
+            new_version = resolve_installed_version()
+            if new_version and stamp_version(new_version):
+                print(f"version stamp bumped to {new_version}")
         sys.exit(0)
 
     if not APPLY:
@@ -429,6 +564,29 @@ def main():
 
     if bin_plan:
         apply_removed_binaries(bin_plan, backup_root)
+
+    # B09 defect 1 (apply-side): strip orphan managed blocks (e.g., the
+    # v3 `<!-- hv-context-* -->` block left after F18 cut /hv-context).
+    # Silent on success; warns to stderr if the helper isn't present so
+    # the migration doesn't fail on partial v4 installs.
+    try:
+        subprocess.run(
+            [MANAGED_BLOCK, "--strip-deprecated"],
+            check=False, capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        print(
+            "warn: hv-managed-block not found — orphan v3 managed blocks "
+            "in CLAUDE.md may need manual cleanup.",
+            file=sys.stderr,
+        )
+
+    # B08: stamp hvSkills.version so hv-preflight stops nagging. stamp_version
+    # returns False when the stamp is already canonical, keeping idempotent
+    # re-runs free of noise.
+    new_version = resolve_installed_version()
+    if new_version and stamp_version(new_version):
+        print(f"version stamp bumped to {new_version}")
 
     print(f"applied. backup at: {backup_root}")
 

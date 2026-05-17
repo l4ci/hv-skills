@@ -88,8 +88,8 @@
     },
     "Build & Tooling::Smoke fixtures for dirty-tree-refusing helpers redirect stderr into $TMP_*/.hv/": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-16"
+      "hits": 1,
+      "lastSeen": "2026-05-17"
     },
     "Build & Tooling::hv-preflight opens a smoke-failure window during major-version transitions": {
       "tier": "provisional",

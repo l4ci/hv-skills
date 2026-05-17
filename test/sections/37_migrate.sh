@@ -238,3 +238,123 @@ EOF
 grep -q "/hv-c is" "$TMP_WB/.hv/BACKLOG.md" && fail "stale /hv-c left after rewrite"
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-migrate — word boundary: /hv-capture preserved, /hv-c rewritten"
+
+echo "hv-migrate — B07: reads hvSkills.version when top-level 'version' absent"
+TMP_B07="$(mktemp -d)"
+trap 'rm -rf "$TMP_B07"' EXIT
+( cd "$TMP_B07" && git init -q && git config user.email t@t && git config user.name t )
+mkdir -p "$TMP_B07/.hv"
+# Fresh v4 init shape: ONLY hvSkills.version, no top-level "version" field.
+echo '{"hvSkills":{"version":"4.0.0"}}' > "$TMP_B07/.hv/config.json"
+( cd "$TMP_B07" && git add -A && git commit -q -m init )
+# Should pass the safety precondition (no "refusing: no version field") — exits
+# either 0 (noop) or 3 (F18 dep missing in $BIN). Anything that mentions "version
+# field" is B07 still firing.
+set +e
+( cd "$TMP_B07" && "$BIN/hv-migrate" v4 2>"$TMP_B07/.hv/err" >"$TMP_B07/.hv/out" ); RC=$?
+set -e
+grep -q "no 'version' field" "$TMP_B07/.hv/err" "$TMP_B07/.hv/out" && fail "B07: nested hvSkills.version should not trigger the missing-version refusal"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-migrate — B07: reads hvSkills.version when top-level 'version' absent"
+
+echo "hv-migrate — B08: --apply bumps hvSkills.version to installed plugin"
+TMP_B08="$(mktemp -d)"
+trap 'rm -rf "$TMP_B08"' EXIT
+( cd "$TMP_B08" && git init -q && git config user.email t@t && git config user.name t )
+( cd "$TMP_B08" && "$BIN/hv-bootstrap" >/dev/null )
+echo '{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}' > "$TMP_B08/.hv/config.json"
+( cd "$TMP_B08" && git add -A && git commit -q -m init )
+
+# Force HV_INSTALL_ROOT to point at $REPO so resolve-plugin-root returns it,
+# and the version stamp picks up $REPO/.claude-plugin/plugin.json's version.
+INSTALLED_VER=$(python3 -c "import json; print(json.load(open('$REPO/.claude-plugin/plugin.json'))['version'])")
+[ -n "$INSTALLED_VER" ] || fail "test setup: could not read .claude-plugin/plugin.json version"
+
+( cd "$TMP_B08" && HV_INSTALL_ROOT="$REPO" "$BIN/hv-migrate" v4 --apply >/dev/null )
+
+# hvSkills.version must equal the installed plugin version after apply.
+STAMPED=$(python3 -c "import json; print(json.load(open('$TMP_B08/.hv/config.json')).get('hvSkills',{}).get('version',''))")
+[ "$STAMPED" = "$INSTALLED_VER" ] || fail "B08: hvSkills.version is '$STAMPED', expected '$INSTALLED_VER'"
+
+# Legacy top-level "version" should be cleaned up.
+HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")
+[ "$HAS_LEGACY" = "no" ] || fail "B08: legacy top-level 'version' should be removed after migration"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-migrate — B08: --apply bumps hvSkills.version"
+
+echo "hv-managed-block — B09: --strip-deprecated removes orphan v3 blocks"
+TMP_STRIP="$(mktemp -d)"
+trap 'rm -rf "$TMP_STRIP"' EXIT
+mkdir -p "$TMP_STRIP/.hv/bin"
+cd "$TMP_STRIP"
+# Seed a CLAUDE.md with an orphan hv-context block, a live hv-knowledge block,
+# and unrelated prose. After strip: orphan gone, live block kept, prose intact.
+cat > CLAUDE.md <<'EOF'
+# Project
+
+<!-- hv-knowledge-start -->
+## Project Knowledge
+Live block — must survive.
+<!-- hv-knowledge-end -->
+
+<!-- hv-context-start -->
+## Project Context
+Orphan block — must be stripped.
+<!-- hv-context-end -->
+
+Regular prose stays.
+EOF
+
+"$BIN/hv-managed-block" --strip-deprecated > "$TMP_STRIP/strip.out"
+
+grep -q "hv-knowledge-start" CLAUDE.md || fail "B09-d1: live hv-knowledge block should survive strip"
+grep -q "hv-context-start" CLAUDE.md && fail "B09-d1: orphan hv-context block should be removed"
+grep -q "Regular prose stays" CLAUDE.md || fail "B09-d1: surrounding prose must survive"
+grep -q "stripped: context" "$TMP_STRIP/strip.out" || fail "B09-d1: strip output should report 'stripped: context'"
+
+# Idempotency: second run is silent and a no-op.
+"$BIN/hv-managed-block" --strip-deprecated > "$TMP_STRIP/strip2.out"
+[ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running --strip-deprecated on clean CLAUDE.md should be silent"
+
+cd "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-managed-block — B09: --strip-deprecated removes orphan v3 blocks"
+
+echo "hv-migrate — B09: rewrite_text skips fenced/inline code + helper-path tokens"
+TMP_B09D2="$(mktemp -d)"
+trap 'rm -rf "$TMP_B09D2"' EXIT
+( cd "$TMP_B09D2" && git init -q && git config user.email t@t && git config user.name t )
+mkdir -p "$TMP_B09D2/.hv"
+echo '{"version":"3.4.0"}' > "$TMP_B09D2/.hv/config.json"
+# Fixture covers four cases:
+#   (a) `/hv-context` inside inline code — must NOT be rewritten
+#   (b) `/hv-context` in a fenced block — must NOT be rewritten
+#   (c) `hv-map-query` substring inside a helper-path token — must NOT be rewritten
+#   (d) bare `/hv-context` in prose — must be rewritten (control case)
+cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
+# TODO
+## Bugs
+- **[B01]** Mention `/hv-context` inline — preserve as a literal name.
+
+  ```
+  This fenced block names /hv-context literally.
+  ```
+
+  Use `.hv/bin/hv-map-query` to query the map — substring `hv-map` is part of a helper path.
+
+  Bare /hv-context in prose should still rewrite (control).
+EOF
+( cd "$TMP_B09D2" && git add -A && git commit -q -m init )
+
+( cd "$TMP_B09D2" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+
+# (a) inline-code mention preserved
+grep -q '`/hv-context`' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: inline-code /hv-context should be preserved"
+# (b) fenced-block mention preserved
+grep -q 'fenced block names /hv-context literally' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: fenced /hv-context should be preserved"
+# (c) helper-path token preserved (no rewrite of the embedded "/hv-map" inside the path-like token)
+grep -q 'hv-map-query' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: hv-map-query helper-path token should be preserved verbatim"
+# (d) bare prose mention rewritten to /hv-learn --term (control — proves rewriting still works outside masks)
+grep -q 'Bare /hv-learn --term in prose' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: bare /hv-context in prose should rewrite to /hv-learn --term"
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-migrate — B09: rewrite_text skips fenced/inline code + helper-path tokens"
