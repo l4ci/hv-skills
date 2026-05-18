@@ -249,7 +249,8 @@ cfg = {
   "debug":    {"competingHypotheses": <Q4-debug>},
   "docs":     {"path": "docs", "autoCreate": False, "afterWork": False},
   "loop":     {"webResearch": False},
-  "git":      {"baseBranch": ""}
+  "git":      {"baseBranch": ""},
+  "issues":   {"providers": {"github": True, "gitlab": True}}
 }
 cfg.setdefault("umbrella", {})["enabled"] = umbrella_enabled
 cfg.setdefault("hvSkills", {})["version"] = os.environ.get("HV_PLUGIN_VERSION", "")
@@ -319,6 +320,14 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # with "Yes" answers sets it to true). Default false on upgrade when the env var
 # is unset (no migration prompt for users who didn't re-run from a parent).
 .hv/bin/hv-config-set umbrella.enabled "${UMBRELLA_MODE:-false}"
+
+# issues.providers.{github,gitlab} — silent defaults. No question; gate
+# `/hv-capture --from-github` / `--from-gitlab` per-provider. Defaulted to
+# `true` because the de-facto behavior before schema visibility was
+# "enabled when absent" — make it discoverable in `.hv/config.json` so
+# users can toggle off via `/hv-config` instead of guessing.
+.hv/bin/hv-config-set issues.providers.github true
+.hv/bin/hv-config-set issues.providers.gitlab true
 
 # hvSkills.version — re-stamped on every /hv-init so the project's recorded
 # version follows the currently-installed plugin. hv-preflight nudges to

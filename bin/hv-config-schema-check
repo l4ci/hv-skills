@@ -35,6 +35,8 @@ EXPECTED = [
     ("docs", "afterWork"),
     ("git", "baseBranch"),
     ("umbrella", "enabled"),
+    ("issues", "providers", "github"),
+    ("issues", "providers", "gitlab"),
     ("hvSkills", "version"),
 ]
 p = Path(".hv/config.json")
@@ -45,7 +47,15 @@ try:
     if not isinstance(cfg, dict): raise ValueError
 except Exception:
     print("CORRUPT"); raise SystemExit
-missing = [f"{s}.{k}" for s, k in EXPECTED
-           if not isinstance(cfg.get(s), dict) or cfg.get(s, {}).get(k) is None]
+
+def _missing(path):
+    cursor = cfg
+    for seg in path[:-1]:
+        if not isinstance(cursor, dict) or not isinstance(cursor.get(seg), dict):
+            return True
+        cursor = cursor[seg]
+    return not isinstance(cursor, dict) or cursor.get(path[-1]) is None
+
+missing = [".".join(path) for path in EXPECTED if _missing(path)]
 print("UP_TO_DATE" if not missing else "STALE:" + ",".join(missing))
 PY

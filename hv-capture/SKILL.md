@@ -424,7 +424,7 @@ Inventory-driven capture: fetch open issues from the upstream GitHub or GitLab r
 
 ### Step I1 — Resolve Target Repo Set
 
-Read `issues.providers.github` and `issues.providers.gitlab` from `.hv/config.json`; if the provider matching the invoking flag is `false`, stop with: *"Provider disabled: set `issues.providers.<github|gitlab>` to `true` in `.hv/config.json` to enable."*
+Read `issues.providers.github` and `issues.providers.gitlab` from `.hv/config.json` (default `true` when the key is absent — `/hv-init` seeds both as `true`, but pre-schema-visibility configs may lack them); if the resolved value for the provider matching the invoking flag is literally `false`, stop with: *"Provider disabled: set `issues.providers.<github|gitlab>` to `true` in `.hv/config.json` to enable."*
 
 **Single-repo mode:** when `.hv/bin/hv-umbrella-on` prints `no` (or `.hv/repos.json` registers 0 sub-repos), target is cwd's repo. Skip the picker and proceed to Step I2 with that single target. If the cwd's `hv-issues-provider` doesn't match the dispatching flag (e.g. user passed `--from-github` but cwd is a GitLab repo), stop with: *"Provider mismatch: --from-<flag> requires a <flag> remote; cwd resolves to <other>."*
 
