@@ -34,6 +34,9 @@ trap 'rm -rf "$DSN_TMP"' EXIT
     echo "FAIL: hv-design-show F99 (missing) should exit 1"; exit 1
   fi
 
+  # 6b. F26: hv-design-show sources the shared lib
+  grep -q "hv-artifact-show.sh" "$BIN/hv-design-show" || { echo "FAIL: hv-design-show should source hv-artifact-show.sh after F26"; exit 1; }
+
   # 7. hv-design-list non-empty — valid JSON containing F00 entry
   OUT=$("$BIN/hv-design-list") || { echo "FAIL: hv-design-list exited non-zero"; exit 1; }
   echo "$OUT" | python3 -c "

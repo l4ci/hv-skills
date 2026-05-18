@@ -4,10 +4,6 @@
 # Usage: hv-design-show <ID>     (e.g. hv-design-show F58)
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-artifact-show.sh"
 ID="${1:?usage: hv-design-show <ID>}"
-DESIGN=".hv/designs/${ID}.md"
-if [ ! -f "$DESIGN" ]; then
-  echo "error: $DESIGN not found" >&2
-  exit 1
-fi
-cat "$DESIGN"
+hv_artifact_show design "$ID" .hv/designs
