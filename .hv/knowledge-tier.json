@@ -83,8 +83,8 @@
     },
     "Architecture::Use load_repos() for umbrella detection \u2014 never truthy-test raw repos.json": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-16"
+      "hits": 1,
+      "lastSeen": "2026-05-18"
     },
     "Build & Tooling::Smoke fixtures for dirty-tree-refusing helpers redirect stderr into $TMP_*/.hv/": {
       "tier": "provisional",
@@ -125,6 +125,91 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-17"
+    },
+    "Build & Tooling: Helpers & migrations::hv-migrate --apply bumps the version stamp on every path, including nothing_to_do": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::Bootstrap-stage helpers can't depend on hv-preamble.sh \u2014 keep the canonical exception list": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::hv-preflight opens a smoke-failure window during major-version transitions": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::Generic dispatchers accumulate dead-letter keys when typed wrappers grow own parsers": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::hv-append is the chokepoint for derived BACKLOG fields": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::TODO field additions require three synchronized edits": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Smoke testing::Standalone smoke fixtures for preamble-sourcing helpers need .hv/ in the tempdir": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Smoke testing::Smoke fixtures for dirty-tree-refusing helpers redirect stderr into $TMP_*/.hv/": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Smoke testing::Smoke sections run only inside the runner; standalone needs an env-prep wrapper": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Git & isolation::bg-isolation guard blocks main-thread Edits under /hv-work branch isolation": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Git & isolation::Worktree .hv/ is gitignored \u2014 run state helpers from main repo path": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Git & isolation::EnterWorktree branches from origin/main; rebase onto local main before editing": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Git & isolation::`git branch -d` refuses on stale remote-tracking refs": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Git & isolation::git checkout -b inherits HEAD's lead over base": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Architecture::Flat-module extractions place functions by import-DAG, not nominal category": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Architecture::Shim re-exports preserve private module-level names across extractions": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
+    },
+    "Build & Tooling: Helpers & migrations::Re-grep the actual surface before executing a stored plan": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-18"
     }
   }
 }

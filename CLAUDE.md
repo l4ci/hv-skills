@@ -3,7 +3,9 @@
 
 Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:
 
-- Architecture
+- Architecture: Module extraction & migration safety
+- Architecture: Helper conventions & invariants
+- Architecture: Skill authoring
 - Build & Tooling: Helpers & migrations
 - Build & Tooling: Smoke testing
 - Build & Tooling: Git & isolation
