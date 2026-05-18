@@ -342,10 +342,10 @@ Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with al
 
 ## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
 
-Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics including the pinned `## Glossary` term store (`/hv-learn`, `/hv-learn --term`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic. Before regenerating, the `--strip-deprecated` mode removes managed blocks left behind by previous hv-skills versions whose v4 helper has been cut (currently `<!-- hv-context-* -->`, from F18) — keeps `CLAUDE.md` from pointing at retired skills.
+Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics including the pinned `## Glossary` term store (`/hv-learn`, `/hv-learn --term`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic. Before regenerating, the `hv-managed-block-strip-deprecated` helper removes managed blocks left behind by previous hv-skills versions whose v4 helper has been cut (currently `<!-- hv-context-* -->`, from F18) — keeps `CLAUDE.md` from pointing at retired skills.
 
 ```bash
-.hv/bin/hv-managed-block --strip-deprecated
+.hv/bin/hv-managed-block-strip-deprecated
 .hv/bin/hv-skills-index
 .hv/bin/hv-managed-block knowledge
 .hv/bin/hv-vision-index

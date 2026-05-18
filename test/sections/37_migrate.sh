@@ -282,7 +282,7 @@ HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-migrate — B08: --apply bumps hvSkills.version"
 
-echo "hv-managed-block — B09: --strip-deprecated removes orphan v3 blocks"
+echo "hv-managed-block-strip-deprecated — B09: removes orphan v3 blocks"
 TMP_STRIP="$(mktemp -d)"
 trap 'rm -rf "$TMP_STRIP"' EXIT
 mkdir -p "$TMP_STRIP/.hv/bin"
@@ -305,7 +305,7 @@ Orphan block — must be stripped.
 Regular prose stays.
 EOF
 
-"$BIN/hv-managed-block" --strip-deprecated > "$TMP_STRIP/strip.out"
+"$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip.out"
 
 grep -q "hv-knowledge-start" CLAUDE.md || fail "B09-d1: live hv-knowledge block should survive strip"
 grep -q "hv-context-start" CLAUDE.md && fail "B09-d1: orphan hv-context block should be removed"
@@ -313,12 +313,12 @@ grep -q "Regular prose stays" CLAUDE.md || fail "B09-d1: surrounding prose must 
 grep -q "stripped: context" "$TMP_STRIP/strip.out" || fail "B09-d1: strip output should report 'stripped: context'"
 
 # Idempotency: second run is silent and a no-op.
-"$BIN/hv-managed-block" --strip-deprecated > "$TMP_STRIP/strip2.out"
-[ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running --strip-deprecated on clean CLAUDE.md should be silent"
+"$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip2.out"
+[ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running hv-managed-block-strip-deprecated on clean CLAUDE.md should be silent"
 
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-managed-block — B09: --strip-deprecated removes orphan v3 blocks"
+pass "hv-managed-block-strip-deprecated — B09: removes orphan v3 blocks"
 
 echo "hv-migrate — B09: rewrite_text skips fenced/inline code + helper-path tokens"
 TMP_B09D2="$(mktemp -d)"
