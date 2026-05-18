@@ -6,6 +6,7 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 
 ### Getting started
 
+- [Cheat sheet](cheatsheet.md) — one-line summary of every `/hv-*` skill (rapid scan)
 - [Getting started](getting-started.md) — install and run your first cycle
 - [How it works](how-it-works.md) — system diagram, plus how each skill connects to the artifacts it touches
 
