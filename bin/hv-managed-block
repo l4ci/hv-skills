@@ -3,54 +3,12 @@
 # Atomic-merge helper: regenerates a named managed block in CLAUDE.md; exit 0 on success, 1 on unknown key.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
-#        hv-managed-block --strip-deprecated           # remove blocks for v3-cut keys (B09)
 # Keys: knowledge | decisions | vision | map | qa (vision, map, qa are body-stdin only).
-# Prints: created | updated | appended (regenerator modes); stripped: <key> (strip mode).
+# Prints: created | updated | appended.
+# Companion: `hv-managed-block-strip-deprecated` removes orphan blocks for v3-cut keys.
 set -euo pipefail
 
-# Strip-deprecated mode: remove managed blocks for v3 keys that no v4
-# helper regenerates (B09 defect 1). Runs before any positional parsing
-# so the bare flag invocation doesn't trip the usage check below.
-if [ "${1:-}" = "--strip-deprecated" ]; then
-  . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import re
-from pathlib import Path
-from hvlib import write_text_atomic
-
-# Hardcoded list of managed-block keys that previous hv-skills versions
-# wrote to CLAUDE.md but no v4 helper regenerates. Add new entries here
-# when future cuts orphan a managed block.
-DEPRECATED_KEYS = ["context"]
-
-claude = Path("CLAUDE.md")
-if not claude.exists():
-    raise SystemExit(0)
-
-content = claude.read_text()
-new_content = content
-for key in DEPRECATED_KEYS:
-    # Match both canonical `hv-<key>-start/-end` and legacy `hv:<key>:start/:end`.
-    pattern = re.compile(
-        rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(key)}:start) -->"
-        rf".*?"
-        rf"<!-- hv(?:-{re.escape(key)}-end|:{re.escape(key)}:end) -->\n?",
-        re.DOTALL,
-    )
-    new_content, n = pattern.subn("", new_content)
-    if n:
-        print(f"stripped: {key}")
-
-if new_content != content:
-    # Collapse any 3+ consecutive blank lines left behind by the strip down
-    # to exactly two blank lines, keeping the surrounding doc readable.
-    new_content = re.sub(r"\n{3,}", "\n\n", new_content)
-    write_text_atomic(str(claude), new_content)
-PY
-  exit 0
-fi
-
-KEY="${1:?usage: hv-managed-block <key> [--body-stdin]   |   hv-managed-block --strip-deprecated}"
+KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"
 MODE="${2:-}"
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 

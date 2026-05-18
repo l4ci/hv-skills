@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Atomic multi-term import into the ## Glossary topic of .hv/KNOWLEDGE.md.
+# Mutator helper: exit 0 on success, 2 on usage error, 3 on alias collision.
+#
+# Usage: hv-glossary-import <manifest> [--touch]
+#
+# Manifest format: tab-separated columns `term<TAB>def<TAB>aliases<TAB>nots`.
+# Aliases/nots are CSV (comma-separated) within the cell. Blank lines and
+# lines starting with `#` are skipped.
+#
+# Validated against existing Glossary entries AND intra-batch uniqueness
+# BEFORE any write — on any alias collision the entire batch is refused
+# with a multi-line conflict summary; KNOWLEDGE.md is not touched.
+#
+# Companion to hv-glossary-write (single-term). Split out so the batch
+# validator and the single-write path can evolve independently and so each
+# file stays narrowly focused. Single-repo only; umbrella support is F21.
+# Regenerates the CLAUDE.md hv-knowledge managed block on success.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+TOUCH="false"
+MANIFEST=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --touch) TOUCH="true"; shift ;;
+    --) shift; break ;;
+    -*) echo "error: unknown flag $1" >&2; exit 2 ;;
+    *) [ -z "$MANIFEST" ] && MANIFEST="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
+  esac
+done
+
+[ -n "$MANIFEST" ] || { echo "usage: hv-glossary-import <manifest> [--touch]" >&2; exit 2; }
+[ -f "$MANIFEST" ] || { echo "error: manifest file '$MANIFEST' not found" >&2; exit 2; }
+
+TARGET=".hv/KNOWLEDGE.md"
+[ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MANIFEST" "$TARGET" "$TOUCH" <<'PY'
+import datetime as dt
+import re
+import sys
+from pathlib import Path
+from hvlib import (
+    build_glossary_entry,
+    find_section,
+    parse_glossary_entries,
+    replace_section,
+    split_csv_list,
+    write_text_atomic,
+)
+
+manifest_path = Path(sys.argv[1])
+target_path = Path(sys.argv[2])
+touch = (sys.argv[3] == "true")
+
+today = dt.date.today().isoformat()
+text = target_path.read_text()
+span = find_section(text, "Glossary")
+if span is None:
+    print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
+    sys.exit(2)
+start, end = span
+existing_entries, leading = parse_glossary_entries(text[start:end])
+by_key: dict[str, dict] = {e["name"].lower(): e for e in existing_entries}
+
+candidates: list[dict] = []
+seen_in_batch: dict[str, int] = {}
+for lineno, raw in enumerate(manifest_path.read_text().splitlines(), start=1):
+    line = raw.rstrip("\n")
+    if not line.strip() or line.lstrip().startswith("#"):
+        continue
+    cells = line.split("\t")
+    while len(cells) < 4:
+        cells.append("")
+    term, definition, aliases_raw, nots_raw = cells[0], cells[1], cells[2], cells[3]
+    term = term.strip()
+    definition = definition.strip()
+    if not term or not definition:
+        print(f"error: manifest line {lineno}: term and def are required (got term='{term}', def='{definition}')", file=sys.stderr)
+        sys.exit(2)
+    key = term.lower()
+    if key in seen_in_batch:
+        print(f"error: manifest line {lineno}: term '{term}' appears earlier on line {seen_in_batch[key]} — refusing batch", file=sys.stderr)
+        sys.exit(3)
+    seen_in_batch[key] = lineno
+    candidates.append({
+        "lineno": lineno,
+        "name": term,
+        "definition": definition,
+        "aliases": split_csv_list(aliases_raw),
+        "nots": split_csv_list(nots_raw),
+    })
+
+if not candidates:
+    print("noop: batch manifest contained no terms", file=sys.stderr)
+    sys.exit(0)
+
+existing_alias_owner: dict[str, str] = {}
+for e in existing_entries:
+    for a in e["aliases"]:
+        existing_alias_owner[a.lower()] = e["name"].lower()
+
+conflicts: list[str] = []
+batch_alias_owner: dict[str, tuple[str, int]] = {}
+
+for cand in candidates:
+    cand_key = cand["name"].lower()
+    for a in cand["aliases"]:
+        al = a.lower()
+        owner = existing_alias_owner.get(al)
+        if owner and owner != cand_key:
+            owner_name = next((e["name"] for e in existing_entries if e["name"].lower() == owner), owner)
+            conflicts.append(
+                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with existing term '{owner_name}'"
+            )
+            continue
+        prior = batch_alias_owner.get(al)
+        if prior and prior[0] != cand_key:
+            prior_term = next((c["name"] for c in candidates if c["name"].lower() == prior[0]), prior[0])
+            conflicts.append(
+                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with '{prior_term}' on line {prior[1]} (intra-batch)"
+            )
+            continue
+        batch_alias_owner[al] = (cand_key, cand["lineno"])
+
+if conflicts:
+    print("error: batch alias collisions — refusing entire batch:", file=sys.stderr)
+    for c in conflicts:
+        print(f"  {c}", file=sys.stderr)
+    sys.exit(3)
+
+for cand in candidates:
+    key = cand["name"].lower()
+    if key in by_key:
+        prev = by_key[key]
+        merged_aliases: list[str] = []
+        seen: set[str] = set()
+        for a in prev["aliases"] + cand["aliases"]:
+            al = a.lower()
+            if al not in seen:
+                seen.add(al)
+                merged_aliases.append(a)
+        merged_nots: list[str] = []
+        seen_n: set[str] = set()
+        for n in prev["nots"] + cand["nots"]:
+            nl = n.lower()
+            if nl not in seen_n:
+                seen_n.add(nl)
+                merged_nots.append(n)
+        by_key[key] = {
+            "name": prev["name"],
+            "definition": cand["definition"],
+            "aliases": merged_aliases,
+            "nots": merged_nots,
+            "date": today if touch else (prev["date"] or today),
+        }
+    else:
+        by_key[key] = {
+            "name": cand["name"],
+            "definition": cand["definition"],
+            "aliases": cand["aliases"],
+            "nots": cand["nots"],
+            "date": today,
+        }
+
+ordered_keys = sorted(by_key.keys())
+rendered = "\n\n".join(build_glossary_entry(by_key[k], today) for k in ordered_keys)
+
+leading_clean = re.sub(
+    r"^_\(no terms yet[^)]*\)_\s*$\n?",
+    "",
+    leading,
+    flags=re.MULTILINE,
+).rstrip("\n")
+new_body = ("\n" + leading_clean.strip() + "\n\n" if leading_clean.strip() else "\n") + rendered + "\n"
+new_text = replace_section(text, "Glossary", new_body)
+write_text_atomic(target_path, new_text)
+for cand in candidates:
+    print(f"wrote: Glossary/{cand['name']}", file=sys.stderr)
+print(f"batch ok: {len(candidates)} term(s) imported atomically", file=sys.stderr)
+PY
+
+# Regenerate the hv-knowledge CLAUDE.md managed block so the topic list
+# stays current (Glossary surfaces automatically since it's just a topic).
+"$HERE/hv-managed-block" knowledge >/dev/null

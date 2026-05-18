@@ -69,7 +69,8 @@ def parse_items(body):
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line})
     return items
 
-_open_bodies = dict(iter_open_sections(content))
+_open_sections = list(iter_open_sections(content))
+_open_bodies = dict(_open_sections)
 bugs = [i for i in parse_items(_open_bodies.get("Bugs", "")) if i["id"] not in active_ids]
 features = [i for i in parse_items(_open_bodies.get("Features", "")) if i["id"] not in active_ids]
 tasks = [i for i in parse_items(_open_bodies.get("Tasks", "")) if i["id"] not in active_ids]
@@ -142,7 +143,7 @@ render_table("Tasks", tasks, ["ID", "Title", "Related"],
 # Connected components across all backlog items (≥ 2 members).
 # Built from the original parsed lists so active items remain in the graph —
 # a backlog item related to an in-flight one is still useful context.
-all_items = [i for _name, body in iter_open_sections(content) for i in parse_items(body)]
+all_items = [i for _name, body in _open_sections for i in parse_items(body)]
 title_by_id = {i["id"]: i["title"] for i in all_items}
 adj = defaultdict(set)
 id_pat = re.compile(rf"\[({ITEM_CLASS}\d+)\]")

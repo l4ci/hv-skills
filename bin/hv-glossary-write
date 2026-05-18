@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Add or update a term entry in the ## Glossary topic of .hv/KNOWLEDGE.md.
+# Add or update a single term entry in the ## Glossary topic of .hv/KNOWLEDGE.md.
 # Writer helper: exit 0 on successful write; exit 2 on usage error, 3 on alias collision.
 #
-# Usage:
-#   hv-glossary-write <term> --def <text> [--alias <a>,...] [--not <n>,...] [--touch]
-#   hv-glossary-write --batch <manifest>    # atomic multi-term import (F18 T9)
+# Usage: hv-glossary-write <term> --def <text> [--alias <a>,...] [--not <n>,...] [--touch]
+#
+# For atomic multi-term import use `hv-glossary-import <manifest>` — the batch
+# path was split out so its validator and this single-write path can evolve
+# independently.
 #
 # Single-repo only. Umbrella support (per-sub-repo Glossary) is F21.
 #
@@ -22,15 +24,6 @@
 # Refuses (exit 3) when an alias would collide with another term's alias in the
 # same Glossary topic (cross-term uniqueness).
 #
-# Batch mode (--batch <manifest>): manifest is tab-separated with columns
-# `term<TAB>def<TAB>aliases<TAB>nots`. Aliases/nots are CSV (comma-separated)
-# within the cell. Blank lines and lines starting with `#` are skipped. The
-# whole batch is validated against existing Glossary entries AND intra-batch
-# uniqueness BEFORE any write — on any alias collision the entire batch is
-# refused (exit 3) with a multi-line conflict summary; KNOWLEDGE.md is not
-# touched. F19 (/hv-migrate v4) consumes this mode to import the per-term
-# entries from a legacy .hv/CONTEXT.md atomically.
-#
 # Regenerates the CLAUDE.md hv-knowledge block on success (Glossary surfaces
 # as a topic name through hv-managed-block knowledge — terms themselves are not listed).
 set -euo pipefail
@@ -41,7 +34,6 @@ ALIASES_RAW=""
 NOTS_RAW=""
 TOUCH="false"
 NOTS_PROVIDED="false"
-BATCH_MANIFEST=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,7 +41,7 @@ while [ $# -gt 0 ]; do
     --alias) ALIASES_RAW="$2"; shift 2 ;;
     --not)   NOTS_RAW="$2"; NOTS_PROVIDED="true"; shift 2 ;;
     --touch) TOUCH="true"; shift ;;
-    --batch) BATCH_MANIFEST="$2"; shift 2 ;;
+    --batch) echo "error: --batch was split out — call hv-glossary-import <manifest> directly" >&2; exit 2 ;;
     --) shift; break ;;
     -*) echo "error: unknown flag $1" >&2; exit 2 ;;
     *) [ -z "$TERM" ] && TERM="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
@@ -61,237 +53,6 @@ done
 TARGET=".hv/KNOWLEDGE.md"
 [ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
 
-if [ -n "$BATCH_MANIFEST" ]; then
-  [ -z "$TERM" ] && [ -z "$DEF" ] || { echo "error: --batch is mutually exclusive with positional term + --def" >&2; exit 2; }
-  [ -f "$BATCH_MANIFEST" ] || { echo "error: manifest file '$BATCH_MANIFEST' not found" >&2; exit 2; }
-
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BATCH_MANIFEST" "$TARGET" "$TOUCH" <<'PY'
-import datetime as dt
-import re
-import sys
-from pathlib import Path
-from hvlib import find_section, replace_section, write_text_atomic
-
-manifest_path = Path(sys.argv[1])
-target_path = Path(sys.argv[2])
-touch = (sys.argv[3] == "true")
-
-def split_csv(s: str) -> list[str]:
-    return [x.strip() for x in s.split(",") if x.strip()]
-
-
-def parse_glossary_entries(body: str) -> tuple[list[dict], str]:
-    lines = body.splitlines(keepends=True)
-    i = 0
-    leading: list[str] = []
-    while i < len(lines):
-        if re.match(r"^- \*\*", lines[i]):
-            break
-        leading.append(lines[i])
-        i += 1
-    entries: list[dict] = []
-    while i < len(lines):
-        m = re.match(r"^- \*\*([^*]+)\*\*\s*(?:—\s*(.*))?\s*$", lines[i])
-        if not m:
-            i += 1
-            continue
-        name = m.group(1).strip()
-        first_line_rest = (m.group(2) or "").rstrip()
-        def_parts: list[str] = []
-        if first_line_rest:
-            def_parts.append(first_line_rest)
-        aliases: list[str] = []
-        nots: list[str] = []
-        date: str | None = None
-        i += 1
-        while i < len(lines):
-            sub = lines[i]
-            if re.match(r"^- \*\*", sub):
-                break
-            stripped = sub.strip()
-            if not stripped:
-                i += 1
-                continue
-            m_al = re.match(r"^- \*\*Aliases:\*\*\s*(.*)$", stripped)
-            if m_al:
-                value = m_al.group(1).strip()
-                if value and value != "_none_":
-                    aliases = [a.strip() for a in value.split(",") if a.strip()]
-                i += 1
-                continue
-            m_no = re.match(r"^- \*\*Not:\*\*\s*(.*)$", stripped)
-            if m_no:
-                value = m_no.group(1).strip()
-                if value:
-                    nots = [n.strip() for n in value.split(",") if n.strip()]
-                i += 1
-                continue
-            m_dt = re.match(r"^<!--\s*(\d{4}-\d{2}-\d{2})\s*-->\s*$", stripped)
-            if m_dt:
-                date = m_dt.group(1)
-                i += 1
-                continue
-            def_parts.append(stripped)
-            i += 1
-        entries.append({
-            "name": name,
-            "definition": " ".join(def_parts).strip(),
-            "aliases": aliases,
-            "nots": nots,
-            "date": date,
-        })
-    return entries, "".join(leading)
-
-
-def build_entry(e: dict, today: str) -> str:
-    lines = [f"- **{e['name']}** — {e['definition']}"]
-    aliases_value = ", ".join(e["aliases"]) if e["aliases"] else "_none_"
-    lines.append(f"  - **Aliases:** {aliases_value}")
-    if e["nots"]:
-        lines.append(f"  - **Not:** {', '.join(e['nots'])}")
-    lines.append(f"  <!-- {e['date'] or today} -->")
-    return "\n".join(lines)
-
-
-today = dt.date.today().isoformat()
-text = target_path.read_text()
-span = find_section(text, "Glossary")
-if span is None:
-    print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
-    sys.exit(2)
-start, end = span
-existing_entries, leading = parse_glossary_entries(text[start:end])
-by_key: dict[str, dict] = {e["name"].lower(): e for e in existing_entries}
-
-# Parse manifest. Skip blank lines and # comments. Each non-skip row must have
-# 1-4 tab-separated fields: term \t def \t aliases \t nots (trailing fields optional).
-candidates: list[dict] = []
-seen_in_batch: dict[str, int] = {}
-for lineno, raw in enumerate(manifest_path.read_text().splitlines(), start=1):
-    line = raw.rstrip("\n")
-    if not line.strip() or line.lstrip().startswith("#"):
-        continue
-    cells = line.split("\t")
-    while len(cells) < 4:
-        cells.append("")
-    term, definition, aliases_raw, nots_raw = cells[0], cells[1], cells[2], cells[3]
-    term = term.strip()
-    definition = definition.strip()
-    if not term or not definition:
-        print(f"error: manifest line {lineno}: term and def are required (got term='{term}', def='{definition}')", file=sys.stderr)
-        sys.exit(2)
-    key = term.lower()
-    if key in seen_in_batch:
-        print(f"error: manifest line {lineno}: term '{term}' appears earlier on line {seen_in_batch[key]} — refusing batch", file=sys.stderr)
-        sys.exit(3)
-    seen_in_batch[key] = lineno
-    candidates.append({
-        "lineno": lineno,
-        "name": term,
-        "definition": definition,
-        "aliases": split_csv(aliases_raw),
-        "nots": split_csv(nots_raw),
-    })
-
-if not candidates:
-    print("noop: batch manifest contained no terms", file=sys.stderr)
-    sys.exit(0)
-
-# Validate every candidate's aliases atomically. Conflicts can be:
-#   (1) Candidate's alias matches an existing OTHER term's alias.
-#   (2) Candidate's alias matches another candidate's alias for a different term.
-# Same-term updates union aliases; aliases attached to the SAME (case-insensitive)
-# term are not conflicts.
-existing_alias_owner: dict[str, str] = {}
-for e in existing_entries:
-    for a in e["aliases"]:
-        existing_alias_owner[a.lower()] = e["name"].lower()
-
-conflicts: list[str] = []
-batch_alias_owner: dict[str, tuple[str, int]] = {}  # alias_lower -> (term_lower, lineno)
-
-for cand in candidates:
-    cand_key = cand["name"].lower()
-    for a in cand["aliases"]:
-        al = a.lower()
-        owner = existing_alias_owner.get(al)
-        if owner and owner != cand_key:
-            owner_name = next((e["name"] for e in existing_entries if e["name"].lower() == owner), owner)
-            conflicts.append(
-                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with existing term '{owner_name}'"
-            )
-            continue
-        prior = batch_alias_owner.get(al)
-        if prior and prior[0] != cand_key:
-            prior_term = next((c["name"] for c in candidates if c["name"].lower() == prior[0]), prior[0])
-            conflicts.append(
-                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with '{prior_term}' on line {prior[1]} (intra-batch)"
-            )
-            continue
-        batch_alias_owner[al] = (cand_key, cand["lineno"])
-
-if conflicts:
-    print("error: batch alias collisions — refusing entire batch:", file=sys.stderr)
-    for c in conflicts:
-        print(f"  {c}", file=sys.stderr)
-    sys.exit(3)
-
-# Apply: for each candidate, either insert new or merge into existing.
-for cand in candidates:
-    key = cand["name"].lower()
-    if key in by_key:
-        prev = by_key[key]
-        merged_aliases: list[str] = []
-        seen: set[str] = set()
-        for a in prev["aliases"] + cand["aliases"]:
-            al = a.lower()
-            if al not in seen:
-                seen.add(al)
-                merged_aliases.append(a)
-        merged_nots: list[str] = []
-        seen_n: set[str] = set()
-        for n in prev["nots"] + cand["nots"]:
-            nl = n.lower()
-            if nl not in seen_n:
-                seen_n.add(nl)
-                merged_nots.append(n)
-        by_key[key] = {
-            "name": prev["name"],
-            "definition": cand["definition"],
-            "aliases": merged_aliases,
-            "nots": merged_nots,
-            "date": today if touch else (prev["date"] or today),
-        }
-    else:
-        by_key[key] = {
-            "name": cand["name"],
-            "definition": cand["definition"],
-            "aliases": cand["aliases"],
-            "nots": cand["nots"],
-            "date": today,
-        }
-
-ordered_keys = sorted(by_key.keys())
-rendered = "\n\n".join(build_entry(by_key[k], today) for k in ordered_keys)
-
-leading_clean = re.sub(
-    r"^_\(no terms yet[^)]*\)_\s*$\n?",
-    "",
-    leading,
-    flags=re.MULTILINE,
-).rstrip("\n")
-new_body = ("\n" + leading_clean.strip() + "\n\n" if leading_clean.strip() else "\n") + rendered + "\n"
-new_text = replace_section(text, "Glossary", new_body)
-write_text_atomic(target_path, new_text)
-for cand in candidates:
-    print(f"wrote: Glossary/{cand['name']}", file=sys.stderr)
-print(f"batch ok: {len(candidates)} term(s) imported atomically", file=sys.stderr)
-PY
-
-  "$HERE/hv-managed-block" knowledge >/dev/null
-  exit 0
-fi
-
 [ -n "$TERM" ] || { echo "usage: hv-glossary-write <term> --def <text> [--alias …] [--not …] [--touch]" >&2; exit 2; }
 [ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
 
@@ -300,18 +61,22 @@ import datetime as dt
 import re
 import sys
 from pathlib import Path
-from hvlib import find_section, replace_section, write_text_atomic
+from hvlib import (
+    build_glossary_entry,
+    find_section,
+    parse_glossary_entries,
+    replace_section,
+    split_csv_list,
+    write_text_atomic,
+)
 
 term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target = sys.argv[1:]
 target_path = Path(target)
 nots_provided = (nots_provided == "true")
 touch = (touch_flag == "true")
 
-def split_csv(s: str) -> list[str]:
-    return [x.strip() for x in s.split(",") if x.strip()]
-
-new_aliases = split_csv(aliases_raw)
-new_nots = split_csv(nots_raw)
+new_aliases = split_csv_list(aliases_raw)
+new_nots = split_csv_list(nots_raw)
 
 text = target_path.read_text()
 span = find_section(text, "Glossary")
@@ -319,98 +84,11 @@ if span is None:
     print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
     sys.exit(2)
 start, end = span
-glossary_body = text[start:end]
-
-
-def parse_glossary_entries(body: str) -> tuple[list[dict], str]:
-    """Parse nested-bullet term entries from the Glossary body.
-
-    Each entry shape:
-        - **<term>** — <definition>
-          - **Aliases:** X, Y
-          - **Not:** Z              (optional)
-          <!-- YYYY-MM-DD -->       (optional but conventional)
-
-    Returns (entries, leading) where leading is the prose between the heading
-    and the first entry (or the placeholder line). entries preserves document
-    order.
-    """
-    lines = body.splitlines(keepends=True)
-    i = 0
-    leading: list[str] = []
-    while i < len(lines):
-        if re.match(r"^- \*\*", lines[i]):
-            break
-        leading.append(lines[i])
-        i += 1
-    entries: list[dict] = []
-    while i < len(lines):
-        line = lines[i]
-        m = re.match(r"^- \*\*([^*]+)\*\*\s*(?:—\s*(.*))?\s*$", line)
-        if not m:
-            i += 1
-            continue
-        name = m.group(1).strip()
-        first_line_rest = (m.group(2) or "").rstrip()
-        def_parts: list[str] = []
-        if first_line_rest:
-            def_parts.append(first_line_rest)
-        aliases: list[str] = []
-        nots: list[str] = []
-        date: str | None = None
-        i += 1
-        while i < len(lines):
-            sub = lines[i]
-            # End of entry: next top-level bullet or end of body.
-            if re.match(r"^- \*\*", sub):
-                break
-            stripped = sub.strip()
-            if not stripped:
-                i += 1
-                continue
-            m_al = re.match(r"^- \*\*Aliases:\*\*\s*(.*)$", stripped)
-            if m_al:
-                value = m_al.group(1).strip()
-                if value and value != "_none_":
-                    aliases = [a.strip() for a in value.split(",") if a.strip()]
-                i += 1
-                continue
-            m_no = re.match(r"^- \*\*Not:\*\*\s*(.*)$", stripped)
-            if m_no:
-                value = m_no.group(1).strip()
-                if value:
-                    nots = [n.strip() for n in value.split(",") if n.strip()]
-                i += 1
-                continue
-            m_dt = re.match(r"^<!--\s*(\d{4}-\d{2}-\d{2})\s*-->\s*$", stripped)
-            if m_dt:
-                date = m_dt.group(1)
-                i += 1
-                continue
-            # Continuation of definition (multi-line def is uncommon but supported).
-            if stripped.startswith("- "):
-                # Unknown nested-bullet kind; ignore it conservatively (don't lose data — wrap into def).
-                def_parts.append(stripped)
-            else:
-                def_parts.append(stripped)
-            i += 1
-        entries.append({
-            "name": name,
-            "definition": " ".join(def_parts).strip(),
-            "aliases": aliases,
-            "nots": nots,
-            "date": date,
-        })
-    leading_text = "".join(leading)
-    return entries, leading_text
-
-
-entries, leading = parse_glossary_entries(glossary_body)
+entries, leading = parse_glossary_entries(text[start:end])
 by_key = {e["name"].lower(): e for e in entries}
 today = dt.date.today().isoformat()
 key = term.lower()
 
-# Cross-term alias-collision check within Glossary.
 for other_key, info in by_key.items():
     if other_key == key:
         continue
@@ -461,21 +139,9 @@ by_key[key] = {
     "date": date,
 }
 
-
-def build_entry(e: dict) -> str:
-    lines = [f"- **{e['name']}** — {e['definition']}"]
-    aliases_value = ", ".join(e["aliases"]) if e["aliases"] else "_none_"
-    lines.append(f"  - **Aliases:** {aliases_value}")
-    if e["nots"]:
-        lines.append(f"  - **Not:** {', '.join(e['nots'])}")
-    lines.append(f"  <!-- {e['date'] or today} -->")
-    return "\n".join(lines)
-
-
 ordered_keys = sorted(by_key.keys())
-rendered = "\n\n".join(build_entry(by_key[k]) for k in ordered_keys)
+rendered = "\n\n".join(build_glossary_entry(by_key[k], today) for k in ordered_keys)
 
-# Drop the "no terms yet" placeholder once any term exists.
 leading_clean = re.sub(
     r"^_\(no terms yet[^)]*\)_\s*$\n?",
     "",

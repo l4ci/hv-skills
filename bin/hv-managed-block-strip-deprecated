@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Remove managed CLAUDE.md blocks for v3 keys that no v4 helper regenerates.
+# Mutator helper: exit 0 on success (idempotent — silent when nothing to strip).
+# Usage: hv-managed-block-strip-deprecated
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import re
+from pathlib import Path
+from hvlib import write_text_atomic
+
+# Hardcoded list of managed-block keys that previous hv-skills versions
+# wrote to CLAUDE.md but no v4 helper regenerates. Add new entries here
+# when future cuts orphan a managed block.
+DEPRECATED_KEYS = ["context"]
+
+claude = Path("CLAUDE.md")
+if not claude.exists():
+    raise SystemExit(0)
+
+content = claude.read_text()
+new_content = content
+for key in DEPRECATED_KEYS:
+    # Match both canonical `hv-<key>-start/-end` and legacy `hv:<key>:start/:end`.
+    pattern = re.compile(
+        rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(key)}:start) -->"
+        rf".*?"
+        rf"<!-- hv(?:-{re.escape(key)}-end|:{re.escape(key)}:end) -->\n?",
+        re.DOTALL,
+    )
+    new_content, n = pattern.subn("", new_content)
+    if n:
+        print(f"stripped: {key}")
+
+if new_content != content:
+    # Collapse any 3+ consecutive blank lines left behind by the strip down
+    # to exactly two blank lines, keeping the surrounding doc readable.
+    new_content = re.sub(r"\n{3,}", "\n\n", new_content)
+    write_text_atomic(str(claude), new_content)
+PY

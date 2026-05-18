@@ -36,7 +36,7 @@ Phases:
 
 **Args parsing.** Before running the phases above, inspect the `args` value passed at invocation. If `args` contains any of the following flags, skip Steps 2–8 and jump directly to Step 1.5:
 
-- `--term <name>` — capture a domain term into the `## Glossary` topic of `.hv/KNOWLEDGE.md` (folds the former `/hv-context` flow); requires `--def`, accepts `--alias`, `--not`, `--touch`
+- `--term <name>` — capture a domain term into the `## Glossary` topic of `.hv/KNOWLEDGE.md`; requires `--def`, accepts `--alias`, `--not`, `--touch`
 - `--promote <topic> "<title>"` — promote one bullet to `confirmed`, bypassing discovery
 - `--deprecate <topic> "<title>"` — demote one bullet to `deprecated`, bypassing discovery
 - `--amend <topic> "<title>"` — rewrite the body of one bullet, preserving tier + hits
@@ -49,7 +49,7 @@ This step fires only when a manual flag (`--term`, `--promote`, `--deprecate`, o
 
 ### `--term <name>`
 
-Captures a domain term into the pinned `## Glossary` topic of `.hv/KNOWLEDGE.md`. Folds the former `/hv-context` capture flow; `/hv-context` was removed in v4.0.
+Captures a domain term into the pinned `## Glossary` topic of `.hv/KNOWLEDGE.md`.
 
 **Required:** `--def "<text>"` — one-paragraph canonical definition (single paragraph, no nested headings).
 **Optional:** `--alias "a, b, c"` (comma-separated synonyms), `--not "x, y"` (near-miss disambiguators), `--touch` (force-bump the date stamp on an existing-term update).

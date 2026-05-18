@@ -186,46 +186,10 @@ The helper writes `.hv/repos.json` and (if the umbrella is itself a git repo) ap
 Detect the current config state — fresh projects take the full interactive path; upgrading projects keep every prior value and are only prompted for keys added since their config was written:
 
 ```bash
-python3 - <<'PY'
-import json
-from pathlib import Path
-
-EXPECTED = [
-    ("models", "orchestrator"),
-    ("models", "worker"),
-    ("work", "isolation"),
-    ("work", "mergeStrategy"),
-    ("refactor", "confirmBeforeExecute"),
-    ("refactor", "verifyCommands"),
-    ("learn", "verify"),
-    ("learn", "promoteThreshold"),
-    ("ship", "review"),
-    ("ship", "secondOpinion"),
-    ("ship", "qa"),
-    ("qa", "gate"),
-    ("qa", "afterWork"),
-    ("autonomy", "level"),
-    ("debug", "competingHypotheses"),
-    ("docs", "path"),
-    ("docs", "autoCreate"),
-    ("docs", "afterWork"),
-    ("git", "baseBranch"),
-    ("umbrella", "enabled"),
-    ("hvSkills", "version"),
-]
-p = Path(".hv/config.json")
-if not p.exists():
-    print("FRESH"); raise SystemExit
-try:
-    cfg = json.loads(p.read_text())
-    if not isinstance(cfg, dict): raise ValueError
-except Exception:
-    print("CORRUPT"); raise SystemExit
-missing = [f"{s}.{k}" for s, k in EXPECTED
-           if not isinstance(cfg.get(s), dict) or cfg.get(s, {}).get(k) is None]
-print("UP_TO_DATE" if not missing else "STALE:" + ",".join(missing))
-PY
+.hv/bin/hv-config-schema-check
 ```
+
+The helper owns the expected-key list — see `bin/hv-config-schema-check` for the canonical `EXPECTED` tuples. Output: `FRESH` | `UP_TO_DATE` | `STALE:<sec>.<key>,...` | `CORRUPT`.
 
 Branch on the output:
 

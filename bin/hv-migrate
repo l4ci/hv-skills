@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # One-shot v3 → v4 codemod. Rewrites references to 8 commands cut by M01,
-# migrates .hv/CONTEXT.md terms into .hv/KNOWLEDGE.md (## Glossary) via F18's
-# `hv-glossary-write --batch`, and removes stale `.hv/bin/hv-context-*` files
-# left by the cuts. `--dry-run` is default; `--apply` writes; `--verbose` adds
+# migrates .hv/CONTEXT.md terms into .hv/KNOWLEDGE.md (## Glossary) via
+# `hv-glossary-import`, and removes stale `.hv/bin/hv-context-*` files left
+# by the cuts. `--dry-run` is default; `--apply` writes; `--verbose` adds
 # per-file diffs. Idempotent — a clean second `--apply` rewrites zero files.
 # Writer helper: exit 0 on success; exit 1 on safety-precondition refusal,
-# 2 on usage error, 3 on F18 dependency failure.
+# 2 on usage error, 3 on missing companion helper.
 #
 # Usage:
 #   hv-migrate v4 [--apply] [--verbose]
@@ -41,9 +41,9 @@ fi
 
 export _HV_MIGRATE_APPLY="$APPLY"
 export _HV_MIGRATE_VERBOSE="$VERBOSE"
-export _HV_MIGRATE_GLOSSARY_WRITE="$HERE/hv-glossary-write"
+export _HV_MIGRATE_GLOSSARY_IMPORT="$HERE/hv-glossary-import"
 export _HV_MIGRATE_RESOLVE_PLUGIN="$HERE/hv-resolve-plugin-root"
-export _HV_MIGRATE_MANAGED_BLOCK="$HERE/hv-managed-block"
+export _HV_MIGRATE_MANAGED_BLOCK_STRIP="$HERE/hv-managed-block-strip-deprecated"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import datetime as dt
@@ -60,9 +60,9 @@ from hvlib import iter_topics, load_repos, parse_term_entry, write_text_atomic
 
 APPLY = os.environ["_HV_MIGRATE_APPLY"] == "true"
 VERBOSE = os.environ["_HV_MIGRATE_VERBOSE"] == "true"
-GLOSSARY_WRITE = os.environ["_HV_MIGRATE_GLOSSARY_WRITE"]
+GLOSSARY_IMPORT = os.environ["_HV_MIGRATE_GLOSSARY_IMPORT"]
 RESOLVE_PLUGIN = os.environ["_HV_MIGRATE_RESOLVE_PLUGIN"]
-MANAGED_BLOCK = os.environ["_HV_MIGRATE_MANAGED_BLOCK"]
+MANAGED_BLOCK_STRIP = os.environ["_HV_MIGRATE_MANAGED_BLOCK_STRIP"]
 
 ROOT = Path.cwd()
 
@@ -155,7 +155,7 @@ def check_safety_preconditions() -> None:
         cfg = json.loads(CONFIG_PATH.read_text())
     except json.JSONDecodeError as e:
         die(f"refusing: .hv/config.json is not valid JSON ({e}).", 1)
-    # B07: nested-first read with legacy top-level fallback.
+    # Nested-first read with legacy top-level fallback.
     # /hv-init writes hvSkills.version (canonical v4 location); v3 projects
     # stamped the top-level "version" key. Tolerate both so fresh v4 inits
     # (hvSkills.version only) don't dead-end here.
@@ -184,21 +184,13 @@ def check_safety_preconditions() -> None:
         )
 
 
-def check_f18_dependency() -> None:
-    """Verify hv-glossary-write supports --batch (F18 obligation)."""
-    gw = Path(GLOSSARY_WRITE)
-    if not gw.exists():
+def check_glossary_import_present() -> None:
+    """Verify bin/hv-glossary-import exists — required for CONTEXT.md migration."""
+    gi = Path(GLOSSARY_IMPORT)
+    if not gi.exists():
         die(
-            "refusing: F18 dependency missing — bin/hv-glossary-write not found. "
-            "F19 cannot ship without F18's --batch API.",
-            3,
-        )
-    # Static check — the helper's arg parser carries `--batch` literally.
-    # Cheaper and more reliable than probing (probes hit per-cwd preconditions).
-    if "--batch" not in gw.read_text():
-        die(
-            "refusing: F18 dependency stale — bin/hv-glossary-write missing --batch mode. "
-            "Reinstall hv-skills to pick up F18.",
+            "refusing: bin/hv-glossary-import not found — reinstall hv-skills to pick "
+            "up the split helper (the batch path was previously hv-glossary-write --batch).",
             3,
         )
 
@@ -225,7 +217,7 @@ def _compute_skip_mask(text: str) -> list[tuple[int, int]]:
     Covers fenced code blocks, inline code spans, and helper-path tokens like
     `hv-map-query` or `.hv/bin/hv-foo` — anything that's a literal helper
     name (multi-segment kebab containing hv-) rather than a slash-command
-    usage. The mask is a guard against B09 defect 2 false-positives."""
+    usage. The mask is a guard against false-positive rewrites inside code spans."""
     masks: list[tuple[int, int]] = []
     # Fenced code blocks: ```...```  (DOTALL so they span lines)
     for m in re.finditer(r"```.*?```", text, re.DOTALL):
@@ -236,8 +228,9 @@ def _compute_skip_mask(text: str) -> list[tuple[int, int]]:
     # Helper-path tokens: multi-segment names like `hv-map-query` or paths
     # like `.hv/bin/hv-foo`. The regex requires `hv-` followed by two or more
     # word-char segments separated by hyphens, optionally prefixed by a path.
-    # This catches B09 defect 2b (substring false-match on hv-map-query) while
-    # leaving bare slash-commands like `/hv-context` untouched (only one segment).
+    # This catches substring false-matches on multi-segment helper names like
+    # `hv-map-query` while leaving bare slash-commands like `/hv-context`
+    # untouched (only one segment).
     for m in re.finditer(r"(?:[\w./]+/)?\bhv-\w+(?:-\w+)+", text):
         masks.append((m.start(), m.end()))
     return masks
@@ -251,10 +244,10 @@ def _overlaps_any(start: int, end: int, masks: list[tuple[int, int]]) -> bool:
 def rewrite_text(text: str, file_repr: str):
     """Apply all 8 rules to `text`. Return (new_text, count, manual_reviews).
 
-    B09 defect 2 mitigation: skip matches inside fenced/inline code spans
-    and inside helper-path tokens. This prevents corrupting self-documenting
-    mentions in BACKLOG/KNOWLEDGE entries and substring false-matches like
-    `/hv-map\b` hitting inside `hv-map-query`.
+    Skip matches inside fenced/inline code spans and inside helper-path
+    tokens. This prevents corrupting self-documenting mentions in
+    BACKLOG/KNOWLEDGE entries and substring false-matches like `/hv-map\b`
+    hitting inside `hv-map-query`.
 
     `manual_reviews` is a list of "file:line: rule — reason" strings.
     """
@@ -389,12 +382,12 @@ def apply_context_migration(plan, backup_root: Path) -> None:
             manifest = f.name
         try:
             r = subprocess.run(
-                [GLOSSARY_WRITE, "--batch", manifest],
+                [GLOSSARY_IMPORT, manifest],
                 capture_output=True, text=True,
             )
             if r.returncode != 0:
                 die(
-                    f"CONTEXT migration failed (hv-glossary-write --batch exit {r.returncode}):\n"
+                    f"CONTEXT migration failed (hv-glossary-import exit {r.returncode}):\n"
                     f"{r.stderr}\n"
                     f"CONTEXT.md backed up at {dest}; not deleted. Resolve the conflict and re-run.",
                     3,
@@ -464,7 +457,7 @@ def apply_removed_binaries(paths, backup_root: Path) -> None:
 
 def main():
     check_safety_preconditions()
-    check_f18_dependency()
+    check_glossary_import_present()
 
     rewrites = []          # list of {path, original, new, count}
     manual_review = []      # flat list of strings
@@ -534,10 +527,10 @@ def main():
 
     if nothing_to_do:
         print("noop: project is already on v4 (no rewrites, no CONTEXT.md, no stale bins).")
-        # B08: even when no rewrites happened, --apply still bumps the version
+        # Even when no rewrites happened, --apply still bumps the version
         # stamp so hv-preflight reflects post-migration state. Without this the
         # user runs a clean --apply that "did nothing" yet preflight keeps
-        # nagging — the original B08 symptom.
+        # nagging.
         if APPLY:
             new_version = resolve_installed_version()
             if new_version and stamp_version(new_version):
@@ -565,23 +558,23 @@ def main():
     if bin_plan:
         apply_removed_binaries(bin_plan, backup_root)
 
-    # B09 defect 1 (apply-side): strip orphan managed blocks (e.g., the
-    # v3 `<!-- hv-context-* -->` block left after F18 cut /hv-context).
-    # Silent on success; warns to stderr if the helper isn't present so
-    # the migration doesn't fail on partial v4 installs.
+    # Strip orphan managed blocks (e.g., the v3 `<!-- hv-context-* -->`
+    # block left after /hv-context was cut). Silent on success; warns to
+    # stderr if the helper isn't present so the migration doesn't fail on
+    # partial v4 installs.
     try:
         subprocess.run(
-            [MANAGED_BLOCK, "--strip-deprecated"],
+            [MANAGED_BLOCK_STRIP],
             check=False, capture_output=True, text=True,
         )
     except FileNotFoundError:
         print(
-            "warn: hv-managed-block not found — orphan v3 managed blocks "
-            "in CLAUDE.md may need manual cleanup.",
+            "warn: hv-managed-block-strip-deprecated not found — orphan v3 managed "
+            "blocks in CLAUDE.md may need manual cleanup.",
             file=sys.stderr,
         )
 
-    # B08: stamp hvSkills.version so hv-preflight stops nagging. stamp_version
+    # Stamp hvSkills.version so hv-preflight stops nagging. stamp_version
     # returns False when the stamp is already canonical, keeping idempotent
     # re-runs free of noise.
     new_version = resolve_installed_version()

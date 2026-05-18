@@ -81,9 +81,7 @@ Plain-text fallback per `references/ask-user-question-fallback.md`; default rule
 
 Pull the picture in parallel — these reads are independent and latency-bound:
 
-- `.hv/bin/hv-todo-field <ID> title`
-- `.hv/bin/hv-todo-field <ID> milestone`
-- `.hv/bin/hv-todo-field <ID> related`
+- `.hv/bin/hv-todo-field --dump <ID>` — JSON with `title`, `milestone`, `related`, `detail`, `repos`, `subsystem`, `since` (single corpus load; avoids re-parsing BACKLOG.md per field)
 - Detail file: `.hv/bugs/<ID>.md`, `.hv/features/<ID>.md`, or `.hv/tasks/<ID>.md` (read whichever exists)
 - `.hv/bin/hv-knowledge-query <topic>` for topics inferred from the TODO entry and detail file
 - `.hv/bin/hv-decisions-query <topic>` for the same topics — committed boundaries the design must respect

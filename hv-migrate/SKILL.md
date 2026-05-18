@@ -1,6 +1,6 @@
 ---
 name: hv-migrate
-description: One-shot codemod for v3 → v4 upgrades. Versioned arg required — `/hv-migrate v4`. Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv-glossary-write --batch`, and removes stale `.hv/bin/hv-context-*` files left behind. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, umbrella projects (F21), or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0.
+description: One-shot codemod for v3 → v4 upgrades. Versioned arg required — `/hv-migrate v4`. Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv-glossary-import`, and removes stale `.hv/bin/hv-context-*` files left behind. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, umbrella projects (F21), or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0.
 user-invocable: true
 ---
 

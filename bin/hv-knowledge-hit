@@ -6,6 +6,10 @@
 # after consuming a queried bullet.
 # Writer helper: exit 0 on success; exit 1 on argv error.
 # Usage: hv-knowledge-hit --topic <T> --title <S>
+#
+# Inlines the read-modify-write of .hv/knowledge-tier.json — the sidecar
+# schema lives in hv-knowledge-tier; keep the invariants in lockstep:
+#   {version: 1, entries: {"<topic>::<title>": {tier, hits, lastSeen}}}
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
@@ -42,77 +46,90 @@ if [[ -z "$TOPIC" || -z "$TITLE" ]]; then
   exit 1
 fi
 
-# Step 1: increment hits via canonical sidecar writer
-"$HERE/hv-knowledge-tier" --inc --topic "$TOPIC" --title "$TITLE"
+# Glossary terms aren't tier-eligible (canonical names, not probationary
+# observations) — mirror the canonical skip from hv-knowledge-tier.
+if [[ "$TOPIC" == "Glossary" ]]; then
+  exit 0
+fi
 
-# Step 2: read back the new state
-STATE="$("$HERE/hv-knowledge-tier" --get --topic "$TOPIC" --title "$TITLE")"
-
-# Step 3: evaluate auto-promotion using Python stdlib
 export _HV_KH_TOPIC="$TOPIC"
 export _HV_KH_TITLE="$TITLE"
-export _HV_KH_STATE="$STATE"
-export _HV_KH_BIN="$HERE"
 
 python3 - <<'PY'
 import json
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
-topic  = os.environ["_HV_KH_TOPIC"]
-title  = os.environ["_HV_KH_TITLE"]
-state  = json.loads(os.environ["_HV_KH_STATE"])
-here   = os.environ["_HV_KH_BIN"]
+SIDECAR        = Path(".hv/knowledge-tier.json")
+SIDECAR_TMP    = Path(".hv/knowledge-tier.json.tmp")
+CONFIG         = Path(".hv/config.json")
+CONTRADICTIONS = Path(".hv/knowledge-contradictions.json")
 
-# Read promotion threshold from config
+topic = os.environ["_HV_KH_TOPIC"]
+title = os.environ["_HV_KH_TITLE"]
+today = date.today().isoformat()
+key   = f"{topic}::{title}"
+
 threshold = 3
-config_path = Path(".hv/config.json")
-if config_path.exists():
+if CONFIG.exists():
     try:
-        cfg = json.loads(config_path.read_text())
+        cfg = json.loads(CONFIG.read_text())
         val = cfg.get("learn", {}).get("promoteThreshold")
         if isinstance(val, int) and val > 0:
             threshold = val
     except Exception:
-        pass  # default to 3
+        pass
 
-tier = state.get("tier", "provisional")
-hits = state.get("hits", 0)
+if SIDECAR.exists():
+    data = json.loads(SIDECAR.read_text())
+    if data.get("version") != 1:
+        got = data.get("version", "<missing>")
+        print(
+            f"error: knowledge-tier.json schema version mismatch — expected 1, got {got}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+else:
+    data = {"version": 1, "entries": {}}
 
-# Only consider auto-promotion when provisional and at threshold
-if tier != "provisional" or hits < threshold:
-    sys.exit(0)
+entries = data["entries"]
+if key in entries:
+    entries[key]["hits"] += 1
+    entries[key]["lastSeen"] = today
+else:
+    entries[key] = {"tier": "provisional", "hits": 1, "lastSeen": today}
 
-# Outstanding contradiction check
-contradictions_path = Path(".hv/knowledge-contradictions.json")
-if contradictions_path.exists():
-    try:
-        cdata = json.loads(contradictions_path.read_text())
-        pending = cdata.get("pending", [])
-        for entry in pending:
-            if entry.get("topic") == topic and entry.get("title") == title:
-                print(
-                    f"skip-auto-promote: {topic} :: {title} has pending contradiction",
-                    file=sys.stderr,
-                )
-                sys.exit(0)
-    except Exception:
-        pass  # treat as no contradictions
+state = entries[key]
+auto_promoted = False
 
-# Auto-promote to confirmed
-import subprocess
-result = subprocess.run(
-    [f"{here}/hv-knowledge-tier", "--set", "--topic", topic, "--title", title, "--tier", "confirmed"],
-    capture_output=True,
-    text=True,
-)
-if result.returncode != 0:
-    print(result.stderr, end="", file=sys.stderr)
-    sys.exit(result.returncode)
+if state["tier"] == "provisional" and state["hits"] >= threshold:
+    has_contradiction = False
+    if CONTRADICTIONS.exists():
+        try:
+            cdata = json.loads(CONTRADICTIONS.read_text())
+            for entry in cdata.get("pending", []):
+                if entry.get("topic") == topic and entry.get("title") == title:
+                    has_contradiction = True
+                    break
+        except Exception:
+            pass
+    if has_contradiction:
+        print(
+            f"skip-auto-promote: {topic} :: {title} has pending contradiction",
+            file=sys.stderr,
+        )
+    else:
+        state["tier"] = "confirmed"
+        auto_promoted = True
 
-print(
-    f"auto-promoted: {topic} :: {title} (hits={hits}, threshold={threshold})",
-    file=sys.stderr,
-)
+SIDECAR_TMP.write_text(json.dumps(data, indent=2) + "\n")
+os.replace(SIDECAR_TMP, SIDECAR)
+
+if auto_promoted:
+    print(
+        f"auto-promoted: {topic} :: {title} (hits={state['hits']}, threshold={threshold})",
+        file=sys.stderr,
+    )
 PY

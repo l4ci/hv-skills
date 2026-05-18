@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Print the state of .hv/config.json against the current expected schema.
+# Lookup helper: prints FRESH | UP_TO_DATE | STALE:<csv-of-keys> | CORRUPT to stdout. Exit 0.
+# Usage: hv-config-schema-check
+#
+# Output contract (consumed by /hv-init Step 3):
+#   FRESH                 — .hv/config.json missing; ask all Q1-Q5
+#   UP_TO_DATE            — every expected key present; skip prompts
+#   STALE:<sec>.<key>,... — config missing one or more keys; ask only those
+#   CORRUPT               — file exists but isn't valid JSON; user must fix
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+from pathlib import Path
+
+EXPECTED = [
+    ("models", "orchestrator"),
+    ("models", "worker"),
+    ("work", "isolation"),
+    ("work", "mergeStrategy"),
+    ("refactor", "confirmBeforeExecute"),
+    ("refactor", "verifyCommands"),
+    ("learn", "verify"),
+    ("learn", "promoteThreshold"),
+    ("ship", "review"),
+    ("ship", "secondOpinion"),
+    ("ship", "qa"),
+    ("qa", "gate"),
+    ("qa", "afterWork"),
+    ("autonomy", "level"),
+    ("debug", "competingHypotheses"),
+    ("docs", "path"),
+    ("docs", "autoCreate"),
+    ("docs", "afterWork"),
+    ("git", "baseBranch"),
+    ("umbrella", "enabled"),
+    ("hvSkills", "version"),
+]
+p = Path(".hv/config.json")
+if not p.exists():
+    print("FRESH"); raise SystemExit
+try:
+    cfg = json.loads(p.read_text())
+    if not isinstance(cfg, dict): raise ValueError
+except Exception:
+    print("CORRUPT"); raise SystemExit
+missing = [f"{s}.{k}" for s, k in EXPECTED
+           if not isinstance(cfg.get(s), dict) or cfg.get(s, {}).get(k) is None]
+print("UP_TO_DATE" if not missing else "STALE:" + ",".join(missing))
+PY

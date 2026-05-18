@@ -1,36 +1,62 @@
 #!/usr/bin/env bash
-# Extract a single field (title/detail/related/milestone/repos/subsystem) from the TODO
-# bullet of <ID>, using hvlib.parse_todo_fields. Replaces ad-hoc
-# grep|grep|sed|sed chains in skill prose.
+# Extract field(s) from the TODO bullet of <ID>, using hvlib.parse_todo_fields.
+# Replaces ad-hoc grep|grep|sed|sed chains in skill prose.
 # Resolve helper: exits 1 when ID is unknown or field name is invalid.
 #
 # Usage: hv-todo-field <ID> <field>
-#   <field>: title | detail | related | milestone | repos | subsystem | since
-#   stdout: field value (may be empty)
-#   exit:   0 on success (even if field empty), 1 on unknown ID or bad field
+#          <field>: title | detail | related | milestone | repos | subsystem | since
+#          stdout: field value (may be empty)
+#          exit:   0 on success (even if field empty), 1 on unknown ID or bad field
+#        hv-todo-field --dump <ID>
+#          stdout: JSON object with every known field (single corpus load).
+#                  Use when a caller needs ≥2 fields per ID — avoids re-reading
+#                  BACKLOG.md + ARCHIVE.md once per field.
+#          exit:   0 on success, 1 on unknown ID
 set -euo pipefail
-ID="${1:?usage: hv-todo-field <ID> <field>}"
-FIELD="${2:?usage: hv-todo-field <ID> <field>}"
+
+DUMP=""
+if [ "${1:-}" = "--dump" ]; then
+  DUMP="1"
+  shift
+fi
+ID="${1:?usage: hv-todo-field <ID> <field>   |   hv-todo-field --dump <ID>}"
+FIELD="${2:-}"
+if [ -z "$DUMP" ] && [ -z "$FIELD" ]; then
+  echo "usage: hv-todo-field <ID> <field>   |   hv-todo-field --dump <ID>" >&2
+  exit 1
+fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$DUMP" <<'PY'
+import json
 import sys
 from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus
 
-iid, field = sys.argv[1], sys.argv[2]
-if field not in {"title", "detail", "related", "milestone", "repos", "subsystem", "since"}:
-    sys.stderr.write(f"error: {field} is not a valid field; pick one of title/detail/related/milestone/repos/subsystem/since\n")
-    sys.exit(1)
+iid, field, dump = sys.argv[1], sys.argv[2], sys.argv[3]
+VALID = ("title", "detail", "related", "milestone", "repos", "subsystem", "since")
 
 corpus = load_backlog_corpus(".")
 result = find_origin_bullet(corpus, iid)
 if result is None:
     sys.stderr.write(f"error: [{iid}] not found in BACKLOG.md or ARCHIVE.md\n")
     sys.exit(1)
-
 line, title = result
+fields = parse_todo_fields(line)
+
+if dump:
+    payload = {"title": title}
+    for name in VALID:
+        if name == "title":
+            continue
+        payload[name] = fields.get(name, "")
+    print(json.dumps(payload))
+    sys.exit(0)
+
+if field not in VALID:
+    sys.stderr.write(f"error: {field} is not a valid field; pick one of {'/'.join(VALID)}\n")
+    sys.exit(1)
+
 if field == "title":
     print(title)
 else:
-    fields = parse_todo_fields(line)
     print(fields.get(field, ""))
 PY

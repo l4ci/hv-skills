@@ -190,7 +190,7 @@ If the entry created a new topic, prepend a line: *"New topic: `<topic>`."*
 - **No verifier.** Manual confirmation is the verification.
 - **`--from-learning <topic>` and `--from-spike <name>` only seed the rule and why from the source artifact.** The forbids/permits are still user-articulated — that's what makes a decision a decision.
 - **`inconclusive` spikes can't be promoted.** Promotion requires a verdict the project is committing to.
-- **Sibling persistence skills.** `/hv-learn` and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`. `/hv-learn` carries two modes: passive topic-bullet learnings and `--term <name>` for Glossary entries (folded from the former `/hv-context` in v4.0).
+- **Sibling persistence skills.** `/hv-learn` and `/hv-decide` share one contract (persist + index `CLAUDE.md` + confirm) and intentionally diverge on gate strength — see `references/persistence-skills.md`. `/hv-learn` carries two modes: passive topic-bullet learnings and `--term <name>` for Glossary entries.
 
 ## References
 
