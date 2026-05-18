@@ -248,7 +248,7 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
   1. Read the topic's bullets via `.hv/bin/hv-knowledge-query "<topic>"`.
   2. Group bullets into 2 or 3 cohesive facets by semantic theme (e.g. `Helpers` / `Workers & Parallelism`, `Conventions` / `References`). Each facet must hold ≥3 bullets; `Misc` / `Other` / `Etc.` facets are forbidden — every bullet gets a substantive home. If no plausible split axis exists (bullets are byte-equivalent in theme), fall back to the `"off"` nudge for that topic and skip steps 3–7.
   3. Append `## <Topic>: <FacetA>` and `## <Topic>: <FacetB>` headings to `.hv/KNOWLEDGE.md` immediately before the old `## <Topic>` heading.
-  4. Move each bullet under its new heading via `Edit` — preserve the bullet body byte-identical including the trailing `<!-- date -->`.
+  4. For each bullet in `<Topic>`, call `.hv/bin/hv-knowledge-rename-topic --from "<Topic>" --to "<Topic>: <Facet>" --title "<bullet-title>"`. The helper relocates the bullet body byte-identical AND re-keys its `.hv/knowledge-tier.json` entry from `<Topic>::<title>` to `<Topic>: <Facet>::<title>` in one atomic step — tier and hit state survive the split. Issue all calls for one offender as a single parallel batch (each invocation is atomic on a different bullet). Do NOT hand-edit bullets via `Edit` for this — that path silently orphans sidecar entries (the T03 / hv-skills#13 regression this auto-split was fixed to prevent).
   5. Remove the now-empty old `## <Topic>` heading.
   6. Re-run `.hv/bin/hv-managed-block knowledge` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
   7. Append one line to the confirm output: `Auto-split <topic> → <topic>: <FacetA> + <topic>: <FacetB> — N → A+B bullets.`
