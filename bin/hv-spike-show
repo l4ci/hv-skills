@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Print the contents of a spike file.
+# Usage: hv-spike-show <name>     (e.g. hv-spike-show sse-feasibility)
+# Resolve helper: exits 1 when spike name not found or bad shape; exits 0 with content on match.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-artifact-show.sh"
+NAME="${1:?usage: hv-spike-show <name>}"
+if ! [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "error: name must be lowercase alphanumeric + dashes, got '$NAME'" >&2
+  exit 1
+fi
+hv_artifact_show spike "$NAME" .hv/spikes

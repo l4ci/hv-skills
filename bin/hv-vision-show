@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Print the contents of a milestone detail file.
+# Usage: hv-vision-show <ID>     (e.g. hv-vision-show M01)
+# Resolve helper: exits 1 when milestone ID not found or bad shape; exits 0 with content on match.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-artifact-show.sh"
+ID="${1:?usage: hv-vision-show <ID>}"
+if ! [[ "$ID" =~ ^M[0-9]{2,}$ ]]; then
+  echo "error: milestone ID must match M\d{2,} (e.g. M01, M03), got '$ID'" >&2
+  exit 1
+fi
+hv_artifact_show vision "$ID" .hv/milestones

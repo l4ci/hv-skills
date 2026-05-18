@@ -65,6 +65,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
 | `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
 | `hv-vision-empty-active` | Print active milestone IDs with 0 open items, one per line | `.hv/bin/hv-vision-empty-active` |
+| `hv-vision-show` | Resolve: print a milestone detail file's contents; exit 1 when milestone ID not found or bad shape | `.hv/bin/hv-vision-show M01` |
 | `hv-design-add` | Writer: create `.hv/designs/<ID>.md` from an item ID (`[BFT]\d{2,}`); exit 1 on bad ID or conflict | `.hv/bin/hv-design-add F12 "Archive command"` |
 | `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
 | `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
@@ -76,6 +77,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-spike-add` | Create `spike/<name>` branch and `.hv/spikes/<name>.md` stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
 | `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
 | `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
+| `hv-spike-show` | Resolve: print a spike file's contents; exit 1 when spike name not found or bad shape | `.hv/bin/hv-spike-show sse-feasibility` |
 | `hv-base-branch` | Print the resolved base branch (`main`, `master`, `trunk`, or `origin/HEAD`) | `.hv/bin/hv-base-branch` |
 | `hv-worktree-clear` | Remove a non-main worktree that has `<branch>` checked out; silent if none | `.hv/bin/hv-worktree-clear [--repo <name>] hv/foo` |
 | `hv-worktree-path` | Print the canonical Layout B worktree path for a sub-repo branch (`<umbrella>/.claude/worktrees/<repo>/<branch>`) | `.hv/bin/hv-worktree-path --repo web hv/foo` |
@@ -192,7 +194,7 @@ while knowledge is *passive* gotchas captured by `/hv-learn`. See
 
 `hv-glossary-read` and `hv-glossary-write` operate on the `## Glossary` topic of `.hv/KNOWLEDGE.md` — the project glossary written via [`/hv-learn --term <name>`](slash-commands.md#hv-learn). Term entries are nested bullets under the Glossary topic: `- **<term>** — <definition>` followed by an indented `**Aliases:**` line, an optional `**Not:**` line, and a date stamp. `hv-glossary-read <term>...` prints matching entries (case-insensitive) prefixed with `> from: .hv/KNOWLEDGE.md (## Glossary)`. `hv-glossary-write <term> --def <text> [--alias ...] [--not ...] [--touch]` inserts or updates a term within the Glossary topic; alphabetical insertion is preserved; exit 3 on alias collision with another term in the same Glossary. The Glossary topic is special-cased — `hv-knowledge-tier` skips it (terms aren't tier-eligible), and `hv-managed-block knowledge` surfaces it like any other topic in the CLAUDE.md `## Project Knowledge` index. Umbrella-mode per-sub-repo glossaries are deferred to F21.
 
-The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints the next `MNN` ID, creates the milestone file, and appends its overview line to `MILESTONES.md`. `hv-vision-status` updates both the file's frontmatter and the overview line atomically. `hv-vision-active`, `hv-vision-list`, `hv-vision-index`, and `hv-vision-empty-active` let you query and refresh milestone state. `hv-vision-index` also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`. `hv-vision-empty-active` prints active milestone IDs that have zero open TODO items, one per line; empty stdout is a valid answer and the helper always exits 0.
+The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints the next `MNN` ID, creates the milestone file, and appends its overview line to `MILESTONES.md`. `hv-vision-status` updates both the file's frontmatter and the overview line atomically. `hv-vision-active`, `hv-vision-list`, `hv-vision-index`, and `hv-vision-empty-active` let you query and refresh milestone state. `hv-vision-index` also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`. `hv-vision-empty-active` prints active milestone IDs that have zero open TODO items, one per line; empty stdout is a valid answer and the helper always exits 0. `hv-vision-show` prints a milestone's detail file; exit 1 when the milestone ID is unknown or doesn't match `M\d{2,}`.
 
 `hv-todo-by-milestone` is covered in [Backlog manipulation](#backlog-manipulation).
 
@@ -218,6 +220,7 @@ Spikes live at `.hv/spikes/<name>.md` with a matching `spike/<name>` git branch.
 `hv-spike-add` creates both in one call. `hv-spike-finish` closes the spike and
 records the finish date. `hv-spike-list` returns JSON with a `branchExists` field
 so you can detect spikes whose branches were already deleted.
+`hv-spike-show` prints the spike file's contents; exit 1 when the spike is missing or the name doesn't match the slug shape `[a-z0-9][a-z0-9-]*`.
 
 ## Merge and PR helpers
 
