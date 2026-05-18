@@ -1,10 +1,10 @@
 {
-  "bugs": 11,
-  "features": 27,
-  "tasks": 4,
-  "milestones": 1,
+  "bugs": 28,
+  "features": 75,
+  "tasks": 101,
+  "milestones": 5,
   "since_refactor": {
-    "features": 1,
+    "features": 4,
     "bugs": 5
   }
 }
