@@ -1,6 +1,7 @@
 # TODO
 
 ## Bugs
+- **[B11] [P2] hv-managed-block lost --strip-deprecated mode; smoke section 'hv-managed-block — B09: --strip-deprecated removes orphan v3 blocks' fails on main.** Error: `unknown key '--strip-deprecated' (known: knowledge, decisions)`. Likely regression from `c623d2f refactor: simplify hv-skills surface`. Smoke ran red on main before F26 work — F26 ships unaffected. /hv-init's deprecated-block stripping pipeline is broken until restored. Since: 51c5540
 
 ## Features
 - **[F05] [Major] `/hv-freeze` scope lock for parallel orchestrators.** Per-stream file-edit boundary enforced via PreToolUse hook. `/hv-work` writes declared scope to `.hv/locks/<stream>.json`; hook rejects writes outside it. Auto-released on completion/pause. Distinct from worktree isolation — worktrees protect filesystem between streams; freeze protects intent within a stream. Most valuable for multi-stream `/hv-work` and `/hv-refactor`. Detail: `.hv/features/F05.md` Since: a0e7f1f
