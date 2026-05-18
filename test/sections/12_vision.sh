@@ -336,6 +336,25 @@ if "$BIN/hv-spike-finish" not-a-spike 2>/dev/null; then
 fi
 pass "hv-spike-finish rejects unknown name"
 
+echo "hv-spike-show"
+
+# spike-show positive — sse-feasibility fixture exists from earlier in this block
+SHOW=$("$BIN/hv-spike-show" sse-feasibility)
+echo "$SHOW" | grep -q "^name: sse-feasibility$" || fail "hv-spike-show should print name: sse-feasibility frontmatter"
+pass "hv-spike-show prints sse-feasibility content"
+
+# spike-show miss — exit 1 with stderr
+if "$BIN/hv-spike-show" not-a-spike 2>/dev/null; then
+  fail "hv-spike-show not-a-spike (missing) should exit 1"
+fi
+pass "hv-spike-show rejects unknown name"
+
+# spike-show bad-shape — exit 1 (space in name)
+if "$BIN/hv-spike-show" "Bad Name" 2>/dev/null; then
+  fail "hv-spike-show 'Bad Name' (bad shape) should exit 1"
+fi
+pass "hv-spike-show rejects bad-shape name"
+
 git branch -D spike/sse-feasibility >/dev/null 2>&1 || true
 
 echo "items <-> milestones <-> plans triangle"
