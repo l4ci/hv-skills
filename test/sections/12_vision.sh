@@ -273,6 +273,25 @@ if "$BIN/hv-plan-rm" M99-S99 2>/dev/null; then
 fi
 pass "hv-plan-rm rejects unknown key"
 
+echo "hv-vision-show"
+
+# vision-show positive — M01 fixture exists from earlier in this section
+SHOW=$("$BIN/hv-vision-show" M01)
+echo "$SHOW" | grep -q "^id: M01$" || fail "hv-vision-show should print id: M01 frontmatter"
+pass "hv-vision-show prints M01 content"
+
+# vision-show miss — exit 1 with stderr
+if "$BIN/hv-vision-show" M99 2>/dev/null; then
+  fail "hv-vision-show M99 (missing) should exit 1"
+fi
+pass "hv-vision-show rejects unknown ID"
+
+# vision-show bad-shape — exit 1
+if "$BIN/hv-vision-show" foo 2>/dev/null; then
+  fail "hv-vision-show 'foo' (bad shape) should exit 1"
+fi
+pass "hv-vision-show rejects bad-shape ID"
+
 echo "hv-spike-add / hv-spike-list / hv-spike-finish"
 git checkout -q main 2>/dev/null || true
 
