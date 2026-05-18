@@ -145,7 +145,7 @@ indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 `hv-find-milestone-for-items` answers the inverse of `hv-todo-by-milestone`: given a list of item IDs, it prints the milestone tags those items carry in BACKLOG.md (unique, numerically sorted, open sections only — completed/archived items don't surface). Always exits 0; an unknown ID or untagged item is a silent skip, not an error.
 
-`hv-plan-rename-check` wraps `git grep -l "<old-name>" [-- <scope>...]` so `/hv-work` Step 4 #3 ("Detect rename + link-sweep collisions") can name the check at both plan time and verify time. Always exits 0; no matches, no repo, and out-of-scope inputs are all silent. The pathspec scope is passed through to git grep, so `*.md`-style globs work.
+`hv-plan-rename-check` wraps `git grep -l "<old-name>" [-- <scope>...]` so `/hv-work` Step 4 #3 ("Absorb wave-internal file collisions", rename + link-sweep sub-case) can name the check at both plan time and verify time. Always exits 0; no matches, no repo, and out-of-scope inputs are all silent. The pathspec scope is passed through to git grep, so `*.md`-style globs work.
 
 `hv-uncertain` evaluates whether a backlog item warrants a `/hv-work --preview` pass before `/hv-plan` runs in loop mode. Exit 0 means the item is uncertain (reasons on stdout); exit 1 means it is clear enough to proceed directly to planning.
 
