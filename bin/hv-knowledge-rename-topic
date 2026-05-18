@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+# Atomically rename a topic heading in .hv/KNOWLEDGE.md AND re-key its
+# .hv/knowledge-tier.json sidecar entries. Closes T03 (hv-skills#13):
+# /hv-learn Step 8 auto-split renamed `## Topic` headings but left
+# `"<old>::<title>"` keys orphaned in the sidecar, silently losing tier and
+# hit state for every titled bullet.
+#
+# Two modes:
+#   1. Whole-topic rename — `--from X --to Y` (no `--title`):
+#      Renames the `## X` heading to `## Y` and re-keys every sidecar entry
+#      `X::*` → `Y::*`. Errors if `## Y` already exists (use per-bullet mode
+#      to merge into an existing topic).
+#
+#   2. Per-bullet move — `--from X --to Y --title T`:
+#      Moves the single bullet whose title matches T (case-sensitive) from
+#      `## X` to `## Y` (prepended), and re-keys `X::T` → `Y::T` in the
+#      sidecar. Used by /hv-learn Step 8 auto-split (one call per bullet).
+#      Requires `## Y` to already exist (matches hv-knowledge-merge contract).
+#
+# Glossary topic is skipped for sidecar ops (terms are canonical, not
+# tier-eligible) — matches hv-knowledge-tier's defense-in-depth filter.
+#
+# Writer helper: exit 0 on successful write (or idempotent same-name no-op);
+# exit 1 on missing argv, missing source topic, missing target heading
+# (per-bullet mode), pre-existing target heading (whole-topic mode),
+# missing bullet title, or sidecar schema mismatch.
+#
+# Usage:
+#   hv-knowledge-rename-topic --from <X> --to <Y>            # whole-topic
+#   hv-knowledge-rename-topic --from <X> --to <Y> --title <T>  # per-bullet
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+USAGE="usage: hv-knowledge-rename-topic --from <X> --to <Y> [--title <T>]
+  Without --title: rename whole topic heading + re-key all sidecar entries.
+  With --title:    move one bullet from X to Y + re-key its sidecar entry."
+
+FROM=""
+TO=""
+TITLE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --from)
+      FROM="${2:?$USAGE}"
+      shift 2
+      ;;
+    --to)
+      TO="${2:?$USAGE}"
+      shift 2
+      ;;
+    --title)
+      TITLE="${2:?$USAGE}"
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$FROM" || -z "$TO" ]]; then
+  echo "error: --from and --to are required" >&2
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+# Same-name no-op (idempotent).
+if [[ "$FROM" == "$TO" ]]; then
+  exit 0
+fi
+
+export _HV_KR_FROM="$FROM"
+export _HV_KR_TO="$TO"
+export _HV_KR_TITLE="$TITLE"
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from hvlib import read_or_empty, write_text_atomic, find_section
+
+KM = Path(".hv/KNOWLEDGE.md")
+SIDECAR = Path(".hv/knowledge-tier.json")
+SIDECAR_TMP = Path(".hv/knowledge-tier.json.tmp")
+
+src = os.environ["_HV_KR_FROM"]
+dst = os.environ["_HV_KR_TO"]
+title = os.environ.get("_HV_KR_TITLE", "")
+
+content = read_or_empty(KM)
+if not content:
+    print(f"error: {KM} not found or empty", file=sys.stderr)
+    sys.exit(1)
+
+src_span = find_section(content, src)
+if src_span is None:
+    print(f"error: source topic '{src}' not found in {KM}", file=sys.stderr)
+    sys.exit(1)
+
+dst_span = find_section(content, dst)
+
+
+def load_sidecar():
+    if not SIDECAR.exists():
+        return None
+    data = json.loads(SIDECAR.read_text())
+    if data.get("version") != 1:
+        got = data.get("version", "<missing>")
+        print(
+            f"error: knowledge-tier.json schema version mismatch — expected 1, got {got}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return data
+
+
+def save_sidecar(data):
+    SIDECAR_TMP.write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(SIDECAR_TMP, SIDECAR)
+
+
+def rekey_sidecar(old_key, new_key):
+    """Move sidecar entry old_key → new_key. No-op if old_key missing.
+    Glossary entries are skipped defensively (they shouldn't exist, but
+    the tier helper filters them anyway).
+    """
+    data = load_sidecar()
+    if data is None:
+        return
+    entries = data.get("entries", {})
+    if old_key not in entries:
+        return
+    # Don't carry over Glossary entries (defense in depth).
+    old_topic = old_key.split("::", 1)[0] if "::" in old_key else ""
+    if old_topic == "Glossary":
+        return
+    entries[new_key] = entries.pop(old_key)
+    save_sidecar(data)
+
+
+def rekey_sidecar_topic(old_topic, new_topic):
+    """Move every sidecar entry `<old_topic>::*` → `<new_topic>::*` in a
+    single atomic write. Used by whole-topic rename.
+    """
+    data = load_sidecar()
+    if data is None:
+        return
+    entries = data.get("entries", {})
+    prefix = old_topic + "::"
+    moved = {}
+    for key in list(entries.keys()):
+        if not key.startswith(prefix):
+            continue
+        suffix = key[len(prefix):]
+        new_key = new_topic + "::" + suffix
+        moved[new_key] = entries.pop(key)
+    if not moved:
+        return
+    entries.update(moved)
+    save_sidecar(data)
+
+
+if not title:
+    # --- Whole-topic rename ---
+    if dst_span is not None:
+        print(
+            f"error: target topic '{dst}' already exists in {KM} — "
+            f"use --title to move bullets individually",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    # Rename the heading line itself. The body content is untouched, so all
+    # bullets follow the heading rename automatically.
+    new_content = re.sub(
+        rf"^## {re.escape(src)}\s*$",
+        f"## {dst}",
+        content,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if new_content == content:
+        # Shouldn't happen — find_section already located the heading.
+        print(f"error: failed to rewrite '## {src}' heading", file=sys.stderr)
+        sys.exit(1)
+    write_text_atomic(KM, new_content)
+    rekey_sidecar_topic(src, dst)
+    sys.exit(0)
+
+# --- Per-bullet move ---
+if dst_span is None:
+    print(
+        f"error: target topic '{dst}' not found in {KM} — "
+        f"append `## {dst}` heading before moving bullets",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+src_start, src_end = src_span
+src_body = content[src_start:src_end]
+
+# Find the bullet line whose title matches `title` (case-sensitive, to keep
+# parity with the sidecar key). The bullet may have continuation lines
+# (sub-bullets, trailing `<!-- date -->`) — match the full block up to the
+# next sibling bullet, next `## ` heading, or EOF.
+bullet_start_re = re.compile(r"^- \*\*(?P<t>.+?)\*\*", re.MULTILINE)
+
+target_match = None
+for m in bullet_start_re.finditer(src_body):
+    if m.group("t") == title:
+        target_match = m
+        break
+
+if target_match is None:
+    print(
+        f"error: bullet titled '{title}' not found under '## {src}' in {KM}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+bullet_start = target_match.start()
+# Bullet ends at the next sibling `- **` at column 0, or end of section body.
+tail = src_body[target_match.end():]
+nxt = re.search(r"^- \*\*", tail, re.MULTILINE)
+bullet_end = target_match.end() + nxt.start() if nxt else len(src_body)
+
+bullet_block = src_body[bullet_start:bullet_end]
+
+# Trim trailing whitespace/newlines for clean reinsertion; re-add a single
+# trailing newline below.
+bullet_block_stripped = bullet_block.rstrip("\n")
+
+# Remove the bullet from the source body. Collapse a leading blank line
+# that the removal would otherwise leave doubled.
+new_src_body = src_body[:bullet_start] + src_body[bullet_end:]
+# Don't aggressively normalize blank-line runs — preserve surrounding layout
+# the way the file authored it. The auto-split caller relies on Step 5 to
+# remove the empty heading; per-bullet calls just need atomic in/out.
+
+# Prepend the bullet to the destination body (matches hv-knowledge-merge's
+# "newest on top" convention).
+dst_start, dst_end = dst_span
+dst_body = content[dst_start:dst_end]
+
+# Layout: insert as `\n<bullet>\n` after any leading blank lines that follow
+# the heading. find_section returns body starting after the heading's
+# trailing \n, so `dst_body` typically begins with `\n` (blank line before
+# bullets).
+rest = dst_body.lstrip("\n")
+leading_newlines = dst_body[: len(dst_body) - len(rest)]
+new_dst_body = leading_newlines + bullet_block_stripped + "\n" + ("\n" if rest else "") + rest
+# Ensure section ends with at least one newline so the next `## ` heading
+# stays at column 0 (preserves iter_topics boundary invariant).
+if not new_dst_body.endswith("\n"):
+    new_dst_body += "\n"
+
+# Splice both edits in one write. The slice ranges in `content` are
+# [src_start:src_end] and [dst_start:dst_end]. Whichever appears first in
+# `content` is replaced first; the second replacement uses an offset
+# adjusted for the length delta of the first edit.
+if src_start < dst_start:
+    pre = content[:src_start]
+    mid = content[src_end:dst_start]
+    post = content[dst_end:]
+    new_content = pre + new_src_body + mid + new_dst_body + post
+else:
+    pre = content[:dst_start]
+    mid = content[dst_end:src_start]
+    post = content[src_end:]
+    new_content = pre + new_dst_body + mid + new_src_body + post
+
+write_text_atomic(KM, new_content)
+rekey_sidecar(f"{src}::{title}", f"{dst}::{title}")
+PY
