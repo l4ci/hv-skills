@@ -1,6 +1,7 @@
 # TODO
 
 ## Bugs
+- **[B10] [P2] `issues.providers.{github,gitlab}` config gate accepts None as enabled.** /hv-capture --from-github / --from-gitlab Step I1 reads `cfg.get('issues',{}).get('providers',{}).get('github')` and only stops when the value is literally `false`. On a project that never set the key (config has no `issues` section at all, returns None), the import proceeds silently. Either the key should default to `true` explicitly (current de-facto behavior, just make it schema-visible) or the gate should require `is True` to enable. /hv-init's EXPECTED schema check doesn't include `issues.providers.*` either, so STALE migration never prompts for it. Subsystem: hv-capture Milestone: M01 Since: 4f17322
 
 ## Features
 - **[F05] [Major] `/hv-freeze` scope lock for parallel orchestrators.** Per-stream file-edit boundary enforced via PreToolUse hook. `/hv-work` writes declared scope to `.hv/locks/<stream>.json`; hook rejects writes outside it. Auto-released on completion/pause. Distinct from worktree isolation — worktrees protect filesystem between streams; freeze protects intent within a stream. Most valuable for multi-stream `/hv-work` and `/hv-refactor`. Detail: `.hv/features/F05.md` Since: a0e7f1f
