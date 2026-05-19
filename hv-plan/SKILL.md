@@ -50,7 +50,7 @@ The user's input may be:
 
 For an item target, read its `BACKLOG.md` entry and overflow file (`.hv/<bugs|features|tasks>/<id>.md` if it exists) and look for a `Milestone:` field. That's the parent. If the item lacks a milestone tag, ask the user to either:
 
-- Tag the item under an active milestone (then proceed)
+- Tag the item under an active milestone — write the tag via `.hv/bin/hv-todo-set-field <ID> milestone <MID>` (never hand-edit `.hv/BACKLOG.md`; the helper mutates the open bullet in place and is idempotent), then proceed
 - Skip planning and use `/hv-go` for one-shot execution
 
 When the item carries a `Repos:` field, capture that value as the plan's target sub-repo(s) so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Multi-repo items pass the full comma-list through (`--repo "web, api"`); the frontmatter key stays singular `repo:` and just carries the joined string. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).

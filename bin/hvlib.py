@@ -29,7 +29,7 @@ from hvlib_section import (
 )
 from hvlib_bullet import (
     _TODO_FIELD_NAMES, _DONE_LINE_RE,
-    find_item_ids, find_origin_bullet, parse_todo_fields,
+    find_item_ids, find_origin_bullet, parse_todo_fields, set_todo_field,
     open_bullet_re, parse_open_bullet, format_done_line, parse_done_line,
     find_bullet_in_content, find_open_bullet, strip_bullet_from_content,
 )

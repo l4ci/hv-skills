@@ -97,6 +97,39 @@ if "$BIN/hv-complete" B99 "$HASH" 2>/dev/null; then
 fi
 pass "hv-complete rejects unknown ID"
 
+echo "hv-todo-set-field"
+# F01 is still an open feature bullet at this point (B01 was completed above).
+"$BIN/hv-todo-set-field" F01 milestone M01
+grep -q "\[F01\].*Milestone: M01" .hv/BACKLOG.md || fail "F01 milestone not appended"
+pass "set-field appends absent Milestone"
+
+"$BIN/hv-todo-set-field" F01 milestone M07
+grep -q "\[F01\].*Milestone: M07" .hv/BACKLOG.md || fail "F01 milestone not replaced in place"
+grep -q "Milestone: M01" .hv/BACKLOG.md && fail "old Milestone M01 value lingered"
+pass "set-field replaces present Milestone in place"
+
+"$BIN/hv-todo-set-field" F01 repos "web, api"
+grep -q "\[F01\].*Repos: web, api" .hv/BACKLOG.md || fail "F01 repos not set"
+"$BIN/hv-todo-set-field" F01 repos ""
+grep -q "\[F01\].*Repos:" .hv/BACKLOG.md && fail "F01 repos segment not cleared"
+grep -q "\[F01\].*Milestone: M07" .hv/BACKLOG.md || fail "clearing repos disturbed Milestone"
+pass "set-field clears a field on empty value, leaving neighbors intact"
+
+BEFORE_MD5=$(md5sum .hv/BACKLOG.md)
+"$BIN/hv-todo-set-field" F01 milestone M07 || fail "idempotent set-field errored"
+[ "$BEFORE_MD5" = "$(md5sum .hv/BACKLOG.md)" ] || fail "idempotent set-field rewrote the file"
+pass "set-field is idempotent on unchanged value"
+
+if "$BIN/hv-todo-set-field" F01 title "X" 2>/dev/null; then
+  fail "set-field should reject a non-settable field"
+fi
+pass "set-field rejects non-settable field"
+
+if "$BIN/hv-todo-set-field" B01 milestone M01 2>/dev/null; then
+  fail "set-field should reject a completed/archived ID (no open bullet)"
+fi
+pass "set-field rejects ID with no open bullet"
+
 echo "hv-guard-clean"
 git add -A && git commit -q -m "progress"
 "$BIN/hv-guard-clean" test >/dev/null 2>&1 || fail "guard rejected clean tree"
