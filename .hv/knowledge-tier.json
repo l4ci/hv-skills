@@ -295,6 +295,11 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-18"
+    },
+    "Architecture: Helper conventions & invariants::Field writers co-locate with the read-grammar SoT; order-agnostic parse allows append-at-end": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
     }
   }
 }
