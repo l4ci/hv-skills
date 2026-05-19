@@ -7,7 +7,7 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-knowledge-tier --get|--set|--init|--inc|--list [flags]
+USAGE="usage: hv-knowledge-tier [--repo umbrella|<name>] --get|--set|--init|--inc|--list [flags]
   --get  --topic <T> --title <S>
   --set  --topic <T> --title <S> --tier <provisional|confirmed|deprecated>
   --init --topic <T> --title <S>
@@ -19,6 +19,7 @@ TOPIC=""
 TITLE=""
 TIER_ARG=""
 LIST_TIER=""
+REPO_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,6 +58,10 @@ while [[ $# -gt 0 ]]; do
       else
         TIER_ARG="${2:?$USAGE}"
       fi
+      shift 2
+      ;;
+    --repo)
+      REPO_FLAG="${2:?$USAGE}"
       shift 2
       ;;
     --help|-h)
@@ -103,21 +108,36 @@ if [[ "$CMD" == "set" && -z "$TIER_ARG" ]]; then
   exit 1
 fi
 
+. "$(dirname "${BASH_SOURCE[0]}")/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+SIDECAR_PATH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYINLINE'
+import sys
+from hvlib import resolve_tier_sidecar
+try:
+    print(resolve_tier_sidecar(sys.argv[1]))
+except ValueError as e:
+    import sys as _sys
+    _sys.stderr.write(f"error: {e}\n")
+    _sys.exit(1)
+PYINLINE
+)" || exit 1
+export _HV_KT_SIDECAR="$SIDECAR_PATH"
+
 export _HV_KT_CMD="$CMD"
 export _HV_KT_TOPIC="$TOPIC"
 export _HV_KT_TITLE="$TITLE"
 export _HV_KT_TIER="$TIER_ARG"
 export _HV_KT_LIST_TIER="$LIST_TIER"
 
-python3 - <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 import os
 import sys
 from datetime import date
 from pathlib import Path
 
-SIDECAR = Path(".hv/knowledge-tier.json")
-SIDECAR_TMP = Path(".hv/knowledge-tier.json.tmp")
+SIDECAR = Path(os.environ["_HV_KT_SIDECAR"])
+SIDECAR_TMP = Path(os.environ["_HV_KT_SIDECAR"] + ".tmp")
 VALID_TIERS = {"provisional", "confirmed", "deprecated"}
 
 cmd        = os.environ["_HV_KT_CMD"]

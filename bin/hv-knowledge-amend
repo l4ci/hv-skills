@@ -8,11 +8,12 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-knowledge-amend --topic <T> --fragment <F> --append <text>"
+USAGE="usage: hv-knowledge-amend [--repo umbrella|<name>] --topic <T> --fragment <F> --append <text>"
 
 TOPIC=""
 FRAGMENT=""
 APPEND_TEXT=""
+REPO_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +27,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --append)
       APPEND_TEXT="${2:?$USAGE}"
+      shift 2
+      ;;
+    --repo)
+      REPO_FLAG="${2:?$USAGE}"
       shift 2
       ;;
     --help|-h)
@@ -45,56 +50,107 @@ if [[ -z "$TOPIC" || -z "$FRAGMENT" || -z "$APPEND_TEXT" ]]; then
   exit 1
 fi
 
+. "$(dirname "${BASH_SOURCE[0]}")/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+
 export _HV_KA_APPEND="$APPEND_TEXT"
+export _HV_KA_SCOPE="$SCOPE"
+export _HV_KA_REPO_EXPLICIT="$REPO_FLAG"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$FRAGMENT" <<'PY'
 import os
 import sys
-from hvlib import read_or_empty, write_text_atomic, find_section
+from hvlib import read_or_empty, write_text_atomic, find_section, resolve_knowledge_target, load_repos
 
 topic = sys.argv[1]
 fragment = sys.argv[2]
 append_text = os.environ.get("_HV_KA_APPEND", "")
+scope = os.environ.get("_HV_KA_SCOPE", "umbrella")
+explicit = os.environ.get("_HV_KA_REPO_EXPLICIT", "")
 
-content = read_or_empty(".hv/KNOWLEDGE.md")
 
-span = find_section(content, topic)
-if span is None:
-    print(f"error: topic '{topic}' not found in .hv/KNOWLEDGE.md", file=sys.stderr)
-    sys.exit(1)
+def find_target_line(content):
+    """Return the stripped bullet line containing fragment in topic's section, or None."""
+    span = find_section(content, topic)
+    if span is None:
+        return None
+    start, end = span
+    for line in content[start:end].splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- ") and fragment in stripped:
+            return stripped
+    return None
 
-start, end = span
-section_body = content[start:end]
 
-# Find the first bullet line in the section body that contains fragment
-target_line = None
-for line in section_body.splitlines():
-    stripped = line.strip()
-    if stripped.startswith("- ") and fragment in stripped:
-        target_line = stripped
-        break
+def amend_file(file_path, target_line):
+    """Append append_text after target_line in file_path (atomic write)."""
+    content = read_or_empty(file_path)
+    span = find_section(content, topic)
+    # span guaranteed non-None since target_line was found here
+    start, end = span
+    section_text = content[start:end]
+    idx = section_text.find(target_line)
+    if idx == -1:
+        print(f"error: internal: could not re-locate target line in section body", file=sys.stderr)
+        sys.exit(1)
+    amended_line = target_line + " " + append_text
+    new_section_text = section_text[:idx] + amended_line + section_text[idx + len(target_line):]
+    new_content = content[:start] + new_section_text + content[end:]
+    write_text_atomic(file_path, new_content)
 
-if target_line is None:
-    print(f"error: no bullet in '{topic}' contains fragment '{fragment}'", file=sys.stderr)
-    sys.exit(1)
 
-# Build the amended line: append_text goes after the existing trailing content
-amended_line = target_line + " " + append_text
+if explicit:
+    # Explicit --repo: resolve single target and amend it
+    try:
+        file_path = resolve_knowledge_target(scope)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
+    content = read_or_empty(file_path)
+    span = find_section(content, topic)
+    if span is None:
+        print(f"error: topic '{topic}' not found in {file_path}", file=sys.stderr)
+        sys.exit(1)
+    target_line = find_target_line(content)
+    if target_line is None:
+        print(f"error: no bullet in '{topic}' contains fragment '{fragment}'", file=sys.stderr)
+        sys.exit(1)
+    amend_file(file_path, target_line)
+else:
+    # No --repo: search umbrella + sub-repo (if auto-resolved) for hits
+    candidates = []
+    umbrella_path = resolve_knowledge_target("umbrella")
+    candidates.append(umbrella_path)
+    if scope != "umbrella":
+        try:
+            sub_path = resolve_knowledge_target(scope)
+            candidates.append(sub_path)
+        except ValueError:
+            pass  # sub-repo not registered; fall back to umbrella only
 
-# Replace the exact target line in the full content (scoped to section, but we
-# replace the first occurrence globally which will be in the right section since
-# the fragment search was already scoped to the section body — and we replace
-# using the exact line text).
-# To be safe, replace only within the section span.
-section_text = content[start:end]
-# Replace first occurrence of target_line in section_text
-idx = section_text.find(target_line)
-if idx == -1:
-    # Shouldn't happen since we found it above, but guard
-    print(f"error: internal: could not re-locate target line in section body", file=sys.stderr)
-    sys.exit(1)
+    hits = []
+    for file_path in candidates:
+        content = read_or_empty(file_path)
+        target_line = find_target_line(content)
+        if target_line is not None:
+            hits.append((file_path, target_line))
 
-new_section_text = section_text[:idx] + amended_line + section_text[idx + len(target_line):]
-new_content = content[:start] + new_section_text + content[end:]
-
-write_text_atomic(".hv/KNOWLEDGE.md", new_content)
+    if len(hits) == 0:
+        searched = ", ".join(candidates)
+        print(
+            f"error: no bullet in '{topic}' contains fragment '{fragment}'"
+            f" (searched: {searched})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    elif len(hits) >= 2:
+        file_list = ", ".join(f for f, _ in hits)
+        print(
+            f"error: fragment '{fragment}' under topic '{topic}' matches in multiple files:"
+            f" {file_list}; pass --repo umbrella|<name> to disambiguate",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    else:
+        file_path, target_line = hits[0]
+        amend_file(file_path, target_line)
 PY
