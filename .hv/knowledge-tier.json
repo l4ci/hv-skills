@@ -320,6 +320,16 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-19"
+    },
+    "Architecture: Helper conventions & invariants::Optional-value flags use `${PARAM:?$USAGE}` to reject bare trailing flag values": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
+    },
+    "Architecture: Helper conventions & invariants::Umbrella scope as the degenerate 1-element case of hybrid `file_pairs`": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
     }
   }
 }
