@@ -34,3 +34,30 @@ hv_resolve_knowledge_scope() {
   printf '%s\n' "umbrella"
   return 0
 }
+
+# hv_resolve_knowledge_path <scope> [tier]
+#   Resolve a scope string to its KNOWLEDGE.md path (default) or, when the
+#   second arg is the literal "tier", its tier-sidecar path. Wraps the
+#   hvlib resolver ONCE, passing scope via argv (never string-interpolated
+#   into Python source) so sub-repo names with shell/quote metacharacters
+#   are safe. Prints the resolved path on stdout. On the resolver's
+#   ValueError (sub-repo scope while umbrella off, or unregistered name),
+#   prints `error: <message>` to stderr and returns 2 — the single
+#   canonical exit code for a scope-resolution failure across every
+#   knowledge/glossary helper (F21 #4a unification). Never interpolates.
+hv_resolve_knowledge_path() {
+  local _scope="${1:?hv_resolve_knowledge_path: scope required}"
+  local _which="${2:-knowledge}"
+  local _bin
+  _bin="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  PYTHONPATH="$_bin${PYTHONPATH:+:$PYTHONPATH}" python3 - "$_scope" "$_which" <<'PYR'
+import sys
+from hvlib import resolve_knowledge_target, resolve_tier_sidecar
+scope, which = sys.argv[1], sys.argv[2]
+try:
+    print(resolve_tier_sidecar(scope) if which == "tier" else resolve_knowledge_target(scope))
+except ValueError as e:
+    sys.stderr.write(f"error: {e}\n")
+    sys.exit(2)
+PYR
+}

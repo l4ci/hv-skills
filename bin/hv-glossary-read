@@ -91,15 +91,7 @@ PY
 
 else
   # ── Sub-repo hybrid path: umbrella file + sub-repo file ────────────────────
-  SUBREPO_FILE=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYR'
-import sys
-from hvlib import resolve_knowledge_target
-try:
-    print(resolve_knowledge_target(sys.argv[1]))
-except ValueError as e:
-    sys.stderr.write(f"error: {e}\n"); sys.exit(2)
-PYR
-) || exit 2
+  SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
 
   # Pass list of (path, label) pairs via env var; terms via argv.
   export HV_GLOSS_FILES

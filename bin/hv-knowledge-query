@@ -141,10 +141,8 @@ PY
 
 else
   # ── Sub-repo hybrid path: umbrella file + sub-repo file, with > from: ───────
-  # Resolve sub-repo file path via T1 resolver; guard ValueError → exit 1.
-  SUBREPO_FILE=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
-    "from hvlib import resolve_knowledge_target; print(resolve_knowledge_target('$SCOPE'))" \
-    2>&1) || { echo "error: $SUBREPO_FILE" >&2; exit 1; }
+  # Resolve sub-repo file path via T1 resolver; guard ValueError → exit 2.
+  SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || { rc=$?; echo "$SUBREPO_FILE" >&2; exit $rc; }
 
   # Collect sidecars for umbrella and sub-repo scopes separately.
   UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")

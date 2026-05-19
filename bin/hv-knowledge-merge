@@ -93,7 +93,7 @@ try:
     target = resolve_knowledge_target(scope)
 except ValueError as e:
     print(f"error: {e}", file=sys.stderr)
-    sys.exit(1)
+    sys.exit(2)
 
 iso_date = date_arg if date_arg else date.today().isoformat()
 

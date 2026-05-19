@@ -110,17 +110,7 @@ fi
 
 . "$(dirname "${BASH_SOURCE[0]}")/hv-knowledge-scope.sh"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
-SIDECAR_PATH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYINLINE'
-import sys
-from hvlib import resolve_tier_sidecar
-try:
-    print(resolve_tier_sidecar(sys.argv[1]))
-except ValueError as e:
-    import sys as _sys
-    _sys.stderr.write(f"error: {e}\n")
-    _sys.exit(1)
-PYINLINE
-)" || exit 1
+SIDECAR_PATH="$(hv_resolve_knowledge_path "$SCOPE" tier)" || exit $?
 export _HV_KT_SIDECAR="$SIDECAR_PATH"
 
 export _HV_KT_CMD="$CMD"

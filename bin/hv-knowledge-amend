@@ -104,7 +104,7 @@ if explicit:
         file_path = resolve_knowledge_target(scope)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
     content = read_or_empty(file_path)
     span = find_section(content, topic)
     if span is None:
