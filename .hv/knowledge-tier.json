@@ -300,6 +300,26 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-19"
+    },
+    "Architecture: Helper conventions & invariants::Sourced libs needing caller cwd must restore HV_ORIG_PWD (hv-preamble.sh cds first)": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
+    },
+    "Architecture: Helper conventions & invariants::Scope-axis additions keep the default path byte-identical via literal legacy resolution": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
+    },
+    "Build & Tooling: Smoke testing::Behavior-changing tasks must sweep smoke sections asserting the old behavior": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
+    },
+    "Build & Tooling: Smoke testing::Inverted grep assertion (grep && fail) aborts the section under set -e": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-05-19"
     }
   }
 }
