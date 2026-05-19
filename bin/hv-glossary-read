@@ -20,18 +20,20 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
+USAGE="usage: hv-glossary-read [--repo umbrella|<name>] <term>..."
+
 REPO_FLAG=""
 TERMS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --repo) REPO_FLAG="$2"; shift 2 ;;
+    --repo) REPO_FLAG="${2:?$USAGE}"; shift 2 ;;
     --) shift; while [ $# -gt 0 ]; do TERMS+=("$1"); shift; done ;;
     -*) echo "error: unknown flag $1" >&2; exit 1 ;;
     *) TERMS+=("$1"); shift ;;
   esac
 done
 
-[ "${#TERMS[@]}" -ge 1 ] || { echo "usage: hv-glossary-read [--repo umbrella|<name>] <term>..." >&2; exit 1; }
+[ "${#TERMS[@]}" -ge 1 ] || { echo "$USAGE" >&2; exit 1; }
 
 . "$HERE/hv-knowledge-scope.sh"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"

@@ -19,6 +19,8 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
+USAGE="usage: hv-knowledge-query [--repo umbrella|<name>] [--include-deprecated] [--tier <T>] <topic>..."
+
 INCLUDE_DEPRECATED=0
 TIER_FILTER=""
 REPO_FLAG=""
@@ -26,7 +28,7 @@ TOPICS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
-      REPO_FLAG="${2:?--repo requires a value (umbrella or a sub-repo name)}"
+      REPO_FLAG="${2:?$USAGE}"
       shift 2
       ;;
     --include-deprecated)
