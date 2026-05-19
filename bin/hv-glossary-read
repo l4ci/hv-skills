@@ -35,75 +35,26 @@ done
 
 [ "${#TERMS[@]}" -ge 1 ] || { echo "$USAGE" >&2; exit 1; }
 
+# Resolve scope: "umbrella" or a sub-repo name. Umbrella is the degenerate
+# 1-element case of the hybrid file_pairs list — both emit `> from: <label>`
+# per match, so a single outer loop covers both shapes. extract_entries()
+# (the bullet/term parser) is defined once and used unchanged.
 . "$HERE/hv-knowledge-scope.sh"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 
 if [ "$SCOPE" = "umbrella" ]; then
-  # ── Umbrella path: byte-identical to pre-F21 behavior ──────────────────────
-  TARGET=".hv/KNOWLEDGE.md"
-  [ -f "$TARGET" ] || exit 0
-
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TARGET" "${TERMS[@]}" <<'PY'
-import re
-import sys
-from pathlib import Path
-from hvlib import find_section
-
-target = Path(sys.argv[1])
-wanted = {t.strip().lower() for t in sys.argv[2:]}
-if not wanted:
-    sys.exit(0)
-
-text = target.read_text()
-span = find_section(text, "Glossary")
-if span is None:
-    sys.exit(0)
-start, end = span
-body = text[start:end]
-
-# Split the body into per-entry blocks by top-level `- **<name>**` boundaries.
-lines = body.splitlines(keepends=True)
-i = 0
-entries: list[tuple[str, str]] = []
-while i < len(lines):
-    m = re.match(r"^- \*\*([^*]+)\*\*", lines[i])
-    if not m:
-        i += 1
-        continue
-    name = m.group(1).strip()
-    block_lines = [lines[i]]
-    i += 1
-    while i < len(lines):
-        if re.match(r"^- \*\*", lines[i]):
-            break
-        block_lines.append(lines[i])
-        i += 1
-    entries.append((name, "".join(block_lines).rstrip("\n")))
-
-printed = False
-for name, block in entries:
-    if name.lower() not in wanted:
-        continue
-    if printed:
-        print()
-    print("> from: .hv/KNOWLEDGE.md (## Glossary)")
-    print(block)
-    printed = True
-PY
-
+  HV_GLOSS_FILES='[[".hv/KNOWLEDGE.md", ".hv/KNOWLEDGE.md"]]'
 else
-  # ── Sub-repo hybrid path: umbrella file + sub-repo file ────────────────────
   SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
-
-  # Pass list of (path, label) pairs via env var; terms via argv.
-  export HV_GLOSS_FILES
   HV_GLOSS_FILES="$(python3 -c "
 import json, sys
 pairs = [('.hv/KNOWLEDGE.md', '.hv/KNOWLEDGE.md'), (sys.argv[1], sys.argv[1])]
 print(json.dumps(pairs))
 " "$SUBREPO_FILE")"
+fi
+export HV_GLOSS_FILES
 
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TERMS[@]}" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TERMS[@]}" <<'PY'
 import json
 import os
 import re
@@ -163,5 +114,3 @@ for fp, label in file_pairs:
         print(block)
         printed = True
 PY
-
-fi
