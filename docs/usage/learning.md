@@ -37,6 +37,14 @@ Entries are grouped under short topic headings such as `Build & Tooling`,
 top. New entries carry an HTML-comment date stamp (`<!-- YYYY-MM-DD -->`) so
 you can tell at a glance how fresh a piece of knowledge is.
 
+In **umbrella mode**, `KNOWLEDGE.md` is hybrid: cross-repo learnings live in
+the umbrella `.hv/KNOWLEDGE.md`, repo-local ones in
+`.hv/knowledge/<name>/KNOWLEDGE.md`. `/hv-learn` (and `--term` Glossary
+entries) routes to the scope resolved from cwd or an explicit `--repo`; at
+the umbrella root it asks once whether a learning is umbrella-shared or
+sub-repo-scoped. DECISIONS stays umbrella-only. Single-repo projects are
+unaffected. Full model: [`references/persistence-umbrella-scoping.md`](../../references/persistence-umbrella-scoping.md).
+
 ## Promotion lifecycle
 
 `KNOWLEDGE.md` bullets carry a tier — `provisional`, `confirmed`, or `deprecated` — tracked in a sidecar (`.hv/knowledge-tier.json`) along with a hit counter. Tiers separate "we wrote this down once" from "we've validated this repeatedly in real cycles."
