@@ -78,6 +78,10 @@ names = sorted(set(requested) | set(kept_prior))
 repos = [{"name": n, "path": f"./{n}"} for n in names]
 dump_json_atomic(repos_path, {"repos": repos})
 
+# Pre-create per-sub-repo knowledge dirs (defense-in-depth; T1 resolver also lazily mkdir's).
+for n in names:
+    Path(".hv", "knowledge", n).mkdir(parents=True, exist_ok=True)
+
 # 7. If umbrella is a git repo, manage .gitignore (idempotent append-only).
 if umbrella_has_git:
     gi = Path(".gitignore")
