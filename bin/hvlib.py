@@ -42,6 +42,9 @@ from hvlib_repos import (
     parse_repos_csv, validate_repos, load_repos, active_items,
     parse_milestones, update_milestone_status_line,
 )
+from hvlib_knowledge import (
+    resolve_knowledge_target, resolve_tier_sidecar,
+)
 from hvlib_glossary import (
     parse_term_entry, first_sentence,
     parse_glossary_entries, build_glossary_entry, split_csv_list,
