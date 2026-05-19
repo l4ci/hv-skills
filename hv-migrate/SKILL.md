@@ -1,6 +1,6 @@
 ---
 name: hv-migrate
-description: One-shot codemod for v3 → v4 upgrades. Versioned arg required — `/hv-migrate v4`. Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv-glossary-import`, and removes stale `.hv/bin/hv-context-*` files left behind. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, umbrella projects (F21), or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0.
+description: One-shot codemod for v3 → v4 upgrades. Versioned arg required — `/hv-migrate v4`. Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv-glossary-import`, and removes stale `.hv/bin/hv-context-*` files left behind. Umbrella projects are also supported: each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` is migrated into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` (## Glossary) via `hv-glossary-import --repo <name>`; the umbrella-root `.hv/CONTEXT.md` still migrates to the umbrella `.hv/KNOWLEDGE.md`; everything is backed up under `.hv/migrate-backup/` first. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0.
 user-invocable: true
 ---
 
@@ -27,7 +27,7 @@ user-invocable: true
 
 - The project is already on v4.0 — re-running is a noop, but there's no reason to run.
 - The project is a fresh `/hv-init` on a 4.0 plugin — nothing to migrate.
-- The project is in umbrella mode (`.hv/repos.json` registers sub-repos). v4.0 GA refuses; umbrella support comes with F21.
+- The project is in umbrella mode (`.hv/repos.json` registers sub-repos). Umbrella projects are supported — each sub-repo's `.hv/contexts/<name>/CONTEXT.md` migrates into its own `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary.
 
 ## Step 1 — Preflight
 
@@ -71,7 +71,7 @@ Run the helper in dry-run mode regardless of which flags the user passed:
 
 The output names every file that would be rewritten, how many references in each, the CONTEXT.md migration plan, the list of stale `.hv/bin/hv-*` files to remove, and any manual-review items (ambiguous `/hv-issues` and `/hv-map` occurrences).
 
-If the helper refuses on a safety precondition (exit 1) — uncommitted non-`.hv/` changes, pre-3.0 version, umbrella project, or running inside a backup directory — surface the helper's stderr verbatim and stop. The user resolves the precondition (commit, run `/hv-init`, switch to single-repo mode) and re-invokes `/hv-migrate v4` themselves.
+If the helper refuses on a safety precondition (exit 1) — uncommitted non-`.hv/` changes, pre-3.0 version, or running inside a backup directory — surface the helper's stderr verbatim and stop. The user resolves the precondition (commit or run `/hv-init`) and re-invokes `/hv-migrate v4` themselves.
 
 If the helper reports `noop: project is already on v4`, print one line — *"Already on v4. Nothing to migrate."* — and exit.
 

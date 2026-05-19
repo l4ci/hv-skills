@@ -3,14 +3,13 @@
 # Writer helper: exit 0 on successful write; exit 2 on usage error, 3 on alias collision.
 #
 # Usage: hv-glossary-write <term> --def <text> [--alias <a>,...] [--not <n>,...] [--touch]
+#                          [--repo umbrella|<name>]
 #
 # For atomic multi-term import use `hv-glossary-import <manifest>` — the batch
 # path was split out so its validator and this single-write path can evolve
 # independently.
 #
-# Single-repo only. Umbrella support (per-sub-repo Glossary) is F21.
-#
-# Entry format inside .hv/KNOWLEDGE.md `## Glossary`:
+# Entry format inside the target `## Glossary`:
 #   - **<term>** — <definition>
 #     - **Aliases:** X, Y    (or _none_ if empty)
 #     - **Not:** Z           (line omitted when empty)
@@ -34,6 +33,7 @@ ALIASES_RAW=""
 NOTS_RAW=""
 TOUCH="false"
 NOTS_PROVIDED="false"
+REPO_FLAG=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,6 +41,7 @@ while [ $# -gt 0 ]; do
     --alias) ALIASES_RAW="$2"; shift 2 ;;
     --not)   NOTS_RAW="$2"; NOTS_PROVIDED="true"; shift 2 ;;
     --touch) TOUCH="true"; shift ;;
+    --repo)  REPO_FLAG="$2"; shift 2 ;;
     --batch) echo "error: --batch was split out — call hv-glossary-import <manifest> directly" >&2; exit 2 ;;
     --) shift; break ;;
     -*) echo "error: unknown flag $1" >&2; exit 2 ;;
@@ -49,8 +50,19 @@ while [ $# -gt 0 ]; do
 done
 
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 
-TARGET=".hv/KNOWLEDGE.md"
+TARGET="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYR'
+import sys
+from hvlib import resolve_knowledge_target
+try:
+    print(resolve_knowledge_target(sys.argv[1]))
+except ValueError as e:
+    sys.stderr.write(f"error: {e}\n"); sys.exit(2)
+PYR
+)" || exit 2
+
 [ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
 
 [ -n "$TERM" ] || { echo "usage: hv-glossary-write <term> --def <text> [--alias …] [--not …] [--touch]" >&2; exit 2; }
@@ -81,7 +93,7 @@ new_nots = split_csv_list(nots_raw)
 text = target_path.read_text()
 span = find_section(text, "Glossary")
 if span is None:
-    print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
+    print(f"error: ## Glossary topic missing from {target} — run /hv-init or add the heading manually", file=sys.stderr)
     sys.exit(2)
 start, end = span
 entries, leading = parse_glossary_entries(text[start:end])
@@ -157,4 +169,4 @@ PY
 
 # Regenerate the hv-knowledge CLAUDE.md managed block so the topic list
 # stays current (Glossary surfaces automatically since it's just a topic).
-"$HERE/hv-managed-block" knowledge >/dev/null
+"$HERE/hv-managed-block" knowledge --repo "$SCOPE" >/dev/null

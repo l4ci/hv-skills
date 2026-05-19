@@ -209,6 +209,30 @@ The helper handles insertion at the top of the topic, the date stamp, and atomic
 
 `hv-knowledge-merge` is a writer helper — exit 0 on insert OR on idempotent no-op; exit 1 if the topic doesn't exist (handle topic creation first as above).
 
+### Umbrella-mode routing
+
+When `.hv/repos.json` registers at least one sub-repo (umbrella mode), `hv-knowledge-merge` accepts a `--repo umbrella|<name>` flag that controls which `KNOWLEDGE.md` receives the write:
+
+- **`--repo <name>`** — writes to `.hv/knowledge/<name>/KNOWLEDGE.md` (the sub-repo's scoped file).
+- **`--repo umbrella`** — writes to `.hv/KNOWLEDGE.md` (the shared umbrella file).
+- **No `--repo`** — scope auto-resolves from cwd: inside a registered sub-repo's directory the helper writes that sub-repo's scoped file; at the umbrella root it falls back to `.hv/KNOWLEDGE.md`.
+
+**At the umbrella root**, when a learning is clearly repo-local rather than cross-repo, ask once via `AskUserQuestion` before calling the merge helper:
+
+- Header: `"Learning scope"`
+- Question: *"Capture this learning as umbrella-shared, or scoped to a specific sub-repo?"*
+- Options (single-select, one per registered sub-repo plus a shared option):
+  1. `"Umbrella-shared (Recommended)"` — *"Write to `.hv/KNOWLEDGE.md`; visible across all sub-repos."*
+  2. `"<name>"` (one option per registered sub-repo) — *"Write to `.hv/knowledge/<name>/KNOWLEDGE.md`; scoped to that repo."*
+
+Pass the chosen scope as `--repo <scope>` to `hv-knowledge-merge`. `/hv-learn --term` (F18 Glossary entries) uses the same routing — per the *"Persistence-trio scoping"* decision the Glossary topic follows KNOWLEDGE's hybrid scoping, so a `--repo`-scoped term lands in that sub-repo's `## Glossary` (wired in T5).
+
+**Single-repo projects:** no `--repo` needed — scope always resolves to `"umbrella"` and the `.hv/KNOWLEDGE.md` path is used unchanged; behavior is byte-identical to pre-F21.
+
+**New topics in a scoped file:** the "append `## <Topic>` heading first" rule applies to the *resolved* file. A fresh sub-repo `KNOWLEDGE.md` starts empty — seed the heading in that scoped file before calling `hv-knowledge-merge`, just as you would for the umbrella file.
+
+**DECISIONS stay umbrella-only.** Per the *"Persistence-trio scoping under umbrella mode"* decision in `.hv/DECISIONS.md`, only KNOWLEDGE is hybrid (umbrella + per-sub-repo). DECISIONS is umbrella-only — do not offer or pass a `--repo` scope when writing decisions.
+
 ## Step 6 — Update CLAUDE.md Topic Index
 
 ```bash
@@ -216,6 +240,8 @@ The helper handles insertion at the top of the topic, the date stamp, and atomic
 ```
 
 Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
+
+In umbrella mode, pass `--repo <scope>` where `<scope>` is the same scope the learning was written to: this regenerates that sub-repo's `CLAUDE.md` with a block listing umbrella topics first, then any topics unique to that sub-repo, while `--repo umbrella` (or omitting the flag in a single-repo project) regenerates the umbrella/project `CLAUDE.md` unchanged. DECISIONS are umbrella-only and never take `--repo`.
 
 ## Step 7 — Opus Verification (default)
 

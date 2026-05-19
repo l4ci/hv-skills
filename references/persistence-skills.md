@@ -59,4 +59,4 @@ If a new persistence skill needs a different gate, choose deliberately from {non
 - **Manual gates inventory.** The list of always-manual sites across all skills (not just this duo) lives in `references/manual-gates.md`.
 - **TaskCreate phase boilerplate.** The cross-cutting authoring rule lives in `references/authoring-conventions.md` rule *"Surface multi-step skill progress with TaskCreate"*.
 - **Knowledge & decisions consult.** The read-side pattern (helpers, carrier semantics, parallelism) lives in `references/knowledge-consult.md`.
-- **Umbrella-mode per-sub-repo glossary.** Tracked as **F21** — not yet shipped.
+- **Umbrella-mode per-sub-repo KNOWLEDGE + Glossary.** Shipped in **F21** — hybrid umbrella + per-sub-repo storage, scope auto-resolve, and DECISIONS.md staying umbrella-only. Full model in `references/persistence-umbrella-scoping.md`.

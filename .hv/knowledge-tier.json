@@ -208,13 +208,13 @@
     },
     "Build & Tooling: Helpers & migrations::Re-grep the actual surface before executing a stored plan": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-05-19"
     },
     "Architecture: Module extraction & migration safety::Shim re-exports preserve private module-level names across extractions": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-05-19"
     },
     "Architecture: Module extraction & migration safety::Flat-module extractions place functions by import-DAG, not nominal category": {
       "tier": "provisional",
@@ -238,8 +238,8 @@
     },
     "Architecture: Helper conventions & invariants::Use load_repos() for umbrella detection \u2014 never truthy-test raw repos.json": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-05-19"
     },
     "Architecture: Helper conventions & invariants::Atomic-batch helpers validate the whole batch before any write": {
       "tier": "provisional",

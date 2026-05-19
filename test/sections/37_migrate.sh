@@ -26,7 +26,7 @@ grep -q "pre-3.0" "$TMP_OLD/.hv/err" || fail "pre-3.0 refusal message"
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-migrate — refuses pre-3.0 project"
 
-echo "hv-migrate — refuses umbrella project"
+echo "hv-migrate — umbrella project no longer refused (F21)"
 TMP_UMB="$(mktemp -d)"
 trap 'rm -rf "$TMP_UMB"' EXIT
 ( cd "$TMP_UMB" && git init -q && git config user.email t@t && git config user.name t )
@@ -36,11 +36,16 @@ echo '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' >
 set +e
 ( cd "$TMP_UMB" && "$BIN/hv-migrate" v4 2>"$TMP_UMB/.hv/err" ); RC=$?
 set -e
-[ $RC -eq 1 ] || fail "umbrella should exit 1, got $RC"
-grep -q "umbrella project detected" "$TMP_UMB/.hv/err" || fail "umbrella refusal message"
-grep -q "F21" "$TMP_UMB/.hv/err" || fail "umbrella message should cite F21"
+# F21 lifted the umbrella refusal — migrate proceeds. With no per-sub-repo
+# CONTEXT.md in this fixture there is nothing to migrate, so it's a clean
+# no-op dry-run (exit 0). The deep umbrella migration path is covered by
+# test/sections/42_umbrella_knowledge.sh.
+[ $RC -eq 0 ] || fail "umbrella should no longer refuse (expected exit 0, got $RC)"
+if grep -q "umbrella project detected" "$TMP_UMB/.hv/err"; then
+  fail "stale umbrella refusal message still present"
+fi
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — refuses umbrella project"
+pass "hv-migrate — umbrella project no longer refused (F21)"
 
 echo "hv-migrate — refuses dirty tree outside .hv/"
 TMP_DIRTY="$(mktemp -d)"

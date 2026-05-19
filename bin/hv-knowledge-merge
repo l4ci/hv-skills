@@ -12,7 +12,7 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>]
+USAGE="usage: hv-knowledge-merge --topic <T> --title <S> [--date YYYY-MM-DD] [--body <text>] [--repo umbrella|<name>]
        (body also accepted via stdin if --body not given)"
 
 # Parse flags in bash
@@ -21,6 +21,7 @@ TITLE=""
 DATE_ARG=""
 BODY_ARG=""
 BODY_FROM_ARG=0
+REPO_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
     --body)
       BODY_ARG="${2:?$USAGE}"
       BODY_FROM_ARG=1
+      shift 2
+      ;;
+    --repo)
+      REPO_FLAG="${2:?$USAGE}"
       shift 2
       ;;
     --help|-h)
@@ -64,10 +69,16 @@ if [[ "$BODY_FROM_ARG" -eq 0 ]]; then
 fi
 
 export _HV_KM_BODY="$BODY_ARG"
+
+. "$(dirname "${BASH_SOURCE[0]}")/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+export _HV_KM_SCOPE="$SCOPE"
+
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$TITLE" "$DATE_ARG" "$BODY_FROM_ARG" <<PY
+import os
 import sys
 from datetime import date
-from hvlib import read_or_empty, write_text_atomic, find_section, replace_section
+from hvlib import read_or_empty, write_text_atomic, find_section, replace_section, resolve_knowledge_target
 
 topic = sys.argv[1]
 title = sys.argv[2]
@@ -75,16 +86,22 @@ date_arg = sys.argv[3]
 body_from_arg = sys.argv[4] == "1"
 
 # Body was pre-read in bash; pass it through environment to avoid argv escaping issues
-import os
 body = os.environ.get("_HV_KM_BODY", "").rstrip("\n")
+
+scope = os.environ.get("_HV_KM_SCOPE", "umbrella")
+try:
+    target = resolve_knowledge_target(scope)
+except ValueError as e:
+    print(f"error: {e}", file=sys.stderr)
+    sys.exit(1)
 
 iso_date = date_arg if date_arg else date.today().isoformat()
 
-content = read_or_empty(".hv/KNOWLEDGE.md")
+content = read_or_empty(target)
 
 span = find_section(content, topic)
 if span is None:
-    print(f"error: topic '{topic}' not found in .hv/KNOWLEDGE.md", file=sys.stderr)
+    print(f"error: topic '{topic}' not found in {target}", file=sys.stderr)
     sys.exit(1)
 
 start, end = span
@@ -121,7 +138,7 @@ if not new_body.endswith("\n"):
     new_body += "\n"
 
 new_content = replace_section(content, topic, new_body)
-write_text_atomic(".hv/KNOWLEDGE.md", new_content)
+write_text_atomic(target, new_content)
 print(f"wrote: {topic} (title added)", file=sys.stderr)
 PY
 
@@ -130,4 +147,4 @@ PY
 # Fault-tolerant: if hv-knowledge-tier is missing (older install), we
 # still report success — the bullet landed. F03-aware projects pick up
 # the entry on the next hv-knowledge-migrate run.
-"$HERE/hv-knowledge-tier" --init --topic "$TOPIC" --title "$TITLE" 2>/dev/null || true
+"$HERE/hv-knowledge-tier" --init --repo "$SCOPE" --topic "$TOPIC" --title "$TITLE" 2>/dev/null || true

@@ -2,7 +2,7 @@
 # Atomic multi-term import into the ## Glossary topic of .hv/KNOWLEDGE.md.
 # Mutator helper: exit 0 on success, 2 on usage error, 3 on alias collision.
 #
-# Usage: hv-glossary-import <manifest> [--touch]
+# Usage: hv-glossary-import <manifest> [--touch] [--repo umbrella|<name>]
 #
 # Manifest format: tab-separated columns `term<TAB>def<TAB>aliases<TAB>nots`.
 # Aliases/nots are CSV (comma-separated) within the cell. Blank lines and
@@ -14,26 +14,40 @@
 #
 # Companion to hv-glossary-write (single-term). Split out so the batch
 # validator and the single-write path can evolve independently and so each
-# file stays narrowly focused. Single-repo only; umbrella support is F21.
-# Regenerates the CLAUDE.md hv-knowledge managed block on success.
+# file stays narrowly focused. Regenerates the CLAUDE.md hv-knowledge
+# managed block on success.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 TOUCH="false"
 MANIFEST=""
+REPO_FLAG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --touch) TOUCH="true"; shift ;;
+    --repo)  REPO_FLAG="$2"; shift 2 ;;
     --) shift; break ;;
     -*) echo "error: unknown flag $1" >&2; exit 2 ;;
     *) [ -z "$MANIFEST" ] && MANIFEST="$1" || { echo "error: unexpected positional $1" >&2; exit 2; }; shift ;;
   esac
 done
 
-[ -n "$MANIFEST" ] || { echo "usage: hv-glossary-import <manifest> [--touch]" >&2; exit 2; }
+[ -n "$MANIFEST" ] || { echo "usage: hv-glossary-import <manifest> [--touch] [--repo umbrella|<name>]" >&2; exit 2; }
 [ -f "$MANIFEST" ] || { echo "error: manifest file '$MANIFEST' not found" >&2; exit 2; }
 
-TARGET=".hv/KNOWLEDGE.md"
+. "$HERE/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+
+TARGET="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYR'
+import sys
+from hvlib import resolve_knowledge_target
+try:
+    print(resolve_knowledge_target(sys.argv[1]))
+except ValueError as e:
+    sys.stderr.write(f"error: {e}\n"); sys.exit(2)
+PYR
+)" || exit 2
+
 [ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MANIFEST" "$TARGET" "$TOUCH" <<'PY'
@@ -58,7 +72,7 @@ today = dt.date.today().isoformat()
 text = target_path.read_text()
 span = find_section(text, "Glossary")
 if span is None:
-    print("error: ## Glossary topic missing from .hv/KNOWLEDGE.md — run /hv-init or add the heading manually", file=sys.stderr)
+    print(f"error: ## Glossary topic missing from {target_path} — run /hv-init or add the heading manually", file=sys.stderr)
     sys.exit(2)
 start, end = span
 existing_entries, leading = parse_glossary_entries(text[start:end])
@@ -183,4 +197,4 @@ PY
 
 # Regenerate the hv-knowledge CLAUDE.md managed block so the topic list
 # stays current (Glossary surfaces automatically since it's just a topic).
-"$HERE/hv-managed-block" knowledge >/dev/null
+"$HERE/hv-managed-block" knowledge --repo "$SCOPE" >/dev/null
