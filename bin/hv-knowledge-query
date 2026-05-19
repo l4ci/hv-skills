@@ -19,6 +19,8 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
+USAGE="usage: hv-knowledge-query [--repo umbrella|<name>] [--include-deprecated] [--tier <T>] <topic>..."
+
 INCLUDE_DEPRECATED=0
 TIER_FILTER=""
 REPO_FLAG=""
@@ -26,7 +28,7 @@ TOPICS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
-      REPO_FLAG="${2:?--repo requires a value (umbrella or a sub-repo name)}"
+      REPO_FLAG="${2:?$USAGE}"
       shift 2
       ;;
     --include-deprecated)
@@ -58,101 +60,29 @@ done
 
 [ "${#TOPICS[@]}" -ge 1 ] || exit 0
 
-# Resolve scope: "umbrella" or a sub-repo name.
+# Resolve scope: "umbrella" or a sub-repo name. Umbrella is the degenerate
+# 1-element case of the hybrid file_pairs list; the Python block below
+# branches on HV_SCOPE_MODE to preserve umbrella's doc-order outer loop
+# (no `> from:` prefix) versus hybrid's argv-order outer loop (per-file
+# `> from:` prefix). The bullet-filter logic itself is shared.
 . "$HERE/hv-knowledge-scope.sh"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 
+UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
+[ -z "$UMBRELLA_SIDECAR" ] && UMBRELLA_SIDECAR="[]"
+
 if [ "$SCOPE" = "umbrella" ]; then
-  # ── Umbrella path: byte-identical to pre-F21 behavior ──────────────────────
-  # Collect the sidecar state once; emit empty JSON when the helper / file
-  # is missing so the Python below treats it as "no tier info, emit raw".
-  SIDECAR_JSON=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
-  [ -z "$SIDECAR_JSON" ] && SIDECAR_JSON="[]"
-
-  export HV_SIDECAR_JSON="$SIDECAR_JSON"
-  export HV_INCLUDE_DEPRECATED="$INCLUDE_DEPRECATED"
-  export HV_TIER_FILTER="$TIER_FILTER"
-
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - ".hv/KNOWLEDGE.md" "${TOPICS[@]}" <<'PY'
-import json
-import os
-import re
-import sys
-from pathlib import Path
-from hvlib import iter_topics
-
-file_path = Path(sys.argv[1])
-wanted = {t.strip().lower() for t in sys.argv[2:]}
-if not wanted or not file_path.exists():
-    sys.exit(0)
-
-include_deprecated = os.environ.get("HV_INCLUDE_DEPRECATED", "0") == "1"
-tier_filter = os.environ.get("HV_TIER_FILTER", "") or None
-
-try:
-    entries = json.loads(os.environ.get("HV_SIDECAR_JSON", "[]"))
-except json.JSONDecodeError:
-    entries = []
-tier_by_key = {
-    (e["topic"], e["title"]): e["tier"]
-    for e in entries
-    if isinstance(e, dict) and "topic" in e and "title" in e and "tier" in e
-}
-
-content = file_path.read_text()
-
-bullet_re = re.compile(
-    r"^- \*\*(?P<title>[^*]+)\*\* — (?P<body>.*?)(?P<trail>\s*<!-- \d{4}-\d{2}-\d{2}\s*-->\s*)$"
-)
-
-first = True
-for name, body in iter_topics(content):
-    if name.lower() not in wanted:
-        continue
-
-    out_lines = []
-    for line in body.splitlines():
-        m = bullet_re.match(line.rstrip())
-        if not m:
-            out_lines.append(line)
-            continue
-
-        title = m.group("title").strip()
-        tier = tier_by_key.get((name, title))
-
-        if tier_filter is not None and tier != tier_filter:
-            continue
-
-        if tier == "deprecated" and not include_deprecated:
-            continue
-
-        if tier == "provisional":
-            new_body = f"{m.group('body')} (provisional)"
-            line = f"- **{title}** — {new_body}{m.group('trail')}"
-
-        out_lines.append(line)
-
-    if not first:
-        print()
-    print(f"## {name}")
-    print("\n".join(out_lines).rstrip())
-    first = False
-PY
-
+  SCOPE_MODE="umbrella"
+  FILE_PAIRS="$(python3 -c "
+import json, sys
+pairs = [('.hv/KNOWLEDGE.md', json.loads(sys.argv[1]), '.hv/KNOWLEDGE.md')]
+print(json.dumps(pairs))
+" "$UMBRELLA_SIDECAR")"
 else
-  # ── Sub-repo hybrid path: umbrella file + sub-repo file, with > from: ───────
-  # Resolve sub-repo file path via T1 resolver; guard ValueError → exit 2.
+  SCOPE_MODE="hybrid"
   SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || { rc=$?; echo "$SUBREPO_FILE" >&2; exit $rc; }
-
-  # Collect sidecars for umbrella and sub-repo scopes separately.
-  UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
-  [ -z "$UMBRELLA_SIDECAR" ] && UMBRELLA_SIDECAR="[]"
-
   SUBREPO_SIDECAR=$("$HERE/hv-knowledge-tier" --list --repo "$SCOPE" 2>/dev/null || echo "[]")
   [ -z "$SUBREPO_SIDECAR" ] && SUBREPO_SIDECAR="[]"
-
-  # Build a JSON array of [file_path, sidecar_entries, provenance_label] triples.
-  # Python will iterate topics as outer loop, files as inner loop.
   FILE_PAIRS="$(python3 -c "
 import json, sys
 pairs = [
@@ -161,12 +91,14 @@ pairs = [
 ]
 print(json.dumps(pairs))
 " "$UMBRELLA_SIDECAR" "$SUBREPO_FILE" "$SUBREPO_SIDECAR")"
+fi
 
-  export HV_FILE_PAIRS="$FILE_PAIRS"
-  export HV_INCLUDE_DEPRECATED="$INCLUDE_DEPRECATED"
-  export HV_TIER_FILTER="$TIER_FILTER"
+export HV_FILE_PAIRS="$FILE_PAIRS"
+export HV_SCOPE_MODE="$SCOPE_MODE"
+export HV_INCLUDE_DEPRECATED="$INCLUDE_DEPRECATED"
+export HV_TIER_FILTER="$TIER_FILTER"
 
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TOPICS[@]}" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TOPICS[@]}" <<'PY'
 import json
 import os
 import re
@@ -177,7 +109,9 @@ from hvlib import iter_topics
 wanted_ordered = [t.strip().lower() for t in sys.argv[1:]]
 if not wanted_ordered:
     sys.exit(0)
+wanted_set = set(wanted_ordered)
 
+scope_mode = os.environ.get("HV_SCOPE_MODE", "umbrella")
 include_deprecated = os.environ.get("HV_INCLUDE_DEPRECATED", "0") == "1"
 tier_filter = os.environ.get("HV_TIER_FILTER", "") or None
 
@@ -229,30 +163,47 @@ for fp, entries, label in file_pairs:
     }
     parsed_pairs.append((fp, tbk, label))
 
-# Outer loop: topics (in argv order).
-first_topic = True
-for wanted_lower in wanted_ordered:
-    heading_printed = False
-    for fp, tier_by_key, label in parsed_pairs:
-        path = Path(fp)
-        if not path.exists():
+if scope_mode == "umbrella":
+    # Umbrella path: single file pair, doc-order outer loop, no `> from:`.
+    # Preserves pre-F21 byte-identical output.
+    fp, tier_by_key, _label = parsed_pairs[0]
+    path = Path(fp)
+    if not path.exists():
+        sys.exit(0)
+    content = path.read_text()
+    first_topic = True
+    for name, body in iter_topics(content):
+        if name.lower() not in wanted_set:
             continue
-        content = path.read_text()
-        for name, body in iter_topics(content):
-            if name.lower() != wanted_lower:
+        out_lines = collect_bullets(body, name, tier_by_key)
+        if not first_topic:
+            print()
+        print(f"## {name}")
+        print("\n".join(out_lines).rstrip())
+        first_topic = False
+else:
+    # Hybrid path: argv-order outer loop, `> from:` per file with content.
+    first_topic = True
+    for wanted_lower in wanted_ordered:
+        heading_printed = False
+        for fp, tier_by_key, label in parsed_pairs:
+            path = Path(fp)
+            if not path.exists():
                 continue
-            out_lines = collect_bullets(body, name, tier_by_key)
-            if not out_lines:
-                break  # topic exists but all bullets filtered out for this file
-            if not heading_printed:
-                if not first_topic:
-                    print()
-                print(f"## {name}")
-                first_topic = False
-                heading_printed = True
-            print(f"> from: {label}")
-            print("\n".join(out_lines).rstrip())
-            break  # each file has at most one section per topic name
+            content = path.read_text()
+            for name, body in iter_topics(content):
+                if name.lower() != wanted_lower:
+                    continue
+                out_lines = collect_bullets(body, name, tier_by_key)
+                if not out_lines:
+                    break  # topic exists but all bullets filtered out for this file
+                if not heading_printed:
+                    if not first_topic:
+                        print()
+                    print(f"## {name}")
+                    first_topic = False
+                    heading_printed = True
+                print(f"> from: {label}")
+                print("\n".join(out_lines).rstrip())
+                break  # each file has at most one section per topic name
 PY
-
-fi

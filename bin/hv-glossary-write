@@ -27,6 +27,8 @@
 # as a topic name through hv-managed-block knowledge — terms themselves are not listed).
 set -euo pipefail
 
+USAGE="usage: hv-glossary-write <term> --def <text> [--alias …] [--not …] [--touch] [--repo umbrella|<name>]"
+
 TERM=""
 DEF=""
 ALIASES_RAW=""
@@ -41,7 +43,7 @@ while [ $# -gt 0 ]; do
     --alias) ALIASES_RAW="$2"; shift 2 ;;
     --not)   NOTS_RAW="$2"; NOTS_PROVIDED="true"; shift 2 ;;
     --touch) TOUCH="true"; shift ;;
-    --repo)  REPO_FLAG="$2"; shift 2 ;;
+    --repo)  REPO_FLAG="${2:?$USAGE}"; shift 2 ;;
     --batch) echo "error: --batch was split out — call hv-glossary-import <manifest> directly" >&2; exit 2 ;;
     --) shift; break ;;
     -*) echo "error: unknown flag $1" >&2; exit 2 ;;
@@ -57,7 +59,7 @@ TARGET="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
 
 [ -f "$TARGET" ] || { echo "error: $TARGET missing — run /hv-init first" >&2; exit 2; }
 
-[ -n "$TERM" ] || { echo "usage: hv-glossary-write <term> --def <text> [--alias …] [--not …] [--touch]" >&2; exit 2; }
+[ -n "$TERM" ] || { echo "$USAGE" >&2; exit 2; }
 [ -n "$DEF" ]  || { echo "error: --def is required" >&2; exit 2; }
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" <<'PY'
