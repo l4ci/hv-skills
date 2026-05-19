@@ -3,13 +3,23 @@
 # Atomic-merge helper: regenerates a named managed block in CLAUDE.md; exit 0 on success, 1 on unknown key.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
+#        hv-managed-block knowledge [--repo umbrella|<name>]  # sub-repo CLAUDE.md = umbrella ∪ sub-repo topics
 # Keys: knowledge | decisions | vision | map | qa (vision, map, qa are body-stdin only).
 # Prints: created | updated | appended.
 # Companion: `hv-managed-block-strip-deprecated` removes orphan blocks for v3-cut keys.
 set -euo pipefail
 
-KEY="${1:?usage: hv-managed-block <key> [--body-stdin]}"
-MODE="${2:-}"
+KEY="${1:?usage: hv-managed-block <key> [--body-stdin] [--repo umbrella|<name>]}"
+shift
+MODE=""
+REPO_SCOPE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --body-stdin) MODE="--body-stdin"; shift ;;
+    --repo)       REPO_SCOPE="$2"; shift 2 ;;
+    *) echo "error: unknown argument $1" >&2; exit 1 ;;
+  esac
+done
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 if [ "$MODE" = "--body-stdin" ]; then
@@ -30,14 +40,13 @@ status = upsert_block(Path("CLAUDE.md"), key, block)
 print(status)
 PY
 else
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY'
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" "$REPO_SCOPE" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import iter_topics, upsert_block
+from hvlib import iter_topics, upsert_block, load_repos, resolve_knowledge_target
 
 REGISTRY = {
     "knowledge": {
-        "source":  ".hv/KNOWLEDGE.md",
         "heading": "## Project Knowledge",
         "intro":   "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:",
         "empty":   "- _(no topics yet — run `/hv-learn` to capture learnings)_",
@@ -52,16 +61,67 @@ REGISTRY = {
 }
 
 key = sys.argv[1]
+scope = sys.argv[2] if len(sys.argv) > 2 else ""
+
 if key not in REGISTRY:
     print(f"error: unknown key '{key}' (known: {', '.join(REGISTRY)})", file=sys.stderr)
     sys.exit(1)
 
+# decisions is umbrella-only; reject --repo <name> (non-empty, non-"umbrella")
+if key == "decisions" and scope and scope != "umbrella":
+    print(
+        "error: decisions is umbrella-only (Persistence-trio scoping); --repo not allowed",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 cfg = REGISTRY[key]
-source = Path(cfg["source"])
-topics = []
-if source.exists():
-    for name, _body in iter_topics(source.read_text()):
-        topics.append(name)
+
+if key == "knowledge":
+    # Umbrella scope (empty or "umbrella"): today's behavior — single source, CLAUDE.md at cwd.
+    if not scope or scope == "umbrella":
+        try:
+            source = Path(resolve_knowledge_target("umbrella"))
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            sys.exit(1)
+        topics = []
+        if source.exists():
+            for name, _body in iter_topics(source.read_text()):
+                topics.append(name)
+        target_path = Path("CLAUDE.md")
+    else:
+        # Sub-repo scope: union of umbrella topics ∪ sub-repo topics (first-seen order, de-duplicated).
+        try:
+            repos = load_repos()
+        except Exception as e:
+            print(f"error: {e}", file=sys.stderr)
+            sys.exit(1)
+        if scope not in repos:
+            print(f"error: sub-repo '{scope}' not registered in .hv/repos.json", file=sys.stderr)
+            sys.exit(1)
+        try:
+            umbrella_src = Path(resolve_knowledge_target("umbrella"))
+            subrepo_src = Path(resolve_knowledge_target(scope))
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            sys.exit(1)
+        seen: set[str] = set()
+        topics: list[str] = []
+        for src in (umbrella_src, subrepo_src):
+            if src.exists():
+                for name, _body in iter_topics(src.read_text()):
+                    if name not in seen:
+                        seen.add(name)
+                        topics.append(name)
+        target_path = Path(repos[scope]) / "CLAUDE.md"
+else:
+    source = Path(cfg["source"])
+    topics = []
+    if source.exists():
+        for name, _body in iter_topics(source.read_text()):
+            topics.append(name)
+    target_path = Path("CLAUDE.md")
 
 body = "\n".join(f"- {t}" for t in topics) if topics else cfg["empty"]
 
@@ -73,7 +133,7 @@ block = (
     f"<!-- hv-{key}-end -->"
 )
 
-status = upsert_block(Path("CLAUDE.md"), key, block, legacy_marker=cfg.get("legacy_marker"))
+status = upsert_block(target_path, key, block, legacy_marker=cfg.get("legacy_marker"))
 print(status)
 PY
 fi

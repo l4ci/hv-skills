@@ -197,4 +197,4 @@ PY
 
 # Regenerate the hv-knowledge CLAUDE.md managed block so the topic list
 # stays current (Glossary surfaces automatically since it's just a topic).
-"$HERE/hv-managed-block" knowledge >/dev/null
+"$HERE/hv-managed-block" knowledge --repo "$SCOPE" >/dev/null

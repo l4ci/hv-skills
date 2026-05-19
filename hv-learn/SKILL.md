@@ -241,6 +241,8 @@ Pass the chosen scope as `--repo <scope>` to `hv-knowledge-merge`. `/hv-learn --
 
 Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
 
+In umbrella mode, pass `--repo <scope>` where `<scope>` is the same scope the learning was written to: this regenerates that sub-repo's `CLAUDE.md` with a block listing umbrella topics first, then any topics unique to that sub-repo, while `--repo umbrella` (or omitting the flag in a single-repo project) regenerates the umbrella/project `CLAUDE.md` unchanged. DECISIONS are umbrella-only and never take `--repo`.
+
 ## Step 7 — Opus Verification (default)
 
 Run unless `learn.verify` is explicitly `false`. Follow the brief in `hv-learn/verifier.md` — it contains the dispatch instructions, the verifier prompt, and the verdict-application rules. Apply the verdict, then continue to Step 8.
