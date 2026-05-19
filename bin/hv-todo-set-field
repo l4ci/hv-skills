@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Set/replace/clear a trailing field on the open TODO bullet of <ID> in
+# .hv/BACKLOG.md, using hvlib.set_todo_field. The writer counterpart of the
+# read-only hv-todo-field — lets skills retag an existing entry (e.g. /hv-plan
+# tagging a milestone) without hand-editing .hv/BACKLOG.md, which the project
+# forbids.
+# Resolve helper: exits 1 when ID has no open bullet or field is not settable.
+#
+# Usage: hv-todo-set-field <ID> <field> <value>
+#          <field>: milestone | related | repos | subsystem
+#          <value>: new field value; an empty value ("") clears the field
+#          exit:   0 on success (incl. idempotent no-op), 1 on unknown
+#                  open ID / bad field, 2 on usage error
+#
+# Only open bullets in .hv/BACKLOG.md are mutated — completed/archived items
+# are intentionally out of scope (retagging is a planning-time operation on
+# live work).
+set -euo pipefail
+
+if [ "$#" -lt 3 ]; then
+  echo "usage: hv-todo-set-field <ID> <field> <value>" >&2
+  exit 2
+fi
+ID="$1"
+FIELD="$2"
+VALUE="$3"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$VALUE" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+from hvlib import BACKLOG_FILE, set_todo_field, write_text_atomic
+
+iid, field, value = sys.argv[1], sys.argv[2], sys.argv[3]
+
+path = Path(".hv") / BACKLOG_FILE
+if not path.exists():
+    sys.stderr.write(f"error: {path} not found\n")
+    sys.exit(1)
+content = path.read_text()
+
+# Open bullet only: `- **[ID] ...`. Done lines start `- ~~**[` and won't match.
+bullet = re.compile(rf"^- \*\*\[{re.escape(iid)}\].*$", re.MULTILINE)
+m = bullet.search(content)
+if not m:
+    sys.stderr.write(
+        f"error: [{iid}] has no open bullet in .hv/{BACKLOG_FILE} "
+        f"(unknown, completed, or archived)\n"
+    )
+    sys.exit(1)
+
+raw_line = m.group(0)
+try:
+    new_line = set_todo_field(raw_line, field, value)
+except ValueError as e:
+    sys.stderr.write(f"error: {e}\n")
+    sys.exit(1)
+
+if new_line == raw_line:
+    sys.exit(0)  # idempotent no-op — nothing to write
+
+write_text_atomic(path, content[: m.start()] + new_line + content[m.end():])
+PY
