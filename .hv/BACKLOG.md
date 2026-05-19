@@ -4,7 +4,7 @@
 
 ## Features
 - **[F05] [Major] `/hv-freeze` scope lock for parallel orchestrators.** Per-stream file-edit boundary enforced via PreToolUse hook. `/hv-work` writes declared scope to `.hv/locks/<stream>.json`; hook rejects writes outside it. Auto-released on completion/pause. Distinct from worktree isolation — worktrees protect filesystem between streams; freeze protects intent within a stream. Most valuable for multi-stream `/hv-work` and `/hv-refactor`. Detail: `.hv/features/F05.md` Since: a0e7f1f
-- **[F21] [Major] Umbrella-aware KNOWLEDGE.md.** Per-sub-repo .hv/knowledge/<name>/KNOWLEDGE.md storage; rewire hv-knowledge-merge/query/index/tier/amend helpers for umbrella scope; lights up /hv-migrate v4's umbrella branch. Split from F18 to keep the data-shape fold bounded. Ship in v4.0 or v4.1 — plan decides. Detail: `.hv/features/F21.md` Related: [F18], [F19] Since: a0e7f1f
+- **[F21] [Major] Umbrella-aware KNOWLEDGE.md.** Per-sub-repo .hv/knowledge/<name>/KNOWLEDGE.md storage; rewire hv-knowledge-merge/query/index/tier/amend helpers for umbrella scope; lights up /hv-migrate v4's umbrella branch. Split from F18 to keep the data-shape fold bounded. Tagged v4.1 (M06) — v4.0/M01 acceptance excludes umbrella-KNOWLEDGE and forbids partial ship. Detail: `.hv/features/F21.md` Related: [F18], [F19] Milestone: M06 Since: a0e7f1f
 
 ## Tasks
 

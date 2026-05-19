@@ -5,6 +5,7 @@ hv-skills is a Claude Code workflow that plans before coding, makes one commit p
 ## Active milestones
 
 - M01 — "v4.0: The Loop, simplified"
+- M06 — v4.1: umbrella-aware persistence
 
 ## Milestones
 
@@ -16,3 +17,11 @@ hv-skills is a Claude Code workflow that plans before coding, makes one commit p
 Cut 8 redundant commands (28 → 20), ship migration codemod, write announcement. The cut is the marketing.
 
 [Full plan: `.hv/milestones/M01.md`]
+
+### M06 — v4.1: umbrella-aware persistence
+
+**Status:** active · **Depends:** M01
+
+Close the umbrella gap left open in v4.0: per-sub-repo .hv/knowledge/<repo>/KNOWLEDGE.md storage with hybrid umbrella+sub-repo routing, so umbrella users running /hv-migrate v4 no longer hit F19's explicit refusal. DECISIONS.md stays umbrella-only by architectural commitment.
+
+[Full plan: `.hv/milestones/M06.md`]

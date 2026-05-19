@@ -18,6 +18,7 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
 
 - **M01** — "v4.0: The Loop, simplified" (depends: —)
+- **M06** — v4.1: umbrella-aware persistence (depends: M01) ⚠ blocked
 <!-- hv-vision-end -->
 
 ## Working in this repo
