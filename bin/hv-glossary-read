@@ -1,21 +1,47 @@
 #!/usr/bin/env bash
 # Print matching term entries from the ## Glossary topic of .hv/KNOWLEDGE.md.
-# Each printed block is preceded by a `> from: .hv/KNOWLEDGE.md (## Glossary)`
-# line so callers can distinguish glossary hits from regular knowledge bullets.
+# Each printed block is preceded by a `> from: <path> (## Glossary)` line so
+# callers can distinguish glossary hits from regular knowledge bullets.
 #
-# Usage: hv-glossary-read <term>...
+# Usage: hv-glossary-read [--repo umbrella|<name>] <term>...
+#   --repo <scope>  force scope: "umbrella" or a registered sub-repo name
 #   Case-insensitive match against the term name.
 #   Document order preserved when multiple terms are queried.
 #   Unknown terms produce no output and exit 0.
+#
+# Under umbrella mode (default for single-repo or when cwd is not inside a
+# registered sub-repo), reads only .hv/KNOWLEDGE.md — output is byte-identical
+# to pre-F21 behavior.
+#
+# Under sub-repo scope (cwd inside a registered sub-repo OR --repo <name>),
+# performs a hybrid read: umbrella KNOWLEDGE.md first, then the sub-repo
+# KNOWLEDGE.md, each set of matches preceded by its own `> from:` provenance
+# line. Umbrella matches come first, then sub-repo matches.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-[ $# -ge 1 ] || { echo "usage: hv-glossary-read <term>..." >&2; exit 1; }
+REPO_FLAG=""
+TERMS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) REPO_FLAG="$2"; shift 2 ;;
+    --) shift; while [ $# -gt 0 ]; do TERMS+=("$1"); shift; done ;;
+    -*) echo "error: unknown flag $1" >&2; exit 1 ;;
+    *) TERMS+=("$1"); shift ;;
+  esac
+done
 
-TARGET=".hv/KNOWLEDGE.md"
-[ -f "$TARGET" ] || exit 0
+[ "${#TERMS[@]}" -ge 1 ] || { echo "usage: hv-glossary-read [--repo umbrella|<name>] <term>..." >&2; exit 1; }
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TARGET" "$@" <<'PY'
+. "$HERE/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+
+if [ "$SCOPE" = "umbrella" ]; then
+  # ── Umbrella path: byte-identical to pre-F21 behavior ──────────────────────
+  TARGET=".hv/KNOWLEDGE.md"
+  [ -f "$TARGET" ] || exit 0
+
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TARGET" "${TERMS[@]}" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -62,3 +88,86 @@ for name, block in entries:
     print(block)
     printed = True
 PY
+
+else
+  # ── Sub-repo hybrid path: umbrella file + sub-repo file ────────────────────
+  SUBREPO_FILE=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCOPE" <<'PYR'
+import sys
+from hvlib import resolve_knowledge_target
+try:
+    print(resolve_knowledge_target(sys.argv[1]))
+except ValueError as e:
+    sys.stderr.write(f"error: {e}\n"); sys.exit(2)
+PYR
+) || exit 2
+
+  # Pass list of (path, label) pairs via env var; terms via argv.
+  export HV_GLOSS_FILES
+  HV_GLOSS_FILES="$(python3 -c "
+import json, sys
+pairs = [('.hv/KNOWLEDGE.md', '.hv/KNOWLEDGE.md'), (sys.argv[1], sys.argv[1])]
+print(json.dumps(pairs))
+" "$SUBREPO_FILE")"
+
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TERMS[@]}" <<'PY'
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from hvlib import find_section
+
+wanted = {t.strip().lower() for t in sys.argv[1:]}
+if not wanted:
+    sys.exit(0)
+
+try:
+    file_pairs = json.loads(os.environ.get("HV_GLOSS_FILES", "[]"))
+except json.JSONDecodeError:
+    file_pairs = []
+
+
+def extract_entries(text):
+    """Return list of (name, block_str) from ## Glossary body."""
+    span = find_section(text, "Glossary")
+    if span is None:
+        return []
+    start, end = span
+    body = text[start:end]
+    lines = body.splitlines(keepends=True)
+    i = 0
+    entries: list[tuple[str, str]] = []
+    while i < len(lines):
+        m = re.match(r"^- \*\*([^*]+)\*\*", lines[i])
+        if not m:
+            i += 1
+            continue
+        name = m.group(1).strip()
+        block_lines = [lines[i]]
+        i += 1
+        while i < len(lines):
+            if re.match(r"^- \*\*", lines[i]):
+                break
+            block_lines.append(lines[i])
+            i += 1
+        entries.append((name, "".join(block_lines).rstrip("\n")))
+    return entries
+
+
+printed = False
+for fp, label in file_pairs:
+    path = Path(fp)
+    if not path.exists():
+        continue
+    entries = extract_entries(path.read_text())
+    for name, block in entries:
+        if name.lower() not in wanted:
+            continue
+        if printed:
+            print()
+        print(f"> from: {label} (## Glossary)")
+        print(block)
+        printed = True
+PY
+
+fi
