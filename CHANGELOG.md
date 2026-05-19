@@ -1,5 +1,52 @@
 # Changelog
 
+## v4.2.0 — 2026-05-19
+
+v4.2 ships F21 (umbrella-aware KNOWLEDGE.md, the M06 milestone headline), the F25 hvlib package split, and a wave of v3→v4 migration fixes that unblock upgrade for umbrella projects.
+
+## New
+
+**F21 (M06 milestone) — umbrella-aware KNOWLEDGE.md.** Per-sub-repo `.hv/knowledge/<name>/KNOWLEDGE.md` storage alongside the umbrella file, hybrid reads with `> from:` provenance, per-file tier sidecars, scope auto-resolve via the new `bin/hv-knowledge-scope.sh`, and a cross-file amend guard. Single-repo output stays byte-identical; DECISIONS.md stays umbrella-only by hard boundary.
+- `bin/hvlib_knowledge.py` exposes `resolve_knowledge_target` / `resolve_tier_sidecar` (re-exported via `hvlib`).
+- `/hv-migrate v4` now supports umbrella projects: per-sub-repo `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's KNOWLEDGE Glossary (refusal lifted).
+- Per-sub-repo CLAUDE.md knowledge block = umbrella topics ∪ that sub-repo's topics.
+
+**F26 — artifact-CRUD consolidation.** Shared `hv-artifact-show.sh` lib backing `hv-vision-show` and `hv-spike-show`; same pattern absorbs a 5th artifact kind with one new wrapper.
+
+Smaller helpers: `hv-todo-set-field` (writer for BACKLOG item fields), `hv-knowledge-rename-topic` (atomic heading move + tier sidecar re-key), and `hv-managed-block --strip-deprecated` (removes orphan v3 blocks during `/hv-init` upgrade refresh, B09).
+
+## Fixed
+
+**v3→v4 migration polish.** `hv-migrate` now reads nested `hvSkills.version`, stamps it after `--apply`, and skips code spans + helper paths during rewrite (B07, B08, B09). Two pre-existing executable-bit bugs caught by the F66 smoke gate (`bin/hv-todo-set-field`, `bin/hv-review-scaffolding`). `hv-learn` Step 8 auto-split now re-keys the knowledge-tier sidecar so promotion state survives a topic split (T03). `issues.providers.{github,gitlab}` made schema-visible (B10). ID counters seed at the cross-machine high-water mark to prevent collisions after a clone.
+
+## Changed
+
+**F25 — hvlib package split.** The 1077-line `hvlib.py` decomposed into 8 flat sibling modules (`hvlib_io`, `_version`, `_section`, `_bullet`, `_frontmatter`, `_paths`, `_repos`, `_glossary`, `_crossref`), with `hvlib.py` becoming a thin re-export shim. Inter-module imports go through direct paths so the import DAG stays acyclic.
+
+**F21 follow-through.** Scope-path resolution shim consolidated into one safe (argv, no string-interpolation) function; scope-resolution exit code unified across all knowledge/glossary helpers (`e67fd63`).
+
+Project state migrated to v4 in this tree (`74ca9df`); plugin version re-stamped to 4.1.0 after the helper refresh (`e656e2d`).
+
+(Backlog/state bookkeeping commits — captures, marks, and tombstones across F21/F25/F26/T03/T04/T102/B07-B11 — are omitted from the changelog because they don't represent shipped behavior.)
+
+## Documentation
+
+**F21 doc reconciliation.** Three pages updated (`docs/usage/umbrella-mode.md`, `docs/usage/learning.md`, `docs/reference/slash-commands.md`) and a new canonical reference `references/persistence-umbrella-scoping.md` covering the hybrid model. F21 design flipped to `approved`.
+
+**F25/F26/migration learnings.** KNOWLEDGE.md gained durable bullets covering module extraction safety, helper conventions, codemod safety, and v3→v4 migration patterns; `cli-helpers.md` reflects `hv-vision-show` / `hv-spike-show` and the migration tightening.
+
+Polish: a one-line cheatsheet for every `/hv-*` skill (`docs/cheatsheet.md`); README logo proportioned. Wave-internal file-collision absorption pattern documented in `/hv-work` (T04). `hv-todo-set-field` documented.
+
+## Other
+
+- plan: M06 v4.1 milestone + M06-F21 implementation plan (`e7dbbf0`)
+
+## Stats
+
+66 commits, 79 files changed, +4347 −1551 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.1.0...v4.2.0
+
 ## v4.1.0 — 2026-05-17
 
 `.hv/` is now tracked by default — backlog, knowledge, decisions, plans, designs, milestones, and per-item detail travel with the repo from the first commit. Six paths stay gitignored: `.hv/bin/` (regenerated mirror), `.hv/status.json` and `.hv/repos.json` (per-developer runtime), `.hv/config.local.json` (per-developer overrides, deep-merged on top of `config.json` by `load_config()`), `.hv/handoff/` (per-developer scratch), and `.hv/qa-runs/` (bulky artifacts).
