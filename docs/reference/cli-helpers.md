@@ -20,6 +20,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-rm` | Remove backlog item(s) — strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
 | `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`/`subsystem`/`since`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
+| `hv-todo-set-field` | Set, replace, or clear a single field (`milestone`/`related`/`repos`/`subsystem`) on an open TODO bullet; writer counterpart of `hv-todo-field`; an empty value clears the field; idempotent on unchanged values | `.hv/bin/hv-todo-set-field B07 milestone M01` |
 | `hv-find-milestone-for-items` | Lookup the milestones tagged on a list of TODO item IDs; prints unique sorted M-IDs (one per line); always exits 0 | `.hv/bin/hv-find-milestone-for-items B07 F03` |
 | `hv-plan-rename-check` | List files that reference `<old-name>` (wraps `git grep -l`); used at plan + verify time for rename + link-sweep collision detection; always exits 0 | `.hv/bin/hv-plan-rename-check OldName.swift` |
 | `hv-uncertain` | Determine whether an item warrants `/hv-work --preview` before `/hv-plan` in loop mode; exits 0 (uncertain, reasons on stdout) or 1 (certain) | `.hv/bin/hv-uncertain B07` |
@@ -142,6 +143,8 @@ filter the backlog by milestone tag; see also [Knowledge and vision
 indexes](#knowledge-and-vision-indexes) where milestone state lives.
 
 `hv-todo-field` extracts a single named field (`detail`, `related`, `milestone`, or `repos`) from the TODO bullet of a given item ID. It replaces the ad-hoc `grep | sed` chains that skill prose previously inlined for that purpose.
+
+`hv-todo-set-field` is the writer counterpart: it sets, replaces, or clears one field (`milestone`, `related`, `repos`, or `subsystem`) on an open `BACKLOG.md` bullet, so a skill like `/hv-plan` can tag a milestone without hand-editing the file. An empty value drops the field; rewriting an unchanged value writes nothing and exits 0. Only open bullets are mutated — completed and archived items are out of scope.
 
 `hv-find-milestone-for-items` answers the inverse of `hv-todo-by-milestone`: given a list of item IDs, it prints the milestone tags those items carry in BACKLOG.md (unique, numerically sorted, open sections only — completed/archived items don't surface). Always exits 0; an unknown ID or untagged item is a silent skip, not an error.
 
