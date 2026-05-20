@@ -39,6 +39,8 @@ Marking a milestone `shipped` immediately unblocks anything that depended on it.
 
 Each plan contains: goal in one sentence, approach in 3–6 sentences, tasks with observable behaviors and verify steps, named assumptions, and open questions. Tasks must fit one execution window. If they don't, split the plan. Every task requires a verify step; a task without one is not well-defined.
 
+Before the plan is signed off, `/hv-plan` checks doc-by-path deliverables — any task file path containing a `docs/` segment must resolve to an existing doc home in the target repo. Mismatches surface as Open questions instead of biting mid-`/hv-work`. In umbrella mode a sibling `<repo>-docs` sub-repo registered in `.hv/repos.json` is surfaced as the suggested alternative home.
+
 When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
 
 After `/hv-work` ships an item that had its own plan (e.g. `M01-B07.md`), the plan file is removed automatically. Once the cycle commits, the plan's task decomposition and assumptions are stale, and leaving the file would confuse a future cycle on the same key. Slice plans (`M01-S01.md`) stay through their multi-item lifetime; remove the slice plan with `.hv/bin/hv-plan-rm M01-S01` once the slice is fully shipped.

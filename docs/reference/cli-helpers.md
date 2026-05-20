@@ -218,6 +218,11 @@ in the plan's frontmatter when a `.hv/designs/<ID>.md` artifact exists for the i
 the path must start with `.hv/designs/` and the file must exist or the helper
 exits 1. `hv-plan-list` returns JSON you can pipe into other tools.
 `hv-plan-show` and `hv-plan-rm` are straightforward read/delete operations.
+`hv-plan-validate-docs <key>` scans the plan's `Files:` bullets, flags any
+doc-by-path deliverable (under a `docs/` segment) whose doc home is missing in
+the target repo, and points at sibling `<repo>-docs` sub-repos as alternatives
+when one is registered. Called from `/hv-plan` Step 6.5; runnable by hand as a
+pre-merge sanity check.
 
 Spikes live at `.hv/spikes/<name>.md` with a matching `spike/<name>` git branch.
 `hv-spike-add` creates both in one call. `hv-spike-finish` closes the spike and
