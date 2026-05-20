@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# Validate doc-by-path deliverables in a plan against the target repo layout.
+# Lookup helper: exit 0 on validation completion (with or without warnings);
+# exit 1 on usage error or missing plan; exit 2 on malformed frontmatter.
+# Usage: hv-plan-validate-docs <plan-key>
+#   plan-key  e.g. M01-B07 or M02-S03
+#
+# Scope. F76: catches the gap that surfaced in /hv-work — a plan task placed
+# a doc deliverable at `<repo>/docs/x.md` when `<repo>` had no `docs/` dir,
+# forcing an execution-time replan. This helper does the same check before
+# the plan is signed off, so the mismatch lands as an Open Question.
+#
+# Heuristics.
+#   - Doc-by-path: any Files: bullet path containing the configured docs
+#     segment as a path segment (default 'docs', overridden by docs.path
+#     in .hv/config.json).
+#   - Target repo: read from plan frontmatter `repo:`. Multi-repo plans
+#     ("web, api") validate against each. Slice / milestone plans without
+#     `repo:` resolve against cwd.
+#   - Doc home: <repo-root>/<docs-segment>/. Missing directory => warning.
+#     Sibling sub-repo named <repo>-docs in .hv/repos.json is suggested
+#     as an alternative when present.
+#
+# Output. One human-readable line per mismatch. Empty stdout when the plan
+# is clean. The /hv-plan SKILL.md Step 6.5 wraps any warnings into the
+# plan's Open questions section via the Edit tool.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+KEY="${1:?usage: hv-plan-validate-docs <plan-key>}"
+PLAN=".hv/plans/${KEY}.md"
+if [ ! -f "$PLAN" ]; then
+  echo "error: plan not found: $PLAN" >&2
+  exit 1
+fi
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$PLAN" "$KEY" <<'PY'
+import os, re, sys
+from pathlib import Path
+from hvlib import parse_frontmatter, load_repos, load_json
+
+plan_path, key = Path(sys.argv[1]), sys.argv[2]
+text = plan_path.read_text()
+fm, body = parse_frontmatter(text)
+if not fm:
+    sys.stderr.write(f"error: plan {plan_path} has no parseable frontmatter\n")
+    sys.exit(2)
+
+# Resolve the docs segment from config — default 'docs', overridable.
+cfg = load_json(".hv/config.json", {})
+docs_segment = ((cfg.get("docs") or {}).get("path") or "docs").strip("/") or "docs"
+
+# Target repos from plan frontmatter.
+repo_csv = (fm.get("repo") or "").strip()
+target_repos = [s.strip() for s in repo_csv.split(",") if s.strip()] if repo_csv else [""]
+
+# Umbrella registry.
+all_repos = load_repos()  # {name: abs-path}
+
+# --- Extract Files: bullets from the Tasks section ----------------------------
+
+def slice_section(text, header):
+    pat = re.compile(rf"^## +{re.escape(header)}\s*$", re.M)
+    m = pat.search(text)
+    if not m:
+        return ""
+    rest = text[m.end():]
+    nxt = re.search(r"^## +", rest, re.M)
+    return rest[:nxt.start()] if nxt else rest
+
+tasks_body = slice_section(body, "Tasks")
+candidates = []  # list of raw tokens that look like file references
+
+lines = tasks_body.splitlines()
+i = 0
+while i < len(lines):
+    line = lines[i]
+    # Match "- Files:" or "- **Files**:" or "  - **Files:**" — case-insensitive.
+    m = re.match(r"^(\s*)-\s+\*{0,2}Files\*{0,2}:\s*(.*)$", line, re.I)
+    if not m:
+        i += 1
+        continue
+    base_indent = len(m.group(1))
+    tail = m.group(2).strip()
+    # Skip the stub placeholder.
+    if tail and not re.fullmatch(r"_\(.*\)_", tail):
+        for tok in re.split(r"[,;]", tail):
+            tok = tok.strip().strip("`").strip()
+            if tok:
+                candidates.append(tok)
+    # Walk deeper bullets that belong to this Files: block.
+    j = i + 1
+    while j < len(lines):
+        nxt = lines[j]
+        if not nxt.strip():
+            j += 1
+            continue
+        bm = re.match(r"^(\s*)-\s+(.+)$", nxt)
+        if not bm or len(bm.group(1)) <= base_indent:
+            break
+        tok = bm.group(2).strip().strip("`").strip()
+        if tok and not re.fullmatch(r"_\(.*\)_", tok):
+            candidates.append(tok)
+        j += 1
+    i = j
+
+# --- Classify candidates as doc-by-path -------------------------------------
+
+def normalize_path(tok):
+    """Pull a path-shaped substring out of a free-text token.
+    Strip parenthetical annotations, line refs, prose suffixes.
+    Returns "" when the token has no slash (i.e., not a path)."""
+    # Take everything before first space or em-dash — paths don't have those.
+    bare = re.split(r"[\s—\(]", tok, 1)[0]
+    bare = bare.strip().strip(",").strip(".")
+    # Strip trailing :N line refs (e.g. "src/x.ts:42").
+    bare = bare.split(":", 1)[0]
+    if "/" not in bare:
+        return ""
+    return bare
+
+doc_paths = []
+for c in candidates:
+    bare = normalize_path(c)
+    if not bare:
+        continue
+    if docs_segment in bare.split("/"):
+        doc_paths.append(bare)
+
+# --- Validate each doc-by-path against the target repo's doc home -----------
+
+warnings = []
+
+def repo_root_for(name):
+    """Resolve a target repo name to its absolute root, or cwd when name=''."""
+    if not name:
+        return os.getcwd()
+    return all_repos.get(name)
+
+for path in doc_paths:
+    for repo_name in target_repos:
+        repo_root = repo_root_for(repo_name)
+        if repo_root is None:
+            warnings.append({
+                "path": path,
+                "repo": repo_name,
+                "issue": f"sub-repo '{repo_name}' is not registered in .hv/repos.json",
+                "suggestion": "",
+            })
+            continue
+        # Path inside the plan is relative to the repo root. If it begins with
+        # the sub-repo name segment (umbrella-relative form), strip it.
+        norm = path
+        if repo_name and norm.split("/")[0] == repo_name:
+            norm = "/".join(norm.split("/")[1:])
+        # Doc home for this repo.
+        doc_home = os.path.join(repo_root, docs_segment)
+        if os.path.isdir(doc_home):
+            continue  # path resolves cleanly
+        # Doc home missing — warn.
+        suggestion = ""
+        if repo_name:
+            sibling = f"{repo_name}-docs"
+            if sibling in all_repos:
+                suggestion = f"sibling sub-repo '{sibling}' exists at {all_repos[sibling]}"
+        warnings.append({
+            "path": path,
+            "repo": repo_name,
+            "issue": f"expected doc home {doc_home} does not exist",
+            "suggestion": suggestion,
+        })
+
+# --- Emit ------------------------------------------------------------------
+
+if not warnings:
+    sys.exit(0)
+
+print(f"{len(warnings)} doc-deliverable mismatch(es) in {plan_path}:")
+print()
+for w in warnings:
+    print(f"  - {w['path']}")
+    if w["repo"]:
+        print(f"      target repo: {w['repo']}")
+    print(f"      {w['issue']}")
+    if w["suggestion"]:
+        print(f"      suggested alternative: {w['suggestion']}")
+sys.exit(0)
+PY
