@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.3.0 — 2026-05-20
+
+hv-skills 4.3.0 — `/hv-plan` catches doc-deliverable mismatches before the plan ships. Internal helper hygiene from the F21 refactor follow-ups (T103, T104).
+
+## New
+
+- **`/hv-plan` validates doc-by-path deliverables against the target repo's layout** (F76, [GH#15](https://github.com/l4ci/hv-skills/issues/15)). A task that plans `<repo>/docs/x.md` when `<repo>` has no `docs/` dir is now caught at plan-write time and surfaced as an Open question instead of dying mid-`/hv-work`. New helper `bin/hv-plan-validate-docs` runs at Step 6.5; in umbrella mode a sibling `<repo>-docs` sub-repo (registered in `.hv/repos.json`) is suggested as the alternative home — the cross-repo doc routing case the bug was opened for.
+
+## Changed
+
+- **Knowledge/glossary helper hygiene** (T103, T104). `hv-knowledge-query` and `hv-glossary-read` now share one umbrella+hybrid parser; 7 helpers in the knowledge/glossary family standardize their `--repo` guard. F21 follow-ups, no behavior change — cleaner failure modes on bare `--repo` and consistent multi-repo resolution.
+- **Vision/backlog hygiene** — M01 and M06 closed as shipped; F05 dropped from the backlog (covered by worktrees + `/hv-review`).
+
+## Stats
+
+13 commits, 19 files changed, +593 −241 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.2.0...v4.3.0
+
 ## v4.2.0 — 2026-05-19
 
 v4.2 ships F21 (umbrella-aware KNOWLEDGE.md, the M06 milestone headline), the F25 hvlib package split, and a wave of v3→v4 migration fixes that unblock upgrade for umbrella projects.
