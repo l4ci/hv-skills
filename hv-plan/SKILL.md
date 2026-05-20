@@ -66,6 +66,7 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 - Existing plans for this milestone: `.hv/bin/hv-plan-list <MID>`
 - For item targets carrying a `Repos:` field: resolve it to an absolute sub-repo path via `.hv/repos.json` (`load_repos()`). Skipped for slice / milestone targets and when umbrella mode is off.
 - For item targets whose ID matches `[BFT]\d{2,}`: `[ -f .hv/designs/<ID>.md ] && cat .hv/designs/<ID>.md` to load any design artifact from `/hv-brainstorm`. Skipped for slice targets. When a design artifact exists, it carries the negotiated Goal/Design/Approaches-considered — Step 4's proposal mirrors the design's chosen approach rather than re-exploring.
+- **Doc-home awareness (F76).** Note whether the target repo has a doc home — i.e. `<repo-root>/<docs.path>/` (default `<repo-root>/docs/`). In umbrella mode also peek at siblings: if `<repo>-docs` is registered in `.hv/repos.json`, the project's docs likely live there, not in `<repo>/docs/`. The deterministic post-write helper `hv-plan-validate-docs` re-checks this at Step 6.5, but the proposal in Step 4 should already route doc deliverables correctly rather than leave a mismatch for the post-write check to catch.
 
 DECISIONS matches are committed boundaries the plan must respect. If the plan would violate any, **redesign before writing**, or surface the conflict and ask the user whether to update the decision first.
 
@@ -98,6 +99,7 @@ Rules for the plan:
 - **No half-implementations.** Each task results in real, runnable code — no stubs or placeholders.
 - **Tasks are vertical slivers, not horizontal layers.** Each task crosses every layer it needs to be observable — UI + logic + data together for one feature path, not "all UI first, all logic second". The **Observable behavior** requirement and the **No half-implementations** rule already enforce this implicitly; calling it out by name keeps slice plans from drifting into the horizontal anti-pattern that AI agents fall into by default. For a hotel-reservation slice: "Reserve" button is one task end-to-end; "Cancel" is a separate task end-to-end; "email confirmation" is a third. Not "build all the UI in T1, then all the controllers in T2, then all the persistence in T3."
 - **Rename + incoming-link sweep is ONE task, not two.** Every file linking to a renamed target must update; co-scheduling rename + sweep in the same wave races on the index. Group rename + all incoming-link updates into one task, derive the file list from `git grep -l "<old-name>"` (the plan's enumeration is a hint, grep is ground truth).
+- **Doc-by-path deliverables must resolve to an existing doc home (F76).** Any task file path under a `docs/` segment (or the configured `docs.path`) must land in a doc home that exists in the target repo — `<repo-root>/<docs.path>/`. If the doc home is missing, do not plant the file there; surface as an Open question instead. In umbrella mode, a sibling sub-repo named `<repo>-docs` is the usual cross-repo doc home (e.g. `runlog` → `runlog-docs`); call it out by name in the question. The Step 6.5 post-write check enforces this deterministically; surfacing it here is cheaper than reworking the plan after `hv-plan-add`.
 - **Name assumptions you'd otherwise leave implicit.** Forces the user to confirm or push back.
 - **List open questions you'd resolve mid-flight.** If they should be answered before `/hv-work` runs, ask now.
 
@@ -139,6 +141,25 @@ Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode
 When `.hv/designs/<ID>.md` exists for the plan's item, pass `--design .hv/designs/<ID>.md` to `hv-plan-add`. The plan's frontmatter records `design: .hv/designs/<ID>.md` as a traceability pointer.
 
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
+
+## Step 6.5 — Validate Doc-by-Path Deliverables (F76)
+
+```bash
+.hv/bin/hv-plan-validate-docs <key>
+```
+
+The helper scans `Files:` bullets under the Tasks section, classifies each path as doc-by-path when it contains a `docs/` (or configured `docs.path`) segment, and warns when the corresponding doc home does not exist in the target repo. Multi-repo plans validate against every name in `repo:`; slice / milestone plans (no `repo:` frontmatter) resolve against cwd. Sibling `<repo>-docs` sub-repos are surfaced as suggested alternatives.
+
+- **No warnings.** Continue silently to Step 7.
+- **Warnings present.** For each warning, append a question to the plan's *Open questions* section via `Edit` — keep the helper's path / target-repo / suggestion line shape so the user sees the concrete mismatch:
+
+  ```
+  - **Doc home mismatch.** `docs/api/auth.md` plans to land in `<repo>/docs/`, but that directory does not exist. Sibling `<repo>-docs` is registered — should the deliverable move there, or should this plan also create `<repo>/docs/`?
+  ```
+
+  Then proceed to Step 7. The validator is advisory — false positives (e.g. a task earlier in the plan creates the doc home before the doc deliverable lands) are the user's call to dismiss in review.
+
+**Under `--auto-loop`**, warnings ride the standard placeholder pipeline (`## Auto-loop mode` → step 3): the open question lands in the plan literally with `_(Unresolved — surfaced for review)_` appended, so the post-cycle review catches it.
 
 ## Step 7 — Report
 
