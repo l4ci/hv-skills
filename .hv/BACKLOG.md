@@ -3,6 +3,7 @@
 ## Bugs
 
 ## Features
+- **[F76] [Minor] `/hv-plan` should validate doc-deliverable paths against the repo/umbrella layout.** A /hv-plan task placed a doc deliverable at `runlog/docs/NN-x.md` but that repo had no `docs/` dir — the mismatch only surfaced mid-/hv-work. /hv-plan should validate doc-by-path deliverables against the target repo's layout before the plan is written, surfacing cross-repo doc mismatches as an open question. Detail: `.hv/features/F76.md` GH: #15 Since: 5ad9273
 
 ## Tasks
 
