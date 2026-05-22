@@ -245,10 +245,10 @@ This step runs only on the **direct-merge path** (after `hv-merge` returns a com
 From the scope JSON's `referencedIds` (already in memory from Step 2), call:
 
 ```bash
-.hv/bin/hv-issues-imported
+.hv/bin/hv-issues-imported --open-only
 ```
 
-Parse the JSON array. Filter to entries whose `item_id` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
+`--open-only` drops entries whose upstream issue is already closed so the gate doesn't surface no-ops. Parse the JSON array; filter to entries whose `item_id` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
 
 **2. Manual gate.**
 

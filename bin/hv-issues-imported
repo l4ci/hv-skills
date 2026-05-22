@@ -12,10 +12,16 @@
 #   item_id   string (e.g. "F69", "B12")
 #   status    "open" | "archived"
 #
-# Used by /hv-issues to subtract already-imported issues from the picker.
+# Used by /hv-issues to subtract already-imported issues from the picker,
+# and by /hv-release Step 13.6 + /hv-ship Step 6c (with --open-only) to
+# offer close gates for issues still open upstream.
 #
-# Usage: hv-issues-imported [--repo <name>]
+# Usage: hv-issues-imported [--repo <name>] [--open-only]
 #   --repo <name>  Filter output to entries whose repo field matches <name>.
+#   --open-only    Drop entries whose upstream issue is closed. Queries
+#                  `gh issue view` / `glab issue view` once per entry; entries
+#                  whose state cannot be resolved (missing CLI, auth failure,
+#                  deleted issue) are dropped silently.
 #   stdout:        Pretty-printed JSON array.
 #   exit:          always 0
 
@@ -29,7 +35,16 @@ HV="$(pwd -P)/.hv"
 . "$HERE/hv-issues-common.sh"
 hv_issues_parse_repo_flag "$@"
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HV" "$REPO" <<'PY'
+# Parse --open-only (orthogonal to --repo; both can be combined).
+OPEN_ONLY=0
+for arg in "$@"; do
+  if [ "$arg" = "--open-only" ]; then
+    OPEN_ONLY=1
+    break
+  fi
+done
+
+RAW="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HV" "$REPO" <<'PY'
 import json, re, sys
 from pathlib import Path
 
@@ -140,5 +155,74 @@ if repo_filter:
 json.dump(result, sys.stdout, indent=2)
 print()
 PY
+)"
+
+if [ "$OPEN_ONLY" != 1 ]; then
+  printf '%s\n' "$RAW"
+  exit 0
+fi
+
+# ── --open-only post-filter ────────────────────────────────────────────────
+# Query upstream state per entry; drop entries that aren't OPEN/opened.
+# Entries whose state can't be resolved (missing CLI, auth failure, deleted
+# issue) are dropped silently — the close gate would no-op on them anyway.
+
+# Resolve a per-entry working directory: cwd for null-repo entries, the
+# sub-repo path for umbrella entries. Cached across the loop.
+declare -A REPO_PATH_CACHE
+resolve_entry_cwd() {
+  local repo="$1"
+  if [ -z "$repo" ] || [ "$repo" = "null" ]; then
+    echo ""
+    return 0
+  fi
+  if [ -n "${REPO_PATH_CACHE[$repo]+x}" ]; then
+    echo "${REPO_PATH_CACHE[$repo]}"
+    return 0
+  fi
+  local path
+  path="$("$HERE/hv-resolve-repo-path" "$repo" 2>/dev/null || true)"
+  REPO_PATH_CACHE[$repo]="$path"
+  echo "$path"
+}
+
+probe_state() {
+  local provider="$1" issue="$2" cwd="$3"
+  case "$provider" in
+    github)
+      command -v gh >/dev/null 2>&1 || return 1
+      if [ -n "$cwd" ]; then
+        (cd "$cwd" && gh issue view "$issue" --json state -q .state 2>/dev/null)
+      else
+        gh issue view "$issue" --json state -q .state 2>/dev/null
+      fi
+      ;;
+    gitlab)
+      command -v glab >/dev/null 2>&1 || return 1
+      if [ -n "$cwd" ]; then
+        (cd "$cwd" && glab issue view "$issue" --output json 2>/dev/null) | jq -r .state 2>/dev/null
+      else
+        glab issue view "$issue" --output json 2>/dev/null | jq -r .state 2>/dev/null
+      fi
+      ;;
+  esac
+}
+
+KEEP="[]"
+while IFS= read -r entry; do
+  [ -z "$entry" ] && continue
+  provider=$(printf '%s' "$entry" | jq -r .provider)
+  issue=$(printf '%s' "$entry" | jq -r .issue)
+  repo=$(printf '%s' "$entry" | jq -r '.repo // ""')
+  cwd="$(resolve_entry_cwd "$repo")"
+  state="$(probe_state "$provider" "$issue" "$cwd" || true)"
+  case "$provider:$state" in
+    github:OPEN|gitlab:opened)
+      KEEP=$(printf '%s' "$KEEP" | jq --argjson e "$entry" '. + [$e]')
+      ;;
+  esac
+done < <(printf '%s' "$RAW" | jq -c '.[]?')
+
+printf '%s\n' "$KEEP" | jq .
 
 exit 0

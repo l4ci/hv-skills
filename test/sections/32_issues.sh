@@ -150,3 +150,52 @@ count2=$(echo "$out2" | jq 'length')
 
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-issues-imported indexes GH/GL refs from a fixture BACKLOG"
+
+# === hv-issues-imported --open-only smoke (F77) ===
+echo "Section 32: hv-issues-imported --open-only flag"
+TMP_OO="$(mktemp -d)"
+trap 'rm -rf "$TMP_OO"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
+
+mkdir -p "$TMP_OO/.hv/bugs" "$TMP_OO/.hv/features" "$TMP_OO/.hv/tasks"
+
+# Seed BACKLOG with GH + GL refs the post-filter has to probe upstream for.
+cat > "$TMP_OO/.hv/BACKLOG.md" <<'EOF'
+# TODO
+
+## Features
+
+- **[F01] [Major] Test feature.** Body. GH: #999999
+
+## Bugs
+
+- **[B01] [P1] Test bug.** GL: #999999
+
+## Tasks
+
+## Completed
+EOF
+
+# Without --open-only: both entries should appear (existing behavior preserved).
+out_all=$(cd "$TMP_OO" && "$REPO/bin/hv-issues-imported") || \
+  fail "hv-issues-imported (no flag) exited non-zero on --open-only fixture"
+count_all=$(echo "$out_all" | jq 'length')
+[ "$count_all" = "2" ] || fail "hv-issues-imported (no flag) expected 2 entries on F77 fixture, got $count_all"
+
+# With --open-only and no gh/glab on PATH: every entry fails the state probe
+# silently, so the result is []. Proves the flag is recognized, doesn't error
+# out on missing CLIs, and emits a JSON array.
+out_oo=$(cd "$TMP_OO" && env PATH=/usr/bin:/bin "$REPO/bin/hv-issues-imported" --open-only) || \
+  fail "hv-issues-imported --open-only exited non-zero with stripped PATH"
+echo "$out_oo" | jq -e '. == []' >/dev/null || \
+  fail "hv-issues-imported --open-only with no gh/glab expected [], got $out_oo"
+
+# --open-only is orthogonal to --repo: combining them parses fine and still
+# emits a JSON array (here empty because the only Repos:-tagged entries don't
+# match 'nonexistent').
+out_combo=$(cd "$TMP_OO" && env PATH=/usr/bin:/bin "$REPO/bin/hv-issues-imported" --repo nonexistent --open-only) || \
+  fail "hv-issues-imported --repo nonexistent --open-only exited non-zero"
+echo "$out_combo" | jq -e 'type == "array"' >/dev/null || \
+  fail "hv-issues-imported --repo … --open-only expected JSON array, got $out_combo"
+
+trap 'rm -rf "$TMP"' EXIT
+pass "hv-issues-imported --open-only filters by upstream state, no-ops gracefully without gh/glab"
