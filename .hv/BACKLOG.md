@@ -3,6 +3,7 @@
 ## Bugs
 
 ## Features
+- **[F77] [Minor] `/hv-release` should detect and offer to close open upstream GH/GL issues for shipped items.** Mirrors the gate `/hv-ship` Step 6c runs on the direct-merge path. Pushing directly to main skips `/hv-ship` entirely — F76 shipped in v4.3.0 but GH #15 stayed open. Scope: add `--open-only` flag to `bin/hv-issues-imported` (filters by live upstream state via gh/glab), new Step 13.6 in `hv-release/SKILL.md` (manual gate, parallel `hv-issues-close` dispatch using the release commit SHA), update `hv-ship` Step 6c to also use `--open-only`. Add smoke coverage for the helper flag. Related: [F76] Subsystem: release Since: ae8877b
 
 ## Tasks
 
