@@ -35,7 +35,7 @@
     "enabled": false
   },
   "hvSkills": {
-    "version": "4.2.0"
+    "version": "4.3.0"
   },
   "git": {
     "baseBranch": ""
@@ -44,5 +44,11 @@
     "gate": "advisory",
     "afterWork": false
   },
-  "version": "3.3.0"
+  "version": "3.3.0",
+  "issues": {
+    "providers": {
+      "github": true,
+      "gitlab": true
+    }
+  }
 }
