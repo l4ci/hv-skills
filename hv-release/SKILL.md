@@ -1,6 +1,6 @@
 ---
 name: hv-release
-description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a preflight gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, and publish a release on GitHub or GitLab if origin is set. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
+description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a preflight gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, publish a release on GitHub or GitLab if origin is set, and offer to close any upstream issues still open for shipped items. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
 user-invocable: true
 ---
 
@@ -70,7 +70,8 @@ Phases:
 4. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
 5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
 6. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
-7. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
+7. *Close upstream issues* — manual gate to close any GH/GL issues still open for shipped items (Step 13.4)
+8. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
 
 ## Step 1.5 — Project Checklist
 
@@ -323,6 +324,56 @@ Branch on the helper's `host` output. Host-specific command blocks live in `refe
 Add new host values to both the helper and the reference together.
 
 Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that would run.
+
+## Step 13.4 — Close Upstream Issues
+
+Mirrors `/hv-ship` Step 6c, scoped to the whole release range rather than a single ship cycle. Closes upstream issues that landed in this release but stayed open because the work was pushed directly to main (skipping `/hv-ship` entirely) or because `/hv-ship` chose "leave open" at the time.
+
+Skip the whole step in `--dry-run` mode (nothing was actually tagged or pushed).
+
+**1. List candidates.**
+
+```bash
+.hv/bin/hv-issues-imported --open-only
+```
+
+The `--open-only` flag drops entries whose upstream issue is already closed (or whose state can't be resolved — missing CLI, deleted issue), so the gate only surfaces issues still actually open. If the resulting JSON array is empty, skip the rest of this step silently.
+
+**2. Manual gate.**
+
+> **Manual gate — closing public upstream issues.** Closing the issues posts a tracking comment and changes their state on the remote — externally-visible. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The release already published; this step decides whether to close the upstream issues too. See `references/manual-gates.md`.
+
+**3. Ask the user.**
+
+Invoke `AskUserQuestion` (single-select, ≤4 options):
+
+- Header: `"Close"`
+- Question: *"Close N upstream issue(s) released in `v<new_version>`? (`<comma-separated list of #N>`)"*
+- Options: `"Yes, close all"`, `"Pick subset"`, `"No, leave open"`
+
+This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
+
+**4. On "Yes, close all":** dispatch parallel `hv-issues-close` calls (one per candidate, all in a single batch of tool calls), passing the release commit SHA from Step 10:
+
+```bash
+.hv/bin/hv-issues-close --issue <N> --commit <release-commit-sha> --item <ID> [--repo <name>]
+```
+
+Pass `--repo` only for entries whose `repo` field is non-null (umbrella mode).
+
+**5. On "Pick subset":** invoke a second `AskUserQuestion` (multiSelect, ≤4 candidates per call; chunk if N>4):
+
+- Header: `"Pick issues"`
+- Question: *"Which issue(s) should be closed?"*
+- Options: one entry per candidate formatted as `"#N (item <ID>)"`
+
+Then dispatch parallel `hv-issues-close` calls for each selected entry as in step 4.
+
+**6. On "No, leave open":** print:
+
+```
+Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired.
+```
 
 ## Step 13.5 — Docs After-Work (Nudge or Auto-Invoke)
 
