@@ -33,7 +33,6 @@ from hvlib import (
     load_json,
     parse_todo_fields,
     find_bullet_in_content,
-    infer_type_from_section,
     detail_dir_for_id,
     strip_bullet_from_content,
     parse_related_ids,
@@ -85,7 +84,7 @@ todo_content = read_file(TODO_PATH)
 archive_content = read_file(ARCHIVE_PATH)
 
 # Build info per ID.
-id_info = {}  # iid → {source, sec_name, bullet_line, item_type}
+id_info = {}  # iid → {source, sec_name, bullet_line}
 
 for iid in raw_ids:
     # Try TODO first.
@@ -97,7 +96,6 @@ for iid in raw_ids:
             "source_content": todo_content,
             "sec_name": sec_name,
             "bullet_line": bullet,
-            "item_type": infer_type_from_section(sec_name),
         }
         continue
 
@@ -111,7 +109,6 @@ for iid in raw_ids:
                 "source_content": archive_content,
                 "sec_name": sec_name,
                 "bullet_line": bullet,
-                "item_type": infer_type_from_section(sec_name),
             }
             continue
 
@@ -165,8 +162,7 @@ for iid in raw_ids:
     xrefs_archive = []
     if scrub_archive and archive_content:
         # Scan all ## sections in ARCHIVE.
-        import re as _re
-        archive_secs = [m.group(1) for m in _re.finditer(r"^## (.+)$", archive_content, _re.MULTILINE)]
+        archive_secs = [m.group(1) for m in re.finditer(r"^## (.+)$", archive_content, re.MULTILINE)]
         xrefs_archive = collect_cross_refs(archive_content, iid, archive_secs)
 
     # Detail file.

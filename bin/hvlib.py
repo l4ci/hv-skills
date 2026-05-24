@@ -38,8 +38,7 @@ from hvlib_bullet import (
 from hvlib_frontmatter import parse_frontmatter, update_frontmatter_field
 from hvlib_paths import (
     resolve_plugin_root, iter_map_entries,
-    infer_type_from_section, detail_dir_for_id,
-    section_name_for_id, section_name_for_dir,
+    detail_dir_for_id, section_name_for_id, section_name_for_dir,
 )
 from hvlib_repos import (
     parse_repos_csv, validate_repos, load_repos, active_items,

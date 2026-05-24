@@ -51,12 +51,14 @@ KEY_CFG = {
         "intro":   "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:",
         "empty":   "- _(no topics yet — run `/hv-learn` to capture learnings)_",
         "legacy_marker": "knowledge",
+        "umbrella_only": False,
     },
     "decisions": {
         "heading": "## Project Decisions",
         "intro":   "Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:",
         "empty":   "- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_",
         "legacy_marker": None,
+        "umbrella_only": True,
     },
 }
 
@@ -67,10 +69,10 @@ if key not in KEY_CFG:
     print(f"error: unknown key '{key}' (known: {', '.join(KEY_CFG)})", file=sys.stderr)
     sys.exit(1)
 
-# decisions is umbrella-only; reject --repo <name> (non-empty, non-"umbrella")
-if key == "decisions" and scope and scope != "umbrella":
+# Reject --repo <name> for umbrella-only keys (Persistence-trio scoping).
+if KEY_CFG[key]["umbrella_only"] and scope and scope != "umbrella":
     print(
-        "error: decisions is umbrella-only (Persistence-trio scoping); --repo not allowed",
+        f"error: {key} is umbrella-only (Persistence-trio scoping); --repo not allowed",
         file=sys.stderr,
     )
     sys.exit(1)

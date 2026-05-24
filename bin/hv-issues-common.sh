@@ -108,3 +108,19 @@ hv_issues_resolve_path_cached() {
   HV_ISSUES_REPO_CACHE[$_repo]="$_path"
   printf '%s' "$_path"
 }
+
+# ---------------------------------------------------------------------------
+# hv_issues_validate_repo
+#
+# Validate that <repo-name> is a registered sub-repo. Exits non-zero with
+# stderr if not — surfaces typos at startup. Unlike hv_issues_resolve_path_cached
+# (which swallows resolve failures by design for per-entry loops), this helper
+# is meant for top-of-helper validation of an explicit --repo flag.
+# ---------------------------------------------------------------------------
+hv_issues_validate_repo() {
+  local _repo="${1:?hv_issues_validate_repo: repo name required}"
+  if ! "$HERE/hv-resolve-repo-path" "$_repo" >/dev/null 2>&1; then
+    echo "error: hv-issues: unknown sub-repo '$_repo' (check .hv/repos.json)" >&2
+    return 1
+  fi
+}

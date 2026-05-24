@@ -31,7 +31,6 @@ NAMES = [
     "format_done_line",
     "get_version_or_die",
     "git_mtime",
-    "infer_type_from_section",
     "infer_version_kind",
     "iter_map_entries",
     "iter_open_sections",
@@ -83,4 +82,4 @@ for n in NAMES:
 print(f"OK: {len(NAMES)} public names resolve via from hvlib import X")
 PY
 
-pass "hvlib export sentinel — 51 caller-imported public names resolve via shim"
+pass "hvlib export sentinel — 49 caller-imported public names resolve via shim"

@@ -127,14 +127,6 @@ def iter_map_entries(map_dir):
         yield entry
 
 
-def infer_type_from_section(sec_name: str) -> str:
-    """Map a TODO section name to an item-type label.
-    Bugs→bug, Features→feature, Tasks→task, Completed→completed,
-    anything else→unknown."""
-    mapping = {"Bugs": "bug", "Features": "feature", "Tasks": "task", "Completed": "completed"}
-    return mapping.get(sec_name, "unknown")
-
-
 def section_name_for_id(item_id: str) -> str:
     """Return the open-section name ("Bugs"/"Features"/"Tasks") for an item
     ID like "B07" / "F12" / "T44". Returns "Unknown" for unknown prefixes.

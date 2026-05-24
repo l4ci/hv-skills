@@ -9,8 +9,8 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
+import argparse
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,79 +38,70 @@ def atomic_write(data):
 
 
 def cmd_add(args):
-    topic = title = text = None
-    i = 0
-    while i < len(args):
-        if args[i] == "--topic" and i + 1 < len(args):
-            topic = args[i + 1]; i += 2
-        elif args[i] == "--title" and i + 1 < len(args):
-            title = args[i + 1]; i += 2
-        elif args[i] == "--text" and i + 1 < len(args):
-            text = args[i + 1]; i += 2
-        else:
-            i += 1
-    if not topic or not title or text is None:
-        print("error: --add requires --topic <T> --title <S> --text <correction>", file=sys.stderr)
-        sys.exit(1)
     data = load_queue()
-    entry = {
-        "topic": topic,
-        "title": title,
-        "correctionText": text,
+    data["pending"].append({
+        "topic": args.topic,
+        "title": args.title,
+        "correctionText": args.text,
         "loggedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    data["pending"].append(entry)
+    })
     atomic_write(data)
 
 
-def cmd_list():
+def cmd_list(_args):
     data = load_queue()
     print(json.dumps(data["pending"], indent=2))
 
 
-def cmd_clear():
+def cmd_clear(_args):
     data = load_queue()
     data["pending"] = []
     atomic_write(data)
 
 
 def cmd_has(args):
-    topic = title = None
-    i = 0
-    while i < len(args):
-        if args[i] == "--topic" and i + 1 < len(args):
-            topic = args[i + 1]; i += 2
-        elif args[i] == "--title" and i + 1 < len(args):
-            title = args[i + 1]; i += 2
-        else:
-            i += 1
-    if not topic or not title:
-        print("error: --has requires --topic <T> --title <S>", file=sys.stderr)
-        sys.exit(1)
     data = load_queue()
     for entry in data["pending"]:
-        if entry.get("topic") == topic and entry.get("title") == title:
+        if entry.get("topic") == args.topic and entry.get("title") == args.title:
             sys.exit(0)
     sys.exit(1)
 
 
+# argparse cannot use '--foo' as a subcommand name (parsed as optional arg),
+# so we peel the subcommand off argv[0] ourselves and delegate flag parsing
+# to per-subcommand ArgumentParser instances — typos in flags still hard-error.
+def make_parser_add():
+    p = argparse.ArgumentParser(prog="hv-knowledge-contradiction --add")
+    p.add_argument("--topic", required=True)
+    p.add_argument("--title", required=True)
+    p.add_argument("--text", required=True)
+    return p
+
+
+def make_parser_has():
+    p = argparse.ArgumentParser(prog="hv-knowledge-contradiction --has")
+    p.add_argument("--topic", required=True)
+    p.add_argument("--title", required=True)
+    return p
+
+
+def make_parser_no_flags(subcmd):
+    return argparse.ArgumentParser(prog=f"hv-knowledge-contradiction {subcmd}")
+
+
+COMMANDS = {
+    "--add":   (cmd_add,   make_parser_add),
+    "--list":  (cmd_list,  lambda: make_parser_no_flags("--list")),
+    "--clear": (cmd_clear, lambda: make_parser_no_flags("--clear")),
+    "--has":   (cmd_has,   make_parser_has),
+}
+
 argv = sys.argv[1:]
-if not argv:
+if not argv or argv[0] not in COMMANDS:
     print("error: subcommand required: --add | --list | --clear | --has", file=sys.stderr)
     sys.exit(1)
 
-subcmd = argv[0]
-rest = argv[1:]
-
-if subcmd == "--add":
-    cmd_add(rest)
-elif subcmd == "--list":
-    cmd_list()
-elif subcmd == "--clear":
-    cmd_clear()
-elif subcmd == "--has":
-    cmd_has(rest)
-else:
-    print(f"error: unknown subcommand '{subcmd}' — use --add | --list | --clear | --has", file=sys.stderr)
-    sys.exit(1)
+func, make_parser = COMMANDS[argv[0]]
+ns = make_parser().parse_args(argv[1:])
+func(ns)
 PY

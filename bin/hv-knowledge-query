@@ -68,7 +68,11 @@ done
 . "$HERE/hv-knowledge-scope.sh"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 
-UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
+if ! UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>&1); then
+  printf '%s\n' "$UMBRELLA_SIDECAR" >&2
+  echo "error: hv-knowledge-query: umbrella tier sidecar read failed" >&2
+  exit 1
+fi
 [ -z "$UMBRELLA_SIDECAR" ] && UMBRELLA_SIDECAR="[]"
 
 if [ "$SCOPE" = "umbrella" ]; then
@@ -78,7 +82,11 @@ if [ "$SCOPE" = "umbrella" ]; then
 else
   SCOPE_MODE="hybrid"
   SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || { rc=$?; echo "$SUBREPO_FILE" >&2; exit $rc; }
-  SUBREPO_SIDECAR=$("$HERE/hv-knowledge-tier" --list --repo "$SCOPE" 2>/dev/null || echo "[]")
+  if ! SUBREPO_SIDECAR=$("$HERE/hv-knowledge-tier" --list --repo "$SCOPE" 2>&1); then
+    printf '%s\n' "$SUBREPO_SIDECAR" >&2
+    echo "error: hv-knowledge-query: sub-repo tier sidecar read failed (--repo $SCOPE)" >&2
+    exit 1
+  fi
   [ -z "$SUBREPO_SIDECAR" ] && SUBREPO_SIDECAR="[]"
 fi
 
