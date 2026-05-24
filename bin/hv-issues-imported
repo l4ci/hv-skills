@@ -35,9 +35,6 @@ HV="$(pwd -P)/.hv"
 . "$HERE/hv-issues-common.sh"
 hv_issues_init_path_cache
 hv_issues_parse_repo_flag "$@"
-if [ -n "$REPO" ]; then
-  hv_issues_validate_repo "$REPO" || exit 1
-fi
 
 # Parse --open-only (orthogonal to --repo; both can be combined).
 OPEN_ONLY=0
