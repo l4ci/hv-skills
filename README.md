@@ -57,7 +57,7 @@ A full feature list (autonomy chaining, product QA gate, throwaway spikes, backl
 
 ## Configuration
 
-Defaults in `.hv/config.json` are conservative: branch isolation, direct merge, review gate on, no autonomous chaining. Flip `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship`, or `"loop"` to drain the backlog. Use `/hv-config` to edit interactively; full key list in [docs/usage/configuration.md](docs/usage/configuration.md).
+Defaults in `.hv/config.json` are conservative: branch isolation, direct merge, review gate on, no autonomous chaining. Flip `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship`, or `"loop"` to drain the backlog. Use `/hv-config` to edit interactively, `/hv-config <key>` to jump to a value picker, or `/hv-config <key>=<value>` to apply directly; full key list in [docs/usage/configuration.md](docs/usage/configuration.md).
 
 ## FAQ
 
