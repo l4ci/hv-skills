@@ -176,3 +176,153 @@ def split_csv_list(s: str) -> "list[str]":
     """Split a comma-separated string into stripped non-empty tokens.
     Shared CSV-cell parser for Glossary alias/not fields."""
     return [x.strip() for x in s.split(",") if x.strip()]
+
+
+def check_alias_collisions(
+    existing_entries: "list[dict]",
+    candidates: "list[dict]",
+) -> "list[str]":
+    """Return a list of human-readable conflict strings (empty if none).
+
+    Each candidate is a dict with keys: `name` (str), `aliases` (list[str]),
+    and optionally `lineno` (int — included in messages when present).
+
+    Rules:
+      - alias in `candidate.aliases` collides if it matches another term's
+        existing alias (case-insensitive) AND the other term is not the
+        candidate's own term.
+      - within `candidates`, two distinct terms cannot claim the same alias
+        (case-insensitive intra-batch check).
+      - aliases owned by the same term across candidates and existing
+        entries are NOT a conflict (re-asserting your own alias is fine).
+    """
+    conflicts: list[str] = []
+    existing_alias_owner: dict[str, str] = {}
+    for e in existing_entries:
+        for a in e["aliases"]:
+            existing_alias_owner[a.lower()] = e["name"].lower()
+
+    batch_alias_owner: "dict[str, tuple[str, int | None, str]]" = {}
+    for cand in candidates:
+        cand_key = cand["name"].lower()
+        lineno = cand.get("lineno")
+        prefix = f"line {lineno}: " if lineno is not None else ""
+        for a in cand["aliases"]:
+            al = a.lower()
+            owner = existing_alias_owner.get(al)
+            if owner and owner != cand_key:
+                owner_name = next(
+                    (e["name"] for e in existing_entries if e["name"].lower() == owner),
+                    owner,
+                )
+                conflicts.append(
+                    f"{prefix}alias '{a}' on '{cand['name']}' collides with existing term '{owner_name}'"
+                )
+                continue
+            prior = batch_alias_owner.get(al)
+            if prior and prior[0] != cand_key:
+                prior_term, prior_lineno, _ = prior
+                prior_term_name = next(
+                    (c["name"] for c in candidates if c["name"].lower() == prior_term),
+                    prior_term,
+                )
+                if prior_lineno is not None:
+                    conflicts.append(
+                        f"{prefix}alias '{a}' on '{cand['name']}' collides with '{prior_term_name}' on line {prior_lineno} (intra-batch)"
+                    )
+                else:
+                    conflicts.append(
+                        f"{prefix}alias '{a}' on '{cand['name']}' collides with '{prior_term_name}' (intra-batch)"
+                    )
+                continue
+            batch_alias_owner[al] = (cand_key, lineno, cand["name"])
+    return conflicts
+
+
+def merge_into_by_key(
+    by_key: "dict[str, dict]",
+    candidates: "list[dict]",
+    today: str,
+    *,
+    touch: bool,
+    nots_provided: bool = True,
+) -> "dict[str, dict]":
+    """Return a new by_key dict with each candidate merged in.
+
+    Each candidate dict has: `name` (str), `definition` (str),
+    `aliases` (list[str]), `nots` (list[str]).
+
+    For an existing term:
+      - aliases = union(prev.aliases, cand.aliases), de-duped case-insensitively
+        in first-seen order.
+      - nots = union if `nots_provided`, else prev.nots verbatim.
+      - definition = cand.definition (replaced).
+      - date = today if `touch` else (prev.date or today).
+      - name keeps prev.name (preserves original casing).
+
+    For a new term: copies the candidate verbatim; date = today.
+    """
+    new_by_key = dict(by_key)
+    for cand in candidates:
+        key = cand["name"].lower()
+        if key in new_by_key:
+            prev = new_by_key[key]
+            merged_aliases: list[str] = []
+            seen: set[str] = set()
+            for a in prev["aliases"] + cand["aliases"]:
+                al = a.lower()
+                if al not in seen:
+                    seen.add(al)
+                    merged_aliases.append(a)
+            if nots_provided:
+                merged_nots: list[str] = []
+                seen_n: set[str] = set()
+                for n in prev["nots"] + cand["nots"]:
+                    nl = n.lower()
+                    if nl not in seen_n:
+                        seen_n.add(nl)
+                        merged_nots.append(n)
+            else:
+                merged_nots = list(prev["nots"])
+            new_by_key[key] = {
+                "name": prev["name"],
+                "definition": cand["definition"],
+                "aliases": merged_aliases,
+                "nots": merged_nots,
+                "date": today if touch else (prev["date"] or today),
+            }
+        else:
+            new_by_key[key] = {
+                "name": cand["name"],
+                "definition": cand["definition"],
+                "aliases": list(cand["aliases"]),
+                "nots": list(cand["nots"]),
+                "date": today,
+            }
+    return new_by_key
+
+
+def render_glossary_body(
+    by_key: "dict[str, dict]",
+    leading: str,
+    today: str,
+) -> str:
+    """Return the body to splice back via `replace_section(text, "Glossary", body)`.
+
+    Handles the `_(no terms yet ...)_` empty placeholder removal and the
+    leading-block-vs-rendered-entries formatting that both helpers do today.
+    """
+    import re
+
+    ordered_keys = sorted(by_key.keys())
+    rendered = "\n\n".join(build_glossary_entry(by_key[k], today) for k in ordered_keys)
+
+    leading_clean = re.sub(
+        r"^_\(no terms yet[^)]*\)_\s*$\n?",
+        "",
+        leading,
+        flags=re.MULTILINE,
+    ).rstrip("\n")
+    if leading_clean.strip():
+        return "\n" + leading_clean.strip() + "\n\n" + rendered + "\n"
+    return "\n" + rendered + "\n"

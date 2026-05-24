@@ -43,9 +43,9 @@ else
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" "$REPO_SCOPE" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import iter_topics, upsert_block, load_repos, resolve_knowledge_target
+from hvlib import compute_managed_block_inputs, upsert_block
 
-REGISTRY = {
+KEY_CFG = {
     "knowledge": {
         "heading": "## Project Knowledge",
         "intro":   "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:",
@@ -53,18 +53,18 @@ REGISTRY = {
         "legacy_marker": "knowledge",
     },
     "decisions": {
-        "source":  ".hv/DECISIONS.md",
         "heading": "## Project Decisions",
         "intro":   "Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:",
         "empty":   "- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_",
+        "legacy_marker": None,
     },
 }
 
 key = sys.argv[1]
 scope = sys.argv[2] if len(sys.argv) > 2 else ""
 
-if key not in REGISTRY:
-    print(f"error: unknown key '{key}' (known: {', '.join(REGISTRY)})", file=sys.stderr)
+if key not in KEY_CFG:
+    print(f"error: unknown key '{key}' (known: {', '.join(KEY_CFG)})", file=sys.stderr)
     sys.exit(1)
 
 # decisions is umbrella-only; reject --repo <name> (non-empty, non-"umbrella")
@@ -75,54 +75,13 @@ if key == "decisions" and scope and scope != "umbrella":
     )
     sys.exit(1)
 
-cfg = REGISTRY[key]
+try:
+    topics, target_path = compute_managed_block_inputs(key, scope)
+except ValueError as e:
+    print(f"error: {e}", file=sys.stderr)
+    sys.exit(1)
 
-if key == "knowledge":
-    # Umbrella scope (empty or "umbrella"): today's behavior — single source, CLAUDE.md at cwd.
-    if not scope or scope == "umbrella":
-        try:
-            source = Path(resolve_knowledge_target("umbrella"))
-        except ValueError as e:
-            print(f"error: {e}", file=sys.stderr)
-            sys.exit(1)
-        topics = []
-        if source.exists():
-            for name, _body in iter_topics(source.read_text()):
-                topics.append(name)
-        target_path = Path("CLAUDE.md")
-    else:
-        # Sub-repo scope: union of umbrella topics ∪ sub-repo topics (first-seen order, de-duplicated).
-        try:
-            repos = load_repos()
-        except Exception as e:
-            print(f"error: {e}", file=sys.stderr)
-            sys.exit(1)
-        if scope not in repos:
-            print(f"error: sub-repo '{scope}' not registered in .hv/repos.json", file=sys.stderr)
-            sys.exit(1)
-        try:
-            umbrella_src = Path(resolve_knowledge_target("umbrella"))
-            subrepo_src = Path(resolve_knowledge_target(scope))
-        except ValueError as e:
-            print(f"error: {e}", file=sys.stderr)
-            sys.exit(1)
-        seen: set[str] = set()
-        topics: list[str] = []
-        for src in (umbrella_src, subrepo_src):
-            if src.exists():
-                for name, _body in iter_topics(src.read_text()):
-                    if name not in seen:
-                        seen.add(name)
-                        topics.append(name)
-        target_path = Path(repos[scope]) / "CLAUDE.md"
-else:
-    source = Path(cfg["source"])
-    topics = []
-    if source.exists():
-        for name, _body in iter_topics(source.read_text()):
-            topics.append(name)
-    target_path = Path("CLAUDE.md")
-
+cfg = KEY_CFG[key]
 body = "\n".join(f"- {t}" for t in topics) if topics else cfg["empty"]
 
 block = (
@@ -133,7 +92,7 @@ block = (
     f"<!-- hv-{key}-end -->"
 )
 
-status = upsert_block(target_path, key, block, legacy_marker=cfg.get("legacy_marker"))
+status = upsert_block(target_path, key, block, legacy_marker=cfg["legacy_marker"])
 print(status)
 PY
 fi

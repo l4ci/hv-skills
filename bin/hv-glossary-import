@@ -46,16 +46,12 @@ TARGET="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MANIFEST" "$TARGET" "$TOUCH" <<'PY'
 import datetime as dt
-import re
 import sys
 from pathlib import Path
 from hvlib import (
-    build_glossary_entry,
-    find_section,
-    parse_glossary_entries,
-    replace_section,
-    split_csv_list,
-    write_text_atomic,
+    check_alias_collisions, find_section, merge_into_by_key,
+    parse_glossary_entries, render_glossary_body, replace_section,
+    split_csv_list, write_text_atomic,
 )
 
 manifest_path = Path(sys.argv[1])
@@ -70,7 +66,6 @@ if span is None:
     sys.exit(2)
 start, end = span
 existing_entries, leading = parse_glossary_entries(text[start:end])
-by_key: dict[str, dict] = {e["name"].lower(): e for e in existing_entries}
 
 candidates: list[dict] = []
 seen_in_batch: dict[str, int] = {}
@@ -104,84 +99,17 @@ if not candidates:
     print("noop: batch manifest contained no terms", file=sys.stderr)
     sys.exit(0)
 
-existing_alias_owner: dict[str, str] = {}
-for e in existing_entries:
-    for a in e["aliases"]:
-        existing_alias_owner[a.lower()] = e["name"].lower()
-
-conflicts: list[str] = []
-batch_alias_owner: dict[str, tuple[str, int]] = {}
-
-for cand in candidates:
-    cand_key = cand["name"].lower()
-    for a in cand["aliases"]:
-        al = a.lower()
-        owner = existing_alias_owner.get(al)
-        if owner and owner != cand_key:
-            owner_name = next((e["name"] for e in existing_entries if e["name"].lower() == owner), owner)
-            conflicts.append(
-                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with existing term '{owner_name}'"
-            )
-            continue
-        prior = batch_alias_owner.get(al)
-        if prior and prior[0] != cand_key:
-            prior_term = next((c["name"] for c in candidates if c["name"].lower() == prior[0]), prior[0])
-            conflicts.append(
-                f"line {cand['lineno']}: alias '{a}' on '{cand['name']}' collides with '{prior_term}' on line {prior[1]} (intra-batch)"
-            )
-            continue
-        batch_alias_owner[al] = (cand_key, cand["lineno"])
-
+conflicts = check_alias_collisions(existing_entries, candidates)
 if conflicts:
     print("error: batch alias collisions — refusing entire batch:", file=sys.stderr)
     for c in conflicts:
         print(f"  {c}", file=sys.stderr)
     sys.exit(3)
 
-for cand in candidates:
-    key = cand["name"].lower()
-    if key in by_key:
-        prev = by_key[key]
-        merged_aliases: list[str] = []
-        seen: set[str] = set()
-        for a in prev["aliases"] + cand["aliases"]:
-            al = a.lower()
-            if al not in seen:
-                seen.add(al)
-                merged_aliases.append(a)
-        merged_nots: list[str] = []
-        seen_n: set[str] = set()
-        for n in prev["nots"] + cand["nots"]:
-            nl = n.lower()
-            if nl not in seen_n:
-                seen_n.add(nl)
-                merged_nots.append(n)
-        by_key[key] = {
-            "name": prev["name"],
-            "definition": cand["definition"],
-            "aliases": merged_aliases,
-            "nots": merged_nots,
-            "date": today if touch else (prev["date"] or today),
-        }
-    else:
-        by_key[key] = {
-            "name": cand["name"],
-            "definition": cand["definition"],
-            "aliases": cand["aliases"],
-            "nots": cand["nots"],
-            "date": today,
-        }
+by_key = {e["name"].lower(): e for e in existing_entries}
+by_key = merge_into_by_key(by_key, candidates, today, touch=touch, nots_provided=True)
 
-ordered_keys = sorted(by_key.keys())
-rendered = "\n\n".join(build_glossary_entry(by_key[k], today) for k in ordered_keys)
-
-leading_clean = re.sub(
-    r"^_\(no terms yet[^)]*\)_\s*$\n?",
-    "",
-    leading,
-    flags=re.MULTILINE,
-).rstrip("\n")
-new_body = ("\n" + leading_clean.strip() + "\n\n" if leading_clean.strip() else "\n") + rendered + "\n"
+new_body = render_glossary_body(by_key, leading, today)
 new_text = replace_section(text, "Glossary", new_body)
 write_text_atomic(target_path, new_text)
 for cand in candidates:

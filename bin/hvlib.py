@@ -32,22 +32,25 @@ from hvlib_bullet import (
     find_item_ids, find_origin_bullet, parse_todo_fields, set_todo_field,
     open_bullet_re, parse_open_bullet, format_done_line, parse_done_line,
     find_bullet_in_content, find_open_bullet, strip_bullet_from_content,
+    resolve_cycle_ids,
 )
 from hvlib_frontmatter import parse_frontmatter, update_frontmatter_field
 from hvlib_paths import (
     resolve_plugin_root, iter_map_entries,
     infer_type_from_section, infer_type_from_id, detail_dir_for_id,
+    section_name_for_id,
 )
 from hvlib_repos import (
     parse_repos_csv, validate_repos, load_repos, active_items,
     parse_milestones, update_milestone_status_line,
 )
 from hvlib_knowledge import (
-    resolve_knowledge_target, resolve_tier_sidecar,
+    resolve_knowledge_target, resolve_tier_sidecar, compute_managed_block_inputs,
 )
 from hvlib_glossary import (
     parse_term_entry, first_sentence,
     parse_glossary_entries, build_glossary_entry, split_csv_list,
+    check_alias_collisions, merge_into_by_key, render_glossary_body,
 )
 from hvlib_crossref import (
     parse_related_ids, remove_id_from_related_field,

@@ -73,28 +73,19 @@ UMBRELLA_SIDECAR=$("$HERE/hv-knowledge-tier" --list 2>/dev/null || echo "[]")
 
 if [ "$SCOPE" = "umbrella" ]; then
   SCOPE_MODE="umbrella"
-  FILE_PAIRS="$(python3 -c "
-import json, sys
-pairs = [('.hv/KNOWLEDGE.md', json.loads(sys.argv[1]), '.hv/KNOWLEDGE.md')]
-print(json.dumps(pairs))
-" "$UMBRELLA_SIDECAR")"
+  SUBREPO_FILE=""
+  SUBREPO_SIDECAR=""
 else
   SCOPE_MODE="hybrid"
   SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || { rc=$?; echo "$SUBREPO_FILE" >&2; exit $rc; }
   SUBREPO_SIDECAR=$("$HERE/hv-knowledge-tier" --list --repo "$SCOPE" 2>/dev/null || echo "[]")
   [ -z "$SUBREPO_SIDECAR" ] && SUBREPO_SIDECAR="[]"
-  FILE_PAIRS="$(python3 -c "
-import json, sys
-pairs = [
-    ('.hv/KNOWLEDGE.md', json.loads(sys.argv[1]), '.hv/KNOWLEDGE.md'),
-    (sys.argv[2],        json.loads(sys.argv[3]), sys.argv[2]),
-]
-print(json.dumps(pairs))
-" "$UMBRELLA_SIDECAR" "$SUBREPO_FILE" "$SUBREPO_SIDECAR")"
 fi
 
-export HV_FILE_PAIRS="$FILE_PAIRS"
 export HV_SCOPE_MODE="$SCOPE_MODE"
+export HV_UMBRELLA_SIDECAR="$UMBRELLA_SIDECAR"
+export HV_SUBREPO_FILE="$SUBREPO_FILE"
+export HV_SUBREPO_SIDECAR="$SUBREPO_SIDECAR"
 export HV_INCLUDE_DEPRECATED="$INCLUDE_DEPRECATED"
 export HV_TIER_FILTER="$TIER_FILTER"
 
@@ -114,11 +105,6 @@ wanted_set = set(wanted_ordered)
 scope_mode = os.environ.get("HV_SCOPE_MODE", "umbrella")
 include_deprecated = os.environ.get("HV_INCLUDE_DEPRECATED", "0") == "1"
 tier_filter = os.environ.get("HV_TIER_FILTER", "") or None
-
-try:
-    file_pairs = json.loads(os.environ.get("HV_FILE_PAIRS", "[]"))
-except json.JSONDecodeError:
-    file_pairs = []
 
 bullet_re = re.compile(
     r"^- \*\*(?P<title>[^*]+)\*\* — (?P<body>.*?)(?P<trail>\s*<!-- \d{4}-\d{2}-\d{2}\s*-->\s*)$"
@@ -151,17 +137,28 @@ def collect_bullets(body, name, tier_by_key):
     return out_lines
 
 
-# Pre-build tier_by_key for each file pair.
-parsed_pairs = []
-for fp, entries, label in file_pairs:
+def _parse_sidecar(raw):
+    entries = []
+    if raw:
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
     if not isinstance(entries, list):
         entries = []
-    tbk = {
+    return {
         (e["topic"], e["title"]): e["tier"]
         for e in entries
         if isinstance(e, dict) and "topic" in e and "title" in e and "tier" in e
     }
-    parsed_pairs.append((fp, tbk, label))
+
+
+umbrella_tbk = _parse_sidecar(os.environ.get("HV_UMBRELLA_SIDECAR", ""))
+parsed_pairs = [(".hv/KNOWLEDGE.md", umbrella_tbk, ".hv/KNOWLEDGE.md")]
+subrepo_file = os.environ.get("HV_SUBREPO_FILE", "")
+if scope_mode == "hybrid" and subrepo_file:
+    subrepo_tbk = _parse_sidecar(os.environ.get("HV_SUBREPO_SIDECAR", ""))
+    parsed_pairs.append((subrepo_file, subrepo_tbk, subrepo_file))
 
 if scope_mode == "umbrella":
     # Umbrella path: single file pair, doc-order outer loop, no `> from:`.

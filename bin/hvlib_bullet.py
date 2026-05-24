@@ -220,6 +220,38 @@ def parse_done_line(line: str) -> dict | None:
     }
 
 
+def resolve_cycle_ids(cycle_hashes: "set[str]") -> "list[str]":
+    """Return the ordered list of item IDs whose done-line in BACKLOG.md or
+    ARCHIVE.md matches any of the given short hashes. De-duplicated in
+    first-seen order across BACKLOG before ARCHIVE.
+
+    Missing files are skipped silently. Used by hv-undo to map a cycle's
+    commit range back to the IDs it completed.
+    """
+    from pathlib import Path
+
+    def scan(path: Path) -> list:
+        if not path.exists():
+            return []
+        hits = []
+        for raw in path.read_text().splitlines():
+            d = parse_done_line(raw)
+            if not d:
+                continue
+            if d["hash"] in cycle_hashes and d["id"]:
+                hits.append(d["id"])
+        return hits
+
+    ids: list = []
+    seen: set = set()
+    for p in (Path(".hv/BACKLOG.md"), Path(".hv/ARCHIVE.md")):
+        for iid in scan(p):
+            if iid not in seen:
+                seen.add(iid)
+                ids.append(iid)
+    return ids
+
+
 def find_bullet_in_content(content: str, iid: str, active_sections: list[str]) -> tuple[str | None, str | None]:
     """Return (section_name, bullet_line) for iid in content, or (None, None).
     `active_sections` is the ordered list of `## <name>` sections to scan

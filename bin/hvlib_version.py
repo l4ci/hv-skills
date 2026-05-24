@@ -235,44 +235,13 @@ def write_version_for_kind(kind: str, new_version: str, cwd=".") -> None:
 
 def write_version(filepath, kind: str, new_version: str) -> None:
     """Write `new_version` into the manifest at `filepath` according to `kind`.
-    JSON manifests are rewritten with dump_json_atomic; TOML manifests have
-    only the `version = "..."` line in the relevant section replaced
-    (write_text_atomic); `plain` rewrites the file with `new_version + "\\n"`.
-    Raises FileNotFoundError if the file is missing; raises ValueError if the
-    target section/field can't be located.
+    Delegates to the per-kind writer registered in VERSION_KIND_REGISTRY.
+    Raises ValueError if kind is unknown; the registry writer raises
+    FileNotFoundError if the file is missing and ValueError if the target
+    section/field can't be located (TOML kinds).
     """
-    path = Path(filepath)
-    if kind in ("plugin-json", "package-json"):
-        data = load_json(path, {})
-        data["version"] = new_version
-        dump_json_atomic(path, data)
-        return
-    if kind == "plain":
-        write_text_atomic(path, new_version + "\n")
-        return
-    if kind in ("pyproject", "cargo"):
-        sections = ["project", "tool.poetry"] if kind == "pyproject" else ["package"]
-        content = path.read_text()
-        for section_name in sections:
-            sec_pat = re.compile(
-                r"^\s*\[" + re.escape(section_name) + r"\s*\]\s*$",
-                re.MULTILINE,
-            )
-            sec_m = sec_pat.search(content)
-            if not sec_m:
-                continue
-            next_m = re.search(r"^\s*\[", content[sec_m.end():], re.MULTILINE)
-            end = sec_m.end() + next_m.start() if next_m else len(content)
-            sec_body = content[sec_m.end():end]
-            new_body, n = re.subn(
-                r'(?m)^(version\s*=\s*)"[^"]*"',
-                rf'\1"{new_version}"',
-                sec_body,
-                count=1,
-            )
-            if n:
-                content = content[:sec_m.end()] + new_body + content[end:]
-                write_text_atomic(path, content)
-                return
-        raise ValueError(f"{path}: no version field in section")
-    raise ValueError(f"unknown version kind: {kind!r}")
+    try:
+        entry = VERSION_KIND_REGISTRY[kind]
+    except KeyError:
+        raise ValueError(f"unknown version kind: {kind!r}")
+    entry["writer"](str(filepath), new_version)

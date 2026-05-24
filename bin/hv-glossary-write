@@ -64,25 +64,18 @@ TARGET="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TERM" "$DEF" "$ALIASES_RAW" "$NOTS_RAW" "$NOTS_PROVIDED" "$TOUCH" "$TARGET" <<'PY'
 import datetime as dt
-import re
 import sys
 from pathlib import Path
 from hvlib import (
-    build_glossary_entry,
-    find_section,
-    parse_glossary_entries,
-    replace_section,
-    split_csv_list,
-    write_text_atomic,
+    check_alias_collisions, find_section, merge_into_by_key,
+    parse_glossary_entries, render_glossary_body, replace_section,
+    split_csv_list, write_text_atomic,
 )
 
 term, definition, aliases_raw, nots_raw, nots_provided, touch_flag, target = sys.argv[1:]
 target_path = Path(target)
 nots_provided = (nots_provided == "true")
 touch = (touch_flag == "true")
-
-new_aliases = split_csv_list(aliases_raw)
-new_nots = split_csv_list(nots_raw)
 
 text = target_path.read_text()
 span = find_section(text, "Glossary")
@@ -91,73 +84,36 @@ if span is None:
     sys.exit(2)
 start, end = span
 entries, leading = parse_glossary_entries(text[start:end])
-by_key = {e["name"].lower(): e for e in entries}
-today = dt.date.today().isoformat()
-key = term.lower()
 
-for other_key, info in by_key.items():
-    if other_key == key:
-        continue
-    other_aliases = {a.lower() for a in info["aliases"]}
-    collision = [a for a in new_aliases if a.lower() in other_aliases]
-    if collision:
-        print(
-            f"error: alias '{collision[0]}' is already an alias of term "
-            f"'{info['name']}' — refuse to write",
-            file=sys.stderr,
-        )
-        sys.exit(3)
-
-if key in by_key:
-    prev = by_key[key]
-    merged_aliases: list[str] = []
-    seen: set[str] = set()
-    for a in prev["aliases"] + new_aliases:
-        al = a.lower()
-        if al not in seen:
-            seen.add(al)
-            merged_aliases.append(a)
-    if nots_provided:
-        merged_nots: list[str] = []
-        seen_n: set[str] = set()
-        for n in prev["nots"] + new_nots:
-            nl = n.lower()
-            if nl not in seen_n:
-                seen_n.add(nl)
-                merged_nots.append(n)
-    else:
-        merged_nots = list(prev["nots"])
-    date = today if touch else (prev["date"] or today)
-    new_def = definition
-    new_name = prev["name"]
-else:
-    merged_aliases = list(new_aliases)
-    merged_nots = list(new_nots)
-    date = today
-    new_def = definition
-    new_name = term
-
-by_key[key] = {
-    "name": new_name,
-    "definition": new_def,
-    "aliases": merged_aliases,
-    "nots": merged_nots,
-    "date": date,
+candidate = {
+    "name": term,
+    "definition": definition,
+    "aliases": split_csv_list(aliases_raw),
+    "nots": split_csv_list(nots_raw),
 }
 
-ordered_keys = sorted(by_key.keys())
-rendered = "\n\n".join(build_glossary_entry(by_key[k], today) for k in ordered_keys)
+conflicts = check_alias_collisions(entries, [candidate])
+if conflicts:
+    import re
+    m = re.search(r"alias '([^']+)' on '[^']+' collides with existing term '([^']+)'", conflicts[0])
+    if m:
+        print(
+            f"error: alias '{m.group(1)}' is already an alias of term "
+            f"'{m.group(2)}' — refuse to write",
+            file=sys.stderr,
+        )
+    else:
+        print(f"error: {conflicts[0]}", file=sys.stderr)
+    sys.exit(3)
 
-leading_clean = re.sub(
-    r"^_\(no terms yet[^)]*\)_\s*$\n?",
-    "",
-    leading,
-    flags=re.MULTILINE,
-)
-leading_clean = leading_clean.rstrip("\n")
-new_body = ("\n" + leading_clean.strip() + "\n\n" if leading_clean.strip() else "\n") + rendered + "\n"
+today = dt.date.today().isoformat()
+by_key = {e["name"].lower(): e for e in entries}
+by_key = merge_into_by_key(by_key, [candidate], today, touch=touch, nots_provided=nots_provided)
+
+new_body = render_glossary_body(by_key, leading, today)
 new_text = replace_section(text, "Glossary", new_body)
 write_text_atomic(target_path, new_text)
+new_name = by_key[term.lower()]["name"]
 print(f"wrote: Glossary/{new_name}", file=sys.stderr)
 PY
 

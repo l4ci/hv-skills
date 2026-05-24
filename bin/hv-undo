@@ -158,37 +158,17 @@ fi
 # Cycle commits (everything on the merged branch, exclusive of the base side).
 CYCLE_HASHES="$(git log --pretty='%h' "${MERGE}^1..${MERGE}^2" 2>/dev/null || true)"
 
-# Resolve item IDs by matching cycle hashes against done-lines in BACKLOG/ARCHIVE.
-RESOLVED_IDS="$(
+# Resolve item IDs by matching cycle hashes against done-lines in BACKLOG/ARCHIVE,
+# and emit "ID<TAB>SECTION" pairs so bash gets section names without an extra Python spawn per ID.
+ID_SECTION_TSV="$(
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" \
   python3 - "$CYCLE_HASHES" <<'PY'
 import sys
-from pathlib import Path
-from hvlib import parse_done_line
+from hvlib import resolve_cycle_ids, section_name_for_id
 
 cycle_hashes = {h.strip() for h in sys.argv[1].splitlines() if h.strip()}
-
-def scan(path: Path):
-    if not path.exists():
-        return []
-    hits = []
-    for raw in path.read_text().splitlines():
-        d = parse_done_line(raw)
-        if not d:
-            continue
-        if d["hash"] in cycle_hashes and d["id"]:
-            hits.append(d["id"])
-    return hits
-
-ids = []
-seen = set()
-for p in (Path(".hv/BACKLOG.md"), Path(".hv/ARCHIVE.md")):
-    for iid in scan(p):
-        if iid not in seen:
-            seen.add(iid)
-            ids.append(iid)
-
-print("\n".join(ids))
+for iid in resolve_cycle_ids(cycle_hashes):
+    print(f"{iid}\t{section_name_for_id(iid)}")
 PY
 )"
 
@@ -198,23 +178,16 @@ if [ "$POST_MERGE_COUNT" -gt 0 ]; then
   POST_MERGE_NOTE=", $POST_MERGE_COUNT commit(s) past the merge will be discarded"
 fi
 
-# Read array of IDs from RESOLVED_IDS (newline-delimited).
+# Parse ID_SECTION_TSV into parallel arrays.
 ID_LIST=()
-if [ -n "$RESOLVED_IDS" ]; then
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    ID_LIST+=("$line")
-  done <<< "$RESOLVED_IDS"
+SEC_LIST=()
+if [ -n "$ID_SECTION_TSV" ]; then
+  while IFS=$'\t' read -r iid sec; do
+    [ -z "$iid" ] && continue
+    ID_LIST+=("$iid")
+    SEC_LIST+=("$sec")
+  done <<< "$ID_SECTION_TSV"
 fi
-
-section_for_id() {
-  case "$1" in
-    B*) echo "Bugs" ;;
-    F*) echo "Features" ;;
-    T*) echo "Tasks" ;;
-    *)  echo "Unknown" ;;
-  esac
-}
 
 echo "Undo plan for last cycle: $MERGE_SHORT"
 echo
@@ -224,8 +197,9 @@ if [ "${#ID_LIST[@]}" -eq 0 ]; then
   echo "Items:    none (cycle resolved no tracked items)"
 else
   first=1
-  for iid in "${ID_LIST[@]}"; do
-    sec="$(section_for_id "$iid")"
+  for i in "${!ID_LIST[@]}"; do
+    iid="${ID_LIST[$i]}"
+    sec="${SEC_LIST[$i]}"
     if [ "$first" -eq 1 ]; then
       echo "Items:    $iid will be restored to BACKLOG.md ($sec)"
       first=0

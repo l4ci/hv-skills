@@ -208,21 +208,25 @@ probe_state() {
   esac
 }
 
-KEEP="[]"
-while IFS= read -r entry; do
-  [ -z "$entry" ] && continue
-  provider=$(printf '%s' "$entry" | jq -r .provider)
-  issue=$(printf '%s' "$entry" | jq -r .issue)
-  repo=$(printf '%s' "$entry" | jq -r '.repo // ""')
+# Emit one TSV row per entry: provider<TAB>issue<TAB>repo. Single jq spawn.
+KEPT_IDX=()
+idx=-1
+while IFS=$'\t' read -r provider issue repo; do
+  idx=$((idx + 1))
+  [ -z "$provider" ] && continue
   cwd="$(resolve_entry_cwd "$repo")"
   state="$(probe_state "$provider" "$issue" "$cwd" || true)"
   case "$provider:$state" in
-    github:OPEN|gitlab:opened)
-      KEEP=$(printf '%s' "$KEEP" | jq --argjson e "$entry" '. + [$e]')
-      ;;
+    github:OPEN|gitlab:opened) KEPT_IDX+=("$idx") ;;
   esac
-done < <(printf '%s' "$RAW" | jq -c '.[]?')
+done < <(printf '%s' "$RAW" | jq -r '.[] | [.provider, (.issue|tostring), (.repo // "")] | @tsv')
 
-printf '%s\n' "$KEEP" | jq .
+# Build final KEEP by slicing RAW by the kept indices in one jq call.
+if [ "${#KEPT_IDX[@]}" -eq 0 ]; then
+  printf '[]\n'
+else
+  IDX_JSON="$(printf '%s\n' "${KEPT_IDX[@]}" | jq -s '.')"
+  printf '%s' "$RAW" | jq --argjson idx "$IDX_JSON" '[ .[$idx[]] ]'
+fi
 
 exit 0

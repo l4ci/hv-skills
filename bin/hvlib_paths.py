@@ -146,6 +146,20 @@ def infer_type_from_id(iid: str, prefix_to_section: dict[str, str]) -> str:
     return infer_type_from_section(sec)
 
 
+def section_name_for_id(item_id: str) -> str:
+    """Return the open-section name ("Bugs"/"Features"/"Tasks") for an item
+    ID like "B07" / "F12" / "T44". Returns "Unknown" for unknown prefixes.
+
+    Use this instead of inferring via string-suffix branching at call sites.
+    The mapping mirrors detail_dir_for_id / infer_type_from_id but emits the
+    section name (capitalized plural) instead of the type slug.
+    """
+    prefix_to_section = {"B": "Bugs", "F": "Features", "T": "Tasks"}
+    if item_id and item_id[0] in prefix_to_section:
+        return prefix_to_section[item_id[0]]
+    return "Unknown"
+
+
 def detail_dir_for_id(iid: str) -> str:
     """Map an ID's prefix to its detail directory under .hv/.
     B→bugs, F→features, T→tasks, otherwise empty string."""

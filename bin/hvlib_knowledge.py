@@ -77,3 +77,67 @@ def resolve_tier_sidecar(repo: str = "umbrella") -> str:
     if d is None:
         return ".hv/knowledge-tier.json"
     return os.path.join(d, "knowledge-tier.json")
+
+
+def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str], Path]":
+    """For a managed-block key + scope, return (topics, target_path).
+
+    `key`:   "knowledge" or "decisions"
+    `scope`: empty | "umbrella" | sub-repo name (only meaningful for "knowledge")
+
+    Knowledge with umbrella scope (empty or "umbrella"):
+      - source = resolve_knowledge_target("umbrella")
+      - topics = iter_topics(source) names, doc order
+      - target_path = Path("CLAUDE.md")
+    Knowledge with sub-repo scope:
+      - sources = umbrella + sub-repo KNOWLEDGE.md
+      - topics = first-seen union across both, doc order per file
+      - target_path = repos[scope] / "CLAUDE.md"
+    Decisions (umbrella-only — caller is responsible for rejecting --repo
+    before calling this function):
+      - source = .hv/DECISIONS.md
+      - topics = iter_topics(source) names, doc order
+      - target_path = Path("CLAUDE.md")
+
+    Raises ValueError on unknown key, on scope mismatch (sub-repo name not
+    in .hv/repos.json), or on knowledge-target resolution failure. Missing
+    source files are NOT an error — they just yield an empty topics list.
+    """
+    from pathlib import Path
+
+    from hvlib_repos import load_repos
+    from hvlib_section import iter_topics
+
+    if key == "knowledge":
+        if not scope or scope == "umbrella":
+            source = Path(resolve_knowledge_target("umbrella"))
+            topics: list[str] = []
+            if source.exists():
+                for name, _body in iter_topics(source.read_text()):
+                    topics.append(name)
+            return topics, Path("CLAUDE.md")
+        # Sub-repo scope: union umbrella ∪ sub-repo, first-seen order.
+        repos = load_repos()
+        if scope not in repos:
+            raise ValueError(f"sub-repo '{scope}' not registered in .hv/repos.json")
+        umbrella_src = Path(resolve_knowledge_target("umbrella"))
+        subrepo_src = Path(resolve_knowledge_target(scope))
+        seen: set[str] = set()
+        topics = []
+        for src in (umbrella_src, subrepo_src):
+            if src.exists():
+                for name, _body in iter_topics(src.read_text()):
+                    if name not in seen:
+                        seen.add(name)
+                        topics.append(name)
+        return topics, Path(repos[scope]) / "CLAUDE.md"
+
+    if key == "decisions":
+        source = Path(".hv/DECISIONS.md")
+        topics = []
+        if source.exists():
+            for name, _body in iter_topics(source.read_text()):
+                topics.append(name)
+        return topics, Path("CLAUDE.md")
+
+    raise ValueError(f"unknown key '{key}' (known: knowledge, decisions)")

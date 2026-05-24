@@ -43,16 +43,13 @@ done
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 
 if [ "$SCOPE" = "umbrella" ]; then
-  HV_GLOSS_FILES='[[".hv/KNOWLEDGE.md", ".hv/KNOWLEDGE.md"]]'
+  HV_GLOSS_SCOPE="umbrella"
+  HV_GLOSS_SUBREPO_FILE=""
 else
-  SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
-  HV_GLOSS_FILES="$(python3 -c "
-import json, sys
-pairs = [('.hv/KNOWLEDGE.md', '.hv/KNOWLEDGE.md'), (sys.argv[1], sys.argv[1])]
-print(json.dumps(pairs))
-" "$SUBREPO_FILE")"
+  HV_GLOSS_SCOPE="hybrid"
+  HV_GLOSS_SUBREPO_FILE="$(hv_resolve_knowledge_path "$SCOPE")" || exit $?
 fi
-export HV_GLOSS_FILES
+export HV_GLOSS_SCOPE HV_GLOSS_SUBREPO_FILE
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${TERMS[@]}" <<'PY'
 import json
@@ -66,10 +63,10 @@ wanted = {t.strip().lower() for t in sys.argv[1:]}
 if not wanted:
     sys.exit(0)
 
-try:
-    file_pairs = json.loads(os.environ.get("HV_GLOSS_FILES", "[]"))
-except json.JSONDecodeError:
-    file_pairs = []
+subrepo_file = os.environ.get("HV_GLOSS_SUBREPO_FILE", "")
+file_pairs = [(".hv/KNOWLEDGE.md", ".hv/KNOWLEDGE.md")]
+if os.environ.get("HV_GLOSS_SCOPE") == "hybrid" and subrepo_file:
+    file_pairs.append((subrepo_file, subrepo_file))
 
 
 def extract_entries(text):
