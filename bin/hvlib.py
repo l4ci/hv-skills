@@ -18,7 +18,7 @@ from hvlib_io import (
     load_sidecar,
 )
 from hvlib_version import (
-    parse_toml_version, infer_version_kind, get_version_or_die, read_version,
+    parse_toml_version, infer_version_kind, get_version_or_die,
     detect_version_kind, write_version_for_kind, write_version,
     VERSION_KIND_REGISTRY,
 )
@@ -33,7 +33,7 @@ from hvlib_bullet import (
     find_item_ids, find_origin_bullet, parse_todo_fields, set_todo_field,
     open_bullet_re, parse_open_bullet, format_done_line, parse_done_line,
     find_bullet_in_content, find_open_bullet, strip_bullet_from_content,
-    resolve_cycle_ids,
+    resolve_cycle_ids, iter_open_bullets,
 )
 from hvlib_frontmatter import parse_frontmatter, update_frontmatter_field
 from hvlib_paths import (
@@ -46,6 +46,7 @@ from hvlib_repos import (
 )
 from hvlib_knowledge import (
     resolve_knowledge_target, resolve_tier_sidecar, compute_managed_block_inputs,
+    load_tier_sidecar, save_tier_sidecar, bump_hit,
 )
 from hvlib_glossary import (
     parse_term_entry, first_sentence,

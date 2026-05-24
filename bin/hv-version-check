@@ -35,10 +35,14 @@ print(load_config().get('hvSkills', {}).get('version', '') or '')
 ROOT=$("$BIN_DIR/hv-resolve-plugin-root" --root-only)
 INSTALLED=""
 if [ -n "$ROOT" ]; then
-  INSTALLED=$(python3 -c "
+  INSTALLED=$(
+    python3 - "$ROOT" 2>/dev/null <<'PY' || true
+import sys
 from hvlib import load_json
-print(load_json('$ROOT/.claude-plugin/plugin.json', {}).get('version', '') or '')
-" 2>/dev/null || true)
+root = sys.argv[1]
+print(load_json(f"{root}/.claude-plugin/plugin.json", {}).get("version", "") or "")
+PY
+  )
 fi
 
 STATUS="unknown"

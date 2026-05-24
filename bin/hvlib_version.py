@@ -2,7 +2,7 @@
 to keep the main module under 800 LoC.
 
 Imports IO primitives from hvlib_io (pure stdlib otherwise). Re-exported by
-hvlib for backward compat: existing `from hvlib import read_version` imports
+hvlib for backward compat: existing `from hvlib import write_version` imports
 continue to work.
 """
 import json
@@ -59,56 +59,6 @@ def infer_version_kind(filepath) -> str:
     if name == "Cargo.toml":
         return "cargo"
     return "plain"
-
-
-def get_version_or_die(filepath, kind: str) -> str:
-    """Read the version from `filepath` (kind per `infer_version_kind`), or
-    print a one-line error to stderr and `sys.exit(1)`. Wraps `read_version`
-    so release helpers don't have to repeat the same try/except dance.
-
-    Error messages match the prior inline implementation byte-for-byte:
-      - missing file        → "error: <path>: file not found"
-      - corrupt JSON / TOML → "error: <path>: <e>"
-      - no version field    → "error: <path>: no version field found"
-    """
-    try:
-        v = read_version(filepath, kind)
-    except FileNotFoundError:
-        print(f"error: {filepath}: file not found", file=sys.stderr)
-        sys.exit(1)
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"error: {filepath}: {e}", file=sys.stderr)
-        sys.exit(1)
-    if v is None:
-        print(f"error: {filepath}: no version field found", file=sys.stderr)
-        sys.exit(1)
-    return v
-
-
-def read_version(filepath, kind: str) -> str | None:
-    """Read the version string from a manifest. Returns the version, or None
-    if the file has no version field. Raises FileNotFoundError if the path
-    doesn't exist; raises json.JSONDecodeError if a JSON manifest is corrupt
-    (callers that prefer silent failure should wrap with hvlib.load_json
-    semantics — but for release-helper context, surfacing a hard error on
-    corrupt JSON is preferable).
-    """
-    path = Path(filepath)
-    text = path.read_text()
-    if kind in ("plugin-json", "package-json"):
-        data = json.loads(text)
-        return data.get("version")
-    if kind == "pyproject":
-        return parse_toml_version(text, ["project", "tool.poetry"])
-    if kind == "cargo":
-        return parse_toml_version(text, ["package"])
-    if kind == "plain":
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped:
-                return stripped
-        return None
-    raise ValueError(f"unknown version kind: {kind!r}")
 
 
 def _read_version_json(filepath: str) -> "str | None":
@@ -233,15 +183,39 @@ def write_version_for_kind(kind: str, new_version: str, cwd=".") -> None:
     entry["writer"](str(path), new_version)
 
 
-def write_version(filepath, kind: str, new_version: str) -> None:
-    """Write `new_version` into the manifest at `filepath` according to `kind`.
-    Delegates to the per-kind writer registered in VERSION_KIND_REGISTRY.
-    Raises ValueError if kind is unknown; the registry writer raises
-    FileNotFoundError if the file is missing and ValueError if the target
-    section/field can't be located (TOML kinds).
+def get_version_or_die(filepath, kind: str) -> str:
+    """Read the version from `filepath` (kind per `infer_version_kind`), or
+    print a one-line error to stderr and `sys.exit(1)`. Wraps the per-kind
+    parser registered in VERSION_KIND_REGISTRY so release helpers don't have
+    to repeat the same try/except dance.
+
+    Error messages:
+      - missing file        → "error: <path>: file not found"
+      - corrupt JSON / TOML → "error: <path>: <e>"
+      - no version field    → "error: <path>: no version field found"
+      - unknown kind        → "error: <path>: unknown version kind: <kind>"
     """
     try:
         entry = VERSION_KIND_REGISTRY[kind]
     except KeyError:
-        raise ValueError(f"unknown version kind: {kind!r}")
-    entry["writer"](str(filepath), new_version)
+        print(f"error: {filepath}: unknown version kind: {kind!r}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        v = entry["parser"](str(filepath))
+    except FileNotFoundError:
+        print(f"error: {filepath}: file not found", file=sys.stderr)
+        sys.exit(1)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"error: {filepath}: {e}", file=sys.stderr)
+        sys.exit(1)
+    if v is None:
+        print(f"error: {filepath}: no version field found", file=sys.stderr)
+        sys.exit(1)
+    return v
+
+
+def write_version(filepath, kind: str, new_version: str) -> None:
+    """Write `new_version` into the manifest at `filepath` according to `kind`.
+    Delegates to the per-kind writer registered in VERSION_KIND_REGISTRY.
+    """
+    VERSION_KIND_REGISTRY[kind]["writer"](str(filepath), new_version)

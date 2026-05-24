@@ -125,7 +125,7 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
-from hvlib import load_sidecar, dump_json_atomic
+from hvlib import load_sidecar, dump_json_atomic, bump_hit
 
 SIDECAR = Path(os.environ["_HV_KT_SIDECAR"])
 VALID_TIERS = {"provisional", "confirmed", "deprecated"}
@@ -190,12 +190,7 @@ elif cmd == "init":
 
 elif cmd == "inc":
     data = load()
-    key = make_key(topic, title)
-    if key in data["entries"]:
-        data["entries"][key]["hits"] += 1
-        data["entries"][key]["lastSeen"] = today
-    else:
-        data["entries"][key] = {"tier": "provisional", "hits": 1, "lastSeen": today}
+    data, _entry = bump_hit(data, topic, title, today)
     save(data)
 
 elif cmd == "list":

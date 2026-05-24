@@ -11,7 +11,7 @@ MID="${1:?usage: hv-todo-by-milestone <MID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re, parse_milestones
+from hvlib import iter_open_bullets, parse_milestones
 
 mid = sys.argv[1]
 todo = Path(".hv/BACKLOG.md")
@@ -19,17 +19,11 @@ if not todo.exists():
     raise SystemExit(0)
 content = todo.read_text()
 
-_open_re = open_bullet_re()
-body = "".join(b for _name, b in iter_open_sections(content))
-for line in body.splitlines():
-    line = line.strip()
-    idm = _open_re.match(line)
-    if not idm:
-        continue
-    milestone_val = parse_todo_fields(line)["milestone"]
+for iid, line, fields, _section in iter_open_bullets(content):
+    milestone_val = fields["milestone"]
     if not milestone_val:
         continue
     milestones = parse_milestones(milestone_val)
     if mid in milestones:
-        print(idm.group("id"))
+        print(iid)
 PY

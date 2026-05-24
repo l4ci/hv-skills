@@ -79,6 +79,56 @@ def resolve_tier_sidecar(repo: str = "umbrella") -> str:
     return os.path.join(d, "knowledge-tier.json")
 
 
+def load_tier_sidecar(sidecar_path) -> dict:
+    """Load the F03 tier sidecar at `sidecar_path` with schema-version
+    checking. Returns `{"version": 1, "entries": {}}` when the file is
+    missing. Raises ValueError on schema mismatch — callers convert to
+    exit 1 with the error printed to stderr.
+
+    `sidecar_path` is a string or Path. Callers typically resolve it via
+    `resolve_tier_sidecar(scope)`.
+    """
+    from hvlib_io import load_sidecar
+    return load_sidecar(
+        sidecar_path,
+        schema_version=1,
+        default={"version": 1, "entries": {}},
+    )
+
+
+def save_tier_sidecar(sidecar_path, data: dict) -> None:
+    """Persist the F03 tier sidecar to `sidecar_path` via atomic write.
+    `sidecar_path` is a string or Path. Companion of `load_tier_sidecar`.
+    """
+    from hvlib_io import dump_json_atomic
+    dump_json_atomic(sidecar_path, data)
+
+
+def bump_hit(data: dict, topic: str, title: str, today: str) -> "tuple[dict, dict]":
+    """Apply the canonical hit increment to a tier-sidecar `data` dict.
+
+    Returns `(data, entry)` where `data` is the mutated sidecar (caller
+    passes through `save_tier_sidecar`) and `entry` is the post-mutation
+    entry for `(topic, title)` — useful for downstream auto-promotion
+    decisions.
+
+    Semantics:
+      - Existing entry: hits += 1, lastSeen = today; tier unchanged.
+      - New entry: provisional / hits=1 / lastSeen=today.
+
+    Schema key is `f"{topic}::{title}"`. Used by hv-knowledge-tier --inc and
+    by hv-knowledge-hit (which adds auto-promotion on top).
+    """
+    key = f"{topic}::{title}"
+    entries = data["entries"]
+    if key in entries:
+        entries[key]["hits"] += 1
+        entries[key]["lastSeen"] = today
+    else:
+        entries[key] = {"tier": "provisional", "hits": 1, "lastSeen": today}
+    return data, entries[key]
+
+
 def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str], Path]":
     """For a managed-block key + scope, return (topics, target_path).
 

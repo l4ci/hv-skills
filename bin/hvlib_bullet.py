@@ -166,6 +166,36 @@ def open_bullet_re() -> "re.Pattern":
     )
 
 
+def iter_open_bullets(content: str):
+    """Yield `(item_id, line, fields, section_name)` for every open bullet
+    in `content` (typically `.hv/BACKLOG.md`).
+
+    Iterates `iter_open_sections` (skips `## Completed`), then matches each
+    line against `open_bullet_re()`. Lines that don't match an open-bullet
+    pattern are skipped silently. Each yield provides:
+
+      - item_id: the ID without brackets (e.g. "B07")
+      - line: the bullet line, stripped of surrounding whitespace
+      - fields: the dict from `parse_todo_fields(line)` — keys per
+        `_TODO_FIELD_NAMES` (lowercased), missing fields map to ""
+      - section_name: the `## <name>` heading containing the bullet
+        ("Bugs", "Features", "Tasks")
+
+    Use this for any scan that needs to walk the open backlog and react
+    per-bullet. Section-aware callers (hv-staleness, hv-backfill-since)
+    use the `section_name` field; section-agnostic callers ignore it.
+    """
+    bullet_re = open_bullet_re()
+    for section_name, body in iter_open_sections(content):
+        for raw in body.splitlines():
+            line = raw.strip()
+            m = bullet_re.match(line)
+            if not m:
+                continue
+            fields = parse_todo_fields(line)
+            yield (m.group("id"), line, fields, section_name)
+
+
 def parse_open_bullet(line: str) -> dict | None:
     """Parse a single open bullet line. Returns a dict with id/tag/title/rest
     keys (matching open_bullet_re named groups), or None if the line isn't an

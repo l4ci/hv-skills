@@ -5,7 +5,7 @@
 # bullet has a pending contradiction. Called by /hv-work and /hv-review
 # after consuming a queried bullet.
 # Writer helper: exit 0 on success; exit 1 on argv error.
-# Usage: hv-knowledge-hit --topic <T> --title <S>
+# Usage: hv-knowledge-hit [--repo umbrella|<name>] --topic <T> --title <S>
 #
 # Inlines the read-modify-write of .hv/knowledge-tier.json — the sidecar
 # schema lives in hv-knowledge-tier; keep the invariants in lockstep:
@@ -13,13 +13,18 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-knowledge-hit --topic <T> --title <S>"
+USAGE="usage: hv-knowledge-hit [--repo umbrella|<name>] --topic <T> --title <S>"
+REPO_FLAG=""
 
 TOPIC=""
 TITLE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --repo)
+      REPO_FLAG="${2:?$USAGE}"
+      shift 2
+      ;;
     --topic)
       TOPIC="${2:?$USAGE}"
       shift 2
@@ -52,8 +57,13 @@ if [[ "$TOPIC" == "Glossary" ]]; then
   exit 0
 fi
 
+. "$HERE/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+SIDECAR_PATH="$(hv_resolve_knowledge_path "$SCOPE" tier)" || exit $?
+
 export _HV_KH_TOPIC="$TOPIC"
 export _HV_KH_TITLE="$TITLE"
+export _HV_KH_SIDECAR="$SIDECAR_PATH"
 export HV_BIN="$HERE"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
@@ -61,37 +71,28 @@ import os
 import subprocess
 import sys
 from datetime import date
-from pathlib import Path
-from hvlib import load_sidecar, dump_json_atomic, load_config
+from hvlib import load_tier_sidecar, save_tier_sidecar, bump_hit, load_config
 
-SIDECAR        = Path(".hv/knowledge-tier.json")
+SIDECAR        = os.environ["_HV_KH_SIDECAR"]
 DEFAULT_THRESHOLD = 3
 
 topic = os.environ["_HV_KH_TOPIC"]
 title = os.environ["_HV_KH_TITLE"]
 today = date.today().isoformat()
-key   = f"{topic}::{title}"
 
 cfg = load_config()
 val = cfg.get("learn", {}).get("promoteThreshold")
 threshold = val if isinstance(val, int) and val > 0 else DEFAULT_THRESHOLD
 
 try:
-    data = load_sidecar(SIDECAR, schema_version=1, default={"version": 1, "entries": {}})
+    data = load_tier_sidecar(SIDECAR)
 except ValueError as e:
     print(f"error: {e}", file=sys.stderr)
     sys.exit(1)
 
-entries = data["entries"]
-if key in entries:
-    entries[key]["hits"] += 1
-    entries[key]["lastSeen"] = today
-else:
-    entries[key] = {"tier": "provisional", "hits": 1, "lastSeen": today}
+data, state = bump_hit(data, topic, title, today)
 
-state = entries[key]
 auto_promoted = False
-
 if state["tier"] == "provisional" and state["hits"] >= threshold:
     bin_dir = os.environ["HV_BIN"]
     result = subprocess.run(
@@ -116,7 +117,7 @@ if state["tier"] == "provisional" and state["hits"] >= threshold:
         state["tier"] = "confirmed"
         auto_promoted = True
 
-dump_json_atomic(SIDECAR, data)
+save_tier_sidecar(SIDECAR, data)
 
 if auto_promoted:
     print(

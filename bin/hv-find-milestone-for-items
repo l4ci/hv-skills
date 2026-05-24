@@ -15,22 +15,18 @@ fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import iter_open_sections, parse_todo_fields, open_bullet_re, parse_milestones
+from hvlib import iter_open_bullets, parse_milestones
 
 ids_wanted = set(sys.argv[1:])
 todo = Path(".hv/BACKLOG.md")
 if not todo.exists():
     raise SystemExit(0)
 content = todo.read_text()
-_open_re = open_bullet_re()
 milestones = set()
-body = "".join(b for _name, b in iter_open_sections(content))
-for line in body.splitlines():
-    line = line.strip()
-    m = _open_re.match(line)
-    if not m or m.group("id") not in ids_wanted:
+for iid, line, fields, _section in iter_open_bullets(content):
+    if iid not in ids_wanted:
         continue
-    val = parse_todo_fields(line)["milestone"]
+    val = fields["milestone"]
     if not val:
         continue
     for mid in parse_milestones(val):

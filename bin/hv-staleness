@@ -25,7 +25,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KIND" "$DAYS" "$TODAY"
 import datetime as dt
 import sys
 from pathlib import Path
-from hvlib import iter_map_entries, iter_topics, git_mtime, iter_open_sections, parse_todo_fields, open_bullet_re
+from hvlib import iter_map_entries, iter_topics, git_mtime, iter_open_bullets
 
 kind, days_s, today_s = sys.argv[1], sys.argv[2], sys.argv[3]
 days = int(days_s)
@@ -74,19 +74,13 @@ elif kind == "todo":
         sys.exit(0)
     # Scan open backlog bullets via the canonical helpers — the prior inline
     # regex assumed `- [ID]` but the real shape is `- **[ID] [Tag] Title.** ...`.
-    bullet_re = open_bullet_re()
-    for _name, body in iter_open_sections(p.read_text()):
-        for line in body.splitlines():
-            line = line.strip()
-            bm = bullet_re.match(line)
-            if not bm:
-                continue
-            captured = parse_todo_fields(line).get("captured", "")
-            if not captured:
-                continue
-            d = parse_date(captured)
-            if is_stale(d):
-                emit(bm.group("id"), d)
+    for iid, line, fields, _section in iter_open_bullets(p.read_text()):
+        captured = fields.get("captured", "")
+        if not captured:
+            continue
+        d = parse_date(captured)
+        if is_stale(d):
+            emit(iid, d)
 else:
     print(f"unknown kind: {kind}", file=sys.stderr)
     sys.exit(1)

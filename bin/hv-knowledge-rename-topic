@@ -31,16 +31,21 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-knowledge-rename-topic --from <X> --to <Y> [--title <T>]
+USAGE="usage: hv-knowledge-rename-topic [--repo umbrella|<name>] --from <X> --to <Y> [--title <T>]
   Without --title: rename whole topic heading + re-key all sidecar entries.
   With --title:    move one bullet from X to Y + re-key its sidecar entry."
 
 FROM=""
 TO=""
 TITLE=""
+REPO_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --repo)
+      REPO_FLAG="${2:?$USAGE}"
+      shift 2
+      ;;
     --from)
       FROM="${2:?$USAGE}"
       shift 2
@@ -76,20 +81,24 @@ if [[ "$FROM" == "$TO" ]]; then
   exit 0
 fi
 
+. "$HERE/hv-knowledge-scope.sh"
+SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
+SIDECAR_PATH="$(hv_resolve_knowledge_path "$SCOPE" tier)" || exit $?
+
 export _HV_KR_FROM="$FROM"
 export _HV_KR_TO="$TO"
 export _HV_KR_TITLE="$TITLE"
+export _HV_KR_SIDECAR="$SIDECAR_PATH"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json
 import os
 import re
 import sys
 from pathlib import Path
-from hvlib import read_or_empty, write_text_atomic, find_section, load_sidecar as _load_sidecar_shared, dump_json_atomic
+from hvlib import read_or_empty, write_text_atomic, find_section, load_tier_sidecar, save_tier_sidecar
 
 KM = Path(".hv/KNOWLEDGE.md")
-SIDECAR = Path(".hv/knowledge-tier.json")
+SIDECAR = Path(os.environ["_HV_KR_SIDECAR"])
 
 src = os.environ["_HV_KR_FROM"]
 dst = os.environ["_HV_KR_TO"]
@@ -110,14 +119,14 @@ dst_span = find_section(content, dst)
 
 def _load():
     try:
-        return _load_sidecar_shared(SIDECAR, schema_version=1, default={"version": 1, "entries": {}})
+        return load_tier_sidecar(SIDECAR)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
 def _save(data):
-    dump_json_atomic(SIDECAR, data)
+    save_tier_sidecar(SIDECAR, data)
 
 
 def rekey_sidecar(old_key, new_key):
