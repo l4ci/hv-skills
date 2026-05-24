@@ -1,5 +1,35 @@
 # Changelog
 
+## v4.4.0 — 2026-05-24
+
+Five rounds of architectural refactor, two new pieces of issue-tracking hygiene (release-time close gate, `--open-only` filter), and a regression fix to keep `hv-issues-imported` always exiting 0.
+
+## New
+
+- `/hv-release` Step 13.4 — close-upstream-issues gate. After publishing, BACKLOG items tagged `GH:` / `GL:` are offered for upstream close. (`2143836`)
+- `hv-issues-imported --open-only` — filter the imported-issues index against live upstream state via `gh` / `glab`. Lets `/hv-ship` Step 6c and `/hv-release` Step 13.4 skip already-closed issues. (`3adc729`)
+
+## Fixed
+
+- `hv-issues-imported` always exits 0 again. The round-4 refactor added a `--repo` validator that hard-failed on unknown names, breaking the documented contract umbrella iteration and `--repo` + `--open-only` orthogonality rely on. (`7e6890f`)
+
+## Changed
+
+- 27 architectural fixes across helpers, skills, and tests. Highlights: hand-rolled subcommand parsing in `hv-knowledge-contradiction` switched to per-subcommand argparse; `hv-knowledge-query` surfaces schema-mismatch errors instead of collapsing to `[]`; `hv-rm` dropped dead `item_type` plumbing. (`99c6974`, `fc68383`, `c2dff99`, `6c1df48`, `dbf79ce`)
+- Archived 27 completed items older than 5 days. (`e253f03`)
+
+## Documentation
+
+- README mentions `/hv-config <key>` and `/hv-config <key>=<value>` shortcuts alongside interactive mode. (`943e4b2`)
+- Humanizer pass on `README.md`. (`08fc1ae`)
+- `/hv-plan` documents doc-by-path validation (F76). (`ae8877b`)
+
+## Stats
+
+18 commits, 67 files changed, +1303 −1010 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.3.0...v4.4.0
+
 ## v4.3.0 — 2026-05-20
 
 hv-skills 4.3.0 — `/hv-plan` catches doc-deliverable mismatches before the plan ships. Internal helper hygiene from the F21 refactor follow-ups (T103, T104).
