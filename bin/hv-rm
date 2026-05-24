@@ -34,7 +34,6 @@ from hvlib import (
     parse_todo_fields,
     find_bullet_in_content,
     infer_type_from_section,
-    infer_type_from_id,
     detail_dir_for_id,
     strip_bullet_from_content,
     parse_related_ids,

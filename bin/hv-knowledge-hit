@@ -54,17 +54,17 @@ fi
 
 export _HV_KH_TOPIC="$TOPIC"
 export _HV_KH_TITLE="$TITLE"
+export HV_BIN="$HERE"
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json
 import os
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 from hvlib import load_sidecar, dump_json_atomic, load_config
 
 SIDECAR        = Path(".hv/knowledge-tier.json")
-CONTRADICTIONS = Path(".hv/knowledge-contradictions.json")
 DEFAULT_THRESHOLD = 3
 
 topic = os.environ["_HV_KH_TOPIC"]
@@ -93,16 +93,20 @@ state = entries[key]
 auto_promoted = False
 
 if state["tier"] == "provisional" and state["hits"] >= threshold:
-    has_contradiction = False
-    if CONTRADICTIONS.exists():
-        try:
-            cdata = json.loads(CONTRADICTIONS.read_text())
-            for entry in cdata.get("pending", []):
-                if entry.get("topic") == topic and entry.get("title") == title:
-                    has_contradiction = True
-                    break
-        except Exception:
-            pass
+    bin_dir = os.environ["HV_BIN"]
+    result = subprocess.run(
+        [f"{bin_dir}/hv-knowledge-contradiction", "--has", "--topic", topic, "--title", title],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        has_contradiction = True
+    elif result.returncode == 1:
+        has_contradiction = False
+    else:
+        sys.stderr.write(result.stderr)
+        sys.exit(result.returncode)
     if has_contradiction:
         print(
             f"skip-auto-promote: {topic} :: {title} has pending contradiction",

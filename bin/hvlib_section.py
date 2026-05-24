@@ -158,6 +158,37 @@ def load_backlog_corpus(base_dir=".") -> str:
     return primary.rstrip("\n") + "\n" + read_or_empty(hv / "ARCHIVE.md")
 
 
+def managed_block_regex(
+    key: str,
+    legacy_marker: "str | None" = None,
+    *,
+    consume_trailing_newline: bool = False,
+) -> "re.Pattern[str]":
+    """Build the regex matching a managed CLAUDE.md block.
+
+    Matches both canonical `<!-- hv-<key>-start --> ... <!-- hv-<key>-end -->`
+    and, when `legacy_marker` is given, the legacy `<!-- hv:<legacy_marker>:start --> ... <!-- hv:<legacy_marker>:end -->`
+    form. Use legacy_marker=key for symmetric stripping of obsolete keys.
+
+    `consume_trailing_newline=True` extends the match with `\\n?` after the end
+    delimiter so callers that want to remove the block (vs. replace it in
+    place) don't leave a blank line behind.
+    """
+    tail = r"\n?" if consume_trailing_newline else ""
+    if legacy_marker:
+        return re.compile(
+            rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(legacy_marker)}:start) -->"
+            rf".*?"
+            rf"<!-- hv(?:-{re.escape(key)}-end|:{re.escape(legacy_marker)}:end) -->"
+            rf"{tail}",
+            re.DOTALL,
+        )
+    return re.compile(
+        rf"<!-- hv-{re.escape(key)}-start -->.*?<!-- hv-{re.escape(key)}-end -->{tail}",
+        re.DOTALL,
+    )
+
+
 def upsert_block(claude_path: Path, key: str, block: str, legacy_marker: str | None = None) -> str:
     """Write `block` into `claude_path`, replacing any existing
     <!-- hv-{key}-start -->...<!-- hv-{key}-end --> match (sub),
@@ -176,18 +207,7 @@ def upsert_block(claude_path: Path, key: str, block: str, legacy_marker: str | N
         write_text_atomic(claude_path, block + "\n")
         return "created"
     content = claude_path.read_text()
-    if legacy_marker:
-        pattern = re.compile(
-            rf"<!-- hv(?:-{re.escape(key)}-start|:{re.escape(legacy_marker)}:start) -->"
-            rf".*?"
-            rf"<!-- hv(?:-{re.escape(key)}-end|:{re.escape(legacy_marker)}:end) -->",
-            re.DOTALL,
-        )
-    else:
-        pattern = re.compile(
-            rf"<!-- hv-{re.escape(key)}-start -->.*?<!-- hv-{re.escape(key)}-end -->",
-            re.DOTALL,
-        )
+    pattern = managed_block_regex(key, legacy_marker=legacy_marker)
     if pattern.search(content):
         new_content = pattern.sub(block, content)
         if new_content == content:

@@ -33,6 +33,7 @@ set -euo pipefail
 HV="$(pwd -P)/.hv"
 
 . "$HERE/hv-issues-common.sh"
+hv_issues_init_path_cache
 hv_issues_parse_repo_flag "$@"
 
 # Parse --open-only (orthogonal to --repo; both can be combined).
@@ -167,25 +168,6 @@ fi
 # Entries whose state can't be resolved (missing CLI, auth failure, deleted
 # issue) are dropped silently — the close gate would no-op on them anyway.
 
-# Resolve a per-entry working directory: cwd for null-repo entries, the
-# sub-repo path for umbrella entries. Cached across the loop.
-declare -A REPO_PATH_CACHE
-resolve_entry_cwd() {
-  local repo="$1"
-  if [ -z "$repo" ] || [ "$repo" = "null" ]; then
-    echo ""
-    return 0
-  fi
-  if [ -n "${REPO_PATH_CACHE[$repo]+x}" ]; then
-    echo "${REPO_PATH_CACHE[$repo]}"
-    return 0
-  fi
-  local path
-  path="$("$HERE/hv-resolve-repo-path" "$repo" 2>/dev/null || true)"
-  REPO_PATH_CACHE[$repo]="$path"
-  echo "$path"
-}
-
 probe_state() {
   local provider="$1" issue="$2" cwd="$3"
   case "$provider" in
@@ -214,7 +196,7 @@ idx=-1
 while IFS=$'\t' read -r provider issue repo; do
   idx=$((idx + 1))
   [ -z "$provider" ] && continue
-  cwd="$(resolve_entry_cwd "$repo")"
+  cwd="$(hv_issues_resolve_path_cached "$repo")"
   state="$(probe_state "$provider" "$issue" "$cwd" || true)"
   case "$provider:$state" in
     github:OPEN|gitlab:opened) KEPT_IDX+=("$idx") ;;

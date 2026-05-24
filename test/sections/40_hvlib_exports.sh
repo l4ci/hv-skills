@@ -31,7 +31,6 @@ NAMES = [
     "format_done_line",
     "get_version_or_die",
     "git_mtime",
-    "infer_type_from_id",
     "infer_type_from_section",
     "infer_version_kind",
     "iter_map_entries",

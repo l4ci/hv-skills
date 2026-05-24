@@ -2,4 +2,5 @@
 # Print the matching ## Topic section(s) from .hv/DECISIONS.md.
 # Lookup helper (thin wrapper via hv-section-query): always exits 0; missing topics are silent.
 # Usage: hv-decisions-query <topic>...
+set -euo pipefail
 exec "$(dirname "$0")/hv-section-query" decisions "$@"

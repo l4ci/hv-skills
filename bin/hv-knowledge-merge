@@ -74,7 +74,7 @@ export _HV_KM_BODY="$BODY_ARG"
 SCOPE="$(hv_resolve_knowledge_scope "$REPO_FLAG")"
 export _HV_KM_SCOPE="$SCOPE"
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$TITLE" "$DATE_ARG" "$BODY_FROM_ARG" <<PY
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TOPIC" "$TITLE" "$DATE_ARG" "$BODY_FROM_ARG" <<'PY'
 import os
 import sys
 from datetime import date

@@ -135,23 +135,12 @@ def infer_type_from_section(sec_name: str) -> str:
     return mapping.get(sec_name, "unknown")
 
 
-def infer_type_from_id(iid: str, prefix_to_section: dict[str, str]) -> str:
-    """Map an ID's first letter to an item-type label via the supplied
-    prefix-to-section mapping (e.g. {'B': 'Bugs', 'F': 'Features', 'T': 'Tasks'}).
-    Returns 'unknown' if the prefix isn't in the map."""
-    prefix = iid[0].upper() if iid else ""
-    sec = prefix_to_section.get(prefix)
-    if sec is None:
-        return "unknown"
-    return infer_type_from_section(sec)
-
-
 def section_name_for_id(item_id: str) -> str:
     """Return the open-section name ("Bugs"/"Features"/"Tasks") for an item
     ID like "B07" / "F12" / "T44". Returns "Unknown" for unknown prefixes.
 
     Use this instead of inferring via string-suffix branching at call sites.
-    The mapping mirrors detail_dir_for_id / infer_type_from_id but emits the
+    The mapping mirrors detail_dir_for_id but emits the
     section name (capitalized plural) instead of the type slug.
     """
     prefix_to_section = {"B": "Bugs", "F": "Features", "T": "Tasks"}

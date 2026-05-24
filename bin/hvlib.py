@@ -26,7 +26,7 @@ from hvlib_section import (
     BACKLOG_FILE,
     find_section, section, print_matching_sections,
     replace_section, append_to_section, iter_open_sections,
-    iter_topics, load_backlog_corpus, upsert_block,
+    iter_topics, load_backlog_corpus, upsert_block, managed_block_regex,
 )
 from hvlib_bullet import (
     _TODO_FIELD_NAMES, _DONE_LINE_RE,
@@ -38,7 +38,7 @@ from hvlib_bullet import (
 from hvlib_frontmatter import parse_frontmatter, update_frontmatter_field
 from hvlib_paths import (
     resolve_plugin_root, iter_map_entries,
-    infer_type_from_section, infer_type_from_id, detail_dir_for_id,
+    infer_type_from_section, detail_dir_for_id,
     section_name_for_id, section_name_for_dir,
 )
 from hvlib_repos import (
