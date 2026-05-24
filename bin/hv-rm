@@ -64,8 +64,6 @@ STATUS_PATH = Path(".hv/status.json")
 # section — hv-rm needs to scan it for done/strikethrough bullets too.
 _OPEN = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
 TODO_ACTIVE_SECTIONS = _OPEN + ["Completed"]
-_TYPES = os.environ.get("HV_ITEM_TYPES", "BFT")
-_PREFIX_TO_SECTION = dict(zip(_TYPES, _OPEN))
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

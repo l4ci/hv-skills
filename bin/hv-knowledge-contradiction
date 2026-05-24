@@ -12,35 +12,29 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
 import json
 import os
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from hvlib import load_sidecar, dump_json_atomic
 
 QUEUE_PATH = Path(".hv/knowledge-contradictions.json")
 EXPECTED_VERSION = 1
 
 
 def load_queue():
-    if not QUEUE_PATH.exists():
-        return {"version": EXPECTED_VERSION, "pending": []}
-    raw = QUEUE_PATH.read_text()
-    data = json.loads(raw)
-    v = data.get("version")
-    if v != EXPECTED_VERSION:
-        print(
-            f"error: knowledge-contradictions.json schema version mismatch"
-            f" — expected {EXPECTED_VERSION}, got {v}",
-            file=sys.stderr,
+    try:
+        return load_sidecar(
+            QUEUE_PATH,
+            schema_version=EXPECTED_VERSION,
+            default={"version": EXPECTED_VERSION, "pending": []},
         )
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
-    return data
 
 
 def atomic_write(data):
     QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = str(QUEUE_PATH) + ".tmp"
-    Path(tmp).write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(tmp, str(QUEUE_PATH))
+    dump_json_atomic(QUEUE_PATH, data)
 
 
 def cmd_add(args):

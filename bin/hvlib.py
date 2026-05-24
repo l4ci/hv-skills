@@ -15,6 +15,7 @@ import subprocess
 # Re-exports — keep `from hvlib import X` working for callers.
 from hvlib_io import (
     load_json, load_config, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
+    load_sidecar,
 )
 from hvlib_version import (
     parse_toml_version, infer_version_kind, get_version_or_die, read_version,
@@ -38,7 +39,7 @@ from hvlib_frontmatter import parse_frontmatter, update_frontmatter_field
 from hvlib_paths import (
     resolve_plugin_root, iter_map_entries,
     infer_type_from_section, infer_type_from_id, detail_dir_for_id,
-    section_name_for_id,
+    section_name_for_id, section_name_for_dir,
 )
 from hvlib_repos import (
     parse_repos_csv, validate_repos, load_repos, active_items,

@@ -160,6 +160,16 @@ def section_name_for_id(item_id: str) -> str:
     return "Unknown"
 
 
+def section_name_for_dir(dir_name: str) -> str:
+    """Return the open-section name ("Bugs"/"Features"/"Tasks") for a detail
+    directory name ("bugs"/"features"/"tasks"). Returns "Unknown" for unknown.
+    Used by hv-uncomplete to map a restored item's detail-dir to its BACKLOG
+    section. Mirrors `section_name_for_id` for path-derived contexts.
+    """
+    dir_to_section = {"bugs": "Bugs", "features": "Features", "tasks": "Tasks"}
+    return dir_to_section.get(dir_name, "Unknown")
+
+
 def detail_dir_for_id(iid: str) -> str:
     """Map an ID's prefix to its detail directory under .hv/.
     B→bugs, F→features, T→tasks, otherwise empty string."""

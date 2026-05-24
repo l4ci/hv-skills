@@ -125,9 +125,9 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
+from hvlib import load_sidecar, dump_json_atomic
 
 SIDECAR = Path(os.environ["_HV_KT_SIDECAR"])
-SIDECAR_TMP = Path(os.environ["_HV_KT_SIDECAR"] + ".tmp")
 VALID_TIERS = {"provisional", "confirmed", "deprecated"}
 
 cmd        = os.environ["_HV_KT_CMD"]
@@ -139,22 +139,15 @@ today      = date.today().isoformat()
 
 
 def load():
-    if not SIDECAR.exists():
-        return {"version": 1, "entries": {}}
-    data = json.loads(SIDECAR.read_text())
-    if data.get("version") != 1:
-        got = data.get("version", "<missing>")
-        print(
-            f"error: knowledge-tier.json schema version mismatch — expected 1, got {got}",
-            file=sys.stderr,
-        )
+    try:
+        return load_sidecar(SIDECAR, schema_version=1, default={"version": 1, "entries": {}})
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
-    return data
 
 
 def save(data):
-    SIDECAR_TMP.write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(SIDECAR_TMP, SIDECAR)
+    dump_json_atomic(SIDECAR, data)
 
 
 def make_key(t, s):

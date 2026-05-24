@@ -23,16 +23,16 @@ done
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
 if [ "$MODE" = "--body-stdin" ]; then
-  _BODY_TMP=$(mktemp)
-  trap 'rm -f "$_BODY_TMP"' EXIT
-  cat > "$_BODY_TMP"
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" "$_BODY_TMP" <<'PY'
+  _HV_BLOCK_BODY="$(cat)"
+  export _HV_BLOCK_BODY
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY'
+import os
 import sys
 from pathlib import Path
 from hvlib import upsert_block
 
 key = sys.argv[1]
-body = Path(sys.argv[2]).read_text().rstrip("\n")
+body = os.environ["_HV_BLOCK_BODY"].rstrip("\n")
 
 block = f"<!-- hv-{key}-start -->\n{body}\n<!-- hv-{key}-end -->"
 

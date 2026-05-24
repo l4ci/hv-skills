@@ -15,7 +15,7 @@ import re, subprocess, sys
 from pathlib import Path
 from hvlib import (
     find_section, write_text_atomic, update_json,
-    parse_done_line, detail_dir_for_id,
+    parse_done_line, detail_dir_for_id, section_name_for_dir,
 )
 
 id_s = sys.argv[1]
@@ -93,9 +93,8 @@ active_line = "- " + done_parsed["inner"]
 
 # Pick target section by ID prefix.
 dir_name = detail_dir_for_id(id_s)
-section_for = {"bugs": "Bugs", "features": "Features", "tasks": "Tasks"}
-target = section_for.get(dir_name)
-if target is None:
+target = section_name_for_dir(dir_name)
+if target == "Unknown":
     print(f"error: [{id_s}] has unsupported prefix (expected B/F/T)", file=sys.stderr)
     sys.exit(1)
 

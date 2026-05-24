@@ -55,44 +55,32 @@ fi
 export _HV_KH_TOPIC="$TOPIC"
 export _HV_KH_TITLE="$TITLE"
 
-python3 - <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 import os
 import sys
 from datetime import date
 from pathlib import Path
+from hvlib import load_sidecar, dump_json_atomic, load_config
 
 SIDECAR        = Path(".hv/knowledge-tier.json")
-SIDECAR_TMP    = Path(".hv/knowledge-tier.json.tmp")
-CONFIG         = Path(".hv/config.json")
 CONTRADICTIONS = Path(".hv/knowledge-contradictions.json")
+DEFAULT_THRESHOLD = 3
 
 topic = os.environ["_HV_KH_TOPIC"]
 title = os.environ["_HV_KH_TITLE"]
 today = date.today().isoformat()
 key   = f"{topic}::{title}"
 
-threshold = 3
-if CONFIG.exists():
-    try:
-        cfg = json.loads(CONFIG.read_text())
-        val = cfg.get("learn", {}).get("promoteThreshold")
-        if isinstance(val, int) and val > 0:
-            threshold = val
-    except Exception:
-        pass
+cfg = load_config()
+val = cfg.get("learn", {}).get("promoteThreshold")
+threshold = val if isinstance(val, int) and val > 0 else DEFAULT_THRESHOLD
 
-if SIDECAR.exists():
-    data = json.loads(SIDECAR.read_text())
-    if data.get("version") != 1:
-        got = data.get("version", "<missing>")
-        print(
-            f"error: knowledge-tier.json schema version mismatch — expected 1, got {got}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-else:
-    data = {"version": 1, "entries": {}}
+try:
+    data = load_sidecar(SIDECAR, schema_version=1, default={"version": 1, "entries": {}})
+except ValueError as e:
+    print(f"error: {e}", file=sys.stderr)
+    sys.exit(1)
 
 entries = data["entries"]
 if key in entries:
@@ -124,8 +112,7 @@ if state["tier"] == "provisional" and state["hits"] >= threshold:
         state["tier"] = "confirmed"
         auto_promoted = True
 
-SIDECAR_TMP.write_text(json.dumps(data, indent=2) + "\n")
-os.replace(SIDECAR_TMP, SIDECAR)
+dump_json_atomic(SIDECAR, data)
 
 if auto_promoted:
     print(
