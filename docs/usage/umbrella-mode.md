@@ -6,7 +6,7 @@ If you're in single-repo mode, skip this page. Single-repo behavior is unchanged
 
 ## When to use it
 
-Turn on umbrella mode when you maintain a small fleet of related repositories (say `~/projects/myorg/` with `web/`, `api/`, and `shared/`) and want one shared `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, and backlog instead of forking them into N copies. The typical signal: "I keep cross-pasting the same gotcha into three repos' notes."
+Turn on umbrella mode when you maintain a handful of related repositories (say `~/projects/myorg/` with `web/`, `api/`, and `shared/`) and want one shared `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, and backlog instead of forking them into N copies. The typical signal: "I keep cross-pasting the same gotcha into three repos' notes."
 
 ## When NOT to use it
 
@@ -22,7 +22,7 @@ Turn on umbrella mode when you maintain a small fleet of related repositories (s
 | Where helpers run git ops | The repo | The sub-repo for the current item (resolved via `Repos:` tag or `--repo` flag) |
 | Worktree path | `<repo>/.claude/worktrees/<branch>` | `<umbrella>/.claude/worktrees/<repo>/<branch>` (Layout B) |
 | `BACKLOG.md`, `ARCHIVE.md`, `DECISIONS.md`, `MILESTONES.md` | Per-repo | Shared at the umbrella |
-| `KNOWLEDGE.md` (+ Glossary, tier sidecar) | Per-repo | Hybrid — umbrella `.hv/KNOWLEDGE.md` for cross-repo learnings/terms **plus** per-sub-repo `.hv/knowledge/<name>/KNOWLEDGE.md` for repo-local ones |
+| `KNOWLEDGE.md` (+ Glossary, tier sidecar) | Per-repo | Hybrid: umbrella `.hv/KNOWLEDGE.md` for cross-repo learnings/terms **plus** per-sub-repo `.hv/knowledge/<name>/KNOWLEDGE.md` for repo-local ones |
 | `status.json` entries | Keyed by `branch` | Keyed by `(branch, repo)` |
 | `.hv/handoff/<branch>.md` | One per branch | `.hv/handoff/<branch>@<repo>.md` (one per branch+repo) |
 | Sub-repo git histories | n/a | Independent. No submodules, no version pinning |
@@ -53,7 +53,7 @@ myorg/                 # umbrella root
 
 To opt back out, run [`/hv-config`](configuration.md), pick the umbrella row, and toggle off. The registry file stays intact: entries in `.hv/repos.json` remain on disk, and helpers stop consulting them until you toggle umbrella mode back on.
 
-## The registry — `.hv/repos.json`
+## The registry: `.hv/repos.json`
 
 The registry is one JSON file at the umbrella's `.hv/repos.json`:
 
@@ -77,14 +77,14 @@ To edit the registry today, re-run `/hv-init` from the umbrella. `hv-umbrella-in
 
 KNOWLEDGE.md is **hybrid** in umbrella projects (shipped in F21):
 
-- `.hv/KNOWLEDGE.md` — umbrella file. Cross-repo learnings and umbrella Glossary terms.
-- `.hv/knowledge/<name>/KNOWLEDGE.md` — per-sub-repo file. Repo-local learnings and per-sub-repo Glossary terms. Created on first write (and pre-seeded by `/hv-init` umbrella setup).
+- `.hv/KNOWLEDGE.md`: umbrella file. Cross-repo learnings and umbrella Glossary terms.
+- `.hv/knowledge/<name>/KNOWLEDGE.md`: per-sub-repo file. Repo-local learnings and per-sub-repo Glossary terms. Created on first write (and pre-seeded by `/hv-init` umbrella setup).
 
 The Glossary topic follows the same hybrid scoping. Scope resolves in this order: an explicit `--repo umbrella|<name>` flag wins; otherwise the cwd auto-resolves (inside a registered sub-repo → that repo; at the umbrella root → umbrella). Single-repo projects always resolve to `umbrella` and behave byte-identically to before. The four `hv-knowledge-*` helpers (merge, query, tier, amend) and the three `hv-glossary-*` helpers (write, read, import) all take `--repo`; readers (`hv-knowledge-query`, `hv-glossary-read`) merge umbrella + sub-repo content with a `> from: <path>` provenance line per source when scope is a sub-repo. Tier sidecars split per file (`.hv/knowledge-tier.json` umbrella, `.hv/knowledge/<name>/knowledge-tier.json` per sub-repo).
 
-**DECISIONS.md stays umbrella-only** — hard boundaries are inherently cross-repo. A repo-local "decision" is really a learning; capture it with `/hv-learn`. Full model and rationale: [`references/persistence-umbrella-scoping.md`](../../references/persistence-umbrella-scoping.md), governed by the `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* boundary.
+**DECISIONS.md stays umbrella-only.** Hard boundaries are inherently cross-repo. A repo-local "decision" is really a learning; capture it with `/hv-learn`. Full model and rationale: [`references/persistence-umbrella-scoping.md`](../../references/persistence-umbrella-scoping.md), governed by the `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* boundary.
 
-## Resolvers — `hv-resolve-umbrella` and `hv-resolve-repo`
+## Resolvers: `hv-resolve-umbrella` and `hv-resolve-repo`
 
 Two helpers in `.hv/bin/` answer the questions every umbrella-aware skill asks: *"where is the umbrella?"* and *"which sub-repo am I in?"*
 
@@ -135,7 +135,7 @@ Most skills delegate umbrella resolution to underlying helpers and stay umbrella
 - **`/hv-learn`** routes the learning (and `--term` Glossary entries) to the scope resolved from cwd or `--repo`: repo-local learnings land in `.hv/knowledge/<name>/KNOWLEDGE.md`, cross-repo ones in the umbrella file. At the umbrella root it asks once whether a learning is umbrella-shared or sub-repo-scoped. The per-sub-repo CLAUDE.md knowledge block lists umbrella ∪ that sub-repo's topics. DECISIONS via `/hv-decide` stays umbrella-only.
 - **`/hv-migrate v4`** now supports umbrella projects (the prior refusal was lifted in F21). Each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary; the umbrella-root `.hv/CONTEXT.md` migrates into the umbrella KNOWLEDGE.md. Everything is backed up under `.hv/migrate-backup/` first; `--dry-run` is still the default.
 
-The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`, `hv-worktree-path`, plus the knowledge/glossary surface — `hv-knowledge-merge`, `hv-knowledge-query`, `hv-knowledge-tier`, `hv-knowledge-amend`, `hv-glossary-write`, `hv-glossary-read`, `hv-glossary-import` (scope auto-resolves from cwd via the shared `hv-knowledge-scope.sh` resolver when the flag is omitted). Without the flag, helpers operate on the cwd's git tree / umbrella scope as in single-repo mode.
+The `--repo <name>` flag is also exposed on the underlying helpers when you call them directly: `hv-status-add`, `hv-status-remove`, `hv-review-scope`, `hv-merge`, `hv-pr`, `hv-plan-add`, `hv-spike-add`, `hv-worktree-clear`, `hv-worktree-path`, plus the knowledge/glossary surface (`hv-knowledge-merge`, `hv-knowledge-query`, `hv-knowledge-tier`, `hv-knowledge-amend`, `hv-glossary-write`, `hv-glossary-read`, `hv-glossary-import`) where scope auto-resolves from cwd via the shared `hv-knowledge-scope.sh` resolver when the flag is omitted. Without the flag, helpers operate on the cwd's git tree / umbrella scope as in single-repo mode.
 
 ## What's not yet in umbrella mode
 

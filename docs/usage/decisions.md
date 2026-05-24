@@ -29,7 +29,7 @@ When a `KNOWLEDGE.md` learning has hardened into a commitment, or a [`/hv-spike`
 | Flag | Source | Pre-fills |
 |------|--------|-----------|
 | `/hv-decide --from-learning <topic>` | A bullet under `<topic>` in `.hv/KNOWLEDGE.md` (the skill picks the bullet: auto when there's only one, picker when there are several) | Rule from the bullet; Why cites the topic + date stamp |
-| `/hv-decide --from-spike <name>` | `.hv/spikes/<name>.md`: question, decision, recommended approach | Rule keyed off the verdict (`viable` → "use it", `not viable` → "do not use it", `depends-on-X` → "use only when X"); Why summarizes the question + findings |
+| `/hv-decide --from-spike <name>` | `.hv/spikes/<name>.md`: question, decision, recommended approach | Rule keyed off the verdict (`viable`: "use it"; `not viable`: "do not use it"; `depends-on-X`: "use only when X"); Why summarizes the question + findings |
 
 Both flags only seed `Rule` and `Why`. You still articulate `Forbids` and `Permits`; that's what makes the entry a decision rather than a learning. The Step 5 confirmation gate still runs; nothing is written until you approve.
 
@@ -62,4 +62,4 @@ Both flags only seed `Rule` and `Why`. You still articulate `Forbids` and `Permi
 
 - [`/hv-decide` skill](../../hv-decide/SKILL.md) for the capture flow itself
 - [Knowledge index](../reference/cli-helpers.md#knowledge-and-vision-indexes) for the parallel pattern used by `/hv-learn`
-- Sibling persistence skill: [`docs/usage/learning.md`](learning.md) — covers both topic-bullet learnings and `--term <name>` Glossary capture (folded from the former `/hv-context` in v4.0)
+- Sibling persistence skill: [`docs/usage/learning.md`](learning.md) covers both topic-bullet learnings and `--term <name>` Glossary capture (folded from the former `/hv-context` in v4.0)

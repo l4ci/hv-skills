@@ -10,11 +10,11 @@ That's how every workflow starts, and how most of them stay. The places it tends
 
 Yes. Backlog, knowledge, decisions, plans, designs, milestones, and per-item detail files all travel with the repo so team members share context from the first clone. Six paths stay gitignored: `.hv/bin/` (regenerated mirror of canonical `bin/`, overwritten on every `/hv-init`), `.hv/status.json` (per-developer active work), `.hv/repos.json` (umbrella registry with absolute paths), `.hv/config.local.json` (per-developer config overrides, deep-merged on top of `.hv/config.json` by `load_config()`), `.hv/handoff/` (per-developer scratch notes from `/hv-pause`), and `.hv/qa-runs/` (bulky timestamped artifacts from `/hv-qa`).
 
-If you'd rather keep the whole backlog private — solo development, or experimentation that isn't ready to share — add a blanket `.hv/` line to `.gitignore` before your first commit. The default assumes you want context to travel.
+If you'd rather keep the whole backlog private (solo development, or experimentation that isn't ready to share), add a blanket `.hv/` line to `.gitignore` before your first commit. The default assumes you want context to travel.
 
 ## Can I share `.hv/` with my team?
 
-You already are — sharing is the default. A few things to know: item ID counters in `counters.json` are shared, so coordinating ID numbering matters; `KNOWLEDGE.md` accumulates team learnings; `DECISIONS.md` becomes a team contract. Per-developer settings (autonomy level, model preferences) go in the gitignored `.hv/config.local.json` to avoid stepping on each other.
+You already are; sharing is the default. A few things to know: item ID counters in `counters.json` are shared, so coordinating ID numbering matters; `KNOWLEDGE.md` accumulates team learnings; `DECISIONS.md` becomes a team contract. Per-developer settings (autonomy level, model preferences) go in the gitignored `.hv/config.local.json` to avoid stepping on each other.
 
 This works well for small teams. For larger ones a real issue tracker is usually a better fit, since the file-based format lacks the conflict-resolution and permissions model that scales.
 

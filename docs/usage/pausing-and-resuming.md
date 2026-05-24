@@ -57,7 +57,7 @@ A typical recovery looks like this:
 
 ```
 Active streams
-  hv/my-feature  (3 commits)  — mid-implementation
+  hv/my-feature  (3 commits)  mid-implementation
 
 Handoff note found:
   Next planned step: add the retry path in src/worker.ts
@@ -70,4 +70,4 @@ Handoff note found:
 
 ## When to /hv-pause vs just commit and walk away
 
-A clean commit is enough when the work sits at a natural stopping point: a passing test, a completed subtask, a checkpoint that git state alone can describe. `/hv-pause` is for the messy middle. The live hypothesis, the half-written test, the "I was about to try X" — none of that survives a `/clear` from git state alone. If you'd have to re-read diffs and reconstruct your reasoning to figure out what to do next, pause first.
+A clean commit is enough when the work sits at a natural stopping point: a passing test, a completed subtask, a checkpoint that git state alone can describe. `/hv-pause` is for the messy middle. The live hypothesis, the half-written test, the "I was about to try X": none of that survives a `/clear` from git state alone. If you'd have to re-read diffs and reconstruct your reasoning to figure out what to do next, pause first.

@@ -6,9 +6,9 @@ Every skill calls `.hv/bin/hv-preflight` first. Its exit codes and how skills sh
 
 | Code | Meaning | User state | Skill should |
 |------|---------|------------|--------------|
-| `0`  | Clean — `.hv/` exists, all required data files and helpers are present. | Fully initialized. | Proceed silently. |
-| `2`  | Uninitialized — `.hv/` is missing, or one of the required data files (see below) is absent. | Project has not opted into hv-skills yet. | Tell the user they need to run `/hv-init` first, then **stop**. Do not auto-init; installation requires user consent. |
-| `3`  | Stale install — `.hv/` exists, but one or more helper binaries under `.hv/bin/` are missing (e.g. plugin upgraded, helpers haven't been re-copied). | Project is initialized but its helpers are outdated. | Invoke `hv-init` via the `Skill` tool to refresh, then continue from where preflight ran. |
+| `0`  | Clean: `.hv/` exists, all required data files and helpers are present. | Fully initialized. | Proceed silently. |
+| `2`  | Uninitialized: `.hv/` is missing, or one of the required data files (see below) is absent. | Project has not opted into hv-skills yet. | Tell the user they need to run `/hv-init` first, then **stop**. Do not auto-init; installation requires user consent. |
+| `3`  | Stale install: `.hv/` exists, but one or more helper binaries under `.hv/bin/` are missing (e.g. plugin upgraded, helpers haven't been re-copied). | Project is initialized but its helpers are outdated. | Invoke `hv-init` via the `Skill` tool to refresh, then continue from where preflight ran. |
 
 ## Standard handling
 
@@ -28,9 +28,9 @@ Three skills have skill-specific exit-2 behavior. Their preflight step omits exi
 
 | Skill | On exit `2` | On exit `3` |
 |-------|------------|------------|
-| `/hv-next` | Surface *"Nothing tracked yet — run `/hv-init` then `/hv-capture`."* and stop. | Refresh via `hv-init` (helpers may be needed for the read). |
-| `/hv-pause` | Surface *"Nothing to pause — `/hv-init` the project first."* and stop. | Refresh via `hv-init`. |
-| `/hv-config` | Invoke `hv-init` via the `Skill` tool, then stop — init writes the initial config interactively, so this skill has nothing to do afterward. | Refresh via `hv-init` and continue. |
+| `/hv-next` | Surface *"Nothing tracked yet. Run `/hv-init` then `/hv-capture`."* and stop. | Refresh via `hv-init` (helpers may be needed for the read). |
+| `/hv-pause` | Surface *"Nothing to pause. `/hv-init` the project first."* and stop. | Refresh via `hv-init`. |
+| `/hv-config` | Invoke `hv-init` via the `Skill` tool, then stop. Init writes the initial config interactively, so this skill has nothing to do afterward. | Refresh via `hv-init` and continue. |
 
 Two more skills are structural variants:
 

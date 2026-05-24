@@ -2,7 +2,7 @@
 
 hv-skills supports planning above the day-to-day backlog. `/hv-vision` frames milestones so the project has a clear direction. `/hv-plan` locks an implementation approach for a slice or item before code lands. Together they keep the orchestrator executing your written intent instead of decomposing ad-hoc from an empty context.
 
-## /hv-vision — brainstorm milestones
+## /hv-vision: brainstorm milestones
 
 `/hv-vision` is a brainstorming skill. It runs Socratic discovery (a couple of questions tailored to whether you are creating a roadmap from scratch or editing an existing one), pulls grounded findings from web research, pushes back on your scope and ordering, and proposes milestones with explicit dependencies. You iterate until the breakdown feels right.
 
@@ -11,9 +11,9 @@ When the session ends, `/hv-vision` writes two things to disk:
 - `.hv/MILESTONES.md`: an active milestone list and a one- to two-line overview of every milestone with its status and dependencies. The file opens with a vision intro paragraph as preamble.
 - `.hv/milestones/M01.md`, `M02.md`, …: one detail file per milestone with the goal, acceptance criteria, rationale, risks, and research findings.
 
-Run `/hv-vision` whenever the conversation is about strategy rather than tactics — *"plan the next quarter"*, *"what's the bigger picture"*, *"create a roadmap"*, *"brainstorm milestones"*. Re-running it on a project that already has milestones enters edit mode automatically.
+Run `/hv-vision` whenever the conversation is about strategy rather than tactics: *"plan the next quarter"*, *"what's the bigger picture"*, *"create a roadmap"*, *"brainstorm milestones"*. Re-running it on a project that already has milestones enters edit mode automatically.
 
-## Milestones — the four statuses
+## Milestones: the four statuses
 
 Each milestone carries one of four statuses:
 
@@ -30,7 +30,7 @@ When an active milestone has no open items remaining, `/hv-next` surfaces an emp
 
 Marking a milestone `shipped` immediately unblocks anything that depended on it. Marking it `archived` does not. Use `archived` for milestones you are intentionally dropping, not for ones that finished.
 
-## /hv-plan — write the implementation plan
+## /hv-plan: write the implementation plan
 
 `/hv-plan` writes an agreed implementation note for a milestone slice or a single backlog item before [`/hv-work`](running-work.md) runs. The plan lives at:
 
@@ -39,7 +39,7 @@ Marking a milestone `shipped` immediately unblocks anything that depended on it.
 
 Each plan contains: goal in one sentence, approach in 3–6 sentences, tasks with observable behaviors and verify steps, named assumptions, and open questions. Tasks must fit one execution window. If they don't, split the plan. Every task requires a verify step; a task without one is not well-defined.
 
-Before the plan is signed off, `/hv-plan` checks doc-by-path deliverables — any task file path containing a `docs/` segment must resolve to an existing doc home in the target repo. Mismatches surface as Open questions instead of biting mid-`/hv-work`. In umbrella mode a sibling `<repo>-docs` sub-repo registered in `.hv/repos.json` is surfaced as the suggested alternative home.
+Before the plan is signed off, `/hv-plan` checks doc-by-path deliverables: any task file path containing a `docs/` segment must resolve to an existing doc home in the target repo. Mismatches surface as Open questions instead of biting mid-`/hv-work`. In umbrella mode a sibling `<repo>-docs` sub-repo registered in `.hv/repos.json` is surfaced as the suggested alternative home.
 
 When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
 
@@ -53,7 +53,7 @@ For larger or higher-stakes items, especially size-Major or anything where you a
 
 Rough heuristic: if you would want to review the implementation approach before a colleague started coding, write the plan.
 
-## Throwaway feasibility — /hv-spike
+## Throwaway feasibility: /hv-spike
 
 When a milestone hinges on a question you cannot answer from the chair (*"can SSE work over our nginx setup?"*, *"is this library's threading model compatible with ours?"*), [`/hv-spike`](spikes.md) runs an experiment on a dedicated branch that never merges. Only the findings come back as a markdown record; experimental code stays on the spike branch as reference. See [spikes](spikes.md) for the full flow.
 

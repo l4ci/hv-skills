@@ -21,7 +21,7 @@ The "(Recommended)" tag on each option marks the install-time default. `/hv-conf
 
 Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text) are enumerated in `hv-config/SKILL.md` Step 1.5. An unknown key or invalid value stops the skill with an explicit error; it does not fall through to the guided flow.
 
-## Q1 — Models
+## Q1: Models
 
 `header: "Models"`, single-select.
 
@@ -29,12 +29,12 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 
 | Label | Description |
 |-------|-------------|
-| Balanced — Opus + Sonnet (Recommended) | Opus plans and verifies, Sonnet executes. Strong reasoning where it matters; fast execution elsewhere. |
-| Premium — Opus only | Opus for everything. Highest quality, highest cost. |
-| Fast — Sonnet only | Sonnet for both roles. Faster and cheaper; fine for well-specified tasks. |
-| Minimal — Sonnet + Haiku | Sonnet plans, Haiku executes. Cheapest. Best for mechanical, low-risk work. |
+| Balanced: Opus + Sonnet (Recommended) | Opus plans and verifies, Sonnet executes. Strong reasoning where it matters; fast execution elsewhere. |
+| Premium: Opus only | Opus for everything. Highest quality, highest cost. |
+| Fast: Sonnet only | Sonnet for both roles. Faster and cheaper; fine for well-specified tasks. |
+| Minimal: Sonnet + Haiku | Sonnet plans, Haiku executes. Cheapest. Best for mechanical, low-risk work. |
 
-## Q2 — Isolation
+## Q2: Isolation
 
 `header: "Isolation"`, single-select.
 
@@ -45,7 +45,7 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 | Branch (Recommended) | Feature branch in the current worktree. Simple, works everywhere. |
 | Worktree | Isolated directory under `.claude/worktrees/`. Lets you keep using main while agents work; supports parallel sessions. |
 
-## Q3 — Integration
+## Q3: Integration
 
 `header: "Integration"`, single-select.
 
@@ -56,9 +56,9 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 | Direct merge (Recommended) | Merge into main with `--no-ff` and delete the branch. Fast solo iteration. |
 | GitHub PR | Push the branch and open a PR with `gh pr create`. Required for team review. |
 
-## Q4 — Quality gates
+## Q4: Quality gates
 
-`header: "Gates"`, `multiSelect: true` — a checklist where users can pick any subset (or none).
+`header: "Gates"`, `multiSelect: true`. A checklist where users can pick any subset (or none).
 
 > *"Which quality gates should run by default? (Uncheck anything you want off.)"*
 
@@ -69,7 +69,7 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 | Confirm before refactor (Recommended) | `/hv-refactor` pauses for approval after finding friction and after selecting a design. Off = full autonomy. |
 | Competing hypotheses (debug) | `/hv-debug` dispatches 3 parallel hypothesis agents from different angles. Better diversity on hard bugs, ~3× orchestrator cost. |
 
-## Q5 — Autonomy
+## Q5: Autonomy
 
 `header: "Autonomy"`, single-select.
 
@@ -81,7 +81,7 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 | Auto chain | One-hop chaining: `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`, `/hv-ship` → `/hv-learn`, refactor threshold → `/hv-refactor`. Stops after the chained step. |
 | Full loop | Auto chain + after each cycle, invoke `/hv-next` and start the next item. Runs until the backlog drains, a guard fails, or a brief is genuinely ambiguous. |
 
-## Mapping table — answers to config values
+## Mapping table: answers to config values
 
 Each Q1–Q5 answer maps to a single `key.path: value` write in `.hv/config.json`:
 
@@ -133,7 +133,7 @@ Free text. Default: `""` (auto-detect). Writes `git.baseBranch`.
 
 ### Umbrella mode
 
-> *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json` — registered repos remain.)"*
+> *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json`; registered repos remain.)"*
 
 `On` / `Off`. Toggling off does **not** delete `.hv/repos.json`; registered repos remain and are simply ignored until umbrella mode is re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
 
@@ -148,12 +148,12 @@ Two rules govern how answers are coerced into config writes:
 
 A few keys are written without ever being asked:
 
-- `hvSkills.version` — stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not exposed in `/hv-config`.
-- `refactor.verifyCommands` — array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv-config-set refactor.verifyCommands '[...]'`.
-- `ship.secondOpinion` — opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv-config-set ship.secondOpinion true` or via `/hv-config` (Quality gates category, call 1).
-- `ship.qa` — opt-in product-QA gate in /hv-ship Step 3.75. Silent default `false` (Rule 9). When `true`, /hv-ship invokes [`/hv-qa run`](../usage/qa.md) after /hv-review (and second-opinion if on) and before merge / PR. Set via `hv-config-set ship.qa true` or via `/hv-config` (Quality gates category). See [`usage/configuration.md`](../usage/configuration.md#shipqa).
-- `qa.gate` — verdict routing for /hv-qa invocations from /hv-ship. Silent default `"advisory"` (surface findings, never block). Alternative `"blocking"` halts the ship on `FAIL`. Set via `hv-config-set qa.gate blocking`. See [`usage/configuration.md`](../usage/configuration.md#qagate).
-- `qa.afterWork` — post-cycle /hv-qa invocation from /hv-work when touched files match a target's `Watch globs`. Silent default `false`. Set via `hv-config-set qa.afterWork true`. See [`usage/configuration.md`](../usage/configuration.md#qaafterwork).
-- `learn.promoteThreshold` — F03 knowledge-lifecycle auto-promotion threshold. Integer ≥ 0; silent default `3`. Set via `hv-config-set learn.promoteThreshold <N>` when a project wants stricter or looser confidence gating. See [`usage/configuration.md`](../usage/configuration.md#learnpromotethreshold).
+- `hvSkills.version`: stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not exposed in `/hv-config`.
+- `refactor.verifyCommands`: array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv-config-set refactor.verifyCommands '[...]'`.
+- `ship.secondOpinion`: opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv-config-set ship.secondOpinion true` or via `/hv-config` (Quality gates category, call 1).
+- `ship.qa`: opt-in product-QA gate in /hv-ship Step 3.75. Silent default `false` (Rule 9). When `true`, /hv-ship invokes [`/hv-qa run`](../usage/qa.md) after /hv-review (and second-opinion if on) and before merge / PR. Set via `hv-config-set ship.qa true` or via `/hv-config` (Quality gates category). See [`usage/configuration.md`](../usage/configuration.md#shipqa).
+- `qa.gate`: verdict routing for /hv-qa invocations from /hv-ship. Silent default `"advisory"` (surface findings, never block). Alternative `"blocking"` halts the ship on `FAIL`. Set via `hv-config-set qa.gate blocking`. See [`usage/configuration.md`](../usage/configuration.md#qagate).
+- `qa.afterWork`: post-cycle /hv-qa invocation from /hv-work when touched files match a target's `Watch globs`. Silent default `false`. Set via `hv-config-set qa.afterWork true`. See [`usage/configuration.md`](../usage/configuration.md#qaafterwork).
+- `learn.promoteThreshold`: F03 knowledge-lifecycle auto-promotion threshold. Integer ≥ 0; silent default `3`. Set via `hv-config-set learn.promoteThreshold <N>` when a project wants stricter or looser confidence gating. See [`usage/configuration.md`](../usage/configuration.md#learnpromotethreshold).
 
 For the full per-key behavior (defaults, value semantics, and how each setting affects skill execution), see [`usage/configuration.md`](../usage/configuration.md).

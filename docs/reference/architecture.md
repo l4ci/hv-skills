@@ -31,7 +31,7 @@ Every `bin/hv-preflight` (run by most hv-skills) compares the project's recorded
 
 ## Related
 
-- [How hv-skills works](../how-it-works.md) — system diagram and lane overview
-- [Slash commands](slash-commands.md) — every `/hv-*` command
-- [CLI helpers](cli-helpers.md) — the `.hv/bin/` scripts
-- [`.hv/` folder reference](hv-folder.md) — per-file detail
+- [How hv-skills works](../how-it-works.md): system diagram and lane overview
+- [Slash commands](slash-commands.md): every `/hv-*` command
+- [CLI helpers](cli-helpers.md): the `.hv/bin/` scripts
+- [`.hv/` folder reference](hv-folder.md): per-file detail

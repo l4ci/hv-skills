@@ -1,4 +1,4 @@
-# Brownfield — dropping hv-skills into an existing project
+# Brownfield: dropping hv-skills into an existing project
 
 You have a codebase. You've been maintaining it for months or years. You're tracking a list of bugs informally, some open GitHub issues you haven't gotten to, and a vague sense that the same gotchas keep recurring. By the end of this walkthrough hv-skills is wired into the project, your bugs are captured, one is shipped, and a first lesson is in `KNOWLEDGE.md`.
 
@@ -27,7 +27,7 @@ flowchart LR
 
 Ten steps follow, in execution order.
 
-## Step 1 — /hv-init
+## Step 1: /hv-init
 
 ```bash
 $ /hv-init
@@ -37,9 +37,9 @@ Same five questions as a greenfield setup. For an existing repo I usually flip t
 
 `/hv-init` writes `.hv/` and the managed blocks in `CLAUDE.md`. It doesn't read your code. That happens next.
 
-## Step 2 — Scaffold the project map by hand
+## Step 2: Scaffold the project map by hand
 
-`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. The project map lives in `.hv/map/<name>.md` — one Markdown file per coherent area of the codebase, hand-authored. `/hv-init` already created the empty `.hv/map/` directory in Step 1; you fill it in now.
+`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. The project map lives in `.hv/map/<name>.md`: one Markdown file per coherent area of the codebase, hand-authored. `/hv-init` already created the empty `.hv/map/` directory in Step 1; you fill it in now.
 
 For Pinpoint you spend ten minutes sketching out:
 
@@ -80,9 +80,9 @@ Rule-based alerting. Reads events, evaluates rules, dedups within a window, and 
 - Dedup window is hardcoded; per-rule windows are on the backlog.
 ```
 
-Run `.hv/bin/hv-map-index` once after writing the files; it pulls each file's `summary:` into the always-on `## Project Map` block in `CLAUDE.md`. The map isn't exhaustive — just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `touched:` date bumped automatically and the always-on block is regenerated. When subsystems drift or duplicate later, edit or retire the relevant `.hv/map/<name>.md` files by hand.
+Run `.hv/bin/hv-map-index` once after writing the files; it pulls each file's `summary:` into the always-on `## Project Map` block in `CLAUDE.md`. The map isn't exhaustive; just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `touched:` date bumped automatically and the always-on block is regenerated. When subsystems drift or duplicate later, edit or retire the relevant `.hv/map/<name>.md` files by hand.
 
-## Step 3 — /hv-capture --from-github (optional)
+## Step 3: /hv-capture --from-github (optional)
 
 If your project has open GitHub or GitLab issues, sync them into `BACKLOG.md` rather than retyping them by hand. Use `--from-github` for GitHub repos, `--from-gitlab` for GitLab.
 
@@ -118,7 +118,7 @@ Round-trip closing is automatic when `/hv-ship` runs: the PR body gets `Closes #
 
 If your project has no remote tracker, skip this step entirely.
 
-## Step 4 — /hv-capture for the mental backlog
+## Step 4: /hv-capture for the mental backlog
 
 The remaining items, the ones you've been tracking informally, go in via `/hv-capture`. Brain-dump in one go; the model splits, classifies, and assigns IDs.
 
@@ -139,11 +139,11 @@ The detail files at `.hv/bugs/B06.md` etc. capture the long-form description for
 
 F02 is size-Major. `/hv-capture` nudges you:
 
-> *F02 is Major and touches multiple subsystems. Consider /hv-brainstorm F02 before /hv-plan — for design negotiation, not implementation.*
+> *F02 is Major and touches multiple subsystems. Consider /hv-brainstorm F02 before /hv-plan, for design negotiation, not implementation.*
 
 You take the nudge. `/hv-brainstorm F02` runs a focused design session: Socratic discovery, two competing approaches with tradeoffs, sectioned design with per-section approval. The output lands at `.hv/designs/F02.md`. When `/hv-plan F02` runs later, it reads that file as soft input rather than re-deriving the design.
 
-## Step 5 — /hv-next surveys everything
+## Step 5: /hv-next surveys everything
 
 ```bash
 $ /hv-next
@@ -173,7 +173,7 @@ Run /hv-work B05? [y/N]
 
 P0 always wins. You confirm.
 
-## Step 6 — a hot-path fix that skips the queue: /hv-go
+## Step 6: a hot-path fix that skips the queue (/hv-go)
 
 Before you commit to B05, you spot a typo in the contributing guide while scanning another file. Too small to queue.
 
@@ -183,7 +183,7 @@ $ /hv-go "fix typo in CONTRIBUTING.md line 23, 'depencency' → 'dependency'"
 
 `/hv-go` mints `[T01]`, dispatches a worker, lands one commit on a feature branch, merges back. About thirty seconds. Same machinery as `/hv-work`; it collapses capture and execute into one pass for things too small to queue.
 
-## Step 7 — the P0 cycle
+## Step 7: the P0 cycle
 
 Back to B05. The integration config UI accepts secrets in a URL query string field instead of routing them through a password input. They end up in browser history and access logs.
 
@@ -206,7 +206,7 @@ Task 4. Update integration docs to describe the new form.
 
 Four tasks, four commits, all on `hv/B05-secrets-in-url-form`. Worktree isolation keeps `main` clean. The branch merges back via `--no-ff`, so the cycle is one revertable unit if anything goes sideways downstream.
 
-## Step 8 — a real debug cycle
+## Step 8: a real debug cycle
 
 Two days later you tackle B01, the dedup-fires-twice issue. You run `/hv-work B01`. The orchestrator dispatches, the worker writes what looks like a fix, and the verify step fails:
 
@@ -246,7 +246,7 @@ The bullet that lands:
 
 This bullet now travels with every future `/hv-work` and `/hv-debug` cycle in the `alerts` or `integrations` subsystems. Next time you or a teammate touches dedup logic, the orchestrator pulls this paragraph into its planning context automatically. The class of bug doesn't recur.
 
-## Step 9 — /hv-ship
+## Step 9: /hv-ship
 
 When the branch is ready:
 
@@ -258,7 +258,7 @@ $ /hv-ship
 
 If you'd configured `work.mergeStrategy = direct` instead, `/hv-ship` would have merged into `main` directly and prompted the optional `hv-issues-close` step to close #14 upstream with a tracking comment naming the commit.
 
-## Step 10 — over the next week
+## Step 10: over the next week
 
 After a week of dropping hv-skills into Pinpoint:
 

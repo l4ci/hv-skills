@@ -39,7 +39,7 @@ After you confirm the pick, `/hv-next` routes you to [running work](running-work
 /hv-next
 ```
 
-Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug) — fix auth token expiry`. Answer `y` (or pick a different item) and work begins.
+Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug): fix auth token expiry`. Answer `y` (or pick a different item) and work begins.
 
 If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` offers `/hv-work --preview` as a question option before routing to `/hv-work`.
 

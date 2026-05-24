@@ -1,6 +1,6 @@
 # Product QA
 
-`/hv-qa` answers a question `/hv-review` cannot: *"does the product actually work?"* `/hv-review` reads commits and the diff; `/hv-qa` executes runners against the built artifact — Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares.
+`/hv-qa` answers a question `/hv-review` cannot: *"does the product actually work?"* `/hv-review` reads commits and the diff. `/hv-qa` executes runners against the built artifact (Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares).
 
 The two skills are separate and never call each other. `/hv-ship` may invoke both, each behind its own opt-in config flag.
 
@@ -12,7 +12,7 @@ Each strategy file has five body sections:
 
 | Section | Purpose |
 |---------|---------|
-| **Surface** | What kind of thing this is — web UI, HTTP API, CLI, mobile app, library |
+| **Surface** | What kind of thing this is: web UI, HTTP API, CLI, mobile app, library |
 | **Watch globs** | Paths whose changes should trigger post-cycle QA when `qa.afterWork: true` |
 | **Executable checks** | Runners with concrete commands, grouped by pillar (performance / security / functional). Each entry: name · command · pass criterion |
 | **Audit checks** | Usability dimensions to inspect by hand or LLM (empty states, error recovery, copy clarity, first-run flow). Rubric, no commands |
@@ -60,9 +60,9 @@ Triggered by `/hv-ship` when `ship.qa: true`. Runs after `/hv-review` and the se
 
 ## When to use
 
-- *"QA this"*, *"kick the tires"*, *"does this actually work?"* — manual exploratory run after a feature lands.
+- *"QA this"*, *"kick the tires"*, *"does this actually work?"*: manual exploratory run after a feature lands.
 - Before opening a PR when you want product-level evidence, not just diff sanity.
-- First-time setup on a new repo or umbrella sub-repo — bootstrap the strategy file once via `first-run`.
+- First-time setup on a new repo or umbrella sub-repo: bootstrap the strategy file once via `first-run`.
 
 ## When NOT to use
 
@@ -74,13 +74,13 @@ Triggered by `/hv-ship` when `ship.qa: true`. Runs after `/hv-review` and the se
 
 `/hv-qa` reads three keys from `.hv/config.json`:
 
-- `qa.gate` — `"advisory"` (default) or `"blocking"`. Controls whether `FAIL` halts `/hv-ship` invocations.
-- `qa.afterWork` — `false` (default). When `true`, `/hv-work` invokes `/hv-qa run` post-cycle if touched files match a target's `Watch globs`.
-- `ship.qa` — `false` (default). When `true`, `/hv-ship` calls `/hv-qa run` between review and the merge/PR step.
+- `qa.gate`: `"advisory"` (default) or `"blocking"`. Controls whether `FAIL` halts `/hv-ship` invocations.
+- `qa.afterWork`: `false` (default). When `true`, `/hv-work` invokes `/hv-qa run` post-cycle if touched files match a target's `Watch globs`.
+- `ship.qa`: `false` (default). When `true`, `/hv-ship` calls `/hv-qa run` between review and the merge/PR step.
 
 See [configuration](configuration.md#shipqa) for the full block.
 
 ## See also
 
-- [Review and ship](review-and-ship.md) — diff-level review and the `/hv-ship` flow that calls `/hv-qa`
-- [Configuration](configuration.md) — full key reference
+- [Review and ship](review-and-ship.md): diff-level review and the `/hv-ship` flow that calls `/hv-qa`
+- [Configuration](configuration.md): full key reference

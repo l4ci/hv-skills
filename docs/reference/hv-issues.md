@@ -1,4 +1,4 @@
-# /hv-capture --from-github / --from-gitlab — Pull upstream issues into the backlog
+# /hv-capture --from-github / --from-gitlab: pull upstream issues into the backlog
 
 ## What it does
 
@@ -22,8 +22,8 @@ GitLab-hosted sub-repos).
 - Onboarding to a repo that already has triaged GitHub/GitLab issues.
 - Bulk-importing a milestone's worth of upstream issues without re-typing them.
 - Periodically syncing upstream backlog signals into hv-skills.
-- Mixed-host umbrellas where different sub-repos live on GitHub and GitLab —
-  call `/hv-capture --from-github` and `/hv-capture --from-gitlab` separately,
+- Mixed-host umbrellas where different sub-repos live on GitHub and GitLab.
+  Call `/hv-capture --from-github` and `/hv-capture --from-gitlab` separately;
   each handles only matching sub-repos.
 
 Don't use it to describe work you're inventing from scratch; that's plain
@@ -57,26 +57,26 @@ Edit via `/hv-config` or directly:
 
 ## Flow
 
-1. **Preflight** — `.hv/bin/hv-preflight` (see `docs/reference/preflight.md`).
-2. **Mode dispatch** — `/hv-capture` Step 1.5 routes `--from-github` /
+1. **Preflight**: `.hv/bin/hv-preflight` (see `docs/reference/preflight.md`).
+2. **Mode dispatch**: `/hv-capture` Step 1.5 routes `--from-github` /
    `--from-gitlab` to Import Mode (Steps I1+).
-3. **Resolve target repo set (I1)** — single-repo or umbrella multiSelect.
+3. **Resolve target repo set (I1)**: single-repo or umbrella multiSelect.
    Repos whose provider doesn't match the dispatching flag are silently
    dropped. Loop mode auto-picks all matching repos.
-4. **Discover candidates (I2)** — parallel `hv-issues-provider` +
+4. **Discover candidates (I2)**: parallel `hv-issues-provider` +
    `hv-issues-list` + `hv-issues-imported` per repo.
-5. **Subtract already-imported (I3)** — dedupes by
+5. **Subtract already-imported (I3)**: dedupes by
    `(provider, repo, issue_number)`. Prints `"N candidates, K already imported
    — showing M"` per repo.
-6. **Pick issues (I4)** — multiSelect chunked to ≤4 at a time; options show
+6. **Pick issues (I4)**: multiSelect chunked to ≤4 at a time; options show
    title, labels, author, and URL. Loop mode auto-picks all remaining
    candidates.
-7. **Classify and capture (I5)** — remote labels drive section (`bug` → Bugs,
+7. **Classify and capture (I5)**: remote labels drive section (`bug` → Bugs,
    `enhancement` → Features, else Tasks) and default priority/size. Mint ID,
    write `.hv/<kind>/<ID>.md` with upstream URL footer, append BACKLOG.md entry
    with `GH: #N` / `GL: #N` cross-reference.
 8. **Manual gate: apply the `in-progress` label upstream (I6)** (see below).
-9. **Compact report (I7)** — lists captured IDs, issue numbers, and label
+9. **Compact report (I7)**: lists captured IDs, issue numbers, and label
    status.
 
 ## Manual gate
@@ -85,7 +85,7 @@ Step I6 is a manual gate (see `references/manual-gates.md`). The user sees
 which issues will be labeled and confirms before any label is written
 upstream. Loop mode never auto-picks this step: the label change is
 externally visible, and collaborators see the issues marked as claimed.
-Silence is not consent — the default when a plain-text fallback is used is
+Silence is not consent: the default when a plain-text fallback is used is
 **skip** (opt-in-off).
 
 ## Round-trip closing
@@ -138,10 +138,10 @@ upstream issue isn't left permanently marked as claimed.
 
 ## Related
 
-- `/hv-capture` (no flag) — brain-dump counterpart; use when the item
+- `/hv-capture` (no flag): brain-dump counterpart; use when the item
   originates locally.
-- `/hv-ship` — emits `Closes #N` in PR bodies and handles direct-push closing.
-- `/hv-capture --remove` — optionally removes the upstream label when an
+- `/hv-ship`: emits `Closes #N` in PR bodies and handles direct-push closing.
+- `/hv-capture --remove`: optionally removes the upstream label when an
   imported item is deleted without shipping (Step R3 manual gate).
-- `bin/hv-issues-*` — helpers underlying this flow (`hv-issues-provider`,
+- `bin/hv-issues-*`: helpers underlying this flow (`hv-issues-provider`,
   `hv-issues-list`, `hv-issues-imported`, `hv-issues-label`, `hv-issues-close`).

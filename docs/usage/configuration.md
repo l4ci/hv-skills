@@ -44,7 +44,7 @@ Default config:
 }
 ```
 
-## models — orchestrator and worker
+## models: orchestrator and worker
 
 `models.orchestrator` drives planning, exploration, verification, and design. `models.worker` handles implementation sub-tasks. Set them independently to trade off quality against cost and speed.
 
@@ -56,7 +56,7 @@ Default config:
 
 `/hv-config` and [`/hv-init`](../reference/slash-commands.md#hv-init) offer four ready-made profiles (Balanced, Premium, Fast, Minimal) that set both values at once.
 
-## work.isolation — branch or worktree
+## work.isolation: branch or worktree
 
 Controls where skill work happens.
 
@@ -67,7 +67,7 @@ Controls where skill work happens.
 
 Switch to `"worktree"` when you want multiple work streams in flight without context bleeding between them. See [parallel work](parallel-work.md) for the full pattern.
 
-## work.mergeStrategy — direct or pr
+## work.mergeStrategy: direct or pr
 
 Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 
@@ -122,14 +122,14 @@ See [learning](learning.md) for the full `/hv-learn` workflow.
 
 Controls the F03 knowledge promotion lifecycle: how many `hv-knowledge-hit` events a `provisional` bullet must accumulate before auto-promotion to `confirmed`. Integer ≥ 0; default `3`.
 
-A "hit" registers when `/hv-work` or `/hv-review` consumes the bullet during a cycle's K+D consult (the bullet shows up in a worker brief's `Known gotchas:` section) AND the user doesn't push back with a correction that overlaps the bullet's body. The threshold is the cycle count after which the project decides the bullet has earned `confirmed` status — `hv-knowledge-query` drops the `(provisional)` suffix and the bullet flows into consumers indistinguishable from established knowledge.
+A "hit" registers when `/hv-work` or `/hv-review` consumes the bullet during a cycle's K+D consult (the bullet shows up in a worker brief's `Known gotchas:` section) AND the user doesn't push back with a correction that overlaps the bullet's body. The threshold is the cycle count after which the project decides the bullet has earned `confirmed` status. At that point `hv-knowledge-query` drops the `(provisional)` suffix and the bullet flows into consumers indistinguishable from established knowledge.
 
 | Value | Behavior |
 |-------|----------|
 | `3` (default) | Auto-promote at the third clean hit. Catches durable bullets after a small handful of validated consults. |
-| `≥4` | Stricter — bullets earn `confirmed` only after more validation. Use when you've seen weak bullets sneak through to `confirmed` too quickly. |
-| `1` or `2` | Looser — almost every new bullet auto-promotes on first or second consult. Use when manual `/hv-learn --promote` flow feels heavy. |
-| `0` | Auto-promote on `hv-knowledge-merge` itself — effectively disables the `provisional` tier. Defeats the lifecycle's purpose; included for completeness only. |
+| `≥4` | Stricter. Bullets earn `confirmed` only after more validation. Use when you've seen weak bullets sneak through to `confirmed` too quickly. |
+| `1` or `2` | Looser. Almost every new bullet auto-promotes on first or second consult. Use when manual `/hv-learn --promote` flow feels heavy. |
+| `0` | Auto-promote on `hv-knowledge-merge` itself, effectively disabling the `provisional` tier. Defeats the lifecycle's purpose; included for completeness only. |
 
 Pending contradictions block auto-promotion regardless of hit count. The user must resolve them via `/hv-learn` Step 9 (Demote / Keep / Defer) before the bullet can flow forward.
 
@@ -148,7 +148,7 @@ See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
 ## ship.secondOpinion
 
-Controls whether `/hv-ship` runs a second adversarial review with a fresh subagent after `/hv-review` passes. `/hv-review` shares the project's context (conventions, KNOWLEDGE, plan) with the work it produced — a reviewer with that context naturalizes blind spots. A fresh subagent with only the diff + the goal has to reason from scratch and catches what the contextualized reviewer normalized.
+Controls whether `/hv-ship` runs a second adversarial review with a fresh subagent after `/hv-review` passes. `/hv-review` shares the project's context (conventions, KNOWLEDGE, plan) with the work it produced, and a reviewer with that context naturalizes blind spots. A fresh subagent with only the diff + the goal has to reason from scratch and catches what the contextualized reviewer normalized.
 
 | Value | Behavior |
 |-------|----------|
@@ -163,14 +163,14 @@ See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
 ## ship.qa
 
-Controls whether `/hv-ship` invokes [`/hv-qa run`](qa.md) between `/hv-review` (and the optional second-opinion gate) and the merge/PR step. `/hv-review` answers *"does this diff make sense"*; `/hv-qa` answers *"does the product actually work"* by executing the per-target strategy in `.hv/qa/<target>.md`.
+Controls whether `/hv-ship` invokes [`/hv-qa run`](qa.md) between `/hv-review` (and the optional second-opinion gate) and the merge/PR step. `/hv-review` answers *"does this diff make sense"*. `/hv-qa` answers *"does the product actually work"* by executing the per-target strategy in `.hv/qa/<target>.md`.
 
 | Value | Behavior |
 |-------|----------|
 | `false` (default) | `/hv-ship` skips QA. Diff-level review alone gates merges. |
 | `true` | After `/hv-review` (and second-opinion if on), `/hv-ship` calls `/hv-qa run` scoped to the active repo. QA findings route per `qa.gate`. If no strategy file exists for the active scope, `/hv-ship` surfaces a one-line note pointing at `/hv-qa first-run` and proceeds without QA. |
 
-The gate is opt-in because product QA needs strategy files (`/hv-qa first-run` bootstraps them) and often binds to infra — dev server, sandbox creds, runners installed. Most cycles don't need it. Enable for repos that have a QA strategy wired up and where regressions cost more than the runner time.
+The gate is opt-in because product QA needs strategy files (`/hv-qa first-run` bootstraps them) and often binds to infra (dev server, sandbox creds, runners installed). Most cycles don't need it. Enable for repos that have a QA strategy wired up and where regressions cost more than the runner time.
 
 ## qa.gate
 
@@ -178,7 +178,7 @@ Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Inde
 
 | Value | Behavior |
 |-------|----------|
-| `"advisory"` (default) | All verdicts surface findings (PASS silently, CONCERNS / FAIL with the `QA concerns:` carrier label) and continue to merge / PR. Advisory means advisory — the ship is never blocked on QA. |
+| `"advisory"` (default) | All verdicts surface findings (PASS silently, CONCERNS / FAIL with the `QA concerns:` carrier label) and continue to merge / PR. Advisory means advisory: the ship is never blocked on QA. |
 | `"blocking"` | PASS continues silently. CONCERNS branches on `autonomy.level` (off / auto: `AskUserQuestion` Address / Ship anyway / Stop; loop: auto-pick Address). FAIL stops the ship; user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats FAIL as a guard failure (loop stops). |
 
 `INFRA-FAIL` (dev server / creds / binary missing) is always treated as advisory regardless of `qa.gate`. Missing infrastructure isn't a quality signal; ship shouldn't break because the dev server happened to be down. The missing requirements surface as a note and the ship continues.
@@ -190,7 +190,7 @@ Controls whether `/hv-work` invokes `/hv-qa run` post-cycle when touched files m
 | Value | Behavior |
 |-------|----------|
 | `false` (default) | `/hv-work` never invokes `/hv-qa`. QA only runs from `/hv-ship` (when `ship.qa: true`) or manual `/hv-qa run`. |
-| `true` | After `/hv-work` finishes a cycle, if any touched file matches a `Watch globs` entry in a `.hv/qa/<target>.md` strategy, `/hv-qa run` fires scoped to that target. Verdict is advisory at this stage — the cycle is already complete — but findings surface for the next session. |
+| `true` | After `/hv-work` finishes a cycle, if any touched file matches a `Watch globs` entry in a `.hv/qa/<target>.md` strategy, `/hv-qa run` fires scoped to that target. Verdict is advisory at this stage (the cycle is already complete) but findings surface for the next session. |
 
 Skip turning this on until you have stable strategies and want continuous coverage on every cycle. Otherwise the noise of running runners on every commit outweighs the value.
 
@@ -250,17 +250,17 @@ Leave `false` while you're shaping docs by hand. Flip on once your docs structur
 - **Type:** string
 - **Default:** `.hv/RELEASE.md`
 
-Path to the project's release checklist — a flat markdown file with `- [ ]` items that `/hv-release` walks as gates before bumping the version (Step 1.5). Each open checkbox becomes an `AskUserQuestion` interjection: *Yes, continue* / *Fix now and continue* / *Skip* / *Abort*. Items marked `- [x]` are ignored. Items whose text ends with `(manual)` always interject even under `autonomy.level: auto` or `loop` — use this for sensitive gates (staging migrations, infra rollouts) that need attention regardless of autonomy.
+Path to the project's release checklist: a flat markdown file with `- [ ]` items that `/hv-release` walks as gates before bumping the version (Step 1.5). Each open checkbox becomes an `AskUserQuestion` interjection: *Yes, continue* / *Fix now and continue* / *Skip* / *Abort*. Items marked `- [x]` are ignored. Items whose text ends with `(manual)` always interject even under `autonomy.level: auto` or `loop`. Use this for sensitive gates (staging migrations, infra rollouts) that need attention regardless of autonomy.
 
 The file is per-project and tracked by default, so the checklist is shared with the team. When absent under `autonomy.level: off`, the skill offers to scaffold a starter template; under `auto` or `loop`, the skill silently skips the gate rather than interrupt an unattended run. To keep the checklist per-contributor instead, add it to `.gitignore`.
 
-The skill itself stays generic — no release step is hardcoded. Drift like a forgotten sibling-version-file bump (e.g. the marketplace.json that went stale by two majors) gets caught by adding an item, not by patching the skill.
+The skill itself stays generic: no release step is hardcoded. Drift like a forgotten sibling-version-file bump (e.g. the marketplace.json that went stale by two majors) gets caught by adding an item, not by patching the skill.
 
 ```json
 { "release": { "checklistPath": "docs/RELEASE-CHECKLIST.md" } }
 ```
 
-Override the path if your project prefers a different location — by default the checklist is tracked at `.hv/RELEASE.md` and shared with the team.
+Override the path if your project prefers a different location. By default the checklist is tracked at `.hv/RELEASE.md` and shared with the team.
 
 ## release.confirmLargePushCommits
 
@@ -312,7 +312,7 @@ Records the hv-skills plugin version that was installed when `/hv-init` last ran
 [`bin/hv-preflight`](../reference/preflight.md) calls `bin/hv-version-check` after every `/hv-preflight` invocation. If the stamped value differs from the currently-installed plugin's version, preflight prints one informational line to stderr:
 
 ```
-hv-skills drift: project at 1.16.0, plugin at 1.17.0 — run /hv-init to refresh helpers
+hv-skills drift: project at 1.16.0, plugin at 1.17.0; run /hv-init to refresh helpers
 ```
 
 Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release): this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.

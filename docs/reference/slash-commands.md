@@ -8,21 +8,21 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 | `/hv-migrate v4` | One-shot codemod for v3 → v4 upgrades. Rewrites cut-command references across `.hv/` and the project `CLAUDE.md`, migrates `.hv/CONTEXT.md` terms into `KNOWLEDGE.md` (`## Glossary`), removes stale `bin/hv-context-*`. Dry-run default; `--apply` writes; idempotent; refuses umbrella mode (F21) |
 | `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
-| `/hv-brainstorm` | Per-item design exploration before `/hv-plan` — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
-| `/hv-capture` | Capture bugs, features, and tasks — auto-classifies, assigns priority/size, routes to the correct section. On milestone-spec captures, audits the diff for ship-evidence and asks per flagged title before appending |
-| `/hv-go` | Capture an item and immediately implement it — combines `/hv-capture` + `/hv-work` in one pass |
+| `/hv-brainstorm` | Per-item design exploration before `/hv-plan`: Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval; writes `.hv/designs/<ID>.md` which `/hv-plan` reads as soft input |
+| `/hv-capture` | Capture bugs, features, and tasks: auto-classifies, assigns priority/size, routes to the correct section. On milestone-spec captures, audits the diff for ship-evidence and asks per flagged title before appending |
+| `/hv-go` | Capture an item and immediately implement it; combines `/hv-capture` + `/hv-work` in one pass |
 | `/hv-capture --from-github` / `--from-gitlab` | Pull open GitHub/GitLab issues into BACKLOG.md with round-trip closing |
-| `/hv-capture --remove` | Remove a captured backlog item and clean up its dependencies — dry-run preview by default, asks before applying |
+| `/hv-capture --remove` | Remove a captured backlog item and clean up its dependencies. Dry-run preview by default, asks before applying |
 | `/hv-next` | Review backlog, reconcile active work against git state, suggest the next item, route to `/hv-work` |
-| `/hv-pause` | Gracefully stop mid-session — writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-next` |
-| `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`) — task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
-| `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch — branch never merges, only findings come back as `.hv/spikes/<name>.md` |
+| `/hv-pause` | Gracefully stop mid-session; writes a handoff note (next step, hypothesis, mid-edit files) for the next session's `/hv-next` |
+| `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`): task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
+| `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch. Branch never merges, only findings come back as `.hv/spikes/<name>.md` |
 | `/hv-work` | Orchestrated parallel implementation with per-task commits; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present. Pass `--preview <ID>` for a read-only peek of the intended approach (files, tests, assumptions, unknowns) that gates high-stakes work without writing anything |
-| `/hv-debug` | Systematic bug cycle — reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, hard-stops via the Iron Law after 3 failed committed fixes, nudges `/hv-learn` |
-| `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md` — manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
+| `/hv-debug` | Systematic bug cycle: reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, hard-stops via the Iron Law after 3 failed committed fixes, nudges `/hv-learn` |
+| `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
 | `/hv-review` | Two-stage review of a branch (Stage 1 spec-compliance vs `PLAN.md`, Stage 2 code-quality with silent-failure-hunter + decision-violations) vs `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL. Short-circuits Stage 2 on Stage 1 `FAIL` |
-| `/hv-qa` | Product-level QA: executes per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; emits PASS / CONCERNS / FAIL. Modes — first-run / run / restructure |
-| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates. Flags: `--undo` (guided rollback of the last cycle on the base branch) and `--docs` (public-docs maintenance — first-run / after-work / restructure modes; auto-fires inline at ship time when `docs.afterWork: true`) |
+| `/hv-qa` | Product-level QA: executes per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; emits PASS / CONCERNS / FAIL. Modes: first-run / run / restructure |
+| `/hv-ship` | Bundle commits into a PR (or direct merge) with ID-linked body; runs `/hv-review` first by default, plus opt-in second-opinion (`ship.secondOpinion`) and product QA (`ship.qa`) gates. Flags: `--undo` (guided rollback of the last cycle on the base branch) and `--docs` (public-docs maintenance: first-run / after-work / restructure modes; auto-fires inline at ship time when `docs.afterWork: true`) |
 | `/hv-learn` | Extract durable session learnings into `KNOWLEDGE.md`, grouped by topic; Opus verification on by default |
 | `/hv-refactor` | Full architectural refactor cycle with parallel design + implementation subagents |
 | `/hv-release` | Cut a release: walk per-project checklist, bump version, generate notes, tag, push, publish to GitHub/GitLab |
@@ -42,7 +42,7 @@ Interactive editor for [`.hv/config.json`](../usage/configuration.md). Shows cur
 
 ## /hv-debug
 
-Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, mark complete. Two circuit breakers: (1) if the hypothesize → verify loop iterates 3 times without converging (single-hypothesis mode only), escalates to a fresh-context subagent with a "for-next-agent" brief; (2) if 3 committed fixes fail to resolve the reproducer (counter persisted at `.hv/debug/<session>.json`, survives `/clear`), the Iron Law fires a hard stop — no further agents, surface to the user. Uses the same isolation mode as `/hv-work`, and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
+Systematic root-cause cycle for a single `[B##]` bug: reproduce, hypothesize with the orchestrator model, verify the hypothesis before touching code, fix with the worker model, confirm the reproducer passes, commit, mark complete. Two circuit breakers: (1) if the hypothesize → verify loop iterates 3 times without converging (single-hypothesis mode only), escalates to a fresh-context subagent with a "for-next-agent" brief; (2) if 3 committed fixes fail to resolve the reproducer (counter persisted at `.hv/debug/<session>.json`, survives `/clear`), the Iron Law fires a hard stop with no further agents, surfacing to the user. Uses the same isolation mode as `/hv-work`, and nudges you toward [`/hv-learn`](../usage/learning.md) when the root cause was non-obvious. See [debugging](../usage/debugging.md) for the full flow.
 
 ## /hv-decide
 
@@ -62,7 +62,7 @@ Pulls open issues from GitHub or GitLab into `BACKLOG.md` via a multiSelect pick
 
 ## /hv-learn
 
-Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. Captures gotchas, project conventions, constraints, debugging insights, and decisions with rationale. Skips anything already obvious from reading the code. After writing, asks once whether to file an `hv-skills` upstream issue (when a bullet describes hv-skills behavior) and once whether to contribute to [runlog.org](https://runlog.org) via `/runlog-author` (when a bullet is about an external dependency: third-party API, library, protocol). Both follow-ups are always manual, never auto-fired. In umbrella mode the write (and `--term` Glossary entries) routes to the cwd/`--repo`-resolved scope — repo-local vs the umbrella-shared `.hv/KNOWLEDGE.md`. See [learning](../usage/learning.md) and [umbrella mode](../usage/umbrella-mode.md) for the full flow.
+Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. Captures gotchas, project conventions, constraints, debugging insights, and decisions with rationale. Skips anything already obvious from reading the code. After writing, asks once whether to file an `hv-skills` upstream issue (when a bullet describes hv-skills behavior) and once whether to contribute to [runlog.org](https://runlog.org) via `/runlog-author` (when a bullet is about an external dependency: third-party API, library, protocol). Both follow-ups are always manual, never auto-fired. In umbrella mode the write (and `--term` Glossary entries) routes to the cwd/`--repo`-resolved scope: repo-local vs the umbrella-shared `.hv/KNOWLEDGE.md`. See [learning](../usage/learning.md) and [umbrella mode](../usage/umbrella-mode.md) for the full flow.
 
 ## /hv-migrate
 
@@ -82,7 +82,7 @@ Writes an implementation plan before `/hv-work` runs, keyed under a milestone an
 
 ## /hv-qa
 
-Product-level QA: runs the per-target strategy declared in `.hv/qa/<target>.md` and emits a scored verdict. `/hv-qa` does NOT read commits or the diff — that's `/hv-review`'s job. It runs the built artifact: Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the strategy declares, grouped into executable and audit pillars. Three modes — `first-run` (probe surfaces, propose strategy), `run` (execute, score, verdict), `restructure` (audit strategy files). Returns `PASS` / `CONCERNS` / `FAIL`, or `INFRA-FAIL` when required infra is missing. Invoked from `/hv-ship` when `ship.qa: true`; route on verdict gated by `qa.gate` (`"advisory"` reports only, `"blocking"` halts on `FAIL`). See [product QA](../usage/qa.md) for the full flow.
+Product-level QA: runs the per-target strategy declared in `.hv/qa/<target>.md` and emits a scored verdict. `/hv-qa` does NOT read commits or the diff (that's `/hv-review`'s job). It runs the built artifact: Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the strategy declares, grouped into executable and audit pillars. Three modes: `first-run` (probe surfaces, propose strategy), `run` (execute, score, verdict), `restructure` (audit strategy files). Returns `PASS` / `CONCERNS` / `FAIL`, or `INFRA-FAIL` when required infra is missing. Invoked from `/hv-ship` when `ship.qa: true`; route on verdict gated by `qa.gate` (`"advisory"` reports only, `"blocking"` halts on `FAIL`). See [product QA](../usage/qa.md) for the full flow.
 
 ## /hv-refactor
 
@@ -92,7 +92,9 @@ Runs an architectural refactor cycle: explores the codebase for friction, classi
 
 Cuts a release end-to-end: walks the project's release checklist (`.hv/RELEASE.md` by default; override via `release.checklistPath`) as a preflight gate, bumps the project version (`major`/`minor`/`patch` or explicit semver), generates categorized release notes from commits since the last tag, prepends a section to `CHANGELOG.md` (creating it if absent), creates an annotated git tag, pushes commit + tag, and publishes a release on GitHub or GitLab when origin is set. Auto-detects the version source (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, plain `VERSION`), and honors `release.versionFile` override.
 
-The checklist file is per-project and tracked by default — see [release checklist](../usage/review-and-ship.md#release-checklist) for the format. When absent, the skill offers to scaffold a starter (under `autonomy.level: off`) or silently skips the gate (under `auto`/`loop`). Items ending in `(manual)` always interject even in unattended modes.
+The checklist file is per-project and tracked by default; see [release checklist](../usage/review-and-ship.md#release-checklist) for the format. When absent, the skill offers to scaffold a starter (under `autonomy.level: off`) or silently skips the gate (under `auto`/`loop`). Items ending in `(manual)` always interject even in unattended modes.
+
+After publishing, an always-manual gate offers to close any upstream GitHub/GitLab issues that landed in the release but are still open. This covers the direct-push path where work skipped `/hv-ship` (or chose "leave open") and the linked issues never got closed. Candidates come from `hv-issues-imported --open-only`; the gate is silent when nothing is open. Skipped entirely in `--dry-run` mode.
 
 ## /hv-review
 
@@ -110,8 +112,8 @@ Finishes a feature branch: runs `/hv-review` (by default), builds a PR body from
 
 Two modes folded in via flags:
 
-- `/hv-ship --undo` — guided rollback of the last `/hv-work` cycle on the base branch. Resets the merge commit and restores the cycle's TODO entries to their type sections in `BACKLOG.md`. Direct-merge cycles only (MVP); PR-mode cycles refused with a manual-recovery pointer. Refuses on cycles that have post-merge commits unless `--allow-post-merge` is passed. Defaults to a dry-run preview; the slash command always asks for explicit confirmation before applying. See [rolling back a cycle](../usage/undo.md) for the full flow.
-- `/hv-ship --docs` — public-docs maintainer. Scaffolds `<docs.path>/` on first run (discovery + tailored tree + interactive approval), proposes doc updates in after-work mode, or audits and reorganizes in restructure mode (`/hv-ship --docs restructure`). Auto-fires inline at ship time when `docs.afterWork: true` and the post-cycle trigger condition matches.
+- `/hv-ship --undo`: guided rollback of the last `/hv-work` cycle on the base branch. Resets the merge commit and restores the cycle's TODO entries to their type sections in `BACKLOG.md`. Direct-merge cycles only (MVP); PR-mode cycles refused with a manual-recovery pointer. Refuses on cycles that have post-merge commits unless `--allow-post-merge` is passed. Defaults to a dry-run preview; the slash command always asks for explicit confirmation before applying. See [rolling back a cycle](../usage/undo.md) for the full flow.
+- `/hv-ship --docs`: public-docs maintainer. Scaffolds `<docs.path>/` on first run (discovery + tailored tree + interactive approval), proposes doc updates in after-work mode, or audits and reorganizes in restructure mode (`/hv-ship --docs restructure`). Auto-fires inline at ship time when `docs.afterWork: true` and the post-cycle trigger condition matches.
 
 ## /hv-spike
 

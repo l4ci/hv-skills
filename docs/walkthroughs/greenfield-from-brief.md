@@ -1,4 +1,4 @@
-# Greenfield — from a brief to a shipped milestone
+# Greenfield: from a brief to a shipped milestone
 
 You have an idea, a one-page brief, and an empty repo. By the end of this walkthrough you have a roadmap on disk, a slice plan, real code in `main`, and durable knowledge captured for the next session.
 
@@ -38,7 +38,7 @@ flowchart LR
 
 Ten steps follow, in execution order.
 
-## Step 1 — /hv-init
+## Step 1: /hv-init
 
 ```bash
 $ /hv-init
@@ -55,7 +55,7 @@ The command writes:
 
 Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/bin/` (regenerated mirror), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, and `.hv/qa-runs/` are gitignored.
 
-## Step 2 — /hv-vision
+## Step 2: /hv-vision
 
 `/hv-vision` turns "I have an idea" into "I have milestones I can execute against." It runs Socratic discovery, then web research, then a critique pass.
 
@@ -63,11 +63,11 @@ Most of `.hv/` is tracked by default, so the backlog and learnings travel with t
 $ /hv-vision
 ```
 
-It reads `README.md` and any stack file (`package.json`, `go.mod`, `Cargo.toml`, …) at the project root before asking anything. If your brief lives under a different name (`briefing.md`, `pitch.md`, `idea.md`), point at it in the opening message — *"there's a brief at brief.md"* — and the skill picks it up.
+It reads `README.md` and any stack file (`package.json`, `go.mod`, `Cargo.toml`, …) at the project root before asking anything. If your brief lives under a different name (`briefing.md`, `pitch.md`, `idea.md`), point at it in the opening message (*"there's a brief at brief.md"*) and the skill picks it up.
 
 The first discovery question is usually short and pointed:
 
-> *Your brief says "dogfood within two weeks." What does dogfooded mean concretely — (a) you have a working CLI you use daily for two weeks before showing anyone else, or (b) the CLI plus a shared deployment with your partner within those two weeks?*
+> *Your brief says "dogfood within two weeks." What does dogfooded mean concretely: (a) you have a working CLI you use daily for two weeks before showing anyone else, or (b) the CLI plus a shared deployment with your partner within those two weeks?*
 
 You answer. It probes one more layer ("would month one of CLI-only be enough validation, or does the web piece have to land for the dogfood to count?") and then moves to web research.
 
@@ -104,7 +104,7 @@ Plus three detail files at `.hv/milestones/M01.md`, `M02.md`, `M03.md`, each wit
 
 `/hv-vision` marks M01 active and seeds the always-on `## Project Vision` block in `CLAUDE.md`. Every subsequent skill knows what the active milestone is.
 
-## Step 3 — /hv-spike (optional)
+## Step 3: /hv-spike (optional)
 
 The vision session named one unknown: the SQLite schema design for transactions, specifically how you'd handle multi-currency. The brief doesn't require it, but you suspect you'll add it within a year. A spike checks whether a one-currency-now schema would hurt later.
 
@@ -124,7 +124,7 @@ Then run `.hv/bin/hv-spike-finish sqlite-schema` to stamp it done. The branch st
 
 For a brand-new project you might do zero spikes. Use them when the answer materially changes the design.
 
-## Step 4 — /hv-plan M01-S01
+## Step 4: /hv-plan M01-S01
 
 `/hv-vision` set the destination. `/hv-plan` sets the route for the first slice.
 
@@ -173,7 +173,7 @@ Single binary, `cobra` for the CLI, `database/sql` plus `mattn/go-sqlite3`. Deci
 
 `/hv-work` consults this plan when it dispatches. The verify step on each task is what keeps workers honest; a task with no verify step is not well-defined.
 
-## Step 5 — /hv-capture
+## Step 5: /hv-capture
 
 The plan named five tasks. You can either run `/hv-work` against the plan directly (it decomposes the same way), or capture the slice as backlog items first so each gets an ID, a detail file, and a KNOWLEDGE.md link. For greenfield I prefer the capture step: it gives me hooks for tracking, and `/hv-next` surfaces items in order.
 
@@ -195,7 +195,7 @@ Each gets a row in `BACKLOG.md` under `## Features`, tagged `Milestone: M01`. De
 
 If any of these had been size-Major instead of Minor, `/hv-capture` would have nudged you toward `/hv-brainstorm` before plan to negotiate the design first. Minor items skip that layer.
 
-## Step 6 — first cycle: /hv-next → /hv-work → /hv-ship → /hv-learn
+## Step 6: first cycle (/hv-next → /hv-work → /hv-ship → /hv-learn)
 
 ```bash
 $ /hv-next
@@ -224,7 +224,7 @@ You confirm. The orchestrator reads `.hv/plans/M01-S01.md`, picks the F01 task, 
 
 You repeat for F02 and F03. F03 introduces something subtle. The transactions schema stores amounts as int64 minor units, but the worker writes a helper that converts `decimal.Decimal` to int64 by multiplying by 100 and casting. Looks right. Isn't.
 
-## Step 7 — a real bug, run /hv-debug
+## Step 7: a real bug, run /hv-debug
 
 F04 lands. You try a quick smoke test:
 
@@ -253,7 +253,7 @@ It asks which open or recently completed item to debug. You point at F04 (the `a
 
 You do, after Step 8.
 
-## Step 8 — /hv-ship
+## Step 8: /hv-ship
 
 When F05 lands the slice is functionally complete:
 
@@ -267,7 +267,7 @@ For M01-S01 you get `PASS` with one `CONCERNS` note attached: *"F05 uses `fmt.Pr
 
 `/hv-ship` then either opens a GitHub PR or merges directly into `main`, depending on `work.mergeStrategy`. Solo mode for Tally is direct merge.
 
-## Step 9 — /hv-learn
+## Step 9: /hv-learn
 
 The float-bug session produced one durable insight. `/hv-learn` writes it into `KNOWLEDGE.md` under a topic of your choice:
 
@@ -285,7 +285,7 @@ The verifier judges every bullet for durability before it lands. It rejects "fix
 
 The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time `/hv-work` touches money handling, the orchestrator pulls this section via `hv-knowledge-query "Money & Decimals"` before planning, so the same trap doesn't bite a worker again.
 
-## Step 10 — repeat, then close M01
+## Step 10: repeat, then close M01
 
 You loop steps 6–9 through additional slices: `tally summary` for monthly rollups, `tally yoy` for year-over-year compare, a CSV importer. Each `/hv-plan M01-S02`, `M01-S03`, `M01-S04` writes its own slice plan; `/hv-capture` seeds items; `/hv-work` ships them; `/hv-learn` catches anything subtle that surfaced.
 

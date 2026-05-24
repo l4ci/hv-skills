@@ -12,7 +12,7 @@
 [![Stars](https://img.shields.io/github/stars/l4ci/hv-skills?style=social)](https://github.com/l4ci/hv-skills/stargazers)
 [![For Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2)](https://claude.com/claude-code)
 
-[Install](#install) · [Features](#features) · [Configuration](#configuration) · [FAQ](#faq) · [Docs](docs/)
+[Install](#install) · [What you get](#what-you-get) · [Configuration](#configuration) · [FAQ](#faq) · [Docs](docs/)
 
 </div>
 
@@ -20,15 +20,15 @@
 
 ## The wedge and the loop
 
-💾 **Persist (the wedge).** This is why hv-skills exists. Three files outlive every `/clear`. `KNOWLEDGE.md` carries durable learnings (written by `/hv-learn`, verified before they land, auto-consulted by future `/hv-work` / `/hv-debug` / `/hv-review` runs). `DECISIONS.md` carries hard-boundary commitments (captured by `/hv-decide` with explicit forbids and permits). A handoff note carries the live hypothesis: `/hv-pause` writes current state mid-investigation (current hypothesis, next step, files mid-edit) so the next `/hv-next` after `/clear` picks up exactly where you left off. `/hv-learn --term <name>` lands domain terms under a pinned `## Glossary` topic in `KNOWLEDGE.md`. The project map (hand-authored `.hv/map/<name>.md` files) is bumped by cycle skills post-cycle. `/hv-ship --docs` keeps public docs in sync with the code.
+💾 **Persist (the wedge).** This is why hv-skills exists. Three files outlive every `/clear`. `KNOWLEDGE.md` carries durable learnings, written by `/hv-learn`, verified before they land, and auto-consulted by future `/hv-work`, `/hv-debug`, and `/hv-review` runs. `DECISIONS.md` carries hard-boundary commitments captured by `/hv-decide` with explicit forbids and permits. A handoff note carries the live hypothesis: `/hv-pause` writes the current state mid-investigation (hypothesis, next step, files mid-edit) so the next `/hv-next` after `/clear` picks up exactly where you left off. `/hv-learn --term <name>` lands domain terms under a pinned `## Glossary` topic in `KNOWLEDGE.md`. Cycle skills bump the hand-authored project map (`.hv/map/<name>.md`) post-cycle, and `/hv-ship --docs` keeps public docs in sync with the code.
 
 📥 **Capture.** `/hv-capture` is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-go` collapses capture and execute into a single pass for hot-path fixes. `/hv-capture --from-github` / `--from-gitlab` syncs open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-capture --remove <ID>` is the local inverse: it strips a captured item and cleans up its dependencies behind a dry-run preview and confirmation gate.
 
-🧭 **Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-work --preview <ID>` previews the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
+🧭 **Plan.** `/hv-vision` brainstorms milestones with Socratic discovery, web research, and a deliberate critique pass. `/hv-brainstorm` explores design for size-Major features or P0 bugs before planning. `/hv-plan` writes the implementation plan to its own file, keyed by milestone slice or item. `/hv-spike` runs throwaway feasibility experiments on a branch that never merges; only findings come back. `/hv-work --preview <ID>` shows the orchestrator's intended approach without writing anything, a cheap gate before code lands on high-stakes items.
 
-⚡ **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce → hypothesize → verify → fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction.
+⚡ **Execute.** `/hv-work` is the orchestrator. It reads the plan (or decomposes ad-hoc if none exists), dispatches worker subagents in parallel, and commits one verifiable task at a time. `/hv-debug` runs a systematic reproduce, hypothesize, verify, fix cycle for bugs. `/hv-refactor` does the same shape for architectural friction.
 
-🚢 **Ship.** `/hv-review` reads the branch diff, resolved item IDs, and matching `KNOWLEDGE.md` topics across a two-stage pass (spec compliance → code quality) and returns `PASS` / `CONCERNS` / `FAIL`. `/hv-qa` answers the orthogonal question, *"does the product actually work?"*, by executing per-target runners (Playwright, smoke, lighthouse, axe, ZAP, contract tests) from `.hv/qa/<target>.md`. `/hv-ship` builds an ID-linked PR body or direct-merges based on configured strategy; opt-in gates layer in a fresh-eyes second-opinion review and a product QA run before integration. `/hv-ship --undo` rolls back the last direct-merge cycle in one operation, restoring TODO entries.
+🚢 **Ship.** `/hv-review` reads the branch diff, resolved item IDs, and matching `KNOWLEDGE.md` topics across a two-stage pass (spec compliance, then code quality) and returns `PASS` / `CONCERNS` / `FAIL`. `/hv-qa` answers the orthogonal question, *"does the product actually work?"*, by executing per-target runners (Playwright, smoke, lighthouse, axe, ZAP, contract tests) from `.hv/qa/<target>.md`. `/hv-ship` builds an ID-linked PR body or direct-merges based on configured strategy; opt-in gates layer in a fresh-eyes second-opinion review and a product QA run before integration. `/hv-ship --undo` rolls back the last direct-merge cycle in one operation, restoring TODO entries.
 
 > **Upgrading from v3?** Run `/hv-migrate v4` after install. See the [v4.0 announcement](docs/announcements/v4-0.md).
 
@@ -42,43 +42,22 @@ Then run `/hv-init` once at the project root. See [Getting started](docs/getting
 
 For other install methods (Claude Code plugin marketplace, GNU Stow, local clone) see [install alternatives](docs/install.md).
 
-## Features
+## What you get
 
-|  |  |
-|---|---|
-| 📥 **Auto-classified capture.** Bugs, features, tasks routed with priority/size tags and zero-padded IDs (`[B01]`, `[F01]`, `[T01]`) | ⚡ **Parallel execution.** Orchestrator plans, workers implement in parallel, one atomic commit per task |
-| 🌿 **Branch or worktree isolation.** Main stays clean while agents work, run multiple sessions side by side | 🧠 **Knowledge retention.** `/hv-learn` writes durable learnings; `/hv-work`, `/hv-debug`, and `/hv-review` all consult them |
-| ♻️ **Backlog reconciliation.** `/hv-next` validates `status.json` against git state, auto-cleans stale entries | 🐛 **Systematic debugging.** `/hv-debug` reproduces, hypothesizes, verifies, fixes, nudges `/hv-learn` |
-| 🚢 **Two-stage review.** `/hv-review` splits spec-compliance (plan vs diff) from code-quality (conventions, security, silent failures); Stage 1 `FAIL` short-circuits Stage 2 | 🧪 **Product QA gate.** `/hv-qa` runs per-target strategy files (`.hv/qa/<target>.md`) with Playwright / smoke / lighthouse / axe / ZAP / contract runners; `ship.qa: true` invokes it from `/hv-ship`, `qa.gate` chooses advisory vs blocking |
-| 🕵️ **Fresh-eyes second opinion.** `ship.secondOpinion: true` dispatches a no-prior-context adversarial reviewer after `/hv-review` passes; catches blind spots the contextualized reviewer normalized | 💾 **Context-clear recovery.** `/hv-next` re-reads active streams with recent commits and any handoff note, routing you back to work |
-| 🔧 **Refactor cycles.** `/hv-refactor` explores friction, designs competing approaches, fixes in parallel | 🤝 **Graceful handoff.** `/hv-pause` writes what's in your head (hypothesis, next step, mid-edit files) so `/hv-next` picks up after a `/clear` |
-| 🧭 **Vision & milestones.** `/hv-vision` brainstorms milestones using web research and a critique pass; `/hv-next` and `/hv-pause` keep work scoped to the active set | 🔗 **Loose milestone tags.** Items can carry a `Milestone:` field; multi-active milestones run in parallel when their dependencies allow |
-| 💡 **Per-item design exploration.** `/hv-brainstorm` negotiates shape and tradeoffs for a single `[Major]` feature or `[P0]` bug before planning; writes `.hv/designs/<ID>.md` that `/hv-plan` reads as soft input | 📋 **Plan-as-artifact.** `/hv-plan` writes implementation plans to `.hv/plans/<key>.md`; `/hv-work` consults the plan if present instead of decomposing ad-hoc |
-| 🧪 **Throwaway spikes.** `/hv-spike` runs feasibility experiments on a dedicated `spike/<name>` branch; the branch never merges, only findings come back to main | 🔍 **Approach peek.** `/hv-work --preview <ID>` prints the orchestrator's intended files, tests, and assumptions before code lands, so corrections happen before `/hv-work` runs |
-| 🧰 **Shared by default.** Most of `.hv/` is tracked (backlog, knowledge, decisions, plans, designs) so context travels with the repo; only `.hv/bin/` (regenerated mirror), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, and `.hv/qa-runs/` stay gitignored | 🔔 **Design nudges.** `/hv-capture` and `/hv-next` flag `[Major]` features and `[P0]` bugs with no design artifact and suggest `/hv-brainstorm` before planning |
-| 🤖 **Autonomy levels.** `autonomy.level: "off"` (default nudges), `"auto"` (chain `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`), or `"loop"` (drain the backlog; Major items auto-research via `/hv-brainstorm --auto-loop` → auto-plan → work). Quality gates still apply | ⚙️ **Interactive config.** `/hv-config` shows current values, lets you check off which keys to change, and reuses `/hv-init`'s option vocabulary so you never hand-edit JSON. Positional shortcut: `/hv-config <key>` jumps to the value picker; `/hv-config <key>=<value>` applies directly |
-| 🌐 **Umbrella mode.** One coordinator across N independent sub-repos: shared `KNOWLEDGE.md` / `DECISIONS.md` / `MILESTONES.md` / `BACKLOG.md` at the umbrella with per-sub-repo `CONTEXT.md` under `.hv/contexts/<repo>/`; commits, branches, PRs land in each sub-repo's own `.git/`. No submodules. Tag items with `Repos:` to route work | 🔀 **Per-repo fan-out.** `/hv-refactor` and `/hv-work` route to the resolved sub-repo; `/hv-pause` keys handoffs by `(branch, repo)` so two sub-repos sharing a branch name don't clobber each other |
-| 📊 **Visible progress.** Multi-step skills (`/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-release`, `/hv-refactor`, …) declare a phase checklist via `TaskCreate` at start and tick each phase off as it lands, so long cycles stay legible instead of scrolling past as a stream of bash output | 🛠️ **Codified authoring conventions.** `hv-init`'s `## Authoring conventions` lists the rules new hv-* skills must follow (autonomy-aware dispatch, opt-in flag defaults, `AskUserQuestion` limits, progress checklists), so contributions stay consistent without rediscovery |
+A short list of the things that actually distinguish hv-skills from a TODO file and a willingness to think hard:
+
+- **Knowledge that survives `/clear`.** `/hv-learn` writes durable gotchas to `KNOWLEDGE.md` with verification; `/hv-work`, `/hv-debug`, and `/hv-review` consult them automatically on future runs.
+- **Handoff notes for the live hypothesis.** `/hv-pause` writes what's in your head (current hypothesis, next planned step, files mid-edit) so `/hv-next` after a `/clear` picks up where you left off, not just where git left off.
+- **Parallel execution with atomic commits.** An orchestrator decomposes the plan, worker subagents implement in parallel, one verifiable commit per task. Branch or worktree isolation keeps main clean.
+- **Two-stage review plus opt-in fresh-eyes.** `/hv-review` splits spec-compliance from code-quality. `ship.secondOpinion` adds a no-prior-context adversarial pass after the contextualized one signs off.
+- **Plan-as-artifact and design exploration.** `/hv-plan` writes the plan to its own file; `/hv-brainstorm` negotiates shape and tradeoffs for Major features or P0 bugs before planning; `/hv-work --preview` prints the intended approach before code lands.
+- **Umbrella mode.** One coordinator across N independent sub-repos. Shared `KNOWLEDGE.md` / `DECISIONS.md` / `BACKLOG.md` at the umbrella; commits land in each sub-repo's own `.git/`. No submodules.
+
+A full feature list (autonomy chaining, product QA gate, throwaway spikes, backlog reconciliation, GitHub/GitLab issue round-trip, refactor cycles) is in the [docs](docs/).
 
 ## Configuration
 
-Edit `.hv/config.json`:
-
-```json
-{
-  "models":   { "orchestrator": "opus",   "worker": "sonnet" },
-  "work":     { "isolation": "branch",    "mergeStrategy": "direct" },
-  "debug":    { "competingHypotheses": false },
-  "refactor": { "confirmBeforeExecute": true, "verifyCommands": [] },
-  "learn":    { "verify": true },
-  "ship":     { "review": true },
-  "docs":     { "path": "docs",           "autoCreate": false },
-  "umbrella": { "enabled": false },
-  "autonomy": { "level": "off" }
-}
-```
-
-Defaults are conservative: branch isolation, direct merge, review gate on, knowledge verifier on, docs auto-write off (pending an LLM safety review), no autonomous chaining. Set `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship` automatically, or `"loop"` to keep going until the backlog drains. `umbrella.enabled` is set automatically by `/hv-init` when it detects two or more git children at the parent; see [docs/usage/umbrella-mode.md](docs/usage/umbrella-mode.md). For every key and when to flip it, see [docs/usage/configuration.md](docs/usage/configuration.md).
+Defaults in `.hv/config.json` are conservative: branch isolation, direct merge, review gate on, no autonomous chaining. Flip `autonomy.level` to `"auto"` to chain `/hv-work` → `/hv-learn` and `/hv-debug` → `/hv-ship`, or `"loop"` to drain the backlog. Use `/hv-config` to edit interactively; full key list in [docs/usage/configuration.md](docs/usage/configuration.md).
 
 ## FAQ
 

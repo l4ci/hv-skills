@@ -37,7 +37,7 @@ The skill prints a structured preview:
   ARCHIVE: untouched (use --scrub-archive to mirror)
   Active stream: none
 
-dry-run — no files modified.
+dry-run: no files modified.
 ```
 
 The skill then asks for confirmation with three options: *Apply (Recommended)*, *Apply + scrub ARCHIVE*, *Cancel*. Pick *Apply* and the helper runs again with `--force`, applies the changes, and reports:

@@ -8,7 +8,7 @@ Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" throu
 
 **Trigger phrases:**
 
-- `/hv-work` — after `/hv-next` routes you here automatically
+- `/hv-work` after `/hv-next` routes you here automatically
 - `/hv-work [B03]` to implement a specific item by ID
 - `/hv-work [B03] [F07]` to implement a batch of items together
 - `/hv-work "add retry logic to the upload pipeline"` describes the work; it captures and executes
@@ -39,7 +39,7 @@ sequenceDiagram
     O->>G: commit Task A
     O->>G: commit Task B
     O->>G: merge --no-ff (or open PR)
-    O-->>U: summary — branch landed
+    O-->>U: summary: branch landed
 ```
 
 ## One commit per task
