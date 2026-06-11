@@ -9,8 +9,9 @@
 # Usage: hv-issues-list [--repo <name>] [--mine] [--label <name>] [--limit <N>]
 #   --repo  <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and
 #                   run from that sub-repo directory.
-#   --mine          Only issues authored by the authenticated user
-#                   (--author @me on gh; --author @me on recent glab).
+#   --mine          Only issues assigned to the authenticated user
+#                   (--assignee @me on gh; --assignee @me on recent glab —
+#                   old glab treats @me as a literal username and silently returns []).
 #   --label <name>  Filter by label.
 #   --limit <N>     Max issues to fetch (default 30).
 #   stdout: JSON array — [{number, title, body, labels, url, author}, ...]
@@ -82,7 +83,7 @@ case "$PROVIDER" in
             --state open \
             --json number,title,body,labels,url,author \
             --limit "$LIMIT" \
-            ${MINE:+--author "@me"} \
+            ${MINE:+--assignee "@me"} \
             ${LABEL:+--label "$LABEL"}
         )
       else
@@ -90,7 +91,7 @@ case "$PROVIDER" in
           --state open \
           --json number,title,body,labels,url,author \
           --limit "$LIMIT" \
-          ${MINE:+--author "@me"} \
+          ${MINE:+--assignee "@me"} \
           ${LABEL:+--label "$LABEL"}
       fi
     )"
@@ -119,7 +120,7 @@ case "$PROVIDER" in
             --opened \
             --output json \
             --per-page "$LIMIT" \
-            ${MINE:+--author "@me"} \
+            ${MINE:+--assignee "@me"} \
             ${LABEL:+--label "$LABEL"}
         )
       else
@@ -127,7 +128,7 @@ case "$PROVIDER" in
           --opened \
           --output json \
           --per-page "$LIMIT" \
-          ${MINE:+--author "@me"} \
+          ${MINE:+--assignee "@me"} \
           ${LABEL:+--label "$LABEL"}
       fi
     )"

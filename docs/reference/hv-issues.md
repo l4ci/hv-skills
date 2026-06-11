@@ -44,7 +44,7 @@ soft-warns when a remote is detected but its CLI is missing.
 |-----|---------|---------|
 | `issues.label` | `"in-progress"` | Label applied upstream when an issue is captured |
 | `issues.autoCreateLabel` | `true` | Auto-create the label upstream if it doesn't exist |
-| `issues.filterMineOnly` | `false` | Restrict the picker to issues I authored (`hv-issues-list --mine` → `--author @me`) |
+| `issues.filterMineOnly` | `false` | Restrict the picker to issues assigned to me (`hv-issues-list --mine` → `--assignee @me`) |
 | `issues.providers.github` | `true` | Enable `--from-github` |
 | `issues.providers.gitlab` | `true` | Enable `--from-gitlab` |
 
