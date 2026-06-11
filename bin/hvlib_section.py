@@ -92,7 +92,6 @@ def append_to_section(content: str, name: str, addition: str) -> str:
     """
     span = find_section(content, name)
     if span is None:
-        sep = "" if content.endswith("\n") else "\n"
         return content.rstrip("\n") + "\n\n## " + name + "\n" + addition
     start, end = span
     body = content[start:end]
