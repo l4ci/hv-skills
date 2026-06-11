@@ -2,6 +2,9 @@ echo "hv-refactor-targets"
 mkdir rt-test && cd rt-test
 mkdir -p .hv/bin
 cp "$BIN"/hvlib*.py .hv/bin/
+# hvlib_types.py reads the registry from hv-types.sh next to itself at import
+# time, so the data file must travel with the hvlib*.py modules.
+cp "$BIN/hv-types.sh" .hv/bin/
 cp "$BIN/hv-refactor-targets" .hv/bin/
 chmod +x .hv/bin/hv-refactor-targets
 
