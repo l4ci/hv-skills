@@ -330,6 +330,21 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-05-19"
+    },
+    "Build & Tooling: Helpers & migrations::hv-knowledge-query matches exact full topic headings only": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-06-11"
+    },
+    "Build & Tooling: Smoke testing::Pinned-surface sentinels need a live-scan drift guard": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-06-11"
+    },
+    "Build & Tooling: Helpers & migrations::No amend helper exists for design artifacts": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-06-11"
     }
   }
 }
