@@ -448,7 +448,7 @@ For each target repo, dispatch a **parallel tool-call batch** (all three calls i
 .hv/bin/hv-issues-imported [--repo <name>]
 ```
 
-Read `issues.filterMineOnly` from `.hv/config.json`. When `true`, pass `--mine` to `hv-issues-list`; when `false` or absent, omit it. The helper maps `--mine` to the provider's author-self filter (`--author @me` for both `gh` and `glab`). Never pass `--label @me` — that would filter for a label literally named `@me`.
+Read `issues.filterMineOnly` from `.hv/config.json`. When `true`, pass `--mine` to `hv-issues-list`; when `false` or absent, omit it. The helper maps `--mine` to the provider's assignee-self filter (`--assignee @me` for both `gh` and `glab`). Never pass `--label @me` — that would filter for a label literally named `@me`.
 
 Read `issues.label` from `.hv/config.json` (default `"in-progress"`) — this is the target label applied upstream in Step I6 for round-trip tagging. Never pass it to `hv-issues-list` as a filter; it is not a source filter, which is why the call above takes no `--label` argument.
 
