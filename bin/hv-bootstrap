@@ -135,6 +135,7 @@ IGNORE_LINES=(
   '.hv/config.local.json'
   '.hv/handoff/'
   '.hv/qa-runs/'
+  '.hv/**/*.lock'
 )
 if [ -f .gitignore ]; then
   missing=0

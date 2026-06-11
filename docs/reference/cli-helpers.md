@@ -94,7 +94,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-resolve-plugin-root` | Resolve the installed hv-skills plugin root (default `<kind>\|<root>`; `--root-only`; `--bin`) | `.hv/bin/hv-resolve-plugin-root --root-only` |
 | `hv-issue-suggest` | Open an upstream hv-skills issue via `gh` (or print a manual-fallback URL); reads body from stdin | `printf '%s' "$BODY" \| .hv/bin/hv-issue-suggest --title "Title"` |
 | `hv-issues-provider` | Print the issue-tracking provider for cwd (or `--repo <name>`): `github` / `gitlab` / `unknown`, based on the origin URL; always exits 0 | `.hv/bin/hv-issues-provider` |
-| `hv-issues-list` | List open upstream issues (GH via `gh`, GL via `glab`) as normalized JSON; exit 0 with `[]` when none; exit 1 when the matching CLI is missing or unauthed | `.hv/bin/hv-issues-list [--repo <name>] [--label <name>] [--limit <N>]` |
+| `hv-issues-list` | List open upstream issues (GH via `gh`, GL via `glab`) as normalized JSON; exit 0 with `[]` when none; exit 1 when the matching CLI is missing or unauthed | `.hv/bin/hv-issues-list [--repo <name>] [--mine] [--label <name>] [--limit <N>]` |
 | `hv-issues-imported` | Index every `GH:`/`GL:` cross-reference across `BACKLOG.md`, `ARCHIVE.md`, and per-item detail files as JSON; multi-repo items emit one entry per `Repos:` member; `--open-only` post-filters to issues still open upstream (drops closed/unresolvable entries silently); always exits 0 | `.hv/bin/hv-issues-imported [--repo <name>] [--open-only]` |
 | `hv-issues-label` | Apply or remove a label on an upstream issue (GH/GL); idempotent on the already-present / already-absent transitions; auto-creates the label when `issues.autoCreateLabel` is true | `.hv/bin/hv-issues-label apply --issue 42 --label in-progress` |
 | `hv-issues-close` | Close an upstream issue and post a tracking comment naming the shipping commit; called by `/hv-ship` on the direct-push path after explicit user opt-in | `.hv/bin/hv-issues-close --issue 42 --commit a1b2c3d` |
@@ -295,7 +295,7 @@ Distinct from the upstream-issue helper above. These five helpers back the proje
 
 `hv-issues-provider` detects whether the active git origin points at GitHub or GitLab, printing `github`, `gitlab`, or `unknown`. The match is hostname-based (`github*` → github, `gitlab*` → gitlab), so self-hosted and enterprise instances resolve correctly. Always exits 0; `unknown` is a valid result, not an error.
 
-`hv-issues-list` is the read path: it shells out to `gh issue list --state open` or `glab issue list --opened`, normalizes the output, and emits a uniform JSON array regardless of provider. Optional `--label <name>` and `--limit <N>` flags pass through to the underlying CLI. An empty result (`[]`) and a missing CLI are distinguished: empty list exits 0, but a missing or unauthed `gh`/`glab` exits 1 with a stderr message. Skills should treat exit 1 as "fix your setup," not "nothing to do."
+`hv-issues-list` is the read path: it shells out to `gh issue list --state open` or `glab issue list --opened`, normalizes the output, and emits a uniform JSON array regardless of provider. Optional `--label <name>` and `--limit <N>` flags pass through to the underlying CLI; `--mine` maps to the provider's author-self filter (`--author @me` on `gh` and recent `glab`) and backs the `issues.filterMineOnly` config key. An empty result (`[]`) and a missing CLI are distinguished: empty list exits 0, but a missing or unauthed `gh`/`glab` exits 1 with a stderr message. Skills should treat exit 1 as "fix your setup," not "nothing to do."
 
 `hv-issues-imported` is the dedupe index: it scans `BACKLOG.md`, `ARCHIVE.md`, and every per-item detail file under `.hv/bugs/`, `.hv/features/`, `.hv/tasks/` for `GH: #N` or `GL: #N` cross-references and emits JSON tagged with provider, issue number, item ID, and the resolved `Repos:` value (multi-repo items emit one entry per sub-repo). `/hv-capture --from-github` / `--from-gitlab` subtracts this set from `hv-issues-list` output so already-imported issues are never re-offered. Pass `--open-only` to drop entries whose upstream issue is already closed (one `gh`/`glab` issue view per entry; entries that can't be resolved, e.g. missing CLI, auth failure, deleted issue, are dropped silently because the close gate would no-op on them). `/hv-ship` Step 6c and `/hv-release` Step 13.4 both use the `--open-only` form to power their close-upstream-issues gates.
 
@@ -352,9 +352,9 @@ Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv
    `status.json`.
 3. Appends per-file ignores to `.gitignore` under a `# ── hv-skills ──`
    header (when any are missing): `.hv/bin/`, `.hv/status.json`,
-   `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, and
-   `.hv/qa-runs/`. Migrates legacy blanket `.hv/` lines off the same file.
-   The rest of `.hv/` is tracked.
+   `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`,
+   `.hv/qa-runs/`, and `.hv/**/*.lock`. Migrates legacy blanket `.hv/`
+   lines off the same file. The rest of `.hv/` is tracked.
 
 It does **not** copy helper scripts; that is `/hv-init`'s job. It is called by
 `/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and

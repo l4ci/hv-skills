@@ -125,7 +125,7 @@ import os
 import sys
 from datetime import date
 from pathlib import Path
-from hvlib import load_sidecar, dump_json_atomic, bump_hit
+from hvlib import load_sidecar, dump_json_atomic, bump_hit, locked
 
 SIDECAR = Path(os.environ["_HV_KT_SIDECAR"])
 VALID_TIERS = {"provisional", "confirmed", "deprecated"}
@@ -170,28 +170,32 @@ elif cmd == "set":
             file=sys.stderr,
         )
         sys.exit(1)
-    data = load()
-    key = make_key(topic, title)
-    if key in data["entries"]:
-        data["entries"][key]["tier"] = tier_arg
-    else:
-        data["entries"][key] = {"tier": tier_arg, "hits": 0, "lastSeen": today}
-    save(data)
-
-elif cmd == "init":
-    data = load()
-    key = make_key(topic, title)
-    if key in data["entries"]:
-        # Idempotent no-op
-        pass
-    else:
-        data["entries"][key] = {"tier": "provisional", "hits": 0, "lastSeen": today}
+    # Serialize the read-modify-write — concurrent writers must not lose updates.
+    with locked(SIDECAR):
+        data = load()
+        key = make_key(topic, title)
+        if key in data["entries"]:
+            data["entries"][key]["tier"] = tier_arg
+        else:
+            data["entries"][key] = {"tier": tier_arg, "hits": 0, "lastSeen": today}
         save(data)
 
+elif cmd == "init":
+    with locked(SIDECAR):
+        data = load()
+        key = make_key(topic, title)
+        if key in data["entries"]:
+            # Idempotent no-op
+            pass
+        else:
+            data["entries"][key] = {"tier": "provisional", "hits": 0, "lastSeen": today}
+            save(data)
+
 elif cmd == "inc":
-    data = load()
-    data, _entry = bump_hit(data, topic, title, today)
-    save(data)
+    with locked(SIDECAR):
+        data = load()
+        data, _entry = bump_hit(data, topic, title, today)
+        save(data)
 
 elif cmd == "list":
     data = load()

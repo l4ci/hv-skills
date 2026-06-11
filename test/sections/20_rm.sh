@@ -169,6 +169,41 @@ ARCHEOF
     || true
 )
 
+# ── (h) --force B01,B02 (multi-ID batch): BOTH cross-refs stripped from the
+#        surviving F01 line, with no dangling `Related:` remnant ──────────────
+build_rm_fixture "$RM_TMP"
+(
+  cd "$RM_TMP"
+  cat > .hv/BACKLOG.md <<'FIXEOF'
+# TODO
+
+## Bugs
+- **[B01] [P2] First bug.** Repro: always.
+- **[B02] [P2] Second bug.** Repro: sometimes.
+
+## Features
+- **[F01] [Minor] Depends on both bugs.** Body text. Related: [B01], [B02]
+
+## Tasks
+
+## Completed
+FIXEOF
+  set +e
+  OUT=$("$BIN/hv-rm" --force B01,B02 2>/dev/null)
+  RC=$?
+  set -e
+  [ "$RC" = "0" ] || { echo "FAIL F36(h): multi-ID batch should exit 0, got $RC"; exit 1; }
+  F01_LINE=$(grep '\[F01\]' .hv/BACKLOG.md) \
+    || { echo "FAIL F36(h): surviving [F01] bullet missing from BACKLOG.md"; exit 1; }
+  echo "$F01_LINE" | grep -q '\[B01\]' \
+    && { echo "FAIL F36(h): [B01] cross-ref still on F01 line: $F01_LINE"; exit 1; }
+  echo "$F01_LINE" | grep -q '\[B02\]' \
+    && { echo "FAIL F36(h): [B02] cross-ref still on F01 line: $F01_LINE"; exit 1; }
+  echo "$F01_LINE" | grep -q 'Related:' \
+    && { echo "FAIL F36(h): dangling 'Related:' remnant on F01 line: $F01_LINE"; exit 1; }
+  true
+)
+
 rm -rf "$RM_TMP"
 pass "F36 hv-rm helper smoke"
 

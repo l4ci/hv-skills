@@ -14,6 +14,7 @@ PYTHONPATH="$BIN" python3 - <<'PY'
 import hvlib
 
 NAMES = [
+    "COUNTABLE_TYPES",
     "VERSION_KIND_REGISTRY",
     "active_items",
     "append_to_section",
@@ -39,6 +40,7 @@ NAMES = [
     "load_config",
     "load_json",
     "load_repos",
+    "locked",
     "open_bullet_re",
     "parse_done_line",
     "parse_frontmatter",
@@ -82,4 +84,4 @@ for n in NAMES:
 print(f"OK: {len(NAMES)} public names resolve via from hvlib import X")
 PY
 
-pass "hvlib export sentinel — 49 caller-imported public names resolve via shim"
+pass "hvlib export sentinel — caller-imported public names resolve via shim"

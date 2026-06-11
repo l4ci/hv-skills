@@ -39,7 +39,7 @@ set -e
 # F21 lifted the umbrella refusal — migrate proceeds. With no per-sub-repo
 # CONTEXT.md in this fixture there is nothing to migrate, so it's a clean
 # no-op dry-run (exit 0). The deep umbrella migration path is covered by
-# test/sections/42_umbrella_knowledge.sh.
+# test/sections/46_umbrella_knowledge.sh.
 [ $RC -eq 0 ] || fail "umbrella should no longer refuse (expected exit 0, got $RC)"
 if grep -q "umbrella project detected" "$TMP_UMB/.hv/err"; then
   fail "stale umbrella refusal message still present"

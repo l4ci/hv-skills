@@ -55,7 +55,7 @@ Bash: .hv/bin/hv-knowledge-hit --topic "Architecture" --title "Always route netw
 Bash: .hv/bin/hv-knowledge-hit --topic "Architecture" --title "Avoid force-unwrap in production paths"
 ```
 
-Issue all calls **in a single parallel tool-call batch** — the helper is append-only (no shared mutable state) so concurrent calls don't race. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3) without a pending contradiction.
+Issue all calls **in a single parallel tool-call batch** — each helper serializes its sidecar write behind a per-file lock, so concurrent calls don't lose hits. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3) without a pending contradiction.
 
 **Only register bullets that survived into the brief.** Bullets returned by the query but pruned before they reached a `**Known gotchas:**` / `**Relevant project conventions:**` section don't earn credit — unused queries shouldn't drive promotion.
 

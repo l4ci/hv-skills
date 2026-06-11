@@ -10,7 +10,7 @@
 # Writer helper: exit 0; auto-removes stale status entries and emits JSON summary.
 # Usage: hv-reconcile
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 UMBRELLA_ON=$("$HERE/hv-umbrella-on")
 if [ "$UMBRELLA_ON" = "yes" ]; then
   # In umbrella mode, the umbrella tree may legitimately not be a git repo;

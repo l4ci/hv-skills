@@ -95,7 +95,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from hvlib import read_or_empty, write_text_atomic, find_section, load_tier_sidecar, save_tier_sidecar
+from hvlib import read_or_empty, write_text_atomic, find_section, load_tier_sidecar, save_tier_sidecar, locked
 
 KM = Path(".hv/KNOWLEDGE.md")
 SIDECAR = Path(os.environ["_HV_KR_SIDECAR"])
@@ -136,16 +136,18 @@ def rekey_sidecar(old_key, new_key):
     """
     if not SIDECAR.exists():
         return
-    data = _load()
-    entries = data.get("entries", {})
-    if old_key not in entries:
-        return
-    # Don't carry over Glossary entries (defense in depth).
-    old_topic = old_key.split("::", 1)[0] if "::" in old_key else ""
-    if old_topic == "Glossary":
-        return
-    entries[new_key] = entries.pop(old_key)
-    _save(data)
+    # Serialize the read-modify-write — concurrent writers must not lose updates.
+    with locked(SIDECAR):
+        data = _load()
+        entries = data.get("entries", {})
+        if old_key not in entries:
+            return
+        # Don't carry over Glossary entries (defense in depth).
+        old_topic = old_key.split("::", 1)[0] if "::" in old_key else ""
+        if old_topic == "Glossary":
+            return
+        entries[new_key] = entries.pop(old_key)
+        _save(data)
 
 
 def rekey_sidecar_topic(old_topic, new_topic):
@@ -154,20 +156,21 @@ def rekey_sidecar_topic(old_topic, new_topic):
     """
     if not SIDECAR.exists():
         return
-    data = _load()
-    entries = data.get("entries", {})
-    prefix = old_topic + "::"
-    moved = {}
-    for key in list(entries.keys()):
-        if not key.startswith(prefix):
-            continue
-        suffix = key[len(prefix):]
-        new_key = new_topic + "::" + suffix
-        moved[new_key] = entries.pop(key)
-    if not moved:
-        return
-    entries.update(moved)
-    _save(data)
+    with locked(SIDECAR):
+        data = _load()
+        entries = data.get("entries", {})
+        prefix = old_topic + "::"
+        moved = {}
+        for key in list(entries.keys()):
+            if not key.startswith(prefix):
+                continue
+            suffix = key[len(prefix):]
+            new_key = new_topic + "::" + suffix
+            moved[new_key] = entries.pop(key)
+        if not moved:
+            return
+        entries.update(moved)
+        _save(data)
 
 
 if not title:

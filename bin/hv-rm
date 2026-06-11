@@ -7,7 +7,6 @@
 #   --scrub-archive Also remove matching entries from .hv/ARCHIVE.md.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$HERE/hv-types.sh"
 FORCE=0
 SCRUB_ARCHIVE=0
 while :; do
@@ -21,11 +20,11 @@ while :; do
 done
 IDS_CSV="${1:?usage: hv-rm [--dry-run] [--force] [--scrub-archive] <ID>[,<ID>...]}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$IDS_CSV" "$FORCE" "$SCRUB_ARCHIVE" <<'PY'
-import os
 import re
 import sys
 from pathlib import Path
 from hvlib import (
+    ALL_BACKLOG_SECTIONS,
     find_section,
     replace_section,
     write_text_atomic,
@@ -57,12 +56,6 @@ TODO_PATH = Path(".hv/BACKLOG.md")
 ARCHIVE_PATH = Path(".hv/ARCHIVE.md")
 STATUS_PATH = Path(".hv/status.json")
 
-# Derive active sections from the canonical env var (single source of truth in
-# hv-types.sh). "Completed" is appended locally because it isn't an OPEN
-# section — hv-rm needs to scan it for done/strikethrough bullets too.
-_OPEN = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
-TODO_ACTIVE_SECTIONS = _OPEN + ["Completed"]
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def read_file(path: Path) -> str:
@@ -88,7 +81,7 @@ id_info = {}  # iid → {source, sec_name, bullet_line}
 
 for iid in raw_ids:
     # Try TODO first.
-    sec_name, bullet = find_bullet_in_content(todo_content, iid, TODO_ACTIVE_SECTIONS)
+    sec_name, bullet = find_bullet_in_content(todo_content, iid, ALL_BACKLOG_SECTIONS)
     if sec_name is not None:
         id_info[iid] = {
             "source": "todo",
@@ -101,7 +94,7 @@ for iid in raw_ids:
 
     # Fall through to ARCHIVE.
     if archive_content:
-        sec_name, bullet = find_bullet_in_content(archive_content, iid, TODO_ACTIVE_SECTIONS)
+        sec_name, bullet = find_bullet_in_content(archive_content, iid, ALL_BACKLOG_SECTIONS)
         if sec_name is not None:
             id_info[iid] = {
                 "source": "archive",
@@ -146,24 +139,39 @@ for iid, entry in active_hit.items():
 
 # ── compute cleanup plan ──────────────────────────────────────────────────────
 
-plans = {}  # iid → {todo_entry, xrefs_todo, xrefs_archive, detail_path, plan_files, status_strip}
+# Simulate the full removal up front so the dry-run preview and the applied
+# result come from the same computation. Origin bullets are stripped first
+# (across ALL ids), then cross-references are collected and stripped per id
+# against the evolving content. Collecting against the original content
+# produced stale (old_line, new_line) pairs whenever two removed ids shared
+# a Related: field — the second strip no longer matched and dangled.
 
-# Sections to scan for cross-references in TODO.
-xref_sections_todo = ["Bugs", "Features", "Tasks", "Completed"]
+new_todo = todo_content
+new_archive = archive_content
 
 for iid in raw_ids:
     info = id_info[iid]
-    source = info["source"]  # "todo" or "archive"
+    if info["source"] == "todo":
+        new_todo = strip_bullet_from_content(new_todo, info["bullet_line"], info["sec_name"])
+    elif info["source"] == "archive" and scrub_archive:
+        new_archive = strip_bullet_from_content(new_archive, info["bullet_line"], info["sec_name"])
+
+plans = {}  # iid → {info, xrefs_todo, xrefs_archive, detail_path, plan_files, status_strip}
+
+for iid in raw_ids:
+    info = id_info[iid]
 
     # Cross-references in TODO (always).
-    xrefs_todo = collect_cross_refs(todo_content, iid, xref_sections_todo)
+    xrefs_todo = collect_cross_refs(new_todo, iid, ALL_BACKLOG_SECTIONS)
+    new_todo = apply_cross_ref_strips(new_todo, xrefs_todo)
 
     # Cross-references in ARCHIVE (only if scrub_archive).
     xrefs_archive = []
-    if scrub_archive and archive_content:
+    if scrub_archive and new_archive:
         # Scan all ## sections in ARCHIVE.
-        archive_secs = [m.group(1) for m in re.finditer(r"^## (.+)$", archive_content, re.MULTILINE)]
-        xrefs_archive = collect_cross_refs(archive_content, iid, archive_secs)
+        archive_secs = [m.group(1) for m in re.finditer(r"^## (.+)$", new_archive, re.MULTILINE)]
+        xrefs_archive = collect_cross_refs(new_archive, iid, archive_secs)
+        new_archive = apply_cross_ref_strips(new_archive, xrefs_archive)
 
     # Detail file.
     dir_name = detail_dir_for_id(iid)
@@ -273,34 +281,7 @@ if not force:
 
 # ── apply mode ────────────────────────────────────────────────────────────────
 
-# Work on fresh copies of file content (read once, mutate in memory, write once).
-new_todo = todo_content
-new_archive = archive_content
-
-for iid in raw_ids:
-    plan = plans[iid]
-    info = plan["info"]
-    xrefs_todo = plan["xrefs_todo"]
-    xrefs_archive = plan["xrefs_archive"]
-    detail_path = plan["detail_path"]
-    plan_files = plan["plan_files"]
-    status_strip = plan["status_strip"]
-    source = info["source"]
-    sec_name = info["sec_name"]
-    bullet = info["bullet_line"]
-
-    # Remove the origin bullet from its source file.
-    if source == "todo":
-        new_todo = strip_bullet_from_content(new_todo, bullet, sec_name)
-    elif source == "archive" and scrub_archive:
-        new_archive = strip_bullet_from_content(new_archive, bullet, sec_name)
-
-    # Strip cross-references in TODO.
-    new_todo = apply_cross_ref_strips(new_todo, xrefs_todo)
-
-    # Strip cross-references in ARCHIVE.
-    if scrub_archive and xrefs_archive:
-        new_archive = apply_cross_ref_strips(new_archive, xrefs_archive)
+# new_todo / new_archive were fully computed in the plan phase; only write here.
 
 # Write TODO if changed.
 if new_todo != todo_content:

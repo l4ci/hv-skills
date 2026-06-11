@@ -206,7 +206,7 @@ V1 overlap heuristic — simple case-insensitive substring match: for each candi
 .hv/bin/hv-knowledge-contradiction --add --topic <T> --title <S> --text "<first 200 chars of correction>"
 ```
 
-Process candidates in parallel — append calls are append-only and don't race. `/hv-learn` Step 9 surfaces these candidates at session end and asks per-bullet whether to demote.
+Process candidates in parallel — the helper serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose updates. `/hv-learn` Step 9 surfaces these candidates at session end and asks per-bullet whether to demote.
 
 Edge case: this step only fires when Step 2 actually surfaced an AskUserQuestion AND the user provided a non-Recommended answer. The Step 4 query happens later — so this detection ALSO fires later, comparing the now-loaded bullets against the earlier correction. Practical sequencing: cache the correction text in the cycle's working memory at Step 2, then run the overlap check after Step 4's K+D returns matches.
 
@@ -272,7 +272,7 @@ From the conversation context:
 
    - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
 
-   > **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After writing the Step 6 briefs, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in a brief's `**Known gotchas:**` section, call `.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch. Bullets returned but pruned before the briefs don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
+   > **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After writing the Step 6 briefs, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in a brief's `**Known gotchas:**` section, call `.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch — the helper serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose hits. Bullets returned but pruned before the briefs don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. **Absorb wave-internal file collisions.** Before grouping into waves, scan task pairs for **any two tasks whose modified-file sets intersect** — not just rename / link-sweep. Under `work.isolation: "branch"` two write-only workers editing the same file race on disk (the second worker's `Edit` reads sibling-mutated content), so a same-file pair would otherwise force serialization across waves. The orchestrator's standing recourse is **absorption**: fold one task's same-file portion into the other task's Step 6 brief at dispatch time, leaving the absorbed task touching only files no other task writes. Both then run as parallel write-only workers. This is a reproducible orchestrator-side technique, not per-orchestrator improvisation — resolve every intersecting pair by absorption (preferred), clean split-ownership, or serialize-across-waves before grouping. Rename + link-sweep is the canonical instance; use `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` as ground truth for it (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Absorb wave-internal file collisions* for the absorption choreography, the M02-S02 worked example, and the rename + link-sweep resolution table.
@@ -520,12 +520,11 @@ Don't recap the plan, list verification results, or describe intermediate steps.
 
 ## Step 13 — Learn (Nudge or Auto-Invoke)
 
-Apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md` (2+ items resolved / ≥5 files touched / hard bug). Skip for single-item fixes and pure mechanical changes; don't repeat in the same session.
+Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
 
-When triggered, branch on `autonomy.level`:
-
-- `"off"` — nudge *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
-- `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the verifier (if `learn.verify: true`) has the right context.
+- **Nudge (`"off"`):** *"Capture learnings from this session? Run `/hv-learn` to save durable knowledge before context fades."*
+- **Target (`"auto"`/`"loop"`):** **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.**
+- **Brief:** the cycle's resolved IDs and touched files, so the verifier (if `learn.verify: true`) has the right context.
 
 ## Step 13.5 — Decide (Nudge Only)
 
@@ -537,14 +536,12 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 ## Step 13.6 — Docs After-Work (Nudge or Auto-Invoke)
 
-Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
+Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
 
-When the flag is on, apply the same post-cycle trigger condition as Step 13 — see `references/post-cycle-trigger-gate.md`.
-
-When triggered, branch on `autonomy.level`:
-
-- `"off"` — nudge *"User-facing changes shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
-- `"auto"` or `"loop"` — **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the cycle's resolved IDs and touched files so the after-work flow has the right context.
+- **Config flag:** `docs.afterWork` (default `false`). Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
+- **Nudge (`"off"`):** *"User-facing changes shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
+- **Target (`"auto"`/`"loop"`):** **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** (Skill dispatch, not inline — the inline variant belongs to `/hv-ship` Step 8.6.)
+- **Brief:** the cycle's resolved IDs and touched files, so the after-work flow has the right context.
 
 If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
 
@@ -558,12 +555,13 @@ If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work f
 .hv/bin/hv-refactor-age
 ```
 
-Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit. Trigger when `features >= 5` OR `bugs >= 10`. Don't repeat in the same session.
+Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit.
 
-Branch on `autonomy.level`:
+Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
 
-- `"off"` — nudge *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
-- `"auto"` or `"loop"` — **dispatch `hv-refactor` via `Skill` immediately — no prompt, no confirmation.** (`refactor.confirmBeforeExecute` still governs the internal checkpoints.)
+- **Trigger override:** `features >= 5` OR `bugs >= 10` (replaces the gate's default condition; don't-repeat still applies).
+- **Nudge (`"off"`):** *"You've shipped [N] features / [M] bug fixes since the last refactor. Might be a good time to run `/hv-refactor` to clean up accumulated friction."*
+- **Target (`"auto"`/`"loop"`):** **dispatch `hv-refactor` via `Skill` immediately — no prompt, no confirmation.** No brief needed; `refactor.confirmBeforeExecute` still governs the internal checkpoints.
 
 ## Step 15 — Loop Continuation
 
@@ -591,5 +589,5 @@ Loop stops naturally when:
 | [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
-| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). |
+| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
 | [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

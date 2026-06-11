@@ -3,8 +3,11 @@
 Re-exported by hvlib for backward compat: existing `from hvlib import load_json`
 imports continue to work.
 """
+import fcntl
 import json
 import os
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -49,6 +52,40 @@ def dump_json_atomic(path, data) -> None:
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2) + "\n")
     os.replace(tmp, p)
+
+
+@contextmanager
+def locked(path, timeout=10.0):
+    """Exclusive advisory lock for read-modify-write cycles on `path`.
+
+    Acquires fcntl.flock(LOCK_EX) on the sibling lockfile `<path>.lock`
+    (NOT the data file — os.replace in dump_json_atomic swaps the inode,
+    so a lock on the data file wouldn't survive a write). Non-blocking
+    retry loop (~50ms) up to `timeout` seconds, then TimeoutError naming
+    the lock path. Kernel releases the lock on process death — no stale-
+    lock cleanup. The empty .lock file is left in place (unlink-after-
+    release races with the next acquirer). Writers lock; readers never
+    do (atomic replace keeps lock-free reads consistent). Hold at most
+    one locked() at a time.
+    """
+    lock_path = Path(str(path) + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"timed out after {timeout}s waiting for lock {lock_path}"
+                    )
+                time.sleep(0.05)
+        yield
+    finally:
+        os.close(fd)  # closing the fd releases the flock
 
 
 def load_sidecar(path, schema_version: int = 1, default=None):

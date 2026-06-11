@@ -6,6 +6,36 @@ echo "hv-types.sh source contract"
 ) || fail "hv-types.sh did not export expected values"
 pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_OPEN_SECTIONS=Bugs|Features|Tasks"
 
+echo "hv-types.sh <-> hvlib_types registry parity"
+# Both sides parse the same HV_TYPE_REGISTRY line in bin/hv-types.sh — bash
+# via the sourcing loop, python via hvlib_types' regex parser. This pins the
+# residual duality: any divergence between the two parsers fails here, not
+# in some downstream helper. The subshell scopes the sourced env vars; the
+# python child inherits them via export and compares against the constants.
+( . "$BIN/hv-types.sh"
+  PYTHONPATH="$BIN" python3 - <<'PY'
+import os
+import sys
+import hvlib_types as t
+
+PAIRS = [
+    ("HV_ITEM_TYPES", t.ITEM_TYPES),
+    ("HV_OPEN_SECTIONS", "|".join(t.OPEN_SECTIONS)),
+    ("HV_COUNTABLE_TYPES", t.COUNTABLE_TYPES),
+    ("HV_PLANNABLE_TYPES", t.PLANNABLE_TYPES),
+]
+diverged = False
+for env_name, py_val in PAIRS:
+    env_val = os.environ.get(env_name)
+    if env_val != py_val:
+        print(f"{env_name}: bash={env_val!r} python={py_val!r}", file=sys.stderr)
+        diverged = True
+if diverged:
+    sys.exit(1)
+PY
+) || fail "bash hv-types.sh and python hvlib_types diverge on HV_TYPE_REGISTRY"
+pass "hv-types.sh env exports match hvlib_types constants (registry parity)"
+
 echo "## hv-base-branch + hv-worktree-clear + hv-managed-block + hv-fm-list (refactor)"
 
 # 1. hv-base-branch

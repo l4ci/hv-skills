@@ -71,7 +71,7 @@ import os
 import subprocess
 import sys
 from datetime import date
-from hvlib import load_tier_sidecar, save_tier_sidecar, bump_hit, load_config
+from hvlib import load_tier_sidecar, save_tier_sidecar, bump_hit, load_config, locked
 
 SIDECAR        = os.environ["_HV_KH_SIDECAR"]
 DEFAULT_THRESHOLD = 3
@@ -84,40 +84,45 @@ cfg = load_config()
 val = cfg.get("learn", {}).get("promoteThreshold")
 threshold = val if isinstance(val, int) and val > 0 else DEFAULT_THRESHOLD
 
-try:
-    data = load_tier_sidecar(SIDECAR)
-except ValueError as e:
-    print(f"error: {e}", file=sys.stderr)
-    sys.exit(1)
+# Serialize the full read-modify-write (including the promotion-threshold
+# check) behind the sidecar's lock — concurrent hits must not lose increments.
+# The --has subprocess inside is a lock-free read of a different file (the
+# contradictions queue), so it can't deadlock against this lock.
+with locked(SIDECAR):
+    try:
+        data = load_tier_sidecar(SIDECAR)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
 
-data, state = bump_hit(data, topic, title, today)
+    data, state = bump_hit(data, topic, title, today)
 
-auto_promoted = False
-if state["tier"] == "provisional" and state["hits"] >= threshold:
-    bin_dir = os.environ["HV_BIN"]
-    result = subprocess.run(
-        [f"{bin_dir}/hv-knowledge-contradiction", "--has", "--topic", topic, "--title", title],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        has_contradiction = True
-    elif result.returncode == 1:
-        has_contradiction = False
-    else:
-        sys.stderr.write(result.stderr)
-        sys.exit(result.returncode)
-    if has_contradiction:
-        print(
-            f"skip-auto-promote: {topic} :: {title} has pending contradiction",
-            file=sys.stderr,
+    auto_promoted = False
+    if state["tier"] == "provisional" and state["hits"] >= threshold:
+        bin_dir = os.environ["HV_BIN"]
+        result = subprocess.run(
+            [f"{bin_dir}/hv-knowledge-contradiction", "--has", "--topic", topic, "--title", title],
+            check=False,
+            capture_output=True,
+            text=True,
         )
-    else:
-        state["tier"] = "confirmed"
-        auto_promoted = True
+        if result.returncode == 0:
+            has_contradiction = True
+        elif result.returncode == 1:
+            has_contradiction = False
+        else:
+            sys.stderr.write(result.stderr)
+            sys.exit(result.returncode)
+        if has_contradiction:
+            print(
+                f"skip-auto-promote: {topic} :: {title} has pending contradiction",
+                file=sys.stderr,
+            )
+        else:
+            state["tier"] = "confirmed"
+            auto_promoted = True
 
-save_tier_sidecar(SIDECAR, data)
+    save_tier_sidecar(SIDECAR, data)
 
 if auto_promoted:
     print(

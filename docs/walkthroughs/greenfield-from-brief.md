@@ -53,7 +53,7 @@ The command writes:
 - `.hv/bin/` (every CLI helper)
 - Managed blocks in `CLAUDE.md` so the orchestrator picks up project knowledge, decisions, context, and the active milestone
 
-Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/bin/` (regenerated mirror), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, and `.hv/qa-runs/` are gitignored.
+Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/bin/` (regenerated mirror), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored.
 
 ## Step 2: /hv-vision
 

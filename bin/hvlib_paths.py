@@ -12,6 +12,7 @@ import re
 
 from hvlib_io import load_json
 from hvlib_frontmatter import parse_frontmatter
+from hvlib_types import SECTION_FOR_PREFIX, DIR_FOR_PREFIX, SECTION_FOR_DIR
 from pathlib import Path
 
 
@@ -135,9 +136,8 @@ def section_name_for_id(item_id: str) -> str:
     The mapping mirrors detail_dir_for_id but emits the
     section name (capitalized plural) instead of the type slug.
     """
-    prefix_to_section = {"B": "Bugs", "F": "Features", "T": "Tasks"}
-    if item_id and item_id[0] in prefix_to_section:
-        return prefix_to_section[item_id[0]]
+    if item_id and item_id[0] in SECTION_FOR_PREFIX:
+        return SECTION_FOR_PREFIX[item_id[0]]
     return "Unknown"
 
 
@@ -147,13 +147,11 @@ def section_name_for_dir(dir_name: str) -> str:
     Used by hv-uncomplete to map a restored item's detail-dir to its BACKLOG
     section. Mirrors `section_name_for_id` for path-derived contexts.
     """
-    dir_to_section = {"bugs": "Bugs", "features": "Features", "tasks": "Tasks"}
-    return dir_to_section.get(dir_name, "Unknown")
+    return SECTION_FOR_DIR.get(dir_name, "Unknown")
 
 
 def detail_dir_for_id(iid: str) -> str:
     """Map an ID's prefix to its detail directory under .hv/.
     B→bugs, F→features, T→tasks, otherwise empty string."""
     prefix = iid[0].upper() if iid else ""
-    mapping = {"B": "bugs", "F": "features", "T": "tasks"}
-    return mapping.get(prefix, "")
+    return DIR_FOR_PREFIX.get(prefix, "")

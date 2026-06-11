@@ -6,9 +6,11 @@
 # Exit 1 with stderr when the matching CLI is missing or unauthed (precondition
 # failure, NOT "empty result"). This disambiguates: empty answer ≠ broken setup.
 #
-# Usage: hv-issues-list [--repo <name>] [--label <name>] [--limit <N>]
+# Usage: hv-issues-list [--repo <name>] [--mine] [--label <name>] [--limit <N>]
 #   --repo  <name>  Umbrella mode: resolve <name> via hv-resolve-repo-path and
 #                   run from that sub-repo directory.
+#   --mine          Only issues authored by the authenticated user
+#                   (--author @me on gh; --author @me on recent glab).
 #   --label <name>  Filter by label.
 #   --limit <N>     Max issues to fetch (default 30).
 #   stdout: JSON array — [{number, title, body, labels, url, author}, ...]
@@ -25,6 +27,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 LABEL=""
 LIMIT=30
+MINE=""
 
 hv_issues_parse_repo_flag "$@"
 
@@ -32,6 +35,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
       shift 2
+      ;;
+    --mine)
+      MINE=1
+      shift
       ;;
     --label)
       LABEL="${2:?--label requires a name argument}"
@@ -75,6 +82,7 @@ case "$PROVIDER" in
             --state open \
             --json number,title,body,labels,url,author \
             --limit "$LIMIT" \
+            ${MINE:+--author "@me"} \
             ${LABEL:+--label "$LABEL"}
         )
       else
@@ -82,6 +90,7 @@ case "$PROVIDER" in
           --state open \
           --json number,title,body,labels,url,author \
           --limit "$LIMIT" \
+          ${MINE:+--author "@me"} \
           ${LABEL:+--label "$LABEL"}
       fi
     )"
@@ -110,6 +119,7 @@ case "$PROVIDER" in
             --opened \
             --output json \
             --per-page "$LIMIT" \
+            ${MINE:+--author "@me"} \
             ${LABEL:+--label "$LABEL"}
         )
       else
@@ -117,6 +127,7 @@ case "$PROVIDER" in
           --opened \
           --output json \
           --per-page "$LIMIT" \
+          ${MINE:+--author "@me"} \
           ${LABEL:+--label "$LABEL"}
       fi
     )"

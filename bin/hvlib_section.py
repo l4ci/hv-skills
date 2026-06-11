@@ -8,12 +8,12 @@ glossary uses it, but so do knowledge/decisions/summary callers, and
 print_matching_sections (below) calls it directly. Inter-module imports
 follow the direct-path rule (no circular routing through hvlib).
 """
-import os
 import re
 import sys
 from pathlib import Path
 
 from hvlib_io import read_or_empty, write_text_atomic
+from hvlib_types import OPEN_SECTIONS
 
 
 # Canonical filename for the typed-item backlog (bugs / features / tasks).
@@ -77,7 +77,6 @@ def replace_section(content: str, name: str, new_body: str) -> str:
     """
     span = find_section(content, name)
     if span is None:
-        sep = "" if content.endswith("\n\n") else ("\n" if content.endswith("\n") else "\n\n")
         return content.rstrip("\n") + "\n\n## " + name + "\n" + new_body
     start, end = span
     return content[:start] + new_body + content[end:]
@@ -108,8 +107,8 @@ def append_to_section(content: str, name: str, addition: str) -> str:
 
 def iter_open_sections(content: str):
     """Yield (section_name, body) pairs for each open-work section in
-    `content`, in the order defined by HV_OPEN_SECTIONS env var (default
-    "Bugs|Features|Tasks"). Sections that don't exist are skipped silently.
+    `content`, in the order defined by hvlib_types.OPEN_SECTIONS (parsed
+    from hv-types.sh). Sections that don't exist are skipped silently.
 
     Body is the same string `find_section`/`section` would return — the
     contents between the `## <name>` heading and the next `## ` heading or
@@ -118,8 +117,7 @@ def iter_open_sections(content: str):
     Use this instead of hardcoding ("Bugs", "Features", "Tasks") in helpers
     that scan the open backlog.
     """
-    names = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
-    for name in names:
+    for name in OPEN_SECTIONS:
         span = find_section(content, name)
         if span is not None:
             yield name, content[span[0]:span[1]]
@@ -200,8 +198,9 @@ def upsert_block(claude_path: Path, key: str, block: str, legacy_marker: str | N
     delimiter shape, so callers can migrate older blocks to the
     canonical `hv-{key}-start`/`hv-{key}-end` form in-place.
 
-    Returns 'created' | 'updated' | 'appended' so callers can print
-    the same status string they did before.
+    Returns 'created' | 'updated' | 'appended' | 'unchanged' so callers
+    can print the same status string they did before ('unchanged' when the
+    file already contains exactly this block).
     """
     if not claude_path.exists():
         write_text_atomic(claude_path, block + "\n")

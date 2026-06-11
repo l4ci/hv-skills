@@ -5,7 +5,7 @@
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
 #        hv-managed-block knowledge [--repo umbrella|<name>]  # sub-repo CLAUDE.md = umbrella ∪ sub-repo topics
 # Keys: knowledge | decisions | vision | map | qa (vision, map, qa are body-stdin only).
-# Prints: created | updated | appended.
+# Prints: created | updated | appended | unchanged.
 # Companion: `hv-managed-block-strip-deprecated` removes orphan blocks for v3-cut keys.
 set -euo pipefail
 

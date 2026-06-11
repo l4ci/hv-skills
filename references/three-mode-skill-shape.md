@@ -25,7 +25,7 @@ The two current implementations diverge by design on every operational axis:
 | Mode-3 name | `restructure` (audit + reorganize the IA) | `restructure` (re-probe surfaces, retire dead strategies, fix broken commands) |
 | Mode-2 nature | edits the artifact (after-work) | executes against the artifact (`run` — emits a verdict, does not edit) |
 | After-work approval gate | propose-mode by default (`docs.autoCreate: false`); auto-write opt-in | not applicable — `run` reads strategy, executes, scores; no artifact edits |
-| Trigger gate | post-cycle trigger condition (2+ items / ≥5 files / hard bug) — see `references/post-cycle-trigger-gate.md` | gated by `ship.qa: true` from `/hv-ship`; also runs on demand from the user |
+| Trigger gate | post-cycle trigger condition — see `references/post-cycle-trigger-gate.md` | gated by `ship.qa: true` from `/hv-ship`; also runs on demand from the user |
 | First-run opt-in for downstream automation | flips `docs.afterWork: true` on scaffold approval | opt-in via `ship.qa: true` and `qa.afterWork: true` |
 | Authoring tier | Tier S (banner preamble, `TaskCreate` phase list, integer Step headers) | Tier S (banner preamble, mode-bracketed step structure) |
 | Commit ownership | Docs Mode: own commit (`docs:` prefix) when run inline from `/hv-ship` Step 8.6 or manually via `/hv-ship --docs` | no commits — `/hv-qa` is read-only on the codebase |

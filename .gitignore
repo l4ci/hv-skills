@@ -11,6 +11,8 @@
 .hv/repos.json
 # Per-developer config overrides — deep-merged on top of config.json by load_config()
 .hv/config.local.json
+# Advisory lockfiles guarding sidecar read-modify-write (hvlib_io.locked)
+.hv/**/*.lock
 
 # Python bytecode (hvlib.py)
 __pycache__/

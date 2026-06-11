@@ -9,15 +9,15 @@ from its consumers. Per KNOWLEDGE: adding a field also requires
 updating the `fields` dict initializer and the valid-fields set in
 bin/hv-todo-field — see test/sections/05_reconcile.sh.
 """
-import os
 import re
 
 from hvlib_section import find_section, iter_open_sections
+from hvlib_types import ITEM_TYPES
 
 
-def find_item_ids(text: str, prefixes: str = "BFT") -> list[str]:
+def find_item_ids(text: str, prefixes: str = ITEM_TYPES) -> list[str]:
     """Find all bracketed IDs like [B07], [F12], [T03] in `text`.
-    `prefixes` is typically os.environ.get("HV_ITEM_TYPES", "BFT") at the caller.
+    `prefixes` defaults to hvlib_types.ITEM_TYPES (parsed from hv-types.sh).
     Returns a deduplicated list of full IDs (e.g. ["B07", "F12"]) in order of appearance.
     """
     pat = re.compile(r"\[([" + re.escape(prefixes) + r"])(\d{2,})\]")
@@ -145,9 +145,8 @@ def set_todo_field(line: str, field: str, value: str) -> str:
 
 def open_bullet_re() -> "re.Pattern":
     """Return a compiled regex matching an open TODO bullet line. The character
-    class for the ID prefix is built from HV_ITEM_TYPES env (default "BFT"
-    after stripping the M, since milestones don't appear as bullets in open
-    sections). Captures four named groups:
+    class for the ID prefix is hvlib_types.ITEM_TYPES (milestones don't
+    appear as bullets in open sections). Captures four named groups:
 
         - id      e.g. "B07" (full id, no brackets)
         - tag     e.g. "P1" or "Major" (the bracketed tag after the id), or "" if absent
@@ -159,9 +158,8 @@ def open_bullet_re() -> "re.Pattern":
         - **[F12] Title.**
     Does NOT match strikethrough/done lines (those start with `- ~~**[`).
     """
-    types = os.environ.get("HV_ITEM_TYPES", "BFT").replace("M", "")
     return re.compile(
-        rf"^- \*\*\[(?P<id>[{types}]\d+)\](?:\s+\[(?P<tag>[^\]]+)\])?\s+(?P<title>[^*]+?)\*\*(?P<rest>.*)$",
+        rf"^- \*\*\[(?P<id>[{ITEM_TYPES}]\d+)\](?:\s+\[(?P<tag>[^\]]+)\])?\s+(?P<title>[^*]+?)\*\*(?P<rest>.*)$",
         re.MULTILINE,
     )
 

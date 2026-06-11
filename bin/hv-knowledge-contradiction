@@ -14,7 +14,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from hvlib import load_sidecar, dump_json_atomic
+from hvlib import load_sidecar, dump_json_atomic, locked
 
 QUEUE_PATH = Path(".hv/knowledge-contradictions.json")
 EXPECTED_VERSION = 1
@@ -38,14 +38,16 @@ def atomic_write(data):
 
 
 def cmd_add(args):
-    data = load_queue()
-    data["pending"].append({
-        "topic": args.topic,
-        "title": args.title,
-        "correctionText": args.text,
-        "loggedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
-    atomic_write(data)
+    # Serialize the read-modify-write — concurrent --add calls must not lose entries.
+    with locked(QUEUE_PATH):
+        data = load_queue()
+        data["pending"].append({
+            "topic": args.topic,
+            "title": args.title,
+            "correctionText": args.text,
+            "loggedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        })
+        atomic_write(data)
 
 
 def cmd_list(_args):
@@ -54,9 +56,10 @@ def cmd_list(_args):
 
 
 def cmd_clear(_args):
-    data = load_queue()
-    data["pending"] = []
-    atomic_write(data)
+    with locked(QUEUE_PATH):
+        data = load_queue()
+        data["pending"] = []
+        atomic_write(data)
 
 
 def cmd_has(args):

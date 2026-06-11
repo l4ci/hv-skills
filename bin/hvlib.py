@@ -15,7 +15,12 @@ import subprocess
 # Re-exports — keep `from hvlib import X` working for callers.
 from hvlib_io import (
     load_json, load_config, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
-    load_sidecar,
+    load_sidecar, locked,
+)
+from hvlib_types import (
+    ITEM_TYPES, OPEN_SECTIONS, ALL_BACKLOG_SECTIONS,
+    COUNTABLE_TYPES, PLANNABLE_TYPES,
+    SECTION_FOR_PREFIX, DIR_FOR_PREFIX, SECTION_FOR_DIR,
 )
 from hvlib_version import (
     parse_toml_version, infer_version_kind, get_version_or_die,

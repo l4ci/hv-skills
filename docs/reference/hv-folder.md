@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only six machine-specific or regenerated paths are gitignored. Use the skill helpers to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
+[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only a handful of machine-specific, regenerated, or transient paths are gitignored. Use the skill helpers to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
 
 ## Overview
 
@@ -132,7 +132,7 @@ Completed items are moved from `BACKLOG.md` to `ARCHIVE.md` automatically after 
 
 ## What's tracked and what's gitignored
 
-The backlog is shared by default: state travels with the repo so collaborators see the same `BACKLOG.md`, learn from the same `KNOWLEDGE.md`, and respect the same `DECISIONS.md`. Six paths stay gitignored because they're machine-specific, per-developer, or regenerated on demand:
+The backlog is shared by default: state travels with the repo so collaborators see the same `BACKLOG.md`, learn from the same `KNOWLEDGE.md`, and respect the same `DECISIONS.md`. A few paths stay gitignored because they're machine-specific, per-developer, transient, or regenerated on demand:
 
 | Path | Why ignored |
 |------|-------------|
@@ -142,6 +142,7 @@ The backlog is shared by default: state travels with the repo so collaborators s
 | `.hv/config.local.json` | Per-developer config overrides (see below) |
 | `.hv/handoff/` | Per-developer `/hv-pause` scratch notes |
 | `.hv/qa-runs/` | Bulky timestamped `/hv-qa` artifacts; regeneratable |
+| `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write (`hvlib_io.locked`) |
 
 `/hv-init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
 

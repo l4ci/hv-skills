@@ -27,7 +27,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`merge-strategy-gate.md`](merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. | `/hv-ship`, `/hv-work` |
 | [`milestone-tagging.md`](milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. | `/hv-capture` |
 | [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — `/hv-learn` carries both topic-bullet learnings and `--term` Glossary entries. | `/hv-decide`, `/hv-learn` |
-| [`post-cycle-trigger-gate.md`](post-cycle-trigger-gate.md) | Trigger condition for post-cycle nudges (2+ items / ≥5 files / hard bug). | `/hv-qa`, `/hv-ship`, `/hv-work` |
+| [`post-cycle-trigger-gate.md`](post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle skills. | `/hv-qa`, `/hv-ship`, `/hv-work` |
 | [`refactor-explore.md`](refactor-explore.md) | Exploration-agent prompt + categories + stop condition for `/hv-refactor` single-repo mode. | `/hv-refactor` |
 | [`refactor-design-approaches.md`](refactor-design-approaches.md) | Competing-design choreography (decisions consult, agent constraints, output shape) for `/hv-refactor` Step 5. | `/hv-refactor` |
 | [`refactor-umbrella-fanout.md`](refactor-umbrella-fanout.md) | Per-repo fan-out logic for `/hv-refactor` in umbrella mode. | `/hv-refactor` |
