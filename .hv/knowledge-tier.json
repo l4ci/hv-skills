@@ -168,8 +168,8 @@
     },
     "Build & Tooling: Smoke testing::Smoke sections run only inside the runner; standalone needs an env-prep wrapper": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-06-11"
     },
     "Build & Tooling: Git & isolation::bg-isolation guard blocks main-thread Edits under /hv-work branch isolation": {
       "tier": "provisional",
