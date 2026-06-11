@@ -1,5 +1,31 @@
 # Changelog
 
+## v4.4.1 — 2026-06-11
+
+Maintenance release: round-6 internal refactoring follow-ups, an assignee fix for `hv-issues-list --mine`, and test-suite reconciliation.
+
+## Fixed
+
+- `hv-issues-list --mine` now filters by assignee (`--assignee @me`) instead of author, matching the documented intent of `issues.filterMineOnly`. Docs gained a caveat: glab before 1.30 treats `@me` as a literal username and silently returns `[]` (`4a2e075`)
+- hvlib exports sentinel reconciled with the live import surface (`81918ff`)
+- Section-18 smoke fixture now copies `hv-types.sh` alongside `hvlib*.py`, which `hvlib_types.py` requires at import time (`dc41482`)
+
+## Changed
+
+- Round-6 refactor: 9 architectural improvements, including the split-out `hvlib_types.py` item-type registry (single source of truth shared with `hv-types.sh`) and sidecar locking via `hvlib_io.locked` (`bf49f02`)
+- Dead `sep` variable removed from `append_to_section` in `hvlib_section.py` (`ded3008`)
+- Backlog and knowledge housekeeping for round-6 follow-ups T105–T108
+
+## Documentation
+
+- Renumbered smoke-section references refreshed in knowledge and design files (`1ce63fd`)
+
+## Stats
+
+11 commits, 73 files changed, +748 −357 lines
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.4.0...v4.4.1
+
 ## v4.4.0 — 2026-05-24
 
 Five rounds of architectural refactor, two new pieces of issue-tracking hygiene (release-time close gate, `--open-only` filter), and a regression fix to keep `hv-issues-imported` always exiting 0.
