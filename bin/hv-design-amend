@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Amend a section of an existing design file under .hv/designs/<ID>.md.
+# Writer helper: exit 0 on success; exit 1 on usage error, missing file, or missing section.
+# Usage:
+#   hv-design-amend <ID> --section "<heading>" --append "<text>"
+#   hv-design-amend <ID> --section "<heading>" --replace "<text>"
+#   <ID> matches [BFT]\d{2,} (designs are per-item).
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-artifact-amend.sh"
+
+USAGE='usage: hv-design-amend <ID> --section "<heading>" (--append|--replace) "<text>"'
+
+ID=""
+SECTION=""
+MODE=""
+TEXT=""
+
+if [[ $# -gt 0 && "$1" != -* ]]; then
+  ID="$1"
+  shift
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --section)
+      SECTION="${2:?$USAGE}"
+      shift 2
+      ;;
+    --append)
+      if [[ -n "$MODE" ]]; then
+        echo "error: --append and --replace are mutually exclusive" >&2
+        echo "$USAGE" >&2
+        exit 1
+      fi
+      MODE="append"
+      TEXT="${2:?$USAGE}"
+      shift 2
+      ;;
+    --replace)
+      if [[ -n "$MODE" ]]; then
+        echo "error: --append and --replace are mutually exclusive" >&2
+        echo "$USAGE" >&2
+        exit 1
+      fi
+      MODE="replace"
+      TEXT="${2:?$USAGE}"
+      shift 2
+      ;;
+    --help|-h)
+      echo "$USAGE" >&2
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$ID" || -z "$SECTION" || -z "$MODE" ]]; then
+  echo "$USAGE" >&2
+  exit 1
+fi
+
+if ! [[ "$ID" =~ ^[BFT][0-9]{2,}$ ]]; then
+  echo "error: ID must match [BFT]\\d{2,} (e.g. B07, F03, T11); designs are per-item, got '$ID'" >&2
+  exit 1
+fi
+
+hv_artifact_amend design "$ID" ".hv/designs" "$SECTION" "$MODE" "$TEXT"
