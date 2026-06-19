@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.5.0 — 2026-06-19
+
+Three closed issues: design files amend through a helper, drift detection catches silently-shipped work, and knowledge-query stops failing silently.
+
+## New
+- **`hv-design-amend`** — amend a section of a `.hv/designs/*.md` file (`--append` / `--replace`) through a helper instead of hand edits, backed by a new sourceable `hv-artifact-amend.sh` lib following the per-verb artifact pattern. (#17)
+- **Symbol-drift detection** — `hv-todo-drift` now flags open backlog items whose named code symbols entered the tree *after* capture (shipped by a refactor that never carried the `[ID]`). Advisory, surfaced by `hv-reconcile` and `/hv-next`; the existing commit-based `drift` output is unchanged. (#19)
+
+## Fixed
+- **`hv-knowledge-query`** writes a stderr warning when a topic matches no `## ` heading, so an empty result is no longer indistinguishable from "topic exists but has no learnings". stdout for matched topics stays byte-identical. (#16)
+
+## Stats
+5 commits, 15 files changed, +520 −19 lines.
+
+**Full changelog:** https://github.com/l4ci/hv-skills/compare/v4.4.1...v4.5.0
+
 ## v4.4.1 — 2026-06-11
 
 Maintenance release: round-6 internal refactoring follow-ups, an assignee fix for `hv-issues-list --mine`, and test-suite reconciliation.
