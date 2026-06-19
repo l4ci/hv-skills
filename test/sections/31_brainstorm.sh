@@ -70,6 +70,52 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$DSN_TMP"
 pass "hv-design-add / show / rm / list: writer + resolve + lookup contracts hold under happy + error paths"
 
+echo "## hv-design-amend (T110 — section amend via shared hv-artifact-amend lib)"
+
+AMD_TMP="$(mktemp -d)"
+trap 'rm -rf "$AMD_TMP"' EXIT
+(
+  cd "$AMD_TMP"
+  mkdir -p .hv
+
+  "$BIN/hv-design-add" F00 "amend smoke" >/dev/null || { echo "FAIL: seeding design failed"; exit 1; }
+
+  # a. --replace on an existing section — exit 0; new text shows, old placeholder gone, other section untouched
+  "$BIN/hv-design-amend" F00 --section Goal --replace "Ship the amend helper." \
+    || { echo "FAIL: hv-design-amend --replace exited non-zero"; exit 1; }
+  OUT=$("$BIN/hv-design-show" F00) || { echo "FAIL: show after replace exited non-zero"; exit 1; }
+  echo "$OUT" | grep -q "Ship the amend helper." || { echo "FAIL: replaced Goal text missing"; exit 1; }
+  echo "$OUT" | grep -q "one sentence — what shipping" && { echo "FAIL: old Goal placeholder still present after replace"; exit 1; }
+  echo "$OUT" | grep -q "the chosen shape, the moving parts" || { echo "FAIL: Design section was clobbered by Goal replace"; exit 1; }
+
+  # b. --append to a section — exit 0; both prior content and appended text present; next heading intact
+  "$BIN/hv-design-amend" F00 --section Goal --append "And keep it atomic." \
+    || { echo "FAIL: hv-design-amend --append exited non-zero"; exit 1; }
+  OUT=$("$BIN/hv-design-show" F00) || { echo "FAIL: show after append exited non-zero"; exit 1; }
+  echo "$OUT" | grep -q "Ship the amend helper." || { echo "FAIL: prior Goal content lost after append"; exit 1; }
+  echo "$OUT" | grep -q "And keep it atomic." || { echo "FAIL: appended Goal text missing"; exit 1; }
+  echo "$OUT" | grep -q "^## Design$" || { echo "FAIL: ## Design heading not intact after append"; exit 1; }
+
+  # c. non-existent section — exit 1, stderr mentions section not found
+  ERR=$("$BIN/hv-design-amend" F00 --section Nope --replace "x" 2>&1 >/dev/null) && { echo "FAIL: amend bogus section should exit 1"; exit 1; }
+  echo "$ERR" | grep -q "not found" || { echo "FAIL: stderr missing 'not found' for bogus section: '$ERR'"; exit 1; }
+
+  # d. missing design ID (no file) — exit 1, stderr says not found
+  ERR=$("$BIN/hv-design-amend" F99 --section Goal --replace "x" 2>&1 >/dev/null) && { echo "FAIL: amend missing design should exit 1"; exit 1; }
+  echo "$ERR" | grep -q "not found" || { echo "FAIL: stderr missing 'not found' for missing design: '$ERR'"; exit 1; }
+
+  # e. bad ID shape — exit 1
+  if "$BIN/hv-design-amend" S01 --section Goal --replace "x" 2>/dev/null; then
+    echo "FAIL: bad ID shape S01 should exit 1"; exit 1
+  fi
+
+  # f. wrapper sources the shared lib (mirrors F26 hv-design-show assertion)
+  grep -q "hv-artifact-amend.sh" "$BIN/hv-design-amend" || { echo "FAIL: hv-design-amend should source hv-artifact-amend.sh"; exit 1; }
+) || fail "hv-design-amend assertions"
+trap 'rm -rf "$TMP"' EXIT
+rm -rf "$AMD_TMP"
+pass "hv-design-amend: replace/append section contracts hold; rejects bad section, missing design, bad ID; sources shared lib"
+
 echo "## /hv-plan integration with --design pointer"
 
 PLN_TMP="$(mktemp -d)"

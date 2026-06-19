@@ -10,7 +10,7 @@
 # <name> is given), performs a hybrid read: umbrella KNOWLEDGE.md first, then
 # the sub-repo sidecar, each preceded by a `> from: <path>` provenance line.
 #
-# Lookup helper: always exits 0; missing topics are silent.
+# Lookup helper: always exits 0. A requested topic that matches no '## ' heading prints a warning to stderr (stdout stays empty for it); topics found but tier-filtered stay silent.
 # Usage: hv-knowledge-query [--repo umbrella|<name>] [--include-deprecated] [--tier <T>] <topic>...
 #   --repo <scope>        force scope: "umbrella" or a registered sub-repo name
 #   --include-deprecated  emit deprecated bullets too (still suffixed)
@@ -110,6 +110,9 @@ if not wanted_ordered:
     sys.exit(0)
 wanted_set = set(wanted_ordered)
 
+orig_topics = sys.argv[1:]
+matched_topics: set[str] = set()
+
 scope_mode = os.environ.get("HV_SCOPE_MODE", "umbrella")
 include_deprecated = os.environ.get("HV_INCLUDE_DEPRECATED", "0") == "1"
 tier_filter = os.environ.get("HV_TIER_FILTER", "") or None
@@ -180,6 +183,7 @@ if scope_mode == "umbrella":
     for name, body in iter_topics(content):
         if name.lower() not in wanted_set:
             continue
+        matched_topics.add(name.lower())
         out_lines = collect_bullets(body, name, tier_by_key)
         if not first_topic:
             print()
@@ -199,6 +203,7 @@ else:
             for name, body in iter_topics(content):
                 if name.lower() != wanted_lower:
                     continue
+                matched_topics.add(name.lower())
                 out_lines = collect_bullets(body, name, tier_by_key)
                 if not out_lines:
                     break  # topic exists but all bullets filtered out for this file
@@ -211,4 +216,14 @@ else:
                 print(f"> from: {label}")
                 print("\n".join(out_lines).rstrip())
                 break  # each file has at most one section per topic name
+
+seen_warn: set[str] = set()
+for orig in orig_topics:
+    key = orig.strip().lower()
+    if key and key not in matched_topics and key not in seen_warn:
+        seen_warn.add(key)
+        sys.stderr.write(
+            f"warning: hv-knowledge-query: no topic heading matches {orig!r} "
+            f"— topic args must be the exact '## ' heading text\n"
+        )
 PY

@@ -13,15 +13,26 @@
 # entries written before the anchor existed).
 #
 # Output: JSON to stdout — { "drift": [ { "id": "B07",
-#   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ] }
-# Empty array if no drift. Silent on missing BACKLOG.md (exit 0, empty drift).
+#   "commits": [ { "repo": "<name-or-empty>", "hash": "abc1234", "subject": "..." }, ... ] }, ... ],
+#   "symbol_drift": [ { "id": "B07", "symbols": [...], "files": [...] }, ... ] }
+# Empty arrays if no drift. Silent on missing BACKLOG.md (exit 0, empty drift).
+#
+# `symbol_drift` — a higher-precision, advisory signal for items that were
+# silently shipped by a refactor commit that did NOT carry the `[ID]` tag (so
+# commit-subject `drift` misses them). Only Since-anchored open items are
+# considered: distinctive code symbols (backtick spans, CamelCase, snake_case,
+# hv-* helpers, paths) are extracted from the item's TITLE + DESCRIPTION, then
+# checked with `git grep` at HEAD vs the item's `Since:` commit. A symbol is
+# evidence iff it is present at HEAD but absent at the capture commit — i.e. it
+# entered the tree AFTER capture. Advisory only: it never auto-completes; the
+# orchestrator should git-grep/log the symbols before implementing.
 # Usage: hv-todo-drift
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-types.sh"
 export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 from pathlib import Path
 from hvlib import (
     iter_open_sections,
@@ -46,11 +57,13 @@ cls = os.environ["HV_ITEM_TYPES"]
 # open bullet's `Since:` anchor (empty when not present).
 open_ids: set[str] = set()
 since_by_id: dict[str, str] = {}
+bullet_text_by_id: dict[str, str] = {}
 bullet = open_bullet_re()
 for _name, body in iter_open_sections(content):
     for m in bullet.finditer(body):
         iid = m.group("id")
         open_ids.add(iid)
+        bullet_text_by_id[iid] = m.group(0)
         fields = parse_todo_fields(m.group(0))
         since = fields.get("since", "").strip()
         if since:
@@ -132,5 +145,128 @@ drift = []
 for iid in sorted(hits.keys()):
     drift.append({"id": iid, "commits": list(reversed(hits[iid]))})
 
-print(json.dumps({"drift": drift}, indent=2))
+
+# ---------------------------------------------------------------------------
+# Symbol drift — advisory "shipped after capture" signal (Since-anchored only).
+# ---------------------------------------------------------------------------
+
+# Trailing-metadata marker: truncate the bullet here so symbol extraction sees
+# only TITLE + DESCRIPTION, never field values (a `Detail:` path would match
+# grep at HEAD and false-positive every Since-anchored item).
+_META_MARKER = re.compile(
+    r"\s+(?:Detail|Related|Milestone|Repos|Subsystem|Since|Captured|GH|GL):"
+)
+# Distinctive code-like token patterns (avoid plain English).
+_CAMEL = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b")
+_SNAKE = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+_HVKEBAB = re.compile(r"\bhv-[a-z0-9-]+\b")
+_PATH = re.compile(r"\b[\w.-]*/[\w./-]+\b")
+_FILEEXT = re.compile(r"\b[\w-]+\.[a-z]{1,4}\b")
+_BACKTICK = re.compile(r"`([^`]+)`")
+
+
+def extract_symbols(bullet: str, iid: str) -> list[str]:
+    """Distinctive code symbols from a bullet's title+desc (metadata stripped)."""
+    # Strip leading `- **[ID] [tag] ` prefix and the surrounding `**`, then
+    # truncate at the earliest trailing-metadata marker.
+    text = bullet
+    cut = _META_MARKER.search(text)
+    if cut:
+        text = text[: cut.start()]
+    text = text.replace("**", " ")
+    text = re.sub(r"^\s*-\s*", "", text)
+    text = re.sub(r"\[[A-Za-z]\d+\]", " ", text)  # drop `[ID]` tags
+    text = re.sub(r"\[[^\]]+\]", " ", text)        # drop `[tag]` brackets
+
+    candidates: list[str] = []
+    for inner in _BACKTICK.findall(bullet[: cut.start()] if cut else bullet):
+        candidates.append(inner)
+    for pat in (_CAMEL, _SNAKE, _HVKEBAB, _PATH, _FILEEXT):
+        candidates.extend(pat.findall(text))
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in candidates:
+        sym = raw.strip().strip("`").strip(".,;:()[]{}\"'")
+        if len(sym) <= 3:
+            continue
+        if sym == iid or sym.lstrip("[").rstrip("]") == iid:
+            continue
+        if sym in seen:
+            continue
+        seen.add(sym)
+        out.append(sym)
+        if len(out) >= 8:
+            break
+    return out
+
+
+def grep_found(symbol: str, treeish: str, path):
+    """git grep for a literal symbol at `treeish`. Return the list of matching
+    file paths (treeish prefix stripped) — empty list when no match. Return
+    None when the grep errored (e.g. treeish doesn't resolve) so the caller
+    skips this (symbol, repo) rather than false-positive.
+
+    `.hv/` is excluded from the pathspec so the backlog's own description text
+    (which names the symbol) is never counted as the symbol being shipped."""
+    cmd = ["git"]
+    if path is not None:
+        cmd += ["-C", path]
+    cmd += ["grep", "-I", "-l", "-F", "-e", symbol, treeish,
+            "--", ".", ":(exclude).hv/**"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode == 1:
+        return []
+    if r.returncode != 0:
+        return None
+    files = []
+    for raw in r.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        # `git grep <treeish>` prefixes each path with `<treeish>:`.
+        files.append(raw.split(":", 1)[1] if ":" in raw else raw)
+    return files
+
+
+symbol_hits: dict[str, dict] = {}  # iid -> {"symbols": set, "files": list}
+for iid in sorted(since_by_id.keys()):
+    if iid not in bullet_text_by_id:
+        continue
+    anchor = since_by_id[iid]
+    symbols = extract_symbols(bullet_text_by_id[iid], iid)
+    if not symbols:
+        continue
+    matched_symbols: list[str] = []
+    matched_files: list[str] = []
+    for sym in symbols:
+        for name, path in targets:
+            now = grep_found(sym, "HEAD", path)
+            if not now:  # None (skip) or [] (not present at HEAD)
+                continue
+            then = grep_found(sym, anchor, path)
+            if then is None:  # anchor doesn't resolve here — can't compare
+                continue
+            if then:  # present at capture too — not drift evidence
+                continue
+            if sym not in matched_symbols:
+                matched_symbols.append(sym)
+            for f in now:
+                if f and f not in matched_files:
+                    matched_files.append(f)
+    if matched_symbols:
+        symbol_hits[iid] = {
+            "symbols": matched_symbols,
+            "files": matched_files[:5],
+        }
+
+symbol_drift = []
+for iid in sorted(symbol_hits.keys()):
+    symbol_drift.append({
+        "id": iid,
+        "symbols": symbol_hits[iid]["symbols"],
+        "files": symbol_hits[iid]["files"],
+    })
+
+print(json.dumps({"drift": drift, "symbol_drift": symbol_drift}, indent=2))
 PY

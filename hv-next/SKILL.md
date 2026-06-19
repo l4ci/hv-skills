@@ -41,7 +41,7 @@ Phases:
 
 | Worker | Model | Inputs | Returns |
 |--------|-------|--------|---------|
-| **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's three JSON arrays: `cleaned` / `needsAction` / `todoDrift`, distilled). |
+| **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's JSON arrays: `cleaned` / `needsAction` / `todoDrift` / `todoSymbolDrift`, distilled). |
 | **Worker B — Archive scan** | haiku | `BACKLOG.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
 | **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). |
 | **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `BACKLOG.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
@@ -51,6 +51,8 @@ Each brief uses the small-brief template from the reference: Goal · Inputs (pat
 Aggregate the four returns into the working state used by Steps 3–6: drift IDs feed the `[ID] looks shipped on <hash>` lines below; archive output is silent (already moved); milestone map feeds the Step 5 header and the Step 6 milestone-bias check; relevance map feeds the Step 6 Suggested Next reasoning.
 
 When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in BACKLOG.md`. Then suggest *"Run `.hv/bin/hv-complete <ID> <hash>` to close it, or re-open the work if it isn't actually done."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
+
+When `todoSymbolDrift` is non-empty, print one advisory line per entry: `[ID] names symbol(s) <symbols> that appeared in the tree after capture (e.g. <file>) — verify it isn't already shipped before implementing.` (Use the entry's `symbols` joined and the first `files` entry as `<file>`.) This is a higher-precision "silently shipped without the `[ID]`" hint than `todoDrift`, but still advisory only — don't block, don't ask, and never auto-complete. The user/orchestrator should `git grep`/`git log` the named symbols to confirm the change really landed before implementing. Continue to Step 3 after printing.
 
 If `needsAction` is empty, produce no output and continue.
 
