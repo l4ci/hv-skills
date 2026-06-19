@@ -172,6 +172,77 @@ EOF
 )
 rm -rf "$SA_TMP"
 
+echo "hv-todo-drift symbol-drift"
+SY_TMP="$(mktemp -d)"
+(
+  cd "$SY_TMP"
+  mkdir -p .hv/bin
+  install_helpers
+  echo '{"repos": []}' > .hv/repos.json
+  git init -q
+  git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+
+  # Initial commit: contains a pre-existing symbol (negative case) but NOT
+  # the to-be-shipped symbol. This is the capture point.
+  echo "def already_here_helper(): pass" > existing.py
+  git add -A && git commit -q -m "init"
+  CAP="$(git rev-parse --short HEAD)"
+
+  # Capture two open items anchored at CAP:
+  #  - B20 names widget_transcribe_pipeline — NOT in tree at CAP (positive).
+  #  - B21 names already_here_helper — already in tree at CAP (negative).
+  cat > .hv/BACKLOG.md <<EOF
+# TODO
+
+## Bugs
+- **[B20] [P1] Wire up widget_transcribe_pipeline.** Add the new symbol. Since: $CAP
+- **[B21] [P1] Touch already_here_helper.** Pre-existing symbol. Since: $CAP
+
+## Features
+
+## Tasks
+
+## Completed
+EOF
+
+  # LATER commit ships widget_transcribe_pipeline WITHOUT mentioning [B20]
+  # in the subject — the silent-ship scenario.
+  echo "def widget_transcribe_pipeline(): pass" > pipeline.py
+  git add -A && git commit -q -m "refactor: rework pipeline internals"
+
+  OUT=$(.hv/bin/hv-todo-drift)
+
+  # Commit-subject drift must be empty — no [B20]/[B21] in any subject.
+  DRIFT_IDS=$(echo "$OUT" | python3 -c "import json,sys; print(' '.join(d['id'] for d in json.load(sys.stdin)['drift']))")
+  [ -z "$DRIFT_IDS" ] || fail "commit-drift should be empty, got: $DRIFT_IDS"
+
+  # Symbol drift must flag B20 with the symbol + file, but NOT B21.
+  echo "$OUT" | python3 -c "
+import json, sys
+sd = json.load(sys.stdin)['symbol_drift']
+by = {e['id']: e for e in sd}
+assert 'B20' in by, f'B20 missing from symbol_drift: {sd}'
+assert 'widget_transcribe_pipeline' in by['B20']['symbols'], by['B20']
+assert 'pipeline.py' in by['B20']['files'], by['B20']
+assert 'B21' not in by, f'B21 (pre-existing symbol) should NOT be flagged: {sd}'
+" || fail "symbol_drift assertions failed: $OUT"
+  pass "hv-todo-drift flags symbol shipped after capture, skips pre-existing symbol"
+
+  # hv-reconcile must surface todoSymbolDrift with the B20 entry.
+  echo '{"active":[]}' > .hv/status.json
+  ROUT=$(.hv/bin/hv-reconcile)
+  echo "$ROUT" | grep -q '"todoSymbolDrift"' || fail "reconcile missing todoSymbolDrift field: $ROUT"
+  echo "$ROUT" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+ids = {e['id'] for e in d['todoSymbolDrift']}
+assert 'B20' in ids, f'B20 missing from reconcile todoSymbolDrift: {d[\"todoSymbolDrift\"]}'
+" || fail "reconcile did not surface B20 symbol drift: $ROUT"
+  pass "hv-reconcile surfaces todoSymbolDrift"
+)
+rm -rf "$SY_TMP"
+
 echo "hv-knowledge-query"
 cat > .hv/KNOWLEDGE.md <<'EOF'
 # Knowledge
