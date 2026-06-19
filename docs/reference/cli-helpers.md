@@ -30,7 +30,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-loop-stamp` | Read/write the `loopStartedAt` ISO timestamp in `status.json`; subcommands: `start` (first-write-only), `clear`, `read` | `.hv/bin/hv-loop-stamp start` |
 | `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON (entries flag `noBase: true` for the umbrella cwd when umbrella has no base branch) | `.hv/bin/hv-reconcile` |
 | `hv-debug-counter` | Manage the persistent fix-attempt counter for `/hv-debug` Iron Law; subcommands: `init`, `record-attempt`, `fail`, `pass`, `show`, `summary`, `clear`, `inc-cycle` | `.hv/bin/hv-debug-counter show` |
-| `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open. Respects per-bullet `Since:` anchor (skips commits older than capture time, so reused IDs don't false-flag) | `.hv/bin/hv-todo-drift` |
+| `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open. Respects per-bullet `Since:` anchor (skips commits older than capture time, so reused IDs don't false-flag). Also emits an advisory `symbol_drift` array: Since-anchored items whose named code symbols entered the tree after capture — shipped by a refactor that never carried the [ID] | `.hv/bin/hv-todo-drift` |
 | `hv-backfill-since` | Stamp `Since: <HEAD-short-hash>` on every open TODO bullet lacking the field; idempotent (re-runs are silent no-ops). Used after upgrading to silence legacy entries that pre-date auto-stamping | `.hv/bin/hv-backfill-since` |
 | `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
 | `hv-managed-block knowledge` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-managed-block knowledge` |
@@ -71,6 +71,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
 | `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
 | `hv-design-list` | Lookup: JSON of every design with id, title, status, created; always exits 0 | `.hv/bin/hv-design-list` |
+| `hv-design-amend` | Writer: amend a section of `.hv/designs/<ID>.md` in place — `--section <h>` with `--append` or `--replace`; exit 1 on bad ID, missing file, or missing section | `.hv/bin/hv-design-amend F12 --section Goal --replace "…"` |
 | `hv-plan-add` | Writer: create a plan file; mints next slice number when called with `slice`; accepts `--design <path>` to record a design artifact pointer in frontmatter | `.hv/bin/hv-plan-add [--design <path>] M01 slice "Auth foundation"` |
 | `hv-plan-list` | JSON: every plan with key, milestone, unit, title, status, created | `.hv/bin/hv-plan-list M01` |
 | `hv-plan-show` | Print a plan file's contents | `.hv/bin/hv-plan-show M01-S01` |
@@ -205,7 +206,7 @@ The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints 
 
 Designs live at `.hv/designs/<ID>.md` and are per-item: the ID must match `[BFT]\d{2,}` (e.g. `B07`, `F12`, `T11`). Milestone (`M01`) and slice (`S01`) IDs are rejected; project-level exploration belongs to `/hv-vision`, slice planning belongs to `/hv-plan`.
 
-`hv-design-add` is the writer: it mints `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and five empty sections (Goal, Design, Approaches considered, Open questions, Assumptions). It exits 1 on a bad ID or a pre-existing artifact. `hv-design-show` prints the file's contents and exits 1 when the artifact is missing. `hv-design-rm` deletes the file and exits 1 when the artifact is missing. `hv-design-list` returns JSON for every design with `id`, `title`, `status`, `created`. Always exits 0, useful for dashboards and post-cycle audits.
+`hv-design-add` is the writer: it mints `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and five empty sections (Goal, Design, Approaches considered, Open questions, Assumptions). It exits 1 on a bad ID or a pre-existing artifact. `hv-design-show` prints the file's contents and exits 1 when the artifact is missing. `hv-design-rm` deletes the file and exits 1 when the artifact is missing. `hv-design-list` returns JSON for every design with `id`, `title`, `status`, `created`. Always exits 0, useful for dashboards and post-cycle audits. `hv-design-amend` amends a section in place — `--section <heading>` with `--append` (add to the section) or `--replace` (swap its body); it exits 1 on a bad ID, a missing file, or a section that doesn't exist. It shares the sourceable `hv-artifact-amend.sh` lib with the other per-verb artifact wrappers, so design fixups go through a helper rather than hand edits.
 
 See [Brainstorming a design](../usage/brainstorm.md) for the user-facing flow these helpers back.
 
