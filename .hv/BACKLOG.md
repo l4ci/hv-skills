@@ -5,6 +5,10 @@
 ## Features
 
 ## Tasks
+- **[T109] hv-knowledge-query silently returns empty on partial topic names.** Topic args must be the exact `## ` heading; a partial/mistyped name returns empty with exit 0, indistinguishable from 'no learnings exist'. Substring-match or warn/exit non-zero instead. Detail: `.hv/tasks/T109.md` GH: #16 Subsystem: knowledge Since: 85620c6
+- **[T110] No amend helper exists for design artifacts.** .hv/designs/*.md only has add/show/rm/list (hv-design-add refuses on existing files), so 'amend via helpers' cannot be honored for designs. Add a design-amend verb or a generic hv-artifact-amend lib. Detail: `.hv/tasks/T110.md` GH: #17 Since: 85620c6
+- **[T111] hv-knowledge-hit races on knowledge-tier.json.tmp under parallel batching.** Concurrent calls race on the shared .tmp rename (FileNotFoundError), yet /hv-work Step 4 suggests a parallel batch. Make it parallel-safe (per-process tmp name or file lock) or fix the skill text. Detail: `.hv/tasks/T111.md` GH: #18 Related: [T109] Since: 85620c6
+- **[T112] Backlog drift detection misses items shipped without the [ID] in the commit.** Items captured from a code snapshot (Since: <hash>) get silently shipped by later refactor commits lacking the [ID]; drift only matches IDs in commit messages. Detect when the described change already exists in the tree (symbol-level grep of named identifiers). Detail: `.hv/tasks/T112.md` GH: #19
 
 ## Completed
 - ~~**[B01] [P1] `/hv-capture` Step 7 auto-dispatches `/hv-brainstorm` on `autonomy=auto`, conflating capture with planning.** Capture should be pure intake; auto-invoking brainstorm pulls the user into design exploration mid-brain-dump. Worse, the escalation is inverted: `auto` proactively brainstorms, `loop` skips entirely. Fix: Step 7 prints the nudge line in all modes (off/auto/loop) and never invokes the Skill tool. Move autonomous advancement to `/hv-next` where "advance without asking" semantics belong. Related: [F01], [F03]
