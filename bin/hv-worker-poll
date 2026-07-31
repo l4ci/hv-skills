@@ -136,7 +136,7 @@ PY
 # so N slots cost one settle interval, not N.
 while IFS="$(printf '\t')" read -r NAME WINDOW; do
   [ -n "$NAME" ] || continue
-  tmux capture-pane -p -t "$WINDOW" >"$TMPDIR_POLL/$NAME.a" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.a"
+  tmux capture-pane -pJ -t "$WINDOW" >"$TMPDIR_POLL/$NAME.a" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.a"
 done <<EOF
 $SLOTS
 EOF
@@ -147,7 +147,7 @@ RESULTS="$TMPDIR_POLL/results.tsv"
 : >"$RESULTS"
 while IFS="$(printf '\t')" read -r NAME WINDOW; do
   [ -n "$NAME" ] || continue
-  tmux capture-pane -p -t "$WINDOW" >"$TMPDIR_POLL/$NAME.b" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.b"
+  tmux capture-pane -pJ -t "$WINDOW" >"$TMPDIR_POLL/$NAME.b" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.b"
   MOVED=0
   cmp -s "$TMPDIR_POLL/$NAME.a" "$TMPDIR_POLL/$NAME.b" || MOVED=1
   printf '%s\t%s\n' "$NAME" "$(classify "$NAME" "$MOVED" "$TMPDIR_POLL/$NAME.b")" >>"$RESULTS"

@@ -114,6 +114,27 @@ case "$EVID" in
 esac
 pass "hv-worker-poll surfaces the blocking question as evidence for relay"
 
+# A question longer than the pane is wide must survive whole. `tmux capture-pane`
+# hard-wraps at pane width, so without -J a long sentinel arrives split across
+# physical lines and the classifier's `(.+)$` captures only the first — observed
+# truncating a 118-char question to 42 in a 57-column pane. The user then gets
+# relayed half a question, silently. Two assertions: the classifier handles a
+# long single line, and both helpers actually pass -J.
+LONGQ="Should finished games show the training row, or only live ones, and does that also apply to replays of ranked matches?"
+printf 'HV-BLOCKED w4: %s\n' "$LONGQ" > "$FX/blocked_long.txt"
+EVID=$( ( cd "$TMP_WD" && "$BIN/hv-worker-poll" --fixture "$FX/blocked_long.txt" --slot w4 ) \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["evidence"])' )
+[ "$EVID" = "$LONGQ" ] \
+  || fail "hv-worker-poll truncated a long BLOCKED question: got ${#EVID} chars, expected ${#LONGQ}"
+for H in hv-worker-poll hv-worker-dispatch; do
+  if grep -q 'capture-pane -p ' "$BIN/$H"; then
+    fail "$H captures panes without -J; long sentinels will silently truncate at pane width"
+  fi
+  grep -q 'capture-pane -pJ' "$BIN/$H" \
+    || fail "$H does not use capture-pane -pJ (join wrapped lines)"
+done
+pass "hv-worker-poll preserves questions longer than the pane is wide (capture-pane -J)"
+
 # ── (c) merge gate ──────────────────────────────────────────────────────────
 # Verification command imports every module present, so it naturally covers
 # files that only exist after a merge.

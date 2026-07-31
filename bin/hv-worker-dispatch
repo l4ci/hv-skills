@@ -109,7 +109,7 @@ tmux send-keys -t "$WINDOW" "$LAUNCH" C-m
 # handed off to Claude Code yet loses the brief silently.
 WAITED=0
 while [ "$WAITED" -lt "$BOOT_TIMEOUT" ]; do
-  PANE="$(tmux capture-pane -p -t "$WINDOW" 2>/dev/null || true)"
+  PANE="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
   case "$PANE" in
     *"?"*"for shortcuts"*|*"Welcome to Claude Code"*|*"╭─"*) break ;;
   esac
@@ -119,7 +119,7 @@ done
 [ "$WAITED" -lt "$BOOT_TIMEOUT" ] || {
   echo "error: slot '$SLOT' session did not come up within ${BOOT_TIMEOUT}s" >&2; exit 3; }
 
-BEFORE="$(tmux capture-pane -p -t "$WINDOW" 2>/dev/null || true)"
+BEFORE="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
 
 if [ "$RELAY" -eq 1 ]; then
   {
@@ -143,7 +143,7 @@ while [ "$TRIES" -lt 4 ]; do
   sleep 1
   tmux send-keys -t "$WINDOW" C-m
   sleep 2
-  AFTER="$(tmux capture-pane -p -t "$WINDOW" 2>/dev/null || true)"
+  AFTER="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
   [ "$AFTER" != "$BEFORE" ] && { echo "dispatched: $SLOT"; exit 0; }
   TRIES=$((TRIES + 1))
 done
