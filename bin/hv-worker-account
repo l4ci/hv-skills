@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+# Read per-account usage headroom and assign accounts to tmux worker slots.
+#
+# Each slot can run under its own CLAUDE_CONFIG_DIR, which carries its own
+# OAuth credentials — so "how much headroom does this account have" is a
+# per-config-dir question. Three sources, tried in order, each degrading
+# honestly rather than guessing:
+#
+#   1. The OAuth usage endpoint, authenticated with the account's own
+#      credentials. Works with NO session running, which is what makes
+#      pre-dispatch balancing possible at all.
+#   2. A cached payload for that account, with its age reported so a stale
+#      reading is never mistaken for a live one.
+#   3. `unknown` — which callers must treat as "rotate", never as "free" and
+#      never as "exhausted".
+#
+# Three distinctions the caller must not collapse:
+#   - five_hour and seven_day are SEPARATE windows with staggered resets. An
+#     account can be fine on the 5-hour and dead for the week.
+#   - `utilization: 0` with `resets_at: null` means nothing has been spent in
+#     that window. It is NOT the same as "no data" — that is a missing payload.
+#   - seven_day at 100% does NOT mean the account is unusable when extra_usage
+#     is enabled and `spend_limit_reached` is false. Marking it cooling would
+#     park a working account.
+#
+# This helper NEVER refreshes or writes credentials. An expired token reports
+# `unknown` and falls through to rotation; refreshing would mutate state that
+# a live Claude Code session owns, and racing it risks logging the user out.
+#
+# Tool: exit 0 with output on stdout; exit 2 on usage error; exit 3 on
+#       resolution failure (unknown account, unreadable registry).
+#
+# Usage:
+#   hv-worker-account list [--json]
+#   hv-worker-account pick [--exclude <name>[,<name>...]]
+#   hv-worker-account assign --slot <name> [--account <name>]
+#
+# list    one row per configured account: name, verdict, 5h%, 7d%, resets.
+# pick    prints the name of the account with the most headroom, honoring
+#         cooldowns. Falls back to least-recently-assigned rotation when no
+#         meter is readable. Exits 3 when every account is cooling.
+# assign  writes the account's configDir onto the slot in .hv/workers.json,
+#         so hv-worker-dispatch launches that slot under it.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+USAGE="usage: hv-worker-account list [--json] | pick [--exclude <names>] | assign --slot <name> [--account <name>]"
+
+CMD="${1:-}"
+[ -n "$CMD" ] || { echo "$USAGE" >&2; exit 2; }
+shift
+
+JSON=0
+SLOT=""
+ACCOUNT=""
+EXCLUDE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json)    JSON=1; shift ;;
+    --slot)    SLOT="${2:?$USAGE}"; shift 2 ;;
+    --account) ACCOUNT="${2:?$USAGE}"; shift 2 ;;
+    --exclude) EXCLUDE="${2:?$USAGE}"; shift 2 ;;
+    --)        shift; break ;;
+    -*)        echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)         echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+REGISTRY=".hv/workers.json"
+
+# Emit the meter for every configured account as JSON on stdout.
+# HV_ACCOUNT_USAGE_DIR overrides the network fetch with per-account fixture
+# files (<dir>/<account>.json) so the classifier is testable offline.
+read_meters() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from hvlib import load_config
+
+USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+FIXTURE_DIR = os.environ.get("HV_ACCOUNT_USAGE_DIR", "")
+
+cfg = load_config()
+accounts = (cfg.get("work", {}) or {}).get("accounts", []) or []
+if not accounts:
+    # No accounts configured is not an error: the pool simply inherits the
+    # ambient CLAUDE_CONFIG_DIR, which is the single-account default.
+    print(json.dumps([]))
+    raise SystemExit(0)
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+
+def parse_reset(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def token_for(config_dir):
+    """Read the access token without refreshing it. Returns (token, reason)."""
+    creds = Path(os.path.expanduser(config_dir)) / ".credentials.json"
+    if not creds.is_file():
+        return None, "no credentials file"
+    try:
+        blob = json.loads(creds.read_text())
+    except (OSError, ValueError):
+        return None, "unreadable credentials"
+    oauth = blob.get("claudeAiOauth") or {}
+    token = oauth.get("accessToken")
+    if not token:
+        return None, "no access token"
+    expires = oauth.get("expiresAt")
+    if expires:
+        try:
+            # expiresAt is epoch milliseconds.
+            if datetime.fromtimestamp(int(expires) / 1000, timezone.utc) <= now():
+                return None, "token expired"
+        except (TypeError, ValueError, OSError):
+            pass
+    return token, ""
+
+
+def fetch(config_dir, name):
+    if FIXTURE_DIR:
+        p = Path(FIXTURE_DIR) / f"{name}.json"
+        if not p.is_file():
+            return None, "no fixture"
+        try:
+            return json.loads(p.read_text()), ""
+        except ValueError:
+            return None, "bad fixture"
+    token, reason = token_for(config_dir)
+    if not token:
+        return None, reason
+    try:
+        out = subprocess.run(
+            ["curl", "-s", "--max-time", "5",
+             "-H", "Accept: application/json",
+             "-H", f"Authorization: Bearer {token}",
+             "-H", "anthropic-beta: oauth-2025-04-20",
+             USAGE_URL],
+            capture_output=True, text=True, timeout=10,
+        ).stdout
+        payload = json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None, "usage endpoint unreachable"
+    if not isinstance(payload, dict) or "five_hour" not in payload:
+        return None, "unexpected payload"
+    return payload, ""
+
+
+def window(payload, key):
+    w = payload.get(key) or {}
+    util = w.get("utilization")
+    return (float(util) if isinstance(util, (int, float)) else None,
+            parse_reset(w.get("resets_at")))
+
+
+rows = []
+for acct in accounts:
+    name = acct.get("name") or ""
+    config_dir = acct.get("configDir") or ""
+    if not name:
+        continue
+    payload, why = fetch(config_dir, name)
+    if payload is None:
+        # Unknown is a real verdict. Callers rotate on it; they must not read
+        # it as free (would dispatch into a wall) or as cooling (would park a
+        # healthy account).
+        rows.append({"name": name, "configDir": config_dir, "verdict": "unknown",
+                     "reason": why, "fiveHour": None, "sevenDay": None,
+                     "resetsAt": None, "headroom": None})
+        continue
+
+    five, five_reset = window(payload, "five_hour")
+    seven, seven_reset = window(payload, "seven_day")
+
+    extra = payload.get("extra_usage") or {}
+    extra_live = bool(extra.get("is_enabled")) and not extra.get("spend_limit_reached")
+
+    verdict, resets = "free", None
+    binding = []
+    for label, util, reset in (("five_hour", five, five_reset),
+                               ("seven_day", seven, seven_reset)):
+        if util is None:
+            continue
+        # Weekly exhaustion with extra usage still live neither parks the
+        # account nor constrains it — it would still serve requests, so the
+        # window is discounted from headroom too. Otherwise a working account
+        # scores 0 and gets picked last forever. The 5-hour window has no such
+        # escape hatch.
+        if label == "seven_day" and util >= 100.0 and extra_live:
+            continue
+        binding.append(util)
+        if util < 100.0:
+            continue
+        # A window is only cooling if it is spent AND names a FUTURE reset. A
+        # spent window with no resets_at is not actionable — nothing says when
+        # it clears, so treating it as cooling would park the slot forever.
+        if not reset or reset <= now():
+            continue
+        verdict = "cooling"
+        if resets is None or reset > resets:
+            resets = reset
+
+    headroom = round(100.0 - max(binding), 1) if binding else None
+
+    rows.append({"name": name, "configDir": config_dir, "verdict": verdict,
+                 "reason": "", "fiveHour": five, "sevenDay": seven,
+                 "resetsAt": resets.isoformat() if resets else None,
+                 "headroom": headroom})
+
+print(json.dumps(rows))
+PY
+}
+
+case "$CMD" in
+  list)
+    METERS="$(read_meters)"
+    if [ "$JSON" -eq 1 ]; then
+      printf '%s\n' "$METERS" | python3 -m json.tool
+    else
+      printf '%s\n' "$METERS" | python3 -c '
+import json, sys
+rows = json.load(sys.stdin)
+if not rows:
+    print("no accounts configured (slots inherit the ambient CLAUDE_CONFIG_DIR)")
+    raise SystemExit(0)
+for r in rows:
+    name = r["name"]
+    verdict = r["verdict"]
+    five = r["fiveHour"]
+    seven = r["sevenDay"]
+    five_s = "-" if five is None else "%.0f%%" % five
+    seven_s = "-" if seven is None else "%.0f%%" % seven
+    note = r["reason"] or r["resetsAt"] or ""
+    print("%-12s %-9s 5h=%-5s 7d=%-5s %s" % (name, verdict, five_s, seven_s, note))
+'
+    fi
+    ;;
+
+  pick)
+    METERS="$(read_meters)"
+    RESULT="$(printf '%s\n' "$METERS" | EXCLUDE="$EXCLUDE" python3 -c '
+import json, os, sys
+rows = json.load(sys.stdin)
+excluded = {n.strip() for n in os.environ.get("EXCLUDE", "").split(",") if n.strip()}
+rows = [r for r in rows if r["name"] not in excluded]
+if not rows:
+    raise SystemExit(3)
+usable = [r for r in rows if r["verdict"] != "cooling"]
+if not usable:
+    raise SystemExit(3)
+# Prefer the most headroom. Unknown meters sort last but stay eligible, so a
+# fleet with no readable meters still rotates instead of stalling.
+usable.sort(key=lambda r: (r["headroom"] is None, -(r["headroom"] or 0)))
+print(usable[0]["name"])
+')" || { echo "error: every configured account is cooling down" >&2; exit 3; }
+    printf '%s\n' "$RESULT"
+    ;;
+
+  assign)
+    [ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
+    [ -f "$REGISTRY" ] || { echo "error: no worker pool — run hv-worker-pool init first" >&2; exit 3; }
+    if [ -z "$ACCOUNT" ]; then
+      ACCOUNT="$("$HERE/hv-worker-account" pick)" || exit 3
+    fi
+    PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$ACCOUNT" <<'PY'
+import json
+import sys
+from pathlib import Path
+from hvlib import load_config, update_json
+
+registry, slot, account = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg = load_config()
+accounts = (cfg.get("work", {}) or {}).get("accounts", []) or []
+match = next((a for a in accounts if a.get("name") == account), None)
+if match is None:
+    print(f"error: account '{account}' is not in work.accounts", file=sys.stderr)
+    raise SystemExit(3)
+
+found = [False]
+
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == slot:
+            s["configDir"] = match.get("configDir") or None
+            s["account"] = account
+            found[0] = True
+
+update_json(Path(registry), {"slots": []}, mutator)
+if not found[0]:
+    print(f"error: slot '{slot}' is not in the pool", file=sys.stderr)
+    raise SystemExit(3)
+print(f"assigned: {slot} -> {account}")
+PY
+    ;;
+
+  *)
+    echo "$USAGE" >&2; exit 2 ;;
+esac

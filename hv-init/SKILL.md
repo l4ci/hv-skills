@@ -241,7 +241,8 @@ umbrella_enabled = os.environ.get("UMBRELLA_MODE", "false").lower() == "true"
 cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>",
-               "dispatch": "subagent", "workerSlots": 3, "workerCommand": ""},
+               "dispatch": "subagent", "workerSlots": 3, "workerCommand": "",
+               "accounts": []},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
   "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
@@ -293,6 +294,13 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Set it when workers need a wrapper, an alias, or looser permissions — that
 # choice is the user's to make explicitly, never this skill's to assume.
 .hv/bin/hv-config-set work.workerCommand ''
+
+# work.accounts — silent default. Array of {name, configDir} mapping tmux
+# worker slots to their own CLAUDE_CONFIG_DIR, so slots authenticate
+# independently. Empty means every slot inherits the ambient config dir,
+# which is the single-account default. Only meaningful under
+# work.dispatch=tmux.
+.hv/bin/hv-config-set work.accounts '[]'
 
 # learn.promoteThreshold — silent default. No question; integer knob
 # (default 3) gating F03 knowledge-lifecycle auto-promotion. Users adjust

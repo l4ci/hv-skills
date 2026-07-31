@@ -142,6 +142,29 @@ case "$CMD" in
       register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$SESSION:$NAME"
       i=$((i + 1))
     done
+
+    # Spread slots across configured accounts (phase 2). Assignment is by
+    # headroom, not round-robin, so a fleet does not pile onto an account that
+    # is nearly spent. Silent no-op when work.accounts is empty — the
+    # single-account default inherits the ambient CLAUDE_CONFIG_DIR.
+    if [ "$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
+        'from hvlib import load_config; print(len((load_config().get("work",{}) or {}).get("accounts",[]) or []))')" != "0" ]; then
+      i=1
+      USED=""
+      while [ "$i" -le "$SLOTS" ]; do
+        NAME="w$i"
+        # Exclude accounts already handed out this pass so slots spread rather
+        # than all landing on the single healthiest account. When accounts run
+        # out, the exclusion list resets and they share.
+        PICK="$("$HERE/hv-worker-account" pick --exclude "${USED#,}" 2>/dev/null || true)"
+        [ -n "$PICK" ] || { USED=""; PICK="$("$HERE/hv-worker-account" pick 2>/dev/null || true)"; }
+        if [ -n "$PICK" ]; then
+          "$HERE/hv-worker-account" assign --slot "$NAME" --account "$PICK" >/dev/null 2>&1 || true
+          USED="$USED,$PICK"
+        fi
+        i=$((i + 1))
+      done
+    fi
     ;;
 
   list)

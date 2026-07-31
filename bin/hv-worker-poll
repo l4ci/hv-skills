@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Classify tmux worker slots and emit JSON the /hv-work orchestrator routes on.
 #
-# States: BUSY | IDLE | BLOCKED | DONE | DEAD
+# States: BUSY | IDLE | BLOCKED | DONE | DEAD | LIMITED
 #
 # Liveness is decided by MOVEMENT, not by pattern-matching a spinner: the pane
 # is captured twice, --settle seconds apart, and a pane that changed is BUSY.
@@ -15,6 +15,11 @@
 #     HV-BLOCKED <slot>: <one question in plain language>
 # We own the worker contract, so we can require an unambiguous signal instead
 # of guessing from an idle prompt.
+#
+# LIMITED means the session hit its usage window. It routes to reassigning the
+# slot to another account (hv-worker-account pick) rather than re-dispatching
+# onto the same one. If the pane offers "Add funds", that spends money and is
+# never the orchestrator's to answer — escalate to the human.
 #
 # DEAD is the one state we cannot get a sentinel for, so it stays heuristic:
 #   - a bare `API Error … Overloaded` on a static pane is a HEADSTONE, not a
@@ -82,6 +87,30 @@ if m:
 # before the DEAD patterns so a live retry is never read as a corpse.
 if re.search(r"Retrying in", tail):
     emit("BUSY", "retry in flight")
+
+# LIMITED is checked BEFORE movement: a session that hit its usage limit may
+# still animate a prompt, and reading that as BUSY strands the orchestrator
+# waiting for work that cannot resume until the window resets.
+#
+# Heuristic, like DEAD — a limited session cannot print a sentinel. Patterns
+# are anchored to phrasing a session emits about ITSELF, not bare words like
+# "limit" that a worker reading source code would echo into its pane.
+LIMIT_PATTERNS = (
+    r"reached your usage limit",
+    r"usage limit reached",
+    r"You'?ve hit your (?:usage )?limit",
+    r"limit (?:will )?reset[s]? at",
+    r"Approaching (?:your )?usage limit",
+)
+for pat in LIMIT_PATTERNS:
+    m = re.search(pat, tail, re.IGNORECASE)
+    if m:
+        # The "Add funds" prompt spends real money and is NEVER the
+        # orchestrator's to answer. Flag it so the caller escalates to the
+        # human instead of picking an option.
+        if re.search(r"Add funds", tail):
+            emit("LIMITED", "usage limit reached; pane offers 'Add funds' — needs a human, do NOT answer")
+        emit("LIMITED", m.group(0).strip()[:120])
 
 if moved:
     emit("BUSY", "pane changed between captures")

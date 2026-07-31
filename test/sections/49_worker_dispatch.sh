@@ -135,6 +135,101 @@ for H in hv-worker-poll hv-worker-dispatch; do
 done
 pass "hv-worker-poll preserves questions longer than the pane is wide (capture-pane -J)"
 
+# ── (b2) accounts + LIMITED ─────────────────────────────────────────────────
+# Meters come from per-account fixture payloads via HV_ACCOUNT_USAGE_DIR, which
+# mirrors the real OAuth usage shape. The three cases that are easy to get wrong
+# are all pinned: extra_usage rescuing a spent weekly, a past reset not parking
+# an account forever, and an unreadable meter rotating rather than guessing.
+AFX="$TMP_WD/afx"
+mkdir -p "$AFX"
+python3 - "$TMP_WD/.hv/config.json" "$AFX" <<'PYEOF' || fail "could not write accounts fixture"
+import json, os, sys
+cfg_path, afx = sys.argv[1], sys.argv[2]
+# The merge-gate block later in this section writes this file; at this point it
+# may not exist yet, so start from whatever is (or isn't) there.
+cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
+cfg.setdefault("work", {})["accounts"] = [
+    {"name": "alpha", "configDir": "/nonexistent/alpha"},
+    {"name": "beta",  "configDir": "/nonexistent/beta"},
+    {"name": "gamma", "configDir": "/nonexistent/gamma"},
+    {"name": "delta", "configDir": "/nonexistent/delta"},
+]
+json.dump(cfg, open(cfg_path, "w"))
+def w(name, five, five_r, seven, seven_r, extra):
+    json.dump({"five_hour": {"utilization": five, "resets_at": five_r},
+               "seven_day": {"utilization": seven, "resets_at": seven_r},
+               "extra_usage": extra}, open(f"{afx}/{name}.json", "w"))
+w("alpha", 12.0, None, 40.0, None, {"is_enabled": False})
+# 5-hour spent with a FUTURE reset -> cooling
+w("beta", 100.0, "2090-01-01T00:00:00+00:00", 50.0, None, {"is_enabled": False})
+# weekly spent but extra usage live and under its cap -> still usable
+w("gamma", 5.0, None, 100.0, "2090-01-01T00:00:00+00:00",
+  {"is_enabled": True, "spend_limit_reached": False})
+# 5-hour spent but the reset is in the PAST -> the window already cleared
+w("delta", 100.0, "2020-01-01T00:00:00+00:00", 10.0, None, {"is_enabled": False})
+PYEOF
+
+acct() { ( cd "$TMP_WD" && HV_ACCOUNT_USAGE_DIR="$AFX" "$BIN/hv-worker-account" "$@" ); }
+
+VERDICTS=$( acct list --json | python3 -c '
+import json, sys
+print(",".join(r["name"] + "=" + r["verdict"] for r in json.load(sys.stdin)))' )
+[ "$VERDICTS" = "alpha=free,beta=cooling,gamma=free,delta=free" ] \
+  || fail "hv-worker-account verdicts wrong: $VERDICTS"
+pass "hv-worker-account: extra_usage rescues a spent weekly; a past reset does not park an account"
+
+# gamma's weekly is discounted, so its headroom must come from the 5-hour
+# window (95), not from the spent weekly (0) — otherwise a working account
+# ranks last among free ones forever.
+GH=$( acct list --json | python3 -c '
+import json, sys
+print(next(r["headroom"] for r in json.load(sys.stdin) if r["name"] == "gamma"))' )
+[ "$GH" = "95.0" ] || fail "gamma headroom should be 95.0 (5h window), got $GH"
+pass "hv-worker-account discounts an extra-usage-covered window from headroom"
+
+PICKED=$( acct pick )
+[ "$PICKED" = "gamma" ] || fail "pick should choose gamma (95 headroom), got $PICKED"
+# An account with no readable meter is 'unknown': eligible for rotation, but
+# never preferred over one with real headroom, and never treated as cooling.
+rm -f "$AFX/alpha.json" "$AFX/gamma.json" "$AFX/delta.json"
+UNK=$( acct list --json | python3 -c '
+import json, sys
+print(next(r["verdict"] for r in json.load(sys.stdin) if r["name"] == "alpha"))' )
+[ "$UNK" = "unknown" ] || fail "missing meter should be unknown, got $UNK"
+RC=0
+acct pick >/dev/null 2>&1 || RC=$?
+[ "$RC" = "0" ] || fail "pick should still rotate onto an unknown-meter account, got exit $RC"
+# Every account cooling is the one case that must refuse rather than guess.
+python3 - "$AFX" <<'PYEOF'
+import json, sys
+for n in ("alpha", "beta", "gamma", "delta"):
+    json.dump({"five_hour": {"utilization": 100.0, "resets_at": "2090-01-01T00:00:00+00:00"},
+               "seven_day": {"utilization": 10.0, "resets_at": None},
+               "extra_usage": {"is_enabled": False}}, open(f"{sys.argv[1]}/{n}.json", "w"))
+PYEOF
+RC=0
+acct pick >/dev/null 2>&1 || RC=$?
+[ "$RC" = "3" ] || fail "pick should exit 3 when every account is cooling, got $RC"
+pass "hv-worker-account rotates on unknown meters and refuses (exit 3) when all are cooling"
+
+# LIMITED must outrank movement — a limited session can still animate a prompt,
+# and reading that as BUSY strands the wave on work that cannot resume.
+printf 'You have reached your usage limit. Your limit will reset at 3:00pm.\n' > "$FX/limited.txt"
+printf 'You have reached your usage limit.\n 1. Stop and wait\n 2. Add funds\n'  > "$FX/limited_funds.txt"
+# A worker echoing source code that happens to mention limits is NOT limited.
+printf 'reading src/limits.py: MAX_LIMIT reached the cap here\n'                 > "$FX/limit_false_positive.txt"
+[ "$( classify_fixture "$FX/limited.txt" )" = "LIMITED" ] \
+  || fail "hv-worker-poll did not classify a usage-limit pane as LIMITED"
+[ "$( classify_fixture "$FX/limit_false_positive.txt" )" = "IDLE" ] \
+  || fail "hv-worker-poll false-positived LIMITED on source text mentioning limits"
+FUNDS=$( ( cd "$TMP_WD" && "$BIN/hv-worker-poll" --fixture "$FX/limited_funds.txt" --slot t ) \
+         | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["evidence"])' )
+case "$FUNDS" in
+  *"Add funds"*) : ;;
+  *) fail "an 'Add funds' prompt must be flagged in the evidence (it spends money): '$FUNDS'" ;;
+esac
+pass "hv-worker-poll detects LIMITED, flags the money-spending prompt, and ignores lookalike prose"
+
 # ── (c) merge gate ──────────────────────────────────────────────────────────
 # Verification command imports every module present, so it naturally covers
 # files that only exist after a merge.

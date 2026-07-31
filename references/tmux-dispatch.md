@@ -55,6 +55,7 @@ The two sentinels are the contract's load-bearing half. We own the worker's inst
 | `BLOCKED` | `HV-BLOCKED <slot>: <question>` present | Surface the question via `AskUserQuestion`, relay the answer back with `--relay` |
 | `DONE` | `HV-DONE <slot> <pr>` present | Review the PR diff against the brief, then `hv-worker-gate` |
 | `BUSY` | `Retrying in` present, **or** the pane changed between captures | Wait |
+| `LIMITED` | the session says it hit its usage window | Reassign the slot to another account and re-dispatch (see *Accounts*) |
 | `DEAD` | static pane with `API Error …` or `Resume this session with` | Re-dispatch **once**, then hand the task to a different slot |
 | `IDLE` | static, no sentinel | Parked, or finished without printing a sentinel — inspect |
 
@@ -92,6 +93,41 @@ Neither author can see it — the conflicting change never existed in their tree
 When `refactor.verifyCommands` is empty the gate prints `NO-VERIFY` and exits 0 — it reports that the merged tree was **not** gated by a command rather than implying a pass it cannot back. A project running the tmux backend should set `verifyCommands`; without one, step 3 is a structural diff review by the orchestrator and nothing more.
 
 Batching: re-verify per merge is the rule. A group of PRs with genuinely disjoint file sets can be merged and gated once. Gate **individually** when a PR touches a shared module, widens a shared type, or renames a shared symbol.
+
+## Accounts
+
+`work.accounts` maps slots to independent `CLAUDE_CONFIG_DIR`s so each authenticates as its own account:
+
+```json
+"work": { "accounts": [
+  { "name": "personal", "configDir": "~/.claude" },
+  { "name": "work",     "configDir": "~/.claude-work" }
+] }
+```
+
+Empty (the default) means every slot inherits the ambient config dir — the single-account case, and nothing below applies.
+
+`hv-worker-pool init` assigns slots at pool creation, and `hv-worker-account` owns the reading:
+
+```bash
+.hv/bin/hv-worker-account list                      # per-account headroom + verdict
+.hv/bin/hv-worker-account pick [--exclude <names>]  # most headroom; exit 3 if all cooling
+.hv/bin/hv-worker-account assign --slot w1 --account personal
+```
+
+**Where the numbers come from.** The interactive status line renders usage, so a pane *can* be scraped — but the pane is the weakest source. Headroom comes from the OAuth usage endpoint authenticated with the account's own `$configDir/.credentials.json`, which is structured, per-account, and readable **with no session running**. That last property is what makes balancing possible at all: a slot can be pointed at an account with headroom *before* dispatch, rather than discovering the wall by hitting it. Pane scraping remains the fallback, and `unknown` the honest floor.
+
+**The helper never refreshes credentials.** An expired token reports `unknown` and falls through to rotation. Refreshing would mutate state a live Claude Code session owns, and racing it risks logging the user out — a worse outcome than a slot that rotates.
+
+Three distinctions that must not collapse:
+
+- **`five_hour` and `seven_day` are separate windows with staggered resets.** An account can be fine on the 5-hour and spent for the week. Read each account independently too — one slot hard-stopping says nothing about its siblings, and declaring a blanket stall parks accounts that still have headroom.
+- **`utilization: 0` with `resets_at: null` means nothing spent**, not "no data". No data is a *missing payload*, which is `unknown`.
+- **Weekly at 100% does not mean unusable** when `extra_usage.is_enabled` and `spend_limit_reached` is false — the account still serves requests. Marking it cooling parks something that works, and counting that window against its headroom ranks it last forever. Both are discounted.
+
+A window is only `cooling` when it is spent **and** names a *future* reset. A spent window with no `resets_at` is not actionable — nothing says when it clears, so treating it as cooling would park the slot indefinitely.
+
+**Never answer an "Add funds" prompt.** A limited session may offer *Stop and wait* vs *Add funds*; the second spends real money and is never the orchestrator's to pick. `hv-worker-poll` flags it in the evidence string — escalate to the human and wait. Meanwhile the orchestrator can keep gating, merging, and verifying finished slots, because local shell work does not consume the LLM window.
 
 ## Other failure modes worth knowing
 

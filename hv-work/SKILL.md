@@ -467,6 +467,20 @@ Loop until no slot is `BUSY`, routing each state as it appears:
 
 - **`DEAD`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
 
+- **`LIMITED`** — the session hit its usage window. Re-dispatching onto the same account just hits the same wall, so move the slot instead:
+
+  ```bash
+  .hv/bin/hv-worker-account pick --exclude <current-account>   # exit 3 = all cooling
+  .hv/bin/hv-worker-account assign --slot <wN> --account <picked>
+  .hv/bin/hv-worker-dispatch --slot <wN> --brief-file <same-brief>
+  ```
+
+  Limits are **per-session rolling windows with staggered resets**, so read each account independently — one slot hard-stopping says nothing about its siblings, and declaring a blanket stall wastes accounts that still have headroom. When `pick` exits 3 every configured account is cooling: report the earliest `resetsAt` from `hv-worker-account list` and stop the wave rather than spinning.
+
+  **If the evidence mentions `Add funds`, do not answer the prompt.** That option spends real money and is never the orchestrator's to pick — surface it to the user and wait. Local shell work (gating, merging, verification) does not consume the LLM window, so the orchestrator can keep integrating finished slots while one is limited.
+
+  With `work.accounts` unset this state still fires but has nowhere to move the slot to; treat it as a hard stop and tell the user which window is spent.
+
 - **`DONE`** — the worker opened a PR. Review its diff against the brief using the same rubric as the subagent path above (items 1–6), then gate it:
 
   ```bash
