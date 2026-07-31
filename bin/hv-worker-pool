@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# Manage the /hv-work tmux worker slot pool: worktrees, branches, and the
+# .hv/workers.json registry.
+#
+# One slot == one git worktree == one branch == one tmux window. A slot
+# OUTLIVES a single cycle: worktrees persist so setup isn't re-paid every
+# wave, while tmux windows are destroyed and recreated per dispatch
+# (hv-worker-dispatch does that) because /clear does not reliably reset a
+# Claude Code session — a fresh window is the only trustworthy reset.
+#
+# Writer helper: exit 0 on successful write OR idempotent no-op;
+#                exit 2 on usage error; exit 3 on git failure.
+#
+# Usage:
+#   hv-worker-pool init --slots <N> [--base <branch>] [--session <name>]
+#   hv-worker-pool list [--json]
+#   hv-worker-pool reap [--slot <name>] | [--all]
+#
+# init  is idempotent — an existing, healthy slot is left alone and only
+#       missing slots are created. Re-running with a larger --slots grows
+#       the pool; it never shrinks one (use reap).
+# list  prints one `<name>\t<state>\t<branch>\t<worktree>` row per slot,
+#       or the raw registry with --json.
+# reap  removes the worktree and force-deletes the branch. Worker branches
+#       are throwaway by construction: they are merged into the cycle
+#       branch through hv-worker-gate, never shipped directly.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+USAGE="usage: hv-worker-pool init --slots <N> [--base <branch>] [--session <name>] | list [--json] | reap [--slot <name>|--all]"
+
+CMD="${1:-}"
+[ -n "$CMD" ] || { echo "$USAGE" >&2; exit 2; }
+shift
+
+SLOTS=""
+BASE=""
+SESSION=""
+SLOT=""
+ALL=0
+JSON=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --slots)   SLOTS="${2:?$USAGE}"; shift 2 ;;
+    --base)    BASE="${2:?$USAGE}"; shift 2 ;;
+    --session) SESSION="${2:?$USAGE}"; shift 2 ;;
+    --slot)    SLOT="${2:?$USAGE}"; shift 2 ;;
+    --all)     ALL=1; shift ;;
+    --json)    JSON=1; shift ;;
+    --)        shift; break ;;
+    -*)        echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)         echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+REGISTRY=".hv/workers.json"
+WT_ROOT=".claude/worktrees/hv-worker"
+
+# Register or update one slot in .hv/workers.json. Idempotent on slot name.
+register_slot() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - \
+    "$REGISTRY" "$1" "$2" "$3" "$4" "$5" "$6" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+
+path, name, branch, worktree, base, session, window = sys.argv[1:8]
+
+def mutator(data):
+    data.setdefault("session", session)
+    data["session"] = session
+    data.setdefault("slots", [])
+    existing = next((s for s in data["slots"] if s.get("name") == name), None)
+    if existing is None:
+        data["slots"].append({
+            "name": name,
+            "branch": branch,
+            "worktree": worktree,
+            "base": base,
+            "window": window,
+            # Slots are seeded as already-reported idle so a parked slot never
+            # fires a spurious "it finished" on the first poll. Only a slot that
+            # has gone BUSY re-arms that report.
+            "state": "idle",
+            "task": None,
+            "pr": None,
+            # Phase 2 (multi-account) fills this in; a null configDir means
+            # "inherit the ambient CLAUDE_CONFIG_DIR".
+            "configDir": None,
+        })
+    else:
+        existing.update({"branch": branch, "worktree": worktree, "base": base, "window": window})
+    data["slots"].sort(key=lambda s: s.get("name", ""))
+
+update_json(Path(path), {"session": session, "slots": []}, mutator)
+PY
+}
+
+case "$CMD" in
+  init)
+    [ -n "$SLOTS" ] || { echo "$USAGE" >&2; exit 2; }
+    case "$SLOTS" in
+      ''|*[!0-9]*) echo "error: --slots must be a positive integer" >&2; exit 2 ;;
+    esac
+    [ "$SLOTS" -ge 1 ] || { echo "error: --slots must be at least 1" >&2; exit 2; }
+
+    if [ -z "$BASE" ]; then
+      BASE="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      [ -n "$BASE" ] && [ "$BASE" != "HEAD" ] || {
+        echo "error: cannot resolve base branch — pass --base <branch>" >&2; exit 3; }
+    fi
+    git rev-parse --verify --quiet "$BASE" >/dev/null || {
+      echo "error: base branch '$BASE' does not exist" >&2; exit 3; }
+
+    [ -n "$SESSION" ] || SESSION="hv"
+    mkdir -p "$WT_ROOT"
+
+    i=1
+    while [ "$i" -le "$SLOTS" ]; do
+      NAME="w$i"
+      BRANCH="hv-worker/$NAME"
+      REL="$WT_ROOT/$NAME"
+
+      if [ -d "$REL" ] && git -C "$REL" rev-parse --git-dir >/dev/null 2>&1; then
+        : # healthy slot — leave it alone
+      else
+        # A leftover directory with no working git dir is debris from an
+        # interrupted reap; clear it so `worktree add` doesn't refuse.
+        [ -e "$REL" ] && rm -rf "$REL"
+        git worktree prune
+        if git rev-parse --verify --quiet "$BRANCH" >/dev/null; then
+          git worktree add "$REL" "$BRANCH" >/dev/null 2>&1 || {
+            echo "error: could not add worktree for $NAME on existing branch $BRANCH" >&2; exit 3; }
+        else
+          git worktree add -b "$BRANCH" "$REL" "$BASE" >/dev/null 2>&1 || {
+            echo "error: could not create worktree/branch for $NAME from $BASE" >&2; exit 3; }
+        fi
+      fi
+
+      ABS="$(cd "$REL" && pwd -P)"
+      register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$SESSION:$NAME"
+      i=$((i + 1))
+    done
+    ;;
+
+  list)
+    [ -f "$REGISTRY" ] || { [ "$JSON" -eq 1 ] && echo '{"session":null,"slots":[]}'; exit 0; }
+    if [ "$JSON" -eq 1 ]; then
+      cat "$REGISTRY"
+    else
+      PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+for s in data.get("slots", []):
+    print("\t".join([
+        s.get("name") or "",
+        s.get("state") or "",
+        s.get("branch") or "",
+        s.get("worktree") or "",
+    ]))
+PY
+    fi
+    ;;
+
+  reap)
+    [ -n "$SLOT" ] || [ "$ALL" -eq 1 ] || { echo "error: reap needs --slot <name> or --all" >&2; exit 2; }
+    [ -f "$REGISTRY" ] || exit 0
+
+    TARGETS="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$ALL" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+slot, want_all = sys.argv[2], sys.argv[3] == "1"
+for s in data.get("slots", []):
+    if want_all or s.get("name") == slot:
+        print("\t".join([s.get("name") or "", s.get("worktree") or "", s.get("branch") or ""]))
+PY
+)"
+
+    if [ -n "$TARGETS" ]; then
+      while IFS="$(printf '\t')" read -r NAME WT BRANCH; do
+        [ -n "$NAME" ] || continue
+        [ -n "$WT" ] && git worktree remove --force "$WT" >/dev/null 2>&1 || true
+        [ -n "$BRANCH" ] && git branch -D "$BRANCH" >/dev/null 2>&1 || true
+      done <<EOF
+$TARGETS
+EOF
+      git worktree prune
+    fi
+
+    PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$ALL" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+path, slot, want_all = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+def mutator(data):
+    slots = data.get("slots", [])
+    data["slots"] = [] if want_all else [s for s in slots if s.get("name") != slot]
+update_json(Path(path), {"slots": []}, mutator)
+PY
+    ;;
+
+  *)
+    echo "$USAGE" >&2; exit 2 ;;
+esac

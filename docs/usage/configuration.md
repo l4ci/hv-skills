@@ -76,6 +76,28 @@ Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 | `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
 | `"pr"` | Push branch, create GitHub PR | Team work, code review required |
 
+## work.dispatch: subagent or tmux
+
+Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs its workers on.
+
+| Mode | How it works | When to use |
+|------|-------------|-------------|
+| `"subagent"` (default) | In-process `Agent` workers sharing the orchestrator's session. They write files; the orchestrator commits. | Almost everything. No extra dependencies, no setup. |
+| `"tmux"` | One tmux window per worker, each a separate Claude Code session in its own worktree. Workers commit, open a PR against the cycle branch, and report finished. | Long tasks that need their own context window, or work where you want to answer a worker's question directly in its pane. |
+
+`tmux` mode requires a `tmux` binary and a working `claude` on `PATH`. It never turns on by itself — set it explicitly:
+
+```bash
+.hv/bin/hv-config-set work.dispatch tmux
+```
+
+Two things behave differently under `tmux`:
+
+- **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
+- **Workers commit.** The orchestrator's per-task commit step is skipped; integration happens through the merge gate instead, which re-verifies the *merged* tree. Two workers can each be honestly green and still break the cycle branch together — a signature one widens while another adds a caller, a constant one stops emitting while another starts reading it. Nothing about a clean merge rules that out, which is why the gate runs `refactor.verifyCommands` after every merge rather than trusting the branches.
+
+Related keys: `work.workerSlots` (pool size, default `3`) and `work.workerCommand` (launch command, default builds `claude --model <models.worker> --permission-mode acceptEdits`). Set `workerCommand` when your workers need a wrapper or different permissions — that call is yours to make, not the skill's to assume.
+
 ## refactor.confirmBeforeExecute
 
 When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) pauses for your approval after presenting its findings and again after you select a design. You review the proposed changes before anything is written. Set to `false` for full autonomy: `/hv-refactor` proceeds end-to-end without checkpoints.

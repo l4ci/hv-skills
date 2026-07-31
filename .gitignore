@@ -25,6 +25,7 @@ __pycache__/
 .hv/bin/
 .hv/status.json
 .hv/repos.json
+.hv/workers.json
 .hv/config.local.json
 .hv/handoff/
 .hv/qa-runs/

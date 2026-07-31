@@ -240,7 +240,8 @@ from pathlib import Path
 umbrella_enabled = os.environ.get("UMBRELLA_MODE", "false").lower() == "true"
 cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
-  "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
+  "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>",
+               "dispatch": "subagent", "workerSlots": 3, "workerCommand": ""},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
   "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
@@ -274,6 +275,24 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Users enable via /hv-config when they want a no-prior-context adversarial
 # review in addition to /hv-review.
 .hv/bin/hv-config-set ship.secondOpinion false
+
+# work.dispatch — silent default. Opt-in feature flag (Rule 9) selecting the
+# /hv-work worker backend. "subagent" (default) dispatches in-process Agent
+# workers; "tmux" runs each worker as its own Claude Code session in its own
+# worktree, owning a branch and a PR. tmux mode needs a tmux binary and a
+# working `claude` on PATH, so it never auto-enables.
+.hv/bin/hv-config-set work.dispatch subagent
+
+# work.workerSlots — silent default. Size of the tmux worker pool. Ignored
+# under work.dispatch=subagent. 3 fits an 8-core box; more slots contend for
+# CPU, which turns time-budgeted tests into false reds.
+.hv/bin/hv-config-set work.workerSlots 3
+
+# work.workerCommand — silent default. Empty means "build the launch command
+# from models.worker" (`claude --model <worker> --permission-mode acceptEdits`).
+# Set it when workers need a wrapper, an alias, or looser permissions — that
+# choice is the user's to make explicitly, never this skill's to assume.
+.hv/bin/hv-config-set work.workerCommand ''
 
 # learn.promoteThreshold — silent default. No question; integer knob
 # (default 3) gating F03 knowledge-lifecycle auto-promotion. Users adjust

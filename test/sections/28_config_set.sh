@@ -98,6 +98,61 @@ for key in models.orchestrator models.worker work.isolation work.mergeStrategy s
 done
 pass "hv-config Step 1.5 documents all 14 canonical keys with positional-args syntax"
 
+echo "F78: work.dispatch / workerSlots / workerCommand are registered everywhere"
+# A config key that is only half-registered fails silently: hv-config rejects it
+# as unknown, or /hv-init never backfills it on an upgrade. Pin all six sites.
+for key in work.dispatch work.workerSlots work.workerCommand; do
+  grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" \
+    || fail "F78: hv-config Step 1.5 valid-key list missing $key"
+  grep -q "$key" "$REPO/hv-init/SKILL.md" \
+    || fail "F78: hv-init does not seed $key"
+  grep -q "$key" "$REPO/docs/reference/config-options.md" \
+    || fail "F78: config-options.md does not document $key"
+done
+grep -q '("work", "dispatch")' "$REPO/bin/hv-config-schema-check" \
+  || fail "F78: hv-config-schema-check EXPECTED missing work.dispatch"
+grep -q 'work.dispatch.*subagent.*tmux\|`work.dispatch` accepts' "$REPO/hv-config/SKILL.md" \
+  || fail "F78: hv-config validation rules do not constrain work.dispatch to its enum"
+grep -q 'work.dispatch' "$REPO/docs/usage/configuration.md" \
+  || fail "F78: usage/configuration.md does not explain work.dispatch"
+pass "F78: work.dispatch + workerSlots + workerCommand registered in all six sites"
+
+echo "F78: hv-config-schema-check reports the new keys STALE on an older config"
+CFG_F78="$(mktemp -d)"
+trap 'rm -rf "$CFG_F78"' EXIT
+mkdir -p "$CFG_F78/.hv"
+python3 - "$CFG_F78/.hv/config.json" <<'PYEOF'
+import json, sys
+# A pre-F78 config: complete for its era, missing only the new work.* keys.
+json.dump({
+    "models": {"orchestrator": "opus", "worker": "sonnet"},
+    "work": {"isolation": "branch", "mergeStrategy": "direct"},
+    "refactor": {"confirmBeforeExecute": True, "verifyCommands": []},
+    "learn": {"verify": True, "promoteThreshold": 3},
+    "ship": {"review": True, "secondOpinion": False, "qa": False},
+    "qa": {"gate": "advisory", "afterWork": False},
+    "autonomy": {"level": "off"},
+    "debug": {"competingHypotheses": False},
+    "docs": {"path": "docs", "autoCreate": False, "afterWork": False},
+    "git": {"baseBranch": ""},
+    "umbrella": {"enabled": False},
+    "issues": {"providers": {"github": True, "gitlab": True}},
+    "hvSkills": {"version": "4.5.0"},
+}, open(sys.argv[1], "w"))
+PYEOF
+VERDICT=$( cd "$CFG_F78" && "$BIN/hv-config-schema-check" )
+case "$VERDICT" in
+  STALE:*work.dispatch*) : ;;
+  *) fail "F78: expected STALE naming work.dispatch on a pre-F78 config, got '$VERDICT'" ;;
+esac
+case "$VERDICT" in
+  *work.workerSlots*) : ;;
+  *) fail "F78: STALE verdict omits work.workerSlots: '$VERDICT'" ;;
+esac
+trap 'rm -rf "$TMP"' EXIT
+rm -rf "$CFG_F78"
+pass "F78: pre-F78 configs report STALE so /hv-init backfills the new keys"
+
 echo "hv-config positional-args mentioned in docs + README"
 grep -q 'positional' "$REPO/docs/reference/config-options.md" || fail "config-options.md missing positional-args mention"
 grep -q 'positional\|<key>=<value>' "$REPO/docs/usage/configuration.md" || fail "configuration.md missing positional-args mention"

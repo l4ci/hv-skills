@@ -3,6 +3,8 @@
 ## Bugs
 
 ## Features
+- **[F78] [P1] tmux worker dispatch — `work.dispatch: subagent|tmux`.** Add a second dispatch backend to /hv-work: a tmux window per worker, each a separate Claude Code session in its own git worktree, owning a branch and opening a PR against the cycle branch. Orchestrator polls panes (BUSY/IDLE/BLOCKED/DONE/DEAD), relays escalations to the user via AskUserQuestion, and runs a merge gate (freshness check + post-merge re-verify) that catches the green-on-green breakage per-branch verification structurally cannot. New helpers: hv-worker-pool, hv-worker-dispatch, hv-worker-poll, hv-worker-gate. Default stays `subagent`. Related: [F79] Since: faa8a8f
+- **[F79] [P2] Multi-account worker slots with session-limit balancing.** Phase 2 of [F78]: map each worker slot to its own CLAUDE_CONFIG_DIR so slots authenticate independently (verified — a fresh config dir reports loggedIn:false). Read usage meters off the pane status line, since the interactive TUI renders what no CLI exposes. Needs two guards: a just-booted session shows placeholder meters before real numbers arrive (blank `resets` = not populated, not exhausted), and `current: NN%` plan-usage is a different quantity from the context meter beside it. Limits are per-session rolling windows with staggered resets — read each slot independently. Related: [F78] Since: faa8a8f
 
 ## Tasks
 

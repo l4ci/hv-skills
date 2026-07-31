@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Classify tmux worker slots and emit JSON the /hv-work orchestrator routes on.
+#
+# States: BUSY | IDLE | BLOCKED | DONE | DEAD
+#
+# Liveness is decided by MOVEMENT, not by pattern-matching a spinner: the pane
+# is captured twice, --settle seconds apart, and a pane that changed is BUSY.
+# A static pane is then classified by content. This is deliberately not
+# swarm.md's approach — matching activity markers in prose is what let a dead
+# session read as permanently working.
+#
+# DONE and BLOCKED come from SENTINELS the worker contract requires it to
+# print, not from inference:
+#     HV-DONE <slot> <pr-url-or-branch>
+#     HV-BLOCKED <slot>: <one question in plain language>
+# We own the worker contract, so we can require an unambiguous signal instead
+# of guessing from an idle prompt.
+#
+# DEAD is the one state we cannot get a sentinel for, so it stays heuristic:
+#   - a bare `API Error … Overloaded` on a static pane is a HEADSTONE, not a
+#     pulse. Only `Retrying in` means a retry is actually in flight.
+#   - `Resume this session with` on a static pane is a crashed session.
+# A watcher that treats bare `Overloaded` as activity waits forever on a
+# session that already died.
+#
+# Tool: exit 0 with JSON on stdout; exit 2 on usage error; exit 3 on tmux failure.
+#
+# Usage:
+#   hv-worker-poll [--slot <name>] [--settle <seconds>] [--lines <n>]
+#   hv-worker-poll --fixture <file> [--slot <name>]
+#
+#   --fixture  Classify the given file's contents as a static pane instead of
+#              talking to tmux. Exists so the classifier is testable without a
+#              live session; smoke feeds it captured pane text.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+USAGE="usage: hv-worker-poll [--slot <name>] [--settle <seconds>] [--lines <n>] | --fixture <file> [--slot <name>]"
+
+SLOT=""
+SETTLE=3
+LINES=60
+FIXTURE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --slot)    SLOT="${2:?$USAGE}"; shift 2 ;;
+    --settle)  SETTLE="${2:?$USAGE}"; shift 2 ;;
+    --lines)   LINES="${2:?$USAGE}"; shift 2 ;;
+    --fixture) FIXTURE="${2:?$USAGE}"; shift 2 ;;
+    --)        shift; break ;;
+    -*)        echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)         echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+# classify <slot> <moved:0|1> <pane-text-file> -> prints "STATE<TAB>evidence"
+classify() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" "$3" "$LINES" <<'PY'
+import re
+import sys
+
+slot, moved, path, lines = sys.argv[1], sys.argv[2] == "1", sys.argv[3], int(sys.argv[4])
+text = open(path, encoding="utf-8", errors="replace").read()
+tail = "\n".join(text.splitlines()[-lines:])
+
+def emit(state, evidence):
+    print(f"{state}\t{evidence}")
+    raise SystemExit(0)
+
+# Sentinels win over everything, including movement: a worker that printed
+# HV-DONE and is still rendering its own output is finished, not busy.
+m = re.search(r"^\s*HV-BLOCKED\s+(\S+)\s*:\s*(.+)$", tail, re.MULTILINE)
+if m:
+    emit("BLOCKED", m.group(2).strip())
+
+m = re.search(r"^\s*HV-DONE\s+(\S+)\s*(.*)$", tail, re.MULTILINE)
+if m:
+    emit("DONE", (m.group(2) or "").strip())
+
+# `Retrying in` is the only positive proof a retry is in flight. Check it
+# before the DEAD patterns so a live retry is never read as a corpse.
+if re.search(r"Retrying in", tail):
+    emit("BUSY", "retry in flight")
+
+if moved:
+    emit("BUSY", "pane changed between captures")
+
+# Static pane from here down.
+m = re.search(r"(API Error[^\n]*)", tail)
+if m:
+    emit("DEAD", m.group(1).strip()[:120])
+if re.search(r"Resume this session with", tail):
+    emit("DEAD", "crashed session offering resume")
+
+emit("IDLE", "static pane, no sentinel")
+PY
+}
+
+TMPDIR_POLL="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_POLL"' EXIT
+
+if [ -n "$FIXTURE" ]; then
+  [ -f "$FIXTURE" ] || { echo "error: fixture not found: $FIXTURE" >&2; exit 2; }
+  RESULT="$(classify "${SLOT:-fixture}" 0 "$FIXTURE")"
+  STATE="${RESULT%%	*}"
+  EVIDENCE="${RESULT#*	}"
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${SLOT:-fixture}" "$STATE" "$EVIDENCE" <<'PY'
+import json, sys
+print(json.dumps([{"name": sys.argv[1], "state": sys.argv[2], "evidence": sys.argv[3]}], indent=2))
+PY
+  exit 0
+fi
+
+command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+
+REGISTRY=".hv/workers.json"
+[ -f "$REGISTRY" ] || { echo '[]'; exit 0; }
+
+SLOTS="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+want = sys.argv[2]
+for s in data.get("slots", []):
+    if want and s.get("name") != want:
+        continue
+    print("\t".join([s.get("name") or "", s.get("window") or ""]))
+PY
+)"
+
+[ -n "$SLOTS" ] || { echo '[]'; exit 0; }
+
+# First capture for every slot, then settle once, then the second capture —
+# so N slots cost one settle interval, not N.
+while IFS="$(printf '\t')" read -r NAME WINDOW; do
+  [ -n "$NAME" ] || continue
+  tmux capture-pane -p -t "$WINDOW" >"$TMPDIR_POLL/$NAME.a" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.a"
+done <<EOF
+$SLOTS
+EOF
+
+sleep "$SETTLE"
+
+RESULTS="$TMPDIR_POLL/results.tsv"
+: >"$RESULTS"
+while IFS="$(printf '\t')" read -r NAME WINDOW; do
+  [ -n "$NAME" ] || continue
+  tmux capture-pane -p -t "$WINDOW" >"$TMPDIR_POLL/$NAME.b" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.b"
+  MOVED=0
+  cmp -s "$TMPDIR_POLL/$NAME.a" "$TMPDIR_POLL/$NAME.b" || MOVED=1
+  printf '%s\t%s\n' "$NAME" "$(classify "$NAME" "$MOVED" "$TMPDIR_POLL/$NAME.b")" >>"$RESULTS"
+done <<EOF
+$SLOTS
+EOF
+
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RESULTS" <<'PY'
+import json, sys
+out = []
+for line in open(sys.argv[1], encoding="utf-8"):
+    line = line.rstrip("\n")
+    if not line:
+        continue
+    parts = line.split("\t")
+    name = parts[0]
+    state = parts[1] if len(parts) > 1 else "IDLE"
+    evidence = parts[2] if len(parts) > 2 else ""
+    out.append({"name": name, "state": state, "evidence": evidence})
+print(json.dumps(out, indent=2))
+PY

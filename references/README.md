@@ -38,6 +38,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`subagent-dispatch.md`](subagent-dispatch.md) | Cross-skill rulebook for when and how skills push work into subagents instead of the orchestrator thread. | `/hv-debug`, `/hv-next`, `/hv-qa`, `/hv-vision` |
 | [`task-list-init.md`](task-list-init.md) | Canonical task-list initialization block cited by every skill with three or more phases. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-debug`, `/hv-decide`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
 | [`terminal-loop-surface.md`](terminal-loop-surface.md) | Canonical bash block for surfacing `[Auto:Loop]` decisions from terminal-path skills before halting. | `/hv-debug`, `/hv-next`, `/hv-pause`, `/hv-work` |
+| [`tmux-dispatch.md`](tmux-dispatch.md) | Worker contract, pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"`. | `/hv-work` |
 | [`three-mode-skill-shape.md`](three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship` (Docs Mode) and `/hv-qa`. | `/hv-qa`, `/hv-ship` |
 | [`umbrella-mode.md`](umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. | `/hv-capture`, `/hv-qa`, `/hv-spike`, `/hv-work` |
 | [`update-verdicts.md`](update-verdicts.md) | Update-check verdicts and routing for `/hv-update`. | `/hv-update` |
