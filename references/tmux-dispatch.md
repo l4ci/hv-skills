@@ -79,6 +79,7 @@ The two sentinels are the contract's load-bearing half. We own the worker's inst
 | `BLOCKED` | `HV-BLOCKED <slot>: <question>` present | Surface the question via `AskUserQuestion`, relay the answer back with `--relay` |
 | `DONE` | `HV-DONE <slot> <pr>` present | Review the PR diff against the brief, then `hv-worker-gate` |
 | `BUSY` | `Retrying in` present, **or** the pane changed between captures | Wait |
+| `NEEDS-PERMISSION` | static pane showing a permission prompt | Surface to the user to approve in that pane; recurring means the permission mode is too narrow (see *Permissions*) |
 | `LIMITED` | the session says it hit its usage window | Reassign the slot to another account and re-dispatch (see *Accounts*) |
 | `DEAD` | static pane with `API Error …` or `Resume this session with` | Re-dispatch **once**, then hand the task to a different slot |
 | `IDLE` | static, no sentinel | Parked, or finished without printing a sentinel — inspect |
@@ -117,6 +118,22 @@ Neither author can see it — the conflicting change never existed in their tree
 When `refactor.verifyCommands` is empty the gate prints `NO-VERIFY` and exits 0 — it reports that the merged tree was **not** gated by a command rather than implying a pass it cannot back. A project running the tmux backend should set `verifyCommands`; without one, step 3 is a structural diff review by the orchestrator and nothing more.
 
 Batching: re-verify per merge is the rule. A group of PRs with genuinely disjoint file sets can be merged and gated once. Gate **individually** when a PR touches a shared module, widens a shared type, or renames a shared symbol.
+
+## Permissions
+
+`work.workerCommand` defaults to `claude --model <worker> --permission-mode acceptEdits`. It does **not** use `--dangerously-skip-permissions`, and this project will not default to it: a pool of unattended sessions holding commit and `gh` access is not a permission posture a tool should choose on the operator's behalf.
+
+The consequence is real and worth stating plainly. `acceptEdits` auto-approves **file edits only**. The worker contract asks workers to `git add`, `git commit`, `gh pr create`, and run targeted tests — every one of those prompts. So under the default, a worker gets as far as writing files and then stalls.
+
+`NEEDS-PERMISSION` exists so that stall is legible rather than silent: without it the pane is static with no sentinel and no error, which is indistinguishable from idle. One slot stalling is a prompt to approve; every slot stalling means the mode is too narrow for the work.
+
+Three ways to resolve it, in increasing order of trust:
+
+1. **Approve in the pane.** Fine for a small round; defeats unattended operation.
+2. **Scope the grant.** Point `work.workerCommand` at a settings file that allowlists exactly the commands the contract needs — `git add`, `git commit`, `gh pr create`, the project's test runner — via `claude --settings <file>`. Workers get autonomy for the operations they were briefed to perform and nothing else.
+3. **`--permission-mode bypassPermissions`.** Unattended sessions with unrestricted tool access on your machine. Reasonable only when the worktrees are disposable and you accept that a worker's mistake is not gated by anything.
+
+Option 2 is the one that matches what this backend is for. Whichever you pick, it is set explicitly in `work.workerCommand` — nothing here changes it for you.
 
 ## Accounts
 

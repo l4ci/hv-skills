@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Classify tmux worker slots and emit JSON the /hv-work orchestrator routes on.
 #
-# States: BUSY | IDLE | BLOCKED | DONE | DEAD | LIMITED
+# States: BUSY | IDLE | BLOCKED | DONE | DEAD | LIMITED | NEEDS-PERMISSION
 #
 # Liveness is decided by MOVEMENT, not by pattern-matching a spinner: the pane
 # is captured twice, --settle seconds apart, and a pane that changed is BUSY.
@@ -121,6 +121,22 @@ if m:
     emit("DEAD", m.group(1).strip()[:120])
 if re.search(r"Resume this session with", tail):
     emit("DEAD", "crashed session offering resume")
+
+# A worker stopped at a permission prompt is STALLED, but it looks exactly
+# like an idle one: static pane, no sentinel, no error. Without this it
+# reports IDLE and the orchestrator waits forever on a worker that is waiting
+# on a human. Distinct from BLOCKED — the worker is not asking a design
+# question, it needs an approval (or a permission mode that grants it).
+PERMISSION_PATTERNS = (
+    r"Do you want to (?:proceed|allow|make this edit)",
+    r"and don'?t ask again",
+    r"No, and tell Claude what to do differently",
+    r"Allow .{0,40}\bto run\b",
+)
+for pat in PERMISSION_PATTERNS:
+    if re.search(pat, tail, re.IGNORECASE):
+        emit("NEEDS-PERMISSION",
+             "stopped at a permission prompt — approve in the pane, or widen work.workerCommand")
 
 emit("IDLE", "static pane, no sentinel")
 PY

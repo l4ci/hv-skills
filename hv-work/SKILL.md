@@ -489,6 +489,8 @@ Loop until no slot is `BUSY`, routing each state as it appears:
 
 - **`DEAD`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
 
+- **`NEEDS-PERMISSION`** — the worker stopped at a permission prompt and is waiting on a human. It is **not** idle and it will never self-resolve. Surface it to the user with the slot name and tell them to approve in that pane (`tmux attach -t <session>`, switch to the slot's window). If it recurs across slots, the permission mode is too narrow for what the briefs ask workers to do — the default `acceptEdits` auto-approves file edits but still prompts for `git`, `gh`, and test commands, so a worker briefed to commit and open a PR will stall on its first Bash call. Report that pattern rather than re-dispatching into it; widening it is the user's call via `work.workerCommand`.
+
 - **`LIMITED`** — the session hit its usage window. Re-dispatching onto the same account just hits the same wall, so move the slot instead:
 
   ```bash

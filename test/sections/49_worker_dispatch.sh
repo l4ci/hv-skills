@@ -284,6 +284,22 @@ case "$FUNDS" in
 esac
 pass "hv-worker-poll detects LIMITED, flags the money-spending prompt, and ignores lookalike prose"
 
+# A worker stopped at a permission prompt is indistinguishable from an idle one
+# by shape: static pane, no sentinel, no error. Reported as IDLE, the
+# orchestrator waits forever on a worker that is itself waiting on a human.
+printf 'Bash(git commit -m "feat: x")\n\nDo you want to proceed?\n 1. Yes\n 2. No, and tell Claude what to do differently\n' > "$FX/perm.txt"
+printf 'Allow Bash to run `gh pr create`?\n 1. Yes\n 2. No\n' > "$FX/perm_allow.txt"
+[ "$( classify_fixture "$FX/perm.txt" )" = "NEEDS-PERMISSION" ] \
+  || fail "a pane stopped at a permission prompt must not report IDLE"
+[ "$( classify_fixture "$FX/perm_allow.txt" )" = "NEEDS-PERMISSION" ] \
+  || fail "an 'Allow ... to run' prompt must report NEEDS-PERMISSION"
+# The design-question sentinel still outranks it: a worker that asked something
+# AND hit a prompt needs its question answered, which unblocks both.
+printf 'HV-BLOCKED w1: which shape?\nDo you want to proceed?\n' > "$FX/perm_vs_blocked.txt"
+[ "$( classify_fixture "$FX/perm_vs_blocked.txt" )" = "BLOCKED" ] \
+  || fail "HV-BLOCKED must outrank a permission prompt"
+pass "hv-worker-poll reports NEEDS-PERMISSION instead of mistaking a stalled worker for idle"
+
 # ── (c) merge gate ──────────────────────────────────────────────────────────
 # Verification command imports every module present, so it naturally covers
 # files that only exist after a merge.
