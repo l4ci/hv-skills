@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Guarantee the tmux backend has a session a human can actually attach to.
+#
+# THE PROBLEM THIS SOLVES. `work.dispatch: tmux` is worth its cost for exactly
+# one reason: a worker that needs a decision can idle and a human can answer it
+# in that worker's pane. If /hv-work is launched from a terminal that is NOT
+# already inside tmux, the worker windows get created in a DETACHED session
+# nobody is looking at. Every escalation then goes unanswered, and the backend
+# quietly degrades into a worse version of the subagent one.
+#
+# So being inside tmux is a PRECONDITION, not a nicety. When it is not met the
+# orchestrator itself has to move into the session — hence `ensure`, which
+# spawns an operator window, hands the cycle to it, and tells the caller where
+# to attach.
+#
+# THE HANDOFF. The operator window runs `claude --continue` by default, which
+# resumes the most recent conversation for this directory — so the cycle keeps
+# its plan, its briefs, and its wave layout instead of restarting cold. The
+# caller MUST stop after a successful `ensure`: two orchestrators driving one
+# pool would dispatch the same task twice and race on the same slots.
+#
+# Tool: exit 0 inside tmux (check) or on a completed handoff (ensure);
+#       exit 1 from `check` when outside tmux (a verdict, not a failure);
+#       exit 2 on usage error; exit 3 on tmux failure.
+#
+# Usage:
+#   hv-worker-session check [--session <name>]
+#   hv-worker-session ensure [--session <name>] [--instruction-file <path>]
+#                            [--boot-timeout <s>]
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-tmux-send.sh"
+
+USAGE="usage: hv-worker-session check [--session <name>] | ensure [--session <name>] [--instruction-file <path>] [--boot-timeout <s>]"
+
+CMD="${1:-}"
+[ -n "$CMD" ] || { echo "$USAGE" >&2; exit 2; }
+shift
+
+SESSION=""
+INSTRUCTION=""
+BOOT_TIMEOUT=60
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --session)          SESSION="${2:?$USAGE}"; shift 2 ;;
+    --instruction-file) INSTRUCTION="${2:?$USAGE}"; shift 2 ;;
+    --boot-timeout)     BOOT_TIMEOUT="${2:?$USAGE}"; shift 2 ;;
+    --)                 shift; break ;;
+    -*)                 echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)                  echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$SESSION" ] || SESSION="hv"
+
+case "$CMD" in
+  check)
+    # $TMUX is set for any process started inside a tmux pane. It is the only
+    # reliable signal — `tmux has-session` answers whether a session EXISTS,
+    # which is a different question from whether WE are in it, and conflating
+    # them is what produces detached panes nobody reads.
+    if [ -n "${TMUX:-}" ]; then
+      CUR="$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "?")"
+      echo "inside $CUR"
+      exit 0
+    fi
+    echo "outside"
+    exit 1
+    ;;
+
+  ensure)
+    command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+
+    if [ -n "${TMUX:-}" ]; then
+      CUR="$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "?")"
+      echo "inside $CUR — no handoff needed"
+      exit 0
+    fi
+
+    OPERATOR="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from hvlib import load_config
+cfg = load_config()
+work = cfg.get("work", {}) or {}
+cmd = work.get("operatorCommand") or ""
+if not cmd:
+    # --continue resumes the most recent conversation for this directory, so
+    # the cycle keeps its context rather than restarting from nothing.
+    model = (cfg.get("models", {}) or {}).get("orchestrator") or "opus"
+    cmd = f"claude --continue --model {model}"
+print(cmd)
+PY
+)"
+
+    ROOT="$(pwd -P)"
+    tmux has-session -t "$SESSION" 2>/dev/null || \
+      tmux new-session -d -s "$SESSION" -c "$ROOT" -n scratch || {
+        echo "error: could not create tmux session '$SESSION'" >&2; exit 3; }
+
+    # Reuse an existing operator window rather than stacking duplicates — a
+    # second ensure after an interrupted run must not leave two operators.
+    if tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null | grep -qx operator; then
+      tmux kill-window -t "$SESSION:operator" 2>/dev/null || true
+    fi
+    tmux new-window -d -t "$SESSION" -n operator -c "$ROOT" || {
+      echo "error: could not create the operator window" >&2; exit 3; }
+
+    tmux send-keys -t "$SESSION:operator" "$OPERATOR" C-m
+
+    if [ -n "$INSTRUCTION" ]; then
+      [ -f "$INSTRUCTION" ] || { echo "error: instruction file not found: $INSTRUCTION" >&2; exit 2; }
+      hv_tmux_wait_ready "$SESSION:operator" "$BOOT_TIMEOUT" || {
+        echo "error: the operator session did not come up within ${BOOT_TIMEOUT}s" >&2
+        echo "  the window exists — attach with: tmux attach -t $SESSION" >&2
+        exit 3; }
+      hv_tmux_send_file "$SESSION:operator" "$INSTRUCTION" "hv-operator" || {
+        echo "error: the operator never picked up its instruction" >&2
+        echo "  attach and paste it by hand: tmux attach -t $SESSION" >&2
+        exit 3; }
+    fi
+
+    cat <<EOF
+handed off to tmux session '$SESSION'
+
+  Attach:   tmux attach -t $SESSION
+  Windows:  operator  — the cycle continues here
+            w1..wN    — workers (created on dispatch)
+
+This terminal is no longer the orchestrator and can be closed.
+Answer a worker's question in that worker's window, or in 'operator'.
+EOF
+    ;;
+
+  *)
+    echo "$USAGE" >&2; exit 2 ;;
+esac

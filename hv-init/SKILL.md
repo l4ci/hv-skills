@@ -242,7 +242,7 @@ cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
   "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>",
                "dispatch": "subagent", "workerSlots": 3, "workerCommand": "",
-               "accounts": []},
+               "accounts": [], "operatorCommand": ""},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
   "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
@@ -301,6 +301,13 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # which is the single-account default. Only meaningful under
 # work.dispatch=tmux.
 .hv/bin/hv-config-set work.accounts '[]'
+
+# work.operatorCommand — silent default. Command used to relaunch the
+# ORCHESTRATOR inside tmux when /hv-work is invoked from a terminal that is
+# not already in a tmux session. Empty builds
+# `claude --continue --model <models.orchestrator>`; --continue resumes the
+# current conversation so the cycle keeps its plan instead of restarting cold.
+.hv/bin/hv-config-set work.operatorCommand ''
 
 # learn.promoteThreshold — silent default. No question; integer knob
 # (default 3) gating F03 knowledge-lifecycle auto-promotion. Users adjust

@@ -28,6 +28,8 @@ Read `.hv/config.json`:
 - `work.dispatch` — `"subagent"` (default) or `"tmux"`. Selects the worker backend. `"subagent"` dispatches in-process `Agent` workers that write files while the orchestrator commits. `"tmux"` runs each worker as its own Claude Code session in its own worktree, committing and opening a PR against the cycle branch. See [`references/tmux-dispatch.md`](../references/tmux-dispatch.md).
 - `work.workerSlots` — integer, default `3`. Size of the tmux worker pool; ignored under `"subagent"`.
 - `work.workerCommand` — string, default `""`. Launch command for a tmux worker session; empty builds `claude --model <models.worker> --permission-mode acceptEdits`.
+- `work.accounts` — array of `{name, configDir}`, default `[]`. Maps tmux slots to independent `CLAUDE_CONFIG_DIR`s so each authenticates as its own account. Empty means every slot inherits the ambient config dir.
+- `work.operatorCommand` — string, default `""`. Used to relaunch the orchestrator inside tmux when the cycle starts outside one; empty builds `claude --continue --model <models.orchestrator>`.
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly.
 
 ## When to Use
@@ -309,7 +311,27 @@ Choose a descriptive name (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
 
 ### Backend branch — `work.dispatch == "tmux"`
 
-When `work.dispatch` is `"tmux"`, skip the isolation guard and the branch/worktree patterns below entirely — they describe the `subagent` backend. Instead, after creating the cycle branch, stand up the worker pool:
+When `work.dispatch` is `"tmux"`, skip the isolation guard and the branch/worktree patterns below entirely — they describe the `subagent` backend.
+
+**First, confirm this session is inside tmux. It is a precondition, not a nicety.**
+
+```bash
+.hv/bin/hv-worker-session check     # exit 0 = inside, exit 1 = outside
+```
+
+The backend is worth its cost for exactly one reason: a worker that needs a decision can idle and a human can answer *in that worker's pane*. Launched from a terminal that isn't already inside tmux, the worker windows land in a **detached session nobody is looking at** — every escalation goes unanswered and the backend silently degrades into a worse subagent mode. Don't proceed on the assumption someone will attach later.
+
+**Exit 1 (outside tmux) — hand the cycle over and stop.** Write a short instruction file telling the operator what it is resuming (the cycle target, the wave layout so far, and that it should continue from Step 5), then:
+
+```bash
+.hv/bin/hv-worker-session ensure --instruction-file <path>
+```
+
+That creates the session, spawns an `operator` window running `claude --continue` (which resumes *this* conversation, so the plan and briefs survive), pastes the instruction, and prints the attach command.
+
+**Then stop this cycle immediately.** Print the helper's attach block verbatim and end the run. Do **not** continue to the pool, do not dispatch, do not "keep going in case the handoff failed" — two orchestrators driving one pool dispatch the same task twice and race on the same slots. The handoff either worked (the operator is running it) or the helper exited non-zero (report that and let the user attach by hand). This is a terminal path, so surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` before printing the block.
+
+**Exit 0 (inside tmux) — continue.** After creating the cycle branch, stand up the worker pool:
 
 ```bash
 git checkout -b <cycle-branch>

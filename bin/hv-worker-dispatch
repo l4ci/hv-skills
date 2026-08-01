@@ -5,12 +5,9 @@
 # Code session (it can land as a literal chat message), so a fresh window is
 # the only trustworthy reset. The new session starts at 0 context.
 #
-# The brief is injected via tmux's paste buffer rather than `send-keys` with
-# the text as an argument. send-keys delivers a long prompt as a bracketed
-# paste that swallows the trailing Enter and needs quoting gymnastics for
-# multi-line text; load-buffer/paste-buffer sidesteps both. Enter is always
-# sent as a SEPARATE keypress afterwards, and pickup is CONFIRMED by
-# re-capturing the pane — never assume the first Enter landed.
+# Text injection and pickup confirmation live in hv-tmux-send.sh, shared with
+# hv-worker-session. That path carries several tmux-specific traps; keeping one
+# copy is what stops the two callers from drifting apart.
 #
 # Tool: exit 0 on confirmed pickup; exit 2 on usage error;
 #       exit 3 on tmux/slot failure; exit 4 if the brief never submitted.
@@ -26,6 +23,7 @@
 #            answer; never pass it for an original task brief.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-tmux-send.sh"
 
 USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]"
 
@@ -105,48 +103,27 @@ tmux new-window -d -t "$SESSION" -n "$SLOT" -c "$WORKTREE" || {
 
 tmux send-keys -t "$WINDOW" "$LAUNCH" C-m
 
-# Wait for the session UI before pasting. Pasting into a shell that hasn't
-# handed off to Claude Code yet loses the brief silently.
-WAITED=0
-while [ "$WAITED" -lt "$BOOT_TIMEOUT" ]; do
-  PANE="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
-  case "$PANE" in
-    *"?"*"for shortcuts"*|*"Welcome to Claude Code"*|*"╭─"*) break ;;
-  esac
-  sleep 2
-  WAITED=$((WAITED + 2))
-done
-[ "$WAITED" -lt "$BOOT_TIMEOUT" ] || {
+hv_tmux_wait_ready "$WINDOW" "$BOOT_TIMEOUT" || {
   echo "error: slot '$SLOT' session did not come up within ${BOOT_TIMEOUT}s" >&2; exit 3; }
 
-BEFORE="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
-
+# A relay is prefixed so the worker can tell the orchestrator's voice from the
+# maintainer's. It writes its own PR body and cannot otherwise distinguish
+# them — the two arrive through the same channel.
+PAYLOAD="$BRIEF"
 if [ "$RELAY" -eq 1 ]; then
+  PAYLOAD="$(mktemp)"
+  trap 'rm -f "$PAYLOAD"' EXIT
   {
     printf '%s\n' "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator." \
                   "It is NOT the maintainer speaking to you directly. If you cite it in a PR" \
                   "body, attribute it as 'relayed by the orchestrator', never as a maintainer" \
                   "sign-off in your session.]" ""
     cat "$BRIEF"
-  } | tmux load-buffer -b "hv-$SLOT" -
-else
-  tmux load-buffer -b "hv-$SLOT" "$BRIEF"
+  } >"$PAYLOAD"
 fi
 
-tmux paste-buffer -b "hv-$SLOT" -t "$WINDOW"
-tmux delete-buffer -b "hv-$SLOT" 2>/dev/null || true
+hv_tmux_send_file "$WINDOW" "$PAYLOAD" "hv-$SLOT" || {
+  echo "error: slot '$SLOT' never picked up the brief (pane unchanged after 4 submits)" >&2
+  exit 4; }
 
-# Submit, then CONFIRM. A pasted prompt can land as a collapsed paste chip
-# whose trailing Enter does not submit; up to 3 extra bare Enters clear it.
-TRIES=0
-while [ "$TRIES" -lt 4 ]; do
-  sleep 1
-  tmux send-keys -t "$WINDOW" C-m
-  sleep 2
-  AFTER="$(tmux capture-pane -pJ -t "$WINDOW" 2>/dev/null || true)"
-  [ "$AFTER" != "$BEFORE" ] && { echo "dispatched: $SLOT"; exit 0; }
-  TRIES=$((TRIES + 1))
-done
-
-echo "error: slot '$SLOT' never picked up the brief (pane unchanged after 4 submits)" >&2
-exit 4
+echo "dispatched: $SLOT"

@@ -17,6 +17,30 @@ Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-ga
 | Integration | task commits land on the cycle branch directly | `hv-worker-gate` per slot: freshness → merge → re-verify |
 | A worker can ask a question | no | yes — it idles, the orchestrator relays |
 
+## Being inside tmux is a precondition
+
+The backend earns its cost through one property: a worker can idle on a question and a human can answer it in that worker's pane. Launched from a terminal that is not already inside tmux, the worker windows are created in a **detached session nobody is attached to** — every escalation goes unanswered, workers stall, and the backend degrades into a slower subagent mode with extra moving parts. Nothing about that failure is loud.
+
+So `/hv-work` Step 5 checks first:
+
+```bash
+.hv/bin/hv-worker-session check     # exit 0 inside, exit 1 outside
+```
+
+Detection is `$TMUX`, which is set for any process started inside a pane. `tmux has-session` is the wrong test — it answers whether a session *exists*, not whether *we are in it*, and conflating the two produces exactly the detached-pane failure above.
+
+**Outside → hand the cycle over, then stop.**
+
+```bash
+.hv/bin/hv-worker-session ensure --instruction-file <path>
+```
+
+This creates the session, spawns an `operator` window, and runs `work.operatorCommand` there — `claude --continue --model <orchestrator>` by default. `--continue` resumes the most recent conversation for the directory, so the operator inherits the plan, the briefs, and the wave layout instead of restarting cold. The instruction file is pasted once the session is up, using the same confirm-pickup path as a worker dispatch.
+
+The caller **must stop after a successful `ensure`.** Two orchestrators driving one pool dispatch the same task twice and race on the same slots. There is no "continue anyway in case the handoff failed" — either it worked and the operator owns the cycle, or `ensure` exited non-zero and the user attaches by hand.
+
+`ensure` is idempotent on the operator window: a second call after an interrupted run replaces it rather than stacking a duplicate.
+
 ## The worker contract
 
 A tmux worker boots with **none** of the orchestrator's context: no conversation, no loaded KNOWLEDGE, no plan. Everything it needs is in the brief. Prepend this standing contract to the task brief on every dispatch — the brief body itself is identical to the subagent path, same `**Claims to verify**` section and all.

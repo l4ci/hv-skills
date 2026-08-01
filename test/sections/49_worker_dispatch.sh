@@ -126,14 +126,68 @@ EVID=$( ( cd "$TMP_WD" && "$BIN/hv-worker-poll" --fixture "$FX/blocked_long.txt"
         | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["evidence"])' )
 [ "$EVID" = "$LONGQ" ] \
   || fail "hv-worker-poll truncated a long BLOCKED question: got ${#EVID} chars, expected ${#LONGQ}"
-for H in hv-worker-poll hv-worker-dispatch; do
-  if grep -q 'capture-pane -p ' "$BIN/$H"; then
-    fail "$H captures panes without -J; long sentinels will silently truncate at pane width"
+# Every pane capture in the tree must join wrapped lines. hv-worker-dispatch's
+# captures live in the shared library, so assert against whichever files
+# actually call capture-pane rather than a fixed list that rots on refactor.
+CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-tmux-send.sh 2>/dev/null || true )
+[ -n "$CAPTURERS" ] || fail "no helper calls capture-pane — the pane classifier has gone missing"
+for H in $CAPTURERS; do
+  if grep -q 'capture-pane -p ' "$H"; then
+    fail "$(basename "$H") captures panes without -J; long sentinels silently truncate at pane width"
   fi
-  grep -q 'capture-pane -pJ' "$BIN/$H" \
-    || fail "$H does not use capture-pane -pJ (join wrapped lines)"
+  grep -q 'capture-pane -pJ' "$H" \
+    || fail "$(basename "$H") calls capture-pane but not with -J (join wrapped lines)"
 done
 pass "hv-worker-poll preserves questions longer than the pane is wide (capture-pane -J)"
+
+# ── (b1) tmux precondition ──────────────────────────────────────────────────
+# Being inside tmux is load-bearing: outside it, worker windows land in a
+# detached session nobody reads and every escalation goes unanswered. The check
+# must key on $TMUX (are WE in a session) and not on `tmux has-session` (does
+# one EXIST) — conflating them is what produces the silent failure.
+RC=0
+( cd "$TMP_WD" && env -u TMUX "$BIN/hv-worker-session" check ) >/dev/null 2>&1 || RC=$?
+[ "$RC" = "1" ] || fail "hv-worker-session check should exit 1 outside tmux, got $RC"
+OUT=$( cd "$TMP_WD" && env -u TMUX "$BIN/hv-worker-session" check 2>&1 || true )
+[ "$OUT" = "outside" ] || fail "hv-worker-session check should print 'outside', got '$OUT'"
+
+# A session existing is NOT the same as being inside it. With TMUX unset the
+# verdict must still be 'outside' even when a session by that name is up.
+if command -v tmux >/dev/null 2>&1; then
+  tmux new-session -d -s hvsmoke -c "$TMP_WD" 2>/dev/null || true
+  RC=0
+  ( cd "$TMP_WD" && env -u TMUX "$BIN/hv-worker-session" check --session hvsmoke ) >/dev/null 2>&1 || RC=$?
+  [ "$RC" = "1" ] \
+    || fail "check must key on \$TMUX, not on whether a session exists (got exit $RC with hvsmoke up)"
+  tmux kill-session -t hvsmoke 2>/dev/null || true
+fi
+# Inside a pane, $TMUX is set — simulate that without needing a live server.
+OUT=$( cd "$TMP_WD" && TMUX="/tmp/fake,1,0" "$BIN/hv-worker-session" check 2>&1 || true )
+case "$OUT" in
+  inside*) : ;;
+  *) fail "hv-worker-session check should report 'inside ...' when \$TMUX is set, got '$OUT'" ;;
+esac
+RC=0
+( cd "$TMP_WD" && "$BIN/hv-worker-session" bogus ) >/dev/null 2>&1 || RC=$?
+[ "$RC" = "2" ] || fail "hv-worker-session unknown verb should exit 2, got $RC"
+pass "hv-worker-session detects tmux membership via \$TMUX, not session existence"
+
+# The paste path is shared by hv-worker-dispatch and hv-worker-session. It
+# carries three separate traps (bracketed-paste eating Enter, collapsed paste
+# chips, unconfirmed pickup); two copies would drift.
+[ -f "$BIN/hv-tmux-send.sh" ] || fail "bin/hv-tmux-send.sh (shared paste library) is missing"
+for H in hv-worker-dispatch hv-worker-session; do
+  grep -q 'hv-tmux-send.sh' "$BIN/$H" \
+    || fail "$H does not source the shared hv-tmux-send.sh paste library"
+done
+# Strip comments before grepping: the callers legitimately MENTION the paste
+# path in prose, and matching that reports a defect where none exists.
+if sed 's/#.*//' "$BIN/hv-worker-dispatch" | grep -q 'paste-buffer'; then
+  fail "hv-worker-dispatch still pastes inline; it must go through hv-tmux-send.sh"
+fi
+sed 's/#.*//' "$BIN/hv-tmux-send.sh" | grep -q 'paste-buffer' \
+  || fail "hv-tmux-send.sh does not actually paste — the shared library is hollow"
+pass "hv-worker-dispatch and hv-worker-session share one paste-and-confirm path"
 
 # ── (b2) accounts + LIMITED ─────────────────────────────────────────────────
 # Meters come from per-account fixture payloads via HV_ACCOUNT_USAGE_DIR, which

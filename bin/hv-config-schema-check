@@ -23,6 +23,7 @@ EXPECTED = [
     ("work", "workerSlots"),
     ("work", "workerCommand"),
     ("work", "accounts"),
+    ("work", "operatorCommand"),
     ("refactor", "confirmBeforeExecute"),
     ("refactor", "verifyCommands"),
     ("learn", "verify"),
