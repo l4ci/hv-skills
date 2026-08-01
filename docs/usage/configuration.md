@@ -96,7 +96,9 @@ Two things behave differently under `tmux`:
 - **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
 - **Workers commit.** The orchestrator's per-task commit step is skipped; integration happens through the merge gate instead, which re-verifies the *merged* tree. Two workers can each be honestly green and still break the cycle branch together — a signature one widens while another adds a caller, a constant one stops emitting while another starts reading it. Nothing about a clean merge rules that out, which is why the gate runs `refactor.verifyCommands` after every merge rather than trusting the branches.
 
-Related keys: `work.workerSlots` (pool size, default `3`) and `work.workerCommand` (launch command, default builds `claude --model <models.worker> --permission-mode acceptEdits`). Set `workerCommand` when your workers need a wrapper or different permissions — that call is yours to make, not the skill's to assume.
+Related keys: `work.workerSlots` (pool size, default `3`), `work.workerCommand` (default builds `claude --model <models.worker> --dangerously-skip-permissions`), `work.operatorCommand` (default builds `claude --continue --model <models.orchestrator> --permission-mode auto`), and `work.accounts`.
+
+**Workers run with permissions skipped; the operator does not.** A worker is briefed to commit, open a PR and run tests with nobody in its pane to answer a prompt, so a narrower mode just stalls it. What bounds a worker is scope rather than gating — a throwaway branch in its own worktree, with `hv-worker-gate` re-verifying the merged tree before anything reaches the cycle branch. The operator keeps `auto` because it performs the merges and it is the window a human is actually watching. Narrow either via its config key; a worker that then stops on a prompt reports `NEEDS-PERMISSION` rather than hanging.
 
 ## refactor.confirmBeforeExecute
 

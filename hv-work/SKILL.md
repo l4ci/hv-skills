@@ -27,9 +27,9 @@ Read `.hv/config.json`:
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
 - `work.dispatch` — `"subagent"` (default) or `"tmux"`. Selects the worker backend. `"subagent"` dispatches in-process `Agent` workers that write files while the orchestrator commits. `"tmux"` runs each worker as its own Claude Code session in its own worktree, committing and opening a PR against the cycle branch. See [`references/tmux-dispatch.md`](../references/tmux-dispatch.md).
 - `work.workerSlots` — integer, default `3`. Size of the tmux worker pool; ignored under `"subagent"`.
-- `work.workerCommand` — string, default `""`. Launch command for a tmux worker session; empty builds `claude --model <models.worker> --permission-mode acceptEdits`.
+- `work.workerCommand` — string, default `""`. Launch command for a tmux worker session; empty builds `claude --model <models.worker> --dangerously-skip-permissions` (workers commit, open PRs and run tests unattended).
 - `work.accounts` — array of `{name, configDir}`, default `[]`. Maps tmux slots to independent `CLAUDE_CONFIG_DIR`s so each authenticates as its own account. Empty means every slot inherits the ambient config dir.
-- `work.operatorCommand` — string, default `""`. Used to relaunch the orchestrator inside tmux when the cycle starts outside one; empty builds `claude --continue --model <models.orchestrator>`.
+- `work.operatorCommand` — string, default `""`. Used to relaunch the orchestrator inside tmux when the cycle starts outside one; empty builds `claude --continue --model <models.orchestrator> --permission-mode auto`.
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly.
 
 ## When to Use

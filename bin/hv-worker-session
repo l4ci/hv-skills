@@ -86,8 +86,13 @@ cmd = work.get("operatorCommand") or ""
 if not cmd:
     # --continue resumes the most recent conversation for this directory, so
     # the cycle keeps its context rather than restarting from nothing.
+    #
+    # The operator runs in `auto`, not the workers' skip-permissions mode. It
+    # is the process that merges into the cycle branch and talks to the user,
+    # and it is the one window a human is actually watching — so it keeps a
+    # gate the workers do not.
     model = (cfg.get("models", {}) or {}).get("orchestrator") or "opus"
-    cmd = f"claude --continue --model {model}"
+    cmd = f"claude --continue --model {model} --permission-mode auto"
 print(cmd)
 PY
 )"

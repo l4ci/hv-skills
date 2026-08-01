@@ -189,6 +189,26 @@ sed 's/#.*//' "$BIN/hv-tmux-send.sh" | grep -q 'paste-buffer' \
   || fail "hv-tmux-send.sh does not actually paste — the shared library is hollow"
 pass "hv-worker-dispatch and hv-worker-session share one paste-and-confirm path"
 
+# Workers and the operator run at deliberately different trust levels. Both
+# defaults are pinned because a silent drift either way is bad: narrowing the
+# worker stalls it mid-task on an unattended pane, and widening the operator
+# removes the gate on the process that merges into the cycle branch.
+grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-dispatch" \
+  || fail "worker default must skip permissions — a narrower mode stalls an unattended worker mid-task"
+if grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-session"; then
+  fail "the operator must NOT skip permissions; it merges into the cycle branch and a human watches it"
+fi
+grep -q 'permission-mode auto' "$BIN/hv-worker-session" \
+  || fail "operator default must set --permission-mode auto"
+grep -q 'continue' "$BIN/hv-worker-session" \
+  || fail "operator default must use --continue so the handoff keeps the cycle's context"
+# Both are overridable, or a project could never narrow the grant.
+grep -q 'workerCommand' "$BIN/hv-worker-dispatch" \
+  || fail "work.workerCommand override missing from hv-worker-dispatch"
+grep -q 'operatorCommand' "$BIN/hv-worker-session" \
+  || fail "work.operatorCommand override missing from hv-worker-session"
+pass "worker skips permissions, operator runs auto, both overridable via config"
+
 # ── (b2) accounts + LIMITED ─────────────────────────────────────────────────
 # Meters come from per-account fixture payloads via HV_ACCOUNT_USAGE_DIR, which
 # mirrors the real OAuth usage shape. The three cases that are easy to get wrong

@@ -76,10 +76,15 @@ EOF
 
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
-# Launch command is configurable because autonomous workers need permission
-# settings this project refuses to pick for the user. The default only
-# auto-accepts edits; anything looser is an explicit opt-in via
-# work.workerCommand in .hv/config.json.
+# Workers run with permissions skipped. The contract asks them to git add,
+# git commit, gh pr create and run tests; every one of those prompts under a
+# narrower mode, and there is nobody in the pane to answer — the worker just
+# stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
+# branch in its own worktree, and hv-worker-gate re-verifies the merged tree
+# before anything reaches the cycle branch.
+#
+# Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
+# classifier for exactly that case, so a narrowed mode stalls loudly.
 LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from hvlib import load_config
 cfg = load_config()
@@ -87,7 +92,7 @@ work = cfg.get("work", {}) or {}
 cmd = work.get("workerCommand") or ""
 if not cmd:
     model = (cfg.get("models", {}) or {}).get("worker") or "sonnet"
-    cmd = f"claude --model {model} --permission-mode acceptEdits"
+    cmd = f"claude --model {model} --dangerously-skip-permissions"
 print(cmd)
 PY
 )"

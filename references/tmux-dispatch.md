@@ -121,19 +121,24 @@ Batching: re-verify per merge is the rule. A group of PRs with genuinely disjoin
 
 ## Permissions
 
-`work.workerCommand` defaults to `claude --model <worker> --permission-mode acceptEdits`. It does **not** use `--dangerously-skip-permissions`, and this project will not default to it: a pool of unattended sessions holding commit and `gh` access is not a permission posture a tool should choose on the operator's behalf.
+The two roles run at different trust levels, on purpose:
 
-The consequence is real and worth stating plainly. `acceptEdits` auto-approves **file edits only**. The worker contract asks workers to `git add`, `git commit`, `gh pr create`, and run targeted tests — every one of those prompts. So under the default, a worker gets as far as writing files and then stalls.
+| | Default | Why |
+|---|---|---|
+| Worker | `claude --model <worker> --dangerously-skip-permissions` | Briefed to commit, open a PR and run tests with nobody in the pane to answer a prompt |
+| Operator | `claude --continue --model <orchestrator> --permission-mode auto` | Performs the merges, talks to the user, and is the one window a human is actually watching |
 
-`NEEDS-PERMISSION` exists so that stall is legible rather than silent: without it the pane is static with no sentinel and no error, which is indistinguishable from idle. One slot stalling is a prompt to approve; every slot stalling means the mode is too narrow for the work.
+**Why workers skip the gate.** A narrower mode does not make a worker safer, it makes it stop. `acceptEdits` auto-approves file edits only, so a worker briefed by the contract writes its files and then blocks on its first `git add` — forever, because the prompt is addressed to a human who may not be attached. An unattended session that halts halfway through a task with a dirty worktree is not a safer outcome than one that finishes.
 
-Three ways to resolve it, in increasing order of trust:
+**What bounds a worker is scope, not gating.** Each runs on a throwaway branch in its own worktree; nothing it produces reaches the cycle branch until `hv-worker-gate` has checked freshness, merged, and re-verified the merged tree. The branch is disposable and `hv-worker-pool reap` deletes it. That containment is worth stating precisely, because it has a real hole: worktree confinement is a **contract, not a sandbox**. The worker contract says stay in your worktree and use worktree-rooted paths, and an absolute path under the repo root still reaches the main checkout. Skipped permissions mean nothing stops that but the instruction.
 
-1. **Approve in the pane.** Fine for a small round; defeats unattended operation.
-2. **Scope the grant.** Point `work.workerCommand` at a settings file that allowlists exactly the commands the contract needs — `git add`, `git commit`, `gh pr create`, the project's test runner — via `claude --settings <file>`. Workers get autonomy for the operations they were briefed to perform and nothing else.
-3. **`--permission-mode bypassPermissions`.** Unattended sessions with unrestricted tool access on your machine. Reasonable only when the worktrees are disposable and you accept that a worker's mistake is not gated by anything.
+**The operator keeps `auto`** because its blast radius is different: it merges into the branch the cycle ships from, and a human is watching that window, so a prompt there gets answered rather than stranding the run.
 
-Option 2 is the one that matches what this backend is for. Whichever you pick, it is set explicitly in `work.workerCommand` — nothing here changes it for you.
+**`NEEDS-PERMISSION` stays in the classifier** even though the default should never trigger it. It covers the case where `work.workerCommand` has been narrowed — a stalled worker then reports the stall instead of looking idle. One slot stalling is a prompt to approve; every slot stalling means the mode is too narrow for the briefs.
+
+**Narrowing it.** Point `work.workerCommand` at a settings file that allowlists just what the contract needs (`claude --settings <file>` with `permissions.allow` covering `git add`, `git commit`, `gh pr create`, and the project's test runner). Workers get autonomy for the operations they were briefed to perform and nothing else, at the cost of maintaining the list.
+
+**Multi-account caveat.** Entering skip-permissions mode can itself prompt for confirmation, and that acknowledgement is per config dir. A slot pointed at a **fresh** `CLAUDE_CONFIG_DIR` (see *Accounts*) may therefore stall at boot on a dir where the ambient one is fine. Set `skipDangerousModePermissionPrompt: true` in each account's `settings.json` when provisioning it, or the first dispatch to that slot reports `NEEDS-PERMISSION` before doing any work.
 
 ## Accounts
 

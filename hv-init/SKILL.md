@@ -290,9 +290,10 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 .hv/bin/hv-config-set work.workerSlots 3
 
 # work.workerCommand — silent default. Empty means "build the launch command
-# from models.worker" (`claude --model <worker> --permission-mode acceptEdits`).
-# Set it when workers need a wrapper, an alias, or looser permissions — that
-# choice is the user's to make explicitly, never this skill's to assume.
+# from models.worker" (`claude --model <worker> --dangerously-skip-permissions`).
+# Workers commit, open PRs and run tests with nobody in the pane to answer a
+# prompt; a narrower mode stalls them. Set this to narrow it — the classifier
+# reports NEEDS-PERMISSION when a worker stops on a prompt.
 .hv/bin/hv-config-set work.workerCommand ''
 
 # work.accounts — silent default. Array of {name, configDir} mapping tmux
@@ -305,8 +306,10 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # work.operatorCommand — silent default. Command used to relaunch the
 # ORCHESTRATOR inside tmux when /hv-work is invoked from a terminal that is
 # not already in a tmux session. Empty builds
-# `claude --continue --model <models.orchestrator>`; --continue resumes the
-# current conversation so the cycle keeps its plan instead of restarting cold.
+# `claude --continue --model <models.orchestrator> --permission-mode auto`;
+# --continue resumes the current conversation so the cycle keeps its plan
+# instead of restarting cold. The operator keeps a permission gate the
+# workers do not — it merges, and a human is watching that window.
 .hv/bin/hv-config-set work.operatorCommand ''
 
 # learn.promoteThreshold — silent default. No question; integer knob
