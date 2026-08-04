@@ -66,7 +66,7 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 **Validate `<key>`** against the canonical list. Valid keys (exact match required, case-sensitive):
 
 - `models.orchestrator`, `models.worker`
-- `work.isolation`, `work.mergeStrategy`
+- `work.isolation`, `work.mergeStrategy`, `work.dispatch`, `work.workerSlots`, `work.workerCommand`, `work.accounts`, `work.operatorCommand`
 - `ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`
 - `learn.promoteThreshold`
 - `autonomy.level`
@@ -79,10 +79,11 @@ Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `
 
 **Validate `<value>`** when present, against the allowed values for that key from `docs/reference/config-options.md`:
 
-- Enum keys (`work.isolation`, `work.mergeStrategy`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options.
+- Enum keys (`work.isolation`, `work.mergeStrategy`, `work.dispatch`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options. `work.dispatch` accepts `subagent` or `tmux`.
 - Boolean keys (`ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
-- Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`) — accept any value including the empty string.
-- Integer keys (`learn.promoteThreshold`) — accept any non-negative integer (≥0) as a string of digits. Anything else (negative, non-numeric, decimal) is invalid.
+- JSON-array keys (`refactor.verifyCommands`, `work.accounts`) — value must parse as a JSON array; `work.accounts` entries need a `name` and a `configDir`. Not offered in the guided flow; set via `hv-config-set work.accounts '[{"name":"personal","configDir":"~/.claude"}]'`.
+- Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`, `work.workerCommand`, `work.operatorCommand`) — accept any value including the empty string.
+- Integer keys (`learn.promoteThreshold`, `work.workerSlots`) — accept any non-negative integer (≥0) as a string of digits. Anything else (negative, non-numeric, decimal) is invalid. `work.workerSlots` additionally rejects `0` — a pool with no slots cannot dispatch.
 
 Invalid value → stop with: *"Error: `<value>` is not a valid value for `<key>`. Allowed: <comma-separated list from config-options.md>."*
 

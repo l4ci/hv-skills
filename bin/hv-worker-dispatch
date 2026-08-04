@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Send a brief into a tmux worker slot's Claude Code session.
+#
+# Recreates the slot's window first: /clear does not reliably reset a Claude
+# Code session (it can land as a literal chat message), so a fresh window is
+# the only trustworthy reset. The new session starts at 0 context.
+#
+# Text injection and pickup confirmation live in hv-tmux-send.sh, shared with
+# hv-worker-session. That path carries several tmux-specific traps; keeping one
+# copy is what stops the two callers from drifting apart.
+#
+# Tool: exit 0 on confirmed pickup; exit 2 on usage error;
+#       exit 3 on tmux/slot failure; exit 4 if the brief never submitted.
+#
+# Usage:
+#   hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]
+#
+#   --relay  Mark the injected text as an ORCHESTRATOR RELAY rather than a
+#            direct answer from the user. Load-bearing, not cosmetic: the
+#            worker writes its own PR body, and a relay that arrives through
+#            the same channel a human answer would gets cited as the human's
+#            words. Always pass --relay when forwarding an AskUserQuestion
+#            answer; never pass it for an original task brief.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+. "$HERE/hv-tmux-send.sh"
+
+USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]"
+
+SLOT=""
+BRIEF=""
+RELAY=0
+BOOT_TIMEOUT=60
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --slot)         SLOT="${2:?$USAGE}"; shift 2 ;;
+    --brief-file)   BRIEF="${2:?$USAGE}"; shift 2 ;;
+    --relay)        RELAY=1; shift ;;
+    --boot-timeout) BOOT_TIMEOUT="${2:?$USAGE}"; shift 2 ;;
+    --)             shift; break ;;
+    -*)             echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)              echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
+[ -n "$BRIEF" ] || { echo "$USAGE" >&2; exit 2; }
+[ -f "$BRIEF" ] || { echo "error: brief file not found: $BRIEF" >&2; exit 2; }
+command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+
+REGISTRY=".hv/workers.json"
+[ -f "$REGISTRY" ] || { echo "error: no worker pool — run hv-worker-pool init first" >&2; exit 3; }
+
+# Resolve slot -> worktree, window, session, configDir (phase 2).
+SLOT_INFO="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+slot = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), None)
+if slot is None:
+    raise SystemExit(1)
+print("\t".join([
+    slot.get("worktree") or "",
+    slot.get("window") or "",
+    data.get("session") or "hv",
+    slot.get("configDir") or "",
+]))
+PY
+)" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
+
+IFS="$(printf '\t')" read -r WORKTREE WINDOW SESSION CONFIG_DIR <<EOF
+$SLOT_INFO
+EOF
+
+[ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
+
+# Workers run with permissions skipped. The contract asks them to git add,
+# git commit, gh pr create and run tests; every one of those prompts under a
+# narrower mode, and there is nobody in the pane to answer — the worker just
+# stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
+# branch in its own worktree, and hv-worker-gate re-verifies the merged tree
+# before anything reaches the cycle branch.
+#
+# Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
+# classifier for exactly that case, so a narrowed mode stalls loudly.
+LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from hvlib import load_config
+cfg = load_config()
+work = cfg.get("work", {}) or {}
+cmd = work.get("workerCommand") or ""
+if not cmd:
+    model = (cfg.get("models", {}) or {}).get("worker") or "sonnet"
+    cmd = f"claude --model {model} --dangerously-skip-permissions"
+print(cmd)
+PY
+)"
+
+[ -n "$CONFIG_DIR" ] && LAUNCH="CLAUDE_CONFIG_DIR=$CONFIG_DIR $LAUNCH"
+
+tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" -c "$WORKTREE"
+
+# Fresh window every dispatch — see the /clear note above.
+tmux kill-window -t "$WINDOW" 2>/dev/null || true
+tmux new-window -d -t "$SESSION" -n "$SLOT" -c "$WORKTREE" || {
+  echo "error: could not create tmux window $WINDOW" >&2; exit 3; }
+
+tmux send-keys -t "$WINDOW" "$LAUNCH" C-m
+
+hv_tmux_wait_ready "$WINDOW" "$BOOT_TIMEOUT" || {
+  echo "error: slot '$SLOT' session did not come up within ${BOOT_TIMEOUT}s" >&2; exit 3; }
+
+# A relay is prefixed so the worker can tell the orchestrator's voice from the
+# maintainer's. It writes its own PR body and cannot otherwise distinguish
+# them — the two arrive through the same channel.
+PAYLOAD="$BRIEF"
+if [ "$RELAY" -eq 1 ]; then
+  PAYLOAD="$(mktemp)"
+  trap 'rm -f "$PAYLOAD"' EXIT
+  {
+    printf '%s\n' "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator." \
+                  "It is NOT the maintainer speaking to you directly. If you cite it in a PR" \
+                  "body, attribute it as 'relayed by the orchestrator', never as a maintainer" \
+                  "sign-off in your session.]" ""
+    cat "$BRIEF"
+  } >"$PAYLOAD"
+fi
+
+hv_tmux_send_file "$WINDOW" "$PAYLOAD" "hv-$SLOT" || {
+  echo "error: slot '$SLOT' never picked up the brief (pane unchanged after 4 submits)" >&2
+  exit 4; }
+
+echo "dispatched: $SLOT"

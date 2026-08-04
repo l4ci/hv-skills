@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# Merge gate for one tmux worker slot's branch/PR into the cycle branch.
+#
+# Worker-owned branches buy git-native integration and bring back the failure
+# class that per-branch verification structurally cannot catch: two workers
+# each verify honestly, both branches are green, the merge is textually clean,
+# and the cycle branch breaks. The shapes to expect are a symbol one worker
+# WIDENS or RE-TYPES while another adds a fresh call to it, and a constant one
+# worker stops emitting while another starts depending on it. Neither author
+# can see it — the conflicting change was never in their tree, and git's
+# mergeability answer is about text, not meaning.
+#
+# So this is not a `gh pr merge` wrapper. Per slot, in order:
+#   1. FRESHNESS  — is the cycle branch an ancestor of the worker branch? If
+#                   not, the worker never merged what landed since it branched
+#                   and its green is stale. Bounce it rather than merging.
+#   2. MERGE      — via `gh pr merge` when the slot recorded a PR, else a
+#                   local `git merge` (repos with no remote still work).
+#   3. RE-VERIFY  — on the MERGED tree, never on the branch. This is the only
+#                   step that catches the two shapes above.
+#
+# Verification commands come from refactor.verifyCommands in .hv/config.json.
+# When that is empty the gate reports NO-VERIFY rather than inventing a check
+# it cannot perform — a gate that claims to have verified nothing is worse
+# than one that says so out loud.
+#
+# Tool: exit 0 gate passed (or --check-only and FRESH); exit 2 usage;
+#       exit 3 STALE / merge failure; exit 4 post-merge verification failed.
+#
+# Usage:
+#   hv-worker-gate --slot <name> --base <cycle-branch> [--check-only] [--no-verify]
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+
+USAGE="usage: hv-worker-gate --slot <name> --base <cycle-branch> [--check-only] [--no-verify]"
+
+SLOT=""
+BASE=""
+CHECK_ONLY=0
+NO_VERIFY=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --slot)       SLOT="${2:?$USAGE}"; shift 2 ;;
+    --base)       BASE="${2:?$USAGE}"; shift 2 ;;
+    --check-only) CHECK_ONLY=1; shift ;;
+    --no-verify)  NO_VERIFY=1; shift ;;
+    --)           shift; break ;;
+    -*)           echo "error: unknown flag $1" >&2; exit 2 ;;
+    *)            echo "error: unexpected positional $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
+[ -n "$BASE" ] || { echo "$USAGE" >&2; exit 2; }
+
+REGISTRY=".hv/workers.json"
+[ -f "$REGISTRY" ] || { echo "error: no worker pool — run hv-worker-pool init first" >&2; exit 3; }
+
+SLOT_INFO="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+slot = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), None)
+if slot is None:
+    raise SystemExit(1)
+print("\t".join([slot.get("branch") or "", slot.get("pr") or ""]))
+PY
+)" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
+
+IFS="$(printf '\t')" read -r BRANCH PR <<EOF
+$SLOT_INFO
+EOF
+
+git rev-parse --verify --quiet "$BRANCH" >/dev/null || {
+  echo "error: worker branch '$BRANCH' does not exist" >&2; exit 3; }
+git rev-parse --verify --quiet "$BASE" >/dev/null || {
+  echo "error: base branch '$BASE' does not exist" >&2; exit 3; }
+
+# ── 1. Freshness ────────────────────────────────────────────────────────────
+# Cheap, and it catches per-PR verification's structural blind spot: a worker
+# that branched before sibling work landed builds and tests honestly against a
+# tree that no longer exists.
+if git merge-base --is-ancestor "$BASE" "$BRANCH"; then
+  echo "FRESH $SLOT $BRANCH"
+else
+  BEHIND="$(git rev-list --count "$BRANCH..$BASE" 2>/dev/null || echo "?")"
+  echo "STALE $SLOT $BRANCH — $BEHIND commit(s) landed on $BASE since it branched" >&2
+  echo "  bounce: tell slot $SLOT to \`git merge $BASE\` and re-verify, then re-gate" >&2
+  exit 3
+fi
+
+[ "$CHECK_ONLY" -eq 1 ] && exit 0
+
+# ── 2. Merge ────────────────────────────────────────────────────────────────
+CURRENT="$(git rev-parse --abbrev-ref HEAD)"
+[ "$CURRENT" = "$BASE" ] || {
+  echo "error: gate must run with $BASE checked out (currently on $CURRENT)" >&2; exit 3; }
+
+if [ -n "$PR" ] && command -v gh >/dev/null 2>&1; then
+  gh pr merge "$PR" --merge >/dev/null 2>&1 || {
+    echo "error: gh pr merge failed for $PR" >&2; exit 3; }
+  git pull --ff-only >/dev/null 2>&1 || {
+    echo "error: could not fast-forward $BASE after merging $PR" >&2; exit 3; }
+else
+  git merge --no-ff -m "merge: $BRANCH into $BASE" "$BRANCH" >/dev/null 2>&1 || {
+    echo "error: merge of $BRANCH into $BASE conflicted — resolve with the slot that owns the context" >&2
+    git merge --abort 2>/dev/null || true
+    exit 3; }
+fi
+
+MERGED="$(git rev-parse --short HEAD)"
+echo "MERGED $SLOT $BRANCH -> $BASE ($MERGED)"
+
+[ "$NO_VERIFY" -eq 1 ] && exit 0
+
+# ── 3. Re-verify on the merged tree ─────────────────────────────────────────
+CMDS="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from hvlib import load_config
+cfg = load_config()
+for c in (cfg.get("refactor", {}) or {}).get("verifyCommands", []) or []:
+    if str(c).strip():
+        print(c)
+PY
+)"
+
+if [ -z "$CMDS" ]; then
+  echo "NO-VERIFY $SLOT — refactor.verifyCommands is empty; merged tree was NOT gated by a command."
+  echo "  set refactor.verifyCommands via /hv-config to make this gate real" >&2
+  exit 0
+fi
+
+FAILED=0
+while IFS= read -r CMD; do
+  [ -n "$CMD" ] || continue
+  if sh -c "$CMD" >/dev/null 2>&1; then
+    echo "  verify ok: $CMD"
+  else
+    echo "  verify FAILED: $CMD" >&2
+    FAILED=1
+  fi
+done <<EOF
+$CMDS
+EOF
+
+if [ "$FAILED" -eq 1 ]; then
+  echo "GATE-FAIL $SLOT — merged tree does not pass verification at $MERGED" >&2
+  echo "  fix forward on $BASE; the owning slot has usually moved on" >&2
+  exit 4
+fi
+
+echo "GATE-PASS $SLOT $MERGED"

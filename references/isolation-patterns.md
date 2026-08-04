@@ -68,6 +68,7 @@ This reference covers only the isolation-and-worktree-creation aspects of umbrel
 
 ## What this reference does NOT cover
 
+- **The tmux worker backend** (`work.dispatch: "tmux"`) — see `references/tmux-dispatch.md`. That path does not use these patterns at all: `hv-worker-pool` owns one worktree per slot, and `work.isolation` stops applying because every slot has its own index by construction.
 - **The umbrella-mode concept, registry, and helpers** — see `references/umbrella-mode.md`.
 - **Worker dispatch under each isolation mode** (Skill-tool shape, parallel batching, worker-brief construction) — see `/hv-work` Step 6 inline.
 - **The full F11 write-only-workers default** (why workers don't commit, how the orchestrator collects diffs and commits) — see `KNOWLEDGE.md` 2026-05-07 entry.

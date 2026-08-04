@@ -240,7 +240,9 @@ from pathlib import Path
 umbrella_enabled = os.environ.get("UMBRELLA_MODE", "false").lower() == "true"
 cfg = {
   "models":   {"orchestrator": "<Q1-orchestrator>", "worker": "<Q1-worker>"},
-  "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>"},
+  "work":     {"isolation": "<Q2>", "mergeStrategy": "<Q3>",
+               "dispatch": "subagent", "workerSlots": 3, "workerCommand": "",
+               "accounts": [], "operatorCommand": ""},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
   "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
@@ -274,6 +276,41 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Users enable via /hv-config when they want a no-prior-context adversarial
 # review in addition to /hv-review.
 .hv/bin/hv-config-set ship.secondOpinion false
+
+# work.dispatch — silent default. Opt-in feature flag (Rule 9) selecting the
+# /hv-work worker backend. "subagent" (default) dispatches in-process Agent
+# workers; "tmux" runs each worker as its own Claude Code session in its own
+# worktree, owning a branch and a PR. tmux mode needs a tmux binary and a
+# working `claude` on PATH, so it never auto-enables.
+.hv/bin/hv-config-set work.dispatch subagent
+
+# work.workerSlots — silent default. Size of the tmux worker pool. Ignored
+# under work.dispatch=subagent. 3 fits an 8-core box; more slots contend for
+# CPU, which turns time-budgeted tests into false reds.
+.hv/bin/hv-config-set work.workerSlots 3
+
+# work.workerCommand — silent default. Empty means "build the launch command
+# from models.worker" (`claude --model <worker> --dangerously-skip-permissions`).
+# Workers commit, open PRs and run tests with nobody in the pane to answer a
+# prompt; a narrower mode stalls them. Set this to narrow it — the classifier
+# reports NEEDS-PERMISSION when a worker stops on a prompt.
+.hv/bin/hv-config-set work.workerCommand ''
+
+# work.accounts — silent default. Array of {name, configDir} mapping tmux
+# worker slots to their own CLAUDE_CONFIG_DIR, so slots authenticate
+# independently. Empty means every slot inherits the ambient config dir,
+# which is the single-account default. Only meaningful under
+# work.dispatch=tmux.
+.hv/bin/hv-config-set work.accounts '[]'
+
+# work.operatorCommand — silent default. Command used to relaunch the
+# ORCHESTRATOR inside tmux when /hv-work is invoked from a terminal that is
+# not already in a tmux session. Empty builds
+# `claude --continue --model <models.orchestrator> --permission-mode auto`;
+# --continue resumes the current conversation so the cycle keeps its plan
+# instead of restarting cold. The operator keeps a permission gate the
+# workers do not — it merges, and a human is watching that window.
+.hv/bin/hv-config-set work.operatorCommand ''
 
 # learn.promoteThreshold — silent default. No question; integer knob
 # (default 3) gating F03 knowledge-lifecycle auto-promotion. Users adjust

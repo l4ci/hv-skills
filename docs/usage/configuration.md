@@ -76,6 +76,30 @@ Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 | `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
 | `"pr"` | Push branch, create GitHub PR | Team work, code review required |
 
+## work.dispatch: subagent or tmux
+
+Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs its workers on.
+
+| Mode | How it works | When to use |
+|------|-------------|-------------|
+| `"subagent"` (default) | In-process `Agent` workers sharing the orchestrator's session. They write files; the orchestrator commits. | Almost everything. No extra dependencies, no setup. |
+| `"tmux"` | One tmux window per worker, each a separate Claude Code session in its own worktree. Workers commit, open a PR against the cycle branch, and report finished. | Long tasks that need their own context window, or work where you want to answer a worker's question directly in its pane. |
+
+`tmux` mode requires a `tmux` binary and a working `claude` on `PATH`. It never turns on by itself — set it explicitly:
+
+```bash
+.hv/bin/hv-config-set work.dispatch tmux
+```
+
+Two things behave differently under `tmux`:
+
+- **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
+- **Workers commit.** The orchestrator's per-task commit step is skipped; integration happens through the merge gate instead, which re-verifies the *merged* tree. Two workers can each be honestly green and still break the cycle branch together — a signature one widens while another adds a caller, a constant one stops emitting while another starts reading it. Nothing about a clean merge rules that out, which is why the gate runs `refactor.verifyCommands` after every merge rather than trusting the branches.
+
+Related keys: `work.workerSlots` (pool size, default `3`), `work.workerCommand` (default builds `claude --model <models.worker> --dangerously-skip-permissions`), `work.operatorCommand` (default builds `claude --continue --model <models.orchestrator> --permission-mode auto`), and `work.accounts`.
+
+**Workers run with permissions skipped; the operator does not.** A worker is briefed to commit, open a PR and run tests with nobody in its pane to answer a prompt, so a narrower mode just stalls it. What bounds a worker is scope rather than gating — a throwaway branch in its own worktree, with `hv-worker-gate` re-verifying the merged tree before anything reaches the cycle branch. The operator keeps `auto` because it performs the merges and it is the window a human is actually watching. Narrow either via its config key; a worker that then stops on a prompt reports `NEEDS-PERMISSION` rather than hanging.
+
 ## refactor.confirmBeforeExecute
 
 When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) pauses for your approval after presenting its findings and again after you select a design. You review the proposed changes before anything is written. Set to `false` for full autonomy: `/hv-refactor` proceeds end-to-end without checkpoints.
