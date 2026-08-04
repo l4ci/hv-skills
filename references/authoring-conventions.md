@@ -154,6 +154,23 @@ Codified during the T52 sweep across `hv-debug`, `hv-release`, `hv-review`, `hv-
 
 Codified during the `/hv-config` Step 3 fix (B11) where a 13-key picklist silently fell back to free text; resolved with category-then-keys staging.
 
+## Ask in the user's terms, and name the default
+
+Write every `AskUserQuestion` for someone who does not have the file open. Name the choice in the vocabulary of what the user observes — the behavior, the artifact, the outcome — not in the vocabulary of the code that implements it, and say what the skill will do by default if the answer turns out not to matter. *"Should a finished game still show the training row, or only live ones?"* beats *"confirm expected `inGameMenuActions` behaviour for `replayClosable && mode === 'bot'`"*: same decision, but only the first can be answered without a file open.
+
+The skill is the side of the exchange holding the context, so translating is its job. A question phrased in implementation terms transfers that work to the user and usually gets a guess back — which reads exactly like an answer and is acted on as one. Stating the default converts a question the user does not care about into one they can decline cheaply.
+
+**Forbids.**
+- Naming a symbol, file, config key, or boolean expression as the *subject* of the question when a user-observable phrasing exists. (Citing one as supporting detail after the question is fine.)
+- Asking a question whose options the user cannot distinguish without reading code — if the options only differ internally, the skill should be picking, not asking (see *Don't ask what the code can answer*).
+- Leaving the no-preference path unstated, so that "either is fine" produces another round-trip instead of a decision.
+
+**Permits.**
+- Several questions in one `AskUserQuestion` call — the host renders each separately and returns an answer per question, so batching does not produce the partial answers that a free-text channel would. `/hv-work` Step 2's 1–3 question batch stays correct.
+- Implementation vocabulary in the `description` field of an option, where it disambiguates for a user who *does* have the file open.
+
+Codified from a read of klufft's `swarm.md` (hv-skills#20, 2026-07-31), whose orchestrator pays for this in tmux panes rather than pickers. Its companion rule — *ask one question at a time* — deliberately did **not** transfer: it is a property of a free-text channel where a batch gets a partial reply, and `AskUserQuestion` is not that channel.
+
 ## Nudges on terminal/idle paths only
 
 When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/hv-next` → `/hv-work` → `/hv-ship` → `/hv-next` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.

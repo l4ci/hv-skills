@@ -138,6 +138,14 @@ Dispatch one subagent per check group (per pillar per target) in parallel via th
 
 The orchestrator does not run the checks itself — parallel dispatch is the point. Aggregate the results.
 
+**Re-run a failed check alone before recording it.** Parallel runners contend for one box, and every check with a fixed time budget starts failing on elapsed time rather than on truth once the machine is loaded. Before writing `met: false` for any check that timed out, blew a duration budget, or failed on a connection error, re-run that one check with nothing else in flight and record `uptime` alongside both runs. Three consequences worth stating separately:
+
+- **A timeout is not a failure of the thing under test.** It says the assertion never ran — read the runner's actual output before forming a theory about the code.
+- **Never resolve one of these by raising the budget.** A bigger fixed number fails at some higher load and makes the genuine regression slower to report. If the check is genuinely too slow, the fix belongs in `.hv/qa/<target>.md` as less work, not more time.
+- **A red with no load figure beside it is not evidence in either direction.** Quote both `uptime` readings in the check's `evidence` field so the verdict is auditable.
+
+Connection-refused and address-in-use errors across *many* checks at once are infrastructure, not findings — re-run serially before reporting anything.
+
 #### Step 6 — Audit Pass
 
 Dispatch one subagent (Opus, no prior context) per target with the `Audit checks` rubric, screenshots from Step 5 if available, and read-only access to the running surface. Return: array of `{ dimension, severity (P0|P1|P2|P3), observation, evidence, suggested_fix }`.
@@ -209,7 +217,7 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 
 - **No strategy file** — halt; tell user to run `/hv-qa first-run`. Don't auto-scaffold.
 - **Infra unavailable** — `INFRA-FAIL` verdict; halt. User starts services, re-runs.
-- **Runner subagent timeout** — that check is `met: false` with `evidence: "timeout after Ns"`. QA continues; verdict reflects the failed check.
+- **Runner subagent timeout** — re-run that check alone per Step 5 before recording it. If it passes solo, the original red was contention: record `met: true` with both `uptime` figures in `evidence`. If it times out solo too, record `met: false` with `evidence: "timeout after Ns at load <figure>, reproduced alone at load <figure>"`. QA continues either way; verdict reflects the confirmed result, never the contended one.
 - **Strategy references retired tool** — that check is `met: false` with `evidence: "command not found"`. Surface in `restructure` mode.
 
 ## References

@@ -276,6 +276,8 @@ From the conversation context:
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
 3. **Absorb wave-internal file collisions.** Before grouping into waves, scan task pairs for **any two tasks whose modified-file sets intersect** — not just rename / link-sweep. Under `work.isolation: "branch"` two write-only workers editing the same file race on disk (the second worker's `Edit` reads sibling-mutated content), so a same-file pair would otherwise force serialization across waves. The orchestrator's standing recourse is **absorption**: fold one task's same-file portion into the other task's Step 6 brief at dispatch time, leaving the absorbed task touching only files no other task writes. Both then run as parallel write-only workers. This is a reproducible orchestrator-side technique, not per-orchestrator improvisation — resolve every intersecting pair by absorption (preferred), clean split-ownership, or serialize-across-waves before grouping. Rename + link-sweep is the canonical instance; use `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` as ground truth for it (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Absorb wave-internal file collisions* for the absorption choreography, the M02-S02 worked example, and the rename + link-sweep resolution table.
+
+   **Disjoint file sets are not proof of independence — scan for shared-symbol collisions too.** Two tasks can hold non-intersecting file sets and still break the merged tree, because the break exists in neither worker's diff. Two shapes: a task that **widens, narrows, or re-types a shared symbol's signature** while a sibling adds a fresh call to it, and a task that **stops emitting a constant, key, or output field** while a sibling starts depending on it. Each worker's own output is internally consistent and Step 7's per-task diff review passes both — the defect is only visible in the union, and only to something that resolves symbols across the whole tree. Rename is the one instance of this class the rules above already catch (`hv-plan-rename-check`); signature changes and dropped emissions are not renames and no grep for the old name finds them. When a task's brief changes a symbol's *shape* rather than its *name*, either serialize it ahead of every task that references the symbol, or absorb the call-site updates into it. When the project has a whole-tree resolution check available (typecheck, compile, `hv-qa` executable check), run it once after Step 7.5 commits the wave rather than per task — per-task verification structurally cannot catch this class.
 4. Group into dependency waves:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
@@ -353,11 +355,14 @@ You are implementing Task N of [total].
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]
 
+**Claims to verify before building on them:**
+[Every factual claim this brief rests on — a line number, a call-site count, "function X already returns Y", "this is the only adopter". Check each one first. If a claim is false, STOP and report which claim and what's actually there — do not implement around it. A wrong claim usually means the task is wrong, and the orchestrator needs to know that more than it needs the code.]
+
 **Do NOT run `git add` or `git commit`.** Write changes to files only. The orchestrator owns the commit phase (Step 7.5) — your job is to leave a clean working-tree diff matching the brief.
 
 **Suggested commit message:** [exact commit message — orchestrator uses this in Step 7.5]
 
-**On completion:** report the list of files you modified, plus any tool-generated siblings the toolchain produced, and confirm you did not stage or commit.
+**On completion:** report the list of files you modified, plus any tool-generated siblings the toolchain produced, and confirm you did not stage or commit. Name any brief claim that turned out false, even if you worked around it.
 ```
 
 **Umbrella mode notes:** when umbrella mode is on, the `[UMBRELLA: ...]` line replaces the WORKTREE line if the wave uses branch isolation; both lines appear together if the wave uses Layout B worktrees. The sub-repo path is the absolute path resolved via `.hv/repos.json` (single-repo callers ignore both lines). Workers MUST `cd` to the named directory before any `git` command — the orchestrator stays at the umbrella for `.hv/` access, so worker commands run in the umbrella's cwd by default and would target the wrong `.git/`.
@@ -365,6 +370,8 @@ You are implementing Task N of [total].
 **Multi-repo dispatch:** for a wave with `<N>` sub-repos in its resolved set, dispatch one worker per sub-repo, each with the sub-repo's name and absolute path in its `[UMBRELLA: ...]` line. Workers run in parallel — each repo has its own `.git/index`, so cross-repo parallelism doesn't trip the parallel-waves-require-worktree-isolation guard (which fires only when ≥2 workers share one `.git/`). Each worker's brief lists only the files in its own sub-repo; the orchestrator verifies each repo's commit independently in Step 7.
 
 Rules for briefs: exact paths + line numbers; show the pattern to follow; name the suggested commit message; read-first, minimal-diff, no unrelated changes; workers do NOT stage or commit.
+
+**Enumerate the brief's falsifiable claims — precision is not correctness.** A brief specific enough to execute (exact line numbers, exact call-site counts, "the only adopter is X") is also specific enough to be *wrong*, and a worker handed a precise wrong instruction implements it faithfully. The claims worth listing are the ones the task's shape depends on: if the claim is false, the task is the wrong task, not just a task with a bad line number. Stale plans are the usual source — see `KNOWLEDGE.md`'s *Re-grep the actual surface before executing a stored plan*, which is the orchestrator-side half of the same failure. Leave the section out when the brief carries no such claim (a from-scratch file creation, a mechanical sweep with a grep-derived list); an empty ritual section trains workers to skip it.
 
 **Cross-referencing parallel artifacts — pre-bake citations.** When two parallel workers author artifacts that cite each other, pre-specify the citation language in each brief; neither worker should need to read the other's output. Works for structural cross-references (cite by path + named role); serialize when citation must quote or restate.
 
@@ -396,6 +403,7 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 3. Structural checks: grep for expected patterns, no regressions.
 4. **Rename validation (Step 4 rename + link-sweep rule).** Re-run `git grep -l "<old-name>" -- <scope>`; files outside the worker's modified-file set → dispatch a fix-up to extend coverage before staging.
 5. **Claim-weight check on gap-fills.** When a worker fills a gap left by extraction (sparse carrier prose, missing rationale), expect plausible-sounding editorial that wasn't in the source. Verify the *claim weight* of any sentence the worker authored, not just structural shape — plausible ≠ sourced.
+6. **A worker that disputes its brief is a PASS on the worker and a FAIL on the plan.** When a completion report names a false claim from the `**Claims to verify**` section, do not re-dispatch the same brief with a patched line number — confirm the worker's finding against the code yourself, then re-derive the task from what's actually there. If the correction changes what the task should accomplish (not just where), take it back to Step 4 and re-plan; if it invalidates a stored plan's premise, say so in the commit message rather than editing the plan back. A worker that returns exactly what the brief asked for on a task with falsifiable claims and reports no friction is not evidence the brief was right — spot-check one claim before accepting.
 
 **When the wave produced multiple completions, verify them in parallel** — issue all the `git log`, `Read`, and grep calls for independent tasks in a single tool-call batch, not one task at a time.
 
