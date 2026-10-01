@@ -58,4 +58,11 @@ mkdir -p "$TMP_PF/proj"
   pass "non-done reasons skip the proof gate"
 )
 
+# T119: every skill that calls hv-complete must also give it a proof path.
+for f in hv-ship/SKILL.md hv-debug/SKILL.md hv-next/SKILL.md hv-work/SKILL.md; do
+  grep -q 'hv-complete' "$REPO/$f" || fail "$f: expected an hv-complete call"
+  grep -q 'hv-proof-add' "$REPO/$f" || fail "$f calls hv-complete without an hv-proof-add path"
+done
+pass "hv-complete callers document a proof path"
+
 trap 'rm -rf "$TMP"' EXIT
