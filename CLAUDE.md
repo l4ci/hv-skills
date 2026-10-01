@@ -1,3 +1,16 @@
+## Parallel rounds
+
+Larger rounds run as one orchestrator plus several workers in parallel, each worker a
+standing agent with its own git worktree and herdr workspace, taking one issue at a time.
+Agents are named people (ben, dana, nia, kit) reused across issues; work goes on
+`<agent>/<issue>-<slug>` and its worktree parks on `park/<agent>` between issues. Workers
+implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
+decisions, merges PRs and re-verifies on `main` after every merge.
+
+**"You are the orchestrator" is the kickoff trigger: invoke the `orchestrate-herdr` skill
+and run its startup routine.** Read it and `docs/usage/parallel-rounds.md` (the project
+brief: gate, repo rules, roster) before running or joining a round.
+
 <!-- hv-knowledge-start -->
 ## Project Knowledge
 
