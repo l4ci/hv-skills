@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create a design file under .hv/designs/<ID>.md.
+# Create a design file under .hv/designs/<ID>.md (issue mode: a `design` note on the item's issue).
 # Writer helper: exit 0 on successful design creation; exit 1 on usage error or conflict.
 # Usage:
 #   hv-design-add <ID> "<title>"     — designs are per-item; ID matches [BFT]\d{2,}
@@ -12,23 +12,31 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$TITLE" <<'PY'
 import re, sys
 from datetime import date
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import write_text_atomic, get_backend, IssueBackend, BackendUnavailable, TrackerError, tracker_exit_code
 
 item_id, title = sys.argv[1], sys.argv[2]
 
-if not re.fullmatch(r"[BFT]\d{2,}", item_id):
+try:
+    backend = get_backend()
+except ValueError:
+    backend = None  # file mode never depended on config
+issue = isinstance(backend, IssueBackend)
+
+# Issue-mode IDs are issue numbers, so a single digit is fine there.
+if not re.fullmatch(r"[BFT]\d+" if issue else r"[BFT]\d{2,}", item_id):
     print(f"error: ID must match [BFT]\\d{{2,}} (e.g. B07, F03, T11); designs are per-item, not per-slice or per-milestone, got {item_id!r}", file=sys.stderr)
     sys.exit(1)
 
-designs_dir = Path(".hv/designs")
-designs_dir.mkdir(parents=True, exist_ok=True)
+if not issue:
+    designs_dir = Path(".hv/designs")
+    designs_dir.mkdir(parents=True, exist_ok=True)
 
-design_path = designs_dir / f"{item_id}.md"
-if design_path.exists():
-    print(f"error: {design_path} already exists", file=sys.stderr)
-    sys.exit(1)
+    design_path = designs_dir / f"{item_id}.md"
+    if design_path.exists():
+        print(f"error: {design_path} already exists", file=sys.stderr)
+        sys.exit(1)
 
-write_text_atomic(design_path,
+stub = (
     f"""---
 id: {item_id}
 title: {title}
@@ -59,5 +67,21 @@ _(unresolved questions to answer before /hv-plan or during execution)_
 _(named assumptions made implicit by the chosen design)_
 """
 )
+
+if issue:
+    # Issue mode: the design is a `<!-- hv:design -->` note on the item's issue.
+    try:
+        if backend.note_get(item_id, "design") is not None:
+            print(f"error: design note for {item_id} already exists", file=sys.stderr)
+            sys.exit(1)
+        backend.note_put(item_id, "design", stub)
+    except BackendUnavailable as e:
+        print(f"error: hv-design-add: {e}", file=sys.stderr); sys.exit(2)
+    except TrackerError as e:
+        print(f"error: hv-design-add: {e.message}", file=sys.stderr); sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-design-add: {e.args[0]}", file=sys.stderr); sys.exit(1)
+else:
+    write_text_atomic(design_path, stub)
 print(item_id)
 PY

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Create a plan file under .hv/plans/<milestone>-<unit>.md.
+# Issue mode (backlog.backend "issues"): an item plan (<milestone> <itemId>) is a `plan` note on the
+#   item's issue and its --design pointer is recorded as `note:design`; slice plans stay files.
 # Writer helper: exit 0 on successful plan creation; exit 1 on usage error or conflict.
 # Usage:
 #   hv-plan-add [--repo <name>] [--design <path>] <milestone> slice "<title>"        — mints next S<NN> for that milestone
@@ -24,7 +26,8 @@ if [ -n "$DESIGN" ]; then
     .hv/designs/*) ;;
     *) echo "error: --design path must start with .hv/designs/, got '$DESIGN'" >&2; exit 1 ;;
   esac
-  if [ ! -f "$DESIGN" ]; then
+  # Issue mode: the design is a note on the item's issue, so there is no file to check.
+  if [ ! -f "$DESIGN" ] && ! PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
     echo "error: --design file not found: $DESIGN" >&2
     exit 1
   fi
@@ -36,7 +39,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MILESTONE" "$UNIT" "$T
 import os, re, sys
 from datetime import date
 from pathlib import Path
-from hvlib import write_text_atomic
+from hvlib import write_text_atomic, get_backend, IssueBackend, BackendUnavailable, TrackerError, tracker_exit_code
 
 milestone, unit_in, title, repo, design = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 _plannable = os.environ.get("HV_PLANNABLE_TYPES", "BFTS")
@@ -56,8 +59,15 @@ if repo:
         sys.exit(1)
     repo = ", ".join(names)
 
+try:
+    backend = get_backend()
+except ValueError:
+    backend = None  # file mode never depended on config
+issue = isinstance(backend, IssueBackend)
+
 plans_dir = Path(".hv/plans")
-plans_dir.mkdir(parents=True, exist_ok=True)
+if not issue:
+    plans_dir.mkdir(parents=True, exist_ok=True)
 
 if unit_in == "slice":
     existing = sorted(plans_dir.glob(f"{milestone}-S*.md"))
@@ -70,7 +80,7 @@ if unit_in == "slice":
     unit = f"S{next_n:02d}"
     unit_kind = "slice"
 else:
-    if not re.fullmatch(rf"[{_plannable}]\d{{2,}}", unit_in):
+    if not re.fullmatch(rf"[{_plannable}]\d{{1,}}" if issue else rf"[{_plannable}]\d{{2,}}", unit_in):
         print(f"error: unit must be 'slice' or an ID like B07/F03/T11/S02, got {unit_in!r}", file=sys.stderr)
         sys.exit(1)
     unit = unit_in
@@ -78,14 +88,32 @@ else:
 
 key = f"{milestone}-{unit}"
 plan_path = plans_dir / f"{key}.md"
-if plan_path.exists():
+# Issue mode: an item plan (not a slice plan) is a `plan` note on the item's issue.
+as_note = issue and unit_kind == "item"
+if as_note:
+    try:
+        exists = backend.note_get(unit, "plan") is not None
+    except BackendUnavailable as e:
+        print(f"error: hv-plan-add: {e}", file=sys.stderr); sys.exit(2)
+    except TrackerError as e:
+        print(f"error: hv-plan-add: {e.message}", file=sys.stderr); sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-plan-add: {e.args[0]}", file=sys.stderr); sys.exit(1)
+    if exists:
+        print(f"error: plan note for {unit} already exists", file=sys.stderr)
+        sys.exit(1)
+    if design:
+        design = "note:design"
+elif plan_path.exists():
     print(f"error: {plan_path} already exists", file=sys.stderr)
     sys.exit(1)
+else:
+    plans_dir.mkdir(parents=True, exist_ok=True)
 
 repo_line = f"repo: {repo}\n" if repo else ""
 design_line = f"design: {design}\n" if design else ""
 
-write_text_atomic(plan_path,
+stub = (
     f"""---
 key: {key}
 milestone: {milestone}
@@ -121,5 +149,16 @@ _(3–6 sentences — the shape of the implementation, the design choice, why th
 - _(named assumptions made implicit by the approach)_
 """
 )
+if as_note:
+    try:
+        backend.note_put(unit, "plan", stub)
+    except BackendUnavailable as e:
+        print(f"error: hv-plan-add: {e}", file=sys.stderr); sys.exit(2)
+    except TrackerError as e:
+        print(f"error: hv-plan-add: {e.message}", file=sys.stderr); sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-plan-add: {e.args[0]}", file=sys.stderr); sys.exit(1)
+else:
+    write_text_atomic(plan_path, stub)
 print(key)
 PY

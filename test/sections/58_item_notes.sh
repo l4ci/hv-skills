@@ -138,6 +138,72 @@ i = a.get(2)
 assert i["state"] == "closed" and i["state_reason"] == "not_planned", i
 a.reopen(2)
 PY
+    # --- item designs and plans as notes (design/plan add/show/rm/put, list helpers)
+    F1="$("$BIN/hv-item-create" features --title "Big")"
+    eq "design add" "$F1" "$("$BIN/hv-design-add" "$F1" "Big design")"
+    eq "design marker" "<!-- hv:design -->" "$(MARKERS 3)"
+    "$BIN/hv-design-show" "$F1" | grep -q "^# $F1 — Big design" || fail "$prov design show stub"
+    "$BIN/hv-design-show" "$F1" | grep -q "^status: draft" || fail "$prov design show frontmatter"
+    ERR "$BIN/hv-design-add" "$F1" "again"
+    eq "design add twice refused" "1" "$ERRRC"
+    case "$ERRMSG" in *"already exists"*) ;; *) fail "$prov design exists msg: $ERRMSG";; esac
+    eq "design add leaves one note" "<!-- hv:design -->" "$(MARKERS 3)"
+    printf '%s\n' '---' "id: $F1" 'title: Big design' 'status: final' '---' '' 'new text' > "$P/d.md"
+    "$BIN/hv-design-put" "$F1" --body-file "$P/d.md"
+    eq "design put shows" "$(cat "$P/d.md")" "$("$BIN/hv-design-show" "$F1")"
+    : > "$P/log"
+    cat "$P/d.md" | "$BIN/hv-design-put" "$F1" --body-file -
+    eq "design put idempotent" "0" "$(WRITES)"
+    ERR "$BIN/hv-design-put" T1 --body-file "$P/d.md"
+    eq "design put needs existing" "1" "$ERRRC"
+    case "$ERRMSG" in *"not found"*"hv-design-add"*) ;; *) fail "$prov design put missing msg: $ERRMSG";; esac
+    eq "design put did not create" "" "$("$BIN/hv-item-note" T1 --kind design --show)"
+    ERR "$BIN/hv-design-put" "$F1" --body-file "$P/nope.md"
+    eq "design put unreadable body" "1" "$ERRRC"
+    ERR "$BIN/hv-design-put" "$F1"
+    eq "design put needs body" "1" "$ERRRC"
+    ERR "$BIN/hv-design-show" T1
+    eq "design show missing exit" "1" "$ERRRC"
+    ERR "$BIN/hv-design-list"
+    eq "design list unsupported exit" "2" "$ERRRC"
+    case "$ERRMSG" in *"not supported"*) ;; *) fail "$prov design list msg: $ERRMSG";; esac
+
+    # item plan with --design pointer -> note:design; no plan file written
+    eq "plan add" "M07-$F1" "$("$BIN/hv-plan-add" --design ".hv/designs/$F1.md" M07 "$F1" "Big plan")"
+    [ ! -e .hv/plans/M07-$F1.md ] || fail "$prov item plan wrote a file"
+    eq "plan marker" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
+    "$BIN/hv-plan-show" "M07-$F1" | grep -q "^design: note:design$" || fail "$prov plan show design pointer"
+    "$BIN/hv-plan-show" "M07-$F1" | grep -q "^key: M07-$F1$" || fail "$prov plan show key"
+    ERR "$BIN/hv-plan-add" M07 "$F1" "again"
+    eq "plan add twice refused" "1" "$ERRRC"
+    printf 'plan body\n' > "$P/p.md"
+    "$BIN/hv-plan-put" "M07-$F1" --body-file "$P/p.md"
+    eq "plan put shows" "plan body" "$("$BIN/hv-plan-show" "M07-$F1")"
+    ERR "$BIN/hv-plan-put" "M07-T1" --body-file "$P/p.md"
+    eq "plan put needs existing" "1" "$ERRRC"
+    ERR "$BIN/hv-plan-show" "M07-T1"
+    eq "plan show missing exit" "1" "$ERRRC"
+    # slice plans stay files
+    eq "slice plan add" "M07-S01" "$("$BIN/hv-plan-add" M07 slice "A slice")"
+    [ -f .hv/plans/M07-S01.md ] || fail "$prov slice plan not a file"
+    "$BIN/hv-plan-show" M07-S01 | grep -q "^key: M07-S01$" || fail "$prov slice plan show"
+    ERR "$BIN/hv-plan-list"
+    eq "plan list ok" "0" "$ERRRC"
+    case "$ERRMSG" in *"live on their issues"*) ;; *) fail "$prov plan list note: $ERRMSG";; esac
+    eq "plan list stdout lists slice files only" "M07-S01" "$("$BIN/hv-plan-list" 2>/dev/null | python3 -c 'import json,sys;print(" ".join(p["key"] for p in json.load(sys.stdin)))')"
+    printf 'slice body\n' | "$BIN/hv-plan-put" M07-S01 --body-file -
+    eq "slice plan put writes file" "slice body" "$(cat .hv/plans/M07-S01.md)"
+    eq "slice plan makes no note" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
+    "$BIN/hv-plan-rm" M07-S01
+    [ ! -e .hv/plans/M07-S01.md ] || fail "$prov slice plan rm"
+    "$BIN/hv-plan-rm" "M07-$F1"
+    eq "plan rm leaves design" "<!-- hv:design -->" "$(MARKERS 3)"
+    ERR "$BIN/hv-plan-rm" "M07-$F1"
+    eq "plan rm twice" "1" "$ERRRC"
+    "$BIN/hv-design-rm" "$F1"
+    eq "design rm" "" "$(MARKERS 3)"
+    ERR "$BIN/hv-design-rm" "$F1"
+    eq "design rm twice" "1" "$ERRRC"
     pass "$prov: marker notes, split/shrink, comments, proof and adapter lifecycle calls"
   )
 done
@@ -164,3 +230,36 @@ mkdir -p "$TMP_INF/.hv"
 )
 trap 'rm -rf "$TMP"' EXIT
 pass "file backend: comment_add writes ## Log rows, hv-item-note refuses (exit 2), proof unchanged"
+
+# File mode: design/plan put overwrite an existing file, refuse a missing one
+TMP_INP="$(mktemp -d)"
+trap 'rm -rf "$TMP_IN" "$TMP_INF" "$TMP_INP"' EXIT
+mkdir -p "$TMP_INP/.hv"
+(
+  cd "$TMP_INP"
+  git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
+  rc=0; printf 'x\n' | "$BIN/hv-design-put" F01 --body-file - 2>/dev/null || rc=$?
+  [ "$rc" = 1 ] || fail "file-mode design put on missing file: $rc"
+  [ ! -e .hv/designs/F01.md ] || fail "file-mode design put created a file"
+  "$BIN/hv-design-add" F01 "T" >/dev/null
+  printf 'new design\n' | "$BIN/hv-design-put" F01 --body-file -
+  [ "$(cat .hv/designs/F01.md)" = "new design" ] || fail "file-mode design put content"
+  printf 'from file\n' > body.txt; mkdir sub; cd sub
+  "$BIN/hv-design-put" F01 --body-file ../body.txt
+  [ "$(cat ../.hv/designs/F01.md)" = "from file" ] || fail "file-mode design put relative body"
+  cd ..
+  rc=0; printf 'x\n' | "$BIN/hv-plan-put" M01-F01 --body-file - 2>/dev/null || rc=$?
+  [ "$rc" = 1 ] || fail "file-mode plan put on missing file: $rc"
+  "$BIN/hv-plan-add" M01 F01 "T" >/dev/null
+  "$BIN/hv-plan-add" M01 slice "S" >/dev/null
+  printf 'new plan\n' | "$BIN/hv-plan-put" M01-F01 --body-file -
+  [ "$(cat .hv/plans/M01-F01.md)" = "new plan" ] || fail "file-mode plan put content"
+  printf 'new slice\n' | "$BIN/hv-plan-put" M01-S01 --body-file -
+  [ "$(cat .hv/plans/M01-S01.md)" = "new slice" ] || fail "file-mode slice plan put content"
+  rc=0; "$BIN/hv-plan-put" bogus --body-file body.txt 2>/dev/null || rc=$?
+  [ "$rc" = 1 ] || fail "plan put bad key: $rc"
+  rc=0; "$BIN/hv-design-put" ../x --body-file body.txt 2>/dev/null || rc=$?
+  [ "$rc" = 1 ] || fail "design put bad id: $rc"
+)
+trap 'rm -rf "$TMP"' EXIT
+pass "file backend: design/plan put overwrite existing files and refuse missing ones"

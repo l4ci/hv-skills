@@ -1045,9 +1045,17 @@ def _main(argv):
     """`python3 -m hvlib_backend require-file <helper> <pointer>`: shell guard.
 
     Exit 0 under the file backend, 2 when refused, 1 on an invalid backend.
+    `python3 -m hvlib_backend is-issues`: exit 0 in issue mode, 1 otherwise.
     """
+    if len(argv) == 2 and argv[1] == "is-issues":
+        # Exit 0 when backlog.backend is "issues", 1 otherwise (an unreadable or invalid config
+        # counts as file mode so file-mode helpers keep ignoring config).
+        try:
+            return 0 if isinstance(get_backend(), IssueBackend) else 1
+        except Exception:
+            return 1
     if len(argv) != 4 or argv[1] != "require-file":
-        sys.stderr.write("usage: hvlib_backend require-file <helper> <pointer>\n")
+        sys.stderr.write("usage: hvlib_backend require-file <helper> <pointer> | is-issues\n")
         return 1
     helper, pointer = argv[2], argv[3]
     try:

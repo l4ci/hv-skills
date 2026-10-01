@@ -7,6 +7,10 @@
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 FILTER="${1:-}"
+# Issue mode: item plans live as notes on their issues (not listed); only slice-plan files are.
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  echo "hv-plan-list: item plans live on their issues (backlog.backend \"issues\"); listing slice plan files only" >&2
+fi
 RAW=$("$HERE/hv-fm-list" .hv/plans key milestone unit unitKind title status created repo)
 python3 - "$RAW" "$FILTER" <<'PY'
 import json, sys
