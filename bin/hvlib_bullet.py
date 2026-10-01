@@ -50,7 +50,7 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
     line = m.group(0).strip()
     if line.startswith("- "):
         line = line[2:]
-    line = re.sub(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\]\s*$", "", line)
+    line = re.sub(r"\s*Done\s+\d{4}-\d{2}-\d{2}\s+\[`[^`]+`\](?: \((?:handed-off|blocked|dropped)(?:: .*)?\))?\s*$", "", line)
     strike = re.match(r"~~(.+?)~~$", line)
     if strike:
         line = strike.group(1)
@@ -210,27 +210,40 @@ def parse_open_bullet(line: str) -> dict | None:
     }
 
 
-def format_done_line(open_line: str, date_str: str, hash_short: str) -> str:
+CLOSURE_REASONS = ("done", "handed-off", "blocked", "dropped")
+
+
+def format_done_line(open_line: str, date_str: str, hash_short: str,
+                     reason: str = "done", note: str = "") -> str:
     """Convert an open bullet line (starting with `- **[ID]...`) into the
     canonical Done line (`- ~~**[ID]...**~~ Done DATE [`hash`]`). The input
     must be an open bullet — the leading `- ` is preserved, the rest is
     wrapped in `~~...~~`, and the suffix is appended.
+
+    A `reason` other than "done" appends ` (<reason>)` or ` (<reason>: <note>)`
+    (the note is ignored for "done"). The default output is unchanged.
 
     No validation that `open_line` is well-formed; caller is responsible.
     """
     if not open_line.startswith("- "):
         raise ValueError("expected line starting with '- '")
     inner = open_line[2:].rstrip()
-    return f"- ~~{inner}~~ Done {date_str} [`{hash_short}`]"
+    line = f"- ~~{inner}~~ Done {date_str} [`{hash_short}`]"
+    if reason != "done":
+        line += f" ({reason}: {note})" if note else f" ({reason})"
+    return line
 
 
 _DONE_LINE_RE = re.compile(
-    r"^- ~~(?P<inner>.+?)~~ Done (?P<date>\d{4}-\d{2}-\d{2}) \[`(?P<hash>[^`]+)`\]\s*$"
+    r"^- ~~(?P<inner>.+?)~~ Done (?P<date>\d{4}-\d{2}-\d{2}) \[`(?P<hash>[^`]+)`\]"
+    r"(?: \((?P<reason>handed-off|blocked|dropped)(?:: (?P<note>.*))?\))?\s*$"
 )
 
 
 def parse_done_line(line: str) -> dict | None:
-    """Parse a Done line. Returns dict {id, inner, date, hash} or None.
+    """Parse a Done line. Returns dict {id, inner, date, hash, reason, note}
+    or None. `reason` is "done" when the line carries no `(<reason>...)`
+    suffix; `note` is "" when absent.
     `inner` is the content between `~~ ... ~~` (the original bullet body
     without the leading `- ` and without the strikethrough wrapping).
     `id` is extracted from the leading `**[ID] ...` of `inner`; "" if absent.
@@ -245,6 +258,8 @@ def parse_done_line(line: str) -> dict | None:
         "inner": inner,
         "date": m.group("date"),
         "hash": m.group("hash"),
+        "reason": m.group("reason") or "done",
+        "note": m.group("note") or "",
     }
 
 
