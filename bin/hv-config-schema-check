@@ -30,6 +30,7 @@ EXPECTED = [
     ("learn", "promoteThreshold"),
     ("ship", "review"),
     ("ship", "secondOpinion"),
+    ("ship", "secondOpinionRunner"),
     ("ship", "qa"),
     ("qa", "gate"),
     ("qa", "afterWork"),

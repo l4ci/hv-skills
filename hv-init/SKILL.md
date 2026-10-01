@@ -245,7 +245,7 @@ cfg = {
                "accounts": [], "operatorCommand": ""},
   "refactor": {"confirmBeforeExecute": <Q4-refactor>, "verifyCommands": []},
   "learn":    {"verify": <Q4-learn>, "promoteThreshold": 3},
-  "ship":     {"review": <Q4-ship>, "secondOpinion": False, "qa": False},
+  "ship":     {"review": <Q4-ship>, "secondOpinion": False, "secondOpinionRunner": "subagent", "qa": False},
   "qa":       {"gate": "advisory", "afterWork": False},
   "autonomy": {"level": "<Q5>"},
   "debug":    {"competingHypotheses": <Q4-debug>},
@@ -276,6 +276,11 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # Users enable via /hv-config when they want a no-prior-context adversarial
 # review in addition to /hv-review.
 .hv/bin/hv-config-set ship.secondOpinion false
+
+# ship.secondOpinionRunner — silent default. Opt-in (Rule 9) choosing who runs
+# the Step 3.5 gate: "subagent" (default) or "codex" (hv-codex-verify, needs a
+# working `codex` on PATH; advisory, never blocks). Never auto-enables.
+.hv/bin/hv-config-set ship.secondOpinionRunner subagent
 
 # work.dispatch — silent default. Opt-in feature flag (Rule 9) selecting the
 # /hv-work worker backend. "subagent" (default) dispatches in-process Agent
@@ -421,7 +426,7 @@ If `UMBRELLA_MODE=true` (Step 1 umbrella option accepted), append one extra line
 
 The helper handles network access (via `gh`) and install-type resolution. Treat a non-zero exit or empty JSON as `unknown`. `hvSkills.version` in `.hv/config.json` carries the same `currentVersion` value — re-stamped this run.
 
-Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.{verify,promoteThreshold}`, `ship.{review,secondOpinion}`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
+Config keys: `models.{orchestrator,worker}`, `work.{isolation,mergeStrategy}`, `refactor.{confirmBeforeExecute,verifyCommands}`, `learn.{verify,promoteThreshold}`, `ship.{review,secondOpinion,secondOpinionRunner}`, `autonomy.level`, `debug.competingHypotheses`, `docs.{path,autoCreate,afterWork}`, `loop.webResearch`, `git.baseBranch`, `umbrella.enabled`, `hvSkills.version`. See [`docs/usage/configuration.md`](../docs/usage/configuration.md) for the full reference.
 
 ## References
 
