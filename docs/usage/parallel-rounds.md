@@ -58,10 +58,10 @@ Slots are provisioned once and reused. Workspace ids are re-derived from
 
 | name | kind | worktree | parking branch | account (`CLAUDE_CONFIG_DIR`) |
 |---|---|---|---|---|
-| ben  | claude | `~/.herdr/worktrees/hv-skills/ben`  | `park/ben`  | `/home/vo/.claude-work` |
-| dana | claude | `~/.herdr/worktrees/hv-skills/dana` | `park/dana` | `/home/vo/.claude-personal` |
-| nia  | claude | `~/.herdr/worktrees/hv-skills/nia`  | `park/nia`  | `/home/vo/.claude-work` |
-| kit  | claude | `~/.herdr/worktrees/hv-skills/kit`  | `park/kit`  | `/home/vo/.claude-personal` |
+| ben  | claude | `~/.herdr/worktrees/hv-skills/park-ben`  | `park/ben`  | `/home/vo/.claude-work` |
+| dana | claude | `~/.herdr/worktrees/hv-skills/park-dana` | `park/dana` | `/home/vo/.claude-personal` |
+| nia  | claude | `~/.herdr/worktrees/hv-skills/park-nia`  | `park/nia`  | `/home/vo/.claude-work` |
+| kit  | claude | `~/.herdr/worktrees/hv-skills/park-kit`  | `park/kit`  | `/home/vo/.claude-personal` |
 
 Model per dispatch is the orchestrator's call (`-- --model <m>` after `agent start`);
 default Sonnet, Opus for multi-helper features.
