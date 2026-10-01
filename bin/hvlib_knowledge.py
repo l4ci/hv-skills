@@ -138,16 +138,16 @@ def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str],
     Knowledge with umbrella scope (empty or "umbrella"):
       - source = resolve_knowledge_target("umbrella")
       - topics = iter_topics(source) names, doc order
-      - target_path = Path("CLAUDE.md")
+      - target_path = instructions_file() (AGENTS.md if present, else CLAUDE.md)
     Knowledge with sub-repo scope:
       - sources = umbrella + sub-repo KNOWLEDGE.md
       - topics = first-seen union across both, doc order per file
-      - target_path = repos[scope] / "CLAUDE.md"
+      - target_path = instructions_file(repos[scope])
     Decisions (umbrella-only — caller is responsible for rejecting --repo
     before calling this function):
       - source = .hv/DECISIONS.md
       - topics = iter_topics(source) names, doc order
-      - target_path = Path("CLAUDE.md")
+      - target_path = instructions_file()
 
     Raises ValueError on unknown key, on scope mismatch (sub-repo name not
     in .hv/repos.json), or on knowledge-target resolution failure. Missing
@@ -156,7 +156,7 @@ def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str],
     from pathlib import Path
 
     from hvlib_repos import load_repos
-    from hvlib_section import iter_topics
+    from hvlib_section import instructions_file, iter_topics
 
     if key == "knowledge":
         if not scope or scope == "umbrella":
@@ -165,7 +165,7 @@ def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str],
             if source.exists():
                 for name, _body in iter_topics(source.read_text()):
                     topics.append(name)
-            return topics, Path("CLAUDE.md")
+            return topics, instructions_file()
         # Sub-repo scope: union umbrella ∪ sub-repo, first-seen order.
         repos = load_repos()
         if scope not in repos:
@@ -180,7 +180,7 @@ def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str],
                     if name not in seen:
                         seen.add(name)
                         topics.append(name)
-        return topics, Path(repos[scope]) / "CLAUDE.md"
+        return topics, instructions_file(Path(repos[scope]))
 
     if key == "decisions":
         source = Path(".hv/DECISIONS.md")
@@ -188,6 +188,6 @@ def compute_managed_block_inputs(key: str, scope: str = "") -> "tuple[list[str],
         if source.exists():
             for name, _body in iter_topics(source.read_text()):
                 topics.append(name)
-        return topics, Path("CLAUDE.md")
+        return topics, instructions_file()
 
     raise ValueError(f"unknown key '{key}' (known: knowledge, decisions)")

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Regenerate a managed <!-- hv-<key>-start -->...<!-- hv-<key>-end --> block in CLAUDE.md.
-# Atomic-merge helper: regenerates a named managed block in CLAUDE.md; exit 0 on success, 1 on unknown key.
+# Regenerate a managed <!-- hv-<key>-start -->...<!-- hv-<key>-end --> block in CLAUDE.md (or AGENTS.md when present).
+# Atomic-merge helper: regenerates a named managed block in CLAUDE.md or AGENTS.md (AGENTS.md wins when it exists); exit 0 on success, 1 on unknown key.
 # Usage: hv-managed-block <key>                        # flat list of ## headings from registered source
 #        hv-managed-block <key> --body-stdin           # caller-rendered body via stdin
-#        hv-managed-block knowledge [--repo umbrella|<name>]  # sub-repo CLAUDE.md = umbrella ∪ sub-repo topics
+#        hv-managed-block knowledge [--repo umbrella|<name>]  # sub-repo instructions file = umbrella ∪ sub-repo topics
 # Keys: knowledge | decisions | vision | map | qa (vision, map, qa are body-stdin only).
 # Prints: created | updated | appended | unchanged.
 # Companion: `hv-managed-block-strip-deprecated` removes orphan blocks for v3-cut keys.
@@ -29,14 +29,14 @@ if [ "$MODE" = "--body-stdin" ]; then
 import os
 import sys
 from pathlib import Path
-from hvlib import upsert_block
+from hvlib import instructions_file, upsert_block
 
 key = sys.argv[1]
 body = os.environ["_HV_BLOCK_BODY"].rstrip("\n")
 
 block = f"<!-- hv-{key}-start -->\n{body}\n<!-- hv-{key}-end -->"
 
-status = upsert_block(Path("CLAUDE.md"), key, block)
+status = upsert_block(instructions_file(), key, block)
 print(status)
 PY
 else

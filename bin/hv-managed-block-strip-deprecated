@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove managed CLAUDE.md blocks for v3 keys that no v4 helper regenerates.
+# Remove managed CLAUDE.md / AGENTS.md blocks for v3 keys that no v4 helper regenerates.
 # Mutator helper: exit 0 on success (idempotent — silent when nothing to strip).
 # Usage: hv-managed-block-strip-deprecated
 set -euo pipefail
@@ -7,14 +7,14 @@ set -euo pipefail
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import re
 from pathlib import Path
-from hvlib import write_text_atomic, managed_block_regex
+from hvlib import write_text_atomic, managed_block_regex, instructions_file
 
 # Hardcoded list of managed-block keys that previous hv-skills versions
 # wrote to CLAUDE.md but no v4 helper regenerates. Add new entries here
 # when future cuts orphan a managed block.
 DEPRECATED_KEYS = ["context"]
 
-claude = Path("CLAUDE.md")
+claude = instructions_file()
 if not claude.exists():
     raise SystemExit(0)
 

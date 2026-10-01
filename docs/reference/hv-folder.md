@@ -48,7 +48,7 @@ One topic is special-cased: `## Glossary` holds domain-terminology entries as ne
 
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
-`/hv-init` inserts a managed block in `CLAUDE.md` that lists the current topics (`Glossary` surfaces here like any other topic). That block keeps knowledge visible to the model across context clears without re-reading the full file.
+`/hv-init` inserts a managed block in `CLAUDE.md` (or `AGENTS.md` when present) that lists the current topics (`Glossary` surfaces here like any other topic). That block keeps knowledge visible to the model across context clears without re-reading the full file.
 
 ## DECISIONS.md: hard-boundary decisions
 

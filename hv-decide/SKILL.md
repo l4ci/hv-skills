@@ -167,7 +167,7 @@ Use `Edit` for surgical updates, not `Write`.
 .hv/bin/hv-managed-block decisions
 ```
 
-Reads `.hv/DECISIONS.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-decisions-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. The read-site skills (`/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, `/hv-vision`) read this block to know when to consult `DECISIONS.md`.
+Reads `.hv/DECISIONS.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-decisions-start -->` block in `CLAUDE.md` (or `AGENTS.md` when present). Creates or appends as needed; never touches other content. The read-site skills (`/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, `/hv-vision`) read this block to know when to consult `DECISIONS.md`.
 
 ## Step 8 — Confirm
 

@@ -397,7 +397,7 @@ Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash
 .hv/bin/hv-qa-index
 ```
 
-Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
+Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched. The blocks go to `AGENTS.md` instead when that file exists in the project root (otherwise `CLAUDE.md`); all helpers resolve the target the same way.
 
 ## Step 5 — Confirm
 

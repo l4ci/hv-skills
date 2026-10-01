@@ -44,6 +44,7 @@ NAMES = [
     "get_version_or_die",
     "git_mtime",
     "infer_version_kind",
+    "instructions_file",
     "iter_map_entries",
     "iter_open_bullets",
     "iter_open_sections",
