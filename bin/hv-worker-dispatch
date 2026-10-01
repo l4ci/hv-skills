@@ -1,19 +1,32 @@
 #!/usr/bin/env bash
-# Send a brief into a tmux worker slot's Claude Code session.
+# Send a brief into a worker slot's Claude Code session, on the host that
+# work.dispatch selects (tmux window or herdr tab; see hv-host-select.sh).
 #
-# Recreates the slot's window first: /clear does not reliably reset a Claude
-# Code session (it can land as a literal chat message), so a fresh window is
-# the only trustworthy reset. The new session starts at 0 context.
+# A task brief recreates the slot's session first: /clear does not reliably
+# reset a Claude Code session (it can land as a literal chat message), so a
+# fresh window or tab is the only trustworthy reset. The new session starts
+# at 0 context. A --relay goes into the RUNNING session instead: it answers a
+# question the worker asked, and a fresh session would have no idea what the
+# answer is to.
 #
-# Text injection and pickup confirmation live in hv-tmux-send.sh, shared with
-# hv-worker-session. That path carries several tmux-specific traps; keeping one
-# copy is what stops the two callers from drifting apart.
+# Text injection and pickup confirmation live in the host libs
+# (hv-host-tmux.sh, hv-host-herdr.sh), shared with hv-worker-session.
+#
+# Records the dispatch in .hv/workers.json: the slot's handle (a herdr tab id
+# changes on every dispatch), its task, and state=busy.
 #
 # Tool: exit 0 on confirmed pickup; exit 2 on usage error;
-#       exit 3 on tmux/slot failure; exit 4 if the brief never submitted.
+#       exit 3 on host/slot failure; exit 4 if the brief never submitted;
+#       exit 5 if a dialog in the session refused input (herdr only).
+#
+# Provenance: every payload, brief or relay, is signed with a first line
+# `--- ORCHESTRATOR (round N) ---` (see references/worker-contract.md). A relay
+# is also appended to the slot's relays[] in .hv/workers.json as
+# {round, ts, summary}; hv-worker-gate checks the PR's approvals against it.
 #
 # Usage:
-#   hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]
+#   hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay]
+#                      [--round <n>] [--boot-timeout <s>]
 #
 #   --relay  Mark the injected text as an ORCHESTRATOR RELAY rather than a
 #            direct answer from the user. Load-bearing, not cosmetic: the
@@ -23,20 +36,24 @@
 #            answer; never pass it for an original task brief.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$HERE/hv-tmux-send.sh"
+. "$HERE/hv-host-select.sh"
 
-USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]"
+USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>]"
 
 SLOT=""
 BRIEF=""
+TASK=""
 RELAY=0
+ROUND=""
 BOOT_TIMEOUT=60
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --slot)         SLOT="${2:?$USAGE}"; shift 2 ;;
     --brief-file)   BRIEF="${2:?$USAGE}"; shift 2 ;;
+    --task)         TASK="${2:?$USAGE}"; shift 2 ;;
     --relay)        RELAY=1; shift ;;
+    --round)        ROUND="${2:?$USAGE}"; shift 2 ;;
     --boot-timeout) BOOT_TIMEOUT="${2:?$USAGE}"; shift 2 ;;
     --)             shift; break ;;
     -*)             echo "error: unknown flag $1" >&2; exit 2 ;;
@@ -45,14 +62,25 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
+case "$ROUND" in ''|*[!0-9]*) [ -z "$ROUND" ] || { echo "error: --round must be a number" >&2; exit 2; } ;; esac
 [ -n "$BRIEF" ] || { echo "$USAGE" >&2; exit 2; }
 [ -f "$BRIEF" ] || { echo "error: brief file not found: $BRIEF" >&2; exit 2; }
-command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+
+hv_host_select
+hv_host_require || exit 3
+# herdr tabs are created in the caller's own workspace. Outside herdr there is
+# none, and driving the server anyway lands tabs wherever a human is focused.
+if [ "$HV_HOST" = herdr ] && ! hv_host_in_session; then
+  echo "error: work.dispatch=herdr must run from inside a herdr pane (HERDR_ENV=1)" >&2; exit 3
+fi
 
 REGISTRY=".hv/workers.json"
 [ -f "$REGISTRY" ] || { echo "error: no worker pool — run hv-worker-pool init first" >&2; exit 3; }
 
-# Resolve slot -> worktree, window, session, configDir (phase 2).
+# Resolve slot -> worktree, handle, session, configDir. `window` is the
+# pre-handle field name; read it so an unmigrated registry still dispatches.
+# Empty fields travel as "-": IFS=<tab> counts as whitespace, so read would
+# collapse an empty middle field and shift every later one left.
 SLOT_INFO="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
 import sys
 from pathlib import Path
@@ -62,30 +90,57 @@ slot = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), 
 if slot is None:
     raise SystemExit(1)
 print("\t".join([
-    slot.get("worktree") or "",
-    slot.get("window") or "",
+    slot.get("worktree") or "-",
+    slot.get("handle") or slot.get("window") or "-",
     data.get("session") or "hv",
-    slot.get("configDir") or "",
+    slot.get("configDir") or "-",
 ]))
 PY
 )" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
 
-IFS="$(printf '\t')" read -r WORKTREE WINDOW SESSION CONFIG_DIR <<EOF
+IFS="$(printf '\t')" read -r WORKTREE HANDLE SESSION CONFIG_DIR <<EOF
 $SLOT_INFO
 EOF
+[ "$HANDLE" = "-" ] && HANDLE=""
+[ "$CONFIG_DIR" = "-" ] && CONFIG_DIR=""
 
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
-# Workers run with permissions skipped. The contract asks them to git add,
-# git commit, gh pr create and run tests; every one of those prompts under a
-# narrower mode, and there is nobody in the pane to answer — the worker just
-# stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
-# branch in its own worktree, and hv-worker-gate re-verifies the merged tree
-# before anything reaches the cycle branch.
-#
-# Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
-# classifier for exactly that case, so a narrowed mode stalls loudly.
-LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+# record_dispatch <handle> — write handle, state=busy and, for a task, the
+# task id (clearing the previous task's PR and relay log).
+record_dispatch() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$1" "$TASK" "$ROUND" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+path, name, handle, task, rnd = sys.argv[1:6]
+def mutator(data):
+    if rnd:
+        data["round"] = int(rnd)
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s.pop("window", None)
+            s["handle"] = handle or None
+            s["state"] = "busy"
+            if task:
+                s["task"] = task
+                s["pr"] = None
+                s["relays"] = []
+update_json(Path(path), {"slots": []}, mutator)
+PY
+}
+
+if [ "$RELAY" -eq 0 ]; then
+  # Workers run with permissions skipped. The contract asks them to git add,
+  # git commit, gh pr create and run tests; every one of those prompts under a
+  # narrower mode, and there is nobody in the pane to answer — the worker just
+  # stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
+  # branch in its own worktree, and hv-worker-gate re-verifies the merged tree
+  # before anything reaches the cycle branch.
+  #
+  # Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
+  # classifier for exactly that case, so a narrowed mode stalls loudly.
+  LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from hvlib import load_config
 cfg = load_config()
 work = cfg.get("work", {}) or {}
@@ -97,38 +152,71 @@ print(cmd)
 PY
 )"
 
-[ -n "$CONFIG_DIR" ] && LAUNCH="CLAUDE_CONFIG_DIR=$CONFIG_DIR $LAUNCH"
-
-tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" -c "$WORKTREE"
-
-# Fresh window every dispatch — see the /clear note above.
-tmux kill-window -t "$WINDOW" 2>/dev/null || true
-tmux new-window -d -t "$SESSION" -n "$SLOT" -c "$WORKTREE" || {
-  echo "error: could not create tmux window $WINDOW" >&2; exit 3; }
-
-tmux send-keys -t "$WINDOW" "$LAUNCH" C-m
-
-hv_tmux_wait_ready "$WINDOW" "$BOOT_TIMEOUT" || {
-  echo "error: slot '$SLOT' session did not come up within ${BOOT_TIMEOUT}s" >&2; exit 3; }
-
-# A relay is prefixed so the worker can tell the orchestrator's voice from the
-# maintainer's. It writes its own PR body and cannot otherwise distinguish
-# them — the two arrive through the same channel.
-PAYLOAD="$BRIEF"
-if [ "$RELAY" -eq 1 ]; then
-  PAYLOAD="$(mktemp)"
-  trap 'rm -f "$PAYLOAD"' EXIT
-  {
-    printf '%s\n' "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator." \
-                  "It is NOT the maintainer speaking to you directly. If you cite it in a PR" \
-                  "body, attribute it as 'relayed by the orchestrator', never as a maintainer" \
-                  "sign-off in your session.]" ""
-    cat "$BRIEF"
-  } >"$PAYLOAD"
+  # Fresh session every task dispatch — see the /clear note above.
+  hv_host_kill "$SLOT" "$HANDLE"
+  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || exit 3
+elif [ -z "$HANDLE" ]; then
+  echo "error: slot '$SLOT' has no session to relay into — dispatch a task first" >&2; exit 3
 fi
 
-hv_tmux_send_file "$WINDOW" "$PAYLOAD" "hv-$SLOT" || {
-  echo "error: slot '$SLOT' never picked up the brief (pane unchanged after 4 submits)" >&2
-  exit 4; }
+record_dispatch "$HANDLE"
 
-echo "dispatched: $SLOT"
+# Round for the signature: the flag (just recorded), else the registry's, else 1.
+ROUND="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+print(load_json(Path(sys.argv[1]), {}).get("round") or 1)
+PY
+)"
+SIGNATURE="--- ORCHESTRATOR (round $ROUND) ---"
+
+# Every payload is signed so the worker can tell the orchestrator's voice from
+# unsigned pane text. A relay also carries a note: it writes its own PR body and
+# cannot otherwise tell a relay from the maintainer typing in its pane.
+PAYLOAD="$(mktemp)"
+trap 'rm -f "$PAYLOAD"' EXIT
+{
+  printf '%s\n' "$SIGNATURE"
+  if [ "$RELAY" -eq 1 ]; then
+    printf '%s\n' "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator." \
+                  "It is NOT the maintainer speaking to you directly. If you cite it in your PR" \
+                  "body, attribute it as 'orchestrator relay round $ROUND', never as a maintainer" \
+                  "sign-off in your session.]" ""
+  fi
+  # An already-signed brief is not signed twice.
+  if [ "$(head -n 1 "$BRIEF")" = "$SIGNATURE" ]; then tail -n +2 "$BRIEF"; else cat "$BRIEF"; fi
+} >"$PAYLOAD"
+
+RC=0
+hv_host_send "$SLOT" "$HANDLE" "$PAYLOAD" || RC=$?
+# Log the relay once it was (or may have been) sent. A stall (4) does not prove
+# the text was lost, and the gate must not call a delivered relay unlogged; only
+# a refused dialog (5) is certain nothing went out.
+if [ "$RELAY" -eq 1 ] && [ "$RC" -ne 5 ]; then
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$ROUND" "$BRIEF" <<'PY'
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from hvlib import update_json
+path, name, rnd, brief = sys.argv[1:5]
+text = Path(brief).read_text(errors="replace")
+first = next((l.strip() for l in text.splitlines() if l.strip() and not l.startswith("--- ORCHESTRATOR")), "")
+entry = {"round": int(rnd),
+         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+         "summary": first[:200]}
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s.setdefault("relays", []).append(entry)
+update_json(Path(path), {"slots": []}, mutator)
+PY
+fi
+
+case "$RC" in
+  0) echo "dispatched: $SLOT ($HANDLE)" ;;
+  5) echo "error: slot '$SLOT' has a dialog open and refused input — inspect it before resending" >&2
+     exit 5 ;;
+  *) echo "error: slot '$SLOT' never picked up the brief — inspect the session before resending" >&2
+     exit 4 ;;
+esac

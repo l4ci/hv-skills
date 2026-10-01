@@ -54,12 +54,12 @@ SHAPE=$( cd "$TMP_WD" && python3 -c '
 import json
 d = json.load(open(".hv/workers.json"))
 s = d["slots"][0]
-need = {"name","branch","worktree","base","window","state","task","pr","configDir"}
+need = {"name","branch","worktree","base","handle","state","task","pr","configDir"}
 missing = need - set(s)
-print("MISSING:" + ",".join(sorted(missing)) if missing else "OK:" + s["state"])
+print("MISSING:" + ",".join(sorted(missing)) if missing else "OK:" + s["state"] + ":" + s["handle"])
 ' )
-[ "$SHAPE" = "OK:idle" ] || fail "workers.json slot shape wrong: $SHAPE"
-pass "workers.json carries the full slot shape, seeded idle"
+[ "$SHAPE" = "OK:idle:hv:w1" ] || fail "workers.json slot shape wrong: $SHAPE"
+pass "workers.json carries the full slot shape, seeded idle, tmux handle <session>:<slot>"
 
 BEFORE=$( cat "$TMP_WD/.hv/workers.json" )
 ( cd "$TMP_WD" && "$BIN/hv-worker-pool" init --slots 2 --base main ) >/dev/null 2>&1 \
@@ -129,7 +129,7 @@ EVID=$( ( cd "$TMP_WD" && "$BIN/hv-worker-poll" --fixture "$FX/blocked_long.txt"
 # Every pane capture in the tree must join wrapped lines. hv-worker-dispatch's
 # captures live in the shared library, so assert against whichever files
 # actually call capture-pane rather than a fixed list that rots on refactor.
-CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-tmux-send.sh 2>/dev/null || true )
+CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-host-tmux.sh 2>/dev/null || true )
 [ -n "$CAPTURERS" ] || fail "no helper calls capture-pane — the pane classifier has gone missing"
 for H in $CAPTURERS; do
   if grep -q 'capture-pane -p ' "$H"; then
@@ -172,22 +172,27 @@ RC=0
 [ "$RC" = "2" ] || fail "hv-worker-session unknown verb should exit 2, got $RC"
 pass "hv-worker-session detects tmux membership via \$TMUX, not session existence"
 
-# The paste path is shared by hv-worker-dispatch and hv-worker-session. It
-# carries three separate traps (bracketed-paste eating Enter, collapsed paste
-# chips, unconfirmed pickup); two copies would drift.
-[ -f "$BIN/hv-tmux-send.sh" ] || fail "bin/hv-tmux-send.sh (shared paste library) is missing"
-for H in hv-worker-dispatch hv-worker-session; do
-  grep -q 'hv-tmux-send.sh' "$BIN/$H" \
-    || fail "$H does not source the shared hv-tmux-send.sh paste library"
+# The paste path is shared by hv-worker-dispatch and hv-worker-session through
+# the host libs. It carries three separate traps (bracketed-paste eating Enter,
+# collapsed paste chips, unconfirmed pickup); two copies would drift.
+[ -f "$BIN/hv-host-tmux.sh" ] || fail "bin/hv-host-tmux.sh (tmux host library) is missing"
+if [ -e "$BIN/hv-tmux-send.sh" ]; then
+  fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
+fi
+for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
+  grep -q 'hv-host-select.sh' "$BIN/$H" \
+    || fail "$H does not pick its host through hv-host-select.sh"
 done
 # Strip comments before grepping: the callers legitimately MENTION the paste
 # path in prose, and matching that reports a defect where none exists.
-if sed 's/#.*//' "$BIN/hv-worker-dispatch" | grep -q 'paste-buffer'; then
-  fail "hv-worker-dispatch still pastes inline; it must go through hv-tmux-send.sh"
-fi
-sed 's/#.*//' "$BIN/hv-tmux-send.sh" | grep -q 'paste-buffer' \
-  || fail "hv-tmux-send.sh does not actually paste — the shared library is hollow"
-pass "hv-worker-dispatch and hv-worker-session share one paste-and-confirm path"
+for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
+  if sed 's/#.*//' "$BIN/$H" | grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)'; then
+    fail "$H talks to a host directly; it must go through the hv_host_* primitives"
+  fi
+done
+sed 's/#.*//' "$BIN/hv-host-tmux.sh" | grep -q 'paste-buffer' \
+  || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
+pass "worker helpers share one paste-and-confirm path through the host libs"
 
 # Workers and the operator run at deliberately different trust levels. Both
 # defaults are pinned because a silent drift either way is bad: narrowing the
@@ -400,6 +405,50 @@ case "$GATE_OUT" in
   *) fail "hv-worker-gate with empty verifyCommands must report NO-VERIFY, got: $GATE_OUT" ;;
 esac
 pass "hv-worker-gate reports NO-VERIFY rather than a pass it cannot back"
+
+# ── (c1) provenance check ───────────────────────────────────────────────────
+# The PR body comes from a fake `gh`; the relay log is written straight into the
+# registry, the way hv-worker-dispatch --relay does. Slot w3 is fresh against main.
+FAKEBIN="$TMP_WD/fakebin"; mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/gh" <<'SH'
+#!/usr/bin/env bash
+[ "$1 $2" = "pr view" ] && cat "$FAKE_PR_BODY"
+SH
+chmod +x "$FAKEBIN/gh"
+set_relays() {
+  python3 - "$TMP_WD/.hv/workers.json" "$1" <<'PYEOF' || fail "could not write relays fixture"
+import json, sys
+d = json.load(open(sys.argv[1]))
+s = [s for s in d["slots"] if s["name"] == "w3"][0]
+s["pr"] = "7"
+s["relays"] = json.loads(sys.argv[2])
+json.dump(d, open(sys.argv[1], "w"))
+PYEOF
+}
+prov() {  # prov <body> -> exit code of the check
+  printf '%s' "$1" > "$TMP_WD/pr_body.md"
+  local rc=0
+  ( cd "$TMP_WD" && PATH="$FAKEBIN:$PATH" FAKE_PR_BODY="$TMP_WD/pr_body.md" \
+      "$BIN/hv-worker-gate" --slot w3 --base main --check-only ) >"$TMP_WD/prov.out" 2>&1 || rc=$?
+  echo "$rc"
+}
+RELAYS='[{"round":2,"ts":"2026-10-01T08:00:00Z","summary":"use the per-user cache"}]'
+set_relays "$RELAYS"
+[ "$(prov $'## Summary\nx\n\n## Approvals\n- per-user cache: orchestrator relay round 2\n- naming of flag: my call, unratified\n')" = "0" ] \
+  || fail "a correctly cited relay must pass: $(cat "$TMP_WD/prov.out")"
+[ "$(prov $'## Approvals\n- use the per-user cache: maintainer in pane\n')" = "4" ] \
+  || fail "a relay cited as the maintainer must fail (inflation)"
+grep -q PROVENANCE-FAIL "$TMP_WD/prov.out" || fail "inflation must print PROVENANCE-FAIL"
+[ "$(prov $'## Approvals\n- drop the legacy path: orchestrator relay round 9\n')" = "4" ] \
+  || fail "a relay round that was never logged must fail (deflation)"
+[ "$(prov $'## Summary\nno approvals here\n')" = "4" ] \
+  || fail "no ## Approvals section with a relay recorded must fail"
+[ "$(prov $'## Approvals\n- schema choice: maintainer in pane\n')" = "0" ] \
+  || fail "a maintainer citation that matches no relay must pass"
+set_relays '[]'
+[ "$(prov $'## Summary\nno approvals needed\n')" = "0" ] \
+  || fail "no relays and no section must pass: $(cat "$TMP_WD/prov.out")"
+pass "hv-worker-gate --check-only exits 4 PROVENANCE-FAIL on inflation, deflation and a missing section"
 
 # ── usage contract ──────────────────────────────────────────────────────────
 # Bare invocation is a usage error for pool/gate/dispatch. It is NOT one for

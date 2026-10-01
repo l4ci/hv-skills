@@ -4,7 +4,9 @@ Used by `/hv-work` Steps 5, 6, 7, and 7.5 when `work.dispatch: "tmux"`. Under th
 
 The tmux backend runs each worker as **its own Claude Code session**, in its own `git worktree`, on its own branch, opening a PR against the cycle branch. That buys a real per-worker context window and a channel a human can talk into. It costs the failure modes below, every one of which was paid for by a real round in the runbook this backend is modelled on.
 
-Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`.
+Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`. The tmux primitives they call live in `bin/hv-host-tmux.sh`.
+
+`work.dispatch: "herdr"` runs the same workers in herdr tabs instead; see [`herdr-dispatch.md`](herdr-dispatch.md). These sections apply to both hosts: *The worker contract*, *Escalating and relaying*, *The merge gate*, *Permissions*, *Accounts*.
 
 ## What changes versus the subagent backend
 
@@ -43,32 +45,7 @@ The caller **must stop after a successful `ensure`.** Two orchestrators driving 
 
 ## The worker contract
 
-A tmux worker boots with **none** of the orchestrator's context: no conversation, no loaded KNOWLEDGE, no plan. Everything it needs is in the brief. Prepend this standing contract to the task brief on every dispatch — the brief body itself is identical to the subagent path, same `**Claims to verify**` section and all.
-
-```
-You are a worker on <task-id>, running in your own worktree as slot <slot>.
-Work only this task, then stop.
-
-- Stay in your worktree. Confirm `pwd` before editing and use worktree-rooted
-  paths — an absolute path under the main checkout silently edits the WRONG tree.
-- Stage explicit paths. Never `git add -A` or `git add .`.
-- Commit your own work, then open a PR against `<cycle-branch>`. Never merge.
-- Run TARGETED verification only — the files you touched. The full suite is the
-  orchestrator's gate on the merged tree. Several workers running full suites at
-  once starve the CPU and turn time-budgeted tests into false reds, which costs
-  everyone a re-measurement to disprove.
-- Escalate rather than guess. If the task leaves a choice a user would notice
-  unsettled, and neither the brief nor the code settles it, print
-  `HV-BLOCKED <slot>: <one question in plain language>` and stop. Ask ONE
-  question, phrased for someone who does not have your file open.
-- Cite any approval you acted on and NAME THE CHANNEL it arrived through. Text
-  marked `[ORCHESTRATOR RELAY]` is the orchestrator speaking, NOT the maintainer
-  — never cite it as a maintainer sign-off. Label your own defensible calls
-  "my call, unratified".
-- When your PR is open, print `HV-DONE <slot> <pr-url>` and stop.
-```
-
-The two sentinels are the contract's load-bearing half. We own the worker's instructions, so state is *declared* rather than inferred from prose — which is what makes `hv-worker-poll` reliable where pattern-matching a TUI is not.
+Shared by both hosts and kept in [`worker-contract.md`](worker-contract.md): the standing brief `/hv-work` Step 6 prepends to every task, the `HV-BLOCKED` / `HV-DONE` sentinels the poll below routes on, and the provenance rules. Read it before dispatching.
 
 ## Pane classification
 
@@ -96,9 +73,9 @@ Sentinels outrank movement: a worker still rendering output after printing `HV-D
 2. The orchestrator asks the user with `AskUserQuestion`, **in the worker's words** — the worker already phrased it for someone without the file open; don't re-encode it into implementation terms.
 3. Relay the answer with `hv-worker-dispatch --slot <n> --brief-file <answer> --relay`.
 
-`--relay` prefixes the injected text with an explicit `[ORCHESTRATOR RELAY]` marker. This is not hygiene, it is the fix for a specific, permanent failure: the worker writes its own PR body, and a relay arrives through the *same channel* a human answer would. Without the marker, an orchestrator's own mid-task correction gets cited in a merged PR as *"the maintainer confirmed in my pane"* — while the maintainer was asleep. Not dishonesty on the worker's part; it genuinely cannot tell. Once merged, it is permanent.
+`--relay` signs the injected text `--- ORCHESTRATOR (round N) ---`, adds a note that it is forwarded text, and logs it in the slot's `relays[]`. This is not hygiene, it is the fix for a specific, permanent failure: the worker writes its own PR body, and a relay arrives through the *same channel* a human answer would. Without the signature, an orchestrator's own mid-task correction gets cited in a merged PR as *"the maintainer confirmed in my pane"* — while the maintainer was asleep. Not dishonesty on the worker's part; it genuinely cannot tell. Once merged, it is permanent.
 
-So: **read every PR body for the channel named, not merely for whether a citation exists.**
+So: **read every PR body for the channel named, not merely for whether a citation exists.** `hv-worker-gate` cross-checks the `## Approvals` section against the relay log and exits 4 `PROVENANCE-FAIL` on a mismatch ([provenance](worker-contract.md#provenance)); that catches the obvious cases, not a paraphrase.
 
 ## The merge gate
 
@@ -177,7 +154,7 @@ A window is only `cooling` when it is spent **and** names a *future* reset. A sp
 
 ## Other failure modes worth knowing
 
-- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv-worker-dispatch` kills and recreates the window every dispatch; a fresh session starts at 0 context. Do not try to reuse a window by clearing it.
+- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv-worker-dispatch` kills and recreates the window for every task brief; a fresh session starts at 0 context. Do not try to reuse a window by clearing it. A `--relay` is the exception: it goes into the running session, because the worker that asked the question is the one that needs the answer.
 - **A pasted brief may not submit.** A long prompt arrives as a collapsed paste chip whose trailing Enter is swallowed. `hv-worker-dispatch` sends Enter as a separate keypress and then **confirms pickup** by re-capturing the pane, retrying up to 4 times before failing with exit 4. Never assume the first Enter landed.
 - **Load is a first-class failure mode.** Slots contend for one box. Beyond roughly one slot per two cores, CPU-bound tests with fixed time budgets start failing on elapsed time rather than on truth, and each false red costs a re-measurement to disprove. That is why the worker contract says targeted tests only, and why `work.workerSlots` defaults to 3. Never "fix" a load-induced red by raising a timeout — a bigger fixed number just fails at a higher load and reports genuine regressions more slowly.
 - **A timeout is not a failure of the thing under test.** It says the assertion never ran. Read the output before forming a theory.

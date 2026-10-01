@@ -45,6 +45,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-knowledge-migrate` | One-shot migration: stamp every existing titled KNOWLEDGE bullet as `provisional` in the F03 sidecar; idempotent no-op on re-run | `.hv/bin/hv-knowledge-migrate` |
 | `hv-knowledge-contradiction` | Manage the pending-contradictions queue at `.hv/knowledge-contradictions.json`; gates auto-promotion when a correction overlaps a queried bullet | `.hv/bin/hv-knowledge-contradiction --list` |
 | `hv-config-set` | Set a single value in `.hv/config.json` at a dotted key path; preserves other keys, writes atomically (resolve; JSON-parse value, fallback to string) | `.hv/bin/hv-config-set docs.afterWork true` |
+| `hv-config-show` | Print each config key as `key = value  (source: local\|project\|default)`; no arg lists every known key, one key prints one line, unknown key exits 1. Defaults come from `bin/hvlib_config.py` `CONFIG_KEYS`, the same table `hv-config-schema-check` derives its expected keys from | `.hv/bin/hv-config-show work.dispatch` |
 | `hv-managed-block decisions` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-managed-block decisions` |
 | `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
 | `hv-auto-decision-log` | Append an `[Auto:Loop]` entry to `DECISIONS.md` under a topic; idempotent on `(topic, rule-title)` | `.hv/bin/hv-auto-decision-log "Architecture" "no direct DB writes" "keeps layer clean"` |

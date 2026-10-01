@@ -1,6 +1,6 @@
 ---
 name: hv-work
-description: Orchestrator-driven parallel implementation — plans tasks, dispatches workers, verifies, commits atomically per task. Workers run as in-process subagents (default) or, under work.dispatch=tmux, as separate Claude Code sessions in their own worktrees that open PRs behind a merge gate. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches workers, verifies, commits atomically per task. Workers run as in-process subagents (default) or, under work.dispatch=tmux or herdr, as separate Claude Code sessions in their own worktrees that open PRs behind a merge gate. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
 user-invocable: true
 ---
 
@@ -23,9 +23,9 @@ Read `.hv/config.json`:
 
 - `models.orchestrator` — model for planning and verification (default `opus`)
 - `models.worker` — model for implementation subagents (default `sonnet`)
-- `work.isolation` — `"branch"` (default) or `"worktree"`. Ignored when `work.dispatch == "tmux"` (every slot owns a worktree by construction).
+- `work.isolation` — `"branch"` (default) or `"worktree"`. Ignored when `work.dispatch` is `"tmux"` or `"herdr"` (every slot owns a worktree by construction).
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
-- `work.dispatch` — `"subagent"` (default) or `"tmux"`. Selects the worker backend. `"subagent"` dispatches in-process `Agent` workers that write files while the orchestrator commits. `"tmux"` runs each worker as its own Claude Code session in its own worktree, committing and opening a PR against the cycle branch. See [`references/tmux-dispatch.md`](../references/tmux-dispatch.md).
+- `work.dispatch` — `"subagent"` (default), `"tmux"` or `"herdr"`. Selects the worker backend. `"subagent"` dispatches in-process `Agent` workers that write files while the orchestrator commits. `"tmux"` runs each worker as its own Claude Code session in its own worktree, committing and opening a PR against the cycle branch. See [`references/tmux-dispatch.md`](../references/tmux-dispatch.md). `"herdr"` runs the same workers as herdr tabs in the orchestrator's workspace, with herdr's native agent state; see [`references/herdr-dispatch.md`](../references/herdr-dispatch.md).
 - `work.workerSlots` — integer, default `3`. Size of the tmux worker pool; ignored under `"subagent"`.
 - `work.workerCommand` — string, default `""`. Launch command for a tmux worker session; empty builds `claude --model <models.worker> --dangerously-skip-permissions` (workers commit, open PRs and run tests unattended).
 - `work.accounts` — array of `{name, configDir}`, default `[]`. Maps tmux slots to independent `CLAUDE_CONFIG_DIR`s so each authenticates as its own account. Empty means every slot inherits the ambient config dir.
@@ -309,19 +309,23 @@ When the gate passes, carry the resolved sub-repo set forward to Step 5 (branch 
 
 Choose a descriptive name (e.g., `hv/quick-switch`, `hv/fix-timer-badge`).
 
-### Backend branch — `work.dispatch == "tmux"`
+### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
-When `work.dispatch` is `"tmux"`, skip the isolation guard and the branch/worktree patterns below entirely — they describe the `subagent` backend.
+When `work.dispatch` is `"tmux"` or `"herdr"`, skip the isolation guard and the branch/worktree patterns below entirely — they describe the `subagent` backend. The two hosts share every step here; host-specific lines are marked.
 
-**First, confirm this session is inside tmux. It is a precondition, not a nicety.**
+**First, confirm this session is inside the host. It is a precondition, not a nicety.**
 
 ```bash
 .hv/bin/hv-worker-session check     # exit 0 = inside, exit 1 = outside
 ```
 
+The helper reads `work.dispatch` itself: under tmux it keys on `$TMUX`, under herdr on `HERDR_ENV=1`.
+
 The backend is worth its cost for exactly one reason: a worker that needs a decision can idle and a human can answer *in that worker's pane*. Launched from a terminal that isn't already inside tmux, the worker windows land in a **detached session nobody is looking at** — every escalation goes unanswered and the backend silently degrades into a worse subagent mode. Don't proceed on the assumption someone will attach later.
 
-**Exit 1 (outside tmux) — hand the cycle over and stop.** Write a short instruction file telling the operator what it is resuming (the cycle target, the wave layout so far, and that it should continue from Step 5), then:
+**herdr, exit 1 — stop.** There is no handoff under herdr: `ensure` exits 3 because there is no workspace to open an operator tab in from outside herdr. Tell the user to start Claude Code in a herdr pane at the repo root and re-run `/hv-work` there, then end the run. Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` first.
+
+**tmux, exit 1 (outside tmux) — hand the cycle over and stop.** Write a short instruction file telling the operator what it is resuming (the cycle target, the wave layout so far, and that it should continue from Step 5), then:
 
 ```bash
 .hv/bin/hv-worker-session ensure --instruction-file <path>
@@ -331,7 +335,7 @@ That creates the session, spawns an `operator` window running `claude --continue
 
 **Then stop this cycle immediately.** Print the helper's attach block verbatim and end the run. Do **not** continue to the pool, do not dispatch, do not "keep going in case the handoff failed" — two orchestrators driving one pool dispatch the same task twice and race on the same slots. The handoff either worked (the operator is running it) or the helper exited non-zero (report that and let the user attach by hand). This is a terminal path, so surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` before printing the block.
 
-**Exit 0 (inside tmux) — continue.** After creating the cycle branch, stand up the worker pool:
+**Exit 0 (inside the host) — continue.** After creating the cycle branch, stand up the worker pool:
 
 ```bash
 git checkout -b <cycle-branch>
@@ -339,11 +343,11 @@ git checkout -b <cycle-branch>
 .hv/bin/hv-worker-pool init --slots <work.workerSlots> --base <cycle-branch>
 ```
 
-`hv-worker-pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots persist across cycles by design; the tmux *windows* are what get recreated per dispatch.
+`hv-worker-pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
 
 `work.isolation` does not apply on this path: each slot has its own worktree and therefore its own `.git/index`, which is the precondition the isolation guard exists to enforce. Don't also evaluate the guard — it would be checking a condition that cannot occur.
 
-Preconditions worth failing fast on: `tmux` on `PATH`, and a `claude` binary (or a `work.workerCommand` that resolves). If either is missing, stop and tell the user to either install it or set `work.dispatch=subagent` — do not silently fall back to the subagent backend, because the user chose this path deliberately and a silent downgrade hides that it didn't happen.
+Preconditions worth failing fast on: `tmux` (or `herdr`) on `PATH`, and a `claude` binary (or a `work.workerCommand` that resolves; under herdr it must launch `claude` itself, since `herdr agent start` runs the binary). If either is missing, stop and tell the user to either install it or set `work.dispatch=subagent` — do not silently fall back to the subagent backend, because the user chose this path deliberately and a silent downgrade hides that it didn't happen.
 
 Everything below this point in Step 5 applies to `work.dispatch == "subagent"` only.
 
@@ -424,22 +428,24 @@ Rules for briefs: exact paths + line numbers; show the pattern to follow; name t
 
 Launch all independent agents in one message (parallel tool calls) — write-only workers don't race on `.git/index`, so this is safe under any isolation mode. Don't announce — just do it.
 
-### Backend branch — `work.dispatch == "tmux"`
+### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
 Same brief, different transport. Write each task's brief to a file and dispatch it to a slot:
 
 ```bash
-.hv/bin/hv-worker-dispatch --slot <wN> --brief-file <path>
+.hv/bin/hv-worker-dispatch --slot <wN> --brief-file <path> --task <ID>
 ```
+
+`--task` records the task in `.hv/workers.json` beside the slot's handle and `state: busy`.
 
 Two differences from the subagent path, and only two:
 
-1. **Prepend the standing worker contract** from [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) *The worker contract*. A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through) must be in the brief text. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
+1. **Prepend the standing worker contract** from [`references/worker-contract.md`](../references/worker-contract.md) *The standing contract* (under herdr, plus the line in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md) *Worker contract additions*). A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through in an `## Approvals` PR section) must be in the brief text. `hv-worker-dispatch` signs the brief `--- ORCHESTRATOR (round N) ---`; pass `--round <N>` on the first dispatch of a round. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
 2. **The brief tells the worker to commit and open a PR** against the cycle branch, replacing the *"Do NOT run `git add` or `git commit`"* line. Keep the `**Suggested commit message:**` line — the worker uses it directly rather than the orchestrator.
 
 The brief **body** — Goal, Files, What to do, Known gotchas, Hard boundaries, Canonical terms, Critical constraints, Claims to verify — is byte-identical to the subagent path. Don't fork the template; a second copy drifts.
 
-Dispatch all slots for a wave in sequence (each call returns once pickup is confirmed), then move to Step 7's poll loop. `hv-worker-dispatch` exits 4 if a brief never submitted — treat that as a failed dispatch and retry that slot once before reassigning the task.
+Dispatch all slots for a wave in sequence (each call returns once pickup is confirmed), then move to Step 7's poll loop. `hv-worker-dispatch` exits 4 if a brief never submitted — treat that as a failed dispatch and retry that slot once before reassigning the task. Under herdr, read the tab first (`herdr agent read hv-<slot>-<handle>`): a stall does not prove the text was lost. Exit 5 (herdr only) means a dialog was already open and nothing was sent; inspect the tab and treat it like `NEEDS-PERMISSION`.
 
 **Edit-tool race in parallel same-file workers.** When parallel workers edit the same file at different ranges, an `Edit` call may report *"File has been modified since read"* after a sibling worker's edit invalidates the cached state. Mitigation: re-`Read` the file, re-run the same `Edit` with byte-identical `old_string` — do NOT regenerate `old_string` from scratch (risks sibling-edited content).
 
@@ -471,15 +477,15 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 
 **Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `.hv/bin/hv-proof-add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv-complete` (Step 9) is the acceptance write and exits 3 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced.
 
-### Backend branch — `work.dispatch == "tmux"`
+### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
-Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md); the routing is:
+Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) (herdr's state mapping in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md)); the routing is:
 
 ```bash
 .hv/bin/hv-worker-poll            # JSON: [{name, state, evidence}, ...]
 ```
 
-Loop until no slot is `BUSY`, routing each state as it appears:
+Loop until no slot is `BUSY`, routing each state as it appears. Each poll also writes the slot's state into `.hv/workers.json`, and the PR URL from `HV-DONE` into `slot.pr`, which is what lets the gate merge through the PR:
 
 - **`BLOCKED`** — the worker asked a question and idled. Surface it with `AskUserQuestion`, **in the worker's own words** (it already phrased it for someone without the file open; don't re-encode it into implementation terms). Relay the answer back:
 
@@ -487,11 +493,11 @@ Loop until no slot is `BUSY`, routing each state as it appears:
   .hv/bin/hv-worker-dispatch --slot <wN> --brief-file <answer-file> --relay
   ```
 
-  **Always pass `--relay` when forwarding a user's answer.** It marks the text as coming from the orchestrator. Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
+  **Always pass `--relay` when forwarding a user's answer.** It signs the text as the orchestrator's and logs it in the slot's `relays[]`, which `hv-worker-gate` checks the PR's `## Approvals` against (exit 4 `PROVENANCE-FAIL`). Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
 
 - **`DEAD`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
 
-- **`NEEDS-PERMISSION`** — the worker stopped at a permission prompt and is waiting on a human. It is **not** idle and it will never self-resolve. Surface it to the user with the slot name and tell them to approve in that pane (`tmux attach -t <session>`, switch to the slot's window). If it recurs across slots, the permission mode is too narrow for what the briefs ask workers to do — the default `acceptEdits` auto-approves file edits but still prompts for `git`, `gh`, and test commands, so a worker briefed to commit and open a PR will stall on its first Bash call. Report that pattern rather than re-dispatching into it; widening it is the user's call via `work.workerCommand`.
+- **`NEEDS-PERMISSION`** — the worker stopped at a permission prompt and is waiting on a human. It is **not** idle and it will never self-resolve. Surface it to the user with the slot name and tell them to approve in that pane (tmux: `tmux attach -t <session>`, switch to the slot's window; herdr: the slot's tab, labelled `<wN>`, which also raised a notification). If it recurs across slots, the permission mode is too narrow for what the briefs ask workers to do — the default `acceptEdits` auto-approves file edits but still prompts for `git`, `gh`, and test commands, so a worker briefed to commit and open a PR will stall on its first Bash call. Report that pattern rather than re-dispatching into it; widening it is the user's call via `work.workerCommand`.
 
 - **`LIMITED`** — the session hit its usage window. Re-dispatching onto the same account just hits the same wall, so move the slot instead:
 
@@ -506,6 +512,8 @@ Loop until no slot is `BUSY`, routing each state as it appears:
   **If the evidence mentions `Add funds`, do not answer the prompt.** That option spends real money and is never the orchestrator's to pick — surface it to the user and wait. Local shell work (gating, merging, verification) does not consume the LLM window, so the orchestrator can keep integrating finished slots while one is limited.
 
   With `work.accounts` unset this state still fires but has nowhere to move the slot to; treat it as a hard stop and tell the user which window is spent.
+
+- **`UNKNOWN`** (herdr only) — herdr sees an agent but cannot classify its screen. It is **not** done. Look at the tab and route on what is actually there; never send it to the gate on this state alone.
 
 - **`DONE`** — the worker opened a PR. Review its diff against the brief using the same rubric as the subagent path above (items 1–6), then gate it:
 
@@ -544,7 +552,7 @@ Rules:
 
 **Skip this step entirely** when the wave used the legacy worker-commits path (Step 6 alternative) — workers already committed.
 
-**Skip this step entirely under `work.dispatch == "tmux"`.** Each slot committed on its own branch and Step 7's gate already merged it into the cycle branch. There is no pending working-tree diff for the orchestrator to stage; running `git add` here would sweep in unrelated state.
+**Skip this step entirely under `work.dispatch` `"tmux"` or `"herdr"`.** Each slot committed on its own branch and Step 7's gate already merged it into the cycle branch. There is no pending working-tree diff for the orchestrator to stage; running `git add` here would sweep in unrelated state.
 
 ## Step 8 — Sequential Waves
 
@@ -715,5 +723,7 @@ Loop stops naturally when:
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
-| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Worker contract, pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"`. |
+| [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
+| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"` (shared by `"herdr"`). |
+| [`herdr-dispatch.md`](../references/herdr-dispatch.md) | herdr host for worker dispatch: tabs as slots, startup dialogs, native agent-state mapping, `work.dispatch: "herdr"`. |
 | [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

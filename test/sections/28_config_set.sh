@@ -109,8 +109,8 @@ for key in work.dispatch work.workerSlots work.workerCommand; do
   grep -q "$key" "$REPO/docs/reference/config-options.md" \
     || fail "F78: config-options.md does not document $key"
 done
-grep -q '("work", "dispatch")' "$REPO/bin/hv-config-schema-check" \
-  || fail "F78: hv-config-schema-check EXPECTED missing work.dispatch"
+grep -q '("work.dispatch", "subagent", True)' "$REPO/bin/hvlib_config.py" \
+  || fail "F78: hvlib_config CONFIG_KEYS missing work.dispatch"
 grep -q 'work.dispatch.*subagent.*tmux\|`work.dispatch` accepts' "$REPO/hv-config/SKILL.md" \
   || fail "F78: hv-config validation rules do not constrain work.dispatch to its enum"
 grep -q 'work.dispatch' "$REPO/docs/usage/configuration.md" \

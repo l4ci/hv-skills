@@ -15,7 +15,7 @@ The "(Recommended)" tag on each option marks the install-time default. `/hv-conf
 
 | Shape | Behavior |
 |-------|----------|
-| `/hv-config` (no args) | Full guided flow: category checklist, then key checklist, then value pickers. |
+| `/hv-config` (no args) | Prints `hv-config-show` output (every key, value and source layer: `local`, `project` or `default`), then the full guided flow: category checklist, then key checklist, then value pickers. |
 | `/hv-config <key>` | Jumps straight to the value picker for that key, skipping the category and key checklists. |
 | `/hv-config <key>=<value>` | Applies the value directly without any interactive prompts, then prints the one-line diff. |
 
@@ -156,7 +156,7 @@ A few keys are written without ever being asked:
 - `qa.gate`: verdict routing for /hv-qa invocations from /hv-ship. Silent default `"advisory"` (surface findings, never block). Alternative `"blocking"` halts the ship on `FAIL`. Set via `hv-config-set qa.gate blocking`. See [`usage/configuration.md`](../usage/configuration.md#qagate).
 - `qa.afterWork`: post-cycle /hv-qa invocation from /hv-work when touched files match a target's `Watch globs`. Silent default `false`. Set via `hv-config-set qa.afterWork true`. See [`usage/configuration.md`](../usage/configuration.md#qaafterwork).
 - `learn.promoteThreshold`: F03 knowledge-lifecycle auto-promotion threshold. Integer ≥ 0; silent default `3`. Set via `hv-config-set learn.promoteThreshold <N>` when a project wants stricter or looser confidence gating. See [`usage/configuration.md`](../usage/configuration.md#learnpromotethreshold).
-- `work.dispatch`: which backend `/hv-work` dispatches workers on. Enum `subagent` (silent default) or `tmux`. Opt-in per Rule 9 — `tmux` needs a `tmux` binary and a working `claude` on `PATH`, so it never auto-enables. Set via `hv-config-set work.dispatch tmux`. See [`usage/configuration.md`](../usage/configuration.md#workdispatch).
+- `work.dispatch`: which backend `/hv-work` dispatches workers on. Enum `subagent` (silent default), `tmux` or `herdr`. Opt-in per Rule 9 — `tmux` needs a `tmux` binary and a working `claude` on `PATH`, and `herdr` needs `/hv-work` to run inside a herdr pane, so neither auto-enables. Set via `hv-config-set work.dispatch tmux`. See [`usage/configuration.md`](../usage/configuration.md#workdispatch).
 - `work.workerSlots`: size of the tmux worker pool. Integer ≥ 1; silent default `3`. Ignored under `work.dispatch: subagent`. Set via `hv-config-set work.workerSlots <N>`.
 - `work.accounts`: array of `{name, configDir}` mapping tmux worker slots to independent `CLAUDE_CONFIG_DIR`s, so each slot authenticates as its own account. Silent default `[]` (every slot inherits the ambient config dir). Only meaningful under `work.dispatch: tmux`. Set via `hv-config-set work.accounts '[...]'`.
 - `work.operatorCommand`: command used to relaunch the orchestrator inside tmux when `/hv-work` runs `work.dispatch: tmux` from a non-tmux terminal. Silent default `""`, which builds `claude --continue --model <models.orchestrator> --permission-mode auto` — `--continue` resumes the current conversation so the cycle keeps its context, and the operator keeps a permission gate the workers do not. Set it when your orchestrator needs a wrapper.

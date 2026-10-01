@@ -22,6 +22,7 @@ import hvlib
 NAMES = [
     "ALL_BACKLOG_SECTIONS",
     "BACKLOG_FILE",
+    "CONFIG_KEYS",
     "COUNTABLE_TYPES",
     "VERSION_KIND_REGISTRY",
     "active_items",

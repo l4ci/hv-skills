@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Classify tmux worker slots and emit JSON the /hv-work orchestrator routes on.
+# Classify worker slots and emit JSON the /hv-work orchestrator routes on. The
+# host (tmux window or herdr tab) comes from work.dispatch via hv-host-select.sh.
 #
 # States: BUSY | IDLE | BLOCKED | DONE | DEAD | LIMITED | NEEDS-PERMISSION
+#         | UNKNOWN (herdr only)
 #
 # Liveness is decided by MOVEMENT, not by pattern-matching a spinner: the pane
 # is captured twice, --settle seconds apart, and a pane that changed is BUSY.
@@ -28,24 +30,43 @@
 # A watcher that treats bare `Overloaded` as activity waits forever on a
 # session that already died.
 #
-# Tool: exit 0 with JSON on stdout; exit 2 on usage error; exit 3 on tmux failure.
+# HERDR adds a native agent state, read before the pane text:
+#   working          -> BUSY
+#   blocked          -> NEEDS-PERMISSION (a dialog is up), unless the pane
+#                       carries an HV-BLOCKED sentinel -> BLOCKED
+#   idle / done      -> the text rules below; no sentinel -> IDLE
+#   unknown          -> the text rules below; no sentinel -> UNKNOWN, which is
+#                       surfaced and never treated as finished
+#   gone (no agent)  -> DEAD: the session exited back to a shell
+# Sentinels, `Retrying in` and LIMITED still outrank the native state, the
+# same as they outrank movement.
+#
+# Live polls write each slot's state into .hv/workers.json, and the PR URL
+# from `HV-DONE <slot> <pr-url>` into slot.pr, so hv-worker-gate merges
+# through the PR instead of falling back to a local merge. A slot that newly
+# turns BLOCKED or NEEDS-PERMISSION raises a host notification (herdr only).
+#
+# Tool: exit 0 with JSON on stdout; exit 2 on usage error; exit 3 on host failure.
 #
 # Usage:
 #   hv-worker-poll [--slot <name>] [--settle <seconds>] [--lines <n>]
-#   hv-worker-poll --fixture <file> [--slot <name>]
+#   hv-worker-poll --fixture <file> [--slot <name>] [--status <herdr-state>]
 #
 #   --fixture  Classify the given file's contents as a static pane instead of
-#              talking to tmux. Exists so the classifier is testable without a
-#              live session; smoke feeds it captured pane text.
+#              talking to the host. Exists so the classifier is testable
+#              without a live session; smoke feeds it captured pane text.
+#   --status   With --fixture: the native herdr agent state to classify with
+#              (idle, working, blocked, done, unknown, gone). Writes nothing.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 
-USAGE="usage: hv-worker-poll [--slot <name>] [--settle <seconds>] [--lines <n>] | --fixture <file> [--slot <name>]"
+USAGE="usage: hv-worker-poll [--slot <name>] [--settle <seconds>] [--lines <n>] | --fixture <file> [--slot <name>] [--status <state>]"
 
 SLOT=""
 SETTLE=3
 LINES=60
 FIXTURE=""
+STATUS=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -53,19 +74,23 @@ while [ $# -gt 0 ]; do
     --settle)  SETTLE="${2:?$USAGE}"; shift 2 ;;
     --lines)   LINES="${2:?$USAGE}"; shift 2 ;;
     --fixture) FIXTURE="${2:?$USAGE}"; shift 2 ;;
+    --status)  STATUS="${2:?$USAGE}"; shift 2 ;;
     --)        shift; break ;;
     -*)        echo "error: unknown flag $1" >&2; exit 2 ;;
     *)         echo "error: unexpected positional $1" >&2; exit 2 ;;
   esac
 done
 
-# classify <slot> <moved:0|1> <pane-text-file> -> prints "STATE<TAB>evidence"
+# classify <slot> <moved:0|1> <pane-text-file> [native-state]
+#   -> prints "STATE<TAB>evidence". native-state is herdr's agent_status (or
+#   `gone`); empty under tmux, which has no native state.
 classify() {
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" "$3" "$LINES" <<'PY'
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" "$3" "$LINES" "${4:-}" <<'PY'
 import re
 import sys
 
 slot, moved, path, lines = sys.argv[1], sys.argv[2] == "1", sys.argv[3], int(sys.argv[4])
+native = sys.argv[5]
 text = open(path, encoding="utf-8", errors="replace").read()
 tail = "\n".join(text.splitlines()[-lines:])
 
@@ -112,8 +137,15 @@ for pat in LIMIT_PATTERNS:
             emit("LIMITED", "usage limit reached; pane offers 'Add funds' — needs a human, do NOT answer")
         emit("LIMITED", m.group(0).strip()[:120])
 
+if native == "working":
+    emit("BUSY", "herdr: agent working")
 if moved:
     emit("BUSY", "pane changed between captures")
+if native == "blocked":
+    emit("NEEDS-PERMISSION",
+         "herdr: agent blocked on a dialog — answer it in the slot's tab, or widen work.workerCommand")
+if native == "gone":
+    emit("DEAD", "herdr: no agent in the slot's tab — the session exited")
 
 # Static pane from here down.
 m = re.search(r"(API Error[^\n]*)", tail)
@@ -138,6 +170,8 @@ for pat in PERMISSION_PATTERNS:
         emit("NEEDS-PERMISSION",
              "stopped at a permission prompt — approve in the pane, or widen work.workerCommand")
 
+if native == "unknown":
+    emit("UNKNOWN", "herdr cannot classify the agent — inspect the tab; not proof it finished")
 emit("IDLE", "static pane, no sentinel")
 PY
 }
@@ -147,7 +181,7 @@ trap 'rm -rf "$TMPDIR_POLL"' EXIT
 
 if [ -n "$FIXTURE" ]; then
   [ -f "$FIXTURE" ] || { echo "error: fixture not found: $FIXTURE" >&2; exit 2; }
-  RESULT="$(classify "${SLOT:-fixture}" 0 "$FIXTURE")"
+  RESULT="$(classify "${SLOT:-fixture}" 0 "$FIXTURE" "$STATUS")"
   STATE="${RESULT%%	*}"
   EVIDENCE="${RESULT#*	}"
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "${SLOT:-fixture}" "$STATE" "$EVIDENCE" <<'PY'
@@ -157,11 +191,15 @@ PY
   exit 0
 fi
 
-command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+. "$HERE/hv-host-select.sh"
+hv_host_select
+hv_host_require || exit 3
 
 REGISTRY=".hv/workers.json"
 [ -f "$REGISTRY" ] || { echo '[]'; exit 0; }
 
+# `window` is the pre-handle field name; read it so an unmigrated registry
+# still polls. "-" stands in for an empty handle (see hv-worker-dispatch).
 SLOTS="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
 import sys
 from pathlib import Path
@@ -171,7 +209,8 @@ want = sys.argv[2]
 for s in data.get("slots", []):
     if want and s.get("name") != want:
         continue
-    print("\t".join([s.get("name") or "", s.get("window") or ""]))
+    print("\t".join([s.get("name") or "", s.get("handle") or s.get("window") or "-",
+                     s.get("state") or "-"]))
 PY
 )"
 
@@ -179,9 +218,10 @@ PY
 
 # First capture for every slot, then settle once, then the second capture —
 # so N slots cost one settle interval, not N.
-while IFS="$(printf '\t')" read -r NAME WINDOW; do
+while IFS="$(printf '\t')" read -r NAME HANDLE PREV; do
   [ -n "$NAME" ] || continue
-  tmux capture-pane -pJ -t "$WINDOW" >"$TMPDIR_POLL/$NAME.a" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.a"
+  [ "$HANDLE" = "-" ] && HANDLE=""
+  hv_host_capture "$NAME" "$HANDLE" "$LINES" >"$TMPDIR_POLL/$NAME.a" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.a"
 done <<EOF
 $SLOTS
 EOF
@@ -190,18 +230,31 @@ sleep "$SETTLE"
 
 RESULTS="$TMPDIR_POLL/results.tsv"
 : >"$RESULTS"
-while IFS="$(printf '\t')" read -r NAME WINDOW; do
+while IFS="$(printf '\t')" read -r NAME HANDLE PREV; do
   [ -n "$NAME" ] || continue
-  tmux capture-pane -pJ -t "$WINDOW" >"$TMPDIR_POLL/$NAME.b" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.b"
+  [ "$HANDLE" = "-" ] && HANDLE=""
+  hv_host_capture "$NAME" "$HANDLE" "$LINES" >"$TMPDIR_POLL/$NAME.b" 2>/dev/null || : >"$TMPDIR_POLL/$NAME.b"
+  NATIVE="$(hv_host_status "$NAME" "$HANDLE")"
   MOVED=0
   cmp -s "$TMPDIR_POLL/$NAME.a" "$TMPDIR_POLL/$NAME.b" || MOVED=1
-  printf '%s\t%s\n' "$NAME" "$(classify "$NAME" "$MOVED" "$TMPDIR_POLL/$NAME.b")" >>"$RESULTS"
+  ROW="$(classify "$NAME" "$MOVED" "$TMPDIR_POLL/$NAME.b" "$NATIVE")"
+  printf '%s\t%s\n' "$NAME" "$ROW" >>"$RESULTS"
+  # Notify on the transition only: a poll loop re-reading a stuck slot must
+  # not ring every few seconds.
+  STATE="${ROW%%	*}"
+  NEW="$(printf '%s' "$STATE" | tr '[:upper:]' '[:lower:]')"
+  case "$STATE" in
+    BLOCKED|NEEDS-PERMISSION)
+      [ "$PREV" = "$NEW" ] || hv_host_notify "hv worker $NAME: $STATE" "${ROW#*	}" ;;
+  esac
 done <<EOF
 $SLOTS
 EOF
 
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RESULTS" <<'PY'
-import json, sys
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RESULTS" "$REGISTRY" <<'PY'
+import json, re, sys
+from pathlib import Path
+from hvlib import update_json
 out = []
 for line in open(sys.argv[1], encoding="utf-8"):
     line = line.rstrip("\n")
@@ -212,5 +265,22 @@ for line in open(sys.argv[1], encoding="utf-8"):
     state = parts[1] if len(parts) > 1 else "IDLE"
     evidence = parts[2] if len(parts) > 2 else ""
     out.append({"name": name, "state": state, "evidence": evidence})
+
+# Only a URL-shaped HV-DONE argument becomes slot.pr. The contract allows a
+# bare branch name there, and handing a branch to `gh pr merge` fails where
+# the gate's local merge would have worked.
+PR_URL = re.compile(r"^https?://\S+/(?:pull|merge_requests)/\d+\S*$")
+
+def mutator(data):
+    by_name = {r["name"]: r for r in out}
+    for s in data.get("slots", []):
+        r = by_name.get(s.get("name"))
+        if r is None:
+            continue
+        s["state"] = r["state"].lower()
+        if r["state"] == "DONE" and PR_URL.match(r["evidence"]):
+            s["pr"] = r["evidence"]
+
+update_json(Path(sys.argv[2]), {"slots": []}, mutator)
 print(json.dumps(out, indent=2))
 PY
