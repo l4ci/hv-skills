@@ -54,7 +54,7 @@ if grep -q "hv-knowledge" "$TMP_II/fresh/CLAUDE.md"; then fail "F84[d]: block le
 pass "F84[d]: fresh dir -> both files created, blocks land in AGENTS.md"
 
 # (e) CLAUDE.md with user text + managed blocks (dashed and legacy): blocks move, text stays
-mkdir -p "$TMP_II/mig"
+mkdir -p "$TMP_II/mig/.hv"
 cat > "$TMP_II/mig/CLAUDE.md" <<'MD'
 # My project
 
@@ -93,7 +93,7 @@ cmp -s "$TMP_II/mig/AGENTS.md" "$TMP_II/mig.agents" || fail "F84[f]: AGENTS.md c
 pass "F84[f]: second run is a silent no-op"
 
 # (g) AGENTS.md exists, CLAUDE.md lacks reference: reference added only
-mkdir -p "$TMP_II/ex"
+mkdir -p "$TMP_II/ex/.hv"
 printf '# Agents\n\n<!-- hv-skills-start -->\nkeep\n<!-- hv-skills-end -->\n' > "$TMP_II/ex/AGENTS.md"
 printf '# Notes\n\n<!-- hv-qa-start -->\nstay\n<!-- hv-qa-end -->\n' > "$TMP_II/ex/CLAUDE.md"
 cp "$TMP_II/ex/AGENTS.md" "$TMP_II/ex.agents"
@@ -105,7 +105,7 @@ grep -q "stay" "$TMP_II/ex/CLAUDE.md" || fail "F84[g]: CLAUDE.md content must be
 pass "F84[g]: existing AGENTS.md -> only the CLAUDE.md reference is added"
 
 # (h) symlinked pair: untouched
-mkdir -p "$TMP_II/sym"
+mkdir -p "$TMP_II/sym/.hv"
 printf '# Agents\n' > "$TMP_II/sym/AGENTS.md"
 ln -s AGENTS.md "$TMP_II/sym/CLAUDE.md"
 OUT="$(init_ii "$TMP_II/sym")"
