@@ -94,6 +94,19 @@ class _Adapter:
 
     _milestones = _pages
 
+    def issues_in_milestone(self, title, state="all"):
+        """Normalized issues assigned to the native milestone `title`."""
+        return self.list(state=state, milestone=title)
+
+    @staticmethod
+    def _norm_milestone(d, number_key):
+        return {
+            "number": d[number_key],
+            "title": d.get("title") or "",
+            "description": d.get("description") or "",
+            "state": "closed" if str(d.get("state", "")).lower() == "closed" else "open",
+        }
+
     def _created_id(self, args):
         """Id of the object a POST `api` call created."""
         d = self._json(args)
@@ -159,6 +172,28 @@ class GitHubAdapter(_Adapter):
         """Native milestone title whose leading token is `hv_id` (open or closed), else None."""
         return self._match_milestone(
             self._milestones("repos/{owner}/{repo}/milestones?state=all&per_page=100"), hv_id)
+
+    def milestones(self, state="all"):
+        """Native milestones: [{"number", "title", "description", "state" ("open"|"closed")}]."""
+        return [self._norm_milestone(d, "number") for d in self._milestones(
+            f"repos/{{owner}}/{{repo}}/milestones?state={state}&per_page=100")]
+
+    def create_milestone(self, title, description=""):
+        """Create a native milestone and return its number."""
+        d = self._json(["api", "-X", "POST", "repos/{owner}/{repo}/milestones",
+                        "-f", f"title={title}", "-f", f"description={description}"])
+        try:
+            return int(d["number"])
+        except (KeyError, TypeError, ValueError):
+            raise TrackerError(1, f"cannot parse milestone number from: {str(d)[:200]!r}")
+
+    def edit_milestone(self, number, title=None, description=None, state=None):
+        """Rename, re-describe or open/close ("open"|"closed") a native milestone."""
+        args = ["api", "-X", "PATCH", f"repos/{{owner}}/{{repo}}/milestones/{number}"]
+        for k, v in (("title", title), ("description", description), ("state", state)):
+            if v is not None:
+                args += ["-f", f"{k}={v}"]
+        self._run(args)
 
     @staticmethod
     def _norm(d):
@@ -294,6 +329,32 @@ class GitLabAdapter(_Adapter):
         """Native milestone title whose leading token is `hv_id` (open or closed), else None."""
         return self._match_milestone(self._milestones("projects/:id/milestones?per_page=100"), hv_id)
 
+    def milestones(self, state="all"):
+        """Native milestones: [{"number", "title", "description", "state" ("open"|"closed")}].
+        `number` is the milestone's API id (what PUT .../milestones/<id> takes)."""
+        want = {"open": "&state=active", "closed": "&state=closed"}.get(state, "")
+        return [self._norm_milestone(d, "id") for d in self._milestones(
+            f"projects/:id/milestones?per_page=100{want}")]
+
+    def create_milestone(self, title, description=""):
+        """Create a native milestone and return its id."""
+        d = self._json(["api", "-X", "POST", "projects/:id/milestones",
+                        "-f", f"title={title}", "-f", f"description={description}"])
+        try:
+            return int(d["id"])
+        except (KeyError, TypeError, ValueError):
+            raise TrackerError(1, f"cannot parse milestone id from: {str(d)[:200]!r}")
+
+    def edit_milestone(self, number, title=None, description=None, state=None):
+        """Rename, re-describe or open/close ("open"|"closed") a native milestone."""
+        args = ["api", "-X", "PUT", f"projects/:id/milestones/{number}"]
+        for k, v in (("title", title), ("description", description)):
+            if v is not None:
+                args += ["-f", f"{k}={v}"]
+        if state is not None:
+            args += ["-f", "state_event=" + ("close" if state == "closed" else "activate")]
+        self._run(args)
+
     def _norm(self, d):
         ms = d.get("milestone")
         closed = d.get("state") == "closed"
@@ -385,6 +446,7 @@ class GitLabAdapter(_Adapter):
 
     def reopen(self, number):
         self._run(["issue", "reopen", str(number)])
+        self.remove_labels(number, [self.not_planned_label])
 
     def assign_self(self, number):
         """glab 1.120 documents --assignee as usernames (no @me), so resolve ours once;
