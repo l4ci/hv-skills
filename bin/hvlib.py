@@ -19,6 +19,7 @@ from hvlib_io import (
 )
 from hvlib_backend import get_backend, FileBackend, BackendUnavailable, ProofMissing, require_file_backend
 from hvlib_config import CONFIG_KEYS, config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
+from hvlib_tracker import adapter_for, TrackerError, GitHubAdapter, GitLabAdapter
 from hvlib_types import (
     ITEM_TYPES, OPEN_SECTIONS, ALL_BACKLOG_SECTIONS,
     COUNTABLE_TYPES, PLANNABLE_TYPES,
