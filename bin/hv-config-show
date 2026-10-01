@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Show each hv-config key's effective value and the layer it came from.
+# Lookup helper: one line per key, `key = value  (source: local|project|default)`. Exit 0; exit 1 on an unknown key.
+# Usage: hv-config-show [<dotted.key>]
+#   no key: every known key, in hvlib_config.CONFIG_KEYS order.
+#   source: local   = key set in .hv/config.local.json (wins),
+#           project = key set in .hv/config.json,
+#           default = neither file sets it; the hvlib_config default applies.
+#   Values print as compact JSON. A key counts as set when present and not null.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
+import json
+import sys
+
+from hvlib import CONFIG_KEYS, load_json
+
+if len(sys.argv) > 2:
+    print("usage: hv-config-show [<dotted.key>]", file=sys.stderr)
+    sys.exit(1)
+
+def lookup(cfg, key):
+    cur = cfg
+    for seg in key.split("."):
+        if not isinstance(cur, dict) or cur.get(seg) is None:
+            return None
+        cur = cur[seg]
+    return cur
+
+project = load_json(".hv/config.json", {})
+local = load_json(".hv/config.local.json", {})
+rows = CONFIG_KEYS
+if len(sys.argv) == 2:
+    rows = [r for r in CONFIG_KEYS if r[0] == sys.argv[1]]
+    if not rows:
+        print(f"error: hv-config-show: unknown key '{sys.argv[1]}'", file=sys.stderr)
+        sys.exit(1)
+
+for key, default, _ in rows:
+    for source, cfg in (("local", local), ("project", project)):
+        value = lookup(cfg, key)
+        if value is not None:
+            break
+    else:
+        source, value = "default", default
+    print(f"{key} = {json.dumps(value)}  (source: {source})")
+PY

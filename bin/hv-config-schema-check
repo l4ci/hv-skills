@@ -3,6 +3,8 @@
 # Lookup helper: prints FRESH | UP_TO_DATE | STALE:<csv-of-keys> | CORRUPT to stdout. Exit 0.
 # Usage: hv-config-schema-check
 #
+# The expected key list is the `required` rows of hvlib_config.CONFIG_KEYS.
+#
 # Output contract (consumed by /hv-init Step 3):
 #   FRESH                 — .hv/config.json missing; ask all Q1-Q5
 #   UP_TO_DATE            — every expected key present; skip prompts
@@ -14,37 +16,9 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json
 from pathlib import Path
 
-EXPECTED = [
-    ("models", "orchestrator"),
-    ("models", "worker"),
-    ("work", "isolation"),
-    ("work", "mergeStrategy"),
-    ("work", "dispatch"),
-    ("work", "workerSlots"),
-    ("work", "workerCommand"),
-    ("work", "accounts"),
-    ("work", "operatorCommand"),
-    ("refactor", "confirmBeforeExecute"),
-    ("refactor", "verifyCommands"),
-    ("learn", "verify"),
-    ("learn", "promoteThreshold"),
-    ("ship", "review"),
-    ("ship", "secondOpinion"),
-    ("ship", "secondOpinionRunner"),
-    ("ship", "qa"),
-    ("qa", "gate"),
-    ("qa", "afterWork"),
-    ("autonomy", "level"),
-    ("debug", "competingHypotheses"),
-    ("docs", "path"),
-    ("docs", "autoCreate"),
-    ("docs", "afterWork"),
-    ("git", "baseBranch"),
-    ("umbrella", "enabled"),
-    ("issues", "providers", "github"),
-    ("issues", "providers", "gitlab"),
-    ("hvSkills", "version"),
-]
+from hvlib import CONFIG_KEYS
+
+EXPECTED = [tuple(k.split(".")) for k, _, required in CONFIG_KEYS if required]
 p = Path(".hv/config.json")
 if not p.exists():
     print("FRESH"); raise SystemExit
