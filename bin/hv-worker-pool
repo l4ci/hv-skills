@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# Manage the /hv-work tmux worker slot pool: worktrees, branches, and the
+# Manage the /hv-work worker slot pool: worktrees, branches, and the
 # .hv/workers.json registry.
 #
-# One slot == one git worktree == one branch == one tmux window. A slot
-# OUTLIVES a single cycle: worktrees persist so setup isn't re-paid every
-# wave, while tmux windows are destroyed and recreated per dispatch
-# (hv-worker-dispatch does that) because /clear does not reliably reset a
-# Claude Code session — a fresh window is the only trustworthy reset.
+# One slot == one git worktree == one branch == one host session (a tmux
+# window or a herdr tab, per work.dispatch). A slot OUTLIVES a single cycle:
+# worktrees persist so setup isn't re-paid every wave, while sessions are
+# destroyed and recreated per dispatch (hv-worker-dispatch does that) because
+# /clear does not reliably reset a Claude Code session — a fresh session is
+# the only trustworthy reset.
+#
+# slot.handle names the session in a backend-neutral way: `<session>:<slot>`
+# for tmux (stable, set here), a herdr tab id like `w1:t7` (minted per
+# dispatch, so null until hv-worker-dispatch writes it). init migrates the
+# pre-herdr field name `window` to `handle`. slot.state, slot.task and slot.pr
+# are written by hv-worker-dispatch and hv-worker-poll.
 #
 # Writer helper: exit 0 on successful write OR idempotent no-op;
 #                exit 2 on usage error; exit 3 on git failure.
@@ -65,7 +72,7 @@ import sys
 from pathlib import Path
 from hvlib import update_json
 
-path, name, branch, worktree, base, session, window = sys.argv[1:8]
+path, name, branch, worktree, base, session, handle = sys.argv[1:8]
 
 def mutator(data):
     data.setdefault("session", session)
@@ -78,7 +85,7 @@ def mutator(data):
             "branch": branch,
             "worktree": worktree,
             "base": base,
-            "window": window,
+            "handle": handle or None,
             # Slots are seeded as already-reported idle so a parked slot never
             # fires a spurious "it finished" on the first poll. Only a slot that
             # has gone BUSY re-arms that report.
@@ -90,7 +97,11 @@ def mutator(data):
             "configDir": None,
         })
     else:
-        existing.update({"branch": branch, "worktree": worktree, "base": base, "window": window})
+        # Migrate the pre-herdr field name. An empty handle (herdr) never
+        # clobbers a live tab id that hv-worker-dispatch recorded.
+        legacy = existing.pop("window", None)
+        existing.update({"branch": branch, "worktree": worktree, "base": base})
+        existing["handle"] = handle or existing.get("handle") or legacy
     data["slots"].sort(key=lambda s: s.get("name", ""))
 
 update_json(Path(path), {"session": session, "slots": []}, mutator)
@@ -116,6 +127,10 @@ case "$CMD" in
     [ -n "$SESSION" ] || SESSION="hv"
     mkdir -p "$WT_ROOT"
 
+    # tmux handles are known now; herdr tab ids exist only after a dispatch.
+    DISPATCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
+      'from hvlib import load_config; print((load_config().get("work", {}) or {}).get("dispatch") or "")')"
+
     i=1
     while [ "$i" -le "$SLOTS" ]; do
       NAME="w$i"
@@ -139,7 +154,9 @@ case "$CMD" in
       fi
 
       ABS="$(cd "$REL" && pwd -P)"
-      register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$SESSION:$NAME"
+      HANDLE="$SESSION:$NAME"
+      [ "$DISPATCH" != herdr ] || HANDLE=""
+      register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$HANDLE"
       i=$((i + 1))
     done
 

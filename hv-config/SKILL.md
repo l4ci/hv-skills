@@ -79,7 +79,7 @@ Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `
 
 **Validate `<value>`** when present, against the allowed values for that key from `docs/reference/config-options.md`:
 
-- Enum keys (`work.isolation`, `work.mergeStrategy`, `work.dispatch`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options. `work.dispatch` accepts `subagent` or `tmux`.
+- Enum keys (`work.isolation`, `work.mergeStrategy`, `work.dispatch`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options. `work.dispatch` accepts `subagent`, `tmux` or `herdr`.
 - Boolean keys (`ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
 - JSON-array keys (`refactor.verifyCommands`, `work.accounts`) — value must parse as a JSON array; `work.accounts` entries need a `name` and a `configDir`. Not offered in the guided flow; set via `hv-config-set work.accounts '[{"name":"personal","configDir":"~/.claude"}]'`.
 - Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`, `work.workerCommand`, `work.operatorCommand`) — accept any value including the empty string.

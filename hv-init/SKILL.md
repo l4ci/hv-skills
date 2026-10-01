@@ -280,8 +280,9 @@ Loop over the keys from the STALE list — call the shared helper once per key, 
 # work.dispatch — silent default. Opt-in feature flag (Rule 9) selecting the
 # /hv-work worker backend. "subagent" (default) dispatches in-process Agent
 # workers; "tmux" runs each worker as its own Claude Code session in its own
-# worktree, owning a branch and a PR. tmux mode needs a tmux binary and a
-# working `claude` on PATH, so it never auto-enables.
+# worktree, owning a branch and a PR; "herdr" runs the same workers as herdr
+# tabs. tmux mode needs a tmux binary and a working `claude` on PATH, herdr
+# mode a herdr pane to run /hv-work from, so neither auto-enables.
 .hv/bin/hv-config-set work.dispatch subagent
 
 # work.workerSlots — silent default. Size of the tmux worker pool. Ignored

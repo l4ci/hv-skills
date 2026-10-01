@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Guarantee the tmux backend has a session a human can actually attach to.
+# Guarantee the worker host has a session a human can actually attach to. The
+# host comes from work.dispatch via hv-host-select.sh: a tmux session, or the
+# herdr workspace this process runs in.
 #
 # THE PROBLEM THIS SOLVES. `work.dispatch: tmux` is worth its cost for exactly
 # one reason: a worker that needs a decision can idle and a human can answer it
@@ -19,9 +21,17 @@
 # caller MUST stop after a successful `ensure`: two orchestrators driving one
 # pool would dispatch the same task twice and race on the same slots.
 #
-# Tool: exit 0 inside tmux (check) or on a completed handoff (ensure);
-#       exit 1 from `check` when outside tmux (a verdict, not a failure);
-#       exit 2 on usage error; exit 3 on tmux failure.
+# HERDR. Inside a herdr pane there is nothing to hand off: worker tabs open in
+# the caller's own workspace, which a human is already looking at. Outside
+# one, `ensure` refuses rather than handing off. There is no workspace to open
+# an operator tab in, and herdr's own guide forbids driving its server from
+# outside a managed pane, because commands then land wherever a human happens
+# to be focused. The user starts /hv-work from a herdr pane instead.
+#
+# Tool: exit 0 inside the host (check) or on a completed handoff (ensure);
+#       exit 1 from `check` when outside it (a verdict, not a failure);
+#       exit 2 on usage error; exit 3 on host failure, or `ensure` outside
+#       herdr under work.dispatch=herdr.
 #
 # Usage:
 #   hv-worker-session check [--session <name>]
@@ -29,7 +39,7 @@
 #                            [--boot-timeout <s>]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$HERE/hv-tmux-send.sh"
+. "$HERE/hv-host-select.sh"
 
 USAGE="usage: hv-worker-session check [--session <name>] | ensure [--session <name>] [--instruction-file <path>] [--boot-timeout <s>]"
 
@@ -53,16 +63,16 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$SESSION" ] || SESSION="hv"
+hv_host_select
 
 case "$CMD" in
   check)
-    # $TMUX is set for any process started inside a tmux pane. It is the only
-    # reliable signal — `tmux has-session` answers whether a session EXISTS,
-    # which is a different question from whether WE are in it, and conflating
-    # them is what produces detached panes nobody reads.
-    if [ -n "${TMUX:-}" ]; then
-      CUR="$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "?")"
-      echo "inside $CUR"
+    # Each host keys on an env var its panes inherit ($TMUX, HERDR_ENV). Under
+    # tmux it is the only reliable signal — `tmux has-session` answers whether
+    # a session EXISTS, which is a different question from whether WE are in
+    # it, and conflating them is what produces detached panes nobody reads.
+    if hv_host_in_session; then
+      echo "inside $(hv_host_where)"
       exit 0
     fi
     echo "outside"
@@ -70,12 +80,21 @@ case "$CMD" in
     ;;
 
   ensure)
-    command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+    hv_host_require || exit 3
 
-    if [ -n "${TMUX:-}" ]; then
-      CUR="$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "?")"
-      echo "inside $CUR — no handoff needed"
+    if hv_host_in_session; then
+      echo "inside $(hv_host_where) — no handoff needed"
       exit 0
+    fi
+
+    if [ "$HV_HOST" = herdr ]; then
+      cat >&2 <<EOF
+error: work.dispatch=herdr needs /hv-work to run inside a herdr pane.
+
+  Open herdr, start Claude Code in a pane at $(pwd -P), and run /hv-work there.
+  Worker tabs then open in that workspace, beside the orchestrator.
+EOF
+      exit 3
     fi
 
     OPERATOR="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'

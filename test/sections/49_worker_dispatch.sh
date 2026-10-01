@@ -54,12 +54,12 @@ SHAPE=$( cd "$TMP_WD" && python3 -c '
 import json
 d = json.load(open(".hv/workers.json"))
 s = d["slots"][0]
-need = {"name","branch","worktree","base","window","state","task","pr","configDir"}
+need = {"name","branch","worktree","base","handle","state","task","pr","configDir"}
 missing = need - set(s)
-print("MISSING:" + ",".join(sorted(missing)) if missing else "OK:" + s["state"])
+print("MISSING:" + ",".join(sorted(missing)) if missing else "OK:" + s["state"] + ":" + s["handle"])
 ' )
-[ "$SHAPE" = "OK:idle" ] || fail "workers.json slot shape wrong: $SHAPE"
-pass "workers.json carries the full slot shape, seeded idle"
+[ "$SHAPE" = "OK:idle:hv:w1" ] || fail "workers.json slot shape wrong: $SHAPE"
+pass "workers.json carries the full slot shape, seeded idle, tmux handle <session>:<slot>"
 
 BEFORE=$( cat "$TMP_WD/.hv/workers.json" )
 ( cd "$TMP_WD" && "$BIN/hv-worker-pool" init --slots 2 --base main ) >/dev/null 2>&1 \
@@ -129,7 +129,7 @@ EVID=$( ( cd "$TMP_WD" && "$BIN/hv-worker-poll" --fixture "$FX/blocked_long.txt"
 # Every pane capture in the tree must join wrapped lines. hv-worker-dispatch's
 # captures live in the shared library, so assert against whichever files
 # actually call capture-pane rather than a fixed list that rots on refactor.
-CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-tmux-send.sh 2>/dev/null || true )
+CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-host-tmux.sh 2>/dev/null || true )
 [ -n "$CAPTURERS" ] || fail "no helper calls capture-pane — the pane classifier has gone missing"
 for H in $CAPTURERS; do
   if grep -q 'capture-pane -p ' "$H"; then
@@ -172,22 +172,27 @@ RC=0
 [ "$RC" = "2" ] || fail "hv-worker-session unknown verb should exit 2, got $RC"
 pass "hv-worker-session detects tmux membership via \$TMUX, not session existence"
 
-# The paste path is shared by hv-worker-dispatch and hv-worker-session. It
-# carries three separate traps (bracketed-paste eating Enter, collapsed paste
-# chips, unconfirmed pickup); two copies would drift.
-[ -f "$BIN/hv-tmux-send.sh" ] || fail "bin/hv-tmux-send.sh (shared paste library) is missing"
-for H in hv-worker-dispatch hv-worker-session; do
-  grep -q 'hv-tmux-send.sh' "$BIN/$H" \
-    || fail "$H does not source the shared hv-tmux-send.sh paste library"
+# The paste path is shared by hv-worker-dispatch and hv-worker-session through
+# the host libs. It carries three separate traps (bracketed-paste eating Enter,
+# collapsed paste chips, unconfirmed pickup); two copies would drift.
+[ -f "$BIN/hv-host-tmux.sh" ] || fail "bin/hv-host-tmux.sh (tmux host library) is missing"
+if [ -e "$BIN/hv-tmux-send.sh" ]; then
+  fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
+fi
+for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
+  grep -q 'hv-host-select.sh' "$BIN/$H" \
+    || fail "$H does not pick its host through hv-host-select.sh"
 done
 # Strip comments before grepping: the callers legitimately MENTION the paste
 # path in prose, and matching that reports a defect where none exists.
-if sed 's/#.*//' "$BIN/hv-worker-dispatch" | grep -q 'paste-buffer'; then
-  fail "hv-worker-dispatch still pastes inline; it must go through hv-tmux-send.sh"
-fi
-sed 's/#.*//' "$BIN/hv-tmux-send.sh" | grep -q 'paste-buffer' \
-  || fail "hv-tmux-send.sh does not actually paste — the shared library is hollow"
-pass "hv-worker-dispatch and hv-worker-session share one paste-and-confirm path"
+for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
+  if sed 's/#.*//' "$BIN/$H" | grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)'; then
+    fail "$H talks to a host directly; it must go through the hv_host_* primitives"
+  fi
+done
+sed 's/#.*//' "$BIN/hv-host-tmux.sh" | grep -q 'paste-buffer' \
+  || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
+pass "worker helpers share one paste-and-confirm path through the host libs"
 
 # Workers and the operator run at deliberately different trust levels. Both
 # defaults are pinned because a silent drift either way is bad: narrowing the

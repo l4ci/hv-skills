@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
-# Send a brief into a tmux worker slot's Claude Code session.
+# Send a brief into a worker slot's Claude Code session, on the host that
+# work.dispatch selects (tmux window or herdr tab; see hv-host-select.sh).
 #
-# Recreates the slot's window first: /clear does not reliably reset a Claude
-# Code session (it can land as a literal chat message), so a fresh window is
-# the only trustworthy reset. The new session starts at 0 context.
+# A task brief recreates the slot's session first: /clear does not reliably
+# reset a Claude Code session (it can land as a literal chat message), so a
+# fresh window or tab is the only trustworthy reset. The new session starts
+# at 0 context. A --relay goes into the RUNNING session instead: it answers a
+# question the worker asked, and a fresh session would have no idea what the
+# answer is to.
 #
-# Text injection and pickup confirmation live in hv-tmux-send.sh, shared with
-# hv-worker-session. That path carries several tmux-specific traps; keeping one
-# copy is what stops the two callers from drifting apart.
+# Text injection and pickup confirmation live in the host libs
+# (hv-host-tmux.sh, hv-host-herdr.sh), shared with hv-worker-session.
+#
+# Records the dispatch in .hv/workers.json: the slot's handle (a herdr tab id
+# changes on every dispatch), its task, and state=busy.
 #
 # Tool: exit 0 on confirmed pickup; exit 2 on usage error;
-#       exit 3 on tmux/slot failure; exit 4 if the brief never submitted.
+#       exit 3 on host/slot failure; exit 4 if the brief never submitted;
+#       exit 5 if a dialog in the session refused input (herdr only).
 #
 # Usage:
-#   hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]
+#   hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay]
+#                      [--boot-timeout <s>]
 #
 #   --relay  Mark the injected text as an ORCHESTRATOR RELAY rather than a
 #            direct answer from the user. Load-bearing, not cosmetic: the
@@ -23,12 +31,13 @@
 #            answer; never pass it for an original task brief.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-. "$HERE/hv-tmux-send.sh"
+. "$HERE/hv-host-select.sh"
 
-USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--relay] [--boot-timeout <s>]"
+USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay] [--boot-timeout <s>]"
 
 SLOT=""
 BRIEF=""
+TASK=""
 RELAY=0
 BOOT_TIMEOUT=60
 
@@ -36,6 +45,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --slot)         SLOT="${2:?$USAGE}"; shift 2 ;;
     --brief-file)   BRIEF="${2:?$USAGE}"; shift 2 ;;
+    --task)         TASK="${2:?$USAGE}"; shift 2 ;;
     --relay)        RELAY=1; shift ;;
     --boot-timeout) BOOT_TIMEOUT="${2:?$USAGE}"; shift 2 ;;
     --)             shift; break ;;
@@ -47,12 +57,22 @@ done
 [ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
 [ -n "$BRIEF" ] || { echo "$USAGE" >&2; exit 2; }
 [ -f "$BRIEF" ] || { echo "error: brief file not found: $BRIEF" >&2; exit 2; }
-command -v tmux >/dev/null 2>&1 || { echo "error: tmux is not installed" >&2; exit 3; }
+
+hv_host_select
+hv_host_require || exit 3
+# herdr tabs are created in the caller's own workspace. Outside herdr there is
+# none, and driving the server anyway lands tabs wherever a human is focused.
+if [ "$HV_HOST" = herdr ] && ! hv_host_in_session; then
+  echo "error: work.dispatch=herdr must run from inside a herdr pane (HERDR_ENV=1)" >&2; exit 3
+fi
 
 REGISTRY=".hv/workers.json"
 [ -f "$REGISTRY" ] || { echo "error: no worker pool — run hv-worker-pool init first" >&2; exit 3; }
 
-# Resolve slot -> worktree, window, session, configDir (phase 2).
+# Resolve slot -> worktree, handle, session, configDir. `window` is the
+# pre-handle field name; read it so an unmigrated registry still dispatches.
+# Empty fields travel as "-": IFS=<tab> counts as whitespace, so read would
+# collapse an empty middle field and shift every later one left.
 SLOT_INFO="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
 import sys
 from pathlib import Path
@@ -62,30 +82,54 @@ slot = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), 
 if slot is None:
     raise SystemExit(1)
 print("\t".join([
-    slot.get("worktree") or "",
-    slot.get("window") or "",
+    slot.get("worktree") or "-",
+    slot.get("handle") or slot.get("window") or "-",
     data.get("session") or "hv",
-    slot.get("configDir") or "",
+    slot.get("configDir") or "-",
 ]))
 PY
 )" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
 
-IFS="$(printf '\t')" read -r WORKTREE WINDOW SESSION CONFIG_DIR <<EOF
+IFS="$(printf '\t')" read -r WORKTREE HANDLE SESSION CONFIG_DIR <<EOF
 $SLOT_INFO
 EOF
+[ "$HANDLE" = "-" ] && HANDLE=""
+[ "$CONFIG_DIR" = "-" ] && CONFIG_DIR=""
 
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
-# Workers run with permissions skipped. The contract asks them to git add,
-# git commit, gh pr create and run tests; every one of those prompts under a
-# narrower mode, and there is nobody in the pane to answer — the worker just
-# stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
-# branch in its own worktree, and hv-worker-gate re-verifies the merged tree
-# before anything reaches the cycle branch.
-#
-# Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
-# classifier for exactly that case, so a narrowed mode stalls loudly.
-LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+# record_dispatch <handle> — write handle, state=busy and, for a task, the
+# task id (clearing the previous task's PR).
+record_dispatch() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$1" "$TASK" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+path, name, handle, task = sys.argv[1:5]
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s.pop("window", None)
+            s["handle"] = handle or None
+            s["state"] = "busy"
+            if task:
+                s["task"] = task
+                s["pr"] = None
+update_json(Path(path), {"slots": []}, mutator)
+PY
+}
+
+if [ "$RELAY" -eq 0 ]; then
+  # Workers run with permissions skipped. The contract asks them to git add,
+  # git commit, gh pr create and run tests; every one of those prompts under a
+  # narrower mode, and there is nobody in the pane to answer — the worker just
+  # stops. Scope, not gating, is what bounds a worker here: it owns a throwaway
+  # branch in its own worktree, and hv-worker-gate re-verifies the merged tree
+  # before anything reaches the cycle branch.
+  #
+  # Override via work.workerCommand to narrow it. NEEDS-PERMISSION stays in the
+  # classifier for exactly that case, so a narrowed mode stalls loudly.
+  LAUNCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 from hvlib import load_config
 cfg = load_config()
 work = cfg.get("work", {}) or {}
@@ -97,19 +141,14 @@ print(cmd)
 PY
 )"
 
-[ -n "$CONFIG_DIR" ] && LAUNCH="CLAUDE_CONFIG_DIR=$CONFIG_DIR $LAUNCH"
+  # Fresh session every task dispatch — see the /clear note above.
+  hv_host_kill "$SLOT" "$HANDLE"
+  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || exit 3
+elif [ -z "$HANDLE" ]; then
+  echo "error: slot '$SLOT' has no session to relay into — dispatch a task first" >&2; exit 3
+fi
 
-tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" -c "$WORKTREE"
-
-# Fresh window every dispatch — see the /clear note above.
-tmux kill-window -t "$WINDOW" 2>/dev/null || true
-tmux new-window -d -t "$SESSION" -n "$SLOT" -c "$WORKTREE" || {
-  echo "error: could not create tmux window $WINDOW" >&2; exit 3; }
-
-tmux send-keys -t "$WINDOW" "$LAUNCH" C-m
-
-hv_tmux_wait_ready "$WINDOW" "$BOOT_TIMEOUT" || {
-  echo "error: slot '$SLOT' session did not come up within ${BOOT_TIMEOUT}s" >&2; exit 3; }
+record_dispatch "$HANDLE"
 
 # A relay is prefixed so the worker can tell the orchestrator's voice from the
 # maintainer's. It writes its own PR body and cannot otherwise distinguish
@@ -127,8 +166,12 @@ if [ "$RELAY" -eq 1 ]; then
   } >"$PAYLOAD"
 fi
 
-hv_tmux_send_file "$WINDOW" "$PAYLOAD" "hv-$SLOT" || {
-  echo "error: slot '$SLOT' never picked up the brief (pane unchanged after 4 submits)" >&2
-  exit 4; }
-
-echo "dispatched: $SLOT"
+RC=0
+hv_host_send "$SLOT" "$HANDLE" "$PAYLOAD" || RC=$?
+case "$RC" in
+  0) echo "dispatched: $SLOT ($HANDLE)" ;;
+  5) echo "error: slot '$SLOT' has a dialog open and refused input — inspect it before resending" >&2
+     exit 5 ;;
+  *) echo "error: slot '$SLOT' never picked up the brief — inspect the session before resending" >&2
+     exit 4 ;;
+esac
