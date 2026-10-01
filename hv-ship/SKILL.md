@@ -36,6 +36,7 @@ Read `.hv/config.json`:
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
 - `ship.secondOpinion` — `false` (default) skips the fresh-eyes gate; `true` runs a no-prior-context adversarial review after `/hv-review` passes
+- `ship.secondOpinionRunner` — `"subagent"` (default) or `"codex"`: who runs the Step 3.5 gate. `"codex"` is advisory (FAIL surfaced, never blocks); the subagent runner routes per the verdict reference.
 - `ship.qa` — `false` (default) skips product QA; `true` runs `/hv-qa run` after `/hv-review` (and `secondOpinion`) and before merge/PR. Routed per `qa.gate` (`"advisory"` reports only; `"blocking"` halts on FAIL).
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
 - `docs.path` — relative path to the docs folder used by Docs Mode (default `"docs"`)
@@ -145,6 +146,8 @@ Otherwise, run the gate:
 
 The helper emits a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
 
+Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, follow **Codex runner** below instead of dispatching a subagent.
+
 Dispatch the brief to a **fresh subagent**:
 
 - `Agent` tool, `subagent_type: "general-purpose"` (default — fresh context, no inherited project memory)
@@ -159,6 +162,15 @@ Route the verdict per `references/review-verdict-routing.md` — same contract a
 - **PASS** → continue to Step 4 silently.
 - **CONCERNS** → surface each concern with the label "Second-opinion concerns" (per the carrier-label convention in `references/review-verdict-routing.md`), then route per the reference's Consumer routing table.
 - **FAIL** → stop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
+
+**Codex runner** (`ship.secondOpinionRunner: "codex"`). Same brief, Codex as the reviewer:
+
+```bash
+.hv/bin/hv-second-opinion-brief [--repo "$REPO"] <branch> > "$BRIEF"
+.hv/bin/hv-codex-verify --worktree <cycle worktree or repo root> --brief "$BRIEF"
+```
+
+Last stdout line is the verdict (exit 0 / 1 / 2); findings JSON is in the artifact dir it prints (`.hv/qa-runs/<ts>/codex/last.json`). Map `PASS` → PASS, `FAIL` → FAIL, `ERROR` → **INFRA**. This runner is **advisory** (maintainer decision, unlike the subagent runner's FAIL, which stops): surface a FAIL with its findings under the label "Second-opinion (Codex) findings", never halt on it, and treat INFRA like QA's `INFRA-FAIL` (one-line note — `codex` missing, sandbox error, timeout, or a dirty tree after the run — then continue to Step 4). No `-s` flag is passed by default; add `--sandbox <mode>` only if the user asks. `.hv/bin/hv-codex-verify --doctor` diagnoses a broken Codex sandbox.
 
 The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
 
@@ -314,7 +326,7 @@ For each ID in the scope JSON's `referencedIds`:
 .hv/bin/hv-complete <ID> <merge-or-last-commit-hash>
 ```
 
-`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed.
+`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
 
 ## Step 8.5 — Learn (Nudge or Auto-Invoke)
 

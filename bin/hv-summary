@@ -51,10 +51,11 @@ pairs = []
 for line in completed.splitlines():
     parsed = parse_done_line(line.strip())
     if parsed:
-        pairs.append((f"[{parsed['id']}]", parsed["date"]))
+        pairs.append((f"[{parsed['id']}]", parsed["date"], parsed["reason"]))
 if pairs:
     recent = pairs[:3]
-    print("Recent: " + ", ".join(f"{iid} on {d}" for iid, d in recent))
+    print("Recent: " + ", ".join(
+        f"{iid} on {d}" + ("" if r == "done" else f" ({r})") for iid, d, r in recent))
 
 # Active milestones
 ms = json.loads(sys.argv[1])

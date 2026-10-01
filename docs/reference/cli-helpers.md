@@ -13,13 +13,13 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-capture-audit` | Surface ship-evidence per candidate title before milestone-spec capture; exit 2 with `[STRONG]`/`[MEDIUM]`/`[PATH]` report when any title looks already shipped, exit 0 when clean | `.hv/bin/hv-capture-audit "Title 1" "Title 2"` |
 | `hv-migrate` | v3 → v4 codemod: rewrite cut-command references (skips fenced code, inline code, and helper-path tokens), migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins, strip orphan v3 managed blocks from `CLAUDE.md`, and stamp `hvSkills.version` so `hv-preflight` reflects the post-migration state; reads the version from nested `hvSkills.version` with a top-level `version` fallback; `--dry-run` default, `--apply` writes (also bumps the stamp on the noop path), backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
 | `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
-| `hv-complete` | Move item to `## Completed` with strikethrough | `.hv/bin/hv-complete B07 a1b2c3d` |
+| `hv-complete` | Move item to `## Completed` with strikethrough; `--reason done\|handed-off\|blocked\|dropped` (default `done`) and `--note <text>` append `(<reason>: <note>)` to the marker when the reason is not `done` | `.hv/bin/hv-complete B07 a1b2c3d --reason blocked --note "waits on API"` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
 | `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; engine for `/hv-ship --undo`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
 | `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
 | `hv-rm` | Remove backlog item(s): strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
 | `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
-| `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`/`subsystem`/`since`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
+| `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`/`subsystem`/`since`/`reason`/`note`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
 | `hv-todo-set-field` | Set, replace, or clear a single field (`milestone`/`related`/`repos`/`subsystem`) on an open TODO bullet; writer counterpart of `hv-todo-field`; an empty value clears the field; idempotent on unchanged values | `.hv/bin/hv-todo-set-field B07 milestone M01` |
 | `hv-find-milestone-for-items` | Lookup the milestones tagged on a list of TODO item IDs; prints unique sorted M-IDs (one per line); always exits 0 | `.hv/bin/hv-find-milestone-for-items B07 F03` |
 | `hv-plan-rename-check` | List files that reference `<old-name>` (wraps `git grep -l`); used at plan + verify time for rename + link-sweep collision detection; always exits 0 | `.hv/bin/hv-plan-rename-check OldName.swift` |
@@ -137,7 +137,7 @@ file. Every skill that mints a new backlog item calls this first.
 
 `hv-append` inserts a formatted entry under the matching `##` section heading in
 [`BACKLOG.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`
-and moves it under `## Completed`, stamping it with the supplied git SHA.
+and moves it under `## Completed`, stamping it with the supplied git SHA. A non-default `--reason` (`handed-off`, `blocked`, `dropped`) adds `(<reason>)` or `(<reason>: <note>)` after the SHA; `done` renders exactly as before. `hv-todo-field <ID> reason|note` and `hv-summary` read it back.
 `hv-archive-old` sweeps `## Completed` entries older than N days into
 `ARCHIVE.md` to keep the working file short. `hv-todo-by-milestone` lets you
 filter the backlog by milestone tag; see also [Knowledge and vision
