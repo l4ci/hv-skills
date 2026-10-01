@@ -19,9 +19,14 @@
 #       exit 3 on host/slot failure; exit 4 if the brief never submitted;
 #       exit 5 if a dialog in the session refused input (herdr only).
 #
+# Provenance: every payload, brief or relay, is signed with a first line
+# `--- ORCHESTRATOR (round N) ---` (see references/worker-contract.md). A relay
+# is also appended to the slot's relays[] in .hv/workers.json as
+# {round, ts, summary}; hv-worker-gate checks the PR's approvals against it.
+#
 # Usage:
 #   hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay]
-#                      [--boot-timeout <s>]
+#                      [--round <n>] [--boot-timeout <s>]
 #
 #   --relay  Mark the injected text as an ORCHESTRATOR RELAY rather than a
 #            direct answer from the user. Load-bearing, not cosmetic: the
@@ -33,12 +38,13 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 . "$HERE/hv-host-select.sh"
 
-USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay] [--boot-timeout <s>]"
+USAGE="usage: hv-worker-dispatch --slot <name> --brief-file <path> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>]"
 
 SLOT=""
 BRIEF=""
 TASK=""
 RELAY=0
+ROUND=""
 BOOT_TIMEOUT=60
 
 while [ $# -gt 0 ]; do
@@ -47,6 +53,7 @@ while [ $# -gt 0 ]; do
     --brief-file)   BRIEF="${2:?$USAGE}"; shift 2 ;;
     --task)         TASK="${2:?$USAGE}"; shift 2 ;;
     --relay)        RELAY=1; shift ;;
+    --round)        ROUND="${2:?$USAGE}"; shift 2 ;;
     --boot-timeout) BOOT_TIMEOUT="${2:?$USAGE}"; shift 2 ;;
     --)             shift; break ;;
     -*)             echo "error: unknown flag $1" >&2; exit 2 ;;
@@ -55,6 +62,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$SLOT" ] || { echo "$USAGE" >&2; exit 2; }
+case "$ROUND" in ''|*[!0-9]*) [ -z "$ROUND" ] || { echo "error: --round must be a number" >&2; exit 2; } ;; esac
 [ -n "$BRIEF" ] || { echo "$USAGE" >&2; exit 2; }
 [ -f "$BRIEF" ] || { echo "error: brief file not found: $BRIEF" >&2; exit 2; }
 
@@ -99,14 +107,16 @@ EOF
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
 # record_dispatch <handle> — write handle, state=busy and, for a task, the
-# task id (clearing the previous task's PR).
+# task id (clearing the previous task's PR and relay log).
 record_dispatch() {
-  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$1" "$TASK" <<'PY'
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$1" "$TASK" "$ROUND" <<'PY'
 import sys
 from pathlib import Path
 from hvlib import update_json
-path, name, handle, task = sys.argv[1:5]
+path, name, handle, task, rnd = sys.argv[1:6]
 def mutator(data):
+    if rnd:
+        data["round"] = int(rnd)
     for s in data.get("slots", []):
         if s.get("name") == name:
             s.pop("window", None)
@@ -115,6 +125,7 @@ def mutator(data):
             if task:
                 s["task"] = task
                 s["pr"] = None
+                s["relays"] = []
 update_json(Path(path), {"slots": []}, mutator)
 PY
 }
@@ -150,24 +161,58 @@ fi
 
 record_dispatch "$HANDLE"
 
-# A relay is prefixed so the worker can tell the orchestrator's voice from the
-# maintainer's. It writes its own PR body and cannot otherwise distinguish
-# them — the two arrive through the same channel.
-PAYLOAD="$BRIEF"
-if [ "$RELAY" -eq 1 ]; then
-  PAYLOAD="$(mktemp)"
-  trap 'rm -f "$PAYLOAD"' EXIT
-  {
+# Round for the signature: the flag (just recorded), else the registry's, else 1.
+ROUND="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+print(load_json(Path(sys.argv[1]), {}).get("round") or 1)
+PY
+)"
+SIGNATURE="--- ORCHESTRATOR (round $ROUND) ---"
+
+# Every payload is signed so the worker can tell the orchestrator's voice from
+# unsigned pane text. A relay also carries a note: it writes its own PR body and
+# cannot otherwise tell a relay from the maintainer typing in its pane.
+PAYLOAD="$(mktemp)"
+trap 'rm -f "$PAYLOAD"' EXIT
+{
+  printf '%s\n' "$SIGNATURE"
+  if [ "$RELAY" -eq 1 ]; then
     printf '%s\n' "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator." \
-                  "It is NOT the maintainer speaking to you directly. If you cite it in a PR" \
-                  "body, attribute it as 'relayed by the orchestrator', never as a maintainer" \
+                  "It is NOT the maintainer speaking to you directly. If you cite it in your PR" \
+                  "body, attribute it as 'orchestrator relay round $ROUND', never as a maintainer" \
                   "sign-off in your session.]" ""
-    cat "$BRIEF"
-  } >"$PAYLOAD"
-fi
+  fi
+  # An already-signed brief is not signed twice.
+  if [ "$(head -n 1 "$BRIEF")" = "$SIGNATURE" ]; then tail -n +2 "$BRIEF"; else cat "$BRIEF"; fi
+} >"$PAYLOAD"
 
 RC=0
 hv_host_send "$SLOT" "$HANDLE" "$PAYLOAD" || RC=$?
+# Log the relay once it was (or may have been) sent. A stall (4) does not prove
+# the text was lost, and the gate must not call a delivered relay unlogged; only
+# a refused dialog (5) is certain nothing went out.
+if [ "$RELAY" -eq 1 ] && [ "$RC" -ne 5 ]; then
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" "$ROUND" "$BRIEF" <<'PY'
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from hvlib import update_json
+path, name, rnd, brief = sys.argv[1:5]
+text = Path(brief).read_text(errors="replace")
+first = next((l.strip() for l in text.splitlines() if l.strip() and not l.startswith("--- ORCHESTRATOR")), "")
+entry = {"round": int(rnd),
+         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+         "summary": first[:200]}
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s.setdefault("relays", []).append(entry)
+update_json(Path(path), {"slots": []}, mutator)
+PY
+fi
+
 case "$RC" in
   0) echo "dispatched: $SLOT ($HANDLE)" ;;
   5) echo "error: slot '$SLOT' has a dialog open and refused input — inspect it before resending" >&2

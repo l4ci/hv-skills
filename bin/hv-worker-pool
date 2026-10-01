@@ -92,6 +92,9 @@ def mutator(data):
             "state": "idle",
             "task": None,
             "pr": None,
+            # Orchestrator relays sent to this slot, for hv-worker-gate's
+            # approval-provenance check; hv-worker-dispatch --relay appends.
+            "relays": [],
             # Phase 2 (multi-account) fills this in; a null configDir means
             # "inherit the ambient CLAUDE_CONFIG_DIR".
             "configDir": None,
