@@ -9,17 +9,22 @@
 # Closure reason: --reason done|handed-off|blocked|dropped (default done) and
 # an optional --note <text>. The Done marker gains ` (<reason>[: <note>])` only
 # when the reason is not done; the default output is byte-identical.
-# Usage: hv-complete <ID> [commit-hash] [--reason done|handed-off|blocked|dropped] [--note <text>]
+# Proof gate: a `done` close needs at least one row in the item's `## Proof` section
+# (hv-proof-add / hv-proof-show); otherwise exit 3. --no-proof overrides. Other reasons
+# (handed-off, blocked, dropped) have nothing to prove and skip the gate.
+# Usage: hv-complete <ID> [commit-hash] [--reason done|handed-off|blocked|dropped] [--note <text>] [--no-proof]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-USAGE="usage: hv-complete <ID> [commit-hash] [--reason done|handed-off|blocked|dropped] [--note <text>]"
+USAGE="usage: hv-complete <ID> [commit-hash] [--reason done|handed-off|blocked|dropped] [--note <text>] [--no-proof]"
 REASON="done"
 NOTE=""
+NO_PROOF=""
 POS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --reason) [ $# -ge 2 ] || { echo "$USAGE" >&2; exit 1; }; REASON="$2"; shift 2 ;;
     --note)   [ $# -ge 2 ] || { echo "$USAGE" >&2; exit 1; }; NOTE="$2"; shift 2 ;;
+    --no-proof) NO_PROOF=1; shift ;;
     *) POS+=("$1"); shift ;;
   esac
 done
@@ -36,8 +41,8 @@ if [ -z "$HASH" ]; then
   exit 1
 fi
 DATE=$(date +%Y-%m-%d)
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" "$REASON" "$NOTE" <<'PY'
-import re, subprocess, sys
+HV_PROOF_SHOW="$HERE/hv-proof-show" HV_NO_PROOF="$NO_PROOF" PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" "$REASON" "$NOTE" <<'PY'
+import os, re, subprocess, sys
 from hvlib import find_section, write_text_atomic, update_json, format_done_line, parse_done_line, detail_dir_for_id, COUNTABLE_TYPES
 id_s, hash_s, date_s, reason_s, note_s = sys.argv[1:6]
 path = ".hv/BACKLOG.md"
@@ -54,6 +59,17 @@ if not m:
     # Nowhere to be found → typo guard.
     print(f"error: [{id_s}] not found", file=sys.stderr)
     sys.exit(1)
+
+# Proof gate runs only on the active→completed transition (the already-completed
+# no-op above stays exit 0) and only for a plain `done` close.
+if reason_s == "done" and not os.environ.get("HV_NO_PROOF"):
+    n = subprocess.run([os.environ["HV_PROOF_SHOW"], id_s, "--count"],
+                       capture_output=True, text=True).stdout.strip()
+    if n in ("", "0"):
+        print(f"error: [{id_s}] no proof recorded, pass --no-proof to override "
+              f"(hv-proof-add {id_s} --check <name> --result PASS --evidence <path-or-text>)",
+              file=sys.stderr)
+        sys.exit(3)
 
 line = m.group(0)
 content = content[:m.start()] + content[m.end()+1:]

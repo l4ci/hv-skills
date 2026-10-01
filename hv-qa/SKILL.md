@@ -139,6 +139,8 @@ Dispatch one subagent per check group (per pillar per target) in parallel via th
 
 The orchestrator does not run the checks itself — parallel dispatch is the point. Aggregate the results.
 
+**Record proof.** For every item on the branch (`hv-review-scope` referencedIds), write each executable-check result as a proof row: `.hv/bin/hv-proof-add <ID> --check "<check name>" --result PASS|FAIL --evidence "<artifact path under .hv/qa-runs/ or one-line output>"`. Rows are facts; the QA verdict (Step 7) is still the judgement.
+
 **Re-run a failed check alone before recording it.** Parallel runners contend for one box, and every check with a fixed time budget starts failing on elapsed time rather than on truth once the machine is loaded. Before writing `met: false` for any check that timed out, blew a duration budget, or failed on a connection error, re-run that one check with nothing else in flight and record `uptime` alongside both runs. Three consequences worth stating separately:
 
 - **A timeout is not a failure of the thing under test.** It says the assertion never ran — read the runner's actual output before forming a theory about the code.

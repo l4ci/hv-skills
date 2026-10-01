@@ -155,6 +155,10 @@ that's Stage 2's job. Even if you notice issues there, do NOT flag them.
 
 (Omit a plan section for items without plans — note them as "no plan; skipped from spec check.")
 
+**Recorded proof:**
+<rows from `.hv/bin/hv-proof-show <ID>` per item, or "none recorded">
+Rows are verification already run (check, result, sha, evidence). Do NOT re-run a check that has a PASS row at the current sha; spot-check one row. A FAIL row or a row at a stale sha is a gap to cite.
+
 **Diff by file:**
 <file>
 ```diff
