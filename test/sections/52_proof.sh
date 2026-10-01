@@ -59,8 +59,9 @@ mkdir -p "$TMP_PF/proj"
 )
 
 # T119: every skill that calls hv-complete must also give it a proof path.
-for f in hv-ship/SKILL.md hv-debug/SKILL.md hv-next/SKILL.md hv-work/SKILL.md; do
-  grep -q 'hv-complete' "$REPO/$f" || fail "$f: expected an hv-complete call"
+callers=$(cd "$REPO" && grep -l 'hv-complete' hv-*/SKILL.md)
+[ -n "$callers" ] || fail "expected at least one SKILL.md calling hv-complete"
+for f in $callers; do
   grep -q 'hv-proof-add' "$REPO/$f" || fail "$f calls hv-complete without an hv-proof-add path"
 done
 pass "hv-complete callers document a proof path"
