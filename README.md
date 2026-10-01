@@ -51,6 +51,7 @@ A short list of the things that actually distinguish hv-skills from a TODO file 
 - **Parallel execution with atomic commits.** An orchestrator decomposes the plan, worker subagents implement in parallel, one verifiable commit per task. Branch or worktree isolation keeps main clean.
 - **Two-stage review plus opt-in fresh-eyes.** `/hv-review` splits spec-compliance from code-quality. `ship.secondOpinion` adds a no-prior-context adversarial pass after the contextualized one signs off.
 - **Plan-as-artifact and design exploration.** `/hv-plan` writes the plan to its own file; `/hv-brainstorm` negotiates shape and tradeoffs for Major features or P0 bugs before planning; `/hv-work --preview` prints the intended approach before code lands.
+- **Issue backend.** `backlog.backend: "issues"` keeps the backlog, milestones and design/plan notes on the GitHub or GitLab tracker; `/hv-migrate issues` moves a file backlog over. See [issue backend](docs/usage/issue-backend.md).
 - **Umbrella mode.** One coordinator across N independent sub-repos. Shared `KNOWLEDGE.md` / `DECISIONS.md` / `BACKLOG.md` at the umbrella; commits land in each sub-repo's own `.git/`. No submodules.
 
 A full feature list (autonomy chaining, product QA gate, throwaway spikes, backlog reconciliation, GitHub/GitLab issue round-trip, refactor cycles) is in the [docs](docs/).

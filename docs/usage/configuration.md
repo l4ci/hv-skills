@@ -340,14 +340,16 @@ Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-rev
 
 ## Issues backend keys
 
-- **Keys:** `backlog.backend`, `issues.provider`, `issues.retryWaitSeconds`, `issues.labels.*`
+- **Keys:** `backlog.backend`, `issues.provider`, `issues.retryWaitSeconds`, `issues.bulkPaceMs`, `issues.homeRepo`, `issues.labels.*`
 - **Required:** no. Existing configs stay valid without them.
 
 | Key | Default | Values |
 |-----|---------|--------|
-| `backlog.backend` | `"file"` | `"file"` or `"issues"`. `"issues"` is not available yet; it lands in M07-S02. |
+| `backlog.backend` | `"file"` | `"file"` or `"issues"`. `"issues"` puts the backlog on the tracker; see [issue backend](issue-backend.md). |
 | `issues.provider` | `"auto"` | `"auto"`, `"github"` or `"gitlab"`. |
 | `issues.retryWaitSeconds` | `60` | Seconds to wait before retrying a failed tracker call. |
+| `issues.bulkPaceMs` | `1000` | Milliseconds `hv-migrate-issues` waits between tracker writes. `0` disables the pause. |
+| `issues.homeRepo` | `""` | Umbrella mode only: sub-repo holding milestone tracking issues. Empty means the first registered sub-repo. |
 | `issues.labels.inProgress` | `"in-progress"` | Label name. |
 | `issues.labels.needsReview` | `"needs-review"` | Label name. |
 | `issues.labels.changesRequested` | `"changes-requested"` | Label name. |
