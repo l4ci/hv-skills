@@ -117,6 +117,8 @@ git worktree add .claude/worktrees/<branch-name> <branch-name>
 .hv/bin/hv-status-add <branch> <ID> .claude/worktrees/<branch-name>
 ```
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): claim the bug now with `.hv/bin/hv-item-claim <ID> --as <branch>` (exit 5: someone else holds it, stop; exit 3 or 4: stop and report) and read its comments per the reference's "Resuming an item" before reproducing.
+
 Initialize the per-session counter for the Iron Law (Step 9.5):
 
 ```bash
@@ -289,6 +291,15 @@ Record the Step 9 reproducer re-run as proof, then mark the item complete:
 ```
 
 `hv-complete` exits 3 if the proof row is missing. Never pass `--no-proof` here: Step 9 always runs the reproducer, so a missing row means the step was skipped. Go back and run it.
+
+**Issue mode:** `hv-proof-add` above works unchanged (the row lands in the proof note), but do not call `hv-complete` and do not merge directly. Open a PR instead and hand it to review; the issue closes when the PR merges:
+
+```bash
+printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID> <branch> "<short title>"
+.hv/bin/hv-item-state <ID> needs-review
+```
+
+The claim stays (no `hv-item-release`). Then continue with the status cleanup below.
 
 **Single-repo:**
 

@@ -140,6 +140,8 @@ Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode
 
 When `.hv/designs/<ID>.md` exists for the plan's item, pass `--design .hv/designs/<ID>.md` to `hv-plan-add`. The plan's frontmatter records `design: .hv/designs/<ID>.md` as a traceability pointer.
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): an item plan is a note on the item's issue, not a file; slice plans stay files and follow the file-mode flow. `hv-plan-add` still creates the item plan; draft the confirmed sections in a scratch file and publish with `.hv/bin/hv-plan-put <key> --body-file <scratch-file>` instead of `Edit`. Read it back with `.hv/bin/hv-plan-show <key>`. Record plan-shaping answers with `.hv/bin/hv-item-comment <ID> --kind decision --body-file -`.
+
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
 
 ## Step 6.5 — Validate Doc-by-Path Deliverables (F76)

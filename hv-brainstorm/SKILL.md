@@ -151,6 +151,8 @@ Mint the design stub:
 
 The helper creates `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and the five placeholder section headers. Use the `Edit` tool to overwrite each placeholder section body with the approved content from Step 6. Keep the frontmatter intact.
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): the design is a note on the item's issue, not a file. `hv-design-add` still creates it; draft the approved sections in a scratch file (not under `.hv/designs/`) and publish with `.hv/bin/hv-design-put <ID> --body-file <scratch-file>` instead of `Edit`. Read it back with `.hv/bin/hv-design-show <ID>`. Post each answer that changed the design's direction with `.hv/bin/hv-item-comment <ID> --kind decision --body-file -`.
+
 Under `--auto-loop`, after `hv-design-add` runs, use `Edit` to insert `auto: true` into the frontmatter (between the `status:` and `created:` lines). The `auto: true` key marks the artifact as auto-written, matching the `/hv-plan --auto-loop` convention.
 
 ## Step 8 — Self-Review
