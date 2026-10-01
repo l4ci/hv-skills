@@ -74,6 +74,7 @@ Run when `.hv/qa/` is empty for the active scope (umbrella: per-repo; single-rep
    - **Surface** — what kind of thing this is (web, API, CLI, mobile, lib)
    - **Watch globs** — paths whose changes should trigger after-work QA
    - **Executable checks** — runners with concrete commands, grouped by pillar (performance / security / functional). Each entry: `name` · `command` · `pass criterion`. Examples: `lighthouse --budget-path=.budget.json` · `pa11y http://localhost:3000` · `npm audit --audit-level=high` · `bash test/smoke.sh` · `playwright test --grep @smoke`.
+     - **Codex runner** (propose only when `codex` is on `PATH` and `.hv/bin/hv-codex-verify --doctor` exits 0; otherwise omit): `codex-verify` · `.hv/bin/hv-codex-verify --worktree . --brief .hv/qa/<target>.codex.md` · last line `PASS`. The brief file is plain markdown describing what Codex should verify by running commands; the helper maps `ERROR` (sandbox, timeout, dirty tree) to INFRA-FAIL, not a failed check.
    - **Audit checks** — usability dimensions to inspect by hand or LLM (empty states, error recovery, copy clarity, first-run flow). Rubric, no commands.
    - **Infra requirements** — what must be running for `run` mode (e.g. `npm run dev` on `:3000`, deployed staging URL, sandbox creds). Skill refuses to run if these aren't met.
    - **Out of scope** — explicit non-goals (e.g. "no load testing", "no real-payment flows").

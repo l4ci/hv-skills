@@ -185,6 +185,17 @@ Same-model-fresh-context is the cheap MVP; cross-model second-opinions (Codex/Ge
 
 See [review and ship](review-and-ship.md) for the full `/hv-ship` workflow.
 
+## ship.secondOpinionRunner
+
+Picks who runs the [`ship.secondOpinion`](#shipsecondopinion) gate. Has no effect while `ship.secondOpinion` is `false`.
+
+| Value | Behavior |
+|-------|----------|
+| `"subagent"` (default) | A fresh Sonnet subagent reviews the goal + diff brief. |
+| `"codex"` | `/hv-ship` writes the same brief to a file and runs `hv-codex-verify` (Codex headless, structured PASS/FAIL/ERROR). The helper adds no `-s` flag, so Codex's own configured sandbox applies; a before/after `git status --porcelain` guard runs regardless. |
+
+The `codex` runner is advisory: a FAIL is surfaced to the user and never blocks the ship (the `subagent` runner keeps its existing routing, where FAIL stops). An `ERROR` (Codex missing, sandbox failure such as `bwrap`, timeout, dirty tree after the run) is reported as an infra note and the ship continues. Run `.hv/bin/hv-codex-verify --doctor` to check the Codex install and sandbox.
+
 ## ship.qa
 
 Controls whether `/hv-ship` invokes [`/hv-qa run`](qa.md) between `/hv-review` (and the optional second-opinion gate) and the merge/PR step. `/hv-review` answers *"does this diff make sense"*. `/hv-qa` answers *"does the product actually work"* by executing the per-target strategy in `.hv/qa/<target>.md`.
