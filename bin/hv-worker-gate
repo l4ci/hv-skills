@@ -86,7 +86,7 @@ check_provenance() {
     echo "PROVENANCE-SKIP $SLOT — no recorded PR (or no gh) to read approvals from" >&2
     return 0
   fi
-  body="$(gh pr view "$1" --json body -q .body 2>/dev/null)" || {
+  body="$("$HERE/hv-tracker-call" --provider github -- pr view "$1" --json body -q .body 2>/dev/null </dev/null)" || {
     echo "PROVENANCE-SKIP $SLOT — could not read the body of $1" >&2
     return 0
   }
@@ -158,7 +158,7 @@ CURRENT="$(git rev-parse --abbrev-ref HEAD)"
   echo "error: gate must run with $BASE checked out (currently on $CURRENT)" >&2; exit 3; }
 
 if [ -n "$PR" ] && command -v gh >/dev/null 2>&1; then
-  gh pr merge "$PR" --merge >/dev/null 2>&1 || {
+  "$HERE/hv-tracker-call" --provider github -- pr merge "$PR" --merge >/dev/null 2>&1 </dev/null || {
     echo "error: gh pr merge failed for $PR" >&2; exit 3; }
   git pull --ff-only >/dev/null 2>&1 || {
     echo "error: could not fast-forward $BASE after merging $PR" >&2; exit 3; }

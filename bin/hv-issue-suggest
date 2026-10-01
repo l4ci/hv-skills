@@ -42,7 +42,7 @@ fi
 
 BODY="$(cat)"
 
-if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+if ! command -v gh >/dev/null 2>&1 || ! "$HERE/hv-tracker-call" --provider github -- auth status >/dev/null 2>&1; then
   cat <<EOF
 gh not available — file manually at:
   https://github.com/$REPO/issues/new
@@ -55,6 +55,6 @@ EOF
   exit 1
 fi
 
-URL=$(printf '%s' "$BODY" | gh issue create -R "$REPO" -t "$TITLE" -F -)
+URL=$(printf '%s' "$BODY" | "$HERE/hv-tracker-call" --provider github -- issue create -R "$REPO" -t "$TITLE" -F -)
 NUMBER="${URL##*/}"
 printf '{"url": "%s", "number": %s}\n' "$URL" "$NUMBER"

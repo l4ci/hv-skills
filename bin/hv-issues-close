@@ -99,19 +99,19 @@ case "$PROVIDER" in
       echo "error: gh is not installed" >&2
       exit 1
     fi
-    if ! gh auth status >/dev/null 2>&1; then
+    if ! "$HERE/hv-tracker-call" --provider github -- auth status >/dev/null 2>&1; then
       echo "error: gh is not authenticated; run 'gh auth login'" >&2
       exit 1
     fi
 
     # Idempotency check — GH states are uppercase
-    STATE="$(gh issue view "$ISSUE" --json state -q .state 2>/dev/null || echo "")"
+    STATE="$("$HERE/hv-tracker-call" --provider github -- issue view "$ISSUE" --json state -q .state 2>/dev/null || echo "")"
     if [ "$STATE" = "CLOSED" ]; then
       exit 0
     fi
 
     # Single call: post closing comment and close atomically
-    gh issue close "$ISSUE" --comment "$BODY"
+    "$HERE/hv-tracker-call" --provider github -- issue close "$ISSUE" --comment "$BODY"
     ;;
 
   gitlab)
@@ -119,20 +119,20 @@ case "$PROVIDER" in
       echo "error: glab is not installed" >&2
       exit 1
     fi
-    if ! glab auth status >/dev/null 2>&1; then
+    if ! "$HERE/hv-tracker-call" --provider gitlab -- auth status >/dev/null 2>&1; then
       echo "error: glab is not authenticated; run 'glab auth login'" >&2
       exit 1
     fi
 
     # Idempotency check — GL states are lowercase
-    STATE="$(glab issue view "$ISSUE" --output json 2>/dev/null | jq -r .state 2>/dev/null || echo "")"
+    STATE="$("$HERE/hv-tracker-call" --provider gitlab -- issue view "$ISSUE" --output json 2>/dev/null | jq -r .state 2>/dev/null || echo "")"
     if [ "$STATE" = "closed" ]; then
       exit 0
     fi
 
     # Two calls: comment then close (glab issue close has no --message flag)
-    glab issue note "$ISSUE" --message "$BODY"
-    glab issue close "$ISSUE"
+    "$HERE/hv-tracker-call" --provider gitlab -- issue note "$ISSUE" --message "$BODY"
+    "$HERE/hv-tracker-call" --provider gitlab -- issue close "$ISSUE"
     ;;
 
   unknown)

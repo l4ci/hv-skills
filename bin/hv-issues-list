@@ -70,7 +70,7 @@ hv_issues_detect_provider
 # ---------------------------------------------------------------------------
 case "$PROVIDER" in
   github)
-    if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+    if ! command -v gh >/dev/null 2>&1 || ! "$HERE/hv-tracker-call" --provider github -- auth status >/dev/null 2>&1; then
       echo "error: gh not installed or not authenticated" >&2
       exit 1
     fi
@@ -79,7 +79,7 @@ case "$PROVIDER" in
       if [ -n "$REPO_PATH" ]; then
         (
           cd "$REPO_PATH"
-          gh issue list \
+          "$HERE/hv-tracker-call" --provider github -- issue list \
             --state open \
             --json number,title,body,labels,url,author \
             --limit "$LIMIT" \
@@ -87,7 +87,7 @@ case "$PROVIDER" in
             ${LABEL:+--label "$LABEL"}
         )
       else
-        gh issue list \
+        "$HERE/hv-tracker-call" --provider github -- issue list \
           --state open \
           --json number,title,body,labels,url,author \
           --limit "$LIMIT" \
@@ -107,7 +107,7 @@ case "$PROVIDER" in
     ;;
 
   gitlab)
-    if ! command -v glab >/dev/null 2>&1 || ! glab auth status >/dev/null 2>&1; then
+    if ! command -v glab >/dev/null 2>&1 || ! "$HERE/hv-tracker-call" --provider gitlab -- auth status >/dev/null 2>&1; then
       echo "error: glab not installed or not authenticated" >&2
       exit 1
     fi
@@ -116,7 +116,7 @@ case "$PROVIDER" in
       if [ -n "$REPO_PATH" ]; then
         (
           cd "$REPO_PATH"
-          glab issue list \
+          "$HERE/hv-tracker-call" --provider gitlab -- issue list \
             --opened \
             --output json \
             --per-page "$LIMIT" \
@@ -124,7 +124,7 @@ case "$PROVIDER" in
             ${LABEL:+--label "$LABEL"}
         )
       else
-        glab issue list \
+        "$HERE/hv-tracker-call" --provider gitlab -- issue list \
           --opened \
           --output json \
           --per-page "$LIMIT" \
