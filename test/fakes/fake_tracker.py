@@ -2,7 +2,8 @@
 """Stateful fake `gh` (2.45) and `glab` (1.120) for offline tests.
 
 Usage (via the front-ends): fake_tracker.py <gh|glab> ARGV...
-Env: FAKE_TRACKER_DB   JSON store path (required; created on first write)
+Env: FAKE_TRACKER_DB   JSON store path (required unless FAKE_TRACKER_DB_DIR; created on first write)
+     FAKE_TRACKER_DB_DIR  per-repo stores: <dir>/<basename of the cwd's git toplevel>.json (wins over FAKE_TRACKER_DB)
      FAKE_TRACKER_LOG  if set, each call's argv (space-joined) is appended
      FAKE_TRACKER_FAIL if set, any call whose argv contains it fails (exit 1)
 Only the subset hv uses is implemented; anything else exits 2.
@@ -26,6 +27,12 @@ class Fail(Exception):
 
 # ---------------------------------------------------------------- store
 def db_path():
+    d = os.environ.get("FAKE_TRACKER_DB_DIR")
+    if d:
+        r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise Fail("FAKE_TRACKER_DB_DIR needs a git repo cwd")
+        return os.path.join(d, os.path.basename(r.stdout.strip()) + ".json")
     p = os.environ.get("FAKE_TRACKER_DB")
     if not p:
         raise Fail("FAKE_TRACKER_DB is required")

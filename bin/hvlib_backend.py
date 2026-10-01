@@ -594,14 +594,16 @@ def _one_line(s):
 class IssueBackend:
     """Backlog served from the issue tracker (reads, capture, field writes)."""
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, cwd=None, repo=None):
         self.cfg = load_config() if cfg is None else cfg
         self._adapter = None
+        self.cwd = cwd  # umbrella: the sub-repo path every tracker call runs in
+        self.repo = repo  # umbrella: sub-repo name, rendered as `Repos:` on every bullet
 
     @property
     def adapter(self):
         if self._adapter is None:
-            self._adapter = adapter_for(self.cfg)
+            self._adapter = adapter_for(self.cfg, cwd=self.cwd)
         return self._adapter
 
     # -- classification ----------------------------------------------------
@@ -649,6 +651,8 @@ class IssueBackend:
             v = block.get(name, "")
             if v:
                 out[name] = _bracket_ids(v) if name == "Related" else v
+        if self.repo:
+            out["Repos"] = self.repo
         return out
 
     # -- rendering ---------------------------------------------------------
@@ -674,25 +678,39 @@ class IssueBackend:
         suffix = " (dropped)" if issue.get("state_reason") == "not_planned" else ""
         return f"- ~~{self._bullet_inner(issue)}~~ Done {date} [`#{issue['number']}`]{suffix}"
 
-    def backlog_markdown(self, closed_limit=20):
-        """BACKLOG.md-shaped rendering: open issues by type, newest `closed_limit`
-        closed ones (all when None, none when 0) as Done lines, newest first."""
+    def _open_bullets(self):
+        """Open item bullets by type letter: {letter: [(number, "- **[F3] ...")]}."""
         opened = [i for i in self.adapter.list(state="open") if not self._is_tracker(i)]
         sections = {"B": [], "F": [], "T": []}
         for i in sorted(opened, key=lambda i: i["number"]):
-            sections[self._letter(i)].append(f"- {self._bullet_inner(i)}")
+            sections[self._letter(i)].append((i["number"], f"- {self._bullet_inner(i)}"))
+        return sections
+
+    def _done_lines(self):
+        """Closed items as [(closed_at, number, Done line)], newest first."""
+        closed = [i for i in self.adapter.list(state="closed") if not self._is_tracker(i)]
+        closed.sort(key=lambda i: (i.get("closed_at") or "", i["number"]), reverse=True)
+        return [(i.get("closed_at") or "", i["number"], self._done_line(i)) for i in closed]
+
+    @staticmethod
+    def _render_backlog(sections, done):
         out = ["# Backlog", ""]
         for letter in "BFT":
             out += [f"## {_SECTION_FOR_LETTER[letter]}", "", *sections[letter]]
             if sections[letter]:
                 out.append("")
-        done = []
-        if closed_limit is None or closed_limit > 0:
-            closed = [i for i in self.adapter.list(state="closed") if not self._is_tracker(i)]
-            closed.sort(key=lambda i: (i.get("closed_at") or "", i["number"]), reverse=True)
-            done = [self._done_line(i) for i in (closed if closed_limit is None else closed[:closed_limit])]
         out += ["## Completed", "", *done]
         return "\n".join(out).rstrip("\n") + "\n"
+
+    def backlog_markdown(self, closed_limit=20):
+        """BACKLOG.md-shaped rendering: open issues by type, newest `closed_limit`
+        closed ones (all when None, none when 0) as Done lines, newest first."""
+        sections = {k: [line for _n, line in v] for k, v in self._open_bullets().items()}
+        done = []
+        if closed_limit is None or closed_limit > 0:
+            lines = [line for _c, _n, line in self._done_lines()]
+            done = lines if closed_limit is None else lines[:closed_limit]
+        return self._render_backlog(sections, done)
 
     def list_open(self):
         """Same contract as FileBackend.list_open, derived from the rendering."""
@@ -1366,12 +1384,187 @@ def _ready_reasons(has_criteria, has_note):
     return [] if (has_criteria or has_note) else reasons
 
 
+# -- umbrella: one tracker per registered sub-repo --------------------------------
+
+_QUAL_HASH_RE = re.compile(r"^(?P<repo>[^\s#:]+)#(?P<n>\d+)$")
+_QUAL_COLON_RE = re.compile(r"^(?P<repo>[^\s#:]+):(?P<ref>\S+)$")
+
+# Milestone, vision, slice-plan, release and review/PR operations span repos (M07-S06 T2).
+_UMBRELLA_PENDING = (
+    "_tracking_issues", "tracker_issue", "milestone_list", "next_milestone_id", "milestone_add",
+    "milestone_status", "release_gate", "release_notes", "release_close", "milestone_show",
+    "milestone_put", "slice_units", "slice_plans", "slice_get", "slice_put", "slice_rm",
+    "review_queue", "merge_pr",
+)
+
+
+class UmbrellaIssueBackend(IssueBackend):
+    """Umbrella mode over issue trackers: every registered sub-repo keeps its items on
+    its own tracker (provider auto-detected from that repo's origin). Reads merge the
+    per-repo renderings, each bullet carrying `Repos: <name>`; writes go to the owner.
+
+    Refs: `<repo>#<n>` and `<repo>:<ID>` always resolve; a bare `F42` / `#42` resolves
+    when exactly one sub-repo has it, else TrackerError(1) lists the qualified candidates.
+    """
+
+    def __init__(self, cfg=None):
+        super().__init__(cfg)
+        from hvlib_repos import load_repos
+        self.repos = load_repos()
+        self.subs = {name: IssueBackend(self.cfg, cwd=path, repo=name) for name, path in self.repos.items()}
+
+    # -- reads ---------------------------------------------------------------
+
+    def backlog_markdown(self, closed_limit=20):
+        sections = {"B": [], "F": [], "T": []}
+        for sub in self.subs.values():
+            for letter, bullets in sub._open_bullets().items():
+                sections[letter] += [line for _n, line in bullets]
+        done = []
+        if closed_limit is None or closed_limit > 0:
+            entries = []
+            for sub in self.subs.values():
+                entries += sub._done_lines()
+            entries.sort(key=lambda e: (e[0], e[1]), reverse=True)
+            lines = [line for _c, _n, line in entries]
+            done = lines if closed_limit is None else lines[:closed_limit]
+        return self._render_backlog(sections, done)
+
+    # -- ref resolution ------------------------------------------------------
+
+    def _pick(self, ref):
+        """(sub-backend, plain ref) owning `ref`, or (None, ref) when no sub-repo has it.
+        TrackerError(1) when a bare ref matches several sub-repos."""
+        ref = str(ref).strip()
+        m = _QUAL_HASH_RE.match(ref)
+        if m and m.group("repo") in self.subs:
+            return self.subs[m.group("repo")], "#" + m.group("n")
+        m = _QUAL_COLON_RE.match(ref)
+        if m and m.group("repo") in self.subs:
+            return self.subs[m.group("repo")], m.group("ref")
+        try:
+            resolve_item_ref(ref)
+        except ValueError:
+            return None, ref
+        hits = [(name, sub) for name, sub in self.subs.items() if sub._lookup(ref) is not None]
+        if len(hits) > 1:
+            cands = ", ".join(f"{name}:{sub.canonical_id(ref)}" for name, sub in hits)
+            raise TrackerError(1, f"[{ref}] is ambiguous across sub-repos \u2014 qualify it: {cands}")
+        return (hits[0][1], ref) if hits else (None, ref)
+
+    def _owner(self, ref):
+        sub, plain = self._pick(ref)
+        if sub is None:
+            raise LookupError(f"[{ref}] not found in the issue tracker")
+        return sub, plain
+
+    def canonical_id(self, ref):
+        sub, plain = self._pick(ref)
+        cid = None if sub is None else sub.canonical_id(plain)
+        if cid is not None and plain != str(ref).strip():
+            return f"{sub.repo}:{cid}"
+        return cid
+
+    def fields(self, ref):
+        sub, plain = self._pick(ref)
+        return None if sub is None else sub.fields(plain)
+
+    def detail_text(self, ref):
+        sub, plain = self._pick(ref)
+        return None if sub is None else sub.detail_text(plain)
+
+    # -- writes --------------------------------------------------------------
+
+    def _cwd_repo(self):
+        """Name of the sub-repo the caller's cwd is inside (Layout B worktrees included), else None."""
+        cwd = os.environ.get("HV_ORIG_PWD") or os.getcwd()
+        r = subprocess.run(["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            return None
+        root = os.path.realpath(os.path.dirname(os.path.join(cwd, r.stdout.strip())))
+        return next((n for n, p in self.repos.items() if p == root), None)
+
+    def create(self, kind, title, tag="", desc="", fields=None, body=None):
+        """Capture one item in one sub-repo: `Repos=<name>`, else the repo cwd is inside.
+        Returns the qualified ID `<repo>:F42`."""
+        fields = dict(fields or {})
+        names = [n.strip() for n in fields.pop("Repos", "").split(",") if n.strip()]
+        if len(names) > 1:
+            raise ValueError("an item lives in exactly one sub-repo in issue mode \u2014 capture one item "
+                             "per repo and link them with Related:")
+        name = names[0] if names else self._cwd_repo()
+        if name is None:
+            raise ValueError("umbrella issue mode needs a target sub-repo \u2014 pass --field Repos=<name> "
+                             f"(registered: {', '.join(self.repos)}) or run from inside one")
+        if name not in self.subs:
+            raise ValueError(f"unknown sub-repo '{name}' (registered: {', '.join(self.repos)})")
+        return f"{name}:{self.subs[name].create(kind, title, tag, desc, fields, body)}"
+
+    def set_field(self, ref, field, value):
+        if field.lower() == "repos":
+            raise ValueError("repos is the owning sub-repo; an issue cannot move between trackers")
+        sub, plain = self._owner(ref)
+        return sub.set_field(plain, field, value)
+
+    def note_get(self, ref, kind):
+        sub, plain = self._owner(ref)
+        return sub.note_get(plain, kind)
+
+    def note_put(self, ref, kind, text):
+        sub, plain = self._owner(ref)
+        return sub.note_put(plain, kind, text)
+
+    def note_rm(self, ref, kind):
+        sub, plain = self._owner(ref)
+        return sub.note_rm(plain, kind)
+
+    def comment_add(self, ref, kind, text):
+        sub, plain = self._owner(ref)
+        return sub.comment_add(plain, kind, text)
+
+    def complete(self, ref, hash_s, date_s, reason="done", note="", proof_show=None):
+        sub, plain = self._owner(ref)
+        return sub.complete(plain, hash_s, date_s, reason, note, proof_show)
+
+    def uncomplete(self, ref):
+        sub, plain = self._owner(ref)
+        return sub.uncomplete(plain)
+
+    def claim(self, ref, claim_id):
+        sub, plain = self._owner(ref)
+        return sub.claim(plain, claim_id)
+
+    def release(self, ref, claim_id):
+        sub, plain = self._owner(ref)
+        return sub.release(plain, claim_id)
+
+    def set_state(self, ref, state):
+        sub, plain = self._owner(ref)
+        return sub.set_state(plain, state)
+
+    def ready_reasons(self, ref):
+        sub, plain = self._owner(ref)
+        return sub.ready_reasons(plain)
+
+
+def _umbrella_pending(self, *_a, **_k):
+    raise BackendUnavailable("not available in umbrella mode yet (milestones, release and review across sub-repos: M07-S06 T2)")
+
+
+for _name in _UMBRELLA_PENDING:
+    setattr(UmbrellaIssueBackend, _name, _umbrella_pending)
+
+
 def get_backend(cfg=None):
     """The backend selected by backlog.backend. ValueError on a bad value."""
     if cfg is None:
         cfg = load_config()
     if backlog_backend(cfg) == "file":
         return FileBackend()
+    from hvlib_repos import load_repos
+    if load_repos():  # umbrella mode: registered sub-repos, not the mere presence of repos.json
+        return UmbrellaIssueBackend(cfg)
     return IssueBackend(cfg)
 
 
