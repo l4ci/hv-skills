@@ -1013,6 +1013,60 @@ class IssueBackend:
         if ms is not None and ms["state"] != ("closed" if want_closed else "open"):
             self.adapter.edit_milestone(ms["number"], state="closed" if want_closed else "open")
 
+    # -- release: gate, notes, close-out -----------------------------------
+
+    def _release_issues(self, mid):
+        """(tracking issue, native milestone, [issues in it, tracker excluded]), by number."""
+        tracker = self.tracker_issue(mid)
+        ms = self._native_milestone(mid, tracker)
+        if ms is None:
+            raise LookupError(f"milestone {mid} has no native milestone on the issue tracker")
+        issues = [i for i in self.adapter.issues_in_milestone(ms["title"], state="all")
+                  if i["number"] != tracker["number"] and not self._is_tracker(i)]
+        return tracker, ms, sorted(issues, key=lambda i: i["number"])
+
+    def release_gate(self, mid):
+        """([(issue, label)] blocking, [issue] warnings) over the open issues of milestone `mid`."""
+        _t, _ms, issues = self._release_issues(mid)
+        roles = self._state_labels("inProgress", "needsReview", "changesRequested")
+        blocked, warn = [], []
+        for i in issues:
+            if i["state"] != "open":
+                continue
+            hit = [l for l in roles if l in i["labels"]]
+            if hit:
+                blocked.append((i, hit[0]))
+            else:
+                warn.append(i)
+        return blocked, warn
+
+    def release_notes(self, mid):
+        """{"New": [(title, n)], "Fixed": [...], "Changed": [...]} from issues closed as completed."""
+        _t, _ms, issues = self._release_issues(mid)
+        out = {"New": [], "Fixed": [], "Changed": []}
+        for i in issues:
+            if i["state"] == "closed" and i.get("state_reason") == "completed":
+                out[{"F": "New", "B": "Fixed"}.get(self._letter(i), "Changed")].append(
+                    (_one_line(i["title"]), i["number"]))
+        return out
+
+    def release_close(self, mid, tag):
+        """Label `released` and comment `Released in <tag>` on each completed issue of `mid`
+        (skipping what is there), then close the native milestone and mark it shipped.
+        Returns the number of completed issues."""
+        done = [i for i in self._release_issues(mid)[2]
+                if i["state"] == "closed" and i.get("state_reason") == "completed"]
+        label = tracker_label(self.cfg, "released")
+        marker = f"Released in {tag}"
+        for i in done:
+            if label not in i["labels"]:
+                self.adapter.add_labels(i["number"], [label],
+                                        auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+            if not any(c["body"].strip() == marker for c in self.adapter.comments(i["number"])):
+                self.adapter.add_comment(i["number"], marker)
+        self.milestone_status(mid, "shipped")
+        return len(done)
+
     def milestone_show(self, mid):
         """The milestone plan text (issue body without the fields block)."""
         text, _block = parse_fields_block(self.tracker_issue(mid)["body"])

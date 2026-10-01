@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Release notes (issue mode) from the issues of a milestone, as markdown on stdout: `### New`
+# (features), `### Fixed` (bugs), `### Changed` (tasks), each line `- <Title> (#<n>)`. Only issues
+# closed as completed count (not-planned ones are dropped); the tracking issue is excluded; empty
+# sections are omitted. With --since <git-ref>, commit subjects in <ref>..HEAD that reference no
+# item (no `[F82]`-style tag, no `#N`) follow under `### Other` as `- <subject>`.
+# Reader helper: exit 0 on success; exit 1 on usage error, unknown milestone or bad ref; exit 2 file
+#   backend (issue mode only); exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-release-notes-from-issues <MNN> [--since <git-ref>]
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-release-notes-from-issues <MNN> [--since <git-ref>]"
+MID="${1:?$USAGE}"; shift
+SINCE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --since) SINCE="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$SINCE" <<'PY'
+import re, subprocess, sys
+from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
+
+mid, since = sys.argv[1:3]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-release-notes-from-issues: {msg}\n"); sys.exit(code)
+
+try:
+    backend = get_backend()
+    if not isinstance(backend, IssueBackend):
+        die("issue mode only (backlog.backend is \"file\")", 2)
+    notes = backend.release_notes(mid)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+other = []
+if since:
+    r = subprocess.run(["git", "log", "--format=%s", f"{since}..HEAD"], capture_output=True, text=True)
+    if r.returncode != 0:
+        die(f"git log {since}..HEAD failed: {r.stderr.strip()}")
+    tagged = re.compile(r"\[[A-Z]\d+(?:-S\d+)?\]|#\d+")
+    other = [s for s in r.stdout.splitlines() if s.strip() and not tagged.search(s)]
+sections = [(name, [f"- {t} (#{n})" for t, n in rows]) for name, rows in notes.items()]
+sections.append(("Other", [f"- {s}" for s in other]))
+print("\n\n".join(f"### {name}\n\n" + "\n".join(lines) for name, lines in sections if lines))
+PY
