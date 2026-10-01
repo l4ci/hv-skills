@@ -67,6 +67,11 @@ def find_origin_bullet(corpus: str, iid: str) -> tuple[str, str | None] | None:
 _TODO_FIELD_NAMES = ("Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured", "Since")
 
 
+# Fields a capture may set on a new item: everything but the ones capture derives
+# itself (Detail from --body-file, Since from HEAD).
+_CREATE_FIELDS = tuple(n for n in _TODO_FIELD_NAMES if n not in ("Detail", "Since"))
+
+
 def parse_todo_fields(line: str) -> dict[str, str]:
     """Extract Detail/Related/Milestone/Repos/Subsystem/Captured/Since fields from a TODO bullet line.
 

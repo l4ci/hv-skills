@@ -356,6 +356,7 @@ Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-rev
 | `issues.labels.milestoneTracker` | `"milestone-tracker"` | Label name. |
 | `issues.labels.types.bug` / `.feature` / `.task` | `"type:bug"` / `"type:feature"` / `"type:task"` | Label names per item type. |
 | `issues.labels.priorityPrefix` | `"p"` | Prefix for priority labels. |
+| `issues.labels.sizePrefix` | `"size:"` | Prefix for feature size labels (`size:Major`). |
 
 `issues.label` is the legacy alias of `issues.labels.inProgress`. It is used when the new key is unset. `hv-config-show` lists all of these keys with their effective value and source.
 

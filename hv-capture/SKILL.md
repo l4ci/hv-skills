@@ -226,13 +226,13 @@ Skip this step entirely for items that fit comfortably in 1–3 sentences. Most 
 
 **Consult the Glossary.** Before composing the bullet, scan the `## Glossary` topic of `.hv/KNOWLEDGE.md` (via `hv-glossary-read` if you have a candidate term, or by reading the topic directly when scoping multiple). If the user's phrasing maps to a canonical term (or one of its aliases), use the canonical name in the captured bullet so the backlog stays consistent with the rest of the project's vocabulary. If the captured idea introduces a *new* domain concept the user names explicitly, suggest `/hv-learn --term <name>` after the capture commits — never auto-invoke.
 
-For each item, get the next ID and append the entry in a single command:
+For each item, create it in one command; it prints the new ID:
 
 ```bash
-ID=$(.hv/bin/hv-next-id bugs) && .hv/bin/hv-append "## Bugs" "- **[$ID] [P1] Short title.** Description. Related: [F02]"
+ID=$(.hv/bin/hv-item-create bugs --title "Short title" --tag P1 --desc "Description." --field Related=[F02])
 ```
 
-Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`, `## Tasks`), and entry content for each item.
+Change the type (`bugs`, `features`, `tasks`), `--tag` (`P0`-`P3` for bugs, `Major`/`Minor`/`Cosmetic` for features, none for tasks), and `--desc` / `--field Name=Value` (`Related`, `Milestone`, `Repos`, `Subsystem`; repeatable) for each item. Under the file backend this mints the ID and appends the bullet below exactly as `hv-next-id` + `hv-append` do. Under `backlog.backend: "issues"` it creates a tracker issue instead: the ID is the issue number with its type letter (`F42`), the type/priority/size become labels, `Milestone` becomes the native milestone, and there is no `.hv/<kind>/` file.
 
 **Entry formats:**
 
@@ -240,11 +240,11 @@ Change the type (`bugs`, `features`, `tasks`), section (`## Bugs`, `## Features`
 - Feature: `- **[$ID] [Size] Short title.** What it does, where it lives, why it matters. Related: [B01], [T03] Milestone: M02 Repos: api`
 - Task: `- **[$ID] Short title.** What needs to happen and why. Related: [F01], [B02] Milestone: M01, M03 Repos: web`
 
-With detail file, insert `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`.
+With a detail file, pass `--body-file <path>`: the helper writes it to `.hv/{type}/{ID}.md` (`{ID}` in the content becomes the ID) and inserts `Detail: \`.hv/{type}/{ID}.md\`` before `Related:`. Under the issue backend the file's content becomes part of the issue body instead.
 
 **Field order:** title.description. then any combination of `Detail:`, `Related:`, `Milestone:`, `Repos:`, and `Subsystem:` (optional). Each is independently optional. `Related:` is for cross-item links; `Milestone:` is for milestone tagging from Step 4.5; `Repos:` is for sub-repo tagging from Step 4.6 (umbrella mode only — comma-separated list of registered sub-repos; a single name is the common case, two or more turns the item into a multi-repo dispatch via `/hv-work`); `Subsystem:` is the project-map subsystem this item belongs to.
 
-**`Since:` is auto-stamped.** `hv-append` appends ` Since: <short-hash>` (HEAD at capture time) to every new bullet that doesn't already carry the field, when invoked inside a git repo with at least one commit. The Since anchor lets `hv-todo-drift` ignore commits older than capture — prevents false-positives when IDs are reused across machine syncs. Don't include `Since:` in the entry string manually; let `hv-append` stamp it.
+**`Since:` is auto-stamped.** `hv-item-create` (through `hv-append`) appends ` Since: <short-hash>` (HEAD at capture time) to every new bullet, when invoked inside a git repo with at least one commit. The Since anchor lets `hv-todo-drift` ignore commits older than capture — prevents false-positives when IDs are reused across machine syncs. `Since` is not an accepted `--field`; let the helper stamp it.
 
 **Subsystem inference (optional).** Scan filenames and skill references in the user's text against the entries in `.hv/map/` (or the `## Project Map` block in CLAUDE.md). If a match is clear — e.g. the user mentions `hv-work`, `bin/hv-staleness`, or `hv-init` — append `Subsystem: <name>` (the closest map entry name) to the captured row. If no confident match exists, omit the field entirely. **Never block or delay capture for a missing Subsystem.** The field is a soft hint for map hygiene, not a required tag.
 
@@ -420,6 +420,8 @@ Use `--remove` when:
 
 ## Import Mode
 
+Under `backlog.backend: "issues"` the open issues already are the backlog: skip this whole mode and tell the user so. The rest of this section applies to the file backend.
+
 Inventory-driven capture: fetch open issues from the upstream GitHub or GitLab repo(s), subtract ones already in the backlog, let the user pick which to capture, mint IDs, write detail files, and apply an `in-progress` label upstream behind a manual gate. The provider is fixed by the dispatching flag — `--from-github` scans GitHub repos, `--from-gitlab` scans GitLab repos. Round-trip closing is handled separately by `/hv-ship` and `bin/hv-issues-close`.
 
 ### Step I1 — Resolve Target Repo Set
@@ -511,13 +513,9 @@ When asking is warranted: one AskUserQuestion per pick (single-select, ≤4 opti
 
 **Loop mode:** when `autonomy.level == "loop"`, skip classification AskUserQuestion calls entirely — use the silent defaults above for every issue.
 
-**I5c — Mint ID and write detail file.**
+**I5c — Write the body file.**
 
-```bash
-ID=$(.hv/bin/hv-next-id <bugs|features|tasks>)
-```
-
-Write `.hv/<bugs|features|tasks>/<ID>.md` with the issue body as markdown passthrough, followed by:
+Write the issue body as markdown passthrough to a scratch file, followed by:
 
 ```markdown
 ---
@@ -525,13 +523,13 @@ Write `.hv/<bugs|features|tasks>/<ID>.md` with the issue body as markdown passth
 **Captured from:** <provider> #<N>
 ```
 
-**I5d — Append BACKLOG.md entry.**
+**I5d — Create the item.**
 
 ```bash
-.hv/bin/hv-append "## <Section>" "- **[<ID>] [<Tag>] <Title>.** <first-sentence-or-two-of-body>. Detail: \`.hv/<kind>/<ID>.md\` <provider-tag> Repos: <name>"
+ID=$(.hv/bin/hv-item-create <bugs|features|tasks> --title "<Title>" --tag <Tag> --desc "<first-sentence-or-two-of-body>. <provider-tag>" --body-file <scratch-file> --field Repos=<name>)
 ```
 
-Where `<provider-tag>` is `GH: #<N>` for GitHub or `GL: #<N>` for GitLab. Omit `Repos: <name>` in single-repo mode. Omit `[<Tag>]` for Tasks (no priority/size tag).
+This mints the ID, writes the scratch file to `.hv/<kind>/<ID>.md`, and appends the BACKLOG.md entry with its `Detail:` pointer. `<provider-tag>` is `GH: #<N>` for GitHub or `GL: #<N>` for GitLab. Drop `--field Repos=<name>` in single-repo mode and `--tag` for Tasks (no priority/size tag).
 
 Entry shapes:
 

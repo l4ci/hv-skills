@@ -7,40 +7,12 @@ set -euo pipefail
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-next-id 'IDs are issue numbers; capture creates the issue' || exit $?
 TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
-  bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;
+  bugs|features|tasks|milestones) ;;
   *) echo "error: unknown type '$TYPE'" >&2; exit 1 ;;
 esac
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TYPE" "$P" <<'PY'
-import re
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TYPE" <<'PY'
 import sys
-from pathlib import Path
-from hvlib import update_json
+from hvlib import get_backend
 
-key, prefix = sys.argv[1], sys.argv[2]
-counters_path = Path(".hv/counters.json")
-
-def observed_max(prefix: str) -> int:
-    pat = re.compile(rf"\[{prefix}(\d+)\]")
-    highest = 0
-    for fname in (".hv/BACKLOG.md", ".hv/ARCHIVE.md"):
-        p = Path(fname)
-        if not p.exists():
-            continue
-        for m in pat.finditer(p.read_text()):
-            n = int(m.group(1))
-            if n > highest:
-                highest = n
-    return highest
-
-obs_max = observed_max(prefix)
-
-result = []
-def mutator(d):
-    current = d.get(key, 0)
-    next_id = max(current, obs_max) + 1
-    d[key] = next_id
-    result.append(next_id)
-
-update_json(counters_path, {}, mutator)
-print(f"{prefix}{result[0]:02d}")
+print(get_backend().next_id(sys.argv[1]))
 PY

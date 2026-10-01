@@ -56,6 +56,7 @@ CONFIG_KEYS = [
     ("issues.labels.types.feature", "type:feature", False),
     ("issues.labels.types.task", "type:task", False),
     ("issues.labels.priorityPrefix", "p", False),
+    ("issues.labels.sizePrefix", "size:", False),
     ("issues.autoCreateLabel", True, False),
     ("issues.filterMineOnly", False, False),
     ("release.checklistPath", ".hv/RELEASE.md", False),

@@ -350,6 +350,26 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-10-01"
+    },
+    "Architecture: Helper conventions & invariants::Wrappers read stdin only when an argument takes it": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-01"
+    },
+    "Build & Tooling: Helpers & migrations::New bin/ helpers need the exec bit before commit": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-01"
+    },
+    "Build & Tooling: Smoke testing::Orchestrator owns the 44 NAMES sync across parallel waves": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-01"
+    },
+    "Architecture: Module extraction & migration safety::Golden harness proves byte-identical helper moves": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-01"
     }
   }
 }

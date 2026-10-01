@@ -13,13 +13,21 @@ MS_JSON="$("$HERE/hv-vision-list")"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import section, iter_open_sections, load_json, parse_done_line, iter_topics, active_items
+from hvlib import (section, iter_open_sections, load_json, parse_done_line, iter_topics, active_items,
+                   get_backend, BackendUnavailable, TrackerError, tracker_exit_code)
 
-todo = Path(".hv/BACKLOG.md")
-if not todo.exists():
+try:
+    backend = get_backend()
+    content = backend.backlog_markdown()
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-summary: {e}\n"); sys.exit(2)
+except ValueError as e:
+    sys.stderr.write(f"error: hv-summary: {e}\n"); sys.exit(1)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-summary: {e.message}\n"); sys.exit(tracker_exit_code(e))
+if content is None:
     print("No .hv/ yet — run /hv-init.")
     raise SystemExit(0)
-content = todo.read_text()
 
 def count(body):
     return sum(1 for line in body.splitlines() if line.strip().startswith("- **["))

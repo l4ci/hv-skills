@@ -15,13 +15,21 @@ fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$@" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import iter_open_bullets, parse_milestones
+from hvlib import (iter_open_bullets, parse_milestones, get_backend, BackendUnavailable,
+                   TrackerError, tracker_exit_code)
 
 ids_wanted = set(sys.argv[1:])
-todo = Path(".hv/BACKLOG.md")
-if not todo.exists():
+try:
+    backend = get_backend()
+    content = backend.backlog_markdown()
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-find-milestone-for-items: {e}\n"); sys.exit(2)
+except ValueError as e:
+    sys.stderr.write(f"error: hv-find-milestone-for-items: {e}\n"); sys.exit(1)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-find-milestone-for-items: {e.message}\n"); sys.exit(tracker_exit_code(e))
+if content is None:
     raise SystemExit(0)
-content = todo.read_text()
 milestones = set()
 for iid, line, fields, _section in iter_open_bullets(content):
     if iid not in ids_wanted:

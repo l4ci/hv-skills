@@ -2,8 +2,10 @@
 
 Helpers (hv-append, hv-todo-field, hv-todo-set-field, hv-backlog) call
 get_backend() and keep argv parsing, printing and exit codes to themselves;
-the methods here take and return data. backlog.backend = "issues" has no
-backend yet (M07-S02) and raises BackendUnavailable.
+the methods here take and return data. backlog.backend = "issues" selects
+IssueBackend: reads come from the tracker as BACKLOG.md-shaped markdown
+(backlog_markdown), so readers keep their parsers; lifecycle verbs raise
+BackendUnavailable until M07-S03.
 
 Imports sibling hvlib_* modules by direct path, never through the hvlib shim.
 """
@@ -13,15 +15,15 @@ import sys
 from pathlib import Path
 
 from hvlib_io import load_config, write_text_atomic, update_json
-from hvlib_config import backlog_backend
+from hvlib_config import backlog_backend, tracker_label, config_value
 from hvlib_section import BACKLOG_FILE, find_section, iter_open_sections, load_backlog_corpus
 from hvlib_bullet import (
     find_origin_bullet, parse_todo_fields, parse_done_line, set_todo_field, format_done_line,
+    _TODO_FIELD_NAMES, _SETTABLE_FIELDS, _CREATE_FIELDS,
 )
 from hvlib_paths import detail_dir_for_id, section_name_for_dir
-from hvlib_types import COUNTABLE_TYPES
-
-ISSUES_UNAVAILABLE = "issues backend not available yet (M07-S02)"
+from hvlib_tracker import adapter_for, TrackerError
+from hvlib_types import COUNTABLE_TYPES, ITEM_TYPES
 
 
 class BackendUnavailable(Exception):
@@ -33,6 +35,31 @@ class ProofMissing(Exception):
 
 
 _REFACTOR_SUBJECT = re.compile(r"^refactor(\(.+?\))?!?:")
+
+
+_KIND_PREFIX = {"bugs": "B", "features": "F", "tasks": "T"}
+_KIND_TAGS = {"bugs": ("P0", "P1", "P2", "P3"), "features": ("Major", "Minor", "Cosmetic"), "tasks": ()}
+
+
+def _check_create(kind, title, tag, fields):
+    """Shared capture validation. Returns (clean title, tag, {Name: value}) or raises ValueError."""
+    if kind not in _KIND_PREFIX:
+        raise ValueError(f"unknown kind '{kind}' (expected bugs|features|tasks)")
+    title = _one_line(title)
+    if not title:
+        raise ValueError("--title is required")
+    tag = tag or ""
+    if tag and tag not in _KIND_TAGS[kind]:
+        allowed = "/".join(_KIND_TAGS[kind])
+        raise ValueError(f"invalid tag '{tag}' for {kind}" + (f" (expected {allowed})" if allowed else " (tasks take no tag)"))
+    clean = {}
+    for name, value in (fields or {}).items():
+        if name not in _CREATE_FIELDS:
+            raise ValueError(f"'{name}' is not a settable field (expected {'|'.join(_CREATE_FIELDS)})")
+        if not str(value).strip():
+            raise ValueError(f"field {name} needs a non-empty value")
+        clean[name] = _one_line(str(value))
+    return title, tag, clean
 
 
 class FileBackend:
@@ -47,6 +74,13 @@ class FileBackend:
         the section is absent.
         """
         name = section[3:] if section.startswith("## ") else section
+        # Capture anchor: stamp `Since: <short HEAD>` on bullets that lack it
+        # (hv-todo-drift ignores commits older than capture), when HEAD exists.
+        if line.startswith("- ") and "Since:" not in line:
+            head = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                                  capture_output=True, text=True)
+            if head.returncode == 0 and head.stdout.strip():
+                line = f"{line} Since: {head.stdout.strip()}"
         content = open(self.path).read()
         span = find_section(content, name)
         if span is None:
@@ -55,6 +89,55 @@ class FileBackend:
         tail = "\n" + content[end:] if content[end:] else ""
         content = content[:end].rstrip("\n") + "\n" + line + "\n" + tail
         write_text_atomic(self.path, content)
+
+    def next_id(self, kind):
+        """Bump counters.json and return the new zero-padded ID (`B07`).
+
+        `kind` is bugs|features|tasks|milestones. The counter never lags the
+        highest ID already in BACKLOG.md / ARCHIVE.md.
+        """
+        prefix = {**_KIND_PREFIX, "milestones": "M"}[kind]
+        pat = re.compile(rf"\[{prefix}(\d+)\]")
+        highest = 0
+        for fname in (".hv/BACKLOG.md", ".hv/ARCHIVE.md"):
+            p = Path(fname)
+            if p.exists():
+                for m in pat.finditer(p.read_text()):
+                    highest = max(highest, int(m.group(1)))
+        result = []
+
+        def mutator(d):
+            nxt = max(d.get(kind, 0), highest) + 1
+            d[kind] = nxt
+            result.append(nxt)
+
+        update_json(Path(".hv/counters.json"), {}, mutator)
+        return f"{prefix}{result[0]:02d}"
+
+    def create(self, kind, title, tag="", desc="", fields=None, body=None):
+        """Capture one item: mint the ID, append the bullet (Since stamped by
+        append), write `body` to .hv/<kind>/<ID>.md (`{ID}` tokens replaced).
+
+        `body` is bytes or None. Returns the ID. ValueError on bad input,
+        FileNotFoundError / LookupError as append().
+        """
+        title, tag, fields = _check_create(kind, title, tag, fields)
+        if not self.path.exists():
+            raise FileNotFoundError(str(self.path))
+        item_id = self.next_id(kind)
+        parts = [f"- **[{item_id}] " + (f"[{tag}] " if tag else "")
+                 + title + ("" if title[-1] in ".!?" else ".") + "**"]
+        if (desc or "").strip():
+            parts.append(desc.strip())
+        if body is not None:
+            parts.append(f"Detail: `.hv/{kind}/{item_id}.md`")
+        parts += [f"{k}: {v}" for k, v in fields.items()]
+        self.append(section_name_for_dir(kind), " ".join(parts))
+        if body is not None:
+            detail = Path(f".hv/{kind}/{item_id}.md")
+            detail.parent.mkdir(parents=True, exist_ok=True)
+            detail.write_bytes(body.replace(b"{ID}", item_id.encode()))
+        return item_id
 
     def fields(self, item_id):
         """Every known field of the item's bullet (open or archived), plus
@@ -260,15 +343,350 @@ class FileBackend:
         content = self.path.read_text()
         return content, list(iter_open_sections(content))
 
+    def backlog_markdown(self, closed_limit=None):
+        """BACKLOG.md verbatim (closed_limit is ignored), None when missing."""
+        if not self.path.exists():
+            return None
+        return self.path.read_text()
+
+    def canonical_id(self, ref):
+        """File IDs are already canonical."""
+        return ref
+
+    def detail_text(self, item_id):
+        """Content of the item's detail file, None when absent or unreadable."""
+        d = detail_dir_for_id(item_id)
+        if not d:
+            return None
+        path = Path(f".hv/{d}/{item_id}.md")
+        if not path.exists():
+            return None
+        try:
+            return path.read_text()
+        except OSError:
+            return None
+
+
+# --- issue backend ---------------------------------------------------------
+
+_FIELDS_OPEN = "<!-- hv:fields"
+_FIELDS_RE = re.compile(r"\n*<!-- hv:fields\n(?P<body>.*?)\n?-->[ \t]*\n*\Z", re.DOTALL)
+_FIELD_LINE_RE = re.compile(r"^([A-Za-z]+):[ \t]*(.*?)[ \t]*$")
+# Fields that live in the body block: everything except what the tracker or git supplies.
+_BLOCK_FIELDS = tuple(n for n in _TODO_FIELD_NAMES if n not in ("Milestone", "Since", "Detail"))
+_ITEM_REF_RE = re.compile(rf"^(?:#(?P<n1>\d+)|(?P<t>[{ITEM_TYPES}])?(?P<n2>\d+))$", re.IGNORECASE)
+_SECTION_FOR_LETTER = {"B": "Bugs", "F": "Features", "T": "Tasks"}
+_NOT_FOUND_RE = re.compile(r"not found|could not resolve|404", re.IGNORECASE)
+
+
+def resolve_item_ref(ref):
+    """`#42`, `42` or `F42` -> (42, None) / (42, "F"). ValueError when malformed."""
+    m = _ITEM_REF_RE.match(str(ref).strip())
+    if not m:
+        raise ValueError(f"not an item reference: {ref!r}")
+    n = int(m.group("n1") or m.group("n2"))
+    t = m.group("t")
+    return n, (t.upper() if t else None)
+
+
+def parse_fields_block(body):
+    """(text_without_block, {Name: value}) for an issue body.
+
+    The block is a trailing `<!-- hv:fields` ... `-->` comment, one `Name: value`
+    per line. No block -> (body, {}).
+    """
+    body = (body or "").replace("\r\n", "\n")
+    m = _FIELDS_RE.search(body)
+    if not m:
+        return body, {}
+    fields = {}
+    for line in m.group("body").split("\n"):
+        fm = _FIELD_LINE_RE.match(line)
+        if fm and fm.group(2):
+            fields[fm.group(1)] = fm.group(2)
+    return body[:m.start()], fields
+
+
+def render_fields_block(text, fields):
+    """Inverse of parse_fields_block: append the block to `text` (no block when
+    `fields` has no non-empty values). Round-trips exactly for text without
+    trailing newlines."""
+    text = (text or "").rstrip("\n")
+    lines = [f"{k}: {_one_line(str(v))}" for k, v in fields.items() if _one_line(str(v))]
+    if not lines:
+        return text
+    block = _FIELDS_OPEN + "\n" + "\n".join(lines) + "\n-->"
+    return f"{text}\n\n{block}" if text else block
+
+
+def tracker_exit_code(err):
+    """Exit code for a TrackerError: 3 unavailable and 4 rate-limited pass
+    through, everything else is 1."""
+    return err.code if err.code in (3, 4) else 1
+
+
+def _bracket_ids(value):
+    """`F12, B03` -> `[F12], [B03]` so Related matches the file grammar."""
+    return re.sub(rf"(?<![\[\w])([{ITEM_TYPES}]\d+)(?![\]\w])", r"[\1]", value)
+
+
+def _one_line(s):
+    return re.sub(r"\s+", " ", s or "").strip()
+
+
+class IssueBackend:
+    """Backlog served from the issue tracker (reads, capture, field writes)."""
+
+    def __init__(self, cfg=None):
+        self.cfg = load_config() if cfg is None else cfg
+        self._adapter = None
+
+    @property
+    def adapter(self):
+        if self._adapter is None:
+            self._adapter = adapter_for(self.cfg)
+        return self._adapter
+
+    # -- classification ----------------------------------------------------
+
+    def _letter(self, issue):
+        labels = issue["labels"]
+        for letter, role in (("B", "types.bug"), ("F", "types.feature"), ("T", "types.task")):
+            if tracker_label(self.cfg, role) in labels:
+                return letter
+        return "T"
+
+    def _is_tracker(self, issue):
+        return tracker_label(self.cfg, "milestoneTracker") in issue["labels"]
+
+    def _tag(self, issue, letter):
+        labels = issue["labels"]
+        if letter == "B":
+            pre = tracker_label(self.cfg, "priorityPrefix")
+            for l in labels:
+                m = re.fullmatch(re.escape(pre) + r"(\d+)", l)
+                if m:
+                    return f"P{m.group(1)}"
+        elif letter == "F":
+            pre = tracker_label(self.cfg, "sizePrefix")
+            for l in labels:
+                if l.startswith(pre) and len(l) > len(pre):
+                    return l[len(pre):]
+        return ""
+
+    @staticmethod
+    def _milestone(issue, block):
+        title = _one_line(issue.get("milestone") or "")
+        if title:
+            m = re.match(r"M\d+", title)
+            return m.group(0) if m else title
+        return block.get("Milestone", "")
+
+    def _fields(self, issue, block):
+        """Rendered field values in _TODO_FIELD_NAMES order (Milestone first)."""
+        out = {}
+        ms = self._milestone(issue, block)
+        if ms:
+            out["Milestone"] = ms
+        for name in _BLOCK_FIELDS:
+            v = block.get(name, "")
+            if v:
+                out[name] = _bracket_ids(v) if name == "Related" else v
+        return out
+
+    # -- rendering ---------------------------------------------------------
+
+    def _bullet_inner(self, issue):
+        """`**[F3] [Major] Title.** text Milestone: M07 ...` for one issue."""
+        letter = self._letter(issue)
+        text, block = parse_fields_block(issue["body"])
+        title = _one_line(issue["title"].replace("*", "")) or "(untitled)"
+        if title[-1] not in ".!?":
+            title += "."
+        tag = self._tag(issue, letter)
+        head = f"**[{letter}{issue['number']}] " + (f"[{tag}] " if tag else "") + f"{title}**"
+        paras = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+        desc = _one_line(paras[0]) if paras else ""
+        if len(desc) > 200:
+            desc = desc[:199].rstrip() + "\u2026"
+        parts = [desc] + [f"{k}: {v}" for k, v in self._fields(issue, block).items()]
+        return " ".join([head] + [p for p in parts if p])
+
+    def _done_line(self, issue):
+        date = (issue.get("closed_at") or "1970-01-01")[:10]
+        suffix = " (dropped)" if issue.get("state_reason") == "not_planned" else ""
+        return f"- ~~{self._bullet_inner(issue)}~~ Done {date} [`#{issue['number']}`]{suffix}"
+
+    def backlog_markdown(self, closed_limit=20):
+        """BACKLOG.md-shaped rendering: open issues by type, newest `closed_limit`
+        closed ones (all when None, none when 0) as Done lines, newest first."""
+        opened = [i for i in self.adapter.list(state="open") if not self._is_tracker(i)]
+        sections = {"B": [], "F": [], "T": []}
+        for i in sorted(opened, key=lambda i: i["number"]):
+            sections[self._letter(i)].append(f"- {self._bullet_inner(i)}")
+        out = ["# Backlog", ""]
+        for letter in "BFT":
+            out += [f"## {_SECTION_FOR_LETTER[letter]}", "", *sections[letter]]
+            if sections[letter]:
+                out.append("")
+        done = []
+        if closed_limit is None or closed_limit > 0:
+            closed = [i for i in self.adapter.list(state="closed") if not self._is_tracker(i)]
+            closed.sort(key=lambda i: (i.get("closed_at") or "", i["number"]), reverse=True)
+            done = [self._done_line(i) for i in (closed if closed_limit is None else closed[:closed_limit])]
+        out += ["## Completed", "", *done]
+        return "\n".join(out).rstrip("\n") + "\n"
+
+    def list_open(self):
+        """Same contract as FileBackend.list_open, derived from the rendering."""
+        content = self.backlog_markdown(closed_limit=0)
+        return content, list(iter_open_sections(content))
+
+    # -- single items ------------------------------------------------------
+
+    def _lookup(self, ref):
+        """The issue behind `ref`, or None (malformed, absent, tracker issue or
+        type-letter mismatch). Other tracker failures raise TrackerError."""
+        try:
+            n, letter = resolve_item_ref(ref)
+        except ValueError:
+            return None
+        try:
+            issue = self.adapter.get(n)
+        except TrackerError as e:
+            if e.code == 1 and _NOT_FOUND_RE.search(e.message):
+                return None
+            raise
+        if self._is_tracker(issue) or (letter and letter != self._letter(issue)):
+            return None
+        return issue
+
+    def canonical_id(self, ref):
+        """`#2` / `2` / `F2` -> `F2` (None when no such item)."""
+        issue = self._lookup(ref)
+        return None if issue is None else f"{self._letter(issue)}{issue['number']}"
+
+    def fields(self, ref):
+        """Same keys as FileBackend.fields; `detail` is the issue URL. None when unknown."""
+        issue = self._lookup(ref)
+        if issue is None:
+            return None
+        _text, block = parse_fields_block(issue["body"])
+        rendered = self._fields(issue, block)
+        out = {name.lower(): "" for name in _TODO_FIELD_NAMES}
+        for k, v in rendered.items():
+            out[k.lower()] = v
+        out["detail"] = issue["url"]
+        closed = issue["state"] == "closed"
+        out["reason"] = ("dropped" if issue.get("state_reason") == "not_planned" else "done") if closed else ""
+        out["note"] = ""
+        out["title"] = _one_line(issue["title"].replace("*", "")).rstrip(".").strip() or "(untitled)"
+        return out
+
+    def detail_text(self, ref):
+        """Issue body without the fields block; None when absent or empty."""
+        issue = self._lookup(ref)
+        if issue is None:
+            return None
+        text, _block = parse_fields_block(issue["body"])
+        return text if text.strip() else None
+
+    # -- writes ------------------------------------------------------------
+
+    def _milestone_title(self, value):
+        """Native milestone title for hv ID `value` (`M07`); TrackerError(1) when absent."""
+        value = value.strip()
+        if not re.fullmatch(r"M\d+", value):
+            raise ValueError(f"issue mode takes one milestone ID like M07, got '{value}'")
+        title = self.adapter.find_milestone(value)
+        if title is None:
+            raise TrackerError(
+                1, f"milestone {value} not found on the tracker \u2014 create it with /hv-vision (M07-S05)")
+        return title
+
+    def create(self, kind, title, tag="", desc="", fields=None, body=None):
+        """Capture one item as an issue and return its ID (`F42`).
+
+        Labels: type, `<priorityPrefix><n>` for P-tags, `<sizePrefix><Tag>` for
+        sizes. Body: desc, then `body` (bytes, a detail file's content) after a
+        blank line, then the fields block (Milestone excluded: it is the native
+        milestone). `{ID}` tokens in `body` are substituted by a second edit
+        once the number exists (only when a token is present).
+        """
+        title, tag, fields = _check_create(kind, title, tag, fields)
+        letter = _KIND_PREFIX[kind]
+        labels = [tracker_label(self.cfg, {"B": "types.bug", "F": "types.feature", "T": "types.task"}[letter])]
+        if tag and letter == "B":
+            labels.append(tracker_label(self.cfg, "priorityPrefix") + tag[1:])
+        elif tag:
+            labels.append(tracker_label(self.cfg, "sizePrefix") + tag)
+        ms_title = self._milestone_title(fields.pop("Milestone")) if "Milestone" in fields else None
+        text = "\n\n".join(p for p in ((desc or "").strip(),
+                                       body.decode(errors="replace").strip("\n") if body is not None else "") if p)
+        full = render_fields_block(text, fields)
+        self.adapter.ensure_labels(labels, auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+        number = self.adapter.create(title, full, labels, milestone=ms_title)
+        if "{ID}" in full:
+            self.adapter.edit(number, body=full.replace("{ID}", f"{letter}{number}"))
+        return f"{letter}{number}"
+
+    def set_field(self, ref, field, value):
+        """Set/replace/clear a field on an open issue; same contract as FileBackend.
+
+        Milestone is the native milestone; the others live in the body's fields
+        block. Returns True when the tracker changed. LookupError: unknown or
+        closed item. ValueError: field not settable (Detail included).
+        """
+        field = field.lower()
+        if field not in _SETTABLE_FIELDS:
+            raise ValueError(
+                f"{field} is not a settable field; pick one of {'/'.join(_SETTABLE_FIELDS)}")
+        issue = self._lookup(ref)
+        if issue is None or issue["state"] != "open":
+            raise LookupError(f"[{ref}] is not an open item on the issue tracker (unknown or closed)")
+        value = value.strip()
+        n = issue["number"]
+        if field == "milestone":
+            if not value:
+                if not issue["milestone"]:
+                    return False
+                self.adapter.edit(n, remove_milestone=True)
+                return True
+            title = self._milestone_title(value)
+            if issue["milestone"] == title:
+                return False
+            self.adapter.edit(n, milestone=title)
+            return True
+        name = field.capitalize()
+        text, block = parse_fields_block(issue["body"])
+        value = _one_line(value)
+        if block.get(name, "") == value:
+            return False
+        new = dict(block)
+        if value:
+            new[name] = value
+        else:
+            new.pop(name, None)
+        self.adapter.edit(n, body=render_fields_block(text, new))
+        return True
+
+    def append(self, *_a, **_k):
+        raise BackendUnavailable("issue mode creates items with hv-item-create")
+
+    def complete(self, *_a, **_k):
+        raise BackendUnavailable("issues backend not available yet (M07-S03)")
+
+    def uncomplete(self, *_a, **_k):
+        raise BackendUnavailable("issues backend not available yet (M07-S03)")
+
 
 def get_backend(cfg=None):
-    """The backend selected by backlog.backend. ValueError on a bad value,
-    BackendUnavailable for "issues" until M07-S02."""
+    """The backend selected by backlog.backend. ValueError on a bad value."""
     if cfg is None:
         cfg = load_config()
     if backlog_backend(cfg) == "file":
         return FileBackend()
-    raise BackendUnavailable(ISSUES_UNAVAILABLE)
+    return IssueBackend(cfg)
 
 
 def require_file_backend(helper, pointer, cfg=None):
