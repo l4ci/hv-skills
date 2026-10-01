@@ -29,7 +29,7 @@ Change one or more configuration values without hand-editing JSON. Same option v
 ## When NOT to Use
 
 - First-time setup → `/hv-init` writes the whole file from scratch
-- Just inspecting current values → `cat .hv/config.json`
+- Just inspecting current values → `.hv/bin/hv-config-show [<key>]` (value plus source layer)
 - Adding a brand-new key after a plugin upgrade → `/hv-init` runs the STALE migration and asks only for the missing key
 
 ## Step 1 — Preflight
@@ -55,7 +55,7 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 
 | Shape | Behavior |
 |-------|----------|
-| Empty / whitespace only | Continue to Step 2 — full guided flow. |
+| Empty / whitespace only | Run `.hv/bin/hv-config-show` and print its output verbatim (every key, value and source layer), then continue to Step 2 — full guided flow. |
 | `<key>` (no `=`) | Skip Step 2 and Step 3. Treat `<key>` as the single picked key; jump straight to Step 4. |
 | `<key>=<value>` | Skip Steps 2–4. Validate, apply directly via `hv-config-set`, jump to Step 6. |
 

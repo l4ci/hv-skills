@@ -15,7 +15,7 @@ The "(Recommended)" tag on each option marks the install-time default. `/hv-conf
 
 | Shape | Behavior |
 |-------|----------|
-| `/hv-config` (no args) | Full guided flow: category checklist, then key checklist, then value pickers. |
+| `/hv-config` (no args) | Prints `hv-config-show` output (every key, value and source layer: `local`, `project` or `default`), then the full guided flow: category checklist, then key checklist, then value pickers. |
 | `/hv-config <key>` | Jumps straight to the value picker for that key, skipping the category and key checklists. |
 | `/hv-config <key>=<value>` | Applies the value directly without any interactive prompts, then prints the one-line diff. |
 
