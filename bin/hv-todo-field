@@ -31,7 +31,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$DUMP" <<'PY'
 import json
 import sys
-from hvlib import get_backend, BackendUnavailable
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code, IssueBackend
 
 iid, field, dump = sys.argv[1], sys.argv[2], sys.argv[3]
 VALID = ("title", "detail", "related", "milestone", "repos", "subsystem", "since", "reason", "note")
@@ -42,9 +42,13 @@ except BackendUnavailable as e:
     sys.stderr.write(f"error: hv-todo-field: {e}\n"); sys.exit(2)
 except ValueError as e:
     sys.stderr.write(f"error: hv-todo-field: {e}\n"); sys.exit(1)
-fields = backend.fields(iid)
+try:
+    fields = backend.fields(iid)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-todo-field: {e.message}\n"); sys.exit(tracker_exit_code(e))
 if fields is None:
-    sys.stderr.write(f"error: [{iid}] not found in BACKLOG.md or ARCHIVE.md\n")
+    where = "the issue tracker" if isinstance(backend, IssueBackend) else "BACKLOG.md or ARCHIVE.md"
+    sys.stderr.write(f"error: [{iid}] not found in {where}\n")
     sys.exit(1)
 title = fields["title"]
 

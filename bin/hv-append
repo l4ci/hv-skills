@@ -30,6 +30,8 @@ except ValueError as e:
     sys.stderr.write(f"error: hv-append: {e}\n"); sys.exit(1)
 try:
     backend.append(sec, entry)
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-append: {e}\n"); sys.exit(2)
 except LookupError as e:
     print(f"error: {e.args[0]}", file=sys.stderr); sys.exit(1)
 PY

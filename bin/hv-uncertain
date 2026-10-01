@@ -14,15 +14,24 @@ import re
 import sys
 from pathlib import Path
 import os
-from hvlib import parse_todo_fields, find_open_bullet, parse_open_bullet, detail_dir_for_id
+from hvlib import (parse_todo_fields, find_open_bullet, parse_open_bullet, get_backend,
+                   BackendUnavailable, TrackerError, tracker_exit_code)
 
 iid = sys.argv[1]
-todo = Path(".hv/BACKLOG.md")
-if not todo.exists():
+try:
+    backend = get_backend()
+    content = backend.backlog_markdown()
+    if content is not None:
+        iid = backend.canonical_id(iid) or iid
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-uncertain: {e}\n"); sys.exit(2)
+except ValueError as e:
+    sys.stderr.write(f"error: hv-uncertain: {e}\n"); sys.exit(1)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-uncertain: {e.message}\n"); sys.exit(tracker_exit_code(e))
+if content is None:
     print("error: .hv/BACKLOG.md not found", file=sys.stderr)
     raise SystemExit(2)
-
-content = todo.read_text()
 
 sections_env = os.environ.get("HV_OPEN_SECTIONS", "Bugs|Features|Tasks").split("|")
 sections_env = [s.strip() for s in sections_env if s.strip()]
@@ -39,18 +48,16 @@ tag = parsed["tag"] if parsed else ""
 if tag.lower() != "major":
     raise SystemExit(1)
 
-# Resolve detail file location by item-id letter.
-prefix_dir = detail_dir_for_id(iid)
-detail_path = Path(f".hv/{prefix_dir}/{iid}.md") if prefix_dir else None
-
+# Detail text: the detail file (file backend) or the issue body (issues backend).
+# Unreadable/absent counts as missing for gate (a).
+try:
+    detail = backend.detail_text(iid)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-uncertain: {e.message}\n"); sys.exit(tracker_exit_code(e))
 body_text = found_line
-detail_exists = bool(detail_path and detail_path.exists())
+detail_exists = detail is not None
 if detail_exists:
-    try:
-        body_text = body_text + "\n" + detail_path.read_text()
-    except OSError:
-        # Treat unreadable as missing for the purposes of gate (a).
-        detail_exists = False
+    body_text = body_text + "\n" + detail
 
 reasons = []
 

@@ -55,6 +55,8 @@ proof_show = None if os.environ.get("HV_NO_PROOF") else os.environ["HV_PROOF_SHO
 try:
     # Already completed -> silent no-op (idempotent; the counter is not re-bumped).
     backend.complete(id_s, hash_s, date_s, reason_s, note_s, proof_show)
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-complete: {e}\n"); sys.exit(2)
 except LookupError as e:
     print(f"error: {e.args[0]}", file=sys.stderr); sys.exit(1)
 except ProofMissing as e:

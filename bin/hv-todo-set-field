@@ -40,6 +40,8 @@ except ValueError as e:
     sys.stderr.write(f"error: hv-todo-set-field: {e}\n"); sys.exit(1)
 try:
     backend.set_field(iid, field, value)
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-todo-set-field: {e}\n"); sys.exit(2)
 except FileNotFoundError as e:
     sys.stderr.write(f"error: {e} not found\n")
     sys.exit(1)

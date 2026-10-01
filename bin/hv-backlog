@@ -35,7 +35,7 @@ PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
 import json, os, re, sys
 from collections import defaultdict
 from pathlib import Path
-from hvlib import get_backend, BackendUnavailable, load_json, parse_todo_fields, active_items, parse_open_bullet, parse_milestones
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code, load_json, parse_todo_fields, active_items, parse_open_bullet, parse_milestones
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
@@ -45,7 +45,10 @@ except BackendUnavailable as e:
     sys.stderr.write(f"error: hv-backlog: {e}\n"); sys.exit(2)
 except ValueError as e:
     sys.stderr.write(f"error: hv-backlog: {e}\n"); sys.exit(1)
-listing = backend.list_open()
+try:
+    listing = backend.list_open()
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-backlog: {e.message}\n"); sys.exit(tracker_exit_code(e))
 if listing is None:
     print("No .hv/BACKLOG.md yet. Run /hv-init then /hv-capture.")
     raise SystemExit(0)

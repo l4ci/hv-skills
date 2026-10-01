@@ -17,7 +17,10 @@ from hvlib_io import (
     load_json, load_config, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
     load_sidecar, locked,
 )
-from hvlib_backend import get_backend, FileBackend, BackendUnavailable, ProofMissing, require_file_backend
+from hvlib_backend import (
+    get_backend, FileBackend, IssueBackend, BackendUnavailable, ProofMissing, require_file_backend,
+    resolve_item_ref, parse_fields_block, render_fields_block, tracker_exit_code,
+)
 from hvlib_config import CONFIG_KEYS, config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
 from hvlib_tracker import adapter_for, TrackerError, GitHubAdapter, GitLabAdapter
 from hvlib_types import (

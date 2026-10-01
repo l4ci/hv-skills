@@ -23,6 +23,8 @@ except ValueError as e:
 try:
     if backend.uncomplete(id_s) == "active":
         print(f"noop: [{id_s}] already active in BACKLOG.md", file=sys.stderr)
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-uncomplete: {e}\n"); sys.exit(2)
 except (FileNotFoundError, LookupError, ValueError) as e:
     msg = f"{e.args[0]} not found" if isinstance(e, FileNotFoundError) else e.args[0]
     print(f"error: {msg}", file=sys.stderr); sys.exit(1)

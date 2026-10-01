@@ -26,11 +26,11 @@ assert adapter_for({}, prov).provider == prov
 n = a.create("First", "line1\nline2 with `ticks`", labels=("bug", "p1"), milestone="M07")
 assert n == 1, n
 g = a.get(n)
-keys = {"number","title","body","labels","milestone","state","closed_at","url","assignees"}
+keys = {"number","title","body","labels","milestone","state","state_reason","closed_at","url","assignees"}
 assert set(g) == keys, set(g) ^ keys
 assert g["title"] == "First" and g["body"] == "line1\nline2 with `ticks`", g
 assert sorted(g["labels"]) == ["bug", "p1"] and g["milestone"] == "M07", g
-assert g["state"] == "open" and g["closed_at"] is None and g["assignees"] == [], g
+assert g["state"] == "open" and g["state_reason"] is None and g["closed_at"] is None and g["assignees"] == [], g
 assert g["url"].endswith("/1"), g["url"]
 b = a.create("Second", "b2", labels=("bug",))
 assert b == 2
@@ -46,7 +46,7 @@ assert [i["number"] for i in a.list(state="open")] == [1]
 cl = a.list(state="closed")
 assert [i["number"] for i in cl] == [2] and cl[0]["state"] == "closed" and cl[0]["closed_at"], cl
 assert sorted(i["number"] for i in a.list(state="all")) == [1, 2]
-assert set(cl[0]) == keys
+assert set(cl[0]) == keys and cl[0]["state_reason"] == "completed", cl[0]
 # edit
 a.edit(1, title="First!", body="new body\nmore", add_labels=("extra",), remove_labels=("p1",))
 g = a.get(1)

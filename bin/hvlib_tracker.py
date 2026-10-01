@@ -5,7 +5,8 @@ hv-tracker-call runs the CLI in the process cwd, so call these with cwd = the pr
 No caching: each method is one CLI round trip.
 
 Normalized issue: {"number", "title", "body", "labels", "milestone" (title|None),
-"state" ("open"|"closed"), "closed_at", "url", "assignees"}; get(comments=True) adds
+"state" ("open"|"closed"), "state_reason" ("completed"|"not_planned"|None), "closed_at",
+"url", "assignees"}; get(comments=True) adds
 "comments": [{"id", "body", "author"}].
 """
 import json
@@ -13,7 +14,7 @@ import os
 import re
 import subprocess
 
-from hvlib_config import config_value
+from hvlib_config import config_value, tracker_label
 
 _BIN = os.path.dirname(os.path.abspath(__file__))
 
@@ -68,7 +69,7 @@ class _Adapter:
 
 class GitHubAdapter(_Adapter):
     provider = "github"
-    _FIELDS = "number,title,body,labels,milestone,state,closedAt,url,assignees"
+    _FIELDS = "number,title,body,labels,milestone,state,stateReason,closedAt,url,assignees"
 
     def create(self, title, body, labels=(), milestone=None):
         args = ["issue", "create", "--title", title, "--body-file", "-"]
@@ -88,6 +89,8 @@ class GitHubAdapter(_Adapter):
             "labels": [l["name"] for l in d.get("labels") or []],
             "milestone": ms["title"] if ms else None,
             "state": "closed" if str(d.get("state", "")).upper() == "CLOSED" else "open",
+            "state_reason": {"COMPLETED": "completed", "NOT_PLANNED": "not_planned"}.get(
+                str(d.get("stateReason") or "").upper()),
             "closed_at": d.get("closedAt") or None,
             "url": d.get("url") or "",
             "assignees": [a["login"] for a in d.get("assignees") or []],
@@ -133,6 +136,7 @@ class GitHubAdapter(_Adapter):
 
 class GitLabAdapter(_Adapter):
     provider = "gitlab"
+    not_planned_label = "not-planned"  # glab has no close reason; a label stands in
 
     def create(self, title, body, labels=(), milestone=None):
         args = ["issue", "create", "--title", title, "--description", body]
@@ -143,16 +147,19 @@ class GitLabAdapter(_Adapter):
         args += ["-y"]
         return self._number_from_url(self._run(args))
 
-    @staticmethod
-    def _norm(d):
+    def _norm(self, d):
         ms = d.get("milestone")
+        closed = d.get("state") == "closed"
+        labels = list(d.get("labels") or [])
         return {
             "number": d["iid"],
             "title": d.get("title") or "",
             "body": d.get("description") or "",
-            "labels": list(d.get("labels") or []),
+            "labels": labels,
             "milestone": ms["title"] if ms else None,
-            "state": "closed" if d.get("state") == "closed" else "open",
+            "state": "closed" if closed else "open",
+            "state_reason": (("not_planned" if self.not_planned_label in labels else "completed")
+                             if closed else None),
             "closed_at": d.get("closed_at") or None,
             "url": d.get("web_url") or "",
             "assignees": [a["username"] for a in d.get("assignees") or []],
@@ -213,5 +220,7 @@ def adapter_for(cfg, provider=None):
     if provider == "github":
         return GitHubAdapter()
     if provider == "gitlab":
-        return GitLabAdapter()
+        a = GitLabAdapter()
+        a.not_planned_label = tracker_label(cfg or {}, "notPlanned")
+        return a
     raise TrackerError(3, "cannot determine provider (set issues.provider)")
