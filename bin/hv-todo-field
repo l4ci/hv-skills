@@ -4,9 +4,11 @@
 # Resolve helper: exits 1 when ID is unknown or field name is invalid.
 #
 # Usage: hv-todo-field <ID> <field>
-#          <field>: title | detail | related | milestone | repos | subsystem | since
+#          <field>: title | detail | related | milestone | repos | subsystem | since | reason | note
 #          stdout: field value (may be empty)
 #          exit:   0 on success (even if field empty), 1 on unknown ID or bad field
+#          reason/note: closure reason ("done" when completed without a suffix,
+#                  empty for open items) and its note, from the Done marker.
 #        hv-todo-field --dump <ID>
 #          stdout: JSON object with every known field (single corpus load).
 #                  Use when a caller needs ≥2 fields per ID — avoids re-reading
@@ -28,11 +30,12 @@ fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$DUMP" <<'PY'
 import json
+import re
 import sys
-from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus
+from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus, parse_done_line
 
 iid, field, dump = sys.argv[1], sys.argv[2], sys.argv[3]
-VALID = ("title", "detail", "related", "milestone", "repos", "subsystem", "since")
+VALID = ("title", "detail", "related", "milestone", "repos", "subsystem", "since", "reason", "note")
 
 corpus = load_backlog_corpus(".")
 result = find_origin_bullet(corpus, iid)
@@ -41,6 +44,11 @@ if result is None:
     sys.exit(1)
 line, title = result
 fields = parse_todo_fields(line)
+# Closure reason/note live on the Done marker, which find_origin_bullet strips.
+m = re.search(rf"^- ~~\*\*\[{re.escape(iid)}\].*$", corpus, re.MULTILINE)
+done = parse_done_line(m.group(0)) if m else None
+fields["reason"] = done["reason"] if done else ""
+fields["note"] = done["note"] if done else ""
 
 if dump:
     payload = {"title": title}

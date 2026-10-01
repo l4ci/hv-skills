@@ -97,6 +97,24 @@ if "$BIN/hv-complete" B99 "$HASH" 2>/dev/null; then
 fi
 pass "hv-complete rejects unknown ID"
 
+# Closure reason: default path stays byte-identical; non-done reasons add a suffix.
+"$BIN/hv-append" "## Bugs" "- **[B71] [P2] Reason bug.** Desc."
+"$BIN/hv-append" "## Bugs" "- **[B72] [P2] Blocked bug.** Desc."
+"$BIN/hv-append" "## Bugs" "- **[B73] [P2] Dropped bug.** Desc."
+"$BIN/hv-complete" B71 "$HASH" --reason done
+grep -qF "Done $(date +%Y-%m-%d) [\`$HASH\`]" .hv/BACKLOG.md || fail "done reason changed marker"
+grep -E "^- ~~.*\[B71\].*~~ Done [0-9-]+ \[\`$HASH\`\]$" .hv/BACKLOG.md >/dev/null || fail "--reason done must render the plain marker"
+"$BIN/hv-complete" B72 "$HASH" --reason blocked --note "waiting on upstream (see #9)"
+grep -qF "[\`$HASH\`] (blocked: waiting on upstream (see #9))" .hv/BACKLOG.md || fail "blocked reason+note not rendered"
+"$BIN/hv-complete" --reason dropped B73 "$HASH"
+grep -E "^- ~~.*\[B73\].*~~ Done [0-9-]+ \[\`$HASH\`\] \(dropped\)$" .hv/BACKLOG.md >/dev/null || fail "dropped reason without note not rendered"
+[ "$("$BIN/hv-todo-field" B72 reason)" = "blocked" ] || fail "hv-todo-field reason"
+[ "$("$BIN/hv-todo-field" B72 note)" = "waiting on upstream (see #9)" ] || fail "hv-todo-field note"
+[ "$("$BIN/hv-todo-field" B71 reason)" = "done" ] || fail "hv-todo-field reason for plain done"
+"$BIN/hv-summary" | grep -qF "[B72] on $(date +%Y-%m-%d) (blocked)" || fail "hv-summary missing reason"
+if "$BIN/hv-complete" B01 "$HASH" --reason bogus 2>/dev/null; then fail "invalid --reason should exit 1"; fi
+pass "hv-complete --reason/--note renders, reads back via hv-todo-field and hv-summary"
+
 echo "hv-todo-set-field"
 # F01 is still an open feature bullet at this point (B01 was completed above).
 "$BIN/hv-todo-set-field" F01 milestone M01
