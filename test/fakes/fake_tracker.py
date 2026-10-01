@@ -256,7 +256,8 @@ def gh_issue_cmd(db, args):
 
 
 def gh_label_cmd(db, args):
-    o, b, pos = parse(args[1:], {"--color": "c", "-c": "c", "--description": "d", "-d": "d", "--json": "json"},
+    o, b, pos = parse(args[1:], {"--color": "c", "-c": "c", "--description": "d", "-d": "d", "--json": "json",
+                                 "--limit": "limit", "-L": "limit"},
                       ("--force", "-f"))
     if args[0] == "create":
         name = pos[0]

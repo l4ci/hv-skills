@@ -59,6 +59,30 @@ class _Adapter:
         except ValueError:
             raise TrackerError(1, f"unparseable tracker output: {out[:200]!r}")
 
+    def _milestones(self, path):
+        """Milestone dicts from an `api` list call; tolerates paginated output
+        that concatenates one JSON array per page."""
+        out = self._run(["api", path]).strip()
+        dec, pos, items = json.JSONDecoder(), 0, []
+        try:
+            while pos < len(out):
+                page, end = dec.raw_decode(out, pos)
+                items += page
+                pos = end
+                while pos < len(out) and out[pos].isspace():
+                    pos += 1
+        except (ValueError, TypeError):
+            raise TrackerError(1, f"unparseable tracker output: {out[:200]!r}")
+        return items
+
+    @staticmethod
+    def _match_milestone(items, hv_id):
+        """Title of the milestone whose leading token is `hv_id`, preferring open ones."""
+        pat = re.compile(re.escape(hv_id) + r"(?!\w)")
+        hits = [m for m in items if pat.match((m.get("title") or "").strip())]
+        hits.sort(key=lambda m: str(m.get("state", "")).lower() in ("closed",))
+        return hits[0]["title"] if hits else None
+
     @staticmethod
     def _number_from_url(out):
         m = re.search(r"/(\d+)\s*$", out.strip().splitlines()[-1] if out.strip() else "")
@@ -78,6 +102,25 @@ class GitHubAdapter(_Adapter):
         if milestone:
             args += ["--milestone", milestone]
         return self._number_from_url(self._run(args, body))
+
+    def ensure_labels(self, names, auto_create=True):
+        """Make sure every label exists (gh refuses unknown ones). Missing ones are
+        created when `auto_create`, else TrackerError(1)."""
+        names = [n for n in dict.fromkeys(names) if n]
+        if not names:
+            return
+        have = {l["name"] for l in self._json(["label", "list", "--json", "name", "--limit", "1000"])}
+        for n in names:
+            if n in have:
+                continue
+            if not auto_create:
+                raise TrackerError(1, f"label '{n}' does not exist (issues.autoCreateLabel is off)")
+            self._run(["label", "create", n, "--force"])
+
+    def find_milestone(self, hv_id):
+        """Native milestone title whose leading token is `hv_id` (open or closed), else None."""
+        return self._match_milestone(
+            self._milestones("repos/{owner}/{repo}/milestones?state=all&per_page=100"), hv_id)
 
     @staticmethod
     def _norm(d):
@@ -146,6 +189,13 @@ class GitLabAdapter(_Adapter):
             args += ["--milestone", milestone]
         args += ["-y"]
         return self._number_from_url(self._run(args))
+
+    def ensure_labels(self, names, auto_create=True):
+        """No-op: GitLab creates labels on first use."""
+
+    def find_milestone(self, hv_id):
+        """Native milestone title whose leading token is `hv_id` (open or closed), else None."""
+        return self._match_milestone(self._milestones("projects/:id/milestones?per_page=100"), hv_id)
 
     def _norm(self, d):
         ms = d.get("milestone")

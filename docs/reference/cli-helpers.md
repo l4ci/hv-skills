@@ -13,6 +13,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-capture-audit` | Surface ship-evidence per candidate title before milestone-spec capture; exit 2 with `[STRONG]`/`[MEDIUM]`/`[PATH]` report when any title looks already shipped, exit 0 when clean | `.hv/bin/hv-capture-audit "Title 1" "Title 2"` |
 | `hv-migrate` | v3 → v4 codemod: rewrite cut-command references (skips fenced code, inline code, and helper-path tokens), migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins, strip orphan v3 managed blocks from `CLAUDE.md`, and stamp `hvSkills.version` so `hv-preflight` reflects the post-migration state; reads the version from nested `hvSkills.version` with a top-level `version` fallback; `--dry-run` default, `--apply` writes (also bumps the stamp on the noop path), backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
 | `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
+| `hv-item-create` | Capture one item in the configured backend and print its ID: file backend mints the ID, appends the bullet (Since stamped) and optionally writes the detail file; issue backend creates the issue | `.hv/bin/hv-item-create bugs --title "Crash" --tag P1 --desc "Why." --field Milestone=M01` → `B07` |
 | `hv-complete` | Move item to `## Completed` with strikethrough; `--reason done\|handed-off\|blocked\|dropped` (default `done`) and `--note <text>` append `(<reason>: <note>)` to the marker when the reason is not `done`; exits 3 on a `done` close with no recorded proof unless `--no-proof` | `.hv/bin/hv-complete B07 a1b2c3d --reason blocked --note "waits on API"` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
 | `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; engine for `/hv-ship --undo`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
@@ -138,6 +139,17 @@ file. Every skill that mints a new backlog item calls this first.
 `/hv-init`. Add namespaces freely; the file grows as you use new ones.
 
 ## Backlog manipulation
+
+`hv-item-create <bugs|features|tasks> --title T [--tag TAG] [--desc D] [--body-file F] [--field Name=Value]...`
+is the capture entry point for both backends and prints the new ID. `--tag` is `P0`-`P3` for bugs and
+`Major`/`Minor`/`Cosmetic` for features (none for tasks); `--field` takes `Related`, `Milestone`, `Repos`,
+`Subsystem` or `Captured` (repeatable, non-empty). With `backlog.backend: "file"` the result is byte-identical to
+`hv-next-id` + `hv-append`; `--body-file` also writes `.hv/<kind>/<ID>.md` (`{ID}` replaced) and adds the `Detail:`
+field. With `"issues"` it creates the issue (type, priority and size labels; fields in the body's `hv:fields`
+block; `Milestone` as the native milestone, which must already exist; missing labels are created on GitHub unless
+`issues.autoCreateLabel` is false) and the ID is the type letter plus issue number. `--body-file` content follows
+`--desc` in the issue body. Exit 1 on bad input or a tracker failure, 3 tracker unavailable, 4 rate-limited.
+`hv-append` exits 2 in issue mode; `hv-todo-set-field` works in both modes.
 
 `hv-append` inserts a formatted entry under the matching `##` section heading in
 [`BACKLOG.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`

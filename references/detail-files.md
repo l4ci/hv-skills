@@ -26,9 +26,10 @@ If any item's input contains bulky raw data that would push the TODO entry past 
 
 ## Ordering
 
-1. Get the ID first via `.hv/bin/hv-next-id <bugs|features|tasks>`.
-2. Write the detail file at `.hv/<kind>/{ID}.md` using the shape above.
-3. Append the TODO entry (hv-capture Step 6) with a `Detail:` reference pointing at the file path.
+1. Write the detail content (shape above, `{ID}` as a placeholder) to a scratch file.
+2. Run `.hv/bin/hv-item-create <bugs|features|tasks> --title ... --body-file <scratch-file>` (hv-capture Step 6). It mints the ID, writes `.hv/<kind>/{ID}.md` with `{ID}` replaced, and appends the TODO entry with the `Detail:` reference.
+
+With `backlog.backend: "issues"` there is no `.hv/<kind>/` file: the content becomes the issue body and the ID is the issue number with its type letter.
 
 ## The Detail: reference
 

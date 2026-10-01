@@ -158,17 +158,12 @@ MD
   eq "backlog bad arg" "1:error: unknown argument: --bogus" "$rc:$err"
   pass "hv-backlog golden"
 
-  # backlog.backend = issues: write helpers refuse (exit 2), BACKLOG.md untouched
+  # backlog.backend = issues: hv-append refuses (exit 2), BACKLOG.md untouched
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
-  want="error: HELPER: issues backend not available yet (M07-S02 T4)"
-  for call in "hv-append|## Bugs|- **[B10] x.**" "hv-todo-set-field|B01|milestone|M09"; do
-    IFS='|' read -r -a argv <<< "$call"
-    h="${argv[0]}"
-    rc=0; err="$("$BIN/$h" "${argv[@]:1}" 2>&1)" || rc=$?
-    eq "$h issues refusal" "2:${want/HELPER/$h}" "$rc:$err"
-    cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "$h wrote BACKLOG.md under issues backend"
-  done
-  pass "issues backend refused by hv-append / hv-todo-set-field (exit 2, file unchanged)"
+  rc=0; err="$("$BIN/hv-append" "## Bugs" "- **[B10] x.**" 2>&1)" || rc=$?
+  eq "hv-append issues refusal" "2:error: hv-append: issue mode creates items with hv-item-create" "$rc:$err"
+  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "hv-append wrote BACKLOG.md under issues backend"
+  pass "issues backend refused by hv-append (exit 2, file unchanged)"
 
   # bogus backend: exit 1
   echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
@@ -495,6 +490,165 @@ PY
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
     rc=0; "$BIN/hv-complete" B1 abc1234 >/dev/null 2>&1 || rc=$?; eq "complete refused" 2 "$rc"
     pass "$prov: hv-append / hv-complete still refused in issue mode"
+  )
+done
+trap 'rm -rf "$TMP"' EXIT
+
+echo "hv-item-create: capture in both backends, issue-mode field writes"
+
+TMP_IC="$(mktemp -d)"
+trap 'rm -rf "$TMP_IC"' EXIT
+
+# --- file mode: byte-identical to hv-next-id + hv-append -------------------
+mkdir -p "$TMP_IC/base/.hv"
+(
+  cd "$TMP_IC/base"
+  git init -q && git config user.email t@t && git config user.name t
+  printf '# Backlog\n\n## Bugs\n\n- **[B01] [P1] Old bug.** d. Since: abc1234\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
+  echo '{"bugs": 1}' > .hv/counters.json
+  printf 'Body for {ID}\n\nsecond {ID} line, no trailing newline' > "$TMP_IC/body.md"
+  git add -A && git commit -q -m seed
+)
+cp -a "$TMP_IC/base" "$TMP_IC/old"; cp -a "$TMP_IC/base" "$TMP_IC/new"
+D='`'
+(
+  cd "$TMP_IC/old"
+  ID=$("$BIN/hv-next-id" bugs); "$BIN/hv-append" "## Bugs" "- **[$ID] [P1] Crash on start.** It crashes. Related: [F01] Milestone: M01 Repos: web" ; echo "$ID" >> "$TMP_IC/old.ids"
+  ID=$("$BIN/hv-next-id" features); mkdir -p .hv/features; sed "s/{ID}/$ID/g" "$TMP_IC/body.md" > ".hv/features/$ID.md"
+  "$BIN/hv-append" "## Features" "- **[$ID] [Major] Big thing.** Does stuff. Detail: ${D}.hv/features/$ID.md${D} Subsystem: core"; echo "$ID" >> "$TMP_IC/old.ids"
+  ID=$("$BIN/hv-next-id" tasks); "$BIN/hv-append" "## Tasks" "- **[$ID] Is it done?**"; echo "$ID" >> "$TMP_IC/old.ids"
+  ID=$("$BIN/hv-next-id" bugs); "$BIN/hv-append" "## Bugs" "- **[$ID] [P3] Cosmetic glitch.** Minor. Captured: 2026-10-01 Subsystem: ui"; echo "$ID" >> "$TMP_IC/old.ids"
+)
+(
+  cd "$TMP_IC/new"
+  IC() { "$BIN/hv-item-create" "$@"; }
+  IC bugs --title "Crash on start" --tag P1 --desc "It crashes." --field Related=[F01] --field Milestone=M01 --field Repos=web >> "$TMP_IC/new.ids"
+  IC features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$TMP_IC/body.md" --field Subsystem=core >> "$TMP_IC/new.ids"
+  IC tasks --title "Is it done?" >> "$TMP_IC/new.ids"
+  IC bugs --title "Cosmetic glitch." --tag P3 --desc "Minor." --field Captured=2026-10-01 --field Subsystem=ui >> "$TMP_IC/new.ids"
+)
+cmp -s "$TMP_IC/old.ids" "$TMP_IC/new.ids" || fail "hv-item-create printed IDs differ: $(cat "$TMP_IC/old.ids" | tr '\n' ' ') vs $(cat "$TMP_IC/new.ids" | tr '\n' ' ')"
+[ "$(tr '\n' ' ' < "$TMP_IC/new.ids")" = "B02 F02 T01 B03 " ] || fail "unexpected IDs: $(cat "$TMP_IC/new.ids")"
+diff -r "$TMP_IC/old/.hv" "$TMP_IC/new/.hv" >/dev/null || fail "file-mode hv-item-create differs from next-id+append: $(diff -r "$TMP_IC/old/.hv" "$TMP_IC/new/.hv")"
+grep -q 'Since: [0-9a-f]\{7,\}' "$TMP_IC/new/.hv/BACKLOG.md" || fail "no Since stamp"
+[ "$(sed -n '3,$p' "$TMP_IC/new/.hv/features/F02.md" | head -c 100 | tr -d '\n')" = "second F02 line, no trailing newline" ] || fail "detail {ID} substitution"
+pass "file mode: hv-item-create == hv-next-id + hv-append (BACKLOG, counters, detail file, printed IDs)"
+
+(
+  cd "$TMP_IC/new"
+  cp -a .hv "$TMP_IC/before.hv"
+  bad() { local want="$1"; shift; local rc=0 err; err="$("$BIN/hv-item-create" "$@" 2>&1)" || rc=$?; [ "$rc" = 1 ] || fail "hv-item-create $*: rc $rc ($err)"; case "$err" in *"$want"*) ;; *) fail "hv-item-create $*: message [$err] lacks [$want]";; esac; }
+  bad "invalid tag 'Major' for bugs" bugs --title x --tag Major
+  bad "invalid tag 'P1' for features" features --title x --tag P1
+  bad "tasks take no tag" tasks --title x --tag P1
+  bad "'Since' is not a settable field" bugs --title x --field Since=abc
+  bad "'Detail' is not a settable field" bugs --title x --field Detail=abc
+  bad "non-empty value" bugs --title x --field Related=
+  bad "Name=Value" bugs --title x --field Related
+  bad "--title is required" bugs --tag P1
+  bad "unknown kind" milestones --title x
+  bad "cannot read --body-file" bugs --title x --body-file /nonexistent
+  rc=0; "$BIN/hv-item-create" bugs --title x --desc >/dev/null 2>&1 || rc=$?; [ "$rc" != 0 ] || fail "bare trailing --desc accepted"
+  diff -r .hv "$TMP_IC/before.hv" >/dev/null || fail "rejected hv-item-create changed .hv"
+  # relative --body-file resolves against the caller's cwd
+  mkdir -p sub; printf 'rel {ID}' > sub/b.md
+  ( cd sub && "$BIN/hv-item-create" tasks --title Rel --body-file b.md >/dev/null )
+  [ "$(cat .hv/tasks/T02.md)" = "rel T02" ] || fail "relative --body-file"
+)
+pass "hv-item-create validates tag/fields/title/body-file without writing"
+
+# --- issue mode -------------------------------------------------------------
+for prov in github gitlab; do
+  P="$TMP_IC/$prov"; mkdir -p "$P/.hv"
+  CFG() { echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0$1}}" > "$P/.hv/config.json"; }
+  CFG ""
+  (
+    cd "$P"
+    git init -q && git config user.email t@t && git config user.name t
+    export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
+    eq() { [ "$2" = "$3" ] || fail "$prov hv-item-create $1: expected [$2] got [$3]"; }
+    TC() { "$BIN/hv-tracker-call" -- "$@" </dev/null >/dev/null; }
+    # IV <n> <key>: one normalized-issue key (labels sorted, joined by comma)
+    IV() { PYTHONPATH="$BIN" python3 -c '
+import sys
+from hvlib import adapter_for, load_config
+i = adapter_for(load_config()).get(int(sys.argv[1]))
+v = i[sys.argv[2]]
+print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "-"))' "$@"; }
+    EDITS() { grep -c 'issue \(edit\|update\)' "$P/log" || true; }
+    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
+
+    if [ "$prov" = github ]; then
+      CFG ',"autoCreateLabel":false'
+      ERR "$BIN/hv-item-create" bugs --title Nope --tag P1
+      eq "autoCreateLabel off" "1:error: hv-item-create: label 'type:bug' does not exist (issues.autoCreateLabel is off)" "$ERRRC:$ERRMSG"
+      eq "no issue created" "[]" "$("$BIN/hv-tracker-call" -- issue list --json number </dev/null | tr -d ' \n')"
+      CFG ""
+      TC api 'repos/{owner}/{repo}/milestones' -f "title=M07 — Issue backend"
+    else
+      TC api 'projects/:id/milestones' -f "title=M07 — Issue backend"
+    fi
+
+    ERR "$BIN/hv-item-create" bugs --title Nope --field Milestone=M99
+    eq "missing milestone" "1:error: hv-item-create: milestone M99 not found on the tracker — create it with /hv-vision (M07-S05)" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-item-create" bugs --title Nope --field Milestone="M07, M08"
+    eq "two milestones" "1:error: hv-item-create: issue mode takes one milestone ID like M07, got 'M07, M08'" "$ERRRC:$ERRMSG"
+
+    printf 'Detail for {ID}.\n' > "$P/body.md"
+    B="$("$BIN/hv-item-create" bugs --title "Crash on start" --tag P1 --desc "It crashes." --field Related='F1, B2' --field Repos=web --field Milestone=M07)"
+    F="$("$BIN/hv-item-create" features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$P/body.md" --field Subsystem=core)"
+    T="$("$BIN/hv-item-create" tasks --title "Chore")"
+    eq "ids" "B1 F2 T3" "$B $F $T"
+    eq "bug labels" "p1,type:bug" "$(IV 1 labels)"
+    eq "bug milestone" "M07 — Issue backend" "$(IV 1 milestone)"
+    eq "bug title" "Crash on start" "$(IV 1 title)"
+    eq "bug body" "$(printf 'It crashes.\n\n<!-- hv:fields\nRelated: F1, B2\nRepos: web\n-->')" "$(IV 1 body)"
+    eq "feature labels" "size:Major,type:feature" "$(IV 2 labels)"
+    eq "feature milestone" "-" "$(IV 2 milestone)"
+    eq "feature body" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\n-->')" "$(IV 2 body)"
+    eq "task labels" "type:task" "$(IV 3 labels)"
+    eq "task body" "" "$(IV 3 body)"
+    eq "todo-field" "M07|[F1], [B2]|web|core" "$("$BIN/hv-todo-field" B1 milestone)|$("$BIN/hv-todo-field" '#1' related)|$("$BIN/hv-todo-field" B1 repos)|$("$BIN/hv-todo-field" F2 subsystem)"
+    bl="$("$BIN/hv-backlog")"
+    for id in B1 F2 T3; do case "$bl" in *"$id"*) ;; *) fail "$prov hv-backlog lacks $id: $bl";; esac; done
+    ERR "$BIN/hv-append" "## Bugs" "- **[B9] x.**"
+    eq "append pointer" "2:error: hv-append: issue mode creates items with hv-item-create" "$ERRRC:$ERRMSG"
+    pass "$prov: hv-item-create creates labelled issues with fields, milestone and body; hv-append points at it"
+
+    # set_field
+    SF() { "$BIN/hv-todo-set-field" "$@"; }
+    e0="$(EDITS)"
+    SF T3 related "[B1]"
+    eq "set related" "$(printf '<!-- hv:fields\nRelated: [B1]\n-->')" "$(IV 3 body)"
+    SF T3 related "[B1]"
+    SF T3 Related "[B1]"
+    eq "related no-op: one edit" "$((e0 + 1))" "$(EDITS)"
+    SF T3 repos api; SF T3 related ""
+    eq "clear related keeps repos" "$(printf '<!-- hv:fields\nRepos: api\n-->')" "$(IV 3 body)"
+    SF T3 repos ""
+    eq "all cleared" "" "$(IV 3 body)"
+    e1="$(EDITS)"; SF T3 repos ""; eq "clear absent is no-op" "$e1" "$(EDITS)"
+    SF F2 related "[B1]"
+    eq "feature keeps text" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\nRelated: [B1]\n-->')" "$(IV 2 body)"
+    SF T3 milestone M07
+    eq "set milestone" "M07 — Issue backend" "$(IV 3 milestone)"
+    e2="$(EDITS)"; SF '#3' milestone M07; eq "milestone no-op" "$e2" "$(EDITS)"
+    eq "todo-field milestone" "M07" "$("$BIN/hv-todo-field" T3 milestone)"
+    SF T3 milestone ""
+    eq "clear milestone" "-" "$(IV 3 milestone)"
+    e3="$(EDITS)"; SF T3 milestone ""; eq "clear milestone no-op" "$e3" "$(EDITS)"
+    ERR "$BIN/hv-todo-set-field" T3 milestone M99
+    eq "set missing milestone" "1:error: hv-todo-set-field: milestone M99 not found on the tracker — create it with /hv-vision (M07-S05)" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-todo-set-field" T3 detail x
+    eq "detail not settable" "1:error: detail is not a settable field; pick one of milestone/related/repos/subsystem" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-todo-set-field" T99 related x
+    eq "unknown item" "1:error: [T99] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-todo-set-field" B3 related x
+    eq "type mismatch" "1:error: [B3] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
+    TC issue close 3
+    ERR "$BIN/hv-todo-set-field" T3 related "[B1]"
+    eq "closed item" "1:error: [T3] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
+    pass "$prov: hv-todo-set-field writes fields/milestone on issues, no-ops when unchanged, rejects bad input"
   )
 done
 trap 'rm -rf "$TMP"' EXIT
