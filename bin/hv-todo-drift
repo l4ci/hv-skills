@@ -29,6 +29,7 @@
 # Usage: hv-todo-drift
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-todo-drift 'PRs carry "Closes #N", so the tracker closes shipped issues' || exit $?
 . "$HERE/hv-types.sh"
 export HERE
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'

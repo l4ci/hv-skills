@@ -26,4 +26,4 @@ fi
 hv_repo_flag_prepare "$BIN_DIR" "hv-pr" "$BRANCH"
 
 git push -u origin "$BRANCH"
-gh pr create --title "$TITLE" --body "$BODY"
+"$BIN_DIR/hv-tracker-call" --provider github -- pr create --title "$TITLE" --body "$BODY"

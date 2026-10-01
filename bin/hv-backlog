@@ -32,18 +32,24 @@ done
 export GREP_PATTERN
 
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import json, os, re
+import json, os, re, sys
 from collections import defaultdict
 from pathlib import Path
-from hvlib import iter_open_sections, load_json, parse_todo_fields, active_items, parse_open_bullet, parse_milestones
+from hvlib import get_backend, BackendUnavailable, load_json, parse_todo_fields, active_items, parse_open_bullet, parse_milestones
 
 ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
-todo_path = Path(".hv/BACKLOG.md")
-if not todo_path.exists():
+try:
+    backend = get_backend()
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-backlog: {e}\n"); sys.exit(2)
+except ValueError as e:
+    sys.stderr.write(f"error: hv-backlog: {e}\n"); sys.exit(1)
+listing = backend.list_open()
+if listing is None:
     print("No .hv/BACKLOG.md yet. Run /hv-init then /hv-capture.")
     raise SystemExit(0)
-content = todo_path.read_text()
+content, _open_sections = listing
 
 status_path = Path(".hv/status.json")
 active_entries, active_ids = [], set()
@@ -69,7 +75,6 @@ def parse_items(body):
         items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line})
     return items
 
-_open_sections = list(iter_open_sections(content))
 _open_bodies = dict(_open_sections)
 bugs = [i for i in parse_items(_open_bodies.get("Bugs", "")) if i["id"] not in active_ids]
 features = [i for i in parse_items(_open_bodies.get("Features", "")) if i["id"] not in active_ids]

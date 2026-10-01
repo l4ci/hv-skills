@@ -111,15 +111,15 @@ case "$PROVIDER" in
       apply)
         # Attempt to add the label; capture stderr to detect "label not found".
         STDERR_TMP="$(mktemp)"
-        if ! _run_in_repo gh issue edit "$ISSUE" --add-label "$LABEL" 2>"$STDERR_TMP"; then
+        if ! _run_in_repo "$HERE/hv-tracker-call" --provider github -- issue edit "$ISSUE" --add-label "$LABEL" 2>"$STDERR_TMP"; then
           STDERR_CONTENT="$(cat "$STDERR_TMP")"
           rm -f "$STDERR_TMP"
           # If label doesn't exist on the repo and autoCreateLabel is enabled,
           # create it then retry.
           if [[ "$AUTO_CREATE" == "true" ]] && \
              echo "$STDERR_CONTENT" | grep -qiE 'label|not found|could not'; then
-            _run_in_repo gh label create "$LABEL" --force
-            _run_in_repo gh issue edit "$ISSUE" --add-label "$LABEL"
+            _run_in_repo "$HERE/hv-tracker-call" --provider github -- label create "$LABEL" --force
+            _run_in_repo "$HERE/hv-tracker-call" --provider github -- issue edit "$ISSUE" --add-label "$LABEL"
           else
             echo "$STDERR_CONTENT" >&2
             exit 1
@@ -130,7 +130,7 @@ case "$PROVIDER" in
         ;;
       remove)
         # gh exits 0 and is silent when the label is not present — idempotent.
-        _run_in_repo gh issue edit "$ISSUE" --remove-label "$LABEL"
+        _run_in_repo "$HERE/hv-tracker-call" --provider github -- issue edit "$ISSUE" --remove-label "$LABEL"
         ;;
     esac
     ;;
@@ -141,13 +141,13 @@ case "$PROVIDER" in
         # If autoCreateLabel is true, ensure the label exists first.
         # glab label create exits non-zero on duplicate — swallow that.
         if [[ "$AUTO_CREATE" == "true" ]]; then
-          _run_in_repo glab label create --name "$LABEL" 2>/dev/null || true
+          _run_in_repo "$HERE/hv-tracker-call" --provider gitlab -- label create --name "$LABEL" 2>/dev/null || true
         fi
-        _run_in_repo glab issue update "$ISSUE" --label "$LABEL"
+        _run_in_repo "$HERE/hv-tracker-call" --provider gitlab -- issue update "$ISSUE" --label "$LABEL"
         ;;
       remove)
         # glab exits 0 when label not present — idempotent.
-        _run_in_repo glab issue update "$ISSUE" --unlabel "$LABEL"
+        _run_in_repo "$HERE/hv-tracker-call" --provider gitlab -- issue update "$ISSUE" --unlabel "$LABEL"
         ;;
     esac
     ;;

@@ -4,6 +4,7 @@
 # Usage: hv-next-id <bugs|features|tasks|milestones>
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-next-id 'IDs are issue numbers; capture creates the issue' || exit $?
 TYPE="${1:?usage: hv-next-id <bugs|features|tasks|milestones>}"
 case "$TYPE" in
   bugs) P=B ;; features) P=F ;; tasks) P=T ;; milestones) P=M ;;

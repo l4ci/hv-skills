@@ -42,7 +42,20 @@ CONFIG_KEYS = [
     ("issues.providers.gitlab", True, True),
     ("hvSkills.version", "", True),
     ("loop.webResearch", False, False),
-    ("issues.label", "in-progress", False),
+    ("issues.label", "in-progress", False),  # legacy alias of issues.labels.inProgress
+    ("backlog.backend", "file", False),  # file | issues
+    ("issues.provider", "auto", False),  # auto | github | gitlab
+    ("issues.retryWaitSeconds", 60, False),
+    ("issues.labels.inProgress", "in-progress", False),
+    ("issues.labels.needsReview", "needs-review", False),
+    ("issues.labels.changesRequested", "changes-requested", False),
+    ("issues.labels.released", "released", False),
+    ("issues.labels.notPlanned", "not-planned", False),
+    ("issues.labels.milestoneTracker", "milestone-tracker", False),
+    ("issues.labels.types.bug", "type:bug", False),
+    ("issues.labels.types.feature", "type:feature", False),
+    ("issues.labels.types.task", "type:task", False),
+    ("issues.labels.priorityPrefix", "p", False),
     ("issues.autoCreateLabel", True, False),
     ("issues.filterMineOnly", False, False),
     ("release.checklistPath", ".hv/RELEASE.md", False),
@@ -50,3 +63,44 @@ CONFIG_KEYS = [
     ("release.nudgeAfterCommits", 10, False),
     ("release.nudgeAfterDays", 14, False),
 ]
+
+BACKLOG_BACKENDS = ("file", "issues")
+
+
+def _walk(cfg, key):
+    """Dotted-key lookup; missing or None counts as absent (returns None)."""
+    cur = cfg
+    for seg in key.split("."):
+        if not isinstance(cur, dict) or cur.get(seg) is None:
+            return None
+        cur = cur[seg]
+    return cur
+
+
+def config_value(cfg: dict, key: str):
+    """Value of a dotted key in cfg, else its CONFIG_KEYS default. KeyError if unknown."""
+    for k, default, _ in CONFIG_KEYS:
+        if k == key:
+            value = _walk(cfg, key)
+            return default if value is None else value
+    raise KeyError(key)
+
+
+def backlog_backend(cfg: dict) -> str:
+    """The configured backlog backend ("file" or "issues"); ValueError otherwise."""
+    v = config_value(cfg, "backlog.backend")
+    if v not in BACKLOG_BACKENDS:
+        raise ValueError(f"invalid backlog.backend '{v}' (expected file|issues)")
+    return v
+
+
+def tracker_label(cfg: dict, role: str) -> str:
+    """Label name for a role under issues.labels (e.g. "inProgress", "types.bug").
+
+    "inProgress" falls back to the legacy `issues.label` when the new key is unset.
+    """
+    if role == "inProgress" and _walk(cfg, "issues.labels.inProgress") is None:
+        legacy = _walk(cfg, "issues.label")
+        if legacy is not None:
+            return legacy
+    return config_value(cfg, f"issues.labels.{role}")
