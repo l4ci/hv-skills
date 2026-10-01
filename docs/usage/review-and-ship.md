@@ -18,6 +18,8 @@ Stage 1 verdict prefixes:
 | `SPEC-CONCERNS` | Partial fulfillment or scope drift, not blocking. |
 | `SPEC-FAIL` | Diff doesn't deliver what was promised. Stage 2 short-circuits: no point quality-reviewing work that doesn't meet spec. |
 
+Stage 1 also runs a **refocus check**: each change is traced from plan task to backlog item to milestone intent (when the item has a milestone tag). Locally sensible steps that drift from the parent intent surface as `SPEC-CONCERNS` naming the drift path; drift alone never fails the review.
+
 **No-plan fallback.** If no referenced item has a plan file (common when `/hv-go` was used), Stage 1 can't run as a meaningful spec check. The skill prints one informational line and proceeds directly to Stage 2, which then absorbs intent-match as its first rubric item.
 
 ### Stage 2: code quality

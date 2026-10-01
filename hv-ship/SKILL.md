@@ -326,7 +326,7 @@ For each ID in the scope JSON's `referencedIds`:
 .hv/bin/hv-complete <ID> <merge-or-last-commit-hash>
 ```
 
-`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed.
+`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
 
 ## Step 8.5 — Learn (Nudge or Auto-Invoke)
 
