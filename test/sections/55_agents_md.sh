@@ -114,5 +114,14 @@ echo "$OUT" | grep -q '^note:' || fail "F84[h]: expected a note, got: $OUT"
 [ -L "$TMP_II/sym/CLAUDE.md" ] || fail "F84[h]: CLAUDE.md symlink replaced"
 pass "F84[h]: symlinked pair left untouched"
 
+# (i) CLAUDE.md held only managed blocks: it becomes the plain stub
+mkdir -p "$TMP_II/only/.hv"
+printf '<!-- hv-knowledge-start -->\nx\n<!-- hv-knowledge-end -->\n' > "$TMP_II/only/CLAUDE.md"
+init_ii "$TMP_II/only" >/dev/null
+[ "$(cat "$TMP_II/only/CLAUDE.md")" = "$(printf '# CLAUDE.md\n\nProject instructions live in AGENTS.md.\n\n@AGENTS.md')" ] \
+  || fail "F84[i]: CLAUDE.md is not the stub: $(cat "$TMP_II/only/CLAUDE.md")"
+grep -q "hv-knowledge-start" "$TMP_II/only/AGENTS.md" || fail "F84[i]: block not moved"
+pass "F84[i]: blocks-only CLAUDE.md becomes the stub"
+
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$TMP_II"

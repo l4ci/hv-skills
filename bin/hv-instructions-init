@@ -50,8 +50,13 @@ if not agents.exists():
     if moved:
         # Collapse 3+ blank lines left behind by the strip.
         rest = re.sub(r"\n{3,}", "\n\n", rest)
-        write_text_atomic(str(claude), rest)
         print(f"moved: {', '.join(moved)} → AGENTS.md")
+        if rest.strip():
+            write_text_atomic(str(claude), rest)
+        else:
+            # Nothing but managed blocks was there: leave the plain stub.
+            write_text_atomic(str(claude), CLAUDE_STUB)
+            print("linked: CLAUDE.md → @AGENTS.md")
 
 if not claude.exists():
     write_text_atomic(str(claude), CLAUDE_STUB)
