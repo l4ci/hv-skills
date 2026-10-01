@@ -345,6 +345,11 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-06-11"
+    },
+    "Architecture: Skill authoring::hv-complete callers own the exit-3 proof path": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-01"
     }
   }
 }
