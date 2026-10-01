@@ -41,6 +41,10 @@ One of `in-progress`, `needs-review`, `changes-requested` at a time, cleared on 
 
 `hv-complete` is still how to close an item with `--reason handed-off|blocked|dropped`. Reasons: `done` closes as completed; `dropped` and `handed-off` close as not planned (comment carries reason and note); `blocked` keeps the issue open with the `blocked` label.
 
+## Milestones and release
+
+A milestone is a native tracker milestone `MNN — <title>` plus a tracking issue labelled `milestone-tracker` and `status:<status>`; its body is the milestone plan. Slice plans are `plan:SNN` notes on that issue. `/hv-vision` writes them via `hv-vision-add` / `hv-vision-put` / `hv-vision-status`, `/hv-plan` via `hv-plan-add` / `hv-plan-put`. `/hv-release --milestone MNN` gates on `hv-release-milestone-check`, drafts notes with `hv-release-notes-from-issues`, and after the tag closes out with `hv-release-close-milestone`. Exit codes: `1` usage or unknown milestone, `2` backend unavailable or file mode, `3` tracker unavailable, `4` rate-limited; `hv-release-milestone-check` also exits `6` when blocked.
+
 ## Resuming an item
 
 A fresh session has only the tracker. Load an item's context before working it:

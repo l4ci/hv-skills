@@ -70,7 +70,7 @@ Phases:
 4. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
 5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
 6. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
-7. *Close upstream issues* — manual gate to close any GH/GL issues still open for shipped items (Step 13.4)
+7. *Close upstream issues / milestone* — manual gate to close any GH/GL issues still open for shipped items (Step 13.4)
 8. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
 
 ## Step 1.5 — Project Checklist
@@ -121,6 +121,16 @@ For each gate, branch on `autonomy.level`:
 - `"auto"` or `"loop"` — auto-acknowledge items whose text does **not** end with `(manual)`; interject (using the off-mode prompt above) for items that do. This lets users mark sensitive items (`Push staging migration (manual)`) as always-confirmed even in unattended runs.
 
 After all gates pass, continue to Step 2.
+
+## Step 1.6 — Milestone Gate (issue mode)
+
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): pick the milestone to release. `--milestone MNN` wins; otherwise the single milestone from `.hv/bin/hv-vision-active`. With several active, `AskUserQuestion` (plain-text fallback: list the IDs). Under `autonomy.level: "loop"`, stop unless exactly one is active. Then:
+
+```bash
+.hv/bin/hv-release-milestone-check <MNN>
+```
+
+Exit 0: clear. Exit 6: blocked; each `blocked: #<n> <title> [<label>]` line is an open issue labelled `in-progress`, `needs-review` or `changes-requested`. Show them and stop. `warning: #<n> <title> (still open)` lines (other open issues) do not block; show them and continue. Exit 1: usage or unknown milestone; 2: backend unavailable or file mode; 3: tracker unavailable; 4: rate-limited: stop and report.
 
 ## Step 2 — Detect Version Source
 
@@ -198,6 +208,14 @@ If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this i
 ```
 
 Captures categorized Markdown (buckets in helper-emit order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the helper.
+
+**Issue mode:** build the notes from the milestone's issues instead:
+
+```bash
+.hv/bin/hv-release-notes-from-issues <MNN> [--since <prev_tag>]
+```
+
+It emits `### New` (features), `### Fixed` (bugs) and `### Changed` (tasks) with lines `- <Title> (#<n>)` (closed-as-completed issues only) and `### Other` (commit subjects with no item reference). Same exit codes as Step 1.6. Compaction, stats and compare URL below apply unchanged.
 
 **Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1–2 bullets naming the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The helper's job is the raw categorization; *editorial collapse is yours*.
 
@@ -324,6 +342,16 @@ Branch on the helper's `host` output. Host-specific command blocks live in `refe
 Add new host values to both the helper and the reference together.
 
 Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that would run.
+
+## Step 13.3 — Close Out the Milestone (issue mode)
+
+**Issue mode:** after the tag is pushed (Step 12) and the remote release is handled (Step 13), behind the same manual gates:
+
+```bash
+.hv/bin/hv-release-close-milestone <MNN> v<new_version>
+```
+
+Labels each completed issue `released` with the comment `Released in <tag>`, closes the native milestone and sets its status `shipped`. Idempotent; prints `closed-out <MNN> <tag>: <k> issues`. Same exit codes as Step 1.6. Skip in `--dry-run`. Step 13.4 below does not apply: the tracker is the backlog and `hv-issues-imported` has nothing to list.
 
 ## Step 13.4 — Close Upstream Issues
 

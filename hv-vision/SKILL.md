@@ -49,6 +49,8 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 - Glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` via `hv-glossary-read` — vision sessions are the highest-yield surface for canonical-term capture; consult so brainstorming uses existing terms, and treat user definitional signals (*"by X I mean…"*, *"let's call this X"*) as triggers for inline `hv-glossary-write` writes (also available as `/hv-learn --term <name>`)
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): milestone plans are tracking-issue bodies, not files. Read them with `.hv/bin/hv-vision-list` and `.hv/bin/hv-vision-show <MNN>` (both modes); never read `.hv/milestones/*.md`. `.hv/MILESTONES.md` still holds the vision paragraph.
+
 DECISIONS matches are committed boundaries that constrain what milestones can promise; surface any conflict before proposing milestones.
 
 **Dispatch a context-bundle worker** rather than issuing the reads on the orchestrator. Per `references/subagent-dispatch.md`, this step is read-heavy (≥3 file reads — `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, `.hv/BACKLOG.md`, glossary query results from `.hv/KNOWLEDGE.md`'s `## Glossary` topic, plus the root stack file) and the orchestrator only needs synthesis to do Step 3, not the raw text.
@@ -184,6 +186,8 @@ Once confirmed, persist each milestone. Batch all writes, then refresh the index
 ```
 
 The helper mints `MNN`, creates `.hv/milestones/MNN.md` with a stub plan, and appends an overview block to `.hv/MILESTONES.md`. Status starts as `planned`.
+
+**Issue mode** (`backlog.backend: "issues"`): `hv-vision-add` prints `MNN` and creates the native milestone `MNN — <title>` plus a tracking issue labelled `milestone-tracker` and `status:planned`; no stub file or overview block is written. Draft the full plan in a scratch file (frontmatter `id: <MNN>` required; `depends` updates the tracking issue's Depends field) and publish it with `.hv/bin/hv-vision-put <MNN> --body-file <scratch-file>|-` instead of the `Edit` steps below. Status follows the label: `.hv/bin/hv-vision-status <MNN> <status>` (`shipped`/`archived` close the tracking issue and native milestone; `planned`/`active` reopen). The vision paragraph stays in `MILESTONES.md`; `hv-vision-index` regenerates only its Active list and the managed instructions block (`AGENTS.md`, else `CLAUDE.md`).
 
 **Fill in the detail file.** After `hv-vision-add` creates the stub, edit `.hv/milestones/MNN.md` with the full content — replace the placeholder sections (`Goal`, `Acceptance criteria`, `Rationale`, `Open risks`, `Research findings`, `Notes`) with what the brainstorm produced. Use the `Edit` tool, not `Write`, so the frontmatter stays intact.
 

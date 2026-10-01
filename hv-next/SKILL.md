@@ -43,7 +43,7 @@ Phases:
 |--------|-------|--------|---------|
 | **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's JSON arrays: `cleaned` / `needsAction` / `todoDrift` / `todoSymbolDrift`, distilled). |
 | **Worker B — Archive scan** | haiku | `BACKLOG.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
-| **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). |
+| **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). In issue mode (`references/issue-mode.md`) the inputs are `hv-vision-active`, `hv-vision-list`, `hv-vision-show <MNN>` and `hv-todo-by-milestone <MNN>`; never read `.hv/milestones/*.md`. |
 | **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `BACKLOG.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
 
 Each brief uses the small-brief template from the reference: Goal · Inputs (paths/IDs only) · Constraints (cite the worktree-isolation rule when commit-producing waves are involved, though this wave is read-only) · Return shape (the table above) · Word budget ≤200 words.
