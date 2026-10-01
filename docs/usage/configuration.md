@@ -76,7 +76,7 @@ Controls how [`/hv-ship`](review-and-ship.md) integrates completed work.
 | `"direct"` | Merge to main, delete branch | Solo work, fast iteration |
 | `"pr"` | Push branch, create GitHub PR | Team work, code review required |
 
-## work.dispatch: subagent or tmux
+## work.dispatch: subagent, tmux or herdr
 
 Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs its workers on.
 
@@ -84,14 +84,15 @@ Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs
 |------|-------------|-------------|
 | `"subagent"` (default) | In-process `Agent` workers sharing the orchestrator's session. They write files; the orchestrator commits. | Almost everything. No extra dependencies, no setup. |
 | `"tmux"` | One tmux window per worker, each a separate Claude Code session in its own worktree. Workers commit, open a PR against the cycle branch, and report finished. | Long tasks that need their own context window, or work where you want to answer a worker's question directly in its pane. |
+| `"herdr"` | The same workers as `tmux`, each in a herdr tab in the workspace you run `/hv-work` from. herdr reports each worker's state (working, blocked, idle) directly and raises a notification when one needs you. | You already work in herdr. `/hv-work` must run inside a herdr pane. |
 
-`tmux` mode requires a `tmux` binary and a working `claude` on `PATH`. It never turns on by itself — set it explicitly:
+`tmux` mode requires a `tmux` binary and a working `claude` on `PATH`; `herdr` mode requires running `/hv-work` from a herdr pane. Neither turns on by itself — set it explicitly:
 
 ```bash
 .hv/bin/hv-config-set work.dispatch tmux
 ```
 
-Two things behave differently under `tmux`:
+Two things behave differently under `tmux` and `herdr`:
 
 - **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
 - **Workers commit.** The orchestrator's per-task commit step is skipped; integration happens through the merge gate instead, which re-verifies the *merged* tree. Two workers can each be honestly green and still break the cycle branch together — a signature one widens while another adds a caller, a constant one stops emitting while another starts reading it. Nothing about a clean merge rules that out, which is why the gate runs `refactor.verifyCommands` after every merge rather than trusting the branches.

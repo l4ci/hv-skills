@@ -4,7 +4,9 @@ Used by `/hv-work` Steps 5, 6, 7, and 7.5 when `work.dispatch: "tmux"`. Under th
 
 The tmux backend runs each worker as **its own Claude Code session**, in its own `git worktree`, on its own branch, opening a PR against the cycle branch. That buys a real per-worker context window and a channel a human can talk into. It costs the failure modes below, every one of which was paid for by a real round in the runbook this backend is modelled on.
 
-Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`.
+Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`. The tmux primitives they call live in `bin/hv-host-tmux.sh`.
+
+`work.dispatch: "herdr"` runs the same workers in herdr tabs instead; see [`herdr-dispatch.md`](herdr-dispatch.md). These sections apply to both hosts: *The worker contract*, *Escalating and relaying*, *The merge gate*, *Permissions*, *Accounts*.
 
 ## What changes versus the subagent backend
 
@@ -177,7 +179,7 @@ A window is only `cooling` when it is spent **and** names a *future* reset. A sp
 
 ## Other failure modes worth knowing
 
-- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv-worker-dispatch` kills and recreates the window every dispatch; a fresh session starts at 0 context. Do not try to reuse a window by clearing it.
+- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv-worker-dispatch` kills and recreates the window for every task brief; a fresh session starts at 0 context. Do not try to reuse a window by clearing it. A `--relay` is the exception: it goes into the running session, because the worker that asked the question is the one that needs the answer.
 - **A pasted brief may not submit.** A long prompt arrives as a collapsed paste chip whose trailing Enter is swallowed. `hv-worker-dispatch` sends Enter as a separate keypress and then **confirms pickup** by re-capturing the pane, retrying up to 4 times before failing with exit 4. Never assume the first Enter landed.
 - **Load is a first-class failure mode.** Slots contend for one box. Beyond roughly one slot per two cores, CPU-bound tests with fixed time budgets start failing on elapsed time rather than on truth, and each false red costs a re-measurement to disprove. That is why the worker contract says targeted tests only, and why `work.workerSlots` defaults to 3. Never "fix" a load-induced red by raising a timeout — a bigger fixed number just fails at a higher load and reports genuine regressions more slowly.
 - **A timeout is not a failure of the thing under test.** It says the assertion never ran. Read the output before forming a theory.
