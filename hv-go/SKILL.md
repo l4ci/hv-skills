@@ -35,6 +35,8 @@ Invoke `hv-capture` via the `Skill` tool. Prefix the args passed to capture with
 
 Capture runs before the clean-tree guard on purpose: `BACKLOG.md` lives under `.hv/`, which the clean-tree guard treats as a separate concern from the code paths it inspects, so capture never blocks Step 3. If Step 3 then fails, the item is safely on the backlog and the user can run `/hv-work` after cleaning up instead of re-describing it.
 
+Under `backlog.backend: "issues"` capture creates tracker issues through `hv-item-create`; the IDs are the type letter plus the issue number (`F42`). See `references/issue-mode.md`; `/hv-work` then claims the items and opens a PR.
+
 Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 4.
 
 ## Step 3 — Guard: Clean Working Tree
@@ -62,4 +64,5 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 
 ## References
 
+- [`references/issue-mode.md`](../references/issue-mode.md) — Issue-mode differences (`backlog.backend: "issues"`).
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.

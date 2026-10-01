@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # List all designs from .hv/designs/*.md as JSON.
-# Lookup helper: always exits 0; empty JSON array when no designs.
+# Lookup helper: exits 0; empty JSON array when no designs. Issue mode: exit 2 (unsupported).
 # Each entry: { id, title, status, created }.
 # Usage: hv-design-list
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+# Issue mode: designs are notes on their issues; finding them would take one comments call per issue.
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  echo "hv-design-list: not supported with backlog.backend \"issues\" (use hv-design-show <ID>)" >&2
+  exit 2
+fi
 RAW=$("$HERE/hv-fm-list" .hv/designs id title status created)
 python3 - "$RAW" <<'PY'
 import json, sys

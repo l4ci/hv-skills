@@ -36,7 +36,8 @@ def load():
             return json.load(f)
     except FileNotFoundError:
         return {"next_issue": 1, "next_milestone": 1, "next_comment": 1,
-                "issues": [], "labels": [], "milestones": []}
+                "issues": [], "labels": [], "milestones": [], "prs": [],
+                "next_mr": 1}
 
 
 def save(db):
@@ -151,6 +152,93 @@ def split_labels(vals):
     return out
 
 
+# ---------------------------------------------------------------- pull / merge requests
+def new_pr(db, tool, title, body, head, base):
+    """gh PRs share the issue counter (as on GitHub); glab MRs have their own."""
+    key = "next_issue" if tool == "gh" else "next_mr"
+    n = db.get(key, 1)
+    db[key] = n + 1
+    pr = {"number": n, "title": title, "body": body or "", "head": head, "base": base,
+          "state": "open"}
+    db.setdefault("prs", []).append(pr)
+    return pr
+
+
+def gh_pr(p):
+    return {"number": p["number"], "title": p["title"], "body": p["body"],
+            "headRefName": p["head"], "baseRefName": p["base"], "state": p["state"].upper(),
+            "url": "https://github.com/fake/repo/pull/%d" % p["number"]}
+
+
+def gl_mr(p):
+    return {"iid": p["number"], "title": p["title"], "description": p["body"],
+            "source_branch": p["head"], "target_branch": p["base"],
+            "state": "opened" if p["state"] == "open" else p["state"],
+            "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
+
+
+GH_PR_FLAGS = {"--title": "title", "-t": "title", "--body": "body", "-b": "body",
+               "--body-file": "body_file", "-F": "body_file", "--base": "base", "-B": "base",
+               "--head": "head", "-H": "head", "--json": "json", "--state": "state", "-s": "state",
+               "--limit": "limit", "-L": "limit"}
+
+
+def gh_pr_cmd(db, args):
+    verb = args[0]
+    o, b, pos = parse(args[1:], GH_PR_FLAGS)
+    fields = split_labels(o.get("json", []))
+    prs = [p for p in db.get("prs", []) if not p.get("mr")]
+    if verb == "create":
+        head = one(o, "head") or "HEAD"
+        p = new_pr(db, "gh", one(o, "title", ""), text_arg(o, "body", "body_file"), head,
+                   one(o, "base", "main"))
+        save(db)
+        print(gh_pr(p)["url"])
+    elif verb == "list":
+        state = one(o, "state", "open")
+        rows = [p for p in prs if state == "all" or p["state"] == state]
+        rows.sort(key=lambda p: -p["number"])
+        emit([pick(gh_pr(p), fields) for p in rows[:int(one(o, "limit", 30))]])
+    elif verb == "view":
+        want = pos[0]
+        hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
+        if not hit:
+            raise Fail("no pull requests found for %s" % want)
+        emit(pick(gh_pr(hit[-1]), fields)) if fields else print("title:\t%s" % hit[-1]["title"])
+    else:
+        raise Fail("unsupported", 2)
+
+
+GL_MR_FLAGS = {"--title": "title", "-t": "title", "--description": "desc", "-d": "desc",
+               "--source-branch": "head", "-s": "head", "--target-branch": "base", "-b": "base",
+               "--output": "output", "-O": "output", "--per-page": "per_page", "-P": "per_page",
+               "--state": "state"}
+
+
+def gl_mr_cmd(db, args):
+    verb = args[0]
+    o, b, pos = parse(args[1:], GL_MR_FLAGS, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--merged", "-M"))
+    prs = [p for p in db.get("prs", []) if p.get("mr")]
+    if verb == "create":
+        p = new_pr(db, "glab", one(o, "title", ""), one(o, "desc"), one(o, "head", "HEAD"),
+                   one(o, "base", "main"))
+        p["mr"] = True
+        save(db)
+        print(gl_mr(p)["web_url"])
+    elif verb == "list":
+        rows = [p for p in prs if ("--all" in b or "-A" in b) or p["state"] == "open"]
+        rows.sort(key=lambda p: -p["number"])
+        emit([gl_mr(p) for p in rows[:int(one(o, "per_page", 30))]])
+    elif verb == "view":
+        want = pos[0]
+        hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
+        if not hit:
+            raise Fail("404 Not Found")
+        emit(gl_mr(hit[-1]))
+    else:
+        raise Fail("unsupported", 2)
+
+
 # ---------------------------------------------------------------- gh
 def gh_issue(i, base_url="https://github.com/fake/repo"):
     return {
@@ -232,8 +320,9 @@ def gh_issue_cmd(db, args):
             i["milestone"] = gh_milestone_ref(db, one(o, "milestone"))
         if "--remove-milestone" in b:
             i["milestone"] = None
-        i["assignees"] += [x for x in split_labels(o.get("add_assignee", [])) if x not in i["assignees"]]
-        i["assignees"] = [x for x in i["assignees"] if x not in split_labels(o.get("remove_assignee", []))]
+        me = lambda xs: [USER if x == "@me" else x for x in xs]
+        i["assignees"] += [x for x in me(split_labels(o.get("add_assignee", []))) if x not in i["assignees"]]
+        i["assignees"] = [x for x in i["assignees"] if x not in me(split_labels(o.get("remove_assignee", [])))]
         save(db)
         print("https://github.com/fake/repo/issues/%d" % i["number"])
     elif verb == "close":
@@ -318,6 +407,19 @@ def gh_api(db, args):
     elif re.match(r"^issues/\d+/comments$", rest) and method == "GET":
         i = find_issue(db, rest.split("/")[1])
         emit([{"id": c["id"], "body": c["body"], "user": {"login": c["author"]}} for c in i["comments"]])
+    elif re.match(r"^issues/\d+/comments$", rest) and method == "POST":
+        c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
+        save(db)
+        emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]}})
+    elif re.match(r"^issues/comments/\d+$", rest) and method == "DELETE":
+        cid = int(rest.split("/")[2])
+        for i in db["issues"]:
+            for c in i["comments"]:
+                if c["id"] == cid:
+                    i["comments"].remove(c)
+                    save(db)
+                    return
+        raise Fail("404 Not Found")
     elif re.match(r"^issues/comments/\d+$", rest) and method == "PATCH":
         cid = int(rest.split("/")[2])
         for i in db["issues"]:
@@ -337,6 +439,8 @@ def run_gh(db, args):
         return
     if args and args[0] == "issue" and len(args) > 1:
         return gh_issue_cmd(db, args[1:])
+    if args and args[0] == "pr" and len(args) > 1:
+        return gh_pr_cmd(db, args[1:])
     if args and args[0] == "label" and len(args) > 1:
         return gh_label_cmd(db, args[1:])
     if args and args[0] == "api":
@@ -431,7 +535,11 @@ def gl_issue_cmd(db, args):
             i["milestone"] = gl_milestone_ref(db, title) if title else None  # `--milestone ""` clears
         if "--unassign" in b:
             i["assignees"] = []
-        i["assignees"] += [x for x in split_labels(o.get("assignee", [])) if x not in i["assignees"]]
+        # `+user` adds; a bare name replaces the assignees (glab semantics).
+        want = split_labels(o.get("assignee", []))
+        if want and not all(x.startswith("+") for x in want):
+            i["assignees"] = []
+        i["assignees"] += [x.lstrip("+") for x in want if x.lstrip("+") not in i["assignees"]]
         save(db)
         print(gl_issue(i)["web_url"])
     elif verb == "close":
@@ -465,6 +573,8 @@ def gl_label_cmd(db, args):
 def gl_api(db, args):
     path, method, fields, _ = parse_api(args, {"--input": "input"})
     method = (method or ("POST" if fields else "GET")).upper()
+    if path == "user" and method == "GET":
+        return emit({"id": 1, "username": USER})
     m = re.match(r"^projects/.+?/((?:milestones|issues).*)$", path)
     if not m:
         raise Fail("unsupported", 2)
@@ -491,7 +601,21 @@ def gl_api(db, args):
         emit(gm(x))
     elif re.match(r"^issues/\d+/notes$", rest) and method == "GET":
         i = find_issue(db, rest.split("/")[1])
-        emit([{"id": c["id"], "body": c["body"], "author": {"username": c["author"]}} for c in i["comments"]])
+        emit([{"id": c["id"], "body": c["body"], "author": {"username": c["author"]}, "system": False}
+              for c in i["comments"]])
+    elif re.match(r"^issues/\d+/notes$", rest) and method == "POST":
+        c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
+        save(db)
+        emit({"id": c["id"], "body": c["body"], "author": {"username": c["author"]}, "system": False})
+    elif re.match(r"^issues/\d+/notes/\d+$", rest) and method == "DELETE":
+        parts = rest.split("/")
+        i = find_issue(db, parts[1])
+        for c in i["comments"]:
+            if c["id"] == int(parts[3]):
+                i["comments"].remove(c)
+                save(db)
+                return
+        raise Fail("404 Not found")
     elif re.match(r"^issues/\d+/notes/\d+$", rest) and method == "PUT":
         parts = rest.split("/")
         i = find_issue(db, parts[1])
@@ -511,6 +635,8 @@ def run_glab(db, args):
         return
     if args and args[0] == "issue" and len(args) > 1:
         return gl_issue_cmd(db, args[1:])
+    if args and args[0] == "mr" and len(args) > 1:
+        return gl_mr_cmd(db, args[1:])
     if args and args[0] == "label" and len(args) > 1:
         return gl_label_cmd(db, args[1:])
     if args and args[0] == "api":

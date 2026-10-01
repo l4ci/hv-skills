@@ -6,13 +6,16 @@
 # counters.json#since_refactor.{features,bugs} unless the resolved commit's
 # subject starts with `refactor:` (those didn't count toward refactor pressure).
 # Writer helper: exit 0 on successful restore OR idempotent no-op; exit 1 if ID is not present in BACKLOG.md (Completed) or ARCHIVE.md.
+# Issue mode: reopens a closed issue and removes the not-planned / blocked labels; an open issue
+# carrying the blocked label is unblocked; anything else is a silent no-op.
+# Tracker failures: exit 1, or 3 unavailable / 4 rate-limited.
 # Usage: hv-uncomplete <ID>
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
 ID="${1:?usage: hv-uncomplete <ID>}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" <<'PY'
 import sys
-from hvlib import get_backend, BackendUnavailable
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
 id_s = sys.argv[1]
 try:
     backend = get_backend()
@@ -22,9 +25,11 @@ except ValueError as e:
     sys.stderr.write(f"error: hv-uncomplete: {e}\n"); sys.exit(1)
 try:
     if backend.uncomplete(id_s) == "active":
-        print(f"noop: [{id_s}] already active in BACKLOG.md", file=sys.stderr)
+        print(f"noop: [{id_s}] already active in {backend.backlog_name}", file=sys.stderr)
 except BackendUnavailable as e:
     sys.stderr.write(f"error: hv-uncomplete: {e}\n"); sys.exit(2)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-uncomplete: {e.message}\n"); sys.exit(tracker_exit_code(e))
 except (FileNotFoundError, LookupError, ValueError) as e:
     msg = f"{e.args[0]} not found" if isinstance(e, FileNotFoundError) else e.args[0]
     print(f"error: {msg}", file=sys.stderr); sys.exit(1)

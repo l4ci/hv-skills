@@ -368,6 +368,8 @@ git checkout -b <branch>
 
 For umbrella-mode branch creation (single sub-repo, multi-repo, Layout B worktree), see `references/umbrella-mode.md` *Branch creation* — that reference owns the canonical umbrella ceremony.
 
+**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`). Once the branch exists, per item: run `.hv/bin/hv-item-ready <ID>`. Exit 1 prints what is missing: warn the user interactively; under `autonomy.level: "loop"` refuse the item. Then claim it with `.hv/bin/hv-item-claim <ID> --as <branch>`. Exit 5 means another worker holds it: drop that item from the wave and continue with the rest (or stop when none remain). Exit 3 or 4: stop and report. Load each item's context as the reference's "Resuming an item" describes before planning tasks.
+
 Orchestrator stays at the repo root (or umbrella root in umbrella mode); workers `cd` into their assigned directory before any file operation, and use absolute paths in their briefs.
 
 ## Step 6 — Dispatch Worker Agents
@@ -475,7 +477,7 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 
 **PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
-**Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `.hv/bin/hv-proof-add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv-complete` (Step 9) is the acceptance write and exits 3 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced.
+**Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `.hv/bin/hv-proof-add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv-complete` (Step 9) is the acceptance write and exits 3 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced. In issue mode `hv-proof-add` works unchanged: the rows go into the item's proof note on the issue.
 
 ### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
@@ -576,6 +578,8 @@ If a tool regenerates siblings only when the editor loads (e.g., Godot `class_na
 
 ## Step 9 — Update BACKLOG.md
 
+**Issue mode:** skip this step and Step 9.5. Do not call `hv-complete`: the issue closes when its PR merges (`Closes #<n>`, Step 10).
+
 ```bash
 .hv/bin/hv-complete <ID> <commit-hash>
 ```
@@ -619,6 +623,15 @@ Single commit per cycle keeps the loop atomic: the implementation commits ship t
 Use `work.mergeStrategy` from `.hv/config.json` to pick `hv-merge` (direct) or `hv-pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), helper contracts, and the Manual-gate rule for opening a PR.
 
 When `work.mergeStrategy == "direct"` (or unset — the default), use `hv-merge`. When `work.mergeStrategy == "pr"`, use `hv-pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `/hv-config`; respect it silently.
+
+**Issue mode forces the PR path**, whatever `work.mergeStrategy` says, and never merges:
+
+```bash
+printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID1>,<ID2> <branch> "<short title>"
+.hv/bin/hv-item-state <ID> needs-review    # once per item
+```
+
+Do not call `hv-item-release`: the claim persists until the PR merges. Merging is `/hv-review --queue`'s job. Details in `references/issue-mode.md`.
 
 ## Step 11 — Update Status
 
@@ -719,6 +732,7 @@ Loop stops naturally when:
 |-----------|---------|
 | [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
 | [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`issue-mode.md`](../references/issue-mode.md) | Issue-mode helper map, state labels, PR flow, resuming an item, exit codes (`backlog.backend: "issues"`). |
 | [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |

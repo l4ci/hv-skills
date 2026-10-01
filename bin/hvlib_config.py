@@ -51,6 +51,7 @@ CONFIG_KEYS = [
     ("issues.labels.changesRequested", "changes-requested", False),
     ("issues.labels.released", "released", False),
     ("issues.labels.notPlanned", "not-planned", False),
+    ("issues.labels.blocked", "blocked", False),
     ("issues.labels.milestoneTracker", "milestone-tracker", False),
     ("issues.labels.types.bug", "type:bug", False),
     ("issues.labels.types.feature", "type:feature", False),

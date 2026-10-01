@@ -3,8 +3,8 @@
 # Proof rows are facts (a check ran, it passed or failed); they are not acceptance —
 # hv-complete is the acceptance write and refuses an item with no proof (see hv-proof-show).
 # Creates .hv/<kind>/<ID>.md when missing. Idempotent: a row with the same check, result,
-# sha and evidence (date ignored) is a silent no-op. Writes under the sidecar lock.
-# Writer helper: exit 0 on write or idempotent no-op; exit 1 on usage error or unknown ID.
+# sha and evidence (date ignored) is a silent no-op. Writes under the sidecar lock. Issue backend: rows go in the proof note (hv-item-note).
+# Writer helper: exit 0 on write or idempotent no-op; exit 1 on usage error, unknown ID or tracker failure; 3/4 tracker down/limited.
 # Usage: hv-proof-add <ID> --check <name> --result PASS|FAIL --evidence <path-or-text> [--sha <commit>]
 # Row format: - <date> · <check> · <PASS|FAIL> · <sha> · <evidence>
 set -euo pipefail
@@ -30,12 +30,38 @@ case "$RESULT" in PASS|FAIL) ;; *) echo "error: --result must be PASS or FAIL" >
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$CHECK" "$RESULT" "$SHA" "$EVIDENCE" "$(date +%Y-%m-%d)" <<'PY'
 import os, re, sys
 from pathlib import Path
-from hvlib import find_origin_bullet, load_backlog_corpus, detail_dir_for_id, find_section, append_to_section
+from hvlib import (find_origin_bullet, load_backlog_corpus, detail_dir_for_id, find_section, append_to_section,
+                   get_backend, IssueBackend, TrackerError, tracker_exit_code)
 from hvlib_io import locked, write_text_atomic
 
 iid, check, result, sha, evidence, date_s = sys.argv[1:7]
 one = lambda s: " ".join(s.split())
 check, sha, evidence = one(check), one(sha), one(evidence)
+
+try:
+    backend = get_backend()
+except ValueError as e:
+    print(f"error: hv-proof-add: {e}", file=sys.stderr)
+    sys.exit(1)
+if isinstance(backend, IssueBackend):
+    row = f"- {date_s} \u00b7 {check} \u00b7 {result} \u00b7 {sha} \u00b7 {evidence}"
+    try:
+        content = backend.note_get(iid, "proof") or ""
+        span = find_section(content, "Proof")
+        if span is not None and any(
+                l.startswith("- ") and " \u00b7 " in l and l.split(" \u00b7 ", 1)[1] == row.split(" \u00b7 ", 1)[1]
+                for l in content[span[0]:span[1]].splitlines()):
+            sys.exit(0)
+        content = content.rstrip("\n")
+        backend.note_put(iid, "proof", append_to_section(content + "\n", "Proof", row + "\n")
+                         if span is not None else (content + "\n\n" if content else "") + f"## Proof\n\n{row}\n")
+    except TrackerError as e:
+        print(f"error: hv-proof-add: {e.message}", file=sys.stderr)
+        sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-proof-add: {e.args[0]}", file=sys.stderr)
+        sys.exit(1)
+    sys.exit(0)
 
 kind = detail_dir_for_id(iid)
 if not kind:

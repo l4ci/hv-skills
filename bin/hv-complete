@@ -12,6 +12,11 @@
 # Proof gate: a `done` close needs at least one row in the item's `## Proof` section
 # (hv-proof-add / hv-proof-show); otherwise exit 3. --no-proof overrides. Other reasons
 # (handed-off, blocked, dropped) have nothing to prove and skip the gate.
+# Issue mode (backlog.backend "issues"): done closes the issue as completed with a "Done in `<hash>`"
+# comment; dropped / handed-off close it as not planned with a "Closed: <reason>" comment; blocked keeps
+# it open with the blocked label and a comment. Closing clears the in-progress / needs-review /
+# changes-requested / blocked labels. Already closed (or already blocked) is a silent no-op.
+# Tracker failures: exit 1, or 3 unavailable / 4 rate-limited.
 # Usage: hv-complete <ID> [commit-hash] [--reason done|handed-off|blocked|dropped] [--note <text>] [--no-proof]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
@@ -43,7 +48,7 @@ fi
 DATE=$(date +%Y-%m-%d)
 HV_PROOF_SHOW="$HERE/hv-proof-show" HV_NO_PROOF="$NO_PROOF" PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$HASH" "$DATE" "$REASON" "$NOTE" <<'PY'
 import os, sys
-from hvlib import get_backend, BackendUnavailable, ProofMissing
+from hvlib import get_backend, BackendUnavailable, ProofMissing, TrackerError, tracker_exit_code
 id_s, hash_s, date_s, reason_s, note_s = sys.argv[1:6]
 try:
     backend = get_backend()
@@ -59,6 +64,8 @@ except BackendUnavailable as e:
     sys.stderr.write(f"error: hv-complete: {e}\n"); sys.exit(2)
 except LookupError as e:
     print(f"error: {e.args[0]}", file=sys.stderr); sys.exit(1)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-complete: {e.message}\n"); sys.exit(tracker_exit_code(e))
 except ProofMissing as e:
     print(f"error: {e.args[0]}", file=sys.stderr); sys.exit(3)
 PY

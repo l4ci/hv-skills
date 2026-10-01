@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Replace the text of an existing plan with a prepared body, so a skill can draft locally and publish.
+# File mode: overwrites .hv/plans/<key>.md (must exist: create it with hv-plan-add first).
+# Issue mode: upserts the item's `plan` note on its issue (must exist likewise).
+# In issue mode only item keys (<M>-<ID>) are notes; slice keys (<M>-S<NN>) stay files.
+# Writer helper: exit 0 on success; exit 1 on usage error, unreadable body or missing target;
+#   exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-plan-put <key> --body-file F|-
+#   --body-file -   read the text from stdin (only then)
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-plan-put <key> --body-file F|-"
+REF="${1:?$USAGE}"
+shift
+BODY_FILE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --body-file) BODY_FILE="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+[ -n "$BODY_FILE" ] || { echo "$USAGE" >&2; exit 1; }
+# The preamble cd'd to the project root; a relative --body-file is relative to the caller.
+if [ "$BODY_FILE" != "-" ] && [[ "$BODY_FILE" != /* ]]; then BODY_FILE="${HV_ORIG_PWD:-$PWD}/$BODY_FILE"; fi
+# python reads its script from stdin (heredoc), so a piped body is staged in a temp file first.
+if [ "$BODY_FILE" = "-" ]; then
+  STAGED="$(mktemp)"; trap 'rm -f "$STAGED"' EXIT
+  cat > "$STAGED"; BODY_FILE="$STAGED"
+fi
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REF" "$BODY_FILE" <<'PY'
+import re, sys
+from pathlib import Path
+from hvlib import write_text_atomic, get_backend, IssueBackend, BackendUnavailable, TrackerError, tracker_exit_code
+
+ref, body_file = sys.argv[1:3]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-plan-put: {msg}\n"); sys.exit(code)
+
+m = re.fullmatch(r"M\d{2,}-([A-Z]\d+)", ref)
+if not m:
+    die(f"key must look like M01-B07 or M01-S02, got {ref!r}")
+item = m.group(1)
+try:
+    text = open(body_file, "rb").read().decode(errors="replace")
+except OSError as e:
+    die(f"cannot read --body-file: {e.strerror}: {body_file}")
+try:
+    backend = get_backend()
+except ValueError:
+    backend = None  # file mode never depended on config
+try:
+    if isinstance(backend, IssueBackend) and not item.startswith("S"):
+        if backend.note_get(item, "plan") is None:
+            die(f"plan note for {item} not found (create it with hv-plan-add)")
+        backend.note_put(item, "plan", text)
+    else:
+        path = Path(f".hv/plans/{ref}.md")
+        if not path.exists():
+            die(f"{path} not found (create it with hv-plan-add)")
+        write_text_atomic(path, text)
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except LookupError as e:
+    die(e.args[0])
+PY

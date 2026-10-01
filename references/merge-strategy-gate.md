@@ -9,6 +9,10 @@ The `work.mergeStrategy` config flag (`"direct"` | `"pr"` | unset) drives whethe
 - `"direct"` → use `hv-merge`. `"pr"` → use `hv-pr`. Unset → the strategy picker fires (next section).
 - `/hv-config` is the canonical UI for changing this; the field's full vocabulary lives in `docs/reference/config-options.md`.
 
+## Issue mode
+
+With `backlog.backend: "issues"` the strategy is forced to `pr`: `work.mergeStrategy` is ignored, no picker fires, and `hv-merge` is never used. `hv-pr` takes `--closes <ID[,ID...]>` to append `Closes #<n>` lines and opens a GitLab MR (`glab mr create`) when the provider is GitLab. Merging is `/hv-review --queue`'s job. See `references/issue-mode.md`.
+
 ## Strategy picker
 
 Used by skills that have to decide (currently `hv-ship`). When to ask:

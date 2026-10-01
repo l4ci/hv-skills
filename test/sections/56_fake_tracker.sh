@@ -70,8 +70,8 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   py "$(gh issue view 1 --json comments)" "len(d['comments'])==3" || fail "gh close --comment adds a comment"
   gh issue reopen 1
   py "$(gh issue view 1 --json state,closedAt)" "d=={'state':'OPEN','closedAt':None}" || fail "gh reopen"
-  rc=0; gh pr list 2>"$TMP_FT/err" || rc=$?
-  [ "$rc" = 2 ] && grep -q "fake gh: unsupported: pr list" "$TMP_FT/err" || fail "gh unsupported should exit 2 with message"
+  rc=0; gh pr merge 1 2>"$TMP_FT/err" || rc=$?
+  [ "$rc" = 2 ] && grep -q "fake gh: unsupported: pr merge" "$TMP_FT/err" || fail "gh unsupported should exit 2 with message"
   FAKE_TRACKER_FAIL="issue view 99" rc=0 gh issue view 99 --json number 2>/dev/null || rc=$?
   [ "$rc" = 1 ] || fail "FAKE_TRACKER_FAIL should force exit 1"
   grep -q "^issue create --title First" "$TMP_FT/gh.log" || fail "argv log should record calls"
@@ -125,11 +125,32 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   py "$(glab issue list --all -O json)" "[x['iid'] for x in d]==[2,1]" || fail "glab --all"
   glab issue reopen 1
   py "$(glab issue view 1 -O json)" "d['state']=='opened' and d['closed_at'] is None" || fail "glab reopen"
-  rc=0; glab mr list 2>"$TMP_FT/err" || rc=$?
-  [ "$rc" = 2 ] && grep -q "fake glab: unsupported: mr list" "$TMP_FT/err" || fail "glab unsupported should exit 2"
+  rc=0; glab mr merge 1 2>"$TMP_FT/err" || rc=$?
+  [ "$rc" = 2 ] && grep -q "fake glab: unsupported: mr merge" "$TMP_FT/err" || fail "glab unsupported should exit 2"
   rc=0; FAKE_TRACKER_FAIL="issue close" glab issue close 2 2>/dev/null || rc=$?
   [ "$rc" = 1 ] || fail "glab FAKE_TRACKER_FAIL"
   pass "glab: close/reopen, failure injection, unsupported"
+)
+
+# pull / merge requests
+(
+  export PATH="$FAKES:$PATH"
+  export FAKE_TRACKER_DB="$TMP_FT/pr.json"
+  gh label create t >/dev/null
+  gh issue create --title A --body b --label t >/dev/null
+  [ "$(gh pr create --title "PR one" --body-file - --base main --head feat/x <<<"body text")" = "https://github.com/fake/repo/pull/2" ] \
+    || fail "gh pr create should print the URL and share the issue counter"
+  py "$(gh pr list --json number,title,body,headRefName,url,state)" \
+    "d==[{'number':2,'title':'PR one','body':'body text\n','headRefName':'feat/x','url':'https://github.com/fake/repo/pull/2','state':'OPEN'}]" \
+    || fail "gh pr list shape"
+  py "$(gh pr view feat/x --json number,headRefName)" "d=={'number':2,'headRefName':'feat/x'}" || fail "gh pr view by branch"
+  [ "$(glab mr create --title "MR one" --description D --source-branch feat/y --target-branch main --yes)" = "https://gitlab.com/fake/repo/-/merge_requests/1" ] \
+    || fail "glab mr create should print the URL with its own counter"
+  py "$(glab mr list --output json)" \
+    "d==[{'iid':1,'title':'MR one','description':'D','source_branch':'feat/y','target_branch':'main','state':'opened','web_url':'https://gitlab.com/fake/repo/-/merge_requests/1'}]" \
+    || fail "glab mr list shape"
+  py "$(glab mr view 1 --output json)" "d['source_branch']=='feat/y'" || fail "glab mr view"
+  pass "fake gh pr / glab mr: create, list, view"
 )
 
 # hv-tracker-call drives the fakes

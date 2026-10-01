@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Print the proof rows from the `## Proof` section of an item's detail file
-# (written by hv-proof-add). Lookup helper: exit 0 even when no proof exists
-# (empty output); exit 1 on usage error.
+# Print the proof rows from the `## Proof` section of an item's detail file (hv-proof-add),
+# or from the issue-backend proof note. Lookup helper: exit 0 even when no proof exists
+# (empty output); exit 1 on usage error, unknown item or tracker failure; 3/4 tracker down/limited.
 # Usage: hv-proof-show <ID> [--count]
 #   --count   print only the number of proof rows (hv-complete uses this to gate on proof)
 set -euo pipefail
@@ -12,14 +12,30 @@ MODE="${2:-}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$MODE" <<'PY'
 import sys
 from pathlib import Path
-from hvlib import detail_dir_for_id, find_section
+from hvlib import detail_dir_for_id, find_section, get_backend, IssueBackend, TrackerError, tracker_exit_code
 
 iid, mode = sys.argv[1], sys.argv[2]
 rows = []
-kind = detail_dir_for_id(iid)
-path = Path(f".hv/{kind}/{iid}.md") if kind else None
-if path and path.exists():
-    content = path.read_text()
+try:
+    backend = get_backend()
+except ValueError as e:
+    print(f"error: hv-proof-show: {e}", file=sys.stderr)
+    sys.exit(1)
+if isinstance(backend, IssueBackend):
+    try:
+        content = backend.note_get(iid, "proof")
+    except TrackerError as e:
+        print(f"error: hv-proof-show: {e.message}", file=sys.stderr)
+        sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-proof-show: {e.args[0]}", file=sys.stderr)
+        sys.exit(1)
+    path = None
+else:
+    kind = detail_dir_for_id(iid)
+    path = Path(f".hv/{kind}/{iid}.md") if kind else None
+    content = path.read_text() if path and path.exists() else None
+if content:
     span = find_section(content, "Proof")
     if span:
         rows = [l for l in content[span[0]:span[1]].splitlines() if l.startswith("- ")]

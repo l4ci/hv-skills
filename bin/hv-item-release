@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Give an item back (issue mode): posts `<!-- hv:release <claim-id> -->` and removes the in-progress
+# label when no other claim is open. No open claim by that id: silent no-op. File backend: silent no-op.
+# Writer helper: exit 0 on release or no-op; exit 1 on usage error, unknown item or tracker failure;
+#   exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-item-release <ref> --as <claim-id>
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-item-release <ref> --as <claim-id>"
+REF="${1:?$USAGE}"
+shift
+AS=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --as) AS="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+case "$AS" in ""|*[[:space:]]*|*"-->"*) echo "$USAGE" >&2; exit 1 ;; esac
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REF" "$AS" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+ref, claim_id = sys.argv[1:3]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-item-release: {msg}\n"); sys.exit(code)
+
+try:
+    get_backend().release(ref, claim_id)
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+PY

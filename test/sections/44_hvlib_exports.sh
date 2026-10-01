@@ -77,6 +77,7 @@ NAMES = [
     "replace_section",
     "resolve_cycle_ids",
     "resolve_knowledge_target",
+    "resolve_item_ref",
     "resolve_plugin_root",
     "resolve_tier_sidecar",
     "save_tier_sidecar",

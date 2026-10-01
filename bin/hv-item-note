@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Read, write or remove an item's durable note (proof, design or plan) in issue mode.
+# The note is a marker comment on the issue (`<!-- hv:<kind> -->`, edited in place); a text over
+# 60,000 chars is split on line boundaries into `<!-- hv:<kind> i/n -->` parts, and shrinking
+# the text deletes the surplus parts. Putting identical text makes no tracker write.
+# Trailing newlines are not kept. --show prints the note ("" and exit 0 when absent);
+# --rm is idempotent. File backend: exit 2 (designs/plans live in .hv/designs and .hv/plans).
+# Writer helper: exit 0 on success or no-op; exit 1 on usage error, unreadable body, unknown item
+#   or tracker failure; exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-item-note <ref> --kind proof|design|plan (--body-file F|- | --show | --rm)
+#   --body-file -   read the note text from stdin (only then)
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-item-note <ref> --kind proof|design|plan (--body-file F|- | --show | --rm)"
+REF="${1:?$USAGE}"
+shift
+KIND="" ACTION="" BODY_FILE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --kind) KIND="${2:?$USAGE}"; shift 2 ;;
+    --body-file) ACTION="put"; BODY_FILE="${2:?$USAGE}"; shift 2 ;;
+    --show) ACTION="show"; shift ;;
+    --rm) ACTION="rm"; shift ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+case "$KIND" in proof|design|plan) ;; *) echo "$USAGE" >&2; exit 1 ;; esac
+[ -n "$ACTION" ] || { echo "$USAGE" >&2; exit 1; }
+# The preamble cd'd to the project root; a relative --body-file is relative to the caller.
+if [ -n "$BODY_FILE" ] && [ "$BODY_FILE" != "-" ] && [[ "$BODY_FILE" != /* ]]; then BODY_FILE="${HV_ORIG_PWD:-$PWD}/$BODY_FILE"; fi
+# python reads its script from stdin (heredoc), so a piped body is staged in a temp file first.
+if [ "$BODY_FILE" = "-" ]; then
+  STAGED="$(mktemp)"; trap 'rm -f "$STAGED"' EXIT
+  cat > "$STAGED"; BODY_FILE="$STAGED"
+fi
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REF" "$KIND" "$ACTION" "$BODY_FILE" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+ref, kind, action, body_file = sys.argv[1:5]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-item-note: {msg}\n"); sys.exit(code)
+
+text = None
+if action == "put":
+    try:
+        text = open(body_file, "rb").read().decode(errors="replace")
+    except OSError as e:
+        die(f"cannot read --body-file: {e.strerror}: {body_file}")
+try:
+    backend = get_backend()
+    if action == "put":
+        backend.note_put(ref, kind, text)
+    elif action == "rm":
+        backend.note_rm(ref, kind)
+    else:
+        out = backend.note_get(ref, kind)
+        if out:
+            print(out)
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+PY
