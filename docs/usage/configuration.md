@@ -353,6 +353,7 @@ Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-rev
 | `issues.labels.changesRequested` | `"changes-requested"` | Label name. |
 | `issues.labels.released` | `"released"` | Label name. |
 | `issues.labels.notPlanned` | `"not-planned"` | Label name. |
+| `issues.labels.blocked` | `"blocked"` | Label name set by `hv-complete --reason blocked`; the issue stays open. |
 | `issues.labels.milestoneTracker` | `"milestone-tracker"` | Label name. |
 | `issues.labels.types.bug` / `.feature` / `.task` | `"type:bug"` / `"type:feature"` / `"type:task"` | Label names per item type. |
 | `issues.labels.priorityPrefix` | `"p"` | Prefix for priority labels. |

@@ -263,16 +263,9 @@ MD
   eq "uncomplete unknown" "1:error: [B99] not found in BACKLOG.md (## Completed) or .hv/ARCHIVE.md" "$rc:$err"
   pass "hv-uncomplete golden"
 
-  # backlog.backend = issues: complete/uncomplete refuse (exit 2, nothing written)
+  # backlog.backend = issues from here on
   cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
-  for call in "hv-complete|B01|$C1|--no-proof" "hv-uncomplete|B03"; do
-    IFS='|' read -r -a argv <<< "$call"; h="${argv[0]}"
-    rc=0; err="$("$BIN/$h" "${argv[@]:1}" 2>&1)" || rc=$?
-    eq "$h issues refusal" "2:error: $h: issues backend not available yet (M07-S03)" "$rc:$err"
-  done
-  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/ARCHIVE.md orig.arch && cmp -s .hv/counters.json orig.cnt || fail "complete/uncomplete wrote under issues backend"
-  pass "complete/uncomplete refused under issues backend, files unchanged"
 
   # file-only verbs refuse in issue mode, with a tracker pointer, writing nothing
   while IFS='|' read -r h args ptr; do
@@ -486,10 +479,9 @@ PY
     eq "todo-field view failure" 1 "$rc"; case "$err" in "error: hv-todo-field: "*) ;; *) fail "$prov todo-field failure: $err";; esac
     pass "$prov: tracker failures surface as 'error: <helper>: ...' exit 1"
 
-    # write verbs stay refused
+    # hv-append stays refused (capture is hv-item-create)
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
-    rc=0; "$BIN/hv-complete" B1 abc1234 --no-proof >/dev/null 2>&1 || rc=$?; eq "complete refused" 2 "$rc"
-    pass "$prov: hv-append / hv-complete still refused in issue mode"
+    pass "$prov: hv-append still refused in issue mode"
   )
 done
 trap 'rm -rf "$TMP"' EXIT
@@ -649,6 +641,101 @@ print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "
     ERR "$BIN/hv-todo-set-field" T3 related "[B1]"
     eq "closed item" "1:error: [T3] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
     pass "$prov: hv-todo-set-field writes fields/milestone on issues, no-ops when unchanged, rejects bad input"
+  )
+done
+trap 'rm -rf "$TMP"' EXIT
+
+echo "Issue mode: hv-complete / hv-uncomplete close reasons, labels, proof gate"
+
+TMP_IL="$(mktemp -d)"
+trap 'rm -rf "$TMP_IL"' EXIT
+for prov in github gitlab; do
+  P="$TMP_IL/$prov"; mkdir -p "$P/.hv"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  (
+    cd "$P"
+    git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
+    export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
+    eq() { [ "$2" = "$3" ] || fail "$prov lifecycle $1: expected [$2] got [$3]"; }
+    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
+    # IV <n>: "state|state_reason|sorted labels (comma)|comments (joined by ' // ')"
+    IV() { PYTHONPATH="$BIN" python3 -c '
+import sys
+from hvlib import adapter_for, load_config
+a = adapter_for(load_config()); n = int(sys.argv[1]); i = a.get(n)
+print("%s|%s|%s|%s" % (i["state"], i["state_reason"] or "", ",".join(sorted(i["labels"])),
+                       " // ".join(c["body"].replace("\n", " ") for c in a.comments(n) if not c["body"].startswith("<!-- hv:proof"))))' "$1"; }
+    PROOF() { "$BIN/hv-proof-add" "$1" --check smoke --result PASS --evidence ok --sha abc1234; }
+    DASH="$(printf '\xe2\x80\x94')"
+    NPL="not-planned,"; [ "$prov" = github ] && NPL=""   # glab has no close reason: a label stands in
+
+    for t in a b c d e f; do "$BIN/hv-item-create" tasks --title "Task $t" >/dev/null; done   # T1..T6
+    PYTHONPATH="$BIN" python3 -c '
+from hvlib import adapter_for, load_config
+a = adapter_for(load_config())
+for n in range(1, 7): a.add_labels(n, ["in-progress"])'
+    eq "seeded labels" "open||in-progress,type:task|" "$(IV 1)"
+
+    # proof gate: unproven done exits 3 and leaves the issue alone
+    before="$(IV 1)"
+    ERR "$BIN/hv-complete" T1 abc1234
+    eq "gate rc" 3 "$ERRRC"
+    case "$ERRMSG" in "error: [T1] no proof recorded, pass --no-proof"*) ;; *) fail "$prov gate msg: $ERRMSG";; esac
+    eq "gate leaves issue" "$before" "$(IV 1)"
+
+    # done: proven, closed completed, state labels cleared, comment
+    PROOF T1
+    out="$("$BIN/hv-complete" T1 abc1234 2>&1)"; eq "done prints nothing" "" "$out"
+    eq "done" "closed|completed|type:task|Done in \`abc1234\`" "$(IV 1)"
+    : > "$P/log"
+    "$BIN/hv-complete" T1 abc1234
+    eq "done idempotent writes nothing" "0" "$(grep -c 'issue \(edit\|update\|close\)\|api -X' "$P/log" || true)"
+
+    # --no-proof + note
+    "$BIN/hv-complete" T2 abc1234 --no-proof --note "shipped in PR"
+    eq "done note" "closed|completed|type:task|Done in \`abc1234\` $DASH shipped in PR" "$(IV 2)"
+
+    # dropped / handed-off: not planned (gitlab: label), no gate
+    "$BIN/hv-complete" T3 abc1234 --reason dropped --note "not needed"
+    eq "dropped" "closed|not_planned|${NPL}type:task|Closed: dropped $DASH not needed" "$(IV 3)"
+    "$BIN/hv-complete" T4 abc1234 --reason handed-off
+    eq "handed-off" "closed|not_planned|${NPL}type:task|Closed: handed-off" "$(IV 4)"
+
+    # blocked: stays open, label + comment, other state labels kept; idempotent
+    "$BIN/hv-complete" T5 abc1234 --reason blocked --note "waiting on X"
+    eq "blocked" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
+    "$BIN/hv-complete" T5 abc1234 --reason blocked --note "again"
+    eq "blocked idempotent" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
+    # blocked then done: closes and clears blocked + in-progress
+    "$BIN/hv-complete" T5 abc1234 --reason dropped
+    eq "blocked then dropped" "closed|not_planned|${NPL}type:task|Blocked $DASH waiting on X // Closed: dropped" "$(IV 5)"
+
+    # unknown / malformed refs: exit 1
+    ERR "$BIN/hv-complete" T99 abc1234 --no-proof; eq "unknown complete" "1:error: [T99] not found in the issue tracker" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-uncomplete" T99; eq "unknown uncomplete" "1:error: [T99] not found in the issue tracker" "$ERRRC:$ERRMSG"
+    ERR "$BIN/hv-complete" B1 abc1234 --no-proof; eq "type mismatch" 1 "$ERRRC"
+
+    # uncomplete: reopens, removes not-planned/blocked; open+blocked unblocks; else no-op
+    "$BIN/hv-uncomplete" T3
+    eq "uncomplete dropped" "open||type:task|Closed: dropped $DASH not needed" "$(IV 3)"
+    "$BIN/hv-uncomplete" T1
+    eq "uncomplete done" "open||type:task|Done in \`abc1234\`" "$(IV 1)"
+    "$BIN/hv-complete" T6 abc1234 --reason blocked
+    "$BIN/hv-uncomplete" T6
+    eq "unblock" "open||in-progress,type:task|Blocked" "$(IV 6)"
+    : > "$P/log"
+    ERR "$BIN/hv-uncomplete" T6
+    eq "uncomplete noop rc" 0 "$ERRRC"
+    eq "uncomplete noop writes nothing" "0" "$(grep -c 'issue \(edit\|update\|close\|reopen\)\|api -X' "$P/log" || true)"
+    # complete again after reopen works
+    PROOF T1; "$BIN/hv-complete" T1 def5678
+    eq "recomplete" "closed|completed|type:task|Done in \`abc1234\` // Done in \`def5678\`" "$(IV 1)"
+
+    # custom blocked label name
+    echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0,\"labels\":{\"blocked\":\"stuck\"}}}" > "$P/.hv/config.json"
+    "$BIN/hv-complete" T6 abc1234 --reason blocked
+    eq "custom blocked label" "open||in-progress,stuck,type:task|Blocked // Blocked" "$(IV 6)"
+    pass "$prov: hv-complete / hv-uncomplete close reasons, labels, gate, idempotency"
   )
 done
 trap 'rm -rf "$TMP"' EXIT

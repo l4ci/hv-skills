@@ -4,8 +4,8 @@ Helpers (hv-append, hv-todo-field, hv-todo-set-field, hv-backlog) call
 get_backend() and keep argv parsing, printing and exit codes to themselves;
 the methods here take and return data. backlog.backend = "issues" selects
 IssueBackend: reads come from the tracker as BACKLOG.md-shaped markdown
-(backlog_markdown), so readers keep their parsers; lifecycle verbs raise
-BackendUnavailable until M07-S03.
+(backlog_markdown), so readers keep their parsers; lifecycle verbs (complete, claim, notes)
+close, label and comment on the issues.
 
 Imports sibling hvlib_* modules by direct path, never through the hvlib shim.
 """
@@ -372,6 +372,26 @@ class FileBackend:
             return path.read_text()
         except OSError:
             return None
+
+    backlog_name = "BACKLOG.md"
+
+    def claim(self, item_id, claim_id):
+        """No-op: status.json is the file-mode lock."""
+        return True, claim_id
+
+    def release(self, item_id, claim_id):
+        return False
+
+    def set_state(self, item_id, state):
+        return False
+
+    def ready_reasons(self, item_id):
+        """Same rule as IssueBackend over the detail file, .hv/designs/<ID>.md
+        and .hv/plans/*-<ID>.md. LookupError for an unknown ID."""
+        if find_origin_bullet(load_backlog_corpus("."), item_id) is None:
+            raise LookupError(f"[{item_id}] not found in BACKLOG.md or ARCHIVE.md")
+        note = Path(".hv/designs", f"{item_id}.md").exists() or any(Path(".hv/plans").glob(f"*-{item_id}.md"))
+        return _ready_reasons(_has_criteria(self.detail_text(item_id)), note)
 
     def note_get(self, item_id, kind):
         raise BackendUnavailable(_FILE_NOTE_MSG.get(kind, _FILE_NOTE_MSG['design']))
@@ -833,12 +853,171 @@ class IssueBackend:
     def append(self, *_a, **_k):
         raise BackendUnavailable("issue mode creates items with hv-item-create")
 
-    def complete(self, item_id, hash_s, date_s, reason="done", note="", proof_show=None):
-        _proof_gate(item_id, reason, proof_show)  # T2 replaces the rest with the real close
-        raise BackendUnavailable("issues backend not available yet (M07-S03)")
+    # -- lifecycle ---------------------------------------------------------
 
-    def uncomplete(self, *_a, **_k):
-        raise BackendUnavailable("issues backend not available yet (M07-S03)")
+    backlog_name = "the issue tracker"
+
+    def _state_labels(self, *roles):
+        return [tracker_label(self.cfg, r) for r in (roles or _STATE_ROLES)]
+
+    def _require(self, ref):
+        issue = self._lookup(ref)
+        if issue is None:
+            raise LookupError(f"[{ref}] not found in the issue tracker")
+        return issue, f"{self._letter(issue)}{issue['number']}"
+
+    def complete(self, ref, hash_s, date_s, reason="done", note="", proof_show=None):
+        """Close the issue with the reason's tracker state; same contract as
+        FileBackend.complete (False = already closed, LookupError unknown,
+        ProofMissing for an unproven `done`).
+
+        done -> closed as completed + "Done in `<hash>`"; dropped / handed-off ->
+        closed as not planned + "Closed: <reason>"; blocked -> stays open with
+        the blocked label and a "Blocked" comment. Closing also clears the
+        in-progress / needs-review / changes-requested / blocked labels.
+        """
+        issue, item_id = self._require(ref)
+        if issue["state"] == "closed":
+            return False
+        n = issue["number"]
+        labels = issue["labels"]
+        note = _one_line(note)
+        suffix = f" \u2014 {note}" if note else ""
+        if reason == "blocked":
+            label = tracker_label(self.cfg, "blocked")
+            if label in labels:
+                return False
+            self.adapter.add_labels(n, [label], auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+            self.adapter.add_comment(n, "Blocked" + suffix)
+            return True
+        _proof_gate(item_id, reason, proof_show)
+        stale = [l for l in self._state_labels() if l in labels]
+        if stale:
+            self.adapter.remove_labels(n, stale)
+        if reason == "done":
+            self.adapter.close(n, "completed", comment=f"Done in `{hash_s}`" + suffix)
+        else:
+            self.adapter.close(n, "not_planned", comment=f"Closed: {reason}" + suffix)
+        return True
+
+    def uncomplete(self, ref):
+        """Reopen a closed issue (clearing not-planned / blocked) or unblock an
+        open one. "restored", or "active" when there was nothing to undo."""
+        issue, _id = self._require(ref)
+        n = issue["number"]
+        stale = [l for l in self._state_labels("notPlanned", "blocked") if l in issue["labels"]]
+        if issue["state"] == "closed":
+            self.adapter.reopen(n)
+        elif tracker_label(self.cfg, "blocked") not in stale:
+            return "active"
+        if stale:
+            self.adapter.remove_labels(n, stale)
+        return "restored"
+
+    # -- claim lock, readiness, state labels ---------------------------------
+
+    def _open_claims(self, n):
+        """Claim ids with no later release, in claim order (earliest holds)."""
+        held = []
+        for c in self.adapter.comments(n):
+            m = _CLAIM_RE.match(c["body"].replace("\r\n", "\n"))
+            if not m:
+                continue
+            if m.group(1) == "claim":
+                if m.group(2) not in held:
+                    held.append(m.group(2))
+            elif m.group(2) in held:
+                held.remove(m.group(2))
+        return held
+
+    def _apply_state(self, issue, want):
+        """One edit call leaving only the `want` role label (None = none) of
+        in-progress / needs-review / changes-requested. True when it wrote."""
+        labels = issue["labels"]
+        keep = tracker_label(self.cfg, want) if want else None
+        drop = [l for l in self._state_labels("inProgress", "needsReview", "changesRequested")
+                if l != keep and l in labels]
+        add = [keep] if keep and keep not in labels else []
+        if not (drop or add):
+            return False
+        if add:
+            self.adapter.ensure_labels(add, auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+        self.adapter.edit(issue["number"], add_labels=add, remove_labels=drop)
+        return True
+
+    def claim(self, ref, claim_id):
+        """Take the item: post a claim marker, re-read, and the earliest open
+        claim wins. Returns (won, holder). A loser posts its release marker and
+        changes no labels; the winner gets in-progress and the assignment.
+        LookupError for an unknown or closed item."""
+        issue, _id = self._require(ref)
+        if issue["state"] != "open":
+            raise LookupError(f"[{ref}] is closed")
+        n = issue["number"]
+        held = self._open_claims(n)
+        if not (held and held[0] == claim_id):
+            self.adapter.add_comment(n, f"<!-- hv:claim {claim_id} -->\nClaimed by {claim_id}")
+            held = self._open_claims(n)
+            if held[0] != claim_id:
+                self.adapter.add_comment(n, f"<!-- hv:release {claim_id} -->")
+                return False, held[0]
+        if self._apply_state(issue, "inProgress") or not issue["assignees"]:
+            self.adapter.assign_self(n)
+        return True, claim_id
+
+    def release(self, ref, claim_id):
+        """Post the release marker; drops in-progress when no claim remains.
+        False (no writes) when `claim_id` holds no open claim."""
+        issue, _id = self._require(ref)
+        n = issue["number"]
+        held = self._open_claims(n)
+        if claim_id not in held:
+            return False
+        self.adapter.add_comment(n, f"<!-- hv:release {claim_id} -->")
+        if held == [claim_id]:
+            label = tracker_label(self.cfg, "inProgress")
+            if label in issue["labels"]:
+                self.adapter.remove_labels(n, [label])
+        return True
+
+    def set_state(self, ref, state):
+        """Ensure exactly one state label (in-progress|needs-review|changes-requested)
+        or none. True when the tracker changed."""
+        if state not in _STATE_ROLE_FOR:
+            raise ValueError(f"state must be one of {'/'.join(_STATE_ROLE_FOR)}")
+        issue, _id = self._require(ref)
+        return self._apply_state(issue, _STATE_ROLE_FOR[state])
+
+    def ready_reasons(self, ref):
+        """What is missing before work starts: [] when ready. Ready = acceptance
+        criteria in the body (an Acceptance heading or a checkbox line) or a
+        design / plan note."""
+        issue, _id = self._require(ref)
+        text, _block = parse_fields_block(issue["body"])
+        return _ready_reasons(
+            _has_criteria(text),
+            bool(self.note_get(ref, "design")) or bool(self.note_get(ref, "plan")))
+
+
+_STATE_ROLES = ("inProgress", "needsReview", "changesRequested", "blocked")
+_STATE_ROLE_FOR = {"in-progress": "inProgress", "needs-review": "needsReview",
+                   "changes-requested": "changesRequested", "none": None}
+_CLAIM_RE = re.compile(r"^<!-- hv:(claim|release) (\S+) -->")
+_ACCEPT_HEADING_RE = re.compile(r"^#{1,6}[ \t]+.*acceptance", re.IGNORECASE | re.MULTILINE)
+_CHECKBOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[[ xX]\]", re.MULTILINE)
+
+
+def _has_criteria(text):
+    return bool(_ACCEPT_HEADING_RE.search(text or "") or _CHECKBOX_RE.search(text or ""))
+
+
+def _ready_reasons(has_criteria, has_note):
+    reasons = []
+    if not has_criteria:
+        reasons.append("no acceptance criteria in the issue body")
+    if not has_note:
+        reasons.append("no design or plan note")
+    return [] if (has_criteria or has_note) else reasons
 
 
 def get_backend(cfg=None):

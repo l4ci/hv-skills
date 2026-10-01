@@ -92,11 +92,12 @@ print("|".join(c["body"].split("\n")[0] for c in adapter_for(load_config()).comm
     ERR "$BIN/hv-proof-add" T99 --check c --result PASS --evidence e
     eq "proof unknown item" "1" "$ERRRC"
 
-    # --- hv-complete gate sees issue-mode proof (close itself lands in M07-S03 T2)
-    ERR "$BIN/hv-complete" T1 abc1234
-    eq "proven item passes the gate, then backend unavailable" "2" "$ERRRC"
+    # --- hv-complete gate sees issue-mode proof
     ERR "$BIN/hv-complete" T2 abc1234
     eq "unproven item stops at the gate" "3" "$ERRRC"
+    ERR "$BIN/hv-complete" T1 abc1234
+    eq "proven item passes the gate and closes" "0" "$ERRRC"
+    "$BIN/hv-uncomplete" T1
 
     # --- adapter lifecycle calls
     PYTHONPATH="$BIN" python3 - "$prov" <<'PY' || fail "$prov adapter lifecycle"
