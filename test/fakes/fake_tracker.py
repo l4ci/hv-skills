@@ -232,8 +232,9 @@ def gh_issue_cmd(db, args):
             i["milestone"] = gh_milestone_ref(db, one(o, "milestone"))
         if "--remove-milestone" in b:
             i["milestone"] = None
-        i["assignees"] += [x for x in split_labels(o.get("add_assignee", [])) if x not in i["assignees"]]
-        i["assignees"] = [x for x in i["assignees"] if x not in split_labels(o.get("remove_assignee", []))]
+        me = lambda xs: [USER if x == "@me" else x for x in xs]
+        i["assignees"] += [x for x in me(split_labels(o.get("add_assignee", []))) if x not in i["assignees"]]
+        i["assignees"] = [x for x in i["assignees"] if x not in me(split_labels(o.get("remove_assignee", [])))]
         save(db)
         print("https://github.com/fake/repo/issues/%d" % i["number"])
     elif verb == "close":
@@ -318,6 +319,19 @@ def gh_api(db, args):
     elif re.match(r"^issues/\d+/comments$", rest) and method == "GET":
         i = find_issue(db, rest.split("/")[1])
         emit([{"id": c["id"], "body": c["body"], "user": {"login": c["author"]}} for c in i["comments"]])
+    elif re.match(r"^issues/\d+/comments$", rest) and method == "POST":
+        c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
+        save(db)
+        emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]}})
+    elif re.match(r"^issues/comments/\d+$", rest) and method == "DELETE":
+        cid = int(rest.split("/")[2])
+        for i in db["issues"]:
+            for c in i["comments"]:
+                if c["id"] == cid:
+                    i["comments"].remove(c)
+                    save(db)
+                    return
+        raise Fail("404 Not Found")
     elif re.match(r"^issues/comments/\d+$", rest) and method == "PATCH":
         cid = int(rest.split("/")[2])
         for i in db["issues"]:
@@ -431,7 +445,11 @@ def gl_issue_cmd(db, args):
             i["milestone"] = gl_milestone_ref(db, title) if title else None  # `--milestone ""` clears
         if "--unassign" in b:
             i["assignees"] = []
-        i["assignees"] += [x for x in split_labels(o.get("assignee", [])) if x not in i["assignees"]]
+        # `+user` adds; a bare name replaces the assignees (glab semantics).
+        want = split_labels(o.get("assignee", []))
+        if want and not all(x.startswith("+") for x in want):
+            i["assignees"] = []
+        i["assignees"] += [x.lstrip("+") for x in want if x.lstrip("+") not in i["assignees"]]
         save(db)
         print(gl_issue(i)["web_url"])
     elif verb == "close":
@@ -465,6 +483,8 @@ def gl_label_cmd(db, args):
 def gl_api(db, args):
     path, method, fields, _ = parse_api(args, {"--input": "input"})
     method = (method or ("POST" if fields else "GET")).upper()
+    if path == "user" and method == "GET":
+        return emit({"id": 1, "username": USER})
     m = re.match(r"^projects/.+?/((?:milestones|issues).*)$", path)
     if not m:
         raise Fail("unsupported", 2)
@@ -491,7 +511,21 @@ def gl_api(db, args):
         emit(gm(x))
     elif re.match(r"^issues/\d+/notes$", rest) and method == "GET":
         i = find_issue(db, rest.split("/")[1])
-        emit([{"id": c["id"], "body": c["body"], "author": {"username": c["author"]}} for c in i["comments"]])
+        emit([{"id": c["id"], "body": c["body"], "author": {"username": c["author"]}, "system": False}
+              for c in i["comments"]])
+    elif re.match(r"^issues/\d+/notes$", rest) and method == "POST":
+        c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
+        save(db)
+        emit({"id": c["id"], "body": c["body"], "author": {"username": c["author"]}, "system": False})
+    elif re.match(r"^issues/\d+/notes/\d+$", rest) and method == "DELETE":
+        parts = rest.split("/")
+        i = find_issue(db, parts[1])
+        for c in i["comments"]:
+            if c["id"] == int(parts[3]):
+                i["comments"].remove(c)
+                save(db)
+                return
+        raise Fail("404 Not found")
     elif re.match(r"^issues/\d+/notes/\d+$", rest) and method == "PUT":
         parts = rest.split("/")
         i = find_issue(db, parts[1])

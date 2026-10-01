@@ -59,9 +59,9 @@ class _Adapter:
         except ValueError:
             raise TrackerError(1, f"unparseable tracker output: {out[:200]!r}")
 
-    def _milestones(self, path):
-        """Milestone dicts from an `api` list call; tolerates paginated output
-        that concatenates one JSON array per page."""
+    def _pages(self, path):
+        """Dicts from an `api` list call; tolerates paginated output that
+        concatenates one JSON array per page."""
         out = self._run(["api", path]).strip()
         dec, pos, items = json.JSONDecoder(), 0, []
         try:
@@ -74,6 +74,27 @@ class _Adapter:
         except (ValueError, TypeError):
             raise TrackerError(1, f"unparseable tracker output: {out[:200]!r}")
         return items
+
+    _milestones = _pages
+
+    def _created_id(self, args):
+        """Id of the object a POST `api` call created."""
+        d = self._json(args)
+        try:
+            return int(d["id"])
+        except (KeyError, TypeError, ValueError):
+            raise TrackerError(1, f"cannot parse comment id from: {str(d)[:200]!r}")
+
+    def add_labels(self, number, labels, auto_create=True):
+        labels = [l for l in dict.fromkeys(labels) if l]
+        if labels:
+            self.ensure_labels(labels, auto_create=auto_create)
+            self.edit(number, add_labels=labels)
+
+    def remove_labels(self, number, labels):
+        labels = [l for l in dict.fromkeys(labels) if l]
+        if labels:
+            self.edit(number, remove_labels=labels)
 
     @staticmethod
     def _match_milestone(items, hv_id):
@@ -176,6 +197,38 @@ class GitHubAdapter(_Adapter):
             args += ["--remove-milestone"]
         self._run(args, body)
 
+    def comments(self, number):
+        """Comments oldest first: [{"id", "body", "author"}]."""
+        return [{"id": _int_or_raw(c.get("id")), "body": c.get("body") or "",
+                 "author": (c.get("user") or {}).get("login", "")}
+                for c in self._pages(f"repos/{{owner}}/{{repo}}/issues/{number}/comments")]
+
+    def add_comment(self, number, body):
+        """Post a comment and return its id."""
+        return self._created_id(
+            ["api", "-X", "POST", f"repos/{{owner}}/{{repo}}/issues/{number}/comments", "-f", f"body={body}"])
+
+    def edit_comment(self, number, comment_id, body):
+        self._run(["api", "-X", "PATCH", f"repos/{{owner}}/{{repo}}/issues/comments/{comment_id}",
+                   "-f", f"body={body}"])
+
+    def delete_comment(self, number, comment_id):
+        self._run(["api", "-X", "DELETE", f"repos/{{owner}}/{{repo}}/issues/comments/{comment_id}"])
+
+    def close(self, number, reason="completed", comment=None):
+        """Close with a state reason ("completed" | "not_planned") and optional comment."""
+        args = ["issue", "close", str(number), "--reason",
+                "not planned" if reason == "not_planned" else "completed"]
+        if comment:
+            args += ["--comment", comment]
+        self._run(args)
+
+    def reopen(self, number):
+        self._run(["issue", "reopen", str(number)])
+
+    def assign_self(self, number):
+        self._run(["issue", "edit", str(number), "--add-assignee", "@me"])
+
 
 class GitLabAdapter(_Adapter):
     provider = "gitlab"
@@ -258,6 +311,45 @@ class GitLabAdapter(_Adapter):
             # glab has no remove flag; an empty title clears the milestone.
             args += ["--milestone", ""]
         self._run(args)
+
+    def comments(self, number):
+        """Comments oldest first, system notes excluded: [{"id", "body", "author"}]."""
+        return [{"id": _int_or_raw(n.get("id")), "body": n.get("body") or "",
+                 "author": (n.get("author") or {}).get("username", "")}
+                for n in self._pages(f"projects/:id/issues/{number}/notes?sort=asc&order_by=created_at")
+                if not n.get("system")]
+
+    def add_comment(self, number, body):
+        """Post a comment and return its id."""
+        return self._created_id(
+            ["api", "-X", "POST", f"projects/:id/issues/{number}/notes", "-f", f"body={body}"])
+
+    def edit_comment(self, number, comment_id, body):
+        self._run(["api", "-X", "PUT", f"projects/:id/issues/{number}/notes/{comment_id}",
+                   "-f", f"body={body}"])
+
+    def delete_comment(self, number, comment_id):
+        self._run(["api", "-X", "DELETE", f"projects/:id/issues/{number}/notes/{comment_id}"])
+
+    def close(self, number, reason="completed", comment=None):
+        """Close; glab has no state reason, so "not_planned" adds the not-planned label."""
+        if comment:
+            self._run(["issue", "note", str(number), "-m", comment])
+        if reason == "not_planned":
+            self.add_labels(number, [self.not_planned_label])
+        self._run(["issue", "close", str(number)])
+
+    def reopen(self, number):
+        self._run(["issue", "reopen", str(number)])
+
+    def assign_self(self, number):
+        """glab 1.120 documents --assignee as usernames (no @me), so resolve ours once;
+        the `+` prefix adds without replacing the other assignees."""
+        if getattr(self, "_me", None) is None:
+            self._me = self._json(["api", "user"]).get("username") or ""
+            if not self._me:
+                raise TrackerError(1, "cannot resolve the authenticated GitLab username")
+        self._run(["issue", "update", str(number), "--assignee", "+" + self._me])
 
 
 def adapter_for(cfg, provider=None):

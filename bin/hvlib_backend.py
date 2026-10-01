@@ -9,14 +9,16 @@ BackendUnavailable until M07-S03.
 
 Imports sibling hvlib_* modules by direct path, never through the hvlib shim.
 """
+import os
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
-from hvlib_io import load_config, write_text_atomic, update_json
+from hvlib_io import load_config, write_text_atomic, update_json, locked
 from hvlib_config import backlog_backend, tracker_label, config_value
-from hvlib_section import BACKLOG_FILE, find_section, iter_open_sections, load_backlog_corpus
+from hvlib_section import BACKLOG_FILE, find_section, append_to_section, iter_open_sections, load_backlog_corpus
 from hvlib_bullet import (
     find_origin_bullet, parse_todo_fields, parse_done_line, set_todo_field, format_done_line,
     _TODO_FIELD_NAMES, _SETTABLE_FIELDS, _CREATE_FIELDS,
@@ -60,6 +62,17 @@ def _check_create(kind, title, tag, fields):
             raise ValueError(f"field {name} needs a non-empty value")
         clean[name] = _one_line(str(value))
     return title, tag, clean
+
+
+def _proof_gate(item_id, reason, proof_show):
+    """ProofMissing for a `done` close with no proof row (hv-proof-show --count)."""
+    if reason == "done" and proof_show:
+        n = subprocess.run([proof_show, item_id, "--count"],
+                           capture_output=True, text=True).stdout.strip()
+        if n in ("", "0"):
+            raise ProofMissing(
+                f"[{item_id}] no proof recorded, pass --no-proof to override "
+                f"(hv-proof-add {item_id} --check <name> --result PASS --evidence <path-or-text>)")
 
 
 class FileBackend:
@@ -200,13 +213,7 @@ class FileBackend:
             raise LookupError(f"[{item_id}] not found")
 
         # Proof gate: only on the active->completed transition, only for `done`.
-        if reason == "done" and proof_show:
-            n = subprocess.run([proof_show, item_id, "--count"],
-                               capture_output=True, text=True).stdout.strip()
-            if n in ("", "0"):
-                raise ProofMissing(
-                    f"[{item_id}] no proof recorded, pass --no-proof to override "
-                    f"(hv-proof-add {item_id} --check <name> --result PASS --evidence <path-or-text>)")
+        _proof_gate(item_id, reason, proof_show)
 
         line = m.group(0)
         content = content[:m.start()] + content[m.end() + 1:]
@@ -366,8 +373,91 @@ class FileBackend:
         except OSError:
             return None
 
+    def note_get(self, item_id, kind):
+        raise BackendUnavailable(_FILE_NOTE_MSG.get(kind, _FILE_NOTE_MSG['design']))
+
+    note_put = note_rm = note_get
+
+    def comment_add(self, item_id, kind, text):
+        """Append `- <date> · <kind> · <first line>` (continuation lines indented
+        two spaces) under `## Log` in the item's detail file, creating the file
+        like hv-proof-add when missing. LookupError for an unknown ID."""
+        if kind not in COMMENT_KINDS:
+            raise ValueError(f"comment kind must be one of {'/'.join(COMMENT_KINDS)}")
+        d = detail_dir_for_id(item_id)
+        if not d:
+            raise LookupError(f"[{item_id}] has no detail directory (expected B/F/T prefix)")
+        found = find_origin_bullet(load_backlog_corpus("."), item_id)
+        if found is None:
+            raise LookupError(f"[{item_id}] not found in BACKLOG.md or ARCHIVE.md")
+        lines = (text or "").replace("\r\n", "\n").strip("\n").split("\n")
+        row = f"- {date.today().isoformat()} \u00b7 {kind} \u00b7 {lines[0].strip()}\n" + "".join(
+            f"  {l}\n" if l.strip() else "\n" for l in lines[1:])
+        path = Path(f".hv/{d}/{item_id}.md")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with locked(path):
+            content = path.read_text() if path.exists() else (
+                f"# {item_id}: {found[1] or item_id}\n\n> Related TODO entry: `[{item_id}]` in `.hv/BACKLOG.md`\n")
+            if find_section(content, "Log") is not None:
+                new = append_to_section(content.rstrip("\n") + "\n", "Log", row)
+            else:
+                new = content.rstrip("\n") + f"\n\n## Log\n\n{row}"
+            write_text_atomic(path, new)
+
 
 # --- issue backend ---------------------------------------------------------
+
+NOTE_KINDS = ("proof", "design", "plan")
+COMMENT_KINDS = ("question", "answer", "decision", "feedback")
+NOTE_LIMIT = 60000  # chars per marker comment (GitHub caps a comment at 65,536)
+_FILE_NOTE_MSG = {
+    "proof": "file backend keeps proof in the detail file's ## Proof section (hv-proof-add)",
+    "design": "file backend keeps designs/plans in .hv/designs and .hv/plans",
+    "plan": "file backend keeps designs/plans in .hv/designs and .hv/plans",
+}
+_MARKER_RE = re.compile(r"^<!-- hv:(proof|design|plan)(?: (\d+)/(\d+))? -->(?:\n|\Z)")
+
+
+def _note_limit():
+    """NOTE_LIMIT, overridable through HV_NOTE_LIMIT (tests lower it)."""
+    try:
+        return max(80, int(os.environ.get("HV_NOTE_LIMIT", NOTE_LIMIT)))
+    except ValueError:
+        return NOTE_LIMIT
+
+
+def _note_norm(text):
+    return (text or "").replace("\r\n", "\n").rstrip("\n")
+
+
+def _note_parts(kind, text):
+    """Comment bodies for `text`: one `<!-- hv:kind -->` comment, or numbered
+    `<!-- hv:kind i/n -->` parts split on line boundaries (a line longer than
+    a part is cut). Every part but the last ends in a newline, so concatenating
+    the parts after the marker lines restores the text."""
+    text = _note_norm(text)
+    limit = _note_limit()
+    single = f"<!-- hv:{kind} -->\n"
+    if len(single) + len(text) <= limit:
+        return [single + text]
+    budget = limit - len(f"<!-- hv:{kind} 99/99 -->\n")
+    chunks, cur = [], ""
+    for line in text.splitlines(keepends=True):
+        while len(line) > budget:
+            if cur:
+                chunks.append(cur)
+                cur = ""
+            chunks.append(line[:budget])
+            line = line[budget:]
+        if len(cur) + len(line) > budget:
+            chunks.append(cur)
+            cur = ""
+        cur += line
+    chunks.append(cur)
+    # A trailing newline can only sit at a part's end if more text follows.
+    n = len(chunks)
+    return [f"<!-- hv:{kind} {i}/{n} -->\n{c}" for i, c in enumerate(chunks, 1)]
+
 
 _FIELDS_OPEN = "<!-- hv:fields"
 _FIELDS_RE = re.compile(r"\n*<!-- hv:fields\n(?P<body>.*?)\n?-->[ \t]*\n*\Z", re.DOTALL)
@@ -670,10 +760,81 @@ class IssueBackend:
         self.adapter.edit(n, body=render_fields_block(text, new))
         return True
 
+    # -- marker notes and comments ------------------------------------------
+
+    def _number(self, ref):
+        try:
+            return resolve_item_ref(ref)[0]
+        except ValueError as e:
+            raise LookupError(str(e))
+
+    def _note_comments(self, n, kind):
+        """[(comment, body_after_marker)] of the `kind` note in part order."""
+        found = []
+        for c in self.adapter.comments(n):
+            m = _MARKER_RE.match(c["body"].replace("\r\n", "\n"))
+            if m and m.group(1) == kind:
+                found.append((int(m.group(2) or 1), c["id"], c, c["body"].replace("\r\n", "\n")[m.end():]))
+        found.sort(key=lambda t: (t[0], t[1]))
+        return [(c, rest) for _i, _id, c, rest in found]
+
+    def note_get(self, ref, kind):
+        """The `kind` (proof|design|plan) note text, None when absent. Trailing
+        newlines are not kept."""
+        self._check_kind(kind)
+        parts = self._note_comments(self._number(ref), kind)
+        return _note_norm("".join(rest for _c, rest in parts)) if parts else None
+
+    def note_put(self, ref, kind, text):
+        """Upsert the note: edit existing parts in place, add missing ones,
+        delete surplus ones. Returns False (no API writes) when unchanged."""
+        self._check_kind(kind)
+        n = self._number(ref)
+        existing = self._note_comments(n, kind)
+        want = _note_parts(kind, text)
+        changed = False
+        for i, body in enumerate(want):
+            if i < len(existing):
+                cur = existing[i][0]["body"].replace("\r\n", "\n")
+                if i == len(want) - 1:  # the tracker may trim trailing newlines
+                    cur, body = cur.rstrip("\n"), body.rstrip("\n")
+                if cur != body:
+                    self.adapter.edit_comment(n, existing[i][0]["id"], body)
+                    changed = True
+            else:
+                self.adapter.add_comment(n, body)
+                changed = True
+        for c, _rest in existing[len(want):]:
+            self.adapter.delete_comment(n, c["id"])
+            changed = True
+        return changed
+
+    def note_rm(self, ref, kind):
+        """Delete every part of the note; False when there was none."""
+        self._check_kind(kind)
+        n = self._number(ref)
+        parts = self._note_comments(n, kind)
+        for c, _rest in parts:
+            self.adapter.delete_comment(n, c["id"])
+        return bool(parts)
+
+    @staticmethod
+    def _check_kind(kind):
+        if kind not in NOTE_KINDS:
+            raise ValueError(f"note kind must be one of {'/'.join(NOTE_KINDS)}")
+
+    def comment_add(self, ref, kind, text):
+        """Append-only `<!-- hv:comment <kind> -->` comment; returns its id."""
+        if kind not in COMMENT_KINDS:
+            raise ValueError(f"comment kind must be one of {'/'.join(COMMENT_KINDS)}")
+        return self.adapter.add_comment(
+            self._number(ref), f"<!-- hv:comment {kind} -->\n{_note_norm(text)}")
+
     def append(self, *_a, **_k):
         raise BackendUnavailable("issue mode creates items with hv-item-create")
 
-    def complete(self, *_a, **_k):
+    def complete(self, item_id, hash_s, date_s, reason="done", note="", proof_show=None):
+        _proof_gate(item_id, reason, proof_show)  # T2 replaces the rest with the real close
         raise BackendUnavailable("issues backend not available yet (M07-S03)")
 
     def uncomplete(self, *_a, **_k):

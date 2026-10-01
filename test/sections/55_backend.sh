@@ -266,7 +266,7 @@ MD
   # backlog.backend = issues: complete/uncomplete refuse (exit 2, nothing written)
   cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
-  for call in "hv-complete|B01|$C1" "hv-uncomplete|B03"; do
+  for call in "hv-complete|B01|$C1|--no-proof" "hv-uncomplete|B03"; do
     IFS='|' read -r -a argv <<< "$call"; h="${argv[0]}"
     rc=0; err="$("$BIN/$h" "${argv[@]:1}" 2>&1)" || rc=$?
     eq "$h issues refusal" "2:error: $h: issues backend not available yet (M07-S03)" "$rc:$err"
@@ -488,7 +488,7 @@ PY
 
     # write verbs stay refused
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
-    rc=0; "$BIN/hv-complete" B1 abc1234 >/dev/null 2>&1 || rc=$?; eq "complete refused" 2 "$rc"
+    rc=0; "$BIN/hv-complete" B1 abc1234 --no-proof >/dev/null 2>&1 || rc=$?; eq "complete refused" 2 "$rc"
     pass "$prov: hv-append / hv-complete still refused in issue mode"
   )
 done
