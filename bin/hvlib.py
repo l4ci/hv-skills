@@ -37,7 +37,7 @@ from hvlib_section import (
     BACKLOG_FILE,
     find_section, section, print_matching_sections,
     replace_section, append_to_section, iter_open_sections,
-    iter_topics, load_backlog_corpus, upsert_block, managed_block_regex,
+    iter_topics, load_backlog_corpus, upsert_block, managed_block_regex, instructions_file,
 )
 from hvlib_bullet import (
     _TODO_FIELD_NAMES, _DONE_LINE_RE,

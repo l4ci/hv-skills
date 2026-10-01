@@ -42,7 +42,7 @@ Each sidecar tracks only the bullets in its own file. The Glossary topic in eith
 
 ## CLAUDE.md managed block
 
-Each sub-repo's CLAUDE.md receives a `hv-managed-block knowledge --repo <name>` block listing **umbrella topics ∪ that sub-repo's own topics**. A reader inside the sub-repo therefore sees the full relevant topic index without needing to open umbrella-root files.
+Each sub-repo's CLAUDE.md (or AGENTS.md when present) receives a `hv-managed-block knowledge --repo <name>` block listing **umbrella topics ∪ that sub-repo's own topics**. A reader inside the sub-repo therefore sees the full relevant topic index without needing to open umbrella-root files.
 
 Umbrella-root CLAUDE.md (if present) lists umbrella topics only — per-sub-repo topics stay in their own CLAUDE.md blocks.
 

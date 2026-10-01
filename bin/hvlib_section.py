@@ -155,13 +155,24 @@ def load_backlog_corpus(base_dir=".") -> str:
     return primary.rstrip("\n") + "\n" + read_or_empty(hv / "ARCHIVE.md")
 
 
+def instructions_file(root: Path = Path(".")) -> Path:
+    """Project-instructions file that holds the managed hv blocks under `root`.
+
+    AGENTS.md when it exists there, else CLAUDE.md (which may not exist yet;
+    upsert_block creates it). Single resolution point for every helper that
+    reads or writes managed blocks.
+    """
+    agents = Path(root) / "AGENTS.md"
+    return agents if agents.exists() else Path(root) / "CLAUDE.md"
+
+
 def managed_block_regex(
     key: str,
     legacy_marker: "str | None" = None,
     *,
     consume_trailing_newline: bool = False,
 ) -> "re.Pattern[str]":
-    """Build the regex matching a managed CLAUDE.md block.
+    """Build the regex matching a managed block in CLAUDE.md / AGENTS.md.
 
     Matches both canonical `<!-- hv-<key>-start --> ... <!-- hv-<key>-end -->`
     and, when `legacy_marker` is given, the legacy `<!-- hv:<legacy_marker>:start --> ... <!-- hv:<legacy_marker>:end -->`

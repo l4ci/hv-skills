@@ -35,6 +35,12 @@ if [ -f "$REPO_CLAUDE" ]; then
   REPO_CLAUDE_SNAP="$(mktemp)"
   cp "$REPO_CLAUDE" "$REPO_CLAUDE_SNAP"
 fi
+REPO_AGENTS="$REPO/AGENTS.md"
+REPO_AGENTS_SNAP=""
+if [ -f "$REPO_AGENTS" ]; then
+  REPO_AGENTS_SNAP="$(mktemp)"
+  cp "$REPO_AGENTS" "$REPO_AGENTS_SNAP"
+fi
 # Snapshot dev tree's tracked .hv/ content. We snap the whole subtree
 # (excluding gitignored paths) so any leak surfaces as a diff at the end.
 REPO_HV_SNAP=""
@@ -112,6 +118,11 @@ if [ -n "$REPO_CLAUDE_SNAP" ] && ! cmp -s "$REPO_CLAUDE_SNAP" "$REPO_CLAUDE"; th
   cp "$REPO_CLAUDE_SNAP" "$REPO_CLAUDE"
   LEAKED=1
 fi
+if [ -n "$REPO_AGENTS_SNAP" ] && ! cmp -s "$REPO_AGENTS_SNAP" "$REPO_AGENTS"; then
+  printf '\n\033[31merror: smoke leaked into %s — restoring from snapshot\033[0m\n' "$REPO_AGENTS" >&2
+  cp "$REPO_AGENTS_SNAP" "$REPO_AGENTS"
+  LEAKED=1
+fi
 if [ -n "$REPO_HV_SNAP" ]; then
   while IFS= read -r f; do
     snap_path="$REPO_HV_SNAP/$f"
@@ -129,6 +140,7 @@ if [ -n "$REPO_HV_SNAP" ]; then
   done < <(cd "$REPO_HV_SNAP" && find . -type f | sed 's|^\./||')
 fi
 [ -n "$REPO_CLAUDE_SNAP" ] && rm -f "$REPO_CLAUDE_SNAP"
+[ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
 [ "$LEAKED" = 1 ] && exit 1
 

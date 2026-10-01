@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Set up AGENTS.md as the project-instructions file and CLAUDE.md as its @AGENTS.md importer.
+# Mutator helper: exit 0 on success (idempotent — silent when nothing to do).
+# Usage: hv-instructions-init     # run in the project root; sub-repo dirs are not touched
+# Prints one line per action: created: <file> | moved: <keys> → AGENTS.md | linked: CLAUDE.md → @AGENTS.md
+# Skips (with a note) when CLAUDE.md and AGENTS.md are symlinks to each other.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import re
+from pathlib import Path
+from hvlib import write_text_atomic, managed_block_regex
+
+claude = Path("CLAUDE.md")
+agents = Path("AGENTS.md")
+
+CLAUDE_STUB = "# CLAUDE.md\n\nProject instructions live in AGENTS.md.\n\n@AGENTS.md\n"
+BLOCK_KEY_RE = re.compile(r"<!-- hv(?:-([\w-]+)-start|:([\w-]+):start) -->")
+
+# A symlink between the two files means @AGENTS.md would import itself.
+for a, b in ((claude, agents), (agents, claude)):
+    if a.is_symlink() and a.resolve() == b.resolve():
+        print(f"note: {a} is a symlink to {b}; leaving instruction files untouched")
+        raise SystemExit(0)
+
+if not agents.exists():
+    moved = []
+    rest = None
+    body = ""
+    if claude.exists():
+        text = claude.read_text()
+        chunks = []
+        rest = text
+        for m in BLOCK_KEY_RE.finditer(text):
+            key = m.group(1) or m.group(2)
+            if key in moved:
+                continue
+            pat = managed_block_regex(key, legacy_marker=key, consume_trailing_newline=True)
+            found = [x.group(0).rstrip("\n") for x in pat.finditer(text)]
+            if found:
+                moved.append(key)
+                chunks.extend(found)
+                rest = pat.sub("", rest)
+        body = "\n\n".join(chunks)
+        if body:
+            body += "\n"
+    body = body or "# AGENTS.md\n"
+    write_text_atomic(str(agents), body)
+    print("created: AGENTS.md")
+    if moved:
+        # Collapse 3+ blank lines left behind by the strip.
+        rest = re.sub(r"\n{3,}", "\n\n", rest)
+        print(f"moved: {', '.join(moved)} → AGENTS.md")
+        if rest.strip():
+            write_text_atomic(str(claude), rest)
+        else:
+            # Nothing but managed blocks was there: leave the plain stub.
+            write_text_atomic(str(claude), CLAUDE_STUB)
+            print("linked: CLAUDE.md → @AGENTS.md")
+
+if not claude.exists():
+    write_text_atomic(str(claude), CLAUDE_STUB)
+    print("created: CLAUDE.md")
+elif not any(l.strip() == "@AGENTS.md" for l in claude.read_text().splitlines()):
+    write_text_atomic(str(claude), claude.read_text().rstrip("\n") + "\n\n@AGENTS.md\n")
+    print("linked: CLAUDE.md → @AGENTS.md")
+PY

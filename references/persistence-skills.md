@@ -18,7 +18,7 @@ Every persistence skill (and `/hv-learn`'s `--term` mode) follows:
    - `/hv-learn` (topic bullets) → `bin/hv-knowledge-merge`
    - `/hv-learn --term` → `bin/hv-glossary-write`
    - `/hv-decide` → `Edit` directly on `.hv/DECISIONS.md` (no helper today)
-6. **Regenerates the managed CLAUDE.md block** via an index helper. The block is the always-on signal to read-side skills:
+6. **Regenerates the managed CLAUDE.md block** (in `AGENTS.md` when that file exists) via an index helper. The block is the always-on signal to read-side skills:
    - `/hv-learn` (both modes) → `bin/hv-managed-block knowledge` (`--term` runs it internally via `hv-glossary-write`; Glossary surfaces as a topic name in the Knowledge index automatically)
    - `/hv-decide` → `bin/hv-managed-block decisions`
 7. **Confirms via a compact block** — *"Captured `<artifact>` into `.hv/<FILE>.md`… Updated CLAUDE.md `<block>` block."* Match the shape; don't recap the plan.

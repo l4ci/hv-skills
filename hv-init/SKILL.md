@@ -1,6 +1,6 @@
 ---
 name: hv-init
-description: Initialize the .hv/ folder structure with BACKLOG.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also seeds a managed knowledge-index block in CLAUDE.md so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
+description: Initialize the .hv/ folder structure with BACKLOG.md, KNOWLEDGE.md, counters.json, config.json, status.json, and CLI helpers. Also sets up AGENTS.md (with CLAUDE.md importing it) and seeds a managed knowledge-index block in it so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
 user-invocable: true
 ---
 
@@ -99,7 +99,7 @@ Phases:
 1. *Detect* — environment + umbrella decision (Step 1)
 2. *Write artifacts* — bootstrap `.hv/` and install helpers (Step 2)
 3. *Configure* — interactive config (FRESH or STALE migration, Step 3)
-4. *Seed CLAUDE.md blocks* — skills, knowledge, vision, decisions, map, context indices (Step 4)
+4. *Set up AGENTS.md & seed blocks* — skills, knowledge, vision, decisions, map, context indices (Step 4)
 
 ## Step 2 — Bootstrap & Install Helpers
 
@@ -383,11 +383,12 @@ Rule: for each missing key in the `STALE:` list, run exactly one `hv-config-set 
 
 Briefly confirm the chosen profile in the Step 5 summary. On a FRESH run with all Recommended, just show *"Config: defaults."*; on a STALE migration, list the added keys — *"Config migrated: added `ship.review` (Recommended)."* so the user knows what changed.
 
-## Step 4 — Seed CLAUDE.md Skills, Knowledge, Vision & Decisions Blocks
+## Step 4 — Set Up AGENTS.md, Seed Skills, Knowledge, Vision & Decisions Blocks
 
-Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash-command index (static), knowledge topics including the pinned `## Glossary` term store (`/hv-learn`, `/hv-learn --term`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic. Before regenerating, the `hv-managed-block-strip-deprecated` helper removes managed blocks left behind by previous hv-skills versions whose v4 helper has been cut (currently `<!-- hv-context-* -->`, from F18) — keeps `CLAUDE.md` from pointing at retired skills.
+First `hv-instructions-init` makes `AGENTS.md` the project-instructions file and `CLAUDE.md` a thin importer of it (`@AGENTS.md`). It creates whichever file is missing, moves any managed blocks already in `CLAUDE.md` into the new `AGENTS.md` (other `CLAUDE.md` content stays), adds the `@AGENTS.md` line to an existing `CLAUDE.md` once, and does nothing when the two files are symlinked to each other. Then seed six managed blocks in `AGENTS.md`: the hv-skills slash-command index (static), knowledge topics including the pinned `## Glossary` term store (`/hv-learn`, `/hv-learn --term`), active milestones (`/hv-vision`), decision topics (`/hv-decide`), the project map (subsystems in `.hv/map/<name>.md`, auto-bumped by cycle skills), and QA strategy index (`/hv-qa`). The skills block tells Claude *what* commands are available; the others tell it *what to consult* per work topic. Before regenerating, the `hv-managed-block-strip-deprecated` helper removes managed blocks left behind by previous hv-skills versions whose v4 helper has been cut (currently `<!-- hv-context-* -->`, from F18) — keeps the instructions file from pointing at retired skills.
 
 ```bash
+.hv/bin/hv-instructions-init
 .hv/bin/hv-managed-block-strip-deprecated
 .hv/bin/hv-skills-index
 .hv/bin/hv-managed-block knowledge
@@ -397,7 +398,7 @@ Seed six managed blocks in `CLAUDE.md` (created if missing): the hv-skills slash
 .hv/bin/hv-qa-index
 ```
 
-Each helper creates, updates in place, or appends its own block. Other `CLAUDE.md` content is untouched.
+Each helper creates, updates in place, or appends its own block. Other `AGENTS.md` and `CLAUDE.md` content is untouched.
 
 ## Step 5 — Confirm
 

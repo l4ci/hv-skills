@@ -239,7 +239,7 @@ Pass the chosen scope as `--repo <scope>` to `hv-knowledge-merge`. `/hv-learn --
 .hv/bin/hv-managed-block knowledge
 ```
 
-Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`. Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
+Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md` (or `AGENTS.md` when present). Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
 
 In umbrella mode, pass `--repo <scope>` where `<scope>` is the same scope the learning was written to: this regenerates that sub-repo's `CLAUDE.md` with a block listing umbrella topics first, then any topics unique to that sub-repo, while `--repo umbrella` (or omitting the flag in a single-repo project) regenerates the umbrella/project `CLAUDE.md` unchanged. DECISIONS are umbrella-only and never take `--repo`.
 

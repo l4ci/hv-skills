@@ -86,6 +86,7 @@ STATIC_PATHS = [
     Path(".hv/KNOWLEDGE.md"),
     Path(".hv/DECISIONS.md"),
     Path("CLAUDE.md"),
+    Path("AGENTS.md"),
 ]
 GLOB_DIRS = [
     (".hv/plans",     "*.md"),
