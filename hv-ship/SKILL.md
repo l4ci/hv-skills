@@ -241,6 +241,8 @@ printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID1>,<ID2> <branch> "<short title>
 .hv/bin/hv-item-state <ID> needs-review    # once per item
 ```
 
+In an umbrella add `--repo <name>` to `hv-pr` (it falls back to the cwd's sub-repo); IDs are qualified `<repo>:<ID>`.
+
 `/hv-review --queue` merges it later. Skip Steps 6b, 6c and 8.
 
 > **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs. See `references/manual-gates.md`.

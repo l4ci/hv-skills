@@ -41,6 +41,8 @@ ITEM_CLASS = f"[{os.environ['HV_ITEM_TYPES']}]"
 
 try:
     backend = get_backend()
+    # Umbrella issue mode: plain IDs collide across sub-repos, so the ID cell carries `<repo>:<ID>`.
+    umbrella_issues = hasattr(backend, "subs")
 except BackendUnavailable as e:
     sys.stderr.write(f"error: hv-backlog: {e}\n"); sys.exit(2)
 except ValueError as e:
@@ -75,7 +77,8 @@ def parse_items(body):
         fields = parse_todo_fields(line)
         related = fields["related"].rstrip(".")
         milestones = ", ".join(parse_milestones(fields["milestone"]))
-        items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line})
+        items.append({"id": item_id, "tag": tag, "title": title, "related": related, "milestone": milestones, "raw": line,
+                      "cell": f"{fields['repos']}:{item_id}" if umbrella_issues and fields["repos"] else item_id})
     return items
 
 _open_bodies = dict(_open_sections)
@@ -142,11 +145,11 @@ def render_table(label, items, base_headers, row_fn):
     out.append("")
 
 render_table("Bugs", bugs, ["ID", "Prio", "Title", "Related"],
-             lambda i: [i["id"], i["tag"], i["title"], i["related"]])
+             lambda i: [i["cell"], i["tag"], i["title"], i["related"]])
 render_table("Features", features, ["ID", "Size", "Title", "Related"],
-             lambda i: [i["id"], i["tag"], i["title"], i["related"]])
+             lambda i: [i["cell"], i["tag"], i["title"], i["related"]])
 render_table("Tasks", tasks, ["ID", "Title", "Related"],
-             lambda i: [i["id"], i["title"], i["related"]])
+             lambda i: [i["cell"], i["title"], i["related"]])
 
 # Connected components across all backlog items (≥ 2 members).
 # Built from the original parsed lists so active items remain in the graph —

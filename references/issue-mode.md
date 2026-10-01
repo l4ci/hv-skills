@@ -57,6 +57,17 @@ A fresh session has only the tracker. Load an item's context before working it:
 
 Treat `decision` comments as binding and `feedback` comments (from review) as the to-do list for a `changes-requested` item.
 
+## Umbrella
+
+With `.hv/repos.json` registering sub-repos (`references/umbrella-mode.md`), `UmbrellaIssueBackend` keeps each sub-repo's items on that sub-repo's own tracker. The provider is auto-detected from each origin, so GitHub and GitLab can mix.
+
+- **Reads merge** into one backlog; bullets carry `Repos: <name>` and `hv-backlog` shows qualified IDs `<repo>:<ID>`. Known limitation: its Clusters section keys on plain IDs.
+- **Refs.** `<repo>#<n>` and `<repo>:<ID>` always resolve. A bare `F42` / `#42` resolves only when exactly one sub-repo has it; otherwise exit 1 lists the candidates. `hv-item-create` returns qualified IDs.
+- **Capture** needs a target repo (`--field Repos=<name>` or cwd inside a sub-repo). Multi-repo items are refused: capture one per repo and link with `Related:`. `Repos` is immutable on an existing item.
+- **Milestones.** The tracking issue and slice plans live in the home repo (`issues.homeRepo`, default the first registered sub-repo). A sub-repo's native milestone `MNN — <title>` is created when an item there is first assigned to MNN. Milestone reads report `shipped` only once every sub-repo's native milestone MNN is closed.
+- **Release runs per sub-repo.** `hv-release-milestone-check`, `hv-release-notes-from-issues` and `hv-release-close-milestone` take `--repo <name>`, required here (exit 1 without).
+- **Review.** `hv-review-queue` spans all sub-repos (entries carry `repo`, IDs qualified). `hv-pr --repo <name> --closes ...` falls back to the cwd's sub-repo; `hv-pr-merge --repo <name>` is required.
+
 ## Exit codes
 
 Shared by the `hv-item-*`, `hv-pr` and `hv-tracker-call` helpers:

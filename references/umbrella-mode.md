@@ -99,6 +99,14 @@ echo "<body>"          | .hv/bin/hv-pr    --repo <repo> <branch> "<title>"
 
 Each operates within the sub-repo's `.git/`. Without `--repo`, both helpers hit the umbrella-cwd guard (`hv-require-git-context`) and refuse to run — there's no `.git/` at the umbrella root to merge into.
 
+## Issue mode in an umbrella
+
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`, *Umbrella*) puts each sub-repo's items on that sub-repo's own tracker, so `.hv/BACKLOG.md` and `Repos:` tagging by `/hv-capture` Step 4.6 change shape:
+
+- **One repo per item.** Capture needs a target: `--field Repos=<name>` or a cwd inside a sub-repo. A multi-repo item is refused; capture one item per repo and link them with `Related:` (qualified refs allowed). `Repos` cannot be changed on an existing item.
+- **Qualified IDs.** `<repo>#<n>` and `<repo>:<ID>` always resolve; a bare `F42` / `#42` resolves only when exactly one sub-repo has it, else exit 1 listing the candidates. Created IDs come back qualified; `hv-backlog` shows them as `<repo>:<ID>`.
+- **`--repo` plumbing.** `hv-pr --repo <repo> --closes ...` (falls back to the cwd's sub-repo), `hv-pr-merge --repo <repo>` (required), and the release helpers `hv-release-milestone-check|notes-from-issues|close-milestone ... --repo <repo>` (required, exit 1 without).
+
 ## What this reference does NOT cover
 
 - **Isolation patterns** (branch vs worktree, the decision table, the isolation guard) — see `references/isolation-patterns.md`.

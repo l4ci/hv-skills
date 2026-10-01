@@ -164,6 +164,7 @@ A few keys are written without ever being asked:
 - `backlog.backend`: where the backlog lives. `"file"` (silent default) or `"issues"`. `"issues"` is not available yet; it lands in M07-S02. Set via `hv-config-set backlog.backend file`. See [`usage/configuration.md`](../usage/configuration.md#issues-backend-keys).
 - `issues.provider`: which tracker the issue backend talks to. `"auto"` (silent default), `"github"` or `"gitlab"`. Unused until `backlog.backend: "issues"` ships.
 - `issues.retryWaitSeconds`: seconds to wait before retrying a failed tracker call. Integer; silent default `60`.
+- `issues.homeRepo`: umbrella mode with `backlog.backend: "issues"` only. Name of the registered sub-repo that holds milestone tracking issues. String; silent default `""` (the first registered sub-repo).
 - `issues.labels.*`: tracker label names per role. Defaults: `inProgress` `in-progress`, `needsReview` `needs-review`, `changesRequested` `changes-requested`, `released` `released`, `notPlanned` `not-planned`, `blocked` `blocked`, `milestoneTracker` `milestone-tracker`, `types.bug` `type:bug`, `types.feature` `type:feature`, `types.task` `type:task`, `priorityPrefix` `p`, `sizePrefix` `size:` (feature size labels such as `size:Major`). `issues.label` is the legacy alias of `issues.labels.inProgress` and is used when the new key is unset.
 
 For the full per-key behavior (defaults, value semantics, and how each setting affects skill execution), see [`usage/configuration.md`](../usage/configuration.md).

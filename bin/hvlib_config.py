@@ -60,6 +60,7 @@ CONFIG_KEYS = [
     ("issues.labels.sizePrefix", "size:", False),
     ("issues.autoCreateLabel", True, False),
     ("issues.filterMineOnly", False, False),
+    ("issues.homeRepo", "", False),  # umbrella: sub-repo holding milestone tracking issues ("" = first registered)
     ("release.checklistPath", ".hv/RELEASE.md", False),
     ("release.confirmLargePushCommits", 10, False),
     ("release.nudgeAfterCommits", 10, False),

@@ -6,11 +6,20 @@
 # lowest number first; nothing when clear.
 # Reader helper: exit 0 clear (warnings allowed); exit 6 blocked; exit 1 on usage error or unknown
 #   milestone; exit 2 file backend (issue mode only); exit 3 tracker unavailable; exit 4 rate-limited.
-# Usage: hv-release-milestone-check <MNN>
+# Umbrella mode: --repo <name> selects the sub-repo whose native milestone and issues are checked (required there; ignored elsewhere).
+# Usage: hv-release-milestone-check <MNN> [--repo <name>]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-[ $# -eq 1 ] || { echo "usage: hv-release-milestone-check <MNN>" >&2; exit 1; }
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" <<'PY'
+USAGE="usage: hv-release-milestone-check <MNN> [--repo <name>]"
+MID="${1:?$USAGE}"; shift
+REPO=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) REPO="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$REPO" <<'PY'
 import sys
 from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
 
@@ -21,7 +30,7 @@ try:
     backend = get_backend()
     if not isinstance(backend, IssueBackend):
         die("issue mode only (backlog.backend is \"file\")", 2)
-    blocked, warn = backend.release_gate(sys.argv[1])
+    blocked, warn = backend.release_gate(sys.argv[1], repo=sys.argv[2] or None)
 except TrackerError as e:
     die(e.message, tracker_exit_code(e))
 except (LookupError, ValueError) as e:

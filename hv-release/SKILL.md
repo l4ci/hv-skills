@@ -132,6 +132,8 @@ After all gates pass, continue to Step 2.
 
 Exit 0: clear. Exit 6: blocked; each `blocked: #<n> <title> [<label>]` line is an open issue labelled `in-progress`, `needs-review` or `changes-requested`. Show them and stop. `warning: #<n> <title> (still open)` lines (other open issues) do not block; show them and continue. Exit 1: usage or unknown milestone; 2: backend unavailable or file mode; 3: tracker unavailable; 4: rate-limited: stop and report.
 
+**Umbrella** (`hv-umbrella-on` is `yes`): releases run per sub-repo. Pass `--repo <name>` to `hv-release-milestone-check`, `hv-release-notes-from-issues` (Step 6) and `hv-release-close-milestone` (Step 13.3); without it they exit 1. The milestone reads `shipped` only once every sub-repo's native milestone MNN is closed.
+
 ## Step 2 — Detect Version Source
 
 ```bash

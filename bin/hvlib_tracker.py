@@ -44,6 +44,7 @@ _CLOSING_RE_GL = re.compile(
 class _Adapter:
     provider = ""
     _closing_re = _CLOSING_RE
+    cwd = None  # run the CLI here (umbrella: the sub-repo); None = the process cwd
 
     def closed_numbers(self, body):
         """Issue numbers a PR/MR body closes through a closing keyword
@@ -64,6 +65,7 @@ class _Adapter:
             input=(body or "").encode() if wants else None,
             stdin=None if wants else subprocess.DEVNULL,
             capture_output=True,
+            cwd=self.cwd,
         )
         if r.returncode != 0:
             raise TrackerError(r.returncode, r.stderr.decode(errors="replace").strip())
@@ -487,17 +489,21 @@ class GitLabAdapter(_Adapter):
         return "open" if st == "opened" else st
 
 
-def adapter_for(cfg, provider=None):
-    """Adapter for provider, else issues.provider, else origin-URL detection (run in cwd)."""
+def adapter_for(cfg, provider=None, cwd=None):
+    """Adapter for provider, else issues.provider, else origin-URL detection (run in cwd).
+    `cwd` (umbrella: a sub-repo path) is where detection and every CLI call run."""
     if provider in (None, "", "auto"):
         provider = config_value(cfg, "issues.provider")
     if provider not in ("github", "gitlab"):
-        r = subprocess.run([os.path.join(_BIN, "hv-issues-provider")], capture_output=True, text=True)
+        r = subprocess.run([os.path.join(_BIN, "hv-issues-provider")], capture_output=True, text=True, cwd=cwd)
         provider = r.stdout.strip()
     if provider == "github":
-        return GitHubAdapter()
-    if provider == "gitlab":
+        a = GitHubAdapter()
+    elif provider == "gitlab":
         a = GitLabAdapter()
         a.not_planned_label = tracker_label(cfg or {}, "notPlanned")
-        return a
-    raise TrackerError(3, "cannot determine provider (set issues.provider)")
+    else:
+        raise TrackerError(3, "cannot determine provider (set issues.provider)")
+    if cwd is not None:
+        a.cwd = cwd
+    return a
