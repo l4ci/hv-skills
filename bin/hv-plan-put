@@ -2,7 +2,8 @@
 # Replace the text of an existing plan with a prepared body, so a skill can draft locally and publish.
 # File mode: overwrites .hv/plans/<key>.md (must exist: create it with hv-plan-add first).
 # Issue mode: upserts the item's `plan` note on its issue (must exist likewise).
-# In issue mode only item keys (<M>-<ID>) are notes; slice keys (<M>-S<NN>) stay files.
+# In issue mode an item key (<M>-<ID>) is a note on the item's issue and a slice key (<M>-S<NN>) is a
+# plan:S<NN> note on the milestone's tracking issue.
 # Writer helper: exit 0 on success; exit 1 on usage error, unreadable body or missing target;
 #   exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
 # Usage: hv-plan-put <key> --body-file F|-
@@ -50,7 +51,11 @@ try:
 except ValueError:
     backend = None  # file mode never depended on config
 try:
-    if isinstance(backend, IssueBackend) and not item.startswith("S"):
+    if isinstance(backend, IssueBackend) and item.startswith("S"):
+        if backend.slice_get(ref.split("-")[0], item) is None:
+            die(f"plan note for {ref} not found (create it with hv-plan-add)")
+        backend.slice_put(ref.split("-")[0], item, text)
+    elif isinstance(backend, IssueBackend):
         if backend.note_get(item, "plan") is None:
             die(f"plan note for {item} not found (create it with hv-plan-add)")
         backend.note_put(item, "plan", text)

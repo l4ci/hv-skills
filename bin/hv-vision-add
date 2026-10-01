@@ -3,63 +3,44 @@
 # appends an overview entry to .hv/MILESTONES.md. Status starts as "planned".
 # Writer helper: exit 0 on successful milestone creation; exit 1 on missing argv.
 # Usage: hv-vision-add "<title>" "<summary>" [depends-csv]
+# Issue mode (backlog.backend "issues"): the ID is 1 + the highest MNN over the tracker's native milestones;
+#   creates the native milestone and its tracking issue (body = the plan stub); MILESTONES.md is untouched.
 # Prints the new milestone ID on stdout.
 set -euo pipefail
 TITLE="${1:?usage: hv-vision-add <title> <summary> [depends-csv]}"
 SUMMARY="${2:?usage: hv-vision-add <title> <summary> [depends-csv]}"
 DEPENDS="${3:-}"
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  exec env PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+title, summary, depends_csv = sys.argv[1:4]
+depends = [d.strip() for d in depends_csv.split(",") if d.strip()]
+try:
+    print(get_backend().milestone_add(title, summary, depends))
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-vision-add: {e}\n"); sys.exit(2)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-vision-add: {e.message}\n"); sys.exit(tracker_exit_code(e))
+PY
+fi
 MID=$("$HERE/hv-next-id" milestones)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$TITLE" "$SUMMARY" "$DEPENDS" <<'PY'
 import sys
-from datetime import date
 from pathlib import Path
 from hvlib import append_to_section, write_text_atomic
+from hvlib_backend import milestone_stub
 
 mid, title, summary, depends_csv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
 depends = [d.strip() for d in depends_csv.split(",") if d.strip()]
-depends_yaml = "[" + ", ".join(depends) + "]"
 depends_overview = ", ".join(depends) if depends else "—"
 
 detail_path = Path(f".hv/milestones/{mid}.md")
 detail_path.parent.mkdir(parents=True, exist_ok=True)
-write_text_atomic(detail_path,
-    f"""---
-id: {mid}
-title: {title}
-status: planned
-depends: {depends_yaml}
-created: {date.today().isoformat()}
----
-
-# {mid} — {title}
-
-## Goal
-
-{summary}
-
-## Acceptance criteria
-
-- _(define what shipped looks like)_
-
-## Rationale
-
-_(why this milestone, why now)_
-
-## Open risks
-
-_(unknowns, technical risks, dependencies that could shift)_
-
-## Research findings
-
-_(prior art, references, lessons from /hv-vision web search)_
-
-## Notes
-
-_(free-form brainstorm)_
-"""
-)
+write_text_atomic(detail_path, milestone_stub(mid, title, summary, depends))
 
 ms_path = Path(".hv/MILESTONES.md")
 content = ms_path.read_text() if ms_path.exists() else ""

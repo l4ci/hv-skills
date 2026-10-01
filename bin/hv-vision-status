@@ -12,6 +12,27 @@ if ! [[ "$NEW_STATUS" =~ ^($HV_MILESTONE_STATUSES)$ ]]; then
     echo "error: status must be one of: $HV_MILESTONE_STATUSES" >&2
     exit 1
 fi
+# Issue mode: swap the tracking issue's status label and open/close it with its native milestone.
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  RC=0
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY' || RC=$?
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+mid, status = sys.argv[1:3]
+try:
+    get_backend().milestone_status(mid, status)
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-vision-status: {e}\n"); sys.exit(2)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-vision-status: {e.message}\n"); sys.exit(tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    sys.stderr.write(f"error: hv-vision-status: {e.args[0]}\n"); sys.exit(1)
+PY
+  [ "$RC" -eq 0 ] || exit "$RC"
+  "$HERE/hv-vision-index"
+  exit 0
+fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$NEW_STATUS" <<'PY'
 import sys
 from pathlib import Path

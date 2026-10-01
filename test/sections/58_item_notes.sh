@@ -183,19 +183,26 @@ PY
     eq "plan put needs existing" "1" "$ERRRC"
     ERR "$BIN/hv-plan-show" "M07-T1"
     eq "plan show missing exit" "1" "$ERRRC"
-    # slice plans stay files
+    # slice plans are plan:S<NN> notes on the milestone's tracking issue (S05; see 61_milestones.sh)
+    PYTHONPATH="$BIN" python3 -c '
+from hvlib import adapter_for, load_config
+a = adapter_for(load_config())
+a.ensure_labels(["milestone-tracker"])
+a.create("M07 \u2014 Seven", "---\nid: M07\n---\n", ["milestone-tracker"])'
+    TRK="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().tracker_issue("M07")["number"])')"
     eq "slice plan add" "M07-S01" "$("$BIN/hv-plan-add" M07 slice "A slice")"
-    [ -f .hv/plans/M07-S01.md ] || fail "$prov slice plan not a file"
+    [ ! -e .hv/plans/M07-S01.md ] || fail "$prov slice plan wrote a file"
+    eq "slice plan marker" "<!-- hv:plan:S01 -->" "$(MARKERS "$TRK")"
     "$BIN/hv-plan-show" M07-S01 | grep -q "^key: M07-S01$" || fail "$prov slice plan show"
     ERR "$BIN/hv-plan-list"
     eq "plan list ok" "0" "$ERRRC"
     case "$ERRMSG" in *"live on their issues"*) ;; *) fail "$prov plan list note: $ERRMSG";; esac
-    eq "plan list stdout lists slice files only" "M07-S01" "$("$BIN/hv-plan-list" 2>/dev/null | python3 -c 'import json,sys;print(" ".join(p["key"] for p in json.load(sys.stdin)))')"
+    eq "plan list stdout lists slice plans only" "M07-S01" "$("$BIN/hv-plan-list" 2>/dev/null | python3 -c 'import json,sys;print(" ".join(p["key"] for p in json.load(sys.stdin)))')"
     printf 'slice body\n' | "$BIN/hv-plan-put" M07-S01 --body-file -
-    eq "slice plan put writes file" "slice body" "$(cat .hv/plans/M07-S01.md)"
-    eq "slice plan makes no note" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
+    eq "slice plan put stores the note" "slice body" "$("$BIN/hv-plan-show" M07-S01)"
+    eq "slice plan makes no item note" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
     "$BIN/hv-plan-rm" M07-S01
-    [ ! -e .hv/plans/M07-S01.md ] || fail "$prov slice plan rm"
+    eq "slice plan rm" "" "$(MARKERS "$TRK")"
     "$BIN/hv-plan-rm" "M07-$F1"
     eq "plan rm leaves design" "<!-- hv:design -->" "$(MARKERS 3)"
     ERR "$BIN/hv-plan-rm" "M07-$F1"

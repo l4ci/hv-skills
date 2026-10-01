@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Replace the text of an existing milestone with a prepared body, so a skill can draft locally and publish.
+# File mode: overwrites .hv/milestones/<MNN>.md (must exist: create it with hv-vision-add first).
+# Issue mode (backlog.backend "issues"): replaces the body of the milestone's tracking issue.
+# The text must carry frontmatter with `id: <MNN>`. In issue mode `status` follows the status label
+#   and `depends` updates the tracking issue's Depends field.
+# Writer helper: exit 0 on success; exit 1 on usage error, unreadable body, bad frontmatter or unknown milestone;
+#   exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-vision-put <MNN> --body-file F|-
+#   --body-file -   read the text from stdin (only then)
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-vision-put <MNN> --body-file F|-"
+ID="${1:?$USAGE}"
+shift
+BODY_FILE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --body-file) BODY_FILE="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+[ -n "$BODY_FILE" ] || { echo "$USAGE" >&2; exit 1; }
+# The preamble cd'd to the project root; a relative --body-file is relative to the caller.
+if [ "$BODY_FILE" != "-" ] && [[ "$BODY_FILE" != /* ]]; then BODY_FILE="${HV_ORIG_PWD:-$PWD}/$BODY_FILE"; fi
+# python reads its script from stdin (heredoc), so a piped body is staged in a temp file first.
+if [ "$BODY_FILE" = "-" ]; then
+  STAGED="$(mktemp)"; trap 'rm -f "$STAGED"' EXIT
+  cat > "$STAGED"; BODY_FILE="$STAGED"
+fi
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$BODY_FILE" <<'PY'
+import re, sys
+from pathlib import Path
+from hvlib import write_text_atomic, get_backend, IssueBackend, BackendUnavailable, TrackerError, tracker_exit_code
+
+mid, body_file = sys.argv[1:3]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-vision-put: {msg}\n"); sys.exit(code)
+
+if not re.fullmatch(r"M\d{2,}", mid):
+    die(f"milestone ID must match M\\d{{2,}} (e.g. M01), got {mid!r}")
+try:
+    text = open(body_file, "rb").read().decode(errors="replace")
+except OSError as e:
+    die(f"cannot read --body-file: {e.strerror}: {body_file}")
+try:
+    backend = get_backend()
+except ValueError:
+    backend = None  # file mode never depended on config
+try:
+    if isinstance(backend, IssueBackend):
+        backend.milestone_put(mid, text)
+    else:
+        path = Path(f".hv/milestones/{mid}.md")
+        if not path.exists():
+            die(f"{path} not found (create it with hv-vision-add)")
+        fm = re.match(r"---\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", text, re.DOTALL)
+        idm = re.search(r"^id:[ \t]*(\S+)", fm.group(1), re.MULTILINE) if fm else None
+        if not idm or idm.group(1) != mid:
+            die(f"milestone text needs frontmatter with 'id: {mid}'")
+        write_text_atomic(path, text)
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+PY

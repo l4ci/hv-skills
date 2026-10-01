@@ -10,4 +10,20 @@ if ! [[ "$ID" =~ ^M[0-9]{2,}$ ]]; then
   echo "error: milestone ID must match M\d{2,} (e.g. M01, M03), got '$ID'" >&2
   exit 1
 fi
+# Issue mode: the milestone plan is the tracking issue's body.
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  exec env PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+try:
+    print(get_backend().milestone_show(sys.argv[1]))
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-vision-show: {e}\n"); sys.exit(2)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-vision-show: {e.message}\n"); sys.exit(tracker_exit_code(e))
+except LookupError as e:
+    sys.stderr.write(f"error: hv-vision-show: {e.args[0]}\n"); sys.exit(1)
+PY
+fi
 hv_artifact_show vision "$ID" .hv/milestones

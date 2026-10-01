@@ -7,7 +7,7 @@ set -euo pipefail
 . "$HERE/hv-artifact-rm.sh"
 KEY="${1:?usage: hv-plan-rm <key>}"
 # Issue mode: an item plan (<M>-<ID>) is a note on the item's issue (the milestone part is ignored);
-# slice keys (<M>-S<NN>) stay files.
+# a slice plan (<M>-S<NN>) is a plan:S<NN> note on the milestone's tracking issue.
 if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
   RC=0
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$KEY" <<'PY' || RC=$?
@@ -17,12 +17,14 @@ from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_co
 ref = sys.argv[1]
 import re
 m = re.fullmatch(r"M\d{2,}-([A-Z]\d+)", ref)
-if not m or m.group(1).startswith("S"):
-    sys.exit(64)  # slice (or odd) key: file behaviour
+if not m:
+    sys.exit(64)  # odd key: file behaviour
 item = m.group(1)
 try:
     backend = get_backend()
-    if not backend.note_rm(item, "plan"):
+    # A slice plan (<M>-S<NN>) is a plan:S<NN> note on the milestone's tracking issue.
+    gone = backend.slice_rm(ref.split("-")[0], item) if item.startswith("S") else backend.note_rm(item, "plan")
+    if not gone:
         print("error: plan note for %s not found" % ref, file=sys.stderr); sys.exit(1)
 except BackendUnavailable as e:
     print(f"error: hv-plan-rm: {e}", file=sys.stderr); sys.exit(2)
