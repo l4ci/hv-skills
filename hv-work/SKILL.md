@@ -469,6 +469,8 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 
 **PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
+**Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `.hv/bin/hv-proof-add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv-complete` (Step 9) is the acceptance write and exits 3 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced.
+
 ### Backend branch — `work.dispatch == "tmux"`
 
 Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md); the routing is:

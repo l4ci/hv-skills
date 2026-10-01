@@ -80,10 +80,16 @@ pass "feature appended to ## Features"
 echo "hv-complete"
 git add -A && git commit -q -m "add B01"
 HASH=$(git log --oneline -1 --format='%h')
-"$BIN/hv-complete" B01 "$HASH"
+"$BIN/hv-complete" B01 "$HASH" --no-proof
 grep -q "~~.*\[B01\].*~~ Done" .hv/BACKLOG.md || fail "B01 not marked completed"
 grep -q "^- \*\*\[B01\]" .hv/BACKLOG.md && fail "B01 still in active section"
 pass "B01 moved to Completed with strikethrough"
+# Proof gate (details in section 52): a done close without proof exits 3 unless --no-proof.
+"$BIN/hv-append" "## Bugs" "- **[B70] [P2] Unproven bug.** Desc."
+rc=0; "$BIN/hv-complete" B70 "$HASH" 2>/dev/null || rc=$?
+[ "$rc" = "3" ] || fail "hv-complete without proof should exit 3, got $rc"
+grep -q "^- \*\*\[B70\]" .hv/BACKLOG.md || fail "refused hv-complete must leave B70 open"
+pass "hv-complete refuses a done close with no proof"
 
 # Idempotent: running hv-complete again on an already-completed ID is a no-op.
 "$BIN/hv-complete" B01 "$HASH" >/dev/null 2>&1 || fail "second hv-complete errored on already-completed ID"
@@ -101,7 +107,7 @@ pass "hv-complete rejects unknown ID"
 "$BIN/hv-append" "## Bugs" "- **[B71] [P2] Reason bug.** Desc."
 "$BIN/hv-append" "## Bugs" "- **[B72] [P2] Blocked bug.** Desc."
 "$BIN/hv-append" "## Bugs" "- **[B73] [P2] Dropped bug.** Desc."
-"$BIN/hv-complete" B71 "$HASH" --reason done
+"$BIN/hv-complete" B71 "$HASH" --reason done --no-proof
 grep -qF "Done $(date +%Y-%m-%d) [\`$HASH\`]" .hv/BACKLOG.md || fail "done reason changed marker"
 grep -E "^- ~~.*\[B71\].*~~ Done [0-9-]+ \[\`$HASH\`\]$" .hv/BACKLOG.md >/dev/null || fail "--reason done must render the plain marker"
 "$BIN/hv-complete" B72 "$HASH" --reason blocked --note "waiting on upstream (see #9)"

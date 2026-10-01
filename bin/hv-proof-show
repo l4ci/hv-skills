@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Print the proof rows from the `## Proof` section of an item's detail file
+# (written by hv-proof-add). Lookup helper: exit 0 even when no proof exists
+# (empty output); exit 1 on usage error.
+# Usage: hv-proof-show <ID> [--count]
+#   --count   print only the number of proof rows (hv-complete uses this to gate on proof)
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+ID="${1:?usage: hv-proof-show <ID> [--count]}"
+MODE="${2:-}"
+[ -z "$MODE" ] || [ "$MODE" = "--count" ] || { echo "usage: hv-proof-show <ID> [--count]" >&2; exit 1; }
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$MODE" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import detail_dir_for_id, find_section
+
+iid, mode = sys.argv[1], sys.argv[2]
+rows = []
+kind = detail_dir_for_id(iid)
+path = Path(f".hv/{kind}/{iid}.md") if kind else None
+if path and path.exists():
+    content = path.read_text()
+    span = find_section(content, "Proof")
+    if span:
+        rows = [l for l in content[span[0]:span[1]].splitlines() if l.startswith("- ")]
+if mode == "--count":
+    print(len(rows))
+else:
+    for r in rows:
+        print(r)
+PY
