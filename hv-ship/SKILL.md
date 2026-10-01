@@ -328,6 +328,14 @@ For each ID in the scope JSON's `referencedIds`:
 
 `hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
 
+**Exit 3 = no proof recorded.** The ID is still open and has no `## Proof` row. Record one row per executed check that passed during this ship — the Step 3.75 QA run, or the project's test/smoke command run before merge — then re-run `hv-complete`:
+
+```bash
+.hv/bin/hv-proof-add <ID> --check "<command that ran>" --result PASS --evidence "<summary line or log path>" --sha <merge-or-last-commit-hash>
+```
+
+A `/hv-review` or second-opinion PASS is acceptance, not proof — it reads the diff, it doesn't run anything — so it never becomes a row. If no executed check ran, ask via `AskUserQuestion`: run the project's test command now and record it (Recommended), close with `--no-proof` (the user's call, said in the Step 9 report), or leave the item open. Loop mode never passes `--no-proof`: the item stays open and Step 9 lists it as unproven.
+
 ## Step 8.5 — Learn (Nudge or Auto-Invoke)
 
 Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh.
@@ -367,7 +375,7 @@ Merged `hv/demo` into main — commit a1b2c3d
 Resolved: [B01] [F03]
 ```
 
-If `REVIEW_CHOICE == ship-anyway`, append the concerns one-liner at the end of the report.
+If `REVIEW_CHOICE == ship-anyway`, append the concerns one-liner at the end of the report. If Step 8 left any ID open for lack of proof, append `Unproven (still open): [<ID>] …`; if the user chose `--no-proof`, append `Closed without proof: [<ID>] …`.
 
 ## Step 9.5 — Release Nudge
 
@@ -756,7 +764,7 @@ Resolves: [B07], [F03]
 - **Read-only until Step 6.** Review, scoping, and body generation never mutate anything.
 - **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
 - **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
-- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 1). No grep needed.
+- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 1); an open ID with no proof row exits 3 (Step 8 records proof or asks). No grep needed.
 
 ## References
 

@@ -281,11 +281,14 @@ Clear the Iron Law counter for this session:
 .hv/bin/hv-debug-counter clear
 ```
 
-Then mark the item complete:
+Record the Step 9 reproducer re-run as proof, then mark the item complete:
 
 ```bash
+.hv/bin/hv-proof-add <ID> --check "<reproducer command>" --result PASS --evidence "<output line showing the symptom is gone>" --sha <commit-hash>
 .hv/bin/hv-complete <ID> <commit-hash>
 ```
+
+`hv-complete` exits 3 if the proof row is missing. Never pass `--no-proof` here: Step 9 always runs the reproducer, so a missing row means the step was skipped. Go back and run it.
 
 **Single-repo:**
 
