@@ -168,6 +168,11 @@ For each item with a plan, return PASS / CONCERN / FAIL with evidence:
 - **CONCERN** — most outcomes fulfilled, but one or more partially met (stub, incomplete coverage, missing test for a named outcome). Cite the gap.
 - **FAIL** — at least one plan outcome is missing entirely OR the diff went off-target (touched files not implied by the plan, scope creep into unrelated areas). Cite the missed outcome AND the off-target evidence.
 
+**Refocus check (per item, after the PASS/CONCERN/FAIL call):**
+1. Trace each change back up the chain: plan task → backlog item intent → milestone intent (only where the item carries a `Milestone:` tag; otherwise stop at the item). Use only the intent text already in this brief.
+2. Flag scope inflation: steps that are sensible on their own but drift from the parent intent (extra options, generalised helpers, adjacent cleanups no level of the chain asks for). Report it as CONCERN, naming the drift path (e.g. `task 3 → [F03] → M01: adds a project-sync mode neither asks for`).
+3. Drift alone is never SPEC-FAIL. Off-target edits to files the plan doesn't imply stay under FAIL above.
+
 **Final verdict** (last line, all caps): SPEC-PASS | SPEC-CONCERNS | SPEC-FAIL
 - SPEC-PASS — every plan-bearing item delivered what its plan promised
 - SPEC-CONCERNS — works, but plan-vs-diff gaps surfaced
