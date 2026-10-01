@@ -24,6 +24,7 @@ from hvlib_bullet import (
     _TODO_FIELD_NAMES, _SETTABLE_FIELDS, _CREATE_FIELDS,
 )
 from hvlib_paths import detail_dir_for_id, section_name_for_dir
+from hvlib_frontmatter import update_frontmatter_field
 from hvlib_tracker import adapter_for, TrackerError
 from hvlib_types import COUNTABLE_TYPES, ITEM_TYPES
 
@@ -435,7 +436,8 @@ _FILE_NOTE_MSG = {
     "design": "file backend keeps designs/plans in .hv/designs and .hv/plans",
     "plan": "file backend keeps designs/plans in .hv/designs and .hv/plans",
 }
-_MARKER_RE = re.compile(r"^<!-- hv:(proof|design|plan)(?: (\d+)/(\d+))? -->(?:\n|\Z)")
+_MARKER_RE = re.compile(r"^<!-- hv:(proof|design|plan(?::S\d+)?)(?: (\d+)/(\d+))? -->(?:\n|\Z)")
+_SLICE_KIND_RE = re.compile(r"plan:(S\d+)")
 
 
 def _note_limit():
@@ -527,6 +529,51 @@ def render_fields_block(text, fields):
         return text
     block = _FIELDS_OPEN + "\n" + "\n".join(lines) + "\n-->"
     return f"{text}\n\n{block}" if text else block
+
+
+_MS_STATUSES = ("planned", "active", "shipped", "archived")
+_STATUS_PREFIX = "status:"
+_MS_TITLE_RE = re.compile(r"(M\d+)(?!\w)(?:\s*[\u2014\u2013-]\s*(.*))?")
+
+
+def milestone_stub(mid, title, summary, depends):
+    """The starter text of .hv/milestones/MNN.md (frontmatter included); also the
+    tracking-issue body in issue mode."""
+    depends_yaml = "[" + ", ".join(depends) + "]"
+    return f"""---
+id: {mid}
+title: {title}
+status: planned
+depends: {depends_yaml}
+created: {date.today().isoformat()}
+---
+
+# {mid} \u2014 {title}
+
+## Goal
+
+{summary}
+
+## Acceptance criteria
+
+- _(define what shipped looks like)_
+
+## Rationale
+
+_(why this milestone, why now)_
+
+## Open risks
+
+_(unknowns, technical risks, dependencies that could shift)_
+
+## Research findings
+
+_(prior art, references, lessons from /hv-vision web search)_
+
+## Notes
+
+_(free-form brainstorm)_
+"""
 
 
 def tracker_exit_code(err):
@@ -840,8 +887,8 @@ class IssueBackend:
 
     @staticmethod
     def _check_kind(kind):
-        if kind not in NOTE_KINDS:
-            raise ValueError(f"note kind must be one of {'/'.join(NOTE_KINDS)}")
+        if kind not in NOTE_KINDS and not _SLICE_KIND_RE.fullmatch(kind):
+            raise ValueError(f"note kind must be one of {'/'.join(NOTE_KINDS)} (or plan:S<NN>)")
 
     def comment_add(self, ref, kind, text):
         """Append-only `<!-- hv:comment <kind> -->` comment; returns its id."""
@@ -852,6 +899,236 @@ class IssueBackend:
 
     def append(self, *_a, **_k):
         raise BackendUnavailable("issue mode creates items with hv-item-create")
+
+    # -- milestones: native milestone + tracking issue ----------------------
+
+    def _tracking_issues(self):
+        """{MNN: issue} for every tracking issue (open and closed). Lowest open
+        number wins per MNN (lowest closed when none is open); duplicates are
+        reported on stderr."""
+        label = tracker_label(self.cfg, "milestoneTracker")
+        groups = {}
+        for i in self.adapter.list(state="all", labels=[label]):
+            m = _MS_TITLE_RE.match(i["title"].strip())
+            if m:
+                groups.setdefault(m.group(1), []).append(i)
+        out = {}
+        for mid, issues in groups.items():
+            issues.sort(key=lambda i: (i["state"] != "open", i["number"]))
+            out[mid] = issues[0]
+            if len(issues) > 1:
+                sys.stderr.write(
+                    f"warning: {len(issues)} tracking issues carry {mid} ("
+                    + ", ".join(f"#{i['number']}" for i in sorted(issues, key=lambda i: i["number"]))
+                    + f"); using #{issues[0]['number']}\n")
+        return out
+
+    def tracker_issue(self, mid):
+        """The tracking issue of milestone `mid`. LookupError when absent."""
+        issue = self._tracking_issues().get(mid)
+        if issue is None:
+            raise LookupError(f"milestone {mid} not found on the issue tracker")
+        return issue
+
+    @staticmethod
+    def _status_of(issue):
+        for l in issue["labels"]:
+            if l.startswith(_STATUS_PREFIX) and l[len(_STATUS_PREFIX):] in _MS_STATUSES:
+                return l[len(_STATUS_PREFIX):]
+        if issue["state"] == "closed":
+            return "archived" if issue.get("state_reason") == "not_planned" else "shipped"
+        return "planned"
+
+    def milestone_list(self):
+        """Same shape as hv-vision-list prints: [{id, title, status, depends, ready}]."""
+        items = []
+        for mid, issue in sorted(self._tracking_issues().items()):
+            _text, block = parse_fields_block(issue["body"])
+            title = _MS_TITLE_RE.match(issue["title"].strip()).group(2) or issue["title"]
+            items.append({"id": mid, "title": title.strip(), "status": self._status_of(issue),
+                          "depends": re.findall(r"M\d+", block.get("Depends", ""))})
+        shipped = {i["id"] for i in items if i["status"] == "shipped"}
+        for i in items:
+            i["ready"] = all(d in shipped for d in i["depends"])
+        return items
+
+    def next_milestone_id(self):
+        """`MNN`: 1 + the highest M<digits> title prefix over every native milestone."""
+        highest = 0
+        for m in self.adapter.milestones("all"):
+            t = _MS_TITLE_RE.match(m["title"].strip())
+            if t:
+                highest = max(highest, int(t.group(1)[1:]))
+        return f"M{highest + 1:02d}"
+
+    def milestone_add(self, title, summary, depends=()):
+        """Create the native milestone and its tracking issue; return `MNN`."""
+        mid = self.next_milestone_id()
+        native = f"{mid} \u2014 {title}"
+        depends = list(depends)
+        labels = [tracker_label(self.cfg, "milestoneTracker"), _STATUS_PREFIX + "planned"]
+        self.adapter.ensure_labels(labels, auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+        self.adapter.create_milestone(native, _one_line(summary))
+        body = render_fields_block(milestone_stub(mid, title, summary, depends),
+                                   {"Depends": ", ".join(depends)})
+        self.adapter.create(native, body, labels, milestone=native)
+        return mid
+
+    def _native_milestone(self, mid, issue):
+        """The native milestone dict of `mid` (the issue's own, else by leading token)."""
+        found = self.adapter.milestones("all")
+        for m in found:
+            if issue.get("milestone") and m["title"] == issue["milestone"]:
+                return m
+        pat = re.compile(re.escape(mid) + r"(?!\w)")
+        hits = sorted((m for m in found if pat.match(m["title"].strip())), key=lambda m: m["state"] == "closed")
+        return hits[0] if hits else None
+
+    def milestone_status(self, mid, status):
+        """Move milestone `mid` to planned|active|shipped|archived: swap the status
+        label, sync the body frontmatter, close (shipped: completed, archived: not
+        planned) or reopen the tracking issue and the native milestone."""
+        if status not in _MS_STATUSES:
+            raise ValueError(f"status must be one of: {' '.join(_MS_STATUSES)}")
+        issue = self.tracker_issue(mid)
+        n = issue["number"]
+        label = _STATUS_PREFIX + status
+        stale = [l for l in issue["labels"] if l.startswith(_STATUS_PREFIX) and l != label]
+        if label not in issue["labels"]:
+            self.adapter.add_labels(n, [label], auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+        if stale:
+            self.adapter.remove_labels(n, stale)
+        text, block = parse_fields_block(issue["body"])
+        new_text, _found = update_frontmatter_field(text, "status", status)
+        if new_text != text:
+            self.adapter.edit(n, body=render_fields_block(new_text, block))
+        want_closed = status in ("shipped", "archived")
+        reason = "not_planned" if status == "archived" else "completed"
+        if issue["state"] == "closed" and (not want_closed or issue.get("state_reason") != reason):
+            self.adapter.reopen(n)
+            issue = dict(issue, state="open")
+        if want_closed and issue["state"] == "open":
+            self.adapter.close(n, reason=reason)
+        ms = self._native_milestone(mid, issue)
+        if ms is not None and ms["state"] != ("closed" if want_closed else "open"):
+            self.adapter.edit_milestone(ms["number"], state="closed" if want_closed else "open")
+
+    # -- release: gate, notes, close-out -----------------------------------
+
+    def _release_issues(self, mid):
+        """(tracking issue, native milestone, [issues in it, tracker excluded]), by number."""
+        tracker = self.tracker_issue(mid)
+        ms = self._native_milestone(mid, tracker)
+        if ms is None:
+            raise LookupError(f"milestone {mid} has no native milestone on the issue tracker")
+        issues = [i for i in self.adapter.issues_in_milestone(ms["title"], state="all")
+                  if i["number"] != tracker["number"] and not self._is_tracker(i)]
+        return tracker, ms, sorted(issues, key=lambda i: i["number"])
+
+    def release_gate(self, mid):
+        """([(issue, label)] blocking, [issue] warnings) over the open issues of milestone `mid`."""
+        _t, _ms, issues = self._release_issues(mid)
+        roles = self._state_labels("inProgress", "needsReview", "changesRequested")
+        blocked, warn = [], []
+        for i in issues:
+            if i["state"] != "open":
+                continue
+            hit = [l for l in roles if l in i["labels"]]
+            if hit:
+                blocked.append((i, hit[0]))
+            else:
+                warn.append(i)
+        return blocked, warn
+
+    def release_notes(self, mid):
+        """{"New": [(title, n)], "Fixed": [...], "Changed": [...]} from issues closed as completed."""
+        _t, _ms, issues = self._release_issues(mid)
+        out = {"New": [], "Fixed": [], "Changed": []}
+        for i in issues:
+            if i["state"] == "closed" and i.get("state_reason") == "completed":
+                out[{"F": "New", "B": "Fixed"}.get(self._letter(i), "Changed")].append(
+                    (_one_line(i["title"]), i["number"]))
+        return out
+
+    def release_close(self, mid, tag):
+        """Label `released` and comment `Released in <tag>` on each completed issue of `mid`
+        (skipping what is there), then close the native milestone and mark it shipped.
+        Returns the number of completed issues."""
+        done = [i for i in self._release_issues(mid)[2]
+                if i["state"] == "closed" and i.get("state_reason") == "completed"]
+        label = tracker_label(self.cfg, "released")
+        marker = f"Released in {tag}"
+        for i in done:
+            if label not in i["labels"]:
+                self.adapter.add_labels(i["number"], [label],
+                                        auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
+            if not any(c["body"].strip() == marker for c in self.adapter.comments(i["number"])):
+                self.adapter.add_comment(i["number"], marker)
+        self.milestone_status(mid, "shipped")
+        return len(done)
+
+    def milestone_show(self, mid):
+        """The milestone plan text (issue body without the fields block)."""
+        text, _block = parse_fields_block(self.tracker_issue(mid)["body"])
+        return text.rstrip("\n")
+
+    def milestone_put(self, mid, text):
+        """Replace the milestone plan text. Its frontmatter `id` must be `mid`; `status`
+        follows the label, `depends` (when present) updates the fields block."""
+        text = (text or "").replace("\r\n", "\n")
+        fm = re.match(r"---\n(.*?)\n---[ \t]*(?:\n|\Z)", text, re.DOTALL)
+        idm = re.search(r"^id:[ \t]*(\S+)", fm.group(1), re.MULTILINE) if fm else None
+        if not idm or idm.group(1) != mid:
+            raise ValueError(f"milestone text needs frontmatter with 'id: {mid}'")
+        issue = self.tracker_issue(mid)
+        _old, block = parse_fields_block(issue["body"])
+        block = dict(block)
+        dm = re.search(r"^depends:[ \t]*(.*)$", fm.group(1), re.MULTILINE)
+        if dm:
+            block["Depends"] = ", ".join(re.findall(r"M\d+", dm.group(1)))
+        text, _found = update_frontmatter_field(text, "status", self._status_of(issue))
+        self.adapter.edit(issue["number"], body=render_fields_block(text, block))
+
+    def slice_units(self, mid):
+        """Sorted `SNN` units that have a plan note on the tracking issue of `mid`."""
+        n = self.tracker_issue(mid)["number"]
+        units = set()
+        for c in self.adapter.comments(n):
+            m = _MARKER_RE.match(c["body"].replace("\r\n", "\n"))
+            sm = _SLICE_KIND_RE.fullmatch(m.group(1)) if m else None
+            if sm:
+                units.add(sm.group(1))
+        return sorted(units, key=lambda u: int(u[1:]))
+
+    def slice_plans(self, mid=None):
+        """[(MNN, SNN, text)] of every slice plan note, ordered by milestone then unit.
+        One tracking-issue listing, then one comments call per milestone listed."""
+        trackers = self._tracking_issues()
+        out = []
+        for m in sorted(trackers) if mid is None else [mid]:
+            if m not in trackers:
+                continue
+            parts = {}
+            for c in self.adapter.comments(trackers[m]["number"]):
+                body = c["body"].replace("\r\n", "\n")
+                mk = _MARKER_RE.match(body)
+                sm = _SLICE_KIND_RE.fullmatch(mk.group(1)) if mk else None
+                if sm:
+                    parts.setdefault(sm.group(1), []).append((int(mk.group(2) or 1), c["id"], body[mk.end():]))
+            for unit in sorted(parts, key=lambda u: int(u[1:])):
+                text = "".join(r for _i, _id, r in sorted(parts[unit], key=lambda t: t[:2]))
+                out.append((m, unit, _note_norm(text)))
+        return out
+
+    def slice_get(self, mid, unit):
+        """The slice plan text, None when absent."""
+        return self.note_get(str(self.tracker_issue(mid)["number"]), f"plan:{unit}")
+
+    def slice_put(self, mid, unit, text):
+        return self.note_put(str(self.tracker_issue(mid)["number"]), f"plan:{unit}", text)
+
+    def slice_rm(self, mid, unit):
+        return self.note_rm(str(self.tracker_issue(mid)["number"]), f"plan:{unit}")
 
     # -- lifecycle ---------------------------------------------------------
 

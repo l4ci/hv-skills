@@ -21,7 +21,7 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-item-ready` | Print one reason per line for what is missing before work can start (no acceptance criteria in the body, no design or plan note); exit 0 when ready, 1 when not | `.hv/bin/hv-item-ready F42` |
 | `hv-item-state` | Set the workflow label: exactly one of `in-progress` / `needs-review` / `changes-requested`, or none; no-op in file mode | `.hv/bin/hv-item-state F42 needs-review` |
 | `hv-design-put` | Replace an existing design's text with a prepared body (file mode: `.hv/designs/<ID>.md`; issue mode: the item's `design` note); create it first with `hv-design-add` | `.hv/bin/hv-design-put F42 --body-file draft.md` |
-| `hv-plan-put` | Replace an existing plan's text with a prepared body (file mode: `.hv/plans/<key>.md`; issue mode: the item's `plan` note, item keys only, slice plans stay files); create it first with `hv-plan-add` | `.hv/bin/hv-plan-put M01-F42 --body-file draft.md` |
+| `hv-plan-put` | Replace an existing plan's text with a prepared body (file mode: `.hv/plans/<key>.md`; issue mode: the item's `plan` note, or a slice's `plan:SNN` note on the milestone's tracking issue); create it first with `hv-plan-add` | `.hv/bin/hv-plan-put M01-F42 --body-file draft.md` |
 | `hv-complete` | Move item to `## Completed` with strikethrough; `--reason done\|handed-off\|blocked\|dropped` (default `done`) and `--note <text>` append `(<reason>: <note>)` to the marker when the reason is not `done`; exits 3 on a `done` close with no recorded proof unless `--no-proof` | `.hv/bin/hv-complete B07 a1b2c3d --reason blocked --note "waits on API"` |
 | `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
 | `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; engine for `/hv-ship --undo`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
@@ -73,22 +73,23 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-instructions-init` | Make `AGENTS.md` the project-instructions file and `CLAUDE.md` an `@AGENTS.md` importer: creates missing files, moves existing managed blocks from `CLAUDE.md` into a new `AGENTS.md`, adds the import line once. Idempotent (silent when nothing to do); no-op when the files are symlinked to each other. Invoked by `/hv-init` Step 4. | `.hv/bin/hv-instructions-init` |
 | `hv-managed-block-strip-deprecated` | Remove orphan v3 managed blocks from `CLAUDE.md` whose key is in `DEPRECATED_KEYS` (currently `context`, from the F18 cut). Idempotent: silent no-op on a clean file. Invoked by `/hv-init` Step 4 and `/hv-migrate v4 --apply` to scrub leftover blocks during upgrades. | `.hv/bin/hv-managed-block-strip-deprecated` |
 | `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
-| `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
-| `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` | `.hv/bin/hv-vision-status M01 active` |
+| `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` Issue mode: creates the native milestone `MNN — <title>` and a `milestone-tracker` tracking issue (`status:planned`); no file. | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
+| `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` Issue mode: also sets the `status:` label; `shipped`/`archived` close the tracking issue and native milestone, `planned`/`active` reopen. | `.hv/bin/hv-vision-status M01 active` |
 | `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
 | `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
-| `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` | `.hv/bin/hv-vision-index` |
+| `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` Issue mode: regenerates only the Active list and the managed instructions block. | `.hv/bin/hv-vision-index` |
 | `hv-vision-empty-active` | Print active milestone IDs with 0 open items, one per line | `.hv/bin/hv-vision-empty-active` |
-| `hv-vision-show` | Resolve: print a milestone detail file's contents; exit 1 when milestone ID not found or bad shape | `.hv/bin/hv-vision-show M01` |
+| `hv-vision-show` | Resolve: print a milestone detail file's contents; exit 1 when milestone ID not found or bad shape Issue mode: prints the tracking issue's body. | `.hv/bin/hv-vision-show M01` |
+| `hv-vision-put` | Replace an existing milestone's plan with a prepared body from `--body-file F\|-`; frontmatter `id` must match `<MNN>`. File mode overwrites `.hv/milestones/<MNN>.md` (must exist); issue mode writes the tracking issue's body (status follows the label, `depends` updates its Depends field). Exit 0 ok; 1 usage, unknown milestone or id mismatch; 2 backend unavailable; 3 tracker unavailable; 4 rate-limited | `.hv/bin/hv-vision-put M01 --body-file plan.md` |
 | `hv-design-add` | Writer: create `.hv/designs/<ID>.md` from an item ID (`[BFT]\d{2,}`); exit 1 on bad ID or conflict | `.hv/bin/hv-design-add F12 "Archive command"` |
 | `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
 | `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
 | `hv-design-list` | Lookup: JSON of every design with id, title, status, created; always exits 0 | `.hv/bin/hv-design-list` |
 | `hv-design-amend` | Writer: amend a section of `.hv/designs/<ID>.md` in place — `--section <h>` with `--append` or `--replace`; exit 1 on bad ID, missing file, or missing section | `.hv/bin/hv-design-amend F12 --section Goal --replace "…"` |
-| `hv-plan-add` | Writer: create a plan file; mints next slice number when called with `slice`; accepts `--design <path>` to record a design artifact pointer in frontmatter | `.hv/bin/hv-plan-add [--design <path>] M01 slice "Auth foundation"` |
-| `hv-plan-list` | JSON: every plan with key, milestone, unit, title, status, created | `.hv/bin/hv-plan-list M01` |
-| `hv-plan-show` | Print a plan file's contents | `.hv/bin/hv-plan-show M01-S01` |
-| `hv-plan-rm` | Delete a plan file | `.hv/bin/hv-plan-rm M01-S01` |
+| `hv-plan-add` | Writer: create a plan file; mints next slice number when called with `slice`; accepts `--design <path>` to record a design artifact pointer in frontmatter Issue mode: slice plans mint `SNN` as `plan:SNN` notes on the tracking issue; `--design` records `design: note:<ID>:design`. | `.hv/bin/hv-plan-add [--design <path>] M01 slice "Auth foundation"` |
+| `hv-plan-list` | JSON: every plan with key, milestone, unit, title, status, created Issue mode: reads slice notes from the tracking issues. | `.hv/bin/hv-plan-list M01` |
+| `hv-plan-show` | Print a plan file's contents Issue mode: reads the note. | `.hv/bin/hv-plan-show M01-S01` |
+| `hv-plan-rm` | Delete a plan file Issue mode: removes the note. | `.hv/bin/hv-plan-rm M01-S01` |
 | `hv-spike-add` | Create `spike/<name>` branch and `.hv/spikes/<name>.md` stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
 | `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
 | `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
@@ -136,6 +137,9 @@ time you rerun it. They evolve with hv-skills and are not a stable API.
 | `hv-release-update-changelog` | Prepend a release section to CHANGELOG.md, creating it if absent (idempotent) | `.hv/bin/hv-release-update-changelog 1.2.0 notes.md` |
 | `hv-release-detect-host` | Detect remote hosting kind (github / gitlab / -enterprise / -self-hosted / none) | `.hv/bin/hv-release-detect-host` |
 | `hv-release-pending` | Emit JSON `{lastTag, commits, days, thresholdCommits, thresholdDays, shouldNudge, reason}` for "is it time to /hv-release?" gating | `.hv/bin/hv-release-pending` |
+| `hv-release-milestone-check` | Issue mode: gate a milestone release. Exit 0 clear; 6 blocked (`blocked: #<n> <title> [<label>]` for open issues labelled `in-progress`/`needs-review`/`changes-requested`); `warning: #<n> <title> (still open)` lines for other open issues do not block. Exit 1 usage or unknown milestone; 2 backend unavailable or file mode; 3 tracker unavailable; 4 rate-limited | `.hv/bin/hv-release-milestone-check M07` |
+| `hv-release-notes-from-issues` | Issue mode: release notes from a milestone's issues closed as completed: `### New` (features), `### Fixed` (bugs), `### Changed` (tasks) with `- <Title> (#<n>)` lines, plus `### Other` (commit subjects with no item reference); `--since <tag>` bounds the commits. Exit 1/2/3/4 as above | `.hv/bin/hv-release-notes-from-issues M07 --since v4.1.0` |
+| `hv-release-close-milestone` | Issue mode: after the tag, label each completed issue `released` (comment `Released in <tag>`), close the native milestone, set status `shipped`; idempotent; prints `closed-out <MNN> <tag>: <k> issues`. Exit 1/2/3/4 as above | `.hv/bin/hv-release-close-milestone M07 v4.2.0` |
 | `hv-qa-index` | Regenerate the managed `<!-- hv-qa-start -->` block in `CLAUDE.md` from `summary:` frontmatter of every `.hv/qa/<target>.md` | `.hv/bin/hv-qa-index` |
 | `hv-qa-query` | Print the body (minus frontmatter) of named QA target files from `.hv/qa/`; missing targets are silent; always exits 0 | `.hv/bin/hv-qa-query hv-skills` |
 

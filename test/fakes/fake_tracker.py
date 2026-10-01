@@ -286,7 +286,7 @@ def gl_mr_cmd(db, args):
     elif verb == "list":
         rows = [p for p in prs if ("--all" in b or "-A" in b) or p["state"] == "open"]
         rows.sort(key=lambda p: -p["number"])
-        emit([gl_mr(p) for p in rows[:int(one(o, "per_page", 30))]])
+        emit([gl_mr(p) for p in rows[:min(int(one(o, "per_page", 30)), 100)]])
     elif verb == "view":
         want = pos[0]
         hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
@@ -574,7 +574,7 @@ def gl_issue_cmd(db, args):
                 continue
             rows.append(i)
         rows.sort(key=lambda i: -i["number"])
-        rows = rows[:int(one(o, "per_page", 30))]
+        rows = rows[:min(int(one(o, "per_page", 30)), 100)]
         emit([gl_issue(i) for i in rows])
     elif verb == "view":
         i = find_issue(db, pos[0])

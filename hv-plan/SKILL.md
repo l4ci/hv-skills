@@ -55,7 +55,7 @@ For an item target, read its `BACKLOG.md` entry and overflow file (`.hv/<bugs|fe
 
 When the item carries a `Repos:` field, capture that value as the plan's target sub-repo(s) so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Multi-repo items pass the full comma-list through (`--repo "web, api"`); the frontmatter key stays singular `repo:` and just carries the joined string. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).
 
-For a slice target, read `.hv/milestones/<MID>.md` for goal/acceptance/risks context.
+For a slice target, read `.hv/milestones/<MID>.md` for goal/acceptance/risks context (issue mode: `.hv/bin/hv-vision-show <MID>`).
 
 If the same key already exists at `.hv/plans/<key>.md`, ask whether to view (`hv-plan-show`), edit (skip to Step 4 with current content as the starting point), or replace (`hv-plan-rm` first, then re-create).
 
@@ -140,7 +140,7 @@ Pass `--repo` only for item-mode targets that carry a `Repos:` value. Slice mode
 
 When `.hv/designs/<ID>.md` exists for the plan's item, pass `--design .hv/designs/<ID>.md` to `hv-plan-add`. The plan's frontmatter records `design: .hv/designs/<ID>.md` as a traceability pointer.
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): an item plan is a note on the item's issue, not a file; slice plans stay files and follow the file-mode flow. `hv-plan-add` still creates the item plan; draft the confirmed sections in a scratch file and publish with `.hv/bin/hv-plan-put <key> --body-file <scratch-file>` instead of `Edit`. Read it back with `.hv/bin/hv-plan-show <key>`. Record plan-shaping answers with `.hv/bin/hv-item-comment <ID> --kind decision --body-file -`.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): plans are notes, not files: an item plan on the item's issue, a slice plan (`plan:SNN`) on the milestone's tracking issue. `hv-plan-add` still creates the plan (`hv-plan-add <M> slice "<title>"` mints `SNN`); draft the confirmed sections in a scratch file and publish with `.hv/bin/hv-plan-put <key> --body-file <scratch-file>|-` instead of `Edit` (slice keys look like `M07-S05`). Read it back with `.hv/bin/hv-plan-show <key>`, list with `hv-plan-list [<M>]`, remove with `hv-plan-rm <key>`. `--design .hv/designs/<ID>.md` on a slice records `design: note:<ID>:design`. Record plan-shaping answers with `.hv/bin/hv-item-comment <ID> --kind decision --body-file -`.
 
 The helper creates `.hv/plans/<key>.md` with frontmatter and stub sections. Use the `Edit` tool to fill in Goal, Approach, Tasks, Open questions, and Assumptions — replacing the placeholder sections with confirmed content. Keep the frontmatter intact.
 

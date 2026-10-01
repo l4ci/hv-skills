@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Close out a released milestone (issue mode): every issue in its native milestone that was closed as
+# completed gets the `released` label and one comment `Released in <tag>`; then the native milestone is
+# closed and the milestone marked shipped (as hv-vision-status shipped). Idempotent: labels and
+# comments already there are skipped, so a second run writes nothing.
+# Prints `closed-out <MNN> <tag>: <k> issues` (k = completed issues in the milestone).
+# Writer helper: exit 0 on success; exit 1 on usage error or unknown milestone; exit 2 file backend
+#   (issue mode only); exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-release-close-milestone <MNN> <tag>
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+[ $# -eq 2 ] || { echo "usage: hv-release-close-milestone <MNN> <tag>" >&2; exit 1; }
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" <<'PY'
+import sys
+from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
+
+mid, tag = sys.argv[1:3]
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-release-close-milestone: {msg}\n"); sys.exit(code)
+
+try:
+    backend = get_backend()
+    if not isinstance(backend, IssueBackend):
+        die("issue mode only (backlog.backend is \"file\")", 2)
+    k = backend.release_close(mid, tag)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+print(f"closed-out {mid} {tag}: {k} issues")
+PY

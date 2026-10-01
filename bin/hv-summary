@@ -9,7 +9,12 @@ set -euo pipefail
 # subsequent relative dirname-BASH_SOURCE resolution breaks. Use $HERE for
 # any further sibling sources.
 . "$HERE/hv-types.sh"
-MS_JSON="$("$HERE/hv-vision-list")"
+# Issue mode: a tracker failure here is reported once, by the backlog read below.
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  MS_JSON="$("$HERE/hv-vision-list" 2>/dev/null)" || MS_JSON="[]"
+else
+  MS_JSON="$("$HERE/hv-vision-list")"
+fi
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path

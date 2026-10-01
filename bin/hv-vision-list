@@ -6,6 +6,20 @@
 # Usage: hv-vision-list
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+# Issue mode: milestones are the tracking issues (same JSON shape).
+if PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend is-issues; then
+  exec env PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import json, sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+try:
+    print(json.dumps(get_backend().milestone_list(), indent=2))
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-vision-list: {e}\n"); sys.exit(2)
+except TrackerError as e:
+    sys.stderr.write(f"error: hv-vision-list: {e.message}\n"); sys.exit(tracker_exit_code(e))
+PY
+fi
 RAW=$("$HERE/hv-fm-list" .hv/milestones id title status depends)
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$RAW" <<'PY'
 import json, sys

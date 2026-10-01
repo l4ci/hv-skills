@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Create a plan file under .hv/plans/<milestone>-<unit>.md.
 # Issue mode (backlog.backend "issues"): an item plan (<milestone> <itemId>) is a `plan` note on the
-#   item's issue and its --design pointer is recorded as `note:design`; slice plans stay files.
+#   item's issue and its --design pointer is recorded as `note:design`; a slice plan is a `plan:S<NN>` note on the
+#   milestone's tracking issue (next S<NN> minted from the existing slice notes) and its --design
+#   .hv/designs/<ID>.md is recorded as `note:<ID>:design` (the design note on item <ID>'s issue).
 # Writer helper: exit 0 on successful plan creation; exit 1 on usage error or conflict.
 # Usage:
 #   hv-plan-add [--repo <name>] [--design <path>] <milestone> slice "<title>"        — mints next S<NN> for that milestone
@@ -69,8 +71,21 @@ plans_dir = Path(".hv/plans")
 if not issue:
     plans_dir.mkdir(parents=True, exist_ok=True)
 
+def tracker_call(fn, *args):
+    try:
+        return fn(*args)
+    except BackendUnavailable as e:
+        print(f"error: hv-plan-add: {e}", file=sys.stderr); sys.exit(2)
+    except TrackerError as e:
+        print(f"error: hv-plan-add: {e.message}", file=sys.stderr); sys.exit(tracker_exit_code(e))
+    except LookupError as e:
+        print(f"error: hv-plan-add: {e.args[0]}", file=sys.stderr); sys.exit(1)
+
 if unit_in == "slice":
-    existing = sorted(plans_dir.glob(f"{milestone}-S*.md"))
+    if issue:
+        existing = [Path(f"{milestone}-{u}.md") for u in tracker_call(backend.slice_units, milestone)]
+    else:
+        existing = sorted(plans_dir.glob(f"{milestone}-S*.md"))
     nums = []
     for p in existing:
         m = re.match(rf"{re.escape(milestone)}-S(\d+)", p.stem)
@@ -90,7 +105,18 @@ key = f"{milestone}-{unit}"
 plan_path = plans_dir / f"{key}.md"
 # Issue mode: an item plan (not a slice plan) is a `plan` note on the item's issue.
 as_note = issue and unit_kind == "item"
-if as_note:
+as_slice = issue and unit_kind == "slice"
+if as_slice:
+    if tracker_call(backend.slice_get, milestone, unit) is not None:
+        print(f"error: plan note for {key} already exists", file=sys.stderr)
+        sys.exit(1)
+    if design:
+        m = re.fullmatch(rf"([{_plannable}]\d+)\.md", Path(design).name)
+        if not m:
+            print(f"error: --design for a slice plan must be .hv/designs/<ID>.md, got {design!r}", file=sys.stderr)
+            sys.exit(1)
+        design = f"note:{m.group(1)}:design"
+elif as_note:
     try:
         exists = backend.note_get(unit, "plan") is not None
     except BackendUnavailable as e:
@@ -149,7 +175,9 @@ _(3–6 sentences — the shape of the implementation, the design choice, why th
 - _(named assumptions made implicit by the approach)_
 """
 )
-if as_note:
+if as_slice:
+    tracker_call(backend.slice_put, milestone, unit, stub)
+elif as_note:
     try:
         backend.note_put(unit, "plan", stub)
     except BackendUnavailable as e:

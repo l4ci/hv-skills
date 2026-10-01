@@ -4,6 +4,9 @@
 # .hv/MILESTONES.md from per-milestone frontmatter. Idempotent; preserves all
 # other content. Frontmatter is the single source of truth — running this
 # heals any drift in MILESTONES.md.
+# Issue mode (backlog.backend "issues"): the list comes from the tracker's tracking issues; only the
+# "## Active milestones" section and the CLAUDE.md block are regenerated (no per-milestone overview
+# sections), and a missing MILESTONES.md is seeded like hv-bootstrap does.
 # Atomic-merge helper: regenerates managed hv-vision block in CLAUDE.md and MILESTONES.md; exit 0.
 # Usage: hv-vision-index
 set -euo pipefail
@@ -13,19 +16,31 @@ ITEMS_JSON="$("$HERE/hv-vision-list")"
 BODY=$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ITEMS_JSON" <<'PY'
 import json, os, re, sys
 from pathlib import Path
-from hvlib import find_section, replace_section, update_milestone_status_line, write_text_atomic
+from hvlib import find_section, replace_section, update_milestone_status_line, write_text_atomic, get_backend, IssueBackend
 
 items = json.loads(sys.argv[1])
 active = [i for i in items if i["status"] == "active"]
+try:
+    issue_mode = isinstance(get_backend(), IssueBackend)
+except ValueError:
+    issue_mode = False
+
+SEED = (
+    "# Milestones\n\n_(no vision yet \u2014 run `/hv-vision` to brainstorm milestones)_\n\n"
+    "## Active milestones\n\n_(none active \u2014 set with `/hv-vision`)_\n\n## Milestones\n"
+)
 
 # 1) Refresh .hv/MILESTONES.md: per-section **Status:** lines + ## Active milestones
 ms_path = Path(".hv/MILESTONES.md")
+if issue_mode and not ms_path.exists():
+    ms_path.parent.mkdir(parents=True, exist_ok=True)
+    write_text_atomic(ms_path, SEED)
 if ms_path.exists():
     original = ms_path.read_text()
     ms = original
 
     # Heal each section's **Status:** line from frontmatter (drift insurance).
-    for i in items:
+    for i in ([] if issue_mode else items):
         ms = update_milestone_status_line(ms, i["id"], i["status"])
 
     if active:
@@ -57,9 +72,10 @@ if active:
         flag = " ⚠ blocked" if unmet else ""
         lines.append(f"- **{i['id']}** — {i['title']} (depends: {deps}){flag}")
     body = "\n".join(lines)
+    where = "the tracking issues (`hv-vision-show MNN`)" if issue_mode else "`.hv/milestones/MNN.md`"
     intro = (
         "Active milestones live in `.hv/MILESTONES.md` "
-        "(detail in `.hv/milestones/MNN.md`). Tag captured items with their "
+        f"(detail in {where}). Tag captured items with their "
         "milestone via the `Milestone:` field where applicable."
     )
 elif items:
