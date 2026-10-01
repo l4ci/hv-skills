@@ -293,6 +293,8 @@ Umbrella mode is in effect when `.hv/repos.json` registers ≥1 sub-repo (the da
 
 If `hv-umbrella-on` returns `no`, skip this step entirely (single-repo path).
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`, *Umbrella*): items are single-repo and their IDs are qualified (`<repo>:<ID>`). Take the repo from the item's `Repos:` field (`hv-todo-field <ID> repos`); a bare ID that exists in several sub-repos exits 1, so use the qualified form. Pass `--repo <repo>` to `hv-pr` (Step 10).
+
 If `yes`:
 
 1. **Every item must carry `Repos:`.** Parse via `.hv/bin/hv-todo-field <ID> repos`. If any item lacks a tag, stop with: *"Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it. Cannot route to a sub-repo."*

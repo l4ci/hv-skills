@@ -195,6 +195,8 @@ Carry the chosen milestone(s) as a comma-separated list into Step 6's `Milestone
 
 ## Step 4.6 — Tag Sub-Repo (when umbrella mode is on)
 
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`, *Umbrella*): each item lives on one sub-repo's tracker, so pick exactly one repo (single-select; no multi-repo option). Pass it as `--field Repos=<name>`, or rely on a cwd inside a sub-repo. `hv-item-create` refuses multi-repo items: for work spanning repos, capture one item per repo and link them with `Related:` (qualified `<repo>:<ID>` refs are fine). The created ID comes back qualified. `Repos` cannot be changed later.
+
 Use the umbrella-mode gate from `references/umbrella-mode.md` — when `hv-umbrella-on` returns `yes` AND `.hv/repos.json` registers ≥1 sub-repo (the registry is the truth, not the config flag), ask which sub-repo(s) each item belongs to. Otherwise skip this step silently.
 
 The question shape:
