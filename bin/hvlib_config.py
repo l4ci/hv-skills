@@ -46,6 +46,7 @@ CONFIG_KEYS = [
     ("backlog.backend", "file", False),  # file | issues
     ("issues.provider", "auto", False),  # auto | github | gitlab
     ("issues.retryWaitSeconds", 60, False),
+    ("issues.bulkPaceMs", 1000, False),  # hv-migrate-issues: pause between tracker writes
     ("issues.labels.inProgress", "in-progress", False),
     ("issues.labels.needsReview", "needs-review", False),
     ("issues.labels.changesRequested", "changes-requested", False),

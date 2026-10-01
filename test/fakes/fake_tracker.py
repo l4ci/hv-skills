@@ -6,6 +6,7 @@ Env: FAKE_TRACKER_DB   JSON store path (required unless FAKE_TRACKER_DB_DIR; cre
      FAKE_TRACKER_DB_DIR  per-repo stores: <dir>/<basename of the cwd's git toplevel>.json (wins over FAKE_TRACKER_DB)
      FAKE_TRACKER_LOG  if set, each call's argv (space-joined) is appended
      FAKE_TRACKER_FAIL if set, any call whose argv contains it fails (exit 1)
+     FAKE_TRACKER_FAIL_MSG extra stderr text on that failure (e.g. "secondary rate limit" makes hv-tracker-call exit 4)
 Only the subset hv uses is implemented; anything else exits 2.
 """
 import json
@@ -725,7 +726,7 @@ def main():
             f.write(line + "\n")
     sub = os.environ.get("FAKE_TRACKER_FAIL")
     if sub and sub in line:
-        sys.stderr.write("fake %s: simulated failure for: %s\n" % (tool, line))
+        sys.stderr.write("fake %s: simulated failure for: %s %s\n" % (tool, line, os.environ.get("FAKE_TRACKER_FAIL_MSG", "")))
         return 1
     try:
         db = load()
