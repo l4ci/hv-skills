@@ -3,7 +3,7 @@
 ## Bugs
 
 ## Features
-- **[F82] [Major] Issue-tracker backend (`backlog.backend: "issues"`).** Config-switchable mode where GitHub/GitLab issues replace .hv/BACKLOG.md: capture creates issues, hv-next/hv-work select from them, hv-vision makes milestones as epic issues with sub/linked issues, feedback/questions/decisions go to issue comments so later sessions resume with context, hv-work labels in-progress and opens clean PRs/MRs, hv-review works the needs-review queue, hv-release checks labels. File backend stays default and unchanged. Since: 5bd7eac
+- **[F82] [Major] Issue-tracker backend (`backlog.backend: "issues"`).** Config-switchable mode where GitHub/GitLab issues replace .hv/BACKLOG.md: capture creates issues, hv-next/hv-work select from them, hv-vision makes milestones as epic issues with sub/linked issues, feedback/questions/decisions go to issue comments so later sessions resume with context, hv-work labels in-progress and opens clean PRs/MRs, hv-review works the needs-review queue, hv-release checks labels. File backend stays default and unchanged. Since: 5bd7eac Milestone: M07
 
 ## Tasks
 - **[T113] Fix Codex sandbox on this host.** `codex exec -s read-only` and workspace-write fail with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted` (Ubuntu 24.04 `apparmor_restrict_unprivileged_userns=1`, no bwrap binary) while codex exits 0 and emits a bogus FAIL. Needs sudo: install bubblewrap plus an AppArmor profile, or `sysctl kernel.apparmor_restrict_unprivileged_userns=0`. Acceptance: `codex exec -s workspace-write "run ls"` succeeds with no bwrap error; add `hv-codex-verify --doctor` to detect and print the fix. Related: [F80] Since: 4a0787b

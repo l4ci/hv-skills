@@ -28,9 +28,9 @@ Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these
 <!-- hv-vision-start -->
 ## Project Vision
 
-Project milestones live in `.hv/MILESTONES.md`.
+Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable.
 
-_(no active milestones — all shipped or archived; run `/hv-vision` to plan more)_
+- **M07** — Issue-tracker backend (depends: —)
 <!-- hv-vision-end -->
 
 ## Working in this repo

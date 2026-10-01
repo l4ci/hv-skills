@@ -4,7 +4,7 @@ hv-skills is a Claude Code workflow that plans before coding, makes one commit p
 
 ## Active milestones
 
-_(none active — set with `/hv-vision`)_
+- M07 — Issue-tracker backend
 
 ## Milestones
 
@@ -24,3 +24,11 @@ Cut 8 redundant commands (28 → 20), ship migration codemod, write announcement
 Close the umbrella gap left open in v4.0: per-sub-repo .hv/knowledge/<repo>/KNOWLEDGE.md storage with hybrid umbrella+sub-repo routing, so umbrella users running /hv-migrate v4 no longer hit F19's explicit refusal. DECISIONS.md stays umbrella-only by architectural commitment.
 
 [Full plan: `.hv/milestones/M06.md`]
+
+### M07 — Issue-tracker backend
+
+**Status:** active · **Depends:** —
+
+backlog.backend: issues makes GitHub/GitLab issues + native milestones the source of truth; file mode unchanged
+
+[Full plan: `.hv/milestones/M07.md`]
