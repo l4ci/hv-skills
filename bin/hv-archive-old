@@ -5,6 +5,7 @@
 # Outputs: number of items moved (silent if 0)
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-archive-old 'closed issues are the archive' || exit $?
 . "$HERE/hv-types.sh"
 THRESHOLD="${1:-5}"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$THRESHOLD" <<'PY'

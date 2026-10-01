@@ -181,3 +181,132 @@ MD
   cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "bogus backend wrote BACKLOG.md"
   pass "bogus backlog.backend exits 1"
 )
+
+echo "FileBackend complete/uncomplete and file-only verbs"
+
+TMP_CU="$(mktemp -d)"
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
+(
+  cd "$TMP_CU"
+  git init -q && git config user.email t@t && git config user.name t
+  echo a > a && git add a && git commit -qm "feat: work"
+  C1="$(git log -1 --format=%h)"
+  echo b >> a && git commit -qam "refactor(core): tidy"
+  R1="$(git log -1 --format=%h)"
+  TODAY="$(date +%Y-%m-%d)"
+  mkdir -p .hv
+  cat > .hv/BACKLOG.md <<MD
+# Backlog
+
+## Bugs
+
+- **[B01] [P1] First bug.** Desc one.
+- **[B02] [P0] Second bug.** Desc two.
+- **[B04] [P2] No proof.** Desc.
+
+## Features
+
+- **[F01] [Major] Big.** Needs work.
+
+## Tasks
+
+## Completed
+
+- ~~**[B03] [P1] Done thing.** old.~~ Done 2026-01-01 [\`$C1\`]
+- ~~**[T02] Skipped.** x.~~ Done 2026-01-02 [\`$C1\`] (dropped: not needed)
+MD
+  printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old.~~ Done 2025-12-01 [`%s`] (blocked: waiting)\n' "$C1" > .hv/ARCHIVE.md
+  echo '{"since_refactor":{"features":3,"bugs":3}}' > .hv/counters.json
+  "$BIN/hv-proof-add" B01 --check t --result PASS --evidence x --sha "$C1" >/dev/null
+  "$BIN/hv-proof-add" B02 --check t --result PASS --evidence x --sha "$C1" >/dev/null
+  cp .hv/BACKLOG.md orig.md; cp .hv/ARCHIVE.md orig.arch; cp .hv/counters.json orig.cnt
+  eq() { [ "$2" = "$3" ] || fail "$1: expected [$2] got [$3]"; }
+  cnt() { python3 -c 'import json;d=json.load(open(".hv/counters.json"))["since_refactor"];print(d["features"],d["bugs"])'; }
+
+  # complete: proof row present, default Done line, counter bumped
+  "$BIN/hv-complete" B01 "$C1"
+  eq "complete line" "- ~~**[B01] [P1] First bug.** Desc one.~~ Done $TODAY [\`$C1\`]" "$(grep -F '[B01]' .hv/BACKLOG.md)"
+  eq "complete counter" "3 4" "$(cnt)"
+  # already completed: silent no-op, no second bump
+  rc=0; out="$("$BIN/hv-complete" B01 "$C1" 2>&1)" || rc=$?
+  eq "complete noop" "0:" "$rc:$out"; eq "noop counter" "3 4" "$(cnt)"
+  # no proof: exit 3 with the exact message, nothing written
+  cp .hv/BACKLOG.md pre.md
+  rc=0; err="$("$BIN/hv-complete" B04 "$C1" 2>&1)" || rc=$?
+  eq "no proof" "3:error: [B04] no proof recorded, pass --no-proof to override (hv-proof-add B04 --check <name> --result PASS --evidence <path-or-text>)" "$rc:$err"
+  cmp -s .hv/BACKLOG.md pre.md || fail "no-proof close wrote BACKLOG.md"
+  # --no-proof with reason and note
+  "$BIN/hv-complete" B04 "$C1" --no-proof --reason blocked --note "waiting on X"
+  eq "reason/note line" "- ~~**[B04] [P2] No proof.** Desc.~~ Done $TODAY [\`$C1\`] (blocked: waiting on X)" "$(grep -F '[B04]' .hv/BACKLOG.md | head -1)"
+  # refactor: commit leaves counters alone
+  "$BIN/hv-complete" B02 "$R1"
+  eq "refactor counter" "3 5" "$(cnt)"
+  # unknown ID / bad reason
+  rc=0; err="$("$BIN/hv-complete" B99 "$C1" 2>&1)" || rc=$?
+  eq "complete unknown" "1:error: [B99] not found" "$rc:$err"
+  rc=0; err="$("$BIN/hv-complete" B01 "$C1" --reason bogus 2>&1 | head -1)" || rc=$?
+  eq "complete bad reason" "error: invalid --reason 'bogus'" "$err"
+  pass "hv-complete golden"
+
+  # uncomplete: from Completed, rewinds counter; from ARCHIVE.md; refactor; active no-op
+  cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
+  "$BIN/hv-uncomplete" B03
+  eq "uncomplete line" "- **[B03] [P1] Done thing.** old." "$(grep -F '[B03]' .hv/BACKLOG.md)"
+  if grep -qF '~~**[B03]' .hv/BACKLOG.md; then fail "B03 Done line left in BACKLOG"; fi
+  eq "uncomplete counter" "3 2" "$(cnt)"
+  "$BIN/hv-uncomplete" B05
+  eq "archive restore" "- **[B05] [P2] Archived.** old." "$(grep -F '[B05]' .hv/BACKLOG.md)"
+  eq "archive emptied" "# Archive" "$(grep -v '^$' .hv/ARCHIVE.md)"
+  eq "archive counter" "3 1" "$(cnt)"
+  rc=0; err="$("$BIN/hv-uncomplete" B03 2>&1)" || rc=$?
+  eq "uncomplete noop" "0:noop: [B03] already active in BACKLOG.md" "$rc:$err"
+  eq "noop counter" "3 1" "$(cnt)"
+  "$BIN/hv-uncomplete" T02
+  eq "task restore" "- **[T02] Skipped.** x." "$(grep -F '[T02]' .hv/BACKLOG.md)"
+  eq "task counter" "3 1" "$(cnt)"
+  rc=0; err="$("$BIN/hv-uncomplete" B99 2>&1)" || rc=$?
+  eq "uncomplete unknown" "1:error: [B99] not found in BACKLOG.md (## Completed) or .hv/ARCHIVE.md" "$rc:$err"
+  pass "hv-uncomplete golden"
+
+  # backlog.backend = issues: complete/uncomplete refuse (exit 2, nothing written)
+  cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
+  echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
+  for call in "hv-complete|B01|$C1" "hv-uncomplete|B03"; do
+    IFS='|' read -r -a argv <<< "$call"; h="${argv[0]}"
+    rc=0; err="$("$BIN/$h" "${argv[@]:1}" 2>&1)" || rc=$?
+    eq "$h issues refusal" "2:error: $h: issues backend not available yet (M07-S02)" "$rc:$err"
+  done
+  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/ARCHIVE.md orig.arch && cmp -s .hv/counters.json orig.cnt || fail "complete/uncomplete wrote under issues backend"
+  pass "complete/uncomplete refused under issues backend, files unchanged"
+
+  # file-only verbs refuse in issue mode, with a tracker pointer, writing nothing
+  while IFS='|' read -r h args ptr; do
+    # shellcheck disable=SC2086
+    rc=0; err="$("$BIN/$h" $args 2>&1)" || rc=$?
+    eq "$h issues refusal" "2:error: $h: not available with backlog.backend \"issues\" — $ptr" "$rc:$err"
+  done <<'EOF'
+hv-next-id|bugs|IDs are issue numbers; capture creates the issue
+hv-rm|--force B01|close the issue instead: hv-complete <#N> --reason dropped
+hv-archive-old|0|closed issues are the archive
+hv-backfill-since|-|Since: anchors exist only in the file backend
+hv-todo-drift|-|PRs carry "Closes #N", so the tracker closes shipped issues
+EOF
+  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/ARCHIVE.md orig.arch && cmp -s .hv/counters.json orig.cnt || fail "file-only verb wrote under issues backend"
+  pass "file-only verbs refuse under issues backend (exit 2, no writes)"
+
+  # bogus backend: exit 1
+  echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
+  for h in hv-complete hv-uncomplete hv-next-id hv-rm hv-archive-old hv-backfill-since hv-todo-drift; do
+    case "$h" in hv-complete) a="B01 $C1" ;; hv-uncomplete) a=B03 ;; hv-next-id) a=bugs ;; hv-rm) a=B01 ;; hv-archive-old) a=0 ;; *) a="" ;; esac
+    # shellcheck disable=SC2086
+    rc=0; err="$("$BIN/$h" $a 2>&1)" || rc=$?
+    eq "$h bogus backend" "1:error: $h: invalid backlog.backend 'bogus' (expected file|issues)" "$rc:$err"
+  done
+  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/counters.json orig.cnt || fail "bogus backend wrote"
+  pass "bogus backlog.backend exits 1 for all seven helpers"
+
+  # file mode: file-only verbs still work
+  rm .hv/config.json
+  eq "next-id file mode" "B06" "$("$BIN/hv-next-id" bugs)"
+  pass "hv-next-id unchanged in file mode"
+)

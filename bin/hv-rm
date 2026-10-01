@@ -7,6 +7,7 @@
 #   --scrub-archive Also remove matching entries from .hv/ARCHIVE.md.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-rm 'close the issue instead: hv-complete <#N> --reason dropped' || exit $?
 FORCE=0
 SCRUB_ARCHIVE=0
 while :; do

@@ -9,6 +9,7 @@
 # Usage: hv-backfill-since
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -m hvlib_backend require-file hv-backfill-since 'Since: anchors exist only in the file backend' || exit $?
 . "$HERE/hv-types.sh"
 
 if ! HEAD_HASH="$(git rev-parse --short HEAD 2>/dev/null)" || [ -z "$HEAD_HASH" ]; then
