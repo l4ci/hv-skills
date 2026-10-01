@@ -31,6 +31,18 @@ When a skill invokes `/hv-review` and gates on the verdict, this is the canonica
 
 *"Address via /hv-work"* is the safe routing — it loops back through review on the next ship attempt and surfaces repeat concerns to the user. *"Ship anyway"* is a user-volition gate: it overrides surfaced concerns and produces a public artifact (merge or PR) on the user's authority. Loop mode auto-picks only the **routing** answer (drain the queue toward integration-ready state), not the **acceptance-of-risk** answer. If a project genuinely wants concerns ignored, set `ship.review` to `false` — don't try to teach the loop to ship-anyway.
 
+## Queue routing (`/hv-review --queue`, issue mode)
+
+The queue loop is the consumer. It routes per PR / MR and always posts the verdict as a `feedback` comment on each linked item and on the PR.
+
+| Verdict | Interactive | `autonomy.level: "loop"` |
+|---------|-------------|--------------------------|
+| `PASS` | `AskUserQuestion` merge / skip / stop; merge runs `hv-pr-merge <pr>` (exit 5 = merged, an item unproven and set to `changes-requested`) | merge, no question |
+| `CONCERNS` | findings as feedback, `hv-item-state <ID> changes-requested`; no merge | same |
+| `FAIL` | same as `CONCERNS`; no merge | same, and the guard-failure stop above still applies to the surrounding loop |
+
+Exit 3 / 4 from any helper stops the queue. Label lifecycle: `references/issue-mode.md`.
+
 ## Producer-side relay (standalone `/hv-review` runs)
 
 When `/hv-review` is invoked directly (not from `/hv-ship`), it relays the verdict to the user as the final product instead of routing on it:
