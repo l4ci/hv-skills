@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Set an item's workflow state label (issue mode): exactly one of in-progress / needs-review /
+# changes-requested, or none of them. The other two state labels are removed in the same edit; no
+# tracker write when the labels already match. Label names come from issues.labels.*.
+# File backend: silent no-op.
+# Writer helper: exit 0 on change or no-op; exit 1 on usage error, unknown item or tracker failure;
+#   exit 2 backend unavailable; exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-item-state <ref> in-progress|needs-review|changes-requested|none
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-item-state <ref> in-progress|needs-review|changes-requested|none"
+REF="${1:?$USAGE}"
+STATE="${2:?$USAGE}"
+[ $# -eq 2 ] || { echo "$USAGE" >&2; exit 1; }
+case "$STATE" in in-progress|needs-review|changes-requested|none) ;; *) echo "$USAGE" >&2; exit 1 ;; esac
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REF" "$STATE" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-item-state: {msg}\n"); sys.exit(code)
+
+try:
+    get_backend().set_state(sys.argv[1], sys.argv[2])
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+PY
