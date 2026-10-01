@@ -7,6 +7,7 @@
 #   item to the body; an unknown item fails before anything is pushed. File mode accepts and ignores it.
 # Tool: exit 0 on successful PR creation; exit 1 on missing body, unknown --closes item or CLI error;
 #   exit 3 tracker unavailable; exit 4 rate-limited (from hv-tracker-call).
+# Umbrella issue mode: --closes IDs resolve inside the --repo sub-repo (or the one the cwd is in).
 # Usage: echo "body" | hv-pr [--repo <name>] [--closes <ID[,ID...]>] <branch> <title>
 # Prints: the PR/MR URL.
 set -euo pipefail
@@ -37,7 +38,7 @@ hv_repo_flag_prepare "$BIN_DIR" "hv-pr" "$BRANCH"
 
 # Provider (and, in issue mode, the Closes lines) are resolved before the push so a bad --closes ID
 # fails with nothing pushed. The subshell sources the preamble so config is found from any subdir.
-RESOLVED=$(CLOSES="$CLOSES" BIN_DIR="$BIN_DIR" bash -c '
+RESOLVED=$(CLOSES="$CLOSES" REPO="$REPO" BIN_DIR="$BIN_DIR" bash -c '
   . "$BIN_DIR/hv-preamble.sh"
   PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - <<"PY"
 import os, subprocess, sys
@@ -56,9 +57,19 @@ if ids:
     except ValueError:
         backend = None
     if isinstance(backend, IssueBackend):
+        owner = backend
+        if hasattr(backend, "subs"):  # umbrella: the PR is opened in one sub-repo, so resolve there
+            name = os.environ.get("REPO") or backend._cwd_repo()
+            if name not in backend.subs:
+                sys.stderr.write("error: hv-pr: umbrella issue mode needs --repo <name> with --closes\n"); sys.exit(1)
+            owner = backend.subs[name]
         for ref in ids:
+            if owner is not backend:
+                head, sep, tail = ref.partition(":")
+                if sep and head == name:
+                    ref = tail
             try:
-                canon = backend.canonical_id(ref)
+                canon = owner.canonical_id(ref)
             except Exception as e:
                 sys.stderr.write("error: hv-pr: %s\n" % e); sys.exit(1)
             if canon is None:

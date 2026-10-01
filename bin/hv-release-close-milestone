@@ -6,15 +6,26 @@
 # Prints `closed-out <MNN> <tag>: <k> issues` (k = completed issues in the milestone).
 # Writer helper: exit 0 on success; exit 1 on usage error or unknown milestone; exit 2 file backend
 #   (issue mode only); exit 3 tracker unavailable; exit 4 rate-limited.
-# Usage: hv-release-close-milestone <MNN> <tag>
+# Umbrella mode: --repo <name> closes out that sub-repo only; the milestone is marked shipped once every
+#   sub-repo's native milestone is closed (--repo required there; ignored elsewhere).
+# Usage: hv-release-close-milestone <MNN> <tag> [--repo <name>]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-[ $# -eq 2 ] || { echo "usage: hv-release-close-milestone <MNN> <tag>" >&2; exit 1; }
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" <<'PY'
+USAGE="usage: hv-release-close-milestone <MNN> <tag> [--repo <name>]"
+[ $# -ge 2 ] || { echo "$USAGE" >&2; exit 1; }
+MID="$1"; TAG="$2"; shift 2
+REPO=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) REPO="${2:?$USAGE}"; shift 2 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$TAG" "$REPO" <<'PY'
 import sys
 from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
 
-mid, tag = sys.argv[1:3]
+mid, tag, repo = sys.argv[1:4]
 
 def die(msg, code=1):
     sys.stderr.write(f"error: hv-release-close-milestone: {msg}\n"); sys.exit(code)
@@ -23,7 +34,7 @@ try:
     backend = get_backend()
     if not isinstance(backend, IssueBackend):
         die("issue mode only (backlog.backend is \"file\")", 2)
-    k = backend.release_close(mid, tag)
+    k = backend.release_close(mid, tag, repo=repo or None)
 except TrackerError as e:
     die(e.message, tracker_exit_code(e))
 except (LookupError, ValueError) as e:

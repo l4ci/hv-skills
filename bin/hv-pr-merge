@@ -9,24 +9,27 @@
 # Writer helper: exit 0 merged and every item closed; exit 5 not merged, an item is unproven (one
 #   `unproven <ID>: ...` line each on stderr); exit 1 on usage error, unknown PR / item or tracker
 #   failure; exit 2 file backend (use hv-merge); exit 3 tracker unavailable; exit 4 rate-limited.
-# Usage: hv-pr-merge <pr> [--items <ID[,ID...]>]
+# Umbrella mode: --repo <name> picks the sub-repo whose PR is merged (required there; ignored elsewhere).
+# Usage: hv-pr-merge <pr> [--items <ID[,ID...]>] [--repo <name>]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-USAGE="usage: hv-pr-merge <pr> [--items <ID[,ID...]>]"
+USAGE="usage: hv-pr-merge <pr> [--items <ID[,ID...]>] [--repo <name>]"
 PR="${1:?$USAGE}"; shift
 ITEMS=""
+REPO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --items) ITEMS="${2:?$USAGE}"; shift 2 ;;
+    --repo) REPO="${2:?$USAGE}"; shift 2 ;;
     *) echo "$USAGE" >&2; exit 1 ;;
   esac
 done
 case "$PR" in ''|*[!0-9]*) echo "$USAGE" >&2; exit 1 ;; esac
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$PR" "$ITEMS" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$PR" "$ITEMS" "$REPO" <<'PY'
 import sys
 from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
 
-pr, items = sys.argv[1], [x.strip() for x in sys.argv[2].split(",") if x.strip()]
+pr, items, repo = sys.argv[1], [x.strip() for x in sys.argv[2].split(",") if x.strip()], sys.argv[3]
 
 def die(msg, code=1):
     sys.stderr.write(f"error: hv-pr-merge: {msg}\n"); sys.exit(code)
@@ -35,7 +38,7 @@ try:
     backend = get_backend()
     if not isinstance(backend, IssueBackend):
         die('not available with backlog.backend "file" — use hv-merge', 2)
-    sha, closed, unproven = backend.merge_pr(pr, items or None)
+    sha, closed, unproven = backend.merge_pr(pr, items or None, **({"repo": repo or None} if hasattr(backend, "subs") else {}))
 except TrackerError as e:
     die(e.message, tracker_exit_code(e))
 except (LookupError, ValueError) as e:

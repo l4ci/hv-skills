@@ -6,23 +6,26 @@
 # item (no `[F82]`-style tag, no `#N`) follow under `### Other` as `- <subject>`.
 # Reader helper: exit 0 on success; exit 1 on usage error, unknown milestone or bad ref; exit 2 file
 #   backend (issue mode only); exit 3 tracker unavailable; exit 4 rate-limited.
-# Usage: hv-release-notes-from-issues <MNN> [--since <git-ref>]
+# Umbrella mode: --repo <name> selects the sub-repo whose milestone issues are listed (required there; ignored elsewhere).
+# Usage: hv-release-notes-from-issues <MNN> [--since <git-ref>] [--repo <name>]
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
-USAGE="usage: hv-release-notes-from-issues <MNN> [--since <git-ref>]"
+USAGE="usage: hv-release-notes-from-issues <MNN> [--since <git-ref>] [--repo <name>]"
 MID="${1:?$USAGE}"; shift
 SINCE=""
+REPO=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --since) SINCE="${2:?$USAGE}"; shift 2 ;;
+    --repo) REPO="${2:?$USAGE}"; shift 2 ;;
     *) echo "$USAGE" >&2; exit 1 ;;
   esac
 done
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$SINCE" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$MID" "$SINCE" "$REPO" <<'PY'
 import re, subprocess, sys
 from hvlib import get_backend, IssueBackend, TrackerError, tracker_exit_code
 
-mid, since = sys.argv[1:3]
+mid, since, repo = sys.argv[1:4]
 
 def die(msg, code=1):
     sys.stderr.write(f"error: hv-release-notes-from-issues: {msg}\n"); sys.exit(code)
@@ -31,7 +34,7 @@ try:
     backend = get_backend()
     if not isinstance(backend, IssueBackend):
         die("issue mode only (backlog.backend is \"file\")", 2)
-    notes = backend.release_notes(mid)
+    notes = backend.release_notes(mid, repo=repo or None)
 except TrackerError as e:
     die(e.message, tracker_exit_code(e))
 except (LookupError, ValueError) as e:

@@ -599,6 +599,7 @@ class IssueBackend:
         self._adapter = None
         self.cwd = cwd  # umbrella: the sub-repo path every tracker call runs in
         self.repo = repo  # umbrella: sub-repo name, rendered as `Repos:` on every bullet
+        self.on_missing_milestone = None  # umbrella: callable(sub, "MNN") -> native title, creating it
 
     @property
     def adapter(self):
@@ -774,6 +775,8 @@ class IssueBackend:
         if not re.fullmatch(r"M\d+", value):
             raise ValueError(f"issue mode takes one milestone ID like M07, got '{value}'")
         title = self.adapter.find_milestone(value)
+        if title is None and self.on_missing_milestone is not None:
+            title = self.on_missing_milestone(self, value)
         if title is None:
             raise TrackerError(
                 1, f"milestone {value} not found on the tracker \u2014 create it with /hv-vision (M07-S05)")
@@ -979,9 +982,9 @@ class IssueBackend:
                 highest = max(highest, int(t.group(1)[1:]))
         return f"M{highest + 1:02d}"
 
-    def milestone_add(self, title, summary, depends=()):
+    def milestone_add(self, title, summary, depends=(), mid=None):
         """Create the native milestone and its tracking issue; return `MNN`."""
-        mid = self.next_milestone_id()
+        mid = mid or self.next_milestone_id()
         native = f"{mid} \u2014 {title}"
         depends = list(depends)
         labels = [tracker_label(self.cfg, "milestoneTracker"), _STATUS_PREFIX + "planned"]
@@ -1033,19 +1036,21 @@ class IssueBackend:
 
     # -- release: gate, notes, close-out -----------------------------------
 
-    def _release_issues(self, mid):
-        """(tracking issue, native milestone, [issues in it, tracker excluded]), by number."""
-        tracker = self.tracker_issue(mid)
+    def _release_issues(self, mid, optional_tracker=False):
+        """(tracking issue, native milestone, [issues in it, tracker excluded]), by number.
+        optional_tracker (umbrella sub-repos other than home): the tracking issue may be absent ({})."""
+        tracker = (self._tracking_issues().get(mid) or {}) if optional_tracker else self.tracker_issue(mid)
         ms = self._native_milestone(mid, tracker)
         if ms is None:
             raise LookupError(f"milestone {mid} has no native milestone on the issue tracker")
         issues = [i for i in self.adapter.issues_in_milestone(ms["title"], state="all")
-                  if i["number"] != tracker["number"] and not self._is_tracker(i)]
+                  if i["number"] != tracker.get("number") and not self._is_tracker(i)]
         return tracker, ms, sorted(issues, key=lambda i: i["number"])
 
-    def release_gate(self, mid):
-        """([(issue, label)] blocking, [issue] warnings) over the open issues of milestone `mid`."""
-        _t, _ms, issues = self._release_issues(mid)
+    def release_gate(self, mid, repo=None, _optional_tracker=False):
+        """([(issue, label)] blocking, [issue] warnings) over the open issues of milestone `mid`.
+        `repo` is only meaningful in umbrella mode (ignored here)."""
+        _t, _ms, issues = self._release_issues(mid, _optional_tracker)
         roles = self._state_labels("inProgress", "needsReview", "changesRequested")
         blocked, warn = [], []
         for i in issues:
@@ -1058,9 +1063,9 @@ class IssueBackend:
                 warn.append(i)
         return blocked, warn
 
-    def release_notes(self, mid):
+    def release_notes(self, mid, repo=None, _optional_tracker=False):
         """{"New": [(title, n)], "Fixed": [...], "Changed": [...]} from issues closed as completed."""
-        _t, _ms, issues = self._release_issues(mid)
+        _t, _ms, issues = self._release_issues(mid, _optional_tracker)
         out = {"New": [], "Fixed": [], "Changed": []}
         for i in issues:
             if i["state"] == "closed" and i.get("state_reason") == "completed":
@@ -1068,11 +1073,16 @@ class IssueBackend:
                     (_one_line(i["title"]), i["number"]))
         return out
 
-    def release_close(self, mid, tag):
+    def release_close(self, mid, tag, repo=None):
         """Label `released` and comment `Released in <tag>` on each completed issue of `mid`
         (skipping what is there), then close the native milestone and mark it shipped.
         Returns the number of completed issues."""
-        done = [i for i in self._release_issues(mid)[2]
+        n = self._label_released(mid, tag)
+        self.milestone_status(mid, "shipped")
+        return n
+
+    def _label_released(self, mid, tag, optional_tracker=False):
+        done = [i for i in self._release_issues(mid, optional_tracker)[2]
                 if i["state"] == "closed" and i.get("state_reason") == "completed"]
         label = tracker_label(self.cfg, "released")
         marker = f"Released in {tag}"
@@ -1082,7 +1092,6 @@ class IssueBackend:
                                         auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
             if not any(c["body"].strip() == marker for c in self.adapter.comments(i["number"])):
                 self.adapter.add_comment(i["number"], marker)
-        self.milestone_status(mid, "shipped")
         return len(done)
 
     def milestone_show(self, mid):
@@ -1155,6 +1164,10 @@ class IssueBackend:
     def _state_labels(self, *roles):
         return [tracker_label(self.cfg, r) for r in (roles or _STATE_ROLES)]
 
+    def _gate_id(self, item_id):
+        """ID handed to hv-proof-show: qualified in umbrella mode (plain IDs collide across repos)."""
+        return f"{self.repo}:{item_id}" if self.repo else item_id
+
     def _require(self, ref):
         issue = self._lookup(ref)
         if issue is None:
@@ -1185,7 +1198,7 @@ class IssueBackend:
             self.adapter.add_labels(n, [label], auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
             self.adapter.add_comment(n, "Blocked" + suffix)
             return True
-        _proof_gate(item_id, reason, proof_show)
+        _proof_gate(self._gate_id(item_id), reason, proof_show)
         stale = [l for l in self._state_labels() if l in labels]
         if stale:
             self.adapter.remove_labels(n, stale)
@@ -1330,7 +1343,7 @@ class IssueBackend:
             if issue["state"] != "open":
                 continue
             try:
-                _proof_gate(item_id, "done", proof_show)
+                _proof_gate(self._gate_id(item_id), "done", proof_show)
             except ProofMissing:
                 unproven.append(item_id)
         if unproven:
@@ -1389,15 +1402,6 @@ def _ready_reasons(has_criteria, has_note):
 _QUAL_HASH_RE = re.compile(r"^(?P<repo>[^\s#:]+)#(?P<n>\d+)$")
 _QUAL_COLON_RE = re.compile(r"^(?P<repo>[^\s#:]+):(?P<ref>\S+)$")
 
-# Milestone, vision, slice-plan, release and review/PR operations span repos (M07-S06 T2).
-_UMBRELLA_PENDING = (
-    "_tracking_issues", "tracker_issue", "milestone_list", "next_milestone_id", "milestone_add",
-    "milestone_status", "release_gate", "release_notes", "release_close", "milestone_show",
-    "milestone_put", "slice_units", "slice_plans", "slice_get", "slice_put", "slice_rm",
-    "review_queue", "merge_pr",
-)
-
-
 class UmbrellaIssueBackend(IssueBackend):
     """Umbrella mode over issue trackers: every registered sub-repo keeps its items on
     its own tracker (provider auto-detected from that repo's origin). Reads merge the
@@ -1412,6 +1416,8 @@ class UmbrellaIssueBackend(IssueBackend):
         from hvlib_repos import load_repos
         self.repos = load_repos()
         self.subs = {name: IssueBackend(self.cfg, cwd=path, repo=name) for name, path in self.repos.items()}
+        for sub in self.subs.values():
+            sub.on_missing_milestone = self._create_sub_milestone
 
     # -- reads ---------------------------------------------------------------
 
@@ -1472,6 +1478,129 @@ class UmbrellaIssueBackend(IssueBackend):
     def detail_text(self, ref):
         sub, plain = self._pick(ref)
         return None if sub is None else sub.detail_text(plain)
+
+    # -- milestones: tracking issue + plans on the home repo, native milestone per sub-repo ---
+
+    @property
+    def home_name(self):
+        name = config_value(self.cfg, "issues.homeRepo") or next(iter(self.repos))
+        if name not in self.subs:
+            raise ValueError(f"issues.homeRepo '{name}' is not a registered sub-repo "
+                             f"(registered: {', '.join(self.repos)})")
+        return name
+
+    @property
+    def home(self):
+        return self.subs[self.home_name]
+
+    def _sub(self, repo):
+        if not repo:
+            raise ValueError("umbrella issue mode needs --repo <name> "
+                             f"(registered: {', '.join(self.repos)})")
+        if repo not in self.subs:
+            raise ValueError(f"unknown sub-repo '{repo}' (registered: {', '.join(self.repos)})")
+        return self.subs[repo]
+
+    def _create_sub_milestone(self, sub, mid):
+        """First use of `mid` in `sub`: create its native milestone `MNN — <title>` (title
+        taken from the home tracking issue). None when the milestone has no tracking issue."""
+        try:
+            native = self.home.tracker_issue(mid)["title"].strip()
+        except LookupError:
+            return None
+        sub.adapter.create_milestone(native, "")
+        return native
+
+    def _natives(self, mid, cache=None):
+        """{repo: native milestone dict} for the sub-repos that have `mid` (open wins)."""
+        pat = re.compile(re.escape(mid) + r"(?!\w)")
+        out = {}
+        for name, sub in self.subs.items():
+            found = cache[name] if cache is not None and name in cache else sub.adapter.milestones("all")
+            if cache is not None:
+                cache[name] = found
+            hits = sorted((m for m in found if pat.match(m["title"].strip())),
+                          key=lambda m: m["state"] == "closed")
+            if hits:
+                out[name] = hits[0]
+        return out
+
+    def next_milestone_id(self):
+        highest = 0
+        for sub in self.subs.values():
+            for m in sub.adapter.milestones("all"):
+                t = _MS_TITLE_RE.match(m["title"].strip())
+                if t:
+                    highest = max(highest, int(t.group(1)[1:]))
+        return f"M{highest + 1:02d}"
+
+    def milestone_add(self, title, summary, depends=()):
+        return self.home.milestone_add(title, summary, depends, mid=self.next_milestone_id())
+
+    def milestone_list(self):
+        """Home tracking issues; `shipped` only when every sub-repo native milestone of it is
+        closed (else `active`)."""
+        items = self.home.milestone_list()
+        cache = {}
+        for i in items:
+            if i["status"] == "shipped" and any(m["state"] != "closed"
+                                                for m in self._natives(i["id"], cache).values()):
+                i["status"] = "active"
+        shipped = {i["id"] for i in items if i["status"] == "shipped"}
+        for i in items:
+            i["ready"] = all(d in shipped for d in i["depends"])
+        return items
+
+    def milestone_status(self, mid, status):
+        self.home.milestone_status(mid, status)
+        want = "closed" if status in ("shipped", "archived") else "open"
+        for name, m in self._natives(mid).items():
+            if name != self.home_name and m["state"] != want:
+                self.subs[name].adapter.edit_milestone(m["number"], state=want)
+
+    # -- release: per sub-repo ------------------------------------------------
+
+    def release_gate(self, mid, repo=None):
+        return self._sub(repo).release_gate(mid, _optional_tracker=True)
+
+    def release_notes(self, mid, repo=None):
+        return self._sub(repo).release_notes(mid, _optional_tracker=True)
+
+    def release_close(self, mid, tag, repo=None):
+        """Close out one sub-repo: label/comment its released issues, close its native
+        milestone. The tracking issue ships only when every sub-repo native milestone is closed."""
+        sub = self._sub(repo)
+        n = sub._label_released(mid, tag, optional_tracker=True)
+        ms = self._natives(mid)[repo]
+        if ms["state"] != "closed":
+            sub.adapter.edit_milestone(ms["number"], state="closed")
+        if all(m["state"] == "closed" for m in self._natives(mid).values()):
+            self.milestone_status(mid, "shipped")
+        return n
+
+    # -- review queue and PR merge --------------------------------------------
+
+    def review_queue(self):
+        out = []
+        for name, sub in self.subs.items():
+            for e in sub.review_queue():
+                out.append(dict(e, id=f"{name}:{e['id']}", repo=name))
+        return out
+
+    def merge_pr(self, pr, items=None, repo=None):
+        sub = self._sub(repo)
+        if items is not None:
+            plain = []
+            for ref in items:
+                m = _QUAL_COLON_RE.match(ref) or _QUAL_HASH_RE.match(ref)
+                if m and m.group("repo") in self.subs:
+                    if m.group("repo") != repo:
+                        raise ValueError(f"item {ref} belongs to {m.group('repo')}, not {repo}")
+                    ref = m.group("ref") if _QUAL_COLON_RE.match(ref) else "#" + m.group("n")
+                plain.append(ref)
+            items = plain
+        sha, closed, unproven = sub.merge_pr(pr, items)
+        return sha, [f"{repo}:{i}" for i in closed], [f"{repo}:{i}" for i in unproven]
 
     # -- writes --------------------------------------------------------------
 
@@ -1548,12 +1677,11 @@ class UmbrellaIssueBackend(IssueBackend):
         return sub.ready_reasons(plain)
 
 
-def _umbrella_pending(self, *_a, **_k):
-    raise BackendUnavailable("not available in umbrella mode yet (milestones, release and review across sub-repos: M07-S06 T2)")
-
-
-for _name in _UMBRELLA_PENDING:
-    setattr(UmbrellaIssueBackend, _name, _umbrella_pending)
+# Milestone-plan and slice-plan operations live on the home repo's tracker.
+for _name in ("_tracking_issues", "tracker_issue", "milestone_show", "milestone_put",
+              "slice_units", "slice_plans", "slice_get", "slice_put", "slice_rm"):
+    setattr(UmbrellaIssueBackend, _name,
+            (lambda n: lambda self, *a, **k: getattr(self.home, n)(*a, **k))(_name))
 
 
 def get_backend(cfg=None):
