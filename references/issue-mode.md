@@ -19,6 +19,8 @@ An ID is the type letter plus the issue number: `#42` is `F42` (feature), `B42` 
 | Design / plan artifact | `hv-design-add` / `hv-plan-add` create it, `hv-design-put <ID> --body-file F\|-` / `hv-plan-put <key> --body-file F\|-` fill it, `hv-design-show` / `hv-plan-show` read it; raw access: `hv-item-note <ref> --kind proof\|design\|plan (--body-file F\|- \| --show \| --rm)`. Slice plans stay files. |
 | Question, answer, decision, feedback | `hv-item-comment <ref> --kind question\|answer\|decision\|feedback --body-file F\|-` |
 | Open the PR / MR | `hv-pr --closes <ID[,ID...]> <branch> "<title>"` (body on stdin) |
+| What needs review | `hv-review-queue` (JSON: `needs-review` items with the open PRs / MRs whose body closes them) |
+| Merge a reviewed PR / MR | `hv-pr-merge <pr> [--items <ID[,ID...]>]` (checks proof first, then merges and closes what the host left open; exit 5 = not merged, an item unproven) |
 | Close | `hv-complete <ID> [commit-hash] [--reason done\|handed-off\|blocked\|dropped] [--note <text>]`; reopen with `hv-uncomplete` |
 
 **Post every `AskUserQuestion` answer that changes an item's direction** as a `decision` (or `answer`) comment with `hv-item-comment`, so later sessions, which share no memory with this one, see why the item took its shape.
@@ -29,13 +31,13 @@ One of `in-progress`, `needs-review`, `changes-requested` at a time, cleared on 
 
 - `hv-item-claim` sets `in-progress` (and assigns the user).
 - `hv-item-state <ref> needs-review` after the PR / MR is open.
-- A reviewer sets `changes-requested` (`/hv-review --queue`); the next `/hv-work` claim returns it to `in-progress`.
+- A reviewer sets `changes-requested` (`/hv-review --queue`, or `hv-pr-merge` for an unproven item); the next `/hv-work` claim returns it to `in-progress`.
 
 ## PR flow
 
 `/hv-work`, `/hv-debug` and `/hv-ship` in issue mode always open a PR / MR, whatever `work.mergeStrategy` says (it is treated as `pr`). `hv-pr --closes <IDs>` appends one `Closes #<n>` line per item, so the tracker closes the issues when the PR merges. The claim stays until then: do not call `hv-item-release` after opening the PR.
 
-**Merging belongs to `/hv-review --queue`.** `/hv-work` and `/hv-ship` never merge in issue mode and never call `hv-complete` for a `done` close: the merge closes the issue.
+**Merging belongs to `/hv-review --queue`.** It lists the queue with `hv-review-queue`, reviews each PR / MR, and merges PASSes with `hv-pr-merge <pr>`. It checks proof before merging: an open linked item with no proof blocks the merge (the item becomes `changes-requested` with a feedback comment, exit 5), because a merge into the default branch lets the host close the issue and skip the gate. After a merge, the host closes the linked issues itself when the PR targets the default branch; for any other base `hv-pr-merge` closes them with `hv-complete` semantics (reason done, merge sha). `/hv-work` and `/hv-ship` never merge in issue mode and never call `hv-complete` for a `done` close: the merge closes the issue.
 
 `hv-complete` is still how to close an item with `--reason handed-off|blocked|dropped`. Reasons: `done` closes as completed; `dropped` and `handed-off` close as not planned (comment carries reason and note); `blocked` keeps the issue open with the `blocked` label.
 
@@ -57,4 +59,4 @@ Shared by the `hv-item-*`, `hv-pr` and `hv-tracker-call` helpers:
 
 - `3` tracker unavailable (CLI missing, not authenticated, provider unknown): stop and report; do not fall back to files.
 - `4` rate-limited: stop and report; never retry in a loop.
-- `5` claim lost (`hv-item-claim`: another worker holds the item): drop that item and pick another.
+- `5` claim lost (`hv-item-claim`: another worker holds the item): drop that item and pick another. `hv-pr-merge`: merged, but a linked item has no proof and stays open: report it.

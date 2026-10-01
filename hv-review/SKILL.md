@@ -26,6 +26,7 @@ Read `.hv/config.json`:
 - Before merging or opening a PR — typically invoked from `/hv-ship`
 - *"Review this branch"*, *"Second-opinion this"*, *"Look over what I've got"*
 - After manual commits to a branch you want validated before integrating
+- Issue mode: `/hv-review --queue` reviews and merges the PRs waiting on `needs-review` items (see Queue mode)
 
 ## When NOT to Use
 
@@ -410,6 +411,26 @@ When invoked from `/hv-ship`, return the verdict; the parent runs consumer routi
 - **PASS** — *"Ready to ship. Run `/hv-ship`."*
 - **CONCERNS** — print the concerns inline (already done in Step 6), then suggest *"Address via `/hv-work` and rerun `/hv-review`, or accept and ship via `/hv-ship`."*
 - **FAIL** — tell the user the merge would regress. Suggest fixing via `/hv-work` or `/hv-debug`. Don't route to `/hv-ship`.
+
+## Queue mode (`--queue`, issue mode)
+
+Works through every `needs-review` item's open PR / MR. Issue mode only (`backlog.backend: "issues"`; see `references/issue-mode.md` for the label lifecycle). In file mode say *"`--queue` needs the issue backend; use `/hv-ship` and `hv-merge` here"* and stop.
+
+```bash
+.hv/bin/hv-review-queue
+```
+
+Prints a JSON list `[{"id","number","title","prs":[{"number","title","branch","url","body"}]}]`. Empty: report *"Review queue is empty"* and stop. Per entry, in order:
+
+1. **PRs.** None: report *"<ID> is `needs-review` but has no PR with a closing keyword"* and skip. Several: review each.
+2. **Checkout.** `git status --short` must be clean, else stop. Check the PR out through the adapter: `.hv/bin/hv-tracker-call -- pr checkout <n>` (GitHub) or `-- mr checkout <n>` (GitLab).
+3. **Review.** Run Steps 2-9 on the checked-out branch, scoped to `<base>...HEAD` (`<base>` from `.hv/bin/hv-base-branch`). The reviewer is read-only; so is the loop, apart from the helpers below.
+4. **Route.**
+   - **PASS** — interactive: `AskUserQuestion` (Header `"Merge"`, *"Merge PR <n> for <ID>?"*, options *Merge (Recommended)* / *Skip* / *Stop*); `autonomy.level: "loop"` merges without asking. Merge with `.hv/bin/hv-pr-merge <n>`: it merges, closes the linked items the host left open, and prints `merged <n> as <sha7>` plus a `closed <ID>` line each. Exit 5 means nothing was merged because an item has no proof: it is now `changes-requested`; report the `unproven <ID>` lines and move on. Then post the verdict on each linked item (`.hv/bin/hv-item-comment <ID> --kind feedback --body-file -`) and on the PR (`.hv/bin/hv-tracker-call -- pr comment <n> --body-file -` on GitHub, `-- mr note <n> --message "<verdict>"` on GitLab).
+   - **CONCERNS / FAIL** — post the findings as a `feedback` comment on each linked item and on the PR (same commands), then `.hv/bin/hv-item-state <ID> changes-requested`. The author's next `/hv-work` claim reads the feedback. No merge, under any autonomy level.
+5. **Return.** `git checkout <base>` before the next entry.
+
+Exit 3 or 4 from any helper stops the queue with a report of what was done and what is left. Never retry in a loop. Routing table: `references/review-verdict-routing.md` (Queue routing).
 
 ## Rules
 

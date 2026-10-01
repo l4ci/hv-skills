@@ -35,8 +35,25 @@ def _int_or_raw(v):
         return v
 
 
+_CLOSE_VERBS = r"close[sd]?|fix(?:es|ed)?|resolve[sd]?"
+_CLOSING_RE = re.compile(rf"(?<![\w])(?:{_CLOSE_VERBS})\b:?\s+#(\d+)(?!\d)", re.I)
+_CLOSING_RE_GL = re.compile(
+    rf"(?<![\w])(?:{_CLOSE_VERBS}|implement(?:s|ed)?)\b:?\s+#(\d+)(?!\d)", re.I)
+
+
 class _Adapter:
     provider = ""
+    _closing_re = _CLOSING_RE
+
+    def closed_numbers(self, body):
+        """Issue numbers a PR/MR body closes through a closing keyword
+        (`Closes #3`, `fixes: #4`, ...), in order of appearance."""
+        return list(dict.fromkeys(int(m) for m in self._closing_re.findall(body or "")))
+
+    def prs_closing(self, number):
+        """Open PRs/MRs whose body closes issue `number`:
+        [{"number", "title", "branch", "url", "body"}]."""
+        return [p for p in self.open_prs() if int(number) in self.closed_numbers(p["body"])]
 
     def _run(self, args, body=None):
         """Run hv-tracker-call; stdin is fed only when an argument is `-`."""
@@ -229,6 +246,33 @@ class GitHubAdapter(_Adapter):
     def assign_self(self, number):
         self._run(["issue", "edit", str(number), "--add-assignee", "@me"])
 
+    # -- pull requests -------------------------------------------------------
+
+    def open_prs(self):
+        """Every open PR: [{"number", "title", "branch", "url", "body"}]."""
+        return [{"number": d["number"], "title": d.get("title") or "", "branch": d.get("headRefName") or "",
+                 "url": d.get("url") or "", "body": d.get("body") or ""}
+                for d in self._json(["pr", "list", "--state", "open", "--json",
+                                     "number,title,body,headRefName,url"])]
+
+    def pr_checkout(self, pr):
+        self._run(["pr", "checkout", str(pr)])
+
+    def pr_merge(self, pr):
+        """Merge with a merge commit, delete the branch; returns the merge commit sha."""
+        self._run(["pr", "merge", str(pr), "--merge", "--delete-branch"])
+        oid = (self._json(["pr", "view", str(pr), "--json", "mergeCommit"]).get("mergeCommit") or {}).get("oid")
+        if not oid:
+            raise TrackerError(1, f"cannot read the merge commit of PR {pr}")
+        return oid
+
+    def pr_comment(self, pr, body):
+        self._run(["pr", "comment", str(pr), "--body-file", "-"], body)
+
+    def pr_state(self, pr):
+        """"open" | "merged" | "closed"."""
+        return str(self._json(["pr", "view", str(pr), "--json", "state"]).get("state", "")).lower()
+
 
 class GitLabAdapter(_Adapter):
     provider = "gitlab"
@@ -350,6 +394,35 @@ class GitLabAdapter(_Adapter):
             if not self._me:
                 raise TrackerError(1, "cannot resolve the authenticated GitLab username")
         self._run(["issue", "update", str(number), "--assignee", "+" + self._me])
+
+    # -- merge requests ------------------------------------------------------
+
+    _closing_re = _CLOSING_RE_GL
+
+    def open_prs(self):
+        """Every open MR: [{"number", "title", "branch", "url", "body"}]."""
+        return [{"number": d["iid"], "title": d.get("title") or "", "branch": d.get("source_branch") or "",
+                 "url": d.get("web_url") or "", "body": d.get("description") or ""}
+                for d in self._json(["mr", "list", "--output", "json"])]
+
+    def pr_checkout(self, pr):
+        self._run(["mr", "checkout", str(pr)])
+
+    def pr_merge(self, pr):
+        """Merge (merge commit), remove the source branch; returns the merge commit sha."""
+        self._run(["mr", "merge", str(pr), "--yes", "--remove-source-branch"])
+        sha = self._json(["mr", "view", str(pr), "--output", "json"]).get("merge_commit_sha")
+        if not sha:
+            raise TrackerError(1, f"cannot read the merge commit of MR {pr}")
+        return sha
+
+    def pr_comment(self, pr, body):
+        self._run(["mr", "note", str(pr), "--message", body])
+
+    def pr_state(self, pr):
+        """"open" | "merged" | "closed"."""
+        st = str(self._json(["mr", "view", str(pr), "--output", "json"]).get("state", "")).lower()
+        return "open" if st == "opened" else st
 
 
 def adapter_for(cfg, provider=None):

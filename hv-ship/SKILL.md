@@ -223,6 +223,8 @@ If a scope area is unclear, pick the most visible behavior change. Don't pad wit
 
 ## Step 5 — Pick Strategy
 
+**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`): no strategy question, whatever `work.mergeStrategy` says. Go to Step 6a; never direct-merge.
+
 Check `work.mergeStrategy` in `.hv/config.json`.
 
 - If set to `"direct"` or `"pr"` and the user hasn't explicitly overridden in this session, use it silently and skip to Step 6a or 6b accordingly.
@@ -231,6 +233,15 @@ Check `work.mergeStrategy` in `.hv/config.json`.
 Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* — see `references/ask-user-question-fallback.md` for canonical fallback mechanics.
 
 ## Step 6a — Open a PR
+
+**Issue mode:** pass the resolved items so the PR closes them, then mark each for review. Do not call `hv-item-release`: the claim stays until the PR merges.
+
+```bash
+printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID1>,<ID2> <branch> "<short title>"
+.hv/bin/hv-item-state <ID> needs-review    # once per item
+```
+
+`/hv-review --queue` merges it later. Skip Steps 6b, 6c and 8.
 
 > **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs. See `references/manual-gates.md`.
 
@@ -249,6 +260,8 @@ printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
 Helper behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
 
 ## Step 6c — Close Upstream Issues (Direct-Push Path)
+
+**Issue mode:** does not apply. The items are the tracker issues and close when `/hv-review --queue` merges the PR.
 
 This step runs only on the **direct-merge path** (after `hv-merge` returns a commit hash). Skip entirely on the PR path — `hv-ship-body` already emits `Closes #N` lines into the PR body, and GitHub/GitLab auto-close the issues on PR merge.
 
@@ -317,6 +330,8 @@ Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `rep
 Silently clears the entry if one existed. Harmless if not.
 
 ## Step 8 — Mark Unfinished Items Complete
+
+**Issue mode:** skip. Closing happens at the review merge (`hv-pr-merge`); `hv-complete` here would close an issue before its PR is reviewed. Use it only for `--reason handed-off|blocked|dropped`.
 
 Most IDs are already completed by `/hv-work`. This catches manual commits that referenced IDs without closing them.
 

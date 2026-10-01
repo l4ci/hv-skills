@@ -9,7 +9,9 @@ Only the subset hv uses is implemented; anything else exits 2.
 """
 import json
 import os
+import hashlib
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 
@@ -167,29 +169,78 @@ def new_pr(db, tool, title, body, head, base):
 def gh_pr(p):
     return {"number": p["number"], "title": p["title"], "body": p["body"],
             "headRefName": p["head"], "baseRefName": p["base"], "state": p["state"].upper(),
+            "mergeCommit": {"oid": p["merge_sha"]} if p.get("merge_sha") else None,
             "url": "https://github.com/fake/repo/pull/%d" % p["number"]}
 
 
 def gl_mr(p):
-    return {"iid": p["number"], "title": p["title"], "description": p["body"],
-            "source_branch": p["head"], "target_branch": p["base"],
-            "state": "opened" if p["state"] == "open" else p["state"],
-            "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
+    out = {"iid": p["number"], "title": p["title"], "description": p["body"],
+           "source_branch": p["head"], "target_branch": p["base"],
+           "state": "opened" if p["state"] == "open" else p["state"],
+           "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
+    if p.get("merge_sha"):
+        out["merge_commit_sha"] = p["merge_sha"]
+    return out
+
+
+CLOSING_RE = re.compile(
+    r"(?<![\w])(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?|implement(?:s|ed)?)\b:?\s+#(\d+)(?!\d)",
+    re.I)
+
+
+def find_pr(prs, want, mr=False):
+    hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
+    if not hit:
+        raise Fail("404 Not Found" if mr else "no pull requests found for %s" % want)
+    return hit[-1]
+
+
+def current_branch():
+    """Head of a PR opened without --head: the branch checked out in the cwd repo (as gh does)."""
+    r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else "HEAD"
+
+
+def checkout_pr(p):
+    """Create/switch a local branch named after the PR head in the cwd repo."""
+    head = p["head"]
+    have = subprocess.run(["git", "rev-parse", "--verify", "-q", "refs/heads/" + head],
+                          capture_output=True).returncode == 0
+    cmd = ["git", "checkout", "-q", head] if have else ["git", "checkout", "-q", "-B", head]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise Fail("checkout failed: " + r.stderr.strip())
+
+
+def merge_pr(db, p):
+    """Mark merged with a deterministic fake sha; like the real hosts, linked
+    issues close automatically only when the base is the default branch."""
+    if p["state"] != "open":
+        raise Fail("pull request is not open")
+    p["state"] = "merged"
+    p["merge_sha"] = hashlib.sha1(("fake-merge-%d" % p["number"]).encode()).hexdigest()
+    if p["base"] == "main":
+        for m in CLOSING_RE.finditer(p["body"]):
+            for i in db["issues"]:
+                if i["number"] == int(m.group(1)) and i["state"] == "open":
+                    close_issue(i, "completed")
+    save(db)
 
 
 GH_PR_FLAGS = {"--title": "title", "-t": "title", "--body": "body", "-b": "body",
                "--body-file": "body_file", "-F": "body_file", "--base": "base", "-B": "base",
                "--head": "head", "-H": "head", "--json": "json", "--state": "state", "-s": "state",
                "--limit": "limit", "-L": "limit"}
+GH_PR_BOOLS = ("--merge", "--squash", "--rebase", "--delete-branch", "-d", "-m")
 
 
 def gh_pr_cmd(db, args):
     verb = args[0]
-    o, b, pos = parse(args[1:], GH_PR_FLAGS)
+    o, b, pos = parse(args[1:], GH_PR_FLAGS, GH_PR_BOOLS)
     fields = split_labels(o.get("json", []))
     prs = [p for p in db.get("prs", []) if not p.get("mr")]
     if verb == "create":
-        head = one(o, "head") or "HEAD"
+        head = one(o, "head") or current_branch()
         p = new_pr(db, "gh", one(o, "title", ""), text_arg(o, "body", "body_file"), head,
                    one(o, "base", "main"))
         save(db)
@@ -205,6 +256,13 @@ def gh_pr_cmd(db, args):
         if not hit:
             raise Fail("no pull requests found for %s" % want)
         emit(pick(gh_pr(hit[-1]), fields)) if fields else print("title:\t%s" % hit[-1]["title"])
+    elif verb == "checkout":
+        checkout_pr(find_pr(prs, pos[0]))
+    elif verb == "merge":
+        merge_pr(db, find_pr(prs, pos[0]))
+    elif verb == "comment":
+        find_pr(prs, pos[0]).setdefault("comments", []).append(text_arg(o, "body", "body_file") or "")
+        save(db)
     else:
         raise Fail("unsupported", 2)
 
@@ -212,12 +270,12 @@ def gh_pr_cmd(db, args):
 GL_MR_FLAGS = {"--title": "title", "-t": "title", "--description": "desc", "-d": "desc",
                "--source-branch": "head", "-s": "head", "--target-branch": "base", "-b": "base",
                "--output": "output", "-O": "output", "--per-page": "per_page", "-P": "per_page",
-               "--state": "state"}
+               "--state": "state", "--message": "message", "-m": "message"}
 
 
 def gl_mr_cmd(db, args):
     verb = args[0]
-    o, b, pos = parse(args[1:], GL_MR_FLAGS, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--merged", "-M"))
+    o, b, pos = parse(args[1:], GL_MR_FLAGS, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--merged", "-M", "--remove-source-branch"))
     prs = [p for p in db.get("prs", []) if p.get("mr")]
     if verb == "create":
         p = new_pr(db, "glab", one(o, "title", ""), one(o, "desc"), one(o, "head", "HEAD"),
@@ -235,6 +293,13 @@ def gl_mr_cmd(db, args):
         if not hit:
             raise Fail("404 Not Found")
         emit(gl_mr(hit[-1]))
+    elif verb == "checkout":
+        checkout_pr(find_pr(prs, pos[0], True))
+    elif verb == "merge":
+        merge_pr(db, find_pr(prs, pos[0], True))
+    elif verb == "note":
+        find_pr(prs, pos[0], True).setdefault("comments", []).append(one(o, "message", ""))
+        save(db)
     else:
         raise Fail("unsupported", 2)
 

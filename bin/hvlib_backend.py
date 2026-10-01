@@ -988,6 +988,75 @@ class IssueBackend:
         issue, _id = self._require(ref)
         return self._apply_state(issue, _STATE_ROLE_FOR[state])
 
+    # -- review queue ----------------------------------------------------------
+
+    def review_queue(self):
+        """Open issues labelled needs-review with the open PRs/MRs that close
+        them: [{"id", "number", "title", "prs": [{number, title, branch, url, body}]}].
+        One issue list and one PR list; matching happens in memory."""
+        label = tracker_label(self.cfg, "needsReview")
+        issues = [i for i in self.adapter.list(state="open", labels=[label]) if not self._is_tracker(i)]
+        by_issue = {}
+        for pr in self.adapter.open_prs():
+            for n in self.adapter.closed_numbers(pr["body"]):
+                by_issue.setdefault(n, []).append(pr)
+        issues.sort(key=lambda i: i["number"])
+        return [{"id": f"{self._letter(i)}{i['number']}", "number": i["number"], "title": i["title"],
+                 "prs": by_issue.get(i["number"], [])} for i in issues]
+
+    def merge_pr(self, pr, items=None):
+        """Merge PR/MR `pr` and make sure its linked items end up closed.
+
+        Linked = `items` when given, else every issue the PR body closes. Proof is
+        checked BEFORE merging: a merge into the default branch makes the host close
+        the issues itself, which would skip the gate. Any open linked item without
+        proof blocks the merge: nothing is merged, each such item flips to
+        changes-requested with a feedback comment, and merge_sha is None. Otherwise
+        the PR merges; linked items the host left open are closed through complete().
+        Returns (merge_sha, closed_ids, unproven_ids). LookupError for an unknown PR.
+        """
+        pr = int(pr)
+        explicit = items is not None
+        found = [p for p in self.adapter.open_prs() if p["number"] == pr]
+        if items is None:
+            if not found:
+                raise LookupError(f"PR {pr} is not open")
+            items = [f"#{n}" for n in self.adapter.closed_numbers(found[0]["body"])]
+        linked = []
+        for ref in items:  # resolve before merging so a bad ref fails with nothing merged
+            if explicit:
+                linked.append(self._require(ref)[1])
+            elif (issue := self._lookup(ref)) is not None:  # a tracker issue is not an item
+                linked.append(f"{self._letter(issue)}{issue['number']}")
+        proof_show = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hv-proof-show")
+        unproven = []
+        for ref in linked:
+            issue, item_id = self._require(ref)
+            if issue["state"] != "open":
+                continue
+            try:
+                _proof_gate(item_id, "done", proof_show)
+            except ProofMissing:
+                unproven.append(item_id)
+        if unproven:
+            for item_id in unproven:
+                self.set_state(item_id, "changes-requested")
+                self.comment_add(
+                    item_id, "feedback",
+                    f"PR {pr} not merged: no proof recorded for {item_id}. "
+                    "Add proof with hv-proof-add, then run the review again.")
+            return None, [], unproven
+        sha = self.adapter.pr_merge(pr)
+        closed = []
+        for ref in linked:
+            issue, item_id = self._require(ref)
+            if issue["state"] == "open":
+                self.complete(item_id, sha[:7], date.today().isoformat(), "done", "", proof_show)
+            else:  # the host closed it on merge; it leaves the state label behind
+                self._apply_state(issue, None)
+            closed.append(item_id)
+        return sha, closed, unproven
+
     def ready_reasons(self, ref):
         """What is missing before work starts: [] when ready. Ready = acceptance
         criteria in the body (an Acceptance heading or a checkbox line) or a
