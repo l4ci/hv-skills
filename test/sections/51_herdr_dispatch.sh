@@ -106,7 +106,7 @@ grep -q "^tab create --workspace w9 --cwd $WT1 --label w1 --no-focus --env CLAUD
   || fail "tab create must adopt the slot worktree with the account env; log: $(cat "$FAKE/log")"
 grep -q '^agent start hv-w1-w9-t7 --kind claude --pane w9:p17 --timeout 60000 -- --model sonnet --dangerously-skip-permissions$' "$FAKE/log" \
   || fail "agent start must run claude in the new pane with the worker args; log: $(cat "$FAKE/log")"
-grep -q '^agent prompt hv-w1-w9-t7 do the task --wait --until working --until blocked --timeout 60000$' "$FAKE/log" \
+grep -q '^do the task --wait --until working --until blocked --timeout 60000$' "$FAKE/log" \
   || fail "the brief must be confirmed by working/blocked, not by waiting for the whole task; log: $(cat "$FAKE/log")"
 [ "$(slot_field w1 handle)" = "w9:t7" ] || fail "dispatch did not record the tab id as handle"
 [ "$(slot_field w1 task)" = "T1" ] || fail "dispatch did not record slot.task"
@@ -128,6 +128,8 @@ if grep -q '^tab \|^agent start' "$FAKE/log"; then
   fail "a relay must go into the running session, not a fresh one; log: $(cat "$FAKE/log")"
 fi
 grep -q 'ORCHESTRATOR RELAY' "$FAKE/last_prompt" || fail "relay text lost its ORCHESTRATOR RELAY marker"
+[ "$(head -n 1 "$FAKE/last_prompt")" = "--- ORCHESTRATOR (round 1) ---" ] \
+  || fail "a relay must open with the signature line, got: $(head -n 1 "$FAKE/last_prompt")"
 [ "$(slot_field w1 task)" = "T2" ] || fail "a relay must not change slot.task"
 python3 - "$TMP_HD/repo/.hv/workers.json" <<'PY'
 import json, sys
@@ -139,6 +141,36 @@ RC=0
 hd "$BIN/hv-worker-dispatch" --slot w2 --brief-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
 [ "$RC" = "3" ] || fail "relay into a never-dispatched herdr slot should exit 3, got $RC"
 pass "hv-worker-dispatch --relay reuses the live session and keeps the relay marker"
+
+# ── (b1) provenance: signature + relay log ──────────────────────────────────
+relays_json() { slot_field "$1" relays; }
+python3 - "$TMP_HD/repo/.hv/workers.json" <<'PY' || fail "relay was not logged as {round, ts, summary}"
+import json, sys
+r = json.load(open(sys.argv[1]))["slots"][0]["relays"]
+assert len(r) == 1 and r[0]["round"] == 1 and r[0]["summary"] == "do the task" and r[0]["ts"].endswith("Z"), r
+PY
+printf 'use the per-user cache\n' > "$TMP_HD/answer.md"
+hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/answer.md" --relay --round 3 >/dev/null \
+  || fail "relay with --round failed"
+[ "$(head -n 1 "$FAKE/last_prompt")" = "--- ORCHESTRATOR (round 3) ---" ] || fail "--round must set the signature"
+python3 - "$TMP_HD/repo/.hv/workers.json" <<'PY' || fail "relays[] must hold both relays, newest round 3 with its summary"
+import json, sys
+d = json.load(open(sys.argv[1]))
+r = d["slots"][0]["relays"]
+assert d["round"] == 3 and [x["round"] for x in r] == [1, 3] and r[1]["summary"] == "use the per-user cache", d
+PY
+# A task brief is signed too, and a new task starts a clean relay log.
+hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --task T3 >/dev/null \
+  || fail "T3 dispatch failed"
+[ "$(head -n 1 "$FAKE/last_prompt")" = "--- ORCHESTRATOR (round 3) ---" ] \
+  || fail "a task brief must open with the signature, got: $(head -n 1 "$FAKE/last_prompt")"
+[ "$(relays_json w1)" = "[]" ] || fail "a new task dispatch must reset relays[], got $(relays_json w1)"
+# A refused relay (dialog up, nothing sent) is not logged.
+echo agent_blocked > "$FAKE/prompt_error"
+hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/answer.md" --relay >/dev/null 2>&1 || true
+rm -f "$FAKE/prompt_error"
+[ "$(relays_json w1)" = "[]" ] || fail "a relay refused by a dialog must not be logged"
+pass "hv-worker-dispatch signs every payload with the round and logs relays in relays[]"
 
 RC=0
 ( cd "$TMP_HD/repo" && PATH="$FAKE/bin:$PATH" FAKE_HERDR="$FAKE" env -u HERDR_ENV \

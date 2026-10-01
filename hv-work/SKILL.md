@@ -440,7 +440,7 @@ Same brief, different transport. Write each task's brief to a file and dispatch 
 
 Two differences from the subagent path, and only two:
 
-1. **Prepend the standing worker contract** from [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) *The worker contract* (under herdr, plus the line in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md) *Worker contract additions*). A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through) must be in the brief text. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
+1. **Prepend the standing worker contract** from [`references/worker-contract.md`](../references/worker-contract.md) *The standing contract* (under herdr, plus the line in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md) *Worker contract additions*). A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through in an `## Approvals` PR section) must be in the brief text. `hv-worker-dispatch` signs the brief `--- ORCHESTRATOR (round N) ---`; pass `--round <N>` on the first dispatch of a round. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
 2. **The brief tells the worker to commit and open a PR** against the cycle branch, replacing the *"Do NOT run `git add` or `git commit`"* line. Keep the `**Suggested commit message:**` line — the worker uses it directly rather than the orchestrator.
 
 The brief **body** — Goal, Files, What to do, Known gotchas, Hard boundaries, Canonical terms, Critical constraints, Claims to verify — is byte-identical to the subagent path. Don't fork the template; a second copy drifts.
@@ -491,7 +491,7 @@ Loop until no slot is `BUSY`, routing each state as it appears. Each poll also w
   .hv/bin/hv-worker-dispatch --slot <wN> --brief-file <answer-file> --relay
   ```
 
-  **Always pass `--relay` when forwarding a user's answer.** It marks the text as coming from the orchestrator. Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
+  **Always pass `--relay` when forwarding a user's answer.** It signs the text as the orchestrator's and logs it in the slot's `relays[]`, which `hv-worker-gate` checks the PR's `## Approvals` against (exit 4 `PROVENANCE-FAIL`). Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
 
 - **`DEAD`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
 
@@ -721,6 +721,7 @@ Loop stops naturally when:
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
-| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Worker contract, pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"` (shared by `"herdr"`). |
+| [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
+| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"` (shared by `"herdr"`). |
 | [`herdr-dispatch.md`](../references/herdr-dispatch.md) | herdr host for worker dispatch: tabs as slots, startup dialogs, native agent-state mapping, `work.dispatch: "herdr"`. |
 | [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |

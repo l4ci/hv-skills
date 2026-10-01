@@ -24,8 +24,17 @@
 # it cannot perform — a gate that claims to have verified nothing is worse
 # than one that says so out loud.
 #
+# Between 1 and 2 sits a PROVENANCE check: the PR body's `## Approvals`
+# section is cross-checked against the slot's relays[] log (written by
+# hv-worker-dispatch --relay). A relay cited as the maintainer, a relay round
+# cited that was never sent, or no section at all while relays exist is a
+# PROVENANCE-FAIL. Nothing merges on a failed citation. It needs the slot's
+# recorded PR; without one (local-merge repos, no gh) it reports
+# PROVENANCE-SKIP, since there is no body to read.
+#
 # Tool: exit 0 gate passed (or --check-only and FRESH); exit 2 usage;
-#       exit 3 STALE / merge failure; exit 4 post-merge verification failed.
+#       exit 3 STALE / merge failure; exit 4 post-merge verification failed
+#       or PROVENANCE-FAIL.
 #
 # Usage:
 #   hv-worker-gate --slot <name> --base <cycle-branch> [--check-only] [--no-verify]
@@ -69,6 +78,54 @@ print("\t".join([slot.get("branch") or "", slot.get("pr") or ""]))
 PY
 )" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
 
+# ── Provenance ──────────────────────────────────────────────────────────────
+# check_provenance <pr> — exit 0 pass/skip, 1 on PROVENANCE-FAIL.
+check_provenance() {
+  local body
+  if [ -z "$1" ] || ! command -v gh >/dev/null 2>&1; then
+    echo "PROVENANCE-SKIP $SLOT — no recorded PR (or no gh) to read approvals from" >&2
+    return 0
+  fi
+  body="$(gh pr view "$1" --json body -q .body 2>/dev/null)" || {
+    echo "PROVENANCE-SKIP $SLOT — could not read the body of $1" >&2
+    return 0
+  }
+  printf '%s' "$body" | PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import re, sys
+from pathlib import Path
+from hvlib import load_json
+slot_name, registry = sys.argv[1:3]
+body = sys.stdin.read()
+slot = next(s for s in load_json(Path(registry), {"slots": []})["slots"] if s.get("name") == slot_name)
+relays = slot.get("relays") or []
+norm = lambda t: re.sub(r"\s+", " ", t.lower()).strip()
+m = re.search(r"^##\s+Approvals\s*$(.*?)(?=^##\s|\Z)", body, re.M | re.S | re.I)
+if m is None:
+    if relays:
+        print("PROVENANCE-FAIL %s: %d relay(s) logged but the PR body has no ## Approvals section" % (slot_name, len(relays)))
+        sys.exit(1)
+    sys.exit(0)
+rounds = {r.get("round") for r in relays}
+problems = []
+for line in filter(str.strip, m.group(1).splitlines()):
+    low = norm(line)
+    cited = re.search(r"orchestrator relay(?:\s+round\s+(\d+))?", low)
+    if cited:
+        n = cited.group(1)
+        if (int(n) not in rounds) if n else not relays:
+            problems.append("cites an orchestrator relay%s but none is logged: %s" % (" for round " + n if n else "", line.strip()))
+    elif "maintainer" in low:
+        for r in relays:
+            summary = norm(r.get("summary") or "")
+            if len(summary) >= 12 and (summary in low or low in summary):
+                problems.append("cites the maintainer for text the orchestrator relayed (round %s): %s" % (r.get("round"), line.strip()))
+                break
+if problems:
+    print("PROVENANCE-FAIL %s: %s" % (slot_name, "; ".join(problems)))
+    sys.exit(1)
+' "$SLOT" "$REGISTRY" >&2
+}
+
 IFS="$(printf '\t')" read -r BRANCH PR <<EOF
 $SLOT_INFO
 EOF
@@ -90,6 +147,8 @@ else
   echo "  bounce: tell slot $SLOT to \`git merge $BASE\` and re-verify, then re-gate" >&2
   exit 3
 fi
+
+check_provenance "$PR" || exit 4
 
 [ "$CHECK_ONLY" -eq 1 ] && exit 0
 

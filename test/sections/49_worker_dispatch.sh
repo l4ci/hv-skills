@@ -406,6 +406,50 @@ case "$GATE_OUT" in
 esac
 pass "hv-worker-gate reports NO-VERIFY rather than a pass it cannot back"
 
+# ── (c1) provenance check ───────────────────────────────────────────────────
+# The PR body comes from a fake `gh`; the relay log is written straight into the
+# registry, the way hv-worker-dispatch --relay does. Slot w3 is fresh against main.
+FAKEBIN="$TMP_WD/fakebin"; mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/gh" <<'SH'
+#!/usr/bin/env bash
+[ "$1 $2" = "pr view" ] && cat "$FAKE_PR_BODY"
+SH
+chmod +x "$FAKEBIN/gh"
+set_relays() {
+  python3 - "$TMP_WD/.hv/workers.json" "$1" <<'PYEOF' || fail "could not write relays fixture"
+import json, sys
+d = json.load(open(sys.argv[1]))
+s = [s for s in d["slots"] if s["name"] == "w3"][0]
+s["pr"] = "7"
+s["relays"] = json.loads(sys.argv[2])
+json.dump(d, open(sys.argv[1], "w"))
+PYEOF
+}
+prov() {  # prov <body> -> exit code of the check
+  printf '%s' "$1" > "$TMP_WD/pr_body.md"
+  local rc=0
+  ( cd "$TMP_WD" && PATH="$FAKEBIN:$PATH" FAKE_PR_BODY="$TMP_WD/pr_body.md" \
+      "$BIN/hv-worker-gate" --slot w3 --base main --check-only ) >"$TMP_WD/prov.out" 2>&1 || rc=$?
+  echo "$rc"
+}
+RELAYS='[{"round":2,"ts":"2026-10-01T08:00:00Z","summary":"use the per-user cache"}]'
+set_relays "$RELAYS"
+[ "$(prov $'## Summary\nx\n\n## Approvals\n- per-user cache: orchestrator relay round 2\n- naming of flag: my call, unratified\n')" = "0" ] \
+  || fail "a correctly cited relay must pass: $(cat "$TMP_WD/prov.out")"
+[ "$(prov $'## Approvals\n- use the per-user cache: maintainer in pane\n')" = "4" ] \
+  || fail "a relay cited as the maintainer must fail (inflation)"
+grep -q PROVENANCE-FAIL "$TMP_WD/prov.out" || fail "inflation must print PROVENANCE-FAIL"
+[ "$(prov $'## Approvals\n- drop the legacy path: orchestrator relay round 9\n')" = "4" ] \
+  || fail "a relay round that was never logged must fail (deflation)"
+[ "$(prov $'## Summary\nno approvals here\n')" = "4" ] \
+  || fail "no ## Approvals section with a relay recorded must fail"
+[ "$(prov $'## Approvals\n- schema choice: maintainer in pane\n')" = "0" ] \
+  || fail "a maintainer citation that matches no relay must pass"
+set_relays '[]'
+[ "$(prov $'## Summary\nno approvals needed\n')" = "0" ] \
+  || fail "no relays and no section must pass: $(cat "$TMP_WD/prov.out")"
+pass "hv-worker-gate --check-only exits 4 PROVENANCE-FAIL on inflation, deflation and a missing section"
+
 # ── usage contract ──────────────────────────────────────────────────────────
 # Bare invocation is a usage error for pool/gate/dispatch. It is NOT one for
 # hv-worker-poll — polling every slot is its default — so that helper is

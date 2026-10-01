@@ -4,7 +4,7 @@ Used by `/hv-work` Steps 5, 6, 7, and 7.5 when `work.dispatch: "herdr"`. Under t
 
 The herdr backend is the tmux backend on a different host. Each worker is its own Claude Code session in its own `git worktree`, on its own branch, opening a PR against the cycle branch. The difference is where the session lives: a **herdr tab** in the orchestrator's own workspace instead of a tmux window. herdr recognises the agent running in each tab and reports its state natively, which removes most of the guesswork tmux needs.
 
-Everything that is about the *workers* rather than the *host* is shared with tmux and lives in [`tmux-dispatch.md`](tmux-dispatch.md): [the worker contract](tmux-dispatch.md#the-worker-contract), [escalating and relaying](tmux-dispatch.md#escalating-and-relaying), [the merge gate](tmux-dispatch.md#the-merge-gate), [permissions](tmux-dispatch.md#permissions) and [accounts](tmux-dispatch.md#accounts). This file covers only what herdr changes.
+Everything that is about the *workers* rather than the *host* is shared with tmux and lives in [`worker-contract.md`](worker-contract.md) (the standing contract and [provenance](worker-contract.md#provenance)) and [`tmux-dispatch.md`](tmux-dispatch.md): [escalating and relaying](tmux-dispatch.md#escalating-and-relaying), [the merge gate](tmux-dispatch.md#the-merge-gate), [permissions](tmux-dispatch.md#permissions) and [accounts](tmux-dispatch.md#accounts). This file covers only what herdr changes.
 
 Helpers: the same four (`hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`) plus `hv-worker-session`. They source `bin/hv-host-herdr.sh` instead of `bin/hv-host-tmux.sh`; `bin/hv-host-select.sh` picks one from `work.dispatch`.
 
@@ -76,7 +76,7 @@ On both hosts, live polls write `slot.state` (lowercased hv state) and, when `HV
 
 ## Worker contract additions
 
-Append to the [standing contract](tmux-dispatch.md#the-worker-contract) under herdr:
+Append to the [standing contract](worker-contract.md#the-standing-contract) under herdr:
 
 ```
 - You are in a herdr tab. Never `herdr agent rename` yourself, never close a
@@ -92,4 +92,5 @@ Append to the [standing contract](tmux-dispatch.md#the-worker-contract) under he
 
 ## See also
 
-- [`tmux-dispatch.md`](tmux-dispatch.md): the worker contract, relay, merge gate, permissions, accounts and failure modes both hosts share.
+- [`worker-contract.md`](worker-contract.md): the standing worker contract and approval provenance.
+- [`tmux-dispatch.md`](tmux-dispatch.md): relay, merge gate, permissions, accounts and failure modes both hosts share.
