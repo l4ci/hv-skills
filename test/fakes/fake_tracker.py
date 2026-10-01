@@ -36,7 +36,8 @@ def load():
             return json.load(f)
     except FileNotFoundError:
         return {"next_issue": 1, "next_milestone": 1, "next_comment": 1,
-                "issues": [], "labels": [], "milestones": []}
+                "issues": [], "labels": [], "milestones": [], "prs": [],
+                "next_mr": 1}
 
 
 def save(db):
@@ -149,6 +150,93 @@ def split_labels(vals):
     for v in vals:
         out += [x for x in v.split(",") if x]
     return out
+
+
+# ---------------------------------------------------------------- pull / merge requests
+def new_pr(db, tool, title, body, head, base):
+    """gh PRs share the issue counter (as on GitHub); glab MRs have their own."""
+    key = "next_issue" if tool == "gh" else "next_mr"
+    n = db.get(key, 1)
+    db[key] = n + 1
+    pr = {"number": n, "title": title, "body": body or "", "head": head, "base": base,
+          "state": "open"}
+    db.setdefault("prs", []).append(pr)
+    return pr
+
+
+def gh_pr(p):
+    return {"number": p["number"], "title": p["title"], "body": p["body"],
+            "headRefName": p["head"], "baseRefName": p["base"], "state": p["state"].upper(),
+            "url": "https://github.com/fake/repo/pull/%d" % p["number"]}
+
+
+def gl_mr(p):
+    return {"iid": p["number"], "title": p["title"], "description": p["body"],
+            "source_branch": p["head"], "target_branch": p["base"],
+            "state": "opened" if p["state"] == "open" else p["state"],
+            "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
+
+
+GH_PR_FLAGS = {"--title": "title", "-t": "title", "--body": "body", "-b": "body",
+               "--body-file": "body_file", "-F": "body_file", "--base": "base", "-B": "base",
+               "--head": "head", "-H": "head", "--json": "json", "--state": "state", "-s": "state",
+               "--limit": "limit", "-L": "limit"}
+
+
+def gh_pr_cmd(db, args):
+    verb = args[0]
+    o, b, pos = parse(args[1:], GH_PR_FLAGS)
+    fields = split_labels(o.get("json", []))
+    prs = [p for p in db.get("prs", []) if not p.get("mr")]
+    if verb == "create":
+        head = one(o, "head") or "HEAD"
+        p = new_pr(db, "gh", one(o, "title", ""), text_arg(o, "body", "body_file"), head,
+                   one(o, "base", "main"))
+        save(db)
+        print(gh_pr(p)["url"])
+    elif verb == "list":
+        state = one(o, "state", "open")
+        rows = [p for p in prs if state == "all" or p["state"] == state]
+        rows.sort(key=lambda p: -p["number"])
+        emit([pick(gh_pr(p), fields) for p in rows[:int(one(o, "limit", 30))]])
+    elif verb == "view":
+        want = pos[0]
+        hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
+        if not hit:
+            raise Fail("no pull requests found for %s" % want)
+        emit(pick(gh_pr(hit[-1]), fields)) if fields else print("title:\t%s" % hit[-1]["title"])
+    else:
+        raise Fail("unsupported", 2)
+
+
+GL_MR_FLAGS = {"--title": "title", "-t": "title", "--description": "desc", "-d": "desc",
+               "--source-branch": "head", "-s": "head", "--target-branch": "base", "-b": "base",
+               "--output": "output", "-O": "output", "--per-page": "per_page", "-P": "per_page",
+               "--state": "state"}
+
+
+def gl_mr_cmd(db, args):
+    verb = args[0]
+    o, b, pos = parse(args[1:], GL_MR_FLAGS, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--merged", "-M"))
+    prs = [p for p in db.get("prs", []) if p.get("mr")]
+    if verb == "create":
+        p = new_pr(db, "glab", one(o, "title", ""), one(o, "desc"), one(o, "head", "HEAD"),
+                   one(o, "base", "main"))
+        p["mr"] = True
+        save(db)
+        print(gl_mr(p)["web_url"])
+    elif verb == "list":
+        rows = [p for p in prs if ("--all" in b or "-A" in b) or p["state"] == "open"]
+        rows.sort(key=lambda p: -p["number"])
+        emit([gl_mr(p) for p in rows[:int(one(o, "per_page", 30))]])
+    elif verb == "view":
+        want = pos[0]
+        hit = [p for p in prs if str(p["number"]) == want.lstrip("#") or p["head"] == want]
+        if not hit:
+            raise Fail("404 Not Found")
+        emit(gl_mr(hit[-1]))
+    else:
+        raise Fail("unsupported", 2)
 
 
 # ---------------------------------------------------------------- gh
@@ -351,6 +439,8 @@ def run_gh(db, args):
         return
     if args and args[0] == "issue" and len(args) > 1:
         return gh_issue_cmd(db, args[1:])
+    if args and args[0] == "pr" and len(args) > 1:
+        return gh_pr_cmd(db, args[1:])
     if args and args[0] == "label" and len(args) > 1:
         return gh_label_cmd(db, args[1:])
     if args and args[0] == "api":
@@ -545,6 +635,8 @@ def run_glab(db, args):
         return
     if args and args[0] == "issue" and len(args) > 1:
         return gl_issue_cmd(db, args[1:])
+    if args and args[0] == "mr" and len(args) > 1:
+        return gl_mr_cmd(db, args[1:])
     if args and args[0] == "label" and len(args) > 1:
         return gl_label_cmd(db, args[1:])
     if args and args[0] == "api":
