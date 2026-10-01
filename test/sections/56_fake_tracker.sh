@@ -70,8 +70,8 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   py "$(gh issue view 1 --json comments)" "len(d['comments'])==3" || fail "gh close --comment adds a comment"
   gh issue reopen 1
   py "$(gh issue view 1 --json state,closedAt)" "d=={'state':'OPEN','closedAt':None}" || fail "gh reopen"
-  rc=0; gh pr merge 1 2>"$TMP_FT/err" || rc=$?
-  [ "$rc" = 2 ] && grep -q "fake gh: unsupported: pr merge" "$TMP_FT/err" || fail "gh unsupported should exit 2 with message"
+  rc=0; gh pr review 1 2>"$TMP_FT/err" || rc=$?
+  [ "$rc" = 2 ] && grep -q "fake gh: unsupported: pr review" "$TMP_FT/err" || fail "gh unsupported should exit 2 with message"
   FAKE_TRACKER_FAIL="issue view 99" rc=0 gh issue view 99 --json number 2>/dev/null || rc=$?
   [ "$rc" = 1 ] || fail "FAKE_TRACKER_FAIL should force exit 1"
   grep -q "^issue create --title First" "$TMP_FT/gh.log" || fail "argv log should record calls"
@@ -125,8 +125,8 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   py "$(glab issue list --all -O json)" "[x['iid'] for x in d]==[2,1]" || fail "glab --all"
   glab issue reopen 1
   py "$(glab issue view 1 -O json)" "d['state']=='opened' and d['closed_at'] is None" || fail "glab reopen"
-  rc=0; glab mr merge 1 2>"$TMP_FT/err" || rc=$?
-  [ "$rc" = 2 ] && grep -q "fake glab: unsupported: mr merge" "$TMP_FT/err" || fail "glab unsupported should exit 2"
+  rc=0; glab mr approve 1 2>"$TMP_FT/err" || rc=$?
+  [ "$rc" = 2 ] && grep -q "fake glab: unsupported: mr approve" "$TMP_FT/err" || fail "glab unsupported should exit 2"
   rc=0; FAKE_TRACKER_FAIL="issue close" glab issue close 2 2>/dev/null || rc=$?
   [ "$rc" = 1 ] || fail "glab FAKE_TRACKER_FAIL"
   pass "glab: close/reopen, failure injection, unsupported"
@@ -151,6 +151,19 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
     || fail "glab mr list shape"
   py "$(glab mr view 1 --output json)" "d['source_branch']=='feat/y'" || fail "glab mr view"
   pass "fake gh pr / glab mr: create, list, view"
+
+  # checkout / merge / comment / note: merge records a sha and closes linked issues only on base main
+  gh pr create --title "PR two" --body "Closes #1" --base dev --head feat/dev >/dev/null
+  gh pr merge 3 --merge --delete-branch
+  py "$(gh pr view 3 --json state,mergeCommit)" "d['state']=='MERGED' and len(d['mergeCommit']['oid'])==40" || fail "gh pr merge state/sha"
+  py "$(gh issue view 1 --json state)" "d['state']=='OPEN'" || fail "merge into a non-default base must not auto-close"
+  gh pr create --title "PR three" --body "Fixes: #1" --head feat/z >/dev/null
+  gh pr merge 4 --merge
+  py "$(gh issue view 1 --json state)" "d['state']=='CLOSED'" || fail "merge into main should auto-close"
+  gh pr comment 2 --body-file - <<<"note" && py "$(cat "$FAKE_TRACKER_DB")" "d['prs'][0]['comments']==['note\n']" || fail "gh pr comment"
+  glab mr note 1 --message "n1" && glab mr merge 1 --yes --remove-source-branch
+  py "$(glab mr view 1 --output json)" "d['state']=='merged' and len(d['merge_commit_sha'])==40" || fail "glab mr merge"
+  pass "fake gh pr / glab mr: merge, comment, auto-close on main"
 )
 
 # hv-tracker-call drives the fakes
