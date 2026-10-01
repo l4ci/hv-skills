@@ -1,6 +1,7 @@
 # TODO
 
 ## Bugs
+- **[B30] [P2] hv-summary "Recent" shows the oldest completions.** `hv-complete` appends Done lines at the end of `## Completed` (FileBackend.complete), but `hv-summary` prints `pairs[:3]`, the first three, which are the oldest. Pick the newest by date, or insert at the top of the section. Found by an M07-S02 worker; issue mode renders newest first, so it is correct there. Since: 41c4611
 
 ## Features
 - **[F82] [Major] Issue-tracker backend (`backlog.backend: "issues"`).** Config-switchable mode where GitHub/GitLab issues replace .hv/BACKLOG.md: capture creates issues, hv-next/hv-work select from them, hv-vision makes milestones as epic issues with sub/linked issues, feedback/questions/decisions go to issue comments so later sessions resume with context, hv-work labels in-progress and opens clean PRs/MRs, hv-review works the needs-review queue, hv-release checks labels. File backend stays default and unchanged. Since: 5bd7eac Milestone: M07
