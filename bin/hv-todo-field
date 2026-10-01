@@ -30,25 +30,23 @@ fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$DUMP" <<'PY'
 import json
-import re
 import sys
-from hvlib import find_origin_bullet, parse_todo_fields, load_backlog_corpus, parse_done_line
+from hvlib import get_backend, BackendUnavailable
 
 iid, field, dump = sys.argv[1], sys.argv[2], sys.argv[3]
 VALID = ("title", "detail", "related", "milestone", "repos", "subsystem", "since", "reason", "note")
 
-corpus = load_backlog_corpus(".")
-result = find_origin_bullet(corpus, iid)
-if result is None:
+try:
+    backend = get_backend()
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-todo-field: {e}\n"); sys.exit(2)
+except ValueError as e:
+    sys.stderr.write(f"error: hv-todo-field: {e}\n"); sys.exit(1)
+fields = backend.fields(iid)
+if fields is None:
     sys.stderr.write(f"error: [{iid}] not found in BACKLOG.md or ARCHIVE.md\n")
     sys.exit(1)
-line, title = result
-fields = parse_todo_fields(line)
-# Closure reason/note live on the Done marker, which find_origin_bullet strips.
-m = re.search(rf"^- ~~\*\*\[{re.escape(iid)}\].*$", corpus, re.MULTILINE)
-done = parse_done_line(m.group(0)) if m else None
-fields["reason"] = done["reason"] if done else ""
-fields["note"] = done["note"] if done else ""
+title = fields["title"]
 
 if dump:
     payload = {"title": title}
@@ -63,8 +61,5 @@ if field not in VALID:
     sys.stderr.write(f"error: {field} is not a valid field; pick one of {'/'.join(VALID)}\n")
     sys.exit(1)
 
-if field == "title":
-    print(title)
-else:
-    print(fields.get(field, ""))
+print(fields.get(field, ""))
 PY

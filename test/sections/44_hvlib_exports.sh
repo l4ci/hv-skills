@@ -21,7 +21,7 @@ import hvlib
 
 NAMES = [
     "ALL_BACKLOG_SECTIONS",
-    "BACKLOG_FILE",
+    "BackendUnavailable",
     "CONFIG_KEYS",
     "COUNTABLE_TYPES",
     "VERSION_KIND_REGISTRY",
@@ -32,6 +32,7 @@ NAMES = [
     "check_alias_collisions",
     "collect_cross_refs",
     "compute_managed_block_inputs",
+    "config_value",
     "detail_dir_for_id",
     "detect_version_kind",
     "dump_json_atomic",
@@ -41,6 +42,7 @@ NAMES = [
     "find_origin_bullet",
     "find_section",
     "format_done_line",
+    "get_backend",
     "get_version_or_die",
     "git_mtime",
     "infer_version_kind",
@@ -80,7 +82,6 @@ NAMES = [
     "section",
     "section_name_for_dir",
     "section_name_for_id",
-    "set_todo_field",
     "split_csv_list",
     "strip_bullet_from_content",
     "update_frontmatter_field",

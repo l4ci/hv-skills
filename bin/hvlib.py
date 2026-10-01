@@ -17,6 +17,7 @@ from hvlib_io import (
     load_json, load_config, read_or_empty, write_text_atomic, dump_json_atomic, update_json,
     load_sidecar, locked,
 )
+from hvlib_backend import get_backend, FileBackend, BackendUnavailable
 from hvlib_config import CONFIG_KEYS, config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
 from hvlib_types import (
     ITEM_TYPES, OPEN_SECTIONS, ALL_BACKLOG_SECTIONS,

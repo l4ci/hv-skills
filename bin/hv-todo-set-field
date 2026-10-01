@@ -26,39 +26,24 @@ FIELD="$2"
 VALUE="$3"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$ID" "$FIELD" "$VALUE" <<'PY'
-import re
 import sys
-from pathlib import Path
 
-from hvlib import BACKLOG_FILE, set_todo_field, write_text_atomic
+from hvlib import get_backend, BackendUnavailable
 
 iid, field, value = sys.argv[1], sys.argv[2], sys.argv[3]
 
-path = Path(".hv") / BACKLOG_FILE
-if not path.exists():
-    sys.stderr.write(f"error: {path} not found\n")
-    sys.exit(1)
-content = path.read_text()
-
-# Open bullet only: `- **[ID] ...`. Done lines start `- ~~**[` and won't match.
-bullet = re.compile(rf"^- \*\*\[{re.escape(iid)}\].*$", re.MULTILINE)
-m = bullet.search(content)
-if not m:
-    sys.stderr.write(
-        f"error: [{iid}] has no open bullet in .hv/{BACKLOG_FILE} "
-        f"(unknown, completed, or archived)\n"
-    )
-    sys.exit(1)
-
-raw_line = m.group(0)
 try:
-    new_line = set_todo_field(raw_line, field, value)
+    backend = get_backend()
+except BackendUnavailable as e:
+    sys.stderr.write(f"error: hv-todo-set-field: {e}\n"); sys.exit(2)
 except ValueError as e:
-    sys.stderr.write(f"error: {e}\n")
+    sys.stderr.write(f"error: hv-todo-set-field: {e}\n"); sys.exit(1)
+try:
+    backend.set_field(iid, field, value)
+except FileNotFoundError as e:
+    sys.stderr.write(f"error: {e} not found\n")
     sys.exit(1)
-
-if new_line == raw_line:
-    sys.exit(0)  # idempotent no-op — nothing to write
-
-write_text_atomic(path, content[: m.start()] + new_line + content[m.end():])
+except (LookupError, ValueError) as e:
+    sys.stderr.write(f"error: {e.args[0]}\n")
+    sys.exit(1)
 PY
