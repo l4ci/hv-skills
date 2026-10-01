@@ -158,8 +158,8 @@
     },
     "Build & Tooling: Smoke testing::Standalone smoke fixtures for preamble-sourcing helpers need .hv/ in the tempdir": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-10-01"
     },
     "Build & Tooling: Smoke testing::Smoke fixtures for dirty-tree-refusing helpers redirect stderr into $TMP_*/.hv/": {
       "tier": "provisional",
@@ -168,8 +168,8 @@
     },
     "Build & Tooling: Smoke testing::Smoke sections run only inside the runner; standalone needs an env-prep wrapper": {
       "tier": "provisional",
-      "hits": 1,
-      "lastSeen": "2026-06-11"
+      "hits": 2,
+      "lastSeen": "2026-10-01"
     },
     "Build & Tooling: Git & isolation::bg-isolation guard blocks main-thread Edits under /hv-work branch isolation": {
       "tier": "provisional",
@@ -218,8 +218,8 @@
     },
     "Architecture: Module extraction & migration safety::Flat-module extractions place functions by import-DAG, not nominal category": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-18"
+      "hits": 1,
+      "lastSeen": "2026-10-01"
     },
     "Architecture: Module extraction & migration safety::Deprecated-managed-block strip uses explicit allowlist, not heuristic 'not in v4 set'": {
       "tier": "provisional",
@@ -308,8 +308,8 @@
     },
     "Architecture: Helper conventions & invariants::Scope-axis additions keep the default path byte-identical via literal legacy resolution": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-19"
+      "hits": 1,
+      "lastSeen": "2026-10-01"
     },
     "Build & Tooling: Smoke testing::Behavior-changing tasks must sweep smoke sections asserting the old behavior": {
       "tier": "provisional",
@@ -318,8 +318,8 @@
     },
     "Build & Tooling: Smoke testing::Inverted grep assertion (grep && fail) aborts the section under set -e": {
       "tier": "provisional",
-      "hits": 0,
-      "lastSeen": "2026-05-19"
+      "hits": 1,
+      "lastSeen": "2026-10-01"
     },
     "Architecture: Helper conventions & invariants::Optional-value flags use `${PARAM:?$USAGE}` to reject bare trailing flag values": {
       "tier": "provisional",
