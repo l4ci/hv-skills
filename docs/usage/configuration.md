@@ -338,6 +338,27 @@ Override the base branch that `hv-base-branch` resolves to. When empty (the defa
 
 Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-review`, and `/hv-merge`) all call `hv-base-branch` and will pick up this override automatically.
 
+## Issues backend keys
+
+- **Keys:** `backlog.backend`, `issues.provider`, `issues.retryWaitSeconds`, `issues.labels.*`
+- **Required:** no. Existing configs stay valid without them.
+
+| Key | Default | Values |
+|-----|---------|--------|
+| `backlog.backend` | `"file"` | `"file"` or `"issues"`. `"issues"` is not available yet; it lands in M07-S02. |
+| `issues.provider` | `"auto"` | `"auto"`, `"github"` or `"gitlab"`. |
+| `issues.retryWaitSeconds` | `60` | Seconds to wait before retrying a failed tracker call. |
+| `issues.labels.inProgress` | `"in-progress"` | Label name. |
+| `issues.labels.needsReview` | `"needs-review"` | Label name. |
+| `issues.labels.changesRequested` | `"changes-requested"` | Label name. |
+| `issues.labels.released` | `"released"` | Label name. |
+| `issues.labels.notPlanned` | `"not-planned"` | Label name. |
+| `issues.labels.milestoneTracker` | `"milestone-tracker"` | Label name. |
+| `issues.labels.types.bug` / `.feature` / `.task` | `"type:bug"` / `"type:feature"` / `"type:task"` | Label names per item type. |
+| `issues.labels.priorityPrefix` | `"p"` | Prefix for priority labels. |
+
+`issues.label` is the legacy alias of `issues.labels.inProgress`. It is used when the new key is unset. `hv-config-show` lists all of these keys with their effective value and source.
+
 ## hvSkills.version (auto-managed)
 
 - **Type:** string
