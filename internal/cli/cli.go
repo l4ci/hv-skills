@@ -105,15 +105,33 @@ func (c *Ctx) RepoPath() (string, error) {
 // as name to absolute path (symlinks resolved when the path exists). The map
 // is empty outside umbrella mode.
 func (c *Ctx) Repos() (root string, repos map[string]string, err error) {
-	root, err = c.Root()
+	root, list, err := c.RepoList()
 	if err != nil {
 		return "", nil, err
 	}
 	repos = map[string]string{}
+	for _, r := range list {
+		repos[r.Name] = r.Path
+	}
+	return root, repos, nil
+}
+
+// Repo is one registered sub-repo: Rel as written in .hv/repos.json, Path
+// absolute with symlinks resolved when it exists.
+type Repo struct {
+	Name, Rel, Path string
+}
+
+// RepoList is Repos in registry order.
+func (c *Ctx) RepoList() (root string, list []Repo, err error) {
+	root, err = c.Root()
+	if err != nil {
+		return "", nil, err
+	}
 	if reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object); ok {
-		list, _ := reg.Get("repos")
-		entries, _ := list.([]any)
-		for _, e := range entries {
+		entries, _ := reg.Get("repos")
+		items, _ := entries.([]any)
+		for _, e := range items {
 			obj, ok := e.(*jsonx.Object)
 			if !ok {
 				continue
@@ -132,10 +150,10 @@ func (c *Ctx) Repos() (root string, repos map[string]string, err error) {
 			if real, err := filepath.EvalSymlinks(p); err == nil {
 				p = real
 			}
-			repos[n] = filepath.Clean(p)
+			list = append(list, Repo{Name: n, Rel: r, Path: filepath.Clean(p)})
 		}
 	}
-	return root, repos, nil
+	return root, list, nil
 }
 
 // globals are the flags every verb accepts (docs/design/5.0-cli-conventions.md,
