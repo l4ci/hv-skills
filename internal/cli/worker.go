@@ -574,7 +574,9 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		r, err := workerEnv().Gate(context.Background(), root, worker.GateOpts{Slot: slot, Base: *base, CheckOnly: *check, NoVerify: *noVerify})
+		ctx, stop := workerContext()
+		defer stop()
+		r, err := workerEnvCtx(ctx).Gate(ctx, root, worker.GateOpts{Slot: slot, Base: *base, CheckOnly: *check, NoVerify: *noVerify})
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}

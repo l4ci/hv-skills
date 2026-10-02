@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
@@ -191,7 +192,7 @@ type Env struct {
 	Forge func(provider, dir string, retryWait time.Duration) *tracker.CLI
 	// Shell runs one verification command through `sh -c` in dir and returns
 	// its combined output and exit code.
-	Shell func(dir, command string) (output string, code int)
+	Shell func(ctx context.Context, dir, command string) (output string, code int)
 }
 
 func (e Env) context() context.Context {
@@ -228,9 +229,14 @@ func (e Env) withDefaults() Env {
 	return e
 }
 
-func execShell(dir, command string) (string, int) {
-	cmd := exec.Command("sh", "-c", command)
+func execShell(ctx context.Context, dir, command string) (string, int) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = dir
+	// Own process group, killed whole on cancel: a killed sh leaves its child
+	// holding the output pipe, which would block Wait.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {

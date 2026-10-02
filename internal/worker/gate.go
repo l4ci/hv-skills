@@ -174,7 +174,10 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 		// The PR must be the thing that was just verified: open, aimed at the
 		// gate's base (a PR stacked on another worker's branch merges THERE, not
 		// here), and headed by the pushed commit.
-		g.verified, _ = e.git(root, "rev-parse", g.headRef)
+		var code int
+		if g.verified, code = e.git(root, "rev-parse", g.headRef); code != 0 || g.verified == "" {
+			return g.broke(fmt.Sprintf("git rev-parse %s failed (exit %d)", g.headRef, code))
+		}
 		info, ok := g.prInfo()
 		if !ok {
 			return g.broke(fmt.Sprintf("could not read PR %s from %s", g.prNum, g.provider))
@@ -194,8 +197,12 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 		}
 	}
 
-	if msg := g.checkProvenance(); msg != "" {
-		return g.verdict(GateProvenanceFail, msg, ""), nil
+	failMsg, brokeMsg := g.checkProvenance()
+	if brokeMsg != "" {
+		return g.broke(brokeMsg)
+	}
+	if failMsg != "" {
+		return g.verdict(GateProvenanceFail, failMsg, ""), nil
 	}
 	if o.CheckOnly {
 		res.Verdict = GateFresh
@@ -251,7 +258,7 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	logf.Close()
 	failed := false
 	for _, c := range cmds {
-		out, code := e.Shell(root, c)
+		out, code := e.Shell(ctx, root, c)
 		appendFile(logf.Name(), "== "+c+"\n"+out)
 		if code == 0 {
 			res.Verified = append(res.Verified, c)
@@ -443,20 +450,25 @@ func norm(s string) string {
 }
 
 // checkProvenance cross-checks the PR body's approvals against the slot's
-// relay log. It returns the PROVENANCE-FAIL message, "" for pass or skip.
-func (g *gate) checkProvenance() string {
+// relay log. It returns the PROVENANCE-FAIL message, or a check-broke message
+// when the PR body cannot be read; both "" for pass or skip.
+//
+// Only a missing forge CLI may skip. Reading the body failing for any other
+// reason (not authenticated, rate limited, PR gone, unparseable reply) used
+// to be a skip too, in the Python gate as well, so the gate merged without
+// having looked at the approvals. That fails open; here it is check-broke.
+func (g *gate) checkProvenance() (failMsg, brokeMsg string) {
 	if g.pr == "" {
 		g.res.Notes = append(g.res.Notes, fmt.Sprintf("PROVENANCE-SKIP %s — no recorded PR (or no %s) to read approvals from", g.o.Slot, g.cliName))
-		return ""
+		return "", ""
 	}
 	body, err := g.prBody()
 	if err != nil {
-		reason := fmt.Sprintf("could not read the body of %s", g.pr)
-		if strings.Contains(err.Error(), "is not installed") {
-			reason = fmt.Sprintf("no recorded PR (or no %s) to read approvals from", g.cliName)
+		if tracker.IsKind(err, tracker.KindUnavailable) && strings.Contains(err.Error(), "is not installed") {
+			g.res.Notes = append(g.res.Notes, fmt.Sprintf("PROVENANCE-SKIP %s — no %s to read approvals from", g.o.Slot, g.cliName))
+			return "", ""
 		}
-		g.res.Notes = append(g.res.Notes, fmt.Sprintf("PROVENANCE-SKIP %s — %s", g.o.Slot, reason))
-		return ""
+		return "", fmt.Sprintf("could not read the body of %s to check its approvals: %v", g.pr, err)
 	}
 	var relays []*jsonx.Object
 	if v, _ := g.slot.Get("relays"); v != nil {
@@ -471,9 +483,9 @@ func (g *gate) checkProvenance() string {
 	section, found := approvalsSection(body)
 	if !found {
 		if len(relays) > 0 {
-			return fmt.Sprintf("PROVENANCE-FAIL %s: %d relay(s) logged but the PR body has no ## Approvals section", g.o.Slot, len(relays))
+			return fmt.Sprintf("PROVENANCE-FAIL %s: %d relay(s) logged but the PR body has no ## Approvals section", g.o.Slot, len(relays)), ""
 		}
-		return ""
+		return "", ""
 	}
 	rounds := map[int]bool{}
 	for _, r := range relays {
@@ -512,9 +524,9 @@ func (g *gate) checkProvenance() string {
 		}
 	}
 	if len(problems) > 0 {
-		return fmt.Sprintf("PROVENANCE-FAIL %s: %s", g.o.Slot, strings.Join(problems, "; "))
+		return fmt.Sprintf("PROVENANCE-FAIL %s: %s", g.o.Slot, strings.Join(problems, "; ")), ""
 	}
-	return ""
+	return "", ""
 }
 
 // approvalsSection is the body of the `## Approvals` section: the lines after

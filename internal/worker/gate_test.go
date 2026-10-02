@@ -462,11 +462,11 @@ func (e Env) withForge(f func(provider, dir string) *tracker.CLI, brokenMergeBas
 		if realGit == nil {
 			realGit = ExecGit
 		}
-		e.Git = func(dir string, args ...string) (string, string, int, error) {
+		e.Git = func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
 			if len(args) > 0 && args[0] == "merge-base" {
 				return "", "", 128, nil
 			}
-			return realGit(dir, args...)
+			return realGit(ctx, dir, args...)
 		}
 	}
 	return e
@@ -486,12 +486,12 @@ func TestGateLocalMergeFailureIsAbortedAndReported(t *testing.T) {
 	if inner == nil {
 		inner = ExecGit
 	}
-	e.Git = func(dir string, args ...string) (string, string, int, error) {
+	e.Git = func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
 		seen = append(seen, strings.Join(args, " "))
 		if len(args) > 0 && args[0] == "merge" && args[1] == "--no-ff" {
 			return "", "conflict", 1, nil
 		}
-		return inner(dir, args...)
+		return inner(ctx, dir, args...)
 	}
 	res, err := e.Gate(bg, w.dir, GateOpts{Slot: "w1", Base: "main"})
 	if err != nil || res.Verdict != GateMergeFailed || !strings.Contains(res.Err, "merge of w1 into main conflicted") || res.Changed {
@@ -499,5 +499,98 @@ func TestGateLocalMergeFailureIsAbortedAndReported(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(seen, "\n"), "merge --abort") {
 		t.Errorf("the half-done merge was not aborted: %v", seen)
+	}
+}
+
+// The Python gate read an unreadable PR body as PROVENANCE-SKIP and merged
+// anyway (fail open). Only a missing forge CLI may skip now; any other read
+// error is check-broke and nothing merges.
+func TestGateProvenanceFailsClosedWhenTheBodyCannotBeRead(t *testing.T) {
+	for name, tc := range map[string]struct {
+		verdict string
+		wrap    func(c *tracker.CLI, w *world)
+	}{
+		"body read exits non-zero": {GateCheckBroke, func(c *tracker.CLI, w *world) {
+			inner := c.Exec
+			c.Exec = func(ctx context.Context, d, n string, a []string, in []byte) ([]byte, []byte, int, error) {
+				if strings.Contains(strings.Join(a, " "), "--json body") {
+					return nil, []byte("HTTP 502"), 1, nil
+				}
+				return inner(ctx, d, n, a, in)
+			}
+		}},
+		"not authenticated": {GateCheckBroke, func(c *tracker.CLI, w *world) {
+			inner := c.Exec
+			c.Exec = func(ctx context.Context, d, n string, a []string, in []byte) ([]byte, []byte, int, error) {
+				if strings.Contains(strings.Join(a, " "), "--json body") {
+					return nil, []byte("gh auth login"), 1, nil
+				}
+				return inner(ctx, d, n, a, in)
+			}
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, ghURL)
+			e := w.env(false)
+			forge := e.Forge
+			e.Forge = func(p, d string, r time.Duration) *tracker.CLI { c := forge(p, d, r); tc.wrap(c, w); return c }
+			res, err := e.Gate(bg, w.dir, GateOpts{Slot: "w1", Base: "main"})
+			if err != nil || res.Verdict != tc.verdict || res.Changed {
+				t.Fatalf("%+v %v", res, err)
+			}
+			if _, err := os.Stat(filepath.Join(w.dir, "work.txt")); err == nil {
+				t.Error("the gate merged without reading the approvals")
+			}
+			if strings.Contains(strings.Join(res.Notes, "\n"), "PROVENANCE-SKIP") {
+				t.Errorf("must not skip: %v", res.Notes)
+			}
+		})
+	}
+	// a missing CLI still skips (the old helper's one legitimate skip) and then
+	// the PR read fails, so the gate stops there instead
+	w := newWorld(t, ghURL)
+	e := w.env(false)
+	forge := e.Forge
+	e.Forge = func(p, d string, r time.Duration) *tracker.CLI {
+		c := forge(p, d, r)
+		c.LookPath = func(string) (string, error) { return "", os.ErrNotExist }
+		return c
+	}
+	res, _ := e.Gate(bg, w.dir, GateOpts{Slot: "w1", Base: "main", CheckOnly: true})
+	if res.Verdict != GateCheckBroke {
+		t.Errorf("PR info needs the CLI too: %+v", res)
+	}
+}
+
+func TestGateRevParseFailureIsCheckBroke(t *testing.T) {
+	w := newWorld(t, ghURL)
+	e := w.env(false)
+	e.Git = func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
+		if len(args) == 2 && args[0] == "rev-parse" && args[1] == "origin/w1" {
+			return "", "fatal", 128, nil
+		}
+		return ExecGit(ctx, dir, args...)
+	}
+	res, err := e.Gate(bg, w.dir, GateOpts{Slot: "w1", Base: "main", CheckOnly: true})
+	if err != nil || res.Verdict != GateCheckBroke || !strings.Contains(res.Err, "git rev-parse origin/w1 failed") {
+		t.Errorf("%+v %v", res, err)
+	}
+	if strings.Contains(w.logText(), "pr merge") {
+		t.Error("nothing may be merged")
+	}
+}
+
+func (w *world) logText() string { b, _ := os.ReadFile(w.log); return string(b) }
+
+func TestGateShellRunsUnderTheContext(t *testing.T) {
+	w := newWorld(t, "")
+	gitq(t, w.dir, "fetch", "-q", "origin", "w1:w1")
+	w.setConfig(`{"refactor":{"verifyCommands":["sleep 30"]}}`)
+	ctx, cancel := context.WithTimeout(bg, 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	res, err := w.env(false).Gate(ctx, w.dir, GateOpts{Slot: "w1", Base: "main"})
+	if err != nil || res.Verdict != GateVerifyFailed || time.Since(start) > 10*time.Second {
+		t.Errorf("a cancelled context must stop the verify command: %+v %v after %v", res, err, time.Since(start))
 	}
 }
