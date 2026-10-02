@@ -50,7 +50,9 @@ func (f *File) Corpus() string {
 
 // Get looks up an item by its exact ID ("B07"; B7 does not find B07), in the
 // backlog or the archive. Fields come from the origin line; Closed, Reason and
-// Note from the done line.
+// Note from the done line. Title is FileBackend.fields' title, which stops at
+// the first "." ("Fix v1.2" gives "Fix v1"): hv item field get prints it, so
+// it keeps the old helper's value; ParseOpen(Line) has the full title.
 func (f *File) Get(ref string) (*Item, error) {
 	corpus := f.Corpus()
 	line, title, ok := FindOrigin(corpus, ref)
@@ -62,7 +64,7 @@ func (f *File) Get(ref string) (*Item, error) {
 		it.Type = string(r)
 	}
 	if b, ok := ParseOpen("- " + line); ok {
-		it.Tag, it.Title = b.Tag, b.Title
+		it.Tag = b.Tag
 	}
 	// The closure reason lives on the done marker, which FindOrigin strips.
 	doneLine := regexp.MustCompile(`(?m)^- ~~\*\*\[` + regexp.QuoteMeta(ref) + `\].*$`).FindString(corpus)
@@ -128,7 +130,6 @@ func (f *File) NextID(kind string) (string, error) {
 		}
 	}
 	var next int
-	var floatCounter bool // a non-integer counter above every ID: Python bumps it, then fails to format it
 	err := fsio.UpdateJSON(f.hv("counters.json"), jsonx.NewObject(), func(v any) (any, error) {
 		d, ok := v.(*jsonx.Object)
 		if !ok {
@@ -136,23 +137,17 @@ func (f *File) NextID(kind string) (string, error) {
 		}
 		cur := 0
 		if raw, ok := d.Get(kind); ok {
-			num, isNum := raw.(json.Number)
-			if !isNum {
-				return nil, fmt.Errorf("counters.json: %s is not a number", kind)
-			}
+			num, _ := raw.(json.Number)
 			n, err := strconv.Atoi(string(num))
 			if err != nil {
+				// Python's max() lets a fractional counter through when an ID
+				// is higher; otherwise it writes the float and crashes. hv
+				// refuses before writing.
 				fl, ferr := strconv.ParseFloat(string(num), 64)
-				if ferr != nil {
-					return nil, fmt.Errorf("counters.json: %s is not a number", kind)
+				if ferr != nil || fl >= float64(highest) {
+					return nil, fmt.Errorf("counters.json: %s is not an integer", kind)
 				}
-				if float64(highest) > fl {
-					n = highest // max() picks the int, so the float never shows
-				} else {
-					floatCounter = true
-					d.Set(kind, json.Number(jsonx.PyFloat(fl+1)))
-					return d, nil
-				}
+				n = highest
 			}
 			cur = n
 		}
@@ -162,9 +157,6 @@ func (f *File) NextID(kind string) (string, error) {
 	})
 	if err != nil {
 		return "", err
-	}
-	if floatCounter {
-		return "", fmt.Errorf("counters.json: %s is not an integer", kind)
 	}
 	return fmt.Sprintf("%s%02d", prefix, next), nil
 }

@@ -97,7 +97,7 @@ for p in json.load(open(sys.argv[1])):
         line, title = find_origin_bullet(corpus, iid)
         b = parse_open_bullet("- " + line)
         f["tag"] = b["tag"] if b else ""
-        f["title"] = b["title"] if b else (title or "")
+        f["title"] = f["title"] or ""
         f["closed"] = f["reason"] != ""
         f["line"] = line
         r["items"].append(f)
@@ -182,7 +182,7 @@ func TestFileItemShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if it.Type != "B" || it.Tag != "P1" || it.Title != "Title. Part two" || it.Closed || it.Fields.Milestone != "M01" {
+	if it.Type != "B" || it.Tag != "P1" || it.Title != "Title" || it.Closed || it.Fields.Milestone != "M01" {
 		t.Fatalf("B07 = %+v", it)
 	}
 	it, err = f.Get("B09")
@@ -243,8 +243,6 @@ func TestNextIDMatchesPython(t *testing.T) {
 		{backlog, "", str(`{"bugs": "7"}`), []string{"bugs"}},
 		{backlog, "", str(`{"bugs": null}`), []string{"bugs"}},
 		{backlog, "", str(`{"bugs": 2.5}`), []string{"bugs"}},
-		{backlog, "", str(`{"bugs": 100.5, "x": 1}`), []string{"bugs", "features"}},
-		{backlog, "", str(`{"bugs": 1e2}`), []string{"bugs"}},
 		{backlog, "", nil, []string{"epics", "bugs"}},
 		{"", "", nil, []string{"tasks", "tasks"}},
 		{"[B٧٨] x [M12] [M3]", "", nil, []string{"bugs", "milestones"}},
@@ -288,4 +286,22 @@ func TestNextIDMatchesPython(t *testing.T) {
 	}
 	n := pytest.Compare(t, "next_id", inputs, got, w)
 	t.Logf("compared %d counter scenarios (%d IDs minted), counters.json byte for byte", n, ids)
+}
+
+// A fractional counter at or above every ID: Python writes the bumped float
+// and then crashes formatting it. hv refuses and leaves the file alone.
+func TestNextIDRefusesFractionalCounter(t *testing.T) {
+	for _, raw := range []string{`{"bugs": 1e2}`, `{"bugs": 100.5, "x": 1}`} {
+		root := t.TempDir()
+		hv := filepath.Join(root, ".hv")
+		os.MkdirAll(hv, 0o755)
+		os.WriteFile(filepath.Join(hv, "BACKLOG.md"), []byte("## Bugs\n- **[B07] a.**\n"), 0o644)
+		os.WriteFile(filepath.Join(hv, "counters.json"), []byte(raw), 0o644)
+		if id, err := (&File{Root: root}).NextID("bugs"); err == nil {
+			t.Fatalf("%s: NextID = %q, want an error", raw, id)
+		}
+		if got, _ := os.ReadFile(filepath.Join(hv, "counters.json")); string(got) != raw {
+			t.Fatalf("%s: counters.json rewritten to %s", raw, got)
+		}
+	}
 }
