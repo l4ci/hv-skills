@@ -97,6 +97,47 @@ func dseed78() map[string]any {
 	return db
 }
 
+// oracleStep is what the old side did for one run of a scenario.
+type oracleStep struct {
+	Code           int
+	Stdout, Stderr string
+	Tree           map[string]string // the .hv/ tree after the run
+	DB             map[string]any    // the forge database after the run
+}
+
+// oracle runs the scenario's old side (the shim) in a copy of base, or replays
+// it from the cache when none of its inputs changed (parity_cache_test.go).
+func (s dsc) oracle(t *testing.T, base string, in info, remote string, seed map[string]any) []oracleStep {
+	t.Helper()
+	type runIn struct {
+		Argv, Env []string
+	}
+	var runs []runIn
+	for _, r := range s.runs {
+		runs = append(runs, runIn{subst(r.argv, in), r.env})
+	}
+	key := oracleKey(t, map[string]any{"kind": "dsc", "project": projectDigest(base), "remote": remote, "seed": seed, "runs": runs})
+	var steps []oracleStep
+	if oracleLoad(key, &steps) && len(steps) == len(s.runs) {
+		return steps
+	}
+	steps = nil
+	refDir := copyTree(t, base)
+	refDB := filepath.Join(t.TempDir(), "ref.json")
+	if seed != nil {
+		raw, _ := json.Marshal(seed)
+		if err := os.WriteFile(refDB, raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, r := range runs {
+		run := envRun(t, refDir, "", append([]string{"FAKE_TRACKER_DB=" + refDB}, r.Env...), "python3", append([]string{shimPath}, r.Argv...)...)
+		steps = append(steps, oracleStep{run.code, run.stdout, run.stderr, snapshot(t, refDir), readDB(t, refDB)})
+	}
+	oracleStore(t, key, steps)
+	return steps
+}
+
 func (s dsc) exec(t *testing.T) {
 	t.Parallel()
 	f := s.fx
@@ -108,24 +149,24 @@ func (s dsc) exec(t *testing.T) {
 	if remote != "" {
 		git(t, base, "remote", "add", "origin", remote)
 	}
-	goDir, refDir := copyTree(t, base), copyTree(t, base)
-	dir := t.TempDir()
-	goDB, refDB := filepath.Join(dir, "go.json"), filepath.Join(dir, "ref.json")
+	var seed map[string]any
 	if s.db != nil {
-		if seed := s.db(); seed != nil {
-			raw, _ := json.Marshal(seed)
-			for _, p := range []string{goDB, refDB} {
-				if err := os.WriteFile(p, raw, 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
+		seed = s.db()
+	}
+	ref := s.oracle(t, base, in, remote, seed)
+	goDir := copyTree(t, base)
+	goDB := filepath.Join(t.TempDir(), "go.json")
+	if seed != nil {
+		raw, _ := json.Marshal(seed)
+		if err := os.WriteFile(goDB, raw, 0o644); err != nil {
+			t.Fatal(err)
 		}
 	}
 	for n, r := range s.runs {
 		argv := subst(r.argv, in)
 		tag := fmt.Sprintf("run %d %v", n+1, argv)
 		goRun := envRun(t, goDir, "", append([]string{"FAKE_TRACKER_DB=" + goDB}, r.env...), hvBin, argv...)
-		refRun := envRun(t, refDir, "", append([]string{"FAKE_TRACKER_DB=" + refDB}, r.env...), "python3", append([]string{shimPath}, argv...)...)
+		refRun := run{code: ref[n].Code, stdout: ref[n].Stdout, stderr: ref[n].Stderr}
 		if goRun.code != r.want {
 			t.Errorf("%s: go exit = %d, want %d\nstdout: %s\nstderr: %s", tag, goRun.code, r.want, goRun.stdout, goRun.stderr)
 		}
@@ -143,10 +184,10 @@ func (s dsc) exec(t *testing.T) {
 				t.Errorf("%s: error message %q does not contain %q", tag, msg, r.msgHas)
 			}
 		}
-		if d := diffTrees(snapshot(t, refDir), snapshot(t, goDir)); d != "" {
+		if d := diffTrees(ref[n].Tree, snapshot(t, goDir)); d != "" {
 			t.Errorf("%s: .hv/ trees differ:\n%s", tag, d)
 		}
-		gDB, rDB := readDB(t, goDB), readDB(t, refDB)
+		gDB, rDB := readDB(t, goDB), ref[n].DB
 		if r.skipDB {
 			if want := norm(s.db()); !reflect.DeepEqual(gDB, want) {
 				t.Errorf("%s: go changed the forge although it refused (%s)", tag, r.div)

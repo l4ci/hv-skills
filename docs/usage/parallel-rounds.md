@@ -25,6 +25,22 @@ run it on `origin/main` in a throwaway worktree before triaging your branch
 `test/runner.sh`, never executable alone. New sections take the number your dispatch assigns;
 do not pick one yourself, siblings are numbering theirs at the same time.
 
+The Go gate is `go vet ./...` and `go test -race -timeout 30m ./...` (the default 10m timeout can
+be hit on a loaded box, #120). Most of `cmd/hv`'s time is the parity suites, which run each scenario against the old
+Python helpers and the Go binary. The old side is frozen, so its results are cached on disk and a
+warm run replays them instead of starting python again; the Go side always runs, so a Go
+regression still fails against a warm cache.
+
+- The cache lives in `$HV_PARITY_CACHE` (default `<user cache dir>/hv-skills/parity-oracle`) and is
+  shared by every worker on the machine. A key covers the helper, shim and fake sources, the python
+  version, the day, the fixture project (files and git refs; fixtures commit at a fixed time of day)
+  and every run's arguments and environment, so a change to any of them is a miss, never a stale hit.
+- `HV_PARITY_ORACLE=fresh` re-runs the old side and refreshes the entries; `HV_PARITY_ORACLE=off`
+  skips the cache. Use `fresh` after touching `bin/`, `test/shim` or `test/fakes` only if you want
+  proof beyond the key, since those files are part of it.
+- A cold run (first of the day on a machine) costs about what the suite cost before; a warm run
+  takes about a third as long. Entries older than three days are pruned.
+
 There are no servers and no ports in this repo. The full suite is cheap enough that the
 worker gate and the orchestrator's merge gate are the same commands.
 

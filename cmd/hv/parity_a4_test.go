@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -59,6 +60,7 @@ func runMain(m *testing.M) int {
 		fmt.Fprintf(os.Stderr, "gh does not resolve into %s (got %q, %v); refusing to run\n", fakes, gh, err)
 		return 1
 	}
+	pruneOracleCache(3 * 24 * time.Hour)
 	harnessTmp, err = os.MkdirTemp("", "hv-parity-*")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -226,7 +228,11 @@ func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(baseEnv, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	// Fixed commit time (noon UTC of the harness day) so a fixture's hashes
+	// repeat from run to run; the oracle cache (parity_cache_test.go) keys on them.
+	when := startDay + "T12:00:00Z"
+	cmd.Env = append(append([]string{}, baseEnv...), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_AUTHOR_DATE="+when, "GIT_COMMITTER_DATE="+when)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -245,10 +251,59 @@ func write(t *testing.T, root, rel, content string) {
 	}
 }
 
-// build makes the fixture in a fresh temp dir and returns it with the hashes.
+// fxTemplates caches built fixtures for the process: most scenarios share a
+// handful of fixture shapes, and building one costs about twenty git calls.
+var fxTemplates = struct {
+	sync.Mutex
+	m map[string]*fxTemplate
+}{m: map[string]*fxTemplate{}}
+
+type fxTemplate struct {
+	once sync.Once
+	dir  string
+	in   info
+}
+
+// build returns a fresh copy of the fixture (a temp dir of the test) with the
+// hashes. The fixture is built once per distinct description; the after hook,
+// which the description cannot capture, runs on each copy.
 func (f fx) build(t *testing.T) (string, info) {
 	t.Helper()
-	dir := t.TempDir()
+	after := f.after
+	f.after = nil
+	key := fmt.Sprintf("%#v", f)
+	fxTemplates.Lock()
+	tpl := fxTemplates.m[key]
+	if tpl == nil {
+		tpl = &fxTemplate{}
+		fxTemplates.m[key] = tpl
+	}
+	fxTemplates.Unlock()
+	tpl.once.Do(func() {
+		dir, err := os.MkdirTemp(harnessTmp, "fx-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tpl.dir, tpl.in = dir, f.buildIn(t, dir)
+	})
+	if tpl.dir == "" {
+		t.Fatal("fixture template failed to build")
+	}
+	dir := copyTree(t, tpl.dir)
+	in := tpl.in
+	in.x = map[string]string{}
+	for k, v := range tpl.in.x {
+		in.x[k] = v
+	}
+	if after != nil {
+		after(t, dir, &in)
+	}
+	return dir, in
+}
+
+// buildIn makes the fixture in dir and returns the hashes.
+func (f fx) buildIn(t *testing.T, dir string) info {
+	t.Helper()
 	var in info
 	git(t, dir, "init", "-q", "-b", "main")
 	git(t, dir, "config", "user.name", "Fixture")
@@ -345,10 +400,7 @@ func (f fx) build(t *testing.T) (string, info) {
 		}
 		write(t, dir, ".hv/repos.json", `{"repos": [`+strings.Join(entries, ", ")+`]}`+"\n")
 	}
-	if f.after != nil {
-		f.after(t, dir, &in)
-	}
-	return dir, in
+	return in
 }
 
 func copyTree(t *testing.T, src string) string {
@@ -625,6 +677,71 @@ func copyEnv(t *testing.T, e envl) envl {
 	return out
 }
 
+// oracleCacheable: a scenario whose check reads the oracle's directory, or
+// whose prep or install layout the key cannot see, always runs the old side.
+func (s scn) oracleCacheable() bool {
+	return s.check == nil && s.prep == nil && s.oldBin == "" && s.bin == ""
+}
+
+// scnOracle is what the old side did for a scenario: the run, the .hv/ tree
+// it left and, for text scenarios, the plain stdout of a second run.
+type scnOracle struct {
+	Code           int
+	Stdout, Stderr string
+	Tree           map[string]string
+	Text           string
+}
+
+// oracle runs the scenario's old side in a copy of base, or replays it from
+// the cache when none of its inputs changed (parity_cache_test.go).
+func (s scn) oracle(t *testing.T, base string, in info, argv []string) (ref run, tree map[string]string, text string) {
+	t.Helper()
+	var plain []string
+	for _, a := range argv {
+		if a != "--json" {
+			plain = append(plain, a)
+		}
+	}
+	var old []string
+	if len(s.old) > 0 {
+		old = subst(s.old, in)
+	}
+	runOld := func(dir string, args []string, oldArgs []string) run {
+		if len(old) > 0 {
+			return exec1e(t, filepath.Join(dir, s.cwd), s.in, s.env, s.oldPath(old[0]), oldArgs...)
+		}
+		return exec1e(t, filepath.Join(dir, s.cwd), s.in, s.env, "python3", append([]string{shimPath}, args...)...)
+	}
+	var oldTail []string
+	if len(old) > 0 {
+		oldTail = old[1:]
+	}
+	cacheable := s.oracleCacheable()
+	var key string
+	if cacheable {
+		key = oracleKey(t, map[string]any{"kind": "scn", "project": projectDigest(base), "argv": argv, "old": old,
+			"in": s.in, "env": s.env, "cwd": s.cwd, "text": s.text, "div": s.div})
+		var c scnOracle
+		if oracleLoad(key, &c) {
+			return run{code: c.Code, stdout: c.Stdout, stderr: c.Stderr}, c.Tree, c.Text
+		}
+	}
+	refDir := copyTree(t, base)
+	if s.prep != nil {
+		s.prep(t, refDir)
+	}
+	ref = runOld(refDir, argv, oldTail)
+	ref.dir = refDir
+	tree = snapshot(t, refDir)
+	if s.text {
+		text = runOld(refDir, plain, oldTail).stdout
+	}
+	if cacheable {
+		oracleStore(t, key, scnOracle{ref.code, ref.stdout, ref.stderr, tree, text})
+	}
+	return ref, tree, text
+}
+
 func (s scn) exec(t *testing.T) {
 	t.Parallel()
 	base, in := s.fx.build(t)
@@ -649,24 +766,15 @@ func (s scn) exec(t *testing.T) {
 		}
 		return
 	}
-	refDir := copyTree(t, base)
-	if s.prep != nil {
-		s.prep(t, refDir)
-	}
-	var ref run
+	ref, refTree, refText := s.oracle(t, base, in, argv)
 	var refCode int
 	if len(s.old) > 0 {
-		old := subst(s.old, in)
-		ref = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, s.oldPath(old[0]), old[1:]...)
-		ref.dir = refDir
 		m := s.oldMap
 		if m == nil {
 			m = mapOld
 		}
 		refCode = m(ref.code, ref.stderr)
 	} else {
-		ref = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, "python3", append([]string{shimPath}, argv...)...)
-		ref.dir = refDir
 		refCode = ref.code
 	}
 	if s.div != "" {
@@ -677,7 +785,7 @@ func (s scn) exec(t *testing.T) {
 		t.Errorf("exit differs: reference %d, go %d\nargv: %v\nref stdout: %s\nref stderr: %s\ngo stdout: %s\ngo stderr: %s",
 			refCode, goRun.code, argv, ref.stdout, ref.stderr, goRun.stdout, goRun.stderr)
 	}
-	refTree, goTree := snapshot(t, refDir), snapshot(t, goDir)
+	goTree := snapshot(t, goDir)
 	if s.normTS {
 		refTree, goTree = normTree(refTree), normTree(goTree)
 	}
@@ -716,15 +824,8 @@ func (s scn) exec(t *testing.T) {
 			}
 		}
 		gt := exec1e(t, filepath.Join(goDir, s.cwd), s.in, s.env, s.goBin(), plain...)
-		var rt run
-		if len(s.old) > 0 {
-			old := subst(s.old, in)
-			rt = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, s.oldPath(old[0]), old[1:]...)
-		} else {
-			rt = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, "python3", append([]string{shimPath}, plain...)...)
-		}
-		if gt.stdout != rt.stdout {
-			t.Errorf("text output differs\nargv: %v\nref:\n%q\ngo:\n%q", plain, rt.stdout, gt.stdout)
+		if gt.stdout != refText {
+			t.Errorf("text output differs\nargv: %v\nref:\n%q\ngo:\n%q", plain, refText, gt.stdout)
 		}
 	}
 	goEnv["__info"] = in
