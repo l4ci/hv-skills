@@ -363,7 +363,7 @@ created: 2026-05-09
 Capture flow.
 
 ## Entry points
-- bin/hv-bootstrap:1 — broken ref (file does not exist in fixture)
+- scripts/bootstrap:1 — broken ref (file does not exist in fixture)
 EOF
   cat > .hv/map/work.md <<'EOF'
 ---
