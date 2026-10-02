@@ -136,7 +136,8 @@ done
   eq "status shipped exit" "0" "$RCV"
   eq "shipped closes every repo" "M05 — Alpha:closed,M06 — Beta:open|M04 — Legacy:open,M05 — Alpha:closed" "$(NATIVE ghrepo)|$(NATIVE glrepo)"
   eq "list shipped" "shipped" "$(LSTAT)"
-  GLM="$(DB glrepo '[m["number"] for m in d["milestones"] if m["title"].startswith("M05")][0]')"
+  # glab addresses a milestone by its global id, which the milestone list reports
+  GLM="$(hvj tracker call --repo glrepo -- api projects/:id/milestones | jget data.stdout | python3 -c 'import json,sys; print([m["id"] for m in json.load(sys.stdin) if m["title"].startswith("M05")][0])')"
   RC hvj tracker call --repo glrepo -- api -X PUT "projects/:id/milestones/$GLM" -f state_event=activate
   eq "reopen one repo exit" "0" "$RCV"
   eq "list active while a repo is open" "active" "$(LSTAT)"
