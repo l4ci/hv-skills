@@ -38,7 +38,7 @@ func Query(root, dir string, names []string) (text string, missing []string, err
 		if err != nil {
 			return "", nil, err
 		}
-		_, body := frontmatter.Parse(string(raw))
+		_, _, body := frontmatter.Parse(string(raw))
 		body = strings.TrimRight(body, "\n")
 		if body == "" {
 			continue
@@ -55,7 +55,7 @@ func Query(root, dir string, names []string) (text string, missing []string, err
 // entry is one parsed .hv/map/*.md file.
 type entry struct {
 	name string
-	fm   frontmatter.Fields
+	fm   map[string]any
 	body string
 	path string
 }
@@ -70,8 +70,8 @@ func mapEntries(dir string) []entry {
 		if err != nil {
 			continue
 		}
-		fm, body := frontmatter.Parse(string(raw))
-		if name := fm.String("subsystem"); name != "" {
+		fm, _, body := frontmatter.Parse(string(raw))
+		if name := frontmatter.Str(fm, "subsystem"); name != "" {
 			out = append(out, entry{name, fm, body, f})
 		}
 	}
@@ -93,7 +93,7 @@ func MapIndexBlock(root string) string {
 	if len(entries) > 0 {
 		lines := make([]string, len(entries))
 		for i, e := range entries {
-			lines[i] = fmt.Sprintf("- **%s** — %s", e.name, orDefault(e.fm.String("summary"), "(no summary)"))
+			lines[i] = fmt.Sprintf("- **%s** — %s", e.name, orDefault(frontmatter.Str(e.fm, "summary"), "(no summary)"))
 		}
 		bullets = strings.Join(lines, "\n")
 	}
@@ -112,9 +112,9 @@ func QAIndexBlock(root string) string {
 			if err != nil {
 				continue
 			}
-			fm, _ := frontmatter.Parse(string(raw))
+			fm, _, _ := frontmatter.Parse(string(raw))
 			name := strings.TrimSuffix(filepath.Base(f), ".md")
-			lines = append(lines, fmt.Sprintf("- **%s** (%s) — %s", name, orDefault(fm.String("surface"), "?"), orDefault(fm.String("summary"), "(no summary)")))
+			lines = append(lines, fmt.Sprintf("- **%s** (%s) — %s", name, orDefault(frontmatter.Str(fm, "surface"), "?"), orDefault(frontmatter.Str(fm, "summary"), "(no summary)")))
 		}
 		bullets = strings.Join(lines, "\n")
 	}
@@ -147,7 +147,7 @@ func Stats(root string) []Subsystem {
 		if err != nil {
 			continue
 		}
-		touched := e.fm.String("touched")
+		touched := frontmatter.Str(e.fm, "touched")
 		if touched == "" {
 			touched = gitDate(root, e.path)
 		}
