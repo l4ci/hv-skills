@@ -1,17 +1,17 @@
 echo "id next"
-ID=$(hvj id next bugs | jget data.id)
+ID=$(hvj id next --kind bugs | jget data.id)
 [ "$ID" = "B01" ] || fail "expected B01, got $ID"
 pass "first bug id = B01"
 
-ID2=$(hvj id next bugs | jget data.id)
+ID2=$(hvj id next --kind bugs | jget data.id)
 [ "$ID2" = "B02" ] || fail "expected B02, got $ID2"
 pass "second bug id = B02"
 
-ID3=$(hvj id next features | jget data.id)
+ID3=$(hvj id next --kind features | jget data.id)
 [ "$ID3" = "F01" ] || fail "expected F01, got $ID3"
 pass "first feature id = F01"
 
-ID4=$(hvj id next milestones | jget data.id)
+ID4=$(hvj id next --kind milestones | jget data.id)
 [ "$ID4" = "M01" ] || fail "expected M01, got $ID4"
 pass "first milestone id = M01"
 
@@ -34,7 +34,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-ID5=$(hvj id next bugs | jget data.id)
+ID5=$(hvj id next --kind bugs | jget data.id)
 [ "$ID5" = "B08" ] || fail "self-heal: expected B08 (max(2,7)+1), got $ID5"
 pass "id next self-heals when TODO has higher IDs than counter"
 
@@ -44,12 +44,12 @@ cat > .hv/ARCHIVE.md <<'EOF'
 
 - ~~**[B15] [P1] Old bug.** Desc.~~ Done 2026-01-01 [`abc1234`]
 EOF
-ID6=$(hvj id next bugs | jget data.id)
+ID6=$(hvj id next --kind bugs | jget data.id)
 [ "$ID6" = "B16" ] || fail "self-heal: expected B16 (ARCHIVE max=15), got $ID6"
 pass "id next scans ARCHIVE.md for self-heal"
 
 # Self-heal is per-prefix: features counter is unaffected by bugs traffic.
-ID7=$(hvj id next features | jget data.id)
+ID7=$(hvj id next --kind features | jget data.id)
 [ "$ID7" = "F02" ] || fail "self-heal per-prefix: expected F02 (features counter still=1), got $ID7"
 pass "id next self-heal is per-prefix"
 
@@ -85,9 +85,11 @@ grep -q "~~.*\[B01\].*~~ Done" .hv/BACKLOG.md || fail "B01 not marked completed"
 grep -q "^- \*\*\[B01\]" .hv/BACKLOG.md && fail "B01 still in active section"
 pass "B01 moved to Completed with strikethrough"
 # Proof gate (details in section 52): a done close without proof exits 4 unless --no-proof.
-"$HV_BIN" item create --kind bugs --raw-file - <<<'- **[B70] [P2] Unproven bug.** Desc.' >/dev/null
-rc=0; "$HV_BIN" item complete B70 --commit "$HASH" 2>/dev/null || rc=$?
+[ "$(hvj item create --kind bugs --raw-file - <<<'- **[B70] [P2] Unproven bug.** Desc.' | jget data.type)" = "B" ] \
+  || fail "item create should report type B for a bug"
+rc=0; OUT=$(hvj item complete B70 --commit "$HASH" 2>/dev/null) || rc=$?
 [ "$rc" = "4" ] || fail "item complete without proof should exit 4, got $rc"
+[ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "proof refusal should report changed=false: $OUT"
 grep -q "^- \*\*\[B70\]" .hv/BACKLOG.md || fail "refused item complete must leave B70 open"
 pass "item complete refuses a done close with no proof"
 
@@ -115,45 +117,45 @@ grep -E "^- ~~.*\[B71\].*~~ Done [0-9-]+ \[\`$HASH\`\]$" .hv/BACKLOG.md >/dev/nu
 grep -qF "[\`$HASH\`] (blocked: waiting on upstream (see #9))" .hv/BACKLOG.md || fail "blocked reason+note not rendered"
 "$HV_BIN" item complete B73 --commit "$HASH" --reason dropped >/dev/null
 grep -E "^- ~~.*\[B73\].*~~ Done [0-9-]+ \[\`$HASH\`\] \(dropped\)$" .hv/BACKLOG.md >/dev/null || fail "dropped reason without note not rendered"
-[ "$(hvj item field B72 --name reason | jget data.value)" = "blocked" ] || fail "item field reason"
-[ "$(hvj item field B72 --name note | jget data.value)" = "waiting on upstream (see #9)" ] || fail "item field note"
-[ "$(hvj item field B71 --name reason | jget data.value)" = "done" ] || fail "item field reason for plain done"
+[ "$(hvj item field get B72 --name reason | jget data.value)" = "blocked" ] || fail "item field reason"
+[ "$(hvj item field get B72 --name note | jget data.value)" = "waiting on upstream (see #9)" ] || fail "item field note"
+[ "$(hvj item field get B71 --name reason | jget data.value)" = "done" ] || fail "item field reason for plain done"
 hvj summary | jget data.recent | grep -qF "{\"id\":\"B72\",\"date\":\"$(date +%Y-%m-%d)\",\"reason\":\"blocked\"}" || fail "summary missing reason"
 rc=0; "$HV_BIN" item complete B01 --commit "$HASH" --reason bogus 2>/dev/null || rc=$?
 [ "$rc" = "2" ] || fail "invalid --reason should exit 2, got $rc"
-pass "item complete --reason/--note renders, reads back via item field and summary"
+pass "item complete --reason/--note renders, reads back via item field get and summary"
 
-echo "item field --set"
+echo "item field set"
 # F01 is still an open feature bullet at this point (B01 was completed above).
-"$HV_BIN" item field F01 --name milestone --set M01 >/dev/null
+"$HV_BIN" item field set F01 --name milestone --value M01 >/dev/null
 grep -q "\[F01\].*Milestone: M01" .hv/BACKLOG.md || fail "F01 milestone not appended"
-pass "item field --set appends absent Milestone"
+pass "item field set appends absent Milestone"
 
-"$HV_BIN" item field F01 --name milestone --set M07 >/dev/null
+"$HV_BIN" item field set F01 --name milestone --value M07 >/dev/null
 grep -q "\[F01\].*Milestone: M07" .hv/BACKLOG.md || fail "F01 milestone not replaced in place"
 grep -q "Milestone: M01" .hv/BACKLOG.md && fail "old Milestone M01 value lingered"
-pass "item field --set replaces present Milestone in place"
+pass "item field set replaces present Milestone in place"
 
-"$HV_BIN" item field F01 --name repos --set "web, api" >/dev/null
+"$HV_BIN" item field set F01 --name repos --value "web, api" >/dev/null
 grep -q "\[F01\].*Repos: web, api" .hv/BACKLOG.md || fail "F01 repos not set"
-"$HV_BIN" item field F01 --name repos --set "" >/dev/null
+"$HV_BIN" item field set F01 --name repos --value "" >/dev/null
 grep -q "\[F01\].*Repos:" .hv/BACKLOG.md && fail "F01 repos segment not cleared"
 grep -q "\[F01\].*Milestone: M07" .hv/BACKLOG.md || fail "clearing repos disturbed Milestone"
-pass "item field --set clears a field on empty value, leaving neighbors intact"
+pass "item field set clears a field on empty value, leaving neighbors intact"
 
 BEFORE_MD5=$(md5sum .hv/BACKLOG.md)
-CHANGED=$(hvj item field F01 --name milestone --set M07 | jget data.changed) || fail "idempotent item field --set errored"
-[ "$CHANGED" = "false" ] || fail "idempotent item field --set reported changed=$CHANGED"
-[ "$BEFORE_MD5" = "$(md5sum .hv/BACKLOG.md)" ] || fail "idempotent item field --set rewrote the file"
-pass "item field --set is idempotent on unchanged value"
+CHANGED=$(hvj item field set F01 --name milestone --value M07 | jget data.changed) || fail "idempotent item field set errored"
+[ "$CHANGED" = "false" ] || fail "idempotent item field set reported changed=$CHANGED"
+[ "$BEFORE_MD5" = "$(md5sum .hv/BACKLOG.md)" ] || fail "idempotent item field set rewrote the file"
+pass "item field set is idempotent on unchanged value"
 
-rc=0; "$HV_BIN" item field F01 --name title --set "X" 2>/dev/null || rc=$?
-[ "$rc" = "2" ] || fail "item field --set should reject a non-settable field with 2, got $rc"
-pass "item field --set rejects non-settable field"
+rc=0; "$HV_BIN" item field set F01 --name title --value "X" 2>/dev/null || rc=$?
+[ "$rc" = "2" ] || fail "item field set should reject a non-settable field with 2, got $rc"
+pass "item field set rejects non-settable field"
 
-rc=0; "$HV_BIN" item field B01 --name milestone --set M01 2>/dev/null || rc=$?
-[ "$rc" = "4" ] || fail "item field --set should refuse a completed/archived ID (no open bullet) with 4, got $rc"
-pass "item field --set refuses ID with no open bullet"
+rc=0; "$HV_BIN" item field set B01 --name milestone --value M01 2>/dev/null || rc=$?
+[ "$rc" = "4" ] || fail "item field set should refuse a completed/archived ID (no open bullet) with 4, got $rc"
+pass "item field set refuses ID with no open bullet"
 
 echo "git guard clean"
 git add -A && git commit -q -m "progress"

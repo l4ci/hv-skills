@@ -335,16 +335,23 @@ def stdin_to_file(path):
 
 
 KINDS = ("bugs", "features", "tasks")
+TYPE_OF_KIND = {"bugs": "B", "features": "F", "tasks": "T"}
+
+
+def item_type(item, kind=None):
+    """The `type` letter of an item: from its ID in file mode, else from its kind."""
+    m = re.search(r"(?:^|[:#])([BFT])\d", item)
+    return m.group(1) if m else TYPE_OF_KIND.get(kind)
 SECTION = {"bugs": "## Bugs", "features": "## Features", "tasks": "## Tasks"}
 
 
 # ---------------------------------------------------------------- adapters: ids and items
 
-@verb("id", "next", pos=(1, 1))
+@verb("id", "next", values=("kind",))
 def id_next(ctx):
-    kind = ctx.pos[0]
+    kind = ctx.flags.get("kind")
     if kind not in KINDS + ("milestones",):
-        raise usage(f"{ctx.name}: kind must be bugs|features|tasks|milestones")
+        raise usage(f"{ctx.name}: --kind must be bugs|features|tasks|milestones")
     new_id = call(ctx, "hv-next-id", kind).strip()
     return {"kind": kind, "id": new_id, "changed": True}, new_id
 
@@ -374,7 +381,7 @@ def item_create(ctx):
         if not m:
             raise usage(f"{ctx.name}: --raw-file bullet needs a **[ID]")
         call(ctx, "hv-append", SECTION[kind], entry)
-        return {"id": m.group(1), "kind": kind, "changed": True}, m.group(1)
+        return {"id": m.group(1), "type": TYPE_OF_KIND[kind], "kind": kind, "changed": True}, m.group(1)
     if not f.get("title"):
         raise usage(f"{ctx.name}: --title is required")
     tag = f.get("tag", "")
@@ -401,7 +408,7 @@ def item_create(ctx):
         e = backend_error(rc, err)
         raise HvError(2 if e.exit == 3 and "cannot read" in e.message else e.exit, e.message)
     new_id = out.strip()
-    data = {"id": new_id, "kind": kind, "changed": True}
+    data = {"id": new_id, "type": TYPE_OF_KIND[kind], "kind": kind, "changed": True}
     if f.get("body-file"):
         data["detail"] = f".hv/{kind}/{new_id}.md"
     return data, new_id
@@ -430,12 +437,14 @@ def item_complete(ctx):
     before = read_text(backlog)
     rc, _, err = ctx.helper("hv-complete", *args)
     if rc == 3 and "no proof recorded" in err:
-        raise HvError(4, first_error_line(err), hint="record proof with `hv proof add`, or pass --no-proof")
+        raise HvError(4, first_error_line(err), hint="record proof with `hv proof add`, or pass --no-proof",
+                      data={"blockedBy": "proof missing", "changed": False})
     if rc != 0:
         raise backend_error(rc, err)
     # File backend: an already-completed item is a silent no-op that leaves BACKLOG.md untouched.
     changed = True if before is None else read_text(backlog) != before
-    return ({"id": item, "reason": reason, "commit": commit, "changed": changed},
+    return ({"id": item, "type": item_type(item), "reason": reason, "commit": commit,
+             "changed": changed},
             f"completed {item} ({reason}) at {commit}")
 
 
@@ -443,37 +452,52 @@ GET_FIELDS = ("title", "detail", "related", "milestone", "repos", "subsystem", "
 SET_FIELDS = ("milestone", "related", "repos", "subsystem", "detail")
 
 
-@verb("item", "field", values=("name", "set"), bools=("all",), pos=(1, 1))
-def item_field(ctx):
-    f, item = ctx.flags, ctx.pos[0]
-    if ("name" in f) == bool(f.get("all")):
-        raise usage(f"{ctx.name}: exactly one of --name or --all is required")
-    if f.get("all"):
-        if "set" in f:
-            raise usage(f"{ctx.name}: --all cannot be combined with --set")
-        fields = json_body(call(ctx, "hv-todo-field", "--dump", item))
-        return {"id": item, "fields": fields}, json.dumps(fields)
-    name = f["name"]
-    if name not in GET_FIELDS:
-        raise usage(f"{ctx.name}: unknown field {name}; pick one of {', '.join(GET_FIELDS)}")
-    if "set" not in f:
-        value = call(ctx, "hv-todo-field", item, name)[:-1]
-        return {"id": item, "field": name, "value": value}, value
-    if name not in SET_FIELDS:
-        raise usage(f"{ctx.name}: field {name} is read-only; settable: {', '.join(SET_FIELDS)}")
+def field_name(ctx, allowed, what):
+    name = ctx.flags.get("name")
+    if not name:
+        raise usage(f"{ctx.name}: --name is required")
+    if name not in allowed:
+        raise usage(f"{ctx.name}: {what} field {name}; pick one of {', '.join(allowed)}")
+    return name
+
+
+@verb("item", "field", "get", values=("name",), pos=(1, 1))
+def item_field_get(ctx):
+    item = ctx.pos[0]
+    name = field_name(ctx, GET_FIELDS, "unknown")
+    value = call(ctx, "hv-todo-field", item, name)[:-1]
+    return {"id": item, "type": item_type(item), "field": name, "value": value}, value
+
+
+@verb("item", "field", "list", pos=(1, 1))
+def item_field_list(ctx):
+    item = ctx.pos[0]
+    fields = json_body(call(ctx, "hv-todo-field", "--dump", item))
+    return {"id": item, "type": item_type(item), "fields": fields}, json.dumps(fields)
+
+
+@verb("item", "field", "set", values=("name", "value"), pos=(1, 1))
+def item_field_set(ctx):
+    item = ctx.pos[0]
+    name = field_name(ctx, SET_FIELDS, "unknown or read-only")
+    if "value" not in ctx.flags:
+        raise usage(f"{ctx.name}: --value is required (--value '' clears the field)")
+    value = ctx.flags["value"]
     backlog = os.path.join(find_root(ctx.cwd), ".hv", "BACKLOG.md")
     before = read_text(backlog)
-    rc, _, err = ctx.helper("hv-todo-set-field", item, name, f["set"])
+    rc, _, err = ctx.helper("hv-todo-set-field", item, name, value)
     if rc == 1 and "no open bullet" in err:
         known = ctx.helper("hv-todo-field", item, "title")[0] == 0
-        raise HvError(4 if known else 3, first_error_line(err))
+        raise HvError(4 if known else 3, first_error_line(err),
+                      data={"blockedBy": "closed item", "changed": False} if known else None)
     if rc == 1 and "detail" in err:
         raise usage(first_error_line(err))
     if rc != 0:
         raise backend_error(rc, err)
     # File backend: an unchanged value leaves BACKLOG.md byte-identical.
     changed = True if before is None else read_text(backlog) != before
-    return {"id": item, "field": name, "value": f["set"], "changed": changed}, f["set"]
+    return {"id": item, "type": item_type(item), "field": name, "value": value,
+            "changed": changed}, value
 
 
 # ---------------------------------------------------------------- adapters: backlog, summary, git
