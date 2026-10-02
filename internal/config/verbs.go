@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
@@ -212,14 +211,11 @@ func Check(root string) (status string, missing []string) {
 	if errors.Is(err, os.ErrNotExist) {
 		return Fresh, missing
 	}
-	if err != nil || !utf8.Valid(raw) {
-		return Corrupt, missing
-	}
-	doc, err := jsonx.Decode(raw)
 	if err != nil {
 		return Corrupt, missing
 	}
-	if _, ok := doc.(*jsonx.Object); !ok {
+	doc, ok := decodeObject(raw)
+	if !ok {
 		return Corrupt, missing
 	}
 	for _, k := range Keys {

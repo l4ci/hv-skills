@@ -77,6 +77,34 @@ func TestA4cConfigSetNotObjectIs70(t *testing.T) {
 	}
 }
 
+// A9 G1: fill brings a stale config up to date, then is a no-op.
+func TestA9ConfigFill(t *testing.T) {
+	root := a4Project(t, `{"models": {"worker": "haiku"}}`+"\n")
+	code, env, _ := hvRun(t, "--json", "-C", root, "config", "fill")
+	d := dataOf(env)
+	filled, _ := get(d, "filled").([]any)
+	if code != 0 || get(d, "changed") != true || len(filled) == 0 || filled[0] != "models.orchestrator" {
+		t.Fatalf("fill: %d %v", code, env)
+	}
+	if code, _, _ := hvRun(t, "--json", "-C", root, "config", "check"); code != 0 {
+		t.Errorf("check after fill: %d", code)
+	}
+	code, env, _ = hvRun(t, "--json", "-C", root, "config", "fill")
+	if d := dataOf(env); code != 0 || get(d, "changed") != false || len(get(d, "filled").([]any)) != 0 {
+		t.Errorf("second fill: %d %v", code, env)
+	}
+	if code, _, _ := hvRun(t, "--json", "-C", root, "config", "fill", "x"); code != ExitUsage {
+		t.Errorf("positional: %d", code)
+	}
+	if code, _, _ := hvRun(t, "--json", "-C", t.TempDir(), "config", "fill"); code != ExitResolution {
+		t.Errorf("no .hv: %d", code)
+	}
+	bad := a4Project(t, "{oops\n")
+	if code, _, stderr := hvRun(t, "--json", "-C", bad, "config", "fill"); code != ExitInternal || !strings.Contains(stderr, "not a valid JSON object") {
+		t.Errorf("corrupt: %d %s", code, stderr)
+	}
+}
+
 func TestA4cRepoVerbs(t *testing.T) {
 	root := a4Project(t, "")
 	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)

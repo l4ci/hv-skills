@@ -27,6 +27,7 @@ func a4cCommands() []*Command {
 			{Name: "show", Summary: "effective value and source of config keys", Repo: true, Verb: a4ConfigShow},
 			{Name: "set", Summary: "set one key in .hv/config.json", Repo: true, Verb: a4ConfigSet},
 			{Name: "check", Summary: "compare .hv/config.json with the schema", Repo: true, Verb: a4ConfigCheck},
+			{Name: "fill", Summary: "write the default of every missing required key", Repo: true, Verb: a4ConfigFill},
 		}},
 		{Name: "repo", Summary: "umbrella sub-repo registry", Subs: []*Command{
 			{Name: "which", Summary: "the registered sub-repo the working directory is in", Verb: a4RepoWhich},
@@ -148,6 +149,32 @@ func a4ConfigCheck(fs *flag.FlagSet) RunFunc {
 			return res, Failed("no .hv/config.json yet")
 		}
 		return res, Failed(".hv/config.json is not a valid JSON object")
+	}
+}
+
+// a4ConfigFill is the A9 `hv config fill` (contract G1): `config check`'s
+// missing keys get their schema defaults.
+func a4ConfigFill(fs *flag.FlagSet) RunFunc {
+	return func(c *Ctx, args []string) (Result, error) {
+		if err := a4Args(c, args, 0, 0, "config fill takes no arguments"); err != nil {
+			return Result{}, err
+		}
+		root, err := a4Scope(c)
+		if err != nil {
+			return Result{}, err
+		}
+		filled, err := config.Fill(root)
+		if errors.Is(err, config.ErrCorrupt) {
+			return Result{}, &Error{Exit: ExitInternal, Message: err.Error()}
+		}
+		if err != nil {
+			return Result{}, err
+		}
+		text := "config up to date; nothing to fill"
+		if len(filled) > 0 {
+			text = "filled: " + strings.Join(filled, ", ")
+		}
+		return Result{Data: a4Obj("filled", a4Strings(filled), "changed", len(filled) > 0), Text: text}, nil
 	}
 }
 
