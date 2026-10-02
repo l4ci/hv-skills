@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,41 +13,54 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 // Issue is the tracker's view of one issue (hvlib_tracker _norm).
-type Issue struct {
-	Number      int
-	Title, Body string
-	Labels      []string
-	Milestone   string // native milestone title, "" when none
-	State       string // "open" | "closed"
-	StateReason string // "completed" | "not_planned" | ""
-	ClosedAt    string // RFC 3339 or ""
-	URL         string
-	Assignees   []string
-}
+type Issue = tracker.Issue
 
-// Tracker is the narrow read seam the issue view needs. It is NOT
-// internal/tracker's Adapter (#90), which has List(ListFilter),
-// Get(n, withComments) and reports a missing issue as an error. A small
-// adapter lands in a follow-up once #90 merges: it adds ctx, passes the state
-// filter through, and maps tracker.KindNotFound to found=false, so nothing here
-// sniffs error messages.
+// Tracker is the part of internal/tracker's Adapter the issue backend calls:
+// exactly those methods, with the Adapter's own signatures. A missing issue is
+// a *tracker.Error of KindNotFound, never an error message to parse.
 type Tracker interface {
-	// List returns the issues in the given state, "open" or "closed".
-	List(state string) ([]Issue, error)
-	// Get returns one issue; found is false when it does not exist.
-	Get(number int) (Issue, bool, error)
+	Get(ctx context.Context, number int, withComments bool) (tracker.Issue, error)
+	List(ctx context.Context, f tracker.ListFilter) ([]tracker.Issue, error)
+	Create(ctx context.Context, title, body string, labels []string, milestone string) (int, error)
+	Edit(ctx context.Context, number int, e tracker.IssueEdit) error
+	EnsureLabels(ctx context.Context, names []string, autoCreate bool) error
+	AddLabels(ctx context.Context, number int, labels []string, autoCreate bool) error
+	RemoveLabels(ctx context.Context, number int, labels []string) error
+	Close(ctx context.Context, number int, reason, comment string) error
+	Reopen(ctx context.Context, number int) error
+	AssignSelf(ctx context.Context, number int) error
+	Comments(ctx context.Context, number int) ([]tracker.Comment, error)
+	AddComment(ctx context.Context, number int, body string) (string, error)
+	EditComment(ctx context.Context, number int, commentID, body string) error
+	DeleteComment(ctx context.Context, number int, commentID string) error
+	FindMilestone(ctx context.Context, hvID string) (title string, ok bool, err error)
 }
 
-// Issues is the backlog served from an issue tracker, read-only
-// (IssueBackend in hvlib_backend.py). Rendered bullets keep the letter
+// A change to tracker.Adapter that breaks the subset fails the build here.
+var _ Tracker = tracker.Adapter(nil)
+
+// Issues is the backlog served from an issue tracker (IssueBackend in
+// hvlib_backend.py). Rendered bullets keep the letter
 // ("[F12]"); only Item.ID drops it, since an issue number is the identity.
 type Issues struct {
-	Cfg     any     // loaded config, for the label names
-	Tracker Tracker // where the issues come from
-	Repo    string  // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
+	Cfg     any             // loaded config, for the label names
+	Tracker Tracker         // where the issues come from
+	Ctx     context.Context // for every tracker call; nil is context.Background()
+	// ProofCount counts the proof rows of an item ("F12"). nil reads the
+	// item's proof note through Tracker (hv-proof-show --count in issue mode).
+	ProofCount func(itemID string) (int, error)
+	Repo       string // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
+}
+
+func (b *Issues) ctx() context.Context {
+	if b.Ctx != nil {
+		return b.Ctx
+	}
+	return context.Background()
 }
 
 // Name is "issues".
@@ -259,7 +273,7 @@ func (b *Issues) openByLetter() (map[string][]string, error) {
 
 // items returns the tracker's issues in state without the milestone trackers.
 func (b *Issues) items(state string) ([]Issue, error) {
-	issues, err := b.Tracker.List(state)
+	issues, err := b.Tracker.List(b.ctx(), tracker.ListFilter{State: state})
 	if err != nil {
 		return nil, err
 	}
@@ -358,8 +372,11 @@ func (b *Issues) lookup(ref string) (Issue, bool, error) {
 	if err != nil {
 		return Issue{}, false, nil
 	}
-	is, found, err := b.Tracker.Get(n)
-	if err != nil || !found {
+	is, err := b.Tracker.Get(b.ctx(), n, false)
+	if tracker.IsKind(err, tracker.KindNotFound) {
+		return Issue{}, false, nil
+	}
+	if err != nil {
 		return Issue{}, false, err
 	}
 	if b.IsMilestoneTracker(is) || (letter != "" && letter != b.Letter(is)) {

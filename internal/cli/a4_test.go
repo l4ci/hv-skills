@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
@@ -63,7 +64,7 @@ func hvRun(t *testing.T, args ...string) (int, map[string]any, string) {
 func TestA4IssueModeNeedsTracker(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
 	code, env, stderr := hvRun(t, "--json", "-C", root, "item", "complete", "12", "--commit", "abc")
-	if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "not ported yet") {
+	if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "cannot determine provider") {
 		t.Fatalf("code=%d env=%v stderr=%s", code, env, stderr)
 	}
 	// File-only verbs are refused before the tracker is built.
@@ -83,30 +84,34 @@ func TestA4IssueModeNeedsTracker(t *testing.T) {
 	}
 }
 
-// With a tracker the issue backend answers, and its write side says so.
-func TestA4IssueModeStubs(t *testing.T) {
+// With a tracker that knows no issue 12, every item verb answers 3, and
+// nothing is written.
+func TestA4IssueModeUnknownItem(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
-	old := newTracker
-	defer func() { newTracker = old }()
-	newTracker = func(string, any) (backlog.Tracker, error) { return fakeTracker{}, nil }
+	fake := &trackertest.Fake{}
+	withTracker(t, fake)
 	for _, argv := range [][]string{
-		{"item", "create", "--kind", "bugs", "--title", "x"},
 		{"item", "complete", "12", "--commit", "abc"},
 		{"item", "reopen", "12"},
 		{"item", "ready", "12"},
+		{"item", "show", "12"},
+		{"item", "claim", "12", "--as", "a"},
+		{"item", "release", "12", "--as", "a"},
+		{"item", "state", "12", "--to", "none"},
+		{"item", "note", "show", "12", "--kind", "plan"},
 		{"item", "field", "set", "12", "--name", "milestone", "--value", "M1"},
 	} {
 		code, _, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
-		if code != ExitNotImplemented || !strings.Contains(stderr, "issue mode for") {
+		if code != ExitResolution {
 			t.Errorf("%v: code=%d stderr=%s", argv, code, stderr)
 		}
 	}
+	for _, c := range fake.Calls {
+		if c.Method != "get" {
+			t.Errorf("unexpected write-side call %v", c)
+		}
+	}
 }
-
-type fakeTracker struct{}
-
-func (fakeTracker) List(string) ([]backlog.Issue, error) { return nil, nil }
-func (fakeTracker) Get(int) (backlog.Issue, bool, error) { return backlog.Issue{}, false, nil }
 
 func TestA4Scope(t *testing.T) {
 	root := a4Project(t, "")
