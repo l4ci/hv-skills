@@ -58,7 +58,7 @@ Exit 3 means the tracker is unavailable; exit 4 means rate-limited. Both stop th
 /hv-config backlog.backend=issues
 ```
 
-Open items, their detail files, proof rows, design and plan artifacts, and planned/active milestones with their slice plans move to the tracker. Completed items, `ARCHIVE.md` and shipped milestones stay in the files. `Related:` fields and old IDs in migrated text are rewritten to the new IDs after every item exists.
+Open items, their detail files, proof rows, design and plan artifacts, and planned/active milestones with their slice plans move to the tracker. Completed items, `ARCHIVE.md` and shipped/archived milestones stay in the files as history, so after the flip `hv-vision-list` shows only the planned and active milestones. `Related:` fields and old IDs in migrated text are rewritten to the new IDs after every item exists; `Related:` IDs that are not migrated (completed items) are dropped from the field and listed in the issue body as `Related before migration (not migrated): F79, F80`. A bullet's `Since:` anchor is kept in the issue's fields block.
 
 The run is resumable: `.hv/issue-map.json` records each old ID, its new ID and URL. Commit it. A rate limit (exit 4) stops the run with the map saved; wait and re-run. `--limit N` creates at most N items per run. Writes are paced by `issues.bulkPaceMs`.
 

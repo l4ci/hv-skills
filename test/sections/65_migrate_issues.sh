@@ -18,8 +18,8 @@ MAKE_MI() {
 
 ## Features
 
-- **[F1] [Major] Export data.** Export to CSV. Detail: .hv/features/F1.md Related: [F2] Milestone: M07
-- **[F2] [Minor] Load files.** Read files in. Repos: web
+- **[F1] [Major] Export data.** Export to CSV. Detail: .hv/features/F1.md Related: [F2], [F9], F80 Milestone: M07 Since: abc1234
+- **[F2] [Minor] Load files.** Read files in. Repos: web Related: [F9]
 
 ## Tasks
 
@@ -94,7 +94,7 @@ print(eval(sys.argv[1]))' "$1"; }
     has "dry slice" "note plan:S01 on M07" "$OUT"
     has "dry related" "rewrite Related on F1: F2 → #?" "$OUT"
     has "dry map" "would-be map" "$OUT"
-    case "$OUT" in *F9*|*"create milestone M01"*) fail "$prov migrate dry: completed item / shipped milestone planned";; esac
+    case "$OUT" in *"issue F9"*|*"create milestone M01"*) fail "$prov migrate dry: completed item / shipped milestone planned";; esac
     has "dry dropped milestone warning" "milestone M01 is not on the tracker" "$ERR"
     eq "dry makes no tracker call" "0" "$(CALLS)"
     eq "dry leaves the tree unchanged" "$BEFORE" "$(TREE)"
@@ -120,6 +120,12 @@ print(eval(sys.argv[1]))' "$1"; }
     case "$(BODY 4)" in *"## Proof"*) fail "$prov migrate: proof section left in the body";; esac
     has "F1 fields block" "Related: [F5]" "$(BODY 4)"
     has "F2 repos field" "Repos: web" "$(BODY 5)"
+    has "Since kept in fields block" "Since: abc1234" "$(BODY 4)"
+    has "F1 dangling Related dropped from field" "Related: [F5]" "$(BODY 4)"
+    case "$(BODY 4)" in *"Related: [F5], "*|*"[F9]"*|*"Related: [F9]"*) fail "$prov migrate: dangling Related left in F1 field: $(BODY 4)";; esac
+    has "F1 unmapped listed in body" "Related before migration (not migrated): F9, F80" "$(BODY 4)"
+    has "F2 unmapped listed in body" "Related before migration (not migrated): F9" "$(BODY 5)"
+    case "$(BODY 5)" in *"Related:"*) fail "$prov migrate: F2 kept an all-dangling Related field: $(BODY 5)";; esac
     has "B1 body" "Crash details." "$(BODY 2)"
     N4="$(NOTES 4)"
     has "proof note" "<!-- hv:proof -->" "$N4"; has "proof rows" "smoke · PASS" "$N4"

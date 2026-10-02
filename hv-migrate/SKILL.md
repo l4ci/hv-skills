@@ -116,7 +116,7 @@ Skip silently when there's nothing to surface beyond the helper's output.
    .hv/bin/hv-migrate-issues --dry-run
    ```
 
-   Read the planned operations and the would-be map (placeholder numbers). Check the item count against `.hv/bin/hv-backlog`: open Bugs/Features/Tasks and planned/active milestones migrate; completed items, `ARCHIVE.md` and shipped milestones stay in the files. Surface any `warning:` lines.
+   Read the planned operations and the would-be map (placeholder numbers). Check the item count against `.hv/bin/hv-backlog`: open Bugs/Features/Tasks and planned/active milestones migrate; completed items, `ARCHIVE.md` and shipped/archived milestones stay in the files as history (after the flip `hv-vision-list` shows only planned and active milestones). `Related:` IDs of completed items are dropped from the field and listed in the issue body; `Since:` is kept. Surface any `warning:` lines.
 
 2. **Confirm** with `AskUserQuestion` (header `"Apply"`; options `"Apply (Recommended)"`, `"Apply 10 items first (--limit 10)"`, `"Cancel"`), or skip when the args include `--apply`. This creates real issues and cannot be undone by the helper.
 

@@ -5,6 +5,9 @@
 #   milestone, fields block, detail file as body); planned/active milestones (.hv/milestones/MNN.md)
 #   become a native milestone + tracking issue with the same MNN and status. Completed items, ARCHIVE.md
 #   and shipped/archived milestones stay in the files.
+# Fields kept: Related, Repos, Subsystem, Captured, Since (a fields-block line), Milestone (native). Detail is
+#   replaced by the issue body. Related IDs that are not migrated (completed/archived items) are dropped from
+#   the field and listed in the body as `Related before migration (not migrated): F79, F80`.
 # Phases: (1) milestones, (2) items, (3) once every item and milestone exists: proof/design/plan notes,
 #   slice plans (plan:SNN on the tracking issue), milestone plan bodies and Related fields, with old item
 #   IDs rewritten to the new ones (exact ID tokens only; slice plans only `[ID]`, their task labels are T1...).
@@ -73,6 +76,7 @@ SECTION_KIND = {"Bugs": "bugs", "Features": "features", "Tasks": "tasks"}
 KIND_TAGS = {"bugs": ("P0", "P1", "P2", "P3"), "features": ("Major", "Minor", "Cosmetic"), "tasks": ()}
 FIELD_NAMES = ("Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured", "Since")
 FIELD_CUT = re.compile(r"\s(?:%s):" % "|".join(FIELD_NAMES))
+TOKEN = re.compile(rf"(?<![\w/-])([{ITEM_TYPES}]\d+)(?!\w)(?!\.md)")
 items = []
 for iid, line, fields, section in iter_open_bullets(BACKLOG.read_text()):
     kind = SECTION_KIND.get(section)
@@ -105,9 +109,25 @@ for iid, line, fields, section in iter_open_bullets(BACKLOG.read_text()):
         if re.fullmatch(rf"M\d+-{iid}\.md", p.name):
             plan = read(p); break
     items.append({"id": iid, "kind": kind, "title": m.group("title").strip().rstrip(".").strip(),
-                  "tag": tag, "desc": desc, "fields": f, "milestone": ms.group(0) if ms else "",
+                  "tag": tag, "desc": desc, "fields": f, "since": fields.get("since", "").strip(), "milestone": ms.group(0) if ms else "",
                   "body": detail.strip("\n") if detail and detail.strip() else None, "proof": proof,
                   "design": read(HV / "designs" / f"{iid}.md"), "plan": plan})
+
+# Related refs to IDs that are not being migrated (completed/archived items) would dangle and could
+# collide with future issue numbers: drop them from the field, keep them as one body line.
+migrating_ids = {it["id"] for it in items}
+for it in items:
+    rel = it["fields"].get("Related", "")
+    toks = list(dict.fromkeys(TOKEN.findall(rel)))
+    it["unmapped"] = [t for t in toks if t not in migrating_ids]
+    if it["unmapped"]:
+        kept = [t for t in toks if t in migrating_ids]
+        if kept:
+            it["fields"]["Related"] = ", ".join(f"[{t}]" for t in kept)
+        else:
+            del it["fields"]["Related"]
+        line = "Related before migration (not migrated): " + ", ".join(it["unmapped"])
+        it["body"] = f'{it["body"]}\n\n{line}' if it["body"] else line
 
 milestones = []
 for p in sorted((HV / "milestones").glob("M*.md")):
@@ -140,7 +160,6 @@ if not isinstance(imap, dict):
 def save_map():
     dump_json_atomic(MAP, imap)
 
-TOKEN = re.compile(rf"(?<![\w/-])([{ITEM_TYPES}]\d+)(?!\w)(?!\.md)")
 BRACKETED = re.compile(rf"\[([{ITEM_TYPES}]\d+)\]")
 
 def new_ids():
@@ -238,9 +257,11 @@ def run():
             else:
                 warn(f"{old}: milestone {ms} is not on the tracker (shipped/archived milestones are not migrated); Milestone field dropped")
         labels = ", ".join(label_names(it))
+        if it["unmapped"]:
+            note += f" (Related not migrated: {', '.join(it['unmapped'])})"
         def create_item(it=it, old=old, fields=fields):
             nid = backend.create(it["kind"], it["title"], it["tag"], it["desc"], fields,
-                                 it["body"].encode() if it["body"] else None)
+                                 it["body"].encode() if it["body"] else None, since=it["since"])
             n = int(nid[1:])
             url = backend.adapter.get(n)["url"]
             imap[old] = {"id": nid, "number": n, "url": url, "done": []}
