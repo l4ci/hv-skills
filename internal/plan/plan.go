@@ -24,6 +24,9 @@ var (
 	addKeyIssue = regexp.MustCompile(`^(M\d{2,})-([BFTS]\d+)$`) // issue numbers have any number of digits
 	milestoneRe = regexp.MustCompile(`^M\d{2,}$`)
 	designIDRe  = regexp.MustCompile(`^[BFT]\d{2,}$`)
+	// issueDesignRe is --design in issue mode: an issue number ("3") or the
+	// lettered form with any digit count ("F3").
+	issueDesignRe = regexp.MustCompile(`^[BFT]?\d+$`)
 )
 
 // ValidKey reports whether key is a plan key: M\d{2,}-(S\d+|[BFT]\d+).
@@ -92,8 +95,12 @@ func extras(root string, o AddOpts, issue bool) (design, repo string, err error)
 		return "", "", artifact.Errf(artifact.ExitUsage, "--title is required")
 	}
 	if o.Design != "" {
-		if !designIDRe.MatchString(o.Design) {
-			return "", "", artifact.Errf(artifact.ExitUsage, "--design must be an item ID like B07, got %q", o.Design)
+		re, like := designIDRe, "B07"
+		if issue {
+			re, like = issueDesignRe, "3 or F3"
+		}
+		if !re.MatchString(o.Design) {
+			return "", "", artifact.Errf(artifact.ExitUsage, "--design must be an item ID like %s, got %q", like, o.Design)
 		}
 		if issue {
 			design = "note:design"
