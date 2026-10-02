@@ -255,7 +255,7 @@ def load_contract_verbs():
     try:
         with open(path) as f:
             for line in f:
-                m = re.match(r"^### hv ((?:[a-z][\w-]*)(?: [a-z][\w-]*)*)\s*$", line)
+                m = re.match(r"^### hv ((?:[a-z][\w-]*)(?: [a-z][\w-]*)*)(?: <\w+>)?\s*$", line)
                 if m:
                     current = tuple(m.group(1).split())
                     CONTRACT_VERBS.add(current)
