@@ -275,3 +275,14 @@ func TestExecGitHonoursCancellation(t *testing.T) {
 		t.Error("a cancelled context must stop git")
 	}
 }
+
+// The gate matches git's English messages (CONFLICT), so ExecGit pins the
+// locale whatever the caller has.
+func TestExecGitRunsInTheCLocale(t *testing.T) {
+	t.Setenv("LC_ALL", "de_DE.UTF-8")
+	t.Setenv("LANGUAGE", "de")
+	out, _, code, err := ExecGit(bg, t.TempDir(), "-c", "alias.loc=!echo $LC_ALL/$LANGUAGE", "loc")
+	if err != nil || code != 0 || strings.TrimSpace(out) != "C/C" {
+		t.Errorf("%q %d %v", out, code, err)
+	}
+}

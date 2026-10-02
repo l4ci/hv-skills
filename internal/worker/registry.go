@@ -151,6 +151,9 @@ func ExecGit(ctx context.Context, dir string, args ...string) (string, string, i
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	// git translates its messages ("CONFLICT (content)" among them) in some
+	// locales; the gate matches on them, so ask for the C locale.
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANGUAGE=C")
 	var out, errb strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
