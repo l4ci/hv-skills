@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 )
 
 // reviewCommands is the `hv review` group (A8, #52).
@@ -377,7 +379,11 @@ func a8Issues(c *Ctx, hint string, perRepo bool) (a8Backend, error) {
 			Msg: c.Path + ` is not available with backlog.backend "file"`}
 	}
 	if perRepo && c.Repo == "" && backlog.IsUmbrella(root) {
-		return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
+		// Scope S: inside a sub-repo the verb acts on it; only the umbrella
+		// root itself needs --repo.
+		if cwd, err := os.Getwd(); err != nil || backlog.CwdSubRepo(cwd, repos.Load(root)) == "" {
+			return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
+		}
 	}
 	be, err := a4Open(c, root, false, hint)
 	if err != nil {

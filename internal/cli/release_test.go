@@ -705,6 +705,9 @@ func TestReleaseIssueVerbsArgsAndBackend(t *testing.T) {
 		if o := trRun(t, root, "", append(append([]string{"release"}, args...), "--json")...); o.code != 2 {
 			t.Errorf("%v at umbrella root: exit %d", args, o.code)
 		}
+		if o := trRun(t, filepath.Join(root, "svc"), "", append(append([]string{"release"}, args...), "--json")...); o.code != 5 {
+			t.Errorf("%v from the svc cwd (scope S), no forge: exit %d, want 5", args, o.code)
+		}
 		if o := trRun(t, root, "", append(append([]string{"release"}, args...), "--repo", "svc", "--json")...); o.code != 5 {
 			t.Errorf("%v --repo: exit %d", args, o.code)
 		}

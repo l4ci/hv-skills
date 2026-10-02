@@ -497,13 +497,15 @@ func (b *Issues) labelReleased(mid, tag string, optional bool) (issues int, err 
 // ---- umbrella --------------------------------------------------------------
 
 // perRepo is the sub-repo a per-repo umbrella verb acts on: Scope (--repo),
-// which it needs (UmbrellaBackend._sub).
+// else the one the working directory is in (contract: scope S). At the
+// umbrella root it needs --repo (UmbrellaBackend._sub).
 func (u *Umbrella) perRepo() (string, *Issues, error) {
-	if u.Scope == "" {
+	name := u.readScope()
+	if name == "" {
 		return "", nil, errf(ErrInvalid, "umbrella issue mode needs --repo <name> (registered: %s)", u.names())
 	}
-	s, err := u.sub(u.Scope)
-	return u.Scope, s, err
+	s, err := u.sub(name)
+	return name, s, err
 }
 
 // ReviewQueue is the review queue of every sub-repo in scope, in registry
@@ -617,6 +619,9 @@ func (u *Umbrella) ReleaseClose(mid, tag string) (issues int, changed bool, err 
 	if issues, err = cp.labelReleased(mid, tag, true); err != nil {
 		return issues, wc.n > 0, err
 	}
+	// natives reads every sub-repo, so one whose forge fails stops the close
+	// after the labels and comments went out. That is safe: they are skipped
+	// when present, so a re-run picks up where this one stopped.
 	nat, err := u.natives(mid)
 	if err != nil {
 		return issues, wc.n > 0, err

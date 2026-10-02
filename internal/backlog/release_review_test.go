@@ -736,6 +736,16 @@ func TestUmbrellaReleaseReview(t *testing.T) {
 	if _, err := u.MergePR(20, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("merge without --repo: %v", err)
 	}
+	// Scope S: with no --repo, the working directory's sub-repo is the one.
+	u.CwdRepo = "gl"
+	if res, err := u.MergePR(25, nil); err != nil || len(res.Closed) != 2 || res.Closed[0].ID != "gl:1" ||
+		!slices.Contains(f["gl"].merged, "25") || slices.Contains(f["gh"].merged, "25") {
+		t.Fatalf("merge from the gl cwd: %+v %v", res, err)
+	}
+	if notes, err := u.ReleaseNotes("M07"); err != nil || len(notes) != 3 {
+		t.Fatalf("notes from the gl cwd: %v %v", notes, err)
+	}
+	u.CwdRepo = ""
 	u.Scope = "gl"
 	if _, err := u.MergePR(20, []string{"gh:1"}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "belongs to gh") {
 		t.Fatalf("cross-repo item: %v", err)

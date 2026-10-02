@@ -650,6 +650,10 @@ func TestShipPRMergeBackend(t *testing.T) {
 	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 5 {
 		t.Errorf("umbrella --repo, no forge: exit %d, want 5", o.code)
 	}
+	// Scope S: inside a sub-repo no --repo is needed; it reaches that tracker.
+	if o := trRun(t, filepath.Join(umb, "svc"), "", "ship", "pr-merge", "1"); o.code != 5 {
+		t.Errorf("from the svc cwd, no forge: exit %d, want 5\n%s", o.code, o.stderr)
+	}
 }
 
 // ---- ship undo ---------------------------------------------------------------
