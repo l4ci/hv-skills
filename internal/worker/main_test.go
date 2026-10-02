@@ -37,6 +37,11 @@ func TestMain(m *testing.M) {
 	if tmp := filepath.Join(dir, "tmp"); os.Mkdir(tmp, 0o755) == nil {
 		os.Setenv("TMPDIR", tmp)
 	}
+	// The gate's local merge commits as the caller. CI runners have no git
+	// identity, so the tests bring their own, for git and for the old helpers.
+	for k, v := range map[string]string{"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"} {
+		os.Setenv(k, v)
+	}
 	for _, k := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_PANE_ID", "HERDR_SOCKET_PATH", "HV_ACCOUNT_USAGE_DIR"} {
 		os.Unsetenv(k)
 	}

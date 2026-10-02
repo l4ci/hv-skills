@@ -219,9 +219,19 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 			return r, nil
 		}
 	} else {
-		if _, code := e.git(root, "merge", "--no-ff", "-m", fmt.Sprintf("merge: %s into %s", branch, o.Base), branch); code != 0 {
+		out, errb, code, gerr := e.Git(e.context(), root, "merge", "--no-ff", "-m", fmt.Sprintf("merge: %s into %s", branch, o.Base), branch)
+		if gerr != nil {
+			code, errb = 127, gerr.Error()
+		}
+		if code != 0 {
 			e.git(root, "merge", "--abort")
-			return g.verdict(GateMergeFailed, fmt.Sprintf("error: merge of %s into %s conflicted — resolve with the slot that owns the context", branch, o.Base), ""), nil
+			// Only a real conflict is called one. Anything else (no committer
+			// identity, a hook, a locked index) is reported with git's own words,
+			// so it is not mistaken for work to resolve with the slot.
+			if strings.Contains(out+errb, "CONFLICT") {
+				return g.verdict(GateMergeFailed, fmt.Sprintf("error: merge of %s into %s conflicted — resolve with the slot that owns the context", branch, o.Base), ""), nil
+			}
+			return g.verdict(GateMergeFailed, fmt.Sprintf("error: merge of %s into %s failed (exit %d): %s", branch, o.Base, code, strings.TrimSpace(errb+" "+out)), ""), nil
 		}
 	}
 	res.Changed = true
