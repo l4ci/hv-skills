@@ -166,14 +166,13 @@ var DeprecatedBlockKeys = []string{"context"}
 // write false it only reports. A missing instructions file strips nothing.
 func (s Store) StripDeprecatedBlocks(write bool) ([]string, error) {
 	path := section.InstructionsFile(s.Root)
-	raw, err := os.ReadFile(path)
+	content, err := fsio.ReadText(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	content := string(raw)
 	next := content
 	var stripped []string
 	for _, key := range DeprecatedBlockKeys {

@@ -48,6 +48,8 @@ func migrateV4(fs *flag.FlagSet) RunFunc {
 		}
 		if !*apply {
 			c.Warn("preview only; pass --apply")
+		} else if installedVersionFn() == "" {
+			c.Warn("version unknown (dev build); config.json not stamped")
 		}
 		return migrateResult(rep), nil
 	}

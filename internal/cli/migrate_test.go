@@ -267,3 +267,38 @@ func TestMigrateV4NoopPreviewWarns(t *testing.T) {
 		t.Errorf("%s", n.stdout)
 	}
 }
+
+func TestMigrateV4DevBuildWarnsAndSkipsStamp(t *testing.T) {
+	migPlugin(t)
+	installedVersionFn = func() string { return "" }
+	dir := migProject(t, false)
+	before := knTree(t, dir)["config.json"]
+	n := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
+	if n.rc != 0 || !strings.Contains(n.stdout, "version unknown (dev build); config.json not stamped") {
+		t.Fatalf("rc=%d %s", n.rc, n.stdout)
+	}
+	if knTree(t, dir)["config.json"] != before {
+		t.Error("config.json was stamped")
+	}
+}
+
+// The strip step reads the instructions file with normalized newlines too: a
+// CRLF AGENTS.md that only needs the context block removed ends up pure LF.
+func TestMigrateV4StripNormalizesCRLF(t *testing.T) {
+	migPlugin(t)
+	oldDir, newDir := migProject(t, false), migProject(t, false)
+	for _, d := range []string{oldDir, newDir} {
+		knWrite(t, filepath.Join(d, "AGENTS.md"), "# Agents\r\n\r\n<!-- hv-context-start -->\r\nold\r\n<!-- hv-context-end -->\r\n\r\nend\r\n")
+		migGit(t, d, "add", "-A", "-f")
+		migGit(t, d, "commit", "-q", "-m", "crlf agents")
+	}
+	o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
+	n := knNew(t, newDir, "", "migrate", "v4", "--apply")
+	if o.rc != 0 || n.rc != 0 {
+		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+	}
+	migSameTree(t, oldDir, newDir)
+	if strings.Contains(knTree(t, newDir)["../AGENTS.md"], "\r") {
+		t.Error("CR kept in AGENTS.md")
+	}
+}
