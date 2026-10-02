@@ -228,6 +228,8 @@ gt_case k "$GH_URL"
 RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
 [ "$RC" = 1 ] && [ "$(gt_verdict)" = merged-remotely ] || fail "gate (k): diverged local base after a remote merge must be merged-remotely (rc=$RC): $(cat "$GT_DIR.out")"
 [ "$(jget data.changed <"$GT_DIR.out")" = true ] || fail "gate (k): merged-remotely must report changed true: $(cat "$GT_DIR.out")"
+[ "$(jget data.sha <"$GT_DIR.out")" = "$(git -C "$GT_ORIGIN" rev-parse --short=7 main)" ] \
+  || fail "gate (k): merged-remotely must report the remote merge as data.sha: $(cat "$GT_DIR.out")"
 git -C "$GT_ORIGIN" merge-base --is-ancestor "$(git -C "$GT_WORKER" rev-parse HEAD)" main || fail "gate (k): the PR should be on origin/main"
 pass "a remote merge whose local fast-forward fails is merged-remotely, not unmerged"
 
@@ -237,6 +239,8 @@ printf '{"refactor":{"verifyCommands":["echo boom-marker; exit 1"]}}' > "$GT_DIR
 RC="$(gt_gate env TMPDIR="$TMP_GT" "$HV_BIN" --json worker gate w1 --base main)"
 [ "$RC" = 1 ] && [ "$(gt_verdict)" = verify-failed ] && [ "$(jget data.changed <"$GT_DIR.out")" = true ] \
   || fail "gate (g): a failed verify must be verify-failed with changed true (rc=$RC): $(cat "$GT_DIR.out")"
+[ "$(jget data.sha <"$GT_DIR.out")" = "$(git -C "$GT_DIR" rev-parse --short HEAD)" ] \
+  || fail "gate (g): verify-failed must report the merge commit as data.sha: $(cat "$GT_DIR.out")"
 grep -q "boom-marker" "$GT_DIR.err" || fail "gate (g): a failed verify must show its output: $(cat "$GT_DIR.err")"
 grep -q "boom-marker" "$TMP_GT"/hv-gate-verify-* 2>/dev/null || fail "gate (g): the verify log must be kept on failure"
 pass "verify output is shown on failure and the log is kept"
