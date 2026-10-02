@@ -32,6 +32,11 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// Root the temp dirs of child processes (the old bin/ helpers mktemp) under
+	// the tripwire dir, which is removed below (#110).
+	if tmp := filepath.Join(dir, "tmp"); os.Mkdir(tmp, 0o755) == nil {
+		os.Setenv("TMPDIR", tmp)
+	}
 	for _, k := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_PANE_ID", "HERDR_SOCKET_PATH", "HV_ACCOUNT_USAGE_DIR"} {
 		os.Unsetenv(k)
 	}

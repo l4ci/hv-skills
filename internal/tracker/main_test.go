@@ -29,6 +29,11 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// Root the temp dirs of child processes (the old bin/ helpers mktemp) under
+	// the tripwire dir, which is removed below (#110).
+	if tmp := filepath.Join(dir, "tmp"); os.Mkdir(tmp, 0o755) == nil {
+		os.Setenv("TMPDIR", tmp)
+	}
 	code := m.Run()
 	if b, err := os.ReadFile(hit); err == nil {
 		fmt.Fprintf(os.Stderr, "FAIL: tests exec'd the forge CLI from PATH:\n%s", b)
