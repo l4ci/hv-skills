@@ -700,6 +700,7 @@ func TestReleaseIssueVerbsArgsAndBackend(t *testing.T) {
 		}
 	}
 	root := umbrella(t)
+	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	for _, args := range [][]string{{"milestone-check", "M01"}, {"close-milestone", "M01", "--release", "1.2.3"}} {
 		if o := trRun(t, root, "", append(append([]string{"release"}, args...), "--json")...); o.code != 2 {
 			t.Errorf("%v at umbrella root: exit %d", args, o.code)
