@@ -125,8 +125,11 @@ func replay(t *testing.T, path string) {
 			if e.Code != s.Error.Code || e.Message != want {
 				t.Fatalf("%s: error [%d] %q, want [%d] %q", step, e.Code, e.Message, s.Error.Code, want)
 			}
-			// What hvlib_backend sniffed with _NOT_FOUND_RE is a kind now.
-			if pyNotFound.MatchString(s.Error.Message) != (e.Kind == KindNotFound) {
+			// What hvlib_backend sniffed with _NOT_FOUND_RE is a kind now. A
+			// label missing under autoCreateLabel off is also not found (the
+			// #106 contract), though Python's message doesn't say so.
+			notFound := pyNotFound.MatchString(s.Error.Message) || reMissingLabel.MatchString(s.Error.Message)
+			if notFound != (e.Kind == KindNotFound) {
 				t.Fatalf("%s: kind %d for %q", step, e.Kind, s.Error.Message)
 			}
 			continue
@@ -258,6 +261,9 @@ func dispatch(ctx context.Context, a Adapter, op string, args map[string]json.Ra
 }
 
 func (b *base) cliOf() *CLI { return b.cli }
+
+// reMissingLabel is the ensure_labels refusal when autoCreateLabel is off.
+var reMissingLabel = regexp.MustCompile(`^label '.*' does not exist \(issues\.autoCreateLabel is off\)$`)
 
 // pyNotFound is hvlib_backend._NOT_FOUND_RE.
 var pyNotFound = regexp.MustCompile(`(?i)not found|could not resolve|404`)
