@@ -355,7 +355,8 @@ GH_ISSUE_FLAGS = {
     "--limit": "limit", "-L": "limit", "--json": "json", "--add-label": "add_label",
     "--remove-label": "remove_label", "--add-assignee": "add_assignee",
     "--remove-assignee": "remove_assignee", "--reason": "reason", "-r": "reason",
-    "--comment": "comment", "-c": "comment",
+    "--comment": "comment", "-c": "comment", "-R": "repo", "--repo": "repo",
+    "-q": "jq", "--jq": "jq",
 }
 
 
@@ -369,8 +370,11 @@ def gh_issue_cmd(db, args):
         ms = gh_milestone_ref(db, one(o, "milestone")) if "milestone" in o else None
         body = text_arg(o, "body", "body_file")
         i = new_issue(db, one(o, "title", ""), body, labels, ms)
+        if "repo" in o:  # -R <owner/repo>: the issue lands there; the store records the target
+            i["repo"] = one(o, "repo")
         save(db)
-        print(gh_issue(i)["url"])
+        print(gh_issue(i, "https://github.com/%s" % i["repo"] if "repo" in i else
+                       "https://github.com/fake/repo")["url"])
     elif verb == "list":
         state = one(o, "state", "open")
         want = split_labels(o.get("label", []))
@@ -383,7 +387,12 @@ def gh_issue_cmd(db, args):
         emit([pick(gh_issue(i), fields) for i in rows])
     elif verb == "view":
         i = find_issue(db, pos[0])
-        emit(pick(gh_issue(i), fields)) if fields else print("title:\t%s" % i["title"])
+        jq = one(o, "jq")
+        if jq and re.fullmatch(r"\.\w+", jq) and fields:  # only the `.field` filter
+            v = pick(gh_issue(i), fields).get(jq[1:])
+            print(v if isinstance(v, str) else json.dumps(v))
+        else:
+            emit(pick(gh_issue(i), fields)) if fields else print("title:\t%s" % i["title"])
     elif verb == "edit":
         i = find_issue(db, pos[0])
         if "title" in o:
@@ -561,7 +570,7 @@ def gl_issue_cmd(db, args):
     flags = dict(GL_ISSUE_FLAGS)
     if verb == "note":
         flags["-m"] = "message"
-    o, b, pos = parse(rest, flags, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--comments", "--unassign"))
+    o, b, pos = parse(rest, flags, ("--yes", "-y", "--all", "-A", "--closed", "-c", "--comments", "--unassign", "--opened", "-o"))
     if verb == "create":
         labels = split_labels(o.get("label", []))
         for n in labels:

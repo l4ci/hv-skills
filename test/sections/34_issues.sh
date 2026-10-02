@@ -220,3 +220,79 @@ rc=0; (cd "$TMP_OO" && "$HV_BIN" issues imported --repo nonexistent >/dev/null 2
 
 trap 'rm -rf "$TMP"' EXIT
 pass "issues imported --open-only filters by upstream state, no-ops gracefully without gh/glab"
+
+# === issues list / label / close ===
+echo "Section 32: issues list, label and close against the fake forges"
+TMP_IV="$(mktemp -d)"
+trap 'rm -rf "$TMP_IV"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
+
+for prov in github gitlab; do
+  P="$TMP_IV/$prov"; mkdir -p "$P/.hv"
+  echo "{\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  (
+    cd "$P"
+    git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
+    # issues list/label/close detect the provider from origin, not from issues.provider
+    git remote add origin "https://$prov.com/o/r.git"
+    SHA=$(git rev-parse HEAD)
+    export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
+    [ "$(command -v "$([ "$prov" = github ] && echo gh || echo glab)")" = "$TESTDIR/fakes/$([ "$prov" = github ] && echo gh || echo glab)" ] || fail "$prov: fake forge CLI not first on PATH"
+    eq() { [ "$2" = "$3" ] || fail "$prov issues $1: expected [$2] got [$3]"; }
+    rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
+    # The fake store is the forge's own state; no verb reads raw labels, state or comments.
+    DBQ() { python3 -c '
+import json, sys
+n = int(sys.argv[2]); i = next(i for i in json.load(open(sys.argv[3]))["issues"] if i["number"] == n)
+print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
+       "comments": len(i["comments"])}[sys.argv[1]])' "$1" "$2" "$P/db.json"; }
+    if [ "$prov" = github ]; then
+      gh label create bug >/dev/null && gh issue create -t "first" -b "body one" -l bug >/dev/null && gh issue create -t "second" -b "body two" >/dev/null
+    else
+      glab issue create -t "first" -d "body one" -l bug >/dev/null && glab issue create -t "second" -d "body two" >/dev/null
+    fi
+
+    # list: both open issues, newest first, normalised shape
+    OUT=$(hvj issues list) || fail "$prov issues list failed: $OUT"
+    eq "list count" 2 "$(echo "$OUT" | jq '.data.issues | length')"
+    eq "list numbers" "2,1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
+    eq "list first title" "first" "$(echo "$OUT" | jq -r '.data.issues[] | select(.number == 1) | .title')"
+    eq "list first labels" "bug" "$(echo "$OUT" | jq -r '.data.issues[] | select(.number == 1) | .labels | join(",")')"
+    eq "list first body" "body one" "$(echo "$OUT" | jq -r '.data.issues[] | select(.number == 1) | .body')"
+    echo "$OUT" | jq -e '.data.issues[0] | has("url") and has("author")' >/dev/null || fail "$prov issues list entry misses url/author: $OUT"
+    OUT=$(hvj issues list --label bug) || fail "$prov issues list --label failed"
+    eq "list --label" "1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
+    OUT=$(hvj issues list --limit 1) || fail "$prov issues list --limit failed"
+    eq "list --limit" "1" "$(echo "$OUT" | jq '.data.issues | length')"
+    eq "list --limit 0 is usage" 2 "$(rcof "$HV_BIN" --json issues list --limit 0)"
+
+    # label: add, remove, usage and a missing issue
+    OUT=$(hvj issues label 2 --add triage) || fail "$prov issues label --add failed: $OUT"
+    eq "label add data" "2 triage add true" "$(echo "$OUT" | jq -r '.data | "\(.issue) \(.label) \(.action) \(.changed)"')"
+    eq "label add state" "triage" "$(DBQ labels 2)"
+    OUT=$(hvj issues label 2 --remove triage) || fail "$prov issues label --remove failed: $OUT"
+    eq "label remove data" "2 triage remove" "$(echo "$OUT" | jq -r '.data | "\(.issue) \(.label) \(.action)"')"
+    eq "label remove state" "" "$(DBQ labels 2)"
+    eq "label needs one of add/remove" 2 "$(rcof "$HV_BIN" --json issues label 2)"
+    eq "label rejects add+remove" 2 "$(rcof "$HV_BIN" --json issues label 2 --add a --remove b)"
+    eq "label missing issue" 5 "$(rcof "$HV_BIN" --json issues label 99 --add triage)"
+
+    # close: closes once and comments with the short sha; a repeat posts no second comment
+    OUT=$(hvj issues close 2 --commit "$SHA" --item B07) || fail "$prov issues close failed: $OUT"
+    eq "close data" "2 $SHA true" "$(echo "$OUT" | jq -r '.data | "\(.issue) \(.commit) \(.changed)"')"
+    eq "close state" closed "$(DBQ state 2)"
+    eq "close comment" 1 "$(DBQ comments 2)"
+    eq "other issue untouched" open "$(DBQ state 1)"
+    hvj issues close 2 --commit "$SHA" >/dev/null || fail "$prov repeat close should exit 0"
+    eq "repeat close adds no comment" 1 "$(DBQ comments 2)"
+    OUT=$(hvj issues list) || fail "$prov issues list after close failed"
+    eq "list drops closed" "1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
+    eq "close unknown commit" 3 "$(rcof "$HV_BIN" --json issues close 1 --commit deadbeef0000)"
+    eq "close missing issue" 5 "$(rcof "$HV_BIN" --json issues close 99 --commit "$SHA")"
+    eq "close without --commit" 2 "$(rcof "$HV_BIN" --json issues close 1)"
+    eq "close non-numeric issue" 2 "$(rcof "$HV_BIN" --json issues close abc --commit "$SHA")"
+  ) || fail "issues list/label/close on $prov failed (see subshell output above)"
+done
+
+trap 'rm -rf "$TMP"' EXIT
+rm -rf "$TMP_IV"
+pass "issues list, label and close behave on github and gitlab (data, store state, exit codes)"
