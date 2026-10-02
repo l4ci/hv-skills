@@ -114,7 +114,7 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   py "$(glab api --paginate projects/:id/issues/1/notes)" "len(d)==2" || fail "glab api notes list"
   glab api -X PUT projects/:id/issues/1/notes/2 -f body=changed >/dev/null
   py "$(glab api projects/fake%2Frepo/issues/1/notes)" "d[1]['body']=='changed'" || fail "glab note PUT"
-  glab api -X PUT projects/:id/milestones/1 -f state_event=close >/dev/null
+  glab api -X PUT projects/:id/milestones/1001 -f state_event=close >/dev/null
   py "$(glab api projects/:id/milestones)" "d[0]['state']=='closed'" || fail "glab milestone close"
   pass "glab: update, notes, api PUT"
 
