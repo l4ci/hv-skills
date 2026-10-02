@@ -101,7 +101,10 @@ func (t *tmux) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 // Send pastes the file's contents, submits, and confirms the pane changed.
 // It gives up after 4 attempts.
 func (t *tmux) Send(ctx context.Context, slot, handle, file string) error {
-	buf := "hv-" + slot
+	return t.sendFile(ctx, handle, file, "hv-"+slot)
+}
+
+func (t *tmux) sendFile(ctx context.Context, handle, file, buf string) error {
 	before := t.pane(ctx, handle)
 	if t.tmux(ctx, "load-buffer", "-b", buf, file).ExitCode != 0 {
 		return ErrNotSubmitted
@@ -182,3 +185,60 @@ func pidSuffix(alive []int) string {
 
 // Notify: tmux has no notification surface.
 func (t *tmux) Notify(ctx context.Context, title, body string) {}
+
+// OperatorOpts describes the operator window `worker session ensure` opens
+// when the orchestrator is not inside tmux.
+type OperatorOpts struct {
+	Session     string
+	Root        string // the project root, the window's cwd
+	Command     string // what the operator window runs
+	Instruction string // file pasted into it once it boots; "" for none
+	BootTimeout int
+}
+
+// Operator hosts can open an operator window (tmux only: herdr has nothing to
+// hand off to, since worker tabs open in the caller's own workspace).
+type Operator interface {
+	EnsureOperator(ctx context.Context, o OperatorOpts) error
+}
+
+// Operator failures, distinguished so the verb can word its hint.
+var (
+	ErrOperatorSession = fmt.Errorf("could not create the tmux session")
+	ErrOperatorWindow  = fmt.Errorf("could not create the operator window")
+	ErrOperatorBoot    = fmt.Errorf("the operator session did not come up")
+	ErrOperatorSend    = fmt.Errorf("the operator never picked up its instruction")
+)
+
+// EnsureOperator spawns an operator window, starts the operator command in it
+// and, with an instruction file, pastes it once the UI is up. An existing
+// operator window is replaced, not stacked: a second ensure after an
+// interrupted run must not leave two operators.
+func (t *tmux) EnsureOperator(ctx context.Context, o OperatorOpts) error {
+	if t.tmux(ctx, "has-session", "-t", o.Session).ExitCode != 0 {
+		if t.tmux(ctx, "new-session", "-d", "-s", o.Session, "-c", o.Root, "-n", "scratch").ExitCode != 0 {
+			return ErrOperatorSession
+		}
+	}
+	for _, name := range strings.Split(t.tmux(ctx, "list-windows", "-t", o.Session, "-F", "#{window_name}").Stdout, "\n") {
+		if name == "operator" {
+			t.tmux(ctx, "kill-window", "-t", o.Session+":operator")
+			break
+		}
+	}
+	if t.tmux(ctx, "new-window", "-d", "-t", o.Session, "-n", "operator", "-c", o.Root).ExitCode != 0 {
+		return ErrOperatorWindow
+	}
+	target := o.Session + ":operator"
+	t.tmux(ctx, "send-keys", "-t", target, o.Command, "C-m")
+	if o.Instruction == "" {
+		return nil
+	}
+	if !t.waitReady(ctx, target, o.BootTimeout) {
+		return ErrOperatorBoot
+	}
+	if t.sendFile(ctx, target, o.Instruction, "hv-operator") != nil {
+		return ErrOperatorSend
+	}
+	return nil
+}

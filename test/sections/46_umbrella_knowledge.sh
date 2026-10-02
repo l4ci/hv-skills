@@ -35,19 +35,19 @@ pass "F21[1]: scoped write lands in sub-repo KNOWLEDGE.md only"
 # ── 2. Hybrid query: sub-repo scope shows both files with > from:; umbrella shows only its own ──
 echo "F21: hybrid query"
 QUERY_WEB="$( cd "$TMP_UK/web" && "$BIN/hv-knowledge-query" Architecture )"
-echo "$QUERY_WEB" | grep -q "umbrella rule" \
+grep -q "umbrella rule" <<<"$QUERY_WEB" \
   || fail "F21[2]: hybrid query from web must include 'umbrella rule'"
-echo "$QUERY_WEB" | grep -q "web rule" \
+grep -q "web rule" <<<"$QUERY_WEB" \
   || fail "F21[2]: hybrid query from web must include 'web rule'"
-echo "$QUERY_WEB" | grep -q "> from:" \
+grep -q "> from:" <<<"$QUERY_WEB" \
   || fail "F21[2]: hybrid query from web must include a '> from:' provenance line"
 
 QUERY_UMBRELLA="$( cd "$TMP_UK" && "$BIN/hv-knowledge-query" Architecture )"
-echo "$QUERY_UMBRELLA" | grep -q "umbrella rule" \
+grep -q "umbrella rule" <<<"$QUERY_UMBRELLA" \
   || fail "F21[2]: umbrella-scope query must include 'umbrella rule'"
-echo "$QUERY_UMBRELLA" | grep -q "web rule" \
+grep -q "web rule" <<<"$QUERY_UMBRELLA" \
   && fail "F21[2]: umbrella-scope query must NOT include 'web rule'"
-echo "$QUERY_UMBRELLA" | grep -q "> from:" \
+grep -q "> from:" <<<"$QUERY_UMBRELLA" \
   && fail "F21[2]: umbrella-scope query must NOT include a '> from:' line"
 pass "F21[2]: hybrid query shows correct provenance per scope"
 
@@ -77,7 +77,7 @@ AMEND_ERR="$( cd "$TMP_UK/web" && "$BIN/hv-knowledge-amend" --topic Architecture
 set -e
 [ "$AMEND_RC" -ne 0 ] \
   || fail "F21[4]: amend without --repo must exit non-zero when fragment matches in multiple files"
-echo "$AMEND_ERR" | grep -qiE "multiple|disambiguate|both" \
+grep -qiE "multiple|disambiguate|both" <<<"$AMEND_ERR" \
   || fail "F21[4]: amend error must mention multiple files or disambiguation; got: $AMEND_ERR"
 
 # With --repo web: unambiguous → exit 0, amends only web file
@@ -94,9 +94,9 @@ echo "F21: glossary parity"
 grep -q "webterm" "$TMP_UK/.hv/knowledge/web/KNOWLEDGE.md" \
   || fail "F21[5]: webterm must land in .hv/knowledge/web/KNOWLEDGE.md Glossary"
 GLOSS_READ="$( cd "$TMP_UK/web" && "$BIN/hv-glossary-read" webterm )"
-echo "$GLOSS_READ" | grep -q "a web term" \
+grep -q "a web term" <<<"$GLOSS_READ" \
   || fail "F21[5]: hv-glossary-read must print the term definition"
-echo "$GLOSS_READ" | grep -q "> from: .hv/knowledge/web/KNOWLEDGE.md (## Glossary)" \
+grep -q "> from: .hv/knowledge/web/KNOWLEDGE.md (## Glossary)" <<<"$GLOSS_READ" \
   || fail "F21[5]: hv-glossary-read must include provenance line for web scope; got: $GLOSS_READ"
 pass "F21[5]: glossary write scoped to sub-repo; read shows provenance"
 
@@ -172,7 +172,7 @@ DECISIONS_ERR="$( cd "$TMP_UK" && "$BIN/hv-managed-block" decisions --repo web 2
 set -e
 [ "$DECISIONS_RC" -ne 0 ] \
   || fail "F21[8]: hv-managed-block decisions --repo web must exit non-zero (Persistence-trio scoping boundary)"
-echo "$DECISIONS_ERR" | grep -qiE "umbrella|decisions" \
+grep -qiE "umbrella|decisions" <<<"$DECISIONS_ERR" \
   || fail "F21[8]: error message must mention 'umbrella' or 'decisions'; got: $DECISIONS_ERR"
 pass "F21[8]: decisions block rejects non-umbrella --repo (Persistence-trio boundary)"
 

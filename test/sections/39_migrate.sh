@@ -83,14 +83,14 @@ EOF
 
 # Dry-run: should report 6 references rewritten, file unchanged on disk.
 OUT_DRY=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 )
-echo "$OUT_DRY" | grep -q "dry-run" || fail "dry-run header missing"
-echo "$OUT_DRY" | grep -q "references rewritten: 7" || fail "dry-run should count 7 references (6 in BACKLOG + 1 in CLAUDE)"
-echo "$OUT_DRY" | grep -q "Run with --apply" || fail "dry-run should suggest --apply"
+grep -q "dry-run" <<<"$OUT_DRY" || fail "dry-run header missing"
+grep -q "references rewritten: 7" <<<"$OUT_DRY" || fail "dry-run should count 7 references (6 in BACKLOG + 1 in CLAUDE)"
+grep -q "Run with --apply" <<<"$OUT_DRY" || fail "dry-run should suggest --apply"
 grep -q "/hv-context" "$TMP_REW/.hv/BACKLOG.md" || fail "dry-run wrote to disk (must not)"
 
 # Apply.
 OUT_APPLY=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 --apply )
-echo "$OUT_APPLY" | grep -q "applied. backup at:" || fail "--apply should report backup path"
+grep -q "applied. backup at:" <<<"$OUT_APPLY" || fail "--apply should report backup path"
 
 # Verify rewrites.
 grep -q "/hv-learn --term" "$TMP_REW/.hv/BACKLOG.md" || fail "/hv-context not rewritten"
@@ -112,7 +112,7 @@ grep -q "/hv-context" "$BACKUP_DIR/.hv/BACKLOG.md" || fail "backup didn't preser
 # Idempotency — commit the apply's writes first (realistic UX), then re-run.
 ( cd "$TMP_REW" && git add -A && git commit -q -m "v4 migration" )
 OUT_AGAIN=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 --apply )
-echo "$OUT_AGAIN" | grep -q "noop: project is already on v4" || fail "second --apply should be noop"
+grep -q "noop: project is already on v4" <<<"$OUT_AGAIN" || fail "second --apply should be noop"
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-migrate — dry-run + apply + idempotency"
 
@@ -130,11 +130,11 @@ EOF
 ( cd "$TMP_AMB" && git add -A && git commit -q -m init )
 
 OUT_AMB=$( cd "$TMP_AMB" && "$BIN/hv-migrate" v4 )
-echo "$OUT_AMB" | grep -q "manual review:" || fail "manual review section missing"
-echo "$OUT_AMB" | grep -qE "manual review:.*2|manual review:\s+2" || fail "should report 2 manual-review items"
-echo "$OUT_AMB" | grep -q "hv-issues" || fail "should flag /hv-issues"
-echo "$OUT_AMB" | grep -q "hv-map" || fail "should flag /hv-map"
-echo "$OUT_AMB" | grep -q "ambiguous" || fail "should call out ambiguity"
+grep -q "manual review:" <<<"$OUT_AMB" || fail "manual review section missing"
+grep -qE "manual review:.*2|manual review:\s+2" <<<"$OUT_AMB" || fail "should report 2 manual-review items"
+grep -q "hv-issues" <<<"$OUT_AMB" || fail "should flag /hv-issues"
+grep -q "hv-map" <<<"$OUT_AMB" || fail "should flag /hv-map"
+grep -q "ambiguous" <<<"$OUT_AMB" || fail "should call out ambiguity"
 
 # Apply should NOT rewrite ambiguous ones.
 ( cd "$TMP_AMB" && "$BIN/hv-migrate" v4 --apply >/dev/null )
@@ -212,7 +212,7 @@ chmod +x "$TMP_BIN/.hv/bin/hv-context-add" "$TMP_BIN/.hv/bin/hv-context-query"
 ( cd "$TMP_BIN" && git add -A && git commit -q -m init )
 
 OUT_BIN=$( cd "$TMP_BIN" && "$BIN/hv-migrate" v4 )
-echo "$OUT_BIN" | grep -q "removed binaries:.*2\|removed binaries: \+2" || fail "should report 2 removed binaries in dry-run"
+grep -q "removed binaries:.*2\|removed binaries: \+2" <<<"$OUT_BIN" || fail "should report 2 removed binaries in dry-run"
 
 ( cd "$TMP_BIN" && "$BIN/hv-migrate" v4 --apply >/dev/null )
 [ ! -e "$TMP_BIN/.hv/bin/hv-context-add" ] || fail "hv-context-add should be removed"

@@ -15,7 +15,7 @@ EOS
   OUT=$(PATH="$HI_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "test title" --body-file - <<<"test body" 2>/dev/null) || rc=$?
   [ "$rc" = "5" ] || fail "expected exit 5 when gh fails: rc=$rc"
   [ "$(echo "$OUT" | jget ok)" = "false" ] || fail "expected ok:false envelope: $OUT"
-  echo "$OUT" | jget error.hint | grep -q "github.com/l4ci/hv-skills/issues/new" || fail "unavailable hint missing repo URL: $OUT"
+  echo "$OUT" | jget error.hint | grep "github.com/l4ci/hv-skills/issues/new" >/dev/null || fail "unavailable hint missing repo URL: $OUT"
   pass "tracker suggest-upstream exits 5 with the manual issue URL when gh unavailable"
 )
 rm -rf "$HI_TMP"
@@ -33,7 +33,7 @@ EOS
   chmod +x stub-bin/gh
   rc=0; OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - <<<"y" 2>/dev/null) || rc=$?
   [ "$rc" = 5 ] || fail "suggest-upstream with a failing gh should exit 5 (got $rc): $OUT"
-  echo "$OUT" | jget error.hint | grep -q "github.com/fork/repo" || fail "--upstream-repo override ignored: $OUT"
+  echo "$OUT" | jget error.hint | grep "github.com/fork/repo" >/dev/null || fail "--upstream-repo override ignored: $OUT"
   pass "tracker suggest-upstream --upstream-repo override flows through to the hint URL"
 )
 rm -rf "$HI2_TMP"

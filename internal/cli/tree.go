@@ -28,6 +28,7 @@ func Tree() *Command {
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
 	root.Subs = append(root.Subs, a4Commands()...)
+	root.Subs = append(root.Subs, workerCommands())
 	return root
 }
 

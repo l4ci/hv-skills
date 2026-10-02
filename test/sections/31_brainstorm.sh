@@ -15,19 +15,19 @@ trap 'rm -rf "$DSN_TMP"' EXIT
 
   # 2. hv-design-add rejects slice-shape ID — exit 1, stderr names the regex
   ERR=$("$BIN/hv-design-add" S01 "x" 2>&1 >/dev/null) && { echo "FAIL: S01 should be rejected"; exit 1; }
-  echo "$ERR" | grep -qE '\[BFT\]\\d\{2,\}' || { echo "FAIL: stderr missing [BFT]\\d{2,} regex hint for S01: '$ERR'"; exit 1; }
+  grep -qE '\[BFT\]\\d\{2,\}' <<<"$ERR" || { echo "FAIL: stderr missing [BFT]\\d{2,} regex hint for S01: '$ERR'"; exit 1; }
 
   # 3. hv-design-add rejects milestone-shape ID — exit 1
   ERR=$("$BIN/hv-design-add" M01 "x" 2>&1 >/dev/null) && { echo "FAIL: M01 should be rejected"; exit 1; }
-  echo "$ERR" | grep -qE '\[BFT\]\\d\{2,\}' || { echo "FAIL: stderr missing regex hint for M01: '$ERR'"; exit 1; }
+  grep -qE '\[BFT\]\\d\{2,\}' <<<"$ERR" || { echo "FAIL: stderr missing regex hint for M01: '$ERR'"; exit 1; }
 
   # 4. hv-design-add conflict — exit 1, stderr says already exists
   ERR=$("$BIN/hv-design-add" F00 "again" 2>&1 >/dev/null) && { echo "FAIL: conflict on existing F00 should exit 1"; exit 1; }
-  echo "$ERR" | grep -q "already exists" || { echo "FAIL: conflict stderr missing 'already exists': '$ERR'"; exit 1; }
+  grep -q "already exists" <<<"$ERR" || { echo "FAIL: conflict stderr missing 'already exists': '$ERR'"; exit 1; }
 
   # 5. hv-design-show positive — exit 0, contains id frontmatter
   OUT=$("$BIN/hv-design-show" F00) || { echo "FAIL: hv-design-show F00 exited non-zero"; exit 1; }
-  echo "$OUT" | grep -q "^id: F00$" || { echo "FAIL: hv-design-show did not print id: F00"; exit 1; }
+  grep -q "^id: F00$" <<<"$OUT" || { echo "FAIL: hv-design-show did not print id: F00"; exit 1; }
 
   # 6. hv-design-show miss — exit 1
   if "$BIN/hv-design-show" F99 2>/dev/null; then
@@ -84,25 +84,25 @@ trap 'rm -rf "$AMD_TMP"' EXIT
   "$BIN/hv-design-amend" F00 --section Goal --replace "Ship the amend helper." \
     || { echo "FAIL: hv-design-amend --replace exited non-zero"; exit 1; }
   OUT=$("$BIN/hv-design-show" F00) || { echo "FAIL: show after replace exited non-zero"; exit 1; }
-  echo "$OUT" | grep -q "Ship the amend helper." || { echo "FAIL: replaced Goal text missing"; exit 1; }
-  echo "$OUT" | grep -q "one sentence — what shipping" && { echo "FAIL: old Goal placeholder still present after replace"; exit 1; }
-  echo "$OUT" | grep -q "the chosen shape, the moving parts" || { echo "FAIL: Design section was clobbered by Goal replace"; exit 1; }
+  grep -q "Ship the amend helper." <<<"$OUT" || { echo "FAIL: replaced Goal text missing"; exit 1; }
+  if grep -q "one sentence — what shipping" <<<"$OUT"; then echo "FAIL: old Goal placeholder still present after replace"; exit 1; fi
+  grep -q "the chosen shape, the moving parts" <<<"$OUT" || { echo "FAIL: Design section was clobbered by Goal replace"; exit 1; }
 
   # b. --append to a section — exit 0; both prior content and appended text present; next heading intact
   "$BIN/hv-design-amend" F00 --section Goal --append "And keep it atomic." \
     || { echo "FAIL: hv-design-amend --append exited non-zero"; exit 1; }
   OUT=$("$BIN/hv-design-show" F00) || { echo "FAIL: show after append exited non-zero"; exit 1; }
-  echo "$OUT" | grep -q "Ship the amend helper." || { echo "FAIL: prior Goal content lost after append"; exit 1; }
-  echo "$OUT" | grep -q "And keep it atomic." || { echo "FAIL: appended Goal text missing"; exit 1; }
-  echo "$OUT" | grep -q "^## Design$" || { echo "FAIL: ## Design heading not intact after append"; exit 1; }
+  grep -q "Ship the amend helper." <<<"$OUT" || { echo "FAIL: prior Goal content lost after append"; exit 1; }
+  grep -q "And keep it atomic." <<<"$OUT" || { echo "FAIL: appended Goal text missing"; exit 1; }
+  grep -q "^## Design$" <<<"$OUT" || { echo "FAIL: ## Design heading not intact after append"; exit 1; }
 
   # c. non-existent section — exit 1, stderr mentions section not found
   ERR=$("$BIN/hv-design-amend" F00 --section Nope --replace "x" 2>&1 >/dev/null) && { echo "FAIL: amend bogus section should exit 1"; exit 1; }
-  echo "$ERR" | grep -q "not found" || { echo "FAIL: stderr missing 'not found' for bogus section: '$ERR'"; exit 1; }
+  grep -q "not found" <<<"$ERR" || { echo "FAIL: stderr missing 'not found' for bogus section: '$ERR'"; exit 1; }
 
   # d. missing design ID (no file) — exit 1, stderr says not found
   ERR=$("$BIN/hv-design-amend" F99 --section Goal --replace "x" 2>&1 >/dev/null) && { echo "FAIL: amend missing design should exit 1"; exit 1; }
-  echo "$ERR" | grep -q "not found" || { echo "FAIL: stderr missing 'not found' for missing design: '$ERR'"; exit 1; }
+  grep -q "not found" <<<"$ERR" || { echo "FAIL: stderr missing 'not found' for missing design: '$ERR'"; exit 1; }
 
   # e. bad ID shape — exit 1
   if "$BIN/hv-design-amend" S01 --section Goal --replace "x" 2>/dev/null; then

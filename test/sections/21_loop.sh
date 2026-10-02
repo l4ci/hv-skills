@@ -53,7 +53,7 @@ F32_TMP="$(mktemp -d)"
   # start writes
   "$BIN/hv-loop-stamp" start
   T1=$("$BIN/hv-loop-stamp" read)
-  echo "$T1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
+  grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' <<<"$T1" \
     || fail "F32(f): hv-loop-stamp start must write ISO timestamp, got '$T1'"
   # idempotent first-write — second start must not overwrite
   sleep 1
@@ -133,11 +133,11 @@ EOFJ
 <!-- [Auto:Loop] M04-F32 2026-05-09 — review and articulate Forbids/Permits -->
 EOFD
   OUT=$("$BIN/hv-auto-decisions-since")
-  echo "$OUT" | grep -q 'In-loop rule' \
+  grep -q 'In-loop rule' <<<"$OUT" \
     || fail "F32(h): post-loopStart entry missing from output: $OUT"
-  echo "$OUT" | grep -q 'Pre-loop rule' \
+  grep -q 'Pre-loop rule' <<<"$OUT" \
     && fail "F32(h): pre-loopStart entry must be filtered out: $OUT"
-  echo "$OUT" | grep -q 'Forbids/Permits unresolved' \
+  grep -q 'Forbids/Permits unresolved' <<<"$OUT" \
     || fail "F32(h): unresolved status tag missing: $OUT"
   # lookup-empty when loopStartedAt is unset
   echo '{"active": []}' > .hv/status.json
@@ -216,8 +216,8 @@ touched: 2026-05-09
 - src/missing.txt:42 — broken ref
 EOF
 out="$("$BIN/hv-map-stats")"
-echo "$out" | grep -q '"name": "capture"' || { echo "FAIL: stats missing capture"; exit 1; }
-echo "$out" | grep -q '"broken_refs"' || { echo "FAIL: stats missing broken_refs"; exit 1; }
+grep -q '"name": "capture"' <<<"$out" || { echo "FAIL: stats missing capture"; exit 1; }
+grep -q '"broken_refs"' <<<"$out" || { echo "FAIL: stats missing broken_refs"; exit 1; }
 # work has 1 broken ref out of 2 entry points
 echo "$out" | python3 -c '
 import json, sys
@@ -252,8 +252,8 @@ echo "ok hv-map-index"
 # Capture (touched 2026-04-01) is older than 30 days from "today=2026-05-09";
 # work is touched 2026-05-09 and should not be flagged at days=30.
 out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-09)"
-echo "$out" | grep -q '^plan ' || { echo "FAIL: plan should be stale"; exit 1; }
-echo "$out" | grep -q '^work ' && { echo "FAIL: work should NOT be stale"; exit 1; }
+grep -q '^plan ' <<<"$out" || { echo "FAIL: plan should be stale"; exit 1; }
+if grep -q '^work ' <<<"$out"; then echo "FAIL: work should NOT be stale"; exit 1; fi
 # days=0 lists all
 out="$("$BIN/hv-staleness" map --days 0 --today 2026-05-09)"
 [ "$(echo "$out" | wc -l)" -ge 2 ] || { echo "FAIL: days=0 should list all"; exit 1; }
@@ -353,7 +353,7 @@ PY
   grep -q "touched: 2026-05-10" .hv/map/capture.md || { echo "FAIL: after-work bump"; exit 1; }
 
   out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-10)"
-  echo "$out" | grep -q "^work " || { echo "FAIL: work should be stale at days=30"; exit 1; }
+  grep -q "^work " <<<"$out" || { echo "FAIL: work should be stale at days=30"; exit 1; }
 
   count=$("$BIN/hv-map-stats" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["subsystems"]))')
   [ "$count" = "2" ] || { echo "FAIL: stats count $count != 2"; exit 1; }

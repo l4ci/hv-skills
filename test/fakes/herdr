@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Fake herdr for tests. SAFE BY CONSTRUCTION: it only appends to a log and
+# prints canned JSON, so it can stand in for the real binary inside a round
+# that itself runs in herdr. Never put the real herdr on a test's PATH.
+#
+# State lives in the directory $FAKE_HERDR (required): `log` gets one argv line
+# per call; the optional files below steer the answers:
+#   tabs               last tab number (default 6, so the first tab is w9:t7)
+#   start_not_ready    `agent start` fails with agent_not_ready
+#   gone               `agent get`/`agent read` fail with agent_not_found
+#   status             agent_status for `agent get` (default idle)
+#   wait_status        agent_status for `agent wait` (default idle)
+#   pane.txt           text returned by `agent read`
+#   prompt_error       error code `agent prompt` fails with (except /exit)
+#   tab_stays          `tab get` keeps succeeding after `tab close`
+[ -n "${FAKE_HERDR:-}" ] || { echo "fake herdr: FAKE_HERDR is not set" >&2; exit 98; }
+F="$FAKE_HERDR"
+printf '%s\n' "$*" >>"$F/log"
+err() { printf '{"error":{"code":"%s","message":"fake"},"id":"cli"}\n' "$1" >&2; exit 1; }
+agent_json() {
+  printf '{"id":"cli","result":{"type":"%s","agent":{"agent":"claude","agent_status":"%s","pane_id":"w9:p11","tab_id":"w9:t7","focused":false}}}\n' "$1" "$2"
+}
+case "$1 $2" in
+  "tab create")
+    n=$(( $(cat "$F/tabs" 2>/dev/null || echo 6) + 1 )); echo "$n" >"$F/tabs"
+    printf '{"id":"cli","result":{"type":"tab_created","tab":{"tab_id":"w9:t%s","workspace_id":"w9","label":"x","number":%s,"focused":false,"pane_count":1,"agent_status":"unknown"},"root_pane":{"pane_id":"w9:p1%s","tab_id":"w9:t%s","workspace_id":"w9"}}}\n' "$n" "$n" "$n" "$n" ;;
+  "tab close") : >"$F/closed"; echo '{"id":"cli","result":{"type":"ok"}}' ;;
+  "tab get")
+    if [ -f "$F/closed" ] && [ ! -f "$F/tab_stays" ]; then err tab_not_found; fi
+    echo '{"id":"cli","result":{"type":"tab_info"}}' ;;
+  "agent start")
+    [ -f "$F/start_not_ready" ] && err agent_not_ready
+    agent_json agent_started idle ;;
+  "agent get")
+    [ -f "$F/gone" ] && err agent_not_found
+    agent_json agent_info "$(cat "$F/status" 2>/dev/null || echo idle)" ;;
+  "agent wait") agent_json agent_info "$(cat "$F/wait_status" 2>/dev/null || echo idle)" ;;
+  "agent read")
+    [ -f "$F/gone" ] && err agent_not_found
+    python3 -c 'import json,sys; print(json.dumps({"id":"cli","result":{"type":"pane_read","read":{"text":open(sys.argv[1]).read(),"pane_id":"w9:p11"}}}))' "$F/pane.txt" ;;
+  "agent send-keys") echo '{"id":"cli","result":{"type":"ok"}}' ;;
+  "agent prompt")
+    printf '%s' "$4" >"$F/last_prompt"
+    [ -f "$F/prompt_error" ] && [ "$4" != "/exit" ] && err "$(cat "$F/prompt_error")"
+    agent_json agent_prompted working ;;
+  "pane process-info") echo '{"id":"cli","result":{"process_info":{"foreground_processes":[],"shell_pid":0}}}' ;;
+  "notification show") echo '{"id":"cli","result":{"type":"notification_show","shown":true,"reason":"shown"}}' ;;
+  *) err unknown_method ;;
+esac

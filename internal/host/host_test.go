@@ -614,3 +614,89 @@ func TestPidTreeParsesPS(t *testing.T) {
 		t.Errorf("pidTree = %v", got)
 	}
 }
+
+func TestTmuxEnsureOperator(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "i.md")
+	os.WriteFile(file, []byte("go"), 0o644)
+	keys := 0
+	f := &fake{handler: func(_ string, a []string) Result {
+		switch a[0] {
+		case "has-session":
+			return Result{ExitCode: 1}
+		case "list-windows":
+			return Result{Stdout: "scratch\noperator\n"} // a stale operator from an interrupted run
+		case "send-keys":
+			keys++
+		case "capture-pane":
+			if keys > 1 { // the launch keypress is the first; the paste's Enter is the second
+				return Result{Stdout: "? for shortcuts, after"}
+			}
+			return Result{Stdout: "? for shortcuts"}
+		}
+		return Result{}
+	}}
+	op := New("tmux", deps(f, nil, &clock{})).(Operator)
+	err := op.EnsureOperator(bg, OperatorOpts{Session: "ops", Root: "/proj", Command: "claude --continue", Instruction: file, BootTimeout: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"tmux has-session -t ops",
+		"tmux new-session -d -s ops -c /proj -n scratch",
+		"tmux list-windows -t ops -F #{window_name}",
+		"tmux kill-window -t ops:operator",
+		"tmux new-window -d -t ops -n operator -c /proj",
+		"tmux send-keys -t ops:operator claude --continue C-m",
+	}
+	if !reflect.DeepEqual(f.calls[:len(want)], want) {
+		t.Errorf("calls =\n%s", f.log())
+	}
+	if !strings.Contains(f.log(), "tmux load-buffer -b hv-operator "+file) {
+		t.Errorf("instruction not pasted:\n%s", f.log())
+	}
+}
+
+func TestTmuxEnsureOperatorFailures(t *testing.T) {
+	cases := map[string]struct {
+		fail string
+		want error
+	}{
+		"session": {"new-session", ErrOperatorSession},
+		"window":  {"new-window", ErrOperatorWindow},
+	}
+	for name, c := range cases {
+		f := &fake{handler: func(_ string, a []string) Result {
+			if a[0] == "has-session" || a[0] == c.fail {
+				return Result{ExitCode: 1}
+			}
+			return Result{}
+		}}
+		err := New("tmux", deps(f, nil, &clock{})).(Operator).EnsureOperator(bg, OperatorOpts{Session: "s", Root: "/p"})
+		if err != c.want {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "capture-pane" {
+			return Result{Stdout: "$ "}
+		}
+		return Result{}
+	}}
+	err := New("tmux", deps(f, nil, &clock{})).(Operator).EnsureOperator(bg, OperatorOpts{Session: "s", Root: "/p", Instruction: "/x", BootTimeout: 4})
+	if err != ErrOperatorBoot {
+		t.Errorf("boot: %v", err)
+	}
+	f = &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "capture-pane" {
+			return Result{Stdout: "? for shortcuts"}
+		}
+		return Result{}
+	}}
+	err = New("tmux", deps(f, nil, &clock{})).(Operator).EnsureOperator(bg, OperatorOpts{Session: "s", Root: "/p", Instruction: "/x", BootTimeout: 4})
+	if err != ErrOperatorSend {
+		t.Errorf("send: %v", err)
+	}
+	if _, ok := New("herdr", deps(f, nil, &clock{})).(Operator); ok {
+		t.Error("herdr has no operator window to open")
+	}
+}
