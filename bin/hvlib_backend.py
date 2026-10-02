@@ -125,7 +125,9 @@ class FileBackend:
             d[kind] = nxt
             result.append(nxt)
 
-        update_json(Path(".hv/counters.json"), {}, mutator)
+        # Lock as hv's Go NextID does, so a mixed-version race can't mint one ID twice.
+        with locked(Path(".hv/counters.json")):
+            update_json(Path(".hv/counters.json"), {}, mutator)
         return f"{prefix}{result[0]:02d}"
 
     def create(self, kind, title, tag="", desc="", fields=None, body=None):
