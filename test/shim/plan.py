@@ -46,3 +46,26 @@ def plan_add(ctx):
     key = out.strip()
     kind = "slice" if unit == "slice" or re.fullmatch(r"S\d+", unit) else "item"
     return {"key": key, "unitKind": kind, "changed": True}, key
+
+
+@verb("plan", "uncertain", pos=(1, 1), repo=False)
+def plan_uncertain(ctx):
+    from item import ident  # item.py owns the rule-11 id spelling
+    item = ctx.pos[0]
+    rc, out, err = ctx.helper("hv-uncertain", item)
+    msg = first_error_line(err) or f"hv-uncertain failed (rc {rc})"
+    if rc == 2:
+        raise HvError(5 if "unavailable" in err else 3, msg)
+    if rc in (3, 4):
+        raise HvError({3: 5, 4: 6}[rc], msg)
+    if rc == 1 and re.search(r"^error:", err, re.M):
+        # Old rc 1 means "certain", but a tracker failure also exits 1, with an error line.
+        raise HvError(5, msg)
+    if rc not in (0, 1):
+        raise HvError(70, msg)
+    iid, itype = ident(ctx, item)
+    reasons = [l.strip() for l in out.splitlines() if l.strip()]
+    data = {"id": iid, "type": itype, "uncertain": rc == 0, "reasons": reasons if rc == 0 else []}
+    if rc == 1:
+        raise HvError(1, f"{item} is certain", data=data)
+    return data, out

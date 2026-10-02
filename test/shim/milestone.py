@@ -53,3 +53,14 @@ def milestone_status(ctx):
         raise tracker_error(rc, err)
     # The old helper also runs hv-vision-index on every call; changed compares the status line.
     return {"id": mid, "status": to, "changed": before != to}, f"{mid} status: {to}"
+
+
+@verb("milestone", "show", pos=(1, 1), repo=False)
+def milestone_show(ctx):
+    mid = ctx.pos[0]
+    if not re.match(r"^M\d{2,}$", mid):
+        raise usage(f"{ctx.name}: <id> must look like M01")
+    rc, out, err = ctx.helper("hv-vision-show", mid)
+    if rc != 0:
+        raise tracker_error(rc, err)
+    return {"id": mid, "body": out}, out

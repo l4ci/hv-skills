@@ -244,17 +244,23 @@ def verb(*path, **spec):
 
 # Every verb the contract defines. A path here with no adapter exits 71.
 CONTRACT_VERBS = set()
+# Verbs whose contract `data` reports `changed`; the rest are read-only.
+MUTATING_VERBS = set()
 
 
 def load_contract_verbs():
     """Read the verb list from the contract's `### hv …` headings."""
     path = os.path.join(REPO, "docs", "design", "5.0-verb-contract.md")
+    current = None
     try:
         with open(path) as f:
             for line in f:
                 m = re.match(r"^### hv ((?:[a-z][\w-]*)(?: [a-z][\w-]*)*)\s*$", line)
                 if m:
-                    CONTRACT_VERBS.add(tuple(m.group(1).split()))
+                    current = tuple(m.group(1).split())
+                    CONTRACT_VERBS.add(current)
+                elif line.startswith("data:") and current and '"changed"' in line:
+                    MUTATING_VERBS.add(current)
     except OSError:
         pass
 
@@ -267,8 +273,15 @@ def backend_error(rc, err):
     if rc == 1:
         if re.search(r"usage:|unknown argument|expects|invalid|not a valid", err):
             return HvError(2, msg)
+        if "ambiguous across sub-repos" in err:
+            # Shared definitions: an ambiguous bare ID is a usage error, and the
+            # candidates use the `id` spelling (`repo:12`, rule 11).
+            return HvError(2, re.sub(r"\b([\w.-]+):[BFT](\d+)\b", r"\1:\2", msg))
         return HvError(3, msg)
-    code = {2: 4, 3: 5, 4: 6}.get(rc, 70)
+    if rc == 2:
+        # Backend mismatch: default exit-4 failure data; main() makes it 1 on read-only verbs.
+        return HvError(4, msg, data={"blockedBy": "backend", "changed": False})
+    code = {3: 5, 4: 6}.get(rc, 70)
     return HvError(code, msg)
 
 
@@ -376,7 +389,7 @@ def main(argv):
     # Conventions: a usage error is an envelope when any token before `--` is
     # exactly `--json`, since no parse exists yet to say otherwise.
     head = argv[:argv.index("--")] if "--" in argv else argv
-    as_json, name = "--json" in head, "hv"
+    as_json, name, path = "--json" in head, "hv", None
     try:
         load_contract_verbs()
         path, rest, g = scan_command(argv, set(ADAPTERS) | CONTRACT_VERBS)
@@ -401,6 +414,11 @@ def main(argv):
         data, text = fn(ctx)
         return emit(as_json, name, data, text, warnings=ctx.warnings)
     except HvError as e:
+        # Conventions: a read-only verb never exits 4. A backend refusal on one
+        # (the verb runs on the other backlog backend only) answers no: exit 1.
+        if e.exit == 4 and (e.data or {}).get("blockedBy") == "backend" \
+                and path is not None and path not in MUTATING_VERBS:
+            e.exit = 1
         return emit(as_json, name, err=e)
     finally:
         if _staged:
