@@ -289,6 +289,16 @@ def check_repo(ctx):
         raise HvError(3, err.strip() or f"unregistered sub-repo: {ctx.repo}")
 
 
+def enter_repo(ctx):
+    """For verbs that act on a checkout: run in the --repo sub-repo, not the umbrella root."""
+    if ctx.repo is None:
+        return
+    rc, out, err = ctx.helper("hv-resolve-repos", ctx.repo, cwd=find_root(ctx.cwd))
+    if rc != 0:
+        raise HvError(3, first_error_line(err) or f"unregistered sub-repo: {ctx.repo}")
+    ctx.cwd = json_body(out)[0]["path"]
+
+
 def read_text(path):
     try:
         with open(path) as f:

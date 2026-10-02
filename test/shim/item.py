@@ -161,3 +161,49 @@ def item_field_set(ctx):
     changed = True if before is None else read_text(backlog) != before
     return {"id": item, "type": item_type(item), "field": name, "value": value,
             "changed": changed}, value
+
+
+def issue_mode(ctx):
+    """True under `backlog.backend` issues (old: `python3 -m hvlib_backend is-issues`)."""
+    env = dict(os.environ, PYTHONPATH=helpers_dir() + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    return subprocess.run(["python3", "-m", "hvlib_backend", "is-issues"], cwd=ctx.cwd, env=env,
+                          capture_output=True).returncode == 0
+
+
+def type_of(ctx, item):
+    """`type` letter of an item: from its ID, else (issue mode, bare number) from hv-item-show."""
+    t = item_type(item)
+    if t:
+        return t
+    rc, out, _ = ctx.helper("hv-item-show", item)
+    m = re.search(r"^type:\s*(bug|feature|task)", out, re.M) if rc == 0 else None
+    return {"bug": "B", "feature": "F", "task": "T"}[m.group(1)] if m else None
+
+
+STATES = ("in-progress", "needs-review", "changes-requested", "none")
+
+
+@verb("item", "state", values=("to",), pos=(1, 1))
+def item_state(ctx):
+    item, to = ctx.pos[0], ctx.flags.get("to")
+    if to not in STATES:
+        raise usage(f"{ctx.name}: --to must be one of {', '.join(STATES)}")
+    if not issue_mode(ctx) and ctx.helper("hv-todo-field", item, "title")[0] != 0:
+        # The old helper is a silent no-op on the file backend; the contract says 3.
+        raise HvError(3, f"item {item} not found")
+    rc, _, err = ctx.helper("hv-item-state", item, to)
+    if rc != 0:
+        raise backend_error(rc, err)
+    # File backend: silent no-op, so nothing changed. Issue mode cannot tell if the label matched.
+    return ({"id": item, "type": type_of(ctx, item), "state": None if to == "none" else to,
+             "changed": issue_mode(ctx)}, f"{item} state: {to}")
+
+
+@verb("item", "reopen", pos=(1, 1))
+def item_reopen(ctx):
+    item = ctx.pos[0]
+    rc, _, err = ctx.helper("hv-uncomplete", item)
+    if rc != 0:
+        raise backend_error(rc, err)
+    return ({"id": item, "type": type_of(ctx, item), "changed": "already active" not in err},
+            f"reopened {item}")
