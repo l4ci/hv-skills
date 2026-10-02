@@ -8,6 +8,9 @@ Env: FAKE_TRACKER_DB   JSON store path (required unless FAKE_TRACKER_DB_DIR; cre
      FAKE_TRACKER_FAIL if set, any call whose argv contains it fails (exit 1)
      FAKE_TRACKER_FAIL_MSG extra stderr text on that failure (e.g. "secondary rate limit" makes hv-tracker-call exit 4)
 Only the subset hv uses is implemented; anything else exits 2.
+Ids are realistic where hv must not mix them up: gh `issue view --json comments` gives
+GraphQL node ids (the REST id is in the comment url), and glab's global `id` differs from
+the project-scoped `iid` (milestone ids are offset by GL_MILESTONE_ID).
 """
 import json
 import os
@@ -18,6 +21,9 @@ import sys
 from datetime import datetime, timezone
 
 USER = "fake-user"
+GL_MILESTONE_ID = 1000  # glab milestone `id` = iid + this
+GL_ISSUE_ID = 5000      # glab issue `id` = iid + this
+GL_MR_ID = 7000         # glab MR `id` = iid + this
 
 
 class Fail(Exception):
@@ -182,7 +188,7 @@ def gh_pr(p):
 
 
 def gl_mr(p):
-    out = {"iid": p["number"], "title": p["title"], "description": p["body"],
+    out = {"id": p["number"] + GL_MR_ID, "iid": p["number"], "title": p["title"], "description": p["body"],
            "source_branch": p["head"], "target_branch": p["base"],
            "state": "opened" if p["state"] == "open" else p["state"],
            "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
@@ -278,7 +284,8 @@ def gh_pr_cmd(db, args):
 GL_MR_FLAGS = {"--title": "title", "-t": "title", "--description": "desc", "-d": "desc",
                "--source-branch": "head", "-s": "head", "--target-branch": "base", "-b": "base",
                "--output": "output", "-O": "output", "--per-page": "per_page", "-P": "per_page",
-               "--state": "state", "--message": "message", "-m": "message"}
+               "--state": "state", "--message": "message", "-m": "message",
+               "--auto-merge": "auto_merge", "--sha": "sha"}
 
 
 def gl_mr_cmd(db, args):
@@ -324,7 +331,8 @@ def gh_issue(i, base_url="https://github.com/fake/repo"):
         "url": "%s/issues/%d" % (base_url, i["number"]),
         "closedAt": i["closed_at"],
         "assignees": [{"login": a} for a in i["assignees"]],
-        "comments": [{"id": c["id"], "body": c["body"],
+        "comments": [{"id": "IC_fake%d" % c["id"], "body": c["body"],
+                      "url": "%s/issues/%d#issuecomment-%d" % (base_url, i["number"], c["id"]),
                       "author": {"login": c["author"]}} for c in i["comments"]],
     }
 
@@ -524,7 +532,7 @@ def run_gh(db, args):
 # ---------------------------------------------------------------- glab
 def gl_issue(i):
     return {
-        "iid": i["number"], "title": i["title"], "description": i["body"],
+        "id": i["number"] + GL_ISSUE_ID, "iid": i["number"], "title": i["title"], "description": i["body"],
         "labels": list(i["labels"]),
         "milestone": ({"title": i["milestone"][0], "iid": i["milestone"][1]}
                       if i["milestone"] else None),
@@ -654,7 +662,7 @@ def gl_api(db, args):
     rest = m.group(1)
 
     def gm(x):
-        return {"id": x["number"], "iid": x["number"], "title": x["title"],
+        return {"id": x["number"] + GL_MILESTONE_ID, "iid": x["number"], "title": x["title"],
                 "description": x["description"], "state": "closed" if x["state"] == "closed" else "active"}
     if rest == "milestones" and method == "GET":
         emit([gm(x) for x in db["milestones"]])
@@ -663,7 +671,7 @@ def gl_api(db, args):
         save(db)
         emit(gm(x))
     elif re.match(r"^milestones/\d+$", rest) and method == "PUT":
-        x = ms_by_number(db, rest.split("/")[1])
+        x = ms_by_number(db, int(rest.split("/")[1]) - GL_MILESTONE_ID)
         for k in ("title", "description"):
             if k in fields:
                 x[k] = fields[k]
