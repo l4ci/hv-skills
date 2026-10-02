@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Print an item's status block, read back from the issue and its comments (issue mode): title, type,
+# open/closed, workflow state label, claim holder, assignee, milestone, the marker notes present
+# (design / plan / proof) and every `hv:comment` row (same rows as `hv-item-comment --list`).
+# A fresh session resumes an item from this output. Read-only: posts no claim, release or comment.
+# File backend: exit 2 (the state lives in BACKLOG.md, status.json and the detail file's ## Log).
+# Reader helper: exit 0; exit 1 on usage error or unknown item; exit 2 backend unavailable;
+#   exit 3 tracker unavailable; exit 4 rate-limited.
+# Usage: hv-item-show <ref>
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/hv-preamble.sh"
+USAGE="usage: hv-item-show <ref>"
+REF="${1:?$USAGE}"
+[ $# -eq 1 ] || { echo "$USAGE" >&2; exit 1; }
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REF" <<'PY'
+import sys
+from hvlib import get_backend, BackendUnavailable, TrackerError, tracker_exit_code, format_comment_rows
+
+def die(msg, code=1):
+    sys.stderr.write(f"error: hv-item-show: {msg}\n"); sys.exit(code)
+
+try:
+    s = get_backend().status(sys.argv[1])
+except BackendUnavailable as e:
+    die(str(e), 2)
+except TrackerError as e:
+    die(e.message, tracker_exit_code(e))
+except (LookupError, ValueError) as e:
+    die(e.args[0])
+print(f"[{s['id']}] {s['title']}")
+print(f"type: {s['type']}")
+print(f"status: {s['status']}")
+print(f"state: {s['state'] or 'none'}")
+print(f"claimed by: {s['claim'] or 'none'}")
+print(f"assignee: {', '.join(s['assignees']) or 'none'}")
+print(f"milestone: {s['milestone'] or 'none'}")
+print(f"notes: {', '.join(s['notes']) or 'none'}")
+print(f"comments: {len(s['comments'])}")
+if s["comments"]:
+    print(format_comment_rows(s["comments"]))
+PY

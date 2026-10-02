@@ -370,7 +370,7 @@ git checkout -b <branch>
 
 For umbrella-mode branch creation (single sub-repo, multi-repo, Layout B worktree), see `references/umbrella-mode.md` *Branch creation* — that reference owns the canonical umbrella ceremony.
 
-**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`). Once the branch exists, per item: run `.hv/bin/hv-item-ready <ID>`. Exit 1 prints what is missing: warn the user interactively; under `autonomy.level: "loop"` refuse the item. Then claim it with `.hv/bin/hv-item-claim <ID> --as <branch>`. Exit 5 means another worker holds it: drop that item from the wave and continue with the rest (or stop when none remain). Exit 3 or 4: stop and report. Load each item's context as the reference's "Resuming an item" describes before planning tasks.
+**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`). Once the branch exists, per item: run `.hv/bin/hv-item-ready <ID>`. Exit 1 prints what is missing: warn the user interactively; under `autonomy.level: "loop"` refuse the item. Then claim it with `.hv/bin/hv-item-claim <ID> --as <branch>`. Exit 5 means another worker holds it: drop that item from the wave and continue with the rest (or stop when none remain). Exit 3 or 4: stop and report. Load each item's context as the reference's "Resuming an item" describes (start with `.hv/bin/hv-item-show <ID>`) before planning tasks.
 
 Orchestrator stays at the repo root (or umbrella root in umbrella mode); workers `cd` into their assigned directory before any file operation, and use absolute paths in their briefs.
 

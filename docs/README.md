@@ -46,6 +46,7 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 
 - [Configuration](usage/configuration.md): every key in `.hv/config.json` and what it does
 - [Autonomy levels](usage/autonomy.md): how `off` / `auto` / `loop` change skill chaining
+- [Issue backend](usage/issue-backend.md): backlog on GitHub/GitLab issues, setup, labels, milestones, `/hv-migrate issues`
 - [Umbrella mode](usage/umbrella-mode.md): coordinator at umbrella, work in sub-repos (M02 V1)
 
 ### Reference

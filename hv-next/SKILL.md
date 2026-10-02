@@ -180,7 +180,7 @@ Recommend using this priority order:
 
 If the active milestone has no captured items yet, surface that in the suggestion line — *"M01 has no items yet; consider running `/hv-capture` to seed it"* — and then suggest the best general-backlog item.
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): items labelled `changes-requested` rank first (after P0 bugs): a reviewer already asked for changes and the work is half done. The `hv-todo-drift` hint does not apply (the helper refuses in issue mode): skip any `todoDrift` / `todoSymbolDrift` nudge. When an item is picked, load its context per the reference's "Resuming an item" (`hv-todo-field --dump <ID>`, `hv-item-note <ID> --kind design|plan --show`, the issue comments) and pass it to `/hv-work`.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): items labelled `changes-requested` rank first (after P0 bugs): a reviewer already asked for changes and the work is half done. The `hv-todo-drift` hint does not apply (the helper refuses in issue mode): skip any `todoDrift` / `todoSymbolDrift` nudge. When an item is picked, load its context per the reference's "Resuming an item" (`hv-item-show <ID>` for state, claim, assignee and comments, `hv-todo-field --dump <ID>`, `hv-item-note <ID> --kind design|plan --show`, the issue comments) and pass it to `/hv-work`.
 
 Skip items already active. Present:
 

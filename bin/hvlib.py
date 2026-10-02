@@ -19,6 +19,7 @@ from hvlib_io import (
 )
 from hvlib_backend import (
     get_backend, FileBackend, IssueBackend, BackendUnavailable, ProofMissing, require_file_backend,
+    format_comment_rows,
     resolve_item_ref, parse_fields_block, render_fields_block, tracker_exit_code,
 )
 from hvlib_config import CONFIG_KEYS, config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS

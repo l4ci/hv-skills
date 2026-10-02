@@ -399,6 +399,34 @@ class FileBackend:
 
     note_put = note_rm = note_get
 
+    def status(self, item_id):
+        raise BackendUnavailable("file backend has no item status block: see BACKLOG.md, status.json and the detail file")
+
+    def comments_list(self, item_id, kind=None):
+        """Rows of the detail file's `## Log` section, oldest first, as
+        [{"kind", "who": <date>, "text"}]; [] when there is no log.
+        LookupError for an unknown ID."""
+        if kind is not None and kind not in COMMENT_KINDS:
+            raise ValueError(f"comment kind must be one of {'/'.join(COMMENT_KINDS)}")
+        if find_origin_bullet(load_backlog_corpus("."), item_id) is None:
+            raise LookupError(f"[{item_id}] not found in BACKLOG.md or ARCHIVE.md")
+        content = self.detail_text(item_id)
+        span = find_section(content, "Log") if content else None
+        if span is None:
+            return []
+        rows = []
+        for line in content[span[0]:span[1]].split("\n"):
+            m = re.match(r"- (\S+) \u00b7 (\w+) \u00b7 (.*)$", line)
+            if m:
+                rows.append({"kind": m.group(2), "who": m.group(1), "text": m.group(3)})
+            elif rows and line.startswith("  "):
+                rows[-1]["text"] += "\n" + line[2:]
+            elif rows and not line.strip():
+                rows[-1]["text"] += "\n"
+        for r in rows:
+            r["text"] = r["text"].rstrip("\n")
+        return [r for r in rows if kind in (None, r["kind"])]
+
     def comment_add(self, item_id, kind, text):
         """Append `- <date> · <kind> · <first line>` (continuation lines indented
         two spaces) under `## Log` in the item's detail file, creating the file
@@ -424,6 +452,16 @@ class FileBackend:
             else:
                 new = content.rstrip("\n") + f"\n\n## Log\n\n{row}"
             write_text_atomic(path, new)
+
+
+def format_comment_rows(rows):
+    """`- <who> \u00b7 <kind> \u00b7 <first line>` per comment, continuation lines indented."""
+    out = []
+    for r in rows:
+        first, *rest = (r["text"] or "").split("\n")
+        out.append(f"- {r['who'] or '?'} \u00b7 {r['kind']} \u00b7 {first}")
+        out.extend(f"  {l}" if l.strip() else "" for l in rest)
+    return "\n".join(out)
 
 
 # --- issue backend ---------------------------------------------------------
@@ -484,8 +522,9 @@ def _note_parts(kind, text):
 _FIELDS_OPEN = "<!-- hv:fields"
 _FIELDS_RE = re.compile(r"\n*<!-- hv:fields\n(?P<body>.*?)\n?-->[ \t]*\n*\Z", re.DOTALL)
 _FIELD_LINE_RE = re.compile(r"^([A-Za-z]+):[ \t]*(.*?)[ \t]*$")
-# Fields that live in the body block: everything except what the tracker or git supplies.
-_BLOCK_FIELDS = tuple(n for n in _TODO_FIELD_NAMES if n not in ("Milestone", "Since", "Detail"))
+# Fields that live in the body block: everything except what the tracker supplies. Since (the HEAD
+# anchor of the file backend) is only ever written by hv-migrate-issues, never by capture.
+_BLOCK_FIELDS = tuple(n for n in _TODO_FIELD_NAMES if n not in ("Milestone", "Detail"))
 _ITEM_REF_RE = re.compile(rf"^(?:#(?P<n1>\d+)|(?P<t>[{ITEM_TYPES}])?(?P<n2>\d+))$", re.IGNORECASE)
 _SECTION_FOR_LETTER = {"B": "Bugs", "F": "Features", "T": "Tasks"}
 _NOT_FOUND_RE = re.compile(r"not found|could not resolve|404", re.IGNORECASE)
@@ -782,8 +821,10 @@ class IssueBackend:
                 1, f"milestone {value} not found on the tracker \u2014 create it with /hv-vision (M07-S05)")
         return title
 
-    def create(self, kind, title, tag="", desc="", fields=None, body=None):
+    def create(self, kind, title, tag="", desc="", fields=None, body=None, since=None):
         """Capture one item as an issue and return its ID (`F42`).
+
+        `since` (migration only): a file-backend `Since:` anchor kept in the fields block.
 
         Labels: type, `<priorityPrefix><n>` for P-tags, `<sizePrefix><Tag>` for
         sizes. Body: desc, then `body` (bytes, a detail file's content) after a
@@ -801,6 +842,8 @@ class IssueBackend:
         ms_title = self._milestone_title(fields.pop("Milestone")) if "Milestone" in fields else None
         text = "\n\n".join(p for p in ((desc or "").strip(),
                                        body.decode(errors="replace").strip("\n") if body is not None else "") if p)
+        if since and str(since).strip():
+            fields["Since"] = _one_line(str(since))
         full = render_fields_block(text, fields)
         self.adapter.ensure_labels(labels, auto_create=bool(config_value(self.cfg, "issues.autoCreateLabel")))
         number = self.adapter.create(title, full, labels, milestone=ms_title)
@@ -917,6 +960,51 @@ class IssueBackend:
             raise ValueError(f"comment kind must be one of {'/'.join(COMMENT_KINDS)}")
         return self.adapter.add_comment(
             self._number(ref), f"<!-- hv:comment {kind} -->\n{_note_norm(text)}")
+
+    def comments_list(self, ref, kind=None):
+        """Context comments oldest first: [{"kind", "who": <author>, "text"}],
+        optionally only `kind`. Read-only. LookupError for an unknown item."""
+        if kind is not None and kind not in COMMENT_KINDS:
+            raise ValueError(f"comment kind must be one of {'/'.join(COMMENT_KINDS)}")
+        return self._comment_rows(self.adapter.comments(self._require(ref)[0]["number"]), kind)
+
+    @staticmethod
+    def _comment_rows(comments, kind=None):
+        rows = []
+        for c in comments:
+            m = _COMMENT_RE.match(c["body"].replace("\r\n", "\n"))
+            if m and kind in (None, m.group(1)):
+                rows.append({"kind": m.group(1), "who": c.get("author", ""),
+                             "text": c["body"].replace("\r\n", "\n")[m.end():].strip("\n")})
+        return rows
+
+    def status(self, ref):
+        """Read-only status block of one item, from the issue and its comments:
+        id, title, type, status (open|closed), state (workflow label or ""),
+        claim (holder or ""), assignees, milestone, notes (kinds present),
+        comments (rows as comments_list). LookupError for an unknown item."""
+        issue, item_id = self._require(ref)
+        comments = self.adapter.comments(issue["number"])
+        _text, block = parse_fields_block(issue["body"])
+        state = [l for l in self._state_labels() if l in issue["labels"]]
+        held = self._open_claims(issue["number"], comments)
+        notes = []
+        for c in comments:
+            m = _MARKER_RE.match(c["body"].replace("\r\n", "\n"))
+            if m and m.group(1) not in notes:
+                notes.append(m.group(1))
+        return {
+            "id": item_id,
+            "title": _one_line(issue["title"].replace("*", "")) or "(untitled)",
+            "type": {"B": "bug", "F": "feature", "T": "task"}[self._letter(issue)],
+            "status": issue["state"],
+            "state": ",".join(state),
+            "claim": held[0] if held else "",
+            "assignees": list(issue["assignees"]),
+            "milestone": self._milestone(issue, block),
+            "notes": notes,
+            "comments": self._comment_rows(comments),
+        }
 
     def append(self, *_a, **_k):
         raise BackendUnavailable("issue mode creates items with hv-item-create")
@@ -1224,10 +1312,10 @@ class IssueBackend:
 
     # -- claim lock, readiness, state labels ---------------------------------
 
-    def _open_claims(self, n):
+    def _open_claims(self, n, comments=None):
         """Claim ids with no later release, in claim order (earliest holds)."""
         held = []
-        for c in self.adapter.comments(n):
+        for c in (self.adapter.comments(n) if comments is None else comments):
             m = _CLAIM_RE.match(c["body"].replace("\r\n", "\n"))
             if not m:
                 continue
@@ -1379,6 +1467,7 @@ class IssueBackend:
 _STATE_ROLES = ("inProgress", "needsReview", "changesRequested", "blocked")
 _STATE_ROLE_FOR = {"in-progress": "inProgress", "needs-review": "needsReview",
                    "changes-requested": "changesRequested", "none": None}
+_COMMENT_RE = re.compile(r"^<!-- hv:comment (\w+) -->(?:\n|\Z)")
 _CLAIM_RE = re.compile(r"^<!-- hv:(claim|release) (\S+) -->")
 _ACCEPT_HEADING_RE = re.compile(r"^#{1,6}[ \t]+.*acceptance", re.IGNORECASE | re.MULTILINE)
 _CHECKBOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[[ xX]\]", re.MULTILINE)
@@ -1651,6 +1740,14 @@ class UmbrellaIssueBackend(IssueBackend):
     def comment_add(self, ref, kind, text):
         sub, plain = self._owner(ref)
         return sub.comment_add(plain, kind, text)
+
+    def comments_list(self, ref, kind=None):
+        sub, plain = self._owner(ref)
+        return sub.comments_list(plain, kind)
+
+    def status(self, ref):
+        sub, plain = self._owner(ref)
+        return sub.status(plain)
 
     def complete(self, ref, hash_s, date_s, reason="done", note="", proof_show=None):
         sub, plain = self._owner(ref)
