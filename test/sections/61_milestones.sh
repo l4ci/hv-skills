@@ -1,4 +1,4 @@
-echo "Issue mode: native milestones, tracking issues, vision helpers, slice plan notes"
+echo "Issue mode: native milestones, tracking issues, milestone verbs, slice plan notes"
 
 TMP_MS="$(mktemp -d)"
 trap 'rm -rf "$TMP_MS"' EXIT
@@ -12,47 +12,63 @@ for prov in github gitlab; do
     printf '# Project\n' > CLAUDE.md
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov $1: expected [$2] got [$3]"; }
-    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
+    # RC <hv call>: exit code in RCV, stdout (the envelope) in OUT
+    RC() { local rc=0; OUT="$("$@" 2>/dev/null)" || rc=$?; RCV=$rc; }
+    # The fake tracker's own store stands in for reading the forge.
     # ISSUE n -> state|reason|sorted labels|native milestone
-    ISSUE() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-i = adapter_for(load_config()).get(int(sys.argv[1]))
-print("|".join([i["state"], str(i["state_reason"]), ",".join(sorted(i["labels"])), str(i["milestone"])]))' "$1"; }
+    ISSUE() { PROV="$prov" DBF="$P/db.json" python3 -c '
+import json, os, sys
+d = json.load(open(os.environ["DBF"]))
+i = next(x for x in d["issues"] if x["number"] == int(sys.argv[1]))
+r = (i["state_reason"] or "").lower().replace(" ", "_") or None
+if i["state"] == "closed" and os.environ["PROV"] == "gitlab":
+    r = "not_planned" if "not-planned" in i["labels"] else "completed"
+ms = i["milestone"]
+print("|".join([i["state"], str(r), ",".join(sorted(i["labels"])), str(ms[0] if isinstance(ms, list) else ms)]))' "$1"; }
     # NATIVE MNN -> state of the native milestone whose title starts with MNN
-    NATIVE() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-print(",".join(m["state"] for m in adapter_for(load_config()).milestones("all") if m["title"].startswith(sys.argv[1] + " ")))' "$1"; }
+    NATIVE() { DBF="$P/db.json" python3 -c '
+import json, os, sys
+d = json.load(open(os.environ["DBF"]))
+print(",".join(m["state"] for m in d["milestones"] if m["title"].startswith(sys.argv[1] + " ")))' "$1"; }
     # SUMMARY -> id:status:ready:depends per milestone
-    SUMMARY() { "$BIN/hv-vision-list" 2>/dev/null | python3 -c '
+    SUMMARY() { hvj milestone list 2>/dev/null | python3 -c '
 import json, sys
-print(" ".join("%s:%s:%s:%s" % (m["id"], m["status"], str(m["ready"]).lower(), "+".join(m["depends"])) for m in json.load(sys.stdin)))'; }
+print(" ".join("%s:%s:%s:%s" % (m["id"], m["status"], str(m["ready"]).lower(), "+".join(m["depends"])) for m in json.load(sys.stdin)["data"]["milestones"]))'; }
+    # SEED_TRACKER <title> <body>: a tracking issue made straight on the forge
+    SEED_TRACKER() {
+      if [ "$prov" = github ]; then
+        hvj tracker call -- issue create --title "$1" --body "$2" --label milestone-tracker >/dev/null
+      else
+        hvj tracker call -- issue create --title "$1" --description "$2" --label milestone-tracker -y >/dev/null
+      fi
+    }
 
     # --- ID minting, add, list shape
-    eq "empty list" "[]" "$("$BIN/hv-vision-list")"
-    eq "first id" "M01" "$("$BIN/hv-vision-add" "Alpha" "First summary")"
-    eq "second id" "M02" "$("$BIN/hv-vision-add" "Beta" "Second summary" "M01")"
+    eq "empty list" "[]" "$(hvj milestone list | jget data.milestones)"
+    eq "first id" "M01" "$(hvj milestone add --title "Alpha" --summary "First summary" | jget data.id)"
+    eq "second id" "M02" "$(hvj milestone add --title "Beta" --summary "Second summary" --depends M01 | jget data.id)"
     eq "list shape" "M01:planned:true: M02:planned:false:M01" "$(SUMMARY)"
-    eq "list keys" "id,title,status,depends,ready" "$("$BIN/hv-vision-list" | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)[0]))')"
-    eq "list titles" "Alpha|Beta" "$("$BIN/hv-vision-list" | python3 -c 'import json,sys; print("|".join(m["title"] for m in json.load(sys.stdin)))')"
+    eq "list keys" "id,title,status,depends,ready" "$(hvj milestone list | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)["data"]["milestones"][0]))')"
+    eq "list titles" "Alpha|Beta" "$(hvj milestone list | python3 -c 'import json,sys; print("|".join(m["title"] for m in json.load(sys.stdin)["data"]["milestones"]))')"
     eq "tracking issue" "open|None|milestone-tracker,status:planned|M01 — Alpha" "$(ISSUE 1)"
     eq "tracking issue with deps" "open|None|milestone-tracker,status:planned|M02 — Beta" "$(ISSUE 2)"
     eq "native open" "open" "$(NATIVE M01)"
-    PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov native milestone fields"
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-ms = {m["title"]: m for m in a.milestones("all")}
+    python3 - "$P/db.json" <<'PY' || fail "$prov native milestone fields"
+import json, sys
+d = json.load(open(sys.argv[1]))
+ms = {m["title"]: m for m in d["milestones"]}
 assert ms["M01 — Alpha"]["description"] == "First summary", ms
 assert isinstance(ms["M01 — Alpha"]["number"], int)
-body = a.get(2)["body"]
+issues = {i["number"]: i for i in d["issues"]}
+body = issues[2]["body"]
 assert body.startswith("---\nid: M02\ntitle: Beta\nstatus: planned\ndepends: [M01]\n"), body
 assert "\n# M02 — Beta\n\n## Goal\n\nSecond summary\n" in body, body
 assert body.endswith("<!-- hv:fields\nDepends: M01\n-->"), body
-assert a.get(1)["body"].count("hv:fields") == 0
+assert issues[1]["body"].count("hv:fields") == 0
 PY
 
     # gaps and closed milestones count toward the next ID
+    # white-box: kept until the A8 Go unit test lands (#52), then delete
     PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import adapter_for, load_config
 a = adapter_for(load_config())
@@ -64,72 +80,75 @@ assert [m["title"] for m in a.milestones("all")][-1] == "M09 — closed holder"
 a.edit_milestone(n, description="renamed")
 assert [m for m in a.milestones("all") if m["number"] == n][0]["description"] == "renamed"
 PY
-    eq "id after gap and closed max" "M10" "$("$BIN/hv-vision-add" "Tenth" "Skips ahead")"
-    ERR "$BIN/hv-next-id" milestones
-    eq "hv-next-id still refuses" "2" "$ERRRC"
+    eq "id after gap and closed max" "M10" "$(hvj milestone add --title "Tenth" --summary "Skips ahead" | jget data.id)"
+    RC hvj id next --kind milestones
+    eq "id next still refuses" "4" "$RCV"
+    eq "id next refusal names the backend" "backend" "$(jget data.blockedBy <<<"$OUT")"
 
     # --- status transitions
-    "$BIN/hv-vision-status" M01 active >/dev/null
+    eq "status changed" "true" "$(hvj milestone status M01 --to active | jget data.changed)"
     eq "active labels" "open|None|milestone-tracker,status:active|M01 — Alpha" "$(ISSUE 1)"
-    eq "active listed" "M01" "$("$BIN/hv-vision-active")"
-    eq "frontmatter synced" "status: active" "$("$BIN/hv-vision-show" M01 | sed -n 4p)"
-    "$BIN/hv-vision-status" M01 shipped >/dev/null
+    eq "active listed" '["M01"]' "$(hvj milestone active | jget data.ids)"
+    eq "frontmatter synced" "status: active" "$(hvj milestone show M01 | jget data.body | sed -n 4p)"
+    hvj milestone status M01 --to shipped >/dev/null || fail "$prov status shipped failed"
     eq "shipped closes completed" "closed|completed|milestone-tracker,status:shipped|M01 — Alpha" "$(ISSUE 1)"
     eq "shipped closes native milestone" "closed" "$(NATIVE M01)"
-    eq "shipped frontmatter" "status: shipped" "$("$BIN/hv-vision-show" M01 | sed -n 4p)"
+    eq "shipped frontmatter" "status: shipped" "$(hvj milestone show M01 | jget data.body | sed -n 4p)"
     case "$(SUMMARY)" in "M01:shipped:true: M02:planned:true:M01 "*) ;; *) fail "$prov ready after ship: $(SUMMARY)" ;; esac
-    "$BIN/hv-vision-status" M02 archived >/dev/null
+    hvj milestone status M02 --to archived >/dev/null || fail "$prov status archived failed"
     eq "archived closes not planned" "closed|not_planned" "$(ISSUE 2 | cut -d'|' -f1,2)"
     eq "archived closes native milestone" "closed" "$(NATIVE M02)"
-    "$BIN/hv-vision-status" M02 planned >/dev/null
+    hvj milestone status M02 --to planned >/dev/null || fail "$prov status planned failed"
     eq "planned reopens" "open|None|milestone-tracker,status:planned|M02 — Beta" "$(ISSUE 2)"
     eq "planned reopens native milestone" "open" "$(NATIVE M02)"
-    "$BIN/hv-vision-status" M02 shipped >/dev/null
+    hvj milestone status M02 --to shipped >/dev/null || fail "$prov status shipped (M02) failed"
     eq "archived -> planned -> shipped reads completed" "closed|completed|milestone-tracker,status:shipped|M02 — Beta" "$(ISSUE 2)"
-    "$BIN/hv-vision-status" M02 active >/dev/null
-    "$BIN/hv-vision-status" M01 active >/dev/null
+    hvj milestone status M02 --to active >/dev/null || fail "$prov status active (M02) failed"
+    hvj milestone status M01 --to active >/dev/null || fail "$prov status active (M01) failed"
     eq "shipped -> active reopens issue" "open|None|milestone-tracker,status:active|M01 — Alpha" "$(ISSUE 1)"
     eq "shipped -> active reopens milestone" "open" "$(NATIVE M01)"
-    "$BIN/hv-vision-status" M01 shipped >/dev/null
+    hvj milestone status M01 --to shipped >/dev/null || fail "$prov status shipped (M01) failed"
     STATE_CALLS() { grep -cE 'issue (close|reopen)' "$P/log" || true; }
     before="$(STATE_CALLS)"; state="$(ISSUE 1)"
-    "$BIN/hv-vision-status" M01 shipped >/dev/null
+    eq "re-status reports unchanged" "false" "$(hvj milestone status M01 --to shipped | jget data.changed)"
     eq "re-status keeps state" "$state" "$(ISSUE 1)"
     eq "re-status adds no close/reopen" "$before" "$(STATE_CALLS)"
-    ERR "$BIN/hv-vision-status" M99 active
-    eq "status unknown id" "1" "$ERRRC"
-    ERR "$BIN/hv-vision-status" M01 bogus
-    eq "status bad value" "1" "$ERRRC"
+    RC hvj milestone status M99 --to active
+    eq "status unknown id" "3" "$RCV"
+    RC hvj milestone status M01 --to bogus
+    eq "status bad value" "2" "$RCV"
 
     # --- show / put round trip
-    "$BIN/hv-vision-show" M02 > "$P/m02.md"
+    "$HV_BIN" milestone show M02 > "$P/m02.md" || fail "$prov milestone show M02 failed"
     eq "show starts with frontmatter" "---" "$(head -1 "$P/m02.md")"
     case "$(cat "$P/m02.md")" in *'hv:fields'*) fail "$prov show leaks the fields block" ;; esac
     printf '\n## Extra section\n\nLonger plan text.\n' >> "$P/m02.md"
     sed -i 's/^depends: .*/depends: [M01, M05]/' "$P/m02.md"
-    "$BIN/hv-vision-put" M02 --body-file "$P/m02.md"
-    eq "put round trip" "$(cat "$P/m02.md" | sed 's/^status: .*/status: active/')" "$("$BIN/hv-vision-show" M02)"
+    eq "put changed" "true" "$(hvj milestone put M02 --body-file "$P/m02.md" | jget data.changed)"
+    eq "put round trip" "$(sed 's/^status: .*/status: active/' "$P/m02.md")" "$("$HV_BIN" milestone show M02)"
     eq "put updates depends" "M02:active:false:M01+M05" "$(SUMMARY | tr ' ' '\n' | grep '^M02')"
     sed -i 's/^status: .*/status: shipped/' "$P/m02.md"
-    "$BIN/hv-vision-put" M02 --body-file - < "$P/m02.md"
-    eq "put keeps status label authoritative" "status: active" "$("$BIN/hv-vision-show" M02 | sed -n 4p)"
-    ERR "$BIN/hv-vision-put" M02 --body-file "$P/missing.md"
-    eq "put unreadable body" "1" "$ERRRC"
+    hvj milestone put M02 --body-file - < "$P/m02.md" >/dev/null || fail "$prov put from stdin failed"
+    eq "put keeps status label authoritative" "status: active" "$(hvj milestone show M02 | jget data.body | sed -n 4p)"
+    eq "put of the same body is unchanged" "false" "$(hvj milestone put M02 --body-file - < "$P/m02.md" | jget data.changed)"
+    RC hvj milestone put M02 --body-file "$P/missing.md"
+    eq "put unreadable body" "2" "$RCV"
     sed 's/^id: M02/id: M03/' "$P/m02.md" > "$P/bad.md"
-    ERR "$BIN/hv-vision-put" M02 --body-file "$P/bad.md"
-    eq "put id mismatch" "1" "$ERRRC"
+    RC hvj milestone put M02 --body-file "$P/bad.md"
+    eq "put id mismatch" "4" "$RCV"
     printf 'no frontmatter\n' > "$P/nofm.md"
-    ERR "$BIN/hv-vision-put" M02 --body-file "$P/nofm.md"
-    eq "put without frontmatter" "1" "$ERRRC"
+    RC hvj milestone put M02 --body-file "$P/nofm.md"
+    eq "put without frontmatter" "4" "$RCV"
     sed 's/^id: M02/id: M77/' "$P/m02.md" > "$P/m77.md"
-    ERR "$BIN/hv-vision-put" M77 --body-file "$P/m77.md"
-    eq "put unknown milestone" "1" "$ERRRC"
-    ERR "$BIN/hv-vision-show" M77
-    eq "show unknown milestone" "1" "$ERRRC"
-    ERR "$BIN/hv-vision-put" M02
-    eq "put usage" "1" "$ERRRC"
+    RC hvj milestone put M77 --body-file "$P/m77.md"
+    eq "put unknown milestone" "3" "$RCV"
+    RC hvj milestone show M77
+    eq "show unknown milestone" "3" "$RCV"
+    RC hvj milestone put M02
+    eq "put usage" "2" "$RCV"
 
     # --- plan:SNN notes on the tracking issue (backend level)
+    # white-box: kept until the A6 Go unit test lands (#50), then delete
     PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov slice notes"
 from hvlib import get_backend, adapter_for, load_config
 b = get_backend()
@@ -153,19 +172,15 @@ except ValueError:
     pass
 PY
 
-    # --- duplicate tracking issues: lowest open wins, stderr warning
-    PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-a.ensure_labels(["milestone-tracker"])
-a.create("M02 — duplicate", "---\nid: M02\n---\n", ["milestone-tracker"])'
-    "$BIN/hv-vision-list" > /dev/null 2> "$P/dup.err"
-    case "$(cat "$P/dup.err")" in *"M02"*"#2"*"#"*"using #2"*) ;; *) fail "$prov duplicate warning: $(cat "$P/dup.err")" ;; esac
+    # --- duplicate tracking issues: lowest open wins
+    SEED_TRACKER "M02 — duplicate" $'---\nid: M02\n---\n' || fail "$prov seeding the duplicate tracking issue failed"
+    RC hvj milestone list
+    eq "duplicate list exits 0" "0" "$RCV"
     eq "duplicate leaves winner" "M02:active:false:M01+M05" "$(SUMMARY | tr ' ' '\n' | grep '^M02')"
   )
 done
 
-# --- helper round trip with its own project: add -> put -> active -> index -> slice plans -> shipped
+# --- verb round trip with its own project: add -> put -> active -> index -> slice plans -> shipped
 for prov in github gitlab; do
   P="$TMP_MS/rt-$prov"; mkdir -p "$P/.hv"
   echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
@@ -175,17 +190,26 @@ for prov in github gitlab; do
     printf '# Project\n\nIntro.\n' > CLAUDE.md
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov $1: expected [$2] got [$3]"; }
-    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
+    RC() { local rc=0; OUT="$("$@" 2>/dev/null)" || rc=$?; RCV=$rc; }
     HAS() { grep -qF -- "$2" "$1" || fail "$prov $3: [$2] not in $1: $(cat "$1")"; }
     NOT() { if grep -qF -- "$2" "$1"; then fail "$prov $3: [$2] unexpectedly in $1"; fi; }
+    # EMPTY_ACTIVE: active milestones that no open item carries, from milestone active + backlog ids
+    EMPTY_ACTIVE() {
+      local id out=""
+      for id in $(hvj milestone active | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)["data"]["ids"]))'); do
+        if [ "$(hvj backlog ids --milestone "$id" | jget data.ids)" = "[]" ]; then out="$out $id"; fi
+      done
+      echo "${out# }"
+    }
 
-    eq "add" "M01" "$("$BIN/hv-vision-add" "Launch" "Ship the thing")"
-    eq "add dep" "M02" "$("$BIN/hv-vision-add" "Scale" "Grow it" "M01")"
+    eq "add" "M01" "$(hvj milestone add --title "Launch" --summary "Ship the thing" | jget data.id)"
+    eq "add dep" "M02" "$(hvj milestone add --title "Scale" --summary "Grow it" --depends M01 | jget data.id)"
     [ ! -e .hv/milestones ] || fail "$prov issue mode wrote .hv/milestones"
-    "$BIN/hv-vision-show" M01 | sed 's/_(define what shipped looks like)_/Users can sign up./' > body.md
-    "$BIN/hv-vision-put" M01 --body-file body.md
-    HAS <("$BIN/hv-vision-show" M01) "Users can sign up." "put body"
-    "$BIN/hv-vision-status" M01 active >/dev/null
+    "$HV_BIN" milestone show M01 | sed 's/_(define what shipped looks like)_/Users can sign up./' > body.md
+    hvj milestone put M01 --body-file body.md >/dev/null || fail "$prov put failed"
+    "$HV_BIN" milestone show M01 > shown.md || fail "$prov show failed"
+    HAS shown.md "Users can sign up." "put body"
+    hvj milestone status M01 --to active >/dev/null || fail "$prov status active failed"
     HAS .hv/MILESTONES.md "- M01 — Launch" "active list"
     NOT .hv/MILESTONES.md "M02 —" "planned milestone not in the active list"
     HAS .hv/MILESTONES.md "# Milestones" "seeded H1"
@@ -195,99 +219,105 @@ for prov in github gitlab; do
     HAS CLAUDE.md "the tracking issues" "CLAUDE.md issue-mode pointer"
     HAS CLAUDE.md "Intro." "CLAUDE.md prose kept"
     NOT .hv/MILESTONES.md "### M01" "no per-milestone overview section"
-    "$BIN/hv-vision-index" >/dev/null
-    eq "index idempotent" "1" "$(grep -c 'hv-vision-start' CLAUDE.md)"
-    "$BIN/hv-vision-status" M02 active >/dev/null
+    eq "index idempotent" "false" "$(hvj milestone index | jget data.changed)"
+    eq "index keeps one block" "1" "$(grep -c 'hv-vision-start' CLAUDE.md)"
+    hvj milestone status M02 --to active >/dev/null || fail "$prov status active (M02) failed"
     HAS CLAUDE.md "- **M02** — Scale (depends: M01) ⚠ blocked" "blocked flag"
-    eq "active ids" "M01 M02" "$("$BIN/hv-vision-active" | tr '\n' ' ' | sed 's/ $//')"
-    eq "empty-active lists milestones without items" "M01 M02" "$("$BIN/hv-vision-empty-active" | tr '\n' ' ' | sed 's/ $//')"
-    "$BIN/hv-item-create" tasks --title "In M01" --field Milestone=M01 > /dev/null
-    eq "empty-active skips milestones with items" "M02" "$("$BIN/hv-vision-empty-active")"
+    eq "active ids" '["M01","M02"]' "$(hvj milestone active | jget data.ids)"
+    eq "active milestones without items" "M01 M02" "$(EMPTY_ACTIVE)"
+    hvj item create --kind tasks --title "In M01" --milestone M01 >/dev/null || fail "$prov item create failed"
+    eq "active milestones skip those with items" "M02" "$(EMPTY_ACTIVE)"
 
-    PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-a.ensure_labels(["milestone-tracker"])
-a.create("M1x stuff", "", ["milestone-tracker"])'
-    case "$("$BIN/hv-vision-list" | python3 -c 'import json,sys; print(" ".join(m["id"] for m in json.load(sys.stdin)))')" in "M01 M02") ;; *) fail "$prov M1x title not ignored" ;; esac
+    SEED_M1X() {
+      if [ "$prov" = github ]; then
+        hvj tracker call -- issue create --title "M1x stuff" --body "" --label milestone-tracker >/dev/null
+      else
+        hvj tracker call -- issue create --title "M1x stuff" --description "" --label milestone-tracker -y >/dev/null
+      fi
+    }
+    SEED_M1X || fail "$prov seeding the M1x tracking issue failed"
+    eq "M1x title ignored" "M01 M02" "$(hvj milestone list | python3 -c 'import json,sys; print(" ".join(m["id"] for m in json.load(sys.stdin)["data"]["milestones"]))')"
 
     # slice plans
-    eq "slice 1" "M01-S01" "$("$BIN/hv-plan-add" M01 slice "First slice")"
-    eq "slice 2" "M01-S02" "$("$BIN/hv-plan-add" M01 slice "Second slice")"
-    HAS <("$BIN/hv-plan-show" M01-S01) "# M01-S01 — First slice" "slice show"
-    HAS <("$BIN/hv-plan-show" M01-S01) "unitKind: slice" "slice frontmatter"
-    eq "slice design pointer" "M01-S03" "$("$BIN/hv-plan-add" --design .hv/designs/F07.md M01 slice "Designed")"
-    HAS <("$BIN/hv-plan-show" M01-S03) "design: note:F07:design" "slice design pointer"
-    ERR "$BIN/hv-plan-add" --design .hv/designs/M01.md M01 slice "Bad design"
-    eq "slice design needs an item id" "1" "$ERRRC"
-    "$BIN/hv-plan-rm" M01-S03
+    eq "slice 1" "M01-S01" "$(hvj plan add --milestone M01 --slice --title "First slice" | jget data.key)"
+    eq "slice 2" "M01-S02" "$(hvj plan add --milestone M01 --slice --title "Second slice" | jget data.key)"
+    hvj plan show M01-S01 | jget data.body > shown.md || fail "$prov plan show failed"
+    HAS shown.md "# M01-S01 — First slice" "slice show"
+    HAS shown.md "unitKind: slice" "slice frontmatter"
+    eq "slice design pointer" "M01-S03" "$(hvj plan add --milestone M01 --slice --design F07 --title "Designed" | jget data.key)"
+    hvj plan show M01-S03 | jget data.body > shown.md || fail "$prov plan show S03 failed"
+    HAS shown.md "design: note:F07:design" "slice design pointer"
+    RC hvj plan add --milestone M01 --slice --design M01 --title "Bad design"
+    eq "slice design needs an item id" "2" "$RCV"
+    hvj plan rm M01-S03 >/dev/null || fail "$prov plan rm S03 failed"
     [ ! -e .hv/plans/M01-S01.md ] || fail "$prov slice plan written as a file"
-    ERR "$BIN/hv-plan-add" M01 S01 "dup"
-    eq "slice duplicate" "1" "$ERRRC"
-    ERR "$BIN/hv-plan-add" M09 slice "no tracker"
-    eq "slice on unknown milestone" "1" "$ERRRC"
-    "$BIN/hv-plan-show" M01-S01 | sed 's/^status: planned/status: active/' > plan.md
-    "$BIN/hv-plan-put" M01-S01 --body-file plan.md
-    eq "slice put/show" "$(cat plan.md)" "$("$BIN/hv-plan-show" M01-S01)"
-    ERR "$BIN/hv-plan-put" M01-S07 --body-file plan.md
-    eq "slice put missing" "1" "$ERRRC"
-    "$BIN/hv-plan-list" 2> plan-list.err > plan-list.json
-    HAS plan-list.err "item plans live on their issues" "plan-list note"
+    RC hvj plan add M01-S01 --title "dup"
+    eq "slice duplicate" "4" "$RCV"
+    RC hvj plan add --milestone M09 --slice --title "no tracker"
+    eq "slice on unknown milestone" "3" "$RCV"
+    "$HV_BIN" plan show M01-S01 | sed 's/^status: planned/status: active/' > plan.md
+    hvj plan put M01-S01 --body-file plan.md >/dev/null || fail "$prov plan put failed"
+    eq "slice put/show" "$(cat plan.md)" "$("$HV_BIN" plan show M01-S01)"
+    RC hvj plan put M01-S07 --body-file plan.md
+    eq "slice put missing" "3" "$RCV"
+    hvj plan list > plan-list.json 2>/dev/null || fail "$prov plan list failed"
+    eq "plan-list note" "item plans live on their issues" "$(jget 'warnings[0]' < plan-list.json | cut -c1-31)"
     eq "plan-list" "M01-S01:slice:active:First slice M01-S02:slice:planned:Second slice" "$(python3 -c '
 import json
-print(" ".join("%s:%s:%s:%s" % (p["key"], p["unitKind"], p["status"], p["title"]) for p in json.load(open("plan-list.json"))))')"
-    eq "plan-list keys" "key,milestone,unit,unitKind,title,status,created,repo" "$(python3 -c 'import json; print(",".join(json.load(open("plan-list.json"))[0]))')"
-    eq "plan-list filter other milestone" "[]" "$("$BIN/hv-plan-list" M02 2>/dev/null)"
-    eq "plan-list filter" "2" "$("$BIN/hv-plan-list" M01 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
-    "$BIN/hv-plan-rm" M01-S02
-    ERR "$BIN/hv-plan-show" M01-S02
-    eq "slice rm" "1" "$ERRRC"
-    ERR "$BIN/hv-plan-rm" M01-S02
-    eq "slice rm twice" "1" "$ERRRC"
-    eq "slice re-mint" "M01-S02" "$("$BIN/hv-plan-add" M01 slice "Again")"
+print(" ".join("%s:%s:%s:%s" % (p["key"], p["unitKind"], p["status"], p["title"]) for p in json.load(open("plan-list.json"))["data"]["plans"]))')"
+    eq "plan-list keys" "key,milestone,unit,unitKind,title,status,created,repos" "$(python3 -c 'import json; print(",".join(json.load(open("plan-list.json"))["data"]["plans"][0]))')"
+    eq "plan-list filter other milestone" "[]" "$(hvj plan list --milestone M02 2>/dev/null | jget data.plans)"
+    eq "plan-list filter" "2" "$(hvj plan list --milestone M01 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["plans"]))')"
+    hvj plan rm M01-S02 >/dev/null || fail "$prov plan rm S02 failed"
+    RC hvj plan show M01-S02
+    eq "slice rm" "3" "$RCV"
+    RC hvj plan rm M01-S02
+    eq "slice rm twice" "3" "$RCV"
+    eq "slice re-mint" "M01-S02" "$(hvj plan add --milestone M01 --slice --title "Again" | jget data.key)"
 
     # ship
-    "$BIN/hv-vision-status" M01 shipped >/dev/null
-    "$BIN/hv-vision-status" M02 shipped >/dev/null
+    hvj milestone status M01 --to shipped >/dev/null || fail "$prov ship M01 failed"
+    hvj milestone status M02 --to shipped >/dev/null || fail "$prov ship M02 failed"
     HAS .hv/MILESTONES.md "_(none active" "active list emptied"
     HAS CLAUDE.md "all shipped or archived" "CLAUDE.md after ship"
-    eq "nothing active" "" "$("$BIN/hv-vision-active")"
+    eq "nothing active" "[]" "$(hvj milestone active | jget data.ids)"
   )
 done
 
-# --- file mode: hv-vision-put
+# --- file mode: milestone put
 P="$TMP_MS/file"; mkdir -p "$P/.hv/milestones"
 (
   cd "$P"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
   echo '{}' > .hv/counters.json
   eq() { [ "$2" = "$3" ] || fail "file mode $1: expected [$2] got [$3]"; }
-  ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
-  eq "add" "M01" "$("$BIN/hv-vision-add" "Local" "On disk")"
+  RC() { local rc=0; OUT="$("$@" 2>/dev/null)" || rc=$?; RCV=$rc; }
+  eq "add" "M01" "$(hvj milestone add --title "Local" --summary "On disk" | jget data.id)"
   sed 's/^title: Local/title: Local renamed/' .hv/milestones/M01.md > "$P/new.md"
-  "$BIN/hv-vision-put" M01 --body-file "$P/new.md"
+  eq "put changed" "true" "$(hvj milestone put M01 --body-file "$P/new.md" | jget data.changed)"
   eq "put writes the file" "$(cat "$P/new.md")" "$(cat .hv/milestones/M01.md)"
-  printf -- '---\nid: M01\ntitle: Via stdin\nstatus: planned\n---\n# body\n' | "$BIN/hv-vision-put" M01 --body-file -
+  printf -- '---\nid: M01\ntitle: Via stdin\nstatus: planned\n---\n# body\n' | hvj milestone put M01 --body-file - >/dev/null || fail "file mode put from stdin failed"
   eq "put from stdin" "title: Via stdin" "$(sed -n 3p .hv/milestones/M01.md)"
   cp .hv/milestones/M01.md before.md
   printf -- '---\nid: M02\ntitle: x\n---\n' > wrong.md
-  ERR "$BIN/hv-vision-put" M01 --body-file wrong.md
-  eq "id mismatch" "1" "$ERRRC"
+  RC hvj milestone put M01 --body-file wrong.md
+  eq "id mismatch" "4" "$RCV"
   printf 'no frontmatter\n' > nofm.md
-  ERR "$BIN/hv-vision-put" M01 --body-file nofm.md
-  eq "no frontmatter" "1" "$ERRRC"
+  RC hvj milestone put M01 --body-file nofm.md
+  eq "no frontmatter" "4" "$RCV"
   eq "refused put leaves the file" "$(cat before.md)" "$(cat .hv/milestones/M01.md)"
   printf -- '---\nid: M09\n---\n' > m09.md
-  ERR "$BIN/hv-vision-put" M09 --body-file m09.md
-  eq "unknown milestone" "1" "$ERRRC"
+  RC hvj milestone put M09 --body-file m09.md
+  eq "unknown milestone" "3" "$RCV"
   [ ! -e .hv/milestones/M09.md ] || fail "file mode put created M09"
-  ERR "$BIN/hv-vision-put" notanid --body-file m09.md
-  eq "bad id" "1" "$ERRRC"
-  ERR "$BIN/hv-vision-put" M01 --body-file "$P/nope.md"
-  eq "unreadable body" "1" "$ERRRC"
-  ERR "$BIN/hv-vision-put" M01
-  eq "usage" "1" "$ERRRC"
+  RC hvj milestone put notanid --body-file m09.md
+  eq "bad id" "2" "$RCV"
+  RC hvj milestone put M01 --body-file "$P/nope.md"
+  eq "unreadable body" "2" "$RCV"
+  RC hvj milestone put M01
+  eq "usage" "2" "$RCV"
 )
 
+rm -rf "$TMP_MS"
 trap 'rm -rf "$TMP"' EXIT
-pass "milestones: native milestone + tracking issue, status transitions, vision and slice-plan helpers (github, gitlab), vision-put (file)"
+pass "milestones: native milestone + tracking issue, status transitions, milestone and slice-plan verbs (github, gitlab), milestone put (file)"

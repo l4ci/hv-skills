@@ -1,5 +1,6 @@
 # Part of the temporary hv test shim (#46); removed in A9 (#53). See test/hv-shim.
 # `hv milestone` adapters (cross-phase verbs).
+import os
 import re
 
 from core import *  # noqa: F401,F403  (shared shim helpers and @verb)
@@ -64,3 +65,56 @@ def milestone_show(ctx):
     if rc != 0:
         raise tracker_error(rc, err)
     return {"id": mid, "body": out}, out
+
+
+@verb("milestone", "put", values=("body-file",), pos=(1, 1), repo=False)
+def milestone_put(ctx):
+    mid, body_file = ctx.pos[0], ctx.flags.get("body-file")
+    if not re.fullmatch(r"M\d{2,}", mid):
+        raise usage(f"{ctx.name}: milestone ID must match M\\d{{2,}}, got '{mid}'")
+    if not body_file:
+        raise usage(f"{ctx.name}: --body-file is required")
+    path, tmp = stdin_to_file(body_file)
+    try:
+        if read_text(path) is None:
+            raise usage(f"{ctx.name}: cannot read --body-file: {body_file}")
+        before = milestone_text(ctx, mid)
+        rc, _, err = ctx.helper("hv-vision-put", mid, "--body-file", os.path.join(ctx.cwd, path))
+    finally:
+        if tmp:
+            os.unlink(tmp)
+    if rc != 0:
+        msg = first_error_line(err)
+        if "needs frontmatter" in err:
+            raise HvError(4, msg, data={"blockedBy": "frontmatter id", "changed": False})
+        if rc == 1 and "not found" not in err and "unknown" not in err.lower() and "no milestone" not in err.lower():
+            raise usage(msg)
+        raise tracker_error(rc, err)
+    return {"id": mid, "changed": milestone_text(ctx, mid) != before}, f"{mid} updated"
+
+
+def milestone_text(ctx, mid):
+    rc, out, _ = ctx.helper("hv-vision-show", mid)
+    return out if rc == 0 else None
+
+
+@verb("milestone", "active", repo=False)
+def milestone_active(ctx):
+    rc, out, err = ctx.helper("hv-vision-active")
+    if rc != 0:
+        raise tracker_error(rc, err)
+    return {"ids": out.split()}, out
+
+
+def milestone_files_hash(ctx):
+    root = find_root(ctx.cwd)
+    return [read_text(os.path.join(root, n)) for n in (".hv/MILESTONES.md", "CLAUDE.md")]
+
+
+@verb("milestone", "index", repo=False)
+def milestone_index(ctx):
+    before = milestone_files_hash(ctx)
+    rc, _, err = ctx.helper("hv-vision-index")
+    if rc != 0:
+        raise tracker_error(rc, err)
+    return {"changed": milestone_files_hash(ctx) != before}, "milestones indexed"
