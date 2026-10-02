@@ -287,7 +287,7 @@ pass "init check passes single-repo without repos.json"
 echo '{"umbrella": {"enabled": true}}' > .hv/config.json
 OUT=$(hvj init check 2>/dev/null) || fail "init check should exit 0 (advisory) when umbrella.enabled and repos.json missing: $OUT"
 [ "$(echo "$OUT" | warn_count)" -ge 1 ] || fail "init check expected a warning about the umbrella mismatch: $OUT"
-echo "$OUT" | jget 'warnings[0]' | grep -q "umbrella" || fail "init check warning should mention umbrella: $OUT"
+grep -q "umbrella" <<<"$(jget 'warnings[0]' <<<"$OUT")" || fail "init check warning should mention umbrella: $OUT"
 pass "init check warns advisory when umbrella.enabled and repos.json missing"
 
 # Umbrella enabled, repos.json with at least one entry: pass (silent)

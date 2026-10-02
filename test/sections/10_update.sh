@@ -50,7 +50,7 @@ EOF2
   OUT=$(env -u HV_INSTALL_ROOT HOME="$XX_TMP/fake-home" HV_TEST_LATEST_VERSION=2.0.0 "$HV_BIN" --json update)
   [ "$(echo "$OUT" | jget data.installType)" = "plugin" ] || fail "cache-layout: installType != plugin: $OUT"
   [ "$(echo "$OUT" | jget data.currentVersion)" = "2.0.0" ] || fail "cache-layout: currentVersion != 2.0.0: $OUT"
-  echo "$OUT" | jget data.installRoot | grep -q '/2.0.0' || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
+  grep -q '/2.0.0' <<<"$(jget data.installRoot <<<"$OUT")" || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
   pass "update resolves Claude Code plugin cache and picks newest version"
 
   # [B05] CLAUDE_PLUGIN_ROOT pointing at a non-hv-skills plugin must NOT be
@@ -64,7 +64,7 @@ EOF2
   OUT=$(env -u HV_INSTALL_ROOT CLAUDE_PLUGIN_ROOT="$XX_TMP/wrong-plugin" HOME="$XX_TMP/fake-home" \
         HV_TEST_LATEST_VERSION=2.0.0 "$HV_BIN" --json update)
   [ "$(echo "$OUT" | jget data.currentVersion)" = "2.0.0" ] || fail "cache-layout: wrong CLAUDE_PLUGIN_ROOT leaked through: $OUT"
-  echo "$OUT" | grep -q 'context-mode' && fail "cache-layout: installRoot points at non-hv-skills plugin: $OUT"
+  grep -q 'context-mode' <<<"$OUT" && fail "cache-layout: installRoot points at non-hv-skills plugin: $OUT"
   pass "update ignores CLAUDE_PLUGIN_ROOT when its plugin.json name != hv-skills"
 )
 trap 'rm -rf "$TMP"' EXIT

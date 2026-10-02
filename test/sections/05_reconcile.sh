@@ -227,9 +227,9 @@ cat > .hv/KNOWLEDGE.md <<'EOF'
 - net bullet
 EOF
 OUT=$(hvj knowledge query "Testing" "Networking" | jget data.text)
-echo "$OUT" | grep -q "testing bullet" || fail "testing topic missing from query"
-echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
-echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
+grep -q "testing bullet" <<<"$OUT" || fail "testing topic missing from query"
+grep -q "net bullet" <<<"$OUT" || fail "networking topic missing from query"
+grep -q "arch bullet" <<<"$OUT" && fail "architecture topic leaked into query"
 pass "knowledge query returns only requested topics"
 
 echo "knowledge stats"
@@ -302,14 +302,14 @@ Only TLS 1.3+.
 **Permits.** Cert pinning.
 EOF
 OUT_D=$(hvj decisions query "Testing" "Networking" | jget data.text)
-echo "$OUT_D" | grep -q "No mocked DB" || fail "Testing decision missing from query"
-echo "$OUT_D" | grep -q "Strict TLS" || fail "Networking decision missing from query"
-echo "$OUT_D" | grep -q "No background queues" && fail "Architecture decision leaked into query"
+grep -q "No mocked DB" <<<"$OUT_D" || fail "Testing decision missing from query"
+grep -q "Strict TLS" <<<"$OUT_D" || fail "Networking decision missing from query"
+grep -q "No background queues" <<<"$OUT_D" && fail "Architecture decision leaked into query"
 pass "decisions query returns only requested topics"
 
 # Forbids/permits content must come through verbatim
-echo "$OUT_D" | grep -q "Forbids.*Mock DB" || fail "Forbids line missing for Testing decision"
-echo "$OUT_D" | grep -q "Permits.*Cert pinning" || fail "Permits line missing for Networking decision"
+grep -q "Forbids.*Mock DB" <<<"$OUT_D" || fail "Forbids line missing for Testing decision"
+grep -q "Permits.*Cert pinning" <<<"$OUT_D" || fail "Permits line missing for Networking decision"
 pass "decisions query preserves forbids/permits structure"
 
 # Empty/missing file is silent (exit 0, no output)

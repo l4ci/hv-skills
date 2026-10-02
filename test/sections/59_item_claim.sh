@@ -41,7 +41,7 @@ else:
     eq "A marker" "<!-- hv:claim ann/t1 -->" "$(MARKERS 1)"
     rc=0; OUT="$(J item claim '#1' --as bob)" || rc=$?
     eq "B loses" "4" "$rc"
-    echo "$OUT" | jget error.message | grep -q 'ann/t1' || fail "$prov claim B loses: the refusal must name the holder: $OUT"
+    grep -q 'ann/t1' <<<"$(jget error.message <<<"$OUT")" || fail "$prov claim B loses: the refusal must name the holder: $OUT"
     eq "B posted claim then release" "<!-- hv:claim ann/t1 -->|<!-- hv:claim bob -->|<!-- hv:release bob -->" "$(MARKERS 1)"
     eq "loser leaves labels" "in-progress,type:task" "$(LABELS 1)"
     : > "$P/log"

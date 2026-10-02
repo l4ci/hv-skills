@@ -16,9 +16,9 @@ ID4=$(hvj id next --kind milestones | jget data.id)
 pass "first milestone id = M01"
 
 COUNTERS=$(cat .hv/counters.json)
-echo "$COUNTERS" | grep -q '"bugs": 2' || fail "counters.bugs != 2: $COUNTERS"
-echo "$COUNTERS" | grep -q '"features": 1' || fail "counters.features != 1: $COUNTERS"
-echo "$COUNTERS" | grep -q '"milestones": 1' || fail "counters.milestones != 1: $COUNTERS"
+grep -q '"bugs": 2' <<<"$COUNTERS" || fail "counters.bugs != 2: $COUNTERS"
+grep -q '"features": 1' <<<"$COUNTERS" || fail "counters.features != 1: $COUNTERS"
+grep -q '"milestones": 1' <<<"$COUNTERS" || fail "counters.milestones != 1: $COUNTERS"
 pass "counters persisted"
 
 # Self-heal: counter=2, but TODO has [B07] → next mint should be B08, not B03.
@@ -120,7 +120,7 @@ grep -E "^- ~~.*\[B73\].*~~ Done [0-9-]+ \[\`$HASH\`\] \(dropped\)$" .hv/BACKLOG
 [ "$(hvj item field get B72 --name reason | jget data.value)" = "blocked" ] || fail "item field reason"
 [ "$(hvj item field get B72 --name note | jget data.value)" = "waiting on upstream (see #9)" ] || fail "item field note"
 [ "$(hvj item field get B71 --name reason | jget data.value)" = "done" ] || fail "item field reason for plain done"
-hvj summary | jget data.recent | grep -qF "{\"id\":\"B72\",\"type\":\"B\",\"date\":\"$(date +%Y-%m-%d)\",\"reason\":\"blocked\"}" || fail "summary missing reason"
+grep -qF "{\"id\":\"B72\",\"type\":\"B\",\"date\":\"$(date +%Y-%m-%d)\",\"reason\":\"blocked\"}" <<<"$(hvj summary | jget data.recent)" || fail "summary missing reason"
 rc=0; "$HV_BIN" item complete B01 --commit "$HASH" --reason bogus 2>/dev/null || rc=$?
 [ "$rc" = "2" ] || fail "invalid --reason should exit 2, got $rc"
 pass "item complete --reason/--note renders, reads back via item field get and summary"

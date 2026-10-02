@@ -111,7 +111,7 @@ pass "T1: repo which exits 3 on a stray .hv/ inside a registered sub-repo"
 
 # white-box: kept until the A3 Go unit test lands (#47), then delete
 mkdir -p "$UMB/web/.hv"
-if (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null) | grep -q "masking"; then
+if grep -q "masking" <<<"$( (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null))"; then
   pass "T1: hv-resolve-umbrella detects masking with stderr message"
 else
   # stderr may not flow through subshell — check exit code instead
@@ -183,7 +183,7 @@ pass "M03-T1: repo resolve accepts single name"
 rc=0; OUT=$(cd "$UMB" && hvj repo resolve web nonexistent 2>/dev/null) || rc=$?
 [ "$rc" = 3 ] || fail "repo resolve should exit 3 on unregistered name, got $rc"
 [ "$(echo "$OUT" | jget error.exit)" = "3" ] || fail "repo resolve error envelope wrong: $OUT"
-echo "$OUT" | jget error.message | grep -q "nonexistent" || fail "repo resolve error must name the missing sub-repo: $OUT"
+grep -q "nonexistent" <<<"$(jget error.message <<<"$OUT")" || fail "repo resolve error must name the missing sub-repo: $OUT"
 pass "M03-T1: repo resolve exits 3 and names missing sub-repo"
 
 # M03-T1: no names returns an empty list, exit 0
@@ -207,7 +207,7 @@ git -C "$UMB/api" branch -D hv/m3-test >/dev/null
 git -C "$UMB/web" branch hv/m3-collide >/dev/null
 rc=0; OUT=$(cd "$UMB" && hvj git branch hv/m3-collide --repos web,api 2>/dev/null) || rc=$?
 [ "$rc" = 4 ] || fail "git branch should exit 4 when branch exists in any repo, got $rc"
-echo "$OUT" | jget error.message | grep -q "web" || fail "git branch error must name the colliding repo: $OUT"
+grep -q "web" <<<"$(jget error.message <<<"$OUT")" || fail "git branch error must name the colliding repo: $OUT"
 [ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "git branch refusal should report changed false: $OUT"
 if git -C "$UMB/api" show-ref --verify --quiet refs/heads/hv/m3-collide; then
   fail "git branch created branch in api despite collision in web"
@@ -295,7 +295,7 @@ pass "M03-T6: plan add accepts comma-separated --repos and writes joined value"
 rc=0; OUT=$(cd "$PLANS_TMP" && hvj plan add M99-B03 --title "bad plan" --repos web,nonexistent 2>/dev/null) || rc=$?
 [ "$rc" = 3 ] || fail "plan add should exit 3 on unregistered name in --repos, got $rc"
 [ -f "$PLANS_TMP/.hv/plans/M99-B03.md" ] && fail "plan add wrote plan file despite invalid --repos"
-echo "$OUT" | jget error.message | grep -q "nonexistent" || fail "plan add error must name the unregistered sub-repo: $OUT"
+grep -q "nonexistent" <<<"$(jget error.message <<<"$OUT")" || fail "plan add error must name the unregistered sub-repo: $OUT"
 pass "M03-T6: plan add rejects unregistered name in --repos CSV"
 
 rm -rf "$PLANS_TMP"

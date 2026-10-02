@@ -211,11 +211,11 @@ FIXEOF
   [ "$rc" = "0" ] || { echo "FAIL F36(h): multi-ID batch should exit 0, got $rc"; exit 1; }
   F01_LINE=$(grep '\[F01\]' .hv/BACKLOG.md) \
     || { echo "FAIL F36(h): surviving [F01] bullet missing from BACKLOG.md"; exit 1; }
-  echo "$F01_LINE" | grep -q '\[B01\]' \
+  grep -q '\[B01\]' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): [B01] cross-ref still on F01 line: $F01_LINE"; exit 1; }
-  echo "$F01_LINE" | grep -q '\[B02\]' \
+  grep -q '\[B02\]' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): [B02] cross-ref still on F01 line: $F01_LINE"; exit 1; }
-  echo "$F01_LINE" | grep -q 'Related:' \
+  grep -q 'Related:' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): dangling 'Related:' remnant on F01 line: $F01_LINE"; exit 1; }
   true
 )

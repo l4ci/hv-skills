@@ -188,11 +188,11 @@ done
 # Strip comments before grepping: the callers legitimately MENTION the paste
 # path in prose, and matching that reports a defect where none exists.
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
-  if sed 's/#.*//' "$BIN/$H" | grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)'; then
+  if grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)' <<<"$(sed 's/#.*//' "$BIN/$H")"; then
     fail "$H talks to a host directly; it must go through the hv_host_* primitives"
   fi
 done
-sed 's/#.*//' "$BIN/hv-host-tmux.sh" | grep -q 'paste-buffer' \
+grep -q 'paste-buffer' <<<"$(sed 's/#.*//' "$BIN/hv-host-tmux.sh")" \
   || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
 pass "worker helpers share one paste-and-confirm path through the host libs"
 

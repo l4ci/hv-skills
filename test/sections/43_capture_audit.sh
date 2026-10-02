@@ -40,7 +40,7 @@ rc=0; OUT="$(hvj item shipped "Implement Driver for postgres backend" 2>/dev/nul
 [ "$rc" = "0" ] || fail "item shipped exit code: expected 0 on matched title, got $rc"
 [ "$(echo "$OUT" | jget data.found)" = "true" ] || fail "item shipped found should be true: $OUT"
 [ "$(echo "$OUT" | jget 'data.titles[0].hits[0].level')" = "strong" ] || fail "item shipped did not report a strong hit for matched title (output: $OUT)"
-echo "$OUT" | jget 'data.titles[0].hits[0].subject' | grep -q "F76" || fail "item shipped hit missing the F76 commit reference (output: $OUT)"
+grep -q "F76" <<<"$(jget 'data.titles[0].hits[0].subject' <<<"$OUT")" || fail "item shipped hit missing the F76 commit reference (output: $OUT)"
 pass "F27 shipped — exit 0 + strong hit on shipped title"
 
 # Path match: title contains `runner/postgres.go`, which exists.
