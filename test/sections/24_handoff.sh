@@ -1,59 +1,70 @@
-echo "hv-resolve-handoff lookup helper"
+echo "status handoff lookup verb"
 
 # Scratch tmpdir for this section — sibling to runner's $TMP to keep state clean.
 HANDOFF_TMP="$(mktemp -d)"
 trap 'rm -rf "$HANDOFF_TMP"' EXIT
 (
   cd "$HANDOFF_TMP"
-  mkdir -p .hv/handoff
+  mkdir -p .hv/handoff web api
+  # --repo needs registered sub-repos.
+  echo '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .hv/repos.json
 
-  # --- Read mode: no handoff present → empty stdout, exit 0 ---
-  out="$("$BIN/hv-resolve-handoff" "hv/feature-x")"
-  [ -z "$out" ] || { echo "FAIL: empty stdout expected when no handoff (got: $out)"; exit 1; }
+  # handoff <expected path|null> <expected exists> <args…>: one lookup, both fields checked.
+  handoff() {
+    local want_path="$1" want_exists="$2" label="$3"; shift 3
+    local out
+    out="$(hvj status handoff "$@")" || { echo "FAIL: $label: exit $?"; exit 1; }
+    [ "$(echo "$out" | jget data.path)" = "$want_path" ] \
+      || { echo "FAIL: $label path (want $want_path, got: $out)"; exit 1; }
+    [ "$(echo "$out" | jget data.exists)" = "$want_exists" ] \
+      || { echo "FAIL: $label exists (want $want_exists, got: $out)"; exit 1; }
+  }
 
-  # --- Read mode: flat handoff present → prints flat path ---
+  # --- Read mode: no handoff present → path null, exists false ---
+  handoff null false "empty when no handoff" "hv/feature-x"
+
+  # --- Read mode: flat handoff present → flat path ---
   mkdir -p .hv/handoff/hv
   echo dummy > .hv/handoff/hv/feature-x.md
-  out="$("$BIN/hv-resolve-handoff" "hv/feature-x")"
-  [ "$out" = ".hv/handoff/hv/feature-x.md" ] || { echo "FAIL: flat read (got: $out)"; exit 1; }
+  handoff .hv/handoff/hv/feature-x.md true "flat read" "hv/feature-x"
 
   # --- Read mode with --repo: prefer @repo form when it exists ---
   echo umbrella > .hv/handoff/hv/feature-x@web.md
-  out="$("$BIN/hv-resolve-handoff" --repo web "hv/feature-x")"
-  [ "$out" = ".hv/handoff/hv/feature-x@web.md" ] || { echo "FAIL: umbrella-keyed read (got: $out)"; exit 1; }
+  handoff .hv/handoff/hv/feature-x@web.md true "umbrella-keyed read" --repo web "hv/feature-x"
 
   # --- Read mode with --repo: fall back to flat when @repo absent ---
   rm -f .hv/handoff/hv/feature-x@web.md
-  out="$("$BIN/hv-resolve-handoff" --repo web "hv/feature-x")"
-  [ "$out" = ".hv/handoff/hv/feature-x.md" ] || { echo "FAIL: fallback to flat (got: $out)"; exit 1; }
+  handoff .hv/handoff/hv/feature-x.md true "fallback to flat" --repo web "hv/feature-x"
 
   # --- Read mode with --repo: nothing exists for either form ---
   rm -f .hv/handoff/hv/feature-x.md
-  out="$("$BIN/hv-resolve-handoff" --repo web "hv/feature-x")"
-  [ -z "$out" ] || { echo "FAIL: empty when neither form exists (got: $out)"; exit 1; }
+  handoff null false "empty when neither form exists" --repo web "hv/feature-x"
 
-  # --- Write mode: canonical path emission, no probing ---
-  out="$("$BIN/hv-resolve-handoff" --write "hv/feature-y")"
-  [ "$out" = ".hv/handoff/hv/feature-y.md" ] || { echo "FAIL: write flat (got: $out)"; exit 1; }
-  out="$("$BIN/hv-resolve-handoff" --write --repo api "hv/feature-y")"
-  [ "$out" = ".hv/handoff/hv/feature-y@api.md" ] || { echo "FAIL: write umbrella-keyed (got: $out)"; exit 1; }
+  # --- Canonical mode: path emission, no probing ---
+  handoff .hv/handoff/hv/feature-y.md false "canonical flat" --canonical "hv/feature-y"
+  handoff .hv/handoff/hv/feature-y@api.md false "canonical umbrella-keyed" --canonical --repo api "hv/feature-y"
 
-  # --- Missing branch arg → exit 1 with usage ---
-  if "$BIN/hv-resolve-handoff" >/dev/null 2>&1; then
-    echo "FAIL: missing branch should exit 1"
-    exit 1
-  fi
+  # --- Canonical mode: exists reports the file even though the path is not probed ---
+  echo dummy > .hv/handoff/hv/feature-y.md
+  handoff .hv/handoff/hv/feature-y.md true "canonical flat, file present" --canonical "hv/feature-y"
 
-  # --- Unknown flag → exit 1 ---
-  if "$BIN/hv-resolve-handoff" --bogus "hv/x" >/dev/null 2>&1; then
-    echo "FAIL: unknown flag should exit 1"
-    exit 1
-  fi
+  # --- Missing branch arg → exit 2 (usage) ---
+  rc=0; "$HV_BIN" status handoff >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || { echo "FAIL: missing branch should exit 2, got $rc"; exit 1; }
+
+  # --- Unknown flag → exit 2 ---
+  rc=0; "$HV_BIN" status handoff --bogus "hv/x" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || { echo "FAIL: unknown flag should exit 2, got $rc"; exit 1; }
+
+  # --- Unregistered --repo → exit 3 (resolution) ---
+  rc=0; "$HV_BIN" status handoff --repo nonexistent "hv/x" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || { echo "FAIL: unregistered --repo should exit 3, got $rc"; exit 1; }
 )
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$HANDOFF_TMP"
-pass "hv-resolve-handoff lookup + write modes, umbrella fallback, error cases"
+pass "status handoff lookup + canonical modes, umbrella fallback, error cases"
 
 echo "hv-next/SKILL.md references hv-resolve-handoff"
+# white-box: kept until A9 (#53)
 grep -q "hv-resolve-handoff" "$REPO/hv-next/SKILL.md" || fail "hv-next/SKILL.md missing hv-resolve-handoff call"
 pass "hv-next/SKILL.md uses hv-resolve-handoff"

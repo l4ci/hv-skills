@@ -101,7 +101,8 @@ func a4Open(root string, fileOnly bool, hint string) (backlog.Backend, error) {
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
 	name, err := config.Backend(cfg)
 	if err != nil {
-		return nil, Usage("%s", err.Error())
+		// An invalid backlog.backend is a corrupt config (contract, shared definitions).
+		return nil, &Error{Exit: ExitInternal, Message: err.Error()}
 	}
 	if name != "file" && fileOnly {
 		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
@@ -132,7 +133,7 @@ func a4Fail(err error) (Result, error) {
 		return Result{Data: a4Obj("blockedBy", ref.BlockedBy, "changed", false)},
 			&Error{Exit: ExitRefused, Message: ref.Msg, Hint: ref.Hint}
 	case errors.As(err, &act):
-		return Result{Data: a4Obj("blockedBy", act.ID+" active on "+act.Branch, "changed", false)},
+		return Result{Data: a4Obj("blockedBy", "active", "id", act.ID, "activeBranch", act.Branch, "changed", false)},
 			&Error{Exit: ExitRefused, Message: act.Error(), Hint: "end the stream first: hv status rm " + act.Branch}
 	case errors.Is(err, backlog.ErrWrongBackend):
 		return Result{Data: a4Obj("blockedBy", "backend", "changed", false)}, Refused("%s", err.Error())
@@ -144,6 +145,17 @@ func a4Fail(err error) (Result, error) {
 		return Result{}, &Error{Exit: ExitNotImplemented, Message: err.Error()}
 	}
 	return Result{}, err
+}
+
+// a4FailRead is a4Fail for a read-only verb: the conventions forbid exit 4
+// there, so a refusal (the wrong backend) becomes exit 1 with the same data.
+func a4FailRead(err error) (Result, error) {
+	res, ferr := a4Fail(err)
+	var e *Error
+	if errors.As(ferr, &e) && e.Exit == ExitRefused {
+		e.Exit = ExitFailed
+	}
+	return res, ferr
 }
 
 func a4Type(id string) string {
@@ -170,8 +182,9 @@ func a4ReadInput(c *Ctx, path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
+// a4ReadErr is exit 3: a named input that cannot be read did not resolve.
 func a4ReadErr(flagName, path string, err error) error {
-	return Usage("cannot read --%s: %s: %s", flagName, unwrapPathErr(err), path)
+	return Resolution("cannot read --%s: %s: %s", flagName, unwrapPathErr(err), path)
 }
 
 // ---- id next --------------------------------------------------------------
@@ -250,10 +263,10 @@ func a4Create(fs *flag.FlagSet) RunFunc {
 				}
 			}
 			raw, err := a4ReadInput(c, *rawFile)
-			entry := strings.TrimRight(a4Newlines.Replace(string(raw)), "\n")
 			if err != nil {
-				entry = ""
+				return Result{}, a4ReadErr("raw-file", *rawFile, err)
 			}
+			entry := strings.TrimRight(a4Newlines.Replace(string(raw)), "\n")
 			m := a4BulletID.FindStringSubmatch(entry)
 			if m == nil {
 				return Result{}, Usage("--raw-file bullet needs a **[ID]")
@@ -273,7 +286,11 @@ func a4Create(fs *flag.FlagSet) RunFunc {
 		}
 		in := backlog.CreateInput{Kind: *kind, Title: *title, Tag: *tag, Desc: *desc}
 		for _, n := range backlog.CreateFields {
-			if v := *named[strings.ToLower(n)]; v != "" {
+			key := strings.ToLower(n)
+			if given[key] && pystr.Strip(*named[key]) == "" {
+				return Result{}, Usage("--%s needs a value", key)
+			}
+			if v := *named[key]; v != "" {
 				in.Fields = append(in.Fields, backlog.Field{Name: n, Value: v})
 			}
 		}

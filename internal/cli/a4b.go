@@ -243,7 +243,7 @@ func a4Drift(fs *flag.FlagSet) RunFunc {
 		}
 		be, err := a4Open(root, true, `PRs carry "Closes #N", so the tracker closes shipped issues`)
 		if err != nil {
-			return a4Fail(err)
+			return a4FailRead(err)
 		}
 		var targets []backlog.Target
 		if repos := status.LoadRepos(root); len(repos) > 0 {

@@ -43,10 +43,15 @@ func TestA4bIssueModeStubExits5(t *testing.T) {
 
 func TestA4bFileOnlyVerbsAreRefusedUnderIssues(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
-	for _, argv := range [][]string{{"backlog", "drift"}, {"backlog", "backfill"}, {"backlog", "archive"}} {
+	// drift is read-only, so its refusal is exit 1 (contract: backend).
+	for _, c := range []struct {
+		argv []string
+		exit int
+	}{{[]string{"backlog", "drift"}, ExitFailed}, {[]string{"backlog", "backfill"}, ExitRefused}, {[]string{"backlog", "archive"}, ExitRefused}} {
+		argv := c.argv
 		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		d := dataOf(env)
-		if code != ExitRefused || get(d, "blockedBy") != "backend" || get(d, "changed") != false {
+		if code != c.exit || get(d, "blockedBy") != "backend" || get(d, "changed") != false {
 			t.Errorf("%v: code=%d env=%v", argv, code, env)
 		}
 	}

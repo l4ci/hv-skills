@@ -5,16 +5,15 @@ trap 'rm -rf "$TMP_BK"' EXIT
 mkdir -p "$TMP_BK/proj/.hv"
 (
   cd "$TMP_BK/proj"
-  out="$("$BIN/hv-config-show" backlog.backend)"
-  [ "$out" = 'backlog.backend = "file"  (source: default)' ] || fail "default backlog.backend: got '$out'"
+  CS() { hvj config show backlog.backend | jget "data.entries[0].$1"; }
+  [ "$(CS value):$(CS source)" = "file:default" ] || fail "default backlog.backend: got '$(CS value):$(CS source)'"
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
-  out="$("$BIN/hv-config-show" backlog.backend)"
-  [ "$out" = 'backlog.backend = "issues"  (source: project)' ] || fail "project backlog.backend: got '$out'"
+  [ "$(CS value):$(CS source)" = "issues:project" ] || fail "project backlog.backend: got '$(CS value):$(CS source)'"
   echo '{"backlog":{"backend":"file"}}' > .hv/config.local.json
-  out="$("$BIN/hv-config-show" backlog.backend)"
-  [ "$out" = 'backlog.backend = "file"  (source: local)' ] || fail "local backlog.backend: got '$out'"
-  pass "hv-config-show reports backlog.backend default/project/local"
+  [ "$(CS value):$(CS source)" = "file:local" ] || fail "local backlog.backend: got '$(CS value):$(CS source)'"
+  pass "config show reports backlog.backend default/project/local"
 
+  # white-box: kept until the A3 Go unit test lands (#47), then delete; see 5.0-smoke-whitebox.md
   PYTHONPATH="$BIN" python3 - <<'PY' || fail "backend accessors"
 from hvlib import config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
 assert BACKLOG_BACKENDS == ("file", "issues")
@@ -38,9 +37,8 @@ except KeyError:
 PY
   pass "backlog_backend / tracker_label / config_value behave"
 )
-trap 'rm -rf "$TMP"' EXIT
 
-echo "FileBackend: create/read helpers byte-identical"
+echo "FileBackend: create/read verbs byte-identical"
 
 TMP_GB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB"' EXIT
@@ -78,106 +76,88 @@ MD
   eq() { # label, expected, actual
     [ "$2" = "$3" ] || fail "golden $1: expected '$2' got '$3'"
   }
+  rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
 
-  # hv-todo-field
-  eq "field title" "First bug" "$("$BIN/hv-todo-field" B01 title)"
-  eq "field milestone" "M01, M02" "$("$BIN/hv-todo-field" F01 milestone)"
-  eq "field reason" "dropped" "$("$BIN/hv-todo-field" T02 reason)"
-  eq "field note archived" "waiting" "$("$BIN/hv-todo-field" B05 note)"
-  eq "field empty" "" "$("$BIN/hv-todo-field" T01 milestone)"
-  eq "dump" '{"title": "Big feature", "detail": "", "related": "[B01]", "milestone": "M01, M02", "repos": "api, web", "subsystem": "core", "since": "abc1234", "reason": "", "note": ""}' "$("$BIN/hv-todo-field" --dump F01)"
-  eq "dump done" '{"title": "Done thing", "detail": "", "related": "", "milestone": "M01", "repos": "", "subsystem": "", "since": "abc1234", "reason": "done", "note": ""}' "$("$BIN/hv-todo-field" --dump B03)"
-  rc=0; err="$("$BIN/hv-todo-field" B99 title 2>&1)" || rc=$?
-  eq "field unknown" "1:error: [B99] not found in BACKLOG.md or ARCHIVE.md" "$rc:$err"
-  rc=0; err="$("$BIN/hv-todo-field" B01 bogus 2>&1)" || rc=$?
-  eq "field bad" "1:error: bogus is not a valid field; pick one of title/detail/related/milestone/repos/subsystem/since/reason/note" "$rc:$err"
-  pass "hv-todo-field golden"
+  # item field get
+  FG() { hvj item field get "$1" --name "$2" | jget data.value; }
+  eq "field title" "First bug" "$(FG B01 title)"
+  eq "field milestone" "M01, M02" "$(FG F01 milestone)"
+  eq "field reason" "dropped" "$(FG T02 reason)"
+  eq "field note archived" "waiting" "$(FG B05 note)"
+  eq "field empty" "" "$(FG T01 milestone)"
+  eq "field type" "F" "$(hvj item field get F01 --name title | jget data.type)"
+  eq "dump" '{"title":"Big feature","detail":"","related":"[B01]","milestone":"M01, M02","repos":"api, web","subsystem":"core","since":"abc1234","reason":"","note":""}' "$(hvj item field list F01 | jget data.fields)"
+  eq "dump done" '{"title":"Done thing","detail":"","related":"","milestone":"M01","repos":"","subsystem":"","since":"abc1234","reason":"done","note":""}' "$(hvj item field list B03 | jget data.fields)"
+  eq "field unknown" "3" "$(rcof hvj item field get B99 --name title)"
+  eq "field bad" "2" "$(rcof hvj item field get B01 --name bogus)"
+  pass "item field get / list golden"
 
-  # hv-todo-set-field
-  "$BIN/hv-todo-set-field" F02 milestone M03
+  # item field set
+  SFV() { hvj item field set "$1" --name "$2" --value "$3"; }
+  eq "set-field changed" "true" "$(SFV F02 milestone M03 | jget data.changed)"
   eq "set-field line" '- **[F02] [Minor] Small feature.** No fields. Milestone: M03' "$(grep -F '[F02]' .hv/BACKLOG.md)"
-  "$BIN/hv-todo-set-field" F02 milestone ""
+  eq "set-field same value" "false" "$(SFV F02 milestone M03 | jget data.changed)"
+  SFV F02 milestone "" >/dev/null
   eq "set-field clear" '- **[F02] [Minor] Small feature.** No fields.' "$(grep -F '[F02]' .hv/BACKLOG.md)"
   cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "set-field round trip changed BACKLOG.md"
-  rc=0; err="$("$BIN/hv-todo-set-field" B99 milestone M1 2>&1)" || rc=$?
-  eq "set-field unknown" "1:error: [B99] has no open bullet in .hv/BACKLOG.md (unknown, completed, or archived)" "$rc:$err"
-  rc=0; err="$("$BIN/hv-todo-set-field" B01 title X 2>&1)" || rc=$?
-  eq "set-field bad field" "1:error: title is not a settable field; pick one of milestone/related/repos/subsystem/detail" "$rc:$err"
-  rc=0; err="$("$BIN/hv-todo-set-field" B01 2>&1)" || rc=$?
-  eq "set-field usage" "2:usage: hv-todo-set-field <ID> <field> <value>" "$rc:$err"
-  pass "hv-todo-set-field golden"
+  eq "set-field unknown" "3" "$(rcof hvj item field set B99 --name milestone --value M1)"
+  eq "set-field completed" "4" "$(rcof hvj item field set B03 --name milestone --value M1)"
+  eq "set-field archived" "4" "$(rcof hvj item field set B05 --name milestone --value M1)"
+  eq "set-field bad field" "2" "$(rcof hvj item field set B01 --name title --value X)"
+  eq "set-field usage" "2" "$(rcof hvj item field set B01 --name milestone)"
+  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "rejected item field set changed BACKLOG.md"
+  pass "item field set golden"
 
   # hv-append (Since: stamped from HEAD when absent)
   head="$(git rev-parse --short HEAD)"
+  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
   "$BIN/hv-append" "## Bugs" '- **[B09] [P2] New.** d.'
   eq "append stamp" "- **[B09] [P2] New.** d. Since: $head" "$(grep -F '[B09]' .hv/BACKLOG.md)"
+  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
   "$BIN/hv-append" "Tasks" '- **[T09] t.** d. Since: zzz9999'
   eq "append keeps Since" '- **[T09] t.** d. Since: zzz9999' "$(grep -F '[T09]' .hv/BACKLOG.md)"
   eq "append placement" "$(printf '%s\n%s' '- **[B02] [P0] Second bug.** Desc two. Since: abc1234' "- **[B09] [P2] New.** d. Since: $head")" "$(grep -A1 -F '[B02]' .hv/BACKLOG.md)"
+  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
   rc=0; err="$("$BIN/hv-append" "## Nope" '- **[B10] x**' 2>&1)" || rc=$?
   eq "append missing section" "1:error: section '## Nope' not found" "$rc:$err"
   cp "$TMP_GB/orig.md" .hv/BACKLOG.md
   pass "hv-append golden"
 
-  # hv-backlog
-  exp_all='### In Progress
+  # backlog list
+  IDS() { hvj backlog list "${@:2}" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(r["id"] for r in json.load(sys.stdin)))'; }
+  eq "backlog in progress" "B02" "$(IDS inProgress)"
+  OUT="$(hvj backlog list)"
+  eq "in progress row" "B|fix/b02|2026-01-01T00:00:00Z" "$(echo "$OUT" | jget 'data.inProgress[0].type')|$(echo "$OUT" | jget 'data.inProgress[0].branch')|$(echo "$OUT" | jget 'data.inProgress[0].startedAt')"
+  eq "backlog bugs" "B01" "$(IDS bugs)"
+  eq "backlog bug row" "P1|First bug|[\"F01\"]|M01" "$(echo "$OUT" | jget 'data.bugs[0].priority')|$(echo "$OUT" | jget 'data.bugs[0].title')|$(echo "$OUT" | jget 'data.bugs[0].related')|$(echo "$OUT" | jget 'data.bugs[0].milestone')"
+  eq "backlog features" "F02,F01" "$(IDS features)"
+  eq "backlog feature row" "Major|Big feature|[\"B01\"]|M01, M02" "$(echo "$OUT" | jget 'data.features[1].size')|$(echo "$OUT" | jget 'data.features[1].title')|$(echo "$OUT" | jget 'data.features[1].related')|$(echo "$OUT" | jget 'data.features[1].milestone')"
+  eq "backlog tasks" "T01" "$(IDS tasks)"
+  eq "backlog clusters" '[["B01","F01","T01"]]' "$(echo "$OUT" | jget data.clusters)"
+  eq "backlog grep keeps In Progress" "B02||" "$(IDS inProgress --grep zzzznomatch)|$(IDS bugs --grep zzzznomatch)|$(IDS features --grep zzzznomatch)"
+  eq "backlog bad arg" "2" "$(rcof hvj backlog list --bogus)"
+  pass "backlog list golden"
 
-| ID | Title | Branch | Started |
-|----|-------|--------|---------|
-| B02 | [P0] Second bug | fix/b02 | 2026-01-01 |
-
-### Bugs
-
-| ID | Prio | Title | Related | Milestone |
-|----|----|----|----|----|
-| B01 | P1 | First bug | [F01] | M01 |
-
-### Features
-
-| ID | Size | Title | Related | Milestone |
-|----|----|----|----|----|
-| F02 | Minor | Small feature |  |  |
-| F01 | Major | Big feature | [B01] | M01, M02 |
-
-### Tasks
-
-| ID | Title | Related |
-|----|----|----|
-| T01 | Chore | [F01] |
-
-### Clusters
-
-- [B01] First bug, [F01] Big feature, [T01] Chore'
-  eq "backlog all" "$exp_all" "$("$BIN/hv-backlog")"
-  eq "backlog grep keeps In Progress" "### In Progress
-
-| ID | Title | Branch | Started |
-|----|-------|--------|---------|
-| B02 | [P0] Second bug | fix/b02 | 2026-01-01 |" "$("$BIN/hv-backlog" --grep zzzznomatch)"
-  rc=0; err="$("$BIN/hv-backlog" --bogus 2>&1)" || rc=$?
-  eq "backlog bad arg" "1:error: unknown argument: --bogus" "$rc:$err"
-  pass "hv-backlog golden"
-
-  # backlog.backend = issues: hv-append refuses (exit 2), BACKLOG.md untouched
+  # backlog.backend = issues: item create --raw-file refuses (exit 4), BACKLOG.md untouched
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
-  rc=0; err="$("$BIN/hv-append" "## Bugs" "- **[B10] x.**" 2>&1)" || rc=$?
-  eq "hv-append issues refusal" "2:error: hv-append: issue mode creates items with hv-item-create" "$rc:$err"
-  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "hv-append wrote BACKLOG.md under issues backend"
-  pass "issues backend refused by hv-append (exit 2, file unchanged)"
+  rc=0; OUT="$(echo '- **[B10] x.**' | hvj item create --kind bugs --raw-file - 2>/dev/null)" || rc=$?
+  eq "raw-file issues refusal" "4:refused" "$rc:$(echo "$OUT" | jget error.code)"
+  eq "raw-file refusal data" "false" "$(echo "$OUT" | jget data.changed)"
+  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "item create --raw-file wrote BACKLOG.md under issues backend"
+  pass "issues backend refused by item create --raw-file (exit 4, file unchanged)"
 
-  # bogus backend: exit 1
+  # bogus backend: the verb fails, nothing is written
   echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
-  for call in "hv-append|## Bugs|- **[B10] x.**" "hv-todo-field|B01|title" "hv-todo-set-field|B01|milestone|M09" "hv-backlog"; do
-    IFS='|' read -r -a argv <<< "$call"
-    h="${argv[0]}"
-    rc=0; err="$("$BIN/$h" "${argv[@]:1}" 2>&1)" || rc=$?
-    eq "$h bogus backend" "1:error: $h: invalid backlog.backend 'bogus' (expected file|issues)" "$rc:$err"
-  done
+  eq "bogus raw-file" "1" "$(echo '- **[B10] x.**' | hvj item create --kind bugs --raw-file - >/dev/null 2>&1 && echo 0 || echo 1)"
+  eq "bogus field get" "1" "$(hvj item field get B01 --name title >/dev/null 2>&1 && echo 0 || echo 1)"
+  eq "bogus field set" "1" "$(hvj item field set B01 --name milestone --value M09 >/dev/null 2>&1 && echo 0 || echo 1)"
+  eq "bogus backlog list" "1" "$(hvj backlog list >/dev/null 2>&1 && echo 0 || echo 1)"
   cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "bogus backend wrote BACKLOG.md"
-  pass "bogus backlog.backend exits 1"
+  pass "bogus backlog.backend fails for create, field get/set and list"
 )
+trap 'rm -rf "$TMP_BK" "$TMP_GB"' EXIT
 
-echo "FileBackend complete/uncomplete and file-only verbs"
+echo "FileBackend complete/reopen and file-only verbs"
 
 TMP_CU="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
@@ -212,98 +192,100 @@ trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
 MD
   printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old.~~ Done 2025-12-01 [`%s`] (blocked: waiting)\n' "$C1" > .hv/ARCHIVE.md
   echo '{"since_refactor":{"features":3,"bugs":3}}' > .hv/counters.json
-  "$BIN/hv-proof-add" B01 --check t --result PASS --evidence x --sha "$C1" >/dev/null
-  "$BIN/hv-proof-add" B02 --check t --result PASS --evidence x --sha "$C1" >/dev/null
+  hvj proof add B01 --check t --result PASS --evidence x --sha "$C1" >/dev/null
+  hvj proof add B02 --check t --result PASS --evidence x --sha "$C1" >/dev/null
   cp .hv/BACKLOG.md orig.md; cp .hv/ARCHIVE.md orig.arch; cp .hv/counters.json orig.cnt
   eq() { [ "$2" = "$3" ] || fail "$1: expected [$2] got [$3]"; }
+  rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
   cnt() { python3 -c 'import json;d=json.load(open(".hv/counters.json"))["since_refactor"];print(d["features"],d["bugs"])'; }
 
   # complete: proof row present, default Done line, counter bumped
-  "$BIN/hv-complete" B01 "$C1"
+  OUT="$(hvj item complete B01 --commit "$C1")"
+  eq "complete data" "B|done|$C1|true" "$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.reason)|$(echo "$OUT" | jget data.commit)|$(echo "$OUT" | jget data.changed)"
   eq "complete line" "- ~~**[B01] [P1] First bug.** Desc one.~~ Done $TODAY [\`$C1\`]" "$(grep -F '[B01]' .hv/BACKLOG.md)"
   eq "complete counter" "3 4" "$(cnt)"
-  # already completed: silent no-op, no second bump
-  rc=0; out="$("$BIN/hv-complete" B01 "$C1" 2>&1)" || rc=$?
-  eq "complete noop" "0:" "$rc:$out"; eq "noop counter" "3 4" "$(cnt)"
-  # no proof: exit 3 with the exact message, nothing written
+  # already completed: success no-op, no second bump
+  rc=0; OUT="$(hvj item complete B01 --commit "$C1")" || rc=$?
+  eq "complete noop" "0:false" "$rc:$(echo "$OUT" | jget data.changed)"; eq "noop counter" "3 4" "$(cnt)"
+  # no proof: refused (exit 4), nothing written
   cp .hv/BACKLOG.md pre.md
-  rc=0; err="$("$BIN/hv-complete" B04 "$C1" 2>&1)" || rc=$?
-  eq "no proof" "3:error: [B04] no proof recorded, pass --no-proof to override (hv-proof-add B04 --check <name> --result PASS --evidence <path-or-text>)" "$rc:$err"
+  rc=0; OUT="$(hvj item complete B04 --commit "$C1" 2>/dev/null)" || rc=$?
+  eq "no proof" "4:proof missing:false" "$rc:$(echo "$OUT" | jget data.blockedBy):$(echo "$OUT" | jget data.changed)"
   cmp -s .hv/BACKLOG.md pre.md || fail "no-proof close wrote BACKLOG.md"
   # --no-proof with reason and note
-  "$BIN/hv-complete" B04 "$C1" --no-proof --reason blocked --note "waiting on X"
+  hvj item complete B04 --commit "$C1" --no-proof --reason blocked --note "waiting on X" >/dev/null
   eq "reason/note line" "- ~~**[B04] [P2] No proof.** Desc.~~ Done $TODAY [\`$C1\`] (blocked: waiting on X)" "$(grep -F '[B04]' .hv/BACKLOG.md | head -1)"
   # refactor: commit leaves counters alone
-  "$BIN/hv-complete" B02 "$R1"
+  hvj item complete B02 --commit "$R1" >/dev/null
   eq "refactor counter" "3 5" "$(cnt)"
   # unknown ID / bad reason
-  rc=0; err="$("$BIN/hv-complete" B99 "$C1" 2>&1)" || rc=$?
-  eq "complete unknown" "1:error: [B99] not found" "$rc:$err"
-  rc=0; err="$("$BIN/hv-complete" B01 "$C1" --reason bogus 2>&1 | head -1)" || rc=$?
-  eq "complete bad reason" "error: invalid --reason 'bogus'" "$err"
-  pass "hv-complete golden"
+  eq "complete unknown" "3" "$(rcof hvj item complete B99 --commit "$C1")"
+  eq "complete bad reason" "2" "$(rcof hvj item complete B01 --commit "$C1" --reason bogus)"
+  pass "item complete golden"
 
-  # uncomplete: from Completed, rewinds counter; from ARCHIVE.md; refactor; active no-op
+  # reopen: from Completed, rewinds counter; from ARCHIVE.md; refactor; active no-op
   cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
-  "$BIN/hv-uncomplete" B03
-  eq "uncomplete line" "- **[B03] [P1] Done thing.** old." "$(grep -F '[B03]' .hv/BACKLOG.md)"
+  eq "reopen changed" "true" "$(hvj item reopen B03 | jget data.changed)"
+  eq "reopen line" "- **[B03] [P1] Done thing.** old." "$(grep -F '[B03]' .hv/BACKLOG.md)"
   if grep -qF '~~**[B03]' .hv/BACKLOG.md; then fail "B03 Done line left in BACKLOG"; fi
-  eq "uncomplete counter" "3 2" "$(cnt)"
-  "$BIN/hv-uncomplete" B05
+  eq "reopen counter" "3 2" "$(cnt)"
+  hvj item reopen B05 >/dev/null
   eq "archive restore" "- **[B05] [P2] Archived.** old." "$(grep -F '[B05]' .hv/BACKLOG.md)"
   eq "archive emptied" "# Archive" "$(grep -v '^$' .hv/ARCHIVE.md)"
   eq "archive counter" "3 1" "$(cnt)"
-  rc=0; err="$("$BIN/hv-uncomplete" B03 2>&1)" || rc=$?
-  eq "uncomplete noop" "0:noop: [B03] already active in BACKLOG.md" "$rc:$err"
+  rc=0; OUT="$(hvj item reopen B03)" || rc=$?
+  eq "reopen noop" "0:false" "$rc:$(echo "$OUT" | jget data.changed)"
   eq "noop counter" "3 1" "$(cnt)"
-  "$BIN/hv-uncomplete" T02
+  hvj item reopen T02 >/dev/null
   eq "task restore" "- **[T02] Skipped.** x." "$(grep -F '[T02]' .hv/BACKLOG.md)"
   eq "task counter" "3 1" "$(cnt)"
-  rc=0; err="$("$BIN/hv-uncomplete" B99 2>&1)" || rc=$?
-  eq "uncomplete unknown" "1:error: [B99] not found in BACKLOG.md (## Completed) or .hv/ARCHIVE.md" "$rc:$err"
-  pass "hv-uncomplete golden"
+  eq "reopen unknown" "3" "$(rcof hvj item reopen B99)"
+  pass "item reopen golden"
 
   # backlog.backend = issues from here on
   cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
   echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
 
-  # file-only verbs refuse in issue mode, with a tracker pointer, writing nothing
-  while IFS='|' read -r h args ptr; do
+  # file-only verbs refuse in issue mode (exit 4, backend), writing nothing
+  # (a mutating verb exits 4; a read-only one, backlog drift, exits 1)
+  while IFS='|' read -r label want call; do
     # shellcheck disable=SC2086
-    rc=0; err="$("$BIN/$h" $args 2>&1)" || rc=$?
-    eq "$h issues refusal" "2:error: $h: not available with backlog.backend \"issues\" — $ptr" "$rc:$err"
+    rc=0; OUT="$(hvj $call 2>/dev/null)" || rc=$?
+    eq "$label issues refusal" "$want:backend" "$rc:$(echo "$OUT" | jget data.blockedBy)"
   done <<'EOF'
-hv-next-id|bugs|IDs are issue numbers; capture creates the issue
-hv-rm|--force B01|close the issue instead: hv-complete <#N> --reason dropped
-hv-archive-old|0|closed issues are the archive
-hv-backfill-since|-|Since: anchors exist only in the file backend
-hv-todo-drift|-|PRs carry "Closes #N", so the tracker closes shipped issues
+id next|4|id next --kind bugs
+item rm|4|item rm B01 --apply
+backlog archive|4|backlog archive --days 0
+backlog backfill|4|backlog backfill
+backlog drift|1|backlog drift
 EOF
   cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/ARCHIVE.md orig.arch && cmp -s .hv/counters.json orig.cnt || fail "file-only verb wrote under issues backend"
-  pass "file-only verbs refuse under issues backend (exit 2, no writes)"
+  pass "file-only verbs refuse under issues backend (exit 4, read-only drift 1, no writes)"
 
-  # bogus backend: exit 1
+  # bogus backend: every verb fails, nothing is written
   echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
-  for h in hv-complete hv-uncomplete hv-next-id hv-rm hv-archive-old hv-backfill-since hv-todo-drift; do
-    case "$h" in hv-complete) a="B01 $C1" ;; hv-uncomplete) a=B03 ;; hv-next-id) a=bugs ;; hv-rm) a=B01 ;; hv-archive-old) a=0 ;; *) a="" ;; esac
+  for call in "item complete B01 --commit $C1" "item reopen B03" "id next --kind bugs" "item rm B01 --apply" "backlog archive --days 0" "backlog backfill" "backlog drift"; do
     # shellcheck disable=SC2086
-    rc=0; err="$("$BIN/$h" $a 2>&1)" || rc=$?
-    eq "$h bogus backend" "1:error: $h: invalid backlog.backend 'bogus' (expected file|issues)" "$rc:$err"
+    rc=0; hvj $call >/dev/null 2>&1 || rc=$?
+    [ "$rc" != 0 ] || fail "hv $call succeeded under a bogus backlog.backend"
   done
   cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/counters.json orig.cnt || fail "bogus backend wrote"
-  pass "bogus backlog.backend exits 1 for all seven helpers"
+  pass "bogus backlog.backend fails for all seven verbs"
 
   # file mode: file-only verbs still work
   rm .hv/config.json
-  eq "next-id file mode" "B06" "$("$BIN/hv-next-id" bugs)"
-  pass "hv-next-id unchanged in file mode"
+  OUT="$(hvj id next --kind bugs)"
+  eq "id next file mode" "B06:true" "$(echo "$OUT" | jget data.id):$(echo "$OUT" | jget data.changed)"
+  pass "id next unchanged in file mode"
 )
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
 
 echo "IssueBackend: reads served from the tracker"
 
 TMP_IB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT
 
+# white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
 # Pure helpers: item refs and the fields block.
 PYTHONPATH="$BIN" python3 - <<'PY' || fail "item ref / fields block helpers"
 from hvlib import resolve_item_ref, parse_fields_block, render_fields_block
@@ -337,7 +319,8 @@ for prov in github gitlab; do
     git init -q && git config user.email t@t && git config user.name t
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov issue mode $1: expected [$2] got [$3]"; }
-    TC() { "$BIN/hv-tracker-call" -- "$@" </dev/null >/dev/null; }
+    rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
+    TC() { hvj tracker call -- "$@" </dev/null >/dev/null; }
     FB="$(printf 'Adds the thing.\n\nSecond paragraph.\n\n<!-- hv:fields\nRelated: F3, B1\nRepos: web\n-->')"
     if [ "$prov" = github ]; then
       TC api repos/fake/repo/milestones -f "title=M07 — Issue backend"
@@ -362,6 +345,7 @@ for prov in github gitlab; do
     sleep 1
     CLOSE_DROP 7
 
+    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     # rendering
     md="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(), end="")')"
     exp="# Backlog
@@ -396,6 +380,7 @@ $md";; esac
     esac
     case "$md" in *"[T5]"*|*"M07 tracking"*) fail "$prov milestone-tracker issue rendered";; esac
     pass "$prov: backlog_markdown shape, tags, fields, completed, tracker issue excluded"
+    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov closed_limit / truncation"
 from hvlib import get_backend
 b = get_backend()
@@ -406,148 +391,163 @@ assert [n for n, _ in secs] == ["Bugs", "Features", "Tasks"] and "Done" not in c
 PY
     BIG="$(python3 -c 'print("word " * 80)')"
     IC "Long one" "$BIG" "type:task"
+    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     long="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(closed_limit=0))' | grep -F '[T8]')"
     [ "${#long}" -lt 260 ] && case "$long" in *"…"*) ;; *) fail "$prov truncation: $long";; esac
 
-    # hv-backlog
-    out="$("$BIN/hv-backlog")"
-    case "$out" in *"| B1 | P1 | Crash on start |  |"*) ;; *) fail "$prov hv-backlog bug row: $out";; esac
-    case "$out" in *"| F2 | Major | Big feature | [F3], [B1] | M07 |"*) ;; *) fail "$prov hv-backlog feature row: $out";; esac
-    case "$out" in *"| F3 | "*"Other feature"*) ;; *) fail "$prov hv-backlog F3: $out";; esac
-    case "$out" in *"| T4 | Chore |"*) ;; *) fail "$prov hv-backlog task: $out";; esac
-    case "$out" in *"Old bug"*|*"tracking"*) fail "$prov hv-backlog shows closed/tracker: $out";; esac
-    pass "$prov: hv-backlog renders tracker items"
+    # backlog list
+    IDS() { echo "$OUT" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))'; }
+    OUT="$(hvj backlog list)"
+    eq "list bugs" "1" "$(IDS bugs)"
+    eq "list bug row" "P1|Crash on start|[]" "$(echo "$OUT" | jget 'data.bugs[0].priority')|$(echo "$OUT" | jget 'data.bugs[0].title')|$(echo "$OUT" | jget 'data.bugs[0].related')"
+    eq "list features" "2,3" "$(IDS features)"
+    big="$(echo "$OUT" | python3 -c 'import json,sys; print(json.dumps([r for r in json.load(sys.stdin)["data"]["features"] if r["id"] == "2"][0], separators=(",", ":")))')"
+    eq "list feature row" "Major|Big feature|3,1|M07" "$(echo "$big" | jget size)|$(echo "$big" | jget title)|$(echo "$big" | jget related | tr -dc '0-9,')|$(echo "$big" | jget milestone)"
+    eq "list other feature" "Other feature" "$(echo "$OUT" | python3 -c 'import json,sys; print([r for r in json.load(sys.stdin)["data"]["features"] if r["id"] == "3"][0]["title"])')"
+    eq "list tasks" "4,8" "$(IDS tasks)"
+    eq "list no closed or tracker issue" "0" "$(echo "$OUT" | grep -c 'Old bug\|tracking')"
+    pass "$prov: backlog list renders tracker items"
 
-    # hv-todo-field across ID spellings
+    # item field get across ID spellings
+    FG() { hvj item field get "$1" --name "$2" | jget data.value; }
     for ref in F2 '#2' 2; do
-      eq "title $ref" "Big feature" "$("$BIN/hv-todo-field" "$ref" title)"
-      eq "milestone $ref" "M07" "$("$BIN/hv-todo-field" "$ref" milestone)"
+      eq "title $ref" "Big feature" "$(FG "$ref" title)"
+      eq "milestone $ref" "M07" "$(FG "$ref" milestone)"
     done
-    eq "related" "[F3], [B1]" "$("$BIN/hv-todo-field" F2 related)"
-    eq "repos" "web" "$("$BIN/hv-todo-field" F2 repos)"
-    eq "subsystem" "" "$("$BIN/hv-todo-field" F2 subsystem)"
-    eq "since" "" "$("$BIN/hv-todo-field" F2 since)"
-    eq "reason open" "" "$("$BIN/hv-todo-field" F2 reason)"
-    eq "reason done" "done" "$("$BIN/hv-todo-field" B6 reason)"
-    eq "reason dropped" "dropped" "$("$BIN/hv-todo-field" '#7' reason)"
-    eq "note" "" "$("$BIN/hv-todo-field" F2 note)"
-    case "$("$BIN/hv-todo-field" F2 detail)" in http*/2) ;; *) fail "$prov detail is not the issue URL";; esac
-    dump="$("$BIN/hv-todo-field" --dump '#2')"
-    DUMP="$dump" python3 - <<'PY' || fail "$prov --dump"
+    eq "id and type" "2|F" "$(hvj item field get F2 --name title | jget data.id)|$(hvj item field get '#2' --name title | jget data.type)"
+    eq "related" "[F3], [B1]" "$(FG F2 related)"
+    eq "repos" "web" "$(FG F2 repos)"
+    eq "subsystem" "" "$(FG F2 subsystem)"
+    eq "since" "" "$(FG F2 since)"
+    eq "reason open" "" "$(FG F2 reason)"
+    eq "reason done" "done" "$(FG B6 reason)"
+    eq "reason dropped" "dropped" "$(FG '#7' reason)"
+    eq "note" "" "$(FG F2 note)"
+    case "$(FG F2 detail)" in http*/2) ;; *) fail "$prov detail is not the issue URL";; esac
+    DUMP="$(hvj item field list '#2')" python3 - <<'PY' || fail "$prov item field list"
 import json, os
-d = json.loads(os.environ["DUMP"])
+d = json.loads(os.environ["DUMP"])["data"]["fields"]
 assert list(d) == ["title","detail","related","milestone","repos","subsystem","since","reason","note"], list(d)
 assert d["title"] == "Big feature" and d["related"] == "[F3], [B1]" and d["milestone"] == "M07", d
 assert d["repos"] == "web" and d["detail"].endswith("/2"), d
 PY
     for bad in B2 T2 B99 9999 F5; do
-      rc=0; err="$("$BIN/hv-todo-field" "$bad" title 2>&1)" || rc=$?
-      eq "unknown $bad" "1:error: [$bad] not found in the issue tracker" "$rc:$err"
+      eq "unknown $bad" "3" "$(rcof hvj item field get "$bad" --name title)"
     done
-    pass "$prov: hv-todo-field resolves F2/#2/2, rejects type mismatch and tracker issues"
+    pass "$prov: item field get resolves F2/#2/2, rejects type mismatch and tracker issues"
 
-    # hv-summary, milestone readers
-    sum="$("$BIN/hv-summary")"
-    case "$sum" in "Backlog: 1 bug, 2 features, 2 tasks"*) ;; *) fail "$prov hv-summary: $sum";; esac
-    case "$sum" in *"Recent: [T7] on "*"(dropped), [B6] on "*) ;; *) fail "$prov hv-summary recent: $sum";; esac
-    eq "todo-by-milestone" "F2" "$("$BIN/hv-todo-by-milestone" M07)"
-    eq "todo-by-milestone none" "" "$("$BIN/hv-todo-by-milestone" M08)"
-    eq "find-milestone" "M07" "$("$BIN/hv-find-milestone-for-items" B1 F2 '#3')"
-    eq "find-milestone none" "" "$("$BIN/hv-find-milestone-for-items" B1 T4)"
-    pass "$prov: hv-summary / hv-todo-by-milestone / hv-find-milestone-for-items"
+    # summary, milestone readers
+    OUT="$(hvj summary)"
+    eq "summary counts" '{"bugs":1,"features":2,"tasks":2}' "$(echo "$OUT" | jget data.backlog)"
+    eq "summary recent" "7|T|dropped|6|B" "$(echo "$OUT" | jget 'data.recent[0].id')|$(echo "$OUT" | jget 'data.recent[0].type')|$(echo "$OUT" | jget 'data.recent[0].reason')|$(echo "$OUT" | jget 'data.recent[1].id')|$(echo "$OUT" | jget 'data.recent[1].type')"
+    eq "ids by milestone" '{"milestone":"M07","ids":["2"]}' "$(hvj backlog ids --milestone M07 | jget data)"
+    eq "ids by milestone none" '[]' "$(hvj backlog ids --milestone M08 | jget data.ids)"
+    eq "milestones of items" '["M07"]' "$(hvj backlog milestones B1 F2 '#3' | jget data.milestones)"
+    eq "milestones of items none" '[]' "$(hvj backlog milestones B1 T4 | jget data.milestones)"
+    pass "$prov: summary / backlog ids / backlog milestones"
 
-    # hv-uncertain: F2 is Major with a prose-only body (no code span)
-    rc=0; out="$("$BIN/hv-uncertain" F2 2>&1)" || rc=$?
-    eq "uncertain F2" "0:no concrete identifiers (unknown surface)" "$rc:$out"
-    rc=0; out="$("$BIN/hv-uncertain" '#2' 2>&1)" || rc=$?
-    eq "uncertain #2" "0:no concrete identifiers (unknown surface)" "$rc:$out"
-    rc=0; out="$("$BIN/hv-uncertain" B1 2>&1)" || rc=$?
-    eq "uncertain non-major" "1:" "$rc:$out"
-    rc=0; out="$("$BIN/hv-uncertain" B2 2>&1)" || rc=$?
-    eq "uncertain unknown" "2:error: item B2 not found in BACKLOG.md" "$rc:$out"
-    pass "$prov: hv-uncertain reads the issue body as the detail text"
+    # plan uncertain: F2 is Major with a prose-only body (no code span)
+    for ref in F2 '#2'; do
+      rc=0; OUT="$(hvj plan uncertain "$ref")" || rc=$?
+      eq "uncertain $ref" "0:true:[\"no concrete identifiers (unknown surface)\"]" "$rc:$(echo "$OUT" | jget data.uncertain):$(echo "$OUT" | jget data.reasons)"
+    done
+    rc=0; OUT="$(hvj plan uncertain B1)" || rc=$?
+    eq "uncertain non-major" "1:false" "$rc:$(echo "$OUT" | jget data.uncertain)"
+    eq "uncertain unknown" "3" "$(rcof hvj plan uncertain B2)"
+    pass "$prov: plan uncertain reads the issue body as the detail text"
 
-    # tracker failure: error line, exit 1
-    for call in "hv-backlog" "hv-summary" "hv-todo-by-milestone M07" "hv-find-milestone-for-items F2" "hv-uncertain F2"; do
-      h="${call%% *}"
+    # tracker failure: exit 5 (unavailable)
+    for call in "backlog list" "summary" "backlog ids --milestone M07" "backlog milestones F2" "plan uncertain F2"; do
       # shellcheck disable=SC2086
-      rc=0; err="$(FAKE_TRACKER_FAIL=list "$BIN/$h" ${call#"$h"} 2>&1 >/dev/null)" || rc=$?
-      eq "$h list failure rc" 1 "$rc"
-      case "$err" in "error: $h: "*) ;; *) fail "$prov $h failure message: $err";; esac
+      eq "$call list failure rc" 5 "$(FAKE_TRACKER_FAIL=list rcof hvj $call)"
     done
-    rc=0; err="$(FAKE_TRACKER_FAIL=view "$BIN/hv-todo-field" F2 title 2>&1)" || rc=$?
-    eq "todo-field view failure" 1 "$rc"; case "$err" in "error: hv-todo-field: "*) ;; *) fail "$prov todo-field failure: $err";; esac
-    pass "$prov: tracker failures surface as 'error: <helper>: ...' exit 1"
+    eq "field get view failure" 5 "$(FAKE_TRACKER_FAIL=view rcof hvj item field get F2 --name title)"
+    pass "$prov: tracker failures surface as exit 5"
 
-    # hv-append stays refused (capture is hv-item-create)
+    # hv-append stays refused (capture is item create)
+    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
     pass "$prov: hv-append still refused in issue mode"
   )
 done
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT
 
-echo "hv-item-create: capture in both backends, issue-mode field writes"
+echo "item create: capture in both backends, issue-mode field writes"
 
 TMP_IC="$(mktemp -d)"
-trap 'rm -rf "$TMP_IC"' EXIT
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB" "$TMP_IC"' EXIT
 
-# --- file mode: byte-identical to hv-next-id + hv-append -------------------
-mkdir -p "$TMP_IC/base/.hv"
+# --- file mode: byte-identical to the golden bullets ------------------------
+mkdir -p "$TMP_IC/new/.hv"
 (
-  cd "$TMP_IC/base"
+  cd "$TMP_IC/new"
   git init -q && git config user.email t@t && git config user.name t
   printf '# Backlog\n\n## Bugs\n\n- **[B01] [P1] Old bug.** d. Since: abc1234\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
   echo '{"bugs": 1}' > .hv/counters.json
   printf 'Body for {ID}\n\nsecond {ID} line, no trailing newline' > "$TMP_IC/body.md"
   git add -A && git commit -q -m seed
+  head="$(git rev-parse --short HEAD)"
+  IC() { hvj item create "$@"; }
+  OUT="$(IC --kind bugs --title "Crash on start" --tag P1 --desc "It crashes." --related '[F01]' --milestone M01 --repos web)"
+  eq() { [ "$2" = "$3" ] || fail "item create $1: expected [$2] got [$3]"; }
+  eq "bug data" "B02|B|bugs|true" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.kind)|$(echo "$OUT" | jget data.changed)"
+  OUT="$(IC --kind features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$TMP_IC/body.md" --subsystem core)"
+  eq "feature data" "F02|F|.hv/features/F02.md" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.detail)"
+  eq "task id" "T01" "$(IC --kind tasks --title "Is it done?" | jget data.id)"
+  eq "bug 2 id" "B03" "$(IC --kind bugs --title "Cosmetic glitch." --tag P3 --desc "Minor." --captured 2026-10-01 | jget data.id)"
+  cat > "$TMP_IC/expected.md" <<MD
+# Backlog
+
+## Bugs
+
+- **[B01] [P1] Old bug.** d. Since: abc1234
+- **[B02] [P1] Crash on start.** It crashes. Related: [F01] Milestone: M01 Repos: web Since: $head
+- **[B03] [P3] Cosmetic glitch.** Minor. Captured: 2026-10-01 Since: $head
+
+## Features
+- **[F02] [Major] Big thing.** Does stuff. Detail: \`.hv/features/F02.md\` Subsystem: core Since: $head
+
+## Tasks
+- **[T01] Is it done?** Since: $head
+
+## Completed
+MD
+  cmp -s "$TMP_IC/expected.md" .hv/BACKLOG.md || fail "file-mode item create BACKLOG.md differs from golden: $(diff "$TMP_IC/expected.md" .hv/BACKLOG.md)"
+  eq "counters" '{"bugs":3,"features":2,"tasks":1}' "$(python3 -c 'import json;print(json.dumps(json.load(open(".hv/counters.json")),separators=(",",":")))')"
+  [ "$(sed -n '3,$p' .hv/features/F02.md | head -c 100 | tr -d '\n')" = "second F02 line, no trailing newline" ] || fail "detail {ID} substitution"
+  [ "$(sed -n 1p .hv/features/F02.md)" = "Body for F02" ] || fail "detail {ID} substitution on line 1"
 )
-cp -a "$TMP_IC/base" "$TMP_IC/old"; cp -a "$TMP_IC/base" "$TMP_IC/new"
-D='`'
+# id next mints from the same counters: F02 above only follows B02's `Related: [F01]` reference
+cp -a "$TMP_IC/new" "$TMP_IC/idn"
 (
-  cd "$TMP_IC/old"
-  ID=$("$BIN/hv-next-id" bugs); "$BIN/hv-append" "## Bugs" "- **[$ID] [P1] Crash on start.** It crashes. Related: [F01] Milestone: M01 Repos: web" ; echo "$ID" >> "$TMP_IC/old.ids"
-  ID=$("$BIN/hv-next-id" features); mkdir -p .hv/features; sed "s/{ID}/$ID/g" "$TMP_IC/body.md" > ".hv/features/$ID.md"
-  "$BIN/hv-append" "## Features" "- **[$ID] [Major] Big thing.** Does stuff. Detail: ${D}.hv/features/$ID.md${D} Subsystem: core"; echo "$ID" >> "$TMP_IC/old.ids"
-  ID=$("$BIN/hv-next-id" tasks); "$BIN/hv-append" "## Tasks" "- **[$ID] Is it done?**"; echo "$ID" >> "$TMP_IC/old.ids"
-  ID=$("$BIN/hv-next-id" bugs); "$BIN/hv-append" "## Bugs" "- **[$ID] [P3] Cosmetic glitch.** Minor. Captured: 2026-10-01 Subsystem: ui"; echo "$ID" >> "$TMP_IC/old.ids"
+  cd "$TMP_IC/idn"
+  git checkout -q -- . && git clean -qfd
+  [ "$(hvj id next --kind bugs | jget data.id) $(hvj id next --kind features | jget data.id) $(hvj id next --kind tasks | jget data.id) $(hvj id next --kind bugs | jget data.id)" = "B02 F01 T01 B03" ] || fail "id next sequence"
+  [ "$(python3 -c 'import json;print(json.dumps(json.load(open(".hv/counters.json")),separators=(",",":")))')" = '{"bugs":3,"features":1,"tasks":1}' ] || fail "id next counters"
 )
-(
-  cd "$TMP_IC/new"
-  IC() { "$BIN/hv-item-create" "$@"; }
-  IC bugs --title "Crash on start" --tag P1 --desc "It crashes." --field Related=[F01] --field Milestone=M01 --field Repos=web >> "$TMP_IC/new.ids"
-  IC features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$TMP_IC/body.md" --field Subsystem=core >> "$TMP_IC/new.ids"
-  IC tasks --title "Is it done?" >> "$TMP_IC/new.ids"
-  IC bugs --title "Cosmetic glitch." --tag P3 --desc "Minor." --field Captured=2026-10-01 --field Subsystem=ui >> "$TMP_IC/new.ids"
-)
-cmp -s "$TMP_IC/old.ids" "$TMP_IC/new.ids" || fail "hv-item-create printed IDs differ: $(cat "$TMP_IC/old.ids" | tr '\n' ' ') vs $(cat "$TMP_IC/new.ids" | tr '\n' ' ')"
-[ "$(tr '\n' ' ' < "$TMP_IC/new.ids")" = "B02 F02 T01 B03 " ] || fail "unexpected IDs: $(cat "$TMP_IC/new.ids")"
-diff -r "$TMP_IC/old/.hv" "$TMP_IC/new/.hv" >/dev/null || fail "file-mode hv-item-create differs from next-id+append: $(diff -r "$TMP_IC/old/.hv" "$TMP_IC/new/.hv")"
-grep -q 'Since: [0-9a-f]\{7,\}' "$TMP_IC/new/.hv/BACKLOG.md" || fail "no Since stamp"
-[ "$(sed -n '3,$p' "$TMP_IC/new/.hv/features/F02.md" | head -c 100 | tr -d '\n')" = "second F02 line, no trailing newline" ] || fail "detail {ID} substitution"
-pass "file mode: hv-item-create == hv-next-id + hv-append (BACKLOG, counters, detail file, printed IDs)"
+pass "file mode: item create == golden bullets, detail file, counters and IDs"
 
 (
   cd "$TMP_IC/new"
   cp -a .hv "$TMP_IC/before.hv"
-  bad() { local want="$1"; shift; local rc=0 err; err="$("$BIN/hv-item-create" "$@" 2>&1)" || rc=$?; [ "$rc" = 1 ] || fail "hv-item-create $*: rc $rc ($err)"; case "$err" in *"$want"*) ;; *) fail "hv-item-create $*: message [$err] lacks [$want]";; esac; }
-  bad "invalid tag 'Major' for bugs" bugs --title x --tag Major
-  bad "invalid tag 'P1' for features" features --title x --tag P1
-  bad "tasks take no tag" tasks --title x --tag P1
-  bad "'Since' is not a settable field" bugs --title x --field Since=abc
-  bad "'Detail' is not a settable field" bugs --title x --field Detail=abc
-  bad "non-empty value" bugs --title x --field Related=
-  bad "Name=Value" bugs --title x --field Related
-  bad "--title is required" bugs --tag P1
-  bad "unknown kind" milestones --title x
-  bad "cannot read --body-file" bugs --title x --body-file /nonexistent
-  rc=0; "$BIN/hv-item-create" bugs --title x --desc >/dev/null 2>&1 || rc=$?; [ "$rc" != 0 ] || fail "bare trailing --desc accepted"
-  diff -r .hv "$TMP_IC/before.hv" >/dev/null || fail "rejected hv-item-create changed .hv"
+  rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
+  bad() { [ "$(rcof hvj item create "$@")" = 2 ] || fail "item create $*: expected exit 2"; }
+  bad --kind bugs --title x --tag Major
+  bad --kind features --title x --tag P1
+  bad --kind tasks --title x --tag P1
+  bad --kind bugs --title x --since abc
+  bad --kind bugs --title x --detail abc
+  bad --kind bugs --tag P1
+  bad --kind milestones --title x
+  [ "$(rcof hvj item create --kind bugs --title x --body-file /nonexistent)" = 3 ] || fail "item create with a missing --body-file: expected exit 3"
+  bad --kind bugs --title x --desc
+  diff -r .hv "$TMP_IC/before.hv" >/dev/null || fail "rejected item create changed .hv"
   # relative --body-file resolves against the caller's cwd
   mkdir -p sub; printf 'rel {ID}' > sub/b.md
-  ( cd sub && "$BIN/hv-item-create" tasks --title Rel --body-file b.md >/dev/null )
+  ( cd sub && hvj item create --kind tasks --title Rel --body-file b.md >/dev/null )
   [ "$(cat .hv/tasks/T02.md)" = "rel T02" ] || fail "relative --body-file"
 )
-pass "hv-item-create validates tag/fields/title/body-file without writing"
+pass "item create validates tag/fields/title/body-file without writing"
 
 # --- issue mode -------------------------------------------------------------
 for prov in github gitlab; do
@@ -558,39 +558,39 @@ for prov in github gitlab; do
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
-    eq() { [ "$2" = "$3" ] || fail "$prov hv-item-create $1: expected [$2] got [$3]"; }
-    TC() { "$BIN/hv-tracker-call" -- "$@" </dev/null >/dev/null; }
-    # IV <n> <key>: one normalized-issue key (labels sorted, joined by comma)
-    IV() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-i = adapter_for(load_config()).get(int(sys.argv[1]))
+    eq() { [ "$2" = "$3" ] || fail "$prov item create $1: expected [$2] got [$3]"; }
+    rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
+    TC() { hvj tracker call -- "$@" </dev/null >/dev/null; }
+    # IV <n> <key>: one issue key from the fake tracker's store (labels sorted, joined by comma;
+    # the store keeps a milestone as [title, number])
+    IV() { python3 -c '
+import json, sys
+i = next(i for i in json.load(open(sys.argv[3]))["issues"] if i["number"] == int(sys.argv[1]))
 v = i[sys.argv[2]]
-print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "-"))' "$@"; }
+if sys.argv[2] == "milestone":
+    v = v[0] if v else None   # the store keeps [title, number]
+print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "-"))' "$1" "$2" "$P/db.json"; }
     EDITS() { grep -c 'issue \(edit\|update\)' "$P/log" || true; }
-    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
 
     if [ "$prov" = github ]; then
       CFG ',"autoCreateLabel":false'
-      ERR "$BIN/hv-item-create" bugs --title Nope --tag P1
-      eq "autoCreateLabel off" "1:error: hv-item-create: label 'type:bug' does not exist (issues.autoCreateLabel is off)" "$ERRRC:$ERRMSG"
-      eq "no issue created" "[]" "$("$BIN/hv-tracker-call" -- issue list --json number </dev/null | tr -d ' \n')"
+      [ "$(rcof hvj item create --kind bugs --title Nope --tag P1)" != 0 ] || fail "$prov item create: a missing label with issues.autoCreateLabel off should fail"
+      eq "no issue created" "[]" "$(hvj tracker call -- issue list --json number </dev/null | jget data.stdout | tr -d ' \n')"
       CFG ""
       TC api 'repos/{owner}/{repo}/milestones' -f "title=M07 — Issue backend"
     else
       TC api 'projects/:id/milestones' -f "title=M07 — Issue backend"
     fi
 
-    ERR "$BIN/hv-item-create" bugs --title Nope --field Milestone=M99
-    eq "missing milestone" "1:error: hv-item-create: milestone M99 not found on the tracker — create it with /hv-vision (M07-S05)" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-item-create" bugs --title Nope --field Milestone="M07, M08"
-    eq "two milestones" "1:error: hv-item-create: issue mode takes one milestone ID like M07, got 'M07, M08'" "$ERRRC:$ERRMSG"
+    eq "missing milestone" "3" "$(rcof hvj item create --kind bugs --title Nope --milestone M99)"
+    [ "$(rcof hvj item create --kind bugs --title Nope --milestone "M07, M08")" != 0 ] || fail "$prov item create: two milestones should fail"
 
     printf 'Detail for {ID}.\n' > "$P/body.md"
-    B="$("$BIN/hv-item-create" bugs --title "Crash on start" --tag P1 --desc "It crashes." --field Related='F1, B2' --field Repos=web --field Milestone=M07)"
-    F="$("$BIN/hv-item-create" features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$P/body.md" --field Subsystem=core)"
-    T="$("$BIN/hv-item-create" tasks --title "Chore")"
-    eq "ids" "B1 F2 T3" "$B $F $T"
+    B="$(hvj item create --kind bugs --title "Crash on start" --tag P1 --desc "It crashes." --related 'F1, B2' --repos web --milestone M07)"
+    F="$(hvj item create --kind features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$P/body.md" --subsystem core)"
+    T="$(hvj item create --kind tasks --title "Chore")"
+    eq "ids" "1 2 3" "$(echo "$B" | jget data.id) $(echo "$F" | jget data.id) $(echo "$T" | jget data.id)"
+    eq "types" "B F T" "$(echo "$B" | jget data.type) $(echo "$F" | jget data.type) $(echo "$T" | jget data.type)"
     eq "bug labels" "p1,type:bug" "$(IV 1 labels)"
     eq "bug milestone" "M07 — Issue backend" "$(IV 1 milestone)"
     eq "bug title" "Crash on start" "$(IV 1 title)"
@@ -600,55 +600,51 @@ print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "
     eq "feature body" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\n-->')" "$(IV 2 body)"
     eq "task labels" "type:task" "$(IV 3 labels)"
     eq "task body" "" "$(IV 3 body)"
-    eq "todo-field" "M07|[F1], [B2]|web|core" "$("$BIN/hv-todo-field" B1 milestone)|$("$BIN/hv-todo-field" '#1' related)|$("$BIN/hv-todo-field" B1 repos)|$("$BIN/hv-todo-field" F2 subsystem)"
-    bl="$("$BIN/hv-backlog")"
-    for id in B1 F2 T3; do case "$bl" in *"$id"*) ;; *) fail "$prov hv-backlog lacks $id: $bl";; esac; done
-    ERR "$BIN/hv-append" "## Bugs" "- **[B9] x.**"
-    eq "append pointer" "2:error: hv-append: issue mode creates items with hv-item-create" "$ERRRC:$ERRMSG"
-    pass "$prov: hv-item-create creates labelled issues with fields, milestone and body; hv-append points at it"
+    FG() { hvj item field get "$1" --name "$2" | jget data.value; }
+    eq "field get" "M07|[F1], [B2]|web|core" "$(FG B1 milestone)|$(FG '#1' related)|$(FG B1 repos)|$(FG F2 subsystem)"
+    OUT="$(hvj backlog list)"
+    eq "list ids" "1|2|3" "$(echo "$OUT" | jget 'data.bugs[0].id')|$(echo "$OUT" | jget 'data.features[0].id')|$(echo "$OUT" | jget 'data.tasks[0].id')"
+    rc=0; OUT="$(echo '- **[B9] x.**' | hvj item create --kind bugs --raw-file - 2>/dev/null)" || rc=$?
+    eq "raw-file refused" "4:refused:backend" "$rc:$(echo "$OUT" | jget error.code):$(echo "$OUT" | jget data.blockedBy)"
+    pass "$prov: item create makes labelled issues with fields, milestone and body; --raw-file is refused"
 
-    # set_field
-    SF() { "$BIN/hv-todo-set-field" "$@"; }
+    # item field set
+    SF() { hvj item field set "$1" --name "$2" --value "$3"; }
     e0="$(EDITS)"
-    SF T3 related "[B1]"
+    eq "set related changed" "true" "$(SF T3 related "[B1]" | jget data.changed)"
     eq "set related" "$(printf '<!-- hv:fields\nRelated: [B1]\n-->')" "$(IV 3 body)"
-    SF T3 related "[B1]"
-    SF T3 Related "[B1]"
+    SF T3 related "[B1]" >/dev/null
+    SF T3 Related "[B1]" >/dev/null 2>&1 || true
     eq "related no-op: one edit" "$((e0 + 1))" "$(EDITS)"
-    SF T3 repos api; SF T3 related ""
+    SF T3 repos api >/dev/null; SF T3 related "" >/dev/null
     eq "clear related keeps repos" "$(printf '<!-- hv:fields\nRepos: api\n-->')" "$(IV 3 body)"
-    SF T3 repos ""
+    SF T3 repos "" >/dev/null
     eq "all cleared" "" "$(IV 3 body)"
-    e1="$(EDITS)"; SF T3 repos ""; eq "clear absent is no-op" "$e1" "$(EDITS)"
-    SF F2 related "[B1]"
+    e1="$(EDITS)"; SF T3 repos "" >/dev/null; eq "clear absent is no-op" "$e1" "$(EDITS)"
+    SF F2 related "[B1]" >/dev/null
     eq "feature keeps text" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\nRelated: [B1]\n-->')" "$(IV 2 body)"
-    SF T3 milestone M07
+    SF T3 milestone M07 >/dev/null
     eq "set milestone" "M07 — Issue backend" "$(IV 3 milestone)"
-    e2="$(EDITS)"; SF '#3' milestone M07; eq "milestone no-op" "$e2" "$(EDITS)"
-    eq "todo-field milestone" "M07" "$("$BIN/hv-todo-field" T3 milestone)"
-    SF T3 milestone ""
+    e2="$(EDITS)"; SF '#3' milestone M07 >/dev/null; eq "milestone no-op" "$e2" "$(EDITS)"
+    eq "field get milestone" "M07" "$(FG T3 milestone)"
+    SF T3 milestone "" >/dev/null
     eq "clear milestone" "-" "$(IV 3 milestone)"
-    e3="$(EDITS)"; SF T3 milestone ""; eq "clear milestone no-op" "$e3" "$(EDITS)"
-    ERR "$BIN/hv-todo-set-field" T3 milestone M99
-    eq "set missing milestone" "1:error: hv-todo-set-field: milestone M99 not found on the tracker — create it with /hv-vision (M07-S05)" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-todo-set-field" T3 detail x
-    eq "detail not settable" "1:error: detail is not a settable field; pick one of milestone/related/repos/subsystem" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-todo-set-field" T99 related x
-    eq "unknown item" "1:error: [T99] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-todo-set-field" B3 related x
-    eq "type mismatch" "1:error: [B3] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
+    e3="$(EDITS)"; SF T3 milestone "" >/dev/null; eq "clear milestone no-op" "$e3" "$(EDITS)"
+    eq "set missing milestone" "3" "$(rcof hvj item field set T3 --name milestone --value M99)"
+    eq "detail not settable" "4" "$(rcof hvj item field set T3 --name detail --value x)"
+    eq "unknown item" "3" "$(rcof hvj item field set T99 --name related --value x)"
+    eq "type mismatch" "3" "$(rcof hvj item field set B3 --name related --value x)"
     TC issue close 3
-    ERR "$BIN/hv-todo-set-field" T3 related "[B1]"
-    eq "closed item" "1:error: [T3] is not an open item on the issue tracker (unknown or closed)" "$ERRRC:$ERRMSG"
-    pass "$prov: hv-todo-set-field writes fields/milestone on issues, no-ops when unchanged, rejects bad input"
+    eq "closed item" "4" "$(rcof hvj item field set T3 --name related --value "[B1]")"
+    pass "$prov: item field set writes fields/milestone on issues, no-ops when unchanged, rejects bad input"
   )
 done
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB" "$TMP_IC"' EXIT
 
-echo "Issue mode: hv-complete / hv-uncomplete close reasons, labels, proof gate"
+echo "Issue mode: item complete / reopen close reasons, labels, proof gate"
 
 TMP_IL="$(mktemp -d)"
-trap 'rm -rf "$TMP_IL"' EXIT
+trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB" "$TMP_IC" "$TMP_IL"' EXIT
 for prov in github gitlab; do
   P="$TMP_IL/$prov"; mkdir -p "$P/.hv"
   echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
@@ -657,85 +653,85 @@ for prov in github gitlab; do
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov lifecycle $1: expected [$2] got [$3]"; }
-    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
-    # IV <n>: "state|state_reason|sorted labels (comma)|comments (joined by ' // ')"
-    IV() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config()); n = int(sys.argv[1]); i = a.get(n)
-print("%s|%s|%s|%s" % (i["state"], i["state_reason"] or "", ",".join(sorted(i["labels"])),
-                       " // ".join(c["body"].replace("\n", " ") for c in a.comments(n) if not c["body"].startswith("<!-- hv:proof"))))' "$1"; }
-    PROOF() { "$BIN/hv-proof-add" "$1" --check smoke --result PASS --evidence ok --sha abc1234; }
+    rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
+    # IV <n>: "state|state_reason|sorted labels (comma)|comments (joined by ' // ')", read from the fake
+    # tracker's store. glab has no close reason: a closed issue is completed unless it carries not-planned.
+    IV() { python3 -c '
+import json, sys
+i = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
+reason = (i["state_reason"] or (("not_planned" if "not-planned" in i["labels"] else "completed") if i["state"] == "closed" else "")).replace(" ", "_")
+print("%s|%s|%s|%s" % (i["state"], reason, ",".join(sorted(i["labels"])),
+                       " // ".join(c["body"].replace("\n", " ") for c in i["comments"] if not c["body"].startswith("<!-- hv:proof"))))' "$1" "$P/db.json"; }
+    WRITES() { grep -c "$1" "$P/log" || true; }
+    PROOF() { hvj proof add "$1" --check smoke --result PASS --evidence ok --sha abc1234 >/dev/null; }
+    DONE() { hvj item complete "$@"; }
     DASH="$(printf '\xe2\x80\x94')"
     NPL="not-planned,"; [ "$prov" = github ] && NPL=""   # glab has no close reason: a label stands in
 
-    for t in a b c d e f; do "$BIN/hv-item-create" tasks --title "Task $t" >/dev/null; done   # T1..T6
-    PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-for n in range(1, 7): a.add_labels(n, ["in-progress"])'
+    for t in a b c d e f; do hvj item create --kind tasks --title "Task $t" >/dev/null; done   # T1..T6
+    for n in 1 2 3 4 5 6; do hvj item state "T$n" --to in-progress >/dev/null; done
     eq "seeded labels" "open||in-progress,type:task|" "$(IV 1)"
 
-    # proof gate: unproven done exits 3 and leaves the issue alone
+    # proof gate: unproven done is refused (exit 4) and leaves the issue alone
     before="$(IV 1)"
-    ERR "$BIN/hv-complete" T1 abc1234
-    eq "gate rc" 3 "$ERRRC"
-    case "$ERRMSG" in "error: [T1] no proof recorded, pass --no-proof"*) ;; *) fail "$prov gate msg: $ERRMSG";; esac
+    rc=0; OUT="$(DONE T1 --commit abc1234 2>/dev/null)" || rc=$?
+    eq "gate rc" "4:proof missing" "$rc:$(echo "$OUT" | jget data.blockedBy)"
     eq "gate leaves issue" "$before" "$(IV 1)"
 
     # done: proven, closed completed, state labels cleared, comment
     PROOF T1
-    out="$("$BIN/hv-complete" T1 abc1234 2>&1)"; eq "done prints nothing" "" "$out"
+    OUT="$(DONE T1 --commit abc1234)"
+    eq "done data" "1|T|done|abc1234|true" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.reason)|$(echo "$OUT" | jget data.commit)|$(echo "$OUT" | jget data.changed)"
     eq "done" "closed|completed|type:task|Done in \`abc1234\`" "$(IV 1)"
     : > "$P/log"
-    "$BIN/hv-complete" T1 abc1234
-    eq "done idempotent writes nothing" "0" "$(grep -c 'issue \(edit\|update\|close\)\|api -X' "$P/log" || true)"
+    eq "done idempotent changed" "false" "$(DONE T1 --commit abc1234 | jget data.changed)"
+    eq "done idempotent writes nothing" "0" "$(WRITES 'issue \(edit\|update\|close\)\|api -X')"
 
     # --no-proof + note
-    "$BIN/hv-complete" T2 abc1234 --no-proof --note "shipped in PR"
+    DONE T2 --commit abc1234 --no-proof --note "shipped in PR" >/dev/null
     eq "done note" "closed|completed|type:task|Done in \`abc1234\` $DASH shipped in PR" "$(IV 2)"
 
     # dropped / handed-off: not planned (gitlab: label), no gate
-    "$BIN/hv-complete" T3 abc1234 --reason dropped --note "not needed"
+    DONE T3 --commit abc1234 --reason dropped --note "not needed" >/dev/null
     eq "dropped" "closed|not_planned|${NPL}type:task|Closed: dropped $DASH not needed" "$(IV 3)"
-    "$BIN/hv-complete" T4 abc1234 --reason handed-off
+    DONE T4 --commit abc1234 --reason handed-off >/dev/null
     eq "handed-off" "closed|not_planned|${NPL}type:task|Closed: handed-off" "$(IV 4)"
 
     # blocked: stays open, label + comment, other state labels kept; idempotent
-    "$BIN/hv-complete" T5 abc1234 --reason blocked --note "waiting on X"
+    DONE T5 --commit abc1234 --reason blocked --note "waiting on X" >/dev/null
     eq "blocked" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
-    "$BIN/hv-complete" T5 abc1234 --reason blocked --note "again"
+    DONE T5 --commit abc1234 --reason blocked --note "again" >/dev/null
     eq "blocked idempotent" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
     # blocked then done: closes and clears blocked + in-progress
-    "$BIN/hv-complete" T5 abc1234 --reason dropped
+    DONE T5 --commit abc1234 --reason dropped >/dev/null
     eq "blocked then dropped" "closed|not_planned|${NPL}type:task|Blocked $DASH waiting on X // Closed: dropped" "$(IV 5)"
 
-    # unknown / malformed refs: exit 1
-    ERR "$BIN/hv-complete" T99 abc1234 --no-proof; eq "unknown complete" "1:error: [T99] not found in the issue tracker" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-uncomplete" T99; eq "unknown uncomplete" "1:error: [T99] not found in the issue tracker" "$ERRRC:$ERRMSG"
-    ERR "$BIN/hv-complete" B1 abc1234 --no-proof; eq "type mismatch" 1 "$ERRRC"
+    # unknown / malformed refs: exit 3
+    eq "unknown complete" "3" "$(rcof hvj item complete T99 --commit abc1234 --no-proof)"
+    eq "unknown reopen" "3" "$(rcof hvj item reopen T99)"
+    eq "type mismatch" "3" "$(rcof hvj item complete B1 --commit abc1234 --no-proof)"
 
-    # uncomplete: reopens, removes not-planned/blocked; open+blocked unblocks; else no-op
-    "$BIN/hv-uncomplete" T3
-    eq "uncomplete dropped" "open||type:task|Closed: dropped $DASH not needed" "$(IV 3)"
-    "$BIN/hv-uncomplete" T1
-    eq "uncomplete done" "open||type:task|Done in \`abc1234\`" "$(IV 1)"
-    "$BIN/hv-complete" T6 abc1234 --reason blocked
-    "$BIN/hv-uncomplete" T6
+    # reopen: reopens, removes not-planned/blocked; open+blocked unblocks; else no-op
+    eq "reopen dropped changed" "true" "$(hvj item reopen T3 | jget data.changed)"
+    eq "reopen dropped" "open||type:task|Closed: dropped $DASH not needed" "$(IV 3)"
+    hvj item reopen T1 >/dev/null
+    eq "reopen done" "open||type:task|Done in \`abc1234\`" "$(IV 1)"
+    DONE T6 --commit abc1234 --reason blocked >/dev/null
+    hvj item reopen T6 >/dev/null
     eq "unblock" "open||in-progress,type:task|Blocked" "$(IV 6)"
     : > "$P/log"
-    ERR "$BIN/hv-uncomplete" T6
-    eq "uncomplete noop rc" 0 "$ERRRC"
-    eq "uncomplete noop writes nothing" "0" "$(grep -c 'issue \(edit\|update\|close\|reopen\)\|api -X' "$P/log" || true)"
+    rc=0; OUT="$(hvj item reopen T6)" || rc=$?
+    eq "reopen noop rc" "0:false" "$rc:$(echo "$OUT" | jget data.changed)"
+    eq "reopen noop writes nothing" "0" "$(WRITES 'issue \(edit\|update\|close\|reopen\)\|api -X')"
     # complete again after reopen works
-    PROOF T1; "$BIN/hv-complete" T1 def5678
+    PROOF T1; DONE T1 --commit def5678 >/dev/null
     eq "recomplete" "closed|completed|type:task|Done in \`abc1234\` // Done in \`def5678\`" "$(IV 1)"
 
     # custom blocked label name
     echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0,\"labels\":{\"blocked\":\"stuck\"}}}" > "$P/.hv/config.json"
-    "$BIN/hv-complete" T6 abc1234 --reason blocked
+    DONE T6 --commit abc1234 --reason blocked >/dev/null
     eq "custom blocked label" "open||in-progress,stuck,type:task|Blocked // Blocked" "$(IV 6)"
-    pass "$prov: hv-complete / hv-uncomplete close reasons, labels, gate, idempotency"
+    pass "$prov: item complete / reopen close reasons, labels, gate, idempotency"
   )
 done
 trap 'rm -rf "$TMP"' EXIT

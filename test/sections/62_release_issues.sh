@@ -128,9 +128,12 @@ P="$TMP_RL/file"; mkdir -p "$P/.hv/milestones"
   cd "$P"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
   echo '{}' > .hv/counters.json
-  for h in "release milestone-check M01" "release notes --from issues M01" "release close-milestone M01 --release 1.0.0"; do
-    set -- $h; rc=0; hvj "$@" >/dev/null 2>&1 || rc=$?
-    [ "$rc" = 4 ] || fail "file mode $h: expected exit 4 got $rc"
+  # read-only verbs answer no (1), the mutating one refuses (4); both say why
+  for h in "1 release milestone-check M01" "1 release notes --from issues M01" "4 release close-milestone M01 --release 1.0.0"; do
+    set -- $h; want=$1; shift
+    rc=0; out="$(hvj "$@" 2>/dev/null)" || rc=$?
+    [ "$rc" = "$want" ] && [ "$(jget data.blockedBy <<<"$out")" = backend ] \
+      || fail "file mode $*: expected exit $want with blockedBy backend, got $rc: $out"
   done
 )
 

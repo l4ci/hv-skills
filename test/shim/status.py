@@ -64,3 +64,56 @@ def status_rm(ctx):
     swept = had_handoff and not os.path.exists(handoff)
     return ({"branch": branch, "removed": removed, "handoffRemoved": swept,
              "changed": removed > 0 or swept}, f"removed {branch}")
+
+
+@verb("status", "show", pos=(1, 1))
+def status_show(ctx):
+    branch = ctx.pos[0]
+    root = find_root(ctx.cwd)
+    entry = next((e for e in status_entries(root) if e.get("branch") == branch
+                  and (ctx.repo is None or e.get("repo") == ctx.repo)), None)
+    if entry is None:
+        return {"branch": branch, "active": False, "repo": None, "items": [],
+                "worktree": None}, f"{branch}: not active"
+    data = {"branch": branch, "active": True, "repo": entry.get("repo") or None,
+            "items": entry.get("items") or [], "worktree": entry.get("worktree") or None}
+    if entry.get("startedAt"):
+        data["startedAt"] = entry["startedAt"]
+    return data, f"{branch}: active"
+
+
+@verb("status", "handoff", bools=("canonical",), pos=(1, 1))
+def status_handoff(ctx):
+    branch = ctx.pos[0]
+    root = find_root(ctx.cwd)
+    args = [*(["--repo", ctx.repo] if ctx.repo else []),
+            *(["--write"] if ctx.flags.get("canonical") else []), branch]
+    out = call(ctx, "hv-resolve-handoff", *args, cwd=root).strip()
+    path = out or None
+    return ({"branch": branch, "path": path,
+             "exists": bool(path) and os.path.exists(os.path.join(root, path))}, out)
+
+
+def loop_stamp(ctx, sub):
+    return call(ctx, "hv-loop-stamp", sub, cwd=find_root(ctx.cwd)).strip()
+
+
+@verb("status", "loop", "start", repo=False)
+def status_loop_start(ctx):
+    was_set = bool(loop_stamp(ctx, "read"))
+    loop_stamp(ctx, "start")
+    stamp = loop_stamp(ctx, "read")
+    return {"loopStartedAt": stamp, "changed": not was_set}, stamp
+
+
+@verb("status", "loop", "clear", repo=False)
+def status_loop_clear(ctx):
+    was_set = bool(loop_stamp(ctx, "read"))
+    loop_stamp(ctx, "clear")
+    return {"changed": was_set}, "cleared"
+
+
+@verb("status", "loop", "show", repo=False)
+def status_loop_show(ctx):
+    stamp = loop_stamp(ctx, "read")
+    return {"loopStartedAt": stamp or None}, stamp

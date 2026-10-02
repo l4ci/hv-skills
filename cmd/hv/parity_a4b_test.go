@@ -437,7 +437,7 @@ func TestParityA4B(t *testing.T) {
 		ar("days-empty", archFx, 2, "--days", ""),
 		ar("positional", archFx, 2, "7"),
 		ar("no-hv", fx{noHV: true}, 3),
-		scn{name: "archive/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "archive"), want: 4, shimNoData: true, check: blocked},
+		scn{name: "archive/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "archive"), want: 4, check: blocked},
 		scn{name: "archive/invalid-date-line", fx: fx{backlog: "# TODO\n\n## Completed\n- ~~**[B02] [P1] a.** x~~ Done 2026-13-45 [`abc`]\n"},
 			argv: j("backlog", "archive"), want: 70, div: "the helper crashes on a calendar-invalid date (rc 1, shim maps it to 3), writing nothing; hv exits 70 and writes nothing", refWant: 3},
 		scn{name: "archive/repo-registered", fx: withFx(umbFx, func(f *fx) { f.backlog = arch }), argv: j("backlog", "archive", "--repo", "web"), want: 0},
@@ -612,7 +612,7 @@ func TestParityA4B(t *testing.T) {
 				eq(t, e, "data.drift", []any{})
 				eq(t, e, "data.symbolDrift", []any{})
 			}},
-		scn{name: "drift/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "drift"), old: driftOld, want: 4, check: blocked},
+		scn{name: "drift/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, argv: j("backlog", "drift"), want: 1, check: blocked},
 		scn{name: "drift/no-hv", goOnly: true, fx: fx{noHV: true}, argv: j("backlog", "drift"), want: 3},
 		scn{name: "drift/repo-outside-umbrella", goOnly: true, argv: j("backlog", "drift", "--repo", "web"), want: 3},
 		scn{name: "drift/positional", goOnly: true, argv: j("backlog", "drift", "x"), want: 2},

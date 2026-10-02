@@ -32,19 +32,23 @@ export HV_SHIM_HELPERS="$HV_SHIM_STAGE/bin"
 cp -R "$BIN" "$HV_SHIM_HELPERS"
 trap 'rm -rf "$TMP" "$HV_SHIM_STAGE"' EXIT
 
-# Forge guard: no section may reach a real gh or glab. Poison stand-ins sit
-# first on PATH for every section; a section that wants the fake tracker puts
-# test/fakes in front of them, as it already does. A poison call logs itself
+# Forge and host guard: no section may reach a real gh, glab, herdr or tmux.
+# The round runs inside herdr, so a real herdr or tmux call could close live
+# agents' panes. Poison stand-ins sit first on PATH for every section; a
+# section that wants a fake puts it in front of them, as it already does. A poison call logs itself
 # and exits 99, and any logged call fails the run after the leak guard. A
 # section that resets PATH must start it with "$HV_POISON_BIN".
 export HV_POISON_BIN="$HV_SHIM_STAGE/poison"  # sections that reset PATH keep this first
 HV_POISON_LOG="$HV_SHIM_STAGE/poison.log"
 mkdir -p "$HV_POISON_BIN" && : > "$HV_POISON_LOG"
-for cli in gh glab; do
+for cli in gh glab herdr tmux; do
   printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_BIN/$cli"
   chmod +x "$HV_POISON_BIN/$cli"
 done
 export PATH="$HV_POISON_BIN:$PATH"
+# Nor may a section inherit this shell's live host identity (pane, tab,
+# socket): sections that need one set fake values themselves.
+for v in $(compgen -e | grep -E '^(HERDR_|TMUX)'); do unset "$v"; done
 
 # Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .hv/
 # content before any section runs. Under v4.1's partial-tracking model
@@ -179,7 +183,7 @@ fi
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
 [ "$LEAKED" = 1 ] && exit 1
 if [ -s "$HV_POISON_LOG" ]; then
-  printf '\n\033[31merror: a section called a real forge CLI (poison gh/glab on PATH):\033[0m\n' >&2
+  printf '\n\033[31merror: a section called a real forge or host CLI (poison gh/glab/herdr/tmux on PATH):\033[0m\n' >&2
   sed 's/^/  /' "$HV_POISON_LOG" >&2
   exit 1
 fi

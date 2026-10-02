@@ -141,7 +141,7 @@ func TestA4FailMapping(t *testing.T) {
 		{"not found", fmt.Errorf("x: %w", backlog.ErrNotFound), ExitResolution, ""},
 		{"invalid", fmt.Errorf("x: %w", backlog.ErrInvalid), ExitUsage, ""},
 		{"refused", &backlog.RefusedError{BlockedBy: "proof missing", Msg: "m", Err: backlog.ErrProofMissing}, ExitRefused, "proof missing"},
-		{"active", &backlog.ActiveError{ID: "B01", Branch: "feat/x"}, ExitRefused, "B01 active on feat/x"},
+		{"active", &backlog.ActiveError{ID: "B01", Branch: "feat/x"}, ExitRefused, "active"},
 		{"wrong backend", backlog.ErrWrongBackend, ExitRefused, "backend"},
 		{"not ported", fmt.Errorf("x: %w", backlog.ErrNotPorted), ExitNotImplemented, ""},
 		{"exit interface", exitErr{6}, ExitRetry, ""},

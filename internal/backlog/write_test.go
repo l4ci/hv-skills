@@ -206,7 +206,7 @@ func TestSetField(t *testing.T) {
 		{"closed", "B08", "milestone", "M01", false, "", ErrClosed},
 		{"unknown", "B99", "milestone", "M01", false, "", ErrNotFound},
 		{"unsettable", "B01", "since", "x", false, "", ErrInvalid},
-		{"detail missing", "T01", "detail", ".hv/tasks/none.md", false, "", ErrInvalid},
+		{"detail missing", "T01", "detail", ".hv/tasks/none.md", false, "", ErrNotFound},
 		{"detail backticks only", "T01", "detail", "``", false, "", ErrInvalid},
 		{"detail ok", "T01", "detail", "`.hv/bugs/B01.md`", true, "w Detail: `.hv/bugs/B01.md`", nil},
 	}
