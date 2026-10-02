@@ -524,6 +524,28 @@ type scn struct {
 	// norm rewrites both envelopes before they are compared: the places where
 	// the shim and the contract disagree.
 	norm func(envl) envl
+	// cwd is the subdirectory of the project both sides run in ("" is the root).
+	cwd string
+	// prep runs on each copy of the fixture before the scenario, for state
+	// that does not survive a copy (a git worktree points at its origin).
+	prep func(t *testing.T, dir string)
+	// bin and oldBin replace the Go binary and the staged bin/ for scenarios
+	// that need another install layout (the update verb).
+	bin, oldBin string
+}
+
+func (s scn) goBin() string {
+	if s.bin != "" {
+		return s.bin
+	}
+	return hvBin
+}
+
+func (s scn) oldPath(name string) string {
+	if s.oldBin != "" {
+		return filepath.Join(s.oldBin, name)
+	}
+	return filepath.Join(stagedBin, name)
 }
 
 // variants runs a scenario with no archive, a plain archive and a sectioned one.
@@ -599,8 +621,11 @@ func (s scn) exec(t *testing.T) {
 	t.Parallel()
 	base, in := s.fx.build(t)
 	goDir := copyTree(t, base)
+	if s.prep != nil {
+		s.prep(t, goDir)
+	}
 	argv := subst(s.argv, in)
-	goRun := exec1e(t, goDir, s.in, s.env, hvBin, argv...)
+	goRun := exec1e(t, filepath.Join(goDir, s.cwd), s.in, s.env, s.goBin(), argv...)
 	if goRun.code != s.want {
 		t.Errorf("go exit = %d, want %d\nargv: %v\nstdout: %s\nstderr: %s", goRun.code, s.want, argv, goRun.stdout, goRun.stderr)
 	}
@@ -617,18 +642,23 @@ func (s scn) exec(t *testing.T) {
 		return
 	}
 	refDir := copyTree(t, base)
+	if s.prep != nil {
+		s.prep(t, refDir)
+	}
 	var ref run
 	var refCode int
 	if len(s.old) > 0 {
 		old := subst(s.old, in)
-		ref = exec1e(t, refDir, s.in, s.env, filepath.Join(stagedBin, old[0]), old[1:]...)
+		ref = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, s.oldPath(old[0]), old[1:]...)
+		ref.dir = refDir
 		m := s.oldMap
 		if m == nil {
 			m = mapOld
 		}
 		refCode = m(ref.code, ref.stderr)
 	} else {
-		ref = exec1e(t, refDir, s.in, s.env, "python3", append([]string{shimPath}, argv...)...)
+		ref = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, "python3", append([]string{shimPath}, argv...)...)
+		ref.dir = refDir
 		refCode = ref.code
 	}
 	if s.div != "" {
@@ -677,13 +707,13 @@ func (s scn) exec(t *testing.T) {
 				plain = append(plain, a)
 			}
 		}
-		gt := exec1e(t, goDir, s.in, s.env, hvBin, plain...)
+		gt := exec1e(t, filepath.Join(goDir, s.cwd), s.in, s.env, s.goBin(), plain...)
 		var rt run
 		if len(s.old) > 0 {
 			old := subst(s.old, in)
-			rt = exec1e(t, refDir, s.in, s.env, filepath.Join(stagedBin, old[0]), old[1:]...)
+			rt = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, s.oldPath(old[0]), old[1:]...)
 		} else {
-			rt = exec1e(t, refDir, s.in, s.env, "python3", append([]string{shimPath}, plain...)...)
+			rt = exec1e(t, filepath.Join(refDir, s.cwd), s.in, s.env, "python3", append([]string{shimPath}, plain...)...)
 		}
 		if gt.stdout != rt.stdout {
 			t.Errorf("text output differs\nargv: %v\nref:\n%q\ngo:\n%q", plain, rt.stdout, gt.stdout)
