@@ -9,31 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-// fakeTracker is an in-memory Tracker.
-type fakeTracker struct{ issues []Issue }
-
-func (f *fakeTracker) List(state string) ([]Issue, error) {
-	var out []Issue
-	for _, is := range f.issues {
-		if is.State == state {
-			out = append(out, is)
-		}
-	}
-	return out, nil
-}
-
-func (f *fakeTracker) Get(n int) (Issue, bool, error) {
-	for _, is := range f.issues {
-		if is.Number == n {
-			return is, true, nil
-		}
-	}
-	return Issue{}, false, nil
-}
+// fakeTracker is the in-memory, call-recording Tracker.
+type fakeTracker = trackertest.Fake
 
 // issueJSON is the wire form shared with the Python stub.
 type issueJSON struct {
@@ -197,7 +179,7 @@ func TestIssuesMatchPython(t *testing.T) {
 		}
 		tr := &fakeTracker{}
 		for _, is := range s.Issues {
-			tr.issues = append(tr.issues, is.issue())
+			tr.Issues = append(tr.Issues, is.issue())
 		}
 		b := &Issues{Cfg: cfg, Tracker: tr, Repo: s.Repo}
 		r := map[string]any{"markdown": map[string]any{}, "items": []any{}, "detail": []any{}}
@@ -296,7 +278,7 @@ func TestFieldsBlockMatchesPython(t *testing.T) {
 }
 
 func TestIssuesOpenAndErrors(t *testing.T) {
-	tr := &fakeTracker{issues: []Issue{
+	tr := &fakeTracker{Issues: []Issue{
 		{Number: 1, Title: "Real", State: "open", Labels: []string{"type:bug"}},
 		{Number: 2, Title: "Tracker", State: "open", Labels: []string{"milestone-tracker"}},
 	}}
@@ -307,7 +289,7 @@ func TestIssuesOpenAndErrors(t *testing.T) {
 	if _, err := b.Get("F1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("letter mismatch must not be found: %v", err)
 	}
-	if !b.IsMilestoneTracker(tr.issues[1]) || b.Letter(tr.issues[0]) != "B" || b.Letter(Issue{}) != "T" {
+	if !b.IsMilestoneTracker(tr.Issues[1]) || b.Letter(tr.Issues[0]) != "B" || b.Letter(Issue{}) != "T" {
 		t.Fatal("Letter / IsMilestoneTracker")
 	}
 	if _, _, err := (&Issues{Cfg: mustDecode(t, `{}`)}).Detail("1"); err == nil {
@@ -330,7 +312,7 @@ func mustDecode(t *testing.T, s string) any {
 func scenarioBackend(t *testing.T, s issueScenario) *Issues {
 	tr := &fakeTracker{}
 	for _, is := range s.Issues {
-		tr.issues = append(tr.issues, is.issue())
+		tr.Issues = append(tr.Issues, is.issue())
 	}
 	return &Issues{Cfg: mustDecode(t, s.Cfg), Tracker: tr, Repo: s.Repo}
 }
@@ -379,23 +361,8 @@ func TestIssuesListEqualsGet(t *testing.T) {
 	}
 }
 
-type countingTracker struct {
-	fakeTracker
-	lists, gets int
-}
-
-func (c *countingTracker) List(state string) ([]Issue, error) {
-	c.lists++
-	return c.fakeTracker.List(state)
-}
-
-func (c *countingTracker) Get(n int) (Issue, bool, error) {
-	c.gets++
-	return c.fakeTracker.Get(n)
-}
-
 func TestIssuesListOrderAndCalls(t *testing.T) {
-	tr := &countingTracker{fakeTracker: fakeTracker{issues: []Issue{
+	tr := &fakeTracker{Issues: []Issue{
 		{Number: 9, Title: "Task", State: "open"},
 		{Number: 5, Title: "Feat", State: "open", Labels: []string{"type:feature"}},
 		{Number: 7, Title: "Bug b", State: "open", Labels: []string{"type:bug"}},
@@ -404,7 +371,7 @@ func TestIssuesListOrderAndCalls(t *testing.T) {
 		{Number: 1, Title: "Old", State: "closed", ClosedAt: "2026-01-01T00:00:00Z"},
 		{Number: 2, Title: "New", State: "closed", ClosedAt: "2026-02-01T00:00:00Z", StateReason: "not_planned"},
 		{Number: 6, Title: "Done tracker", State: "closed", Labels: []string{"milestone-tracker"}},
-	}}}
+	}}
 	b := &Issues{Cfg: mustDecode(t, `{}`), Tracker: tr}
 	all, err := b.List(true)
 	if err != nil {
@@ -413,8 +380,17 @@ func TestIssuesListOrderAndCalls(t *testing.T) {
 	if got := strings.Join(ids(all), ","); got != "3,7,5,9,2,1" {
 		t.Fatalf("order = %s", got)
 	}
-	if tr.lists != 2 || tr.gets != 0 {
-		t.Fatalf("%d List and %d Get calls, want 2 and 0", tr.lists, tr.gets)
+	lists, gets := 0, 0
+	for _, c := range tr.Calls {
+		switch c.Method {
+		case "list":
+			lists++
+		case "get":
+			gets++
+		}
+	}
+	if lists != 2 || gets != 0 {
+		t.Fatalf("%d List and %d Get calls, want 2 and 0", lists, gets)
 	}
 	if all[4].Reason != "dropped" || !all[4].Closed {
 		t.Fatalf("issue 2 = %+v", all[4])
