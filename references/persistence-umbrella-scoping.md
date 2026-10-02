@@ -23,13 +23,13 @@ Resolution priority (highest first):
 2. **cwd auto-resolve** — if the working directory is inside a registered sub-repo, that sub-repo is selected. At the umbrella root, skills ask once via `AskUserQuestion` (umbrella-shared vs. a specific sub-repo).
 3. **Single-repo projects** — always resolve to `umbrella`; behavior is byte-identical to pre-F21.
 
-The shared resolver is `bin/hv-knowledge-scope.sh` (`hv_resolve_knowledge_scope`). The `hvlib` wrappers are `resolve_knowledge_target(repo)` and `resolve_tier_sidecar(repo)`.
+The scoped `hv knowledge` and `hv glossary` verbs resolve the target file and the tier sidecar from the global `--repo` flag or the cwd.
 
 ## Reader semantics
 
-`hv-knowledge-query` and `hv-glossary-read` are **hybrid readers** when the resolved scope is a sub-repo: they read both `.hv/KNOWLEDGE.md` (umbrella) and `.hv/knowledge/<name>/KNOWLEDGE.md` (sub-repo), emitting a `> from: <path>` provenance line before each block so output stays traceable. When the scope is umbrella (root or explicit `--repo umbrella`), only the umbrella file is read.
+`hv knowledge query` and `hv glossary read` are **hybrid readers** when the resolved scope is a sub-repo: they read both `.hv/KNOWLEDGE.md` (umbrella) and `.hv/knowledge/<name>/KNOWLEDGE.md` (sub-repo), emitting a `> from: <path>` provenance line before each block so output stays traceable. When the scope is umbrella (root or explicit `--repo umbrella`), only the umbrella file is read.
 
-`hv-knowledge-amend` refuses an ambiguous `(topic, fragment)` hit that matches entries in both the umbrella and a sub-repo file. The caller must pass `--repo` to disambiguate.
+`hv knowledge amend` refuses an ambiguous `(topic, fragment)` hit that matches entries in both the umbrella and a sub-repo file. The caller must pass `--repo` to disambiguate.
 
 ## Tier sidecars
 
@@ -42,7 +42,7 @@ Each sidecar tracks only the bullets in its own file. The Glossary topic in eith
 
 ## CLAUDE.md managed block
 
-Each sub-repo's CLAUDE.md (or AGENTS.md when present) receives a `hv-managed-block knowledge --repo <name>` block listing **umbrella topics ∪ that sub-repo's own topics**. A reader inside the sub-repo therefore sees the full relevant topic index without needing to open umbrella-root files.
+Each sub-repo's CLAUDE.md (or AGENTS.md when present) receives a `hv block knowledge --repo <name>` block listing **umbrella topics ∪ that sub-repo's own topics**. A reader inside the sub-repo therefore sees the full relevant topic index without needing to open umbrella-root files.
 
 Umbrella-root CLAUDE.md (if present) lists umbrella topics only — per-sub-repo topics stay in their own CLAUDE.md blocks.
 
@@ -52,7 +52,7 @@ Single-repo projects: the managed block is unchanged from pre-F21 (umbrella file
 
 `/hv-migrate v4` migrates legacy per-sub-repo context files:
 
-- Each `.hv/contexts/<name>/CONTEXT.md` → written into `.hv/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `hv-glossary-import --repo <name>`.
+- Each `.hv/contexts/<name>/CONTEXT.md` → written into `.hv/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `hv glossary import --repo <name>`.
 - Umbrella-root `.hv/CONTEXT.md` → written into the umbrella KNOWLEDGE.md's Glossary.
 - Original files backed up under `.hv/migrate-backup/` before removal.
 - Existing umbrella `.hv/KNOWLEDGE.md` content is left untouched — those learnings were already umbrella-shared.

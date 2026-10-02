@@ -17,13 +17,7 @@ user-invocable: true
 
 Distill an active commitment from the current session into `.hv/DECISIONS.md`, organized by topic, so future work consults it as a hard constraint. Decisions are *active* (committed boundaries with forbids/permits) — distinct from `/hv-learn` which captures *passive* knowledge (gotchas, conventions, constraints to remember).
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task list
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -164,7 +158,7 @@ Use `Edit` for surgical updates, not `Write`.
 ## Step 7 — Update CLAUDE.md Decisions Index
 
 ```bash
-.hv/bin/hv-managed-block decisions
+hv block decisions
 ```
 
 Reads `.hv/DECISIONS.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-decisions-start -->` block in `CLAUDE.md` (or `AGENTS.md` when present). Creates or appends as needed; never touches other content. The read-site skills (`/hv-work`, `/hv-debug`, `/hv-plan`, `/hv-refactor`, `/hv-review`, `/hv-vision`) read this block to know when to consult `DECISIONS.md`.

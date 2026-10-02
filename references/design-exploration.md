@@ -9,8 +9,8 @@ The pair shares the **spine** but diverges on every axis where scope, blast radi
 1. **Socratic discovery** — multi-choice clarifying questions via `AskUserQuestion` (≤ 4 options per the picker cap) with plain-text fallback per `references/ask-user-question-fallback.md`. Cadence (one-per-round vs batched) and round budget are scope-dependent — see the divergences table.
 2. **Propose before disk write** — present the proposal inline as plain markdown (not yet committed). At milestone scope, the proposal is the milestone list; at item scope, the proposal is 2 or 3 candidate approaches with Shape / Pros / Cons / Why-this-might-or-might-not-be-the-right-answer plus an *"Ask more questions first"* escape.
 3. **Iterate before commit** — the user redlines; the skill restates; loop until the user explicitly confirms. The gate shape (free-form redline vs structured per-section approval) is scope-dependent — see the divergences table.
-4. **Write artifact via helper** — call the canonical writer helper, then `Edit` placeholder bodies. Frontmatter stays intact. At milestone scope: `hv-vision-add` (and a final `hv-vision-index` to regenerate the managed CLAUDE.md block). At item scope: `hv-design-add` (the index is term/topic-keyed and refreshed by separate persistence helpers — not in this skill).
-5. **User-review gate** — present the artifact (or invoke a `*-show` helper) and ask approve / revise / stop. Plain-text fallback: `approve` / `revise` / `stop`. Default rule: honor yes/no — silence does not approve.
+4. **Write artifact via verb** — call the canonical writer verb, then `Edit` placeholder bodies. Frontmatter stays intact. At milestone scope: `hv milestone add` (and a final `hv milestone index` to regenerate the managed CLAUDE.md block). At item scope: `hv design add` (the index is term/topic-keyed and refreshed by separate persistence verbs — not in this skill).
+5. **User-review gate** — present the artifact (or invoke a `* show` verb) and ask approve / revise / stop. Plain-text fallback: `approve` / `revise` / `stop`. Default rule: honor yes/no — silence does not approve.
 
 ## Per-axis divergences
 

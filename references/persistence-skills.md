@@ -10,18 +10,17 @@ The two skills share one **contract** but different **gate strengths**. New pers
 
 Every persistence skill (and `/hv-learn`'s `--term` mode) follows:
 
-1. **Preflights** via `.hv/bin/hv-preflight` (Step 1) — see `docs/reference/preflight.md`.
-2. **Initializes a TaskCreate phase list** at the end of Step 1 — see `references/authoring-conventions.md` rule *"Surface multi-step skill progress with TaskCreate"*. Phase count and names are skill-specific; the boilerplate shell is shared.
-3. **Identifies a candidate** (learning / term / decision) from arguments, conversation context, or a source artifact. The shape of this step is intentionally skill-local.
-4. **Classifies into a section heading** — by topic for both `/hv-learn` topic bullets and `/hv-decide`; by term name for `/hv-learn --term` (the term entry lands under the fixed `## Glossary` topic). Topic-keyed branches share the alphabetical-with-pinning rule below.
-5. **Merges via a writer helper** that owns insertion, deduplication, and the date stamp:
-   - `/hv-learn` (topic bullets) → `bin/hv-knowledge-merge`
-   - `/hv-learn --term` → `bin/hv-glossary-write`
-   - `/hv-decide` → `Edit` directly on `.hv/DECISIONS.md` (no helper today)
-6. **Regenerates the managed CLAUDE.md block** (in `AGENTS.md` when that file exists) via an index helper. The block is the always-on signal to read-side skills:
-   - `/hv-learn` (both modes) → `bin/hv-managed-block knowledge` (`--term` runs it internally via `hv-glossary-write`; Glossary surfaces as a topic name in the Knowledge index automatically)
-   - `/hv-decide` → `bin/hv-managed-block decisions`
-7. **Confirms via a compact block** — *"Captured `<artifact>` into `.hv/<FILE>.md`… Updated CLAUDE.md `<block>` block."* Match the shape; don't recap the plan.
+1. **Initializes a TaskCreate phase list** at the start (Step 1; see `references/authoring-conventions.md` rule *"Surface multi-step skill progress with TaskCreate"*). Phase count and names are skill-specific; the boilerplate shell is shared.
+2. **Identifies a candidate** (learning / term / decision) from arguments, conversation context, or a source artifact. The shape of this step is intentionally skill-local.
+3. **Classifies into a section heading** — by topic for both `/hv-learn` topic bullets and `/hv-decide`; by term name for `/hv-learn --term` (the term entry lands under the fixed `## Glossary` topic). Topic-keyed branches share the alphabetical-with-pinning rule below.
+4. **Merges via a writer verb** that owns insertion, deduplication, and the date stamp:
+   - `/hv-learn` (topic bullets) → `hv knowledge add`
+   - `/hv-learn --term` → `hv glossary write`
+   - `/hv-decide` → `Edit` directly on `.hv/DECISIONS.md` (no verb today)
+5. **Regenerates the managed CLAUDE.md block** (in `AGENTS.md` when that file exists) via `hv block`. The block is the always-on signal to read-side skills:
+   - `/hv-learn` (both modes) → `hv block knowledge` (`--term` runs it internally via `hv glossary write`; Glossary surfaces as a topic name in the Knowledge index automatically)
+   - `/hv-decide` → `hv block decisions`
+6. **Confirms via a compact block** — *"Captured `<artifact>` into `.hv/<FILE>.md`… Updated CLAUDE.md `<block>` block."* Match the shape; don't recap the plan.
 
 The duo does **not** commit. `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, and `CLAUDE.md` are all tracked under the partial-ignore model, so the duo leaves three working-tree diffs and lets the caller (the user, or a parent `/hv-work` cycle) commit them as one summary. Aligning here matters — the duo is dispatched in sequence under `autonomy.level: loop`, so a per-skill commit would fragment what should be one summary commit.
 
@@ -58,5 +57,5 @@ If a new persistence skill needs a different gate, choose deliberately from {non
 - **The user-facing distinction.** `docs/usage/learning.md` and `docs/usage/decisions.md` explain the duo to users — terminology + gotchas vs. boundaries. This reference is for skill authors.
 - **Manual gates inventory.** The list of always-manual sites across all skills (not just this duo) lives in `references/manual-gates.md`.
 - **TaskCreate phase boilerplate.** The cross-cutting authoring rule lives in `references/authoring-conventions.md` rule *"Surface multi-step skill progress with TaskCreate"*.
-- **Knowledge & decisions consult.** The read-side pattern (helpers, carrier semantics, parallelism) lives in `references/knowledge-consult.md`.
+- **Knowledge & decisions consult.** The read-side pattern (verbs, carrier semantics, parallelism) lives in `references/knowledge-consult.md`.
 - **Umbrella-mode per-sub-repo KNOWLEDGE + Glossary.** Shipped in **F21** — hybrid umbrella + per-sub-repo storage, scope auto-resolve, and DECISIONS.md staying umbrella-only. Full model in `references/persistence-umbrella-scoping.md`.

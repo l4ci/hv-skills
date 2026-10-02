@@ -6,7 +6,7 @@ Cited by `hv-init/SKILL.md` (the canonical entry point for the convention set).
 
 ## Skills are self-contained — no shared contract file
 
-Each skill owns its rules inline. A "shared contract" reference file (an old `GUIDE.md` was one) is a smell when every rule has a single owner. Audit the cross-refs before retaining a shared file: if each rule is already mirrored inline at the call site (preflight 3-exit codes, plain-text fallback, autonomy off/auto/loop dispatch, learn trigger thresholds, etc.), the central file is vestigial pointer-chasing. Build a shared file only when N≥3 callers need the same long rule verbatim.
+Each skill owns its rules inline. A "shared contract" reference file (an old `GUIDE.md` was one) is a smell when every rule has a single owner. Audit the cross-refs before retaining a shared file: if each rule is already mirrored inline at the call site (plain-text fallback, autonomy off/auto/loop dispatch, learn trigger thresholds, etc.), the central file is vestigial pointer-chasing. Build a shared file only when N≥3 callers need the same long rule verbatim.
 
 ## Imperative rules in autonomy-aware steps must live inline at every dispatch point
 
@@ -37,7 +37,7 @@ Per-site shape (adapt phase list per skill):
 **Observable outcome** is the detection predicate that says a phase is done. It must be mechanically verifiable, not subjective. Verifiable shapes:
 
 - A file exists at a named path — `[ -f .hv/plans/M01-S01.md ]`.
-- A command exits 0 — a helper returns success, a test passes, `hv-knowledge-merge` writes successfully.
+- A command exits 0 — a verb returns success, a test passes, `hv knowledge add` writes successfully.
 - A managed-block marker is present in a tracked file — `grep -q '<!-- hv-knowledge-end -->' CLAUDE.md`.
 - A status entry was added or removed — `.hv/status.json` lists / no longer lists the branch.
 - A commit landed — `git log --oneline -1 | grep -q <ID>`.
@@ -185,19 +185,19 @@ When a nudge or check could fire from multiple skills that converge on the same 
 
 Codified after F19's release-pending nudge: fires from `/hv-next` only on the "Stop here" / empty-backlog branch and from `/hv-ship`'s post-ship report, never from inside `/hv-work`'s tail (the most-frequent path, but always followed by a dispatch).
 
-## Helper docstring is the contract — SKILL.md prose paraphrasing drifts
+## The verb contract is the contract — SKILL.md prose paraphrasing drifts
 
-When a SKILL.md cites a helper (`bin/hv-*`), the helper's header docstring IS the contract; prose paraphrases drift. Before extracting or authoring prose ABOUT a helper, read its header — if the SKILL.md disagrees with the helper, the SKILL.md is wrong.
+When a SKILL.md cites an `hv` verb, the verb's entry in `docs/design/5.0-verb-contract.md` (and `hv <verb> --help`) IS the contract; prose paraphrases drift. Before authoring prose ABOUT a verb, read its entry — if the SKILL.md disagrees with the contract, the SKILL.md is wrong.
 
 **Forbids.**
-- Paraphrasing a helper's behavior in SKILL.md prose without reading the helper's header docstring first.
-- Inferring a helper's contract from how callers use it — callers can be wrong; the header is the source of truth.
+- Paraphrasing a verb's behavior in SKILL.md prose without reading its contract entry first.
+- Inferring a verb's contract from how callers use it — callers can be wrong; the contract is the source of truth.
 
 **Permits.**
-- Quoting the helper's header verbatim in the SKILL.md when the prose needs the exact contract.
-- Updating SKILL.md prose to match a helper after a helper's contract changes (the prose follows the code, not the other way around).
+- Quoting the verb's contract entry verbatim in the SKILL.md when the prose needs the exact contract.
+- Updating SKILL.md prose to match a verb after its contract changes (the prose follows the code, not the other way around).
 
-Codified on T28: `hv-work/SKILL.md` Step 4.5 gated umbrella mode on `umbrella.enabled`, but `bin/hv-umbrella-on`'s header pinned the contract to `.hv/repos.json` presence. The header was authoritative; the SKILL.md was wrong.
+Codified on T28: `hv-work/SKILL.md` Step 4.5 gated umbrella mode on `umbrella.enabled`, but the umbrella-on helper's header pinned the contract to `.hv/repos.json` presence (today: `hv repo umbrella`). The header was authoritative; the SKILL.md was wrong.
 
 ## Inventory table beside a citation when ≥4 sibling rules extracted
 
