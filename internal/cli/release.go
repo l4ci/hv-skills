@@ -246,7 +246,7 @@ func releaseNotes(fs *flag.FlagSet) RunFunc {
 			if err := releaseNotAtUmbrella(c); err != nil {
 				return Result{}, err
 			}
-			return Result{}, NotImplemented(c.Path)
+			return releaseNotesIssues(c, args[0], *since)
 		default:
 			return Result{}, Usage("--from must be commits|issues")
 		}
@@ -413,7 +413,28 @@ func releaseMilestoneCheck(c *Ctx, args []string) (Result, error) {
 	if err := releaseNotAtUmbrella(c); err != nil {
 		return Result{}, err
 	}
-	return Result{}, NotImplemented(c.Path)
+	be, err := a8Issues(c, "")
+	if err != nil {
+		return a4FailRead(err)
+	}
+	blocked, warn, err := be.ReleaseGate(args[0])
+	if err != nil {
+		return a4FailRead(err)
+	}
+	bl, still, lines := []any{}, []any{}, []string{}
+	for _, b := range blocked {
+		bl = append(bl, a4Obj("number", b.Issue.Number, "title", b.Issue.Title, "label", b.Label))
+		lines = append(lines, "blocked: #"+strconv.Itoa(b.Issue.Number)+" "+b.Issue.Title+" ["+b.Label+"]")
+	}
+	for _, is := range warn {
+		still = append(still, a4Obj("number", is.Number, "title", is.Title))
+		lines = append(lines, "warning: #"+strconv.Itoa(is.Number)+" "+is.Title+" (still open)")
+	}
+	res := Result{Data: a4Obj("clear", len(blocked) == 0, "blocked", bl, "stillOpen", still), Text: strings.Join(lines, "\n")}
+	if len(blocked) > 0 {
+		return res, Failed("%s is blocked by %d open issue(s)", args[0], len(blocked))
+	}
+	return res, nil
 }
 
 func releaseCloseMilestone(fs *flag.FlagSet) RunFunc {
@@ -428,6 +449,67 @@ func releaseCloseMilestone(fs *flag.FlagSet) RunFunc {
 		if err := releaseNotAtUmbrella(c); err != nil {
 			return Result{}, err
 		}
-		return Result{}, NotImplemented(c.Path)
+		be, err := a8Issues(c, "")
+		if err != nil {
+			return a4Fail(err)
+		}
+		tag := "v" + *rel
+		n, changed, err := be.ReleaseClose(args[0], tag)
+		if err != nil {
+			return a4Fail(err)
+		}
+		return Result{Data: a4Obj("milestone", args[0], "release", *rel, "tag", tag, "issues", n, "changed", changed),
+			Text: "closed-out " + args[0] + " " + tag + ": " + strconv.Itoa(n) + " issues"}, nil
 	}
+}
+
+var releaseTagged = regexp.MustCompile(`\[[A-Z]\p{Nd}+(?:-S\p{Nd}+)?\]|#\p{Nd}+`)
+
+// releaseNotesIssues is `release notes --from issues`: the milestone's closed
+// issues by type, then, with --since, the commit subjects that name no item
+// (hv-release-notes-from-issues).
+func releaseNotesIssues(c *Ctx, mid, since string) (Result, error) {
+	be, err := a8Issues(c, "")
+	if err != nil {
+		return a4FailRead(err)
+	}
+	sections, err := be.ReleaseNotes(mid)
+	if err != nil {
+		return a4FailRead(err)
+	}
+	var other []string
+	if since != "" {
+		dir, err := releaseDir(c)
+		if err != nil {
+			return Result{}, err
+		}
+		res, err := git.Repo{Dir: dir}.Run(context.Background(), "log", "--format=%s", since+"..HEAD")
+		if err != nil {
+			return Result{}, gitErr(err)
+		}
+		if res.Code != 0 {
+			return Result{}, Resolution("git log %s..HEAD failed: %s", since, pystr.Strip(res.Stderr))
+		}
+		for _, s := range pystr.Splitlines(res.Stdout) {
+			if pystr.Strip(s) != "" && !releaseTagged.MatchString(s) {
+				other = append(other, "- "+s)
+			}
+		}
+	}
+	var blocks []string
+	for _, s := range sections {
+		if len(s.Rows) == 0 {
+			continue
+		}
+		lines := make([]string, 0, len(s.Rows))
+		for _, r := range s.Rows {
+			lines = append(lines, "- "+r.Title+" (#"+strconv.Itoa(r.Number)+")")
+		}
+		blocks = append(blocks, "### "+s.Name+"\n\n"+strings.Join(lines, "\n"))
+	}
+	if len(other) > 0 {
+		blocks = append(blocks, "### Other\n\n"+strings.Join(other, "\n"))
+	}
+	md := strings.Join(blocks, "\n\n") + "\n"
+	return Result{Data: gitObj("from", "issues", "markdown", md, "empty", pystr.Strip(md) == ""), Text: md}, nil
 }

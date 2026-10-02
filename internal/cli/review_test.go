@@ -2,14 +2,21 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 const reviewBacklog = `# Backlog
@@ -283,9 +290,192 @@ func TestReviewScaffoldingUnicode(t *testing.T) {
 	}
 }
 
-func TestReviewQueueNotImplemented(t *testing.T) {
-	plain, _ := reviewProject(t)
-	if o := trRun(t, plain, "", "review", "queue"); o.code != 71 {
+// a8Forge is an issue tracker with open PRs, a merge and native milestones,
+// for the issue-only verbs (review queue, ship pr-merge, release ...).
+type a8Forge struct {
+	*trackertest.MS
+	prs      []tracker.PR
+	mergeErr error
+	merged   []int
+}
+
+func (f *a8Forge) OpenPRs(context.Context) ([]tracker.PR, error) {
+	if err := f.Fake.Fail["open_prs"]; err != nil {
+		return nil, err
+	}
+	return slices.Clone(f.prs), nil
+}
+
+var a8Closing = regexp.MustCompile(`(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)`)
+
+func (f *a8Forge) ClosedNumbers(body string) []int {
+	var out []int
+	for _, m := range a8Closing.FindAllStringSubmatch(body, -1) {
+		n, _ := strconv.Atoi(m[1])
+		if !slices.Contains(out, n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (f *a8Forge) PRMerge(_ context.Context, pr int) (string, error) {
+	if f.mergeErr != nil {
+		return "", f.mergeErr
+	}
+	f.merged = append(f.merged, pr)
+	f.prs = slices.DeleteFunc(f.prs, func(p tracker.PR) bool { return p.Number == pr })
+	return "0123456789abcdef0123456789abcdef01234567", nil
+}
+
+func (f *a8Forge) IssuesInMilestone(_ context.Context, title, state string) ([]tracker.Issue, error) {
+	var out []tracker.Issue
+	for _, is := range f.Fake.Issues {
+		if is.Milestone == title && (state == "all" || is.State == state) {
+			out = append(out, is)
+		}
+	}
+	return out, nil
+}
+
+func a8Fixture() *a8Forge {
+	m := "M01 — One"
+	issue := func(n int, title string, labels []string, milestone, state, reason string) tracker.Issue {
+		return tracker.Issue{Number: n, Title: title, Labels: labels, Milestone: milestone, State: state, StateReason: reason,
+			URL: "https://example.test/issues/" + strconv.Itoa(n)}
+	}
+	f := &a8Forge{MS: &trackertest.MS{Fake: &trackertest.Fake{Issues: []tracker.Issue{
+		issue(1, "One", []string{"type:feature", "needs-review"}, m, "open", ""),
+		issue(2, "Two", []string{"type:bug", "needs-review"}, m, "open", ""),
+		{Number: 3, Title: m, Body: "---\nid: M01\ntitle: One\nstatus: active\n---\n\n# M01\n",
+			Labels: []string{"milestone-tracker", "status:active"}, Milestone: m, State: "open"},
+		issue(4, "Old", []string{"type:task"}, m, "closed", "completed"),
+		issue(5, "Wip", []string{"type:feature", "in-progress"}, m, "open", ""),
+		issue(6, "Plain", []string{"type:task"}, m, "open", ""),
+		issue(7, "Fix crash", []string{"type:bug"}, m, "closed", "completed"),
+		issue(8, "Dropped", []string{"type:feature"}, m, "closed", "not_planned"),
+	}}, Native: []tracker.Milestone{{Number: 1, Title: m, State: "open"}}}}
+	if _, err := f.Fake.AddComment(context.Background(), 1, "<!-- hv:proof -->\n## Proof\n- unit \u00b7 PASS \u00b7 ok"); err != nil {
+		panic(err)
+	}
+	f.prs = []tracker.PR{
+		{Number: 10, Title: "PR ten", Branch: "feat/ten", URL: "https://example.test/pull/10", Body: "Closes #1"},
+		{Number: 11, Title: "PR eleven", Branch: "feat/eleven", URL: "https://example.test/pull/11", Body: "Fixes #2"},
+		{Number: 12, Title: "PR twelve", Branch: "feat/twelve", URL: "https://example.test/pull/12", Body: "nothing"},
+	}
+	f.Fake.Calls = nil
+	return f
+}
+
+// a8Run runs hv --json in root and returns the exit code, the data object and the error message.
+func a8Run(t *testing.T, root string, args ...string) (int, map[string]any, string) {
+	t.Helper()
+	o := trRun(t, root, "", append([]string{"--json"}, args...)...)
+	env := envelope(t, o.stdout)
+	data, _ := env["data"].(map[string]any)
+	msg := ""
+	if e, ok := env["error"].(map[string]any); ok {
+		msg, _ = e["message"].(string)
+	}
+	return o.code, data, msg
+}
+
+// a8Project is an issue-mode project served by f, with a git repo for --since.
+func a8Project(t *testing.T, f *a8Forge) string {
+	t.Helper()
+	root := newRepo(t, t.TempDir(), "proj", "main")
+	write(t, filepath.Join(root, ".hv", "config.json"), issuesConfig)
+	withTracker(t, f)
+	return root
+}
+
+func a8FileProject(t *testing.T) string {
+	t.Helper()
+	root := newRepo(t, t.TempDir(), "proj", "main")
+	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"file"}}`)
+	return root
+}
+
+func TestReviewQueue(t *testing.T) {
+	f := a8Fixture()
+	root := a8Project(t, f)
+	code, data, msg := a8Run(t, root, "review", "queue")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, msg)
+	}
+	items := data["items"].([]any)
+	var ids []string
+	for _, it := range items {
+		m := it.(map[string]any)
+		ids = append(ids, m["id"].(string)+m["type"].(string))
+	}
+	// Needs-review issues only, lowest first; the id is the bare number (rule 11).
+	if !reflect.DeepEqual(ids, []string{"1F", "2B"}) {
+		t.Fatalf("items %v", ids)
+	}
+	first := items[0].(map[string]any)
+	prs := first["prs"].([]any)
+	pr := prs[0].(map[string]any)
+	if first["number"] != float64(1) || first["title"] != "One" || len(prs) != 1 ||
+		pr["number"] != float64(10) || pr["branch"] != "feat/ten" || pr["url"] != "https://example.test/pull/10" || pr["body"] != "Closes #1" {
+		t.Fatalf("first %v", first)
+	}
+	// Key order is the contract's.
+	o := trRun(t, root, "", "--json", "review", "queue")
+	if !strings.Contains(o.stdout, `"items": [{"id": "1", "type": "F", "number": 1, "title": "One", "prs": [{"number": 10, "title": "PR ten", "branch": "feat/ten"`) {
+		t.Fatalf("key order: %s", o.stdout)
+	}
+	// Text mode: one line per item.
+	if o := trRun(t, root, "", "review", "queue"); o.code != 0 || o.stdout != "F1 One\nB2 Two\n" {
+		t.Fatalf("text %+v", o)
+	}
+	// One issue list and one PR list.
+	if len(f.Fake.Calls) < 2 {
+		t.Fatalf("calls %v", f.Fake.Calls)
+	}
+}
+
+func TestReviewQueueEmpty(t *testing.T) {
+	f := a8Fixture()
+	f.Fake.Issues = f.Fake.Issues[2:]
+	root := a8Project(t, f)
+	code, data, _ := a8Run(t, root, "review", "queue")
+	if items, ok := data["items"].([]any); code != 0 || !ok || len(items) != 0 {
+		t.Fatalf("exit %d data %v", code, data)
+	}
+}
+
+func TestReviewQueueExits(t *testing.T) {
+	// File backend: backend failure, exit 1 for a read-only verb.
+	code, data, _ := a8Run(t, a8FileProject(t), "review", "queue")
+	if code != 1 || data["blockedBy"] != "backend" || data["changed"] != false {
+		t.Fatalf("file: exit %d data %v", code, data)
+	}
+	// Tracker failures: 5 unavailable, 6 rate-limited.
+	for kind, want := range map[tracker.Kind]int{tracker.KindUnavailable: 5, tracker.KindFailed: 5, tracker.KindRateLimited: 6} {
+		f := a8Fixture()
+		f.Fake.Fail = map[string]error{"list": &tracker.Error{Kind: kind, Code: 3, Message: "boom"}}
+		if code, _, _ := a8Run(t, a8Project(t, f), "review", "queue"); code != want {
+			t.Errorf("list failure %v: exit %d, want %d", kind, code, want)
+		}
+	}
+	f := a8Fixture()
+	f.Fake.Fail = map[string]error{"open_prs": &tracker.Error{Kind: tracker.KindUnavailable, Code: 3, Message: "boom"}}
+	if code, _, _ := a8Run(t, a8Project(t, f), "review", "queue"); code != 5 {
+		t.Errorf("PR list failure: exit %d", code)
+	}
+	if code, _, _ := a8Run(t, a8Project(t, a8Fixture()), "review", "queue", "extra"); code != 2 {
+		t.Errorf("extra argument: exit %d", code)
+	}
+}
+
+// Umbrella issue mode is not ported: exit 71, with and without --repo.
+func TestReviewQueueUmbrella(t *testing.T) {
+	_, umb := reviewProject(t)
+	if o := trRun(t, umb, "", "review", "queue"); o.code != 71 {
 		t.Errorf("exit %d, want 71\n%s%s", o.code, o.stdout, o.stderr)
+	}
+	if o := trRun(t, umb, "", "review", "queue", "--repo", "svc"); o.code != 71 {
+		t.Errorf("--repo: exit %d, want 71\n%s%s", o.code, o.stdout, o.stderr)
 	}
 }

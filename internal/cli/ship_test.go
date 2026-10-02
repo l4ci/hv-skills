@@ -7,9 +7,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 // The ship verbs are checked against the old helpers through the test shim
@@ -495,11 +498,141 @@ func TestShipPRIssueModeUmbrella(t *testing.T) {
 
 // ---- ship pr-merge -----------------------------------------------------------
 
-func TestShipPRMergeNotPorted(t *testing.T) {
-	work := shipFixture(t, "")
-	o := trRun(t, work, "", "ship", "pr-merge", "12", "--items", "F1")
-	if o.code != ExitNotImplemented {
-		t.Errorf("%+v", o)
+func TestShipPRMerge(t *testing.T) {
+	f := a8Fixture()
+	root := a8Project(t, f)
+	code, data, msg := a8Run(t, root, "ship", "pr-merge", "10")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, msg)
+	}
+	if data["pr"] != float64(10) || data["sha"] != "0123456" || !reflect.DeepEqual(data["closed"], []any{"1"}) || data["changed"] != true {
+		t.Fatalf("data %v", data)
+	}
+	if is := f.Fake.Issues[0]; is.State != "closed" || is.StateReason != "completed" || slices.Contains(is.Labels, "needs-review") {
+		t.Fatalf("issue 1 %+v", is)
+	}
+	if !reflect.DeepEqual(f.merged, []int{10}) {
+		t.Fatalf("merged %v", f.merged)
+	}
+	// Key order is the contract's, and text mode prints the old helper's lines.
+	f2 := a8Fixture()
+	o := trRun(t, a8Project(t, f2), "", "--json", "ship", "pr-merge", "10")
+	if !strings.Contains(o.stdout, `"data": {"pr": 10, "sha": "0123456", "closed": ["1"], "changed": true}`) {
+		t.Fatalf("key order: %s", o.stdout)
+	}
+	f3 := a8Fixture()
+	if o := trRun(t, a8Project(t, f3), "", "ship", "pr-merge", "10"); o.code != 0 || o.stdout != "merged 10 as 0123456\nclosed F1\n" {
+		t.Fatalf("text %+v", o)
+	}
+}
+
+func TestShipPRMergeItems(t *testing.T) {
+	f := a8Fixture()
+	root := a8Project(t, f)
+	// An explicit list replaces the PR body's links; spaces and empty entries are dropped.
+	code, data, msg := a8Run(t, root, "ship", "pr-merge", "12", "--items", " F1 ,, ")
+	if code != 0 || !reflect.DeepEqual(data["closed"], []any{"1"}) {
+		t.Fatalf("exit %d %v %s", code, data, msg)
+	}
+	// No linked items: the PR merges and nothing is closed.
+	f = a8Fixture()
+	code, data, msg = a8Run(t, a8Project(t, f), "ship", "pr-merge", "12")
+	if code != 0 || !reflect.DeepEqual(data["closed"], []any{}) || !reflect.DeepEqual(f.merged, []int{12}) {
+		t.Fatalf("exit %d %v %s", code, data, msg)
+	}
+}
+
+func TestShipPRMergeUnproven(t *testing.T) {
+	f := a8Fixture()
+	root := a8Project(t, f)
+	code, data, _ := a8Run(t, root, "ship", "pr-merge", "11")
+	want := map[string]any{"pr": float64(11), "merged": false, "unproven": []any{"2"}, "changesRequested": []any{"2"}, "changed": true}
+	if code != 4 || !reflect.DeepEqual(data, want) {
+		t.Fatalf("exit %d data %v", code, data)
+	}
+	if len(f.merged) != 0 {
+		t.Fatal("merged an unproven PR")
+	}
+	is := f.Fake.Issues[1]
+	if !slices.Contains(is.Labels, "changes-requested") || slices.Contains(is.Labels, "needs-review") || is.State != "open" ||
+		!strings.Contains(is.Comments[len(is.Comments)-1].Body, "hv:comment feedback") {
+		t.Fatalf("issue 2 %+v", is)
+	}
+	o := trRun(t, a8Project(t, a8Fixture()), "", "--json", "ship", "pr-merge", "11")
+	if !strings.Contains(o.stdout, `"data": {"pr": 11, "merged": false, "unproven": ["2"], "changesRequested": ["2"], "changed": true}`) {
+		t.Fatalf("key order: %s", o.stdout)
+	}
+}
+
+func TestShipPRMergeExits(t *testing.T) {
+	root := a8Project(t, a8Fixture())
+	for _, c := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"x"}, 2},
+		{[]string{"1x"}, 2},
+		{[]string{}, 2},
+		{[]string{"10", "11"}, 2},
+		{[]string{"9999"}, 3},                 // unknown PR
+		{[]string{"12", "--items", "99"}, 3},  // unknown item
+		{[]string{"12", "--items", "B1"}, 3},  // type letter mismatch
+		{[]string{"12", "--items", "M01"}, 3}, // not an item
+		{[]string{"12", "--items", "3"}, 3},   // the milestone tracking issue
+	} {
+		code, _, msg := a8Run(t, root, append([]string{"ship", "pr-merge"}, c.args...)...)
+		if code != c.code {
+			t.Errorf("%v: exit %d (%s), want %d", c.args, code, msg, c.code)
+		}
+	}
+	// Already merged: no longer open.
+	f := a8Fixture()
+	root = a8Project(t, f)
+	if code, _, _ := a8Run(t, root, "ship", "pr-merge", "12"); code != 0 {
+		t.Fatalf("first merge: exit %d", code)
+	}
+	if code, _, _ := a8Run(t, root, "ship", "pr-merge", "12"); code != 3 {
+		t.Errorf("already merged: exit %d, want 3", code)
+	}
+}
+
+func TestShipPRMergeRefused(t *testing.T) {
+	f := a8Fixture()
+	f.mergeErr = &tracker.Error{Kind: tracker.KindFailed, Code: 1, Message: "gh pr merge 12: not mergeable"}
+	code, data, _ := a8Run(t, a8Project(t, f), "ship", "pr-merge", "12")
+	want := map[string]any{"pr": float64(12), "merged": false, "unproven": []any{}, "changesRequested": []any{}, "changed": false}
+	if code != 4 || !reflect.DeepEqual(data, want) {
+		t.Fatalf("exit %d data %v", code, data)
+	}
+	f = a8Fixture()
+	f.mergeErr = &tracker.Error{Kind: tracker.KindRateLimited, Code: 4, Message: "rate limit"}
+	if code, _, _ := a8Run(t, a8Project(t, f), "ship", "pr-merge", "12"); code != 6 {
+		t.Errorf("rate limited: exit %d", code)
+	}
+	f = a8Fixture()
+	f.mergeErr = &tracker.Error{Kind: tracker.KindUnavailable, Code: 3, Message: "gh missing"}
+	if code, _, _ := a8Run(t, a8Project(t, f), "ship", "pr-merge", "12"); code != 5 {
+		t.Errorf("unavailable: exit %d", code)
+	}
+	f = a8Fixture()
+	f.Fake.Fail = map[string]error{"open_prs": &tracker.Error{Kind: tracker.KindUnavailable, Code: 3, Message: "boom"}}
+	if code, _, _ := a8Run(t, a8Project(t, f), "ship", "pr-merge", "12"); code != 5 {
+		t.Errorf("PR list failure: exit %d", code)
+	}
+}
+
+func TestShipPRMergeBackend(t *testing.T) {
+	code, data, _ := a8Run(t, a8FileProject(t), "ship", "pr-merge", "1")
+	if code != 4 || data["blockedBy"] != "backend" || data["changed"] != false {
+		t.Fatalf("file: exit %d data %v", code, data)
+	}
+	// Umbrella: without --repo a usage error, with it not ported.
+	_, umb := reviewProject(t)
+	if o := trRun(t, umb, "", "ship", "pr-merge", "1"); o.code != 2 {
+		t.Errorf("umbrella without --repo: exit %d", o.code)
+	}
+	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 71 {
+		t.Errorf("umbrella --repo: exit %d", o.code)
 	}
 }
 
