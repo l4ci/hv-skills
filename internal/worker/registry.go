@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
@@ -166,12 +167,20 @@ func (e Env) git(dir string, args ...string) (string, int) {
 	return strings.TrimRight(out, "\n"), code
 }
 
-// Env is what the worker operations touch outside their own memory.
+// Env is what the worker operations touch outside their own memory. Every
+// field has a production default; tests replace them, and NewHost above all:
+// this round runs inside herdr and tmux, so no test may reach the real ones.
 type Env struct {
 	// Ctx bounds every git call and is cancelled on SIGINT/SIGTERM by the
 	// CLI. Nil means context.Background().
 	Ctx context.Context
 	Git GitFunc
+	// NewHost returns the host for a work.dispatch value.
+	NewHost func(dispatch string) host.Host
+	// Sleep defaults to time.Sleep (poll's settle).
+	Sleep func(time.Duration)
+	// Now defaults to time.Now (relay timestamps).
+	Now func() time.Time
 }
 
 func (e Env) context() context.Context {
@@ -184,6 +193,15 @@ func (e Env) context() context.Context {
 func (e Env) withDefaults() Env {
 	if e.Git == nil {
 		e.Git = ExecGit
+	}
+	if e.NewHost == nil {
+		e.NewHost = func(d string) host.Host { return host.New(d, host.Deps{}) }
+	}
+	if e.Sleep == nil {
+		e.Sleep = time.Sleep
+	}
+	if e.Now == nil {
+		e.Now = time.Now
 	}
 	return e
 }
