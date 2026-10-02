@@ -33,6 +33,29 @@ type Backend interface {
 	// Detail returns the detail file, or the issue body without its fields
 	// block. ok is false when there is none.
 	Detail(ref string) (text string, ok bool, err error)
+
+	// Create captures one item and returns its ID. Bad input wraps
+	// ErrInvalid; a missing BACKLOG.md or section wraps ErrNotFound.
+	Create(in CreateInput) (CreateResult, error)
+	// SetField sets, replaces or clears one trailing field (milestone,
+	// related, repos, subsystem, detail) on an open item. changed is false
+	// when the stored value already matched. A closed item is a RefusedError
+	// wrapping ErrClosed.
+	SetField(ref, field, value string) (changed bool, err error)
+	// Complete closes an item with a reason. changed is false when it is
+	// already completed. A `done` close without proof is a RefusedError
+	// wrapping ErrProofMissing.
+	Complete(ref string, in CompleteInput) (changed bool, err error)
+	// Reopen restores a completed item to its section. changed is false when
+	// it is already active.
+	Reopen(ref string) (changed bool, err error)
+	// Ready lists what an item lacks to be startable; empty means ready.
+	Ready(ref string) (reasons []string, err error)
+	// Comments lists the item's comments, oldest first; kind "" lists all.
+	Comments(ref, kind string) ([]Comment, error)
+	// AddComment appends a comment. id is the tracker's comment ID, "" in
+	// file mode.
+	AddComment(ref, kind, text string) (id string, err error)
 }
 
 // Open returns the backend selected by backlog.backend in cfg, the loaded
@@ -55,6 +78,9 @@ func Open(root string, cfg any, tr Tracker) (Backend, error) {
 	}
 	return &Issues{Cfg: cfg, Tracker: tr}, nil
 }
+
+// IsUmbrella is whether root registers sub-repos in .hv/repos.json.
+func IsUmbrella(root string) bool { return hasRepos(root) }
 
 // hasRepos is whether .hv/repos.json registers at least one sub-repo, as
 // hvlib_repos.load_repos counts them: an entry needs a name and a path.

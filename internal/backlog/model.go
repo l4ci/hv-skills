@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 )
@@ -110,3 +111,5 @@ func atoi(digits string) (int, error) {
 	}
 	return n, nil
 }
+
+func decodeRune(s string) (rune, int) { return utf8.DecodeRuneInString(s) }
