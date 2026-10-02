@@ -23,6 +23,13 @@ with open(os.environ["FORGE_LOG"], "a") as f:
 def save(): json.dump(db, open(dbp, "w"))
 
 def merge():
+    # A real forge refuses a merge whose pin is missing or is not the PR's head.
+    flag = "--match-head-commit" if tool == "gh" else "--sha"
+    pin = args[args.index(flag) + 1] if flag in args else None
+    if mode == "race":
+        db["sha"] = "f" * 40  # someone pushed after the gate's check
+    if pin != db["sha"]:
+        print("simulated: head commit %s does not match the pin %s" % (db["sha"], pin), file=sys.stderr); sys.exit(1)
     if mode == "fail":
         print("simulated: merge blocked by branch protection", file=sys.stderr); sys.exit(1)
     if mode == "noop":
@@ -33,8 +40,11 @@ def merge():
                                          cwd=t, check=True, capture_output=True, text=True).stdout.strip()
         subprocess.run(["git", "clone", "-q", db["origin"], t], check=True)
         if mode == "elsewhere": g("checkout", "-q", "-b", "stack", "origin/" + db["base"])
-        g("merge", "--no-ff", "-q", "-m", "merge pr", "origin/" + db["head"])
-        db["merge"] = g("rev-parse", "HEAD")
+        if mode == "ff":  # fast-forward method: no merge commit on the MR
+            g("merge", "--ff-only", "-q", "origin/" + db["head"])
+        else:
+            g("merge", "--no-ff", "-q", "-m", "merge pr", "origin/" + db["head"])
+            db["merge"] = g("rev-parse", "HEAD")
         g("push", "-q", "origin", target)
     db["state"] = "MERGED"; save()
 
@@ -179,6 +189,35 @@ printf '{"slots":[{"name":"w1","branch":"w1","pr":"%s","relays":[]}]}' "$GL_URL"
 RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
 [ "$RC" = 4 ] && grep -q PROVENANCE-FAIL "$GT_DIR.out" || fail "gate (f): provenance must read the MR description via glab (rc=$RC): $(cat "$GT_DIR.out")"
 pass "gitlab: glab path with auto-merge off, pinned sha, squash sha fallback, MR-description provenance"
+
+# (h) a recorded PR with no origin remote is refused, never merged locally
+gt_case h "$GH_URL"
+git -C "$GT_DIR" remote remove origin
+RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main)"
+[ "$RC" = 5 ] && grep -q "no 'origin' remote" "$GT_DIR.out" || fail "gate (h): PR without origin must be refused exit 5 (rc=$RC): $(cat "$GT_DIR.out")"
+[ ! -f "$GT_DIR/work.txt" ] && ! grep -q "merge" "$FORGE_LOG" || fail "gate (h): nothing may be merged"
+pass "a recorded PR with no origin remote is refused, not merged locally"
+
+# (i) gitlab fast-forward method: merged MR, no merge or squash sha; the verified sha must be on base
+gt_case i "$GL_URL"
+RC="$(gt_gate env FORGE_MODE=ff "$BIN/hv-worker-gate" --slot w1 --base main)"
+[ "$RC" = 0 ] && grep -q "^MERGED w1" "$GT_DIR.out" || fail "gate (i): a fast-forward-merged MR must pass (rc=$RC): $(cat "$GT_DIR.out")"
+[ -f "$GT_DIR/work.txt" ] || fail "gate (i): local base not fast-forwarded"
+pass "gitlab fast-forward merge (no merge_commit_sha) falls back to the verified sha on base"
+
+# (j) the forge enforces the pin: a push after the gate's check makes the merge refuse
+gt_case j "$GH_URL"
+RC="$(gt_gate env FORGE_MODE=race "$BIN/hv-worker-gate" --slot w1 --base main)"
+[ "$RC" = 3 ] && grep -q "does not match the pin" "$GT_DIR.out" || fail "gate (j): a moved PR head must make the merge fail exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+pass "a PR head that moves after the check is refused by the pinned merge"
+
+# (k) merged remotely but local base diverged: distinct exit 6, never 'not merged'
+gt_case k "$GH_URL"
+( cd "$GT_DIR" && echo local > local.txt && git add local.txt && gt_git commit -q -m "unpushed local work" ) || fail "gate (k): local commit failed"
+RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main)"
+[ "$RC" = 6 ] && grep -q "^MERGED-REMOTELY w1" "$GT_DIR.out" || fail "gate (k): diverged local base after a remote merge must exit 6 (rc=$RC): $(cat "$GT_DIR.out")"
+git -C "$GT_ORIGIN" merge-base --is-ancestor "$(git -C "$GT_WORKER" rev-parse HEAD)" main || fail "gate (k): the PR should be on origin/main"
+pass "a remote merge whose local fast-forward fails exits 6 MERGED-REMOTELY, not as unmerged"
 
 # (g) verify output is kept: the failing command's output reaches stderr and a log survives
 gt_case g "$GH_URL"

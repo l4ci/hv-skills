@@ -412,9 +412,21 @@ pass "hv-worker-gate reports NO-VERIFY rather than a pass it cannot back"
 FAKEBIN="$TMP_WD/fakebin"; mkdir -p "$FAKEBIN"
 cat > "$FAKEBIN/gh" <<'SH'
 #!/usr/bin/env bash
-[ "$1 $2" = "pr view" ] && cat "$FAKE_PR_BODY"
+if [ "$1 $2" = "pr view" ]; then
+  case "$*" in
+    *headRefName*) printf '{"headRefName":"%s","headRefOid":"%s","baseRefName":"main","state":"OPEN","mergeCommit":null}\n' "$FAKE_PR_HEAD" "$FAKE_PR_SHA" ;;
+    *) cat "$FAKE_PR_BODY" ;;
+  esac
+fi
 SH
 chmod +x "$FAKEBIN/gh"
+# A recorded PR needs an origin (the gate refuses a local merge of a PR), and the
+# fake gh must report the pushed branch as the PR head.
+git init -q --bare -b main "$TMP_WD/.hv/origin.git"
+W3_BRANCH="$(python3 -c 'import json,sys; print([s for s in json.load(open(sys.argv[1]))["slots"] if s["name"]=="w3"][0]["branch"])' "$TMP_WD/.hv/workers.json")"
+( cd "$TMP_WD" && git remote add origin "$TMP_WD/.hv/origin.git" && git push -q origin main "$W3_BRANCH" ) \
+  || fail "could not push the provenance fixture to its origin"
+FAKE_PR_HEAD="$W3_BRANCH"; FAKE_PR_SHA="$(git -C "$TMP_WD" rev-parse "$W3_BRANCH")"
 set_relays() {
   python3 - "$TMP_WD/.hv/workers.json" "$1" <<'PYEOF' || fail "could not write relays fixture"
 import json, sys
@@ -428,7 +440,7 @@ PYEOF
 prov() {  # prov <body> -> exit code of the check
   printf '%s' "$1" > "$TMP_WD/pr_body.md"
   local rc=0
-  ( cd "$TMP_WD" && PATH="$FAKEBIN:$PATH" FAKE_PR_BODY="$TMP_WD/pr_body.md" \
+  ( cd "$TMP_WD" && PATH="$FAKEBIN:$PATH" FAKE_PR_BODY="$TMP_WD/pr_body.md" FAKE_PR_HEAD="$FAKE_PR_HEAD" FAKE_PR_SHA="$FAKE_PR_SHA" \
       "$BIN/hv-worker-gate" --slot w3 --base main --check-only ) >"$TMP_WD/prov.out" 2>&1 || rc=$?
   echo "$rc"
 }

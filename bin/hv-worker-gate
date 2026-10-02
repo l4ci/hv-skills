@@ -25,7 +25,8 @@
 #   2. MERGE      — via `gh pr merge` / `glab mr merge` when the slot recorded a
 #                   PR (pinned to the verified head SHA; glab with auto-merge
 #                   off, since a scheduled merge is not a merge), else a local
-#                   `git merge` (repos with no remote still work). A PR merge is
+#                   `git merge` (no PR recorded; a recorded PR with no origin remote is
+#                   refused, never merged locally). A PR merge is
 #                   confirmed: its merge commit must be an ancestor of
 #                   origin/<base> and of the local tree before RE-VERIFY runs.
 #   3. RE-VERIFY  — on the MERGED tree, never on the branch. This is the only
@@ -51,7 +52,9 @@
 #       exit 3 STALE / merge failure / PR does not match the verified branch;
 #       exit 4 post-merge verification failed, merge not on base, or
 #       PROVENANCE-FAIL; exit 5 CHECK-BROKE (the gate could not decide: bad
-#       ref, failed fetch, unreadable PR).
+#       ref, failed fetch, unreadable PR, a recorded PR but no origin remote);
+#       exit 6 MERGED-REMOTELY (the PR landed on origin/<base> but the local
+#       base could not follow; never retry the merge).
 #
 # Usage:
 #   hv-worker-gate --slot <name> --base <cycle-branch> [--check-only] [--no-verify]
@@ -196,18 +199,17 @@ CLI=gh; [ "$PROVIDER" = gitlab ] && CLI=glab
 
 # A PR merges what was PUSHED, so with a PR and an origin remote the gate reads
 # origin/* refs. Without a PR the local merge takes the local branch, and local
-# refs are the right ones; a PR recorded in a repo with no origin cannot be
-# merged remotely and falls back to that path, loudly.
+# refs are the right ones. A recorded PR with no origin remote is refused: a
+# local merge would leave the PR open and bypass its review, CI and branch
+# protection while reporting MERGED.
 PR_NUM=""
 REMOTE=0
 if [ -n "$PR" ]; then
   PR_NUM="$(pr_number "$PR")"
-  if git remote get-url origin >/dev/null 2>&1; then
-    [ -n "$PR_NUM" ] || broke "cannot read a PR number from '$PR'"
-    REMOTE=1
-  else
-    echo "note: $SLOT has PR $PR but the repo has no origin remote — judging local refs, merging locally" >&2
-  fi
+  git remote get-url origin >/dev/null 2>&1 \
+    || broke "slot $SLOT has PR $PR but this repo has no 'origin' remote; refusing a local merge that would bypass the PR"
+  [ -n "$PR_NUM" ] || broke "cannot read a PR number from '$PR'"
+  REMOTE=1
 fi
 
 git rev-parse --verify --quiet "$BASE" >/dev/null || {
@@ -280,16 +282,19 @@ if [ "$REMOTE" -eq 1 ]; then
   rm -f "$MLOG"
 
   # Confirm it landed: the tracker's word is not enough. The merge commit can
-  # take a moment to appear; an empty one afterwards is its own verdict (on
-  # GitLab, an auto-merge that is only scheduled).
-  SHA=""
+  # take a moment to appear. State not merged is its own verdict (a scheduled
+  # auto-merge reports success and merges nothing). A fast-forward or rebase
+  # merge has no merge commit on either provider: state merged with an empty
+  # one falls back to the pinned verified SHA, which must then be on the base.
+  SHA=""; STATE=""
   for _ in 1 2 3 4 5; do
     INFO="$(pr_info "$PR_NUM")" || broke "could not re-read PR $PR_NUM after merging"
-    SHA="$(info_field merge)"
-    [ -n "$SHA" ] && [ "$(info_field state)" = MERGED ] && break
-    SHA=""; sleep "${HV_GATE_SHA_WAIT:-2}"
+    STATE="$(info_field state)"; SHA="$(info_field merge)"
+    [ "$STATE" = MERGED ] && [ -n "$SHA" ] && break
+    [ "$STATE" = MERGED ] || sleep "${HV_GATE_SHA_WAIT:-2}"
   done
-  [ -n "$SHA" ] || { echo "NOT-MERGED $SLOT — PR $PR_NUM has no merge commit (state $(info_field state)); nothing is on $BASE" >&2; exit 4; }
+  [ "$STATE" = MERGED ] || { echo "NOT-MERGED $SLOT — PR $PR_NUM is $STATE after the merge call; nothing is on $BASE" >&2; exit 4; }
+  [ -n "$SHA" ] || SHA="$VERIFIED"
 
   git fetch origin -q </dev/null || broke "git fetch origin failed after merging"
   RC=0; git merge-base --is-ancestor "$SHA" "$BASE_REF" || RC=$?
@@ -298,10 +303,12 @@ if [ "$REMOTE" -eq 1 ]; then
     1) echo "NOT-ON-BASE $SLOT — merge commit $SHA is not an ancestor of $BASE_REF (merged into another branch?)" >&2; exit 4 ;;
     *) broke "git merge-base --is-ancestor $SHA $BASE_REF exited $RC" ;;
   esac
+  # Past this point the PR IS merged: report local trouble distinctly (exit 6)
+  # so nobody retries an already-merged PR.
   git merge --ff-only "$BASE_REF" >/dev/null 2>&1 || {
-    echo "error: could not fast-forward $BASE to $BASE_REF after merging $PR" >&2; exit 3; }
+    echo "MERGED-REMOTELY $SLOT — PR $PR_NUM is on $BASE_REF but local $BASE could not fast-forward (diverged); do not re-merge, reconcile $BASE by hand" >&2; exit 6; }
   git merge-base --is-ancestor "$SHA" HEAD || {
-    echo "NOT-ON-BASE $SLOT — merge commit $SHA is not in the local $BASE after fast-forward" >&2; exit 4; }
+    echo "MERGED-REMOTELY $SLOT — PR $PR_NUM is on $BASE_REF but $SHA is not in the local $BASE; do not re-merge, reconcile $BASE by hand" >&2; exit 6; }
 else
   git merge --no-ff -m "merge: $BRANCH into $BASE" "$BRANCH" >/dev/null 2>&1 || {
     echo "error: merge of $BRANCH into $BASE conflicted — resolve with the slot that owns the context" >&2
