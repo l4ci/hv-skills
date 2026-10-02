@@ -1,4 +1,4 @@
-echo "hv-uncertain"
+echo "plan uncertain"
 (
   UTMP="$(mktemp -d)"
   trap 'rm -rf "$UTMP"' EXIT
@@ -50,57 +50,56 @@ EOF
 Use `something` to do Y.
 EOF
 
-  # Item not in TODO -> exit 2.
-  set +e
-  out=$("$BIN/hv-uncertain" F99 2>&1); rc=$?
-  set -e
-  [ "$rc" = "2" ] || fail "hv-uncertain F99: expected exit 2, got $rc"
-  grep -q "not found" <<<"$out" || fail "hv-uncertain F99: missing 'not found' in stderr: $out"
-  pass "hv-uncertain returns 2 when item missing"
+  # Item not in TODO -> exit 3 (resolution).
+  rc=0; out=$(hvj plan uncertain F99 2>/dev/null) || rc=$?
+  [ "$rc" = "3" ] || fail "plan uncertain F99: expected exit 3, got $rc"
+  [ "$(jget error.code <<<"$out")" = "resolution" ] || fail "plan uncertain F99: expected code resolution: $out"
+  pass "plan uncertain returns 3 when item missing"
 
-  # F50: Major, no detail file -> exit 0 with "no detail file".
-  set +e
-  out=$("$BIN/hv-uncertain" F50); rc=$?
-  set -e
-  [ "$rc" = "0" ] || fail "hv-uncertain F50: expected exit 0, got $rc"
-  grep -q "no detail file" <<<"$out" || fail "hv-uncertain F50: missing 'no detail file': $out"
+  # F50: Major, no detail file -> exit 0 (uncertain) with "no detail file".
+  rc=0; out=$(hvj plan uncertain F50) || rc=$?
+  [ "$rc" = "0" ] || fail "plan uncertain F50: expected exit 0, got $rc"
+  [ "$(jget data.uncertain <<<"$out")" = "true" ] || fail "plan uncertain F50: expected uncertain true: $out"
+  [ "$(jget data.id <<<"$out")" = "F50" ] || fail "plan uncertain F50: wrong id: $out"
+  [ "$(jget data.type <<<"$out")" = "F" ] || fail "plan uncertain F50: wrong type: $out"
+  FIELD=$(jget data.reasons <<<"$out")
+  grep -q "no detail file" <<<"$FIELD" || fail "plan uncertain F50: missing 'no detail file': $out"
   # F50 also has zero backticks, so unknown-surface should also fire.
-  grep -q "no concrete identifiers" <<<"$out" || fail "hv-uncertain F50: missing unknown-surface gate: $out"
-  pass "hv-uncertain F50 fires no-detail-file gate"
+  FIELD=$(jget data.reasons <<<"$out")
+  grep -q "no concrete identifiers" <<<"$FIELD" || fail "plan uncertain F50: missing unknown-surface gate: $out"
+  pass "plan uncertain F50 fires no-detail-file gate"
 
   # F51: Major, detail file but zero backticks -> exit 0 with unknown-surface.
-  set +e
-  out=$("$BIN/hv-uncertain" F51); rc=$?
-  set -e
-  [ "$rc" = "0" ] || fail "hv-uncertain F51: expected exit 0, got $rc"
-  grep -q "no concrete identifiers" <<<"$out" || fail "hv-uncertain F51: missing unknown-surface: $out"
-  if grep -q "no detail file" <<<"$out"; then fail "hv-uncertain F51: should not fire no-detail-file: $out"; fi
-  pass "hv-uncertain F51 fires unknown-surface gate"
+  rc=0; out=$(hvj plan uncertain F51) || rc=$?
+  [ "$rc" = "0" ] || fail "plan uncertain F51: expected exit 0, got $rc"
+  reasons=$(jget data.reasons <<<"$out")
+  grep -q "no concrete identifiers" <<<"$reasons" || fail "plan uncertain F51: missing unknown-surface: $out"
+  if grep -q "no detail file" <<<"$reasons"; then fail "plan uncertain F51: should not fire no-detail-file: $out"; fi
+  pass "plan uncertain F51 fires unknown-surface gate"
 
   # F52: Major, detail file + backticks but >=2 ? -> exit 0 with open-question signals.
-  set +e
-  out=$("$BIN/hv-uncertain" F52); rc=$?
-  set -e
-  [ "$rc" = "0" ] || fail "hv-uncertain F52: expected exit 0, got $rc"
-  grep -q "multiple open-question signals" <<<"$out" || fail "hv-uncertain F52: missing open-question gate: $out"
-  pass "hv-uncertain F52 fires multiple-open-question-signals gate"
+  rc=0; out=$(hvj plan uncertain F52) || rc=$?
+  [ "$rc" = "0" ] || fail "plan uncertain F52: expected exit 0, got $rc"
+  FIELD=$(jget data.reasons <<<"$out")
+  grep -q "multiple open-question signals" <<<"$FIELD" || fail "plan uncertain F52: missing open-question gate: $out"
+  pass "plan uncertain F52 fires multiple-open-question-signals gate"
 
   # F53: Major, detail file + backticks + 0 ? + no markers -> exit 1 (certain).
-  set +e
-  out=$("$BIN/hv-uncertain" F53); rc=$?
-  set -e
-  [ "$rc" = "1" ] || fail "hv-uncertain F53: expected exit 1 (certain), got $rc; out=$out"
-  pass "hv-uncertain F53 returns 1 when certain"
+  rc=0; out=$(hvj plan uncertain F53 2>/dev/null) || rc=$?
+  [ "$rc" = "1" ] || fail "plan uncertain F53: expected exit 1 (certain), got $rc; out=$out"
+  [ "$(jget data.uncertain <<<"$out")" = "false" ] || fail "plan uncertain F53: expected uncertain false: $out"
+  [ "$(jget data.reasons <<<"$out")" = "[]" ] || fail "plan uncertain F53: expected no reasons: $out"
+  pass "plan uncertain F53 returns 1 when certain"
 
   # F54: Minor, regardless of other gates -> exit 1.
-  set +e
-  out=$("$BIN/hv-uncertain" F54); rc=$?
-  set -e
-  [ "$rc" = "1" ] || fail "hv-uncertain F54: expected exit 1 (Minor), got $rc; out=$out"
-  pass "hv-uncertain F54 returns 1 for Minor regardless of other gates"
+  rc=0; out=$(hvj plan uncertain F54 2>/dev/null) || rc=$?
+  [ "$rc" = "1" ] || fail "plan uncertain F54: expected exit 1 (Minor), got $rc; out=$out"
+  [ "$(jget data.uncertain <<<"$out")" = "false" ] || fail "plan uncertain F54: expected uncertain false: $out"
+  pass "plan uncertain F54 returns 1 for Minor regardless of other gates"
 )
-echo "ok hv-uncertain"
+echo "ok plan uncertain"
 
+# white-box: kept until A9 (#53)
 echo "F37: TaskCreate progress-checklist convention"
 TIER_SAB_F37=(hv-init hv-work hv-debug hv-ship hv-release \
               hv-refactor hv-learn hv-decide hv-spike hv-vision \
@@ -121,6 +120,7 @@ done
 pass "Tier C SKILL.md files do not reference TaskCreate("
 echo "ok F37"
 
+# white-box: kept until the A5 Go unit test lands (#49), then delete
 echo "hvlib parse_term_entry / first_sentence"
 PYTHONPATH="$BIN" python3 - <<'PY'
 import sys
