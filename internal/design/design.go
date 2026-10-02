@@ -179,7 +179,7 @@ func Amend(root, id, heading, mode, text string) (changed bool, err error) {
 		if rerr != nil {
 			return notFound(root, id)
 		}
-		start, end, ok := section.Find(content, heading)
+		_, _, ok := section.Find(content, heading)
 		if !ok {
 			return artifact.Errf(artifact.ExitResolution, "section '## %s' not found in .hv/designs/%s.md", heading, id)
 		}
@@ -187,11 +187,7 @@ func Amend(root, id, heading, mode, text string) (changed bool, err error) {
 		if mode == "replace" {
 			updated = section.Replace(content, heading, block)
 		} else {
-			body := content[start:end]
-			if !strings.HasSuffix(body, "\n") {
-				body += "\n"
-			}
-			updated = content[:start] + body + block + content[end:]
+			updated, _ = artifact.AppendSection(content, heading, block)
 		}
 		if updated == content {
 			return nil

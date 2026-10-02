@@ -3,6 +3,7 @@
 set -euo pipefail
 REPO="$1"; OUT="$2"; BIN="$REPO/bin"
 W="$(mktemp -d)"; W="$(cd "$W" && pwd -P)"; cd "$W"
+trap 'cd /; rm -rf "$W"' EXIT
 mkdir -p .hv "$W/web" "$W/api"
 printf '{"repos": [{"name": "web", "path": "web"}, {"name": "api", "path": "api"}, {"name": "web-docs", "path": "web-docs"}]}\n' > .hv/repos.json
 mkdir -p web-docs

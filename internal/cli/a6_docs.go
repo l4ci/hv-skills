@@ -32,9 +32,7 @@ func docsCommands() []*Command {
 			{Name: "rm", Summary: "delete a plan", Verb: noFlags(runPlanRm)},
 			{Name: "validate-docs", Summary: "check doc-by-path deliverables", Verb: noFlags(runPlanValidateDocs)},
 			{Name: "rename-check", Summary: "files that mention a name", Verb: noFlags(runPlanRenameCheck)},
-			{Name: "uncertain", Summary: "uncertainty pre-flight for an item", Verb: noFlags(func(*Ctx, []string) (Result, error) {
-				return Result{}, NotImplemented("hv plan uncertain").WithHint("needs the backlog item model (A4)")
-			})},
+			{Name: "uncertain", Summary: "uncertainty pre-flight for an item", Verb: noFlags(runPlanUncertain)},
 		}},
 	}
 }
