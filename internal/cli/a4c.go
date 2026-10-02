@@ -72,7 +72,7 @@ func a4ConfigShow(fs *flag.FlagSet) RunFunc {
 		if err := a4Args(c, args, 0, 1, "config show takes at most one key"); err != nil {
 			return Result{}, err
 		}
-		root, err := a4bScope(c)
+		root, err := a4Scope(c)
 		if err != nil {
 			return Result{}, err
 		}
@@ -99,7 +99,7 @@ func a4ConfigSet(fs *flag.FlagSet) RunFunc {
 		if err := a4Args(c, args, 2, 2, "config set takes a key and a value"); err != nil {
 			return Result{}, err
 		}
-		root, err := a4bScope(c)
+		root, err := a4Scope(c)
 		if err != nil {
 			return Result{}, err
 		}
@@ -128,7 +128,7 @@ func a4ConfigCheck(fs *flag.FlagSet) RunFunc {
 		if err := a4Args(c, args, 0, 0, "config check takes no arguments"); err != nil {
 			return Result{}, err
 		}
-		root, err := a4bScope(c)
+		root, err := a4Scope(c)
 		if err != nil {
 			return Result{}, err
 		}
