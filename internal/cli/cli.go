@@ -14,8 +14,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 )
 
 // Command is a group (Subs) or a verb (Verb) in the hv tree.
@@ -104,23 +104,16 @@ func (c *Ctx) RepoPath() (string, error) {
 // Repos returns the project root and the registered sub-repos of .hv/repos.json
 // as name to absolute path (symlinks resolved when the path exists). The map
 // is empty outside umbrella mode.
-func (c *Ctx) Repos() (root string, repos map[string]string, err error) {
-	root, list, err := c.RepoList()
+func (c *Ctx) Repos() (root string, paths map[string]string, err error) {
+	root, err = c.Root()
 	if err != nil {
 		return "", nil, err
 	}
-	repos = map[string]string{}
-	for _, r := range list {
-		repos[r.Name] = r.Path
-	}
-	return root, repos, nil
+	return root, repos.Paths(root), nil
 }
 
-// Repo is one registered sub-repo: Rel as written in .hv/repos.json, Path
-// absolute with symlinks resolved when it exists.
-type Repo struct {
-	Name, Rel, Path string
-}
+// Repo is one registered sub-repo (see internal/repos).
+type Repo = repos.Repo
 
 // RepoList is Repos in registry order.
 func (c *Ctx) RepoList() (root string, list []Repo, err error) {
@@ -128,32 +121,7 @@ func (c *Ctx) RepoList() (root string, list []Repo, err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object); ok {
-		entries, _ := reg.Get("repos")
-		items, _ := entries.([]any)
-		for _, e := range items {
-			obj, ok := e.(*jsonx.Object)
-			if !ok {
-				continue
-			}
-			name, _ := obj.Get("name")
-			rel, _ := obj.Get("path")
-			n, _ := name.(string)
-			r, _ := rel.(string)
-			if n == "" || r == "" {
-				continue
-			}
-			p := r
-			if !filepath.IsAbs(p) {
-				p = filepath.Join(root, p)
-			}
-			if real, err := filepath.EvalSymlinks(p); err == nil {
-				p = real
-			}
-			list = append(list, Repo{Name: n, Rel: r, Path: filepath.Clean(p)})
-		}
-	}
-	return root, list, nil
+	return root, repos.Load(root), nil
 }
 
 // globals are the flags every verb accepts (docs/design/5.0-cli-conventions.md,

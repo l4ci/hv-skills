@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 )
 
 // gitCommands is the `hv git` group (A8, #52).
@@ -63,24 +63,8 @@ func gitDir(c *Ctx) (string, error) {
 // registeredRels lists the sub-repo paths as written in root's repos.json.
 func registeredRels(root string) []string {
 	var out []string
-	reg, _ := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object)
-	if reg == nil {
-		return nil
-	}
-	list, _ := reg.Get("repos")
-	items, _ := list.([]any)
-	for _, e := range items {
-		obj, _ := e.(*jsonx.Object)
-		if obj == nil {
-			continue
-		}
-		rel, _ := obj.Get("path")
-		name, _ := obj.Get("name")
-		r, _ := rel.(string)
-		n, _ := name.(string)
-		if r != "" && n != "" {
-			out = append(out, r)
-		}
+	for _, r := range repos.Load(root) {
+		out = append(out, r.Rel)
 	}
 	return out
 }
