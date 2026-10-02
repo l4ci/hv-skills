@@ -367,3 +367,19 @@ func TestUncertainMatchesOldHelper(t *testing.T) {
 		t.Errorf("missing BACKLOG.md: %v", err)
 	}
 }
+
+func TestUncertainHonoursOpenSections(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
+	os.WriteFile(filepath.Join(root, ".hv/BACKLOG.md"), []byte("## Bugs\n\n- **[B07] [Major] Vague.** unclear? TBD?\n\n## Features\n\n- **[F01] [Major] Vague.** unclear? TBD?\n"), 0o644)
+	if _, r, err := Uncertain(root, "F01"); err != nil || len(r) == 0 {
+		t.Fatalf("default sections: %v %v", r, err)
+	}
+	t.Setenv("HV_OPEN_SECTIONS", "Bugs")
+	if _, _, err := Uncertain(root, "F01"); exitOf(err) != 3 {
+		t.Errorf("F01 outside HV_OPEN_SECTIONS: %v", err)
+	}
+	if _, r, err := Uncertain(root, "B07"); err != nil || len(r) == 0 {
+		t.Errorf("B07 inside: %v %v", r, err)
+	}
+}

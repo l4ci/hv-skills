@@ -4,7 +4,9 @@
 package proof
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -81,7 +83,10 @@ func Add(root, id string, o AddOpts) (row Row, changed bool, err error) {
 	path := detailPath(root, kind, id)
 	err = fsio.Locked(path, fsio.LockTimeout, func() error {
 		content, rerr := fsio.ReadText(path)
-		if rerr != nil {
+		if rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+			return artifact.Errf(artifact.ExitInternal, "cannot read %s: %v", path, rerr)
+		}
+		if rerr != nil { // missing: start the detail file
 			content = fmt.Sprintf("# %s: %s\n\n> Related TODO entry: `[%s]` in `.hv/BACKLOG.md`\n", id, title, id)
 		}
 		var updated string
@@ -113,8 +118,11 @@ func Show(root, id string) (rows []Row, lines []string, err error) {
 	}
 	rows, lines = []Row{}, []string{}
 	content, rerr := fsio.ReadText(detailPath(root, kind, id))
-	if rerr != nil {
+	if errors.Is(rerr, fs.ErrNotExist) {
 		return
+	}
+	if rerr != nil {
+		return nil, nil, artifact.Errf(artifact.ExitInternal, "cannot read %s: %v", detailPath(root, kind, id), rerr)
 	}
 	s, e, ok := section.Find(content, "Proof")
 	if !ok {

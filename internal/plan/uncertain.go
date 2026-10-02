@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"os"
 	"regexp"
 	"strings"
 
@@ -33,9 +34,21 @@ func Uncertain(root, id string) (typ string, reasons []string, err error) {
 		}
 		return "", nil, merr
 	}
+	// HV_OPEN_SECTIONS ("Bugs|Features|Tasks", as hv-types.sh exports it)
+	// limits which open sections the item may live in.
+	active := map[string]bool{}
+	sections := os.Getenv("HV_OPEN_SECTIONS")
+	if sections == "" {
+		sections = "Bugs|Features|Tasks"
+	}
+	for _, s := range strings.Split(sections, "|") {
+		if s = strings.TrimSpace(s); s != "" {
+			active[s] = true
+		}
+	}
 	var line string
 	for _, e := range backlog.OpenBullets(md) {
-		if e.ID == id {
+		if e.ID == id && active[e.Section] {
 			line = e.Line
 			break
 		}

@@ -184,3 +184,21 @@ func TestAddConcurrentIdenticalRows(t *testing.T) {
 		t.Fatalf("changed=%d rows=%d, want 1 and 1", changed, len(rows))
 	}
 }
+
+// An unreadable detail file is not a missing one: nothing is overwritten.
+func TestUnreadableDetailFileIsExit70(t *testing.T) {
+	root := project(t)
+	p := filepath.Join(root, ".hv/bugs/B07.md")
+	if err := os.MkdirAll(p, 0o777); err != nil { // a directory: ReadFile fails with EISDIR
+		t.Fatal(err)
+	}
+	if _, _, err := Add(root, "B07", AddOpts{"c", "PASS", "e", "s"}); exitOf(err) != 70 {
+		t.Errorf("add: %v", err)
+	}
+	if _, _, err := Show(root, "B07"); exitOf(err) != 70 {
+		t.Errorf("show: %v", err)
+	}
+	if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
+		t.Error("the unreadable path was replaced")
+	}
+}
