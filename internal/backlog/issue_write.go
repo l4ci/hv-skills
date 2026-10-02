@@ -120,6 +120,11 @@ func (b *Issues) milestoneTitle(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !ok && b.OnMissingMilestone != nil {
+		if title, ok, err = b.OnMissingMilestone(value); err != nil {
+			return "", err
+		}
+	}
 	if !ok {
 		return "", errf(ErrNotFound, "milestone %s not found on the tracker — create it with /hv-vision (M07-S05)", value)
 	}

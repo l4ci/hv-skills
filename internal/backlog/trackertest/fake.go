@@ -320,3 +320,13 @@ func (f *Fake) FindMilestone(_ context.Context, hvID string) (string, bool, erro
 	}
 	return "", false, nil
 }
+
+// CreateMilestone adds a native milestone, as the forges do; the number is its
+// position.
+func (f *Fake) CreateMilestone(_ context.Context, title, description string) (int, error) {
+	if err := f.rec("create_milestone", title, description); err != nil {
+		return 0, err
+	}
+	f.Milestones = append(f.Milestones, title)
+	return len(f.Milestones), nil
+}
