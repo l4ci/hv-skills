@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"io"
@@ -61,7 +60,7 @@ func trCall(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		cl, err := tracker.NewCLI(ctx, trackerSettings(c), *provider, dir, trackerOptions...)
 		if err != nil {
 			return Result{}, trackerErr(err)
@@ -126,7 +125,7 @@ func trSuggest(fs *flag.FlagSet) RunFunc {
 		}
 		manual := "file it by hand at https://github.com/" + repo + "/issues/new"
 
-		ctx := context.Background()
+		ctx := c.Context()
 		cl, err := tracker.NewCLI(ctx, trackerSettings(c), "github", "", trackerOptions...)
 		if err != nil {
 			return Result{}, trackerErr(err).WithHint(manual)
