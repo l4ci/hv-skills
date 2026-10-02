@@ -116,6 +116,12 @@ func lookahead(line string, e int, others []string) bool {
 // matchValue matches `\s*(.+?)(?=LOOKAHEAD)` starting at offset a, right after
 // "Cap:". It returns where the group starts and ends.
 func matchValue(line string, a int, others []string) (gs, e int, ok bool) {
+	return matchValueMin(line, a, others, 0)
+}
+
+// matchValueMin is matchValue for a `\s{minWS,}` in front of the group: the
+// `Related:\s+` of remove_id_from_related_field wants minWS 1.
+func matchValueMin(line string, a int, others []string, minWS int) (gs, e int, ok bool) {
 	// Rune boundaries inside the whitespace run that \s* can consume.
 	bounds := []int{a}
 	for i := a; i < len(line); {
@@ -126,7 +132,7 @@ func matchValue(line string, a int, others []string) (gs, e int, ok bool) {
 		i += n
 		bounds = append(bounds, i)
 	}
-	for k := len(bounds) - 1; k >= 0; k-- {
+	for k := len(bounds) - 1; k >= minWS; k-- {
 		gs := bounds[k]
 		if gs >= len(line) || line[gs] == '\n' {
 			continue // (.+?) needs at least one non-newline character
@@ -271,6 +277,11 @@ func firstMarker(line string, others []string) int {
 
 // dropField removes every `\s+Cap:\s*.+?(?=...)` segment, as re.sub does.
 func dropField(line, marker string, others []string) string {
+	return dropFieldMin(line, marker, others, 0)
+}
+
+// dropFieldMin is dropField with `\s{minWS,}` between the marker and its value.
+func dropFieldMin(line, marker string, others []string, minWS int) string {
 	var b strings.Builder
 	copied := 0
 	for s := 0; s < len(line); {
@@ -288,7 +299,7 @@ func dropField(line, marker string, others []string) string {
 			run += n
 		}
 		if strings.HasPrefix(line[run:], marker) {
-			if _, e, ok := matchValue(line, run+len(marker), others); ok {
+			if _, e, ok := matchValueMin(line, run+len(marker), others, minWS); ok {
 				b.WriteString(line[copied:s])
 				copied, s = e, e
 				continue
