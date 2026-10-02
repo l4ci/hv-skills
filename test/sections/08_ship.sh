@@ -53,8 +53,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 OUT=$(hvj backlog list)
-_grep_in=$(echo "$OUT" | jget data.features[0].title || true)
-grep -q "Add v1.2 support" <<<"$_grep_in" || fail "title with period was truncated: $OUT"
+echo "$OUT" | jget data.features[0].title | grep "Add v1.2 support" >/dev/null || fail "title with period was truncated: $OUT"
 pass "backlog keeps mid-title periods intact"
 
 echo "regression: backlog archive always reports a count"

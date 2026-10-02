@@ -35,8 +35,7 @@ for SPELL in '.worktrees' '/.worktrees' '/.worktrees/' '.worktrees/'"$(printf '\
   mkdir -p "$TMP_WR/boot3"
   ( cd "$TMP_WR/boot3" && rm -rf .git .gitignore && git init -q -b main . && printf '%s\n' "$SPELL" > .gitignore \
       && "$BIN/hv-bootstrap" >/dev/null 2>&1 ) || fail "hv-bootstrap failed with an existing '$SPELL' line"
-  _grep_in=$(tr -d '\r' < "$TMP_WR/boot3/.gitignore" || true)
-  grep -qxE '/?\.worktrees/?' <<<"$_grep_in" || fail "fixture lost its ignore line"
+  tr -d '\r' < "$TMP_WR/boot3/.gitignore" | grep -xE '/?\.worktrees/?' >/dev/null || fail "fixture lost its ignore line"
   [ "$(tr -d '\r' < "$TMP_WR/boot3/.gitignore" | grep -cE '^/?\.worktrees/?$')" = "1" ] \
     || fail "an existing '$SPELL' line must not be duplicated: $(cat "$TMP_WR/boot3/.gitignore")"
 done

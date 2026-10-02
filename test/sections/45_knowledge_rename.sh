@@ -42,14 +42,11 @@ EOF
     --title "Foo rule" ) || fail "per-bullet rename returned non-zero"
 
 # Foo rule moved out of Architecture, into Foundations.
-_grep_in=$(grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" || true)
-grep -q "Foo rule" <<<"$_grep_in" \
+grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
   && fail "Foo rule still under Architecture after per-bullet move"
-_grep_in=$(grep -A2 "^## Architecture: Foundations$" "$TMP_KR/.hv/KNOWLEDGE.md" || true)
-grep -q "Foo rule" <<<"$_grep_in" \
+grep -A2 "^## Architecture: Foundations$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
   || fail "Foo rule not under Architecture: Foundations after per-bullet move"
-_grep_in=$(grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" || true)
-grep -q "Bar rule" <<<"$_grep_in" \
+grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Bar rule" >/dev/null \
   || fail "Bar rule lost from Architecture after Foo move"
 pass "per-bullet move: bullet relocated, siblings untouched"
 
@@ -85,8 +82,7 @@ grep -q "^## Tooling & Build$" "$TMP_KR/.hv/KNOWLEDGE.md" \
   || fail "renamed heading '## Tooling & Build' not present"
 grep -q "^## Build & Tooling$" "$TMP_KR/.hv/KNOWLEDGE.md" \
   && fail "old heading '## Build & Tooling' still present after rename"
-_grep_in=$(grep -A2 "^## Tooling & Build$" "$TMP_KR/.hv/KNOWLEDGE.md" || true)
-grep -q "Baz rule" <<<"$_grep_in" \
+grep -A2 "^## Tooling & Build$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Baz rule" >/dev/null \
   || fail "Baz rule did not follow whole-topic rename"
 pass "whole-topic rename: heading renamed, bullets follow"
 

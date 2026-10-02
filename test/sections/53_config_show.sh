@@ -21,8 +21,7 @@ pass "T118: hv-config-show resolves local > project > default"
 N="$(show | wc -l)"
 [ "$N" -eq "$(PYTHONPATH="$BIN" python3 -c 'from hvlib import CONFIG_KEYS; print(len(CONFIG_KEYS))')" ] \
   || fail "T118: no-arg output should have one line per known key, got $N"
-_grep_in=$(show || true)
-grep -q '^work.dispatch = ' <<<"$_grep_in" || fail "T118: no-arg output missing work.dispatch"
+show | grep '^work.dispatch = ' >/dev/null || fail "T118: no-arg output missing work.dispatch"
 RC=0; show no.such.key >/dev/null 2>&1 || RC=$?
 [ "$RC" = "1" ] || fail "T118: unknown key should exit 1, got $RC"
 pass "T118: no-arg lists every key; unknown key exits 1"

@@ -209,8 +209,7 @@ rm -f "$FK/dirty_on_close" "$WT/raced.txt"
 pass "a failure after the kill clears the slot's stale handle"
 
 # ── drift: SKILL.md carries the contract the helper header names ────────────
-_grep_in=$(head -40 "$BIN/hv-worker-reset" || true)
-grep -qF "reset guard" <<<"$_grep_in" || fail "hv-worker-reset header lost the term 'reset guard'"
+head -40 "$BIN/hv-worker-reset" | grep -F "reset guard" >/dev/null || fail "hv-worker-reset header lost the term 'reset guard'"
 grep -qF "reset guard" "$REPO/hv-work/SKILL.md" || fail "hv-work/SKILL.md does not describe the slot reset guard"
 pass "hv-work/SKILL.md and the helper header share the 'reset guard' contract"
 

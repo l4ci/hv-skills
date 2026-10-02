@@ -68,8 +68,7 @@ TIER=$("$BIN/hv-knowledge-tier" --get --topic "Architecture" --title "Bar rule" 
 [ "$TIER" = "provisional" ] || fail "Bar rule should stay provisional at 2 hits; got $TIER"
 pass "hv-knowledge-hit doesn't promote below threshold"
 
-_grep_in=$("$BIN/hv-knowledge-hit" --topic "Architecture" --title "Bar rule" 2>&1 || true)
-grep -q "auto-promoted" <<<"$_grep_in" \
+"$BIN/hv-knowledge-hit" --topic "Architecture" --title "Bar rule" 2>&1 | grep "auto-promoted" >/dev/null \
   || fail "third hit should print auto-promoted line"
 TIER=$("$BIN/hv-knowledge-tier" --get --topic "Architecture" --title "Bar rule" | python3 -c 'import json,sys;print(json.load(sys.stdin)["tier"])')
 [ "$TIER" = "confirmed" ] || fail "third hit should auto-promote to confirmed; got $TIER"

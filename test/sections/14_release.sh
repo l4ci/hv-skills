@@ -88,8 +88,7 @@ TMP_DV="$DV5"
   OUT=$(hvj release version 2>/dev/null) || rc=$?
   [ "$rc" = "3" ] || { echo "FAIL: expected exit 3, got $rc"; exit 1; }
   [ "$(echo "$OUT" | jget ok)" = "false" ] || { echo "FAIL: expected ok:false envelope: $OUT"; exit 1; }
-  _grep_in=$(echo "$OUT" | jget error.message || true)
-  grep -q "no version file detected" <<<"$_grep_in" || { echo "FAIL: error message missing: $OUT"; exit 1; }
+  echo "$OUT" | jget error.message | grep "no version file detected" >/dev/null || { echo "FAIL: error message missing: $OUT"; exit 1; }
 )
 rm -rf "$DV5"
 pass "release version exits 3 with no version files"
@@ -253,8 +252,7 @@ TODAY=$(date +%Y-%m-%d)
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || { echo "FAIL: changed not true: $OUT"; exit 1; }
   [ "$(echo "$OUT" | jget data.path)" = "CHANGELOG.md" ] || { echo "FAIL: path wrong: $OUT"; exit 1; }
   [ -f CHANGELOG.md ] || { echo "FAIL: CHANGELOG.md not created"; exit 1; }
-  _grep_in=$(head -1 CHANGELOG.md || true)
-  grep -q "^# Changelog" <<<"$_grep_in" || { echo "FAIL: missing # Changelog header"; exit 1; }
+  head -1 CHANGELOG.md | grep "^# Changelog" >/dev/null || { echo "FAIL: missing # Changelog header"; exit 1; }
   grep -q "^## v1.0.0 — $TODAY" CHANGELOG.md || { echo "FAIL: missing v1.0.0 section with today's date"; exit 1; }
 )
 pass "release changelog creates CHANGELOG.md with correct header and date"

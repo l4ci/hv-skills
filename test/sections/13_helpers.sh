@@ -86,8 +86,7 @@ WC_TMP="$(mktemp -d)"
   WT_PATH="$WC_TMP/wt-feat-x"
   git worktree add "$WT_PATH" feat-x -q
   "$BIN/hv-worktree-clear" feat-x
-  _grep_in=$(git worktree list || true)
-  if grep -q "$WT_PATH" <<<"$_grep_in"; then echo "FAIL: worktree still present"; exit 1; fi
+  if git worktree list | grep "$WT_PATH" >/dev/null; then echo "FAIL: worktree still present"; exit 1; fi
   true
 )
 rm -rf "$WC_TMP"

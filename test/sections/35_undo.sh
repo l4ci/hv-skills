@@ -129,8 +129,7 @@ PYEOF
   grep -qE '^- \*\*\[B01\] \[P1\] Sample bug\.\*\* Body\.$' .hv/BACKLOG.md \
     || { echo "FAIL F24(a): [B01] active line not restored"; exit 1; }
   # ## Completed no longer references B01.
-  _grep_in=$(awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md || true)
-  if grep -q '\[B01\]' <<<"$_grep_in"; then
+  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md | grep '\[B01\]' >/dev/null; then
     echo "FAIL F24(a): [B01] still present under ## Completed"; exit 1
   fi
   # since_refactor.bugs decremented 1 -> 0.
@@ -259,11 +258,9 @@ PYEOF
     || { echo "FAIL F24(f): items should be [F03]: $OUT"; exit 1; }
   [ "$(echo "$OUT" | jget data.base)" = "main" ] \
     || { echo "FAIL F24(f): base should be main: $OUT"; exit 1; }
-  _grep_in=$(echo "$OUT" | jget data.subject || true)
-  grep -q '^merge: F03' <<<"$_grep_in" \
+  echo "$OUT" | jget data.subject | grep '^merge: F03' >/dev/null \
     || { echo "FAIL F24(f): subject should start 'merge: F03': $OUT"; exit 1; }
-  _grep_in=$(echo "$OUT" | jget warnings || true)
-  grep -q 'pass --apply' <<<"$_grep_in" \
+  echo "$OUT" | jget warnings | grep 'pass --apply' >/dev/null \
     || { echo "FAIL F24(f): preview should warn 'pass --apply': $OUT"; exit 1; }
 
   [ "$BL_BEFORE" = "$(cat .hv/BACKLOG.md)" ] \
@@ -332,8 +329,7 @@ PYEOF
 
   grep -qE '^- \*\*\[F03\]' .hv/BACKLOG.md \
     || { echo "FAIL F24(i): [F03] active line not restored under ## Features"; exit 1; }
-  _grep_in=$(awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md || true)
-  if grep -q '\[F03\]' <<<"$_grep_in"; then
+  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md | grep '\[F03\]' >/dev/null; then
     echo "FAIL F24(i): [F03] still present under ## Completed after rollback"; exit 1
   fi
 
@@ -390,8 +386,7 @@ PYEOF
 
   RC=0; OUT=$(hvj ship undo --apply 2>/dev/null) || RC=$?
   [ "$RC" = "5" ] || { echo "FAIL F24(l): failed restore expected exit 5, got $RC: $OUT"; exit 1; }
-  _grep_in=$(echo "$OUT" | jget error.message || true)
-  grep -q "reset already happened" <<<"$_grep_in" \
+  echo "$OUT" | jget error.message | grep "reset already happened" >/dev/null \
     || { echo "FAIL F24(l): exit 5 message must say the reset already happened: $OUT"; exit 1; }
   [ "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" ] \
     || { echo "FAIL F24(l): the reset should have happened before the restore failed"; exit 1; }

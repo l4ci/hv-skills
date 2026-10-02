@@ -83,11 +83,9 @@ done
 
   # truncation warning
   out=$(FAKE_N=1000 TC -- issue list 2>/dev/null)
-  _grep_in=$(echo "$out" | jget data.stderr || true)
-  grep -q "hit the list limit (1000)" <<<"$_grep_in" || fail "expected truncation warning in data.stderr: $out"
+  echo "$out" | jget data.stderr | grep "hit the list limit (1000)" >/dev/null || fail "expected truncation warning in data.stderr: $out"
   out=$(FAKE_N=3 TC -- issue list 2>/dev/null)
-  _grep_in=$(echo "$out" | jget data.stderr || true)
-  if grep -q "list limit" <<<"$_grep_in"; then fail "no warning below the limit"; fi
+  if echo "$out" | jget data.stderr | grep "list limit" >/dev/null; then fail "no warning below the limit"; fi
   pass "truncation warning at the limit only"
 
   # rate limits
@@ -107,8 +105,7 @@ done
   rc=0; out=$(FAKE_MODE=fail TC -- issue view 9 2>/dev/null) || rc=$?
   [ "$rc" = 1 ] && [ "$(calls)" = 1 ] || fail "plain failure should exit 1 after one call (rc=$rc)"
   [ "$(echo "$out" | jget data.exitCode)" = "7" ] || fail "data.exitCode should carry the CLI's exit code: $out"
-  _grep_in=$(echo "$out" | jget data.stderr || true)
-  grep -q "boom: not found" <<<"$_grep_in" || fail "data.stderr should carry the CLI's stderr: $out"
+  echo "$out" | jget data.stderr | grep "boom: not found" >/dev/null || fail "data.stderr should carry the CLI's stderr: $out"
   pass "auth failure exits 5; plain failure exits 1 with the CLI's exit code and stderr in data"
 
   # missing CLI: PATH with python3/coreutils but no gh/glab

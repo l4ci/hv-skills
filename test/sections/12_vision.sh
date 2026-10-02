@@ -439,10 +439,8 @@ cat > .hv/BACKLOG.md <<'EOF'
 EOF
 BL_OUT=$("$BIN/hv-backlog")
 grep -q "M01" <<<"$BL_OUT" || fail "hv-backlog field-order: Milestone column missing from output: '$BL_OUT'"
-_grep_in=$(echo "$BL_OUT" | grep "B74" || true)
-grep -q "M01" <<<"$_grep_in" || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
-_grep_in=$(echo "$BL_OUT" | grep "B75" || true)
-grep -q "M01" <<<"$_grep_in" || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
+echo "$BL_OUT" | grep "B74" | grep "M01" >/dev/null || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
+echo "$BL_OUT" | grep "B75" | grep "M01" >/dev/null || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
 pass "hv-backlog Milestone column correct regardless of field order"
 
 echo "archived milestone status"
