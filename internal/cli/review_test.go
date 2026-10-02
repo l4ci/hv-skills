@@ -480,10 +480,11 @@ func TestReviewQueueUmbrella(t *testing.T) {
 		t.Errorf("unknown --repo: exit %d, want 3\n%s%s", o.code, o.stdout, o.stderr)
 	}
 	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
-	if o := trRun(t, umb, "", "review", "queue"); o.code != 71 {
-		t.Errorf("exit %d, want 71\n%s%s", o.code, o.stdout, o.stderr)
+	// Past the checks it reaches the sub-repos' trackers; with no forge here that is exit 5.
+	if o := trRun(t, umb, "", "review", "queue"); o.code != 5 {
+		t.Errorf("exit %d, want 5\n%s%s", o.code, o.stdout, o.stderr)
 	}
-	if o := trRun(t, umb, "", "review", "queue", "--repo", "svc"); o.code != 71 {
-		t.Errorf("--repo: exit %d, want 71\n%s%s", o.code, o.stdout, o.stderr)
+	if o := trRun(t, umb, "", "review", "queue", "--repo", "svc"); o.code != 5 {
+		t.Errorf("--repo: exit %d, want 5\n%s%s", o.code, o.stdout, o.stderr)
 	}
 }

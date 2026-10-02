@@ -44,9 +44,10 @@ func (b *Issues) prTracker() (PRTracker, error) {
 
 // QueueEntry is one issue waiting for review and the open PRs that close it.
 type QueueEntry struct {
-	ID, Type string // the issue number and its type letter
+	ID, Type string // the issue number ("<repo>:<number>" in an umbrella) and its type letter
 	Number   int
 	Title    string
+	Repo     string // the sub-repo in an umbrella, else ""
 	PRs      []tracker.PR
 }
 
@@ -251,7 +252,11 @@ func itemRefs(ids []string) []ItemRef {
 
 // releaseIssues is the issues of milestone mid's native milestone, tracking
 // issue excluded, by number (_release_issues).
-func (b *Issues) releaseIssues(mid string) ([]Issue, error) {
+func (b *Issues) releaseIssues(mid string) ([]Issue, error) { return b.releaseIssuesOpt(mid, false) }
+
+// releaseIssuesOpt is releaseIssues; with optional (an umbrella sub-repo
+// other than home) the tracking issue may be absent.
+func (b *Issues) releaseIssuesOpt(mid string, optional bool) ([]Issue, error) {
 	tr, err := b.tracker()
 	if err != nil {
 		return nil, err
@@ -260,8 +265,14 @@ func (b *Issues) releaseIssues(mid string) ([]Issue, error) {
 	if !ok {
 		return nil, errors.New("this tracker has no native milestone support")
 	}
-	tracking, err := b.TrackerIssue(mid)
-	if err != nil {
+	var tracking Issue
+	if optional {
+		all, err := b.trackingIssues()
+		if err != nil {
+			return nil, err
+		}
+		tracking = all[mid]
+	} else if tracking, err = b.TrackerIssue(mid); err != nil {
 		return nil, err
 	}
 	ms, err := b.nativeMilestone(rt, mid, tracking)
@@ -277,7 +288,7 @@ func (b *Issues) releaseIssues(mid string) ([]Issue, error) {
 	}
 	var out []Issue
 	for _, is := range all {
-		if is.Number != tracking.Number && !b.IsMilestoneTracker(is) {
+		if (tracking.Number == 0 || is.Number != tracking.Number) && !b.IsMilestoneTracker(is) {
 			out = append(out, is)
 		}
 	}
@@ -296,7 +307,11 @@ type Blocker struct {
 // in-progress, needs-review or changes-requested label block the release,
 // every other open one is a warning (IssueBackend.release_gate).
 func (b *Issues) ReleaseGate(mid string) (blocked []Blocker, warn []Issue, err error) {
-	issues, err := b.releaseIssues(mid)
+	return b.releaseGate(mid, false)
+}
+
+func (b *Issues) releaseGate(mid string, optional bool) (blocked []Blocker, warn []Issue, err error) {
+	issues, err := b.releaseIssuesOpt(mid, optional)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -336,8 +351,10 @@ type NoteSection struct {
 // ReleaseNotes groups the issues of milestone mid that closed as completed:
 // features under New, bugs under Fixed, the rest under Changed, always in that
 // order (IssueBackend.release_notes).
-func (b *Issues) ReleaseNotes(mid string) ([]NoteSection, error) {
-	issues, err := b.releaseIssues(mid)
+func (b *Issues) ReleaseNotes(mid string) ([]NoteSection, error) { return b.releaseNotes(mid, false) }
+
+func (b *Issues) releaseNotes(mid string, optional bool) ([]NoteSection, error) {
+	issues, err := b.releaseIssuesOpt(mid, optional)
 	if err != nil {
 		return nil, err
 	}
@@ -414,20 +431,39 @@ func (r releaseTrackerCounter) IssuesInMilestone(ctx context.Context, title, sta
 // returns the number of completed issues, and whether it wrote anything: a
 // second run on a closed-out milestone writes nothing.
 func (b *Issues) ReleaseClose(mid, tag string) (issues int, changed bool, err error) {
-	tr, err := b.tracker()
+	cp, wc, err := b.counting()
 	if err != nil {
 		return 0, false, err
 	}
+	if issues, err = cp.labelReleased(mid, tag, false); err != nil {
+		return issues, wc.n > 0, err
+	}
+	err = cp.MilestoneStatus(mid, "shipped")
+	return issues, wc.n > 0, err
+}
+
+// counting is a copy of b whose tracker counts the writes made through it.
+func (b *Issues) counting() (*Issues, *writeCounter, error) {
+	tr, err := b.tracker()
+	if err != nil {
+		return nil, nil, err
+	}
 	rt, ok := tr.(ReleaseTracker)
 	if !ok {
-		return 0, false, errors.New("this tracker has no native milestone support")
+		return nil, nil, errors.New("this tracker has no native milestone support")
 	}
 	wc := &writeCounter{MilestoneTracker: rt}
 	cp := *b
 	cp.Tracker = releaseTrackerCounter{wc, rt}
-	all, err := cp.releaseIssues(mid)
+	return &cp, wc, nil
+}
+
+// labelReleased labels and comments the completed issues of mid
+// (_label_released) and returns how many there are.
+func (b *Issues) labelReleased(mid, tag string, optional bool) (issues int, err error) {
+	all, err := b.releaseIssuesOpt(mid, optional)
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	}
 	label := config.Label(b.Cfg, "released")
 	marker := "Released in " + tag
@@ -437,24 +473,188 @@ func (b *Issues) ReleaseClose(mid, tag string) (issues int, changed bool, err er
 		}
 		issues++
 		if !has(is.Labels, label) {
-			if err := cp.Tracker.AddLabels(b.ctx(), is.Number, []string{label}, b.autoCreate()); err != nil {
-				return issues, wc.n > 0, err
+			if err := b.Tracker.AddLabels(b.ctx(), is.Number, []string{label}, b.autoCreate()); err != nil {
+				return issues, err
 			}
 		}
-		comments, err := cp.Tracker.Comments(b.ctx(), is.Number)
+		comments, err := b.Tracker.Comments(b.ctx(), is.Number)
 		if err != nil {
-			return issues, wc.n > 0, err
+			return issues, err
 		}
 		seen := false
 		for _, c := range comments {
 			seen = seen || pystr.Strip(c.Body) == marker
 		}
 		if !seen {
-			if _, err := cp.Tracker.AddComment(b.ctx(), is.Number, marker); err != nil {
-				return issues, wc.n > 0, err
+			if _, err := b.Tracker.AddComment(b.ctx(), is.Number, marker); err != nil {
+				return issues, err
 			}
 		}
 	}
-	err = cp.MilestoneStatus(mid, "shipped")
-	return issues, wc.n > 0, err
+	return issues, nil
+}
+
+// ---- umbrella --------------------------------------------------------------
+
+// perRepo is the sub-repo a per-repo umbrella verb acts on: Scope (--repo),
+// else the one the working directory is in (contract: scope S). At the
+// umbrella root it needs --repo (UmbrellaBackend._sub).
+func (u *Umbrella) perRepo() (string, *Issues, error) {
+	name := u.readScope()
+	if name == "" {
+		return "", nil, errf(ErrInvalid, "umbrella issue mode needs --repo <name> (registered: %s)", u.names())
+	}
+	s, err := u.sub(name)
+	return name, s, err
+}
+
+// ReviewQueue is the review queue of every sub-repo in scope, in registry
+// order, with IDs as "<repo>:<number>".
+func (u *Umbrella) ReviewQueue() ([]QueueEntry, error) {
+	out := []QueueEntry{}
+	for _, name := range u.scoped() {
+		s, err := u.sub(name)
+		if err != nil {
+			return nil, err
+		}
+		q, err := s.ReviewQueue()
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range q {
+			e.ID, e.Repo = name+":"+e.ID, name
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+// MergePR merges PR pr of the --repo sub-repo. An --items reference qualified
+// with another sub-repo is an error; the IDs it reports are qualified.
+func (u *Umbrella) MergePR(pr int, items []string) (MergeResult, error) {
+	name, s, err := u.perRepo()
+	if err != nil {
+		return MergeResult{}, err
+	}
+	var plain []string
+	for _, ref := range items {
+		owner, p, err := u.pick(ref)
+		if err != nil {
+			return MergeResult{}, err
+		}
+		if owner != nil && owner.Repo != name {
+			return MergeResult{}, errf(ErrInvalid, "item %s belongs to %s, not %s", ref, owner.Repo, name)
+		}
+		plain = append(plain, p)
+	}
+	if items == nil {
+		plain = nil
+	}
+	res, err := s.MergePR(pr, plain)
+	for i := range res.Closed {
+		res.Closed[i].ID = name + ":" + res.Closed[i].ID
+	}
+	for i := range res.Unproven {
+		res.Unproven[i].ID = name + ":" + res.Unproven[i].ID
+	}
+	return res, err
+}
+
+// ReleaseGate is the release gate of mid in the --repo sub-repo, whose
+// tracking issue may live in the home sub-repo.
+func (u *Umbrella) ReleaseGate(mid string) ([]Blocker, []Issue, error) {
+	_, s, err := u.perRepo()
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.releaseGate(mid, true)
+}
+
+// ReleaseNotes are the release notes of mid in the --repo sub-repo.
+func (u *Umbrella) ReleaseNotes(mid string) ([]NoteSection, error) {
+	_, s, err := u.perRepo()
+	if err != nil {
+		return nil, err
+	}
+	return s.releaseNotes(mid, true)
+}
+
+// natives maps each sub-repo that has milestone mid to its native milestone,
+// open ones first (UmbrellaBackend._natives).
+func (u *Umbrella) natives(mid string) (map[string]*tracker.Milestone, error) {
+	out := map[string]*tracker.Milestone{}
+	for _, r := range u.Repos {
+		s, err := u.sub(r.Name)
+		if err != nil {
+			return nil, err
+		}
+		mt, err := s.milestoneTracker()
+		if err != nil {
+			return nil, err
+		}
+		nm, err := s.nativeMilestone(mt, mid, Issue{})
+		if err != nil {
+			return nil, err
+		}
+		if nm != nil {
+			out[r.Name] = nm
+		}
+	}
+	return out, nil
+}
+
+// ReleaseClose closes out mid in the --repo sub-repo: it labels and comments
+// the completed issues and closes that sub-repo's native milestone. The
+// tracking issue ships (with every other native milestone closed) only once
+// every sub-repo's native milestone is closed.
+func (u *Umbrella) ReleaseClose(mid, tag string) (issues int, changed bool, err error) {
+	name, s, err := u.perRepo()
+	if err != nil {
+		return 0, false, err
+	}
+	cp, wc, err := s.counting()
+	if err != nil {
+		return 0, false, err
+	}
+	if issues, err = cp.labelReleased(mid, tag, true); err != nil {
+		return issues, wc.n > 0, err
+	}
+	// natives reads every sub-repo, so one whose forge fails stops the close
+	// after the labels and comments went out. That is safe: they are skipped
+	// when present, so a re-run picks up where this one stopped.
+	nat, err := u.natives(mid)
+	if err != nil {
+		return issues, wc.n > 0, err
+	}
+	if ms := nat[name]; ms != nil && ms.State != "closed" {
+		closed := "closed"
+		if err := wc.EditMilestone(u.ctx(), ms.Number, tracker.MilestoneEdit{State: &closed}); err != nil {
+			return issues, true, err
+		}
+		ms.State = "closed"
+	}
+	for _, ms := range nat {
+		if ms.State != "closed" {
+			return issues, wc.n > 0, nil
+		}
+	}
+	shipped, err := u.milestoneShipped(mid)
+	return issues, wc.n > 0 || shipped, err
+}
+
+// milestoneShipped marks mid shipped on the home tracking issue
+// (UmbrellaBackend.milestone_status with "shipped", called once every native
+// milestone is closed, so no other sub-repo's milestone is left to close). It
+// reports whether it wrote anything.
+func (u *Umbrella) milestoneShipped(mid string) (bool, error) {
+	home, err := u.homeSub()
+	if err != nil {
+		return false, err
+	}
+	hc, hw, err := home.counting()
+	if err != nil {
+		return false, err
+	}
+	err = hc.MilestoneStatus(mid, "shipped")
+	return hw.n > 0, err
 }
