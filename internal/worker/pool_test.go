@@ -1,0 +1,246 @@
+package worker
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// Fixture parity: the old helper and the Go port run on identically built
+// projects and must leave a byte-identical .hv/workers.json.
+
+func goInit(t *testing.T, dir string, o InitOpts) (InitResult, error) {
+	t.Helper()
+	return Env{}.PoolInit(bg, dir, o, &Accounts{})
+}
+
+func TestPoolInitParity(t *testing.T) {
+	for name, cfg := range map[string]string{"tmux": `{}`, "herdr": `{"work":{"dispatch":"herdr"}}`} {
+		t.Run(name, func(t *testing.T) {
+			a, b := newProject(t, cfg), newProject(t, cfg)
+			r := runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "3", "--base", "main", "--session", "s1")
+			if r.Code != 0 {
+				t.Fatalf("old init: %+v", r)
+			}
+			res, err := goInit(t, b, InitOpts{Slots: 3, Base: "main", Session: "s1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+			if !res.Changed || len(res.Slots) != 3 {
+				t.Errorf("result = %+v", res)
+			}
+			// Idempotent: a second run changes nothing, and grows with a larger count.
+			again, err := goInit(t, b, InitOpts{Slots: 3, Base: "main", Session: "s1"})
+			if err != nil || again.Changed {
+				t.Errorf("re-init changed=%v err=%v", again.Changed, err)
+			}
+			runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "4", "--base", "main", "--session", "s1")
+			goInit(t, b, InitOpts{Slots: 4, Base: "main", Session: "s1"})
+			mustEqual(t, "grown workers.json", registry(t, a), registry(t, b))
+			if _, err := os.Stat(filepath.Join(b, ".worktrees", "w4", ".git")); err != nil {
+				t.Errorf("w4 worktree missing: %v", err)
+			}
+		})
+	}
+}
+
+func TestPoolInitDefaultsToCurrentBranchAndHv(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1")
+	res, err := goInit(t, b, InitOpts{Slots: 1})
+	if err != nil || res.Base != "main" || res.Session != "hv" {
+		t.Fatalf("%+v %v", res, err)
+	}
+	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+}
+
+func TestPoolInitErrors(t *testing.T) {
+	dir := newProject(t, `{}`)
+	_, err := goInit(t, dir, InitOpts{Slots: 1, Base: "nope"})
+	if we, ok := err.(*Error); !ok || we.Exit != ExitResolution || !strings.Contains(we.Message, "base branch 'nope' does not exist") {
+		t.Errorf("missing base: %v", err)
+	}
+	sh(t, dir, "git", "checkout", "-q", "--detach")
+	_, err = goInit(t, dir, InitOpts{Slots: 1})
+	if we, ok := err.(*Error); !ok || we.Exit != ExitResolution || !strings.Contains(we.Message, "cannot resolve base branch") {
+		t.Errorf("detached HEAD without --base: %v", err)
+	}
+}
+
+func TestPoolInitMigratesWindowToHandleAndKeepsLiveTab(t *testing.T) {
+	cfg := `{"work":{"dispatch":"herdr"}}`
+	a, b := newProject(t, cfg), newProject(t, cfg)
+	for _, d := range []string{a, b} {
+		if d == a {
+			runOld(t, d, nil, "hv-worker-pool", "init", "--slots", "2", "--base", "main")
+		} else {
+			goInit(t, d, InitOpts{Slots: 2, Base: "main"})
+		}
+		// slot 1 had a live tab recorded; slot 2 is an unmigrated pre-herdr registry
+		raw, _ := os.ReadFile(RegistryPath(d))
+		s := strings.Replace(string(raw), `"handle": null,`, `"handle": "w9:t4",`, 1)
+		s = strings.Replace(s, `"handle": null,`, `"window": "hv:w2",`, 1)
+		os.WriteFile(RegistryPath(d), []byte(s), 0o644)
+	}
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "2", "--base", "main")
+	goInit(t, b, InitOpts{Slots: 2, Base: "main"})
+	mustEqual(t, "migrated workers.json", registry(t, a), registry(t, b))
+	if got := registry(t, b); !strings.Contains(got, `"handle": "w9:t4"`) || !strings.Contains(got, `"handle": "hv:w2"`) || strings.Contains(got, `"window"`) {
+		t.Errorf("window not migrated or live tab clobbered:\n%s", got)
+	}
+}
+
+func TestPoolInitRegistersTheBranchActuallyCheckedOut(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	goInit(t, b, InitOpts{Slots: 1, Base: "main"})
+	for _, d := range []string{a, b} {
+		sh(t, filepath.Join(d, ".worktrees", "w1"), "git", "switch", "-q", "-c", "hv-worker/w1-t9")
+	}
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	goInit(t, b, InitOpts{Slots: 1, Base: "main"})
+	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+	if !strings.Contains(registry(t, b), `"branch": "hv-worker/w1-t9"`) {
+		t.Error("init registered the init-time name, not the checked-out branch")
+	}
+}
+
+// #79: a slot registered at a legacy path stays there; a foreign repo is refused.
+func TestPoolInitLegacySlotStays(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	for _, d := range []string{a, b} {
+		legacy := filepath.Join(d, ".claude", "worktrees", "hv-worker", "w1")
+		sh(t, d, "git", "worktree", "add", "-q", "-b", "hv-worker/w1", legacy, "main")
+		reg := `{"session":"hv","slots":[{"name":"w1","branch":"hv-worker/w1","worktree":"` + legacy + `","base":"main","handle":"hv:w1","state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
+		os.WriteFile(RegistryPath(d), []byte(reg), 0o644)
+	}
+	r := runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	if r.Code != 0 || !strings.Contains(r.Stderr, "stays at") {
+		t.Fatalf("old: %+v", r)
+	}
+	res, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "stays at") {
+		t.Errorf("warnings = %v", res.Warnings)
+	}
+	if _, err := os.Stat(filepath.Join(b, ".worktrees", "w1")); err == nil {
+		t.Error("a second worktree was created at the new root")
+	}
+}
+
+func TestPoolInitRefusesForeignRepoWorktree(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	foreignA, foreignB := newProject(t, `{}`), newProject(t, `{}`)
+	for d, f := range map[string]string{a: foreignA, b: foreignB} {
+		reg := `{"session":"hv","slots":[{"name":"w1","branch":"main","worktree":"` + f + `","base":"main","handle":null,"state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
+		os.WriteFile(RegistryPath(d), []byte(reg), 0o644)
+	}
+	r := runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	if r.Code != 3 || !strings.Contains(r.Stderr, "a worktree of another repository") {
+		t.Fatalf("old: %+v", r)
+	}
+	before, _ := os.ReadFile(RegistryPath(b))
+	_, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"})
+	we, ok := err.(*Error)
+	if !ok || we.Exit != ExitResolution || !strings.Contains(we.Message, "slot w1 is registered at "+foreignB+", a worktree of another repository") {
+		t.Fatalf("go: %v", err)
+	}
+	after, _ := os.ReadFile(RegistryPath(b))
+	if string(before) != string(after) {
+		t.Error("registry changed on a refusal")
+	}
+}
+
+func TestPoolInitWarnsWhenWorktreesNotIgnored(t *testing.T) {
+	dir := newProject(t, `{}`)
+	os.WriteFile(filepath.Join(dir, ".gitignore"), nil, 0o644)
+	res, err := goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
+	if err != nil || len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], ".worktrees/ is not gitignored") {
+		t.Errorf("%+v %v", res.Warnings, err)
+	}
+}
+
+// Known quirk, ported as is: a plain directory inside the project passes the
+// "healthy slot" test (`git -C <dir> rev-parse --git-dir` finds the project's
+// own .git), so debris from an interrupted reap is adopted, not cleared. Parity
+// with the old helper is the point here; the fix belongs to a bin/ change.
+func TestPoolInitTreatsAPlainDirInsideTheProjectAsHealthy(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	for _, d := range []string{a, b} {
+		os.MkdirAll(filepath.Join(d, ".worktrees", "w1"), 0o755)
+		os.WriteFile(filepath.Join(d, ".worktrees", "w1", "junk"), []byte("x"), 0o644)
+	}
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	if _, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"}); err != nil {
+		t.Fatal(err)
+	}
+	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+}
+
+func TestPoolReapParity(t *testing.T) {
+	a, b := newProject(t, `{}`), newProject(t, `{}`)
+	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "3", "--base", "main")
+	goInit(t, b, InitOpts{Slots: 3, Base: "main"})
+
+	runOld(t, a, nil, "hv-worker-pool", "reap", "--slot", "w2")
+	reaped, err := Env{}.Reap(b, []string{"w2", "nope"}, false)
+	if err != nil || len(reaped) != 1 || reaped[0] != "w2" {
+		t.Fatalf("reaped = %v, %v", reaped, err)
+	}
+	mustEqual(t, "after reap w2", registry(t, a), registry(t, b))
+	if _, err := os.Stat(filepath.Join(b, ".worktrees", "w2")); err == nil {
+		t.Error("worktree survived the reap")
+	}
+	if out := sh(t, b, "git", "branch", "--list", "hv-worker/w2"); out != "" {
+		t.Errorf("branch survived: %s", out)
+	}
+
+	runOld(t, a, nil, "hv-worker-pool", "reap", "--all")
+	reaped, _ = Env{}.Reap(b, nil, true)
+	if len(reaped) != 2 {
+		t.Errorf("reaped = %v", reaped)
+	}
+	mustEqual(t, "after reap --all", registry(t, a), registry(t, b))
+}
+
+func TestPoolReapWithoutRegistryIsANoop(t *testing.T) {
+	dir := newProject(t, `{}`)
+	reaped, err := Env{}.Reap(dir, []string{"w1"}, false)
+	if err != nil || len(reaped) != 0 {
+		t.Errorf("%v %v", reaped, err)
+	}
+	if _, err := os.Stat(RegistryPath(dir)); err == nil {
+		t.Error("a registry was created")
+	}
+}
+
+func TestPoolListDropsNullFields(t *testing.T) {
+	dir := newProject(t, `{}`)
+	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
+	session, round, slots := PoolList(dir)
+	if session != "hv" || round != nil || len(slots) != 1 {
+		t.Fatalf("%v %v %v", session, round, slots)
+	}
+	for _, k := range []string{"handle"} {
+		if _, ok := slots[0].Get(k); !ok {
+			t.Errorf("%s missing", k)
+		}
+	}
+	for _, k := range []string{"task", "pr", "configDir"} {
+		if _, ok := slots[0].Get(k); ok {
+			t.Errorf("null field %s must be absent in data", k)
+		}
+	}
+	if _, ok := slots[0].Get("relays"); !ok {
+		t.Error("relays must stay (an empty array)")
+	}
+	dir2 := newProject(t, `{}`)
+	if s, _, sl := PoolList(dir2); s != nil || len(sl) != 0 {
+		t.Errorf("no registry: %v %v", s, sl)
+	}
+}
