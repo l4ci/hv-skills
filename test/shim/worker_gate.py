@@ -56,7 +56,7 @@ def worker_gate(ctx):
     data["verified"] = re.findall(r"^\s*verify ok: (.*)$", out, re.M)
     m = re.search(r"^(?:MERGED|GATE-PASS) \S+ .*?\(?([0-9a-f]{7,40})\)?$", out, re.M)
     if m:
-        data["sha"] = m.group(1)
+        data["sha"] = m.group(1)[:7]  # contract: 7 characters, whatever core.abbrev says
     if rc == 0:
         data["verdict"] = "pass" if re.search(r"^(?:MERGED|GATE-PASS|NO-VERIFY) ", out, re.M) else "fresh"
         data["changed"] = data["verdict"] == "pass"

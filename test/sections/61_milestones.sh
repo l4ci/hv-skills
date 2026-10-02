@@ -89,11 +89,15 @@ PY
     eq "status changed" "true" "$(hvj milestone status M01 --to active | jget data.changed)"
     eq "active labels" "open|None|milestone-tracker,status:active|M01 — Alpha" "$(ISSUE 1)"
     eq "active listed" '["M01"]' "$(hvj milestone active | jget data.ids)"
-    eq "frontmatter synced" "status: active" "$(hvj milestone show M01 | jget data.body | sed -n 4p)"
+    OUT="$(hvj milestone show M01)" || fail "$prov milestone show M01 failed"
+    OUT="$(jget data.body <<<"$OUT")"
+    eq "frontmatter synced" "status: active" "$(grep -m1 "^status:" <<<"$OUT")"
     hvj milestone status M01 --to shipped >/dev/null || fail "$prov status shipped failed"
     eq "shipped closes completed" "closed|completed|milestone-tracker,status:shipped|M01 — Alpha" "$(ISSUE 1)"
     eq "shipped closes native milestone" "closed" "$(NATIVE M01)"
-    eq "shipped frontmatter" "status: shipped" "$(hvj milestone show M01 | jget data.body | sed -n 4p)"
+    OUT="$(hvj milestone show M01)" || fail "$prov milestone show M01 failed"
+    OUT="$(jget data.body <<<"$OUT")"
+    eq "shipped frontmatter" "status: shipped" "$(grep -m1 "^status:" <<<"$OUT")"
     case "$(SUMMARY)" in "M01:shipped:true: M02:planned:true:M01 "*) ;; *) fail "$prov ready after ship: $(SUMMARY)" ;; esac
     hvj milestone status M02 --to archived >/dev/null || fail "$prov status archived failed"
     eq "archived closes not planned" "closed|not_planned" "$(ISSUE 2 | cut -d'|' -f1,2)"
@@ -129,7 +133,9 @@ PY
     eq "put updates depends" "M02:active:false:M01+M05" "$(SUMMARY | tr ' ' '\n' | grep '^M02')"
     sed -i 's/^status: .*/status: shipped/' "$P/m02.md"
     hvj milestone put M02 --body-file - < "$P/m02.md" >/dev/null || fail "$prov put from stdin failed"
-    eq "put keeps status label authoritative" "status: active" "$(hvj milestone show M02 | jget data.body | sed -n 4p)"
+    OUT="$(hvj milestone show M02)" || fail "$prov milestone show M02 failed"
+    OUT="$(jget data.body <<<"$OUT")"
+    eq "put keeps status label authoritative" "status: active" "$(grep -m1 "^status:" <<<"$OUT")"
     eq "put of the same body is unchanged" "false" "$(hvj milestone put M02 --body-file - < "$P/m02.md" | jget data.changed)"
     RC hvj milestone put M02 --body-file "$P/missing.md"
     eq "put unreadable body" "2" "$RCV"
@@ -205,7 +211,8 @@ for prov in github gitlab; do
     eq "add" "M01" "$(hvj milestone add --title "Launch" --summary "Ship the thing" | jget data.id)"
     eq "add dep" "M02" "$(hvj milestone add --title "Scale" --summary "Grow it" --depends M01 | jget data.id)"
     [ ! -e .hv/milestones ] || fail "$prov issue mode wrote .hv/milestones"
-    "$HV_BIN" milestone show M01 | sed 's/_(define what shipped looks like)_/Users can sign up./' > body.md
+    OUT="$("$HV_BIN" milestone show M01)" || fail "$prov milestone show M01 failed"
+    sed 's/_(define what shipped looks like)_/Users can sign up./' <<<"$OUT" > body.md
     hvj milestone put M01 --body-file body.md >/dev/null || fail "$prov put failed"
     "$HV_BIN" milestone show M01 > shown.md || fail "$prov show failed"
     HAS shown.md "Users can sign up." "put body"
@@ -255,7 +262,8 @@ for prov in github gitlab; do
     eq "slice duplicate" "4" "$RCV"
     RC hvj plan add --milestone M09 --slice --title "no tracker"
     eq "slice on unknown milestone" "3" "$RCV"
-    "$HV_BIN" plan show M01-S01 | sed 's/^status: planned/status: active/' > plan.md
+    OUT="$("$HV_BIN" plan show M01-S01)" || fail "$prov plan show M01-S01 failed"
+    sed 's/^status: planned/status: active/' <<<"$OUT" > plan.md
     hvj plan put M01-S01 --body-file plan.md >/dev/null || fail "$prov plan put failed"
     eq "slice put/show" "$(cat plan.md)" "$("$HV_BIN" plan show M01-S01)"
     RC hvj plan put M01-S07 --body-file plan.md

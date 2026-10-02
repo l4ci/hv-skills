@@ -239,7 +239,7 @@ printf '{"refactor":{"verifyCommands":["echo boom-marker; exit 1"]}}' > "$GT_DIR
 RC="$(gt_gate env TMPDIR="$TMP_GT" "$HV_BIN" --json worker gate w1 --base main)"
 [ "$RC" = 1 ] && [ "$(gt_verdict)" = verify-failed ] && [ "$(jget data.changed <"$GT_DIR.out")" = true ] \
   || fail "gate (g): a failed verify must be verify-failed with changed true (rc=$RC): $(cat "$GT_DIR.out")"
-[ "$(jget data.sha <"$GT_DIR.out")" = "$(git -C "$GT_DIR" rev-parse --short HEAD)" ] \
+[ "$(jget data.sha <"$GT_DIR.out")" = "$(git -C "$GT_DIR" rev-parse --short=7 HEAD)" ] \
   || fail "gate (g): verify-failed must report the merge commit as data.sha: $(cat "$GT_DIR.out")"
 grep -q "boom-marker" "$GT_DIR.err" || fail "gate (g): a failed verify must show its output: $(cat "$GT_DIR.err")"
 grep -q "boom-marker" "$TMP_GT"/hv-gate-verify-* 2>/dev/null || fail "gate (g): the verify log must be kept on failure"

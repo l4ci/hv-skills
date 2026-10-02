@@ -191,7 +191,8 @@ PY
     eq "slice plan add" "$MID-S01" "$(hvj plan add --milestone "$MID" --slice --title "A slice" | jget data.key)"
     [ ! -e ".hv/plans/$MID-S01.md" ] || fail "$prov slice plan wrote a file"
     eq "slice plan marker" "<!-- hv:plan:S01 -->" "$(MARKERS "$TRK")"
-    "$HV_BIN" plan show "$MID-S01" | grep "^key: $MID-S01$" >/dev/null || fail "$prov slice plan show"
+    OUT="$("$HV_BIN" plan show "$MID-S01")" || fail "$prov slice plan show failed"
+    grep -q "^key: $MID-S01$" <<<"$OUT" || fail "$prov slice plan show"
     rc=0; OUT="$(hvj plan list 2>/dev/null)" || rc=$?
     eq "plan list ok" "0" "$rc"
     [ -n "$(jget 'warnings[0]' <<<"$OUT")" ] || fail "$prov plan list should warn that item plans live on their issues: $OUT"
