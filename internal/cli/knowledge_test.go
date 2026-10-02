@@ -429,3 +429,56 @@ func TestKnowledgeHitJSON(t *testing.T) {
 		t.Errorf("glossary hit: %s", g.stdout)
 	}
 }
+
+// A CRLF KNOWLEDGE.md is read as LF and rewritten as pure LF, like the old
+// helpers (Python's read_text normalizes line endings).
+func TestKnowledgeCRLFMatchesOldHelpers(t *testing.T) {
+	crlf := strings.ReplaceAll(knFixtureKnowledge, "\n", "\r\n")
+	steps := []struct {
+		helper  string
+		oldArgs []string
+		newArgs []string
+		stdin   string
+	}{
+		{"hv-knowledge-merge", []string{"--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body", "b"},
+			[]string{"knowledge", "add", "--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body-file", "-"}, "b"},
+		{"hv-knowledge-amend", []string{"--topic", "Architecture", "--fragment", "Beta", "--append", "more"},
+			[]string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"}, "more"},
+		{"hv-knowledge-rename-topic", []string{"--from", "Architecture", "--to", "Build", "--title", "Beta rule"},
+			[]string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, ""},
+	}
+	for _, s := range steps {
+		t.Run(s.helper, func(t *testing.T) {
+			oldDir, newDir := knProject(t, false), knProject(t, false)
+			knWrite(t, filepath.Join(oldDir, ".hv", "KNOWLEDGE.md"), crlf)
+			knWrite(t, filepath.Join(newDir, ".hv", "KNOWLEDGE.md"), crlf)
+			o := knOld(t, oldDir, s.stdin, s.helper, s.oldArgs...)
+			n := knNew(t, newDir, s.stdin, s.newArgs...)
+			if o.rc != 0 || n.rc != 0 {
+				t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+			}
+			knSameTree(t, oldDir, newDir)
+			if strings.Contains(knTree(t, newDir)["KNOWLEDGE.md"], "\r") {
+				t.Error("CR survived the rewrite")
+			}
+		})
+	}
+}
+
+func TestKnowledgeAmendRejectsEmptyBody(t *testing.T) {
+	dir := knProject(t, false)
+	before := knTree(t, dir)["KNOWLEDGE.md"]
+	for _, body := range []string{"", "\n", "  \n\n"} {
+		n := knNew(t, dir, body, "knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-")
+		if n.rc != 2 {
+			t.Errorf("body %q: rc=%d", body, n.rc)
+		}
+	}
+	if knTree(t, dir)["KNOWLEDGE.md"] != before {
+		t.Error("file changed")
+	}
+	ok := knNew(t, dir, "x", "knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-", "--json")
+	if !strings.Contains(ok.stdout, `"changed": true`) {
+		t.Errorf("%s", ok.stdout)
+	}
+}

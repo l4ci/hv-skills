@@ -56,7 +56,7 @@ func (s Store) Add(scope, topic, title, body, date string) (AddResult, error) {
 		return AddResult{}, notFound("topic '%s' not found in %s", topic, target)
 	}
 	lower := strings.ToLower(title)
-	for _, line := range strings.Split(content[start:end], "\n") {
+	for _, line := range section.Lines(content[start:end]) {
 		if m := titleRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil && strings.ToLower(m[1]) == lower {
 			// Like the old helper, a repeat still registers the title in the
 			// sidecar, so a bullet that predates tiering gets tracked.
@@ -99,12 +99,12 @@ func (s Store) initTier(scope, topic, title string) error {
 // otherwise the umbrella file and, for a sub-repo scope, that sub-repo's file
 // are searched and a match in both is ErrAmbiguous. It returns the file
 // that was amended.
-func (s Store) Amend(scope string, explicit bool, topic, fragment, text string) (string, error) {
+func (s Store) Amend(scope string, explicit bool, topic, fragment, text string) (string, bool, error) {
 	var candidates []string
 	if explicit {
 		p, err := s.KnowledgePath(scope)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		candidates = []string{p}
 	} else {
@@ -122,16 +122,16 @@ func (s Store) Amend(scope string, explicit bool, topic, fragment, text string) 
 	for _, f := range candidates {
 		content, err := ReadFile(f)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		st, en, ok := section.Find(content, topic)
 		if !ok {
 			if explicit {
-				return "", notFound("topic '%s' not found in %s", topic, f)
+				return "", false, notFound("topic '%s' not found in %s", topic, f)
 			}
 			continue
 		}
-		for _, line := range strings.Split(content[st:en], "\n") {
+		for _, line := range section.Lines(content[st:en]) {
 			stripped := strings.TrimSpace(line)
 			if strings.HasPrefix(stripped, "- ") && strings.Contains(stripped, fragment) {
 				hits = append(hits, hit{f, content, stripped})
@@ -141,23 +141,27 @@ func (s Store) Amend(scope string, explicit bool, topic, fragment, text string) 
 	}
 	switch {
 	case len(hits) == 0:
-		return "", notFound("no bullet in '%s' contains fragment '%s' (searched: %s)", topic, fragment, strings.Join(candidates, ", "))
+		return "", false, notFound("no bullet in '%s' contains fragment '%s' (searched: %s)", topic, fragment, strings.Join(candidates, ", "))
 	case len(hits) > 1:
 		files := make([]string, len(hits))
 		for i, h := range hits {
 			files[i] = h.file
 		}
-		return "", fmt.Errorf("%w: fragment '%s' under topic '%s' matches in multiple files: %s; pass --repo to disambiguate", ErrAmbiguous, fragment, topic, strings.Join(files, ", "))
+		return "", false, fmt.Errorf("%w: fragment '%s' under topic '%s' matches in multiple files: %s; pass --repo to disambiguate", ErrAmbiguous, fragment, topic, strings.Join(files, ", "))
 	}
 	h := hits[0]
 	st, en, _ := section.Find(h.content, topic)
 	body := h.content[st:en]
 	idx := strings.Index(body, h.line)
 	if idx < 0 {
-		return "", fmt.Errorf("internal: could not re-locate target line in section body")
+		return "", false, fmt.Errorf("internal: could not re-locate target line in section body")
 	}
 	body = body[:idx] + h.line + " " + text + body[idx+len(h.line):]
-	return h.file, writeText(h.file, h.content[:st]+body+h.content[en:], fsio.WriteFileAtomic)
+	next := h.content[:st] + body + h.content[en:]
+	if next == h.content {
+		return h.file, false, nil
+	}
+	return h.file, true, writeText(h.file, next, fsio.WriteFileAtomic)
 }
 
 // RenameResult reports RenameTopic.

@@ -104,10 +104,10 @@ func TestAmendAmbiguousAcrossFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(root, ".hv", "KNOWLEDGE.md"), []byte(umb), 0o666)
 	os.WriteFile(filepath.Join(root, ".hv", "knowledge", "web", "KNOWLEDGE.md"), []byte(umb), 0o666)
 	s := Store{Root: root, Repos: map[string]string{"web": filepath.Join(root, "web")}}
-	if _, err := s.Amend("web", false, "T", "shared", "x"); !errors.Is(err, ErrAmbiguous) {
+	if _, _, err := s.Amend("web", false, "T", "shared", "x"); !errors.Is(err, ErrAmbiguous) {
 		t.Fatalf("err = %v", err)
 	}
-	if _, err := s.Amend("web", true, "T", "shared", "x"); err != nil {
+	if _, _, err := s.Amend("web", true, "T", "shared", "x"); err != nil {
 		t.Fatalf("explicit scope: %v", err)
 	}
 }

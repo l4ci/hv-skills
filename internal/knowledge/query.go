@@ -53,7 +53,7 @@ func (s Store) Query(scope string, topics []string, o QueryOpts) (text string, m
 
 	filter := func(body, name string, tiers map[[2]string]string) []string {
 		var out []string
-		for _, line := range strings.Split(strings.TrimSuffix(body, "\n"), "\n") {
+		for _, line := range section.Lines(body) {
 			m := bulletRe.FindStringSubmatch(strings.TrimRight(line, " \t\r\f\v"))
 			if m == nil {
 				out = append(out, line)

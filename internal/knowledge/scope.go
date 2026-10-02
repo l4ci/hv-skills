@@ -71,13 +71,16 @@ func (s Store) TierPath(scope string) (string, error) {
 	return filepath.Join(s.dir(scope), "knowledge-tier.json"), nil
 }
 
-// ReadFile returns the file's text, or "" when it does not exist.
+// ReadFile returns the file's text, or "" when it does not exist. Line
+// endings are normalized to \n (\r\n and lone \r), as Python's read_text does,
+// so a CRLF file is rewritten as LF by the verbs that write it back.
 func ReadFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return "", nil
 	}
-	return string(b), err
+	t := strings.ReplaceAll(string(b), "\r\n", "\n")
+	return strings.ReplaceAll(t, "\r", "\n"), err
 }
 
 // writeText writes text atomically, creating the parent directory first.

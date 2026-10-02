@@ -225,15 +225,18 @@ func knAmend(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		body = strings.TrimRight(body, "\n")
+		if strings.TrimSpace(body) == "" {
+			return Result{}, Usage("--body-file is empty; nothing to append")
+		}
 		st, scope, err := knStore(c)
 		if err != nil {
 			return Result{}, err
 		}
-		file, err := st.Amend(scope, c.Repo != "", *topic, *fragment, body)
+		file, changed, err := st.Amend(scope, c.Repo != "", *topic, *fragment, body)
 		if err != nil {
 			return Result{}, knErr(err)
 		}
-		return Result{Data: knObj("topic", *topic, "changed", body != ""), Text: "amended: " + file}, nil
+		return Result{Data: knObj("topic", *topic, "changed", changed), Text: "amended: " + file}, nil
 	}
 }
 
