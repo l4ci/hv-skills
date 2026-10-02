@@ -13,6 +13,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
+	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 	"github.com/l4ci/hv-skills/v5/internal/section"
@@ -381,12 +382,12 @@ func plural(n int, word string) string {
 // topic names it shows, for a file of ## sections; ok is false for a missing
 // file or one with no topics.
 func topicsLine(path string) (count int, shown []string, ok bool) {
-	raw, err := os.ReadFile(path)
+	text, err := fsio.ReadText(path)
 	if err != nil {
 		return 0, nil, false
 	}
 	var names []string
-	for _, t := range section.Topics(pystr.Universal(string(raw))) {
+	for _, t := range section.Topics(text) {
 		names = append(names, t.Name)
 	}
 	if len(names) == 0 {
@@ -424,24 +425,24 @@ func activeMilestones(root string) []milestone {
 	sort.Strings(names)
 	var out []milestone
 	for _, n := range names {
-		raw, err := os.ReadFile(dir + "/" + n)
+		text, err := fsio.ReadText(dir + "/" + n)
 		if err != nil {
 			continue
 		}
-		fm := frontmatter.Parse(pystr.Universal(string(raw)))
+		fm, _, _ := frontmatter.Parse(text)
 		if len(fm) == 0 {
 			continue
 		}
-		id := fm.String("id")
+		id := frontmatter.Str(fm, "id")
 		if id == "" {
 			id = strings.TrimSuffix(n, ".md")
 		}
-		st := fm.String("status")
+		st := frontmatter.Str(fm, "status")
 		if st == "" {
 			st = "planned"
 		}
 		if st == "active" {
-			out = append(out, milestone{id, fm.String("title")})
+			out = append(out, milestone{id, frontmatter.Str(fm, "title")})
 		}
 	}
 	return out
@@ -551,9 +552,9 @@ func a4Summary(fs *flag.FlagSet) RunFunc {
 				data.Set(k.key, a4Obj("count", n, "topics", shown))
 			}
 		}
-		if raw, err := os.ReadFile(root + "/.hv/ARCHIVE.md"); err == nil {
+		if text, err := fsio.ReadText(root + "/.hv/ARCHIVE.md"); err == nil {
 			n := 0
-			for _, l := range pystr.Splitlines(pystr.Universal(string(raw))) {
+			for _, l := range pystr.Splitlines(text) {
 				if strings.HasPrefix(l, "- ~~") {
 					n++
 				}

@@ -5,7 +5,6 @@ package stale
 import (
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
+	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 	"github.com/l4ci/hv-skills/v5/internal/section"
 )
@@ -90,27 +90,22 @@ func Find(root, kind string, days int, today time.Time) ([]Entry, error) {
 
 func fmtDate(t time.Time) string { return t.Format("2006-01-02") }
 
-func readText(path string) (string, error) {
-	raw, err := os.ReadFile(path)
-	return pystr.Universal(string(raw)), err
-}
-
 func findMap(root string, days int, today time.Time) ([]Entry, error) {
 	dir := filepath.Join(root, ".hv", "map")
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.md"))
 	sort.Strings(paths)
 	type ent struct {
 		name, rel string
-		fm        frontmatter.Block
+		fm        map[string]any
 	}
 	var ents []ent
 	for _, p := range paths {
-		text, err := readText(p)
+		text, err := fsio.ReadText(p)
 		if err != nil {
 			continue
 		}
-		fm := frontmatter.Parse(text)
-		name := fm.String("subsystem")
+		fm, _, _ := frontmatter.Parse(text)
+		name := frontmatter.Str(fm, "subsystem")
 		if name == "" {
 			continue
 		}
@@ -119,7 +114,7 @@ func findMap(root string, days int, today time.Time) ([]Entry, error) {
 	sort.SliceStable(ents, func(i, j int) bool { return ents[i].name < ents[j].name })
 	var out []Entry
 	for _, e := range ents {
-		d, ok := ParseDate(e.fm.String("touched"))
+		d, ok := ParseDate(frontmatter.Str(e.fm, "touched"))
 		if !ok {
 			d, ok = gitMtime(root, e.rel)
 		}
@@ -131,7 +126,7 @@ func findMap(root string, days int, today time.Time) ([]Entry, error) {
 }
 
 func findKnowledge(root string, days int, today time.Time) ([]Entry, error) {
-	text, err := readText(filepath.Join(root, ".hv", "KNOWLEDGE.md"))
+	text, err := fsio.ReadText(filepath.Join(root, ".hv", "KNOWLEDGE.md"))
 	if err != nil {
 		return nil, nil
 	}

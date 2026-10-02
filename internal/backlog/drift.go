@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 )
 
@@ -78,7 +79,7 @@ func reachable(dir, since string) map[string]bool {
 // symbols appeared in the tree after capture. A missing BACKLOG.md, or one
 // with no open items, gives nothing.
 func (f *File) Drift(targets []Target) ([]DriftItem, []SymbolDrift, error) {
-	content, err := readText(f.backlogPath())
+	content, err := fsio.ReadText(f.backlogPath())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil, nil
 	}

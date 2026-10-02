@@ -42,7 +42,7 @@ func (f *File) Archive(days int, today time.Time) (moved int, err error) {
 	cutoff := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -days)
 	var old []string
 	err = fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
@@ -81,7 +81,7 @@ func (f *File) Archive(days int, today time.Time) (moved int, err error) {
 	}
 	ap := f.archivePath()
 	err = fsio.Locked(ap, fsio.LockTimeout, func() error {
-		existing, err := readText(ap)
+		existing, err := fsio.ReadText(ap)
 		if errors.Is(err, os.ErrNotExist) {
 			existing, err = archiveHeader, nil
 		}
@@ -166,7 +166,7 @@ func openBulletSpans(content string) []OpenSpan {
 func (f *File) BackfillSince(head string) (stamped int, err error) {
 	path := f.backlogPath()
 	err = fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}

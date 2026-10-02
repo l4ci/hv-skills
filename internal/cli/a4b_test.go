@@ -12,35 +12,6 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
-// issueTracker serves a fixed set of issues.
-type issueTracker struct{ issues []backlog.Issue }
-
-func (f issueTracker) List(state string) ([]backlog.Issue, error) {
-	var out []backlog.Issue
-	for _, is := range f.issues {
-		if is.State == state {
-			out = append(out, is)
-		}
-	}
-	return out, nil
-}
-
-func (f issueTracker) Get(n int) (backlog.Issue, bool, error) {
-	for _, is := range f.issues {
-		if is.Number == n {
-			return is, true, nil
-		}
-	}
-	return backlog.Issue{}, false, nil
-}
-
-func withTracker(t *testing.T, tr backlog.Tracker) {
-	t.Helper()
-	old := newTracker
-	t.Cleanup(func() { newTracker = old })
-	newTracker = func(string, any) (backlog.Tracker, error) { return tr, nil }
-}
-
 func get(v any, path ...string) any {
 	for _, p := range path {
 		switch t := v.(type) {
@@ -83,7 +54,7 @@ func TestA4bFileOnlyVerbsAreRefusedUnderIssues(t *testing.T) {
 
 func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
-	withTracker(t, issueTracker{issues: []backlog.Issue{
+	withTracker(t, &a4FakeTracker{issues: []backlog.Issue{
 		{Number: 12, Title: "Crash on save", State: "open", Labels: []string{"type:bug"}, Milestone: "M02 — Next",
 			Body: "<!-- hv:fields\nRelated: F3\n-->"},
 		{Number: 3, Title: "Dark mode", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},
