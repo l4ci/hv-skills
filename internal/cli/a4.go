@@ -30,6 +30,10 @@ var newTracker = func(root string, cfg any) (backlog.Tracker, error) {
 }
 
 func a4Commands() []*Command {
+	return append(a4ItemCommands(), a4bCommands()...)
+}
+
+func a4ItemCommands() []*Command {
 	return []*Command{
 		{Name: "id", Summary: "mint item and milestone IDs", Subs: []*Command{
 			{Name: "next", Summary: "mint the next counter ID", Repo: true, Verb: a4IDNext},
