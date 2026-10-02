@@ -112,23 +112,50 @@ func errOf[T any](_ T, err error) error { return err }
 
 // ---- plan (item plans; slice plans come with the milestone verbs)
 
-var errSliceIssue = func(c *Ctx) error {
-	return fromArtifact(artifact.ErrIssueMode(c.Path + " (slice plans)").WithHint("slice plans need the milestone tracking issue"))
+// issuesBackend opens the issue backend for verbs that address a milestone
+// rather than an item; duplicate-tracking-issue notices go to stderr and
+// into the envelope's warnings.
+func issuesBackend(c *Ctx) (*backlog.Issues, error) {
+	root, err := a4Scope(c)
+	if err != nil {
+		return nil, err
+	}
+	be, err := a4Open(root, false, "")
+	if err != nil {
+		return nil, err
+	}
+	is, ok := be.(*backlog.Issues)
+	if !ok {
+		return nil, Refused("%s works on the issue backend only", c.Path)
+	}
+	is.Warn = func(msg string) { c.Warn("%s", msg) }
+	return is, nil
 }
 
 func planAddIssue(c *Ctx, root string, o plan.AddOpts) (Result, error) {
 	if err := plan.CheckAdd(o, true); err != nil {
 		return Result{}, fromArtifact(err)
 	}
-	if o.Key == "" {
-		return Result{}, errSliceIssue(c) // minting a slice is the milestone half
+	slice := o.Key == ""
+	if !slice {
+		if _, _, isSlice := plan.SliceOf(o.Key); isSlice {
+			slice = true
+		}
 	}
-	item, isItem, err := plan.ItemOf(o.Key)
+	if slice {
+		be, err := issuesBackend(c)
+		if err != nil {
+			return a4Fail(err)
+		}
+		key, err := plan.AddSliceNote(root, be, o)
+		if err != nil {
+			return failAny(err)
+		}
+		return Result{Data: addData(key, "slice"), Text: key}, nil
+	}
+	item, _, err := plan.ItemOf(o.Key)
 	if err != nil {
 		return Result{}, fromArtifact(err)
-	}
-	if !isItem {
-		return Result{}, errSliceIssue(c)
 	}
 	_, wf, _, _, err := a4Flow(c, item)
 	if err != nil {
@@ -138,79 +165,118 @@ func planAddIssue(c *Ctx, root string, o plan.AddOpts) (Result, error) {
 	if err != nil {
 		return failAny(err)
 	}
-	d := keyData(key, true)
-	d.Set("unitKind", "item")
+	return Result{Data: addData(key, "item"), Text: key}, nil
+}
+
+func addData(key, kind string) *jsonx.Object {
+	d := jsonx.NewObject()
+	d.Set("key", key)
+	d.Set("unitKind", kind)
 	d.Set("changed", true)
-	return Result{Data: orderKey(d), Text: key}, nil
-}
-
-// orderKey puts unitKind before changed, as the contract spells the data.
-func orderKey(d *jsonx.Object) *jsonx.Object {
-	out := jsonx.NewObject()
-	for _, k := range []string{"key", "unitKind", "changed"} {
-		if v, ok := d.Get(k); ok {
-			out.Set(k, v)
-		}
-	}
-	return out
-}
-
-// planItem resolves a plan key to its item in issue mode; a slice key is the
-// milestone half.
-func planItem(c *Ctx, key string) (wf backlog.Workflow, item string, err error) {
-	item, isItem, err := plan.ItemOf(key)
-	if err != nil {
-		return nil, "", fromArtifact(err)
-	}
-	if !isItem {
-		return nil, "", errSliceIssue(c)
-	}
-	_, wf, _, _, err = a4Flow(c, item)
-	return wf, item, err
+	return d
 }
 
 func planShowIssue(c *Ctx, key string) (Result, error) {
-	wf, item, err := planItem(c, key)
-	if err != nil {
-		return a4Fail(err)
+	if err := validKey(key); err != nil {
+		return Result{}, err
 	}
-	body, err := plan.ShowItemNote(wf, item)
-	if err != nil {
-		return failAny(err)
+	var body string
+	if _, _, isSlice := plan.SliceOf(key); isSlice {
+		be, err := issuesBackend(c)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if body, err = plan.ShowSliceNote(be, key); err != nil {
+			return failAny(err)
+		}
+	} else {
+		item, _, _ := plan.ItemOf(key)
+		_, wf, _, _, err := a4Flow(c, item)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if body, err = plan.ShowItemNote(wf, item); err != nil {
+			return failAny(err)
+		}
 	}
 	d := keyData(key, nil)
 	d.Set("body", body)
 	return Result{Data: d, Text: body}, nil
 }
 
-func planPutIssue(c *Ctx, key, file string) (Result, error) {
+func validKey(key string) error {
 	if !plan.ValidKey(key) {
-		return Result{}, fromArtifact(errOf(plan.Put("", key, "")))
+		return Usage("key must look like M01-B07 or M01-S02, got %q", key)
+	}
+	return nil
+}
+
+func planPutIssue(c *Ctx, key, file string) (Result, error) {
+	if err := validKey(key); err != nil {
+		return Result{}, err
 	}
 	text, err := readBody(c, file)
 	if err != nil {
 		return Result{}, err
 	}
-	wf, item, err := planItem(c, key)
-	if err != nil {
-		return a4Fail(err)
-	}
-	changed, err := plan.PutItemNote(wf, item, key, text)
-	if err != nil {
-		return failAny(err)
+	var changed bool
+	if _, _, isSlice := plan.SliceOf(key); isSlice {
+		be, err := issuesBackend(c)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if changed, err = plan.PutSliceNote(be, key, text); err != nil {
+			return failAny(err)
+		}
+	} else {
+		item, _, _ := plan.ItemOf(key)
+		_, wf, _, _, err := a4Flow(c, item)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if changed, err = plan.PutItemNote(wf, item, key, text); err != nil {
+			return failAny(err)
+		}
 	}
 	return Result{Data: keyData(key, changed), Text: key}, nil
 }
 
 func planRmIssue(c *Ctx, key string) (Result, error) {
-	wf, item, err := planItem(c, key)
+	if err := validKey(key); err != nil {
+		return Result{}, err
+	}
+	if _, _, isSlice := plan.SliceOf(key); isSlice {
+		be, err := issuesBackend(c)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if err := plan.RmSliceNote(be, key); err != nil {
+			return failAny(err)
+		}
+	} else {
+		item, _, _ := plan.ItemOf(key)
+		_, wf, _, _, err := a4Flow(c, item)
+		if err != nil {
+			return a4Fail(err)
+		}
+		if err := plan.RmItemNote(wf, item); err != nil {
+			return failAny(err)
+		}
+	}
+	return Result{Data: keyData(key, true), Text: key}, nil
+}
+
+func planListIssue(c *Ctx, milestone string) (Result, error) {
+	be, err := issuesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
-	if err := plan.RmItemNote(wf, item); err != nil {
+	c.Warn("item plans live on their issues (backlog.backend \"issues\"); listing slice plans from the milestone tracking issues only")
+	list, err := plan.ListSlices(be, milestone)
+	if err != nil {
 		return failAny(err)
 	}
-	return Result{Data: keyData(key, true), Text: key}, nil
+	return planListResult(list), nil
 }
 
 // ---- proof

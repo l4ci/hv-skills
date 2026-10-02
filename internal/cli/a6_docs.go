@@ -301,36 +301,44 @@ func planList(fs *flag.FlagSet) RunFunc {
 		if *milestone != "" && !plan.ValidMilestone(*milestone) {
 			return Result{}, Usage("--milestone must look like M01, got %q", *milestone)
 		}
-		root, err := fileRoot(c, false)
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return planListIssue(c, *milestone)
 		}
 		list, err := plan.List(root, *milestone)
 		if err != nil {
 			return Result{}, err
 		}
-		rows, text := []any{}, ""
-		for _, e := range list {
-			o := jsonx.NewObject()
-			o.Set("key", e.Key)
-			o.Set("milestone", e.Milestone)
-			o.Set("unit", e.Unit)
-			o.Set("unitKind", e.UnitKind)
-			o.Set("title", e.Title)
-			o.Set("status", e.Status)
-			o.Set("created", e.Created)
-			repos := make([]any, len(e.Repos))
-			for i, r := range e.Repos {
-				repos[i] = r
-			}
-			o.Set("repos", repos)
-			rows = append(rows, o)
-			text += e.Key + "\t" + e.Status + "\t" + e.Title + "\n"
-		}
-		d := jsonx.NewObject()
-		d.Set("plans", rows)
-		return Result{Data: d, Text: text}, nil
+		return planListResult(list), nil
 	}
+}
+
+// planListResult is plan list's answer for either mode.
+func planListResult(list []plan.Entry) Result {
+	rows, text := []any{}, ""
+	for _, e := range list {
+		o := jsonx.NewObject()
+		o.Set("key", e.Key)
+		o.Set("milestone", e.Milestone)
+		o.Set("unit", e.Unit)
+		o.Set("unitKind", e.UnitKind)
+		o.Set("title", e.Title)
+		o.Set("status", e.Status)
+		o.Set("created", e.Created)
+		repos := make([]any, len(e.Repos))
+		for i, r := range e.Repos {
+			repos[i] = r
+		}
+		o.Set("repos", repos)
+		rows = append(rows, o)
+		text += e.Key + "\t" + e.Status + "\t" + e.Title + "\n"
+	}
+	d := jsonx.NewObject()
+	d.Set("plans", rows)
+	return Result{Data: d, Text: text}
 }
 
 func keyData(key string, changed any) *jsonx.Object {

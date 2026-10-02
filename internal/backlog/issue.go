@@ -53,7 +53,8 @@ type Issues struct {
 	// ProofCount counts the proof rows of an item ("F12"). nil reads the
 	// item's proof note through Tracker (hv-proof-show --count in issue mode).
 	ProofCount func(itemID string) (int, error)
-	Repo       string // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
+	Warn       func(string) // notices (duplicate tracking issues); nil drops them
+	Repo       string       // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
 }
 
 func (b *Issues) ctx() context.Context {

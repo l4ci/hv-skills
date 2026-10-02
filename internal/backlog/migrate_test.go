@@ -1,7 +1,6 @@
 package backlog
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -15,52 +14,6 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
-
-// msFake is trackertest.Fake with the native milestone calls the migration
-// makes, and a List that honours the label filter like a forge.
-type msFake struct {
-	*trackertest.Fake
-	native []tracker.Milestone
-	failMS error
-}
-
-func (f *msFake) List(ctx context.Context, fl tracker.ListFilter) ([]tracker.Issue, error) {
-	all, err := f.Fake.List(ctx, fl)
-	var out []tracker.Issue
-	for _, is := range all {
-		ok := true
-		for _, l := range fl.Labels {
-			ok = ok && slices.Contains(is.Labels, l)
-		}
-		if ok {
-			out = append(out, is)
-		}
-	}
-	return out, err
-}
-
-func (f *msFake) Milestones(context.Context, string) ([]tracker.Milestone, error) {
-	return slices.Clone(f.native), nil
-}
-
-func (f *msFake) CreateMilestone(_ context.Context, title, desc string) (int, error) {
-	if f.failMS != nil {
-		return 0, f.failMS
-	}
-	n := len(f.native) + 1
-	f.native = append(f.native, tracker.Milestone{Number: n, Title: title, Description: desc, State: "open"})
-	f.Fake.Milestones = append(f.Fake.Milestones, title)
-	return n, nil
-}
-
-func (f *msFake) EditMilestone(_ context.Context, n int, e tracker.MilestoneEdit) error {
-	for i := range f.native {
-		if f.native[i].Number == n && e.State != nil {
-			f.native[i].State = *e.State
-		}
-	}
-	return nil
-}
 
 const migBacklog = `# TODO
 
@@ -101,7 +54,7 @@ func migProject(t *testing.T, files map[string]string) string {
 	return root
 }
 
-func newMig(t *testing.T, root string, apply bool, f *msFake) (MigrateOptions, *[]string, *[]time.Duration) {
+func newMig(t *testing.T, root string, apply bool, f *trackertest.MS) (MigrateOptions, *[]string, *[]time.Duration) {
 	t.Helper()
 	var warns []string
 	var sleeps []time.Duration
@@ -164,7 +117,7 @@ func TestMigratePreviewTouchesNothing(t *testing.T) {
 
 func TestMigrateApplyAndNoop(t *testing.T) {
 	root := migProject(t, nil)
-	f := &msFake{Fake: &trackertest.Fake{}}
+	f := &trackertest.MS{Fake: &trackertest.Fake{}}
 	o, warns, _ := newMig(t, root, true, f)
 	res, err := MigrateIssues(o)
 	if err != nil {
@@ -210,7 +163,7 @@ func TestMigrateApplyAndNoop(t *testing.T) {
 
 func TestMigratePace(t *testing.T) {
 	root := migProject(t, nil)
-	f := &msFake{Fake: &trackertest.Fake{}}
+	f := &trackertest.MS{Fake: &trackertest.Fake{}}
 	o, _, sleeps := newMig(t, root, true, f)
 	o.Cfg = migCfg(t, `{"issues": {"bulkPaceMs": 250}}`)
 	res, err := MigrateIssues(o)
@@ -238,7 +191,7 @@ func TestMigratePace(t *testing.T) {
 	// no pace, no pause; a preview never pauses
 	for _, cfg := range []string{`{"issues": {"bulkPaceMs": 0}}`, `{"issues": {"bulkPaceMs": -5}}`} {
 		root = migProject(t, nil)
-		o, _, sleeps = newMig(t, root, true, &msFake{Fake: &trackertest.Fake{}})
+		o, _, sleeps = newMig(t, root, true, &trackertest.MS{Fake: &trackertest.Fake{}})
 		o.Cfg = migCfg(t, cfg)
 		if _, err := MigrateIssues(o); err != nil || len(*sleeps) != 0 {
 			t.Errorf("%s: %v, %d pauses", cfg, err, len(*sleeps))
@@ -262,7 +215,7 @@ func migCfg(t *testing.T, s string) any {
 
 func TestMigrateLimitResumes(t *testing.T) {
 	root := migProject(t, nil)
-	f := &msFake{Fake: &trackertest.Fake{}}
+	f := &trackertest.MS{Fake: &trackertest.Fake{}}
 	o, _, _ := newMig(t, root, true, f)
 	o.Limit = 2
 	res, err := MigrateIssues(o)
@@ -292,7 +245,7 @@ func TestMigrateLimitResumes(t *testing.T) {
 
 func TestMigrateTrackerStopsKeepProgress(t *testing.T) {
 	root := migProject(t, nil)
-	f := &msFake{Fake: &trackertest.Fake{}}
+	f := &trackertest.MS{Fake: &trackertest.Fake{}}
 	o, _, _ := newMig(t, root, true, f)
 	// the notes fail after every item exists
 	f.Fake.Fail = map[string]error{"add_comment": &tracker.Error{Kind: tracker.KindRateLimited, Code: 4, Message: "slow down"}}
@@ -318,7 +271,7 @@ func TestMigrateTrackerStopsKeepProgress(t *testing.T) {
 	}
 	// a plain failure stops with the other message
 	root = migProject(t, nil)
-	f = &msFake{Fake: &trackertest.Fake{}}
+	f = &trackertest.MS{Fake: &trackertest.Fake{}}
 	o, _, _ = newMig(t, root, true, f)
 	f.Fake.Fail = map[string]error{"create": errors.New("not a tracker error")}
 	if _, err = MigrateIssues(o); err == nil || errors.As(err, &te) {
@@ -356,7 +309,7 @@ func TestMigrateRefusals(t *testing.T) {
 
 func TestMigrateWarnings(t *testing.T) {
 	root := migProject(t, map[string]string{".hv/BACKLOG.md": "# TODO\n\n## Bugs\n- **[B01] [P9] Odd tag.** a Milestone: M07\n- **[B02] [P1] Fine.** b Milestone: M09\n"})
-	f := &msFake{Fake: &trackertest.Fake{Milestones: []string{"M09 — Shipped"}}}
+	f := &trackertest.MS{Fake: &trackertest.Fake{Milestones: []string{"M09 — Shipped"}}}
 	o, warns, _ := newMig(t, root, true, f)
 	if _, err := MigrateIssues(o); err != nil {
 		t.Fatal(err)
