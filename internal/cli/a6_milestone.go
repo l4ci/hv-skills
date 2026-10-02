@@ -110,8 +110,7 @@ func milestonePut(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		if !ms.ValidID(id) {
-			_, err := ms.Put("", id, "")
-			return Result{}, fromArtifact(err)
+			return Result{}, Usage("milestone ID must match M\\d{2,} (e.g. M01, M03), got %q", id)
 		}
 		text, err := readBody(c, *file)
 		if err != nil {

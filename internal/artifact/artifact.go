@@ -144,3 +144,13 @@ func AppendSection(content, name, addition string) (updated string, ok bool) {
 	}
 	return content[:start] + body + addition + content[end:], true
 }
+
+// Notes is the durable-note store of an issue-mode backlog: a note is kept
+// as comments on an item's issue (kind proof, design, plan, or plan:S<NN> on
+// a milestone's tracking issue). backlog.Issues implements it; the issue-mode
+// halves of design, plan and proof take this narrow view of it.
+type Notes interface {
+	NoteGet(ref, kind string) (text string, ok bool, err error)
+	NotePut(ref, kind, text string) (changed bool, err error)
+	NoteRm(ref, kind string) (removed bool, err error)
+}

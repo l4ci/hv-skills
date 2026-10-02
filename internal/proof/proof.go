@@ -68,13 +68,7 @@ func Add(root, id string, o AddOpts) (row Row, changed bool, err error) {
 	}
 	sha := one(o.Sha)
 	if sha == "" {
-		cmd := exec.Command("git", "log", "-1", "--format=%h")
-		cmd.Dir = root
-		out, _ := cmd.Output()
-		sha = one(string(out))
-	}
-	if sha == "" {
-		sha = "-"
+		sha = headSha(root)
 	}
 	row = Row{time.Now().Format("2006-01-02"), check, o.Result, sha, evidence}
 	line := "- " + strings.Join([]string{row.Date, row.Check, row.Result, row.Sha, row.Evidence}, sep)
@@ -124,6 +118,23 @@ func Show(root, id string) (rows []Row, lines []string, err error) {
 	if rerr != nil {
 		return nil, nil, artifact.Errf(artifact.ExitInternal, "cannot read %s: %v", detailPath(root, kind, id), rerr)
 	}
+	return parseRows(content)
+}
+
+// headSha is the abbreviated HEAD of the repository at dir, "-" when there is none.
+func headSha(dir string) string {
+	cmd := exec.Command("git", "log", "-1", "--format=%h")
+	cmd.Dir = dir
+	out, _ := cmd.Output()
+	if sha := one(string(out)); sha != "" {
+		return sha
+	}
+	return "-"
+}
+
+// parseRows reads the "- " rows of the "## Proof" section of content.
+func parseRows(content string) (rows []Row, lines []string, err error) {
+	rows, lines = []Row{}, []string{}
 	s, e, ok := section.Find(content, "Proof")
 	if !ok {
 		return

@@ -61,11 +61,18 @@ func Uncertain(root, id string) (typ string, reasons []string, err error) {
 	if b, ok := backlog.ParseOpen(line); !ok || !strings.EqualFold(b.Tag, "major") {
 		return typ, reasons, nil
 	}
-	body := line
 	detail, has, derr := f.Detail(id)
 	if derr != nil {
 		return "", nil, derr
 	}
+	return typ, uncertainReasons(line, detail, has), nil
+}
+
+// uncertainReasons applies the three gates to a Major item's bullet and its
+// detail text (has is false when there is none).
+func uncertainReasons(line, detail string, has bool) []string {
+	reasons := []string{}
+	body := line
 	if has {
 		body += "\n" + detail
 	} else {
@@ -84,5 +91,5 @@ func Uncertain(root, id string) (typ string, reasons []string, err error) {
 	if !codeSpanRe.MatchString(body) {
 		reasons = append(reasons, "no concrete identifiers (unknown surface)")
 	}
-	return typ, reasons, nil
+	return reasons
 }

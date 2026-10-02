@@ -3,7 +3,6 @@
 package design
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,35 +46,7 @@ func Add(root, id, title string) error {
 		if _, err := os.Stat(p); err == nil {
 			return artifact.Errf(artifact.ExitRefused, ".hv/designs/%s.md already exists", id)
 		}
-		stub := fmt.Sprintf(`---
-id: %[1]s
-title: %[2]s
-status: draft
-created: %[3]s
----
-
-# %[1]s — %[2]s
-
-## Goal
-
-_(one sentence — what shipping this design means)_
-
-## Design
-
-_(3–8 sentences — the chosen shape, the moving parts, where they live)_
-
-## Approaches considered
-
-_(2–3 alternatives weighed with Pros / Cons / Why this might or might not be the right answer)_
-
-## Open questions
-
-_(unresolved questions to answer before /hv-plan or during execution)_
-
-## Assumptions
-
-_(named assumptions made implicit by the chosen design)_
-`, id, title, time.Now().Format("2006-01-02"))
+		stub := stubText(id, title, time.Now().Format("2006-01-02"))
 		return fsio.WriteFileAtomic(p, []byte(stub))
 	})
 }

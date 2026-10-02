@@ -24,6 +24,11 @@ import (
 // Statuses are the legal milestone states, in HV_MILESTONE_STATUSES order.
 var Statuses = []string{"planned", "active", "shipped", "archived"}
 
+// fmBlock and fmID are private on purpose. Put's id check mirrors
+// hvlib_backend.milestone_put exactly: a `---` block at the very start (LF or
+// CRLF), then the first `id:` line inside it, taken as typed. The shared
+// frontmatter parser keeps the last of a repeated key and trims values, so it
+// could accept a text the old helper refused; it is not used here.
 var (
 	idRe        = regexp.MustCompile(`^M\d{2,}$`)
 	milestoneID = regexp.MustCompile(`M\d+`)
