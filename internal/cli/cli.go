@@ -86,11 +86,29 @@ func (c *Ctx) RepoPath() (string, error) {
 	if c.Repo == "" {
 		return "", nil
 	}
-	root, err := c.Root()
+	_, repos, err := c.Repos()
 	if err != nil {
 		return "", err
 	}
-	repos := map[string]string{}
+	if len(repos) == 0 {
+		return "", Resolution("--repo %s: not in umbrella mode (no sub-repos in .hv/repos.json)", c.Repo)
+	}
+	p, ok := repos[c.Repo]
+	if !ok {
+		return "", Resolution("--repo %s is not registered in .hv/repos.json", c.Repo)
+	}
+	return p, nil
+}
+
+// Repos returns the project root and the registered sub-repos of .hv/repos.json
+// as name to absolute path (symlinks resolved when the path exists). The map
+// is empty outside umbrella mode.
+func (c *Ctx) Repos() (root string, repos map[string]string, err error) {
+	root, err = c.Root()
+	if err != nil {
+		return "", nil, err
+	}
+	repos = map[string]string{}
 	if reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object); ok {
 		list, _ := reg.Get("repos")
 		entries, _ := list.([]any)
@@ -103,26 +121,20 @@ func (c *Ctx) RepoPath() (string, error) {
 			rel, _ := obj.Get("path")
 			n, _ := name.(string)
 			r, _ := rel.(string)
-			if n != "" && r != "" {
-				repos[n] = r
+			if n == "" || r == "" {
+				continue
 			}
+			p := r
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(root, p)
+			}
+			if real, err := filepath.EvalSymlinks(p); err == nil {
+				p = real
+			}
+			repos[n] = filepath.Clean(p)
 		}
 	}
-	if len(repos) == 0 {
-		return "", Resolution("--repo %s: not in umbrella mode (no sub-repos in .hv/repos.json)", c.Repo)
-	}
-	rel, ok := repos[c.Repo]
-	if !ok {
-		return "", Resolution("--repo %s is not registered in .hv/repos.json", c.Repo)
-	}
-	p := rel
-	if !filepath.IsAbs(p) {
-		p = filepath.Join(root, p)
-	}
-	if real, err := filepath.EvalSymlinks(p); err == nil {
-		return real, nil
-	}
-	return filepath.Clean(p), nil
+	return root, repos, nil
 }
 
 // globals are the flags every verb accepts (docs/design/5.0-cli-conventions.md,
