@@ -35,15 +35,16 @@ trap 'rm -rf "$TMP" "$HV_SHIM_STAGE"' EXIT
 # Forge guard: no section may reach a real gh or glab. Poison stand-ins sit
 # first on PATH for every section; a section that wants the fake tracker puts
 # test/fakes in front of them, as it already does. A poison call logs itself
-# and exits 99, and any logged call fails the run after the leak guard.
-HV_POISON_DIR="$HV_SHIM_STAGE/poison"
+# and exits 99, and any logged call fails the run after the leak guard. A
+# section that resets PATH must start it with "$HV_POISON_BIN".
+export HV_POISON_BIN="$HV_SHIM_STAGE/poison"  # sections that reset PATH keep this first
 HV_POISON_LOG="$HV_SHIM_STAGE/poison.log"
-mkdir -p "$HV_POISON_DIR" && : > "$HV_POISON_LOG"
+mkdir -p "$HV_POISON_BIN" && : > "$HV_POISON_LOG"
 for cli in gh glab; do
-  printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_DIR/$cli"
-  chmod +x "$HV_POISON_DIR/$cli"
+  printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_BIN/$cli"
+  chmod +x "$HV_POISON_BIN/$cli"
 done
-export PATH="$HV_POISON_DIR:$PATH"
+export PATH="$HV_POISON_BIN:$PATH"
 
 # Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .hv/
 # content before any section runs. Under v4.1's partial-tracking model

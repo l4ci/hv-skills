@@ -183,8 +183,17 @@ count_all=$(echo "$out_all" | jq 'length')
 
 # With --open-only and no gh/glab on PATH: every entry fails the state probe
 # silently, so the result is []. Proves the flag is recognized, doesn't error
-# out on missing CLIs, and emits a JSON array.
-out_oo=$(cd "$TMP_OO" && env PATH=/usr/bin:/bin "$REPO/bin/hv-issues-imported" --open-only) || \
+# out on missing CLIs, and emits a JSON array. NOGH links every tool from
+# /usr/bin and /bin except gh and glab: a real "CLI missing" PATH that can't
+# reach a real forge (the runner's poison stand-ins would count as present).
+NOGH="$TMP_OO/nogh-bin"; mkdir -p "$NOGH"
+for d in /usr/bin /bin; do
+  for t in "$d"/*; do
+    n="${t##*/}"; case "$n" in gh|glab) continue ;; esac
+    [ -e "$NOGH/$n" ] || ln -s "$t" "$NOGH/$n"
+  done
+done
+out_oo=$(cd "$TMP_OO" && env PATH="$NOGH" "$REPO/bin/hv-issues-imported" --open-only) || \
   fail "hv-issues-imported --open-only exited non-zero with stripped PATH"
 echo "$out_oo" | jq -e '. == []' >/dev/null || \
   fail "hv-issues-imported --open-only with no gh/glab expected [], got $out_oo"
@@ -192,7 +201,7 @@ echo "$out_oo" | jq -e '. == []' >/dev/null || \
 # --open-only is orthogonal to --repo: combining them parses fine and still
 # emits a JSON array (here empty because the only Repos:-tagged entries don't
 # match 'nonexistent').
-out_combo=$(cd "$TMP_OO" && env PATH=/usr/bin:/bin "$REPO/bin/hv-issues-imported" --repo nonexistent --open-only) || \
+out_combo=$(cd "$TMP_OO" && env PATH="$NOGH" "$REPO/bin/hv-issues-imported" --repo nonexistent --open-only) || \
   fail "hv-issues-imported --repo nonexistent --open-only exited non-zero"
 echo "$out_combo" | jq -e 'type == "array"' >/dev/null || \
   fail "hv-issues-imported --repo … --open-only expected JSON array, got $out_combo"
