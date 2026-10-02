@@ -15,7 +15,7 @@ import (
 func fakeGo(t *testing.T, verbs string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "hv")
-	script := "#!/bin/sh\nif [ \"$1\" = __verbs ]; then printf '%s' '" + verbs + "'; exit 0; fi\necho GO \"$@\"\n"
+	script := "#!/bin/sh\nif [ \"$1\" = __verbs ]; then printf '%s' '" + verbs + "'; exit 0; fi\necho GO \"$@\"\ncase \"$*\" in *stubme*) exit 71;; *failme*) exit 4;; esac\n"
 	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -124,5 +124,28 @@ func TestHybridClaimedGroupOwnsUnknownSubVerbs(t *testing.T) {
 	got, _ := os.ReadFile(log)
 	if want := "go worker pool\nshim migrate issues\nshim worker\n"; string(got) != want {
 		t.Errorf("log =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// A verb the binary lists but only registered answers exit 71. That is not a
+// Go-served call: the log says "stub", the exit code still reaches the caller,
+// and --check fails a group that has one even when it also has real Go calls.
+func TestHybridLogsExit71AsAStubAndCheckFailsOnIt(t *testing.T) {
+	goBin := fakeGo(t, "version\nreview queue\nreview scope\n")
+	log := filepath.Join(t.TempDir(), "log")
+	if out, _, code := hybrid(t, goBin, log, nil, "review", "queue", "stubme"); code != 71 || !strings.HasPrefix(out, "GO review queue") {
+		t.Errorf("stub call must pass through output and exit 71: %d %q", code, out)
+	}
+	if _, _, code := hybrid(t, goBin, log, nil, "review", "scope", "failme"); code != 4 {
+		t.Errorf("other exit codes pass through: %d", code)
+	}
+	hybrid(t, goBin, log, nil, "review", "scope")
+	got, _ := os.ReadFile(log)
+	if want := "stub review queue\ngo review scope\ngo review scope\n"; string(got) != want {
+		t.Errorf("log =\n%s\nwant\n%s", got, want)
+	}
+	_, errOut, code := hybrid(t, goBin, log, []string{"HV_HYBRID_EXPECT=review"}, "--check")
+	if code != 1 || !strings.Contains(errOut, "'review queue' is a stub") {
+		t.Errorf("--check must fail on a stub: %d %q", code, errOut)
 	}
 }
