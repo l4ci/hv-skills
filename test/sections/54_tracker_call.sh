@@ -1,4 +1,4 @@
-echo "hv-tracker-call"
+echo "tracker call"
 
 TMP_TC="$(mktemp -d)"
 trap 'rm -rf "$TMP_TC"' EXIT
@@ -30,14 +30,21 @@ done
 (
   cd "$TMP_TC/proj"
   export FAKE_LOG="$TMP_TC/log"
-  TC() { : > "$FAKE_LOG"; rm -f "$FAKE_LOG.cwd" "$FAKE_LOG.stdin"; PATH="$TMP_TC/fake:$PATH" "$BIN/hv-tracker-call" "$@" </dev/null; }
+  TC() { : > "$FAKE_LOG"; rm -f "$FAKE_LOG.cwd" "$FAKE_LOG.stdin"; PATH="$TMP_TC/fake:$PATH" hvj tracker call "$@" </dev/null; }
   calls() { wc -l < "$FAKE_LOG" | tr -d ' '; }
 
   # provider resolution
-  TC -- issue list >/dev/null
+  out=$(TC -- issue list)
   [ "$(cat "$FAKE_LOG")" = "issue list --limit 1000" ] || fail "config provider github should run gh with --limit 1000 (got: $(cat "$FAKE_LOG"))"
-  TC --provider gitlab -- issue list >/dev/null
+  [ "$(echo "$out" | jget data.provider)" = "github" ] || fail "data.provider should be the config provider: $out"
+  [ "$(echo "$out" | jget data.exitCode)" = "0" ] || fail "successful call should report exitCode 0: $out"
+  [ "$(echo "$out" | jget data.stdout)" = '[{"n": 0}, {"n": 1}]' ] || fail "data.stdout should carry the CLI's stdout: $out"
+  out=$(TC --provider gitlab -- issue list)
   [ "$(cat "$FAKE_LOG")" = "issue list --per-page 100" ] || fail "--provider gitlab should add --per-page 100"
+  [ "$(echo "$out" | jget data.provider)" = "gitlab" ] || fail "data.provider should be the --provider flag: $out"
+  # Text mode prints the CLI's stdout unchanged.
+  [ "$(PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue view 3 </dev/null)" = '[{"n": 0}, {"n": 1}]' ] \
+    || fail "text mode should print the CLI stdout unchanged"
   pass "provider from config and --provider flag; list limits injected"
 
   # no double injection
@@ -62,59 +69,66 @@ done
 
   # stdin forwarded; cwd restored to caller's
   mkdir -p sub; : > "$FAKE_LOG"; rm -f "$FAKE_LOG.cwd"
-  (cd sub && echo "body text" | PATH="$TMP_TC/fake:$PATH" "$BIN/hv-tracker-call" -- issue create -F - >/dev/null)
+  (cd sub && echo "body text" | PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue create -F - >/dev/null)
   [ "$(cat "$FAKE_LOG.stdin")" = "body text" ] || fail "stdin should reach the CLI"
   [ "$(cat "$FAKE_LOG.cwd")" = "cwd:$(pwd -P)/sub" ] || fail "CLI must run in the caller's cwd (got $(cat "$FAKE_LOG.cwd"))"
   pass "stdin forwarded; CLI runs in caller's cwd"
 
   # An inherited stdin that never closes must not block a call that takes no `-` argument.
   mkfifo "$TMP_TC/held"; exec 9<>"$TMP_TC/held"
-  rc=0; PATH="$TMP_TC/fake:$PATH" timeout 10 "$BIN/hv-tracker-call" -- issue view 3 <"$TMP_TC/held" >/dev/null || rc=$?
+  rc=0; PATH="$TMP_TC/fake:$PATH" timeout 10 "$HV_BIN" tracker call -- issue view 3 <"$TMP_TC/held" >/dev/null || rc=$?
   exec 9>&-
   [ "$rc" = 0 ] || fail "open stdin pipe should not block a call without '-' (rc=$rc)"
   pass "stdin only read when an argument takes it"
 
   # truncation warning
-  FAKE_N=1000 TC -- issue list 2>"$TMP_TC/err" >/dev/null
-  grep -q "hit the list limit (1000)" "$TMP_TC/err" || fail "expected truncation warning"
-  FAKE_N=3 TC -- issue list 2>"$TMP_TC/err" >/dev/null
-  if grep -q "list limit" "$TMP_TC/err"; then fail "no warning below the limit"; fi
+  out=$(FAKE_N=1000 TC -- issue list 2>/dev/null)
+  echo "$out" | jget data.stderr | grep -q "hit the list limit (1000)" || fail "expected truncation warning in data.stderr: $out"
+  out=$(FAKE_N=3 TC -- issue list 2>/dev/null)
+  if echo "$out" | jget data.stderr | grep -q "list limit"; then fail "no warning below the limit"; fi
   pass "truncation warning at the limit only"
 
   # rate limits
   rc=0; FAKE_MODE=primary-once TC -- issue list >/dev/null 2>&1 || rc=$?
   [ "$rc" = 0 ] && [ "$(calls)" = 2 ] || fail "primary-once: want success after 2 calls (rc=$rc, calls=$(calls))"
-  rc=0; FAKE_MODE=primary TC -- issue list >/dev/null 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" = 4 ] && [ "$(calls)" = 2 ] || fail "primary: want exit 4 after 2 calls (rc=$rc, calls=$(calls))"
-  grep -q "rate limit — stopped after one retry" "$TMP_TC/err" || fail "primary message"
-  rc=0; FAKE_MODE=secondary TC -- issue list >/dev/null 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" = 4 ] && [ "$(calls)" = 1 ] || fail "secondary: want exit 4 after 1 call (rc=$rc, calls=$(calls))"
-  grep -q "secondary rate limit" "$TMP_TC/err" || fail "secondary message"
-  pass "primary retries once; secondary stops at once; both exit 4"
+  rc=0; out=$(FAKE_MODE=primary TC -- issue list 2>/dev/null) || rc=$?
+  [ "$rc" = 6 ] && [ "$(calls)" = 2 ] || fail "primary: want exit 6 after 2 calls (rc=$rc, calls=$(calls))"
+  [ "$(echo "$out" | jget error.code)" = "retry" ] || fail "primary: want error code retry: $out"
+  rc=0; out=$(FAKE_MODE=secondary TC -- issue list 2>/dev/null) || rc=$?
+  [ "$rc" = 6 ] && [ "$(calls)" = 1 ] || fail "secondary: want exit 6 after 1 call (rc=$rc, calls=$(calls))"
+  pass "primary retries once; secondary stops at once; both exit 6 (retry)"
 
   # auth, plain failure
-  rc=0; FAKE_MODE=auth TC -- issue list >/dev/null 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" = 3 ] || fail "auth failure should exit 3 (got $rc)"
-  grep -q "gh is not authenticated; run 'gh auth login'" "$TMP_TC/err" || fail "auth message"
-  rc=0; FAKE_MODE=fail TC -- issue view 9 >/dev/null 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" = 7 ] && [ "$(calls)" = 1 ] || fail "plain failure should pass through exit 7 once (rc=$rc)"
-  grep -q "boom: not found" "$TMP_TC/err" || fail "stderr should be forwarded"
-  pass "auth failure exits 3; plain failure keeps CLI exit code and stderr"
+  rc=0; out=$(FAKE_MODE=auth TC -- issue list 2>/dev/null) || rc=$?
+  [ "$rc" = 5 ] || fail "auth failure should exit 5 (got $rc)"
+  [ "$(echo "$out" | jget error.code)" = "unavailable" ] || fail "auth failure: want error code unavailable: $out"
+  rc=0; out=$(FAKE_MODE=fail TC -- issue view 9 2>/dev/null) || rc=$?
+  [ "$rc" = 1 ] && [ "$(calls)" = 1 ] || fail "plain failure should exit 1 after one call (rc=$rc)"
+  [ "$(echo "$out" | jget data.exitCode)" = "7" ] || fail "data.exitCode should carry the CLI's exit code: $out"
+  echo "$out" | jget data.stderr | grep -q "boom: not found" || fail "data.stderr should carry the CLI's stderr: $out"
+  pass "auth failure exits 5; plain failure exits 1 with the CLI's exit code and stderr in data"
 
   # missing CLI: PATH with python3/coreutils but no gh/glab
   mkdir -p "$TMP_TC/nobin"
   for t in python3 bash env dirname cat wc tr git; do ln -sf "$(command -v $t)" "$TMP_TC/nobin/$t"; done
-  rc=0; PATH="$TMP_TC/nobin" "$BIN/hv-tracker-call" -- issue list </dev/null >/dev/null 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" = 3 ] || fail "missing CLI should exit 3 (got $rc)"
-  grep -q "gh is not installed" "$TMP_TC/err" || fail "missing CLI message"
-  pass "missing CLI exits 3"
+  rc=0; PATH="$TMP_TC/nobin" "$HV_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 5 ] || fail "missing CLI should exit 5 (got $rc)"
+  pass "missing CLI exits 5"
+
+  # no provider: no config, no remote
+  mkdir -p "$TMP_TC/noprov/.hv" && echo '{}' > "$TMP_TC/noprov/.hv/config.json"
+  rc=0; (cd "$TMP_TC/noprov" && PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1) || rc=$?
+  [ "$rc" = 5 ] || fail "no resolvable provider should exit 5 (got $rc)"
+  pass "unresolvable provider exits 5"
 
   # usage errors
-  rc=0; "$BIN/hv-tracker-call" </dev/null --provider 2>/dev/null || rc=$?
-  [ "$rc" != 0 ] || fail "bare trailing --provider must fail"
-  rc=0; "$BIN/hv-tracker-call" </dev/null --provider github 2>"$TMP_TC/err" || rc=$?
-  [ "$rc" != 0 ] && grep -q "usage:" "$TMP_TC/err" || fail "missing CLI args should print usage"
-  pass "usage errors rejected"
+  rc=0; "$HV_BIN" tracker call </dev/null --provider 2>/dev/null || rc=$?
+  [ "$rc" = 2 ] || fail "bare trailing --provider must exit 2 (got $rc)"
+  rc=0; "$HV_BIN" tracker call </dev/null --provider github 2>/dev/null || rc=$?
+  [ "$rc" = 2 ] || fail "missing CLI args should exit 2 (got $rc)"
+  rc=0; "$HV_BIN" tracker call </dev/null --provider bogus -- issue list 2>/dev/null || rc=$?
+  [ "$rc" = 2 ] || fail "unknown provider value should exit 2 (got $rc)"
+  pass "usage errors exit 2"
 )
 
 trap 'rm -rf "$TMP"' EXIT
