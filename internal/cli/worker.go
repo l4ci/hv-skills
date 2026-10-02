@@ -5,8 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -18,6 +21,19 @@ var (
 	workerEnv      = func() worker.Env { return worker.Env{} }
 	workerAccounts = func() *worker.Accounts { return &worker.Accounts{} }
 )
+
+// workerContext is cancelled on SIGINT and SIGTERM, so a Ctrl-C reaches the
+// git and host calls a verb has in flight instead of leaving them running.
+func workerContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
+// workerEnvCtx is the worker Env bound to ctx.
+func workerEnvCtx(ctx context.Context) worker.Env {
+	e := workerEnv()
+	e.Ctx = ctx
+	return e
+}
 
 func workerCommands() *Command {
 	return &Command{Name: "worker", Summary: "/hv-work worker slots, hosts and accounts", Subs: []*Command{
@@ -72,7 +88,9 @@ func poolInit(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		res, err := workerEnv().PoolInit(context.Background(), root,
+		ctx, stop := workerContext()
+		defer stop()
+		res, err := workerEnvCtx(ctx).PoolInit(ctx, root,
 			worker.InitOpts{Slots: n, Base: *base, Session: *session}, workerAccounts())
 		if err != nil {
 			return Result{}, fromWorker(err)
@@ -127,7 +145,9 @@ func poolReap(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		reaped, err := workerEnv().Reap(root, args, *all)
+		ctx, stop := workerContext()
+		defer stop()
+		reaped, err := workerEnvCtx(ctx).Reap(root, args, *all)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}
@@ -186,7 +206,9 @@ func workerReset(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		r, err := workerEnv().Reset(root, slot, *task, *check)
+		ctx, stop := workerContext()
+		defer stop()
+		r, err := workerEnvCtx(ctx).Reset(root, slot, *task, *check)
 		res := Result{Data: resetData(r)}
 		if err != nil {
 			var we *worker.Error
@@ -238,7 +260,9 @@ func runAccountList(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	rows := workerAccounts().Meters(context.Background(), root)
+	ctx, stop := workerContext()
+	defer stop()
+	rows := workerAccounts().Meters(ctx, root)
 	list := make([]any, 0, len(rows))
 	var lines []string
 	for _, m := range rows {
@@ -280,7 +304,9 @@ func accountPick(fs *flag.FlagSet) RunFunc {
 				skip = append(skip, n)
 			}
 		}
-		name, found := workerAccounts().Pick(context.Background(), root, skip)
+		ctx, stop := workerContext()
+		defer stop()
+		name, found := workerAccounts().Pick(ctx, root, skip)
 		d := jsonx.NewObject()
 		d.Set("found", found)
 		if !found {
@@ -302,7 +328,9 @@ func accountAssign(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		name, changed, err := workerAccounts().Assign(context.Background(), root, slot, *account)
+		ctx, stop := workerContext()
+		defer stop()
+		name, changed, err := workerAccounts().Assign(ctx, root, slot, *account)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}

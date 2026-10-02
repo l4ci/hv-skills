@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -225,5 +226,52 @@ func TestBranchForMatchesTr(t *testing.T) {
 		if got := BranchFor("w1", task); got != "hv-worker/w1-"+old {
 			t.Errorf("BranchFor(%q) = %q, tr gives %q", task, got, old)
 		}
+	}
+}
+
+// A git call that fails must not read as "clean": the reset would then switch
+// -C over unpushed commits. The old helper aborted here under set -e.
+func TestResetTreatsAFailingGitAsUnavailableNotClean(t *testing.T) {
+	for _, failing := range []string{"status", "cherry"} {
+		_, b := pair(t)
+		commitIn(t, wt(b), "unpushed.txt")
+		before := registry(t, b)
+		e := Env{Git: func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
+			if len(args) > 0 && args[0] == failing {
+				return "", "fatal: boom", 128, nil
+			}
+			return ExecGit(ctx, dir, args...)
+		}}
+		for _, checkOnly := range []bool{true, false} {
+			res, err := e.Reset(b, "w1", "T9", checkOnly)
+			we, ok := err.(*Error)
+			if !ok || we.Exit != ExitUnavailable || !strings.Contains(we.Message, "git "+failing) || res.Clean || res.Changed {
+				t.Errorf("%s checkOnly=%v: %+v %v", failing, checkOnly, res, err)
+			}
+		}
+		if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "hv-worker/w1" {
+			t.Errorf("%s: the worktree was switched to %s", failing, got)
+		}
+		mustEqual(t, "registry", before, registry(t, b))
+		if _, err := os.Stat(filepath.Join(wt(b), "unpushed.txt")); err != nil {
+			t.Errorf("%s: unpushed work lost", failing)
+		}
+	}
+	// a git that cannot run at all (code 127) is the same
+	e := Env{Git: func(context.Context, string, ...string) (string, string, int, error) {
+		return "", "", 0, os.ErrNotExist
+	}}
+	_, b := pair(t)
+	if _, err := e.Reset(b, "w1", "", false); err == nil {
+		t.Error("an unrunnable git must fail the reset")
+	}
+}
+
+func TestExecGitHonoursCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(bg)
+	cancel()
+	_, _, code, err := ExecGit(ctx, t.TempDir(), "status")
+	if err == nil && code == 0 {
+		t.Error("a cancelled context must stop git")
 	}
 }

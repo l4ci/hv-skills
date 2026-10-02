@@ -84,8 +84,16 @@ func (e Env) Reset(root, slot, task string, checkOnly bool) (ResetResult, error)
 		retry = cur == newBranch
 	}
 
-	dirty, _ := e.git(worktree, "status", "--porcelain")
-	cherry, _ := e.git(worktree, "cherry", base, "HEAD")
+	// A failed status or cherry must not read as "clean": the switch -C below
+	// could then orphan unpushed commits. The old helper aborted here (set -e).
+	dirty, code := e.git(worktree, "status", "--porcelain")
+	if code != 0 {
+		return res, fail(ExitUnavailable, fmt.Sprintf("git status failed in %s (exit %d); not resetting slot '%s'", worktree, code, slot))
+	}
+	cherry, code := e.git(worktree, "cherry", base, "HEAD")
+	if code != 0 {
+		return res, fail(ExitUnavailable, fmt.Sprintf("git cherry %s HEAD failed in %s (exit %d); not resetting slot '%s'", base, worktree, code, slot))
+	}
 	var unmerged []string
 	for _, l := range strings.Split(cherry, "\n") {
 		if strings.HasPrefix(l, "+ ") {
