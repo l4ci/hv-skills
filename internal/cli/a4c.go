@@ -10,6 +10,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	hvrepos "github.com/l4ci/hv-skills/v5/internal/repos"
+	"github.com/l4ci/hv-skills/v5/internal/status"
 	"github.com/l4ci/hv-skills/v5/internal/update"
 	"github.com/l4ci/hv-skills/v5/internal/version"
 )
@@ -181,7 +182,7 @@ func a4RepoWhich(fs *flag.FlagSet) RunFunc {
 
 func a4RepoResolve(fs *flag.FlagSet) RunFunc {
 	return func(c *Ctx, args []string) (Result, error) {
-		names := hvrepos.ParseCSV(strings.Join(args, ","))
+		names := status.ParseReposCSV(strings.Join(args, ","))
 		if len(names) == 0 {
 			return Result{Data: a4Obj("repos", []any{})}, nil
 		}
@@ -189,8 +190,8 @@ func a4RepoResolve(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		registry := hvrepos.Load(root)
-		if missing := hvrepos.Missing(registry, names); len(missing) > 0 {
+		registry := status.LoadRepos(root)
+		if missing := status.Missing(registry, names); len(missing) > 0 {
 			e := Resolution("unregistered sub-repo(s): %s", strings.Join(missing, ", "))
 			if len(registry) == 0 {
 				e.WithHint("not an umbrella project: .hv/repos.json registers no sub-repos")

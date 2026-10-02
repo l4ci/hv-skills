@@ -124,3 +124,9 @@ func Which(cwd string) (Repo, error) {
 	}
 	return Repo{}, ErrNotRegistered
 }
+
+func str(o *jsonx.Object, key string) string {
+	v, _ := o.Get(key)
+	s, _ := v.(string)
+	return s
+}
