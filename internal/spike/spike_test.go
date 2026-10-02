@@ -210,3 +210,20 @@ func TestAddConcurrent(t *testing.T) {
 		t.Fatalf("ok=%d refused=%d", ok.Load(), refused.Load())
 	}
 }
+
+func TestCRLFSpikeFile(t *testing.T) {
+	root := repo(t)
+	os.MkdirAll(filepath.Dir(file(root, "x")), 0o777)
+	os.WriteFile(file(root, "x"), []byte("---\r\nname: x\r\nstatus: open\r\n---\r\nbody\r\n"), 0o644)
+	list, _ := List(root, root)
+	if len(list) != 1 || list[0].Status != "open" {
+		t.Fatalf("list = %+v", list)
+	}
+	if changed, err := Finish(root, "x"); err != nil || !changed {
+		t.Fatalf("finish: %v %v", changed, err)
+	}
+	raw, _ := os.ReadFile(file(root, "x"))
+	if !strings.HasPrefix(string(raw), "---\nname: x\nstatus: done\nfinished: ") || strings.Contains(string(raw), "\r") {
+		t.Fatalf("got %q", raw)
+	}
+}

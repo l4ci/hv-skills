@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
+	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
@@ -161,19 +162,19 @@ func Finish(root, name string) (changed bool, err error) {
 		return
 	}
 	path := file(root, name)
-	raw, rerr := os.ReadFile(path)
+	raw, rerr := readText(path)
 	if rerr != nil {
 		return false, artifact.Errf(artifact.ExitResolution, "spike %s not found (.hv/spikes/%s.md)", name, name)
 	}
 	content := string(raw)
-	fm, _, _ := artifact.ParseFrontmatter(content)
+	fm, _, _ := frontmatter.Parse(content)
 	if _, has := fm["status"]; !has {
 		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .hv/spikes/%s.md", name)
 	}
-	if artifact.Str(fm, "status") == "done" {
+	if frontmatter.Str(fm, "status") == "done" {
 		return false, nil
 	}
-	updated, found := artifact.UpdateFrontmatterField(content, "status", "done")
+	updated, found := frontmatter.UpdateField(content, "status", "done")
 	if !found {
 		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .hv/spikes/%s.md", name)
 	}
@@ -255,26 +256,33 @@ func List(root, dir string) ([]Entry, error) {
 	}
 	out := []Entry{}
 	for _, f := range files {
-		raw, err := os.ReadFile(f)
+		raw, err := readText(f)
 		if err != nil {
 			return nil, err
 		}
-		fm, _, _ := artifact.ParseFrontmatter(string(raw))
+		fm, _, _ := frontmatter.Parse(string(raw))
 		if fm == nil {
 			continue
 		}
 		stem := strings.TrimSuffix(filepath.Base(f), ".md")
 		e := Entry{
-			Name:    orDefault(artifact.Str(fm, "name"), stem),
-			Branch:  orDefault(artifact.Str(fm, "branch"), "spike/"+stem),
-			Repo:    artifact.Str(fm, "repo"),
-			Status:  orDefault(artifact.Str(fm, "status"), "open"),
-			Created: artifact.Str(fm, "created"),
+			Name:    orDefault(frontmatter.Str(fm, "name"), stem),
+			Branch:  orDefault(frontmatter.Str(fm, "branch"), "spike/"+stem),
+			Repo:    frontmatter.Str(fm, "repo"),
+			Status:  orDefault(frontmatter.Str(fm, "status"), "open"),
+			Created: frontmatter.Str(fm, "created"),
 		}
 		e.BranchExists = existing(e.Repo)[e.Branch]
 		out = append(out, e)
 	}
 	return out, nil
+}
+
+// readText reads like Python's read_text: CRLF becomes LF. Replace with
+// fsio.ReadText once #89 lands.
+func readText(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	return []byte(strings.ReplaceAll(string(b), "\r\n", "\n")), err
 }
 
 func orDefault(v, d string) string {
