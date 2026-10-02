@@ -1,4 +1,4 @@
-echo "hv-vision-add / hv-vision-status / hv-vision-active / hv-vision-list / hv-vision-index"
+echo "milestone add / status / active / list / index"
 # Reset milestones counter so the next mint is M01.
 python3 -c "
 import json
@@ -20,22 +20,25 @@ _(none active — set with `/hv-vision`)_
 EOF
 mkdir -p .hv/milestones
 
-ID_M1=$("$BIN/hv-vision-add" "Auth foundation" "OAuth + sessions for end users.")
-[ "$ID_M1" = "M01" ] || fail "expected M01 from vision-add, got $ID_M1"
+OUT=$(hvj milestone add --title "Auth foundation" --summary "OAuth + sessions for end users.") || fail "milestone add failed: $OUT"
+ID_M1=$(jget data.id <<<"$OUT")
+[ "$ID_M1" = "M01" ] || fail "expected M01 from milestone add, got $ID_M1"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "milestone add should report changed: $OUT"
 [ -f .hv/milestones/M01.md ] || fail "M01 detail file not created"
 grep -q "^id: M01$" .hv/milestones/M01.md || fail "M01 frontmatter missing id"
 grep -q "^status: planned$" .hv/milestones/M01.md || fail "M01 status not planned"
 grep -q "### M01 — Auth foundation" .hv/MILESTONES.md || fail "M01 not in MILESTONES.md"
 grep -q "Status:\*\* planned" .hv/MILESTONES.md || fail "M01 overview missing status"
-pass "vision-add creates detail file + overview entry"
+pass "milestone add creates detail file + overview entry"
 
-ID_M2=$("$BIN/hv-vision-add" "Multi-tenant" "Org isolation for B2B." "M01")
+ID_M2=$(hvj milestone add --title "Multi-tenant" --summary "Org isolation for B2B." --depends M01 | jget data.id) || fail "milestone add --depends failed"
 [ "$ID_M2" = "M02" ] || fail "expected M02, got $ID_M2"
 grep -q "^depends: \[M01\]$" .hv/milestones/M02.md || fail "M02 depends not [M01]"
 grep -q "Depends:\*\* M01" .hv/MILESTONES.md || fail "M02 overview missing depends"
-pass "vision-add records dependencies"
+pass "milestone add records dependencies"
 
-"$BIN/hv-vision-status" M01 active
+OUT=$(hvj milestone status M01 --to active) || fail "milestone status failed: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "status change should report changed: $OUT"
 grep -q "^status: active$" .hv/milestones/M01.md || fail "M01 status not updated to active in detail"
 grep -q "### M01 — Auth foundation" .hv/MILESTONES.md || fail "M01 section gone"
 # Confirm overview status line for M01 is now active
@@ -45,51 +48,54 @@ ms = open('.hv/MILESTONES.md').read()
 m = re.search(r'### M01 — Auth foundation\n\n\*\*Status:\*\* (\w+)', ms)
 sys.exit(0 if (m and m.group(1) == 'active') else 1)
 " || fail "M01 overview status not updated to active"
-pass "vision-status updates frontmatter and overview"
+OUT=$(hvj milestone status M01 --to active) || fail "repeat milestone status failed: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "repeat status should report changed false: $OUT"
+pass "milestone status updates frontmatter and overview"
 
-ACTIVE=$("$BIN/hv-vision-active")
-[ "$ACTIVE" = "M01" ] || fail "expected active=M01, got '$ACTIVE'"
-pass "vision-active lists only active IDs"
+ACTIVE=$(hvj milestone active | jget data.ids) || fail "milestone active failed"
+[ "$ACTIVE" = '["M01"]' ] || fail "expected active=[M01], got '$ACTIVE'"
+pass "milestone active lists only active IDs"
 
-LIST=$("$BIN/hv-vision-list")
+LIST=$(hvj milestone list) || fail "milestone list failed"
 echo "$LIST" | python3 -c "
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['milestones']
 ids = {i['id']: i for i in data}
 assert 'M01' in ids and 'M02' in ids, f'missing IDs: {ids.keys()}'
 assert ids['M02']['depends'] == ['M01'], f'M02 depends: {ids[\"M02\"][\"depends\"]}'
 assert ids['M02']['ready'] is False, 'M02 should not be ready (M01 not shipped)'
 assert ids['M01']['ready'] is True, 'M01 has no deps; should be ready'
-" || fail "vision-list output did not match expectations"
-pass "vision-list emits JSON with status, depends, ready"
+" || fail "milestone list output did not match expectations"
+pass "milestone list emits status, depends, ready"
 
-"$BIN/hv-vision-index" >/dev/null
+hvj milestone index >/dev/null || fail "milestone index failed"
 grep -q "<!-- hv-vision-start -->" CLAUDE.md || fail "vision block not in CLAUDE.md"
 grep -q "M01.*Auth foundation" CLAUDE.md || fail "active milestone not in CLAUDE.md vision block"
 # Re-running idempotent
-"$BIN/hv-vision-index" >/dev/null
+OUT=$(hvj milestone index) || fail "second milestone index failed"
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "second milestone index should report changed false: $OUT"
 COUNT_VISION=$(grep -c "hv-vision-start" CLAUDE.md)
 [ "$COUNT_VISION" = "1" ] || fail "vision block duplicated"
-pass "vision-index updates CLAUDE.md and active section in MILESTONES.md"
+pass "milestone index updates CLAUDE.md and active section in MILESTONES.md"
 
 # Active section in MILESTONES.md should now reflect M01
 grep -q "^- M01 — Auth foundation" .hv/MILESTONES.md || fail "## Active milestones not updated"
-pass "vision-index regenerates ## Active milestones section"
+pass "milestone index regenerates ## Active milestones section"
 
 # Marking M01 shipped should mark M02 as ready
-"$BIN/hv-vision-status" M01 shipped
-LIST=$("$BIN/hv-vision-list")
+hvj milestone status M01 --to shipped >/dev/null || fail "milestone status shipped failed"
+LIST=$(hvj milestone list) || fail "milestone list failed"
 echo "$LIST" | python3 -c "
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['milestones']
 m02 = next(i for i in data if i['id'] == 'M02')
 sys.exit(0 if m02['ready'] else 1)
 " || fail "M02 should be ready once M01 shipped"
-pass "vision-list marks ready when dependencies are shipped"
+pass "milestone list marks ready when dependencies are shipped"
 
-echo "hv-todo-by-milestone / Milestone field on entries"
+echo "backlog ids --milestone / Milestone field on entries"
 # Reactivate M01 and tag a couple of TODO entries.
-"$BIN/hv-vision-status" M01 active >/dev/null
+hvj milestone status M01 --to active >/dev/null || fail "reactivating M01 failed"
 cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
@@ -104,102 +110,109 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-TAGGED=$("$BIN/hv-todo-by-milestone" M01)
-grep -qx "B60" <<<"$TAGGED" || fail "hv-todo-by-milestone missed B60 (M01): '$TAGGED'"
-grep -qx "F60" <<<"$TAGGED" || fail "hv-todo-by-milestone missed F60 (M01): '$TAGGED'"
-if grep -qx "F61" <<<"$TAGGED"; then fail "hv-todo-by-milestone returned untagged F61"; fi
-pass "hv-todo-by-milestone returns only tagged items"
-TAGGED2=$("$BIN/hv-todo-by-milestone" M02)
-grep -qx "F60" <<<"$TAGGED2" || fail "hv-todo-by-milestone missed F60 (M02 multi-tag)"
-pass "hv-todo-by-milestone handles multi-milestone tags"
+TAGGED=$(hvj backlog ids --milestone M01 | jget data.ids) || fail "backlog ids M01 failed"
+grep -q '"B60"' <<<"$TAGGED" || fail "backlog ids missed B60 (M01): '$TAGGED'"
+grep -q '"F60"' <<<"$TAGGED" || fail "backlog ids missed F60 (M01): '$TAGGED'"
+if grep -q '"F61"' <<<"$TAGGED"; then fail "backlog ids returned untagged F61"; fi
+pass "backlog ids --milestone returns only tagged items"
+TAGGED2=$(hvj backlog ids --milestone M02 | jget data.ids) || fail "backlog ids M02 failed"
+grep -q '"F60"' <<<"$TAGGED2" || fail "backlog ids missed F60 (M02 multi-tag)"
+pass "backlog ids --milestone handles multi-milestone tags"
 
-echo "hv-backlog regression: Milestone field doesn't leak into Related"
-OUT=$("$BIN/hv-backlog")
-B60_ROW=$(echo "$OUT" | grep " B60 ")
-# Related cell should be exactly "[F60]" (no Milestone bleed)
-grep -q "| \[F60\] |" <<<"$B60_ROW" || fail "B60 row Related cell looks wrong: $B60_ROW"
-if grep -q "Milestone:" <<<"$B60_ROW"; then fail "Milestone: leaked into a backlog row"; fi
-# Milestone column should appear when any item carries the field
-grep -q "| Milestone |" <<<"$OUT" || fail "backlog header missing Milestone column"
-grep -q " M01, M02 " <<<"$OUT" || fail "F60 multi-milestone cell missing"
-pass "backlog adds Milestone column without breaking Related parsing"
+echo "backlog list regression: Milestone field doesn't leak into Related"
+OUT=$(hvj backlog list) || fail "backlog list failed"
+[ "$(jget 'data.bugs[0].related' <<<"$OUT")" = '["F60"]' ] || fail "B60 related should be exactly [F60] (no Milestone bleed): $OUT"
+[ "$(jget 'data.bugs[0].milestone' <<<"$OUT")" = "M01" ] || fail "B60 milestone should be M01: $OUT"
+[ "$(jget 'data.features[1].milestone' <<<"$OUT")" = "M01, M02" ] || fail "F60 multi-milestone value missing: $OUT"
+pass "backlog list carries milestone without breaking related"
 
-echo "hv-summary surfaces active milestones"
-OUT=$("$BIN/hv-summary")
-grep -q "Active milestones: M01" <<<"$OUT" || fail "summary missing active milestone line: $OUT"
+echo "summary surfaces active milestones"
+OUT=$(hvj summary) || fail "summary failed"
+[ "$(jget 'data.milestones[0].id' <<<"$OUT")" = "M01" ] || fail "summary missing active milestone: $OUT"
 pass "summary lists active milestones"
 
 # Reset summary fixtures (no Milestone field) to keep later assertions clean.
-"$BIN/hv-vision-status" M01 shipped >/dev/null
+hvj milestone status M01 --to shipped >/dev/null || fail "milestone status shipped failed"
 
-echo "hv-bootstrap"
+echo "init"
 # Self-contained: run in a fresh subdir so the existing .hv/ in TMP isn't touched.
 BOOT_DIR="$TMP/boot-test"
 mkdir -p "$BOOT_DIR"
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "hv-bootstrap did not seed BACKLOG.md"
-[ -f "$BOOT_DIR/.hv/KNOWLEDGE.md" ] || fail "hv-bootstrap did not seed KNOWLEDGE.md"
-[ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "hv-bootstrap did not seed MILESTONES.md"
-[ -f "$BOOT_DIR/.hv/counters.json" ] || fail "hv-bootstrap did not seed counters.json"
-[ -f "$BOOT_DIR/.hv/status.json" ] || fail "hv-bootstrap did not seed status.json"
-[ -d "$BOOT_DIR/.hv/bin" ] || fail "hv-bootstrap did not create .hv/bin"
-grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "hv-bootstrap did not add .hv/ to .gitignore"
-grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap counters.json missing milestones key"
-pass "hv-bootstrap seeds dirs, data files, and .gitignore"
+OUT=$(hvj -C "$BOOT_DIR" init) || fail "init failed: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "init in an empty dir should report changed: $OUT"
+[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "init did not seed BACKLOG.md"
+[ -f "$BOOT_DIR/.hv/KNOWLEDGE.md" ] || fail "init did not seed KNOWLEDGE.md"
+[ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "init did not seed MILESTONES.md"
+[ -f "$BOOT_DIR/.hv/counters.json" ] || fail "init did not seed counters.json"
+[ -f "$BOOT_DIR/.hv/status.json" ] || fail "init did not seed status.json"
+# white-box: kept until A9 (#53)
+[ -d "$BOOT_DIR/.hv/bin" ] || fail "init did not create .hv/bin"
+grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "init did not add .hv/ to .gitignore"
+grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init counters.json missing milestones key"
+pass "init seeds dirs, data files, and .gitignore"
 
 HEADING=$(head -1 "$BOOT_DIR/.hv/MILESTONES.md")
-[ "$HEADING" = "# Milestones" ] || fail "hv-bootstrap seeded MILESTONES.md with wrong H1: '$HEADING' (want '# Milestones')"
-pass "hv-bootstrap seeds MILESTONES.md with '# Milestones' H1"
+[ "$HEADING" = "# Milestones" ] || fail "init seeded MILESTONES.md with wrong H1: '$HEADING' (want '# Milestones')"
+pass "init seeds MILESTONES.md with '# Milestones' H1"
 
 # Idempotency: re-running must not overwrite existing data.
 echo "user content" > "$BOOT_DIR/.hv/BACKLOG.md"
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-grep -q "^user content$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "hv-bootstrap overwrote existing BACKLOG.md"
-pass "hv-bootstrap is idempotent (preserves existing files)"
+hvj -C "$BOOT_DIR" init >/dev/null || fail "second init failed"
+grep -q "^user content$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "init overwrote existing BACKLOG.md"
+pass "init is idempotent (preserves existing files)"
 
 # Counters migration: older counters.json without milestones key must gain it.
 echo '{"bugs":3,"features":1,"tasks":0}' > "$BOOT_DIR/.hv/counters.json"
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap did not migrate counters.json to add milestones key"
-grep -q '"bugs": *3' "$BOOT_DIR/.hv/counters.json" || fail "hv-bootstrap dropped existing counters during migration"
-pass "hv-bootstrap migrates legacy counters.json"
+hvj -C "$BOOT_DIR" init >/dev/null || fail "init on legacy counters failed"
+grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init did not migrate counters.json to add milestones key"
+grep -q '"bugs": *3' "$BOOT_DIR/.hv/counters.json" || fail "init dropped existing counters during migration"
+pass "init migrates legacy counters.json"
 
 rm -rf "$BOOT_DIR"
 
-echo "hv-preflight"
+echo "init check"
 # Ensure all core data files exist (smoke setup creates BACKLOG.md/counters.json/status.json;
-# KNOWLEDGE.md got written by hv-managed-block knowledge; config.json is needed by preflight).
+# KNOWLEDGE.md got written by hv-managed-block knowledge; config.json is needed by the check).
 [ -f .hv/config.json ] || echo '{}' > .hv/config.json
 
 # 1. Helpers not yet installed in .hv/bin → exit 3 (partial install).
 rc=0
+# white-box: kept until A9 (#53)
 "$BIN/hv-preflight" 2>/dev/null || rc=$?
 [ "$rc" = "3" ] || fail "expected exit 3 (partial install), got $rc"
 pass "preflight exits 3 when helpers missing from .hv/bin"
 
-# 2. Install all helpers into .hv/bin, everything present → exit 0.
+# 2. Everything present → init check passes.
 mkdir -p .hv/bin
+# white-box: kept until A9 (#53)
 install_helpers
-"$BIN/hv-preflight" >/dev/null 2>&1 || fail "preflight failed on fully initialized project"
-pass "preflight exits 0 when fully initialized"
+OUT=$(hvj init check) || fail "init check failed on fully initialized project: $OUT"
+[ "$(jget data.initialized <<<"$OUT")" = "true" ] || fail "init check should report initialized: $OUT"
+[ "$(jget data.missing <<<"$OUT")" = "[]" ] || fail "init check should report nothing missing: $OUT"
+pass "init check passes when fully initialized"
 
-# 3. Missing core data file → exit 2 (uninitialized).
+# 3. Missing core data file → exit 1 (uninitialized), named in data.missing.
 mv .hv/BACKLOG.md .hv/BACKLOG.md.bak
 rc=0
-"$BIN/hv-preflight" 2>/dev/null || rc=$?
-[ "$rc" = "2" ] || fail "expected exit 2 (uninitialized), got $rc"
-pass "preflight exits 2 when a data file is missing"
+OUT=$(hvj init check 2>/dev/null) || rc=$?
+[ "$rc" = "1" ] || fail "expected exit 1 (uninitialized), got $rc"
+[ "$(jget data.initialized <<<"$OUT")" = "false" ] || fail "init check should report initialized false: $OUT"
+MISSING=$(jget data.missing <<<"$OUT") || fail "init check data.missing absent: $OUT"
+grep -q '".hv/BACKLOG.md"' <<<"$MISSING" || fail "init check should name .hv/BACKLOG.md as missing: $OUT"
+pass "init check exits 1 when a data file is missing"
 mv .hv/BACKLOG.md.bak .hv/BACKLOG.md
 
 # 4. Missing helper → exit 3 (stale install after plugin upgrade).
-rm .hv/bin/hv-summary
+# white-box: kept until A9 (#53)
+rm -f "$PWD/.hv/bin/hv-summary"
 rc=0
+# white-box: kept until A9 (#53)
 "$BIN/hv-preflight" 2>/dev/null || rc=$?
 [ "$rc" = "3" ] || fail "expected exit 3 (missing helper), got $rc"
 pass "preflight exits 3 when a helper is missing"
 
-echo "hv-plan-add / hv-plan-list / hv-plan-show / hv-plan-rm"
-KEY1=$("$BIN/hv-plan-add" M01 slice "Auth foundation")
+echo "plan add / list / show / rm"
+KEY1=$(hvj plan add --milestone M01 --slice --title "Auth foundation" | jget data.key) || fail "plan add --slice failed"
 [ "$KEY1" = "M01-S01" ] || fail "expected M01-S01, got $KEY1"
 [ -f .hv/plans/M01-S01.md ] || fail "M01-S01.md not created"
 grep -q "^key: M01-S01$" .hv/plans/M01-S01.md || fail "key field missing"
@@ -207,160 +220,156 @@ grep -q "^unitKind: slice$" .hv/plans/M01-S01.md || fail "unitKind not slice"
 grep -q "title: Auth foundation" .hv/plans/M01-S01.md || fail "title missing from plan"
 pass "first slice plan = M01-S01"
 
-KEY2=$("$BIN/hv-plan-add" M01 slice "Auth refresh")
+OUT=$(hvj plan add --milestone M01 --slice --title "Auth refresh") || fail "second plan add --slice failed"
+KEY2=$(jget data.key <<<"$OUT")
 [ "$KEY2" = "M01-S02" ] || fail "expected M01-S02, got $KEY2"
+[ "$(jget data.unitKind <<<"$OUT")" = "slice" ] || fail "slice plan unitKind should be slice: $OUT"
 pass "second slice plan auto-mints M01-S02"
 
-KEY3=$("$BIN/hv-plan-add" M01 B07 "Sign-in flicker")
+OUT=$(hvj plan add M01-B07 --title "Sign-in flicker") || fail "item plan add failed"
+KEY3=$(jget data.key <<<"$OUT")
 [ "$KEY3" = "M01-B07" ] || fail "expected M01-B07, got $KEY3"
+[ "$(jget data.unitKind <<<"$OUT")" = "item" ] || fail "item plan unitKind should be item: $OUT"
 [ -f .hv/plans/M01-B07.md ] || fail "M01-B07.md not created"
 grep -q "^unitKind: item$" .hv/plans/M01-B07.md || fail "unitKind not item"
 pass "item plan uses item ID verbatim"
 
-if "$BIN/hv-plan-add" M01 B07 "Duplicate" 2>/dev/null; then
-  fail "hv-plan-add should reject existing key"
-fi
-pass "hv-plan-add rejects existing key"
+rc=0; OUT=$(hvj plan add M01-B07 --title "Duplicate" 2>/dev/null) || rc=$?
+[ "$rc" = 4 ] || fail "plan add should refuse an existing key with exit 4 (got $rc): $OUT"
+[ "$(jget data.blockedBy <<<"$OUT")" = "exists" ] || fail "plan add duplicate should be blockedBy exists: $OUT"
+pass "plan add rejects existing key"
 
-if "$BIN/hv-plan-add" not-a-milestone slice "x" 2>/dev/null; then
-  fail "hv-plan-add should reject malformed milestone"
-fi
-pass "hv-plan-add rejects malformed milestone"
+rc=0; hvj plan add not-a-milestone-S01 --title "x" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "plan add should reject a malformed milestone with exit 2 (got $rc)"
+pass "plan add rejects malformed milestone"
 
-if "$BIN/hv-plan-add" M01 bogus "x" 2>/dev/null; then
-  fail "hv-plan-add should reject malformed unit"
-fi
-pass "hv-plan-add rejects malformed unit"
+rc=0; hvj plan add M01-bogus --title "x" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "plan add should reject a malformed unit with exit 2 (got $rc)"
+pass "plan add rejects malformed unit"
 
-"$BIN/hv-plan-add" M02 slice "Multi-tenant" >/dev/null
-LIST=$("$BIN/hv-plan-list")
+hvj plan add --milestone M02 --slice --title "Multi-tenant" >/dev/null || fail "plan add M02 slice failed"
+LIST=$(hvj plan list) || fail "plan list failed"
 echo "$LIST" | python3 -c "
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['plans']
 keys = {i['key']: i for i in data}
 for k in ('M01-S01', 'M01-S02', 'M01-B07', 'M02-S01'):
     assert k in keys, f'missing {k}'
 assert keys['M01-S01']['unitKind'] == 'slice'
 assert keys['M01-B07']['unitKind'] == 'item'
 assert keys['M01-B07']['milestone'] == 'M01'
-" || fail "hv-plan-list output did not match"
-pass "hv-plan-list emits all plans with correct fields"
+" || fail "plan list output did not match"
+pass "plan list emits all plans with correct fields"
 
-LIST_M01=$("$BIN/hv-plan-list" M01)
+LIST_M01=$(hvj plan list --milestone M01) || fail "plan list --milestone failed"
 echo "$LIST_M01" | python3 -c "
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['plans']
 mss = {i['milestone'] for i in data}
 assert mss == {'M01'}, f'leak: {mss}'
-" || fail "hv-plan-list M01 leaked other milestones"
-pass "hv-plan-list filters by milestone"
+" || fail "plan list --milestone M01 leaked other milestones"
+pass "plan list filters by milestone"
 
-SHOW=$("$BIN/hv-plan-show" M01-S01)
+SHOW=$(hvj plan show M01-S01 | jget data.body) || fail "plan show failed"
 grep -q "^# M01-S01 — Auth foundation" <<<"$SHOW" || fail "show output missing title"
-pass "hv-plan-show prints content"
+pass "plan show prints content"
 
-if "$BIN/hv-plan-show" M99-S99 2>/dev/null; then
-  fail "hv-plan-show should reject unknown key"
-fi
-pass "hv-plan-show rejects unknown key"
+rc=0; hvj plan show M99-S99 >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "plan show should exit 3 on an unknown key (got $rc)"
+pass "plan show rejects unknown key"
 
-"$BIN/hv-plan-rm" M01-B07
+hvj plan rm M01-B07 >/dev/null || fail "plan rm failed"
 [ -f .hv/plans/M01-B07.md ] && fail "M01-B07 not removed"
-pass "hv-plan-rm deletes plan"
+pass "plan rm deletes plan"
 
-if "$BIN/hv-plan-rm" M99-S99 2>/dev/null; then
-  fail "hv-plan-rm should reject unknown key"
-fi
-pass "hv-plan-rm rejects unknown key"
+rc=0; hvj plan rm M99-S99 >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "plan rm should exit 3 on an unknown key (got $rc)"
+pass "plan rm rejects unknown key"
 
-echo "hv-vision-show"
+echo "milestone show"
 
-# vision-show positive — M01 fixture exists from earlier in this section
-SHOW=$("$BIN/hv-vision-show" M01)
-grep -q "^id: M01$" <<<"$SHOW" || fail "hv-vision-show should print id: M01 frontmatter"
-pass "hv-vision-show prints M01 content"
+# milestone show positive — M01 fixture exists from earlier in this section
+SHOW=$(hvj milestone show M01 | jget data.body) || fail "milestone show M01 failed"
+grep -q "^id: M01$" <<<"$SHOW" || fail "milestone show should print id: M01 frontmatter"
+pass "milestone show prints M01 content"
 
-# vision-show miss — exit 1 with stderr
-if "$BIN/hv-vision-show" M99 2>/dev/null; then
-  fail "hv-vision-show M99 (missing) should exit 1"
-fi
-pass "hv-vision-show rejects unknown ID"
+# milestone show miss — exit 3
+rc=0; hvj milestone show M99 >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "milestone show M99 (missing) should exit 3 (got $rc)"
+pass "milestone show rejects unknown ID"
 
-# vision-show bad-shape — exit 1
-if "$BIN/hv-vision-show" foo 2>/dev/null; then
-  fail "hv-vision-show 'foo' (bad shape) should exit 1"
-fi
-pass "hv-vision-show rejects bad-shape ID"
+# milestone show bad-shape — exit 2
+rc=0; hvj milestone show foo >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "milestone show 'foo' (bad shape) should exit 2 (got $rc)"
+pass "milestone show rejects bad-shape ID"
 
-echo "hv-spike-add / hv-spike-list / hv-spike-finish"
+echo "spike add / list / finish"
 git checkout -q main 2>/dev/null || true
 
-BRANCH=$("$BIN/hv-spike-add" sse-feasibility "Can SSE work over our nginx without proxy buffering?")
-[ "$BRANCH" = "spike/sse-feasibility" ] || fail "expected spike/sse-feasibility, got $BRANCH"
+OUT=$(hvj spike add sse-feasibility --question "Can SSE work over our nginx without proxy buffering?") || fail "spike add failed: $OUT"
+[ "$(jget data.branch <<<"$OUT")" = "spike/sse-feasibility" ] || fail "expected spike/sse-feasibility, got $OUT"
 [ -f .hv/spikes/sse-feasibility.md ] || fail "spike file not created"
 git rev-parse --verify spike/sse-feasibility >/dev/null 2>&1 || fail "spike branch not created"
 grep -q "^name: sse-feasibility$" .hv/spikes/sse-feasibility.md || fail "spike name missing"
 grep -q "^status: open$" .hv/spikes/sse-feasibility.md || fail "spike status not open"
 grep -q "Can SSE work" .hv/spikes/sse-feasibility.md || fail "question not embedded"
-pass "spike-add creates branch and file"
+pass "spike add creates branch and file"
 
-if "$BIN/hv-spike-add" "Bad Name" "?" 2>/dev/null; then
-  fail "hv-spike-add should reject bad name"
-fi
-pass "hv-spike-add rejects bad name"
+rc=0; hvj spike add "Bad Name" --question "?" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "spike add should reject a bad name with exit 2 (got $rc)"
+pass "spike add rejects bad name"
 
-if "$BIN/hv-spike-add" sse-feasibility "?" 2>/dev/null; then
-  fail "hv-spike-add should reject existing branch"
-fi
-pass "hv-spike-add rejects existing branch"
+rc=0; hvj spike add sse-feasibility --question "?" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 4 ] || fail "spike add should refuse an existing spike with exit 4 (got $rc)"
+pass "spike add rejects existing branch"
 
-SLIST=$("$BIN/hv-spike-list")
+SLIST=$(hvj spike list) || fail "spike list failed"
 echo "$SLIST" | python3 -c "
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['spikes']
 sse = next((s for s in data if s['name'] == 'sse-feasibility'), None)
 assert sse is not None, 'sse-feasibility missing'
 assert sse['branch'] == 'spike/sse-feasibility', f'wrong branch: {sse[\"branch\"]}'
 assert sse['status'] == 'open', f'wrong status: {sse[\"status\"]}'
 assert sse['branchExists'] is True, 'branchExists should be True'
-" || fail "spike-list output did not match"
-pass "spike-list emits spikes with branch state"
+" || fail "spike list output did not match"
+pass "spike list emits spikes with branch state"
 
-"$BIN/hv-spike-finish" sse-feasibility
+OUT=$(hvj spike finish sse-feasibility) || fail "spike finish failed: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "spike finish should report changed: $OUT"
 grep -q "^status: done$" .hv/spikes/sse-feasibility.md || fail "spike status not done"
 grep -q "^finished:" .hv/spikes/sse-feasibility.md || fail "spike finished date missing"
-pass "spike-finish flips status to done"
+OUT=$(hvj spike finish sse-feasibility) || fail "repeat spike finish failed: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "repeat spike finish should report changed false: $OUT"
+pass "spike finish flips status to done"
 
-if "$BIN/hv-spike-finish" not-a-spike 2>/dev/null; then
-  fail "hv-spike-finish should reject unknown name"
-fi
-pass "hv-spike-finish rejects unknown name"
+rc=0; hvj spike finish not-a-spike >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "spike finish should exit 3 on an unknown name (got $rc)"
+pass "spike finish rejects unknown name"
 
-echo "hv-spike-show"
+echo "spike show"
 
-# spike-show positive — sse-feasibility fixture exists from earlier in this block
-SHOW=$("$BIN/hv-spike-show" sse-feasibility)
-grep -q "^name: sse-feasibility$" <<<"$SHOW" || fail "hv-spike-show should print name: sse-feasibility frontmatter"
-pass "hv-spike-show prints sse-feasibility content"
+# spike show positive — sse-feasibility fixture exists from earlier in this block
+SHOW=$(hvj spike show sse-feasibility | jget data.body) || fail "spike show failed"
+grep -q "^name: sse-feasibility$" <<<"$SHOW" || fail "spike show should print name: sse-feasibility frontmatter"
+pass "spike show prints sse-feasibility content"
 
-# spike-show miss — exit 1 with stderr
-if "$BIN/hv-spike-show" not-a-spike 2>/dev/null; then
-  fail "hv-spike-show not-a-spike (missing) should exit 1"
-fi
-pass "hv-spike-show rejects unknown name"
+# spike show miss — exit 3
+rc=0; hvj spike show not-a-spike >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "spike show not-a-spike (missing) should exit 3 (got $rc)"
+pass "spike show rejects unknown name"
 
-# spike-show bad-shape — exit 1 (space in name)
-if "$BIN/hv-spike-show" "Bad Name" 2>/dev/null; then
-  fail "hv-spike-show 'Bad Name' (bad shape) should exit 1"
-fi
-pass "hv-spike-show rejects bad-shape name"
+# spike show bad-shape — exit 2 (space in name)
+rc=0; hvj spike show "Bad Name" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "spike show 'Bad Name' (bad shape) should exit 2 (got $rc)"
+pass "spike show rejects bad-shape name"
 
 git branch -D spike/sse-feasibility >/dev/null 2>&1 || true
 
 echo "items <-> milestones <-> plans triangle"
-# Reset BACKLOG.md to a known state, mint a fresh bug ID via hv-next-id, append a
-# Milestone-tagged entry, and verify the full chain: hv-todo-by-milestone picks
-# it up, hv-plan-add mints a plan keyed under the same milestone, hv-plan-list
+# Reset BACKLOG.md to a known state, mint a fresh bug ID via id next, append a
+# Milestone-tagged entry, and verify the full chain: backlog ids --milestone picks
+# it up, plan add mints a plan keyed under the same milestone, plan list
 # surfaces it.
 cat > .hv/BACKLOG.md <<'EOF'
 # TODO
@@ -373,33 +382,35 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-TRI_BUG=$("$BIN/hv-next-id" bugs)
-"$BIN/hv-append" "## Bugs" "- **[$TRI_BUG] [P1] Triangle bug.** Desc. Milestone: M01"
-TAGGED=$("$BIN/hv-todo-by-milestone" M01)
-grep -qx "$TRI_BUG" <<<"$TAGGED" || fail "triangle: $TRI_BUG not found in M01 items: '$TAGGED'"
-pass "triangle: tagged bug surfaces in hv-todo-by-milestone M01"
+TRI_BUG=$(hvj id next --kind bugs | jget data.id) || fail "id next failed"
+printf '%s\n' "- **[$TRI_BUG] [P1] Triangle bug.** Desc. Milestone: M01" > "$TMP/tri-bug.md"
+hvj item create --kind bugs --raw-file "$TMP/tri-bug.md" >/dev/null || fail "item create --raw-file failed"
+rm -f "$TMP/tri-bug.md"
+TAGGED=$(hvj backlog ids --milestone M01 | jget data.ids) || fail "backlog ids M01 failed"
+grep -q "\"$TRI_BUG\"" <<<"$TAGGED" || fail "triangle: $TRI_BUG not found in M01 items: '$TAGGED'"
+pass "triangle: tagged bug surfaces in backlog ids M01"
 
-TRI_KEY=$("$BIN/hv-plan-add" M01 "$TRI_BUG" "Triangle bug fix")
+TRI_KEY=$(hvj plan add "M01-$TRI_BUG" --title "Triangle bug fix" | jget data.key) || fail "triangle: plan add failed"
 [ "$TRI_KEY" = "M01-$TRI_BUG" ] || fail "triangle: expected plan key M01-$TRI_BUG, got $TRI_KEY"
 [ -f ".hv/plans/M01-$TRI_BUG.md" ] || fail "triangle: plan file .hv/plans/M01-$TRI_BUG.md missing"
-pass "triangle: hv-plan-add minted plan keyed M01-$TRI_BUG"
+pass "triangle: plan add minted plan keyed M01-$TRI_BUG"
 
-LIST_M01=$("$BIN/hv-plan-list" M01)
+LIST_M01=$(hvj plan list --milestone M01) || fail "triangle: plan list failed"
 echo "$LIST_M01" | TRI_BUG="$TRI_BUG" python3 -c "
 import json, sys, os
 key = 'M01-' + os.environ['TRI_BUG']
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)['data']['plans']
 keys = {i['key']: i for i in data}
 assert key in keys, f'missing {key} in {list(keys)}'
 assert keys[key]['unitKind'] == 'item', f'unitKind: {keys[key][\"unitKind\"]}'
 assert keys[key]['milestone'] == 'M01', f'milestone: {keys[key][\"milestone\"]}'
-" || fail "triangle: hv-plan-list M01 missing $TRI_KEY entry"
-pass "triangle: hv-plan-list M01 reports new plan with item unitKind"
+" || fail "triangle: plan list M01 missing $TRI_KEY entry"
+pass "triangle: plan list M01 reports new plan with item unitKind"
 
 # Cleanup the triangle plan to avoid polluting later assertions.
-"$BIN/hv-plan-rm" "$TRI_KEY" >/dev/null
+hvj plan rm "$TRI_KEY" >/dev/null || fail "triangle: plan rm failed"
 
-echo "hv-todo-by-milestone field-order regression"
+echo "backlog ids field-order regression"
 # Wave 1 made the regex order-agnostic. Guard against a future regression by
 # tagging Milestone: in three different positions: first, middle, last.
 cat > .hv/BACKLOG.md <<'EOF'
@@ -416,13 +427,13 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-TAGGED=$("$BIN/hv-todo-by-milestone" M01)
+TAGGED=$(hvj backlog ids --milestone M01 | jget data.ids) || fail "backlog ids M01 failed"
 for ID in B71 B72 B73; do
-  grep -qx "$ID" <<<"$TAGGED" || fail "field-order: $ID missing from M01 items (regex regressed?): '$TAGGED'"
+  grep -q "\"$ID\"" <<<"$TAGGED" || fail "field-order: $ID missing from M01 items (regex regressed?): '$TAGGED'"
 done
-pass "hv-todo-by-milestone is order-agnostic across Detail/Related/Milestone"
+pass "backlog ids is order-agnostic across Detail/Related/Milestone"
 
-echo "hv-backlog field-order regression"
+echo "backlog list field-order regression"
 # Guard against parse_todo_fields regressions: Milestone before Related, and after.
 cat > .hv/BACKLOG.md <<'EOF'
 # TODO
@@ -437,22 +448,23 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-BL_OUT=$("$BIN/hv-backlog")
-grep -q "M01" <<<"$BL_OUT" || fail "hv-backlog field-order: Milestone column missing from output: '$BL_OUT'"
-echo "$BL_OUT" | grep "B74" | grep "M01" >/dev/null || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
-echo "$BL_OUT" | grep "B75" | grep "M01" >/dev/null || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
-pass "hv-backlog Milestone column correct regardless of field order"
+BL_OUT=$(hvj backlog list) || fail "backlog list failed"
+for n in 0 1; do
+  [ "$(jget "data.bugs[$n].milestone" <<<"$BL_OUT")" = "M01" ] || fail "backlog list field-order: bugs[$n] missing M01: '$BL_OUT'"
+  [ "$(jget "data.bugs[$n].related" <<<"$BL_OUT")" = '["F02"]' ] || fail "backlog list field-order: bugs[$n] related should be [F02]: '$BL_OUT'"
+done
+pass "backlog list milestone and related correct regardless of field order"
 
 echo "archived milestone status"
 # Mint a fresh milestone, archive it, and verify exclusion + frontmatter + overview.
-ARCH_ID=$("$BIN/hv-vision-add" "Throwaway prototype" "Will be abandoned for testing.")
-ACTIVE_BEFORE=$("$BIN/hv-vision-active")
-if grep -qx "$ARCH_ID" <<<"$ACTIVE_BEFORE"; then fail "archived test: $ARCH_ID was active before archival (unexpected)"; fi
+ARCH_ID=$(hvj milestone add --title "Throwaway prototype" --summary "Will be abandoned for testing." | jget data.id) || fail "milestone add failed"
+ACTIVE_BEFORE=$(hvj milestone active | jget data.ids) || fail "milestone active failed"
+if grep -q "\"$ARCH_ID\"" <<<"$ACTIVE_BEFORE"; then fail "archived test: $ARCH_ID was active before archival (unexpected)"; fi
 
-"$BIN/hv-vision-status" "$ARCH_ID" archived
-ACTIVE_AFTER=$("$BIN/hv-vision-active")
-if grep -qx "$ARCH_ID" <<<"$ACTIVE_AFTER"; then fail "archived: $ARCH_ID still appears in hv-vision-active"; fi
-pass "archived milestone excluded from hv-vision-active"
+hvj milestone status "$ARCH_ID" --to archived >/dev/null || fail "milestone status archived failed"
+ACTIVE_AFTER=$(hvj milestone active | jget data.ids) || fail "milestone active failed"
+if grep -q "\"$ARCH_ID\"" <<<"$ACTIVE_AFTER"; then fail "archived: $ARCH_ID still appears in milestone active"; fi
+pass "archived milestone excluded from milestone active"
 
 grep -q "^status: archived$" ".hv/milestones/$ARCH_ID.md" || fail "archived: frontmatter status not 'archived'"
 pass "archived milestone frontmatter status updated"
@@ -466,53 +478,7 @@ sys.exit(0 if (m and m.group(1) == 'archived') else 1)
 " || fail "archived: MILESTONES.md overview not 'archived'"
 pass "archived milestone overview line reflects status"
 
-# Reject unknown status values with the new four-option error message.
-if "$BIN/hv-vision-status" "$ARCH_ID" bogus 2>/dev/null; then
-  fail "archived: hv-vision-status accepted a bogus status value"
-fi
-pass "hv-vision-status rejects unknown status values"
-
-echo "hv-vision-empty-active"
-# Create a fresh milestone M04 and activate it for the three cases below.
-ID_M4=$("$BIN/hv-vision-add" "Empty-active test" "Scratch milestone for helper smoke.")
-"$BIN/hv-vision-status" "$ID_M4" active
-
-# Case A: active milestone WITH an open item → helper emits empty stdout.
-cat > .hv/BACKLOG.md <<'EOF'
-# TODO
-
-## Bugs
-- **[B99] [P1] Scratch bug.** Desc. Milestone: M04
-
-## Features
-
-## Tasks
-
-## Completed
-EOF
-OUT_A=$("$BIN/hv-vision-empty-active")
-if grep -qx "$ID_M4" <<<"$OUT_A"; then fail "empty-active Case A: $ID_M4 should NOT appear when it has open items (got: '$OUT_A')"; fi
-pass "hv-vision-empty-active: active milestone with open items emits empty stdout"
-
-# Case B: active milestone with ZERO open items → helper emits the ID.
-cat > .hv/BACKLOG.md <<'EOF'
-# TODO
-
-## Bugs
-
-## Features
-
-## Tasks
-
-## Completed
-EOF
-OUT_B=$("$BIN/hv-vision-empty-active")
-grep -qx "$ID_M4" <<<"$OUT_B" || fail "empty-active Case B: $ID_M4 should appear when it has no open items (got: '$OUT_B')"
-pass "hv-vision-empty-active: active milestone with zero open items is reported"
-
-# Case C: no active milestones at all → helper emits empty stdout.
-"$BIN/hv-vision-status" "$ID_M4" shipped
-OUT_C=$("$BIN/hv-vision-empty-active")
-[ -z "$OUT_C" ] || fail "empty-active Case C: expected empty stdout when no active milestones, got: '$OUT_C'"
-pass "hv-vision-empty-active: no active milestones emits empty stdout"
-
+# Reject unknown status values with the four-option usage error.
+rc=0; hvj milestone status "$ARCH_ID" --to bogus >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "archived: milestone status accepted a bogus status value (exit $rc, want 2)"
+pass "milestone status rejects unknown status values"

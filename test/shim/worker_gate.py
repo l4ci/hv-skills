@@ -56,7 +56,7 @@ def worker_gate(ctx):
     data["verified"] = re.findall(r"^\s*verify ok: (.*)$", out, re.M)
     m = re.search(r"^(?:MERGED|GATE-PASS) \S+ .*?\(?([0-9a-f]{7,40})\)?$", out, re.M)
     if m:
-        data["sha"] = m.group(1)
+        data["sha"] = m.group(1)[:7]  # contract: 7 characters, whatever core.abbrev says
     if rc == 0:
         data["verdict"] = "pass" if re.search(r"^(?:MERGED|GATE-PASS|NO-VERIFY) ", out, re.M) else "fresh"
         data["changed"] = data["verdict"] == "pass"
@@ -77,6 +77,15 @@ def worker_gate(ctx):
         raise backend_error(rc, err)
     data["verdict"] = verdict
     data["changed"] = verdict in GATE_MERGED
+    if verdict == "merged-remotely" and "sha" not in data:
+        # The old helper names the merge SHA in only one of its two messages; the
+        # other case reports the tip of origin/<base>, which the merge produced.
+        m = re.search(r"but ([0-9a-f]{7,40}) is not in the local", both)
+        sha = m.group(1)[:7] if m else subprocess.run(
+            ["git", "-C", ctx.cwd, "rev-parse", "--short=7", "origin/" + f["base"]],
+            capture_output=True, text=True).stdout.strip()
+        if sha:
+            data["sha"] = sha
     line = next((l for l in both.splitlines() if re.search(dict(GATE_TOKENS)[verdict], l)), "")
     tail = [l for l in err.splitlines() if l.strip() and l != line][-20:]
     raise HvError(1, line.strip() or verdict, hint="\n".join(tail) or None, data=data)
