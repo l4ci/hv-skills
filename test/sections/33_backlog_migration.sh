@@ -1,4 +1,4 @@
-echo "hv-bootstrap BACKLOG.md migration (F71/T1)"
+echo "init BACKLOG.md migration (F71/T1)"
 
 # Self-contained: each subtest uses its own BOOT_DIR so state doesn't bleed.
 BOOT_DIR="$TMP/boot-test-31"
@@ -8,32 +8,42 @@ trap 'rm -rf "$BOOT_DIR"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
 # ── (a) Fresh init seeds BACKLOG.md, not TODO.md ─────────────────────────────
 mkdir -p "$BOOT_DIR"
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "hv-bootstrap did not seed BACKLOG.md on fresh init"
-! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "hv-bootstrap seeded legacy TODO.md on fresh init"
-pass "hv-bootstrap seeds BACKLOG.md on fresh init"
+OUT=$(cd "$BOOT_DIR" && hvj init) || fail "init failed on a fresh directory: $OUT"
+[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "init did not seed BACKLOG.md on fresh init"
+! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "init seeded legacy TODO.md on fresh init"
+[ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "fresh init should report changed: $OUT"
+echo "$OUT" | python3 -c '
+import json, sys
+created = json.load(sys.stdin)["data"]["created"]
+assert ".hv/BACKLOG.md" in created, created
+' || fail "fresh init should list .hv/BACKLOG.md as created: $OUT"
+pass "init seeds BACKLOG.md on fresh init"
+
+# The seeded project passes the initialized check.
+OUT=$(cd "$BOOT_DIR" && hvj init check) || fail "init check failed on a fresh init: $OUT"
+[ "$(echo "$OUT" | jget data.initialized)" = "true" ] || fail "init check: expected initialized: $OUT"
 
 # ── (b) Legacy auto-rename ────────────────────────────────────────────────────
 rm -rf "$BOOT_DIR"
 mkdir -p "$BOOT_DIR/.hv"
 echo "# TODO" > "$BOOT_DIR/.hv/TODO.md"
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "hv-bootstrap did not rename TODO.md → BACKLOG.md"
-! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "hv-bootstrap left legacy TODO.md after rename"
+( cd "$BOOT_DIR" && hvj init >/dev/null ) || fail "init failed with a legacy TODO.md"
+[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "init did not rename TODO.md → BACKLOG.md"
+! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "init left legacy TODO.md after rename"
 grep -q "^# TODO$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "content was not preserved after rename"
 
-# Idempotency: second run must exit 0 and preserve the file.
-( cd "$BOOT_DIR" && "$BIN/hv-bootstrap" )
+# Idempotency: second run must succeed, create nothing and preserve the file.
+OUT=$(cd "$BOOT_DIR" && hvj init) || fail "second init failed: $OUT"
 [ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "BACKLOG.md missing after idempotent second run"
-pass "hv-bootstrap renames legacy TODO.md → BACKLOG.md, idempotent"
+grep -q "^# TODO$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "second init rewrote BACKLOG.md"
+[ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "second init should report changed false: $OUT"
+[ "$(echo "$OUT" | jget data.created)" = "[]" ] || fail "second init should create nothing: $OUT"
+pass "init renames legacy TODO.md → BACKLOG.md, idempotent"
 
-# ── (c) Reader contract — load_backlog_corpus reads BACKLOG.md only ──
+# ── (c) Reader contract — the backlog reads BACKLOG.md only ──
 # The legacy TODO.md fallback was removed in v4.1 (F71 self-flagged it for
-# removal once the rename shipped in v4.0). Preflight gates on BACKLOG.md
-# presence — the fallback was unreachable in practice. Reader test now
-# verifies the corpus reflects what's at BACKLOG.md, not the legacy path.
-rm -rf "$BOOT_DIR"
-mkdir -p "$BOOT_DIR/.hv"
+# removal once the rename shipped in v4.0). Reader test now verifies a listing
+# reflects what's at BACKLOG.md, not the legacy path.
 cat > "$BOOT_DIR/.hv/BACKLOG.md" <<'EOF'
 # BACKLOG
 
@@ -41,12 +51,31 @@ cat > "$BOOT_DIR/.hv/BACKLOG.md" <<'EOF'
 
 - **[B99] [P1] Reader-contract test bug.** Body.
 EOF
+OUT=$(cd "$BOOT_DIR" && hvj backlog list) || fail "backlog list failed in the migrated project: $OUT"
+[ "$(echo "$OUT" | jget 'data.bugs[0].id')" = "B99" ] \
+  || fail "backlog list did not read BACKLOG.md content: $OUT"
+pass "backlog list reads BACKLOG.md (legacy TODO.md fallback removed in v4.1)"
+
+# white-box: kept until the A4 Go unit test lands (#48), then delete
 PYTHONPATH="$BIN" python3 -c "
 from hvlib import load_backlog_corpus
 corpus = load_backlog_corpus('$BOOT_DIR')
 assert 'B99' in corpus, f'load_backlog_corpus did not include BACKLOG.md content; corpus={corpus!r}'
 " || fail "load_backlog_corpus did not read BACKLOG.md"
 pass "load_backlog_corpus reads BACKLOG.md (legacy TODO.md fallback removed in v4.1)"
+
+# ── Not initialized: init check names what is missing ────────────────────────
+rm -rf "$BOOT_DIR"
+mkdir -p "$BOOT_DIR"
+rc=0; OUT=$(cd "$BOOT_DIR" && hvj init check 2>/dev/null) || rc=$?
+[ "$rc" = 1 ] || fail "init check on an uninitialized directory should exit 1, got $rc"
+[ "$(echo "$OUT" | jget data.initialized)" = "false" ] || fail "init check: expected initialized false: $OUT"
+echo "$OUT" | python3 -c '
+import json, sys
+missing = json.load(sys.stdin)["data"]["missing"]
+assert missing == [".hv"], missing
+' || fail "init check should name the missing .hv: $OUT"
+pass "init check exits 1 and names the missing path when uninitialized"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 rm -rf "$BOOT_DIR"

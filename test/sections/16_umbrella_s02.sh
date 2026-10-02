@@ -1,135 +1,125 @@
-echo "umbrella mode S02 (--repo flags + reconcile + worktree-clear)"
+echo "umbrella mode S02 (--repo flags + worktree cleanup)"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-echo "web,api" | (cd "$UMB" && "$BIN/hv-umbrella-init" >/dev/null)
+(cd "$UMB" && hvj init umbrella --repos web,api >/dev/null) || fail "init umbrella failed"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB" && "$BIN/hv-status-add" hv/x B01)
+(cd "$UMB" && hvj status add hv/x --items B01 >/dev/null) || fail "status add (no --repo) failed"
 python3 -c "
 import json; d=json.load(open('$UMB/.hv/status.json'))
 assert d['active'][0]['repo'] is None, d
 assert d['active'][0]['branch'] == 'hv/x'
 "
-pass "T1: hv-status-add (no --repo) writes repo: null"
+pass "T1: status add (no --repo) writes repo: null"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/x B01)
-(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/x B02)
+(cd "$UMB" && hvj status add hv/x --items B01 --repo web >/dev/null) || fail "status add --repo web failed"
+(cd "$UMB" && hvj status add hv/x --items B02 --repo api >/dev/null) || fail "status add --repo api failed"
 python3 -c "
 import json; d=json.load(open('$UMB/.hv/status.json'))
 pairs = sorted((e['branch'], e['repo']) for e in d['active'])
 assert pairs == [('hv/x', 'api'), ('hv/x', 'web')], pairs
 "
-pass "T1: hv-status-add (--repo web) and (--repo api) coexist on same branch"
+pass "T1: status add (--repo web) and (--repo api) coexist on same branch"
 
-(cd "$UMB" && "$BIN/hv-status-add" --if-absent --repo web hv/x B01)
+OUT=$(cd "$UMB" && hvj status add hv/x --items B01 --if-absent --repo web) || fail "status add --if-absent failed: $OUT"
+[ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "if-absent on an existing (branch, repo) should report changed false: $OUT"
 COUNT=$(python3 -c "import json; print(len(json.load(open('$UMB/.hv/status.json'))['active']))")
 [ "$COUNT" = "2" ] || fail "if-absent should be no-op for existing (branch, repo); got count $COUNT"
-pass "T1: hv-status-add --if-absent --repo respects (branch, repo) uniqueness"
+pass "T1: status add --if-absent --repo respects (branch, repo) uniqueness"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB" && "$BIN/hv-status-add" --repo web --if-absent hv/y B01)
-(cd "$UMB" && "$BIN/hv-status-add" --if-absent --repo api hv/y B02)
+(cd "$UMB" && hvj status add hv/y --items B01 --repo web --if-absent >/dev/null) || fail "status add --repo web --if-absent failed"
+(cd "$UMB" && hvj status add hv/y --items B02 --if-absent --repo api >/dev/null) || fail "status add --if-absent --repo api failed"
 python3 -c "
 import json; d=json.load(open('$UMB/.hv/status.json'))
 pairs = sorted((e['branch'], e['repo']) for e in d['active'])
 assert pairs == [('hv/y', 'api'), ('hv/y', 'web')], pairs
 "
-pass "T1: hv-status-add accepts --repo and --if-absent in either order"
+pass "T1: status add accepts --repo and --if-absent in either order"
+
+# A --repo that is not registered is a resolution error (exit 3), not a silent tag.
+rc=0; (cd "$UMB" && "$HV_BIN" status add hv/recon-x --items B03 --repo nonexistent >/dev/null 2>&1) || rc=$?
+[ "$rc" = 3 ] || fail "status add --repo nonexistent should exit 3, got $rc"
+python3 -c "
+import json; d=json.load(open('$UMB/.hv/status.json'))
+assert not any(e['branch'] == 'hv/recon-x' for e in d['active']), d
+"
+pass "T1: status add --repo rejects an unregistered sub-repo (exit 3), writing nothing"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB" && "$BIN/hv-status-add" hv/z B01)
-(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/z B02)
-(cd "$UMB" && "$BIN/hv-status-remove" hv/z)
+(cd "$UMB" && hvj status add hv/z --items B01 >/dev/null) || fail "status add hv/z failed"
+(cd "$UMB" && hvj status add hv/z --items B02 --repo web >/dev/null) || fail "status add hv/z --repo web failed"
+(cd "$UMB" && hvj status rm hv/z >/dev/null) || fail "status rm (no --repo) failed"
 python3 -c "
 import json; d=json.load(open('$UMB/.hv/status.json'))
 pairs = [(e['branch'], e['repo']) for e in d['active']]
 assert pairs == [('hv/z', 'web')], pairs
 "
-pass "T1: hv-status-remove (no --repo) preserves umbrella entries"
+pass "T1: status rm (no --repo) preserves umbrella entries"
 
 echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/z B01)
-(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/z B02)
-(cd "$UMB" && "$BIN/hv-status-remove" --repo web hv/z)
+(cd "$UMB" && hvj status add hv/z --items B01 --repo web >/dev/null) || fail "status add hv/z --repo web failed"
+(cd "$UMB" && hvj status add hv/z --items B02 --repo api >/dev/null) || fail "status add hv/z --repo api failed"
+(cd "$UMB" && hvj status rm hv/z --repo web >/dev/null) || fail "status rm --repo web failed"
 python3 -c "
 import json; d=json.load(open('$UMB/.hv/status.json'))
 pairs = [(e['branch'], e['repo']) for e in d['active']]
 assert pairs == [('hv/z', 'api')], pairs
 "
-pass "T1: hv-status-remove --repo web only removes web entry"
+pass "T1: status rm --repo web only removes web entry"
 
 (cd "$UMB/web" && git checkout -q -b hv/feat-merge && echo "x" > x.txt && git add x.txt && git -c user.email=t@t -c user.name=t commit -q -m "feat: x")
 WEB_HEAD_BEFORE=$(cd "$UMB/web" && git -c init.defaultBranch=main rev-parse main)
-(cd "$UMB" && printf 'merge: feat-merge\n\n- added x\n' | "$BIN/hv-merge" --repo web hv/feat-merge >/dev/null)
+(cd "$UMB" && printf 'merge: feat-merge\n\n- added x\n' | hvj ship merge hv/feat-merge --repo web --body-file - >/dev/null) \
+  || fail "ship merge --repo web failed"
 WEB_HEAD_AFTER=$(cd "$UMB/web" && git rev-parse main)
-[ "$WEB_HEAD_BEFORE" != "$WEB_HEAD_AFTER" ] || fail "hv-merge --repo web did not advance web/main"
+[ "$WEB_HEAD_BEFORE" != "$WEB_HEAD_AFTER" ] || fail "ship merge --repo web did not advance web/main"
 if (cd "$UMB/web" && git rev-parse --verify hv/feat-merge >/dev/null 2>&1); then
-  fail "hv-merge --repo web did not delete the feature branch"
+  fail "ship merge --repo web did not delete the feature branch"
 fi
-[ ! -d "$UMB/.git" ] || fail "hv-merge --repo web should NOT create umbrella .git/"
-pass "T2: hv-merge --repo web lands the merge in web/.git/, not umbrella"
+[ ! -d "$UMB/.git" ] || fail "ship merge --repo web should NOT create umbrella .git/"
+pass "T2: ship merge --repo web lands the merge in web/.git/, not umbrella"
 
-echo '{"active":[]}' > "$UMB/.hv/status.json"
-(cd "$UMB/web" && git checkout -q main && git branch hv/recon-live 2>/dev/null || true)
-(cd "$UMB" && "$BIN/hv-status-add" --repo web hv/recon-live B01)
-(cd "$UMB" && "$BIN/hv-status-add" --repo api hv/recon-dead B02)
-OUT=$(cd "$UMB" && "$BIN/hv-reconcile")
-echo "$OUT" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-na = d['needsAction']
-cl = d['cleaned']
-assert any(e['branch'] == 'hv/recon-live' and e.get('repo') == 'web' for e in na), na
-assert any(e['branch'] == 'hv/recon-dead' and e.get('repo') == 'api' for e in cl), cl
-"
-pass "T3: hv-reconcile output entries carry repo field"
-
-(cd "$UMB" && "$BIN/hv-status-add" --repo nonexistent hv/recon-x B03)
-OUT=$(cd "$UMB" && "$BIN/hv-reconcile")
-echo "$OUT" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-cl = d['cleaned']
-assert any(e.get('reason') == 'repo_unregistered' and e.get('repo') == 'nonexistent' for e in cl), cl
-"
-pass "T3: hv-reconcile flags entries pointing at unregistered repos"
-
+# T4: merging a branch that has a Layout B worktree removes the worktree first.
 (cd "$UMB/web" && git checkout -q main && git branch hv/wt-x 2>/dev/null || true)
 mkdir -p "$UMB/.claude/worktrees/web"
 (cd "$UMB/web" && git worktree add "$UMB/.claude/worktrees/web/hv-wt-x" hv/wt-x >/dev/null 2>&1)
 [ -d "$UMB/.claude/worktrees/web/hv-wt-x" ] || fail "Layout B worktree setup failed"
-(cd "$UMB/web" && "$BIN/hv-worktree-clear" --repo web hv/wt-x)
-[ ! -d "$UMB/.claude/worktrees/web/hv-wt-x" ] || fail "Layout B worktree was not cleaned up"
-pass "T4: hv-worktree-clear --repo web removes Layout B worktree"
+(cd "$UMB/.claude/worktrees/web/hv-wt-x" && echo y > y.txt && git add y.txt && git -c user.email=t@t -c user.name=t commit -q -m "feat: y")
+(cd "$UMB" && printf 'merge: wt-x\n\n- added y\n' | hvj ship merge hv/wt-x --repo web --body-file - >/dev/null) \
+  || fail "ship merge --repo web of a worktree branch failed"
+[ ! -d "$UMB/.claude/worktrees/web/hv-wt-x" ] || fail "Layout B worktree was not cleaned up by ship merge"
+pass "T4: ship merge --repo web removes the Layout B worktree"
 (cd "$UMB/web" && git branch -D hv/wt-x >/dev/null 2>&1) || true
 
-OUT=$(cd "$TMP" && "$BIN/hv-reconcile")
-echo "$OUT" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-assert 'cleaned' in d and 'needsAction' in d
-for e in d['needsAction']:
-    assert e.get('repo') in (None, ''), e
-"
-pass "single-repo backward compat: hv-reconcile schema unchanged"
+# white-box: kept until the A8 Go unit test lands (#52), then delete
+(cd "$UMB/web" && git checkout -q main && git branch hv/wt-z 2>/dev/null || true)
+mkdir -p "$UMB/.claude/worktrees/web"
+(cd "$UMB/web" && git worktree add "$UMB/.claude/worktrees/web/hv-wt-z" hv/wt-z >/dev/null 2>&1)
+[ -d "$UMB/.claude/worktrees/web/hv-wt-z" ] || fail "Layout B worktree setup failed"
+(cd "$UMB/web" && "$BIN/hv-worktree-clear" --repo web hv/wt-z)
+[ ! -d "$UMB/.claude/worktrees/web/hv-wt-z" ] || fail "Layout B worktree was not cleaned up"
+pass "T4: hv-worktree-clear --repo web removes Layout B worktree"
+(cd "$UMB/web" && git branch -D hv/wt-z >/dev/null 2>&1) || true
 
 cp "$TMP/.hv/status.json" "$TMP/.hv/status.json.bak"
 echo '{"active":[]}' > "$TMP/.hv/status.json"
-(cd "$TMP" && "$BIN/hv-status-add" hv/legacy L01)
+(cd "$TMP" && hvj status add hv/legacy --items L01 >/dev/null) || fail "status add without flags failed"
 python3 -c "
 import json; d=json.load(open('$TMP/.hv/status.json'))
 e = d['active'][0]
 assert e['branch'] == 'hv/legacy' and e['repo'] is None, e
 "
-(cd "$TMP" && "$BIN/hv-status-remove" hv/legacy)
+(cd "$TMP" && hvj status rm hv/legacy >/dev/null) || fail "status rm without flags failed"
 python3 -c "
 import json; d=json.load(open('$TMP/.hv/status.json'))
 assert d['active'] == [], d
 "
 mv "$TMP/.hv/status.json.bak" "$TMP/.hv/status.json"
-pass "single-repo backward compat: hv-status-add and hv-status-remove without flags"
+pass "single-repo backward compat: status add and status rm without flags"
 
+# white-box: kept until the A4 Go unit test lands (#48), then delete
 echo "parse_todo_fields Repos field"
 RESULT=$(PYTHONPATH="$BIN" python3 -c "
 from hvlib import parse_todo_fields
@@ -149,6 +139,7 @@ print(r['milestone'])
 [ "$RESULT2" = "M01" ] || fail "parse_todo_fields Milestone without Repos: expected M01, got '$RESULT2'"
 pass "parse_todo_fields Milestone capture without Repos field unchanged"
 
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 echo "hvlib.load_repos"
 mkdir lr-test && cd lr-test
 mkdir -p .hv web api
@@ -171,7 +162,7 @@ pass "load_repos returns {} for empty registry"
 
 cd ..
 
-echo "hv-base-branch walks up to umbrella config"
+echo "git base walks up to umbrella config"
 mkdir bb-walk && cd bb-walk
 # Create a fake umbrella with config.json, no git
 mkdir -p .hv subrepo
@@ -184,13 +175,13 @@ git init -q
 git config user.email t@t && git config user.name t
 git checkout -q -b develop 2>/dev/null || git branch -m develop
 echo "x" > f && git add f && git commit -q -m "seed"
-# From inside the sub-repo (no .hv/), hv-base-branch should find umbrella's develop
-RESULT=$("$BIN/hv-base-branch")
-[ "$RESULT" = "develop" ] || fail "hv-base-branch from sub-repo: expected develop, got '$RESULT'"
-pass "hv-base-branch walks up to umbrella .hv/config.json from sub-repo"
+# From inside the sub-repo (no .hv/), `git base` should find umbrella's develop
+OUT=$(hvj git base) || fail "git base from sub-repo failed: $OUT"
+[ "$(echo "$OUT" | jget data.base)" = "develop" ] || fail "git base from sub-repo: expected develop, got $OUT"
+pass "git base walks up to umbrella .hv/config.json from sub-repo"
 cd ../..
 
-echo "hv-summary shows repo for umbrella active entries"
+echo "summary shows repo for umbrella active entries"
 mkdir sum-test && cd sum-test
 mkdir -p .hv
 cat > .hv/BACKLOG.md <<'EOF'
@@ -215,20 +206,21 @@ cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z", "repo": "web"}]}
 EOF
 echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
-OUT=$("$BIN/hv-summary")
-echo "$OUT" | grep -q "(repo: web)" || fail "hv-summary missing (repo: web): $OUT"
-pass "hv-summary shows (repo: <name>) for umbrella active entry"
+OUT=$(hvj summary) || fail "summary failed: $OUT"
+[ "$(echo "$OUT" | jget 'data.active[0].repo')" = "web" ] || fail "summary missing repo web on the active entry: $OUT"
+pass "summary carries the repo for an umbrella active entry"
 
-# And: legacy entry without repo doesn't show parenthetical
+# And: legacy entry without repo carries no repo field
 cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
 EOF
-OUT=$("$BIN/hv-summary")
-if echo "$OUT" | grep -q "repo:"; then fail "hv-summary unexpectedly shows 'repo:' for non-umbrella entry: $OUT"; fi
-pass "hv-summary does not show repo: for legacy active entries"
+OUT=$(hvj summary) || fail "summary failed: $OUT"
+echo "$OUT" | jget 'data.active[0].repo' >/dev/null && fail "summary unexpectedly carries a repo for a non-umbrella entry: $OUT"
+[ "$(echo "$OUT" | jget 'data.active[0].branch')" = "hv/foo" ] || fail "summary should still list the legacy active entry: $OUT"
+pass "summary carries no repo for legacy active entries"
 cd ..
 
-echo "hv-backlog In Progress Repo column"
+echo "backlog list In Progress repo"
 mkdir bl-test && cd bl-test
 mkdir -p .hv
 cat > .hv/BACKLOG.md <<'EOF'
@@ -253,75 +245,79 @@ cat > .hv/MILESTONES.md <<'EOF'
 EOF
 echo '{"bugs":1,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
 
-# With umbrella entry: column should appear
+# With umbrella entry: the in-progress row names the repo
 cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z", "repo": "web"}]}
 EOF
-OUT=$("$BIN/hv-backlog")
-echo "$OUT" | grep -q "| Repo |" || fail "hv-backlog missing Repo column: $OUT"
-pass "hv-backlog adds Repo column when active entry has repo"
+OUT=$(hvj backlog list) || fail "backlog list failed: $OUT"
+[ "$(echo "$OUT" | jget 'data.inProgress[0].repo')" = "web" ] || fail "backlog list in-progress row missing repo: $OUT"
+pass "backlog list names the repo on an in-progress row when the entry has one"
 
-# Legacy entry: column should NOT appear
+# Legacy entry: the row has no repo
 cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
 EOF
-OUT=$("$BIN/hv-backlog")
-if echo "$OUT" | grep -q "| Repo |"; then fail "hv-backlog unexpectedly shows Repo column: $OUT"; fi
-pass "hv-backlog omits Repo column when no active entry has repo"
+OUT=$(hvj backlog list) || fail "backlog list failed: $OUT"
+echo "$OUT" | jget 'data.inProgress[0].repo' >/dev/null && fail "backlog list unexpectedly shows a repo: $OUT"
+[ "$(echo "$OUT" | jget 'data.inProgress[0].id')" = "B01" ] || fail "backlog list should still list the in-progress row: $OUT"
+pass "backlog list omits repo when no active entry has one"
 cd ..
 
-echo "hv-preflight gates on repos.json under umbrella mode"
+echo "init check gates on repos.json under umbrella mode"
 mkdir pf-test && cd pf-test
-mkdir -p .hv/bin
-# Seed minimal required files
-echo "" > .hv/DECISIONS.md
-echo "" > .hv/BACKLOG.md
-echo "" > .hv/KNOWLEDGE.md
-echo "" > .hv/MILESTONES.md
-echo "{}" > .hv/counters.json
-echo '{"active":[]}' > .hv/status.json
-# Copy hvlib*.py (hvlib.py + split-out hvlib_io.py / hvlib_version.py) + hv-preflight
-# (preflight discovers helpers from its own dir's siblings; hvlib.py imports from the
-# split modules at import time so all three must travel together)
-cp "$BIN"/hvlib*.py .hv/bin/
-for f in "$BIN"/hv-*; do cp "$f" .hv/bin/ && chmod +x ".hv/bin/$(basename $f)"; done
+hvj init >/dev/null || fail "init failed in pf-test"
+
+# warn_count <envelope>: number of entries in `warnings` (0 when the key is absent).
+warn_count() {
+  python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("warnings", [])))'
+}
 
 # Single-repo: no repos.json needed
+rm -f .hv/repos.json
 echo '{"umbrella": {"enabled": false}}' > .hv/config.json
-.hv/bin/hv-preflight && pass "hv-preflight passes single-repo without repos.json" || fail "hv-preflight failed single-repo"
+OUT=$(hvj init check) || fail "init check failed single-repo: $OUT"
+[ "$(echo "$OUT" | jget data.initialized)" = "true" ] || fail "init check single-repo: $OUT"
+[ "$(echo "$OUT" | warn_count)" = "0" ] || fail "init check single-repo should not warn: $OUT"
+pass "init check passes single-repo without repos.json"
 
-# Umbrella enabled, repos.json missing: ADVISORY (warn to stderr, exit 0).
+# Umbrella enabled, repos.json missing: ADVISORY (a warning, exit 0).
 # Per DECISIONS.md > Architecture > "Persistence-trio scoping under umbrella
 # mode": data is truth; the config flag is informational. Earlier versions
 # of preflight blocked here; the rule was relaxed to advisory in v3.x.
 echo '{"umbrella": {"enabled": true}}' > .hv/config.json
-WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json missing"
-echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about umbrella mismatch, got: $WARN"
-pass "hv-preflight warns advisory when umbrella.enabled and repos.json missing"
+OUT=$(hvj init check 2>/dev/null) || fail "init check should exit 0 (advisory) when umbrella.enabled and repos.json missing: $OUT"
+[ "$(echo "$OUT" | warn_count)" -ge 1 ] || fail "init check expected a warning about the umbrella mismatch: $OUT"
+echo "$OUT" | jget 'warnings[0]' | grep -q "umbrella" || fail "init check warning should mention umbrella: $OUT"
+pass "init check warns advisory when umbrella.enabled and repos.json missing"
 
 # Umbrella enabled, repos.json with at least one entry: pass (silent)
 echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
-.hv/bin/hv-preflight && pass "hv-preflight passes with umbrella.enabled and valid repos.json" || fail "hv-preflight failed with valid repos.json"
+OUT=$(hvj init check) || fail "init check failed with valid repos.json: $OUT"
+[ "$(echo "$OUT" | warn_count)" = "0" ] || fail "init check with a valid registry should not warn: $OUT"
+pass "init check passes with umbrella.enabled and valid repos.json"
 
-# Umbrella enabled, repos.json empty: ADVISORY (warn to stderr, exit 0).
+# Umbrella enabled, repos.json empty: ADVISORY (a warning, exit 0).
 echo '{"repos": []}' > .hv/repos.json
-WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json empty"
-echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about empty repos.json, got: $WARN"
-pass "hv-preflight warns advisory when umbrella.enabled and repos.json empty"
+OUT=$(hvj init check 2>/dev/null) || fail "init check should exit 0 (advisory) when umbrella.enabled and repos.json empty: $OUT"
+[ "$(echo "$OUT" | warn_count)" -ge 1 ] || fail "init check expected a warning about the empty repos.json: $OUT"
+pass "init check warns advisory when umbrella.enabled and repos.json empty"
 
 # Umbrella DISABLED but repos.json valid: pass (data is truth; flag is informational).
 # Exercises the B15 fix — /hv-next must reconcile when repos.json is present
 # even if a stale config has umbrella.enabled: false.
 echo '{"umbrella": {"enabled": false}}' > .hv/config.json
 echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
-.hv/bin/hv-preflight && pass "hv-preflight passes with umbrella.enabled:false but valid repos.json (data is truth)" || fail "hv-preflight failed when repos.json valid but flag false"
+OUT=$(hvj init check) || fail "init check failed when repos.json valid but flag false: $OUT"
+[ "$(echo "$OUT" | warn_count)" = "0" ] || fail "init check should not warn when repos.json is valid and the flag is false: $OUT"
+pass "init check passes with umbrella.enabled:false but valid repos.json (data is truth)"
 
-# Direct test of hv-umbrella-on: repos.json wins over the config flag.
-OUT=$(.hv/bin/hv-umbrella-on)
-[ "$OUT" = "yes" ] || fail "hv-umbrella-on expected 'yes' from repos.json regardless of config flag, got '$OUT'"
-pass "hv-umbrella-on returns 'yes' from repos.json regardless of config flag"
+# Direct test of repo umbrella: repos.json wins over the config flag.
+OUT=$(hvj repo umbrella) || fail "repo umbrella expected yes from repos.json regardless of config flag, got $OUT"
+[ "$(echo "$OUT" | jget data.umbrella)" = "true" ] || fail "repo umbrella expected true: $OUT"
+pass "repo umbrella is true from repos.json regardless of config flag"
 cd ..
 
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 echo "hv-resolve-umbrella detects deep stray .hv/"
 mkdir ru-deep && cd ru-deep
 # umbrella + sub-repo registered + DEEP stray .hv/ inside sub-repo's source tree
@@ -334,4 +330,3 @@ RC=0; "$BIN/hv-resolve-umbrella" 2>/dev/null || RC=$?
 [ "$RC" = "2" ] || fail "hv-resolve-umbrella deep stray expected exit 2, got $RC"
 pass "hv-resolve-umbrella exits 2 on deep stray .hv/ inside registered sub-repo"
 cd ../../..
-

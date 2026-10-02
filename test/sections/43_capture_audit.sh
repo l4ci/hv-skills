@@ -1,11 +1,11 @@
-echo "F27 hv-capture-audit — surfaces ship evidence for stale milestone-spec captures"
+echo "F27 item shipped — surfaces ship evidence for stale milestone-spec captures"
 
 # Builds a fixture repo with a few commits whose subjects mention specific
-# helper names + paths, then asserts hv-capture-audit:
-#   - exits 2 with a matching report for titles whose distinctive tokens
+# helper names + paths, then asserts `item shipped`:
+#   - exits 0 with found=true and hits for titles whose distinctive tokens
 #     appear in commit subjects
-#   - exits 0 silently for titles with no overlap
-#   - exits 1 on missing args
+#   - exits 1 with found=false and no hits for titles with no overlap
+#   - exits 2 on missing args
 #
 # The audit is heuristic — keyword grep against `git log` + path existence.
 # False-positive tolerance is acceptable; false-negatives (missing a shipped
@@ -31,45 +31,44 @@ git commit -q -m "seed runner/postgres.go and bin/hv-flagship"
 git commit --allow-empty -q -m "feat: implement Driver for postgres backend [F76]"
 git commit --allow-empty -q -m "refactor: rename bin/hv-flagship to bin/hv-flagship-v2"
 
-# Exit 2: a title whose tokens hit a real commit subject.
-OUT="$("$BIN/hv-capture-audit" "Implement Driver for postgres backend" 2>&1)" || RC=$?
-RC=${RC:-0}
-[ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 on matched title, got $RC"
-echo "$OUT" | grep -q "STRONG" || fail "hv-capture-audit did not emit [STRONG] for matched title (output: $OUT)"
-echo "$OUT" | grep -q "F76" || fail "hv-capture-audit report missing the F76 commit reference (output: $OUT)"
-pass "F27 audit — exit 2 + STRONG match on shipped title"
+# The verb needs a project root (no `.hv/` walk-up past the fixture), but audits
+# the git repo it runs in.
+mkdir -p .hv
+
+# Exit 0 (evidence found): a title whose tokens hit a real commit subject.
+rc=0; OUT="$(hvj item shipped "Implement Driver for postgres backend" 2>/dev/null)" || rc=$?
+[ "$rc" = "0" ] || fail "item shipped exit code: expected 0 on matched title, got $rc"
+[ "$(echo "$OUT" | jget data.found)" = "true" ] || fail "item shipped found should be true: $OUT"
+[ "$(echo "$OUT" | jget 'data.titles[0].hits[0].level')" = "strong" ] || fail "item shipped did not report a strong hit for matched title (output: $OUT)"
+echo "$OUT" | jget 'data.titles[0].hits[0].subject' | grep -q "F76" || fail "item shipped hit missing the F76 commit reference (output: $OUT)"
+pass "F27 shipped — exit 0 + strong hit on shipped title"
 
 # Path match: title contains `runner/postgres.go`, which exists.
-unset RC
-OUT_PATH="$("$BIN/hv-capture-audit" "Add tests for \`runner/postgres.go\`" 2>&1)" || RC=$?
-RC=${RC:-0}
-[ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 on path-match, got $RC"
-echo "$OUT_PATH" | grep -q "PATH" || fail "hv-capture-audit did not emit [PATH] for an existing file (output: $OUT_PATH)"
-pass "F27 audit — exit 2 + PATH marker when title names an existing file"
+rc=0; OUT_PATH="$(hvj item shipped "Add tests for \`runner/postgres.go\`" 2>/dev/null)" || rc=$?
+[ "$rc" = "0" ] || fail "item shipped exit code: expected 0 on path-match, got $rc"
+[ "$(echo "$OUT_PATH" | jget 'data.titles[0].hits[0].level')" = "path" ] || fail "item shipped did not report a path hit for an existing file (output: $OUT_PATH)"
+[ "$(echo "$OUT_PATH" | jget 'data.titles[0].hits[0].path')" = "runner/postgres.go" ] || fail "item shipped path hit names the wrong file (output: $OUT_PATH)"
+pass "F27 shipped — exit 0 + path hit when title names an existing file"
 
-# Exit 0: a title with no overlap. Use distinctive made-up tokens so common
+# Exit 1: a title with no overlap. Use distinctive made-up tokens so common
 # words like "session" don't accidentally hit prior commits.
-unset RC
-OUT_CLEAN="$("$BIN/hv-capture-audit" "Add zorblax-foofoo zonkmind handler" 2>&1)" || RC=$?
-RC=${RC:-0}
-[ "$RC" = "0" ] || fail "hv-capture-audit exit code: expected 0 on no-overlap title, got $RC (output: $OUT_CLEAN)"
-[ -z "$OUT_CLEAN" ] || fail "hv-capture-audit emitted output on clean title (expected silent): $OUT_CLEAN"
-pass "F27 audit — exit 0 silent on titles with no ship evidence"
+rc=0; OUT_CLEAN="$(hvj item shipped "Add zorblax-foofoo zonkmind handler" 2>/dev/null)" || rc=$?
+[ "$rc" = "1" ] || fail "item shipped exit code: expected 1 on no-overlap title, got $rc (output: $OUT_CLEAN)"
+[ "$(echo "$OUT_CLEAN" | jget data.found)" = "false" ] || fail "item shipped found should be false on a clean title: $OUT_CLEAN"
+[ "$(echo "$OUT_CLEAN" | jget 'data.titles[0].hits')" = "[]" ] || fail "item shipped reported hits on a clean title: $OUT_CLEAN"
+pass "F27 shipped — exit 1, found=false and no hits on titles with no ship evidence"
 
-# Exit 1: usage error on no args.
-unset RC
-"$BIN/hv-capture-audit" 2>/dev/null && RC=$? || RC=$?
-[ "$RC" = "1" ] || fail "hv-capture-audit exit code: expected 1 on missing args, got $RC"
-pass "F27 audit — exit 1 with usage on missing args"
+# Exit 2: usage error on no args.
+rc=0; "$HV_BIN" item shipped >/dev/null 2>&1 || rc=$?
+[ "$rc" = "2" ] || fail "item shipped exit code: expected 2 on missing args, got $rc"
+pass "F27 shipped — exit 2 on missing args"
 
-# Multi-arg: clean + flagged in one call returns 2 (any flag wins).
-unset RC
-OUT_MIX="$("$BIN/hv-capture-audit" "Add zorblax-foofoo zonkmind handler" "Implement Driver for postgres backend" 2>&1)" || RC=$?
-RC=${RC:-0}
-[ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 when any input flags, got $RC"
-echo "$OUT_MIX" | grep -q "Implement Driver" || fail "multi-arg audit did not report on the flagged title"
-echo "$OUT_MIX" | grep -q "zorblax" && fail "multi-arg audit reported on the clean title (should be silent)"
-pass "F27 audit — multi-arg call reports only the flagged titles"
+# Multi-arg: clean + flagged in one call is found (any hit wins); the clean title has no hits.
+rc=0; OUT_MIX="$(hvj item shipped "Add zorblax-foofoo zonkmind handler" "Implement Driver for postgres backend" 2>/dev/null)" || rc=$?
+[ "$rc" = "0" ] || fail "item shipped exit code: expected 0 when any input has evidence, got $rc"
+[ "$(echo "$OUT_MIX" | jget 'data.titles[0].hits')" = "[]" ] || fail "multi-arg call reported hits on the clean title: $OUT_MIX"
+[ "$(echo "$OUT_MIX" | jget 'data.titles[1].hits[0].level')" = "strong" ] || fail "multi-arg call did not report the flagged title: $OUT_MIX"
+pass "F27 shipped — multi-arg call reports hits only on the flagged titles"
 
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT

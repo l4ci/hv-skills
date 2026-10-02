@@ -16,187 +16,190 @@ done
   export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB_DIR="$TMP_UI/db" FAKE_TRACKER_LOG="$TMP_UI/log"
   unset FAKE_TRACKER_DB
   eq() { [ "$2" = "$3" ] || fail "umbrella issues $1: expected [$2] got [$3]"; }
+  # RC <hv call>: OUT is the envelope (errors included), RCV the exit code, ERR stderr
   RC() { local rc=0; OUT="$("$@" 2>"$TMP_UI/err")" || rc=$?; RCV=$rc; ERR="$(cat "$TMP_UI/err")"; }
   has() { case "$3" in *"$2"*) ;; *) fail "umbrella issues $1: [$3] lacks [$2]";; esac; }
+  ID() { echo "$OUT" | jget data.id; }
+  # DB <repo> <python over d>: evaluate against the fake tracker's own store for one sub-repo
+  DB() { python3 -c "import json,sys; d=json.load(open('$TMP_UI/db/$1.json')); print($2)"; }
+  # NATIVE <repo>: the repo's native milestones as title:state
+  NATIVE() { DB "$1" '",".join(m["title"] + ":" + m["state"] for m in d["milestones"])'; }
+  FG() { hvj item field get "$1" --name "$2" | jget data.value; }
 
   # --- capture routing (colliding numbers: both repos start at #1)
-  RC "$BIN/hv-item-create" features --title "Gh feat" --field Repos=ghrepo
-  eq "create field exit" "0" "$RCV"; eq "create field id" "ghrepo:F1" "$OUT"
-  RC "$BIN/hv-item-create" tasks --title "Gh task" --field Repos=ghrepo
-  eq "gh T2" "ghrepo:T2" "$OUT"
-  RC "$BIN/hv-item-create" features --title "Gl feat" --field Repos=glrepo
-  eq "gl F1" "glrepo:F1" "$OUT"
-  RC "$BIN/hv-item-create" bugs --tag P1 --title "Gl bug" --field Repos=glrepo
-  eq "gl B2" "glrepo:B2" "$OUT"
-  RC bash -c "cd '$U/glrepo' && '$BIN/hv-item-create' tasks --title 'Gl cwd task'"
-  eq "create cwd exit" "0" "$RCV"; eq "create cwd id" "glrepo:T3" "$OUT"
-  RC "$BIN/hv-item-create" tasks --title "Nowhere"
-  eq "create missing repo exit" "1" "$RCV"; has "missing repo msg" "Repos=<name>" "$ERR"
-  RC "$BIN/hv-item-create" tasks --title "Both" --field Repos=ghrepo,glrepo
-  eq "create multi-repo exit" "1" "$RCV"; has "multi-repo msg" "one item per repo" "$ERR"
-  RC "$BIN/hv-item-create" tasks --title "Bad" --field Repos=nope
-  eq "create unknown repo exit" "1" "$RCV"
+  RC hvj item create --kind features --title "Gh feat" --repos ghrepo
+  eq "create field exit" "0" "$RCV"; eq "create field id" "ghrepo:1|F" "$(ID)|$(echo "$OUT" | jget data.type)"
+  RC hvj item create --kind tasks --title "Gh task" --repos ghrepo
+  eq "gh T2" "ghrepo:2|T" "$(ID)|$(echo "$OUT" | jget data.type)"
+  RC hvj item create --kind features --title "Gl feat" --repos glrepo
+  eq "gl F1" "glrepo:1|F" "$(ID)|$(echo "$OUT" | jget data.type)"
+  RC hvj item create --kind bugs --tag P1 --title "Gl bug" --repos glrepo
+  eq "gl B2" "glrepo:2|B" "$(ID)|$(echo "$OUT" | jget data.type)"
+  RC hvj -C "$U/glrepo" item create --kind tasks --title 'Gl cwd task'
+  eq "create cwd exit" "0" "$RCV"; eq "create cwd id" "glrepo:3|T" "$(ID)|$(echo "$OUT" | jget data.type)"
+  RC hvj item create --kind tasks --title "Nowhere"
+  eq "create missing repo exit" "3" "$RCV"
+  RC hvj item create --kind tasks --title "Both" --repos ghrepo,glrepo
+  eq "create multi-repo exit" "3" "$RCV"
+  RC hvj item create --kind tasks --title "Bad" --repos nope
+  eq "create unknown repo exit" "3" "$RCV"
   # each item went to its own tracker
-  eq "gh store" "2" "$(python3 -c "import json;print(len(json.load(open('$TMP_UI/db/ghrepo.json'))['issues']))")"
-  eq "gl store" "3" "$(python3 -c "import json;print(len(json.load(open('$TMP_UI/db/glrepo.json'))['issues']))")"
-  grep -q "^gh " "$TMP_UI/log" && grep -q "^glab " "$TMP_UI/log" 2>/dev/null || true
+  eq "gh store" "2" "$(DB ghrepo 'len(d["issues"])')"
+  eq "gl store" "3" "$(DB glrepo 'len(d["issues"])')"
 
-  # --- merged backlog
-  RC "$BIN/hv-backlog"
+  # --- merged backlog: qualified IDs (plain numbers collide across sub-repos)
+  RC hvj backlog list
   eq "backlog exit" "0" "$RCV$ERR"
-  has "backlog gh feat" "Gh feat" "$OUT"; has "backlog gl feat" "Gl feat" "$OUT"
-  has "backlog gl bug" "Gl bug" "$OUT"; has "backlog gl cwd task" "Gl cwd task" "$OUT"
-  eq "Repos field gh" "ghrepo" "$("$BIN/hv-todo-field" ghrepo:F1 repos)"
-  eq "Repos field gl" "glrepo" "$("$BIN/hv-todo-field" glrepo:F1 repos)"
+  ALL() { echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(",".join(sorted(r["id"] + "=" + r["title"] for k in ("bugs", "features", "tasks") for r in d[k])))'; }
+  eq "backlog rows" "ghrepo:1=Gh feat,ghrepo:2=Gh task,glrepo:1=Gl feat,glrepo:2=Gl bug,glrepo:3=Gl cwd task" "$(ALL)"
+  eq "Repos field gh" "ghrepo" "$(FG ghrepo:F1 repos)"
+  eq "Repos field gl" "glrepo" "$(FG glrepo:F1 repos)"
 
   # --- refs: qualified
-  eq "qualified colon" "Gl feat" "$("$BIN/hv-todo-field" glrepo:F1 title)"
-  eq "qualified hash" "Gh feat" "$("$BIN/hv-todo-field" ghrepo#1 title)"
+  eq "qualified colon" "Gl feat" "$(FG glrepo:F1 title)"
+  eq "qualified colon, number" "Gl feat" "$(FG glrepo:1 title)"
+  eq "qualified hash" "Gh feat" "$(FG ghrepo#1 title)"
+  eq "qualified id" "glrepo:1|F" "$(hvj item field get glrepo:F1 --name title | jget data.id)|$(hvj item field get glrepo:F1 --name title | jget data.type)"
   # bare: unique (type letter or number exists once), ambiguous
-  eq "bare unique T2" "Gh task" "$("$BIN/hv-todo-field" T2 title)"
-  eq "bare unique B2" "Gl bug" "$("$BIN/hv-todo-field" B2 title)"
-  eq "bare unique T3" "Gl cwd task" "$("$BIN/hv-todo-field" '#3' title)"
-  RC "$BIN/hv-todo-field" F1 title
-  eq "bare ambiguous exit" "1" "$RCV"
-  has "ambiguous lists ghrepo" "ghrepo:F1" "$ERR"; has "ambiguous lists glrepo" "glrepo:F1" "$ERR"
-  RC "$BIN/hv-todo-field" '#2' title
-  eq "bare #2 ambiguous" "1" "$RCV"
-  RC "$BIN/hv-todo-field" F99 title
-  eq "unknown exit" "1" "$RCV"
-  RC "$BIN/hv-todo-field" nope:F1 title
-  eq "unknown repo prefix" "1" "$RCV"
+  eq "bare unique T2" "Gh task" "$(FG T2 title)"
+  eq "bare unique B2" "Gl bug" "$(FG B2 title)"
+  eq "bare unique T3" "Gl cwd task" "$(FG '#3' title)"
+  RC hvj item field get F1 --name title
+  eq "bare ambiguous exit" "2" "$RCV"
+  has "ambiguous lists ghrepo" "ghrepo:1" "$OUT"; has "ambiguous lists glrepo" "glrepo:1" "$OUT"
+  RC hvj item field get '#2' --name title
+  eq "bare #2 ambiguous" "2" "$RCV"
+  RC hvj item field get F99 --name title
+  eq "unknown exit" "3" "$RCV"
+  RC hvj item field get nope:F1 --name title
+  eq "unknown repo prefix" "3" "$RCV"
 
-  # --- hv-item-claim
-  RC "$BIN/hv-item-claim" F1 --as w1
-  eq "claim ambiguous exit" "1" "$RCV"; has "claim ambiguous msg" "ghrepo:F1" "$ERR"
-  RC "$BIN/hv-item-claim" glrepo:F1 --as w1
-  eq "claim qualified exit" "0" "$RCV"; eq "claim qualified out" "claimed glrepo:F1 as w1" "$OUT"
-  RC "$BIN/hv-item-claim" B2 --as w2
-  eq "claim bare unique" "claimed B2 as w2" "$OUT"
-  RC "$BIN/hv-item-claim" glrepo:F1 --as w3
-  eq "claim lost exit" "5" "$RCV"
+  # --- item claim
+  RC hvj item claim F1 --as w1
+  eq "claim ambiguous exit" "2" "$RCV"; has "claim ambiguous msg" "ghrepo:1" "$OUT"
+  RC hvj item claim glrepo:F1 --as w1
+  eq "claim qualified exit" "0" "$RCV"; eq "claim qualified out" "glrepo:1|w1|true" "$(ID)|$(echo "$OUT" | jget data.claimId)|$(echo "$OUT" | jget data.changed)"
+  RC hvj item claim B2 --as w2
+  eq "claim bare unique" "0|glrepo:2|w2" "$RCV|$(ID)|$(echo "$OUT" | jget data.claimId)"
+  RC hvj item claim glrepo:F1 --as w3
+  eq "claim lost exit" "4" "$RCV"
   has "claim only in gl store" "in-progress" "$(cat "$TMP_UI/db/glrepo.json")"
   case "$(cat "$TMP_UI/db/ghrepo.json")" in *in-progress*) fail "umbrella issues: claim leaked into ghrepo";; esac
 
-  # --- hv-complete
-  RC "$BIN/hv-complete" F1 abc1234 --reason done --no-proof
-  eq "complete ambiguous exit" "1" "$RCV"; has "complete ambiguous msg" "glrepo:F1" "$ERR"
-  RC "$BIN/hv-complete" ghrepo:F1 abc1234 --reason done --no-proof
+  # --- item complete
+  RC hvj item complete F1 --commit abc1234 --reason done --no-proof
+  eq "complete ambiguous exit" "2" "$RCV"; has "complete ambiguous msg" "glrepo:1" "$OUT"
+  RC hvj item complete ghrepo:F1 --commit abc1234 --reason done --no-proof
   eq "complete qualified exit" "0" "$RCV"
-  RC "$BIN/hv-complete" T2 abc1234 --reason done --no-proof
+  RC hvj item complete T2 --commit abc1234 --reason done --no-proof
   eq "complete bare unique exit" "0" "$RCV"
-  eq "gh F1 closed" "closed" "$(python3 -c "
-import json;d=json.load(open('$TMP_UI/db/ghrepo.json'))
-print([i['state'] for i in d['issues'] if i['number']==1][0])")"
-  eq "gl F1 still open" "open" "$(python3 -c "
-import json;d=json.load(open('$TMP_UI/db/glrepo.json'))
-print([i['state'] for i in d['issues'] if i['number']==1][0])")"
-  RC "$BIN/hv-backlog"
-  case "$OUT" in *"Gh feat"*) fail "umbrella issues: closed ghrepo F1 still listed open";; esac
-  has "open gl feat kept" "Gl feat" "$OUT"
+  eq "gh F1 closed" "closed" "$(DB ghrepo '[i["state"] for i in d["issues"] if i["number"] == 1][0]')"
+  eq "gl F1 still open" "open" "$(DB glrepo '[i["state"] for i in d["issues"] if i["number"] == 1][0]')"
+  RC hvj backlog list
+  case "$(ALL)" in *"Gh feat"*) fail "umbrella issues: closed ghrepo F1 still listed open";; esac
+  has "open gl feat kept" "Gl feat" "$(ALL)"
 
-  # --- hv-backlog: qualified ID cells (plain IDs collide across sub-repos)
-  RC "$BIN/hv-backlog"
-  has "backlog qualified glrepo F1" "| glrepo:F1 |" "$OUT"
-  has "backlog qualified glrepo B2" "| glrepo:B2 |" "$OUT"
-  has "backlog qualified glrepo T3" "| glrepo:T3 |" "$OUT"
+  # --- backlog list: qualified IDs in the rows
+  eq "backlog qualified glrepo" "glrepo:1,glrepo:2,glrepo:3" "$(ALL | tr ',' '\n' | sed 's/=.*//' | grep '^glrepo' | tr '\n' ',' | sed 's/,$//')"
 
   # --- milestones: ID minted over native milestones of ALL sub-repos, tracking issue on the home repo
-  NATIVE() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-print(",".join(m["title"] + ":" + m["state"] for m in adapter_for(load_config(), cwd=sys.argv[1]).milestones("all")))' "$U/$1"; }
-  (cd "$U/glrepo" && glab api -X POST projects/:id/milestones -f title="M04 — Legacy" -f description= >/dev/null)
-  RC "$BIN/hv-vision-add" "Alpha" "First"
-  eq "vision-add mints over all repos" "M05" "$OUT"
-  RC "$BIN/hv-vision-add" "Beta" "Second" M05
-  eq "vision-add second" "M06" "$OUT"
+  RC hvj tracker call --repo glrepo -- api -X POST projects/:id/milestones -f title="M04 — Legacy" -f description=
+  eq "legacy milestone created" "0" "$RCV"
+  RC hvj milestone add --title "Alpha" --summary "First"
+  eq "milestone add mints over all repos" "M05" "$(ID)"
+  RC hvj milestone add --title "Beta" --summary "Second" --depends M05
+  eq "milestone add second" "M06" "$(ID)"
   eq "home native milestones" "M05 — Alpha:open,M06 — Beta:open" "$(NATIVE ghrepo)"
   eq "other repo untouched" "M04 — Legacy:open" "$(NATIVE glrepo)"
-  RC "$BIN/hv-vision-list"
-  eq "vision-list exit" "0" "$RCV"
-  eq "vision-list ids" "M05,M06" "$(python3 -c 'import json,sys;print(",".join(m["id"]+"" for m in json.loads(sys.argv[1])))' "$OUT")"
-  has "vision-show" "id: M05" "$("$BIN/hv-vision-show" M05)"
+  RC hvj milestone list
+  eq "milestone list exit" "0" "$RCV"
+  eq "milestone list ids" "M05,M06" "$(echo "$OUT" | python3 -c 'import json,sys; print(",".join(m["id"] for m in json.load(sys.stdin)["data"]["milestones"]))')"
+  has "milestone show" "id: M05" "$(hvj milestone show M05 | jget data.body)"
 
   # --- assigning an item creates the sub-repo native milestone once
-  RC "$BIN/hv-todo-set-field" glrepo:F1 milestone M05
+  RC hvj item field set glrepo:F1 --name milestone --value M05
   eq "assign exit" "0" "$RCV"
   eq "gl milestone created" "M04 — Legacy:open,M05 — Alpha:open" "$(NATIVE glrepo)"
-  RC "$BIN/hv-todo-set-field" glrepo:B2 milestone M05
+  RC hvj item field set glrepo:B2 --name milestone --value M05
   eq "second assign exit" "0" "$RCV"
   eq "gl milestone reused" "M04 — Legacy:open,M05 — Alpha:open" "$(NATIVE glrepo)"
-  RC "$BIN/hv-item-create" features --title "Gh ms feat" --field Repos=ghrepo --field Milestone=M05
-  eq "capture with milestone" "0" "$RCV"; GHMS="${OUT#ghrepo:}"
+  RC hvj item create --kind features --title "Gh ms feat" --repos ghrepo --milestone M05
+  eq "capture with milestone" "0" "$RCV"; GHMS="$(ID)"; GHMS="${GHMS#ghrepo:}"
   eq "home milestone not duplicated" "M05 — Alpha:open,M06 — Beta:open" "$(NATIVE ghrepo)"
-  RC "$BIN/hv-todo-set-field" glrepo:T3 milestone M99
-  eq "unknown milestone exit" "1" "$RCV"
+  RC hvj item field set glrepo:T3 --name milestone --value M99
+  eq "unknown milestone exit" "3" "$RCV"
 
   # --- status aggregation
-  eq "status planned" "planned" "$(python3 -c 'import json,sys;print([m["status"] for m in json.loads(sys.argv[1]) if m["id"]=="M05"][0])' "$("$BIN/hv-vision-list")")"
-  RC "$BIN/hv-vision-status" M05 shipped
+  LSTAT() { hvj milestone list | python3 -c 'import json,sys; print([m["status"] for m in json.load(sys.stdin)["data"]["milestones"] if m["id"] == "M05"][0])'; }
+  eq "status planned" "planned" "$(LSTAT)"
+  RC hvj milestone status M05 --to shipped
   eq "status shipped exit" "0" "$RCV"
   eq "shipped closes every repo" "M05 — Alpha:closed,M06 — Beta:open|M04 — Legacy:open,M05 — Alpha:closed" "$(NATIVE ghrepo)|$(NATIVE glrepo)"
-  LSTAT() { python3 -c 'import json,sys;print([m["status"] for m in json.loads(sys.argv[1]) if m["id"]=="M05"][0])' "$("$BIN/hv-vision-list")"; }
   eq "list shipped" "shipped" "$(LSTAT)"
-  (cd "$U/glrepo" && glab api -X PUT "projects/:id/milestones/$(PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-print([m["number"] for m in adapter_for(load_config(), cwd=".").milestones("all") if m["title"].startswith("M05")][0])')" -f state_event=activate >/dev/null)
+  GLM="$(DB glrepo '[m["number"] for m in d["milestones"] if m["title"].startswith("M05")][0]')"
+  RC hvj tracker call --repo glrepo -- api -X PUT "projects/:id/milestones/$GLM" -f state_event=activate
+  eq "reopen one repo exit" "0" "$RCV"
   eq "list active while a repo is open" "active" "$(LSTAT)"
-  RC "$BIN/hv-vision-status" M05 planned
+  RC hvj milestone status M05 --to planned
   eq "planned reopens all" "M05 — Alpha:open|M05 — Alpha:open" "$(NATIVE ghrepo | tr ',' '\n' | grep M05)|$(NATIVE glrepo | tr ',' '\n' | grep M05)"
   eq "list planned" "planned" "$(LSTAT)"
 
   # --- release per sub-repo
-  RC "$BIN/hv-release-milestone-check" M05
-  eq "gate without --repo exit" "1" "$RCV"; has "gate without --repo msg" "--repo" "$ERR"
-  RC "$BIN/hv-release-notes-from-issues" M05
-  eq "notes without --repo exit" "1" "$RCV"
-  RC "$BIN/hv-release-close-milestone" M05 v1.0.0
-  eq "close without --repo exit" "1" "$RCV"
-  RC "$BIN/hv-release-milestone-check" M05 --repo glrepo
-  eq "gate glrepo blocked (B2 in progress)" "6" "$RCV"; has "gate lists B2" "[in-progress]" "$OUT"
-  RC "$BIN/hv-release-milestone-check" M05 --repo nope
-  eq "gate unknown repo exit" "1" "$RCV"
-  RC "$BIN/hv-complete" glrepo:F1 aaa1111 --reason done --no-proof;  eq "complete gl F1" "0" "$RCV"
-  RC "$BIN/hv-complete" glrepo:B2 bbb2222 --reason done --no-proof;  eq "complete gl B2" "0" "$RCV"
-  RC "$BIN/hv-complete" "ghrepo:$GHMS" ccc3333 --reason done --no-proof; eq "complete gh ms feat" "0" "$RCV"
-  RC "$BIN/hv-release-notes-from-issues" M05 --repo glrepo
-  has "gl notes new" "Gl feat" "$OUT"; has "gl notes fixed" "Gl bug" "$OUT"
-  case "$OUT" in *"Gh ms feat"*) fail "umbrella issues: ghrepo item in glrepo notes";; esac
-  RC "$BIN/hv-release-close-milestone" M05 v1.0.0 --repo glrepo
-  eq "close glrepo exit" "0" "$RCV"; eq "close glrepo out" "closed-out M05 v1.0.0: 2 issues" "$OUT"
+  RC hvj release milestone-check M05
+  eq "gate without --repo exit" "2" "$RCV"
+  RC hvj release notes --from issues M05
+  eq "notes without --repo exit" "2" "$RCV"
+  RC hvj release close-milestone M05 --release 1.0.0
+  eq "close without --repo exit" "2" "$RCV"
+  RC hvj release milestone-check M05 --repo glrepo
+  eq "gate glrepo blocked (B2 in progress)" "1" "$RCV"; eq "gate lists B2" "false|in-progress" "$(echo "$OUT" | jget data.clear)|$(echo "$OUT" | jget 'data.blocked[0].label')"
+  RC hvj release milestone-check M05 --repo nope
+  eq "gate unknown repo exit" "3" "$RCV"
+  RC hvj item complete glrepo:F1 --commit aaa1111 --reason done --no-proof;  eq "complete gl F1" "0" "$RCV"
+  RC hvj item complete glrepo:B2 --commit bbb2222 --reason done --no-proof;  eq "complete gl B2" "0" "$RCV"
+  RC hvj item complete "ghrepo:$GHMS" --commit ccc3333 --reason done --no-proof; eq "complete gh ms feat" "0" "$RCV"
+  RC hvj release notes --from issues M05 --repo glrepo
+  NOTES="$(echo "$OUT" | jget data.markdown)"
+  has "gl notes new" "Gl feat" "$NOTES"; has "gl notes fixed" "Gl bug" "$NOTES"
+  case "$NOTES" in *"Gh ms feat"*) fail "umbrella issues: ghrepo item in glrepo notes";; esac
+  RC hvj release close-milestone M05 --release 1.0.0 --repo glrepo
+  eq "close glrepo exit" "0" "$RCV"; eq "close glrepo data" "M05|1.0.0|v1.0.0|2|true" "$(echo "$OUT" | jget data.milestone)|$(echo "$OUT" | jget data.release)|$(echo "$OUT" | jget data.tag)|$(echo "$OUT" | jget data.issues)|$(echo "$OUT" | jget data.changed)"
   eq "gl native closed" "closed" "$(NATIVE glrepo | tr ',' '\n' | grep M05 | sed 's/.*://')"
   eq "tracking issue still open after one repo" "planned" "$(LSTAT)"
-  RC "$BIN/hv-release-close-milestone" M05 v1.0.0 --repo glrepo
-  eq "close idempotent" "0" "$RCV"
-  RC "$BIN/hv-release-close-milestone" M05 v1.0.0 --repo ghrepo
-  eq "close ghrepo exit" "0" "$RCV"; eq "close ghrepo out" "closed-out M05 v1.0.0: 1 issues" "$OUT"
+  # The Go port reports changed:false on a re-run; the shim cannot tell, so prove the no-op from the write log
+  : > "$TMP_UI/log"
+  RC hvj release close-milestone M05 --release 1.0.0 --repo glrepo
+  eq "close idempotent" "0:0" "$RCV:$(grep -cE 'issue (edit|update|close|reopen|comment)|label (create|add)|api -X|milestone (create|edit)' "$TMP_UI/log" || true)"
+  RC hvj release close-milestone M05 --release 1.0.0 --repo ghrepo
+  eq "close ghrepo exit" "0" "$RCV"; eq "close ghrepo issues" "1" "$(echo "$OUT" | jget data.issues)"
   eq "list shipped after both" "shipped" "$(LSTAT)"
 
   # --- review queue + PRs across both repos
-  RC "$BIN/hv-item-create" tasks --title "Gh review" --field Repos=ghrepo; GHQ="${OUT#ghrepo:}"
-  RC "$BIN/hv-item-create" tasks --title "Gl review" --field Repos=glrepo; GLQ="${OUT#glrepo:}"
-  "$BIN/hv-item-state" "ghrepo:$GHQ" needs-review; "$BIN/hv-item-state" "glrepo:$GLQ" needs-review
-  (cd "$U/ghrepo" && gh pr create --title "gh pr" --body "Closes #${GHQ#T}" --base main --head feat/gh >/dev/null)
-  (cd "$U/glrepo" && glab mr create --title "gl mr" --description "Closes #${GLQ#T}" --source-branch feat/gl --target-branch main --yes >/dev/null)
-  RC "$BIN/hv-review-queue"
+  RC hvj item create --kind tasks --title "Gh review" --repos ghrepo; GHQ="$(ID)"; GHQ="${GHQ#ghrepo:}"
+  RC hvj item create --kind tasks --title "Gl review" --repos glrepo; GLQ="$(ID)"; GLQ="${GLQ#glrepo:}"
+  hvj item state "ghrepo:$GHQ" --to needs-review >/dev/null; hvj item state "glrepo:$GLQ" --to needs-review >/dev/null
+  hvj tracker call --repo ghrepo -- pr create --title "gh pr" --body "Closes #$GHQ" --base main --head feat/gh >/dev/null
+  hvj tracker call --repo glrepo -- mr create --title "gl mr" --description "Closes #$GLQ" --source-branch feat/gl --target-branch main --yes >/dev/null
+  RC hvj review queue
+  QUEUE="$OUT"
   eq "queue exit" "0" "$RCV"
-  eq "queue repos" "ghrepo:$GHQ,glrepo:$GLQ" "$(python3 -c 'import json,sys;print(",".join(x["id"] for x in json.loads(sys.argv[1])))' "$OUT")"
-  eq "queue repo field + prs" "ghrepo:1,glrepo:1" "$(python3 -c 'import json,sys;print(",".join("%s:%d" % (x["repo"], len(x["prs"])) for x in json.loads(sys.argv[1])))' "$OUT")"
-  RC "$BIN/hv-pr-merge" 1
-  eq "pr-merge without --repo exit" "1" "$RCV"
-  "$BIN/hv-proof-add" "glrepo:$GLQ" --check unit --result PASS --evidence ok --sha abc1234 >/dev/null
-  PRN="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])[1]["prs"][0]["number"])' "$("$BIN/hv-review-queue")")"
-  RC "$BIN/hv-pr-merge" "$PRN" --repo glrepo
-  eq "pr-merge glrepo exit" "0" "$RCV"; has "pr-merge closed qualified" "closed glrepo:$GLQ" "$OUT"
-  eq "gh queue entry remains" "ghrepo:$GHQ" "$(python3 -c 'import json,sys;print(",".join(x["id"] for x in json.loads(sys.argv[1])))' "$("$BIN/hv-review-queue")")"
-  # hv-pr --repo --closes resolves the bare ID inside that sub-repo and pushes there
+  QIDS() { hvj review queue | python3 -c 'import json,sys; print(",".join(x["id"] for x in json.load(sys.stdin)["data"]["items"]))'; }
+  eq "queue repos" "ghrepo:$GHQ,glrepo:$GLQ" "$(QIDS)"
+  eq "queue repo field + prs" "ghrepo:1,glrepo:1" "$(echo "$QUEUE" | python3 -c 'import json,sys; print(",".join("%s:%d" % (x["repo"], len(x["prs"])) for x in json.load(sys.stdin)["data"]["items"]))')"
+  RC hvj ship pr-merge 1
+  eq "pr-merge without --repo exit" "2" "$RCV"
+  hvj proof add "glrepo:$GLQ" --check unit --result PASS --evidence ok --sha abc1234 >/dev/null
+  PRN="$(echo "$QUEUE" | jget 'data.items[1].prs[0].number')"
+  RC hvj ship pr-merge "$PRN" --repo glrepo
+  eq "pr-merge glrepo exit" "0" "$RCV"; eq "pr-merge closed qualified" "[\"glrepo:$GLQ\"]" "$(echo "$OUT" | jget data.closed)"
+  eq "gh queue entry remains" "ghrepo:$GHQ" "$(QIDS)"
+  # ship pr --repo --items resolves the bare ID inside that sub-repo and pushes there
   git init -q --bare "$TMP_UI/gh-origin.git"
   git -C "$U/ghrepo" config "url.$TMP_UI/gh-origin.git.pushInsteadOf" "https://github.com/o/ghrepo.git"
   git -C "$U/ghrepo" checkout -q -b feat/pr2
-  RC bash -c "printf 'Body' | '$BIN/hv-pr' --repo ghrepo --closes $GHQ feat/pr2 'Via hv-pr'"
-  eq "hv-pr --repo exit" "0" "$RCV"
-  has "hv-pr --repo body" "Closes #${GHQ#T}" "$(python3 -c "import json;print(json.load(open('$TMP_UI/db/ghrepo.json'))['prs'][-1]['body'])")"
+  RC bash -c "printf 'Body' | '$HV_BIN' --json ship pr feat/pr2 --repo ghrepo --title 'Via ship pr' --body-file - --items $GHQ"
+  eq "ship pr --repo exit" "0" "$RCV"
+  has "ship pr --repo body" "Closes #$GHQ" "$(DB ghrepo 'd["prs"][-1]["body"]')"
   git -C "$U/ghrepo" checkout -q master 2>/dev/null || git -C "$U/ghrepo" checkout -q main 2>/dev/null || true
 ) 2>"$TMP_UI/subshell.err" || { cat "$TMP_UI/subshell.err" >&2; fail "umbrella issue mode section failed"; }
 rm -rf "$TMP_UI"

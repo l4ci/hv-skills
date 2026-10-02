@@ -120,7 +120,7 @@ grep -E "^- ~~.*\[B73\].*~~ Done [0-9-]+ \[\`$HASH\`\] \(dropped\)$" .hv/BACKLOG
 [ "$(hvj item field get B72 --name reason | jget data.value)" = "blocked" ] || fail "item field reason"
 [ "$(hvj item field get B72 --name note | jget data.value)" = "waiting on upstream (see #9)" ] || fail "item field note"
 [ "$(hvj item field get B71 --name reason | jget data.value)" = "done" ] || fail "item field reason for plain done"
-hvj summary | jget data.recent | grep -qF "{\"id\":\"B72\",\"date\":\"$(date +%Y-%m-%d)\",\"reason\":\"blocked\"}" || fail "summary missing reason"
+hvj summary | jget data.recent | grep -qF "{\"id\":\"B72\",\"type\":\"B\",\"date\":\"$(date +%Y-%m-%d)\",\"reason\":\"blocked\"}" || fail "summary missing reason"
 rc=0; "$HV_BIN" item complete B01 --commit "$HASH" --reason bogus 2>/dev/null || rc=$?
 [ "$rc" = "2" ] || fail "invalid --reason should exit 2, got $rc"
 pass "item complete --reason/--note renders, reads back via item field get and summary"

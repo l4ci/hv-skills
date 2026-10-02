@@ -141,7 +141,7 @@ echo '{"backlog":{"backend":"file"}}' > "$F/.hv/config.json"
 (
   cd "$F"; git init -q
   rc=0; out="$(hvj review queue 2>/dev/null)" || rc=$?
-  [ "$rc" = 4 ] && [ "$(jget data.blockedBy <<<"$out")" = backend ] || fail "file-mode queue: rc=$rc out=[$out]"
+  [ "$rc" = 1 ] && [ "$(jget data.blockedBy <<<"$out")" = backend ] || fail "file-mode queue: rc=$rc out=[$out]"
   rc=0; out="$(hvj ship pr-merge 1 2>/dev/null)" || rc=$?
   [ "$rc" = 4 ] && [ "$(jget data.blockedBy <<<"$out")" = backend ] && [ "$(jget data.changed <<<"$out")" = false ] || fail "file-mode merge: rc=$rc out=[$out]"
 )
