@@ -18,7 +18,8 @@ func TestA4cUpdateIsPinned(t *testing.T) {
 	}
 	code, env, _ := hvRun(t, "--json", "update")
 	d := dataOf(env)
-	if code != 0 || get(d, "status") != "unknown" || get(d, "latestVersion") != "2.0.0" || get(d, "installType") != "unknown" {
+	// No install root resolves, so currentVersion is the stamped fallback.
+	if code != 0 || get(d, "status") != "behind" || get(d, "currentVersion") != "1.0.0" || get(d, "latestVersion") != "2.0.0" || get(d, "installType") != "unknown" {
 		t.Errorf("code=%d env=%v", code, env)
 	}
 	if code, _, _ := hvRun(t, "--json", "update", "extra"); code != ExitUsage {

@@ -6,6 +6,7 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 	"os"
 	"os/exec"
@@ -87,14 +88,15 @@ func ghLatest() string {
 	return strings.TrimPrefix(tag, "v")
 }
 
-// Check is hv-update-check. currentVersion is the running binary's version,
-// but empty when no install resolves, as the old helper gave when it found no
-// plugin.json.
+// Check is hv-update-check. currentVersion is the installed plugin's version,
+// read from .claude-plugin/plugin.json under the resolved install root as the
+// old helper did; only when no install root resolves is it the running
+// binary's stamped version (orchestrator ruling, A4 acceptance).
 func Check(e Env) Result {
 	kind, root := detect(e)
-	r := Result{InstallType: kind, InstallRoot: root}
+	r := Result{InstallType: kind, InstallRoot: root, CurrentVersion: e.Current}
 	if root != "" {
-		r.CurrentVersion = e.Current
+		r.CurrentVersion = manifestVersion(root)
 	}
 	if e.Latest != nil {
 		r.LatestVersion = e.Latest()
@@ -145,6 +147,23 @@ func isDir(p string) bool {
 }
 
 func manifest(root string) string { return filepath.Join(root, ".claude-plugin", "plugin.json") }
+
+// manifestVersion is read_version: plugin.json's "version" ("" when the file
+// is missing, unreadable or has none), printed as Python prints a string or
+// a number.
+func manifestVersion(root string) string {
+	m, ok := fsio.LoadJSON(manifest(root), nil).(*jsonx.Object)
+	if !ok {
+		return ""
+	}
+	switch v, _ := m.Get("version"); v := v.(type) {
+	case string:
+		return v
+	case json.Number:
+		return string(v)
+	}
+	return ""
+}
 
 // detect is resolve_root of hv-update-check: hvlib_paths.resolve_plugin_root
 // first, then the stow symlink walk, then a walk up from the binary.

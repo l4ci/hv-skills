@@ -345,6 +345,36 @@ func checkUpdate(installType, status string) func(t *testing.T, e envl, ref run)
 	}
 }
 
+// updNoRoot is updScn where no install root resolves: currentVersion falls
+// back to the binary's stamped version (orchestrator ruling, A4 acceptance)
+// where the old helper gave "", so the status compares instead of unknown.
+func updNoRoot(name, home, latest string, extra []string, status string) scn {
+	s := updScn(name, home, latest, extra, "unknown", status)
+	s.div, s.refWant = "no install root: Go falls back to the stamped version (ruling); old gave an empty currentVersion", 0
+	s.check = func(t *testing.T, e envl, ref run) {
+		t.Helper()
+		var old map[string]any
+		if err := json.Unmarshal([]byte(ref.stdout), &old); err != nil {
+			t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
+		}
+		if old["currentVersion"] != "" || old["status"] != "unknown" {
+			t.Errorf("old = %v, expected the empty version and unknown", old)
+		}
+		got, _ := at(e, "data").(map[string]any)
+		g := map[string]any{}
+		for k, v := range got {
+			g[k] = v
+		}
+		eq(t, e, "data.currentVersion", instVersion)
+		eq(t, e, "data.status", status)
+		g["currentVersion"], g["status"] = "", "unknown"
+		if !reflect.DeepEqual(g, old) {
+			t.Errorf("update data differs beyond the fallback\ngo:  %v\nold: %v", got, old)
+		}
+	}
+	return s
+}
+
 func updScn(name, home, latest string, extra []string, installType, status string) scn {
 	env := []string{"HOME=" + home, "HV_TEST_LATEST_VERSION=" + latest, "HV_LATEST_VERSION=" + latest}
 	return scn{name: "update/" + name, fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
@@ -806,18 +836,18 @@ func TestParityA4C(t *testing.T) {
 		updScn("override/huge-component", upd.homeNone, "1.2.99999999999999999999999", []string{"HV_INSTALL_ROOT=" + upd.plain}, "override", "behind"),
 		updScn("override/latest-without-digits", upd.homeNone, "abc", []string{"HV_INSTALL_ROOT=" + upd.plain}, "override", "ahead"),
 		updScn("override/wins-over-the-plugin-root", upd.homePlugin, "1.2.4", []string{"HV_INSTALL_ROOT=" + upd.plain}, "override", "behind"),
-		updScn("override/missing-dir-falls-through", upd.homeNone, "1.2.4", []string{"HV_INSTALL_ROOT=" + filepath.Join(upd.empty, "gone")}, "unknown", "unknown"),
+		updNoRoot("override/missing-dir-falls-through", upd.homeNone, "1.2.4", []string{"HV_INSTALL_ROOT=" + filepath.Join(upd.empty, "gone")}, "behind"),
 		updScn("plugin/claude-plugin-root", upd.homeNone, "1.2.4", []string{"CLAUDE_PLUGIN_ROOT=" + upd.plain}, "plugin", "behind"),
-		updScn("plugin/foreign-claude-plugin-root-ignored", upd.homeNone, "1.2.4", []string{"CLAUDE_PLUGIN_ROOT=" + upd.foreign}, "unknown", "unknown"),
-		updScn("plugin/claude-plugin-root-without-manifest", upd.homeNone, "1.2.4", []string{"CLAUDE_PLUGIN_ROOT=" + upd.empty}, "unknown", "unknown"),
+		updNoRoot("plugin/foreign-claude-plugin-root-ignored", upd.homeNone, "1.2.4", []string{"CLAUDE_PLUGIN_ROOT=" + upd.foreign}, "behind"),
+		updNoRoot("plugin/claude-plugin-root-without-manifest", upd.homeNone, "1.2.4", []string{"CLAUDE_PLUGIN_ROOT=" + upd.empty}, "behind"),
 		updScn("plugin/marketplace-dir", upd.homePlugin, "1.2.3", nil, "plugin", "current"),
 		updScn("plugin/cache-newest-version-with-manifest", upd.homeCache, "1.2.4", nil, "plugin", "behind"),
 		updScn("plugin/override-beats-marketplace", upd.homePlugin, "1.2.3", []string{"HV_INSTALL_ROOT=" + upd.plain}, "override", "current"),
 		updScn("stow/agents-skills-dir", upd.homeAgents, "1.2.4", nil, "stow", "behind"),
 		updScn("stow/skill-symlink-walk", upd.homeStow, "1.2.4", nil, "stow", "behind"),
 		updScn("stow/skill-symlink-walk-current", upd.homeStow, "1.2.3", nil, "stow", "current"),
-		updScn("unknown/no-install-anywhere", upd.homeNone, "1.2.4", nil, "unknown", "unknown"),
-		updScn("unknown/latest-still-reported", upd.homeNone, "9.9.9", nil, "unknown", "unknown"),
+		updNoRoot("unknown/no-install-anywhere", upd.homeNone, "1.2.4", nil, "behind"),
+		updNoRoot("unknown/latest-still-reported", upd.homeNone, "9.9.9", nil, "behind"),
 		scn{name: "update/repo-clone-found-by-walking-up-from-the-binary", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
 			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4"}, bin: upd.cloneBin, oldBin: upd.cloneOld,
 			check: checkUpdate("repo", "behind")},
@@ -833,21 +863,14 @@ func TestParityA4C(t *testing.T) {
 		scn{name: "update/runs-from-a-subdirectory", fx: withFile("sub/x.txt", "x\n"), cwd: "sub", argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
 			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
 			check: checkUpdate("override", "behind")},
-		scn{name: "update/override-without-manifest-uses-the-embedded-version", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
-			div: "old reads plugin.json at the root and gives an empty currentVersion when it is absent; the contract takes the embedded version", refWant: 0,
+		// A resolved root without plugin.json: currentVersion is "" and the
+		// status unknown, as old read_version gave (ruling: the stamped
+		// version is only the no-root fallback).
+		scn{name: "update/override-without-manifest-is-empty", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
 			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.empty},
-			check: func(t *testing.T, e envl, ref run) {
-				eq(t, e, "data.installType", "override")
-				eq(t, e, "data.currentVersion", instVersion)
-				eq(t, e, "data.status", "behind")
-				var old map[string]any
-				json.Unmarshal([]byte(ref.stdout), &old)
-				if old["currentVersion"] != "" || old["status"] != "unknown" {
-					t.Errorf("old = %v, expected the documented empty version", old)
-				}
-			}},
+			check: both(eqCheck("data.installType", "override"), eqCheck("data.currentVersion", ""), eqCheck("data.status", "unknown"))},
 		scn{name: "update/dev-build-compares-as-zero", fx: fx{noHV: true}, argv: j("update"), goOnly: true, want: 0,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=0.0.0", "HV_INSTALL_ROOT=" + upd.empty},
+			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=0.0.0"},
 			check: both(eqCheck("data.currentVersion", "dev"), eqCheck("data.status", "current"))},
 		scn{name: "update/without-the-test-variable-only-the-fake-gh-runs", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
 			env: []string{"HOME=" + upd.homeNone, "HV_INSTALL_ROOT=" + upd.plain, "FAKE_TRACKER_LOG=" + filepath.Join(harnessTmp, "update-gh.log")},

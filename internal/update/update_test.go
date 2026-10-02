@@ -57,6 +57,7 @@ func env(home string, vars map[string]string, latest string) Env {
 
 func TestDetectOverride(t *testing.T) {
 	dir := t.TempDir()
+	plugin(t, dir, "1.0.0")
 	r := Check(env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, "1.1.0"))
 	if r.InstallType != Override || r.InstallRoot != dir || r.Status != "behind" || r.UpdateCommand != "manual — HV_INSTALL_ROOT was set" {
 		t.Errorf("%+v", r)
@@ -141,9 +142,11 @@ func TestDetectRepoClone(t *testing.T) {
 	}
 }
 
-func TestUnknownInstallLeavesCurrentEmpty(t *testing.T) {
+// With no install root, currentVersion falls back to the binary's stamped
+// version (env's Current), so the status still compares.
+func TestUnknownInstallUsesStampedVersion(t *testing.T) {
 	r := Check(env(t.TempDir(), nil, "1.0.0"))
-	if r.InstallType != Unknown || r.InstallRoot != "" || r.CurrentVersion != "" || r.Status != "unknown" ||
+	if r.InstallType != Unknown || r.InstallRoot != "" || r.CurrentVersion != "1.0.0" || r.Status != "current" ||
 		r.UpdateCommand != "reinstall: claude plugin install hv-skills" || r.LatestVersion != "1.0.0" {
 		t.Errorf("%+v", r)
 	}
@@ -151,6 +154,7 @@ func TestUnknownInstallLeavesCurrentEmpty(t *testing.T) {
 
 func TestStatuses(t *testing.T) {
 	dir := t.TempDir()
+	plugin(t, dir, "1.0.0")
 	for latest, want := range map[string]string{"1.1.0": "behind", "1.0.0": "current", "0.9.0": "ahead", "": "unknown"} {
 		if r := Check(env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, latest)); r.Status != want {
 			t.Errorf("latest %q: %s, want %s", latest, r.Status, want)
@@ -191,4 +195,23 @@ func TestGuardRefusesForeignGh(t *testing.T) {
 		}
 	}()
 	ghLatest()
+}
+
+// currentVersion is the installed plugin's version, not the binary's: a fake
+// install at 1.2.0 run by a 4.5.0 binary is behind 1.3.0. A root without a
+// readable version gives "" and status unknown, as the old helper did.
+func TestCurrentVersionFromInstallRoot(t *testing.T) {
+	dir := t.TempDir()
+	plugin(t, dir, "1.2.0")
+	e := env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, "1.3.0")
+	e.Current = "4.5.0"
+	if r := Check(e); r.CurrentVersion != "1.2.0" || r.Status != "behind" {
+		t.Errorf("%+v", r)
+	}
+	bare := t.TempDir()
+	e = env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": bare}, "1.3.0")
+	e.Current = "4.5.0"
+	if r := Check(e); r.CurrentVersion != "" || r.Status != "unknown" {
+		t.Errorf("no manifest: %+v", r)
+	}
 }
