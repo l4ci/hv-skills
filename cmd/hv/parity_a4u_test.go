@@ -20,12 +20,14 @@ package main
 // Documented divergences (each scenario that exercises one carries a div text,
 // a norm or a changed expectation, so none passes silently):
 //  1. --repo: the shim and the old helpers ignore it on item verbs after
-//     validating the name. The contract's scope S narrows reads and bare
-//     references to the sub-repo and names the capture target, so Go resolves
-//     a bare F1 under --repo web where the old helper says ambiguous.
-//  2. cwd inside a sub-repo narrows only item create (the old _cwd_repo). The
-//     contract's scope S would also narrow reads; Go keeps them umbrella-wide,
-//     as the old helpers did.
+//     validating the name. Go follows the contract's scope S (accepted by the
+//     orchestrator on #119): it narrows reads and bare references to the
+//     sub-repo and names the capture target, so a bare F1 under --repo web
+//     resolves where the old helper says ambiguous. Not an open question; the
+//     marker stays because the shim cannot agree.
+//  2. cwd inside a sub-repo: scope S narrows reads and bare refs to that
+//     sub-repo, like --repo (contract; orchestrator ruling on #119). The old
+//     helpers read the whole umbrella from anywhere (scopeDiv).
 //  3. field set --name repos: Go 2 (read-only field, contract), the shim 3.
 //  4. backlog ids and milestones: the old helper prints bare "F12" (the
 //     shim "12"), Go prints the qualified ID of rule 11 ("web:12"). norm maps
@@ -449,11 +451,21 @@ func TestParityA4Umbrella(t *testing.T) {
 		}
 		add(s)
 	}
-	// cwd never narrows reads (divergence 2): a bare ambiguous ref stays ambiguous from inside a sub-repo
+	// Scope S (orchestrator ruling on #119): a sub-repo cwd narrows reads and
+	// bare refs like --repo does, so F1 resolves to the cwd's own F1 and B4
+	// (api only) is unknown from web. Qualified refs resolve anywhere.
 	for _, cw := range cwds {
-		withCwds(cwdDiv(fget("cwd-ambiguous", "F1", "title", 2), cw), cw)
+		in := ubSubRepoOf(cw)
+		amb, uniq := 2, 0
+		if in != "" {
+			amb = 0
+		}
+		if in == "web" {
+			uniq = 3
+		}
+		withCwds(cwdDiv(fget("cwd-ambiguous", "F1", "title", amb), cw), cw)
 		withCwds(cwdDiv(fget("cwd-qualified", "api:F1", "title", 0), cw), cw)
-		withCwds(cwdDiv(fget("cwd-bare-unique", "B4", "title", 0), cw), cw)
+		withCwds(cwdDiv(fget("cwd-bare-unique", "B4", "title", uniq), cw), cw)
 	}
 	add(
 		ubcase{name: "fieldlist/qualified", argv: j("item", "field", "list", "web:F1"), want: 0},
@@ -930,12 +942,13 @@ func TestParityA4Umbrella(t *testing.T) {
 			}},
 	)
 	for _, cw := range []string{"web", "api/src/deep", "docs/deep"} {
-		withCwds(ubcase{name: "backlog-list/cwd", argv: j("backlog", "list"), want: 0, norm: ubNormList,
+		want := map[string]int{"web": 1, "api": 2, "": 3}[ubSubRepoOf(cw)]
+		withCwds(scopeDiv(ubcase{name: "backlog-list/cwd", argv: j("backlog", "list"), want: 0, norm: ubNormList,
 			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
-				if n := len(at(e, "data.features").([]any)); n != 3 {
-					t.Errorf("cwd narrowed the listing: features %d", n)
+				if n := len(at(e, "data.features").([]any)); n != want {
+					t.Errorf("features %d, want %d for cwd %q (scope S)", n, want, cw)
 				}
-			}}, cw)
+			}}, cw), cw)
 	}
 	add(
 		ubcase{name: "backlog-ids/native-milestone", argv: j("backlog", "ids", "--milestone", "M07"), want: 0, norm: ubNormIDs,
@@ -966,7 +979,11 @@ func TestParityA4Umbrella(t *testing.T) {
 		ubcase{name: "summary/rate-limit", argv: j("summary"), want: 6, env: []string{"FAKE_TRACKER_FAIL=issue list", "FAKE_TRACKER_FAIL_MSG=secondary rate limit"}},
 	)
 	for _, cw := range []string{"web", "docs/deep"} {
-		withCwds(ubcase{name: "summary/cwd", argv: j("summary"), want: 0, norm: ubNormIDs}, cw)
+		want := map[string]float64{"web": 1, "": 3}[ubSubRepoOf(cw)]
+		withCwds(scopeDiv(ubcase{name: "summary/cwd", argv: j("summary"), want: 0, norm: ubNormIDs,
+			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+				eq(t, e, "data.backlog.features", want)
+			}}, cw), cw)
 	}
 
 	// ---- file-only verbs under an issue umbrella are refused
@@ -1003,6 +1020,28 @@ func TestParityA4Umbrella(t *testing.T) {
 // hv-todo-field and hv-todo-set-field read .hv/config.json from the cwd without
 // self-locating, so they see a file-mode project with no BACKLOG.md (rc 1,
 // exit 3). Go finds the project by walking up, as the conventions say.
+// ubSubRepoOf is the registered sub-repo a fixture cwd is in, "" for the
+// umbrella root and the unregistered docs/ tree.
+func ubSubRepoOf(cw string) string {
+	for _, r := range []string{"web", "api"} {
+		if cw == r || strings.HasPrefix(cw, r+"/") {
+			return r
+		}
+	}
+	return ""
+}
+
+// scopeDiv marks a read run from inside a sub-repo: Go narrows it to that
+// sub-repo (contract scope S, orchestrator ruling on #119); the shim stays
+// umbrella-wide, so only Go's result is checked.
+func scopeDiv(c ubcase, cw string) ubcase {
+	if ubSubRepoOf(cw) != "" {
+		c.div = "scope S: a sub-repo cwd narrows reads in Go (contract); the shim reads the whole umbrella"
+		c.refWant = 0
+	}
+	return c
+}
+
 func cwdDiv(c ubcase, cw string) ubcase {
 	if cw != "" {
 		c.div = "10: the old helper does not self-locate from a subdirectory"

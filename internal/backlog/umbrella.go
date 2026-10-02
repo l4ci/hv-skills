@@ -36,8 +36,9 @@ type Umbrella struct {
 	// global --repo). Qualified references still resolve anywhere, and IDs
 	// keep their "<repo>:" spelling.
 	Scope string
-	// CwdRepo names the sub-repo the caller works in, the default target of
-	// Create; "" when none.
+	// CwdRepo names the sub-repo the caller works in; "" when none. With no
+	// Scope it narrows reads like Scope does (contract: scope S) and is the
+	// default target of Create.
 	CwdRepo string
 
 	subs map[string]*Issues
@@ -94,11 +95,21 @@ func (u *Umbrella) sub(name string) (*Issues, error) {
 	return s, nil
 }
 
-// scoped lists the sub-repos reads cover: all of them, or just Scope.
+// readScope is the sub-repo reads cover: --repo, else the working
+// directory's sub-repo; "" (all of them) at the umbrella root.
+func (u *Umbrella) readScope() string {
+	if u.Scope != "" {
+		return u.Scope
+	}
+	return u.CwdRepo
+}
+
+// scoped lists the sub-repos reads cover: all of them, or just readScope.
 func (u *Umbrella) scoped() []string {
+	scope := u.readScope()
 	var out []string
 	for _, r := range u.Repos {
-		if u.Scope == "" || r.Name == u.Scope {
+		if scope == "" || r.Name == scope {
 			out = append(out, r.Name)
 		}
 	}
@@ -508,7 +519,6 @@ func (u *Umbrella) NoteRm(ref, kind string) (bool, error) {
 }
 
 // ---- milestones ------------------------------------------------------------
-
 
 // msTitleID is _MS_TITLE_RE's group 1 for a tracking issue title, "" when it
 // does not start with a milestone ID.
