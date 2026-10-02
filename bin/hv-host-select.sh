@@ -20,3 +20,27 @@ hv_host_select() {
     *)     . "$HERE/hv-host-tmux.sh" ;;
   esac
 }
+
+# hv_pid_alive <pid> — 0 while the process exists and has not exited. A zombie
+# has exited and only waits for its parent to reap it, so `kill -0` alone would
+# call it alive and a slow reaper would read as a session that will not close.
+hv_pid_alive() {
+  kill -0 "$1" 2>/dev/null || return 1
+  case "$(ps -o stat= -p "$1" 2>/dev/null | tr -d ' ')" in Z*|"") return 1 ;; esac
+  return 0
+}
+
+# hv_pid_tree <pid> — the pid and all its descendants, space-separated. Taken
+# BEFORE a close: afterwards orphaned children are reparented and unfindable.
+hv_pid_tree() {
+  ps -A -o pid= -o ppid= 2>/dev/null | awk -v root="$1" '
+    { kids[$2] = kids[$2] " " $1 }
+    END {
+      n = split(root, q, " "); out = root
+      for (i = 1; i <= n; i++) {
+        m = split(kids[q[i]], c, " ")
+        for (j = 1; j <= m; j++) { q[++n] = c[j]; out = out " " c[j] }
+      }
+      print out
+    }'
+}

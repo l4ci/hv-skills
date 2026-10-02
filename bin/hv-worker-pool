@@ -159,7 +159,17 @@ case "$CMD" in
       ABS="$(cd "$REL" && pwd -P)"
       # A healthy slot may sit on a per-task branch (hv-worker-reset); register
       # what is actually checked out, not the init-time name.
-      BRANCH="$(git -C "$ABS" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$BRANCH")"
+      # A detached worktree has no branch to register; keep what the registry
+      # already holds for the slot, else the init-time name.
+      BRANCH="$(git -C "$ABS" symbolic-ref --short -q HEAD 2>/dev/null || PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$NAME" "$BRANCH" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+s = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), None)
+print((s or {}).get("branch") or sys.argv[3])
+PY
+)"
       HANDLE="$SESSION:$NAME"
       [ "$DISPATCH" != herdr ] || HANDLE=""
       register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$HANDLE"

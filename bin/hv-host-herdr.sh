@@ -247,7 +247,7 @@ except Exception:
   herdr tab close "$2" >/dev/null 2>&1 || true
   while :; do
     alive=""
-    for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+    for pid in $pids; do hv_pid_alive "$pid" && alive="$alive $pid"; done
     if ! herdr tab get "$2" >/dev/null 2>&1 && [ -z "$alive" ]; then
       return 0
     fi

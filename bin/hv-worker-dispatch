@@ -113,6 +113,22 @@ EOF
 
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
+# clear_handle — the slot's session is gone: drop its handle, mark it idle.
+clear_handle() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+path, name = sys.argv[1:3]
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s["handle"] = None
+            s["state"] = "idle"
+update_json(Path(path), {"slots": []}, mutator)
+PY
+}
+
 # record_dispatch <handle> — write handle, state=busy and, for a task, the
 # task id (clearing the previous task's PR and relay log).
 record_dispatch() {
@@ -162,28 +178,48 @@ PY
   # A resume flag reopens the previous conversation in the "fresh" session,
   # which undoes the reset. Only tokens after the claude binary count: a
   # wrapper's own `-c` is not ours to judge.
+  # Quoted arguments are scanned too (`sh -c "claude -c"`), as are `--resume=x`
+  # and short clusters (`-cr`). A command that cannot be parsed is rejected.
   BAD_FLAG="$(python3 - "$LAUNCH" <<'PY'
-import os, shlex, sys
-toks = shlex.split(sys.argv[1])
-i = next((i for i, t in enumerate(toks) if os.path.basename(t) == "claude"), None)
-bad = [t for t in toks[i + 1:] if t in ("-c", "-r", "--continue", "--resume") or t.startswith("--resume=")] if i is not None else []
-print(bad[0] if bad else "")
+import os, re, shlex, sys
+def scan(cmd):
+    seen = False
+    for t in shlex.split(cmd):
+        if seen:
+            if (t in ("--continue", "--resume") or t.startswith(("--continue=", "--resume="))
+                    or re.fullmatch(r"-[A-Za-z]*[cr][A-Za-z]*", t)):
+                return t
+        elif os.path.basename(t) == "claude":
+            seen = True
+        elif re.search(r"\s", t):
+            hit = scan(t)
+            if hit:
+                return hit
+    return ""
+try:
+    print("bad " + hit if (hit := scan(sys.argv[1])) else "ok")
+except ValueError:
+    print("err")
 PY
 )"
-  if [ -n "$BAD_FLAG" ]; then
-    echo "error: work.workerCommand contains '$BAD_FLAG', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it." >&2
-    exit 2
-  fi
+  case "$BAD_FLAG" in
+    ok) ;;
+    err) echo "error: work.workerCommand cannot be parsed (unbalanced quote?): $LAUNCH" >&2; exit 2 ;;
+    *)   echo "error: work.workerCommand contains '${BAD_FLAG#bad }', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it." >&2
+         exit 2 ;;
+  esac
 
   # Refuse a slot that still holds work, before its session is killed.
-  "$HERE/hv-worker-reset" --slot "$SLOT" --check-only || exit 3
+  "$HERE/hv-worker-reset" --slot "$SLOT" --check-only ${TASK:+--task "$TASK"} || exit 3
 
   # Fresh session every task dispatch — see the /clear note above. The kill
   # must be provable: a window that survives it would run beside the new one.
   hv_host_kill "$SLOT" "$HANDLE" || exit 3
   # Re-check: the old session may have written between the check and its exit.
-  "$HERE/hv-worker-reset" --slot "$SLOT" ${TASK:+--task "$TASK"} || exit 3
-  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || exit 3
+  # The old session is dead from here on, so a failure must not leave its
+  # handle in the registry for a poll or relay to chase.
+  "$HERE/hv-worker-reset" --slot "$SLOT" ${TASK:+--task "$TASK"} || { clear_handle; exit 3; }
+  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || { clear_handle; exit 3; }
 elif [ -z "$HANDLE" ]; then
   echo "error: slot '$SLOT' has no session to relay into — dispatch a task first" >&2; exit 3
 fi

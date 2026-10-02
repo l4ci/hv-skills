@@ -224,6 +224,10 @@ rm -f "$FAKE/start_not_ready"
 pass "startup dialogs are answered by reading the pane, unknown ones refused"
 
 # ── (d) prompt errors ───────────────────────────────────────────────────────
+# The refused dialog above left the slot without a session (its handle is
+# cleared), so start one for the relays below to land in.
+hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null \
+  || fail "re-dispatch after a failed spawn did not start a session"
 echo agent_blocked > "$FAKE/prompt_error"
 RC=0
 hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
