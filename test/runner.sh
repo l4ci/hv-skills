@@ -32,6 +32,19 @@ export HV_SHIM_HELPERS="$HV_SHIM_STAGE/bin"
 cp -R "$BIN" "$HV_SHIM_HELPERS"
 trap 'rm -rf "$TMP" "$HV_SHIM_STAGE"' EXIT
 
+# Forge guard: no section may reach a real gh or glab. Poison stand-ins sit
+# first on PATH for every section; a section that wants the fake tracker puts
+# test/fakes in front of them, as it already does. A poison call logs itself
+# and exits 99, and any logged call fails the run after the leak guard.
+HV_POISON_DIR="$HV_SHIM_STAGE/poison"
+HV_POISON_LOG="$HV_SHIM_STAGE/poison.log"
+mkdir -p "$HV_POISON_DIR" && : > "$HV_POISON_LOG"
+for cli in gh glab; do
+  printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_DIR/$cli"
+  chmod +x "$HV_POISON_DIR/$cli"
+done
+export PATH="$HV_POISON_DIR:$PATH"
+
 # Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .hv/
 # content before any section runs. Under v4.1's partial-tracking model
 # (.hv/ files committed to the repo), a section helper that walks up past
@@ -164,6 +177,11 @@ fi
 [ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
 [ "$LEAKED" = 1 ] && exit 1
+if [ -s "$HV_POISON_LOG" ]; then
+  printf '\n\033[31merror: a section called a real forge CLI (poison gh/glab on PATH):\033[0m\n' >&2
+  sed 's/^/  /' "$HV_POISON_LOG" >&2
+  exit 1
+fi
 [ "$SECTIONS_RC" = 0 ] || exit "$SECTIONS_RC"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
