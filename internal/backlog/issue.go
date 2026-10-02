@@ -41,7 +41,7 @@ type Tracker interface {
 type Issues struct {
 	Cfg     any     // loaded config, for the label names
 	Tracker Tracker // where the issues come from
-	Repo    string  // umbrella sub-repo name, "" otherwise
+	Repo    string  // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
 }
 
 // Name is "issues".
@@ -423,9 +423,6 @@ func (b *Issues) item(is Issue) *Item {
 	}
 	if it.Title == "" {
 		it.Title = "(untitled)"
-	}
-	if b.Repo != "" {
-		it.ID = b.Repo + ":" + it.ID
 	}
 	for _, f := range b.fields(is, block) {
 		it.Fields.set(strings.ToLower(f.name), f.value)

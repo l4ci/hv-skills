@@ -229,9 +229,6 @@ func TestIssuesMatchPython(t *testing.T) {
 				m["id"] = it.Type + strconv.Itoa(it.Number)
 				r["items"] = append(r["items"].([]any), m)
 				wantID := strconv.Itoa(it.Number)
-				if s.Repo != "" {
-					wantID = s.Repo + ":" + wantID
-				}
 				if it.ID != wantID || it.URL == "" {
 					t.Errorf("Get(%q): ID %q (want %q), URL %q", ref, it.ID, wantID, it.URL)
 				}
@@ -338,8 +335,8 @@ func scenarioBackend(t *testing.T, s issueScenario) *Issues {
 	return &Issues{Cfg: mustDecode(t, s.Cfg), Tracker: tr, Repo: s.Repo}
 }
 
-// Every listed item is what Get returns for it (by number: a qualified
-// "repo:12" ID is Get's output, not an input), on generated issue sets.
+// Every listed item is what Get returns for its ID, on generated issue sets;
+// a foreign qualifier ("other:12") is not found.
 func TestIssuesListEqualsGet(t *testing.T) {
 	rng := rand.New(rand.NewSource(33))
 	listed := 0
@@ -361,18 +358,18 @@ func TestIssuesListEqualsGet(t *testing.T) {
 			t.Fatalf("scenario %d: List(false) is not the prefix of List(true)", i)
 		}
 		for j, it := range all {
-			want, err := b.Get(strconv.Itoa(it.Number))
+			want, err := b.Get(it.ID)
 			if err != nil {
-				t.Fatalf("scenario %d: Get(%d): %v", i, it.Number, err)
+				t.Fatalf("scenario %d: Get(%q): %v", i, it.ID, err)
+			}
+			if _, err := b.Get("other:" + strconv.Itoa(it.Number)); !errors.Is(err, ErrNotFound) {
+				t.Fatalf("scenario %d: foreign qualifier resolved: %v", i, err)
 			}
 			if !reflect.DeepEqual(&all[j], want) {
 				t.Fatalf("scenario %d: List()[%d] = %+v, Get = %+v", i, j, it, *want)
 			}
-			if s.Repo == "" && it.ID != strconv.Itoa(it.Number) {
+			if it.ID != strconv.Itoa(it.Number) {
 				t.Fatalf("ID %q, want the number", it.ID)
-			}
-			if s.Repo != "" && it.ID != s.Repo+":"+strconv.Itoa(it.Number) {
-				t.Fatalf("ID %q, want repo-qualified", it.ID)
 			}
 			listed++
 		}
