@@ -2,11 +2,9 @@ package backlog
 
 import (
 	"errors"
-	"path/filepath"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
 // Backend is the read side of a backlog, whichever store holds it.
@@ -82,30 +80,8 @@ func Open(root string, cfg any, tr Tracker) (Backend, error) {
 // IsUmbrella is whether root registers sub-repos in .hv/repos.json.
 func IsUmbrella(root string) bool { return hasRepos(root) }
 
-// hasRepos is whether .hv/repos.json registers at least one sub-repo, as
-// hvlib_repos.load_repos counts them: an entry needs a name and a path.
-func hasRepos(root string) bool {
-	data, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object)
-	if !ok {
-		return false
-	}
-	list, _ := data.Get("repos")
-	entries, _ := list.([]any)
-	for _, e := range entries {
-		obj, ok := e.(*jsonx.Object)
-		if !ok {
-			continue
-		}
-		name, _ := obj.Get("name")
-		path, _ := obj.Get("path")
-		if n, ok := name.(string); ok && n != "" {
-			if p, ok := path.(string); ok && p != "" {
-				return true
-			}
-		}
-	}
-	return false
-}
+// hasRepos is whether .hv/repos.json registers at least one sub-repo.
+func hasRepos(root string) bool { return len(repos.Load(root)) > 0 }
 
 var (
 	_ Backend = (*File)(nil)

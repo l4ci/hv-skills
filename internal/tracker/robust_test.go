@@ -61,6 +61,8 @@ func TestNotFound(t *testing.T) {
 		{"gitlab", "ERROR: 404 Not Found", KindNotFound},
 		{"gitlab", "404 Not found", KindNotFound},
 		{"gitlab", "ERROR: 500 Internal Server Error", KindFailed},
+		{"gitlab", "ERROR: 404 Project Not Found", KindFailed},
+		{"github", "GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)", KindFailed},
 	}
 	for _, c := range cases {
 		a := newAdapter(t, c.provider, &scripted{answer: func(string, []string) (string, string, int) { return "", c.stderr, 1 }})
@@ -328,5 +330,56 @@ func TestGitLabPRMerge(t *testing.T) {
 		if !IsKind(err, KindFailed) || !strings.Contains(err.Error(), c.errHas) {
 			t.Errorf("%s: %v; want KindFailed with %q", c.name, err, c.errHas)
 		}
+	}
+}
+
+func TestGitLabGetDropsSystemNotesLikeComments(t *testing.T) {
+	ctx := context.Background()
+	notes := `[{"id":7,"body":"added label","system":true},{"id":8,"body":"hi","author":{"username":"u"}}]`
+	s := &scripted{answer: func(_ string, args []string) (string, string, int) {
+		if args[0] == "api" {
+			return notes, "", 0
+		}
+		return `{"iid":1,"notes":` + notes + `}`, "", 0
+	}}
+	a := newAdapter(t, "gitlab", s)
+	is, err := a.Get(ctx, 1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := a.Comments(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(is.Comments) != 1 || is.Comments[0] != cs[0] || len(cs) != 1 {
+		t.Fatalf("Get %+v, Comments %+v", is.Comments, cs)
+	}
+}
+
+func TestGitLabMergeGitCallsTimeOut(t *testing.T) {
+	a, err := New(context.Background(), Settings{Provider: "gitlab"}, "", "/repo",
+		WithTimeout(20*time.Millisecond),
+		WithExec(func(ctx context.Context, _, name string, args []string, _ []byte) ([]byte, []byte, int, error) {
+			switch {
+			case name == "git":
+				<-ctx.Done()
+				return nil, nil, 0, ctx.Err()
+			case args[1] == "view":
+				return []byte(`{"state":"merged","sha":"aaaa","target_branch":"main"}`), nil, 0, nil
+			}
+			return nil, nil, 0, nil
+		}, func(string) (string, error) { return "/fake", nil }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := a.PRMerge(context.Background(), 4); done <- err }()
+	select {
+	case err := <-done:
+		if !IsKind(err, KindFailed) || !strings.Contains(err.Error(), "git fetch origin failed") {
+			t.Fatalf("got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("git fetch ran without the per-attempt timeout")
 	}
 }

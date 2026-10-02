@@ -7,6 +7,7 @@ package artifact
 import (
 	"errors"
 	"fmt"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
@@ -113,37 +113,8 @@ func ListDocs(dir string) ([]Doc, error) {
 }
 
 // Repos is the sub-repo registry, name to absolute path, from
-// .hv/repos.json. Paths there are relative to the project root.
-func Repos(root string) map[string]string {
-	out := map[string]string{}
-	reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object)
-	if !ok {
-		return out
-	}
-	lv, _ := reg.Get("repos")
-	list, _ := lv.([]any)
-	for _, e := range list {
-		o, ok := e.(*jsonx.Object)
-		if !ok {
-			continue
-		}
-		n, _ := o.Get("name")
-		p, _ := o.Get("path")
-		name, _ := n.(string)
-		rel, _ := p.(string)
-		if name == "" || rel == "" {
-			continue
-		}
-		if !filepath.IsAbs(rel) {
-			rel = filepath.Join(root, rel)
-		}
-		if real, err := filepath.EvalSymlinks(rel); err == nil {
-			rel = real
-		}
-		out[name] = rel
-	}
-	return out
-}
+// .hv/repos.json (internal/repos).
+func Repos(root string) map[string]string { return repos.Paths(root) }
 
 // SplitCSV splits a comma list, trimming blanks and dropping empties
 // (hvlib_repos.parse_repos_csv).

@@ -14,8 +14,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 )
 
 // Command is a group (Subs) or a verb (Verb) in the hv tree.
@@ -47,6 +47,7 @@ type Ctx struct {
 	JSON   bool
 	Repo   string // the --repo value; resolve it with RepoPath
 	Stdin  io.Reader
+	Stdout io.Writer // for passthrough verbs only; others return Text
 	Stderr io.Writer
 
 	warnings []string
@@ -103,38 +104,24 @@ func (c *Ctx) RepoPath() (string, error) {
 // Repos returns the project root and the registered sub-repos of .hv/repos.json
 // as name to absolute path (symlinks resolved when the path exists). The map
 // is empty outside umbrella mode.
-func (c *Ctx) Repos() (root string, repos map[string]string, err error) {
+func (c *Ctx) Repos() (root string, paths map[string]string, err error) {
 	root, err = c.Root()
 	if err != nil {
 		return "", nil, err
 	}
-	repos = map[string]string{}
-	if reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object); ok {
-		list, _ := reg.Get("repos")
-		entries, _ := list.([]any)
-		for _, e := range entries {
-			obj, ok := e.(*jsonx.Object)
-			if !ok {
-				continue
-			}
-			name, _ := obj.Get("name")
-			rel, _ := obj.Get("path")
-			n, _ := name.(string)
-			r, _ := rel.(string)
-			if n == "" || r == "" {
-				continue
-			}
-			p := r
-			if !filepath.IsAbs(p) {
-				p = filepath.Join(root, p)
-			}
-			if real, err := filepath.EvalSymlinks(p); err == nil {
-				p = real
-			}
-			repos[n] = filepath.Clean(p)
-		}
+	return root, repos.Paths(root), nil
+}
+
+// Repo is one registered sub-repo (see internal/repos).
+type Repo = repos.Repo
+
+// RepoList is Repos in registry order.
+func (c *Ctx) RepoList() (root string, list []Repo, err error) {
+	root, err = c.Root()
+	if err != nil {
+		return "", nil, err
 	}
-	return root, repos, nil
+	return root, repos.Load(root), nil
 }
 
 // globals are the flags every verb accepts (docs/design/5.0-cli-conventions.md,
@@ -219,7 +206,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	// Until the arguments parse, an error answers in JSON if any token
 	// before "--" is exactly --json.
-	c := &Ctx{Path: "hv", Stdin: stdin, Stderr: stderr, JSON: containsJSON(args)}
+	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args)}
 	defer func() {
 		if r := recover(); r != nil {
 			code = fail(c, stdout, asError(fmt.Errorf("panic: %v", r)))
