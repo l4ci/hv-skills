@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -259,14 +260,27 @@ func gitBranch(fs *flag.FlagSet) RunFunc {
 			return Result{Data: gitObj("branch", branch, "repos", names, "changed", false)},
 				Refused("branch '%s' already exists in: %s", branch, strings.Join(taken, ", "))
 		}
+		var created []string
+		// partial names the repos that already got the branch: exit 5
+		// carries no data, so a part-done run says so in its message.
+		partial := func() string {
+			if len(created) == 0 {
+				return "; created nowhere"
+			}
+			return "; already created in: " + strings.Join(created, ", ")
+		}
 		for _, n := range names {
 			msg, ok, err := git.Repo{Dir: repos[n]}.CreateBranch(ctx, branch)
 			if err != nil {
-				return Result{}, gitErr(err)
+				if errors.Is(err, git.ErrNoGit) {
+					return Result{}, Unavailable("git is not installed%s", partial())
+				}
+				return Result{}, fmt.Errorf("creating '%s' in %s: %w%s", branch, n, err, partial())
 			}
 			if !ok {
-				return Result{}, Unavailable("failed to create '%s' in %s: %s", branch, n, msg)
+				return Result{}, Unavailable("failed to create '%s' in %s: %s%s", branch, n, msg, partial())
 			}
+			created = append(created, n)
 		}
 		return Result{Data: gitObj("branch", branch, "repos", names, "changed", true),
 			Text: "created " + branch + " in " + strings.Join(names, ", ")}, nil

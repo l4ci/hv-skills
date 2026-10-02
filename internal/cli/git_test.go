@@ -236,6 +236,17 @@ func TestGitBranch(t *testing.T) {
 		{name: "create", dir: u, args: []string{"git", "branch", "feat/x", "--repos", "svc,web"},
 			data: map[string]any{"branch": "feat/x", "repos": list("svc", "web"), "changed": true}},
 	})
+	// A failure after the first repo names the repos that got the branch.
+	gitT(t, web, "branch", "half") // refs/heads/half blocks half/x in web only
+	o := trRun(t, u, "", "git", "branch", "half/x", "--repos", "svc,web")
+	if o.code != 5 || !strings.Contains(o.stderr, "failed to create 'half/x' in web") ||
+		!strings.Contains(o.stderr, "already created in: svc") {
+		t.Errorf("partial failure: %+v", o)
+	}
+	o = trRun(t, u, "", "git", "branch", "half/y", "--repos", "web,svc")
+	if o.code != 5 || !strings.Contains(o.stderr, "created nowhere") {
+		t.Errorf("failure on the first repo: %+v", o)
+	}
 	if gitT(t, svc, "branch", "--list", "taken") != "" {
 		t.Error("a collision must create nothing anywhere")
 	}
