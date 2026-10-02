@@ -1,0 +1,145 @@
+#!/bin/sh
+# hv launcher: the plugin's bin/hv. Finds the hv binary for this plugin
+# version, fetching it once, then execs it with all arguments.
+#
+# Order:
+#   1. $HV_BINARY, when set.
+#   2. HV_LAUNCHER_MODE=dev (opt-in, for contributors): go build this
+#      checkout into the cache, rebuilt when Go sources or plugin.json change.
+#   3. The release binary for the version in .claude-plugin/plugin.json,
+#      cached under <cache>/<version>/<os>-<arch>/hv, where <cache> is
+#      $HV_CACHE_DIR, else $XDG_CACHE_HOME/hv, else $HOME/.cache/hv. First
+#      use downloads hv_<os>_<arch> and checksums.txt from the GitHub release
+#      and refuses a binary whose sha256 does not match.
+#
+# Not a helper: it does not source hv-preamble.sh, because it must run
+# outside any .hv/ project (hv init, hv version) and must not change the
+# working directory the binary sees. Every launcher failure exits 5
+# (unavailable), per docs/design/5.0-cli-conventions.md.
+#
+# Env: HV_BINARY, HV_CACHE_DIR, HV_LAUNCHER_MODE=dev|release,
+#      HV_RELEASE_BASE_URL (default https://github.com/l4ci/hv-skills/releases/download;
+#      https or file, or http only for localhost / 127.0.0.1).
+set -eu
+
+hv_args=" $* "
+die() {
+  printf 'hv: %s\n' "$1" >&2
+  [ -z "${2:-}" ] || printf 'hint: %s\n' "$2" >&2
+  case $hv_args in
+    *" --json "*)
+      msg=$(printf '%s' "$1" | sed 's/[\\"]/\\&/g')
+      printf '{"ok": false, "error": {"code": "unavailable", "exit": 5, "message": "%s"}}\n' "$msg" ;;
+  esac
+  exit 5
+}
+
+if [ -n "${HV_BINARY:-}" ]; then exec "$HV_BINARY" "$@"; fi
+
+# Plugin root: follow symlinks to the real bin/hv (stow installs link it).
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in /*) self=$link ;; *) self=$(dirname "$self")/$link ;; esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd)
+manifest=$root/.claude-plugin/plugin.json
+
+version=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" 2>/dev/null | head -n 1)
+[ -n "$version" ] || die "cannot read version from $manifest"
+
+if [ -n "${HV_CACHE_DIR:-}" ]; then cache=$HV_CACHE_DIR
+elif [ -n "${XDG_CACHE_HOME:-}" ]; then cache=$XDG_CACHE_HOME/hv
+elif [ -n "${HOME:-}" ]; then cache=$HOME/.cache/hv
+else die "no cache directory: HOME is not set" "set HV_CACHE_DIR to a writable directory"
+fi
+
+case $(uname -s) in Linux) os=linux ;; Darwin) os=darwin ;; *) die "unsupported OS $(uname -s)" ;; esac
+case $(uname -m) in x86_64 | amd64) arch=amd64 ;; aarch64 | arm64) arch=arm64 ;; *) die "unsupported CPU $(uname -m)" ;; esac
+
+case ${HV_LAUNCHER_MODE:-release} in
+  dev)
+    command -v go >/dev/null 2>&1 || die "HV_LAUNCHER_MODE=dev needs go on PATH"
+    [ -f "$root/go.mod" ] || die "HV_LAUNCHER_MODE=dev needs a source checkout; $root has no go.mod"
+    # One build per checkout and platform: key on the checkout path.
+    key=$(printf '%s' "$root" | cksum | cut -d' ' -f1)
+    dir=$cache/dev-$key/$os-$arch
+    bin=$dir/hv
+    if [ ! -x "$bin" ] || [ -n "$(find "$manifest" "$root/go.mod" "$root/cmd" "$root/internal" -newer "$bin" 2>/dev/null | head -n 1)" ]; then
+      mkdir -p "$dir" || die "cannot create $dir"
+      # Private build dir: parallel cold starts never share a temp file, and
+      # the rename below means nobody execs a half-written binary.
+      build=$(mktemp -d "$dir/.build.XXXXXX") || die "cannot write to $dir"
+      commit=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || true)
+      pkg=github.com/l4ci/hv-skills/v5/internal/version
+      if ! (cd "$root" && go build -o "$build/hv" \
+        -ldflags "-X $pkg.Version=$version-dev -X $pkg.Commit=$commit" ./cmd/hv) >&2; then
+        rm -rf "$build"
+        die "go build failed in $root"
+      fi
+      mv -f "$build/hv" "$bin" || { rm -rf "$build"; die "cannot install $bin"; }
+      rm -rf "$build"
+    fi
+    exec "$bin" "$@"
+    ;;
+  release) ;;
+  *) die "HV_LAUNCHER_MODE must be dev or release, not ${HV_LAUNCHER_MODE}" ;;
+esac
+
+dir=$cache/$version/$os-$arch
+bin=$dir/hv
+if [ ! -x "$bin" ]; then
+  base=${HV_RELEASE_BASE_URL:-https://github.com/l4ci/hv-skills/releases/download}
+  # No userinfo anywhere (http://localhost:1@evil.example is evil.example).
+  # Plain http only when the whole host is localhost or 127.0.0.1, with an
+  # optional numeric port.
+  url_ok=
+  case $base in
+    *@*) ;;
+    https://* | file://*) url_ok=1 ;;
+    http://*)
+      hostport=${base#http://}
+      hostport=${hostport%%/*}
+      case $hostport in
+        localhost | 127.0.0.1) url_ok=1 ;;
+        localhost:* | 127.0.0.1:*)
+          port=${hostport#*:}
+          case $port in '' | *[!0-9]*) ;; *) url_ok=1 ;; esac ;;
+      esac ;;
+  esac
+  [ -n "$url_ok" ] || die "refusing release URL $base" "use https without userinfo (plain http only for localhost or 127.0.0.1)"
+  base=$base/v$version
+  asset=hv_${os}_${arch}
+  mkdir -p "$dir" || die "cannot create $dir"
+  tmp=$(mktemp "$dir/.dl.XXXXXX") || die "cannot write to $dir"
+  sums=$(mktemp "$dir/.sums.XXXXXX") || die "cannot write to $dir"
+  trap 'rm -f "$tmp" "$sums"' EXIT
+  fetch() {
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL --connect-timeout 10 --max-time 300 --proto-redir =https -o "$2" "$1"
+    elif command -v wget >/dev/null 2>&1; then
+      # wget cannot limit redirects to https (GitHub release assets always
+      # redirect, so refusing redirects would break every download). The
+      # sha256 check still applies; see the conventions doc.
+      wget -q --tries=1 --timeout=30 -O "$2" "$1"
+    else
+      die "need curl or wget to download hv v$version"
+    fi
+  }
+  printf 'hv: downloading %s v%s\n' "$asset" "$version" >&2
+  hint=
+  [ ! -f "$root/go.mod" ] || hint="in a source checkout, HV_LAUNCHER_MODE=dev builds hv from source"
+  fetch "$base/$asset" "$tmp" || die "download failed: $base/$asset" "$hint"
+  fetch "$base/checksums.txt" "$sums" || die "download failed: $base/checksums.txt" "$hint"
+  want=$(awk -v a="$asset" '$2 == a || $2 == "*" a { print $1 }' "$sums")
+  [ -n "$want" ] || die "checksums.txt has no entry for $asset"
+  if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum "$tmp" | cut -d' ' -f1)
+  else got=$(shasum -a 256 "$tmp" | cut -d' ' -f1)
+  fi
+  [ "$got" = "$want" ] || die "checksum mismatch for $asset (want $want, got $got)"
+  chmod 755 "$tmp"
+  mv -f "$tmp" "$bin" || die "cannot install $bin"
+  rm -f "$sums"
+  trap - EXIT
+fi
+exec "$bin" "$@"

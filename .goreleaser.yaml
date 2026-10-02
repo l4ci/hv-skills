@@ -1,0 +1,36 @@
+# Release build for the hv CLI. Asset names are a contract with bin/hv, the
+# plugin launcher: it downloads hv_<os>_<arch> and checks it against
+# checksums.txt. Run `goreleaser release --snapshot --clean` to build locally.
+version: 2
+project_name: hv
+
+builds:
+  - id: hv
+    main: ./cmd/hv
+    binary: hv
+    env:
+      - CGO_ENABLED=0
+    # No windows: the sidecar lock uses flock (as hvlib_io does).
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/l4ci/hv-skills/v5/internal/version.Version={{ .Version }}
+      - -X github.com/l4ci/hv-skills/v5/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/l4ci/hv-skills/v5/internal/version.Date={{ .Date }}
+
+archives:
+  # Bare binaries for bin/hv.
+  - id: launcher
+    formats: [binary]
+    name_template: "hv_{{ .Os }}_{{ .Arch }}"
+  # Tarballs for people and package managers.
+  - id: tarball
+    formats: [tar.gz]
+    name_template: "hv_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+# Homebrew needs a tap repository (e.g. l4ci/homebrew-tap) and a token with
+# write access to it; neither exists yet, so the brew section stays out.
