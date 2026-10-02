@@ -3,15 +3,19 @@
 // the forge CLI runs (CLI.Run, ported from bin/hv-tracker-call), with list
 // limits, pagination and bounded rate-limit handling.
 //
-// Adapters make one CLI round trip per call and cache nothing, except the
-// GitLab username that AssignSelf resolves once per adapter.
+// Adapters cache nothing, except the GitLab username that AssignSelf resolves
+// once per adapter. List calls page until the forge returns a short page, so
+// a result is never silently truncated. Every call takes a context; each CLI
+// attempt also has its own timeout (CLI.Timeout).
 package tracker
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,16 +29,38 @@ type Kind int
 const (
 	// KindFailed: the forge CLI ran and failed, or its output did not parse.
 	KindFailed Kind = iota
-	// KindUnavailable: no provider resolves, the CLI is missing, or it is not
-	// authenticated (exit 5 in the 5.0 table, old helper exit 3).
+	// KindUnavailable: no provider resolves, the CLI is missing, not
+	// authenticated, or timed out (old helper exit 3).
 	KindUnavailable
-	// KindRateLimited: the forge rate-limited the call (exit 6, old exit 4).
+	// KindRateLimited: the forge rate-limited the call (old exit 4).
 	KindRateLimited
+	// KindNotFound: the issue, PR, comment, milestone or label does not
+	// exist (the CLI said so on a failed call).
+	KindNotFound
+	// KindInternal: the CLI could not be started for a reason that is not
+	// the forge's (a bad working directory), or the caller cancelled.
+	KindInternal
 )
 
+// Exit is the 5.0 exit code for the kind (docs/design/5.0-cli-conventions.md):
+// not found is 3 (resolution), a missing or failing forge is 5, a rate limit
+// is 6, an internal failure is 70.
+func (k Kind) Exit() int {
+	switch k {
+	case KindNotFound:
+		return 3
+	case KindRateLimited:
+		return 6
+	case KindInternal:
+		return 70
+	}
+	return 5
+}
+
 // Error is a tracker failure. Code is what the Python TrackerError carried:
-// 3 unavailable, 4 rate-limited, the CLI's own exit code when it failed, and 1
-// for output that did not parse.
+// 3 unavailable, 4 rate-limited, the CLI's own exit code when it failed
+// (also for KindNotFound), and 1 for output that did not parse. Use
+// Kind.Exit, not Code, for an hv exit code.
 type Error struct {
 	Kind    Kind
 	Code    int
@@ -54,6 +80,15 @@ func rateLimited(format string, a ...any) *Error {
 func failed(format string, a ...any) *Error {
 	return &Error{Kind: KindFailed, Code: 1, Message: fmt.Sprintf(format, a...)}
 }
+
+func internal(format string, a ...any) *Error {
+	return &Error{Kind: KindInternal, Code: 1, Message: fmt.Sprintf(format, a...)}
+}
+
+// reNotFound is how gh and glab say the object of a call does not exist:
+// gh "Could not resolve to an Issue", "no pull requests found", "HTTP 404";
+// glab "404 Not Found".
+var reNotFound = regexp.MustCompile(`(?i)not found|could not resolve|404|no pull requests found`)
 
 // IsKind reports whether err is a tracker *Error of kind k.
 func IsKind(err error, k Kind) bool {
@@ -77,9 +112,8 @@ type Issue struct {
 	Comments    []Comment
 }
 
-// Comment is an issue comment (a GitLab note). ID is the forge's id as text:
-// a decimal number, or a GraphQL node id for comments read through gh
-// `issue view`.
+// Comment is an issue comment (a GitLab note). ID is the forge's numeric REST
+// id as text, the one EditComment and DeleteComment take, on every path.
 type Comment struct {
 	ID     string
 	Body   string
@@ -132,44 +166,44 @@ type MilestoneEdit struct {
 type Adapter interface {
 	Provider() string
 
-	Create(title, body string, labels []string, milestone string) (int, error)
-	Get(number int, withComments bool) (Issue, error)
-	List(f ListFilter) ([]Issue, error)
-	Edit(number int, e IssueEdit) error
-	EnsureLabels(names []string, autoCreate bool) error
-	AddLabels(number int, labels []string, autoCreate bool) error
-	RemoveLabels(number int, labels []string) error
+	Create(ctx context.Context, title, body string, labels []string, milestone string) (int, error)
+	Get(ctx context.Context, number int, withComments bool) (Issue, error)
+	List(ctx context.Context, f ListFilter) ([]Issue, error)
+	Edit(ctx context.Context, number int, e IssueEdit) error
+	EnsureLabels(ctx context.Context, names []string, autoCreate bool) error
+	AddLabels(ctx context.Context, number int, labels []string, autoCreate bool) error
+	RemoveLabels(ctx context.Context, number int, labels []string) error
 	// Close with reason "completed" (or "") or "not_planned"; comment is optional.
-	Close(number int, reason, comment string) error
-	Reopen(number int) error
-	AssignSelf(number int) error
+	Close(ctx context.Context, number int, reason, comment string) error
+	Reopen(ctx context.Context, number int) error
+	AssignSelf(ctx context.Context, number int) error
 
-	Comments(number int) ([]Comment, error)
-	AddComment(number int, body string) (string, error)
-	EditComment(number int, commentID, body string) error
-	DeleteComment(number int, commentID string) error
+	Comments(ctx context.Context, number int) ([]Comment, error)
+	AddComment(ctx context.Context, number int, body string) (string, error)
+	EditComment(ctx context.Context, number int, commentID, body string) error
+	DeleteComment(ctx context.Context, number int, commentID string) error
 
 	// FindMilestone returns the title of the milestone whose leading token is
 	// hvID, preferring open ones; ok is false when none matches.
-	FindMilestone(hvID string) (title string, ok bool, err error)
+	FindMilestone(ctx context.Context, hvID string) (title string, ok bool, err error)
 	// Milestones lists by state "open", "closed" or "all" (or "").
-	Milestones(state string) ([]Milestone, error)
-	CreateMilestone(title, description string) (int, error)
-	EditMilestone(number int, e MilestoneEdit) error
-	IssuesInMilestone(title, state string) ([]Issue, error)
+	Milestones(ctx context.Context, state string) ([]Milestone, error)
+	CreateMilestone(ctx context.Context, title, description string) (int, error)
+	EditMilestone(ctx context.Context, number int, e MilestoneEdit) error
+	IssuesInMilestone(ctx context.Context, title, state string) ([]Issue, error)
 
 	// ClosedNumbers returns the issue numbers a PR body closes through a
 	// closing keyword, in order of first appearance.
 	ClosedNumbers(body string) []int
-	OpenPRs() ([]PR, error)
-	PRsClosing(number int) ([]PR, error)
-	PRCheckout(pr int) error
+	OpenPRs(ctx context.Context) ([]PR, error)
+	PRsClosing(ctx context.Context, number int) ([]PR, error)
+	PRCheckout(ctx context.Context, pr int) error
 	// PRMerge merges with a merge commit, deletes the source branch and
 	// returns the merge commit sha.
-	PRMerge(pr int) (string, error)
-	PRComment(pr int, body string) error
+	PRMerge(ctx context.Context, pr int) (string, error)
+	PRComment(ctx context.Context, pr int, body string) error
 	// PRState is "open", "merged" or "closed".
-	PRState(pr int) (string, error)
+	PRState(ctx context.Context, pr int) (string, error)
 }
 
 // Settings are the issues.* config values the tracker reads.
@@ -201,20 +235,29 @@ func SettingsFromConfig(cfg any) Settings {
 // New returns the adapter for provider ("" or "auto" falls back to
 // s.Provider, then to origin-URL detection in dir). Every CLI call runs in
 // dir ("" is the process cwd); in umbrella mode that is the sub-repo.
-func New(s Settings, provider, dir string, opts ...Option) (Adapter, error) {
+func New(ctx context.Context, s Settings, provider, dir string, opts ...Option) (Adapter, error) {
+	c, err := NewCLI(ctx, s, provider, dir, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if c.Provider == "github" {
+		return &GitHub{base{cli: c, closing: closingGH}}, nil
+	}
+	return &GitLab{base: base{cli: c, closing: closingGL}, NotPlannedLabel: s.NotPlannedLabel}, nil
+}
+
+// NewCLI returns the forge CLI runner for provider, resolved as in New.
+func NewCLI(ctx context.Context, s Settings, provider, dir string, opts ...Option) (*CLI, error) {
 	c := &CLI{Dir: dir, RetryWait: s.RetryWait}
 	for _, o := range opts {
 		o(c)
 	}
-	p, err := c.resolve(provider, s.Provider)
+	p, err := c.resolve(ctx, provider, s.Provider)
 	if err != nil {
 		return nil, err
 	}
 	c.Provider = p
-	if p == "github" {
-		return &GitHub{base{cli: c, closing: closingGH}}, nil
-	}
-	return &GitLab{base: base{cli: c, closing: closingGL}, NotPlannedLabel: s.NotPlannedLabel}, nil
+	return c, nil
 }
 
 // Option adjusts the CLI an adapter runs through (tests swap the executor).
@@ -224,6 +267,11 @@ type Option func(*CLI)
 // the CLI binary with lookPath.
 func WithExec(x Exec, lookPath func(string) (string, error)) Option {
 	return func(c *CLI) { c.Exec, c.LookPath = x, lookPath }
+}
+
+// WithTimeout sets the per-attempt timeout (CLI.Timeout).
+func WithTimeout(d time.Duration) Option {
+	return func(c *CLI) { c.Timeout = d }
 }
 
 // WithSleep replaces the rate-limit wait.
@@ -242,7 +290,8 @@ func (b *base) Provider() string { return b.cli.Provider }
 func (b *base) ClosedNumbers(body string) []int { return b.closing(body) }
 
 // run makes one call; stdin carries body only when an argument is exactly "-".
-func (b *base) run(args []string, body string) (string, error) {
+// A failed call is KindNotFound when the CLI says the object does not exist.
+func (b *base) run(ctx context.Context, args []string, body string) (string, error) {
 	var stdin io.Reader
 	for _, a := range args {
 		if a == "-" {
@@ -250,18 +299,52 @@ func (b *base) run(args []string, body string) (string, error) {
 			break
 		}
 	}
-	res, err := b.cli.Run(args, stdin)
+	res, err := b.cli.Run(ctx, args, stdin)
 	if err != nil {
 		return "", err
 	}
 	if res.ExitCode != 0 {
-		return "", &Error{Kind: KindFailed, Code: res.ExitCode, Message: strings.TrimSpace(string(res.Stderr))}
+		kind := KindFailed
+		if reNotFound.Match(res.Stderr) {
+			kind = KindNotFound
+		}
+		return "", &Error{Kind: kind, Code: res.ExitCode, Message: strings.TrimSpace(string(res.Stderr))}
 	}
 	return string(res.Stdout), nil
 }
 
-func (b *base) json(args []string, v any) error {
-	out, err := b.run(args, "")
+// list runs a list command with an explicit page size and keeps fetching
+// while pages come back full, so a long list is never cut short. more turns
+// the page size and the 1-based page number into the paging arguments; when
+// it returns grow, the page size doubles and the whole list is re-fetched
+// instead (gh pages internally up to --limit).
+func (b *base) list(ctx context.Context, args []string, size int, more func(size, page int) (extra []string, grow bool), v any) error {
+	var all []json.RawMessage
+	for page := 1; ; page++ {
+		extra, grow := more(size, page)
+		var rows []json.RawMessage
+		if err := b.json(ctx, append(append([]string(nil), args...), extra...), &rows); err != nil {
+			return err
+		}
+		if grow {
+			all = rows
+			if len(rows) < size {
+				break
+			}
+			size *= 2
+			continue
+		}
+		all = append(all, rows...)
+		if len(rows) < size {
+			break
+		}
+	}
+	joined, _ := json.Marshal(all)
+	return json.Unmarshal(joined, v)
+}
+
+func (b *base) json(ctx context.Context, args []string, v any) error {
+	out, err := b.run(ctx, args, "")
 	if err != nil {
 		return err
 	}
@@ -273,8 +356,8 @@ func (b *base) json(args []string, v any) error {
 
 // pages decodes an `api` list call whose paginated output concatenates one
 // JSON array per page.
-func (b *base) pages(path string, v any) error {
-	out, err := b.run([]string{"api", path}, "")
+func (b *base) pages(ctx context.Context, path string, v any) error {
+	out, err := b.run(ctx, []string{"api", path}, "")
 	if err != nil {
 		return err
 	}
@@ -294,9 +377,9 @@ func (b *base) pages(path string, v any) error {
 	return nil
 }
 
-func (b *base) createdID(args []string) (string, error) {
+func (b *base) createdID(ctx context.Context, args []string) (string, error) {
 	var d struct{ ID json.RawMessage }
-	if err := b.json(args, &d); err != nil {
+	if err := b.json(ctx, args, &d); err != nil {
 		return "", err
 	}
 	n, ok := intOf(d.ID)
@@ -355,8 +438,8 @@ func uniq(names []string) []string {
 	return out
 }
 
-func (b *base) prsClosing(a Adapter, number int) ([]PR, error) {
-	prs, err := a.OpenPRs()
+func (b *base) prsClosing(ctx context.Context, a Adapter, number int) ([]PR, error) {
+	prs, err := a.OpenPRs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -372,23 +455,23 @@ func (b *base) prsClosing(a Adapter, number int) ([]PR, error) {
 	return out, nil
 }
 
-func (b *base) addLabels(a Adapter, number int, labels []string, autoCreate bool) error {
+func (b *base) addLabels(ctx context.Context, a Adapter, number int, labels []string, autoCreate bool) error {
 	labels = uniq(labels)
 	if len(labels) == 0 {
 		return nil
 	}
-	if err := a.EnsureLabels(labels, autoCreate); err != nil {
+	if err := a.EnsureLabels(ctx, labels, autoCreate); err != nil {
 		return err
 	}
-	return a.Edit(number, IssueEdit{AddLabels: labels})
+	return a.Edit(ctx, number, IssueEdit{AddLabels: labels})
 }
 
-func (b *base) removeLabels(a Adapter, number int, labels []string) error {
+func (b *base) removeLabels(ctx context.Context, a Adapter, number int, labels []string) error {
 	labels = uniq(labels)
 	if len(labels) == 0 {
 		return nil
 	}
-	return a.Edit(number, IssueEdit{RemoveLabels: labels})
+	return a.Edit(ctx, number, IssueEdit{RemoveLabels: labels})
 }
 
 // numberFromURL reads the issue number off the last line of a create call.

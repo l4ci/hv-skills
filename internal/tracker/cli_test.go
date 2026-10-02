@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +30,7 @@ func (f *fakeCLI) cli(provider string) *CLI {
 	return &CLI{
 		Provider:  provider,
 		RetryWait: 7 * time.Second,
-		Exec: func(dir, name string, args []string, stdin []byte) ([]byte, []byte, int, error) {
+		Exec: func(_ context.Context, dir, name string, args []string, stdin []byte) ([]byte, []byte, int, error) {
 			f.calls = append(f.calls, append([]string{name}, args...))
 			f.dirs = append(f.dirs, dir)
 			f.stdins = append(f.stdins, stdin)
@@ -80,7 +81,7 @@ func TestRunInjectsLimitsAndPagination(t *testing.T) {
 	}
 	for _, c := range cases {
 		f := &fakeCLI{}
-		if _, err := f.cli(c.provider).Run(strings.Fields(c.args), nil); err != nil {
+		if _, err := f.cli(c.provider).Run(context.Background(), strings.Fields(c.args), nil); err != nil {
 			t.Fatalf("%s: %v", c.args, err)
 		}
 		if got := f.last(); got != c.want {
@@ -100,7 +101,7 @@ func TestRunStdinOnlyWhenAnArgumentTakesIt(t *testing.T) {
 		{"issue view 3", nil},
 	} {
 		f := &fakeCLI{}
-		if _, err := f.cli("github").Run(strings.Fields(c.args), strings.NewReader("body")); err != nil {
+		if _, err := f.cli("github").Run(context.Background(), strings.Fields(c.args), strings.NewReader("body")); err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(f.stdins[0], c.want) {
@@ -109,7 +110,7 @@ func TestRunStdinOnlyWhenAnArgumentTakesIt(t *testing.T) {
 	}
 	// An argument that takes stdin with no reader gets an empty one, not none.
 	f := &fakeCLI{}
-	if _, err := f.cli("github").Run([]string{"issue", "create", "-F", "-"}, nil); err != nil {
+	if _, err := f.cli("github").Run(context.Background(), []string{"issue", "create", "-F", "-"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if f.stdins[0] == nil || len(f.stdins[0]) != 0 {
@@ -124,7 +125,7 @@ func TestRunStdinReplayedOnRetry(t *testing.T) {
 		}
 		return "{}", "", 0
 	}}
-	if _, err := f.cli("github").Run([]string{"issue", "create", "-F", "-"}, strings.NewReader("body")); err != nil {
+	if _, err := f.cli("github").Run(context.Background(), []string{"issue", "create", "-F", "-"}, strings.NewReader("body")); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.stdins) != 2 || string(f.stdins[1]) != "body" {
@@ -136,7 +137,7 @@ func TestRunRunsInDir(t *testing.T) {
 	f := &fakeCLI{}
 	c := f.cli("github")
 	c.Dir = "/some/sub"
-	if _, err := c.Run([]string{"issue", "view", "1"}, nil); err != nil {
+	if _, err := c.Run(context.Background(), []string{"issue", "view", "1"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if f.dirs[0] != "/some/sub" {
@@ -161,7 +162,7 @@ func TestRunTruncationWarning(t *testing.T) {
 		{"gitlab", "mr list", 100, true},
 	} {
 		f := &fakeCLI{answer: func(int, []string) (string, string, int) { return rows(c.n), "note\n", 0 }}
-		r, err := f.cli(c.provider).Run(strings.Fields(c.args), nil)
+		r, err := f.cli(c.provider).Run(context.Background(), strings.Fields(c.args), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,7 +212,7 @@ func TestRunRateLimits(t *testing.T) {
 	}
 	for _, c := range cases {
 		f := &fakeCLI{answer: c.answer}
-		_, err := f.cli("github").Run([]string{"issue", "list"}, nil)
+		_, err := f.cli("github").Run(context.Background(), []string{"issue", "list"}, nil)
 		if len(f.calls) != c.calls || len(f.slept) != c.slept {
 			t.Errorf("%s: %d calls, %d sleeps; want %d, %d", c.name, len(f.calls), len(f.slept), c.calls, c.slept)
 		}
@@ -233,7 +234,7 @@ func TestRunRateLimits(t *testing.T) {
 
 func TestRunPlainFailurePassesThrough(t *testing.T) {
 	f := &fakeCLI{answer: func(int, []string) (string, string, int) { return "partial", "boom: not found", 7 }}
-	r, err := f.cli("github").Run([]string{"issue", "view", "9"}, nil)
+	r, err := f.cli("github").Run(context.Background(), []string{"issue", "view", "9"}, nil)
 	if err != nil || r.ExitCode != 7 || string(r.Stdout) != "partial" || string(r.Stderr) != "boom: not found" || len(f.calls) != 1 {
 		t.Fatalf("got %+v, %v after %d calls", r, err, len(f.calls))
 	}
@@ -244,7 +245,7 @@ func TestRunMissingCLI(t *testing.T) {
 		f := &fakeCLI{}
 		c := f.cli(p)
 		c.LookPath = func(string) (string, error) { return "", exec.ErrNotFound }
-		_, err := c.Run([]string{"issue", "list"}, nil)
+		_, err := c.Run(context.Background(), []string{"issue", "list"}, nil)
 		if !IsKind(err, KindUnavailable) || err.Error() != cli+" is not installed" || len(f.calls) != 0 {
 			t.Errorf("%s: %v", p, err)
 		}
@@ -253,7 +254,7 @@ func TestRunMissingCLI(t *testing.T) {
 
 func TestResolveProvider(t *testing.T) {
 	origin := func(url string, code int) Exec {
-		return func(dir, name string, args []string, _ []byte) ([]byte, []byte, int, error) {
+		return func(_ context.Context, dir, name string, args []string, _ []byte) ([]byte, []byte, int, error) {
 			if name != "git" || strings.Join(args, " ") != "remote get-url origin" || dir != "/repo" {
 				return nil, nil, 0, fmt.Errorf("unexpected %s %q in %q", name, args, dir)
 			}
@@ -274,7 +275,7 @@ func TestResolveProvider(t *testing.T) {
 		{"", "auto", origin("", 2), ""},
 		{"", "auto", origin("https://example.com/o/r", 0), ""},
 	} {
-		p, err := ResolveProvider(c.want, c.configured, "/repo", c.x)
+		p, err := ResolveProvider(context.Background(), c.want, c.configured, "/repo", c.x)
 		if c.out == "" {
 			if !IsKind(err, KindUnavailable) || err.Error() != "cannot determine provider (set issues.provider)" {
 				t.Errorf("%+v: %q, %v", c, p, err)
@@ -370,9 +371,9 @@ func TestAdapterParseErrors(t *testing.T) {
 	}}
 	f2 := &fakeCLI{answer: func(int, []string) (string, string, int) { return "[{}] {}", "", 0 }}
 	gh := &GitHub{base{cli: f.cli("github"), closing: closingGH}}
-	_, err1 := gh.Get(1, false)
-	_, err2 := gh.Create("t", "b", nil, "")
-	_, err3 := (&GitHub{base{cli: f2.cli("github"), closing: closingGH}}).Comments(1)
+	_, err1 := gh.Get(context.Background(), 1, false)
+	_, err2 := gh.Create(context.Background(), "t", "b", nil, "")
+	_, err3 := (&GitHub{base{cli: f2.cli("github"), closing: closingGH}}).Comments(context.Background(), 1)
 	for i, err := range []error{err1, err2, err3} {
 		var e *Error
 		if !errors.As(err, &e) || e.Kind != KindFailed || e.Code != 1 {
@@ -385,7 +386,7 @@ func TestPagesConcatenates(t *testing.T) {
 	f := &fakeCLI{answer: func(int, []string) (string, string, int) {
 		return `[{"id":1,"body":"a","user":{"login":"x"}}]` + "\n" + `[{"id":"IC_2","body":"b"}]` + "\n", "", 0
 	}}
-	cs, err := (&GitHub{base{cli: f.cli("github"), closing: closingGH}}).Comments(5)
+	cs, err := (&GitHub{base{cli: f.cli("github"), closing: closingGH}}).Comments(context.Background(), 5)
 	want := []Comment{{ID: "1", Body: "a", Author: "x"}, {ID: "IC_2", Body: "b"}}
 	if err != nil || !reflect.DeepEqual(cs, want) {
 		t.Fatalf("%+v, %v", cs, err)

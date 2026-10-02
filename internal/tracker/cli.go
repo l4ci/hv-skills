@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,8 +15,11 @@ import (
 
 // Exec starts name with args in dir and returns its output and exit code.
 // A nil stdin gives the process an empty one. err is set only when the
-// process could not run at all.
-type Exec func(dir, name string, args []string, stdin []byte) (stdout, stderr []byte, code int, err error)
+// process could not run at all, or ctx ended it.
+type Exec func(ctx context.Context, dir, name string, args []string, stdin []byte) (stdout, stderr []byte, code int, err error)
+
+// DefaultTimeout bounds one CLI attempt when CLI.Timeout is zero.
+const DefaultTimeout = 2 * time.Minute
 
 // Result is one forge CLI call. Stderr ends with the truncation warning when
 // a list hit the injected limit.
@@ -33,6 +37,7 @@ type CLI struct {
 	Provider  string // github | gitlab
 	Dir       string // where the CLI runs; "" is the process cwd
 	RetryWait time.Duration
+	Timeout   time.Duration // per attempt; 0 is DefaultTimeout
 
 	Exec     Exec
 	LookPath func(string) (string, error)
@@ -61,15 +66,20 @@ func (c *CLI) lookPath(name string) (string, error) {
 	return exec.LookPath(name)
 }
 
-func osExec(dir, name string, args []string, stdin []byte) ([]byte, []byte, int, error) {
-	cmd := exec.Command(name, args...)
+func osExec(ctx context.Context, dir, name string, args []string, stdin []byte) ([]byte, []byte, int, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
+	// A killed gh can leave a child holding the pipes; don't wait on it.
+	cmd.WaitDelay = 5 * time.Second
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		return nil, nil, 0, ctx.Err()
+	}
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
 		return out.Bytes(), errb.Bytes(), ee.ExitCode(), nil
@@ -83,18 +93,18 @@ func osExec(dir, name string, args []string, stdin []byte) ([]byte, []byte, int,
 // ResolveProvider picks the provider: want (a --provider value) unless it is
 // "" or "auto", then configured (issues.provider) on the same terms, then
 // origin-URL detection in dir. It is KindUnavailable when none resolves.
-func ResolveProvider(want, configured, dir string, x Exec) (string, error) {
+func ResolveProvider(ctx context.Context, want, configured, dir string, x Exec) (string, error) {
 	c := &CLI{Dir: dir, Exec: x}
-	return c.resolve(want, configured)
+	return c.resolve(ctx, want, configured)
 }
 
-func (c *CLI) resolve(want, configured string) (string, error) {
+func (c *CLI) resolve(ctx context.Context, want, configured string) (string, error) {
 	p := want
 	if p == "" || p == "auto" {
 		p = configured
 	}
 	if p != "github" && p != "gitlab" {
-		p = c.detect()
+		p = c.detect(ctx)
 	}
 	if p != "github" && p != "gitlab" {
 		return "", unavailable("cannot determine provider (set issues.provider)")
@@ -107,8 +117,10 @@ var reHost = regexp.MustCompile(`(?i)^(https?://|ssh://)?(git@)?([^:/\n]+)[:/].*
 
 // detect classifies dir's origin URL as hv-issues-provider did: "github" or
 // "gitlab" when the host contains that word, else "unknown".
-func (c *CLI) detect() string {
-	out, _, code, err := c.exec()(c.Dir, "git", []string{"remote", "get-url", "origin"}, nil)
+func (c *CLI) detect(ctx context.Context) string {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout())
+	defer cancel()
+	out, _, code, err := c.exec()(ctx, c.Dir, "git", []string{"remote", "get-url", "origin"}, nil)
 	if err != nil || code != 0 {
 		return "unknown"
 	}
@@ -136,9 +148,11 @@ func ProviderFromURL(url string) string {
 
 // Run makes one forge CLI call. A non-zero CLI exit is not an error: it comes
 // back in Result.ExitCode with the CLI's output. Errors are KindUnavailable
-// (CLI missing or unauthenticated) and KindRateLimited. stdin is read once,
-// and only when an argument takes it (`-`, or ending in `=-` or `@-`).
-func (c *CLI) Run(args []string, stdin io.Reader) (Result, error) {
+// (CLI missing, unauthenticated, or an attempt past Timeout), KindRateLimited,
+// and KindInternal (the process could not start, or ctx was cancelled).
+// stdin is read once, and only when an argument takes it (`-`, or ending in
+// `=-` or `@-`).
+func (c *CLI) Run(ctx context.Context, args []string, stdin io.Reader) (Result, error) {
 	cli := "gh"
 	if c.Provider == "gitlab" {
 		cli = "glab"
@@ -154,17 +168,26 @@ func (c *CLI) Run(args []string, stdin io.Reader) (Result, error) {
 		if stdin != nil {
 			b, err := io.ReadAll(stdin)
 			if err != nil {
-				return Result{}, unavailable("reading stdin: %v", err)
+				return Result{}, internal("reading stdin: %v", err)
 			}
 			data = b
 		}
 	}
 	attempt := func() (Result, error) {
-		out, errb, code, err := c.exec()(c.Dir, cli, args, data)
-		if err != nil {
-			return Result{}, unavailable("%s: %v", cli, err)
+		actx, cancel := context.WithTimeout(ctx, c.timeout())
+		defer cancel()
+		out, errb, code, err := c.exec()(actx, c.Dir, cli, args, data)
+		switch {
+		case err == nil:
+			return Result{Stdout: out, Stderr: errb, ExitCode: code}, nil
+		case ctx.Err() != nil:
+			return Result{}, internal("%s: %v", cli, ctx.Err())
+		case actx.Err() != nil:
+			return Result{}, unavailable("%s timed out after %s", cli, c.timeout())
+		case errors.Is(err, exec.ErrNotFound):
+			return Result{}, unavailable("%s is not installed", cli)
 		}
-		return Result{Stdout: out, Stderr: errb, ExitCode: code}, nil
+		return Result{}, internal("cannot run %s: %v", cli, err)
 	}
 
 	r, err := attempt()
@@ -181,7 +204,9 @@ func (c *CLI) Run(args []string, stdin io.Reader) (Result, error) {
 		if try == 2 {
 			return Result{}, rateLimited("%s rate limit — stopped after one retry", c.Provider)
 		}
-		c.sleep(c.RetryWait)
+		if err := c.sleep(ctx, c.RetryWait); err != nil {
+			return Result{}, err
+		}
 		if r, err = attempt(); err != nil {
 			return Result{}, err
 		}
@@ -201,12 +226,27 @@ func (c *CLI) Run(args []string, stdin io.Reader) (Result, error) {
 	return r, nil
 }
 
-func (c *CLI) sleep(d time.Duration) {
+func (c *CLI) timeout() time.Duration {
+	if c.Timeout > 0 {
+		return c.Timeout
+	}
+	return DefaultTimeout
+}
+
+// sleep waits d before a retry, or until ctx ends.
+func (c *CLI) sleep(ctx context.Context, d time.Duration) error {
 	if c.Sleep != nil {
 		c.Sleep(d)
-		return
+		return nil
 	}
-	time.Sleep(d)
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return internal("rate-limit wait cancelled: %v", ctx.Err())
+	}
 }
 
 // inject adds the list limit and GET pagination when the caller left them

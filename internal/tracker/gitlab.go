@@ -1,10 +1,12 @@
 package tracker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // GitLab is the glab adapter. glab has no close reason, so a not-planned
@@ -12,7 +14,20 @@ import (
 type GitLab struct {
 	base
 	NotPlannedLabel string
-	me              string
+
+	mu sync.Mutex
+	me string
+}
+
+// glPerPage is the page size of glab list calls; full pages fetch the next.
+const glPerPage = 100
+
+func glPaging(size, page int) ([]string, bool) {
+	args := []string{"--per-page", strconv.Itoa(size)}
+	if page > 1 {
+		args = append(args, "--page", strconv.Itoa(page))
+	}
+	return args, false
 }
 
 type glIssue struct {
@@ -63,7 +78,7 @@ func (g *GitLab) norm(d glIssue) Issue {
 	return is
 }
 
-func (g *GitLab) Create(title, body string, labels []string, milestone string) (int, error) {
+func (g *GitLab) Create(ctx context.Context, title, body string, labels []string, milestone string) (int, error) {
 	args := []string{"issue", "create", "--title", title, "--description", body}
 	if len(labels) > 0 {
 		args = append(args, "--label", strings.Join(labels, ","))
@@ -71,7 +86,7 @@ func (g *GitLab) Create(title, body string, labels []string, milestone string) (
 	if milestone != "" {
 		args = append(args, "--milestone", milestone)
 	}
-	out, err := g.run(append(args, "-y"), "")
+	out, err := g.run(ctx, append(args, "-y"), "")
 	if err != nil {
 		return 0, err
 	}
@@ -79,18 +94,18 @@ func (g *GitLab) Create(title, body string, labels []string, milestone string) (
 }
 
 // EnsureLabels is a no-op: GitLab creates labels on first use.
-func (g *GitLab) EnsureLabels(names []string, autoCreate bool) error { return nil }
+func (g *GitLab) EnsureLabels(ctx context.Context, names []string, autoCreate bool) error { return nil }
 
-func (g *GitLab) AddLabels(number int, labels []string, autoCreate bool) error {
-	return g.addLabels(g, number, labels, autoCreate)
+func (g *GitLab) AddLabels(ctx context.Context, number int, labels []string, autoCreate bool) error {
+	return g.addLabels(ctx, g, number, labels, autoCreate)
 }
 
-func (g *GitLab) RemoveLabels(number int, labels []string) error {
-	return g.removeLabels(g, number, labels)
+func (g *GitLab) RemoveLabels(ctx context.Context, number int, labels []string) error {
+	return g.removeLabels(ctx, g, number, labels)
 }
 
-func (g *GitLab) FindMilestone(hvID string) (string, bool, error) {
-	ms, err := g.milestones("projects/:id/milestones?per_page=100")
+func (g *GitLab) FindMilestone(ctx context.Context, hvID string) (string, bool, error) {
+	ms, err := g.milestones(ctx, "projects/:id/milestones?per_page=100")
 	if err != nil {
 		return "", false, err
 	}
@@ -100,14 +115,14 @@ func (g *GitLab) FindMilestone(hvID string) (string, bool, error) {
 
 // Milestones numbers each milestone by its API id (what PUT
 // .../milestones/<id> takes).
-func (g *GitLab) Milestones(state string) ([]Milestone, error) {
+func (g *GitLab) Milestones(ctx context.Context, state string) ([]Milestone, error) {
 	want := map[string]string{"open": "&state=active", "closed": "&state=closed"}[state]
-	return g.milestones("projects/:id/milestones?per_page=100" + want)
+	return g.milestones(ctx, "projects/:id/milestones?per_page=100"+want)
 }
 
-func (g *GitLab) milestones(path string) ([]Milestone, error) {
+func (g *GitLab) milestones(ctx context.Context, path string) ([]Milestone, error) {
 	var raw []rawMilestone
-	if err := g.pages(path, &raw); err != nil {
+	if err := g.pages(ctx, path, &raw); err != nil {
 		return nil, err
 	}
 	out := []Milestone{}
@@ -117,9 +132,9 @@ func (g *GitLab) milestones(path string) ([]Milestone, error) {
 	return out, nil
 }
 
-func (g *GitLab) CreateMilestone(title, description string) (int, error) {
+func (g *GitLab) CreateMilestone(ctx context.Context, title, description string) (int, error) {
 	var d struct{ ID json.RawMessage }
-	if err := g.json([]string{"api", "-X", "POST", "projects/:id/milestones",
+	if err := g.json(ctx, []string{"api", "-X", "POST", "projects/:id/milestones",
 		"-f", "title=" + title, "-f", "description=" + description}, &d); err != nil {
 		return 0, err
 	}
@@ -130,7 +145,7 @@ func (g *GitLab) CreateMilestone(title, description string) (int, error) {
 	return n, nil
 }
 
-func (g *GitLab) EditMilestone(number int, e MilestoneEdit) error {
+func (g *GitLab) EditMilestone(ctx context.Context, number int, e MilestoneEdit) error {
 	args := []string{"api", "-X", "PUT", fmt.Sprintf("projects/:id/milestones/%d", number)}
 	if e.Title != nil {
 		args = append(args, "-f", "title="+*e.Title)
@@ -145,24 +160,24 @@ func (g *GitLab) EditMilestone(number int, e MilestoneEdit) error {
 		}
 		args = append(args, "-f", "state_event="+ev)
 	}
-	_, err := g.run(args, "")
+	_, err := g.run(ctx, args, "")
 	return err
 }
 
-func (g *GitLab) IssuesInMilestone(title, state string) ([]Issue, error) {
+func (g *GitLab) IssuesInMilestone(ctx context.Context, title, state string) ([]Issue, error) {
 	if state == "" {
 		state = "all"
 	}
-	return g.List(ListFilter{State: state, Milestone: title})
+	return g.List(ctx, ListFilter{State: state, Milestone: title})
 }
 
-func (g *GitLab) Get(number int, withComments bool) (Issue, error) {
+func (g *GitLab) Get(ctx context.Context, number int, withComments bool) (Issue, error) {
 	args := []string{"issue", "view", strconv.Itoa(number), "--output", "json"}
 	if withComments {
 		args = append(args, "--comments")
 	}
 	var d glIssue
-	if err := g.json(args, &d); err != nil {
+	if err := g.json(ctx, args, &d); err != nil {
 		return Issue{}, err
 	}
 	is := g.norm(d)
@@ -175,7 +190,7 @@ func (g *GitLab) Get(number int, withComments bool) (Issue, error) {
 	return is, nil
 }
 
-func (g *GitLab) List(f ListFilter) ([]Issue, error) {
+func (g *GitLab) List(ctx context.Context, f ListFilter) ([]Issue, error) {
 	args := []string{"issue", "list", "--output", "json"}
 	switch f.State {
 	case "all":
@@ -190,7 +205,7 @@ func (g *GitLab) List(f ListFilter) ([]Issue, error) {
 		args = append(args, "--milestone", f.Milestone)
 	}
 	var raw []glIssue
-	if err := g.json(args, &raw); err != nil {
+	if err := g.list(ctx, args, glPerPage, glPaging, &raw); err != nil {
 		return nil, err
 	}
 	out := []Issue{}
@@ -200,7 +215,7 @@ func (g *GitLab) List(f ListFilter) ([]Issue, error) {
 	return out, nil
 }
 
-func (g *GitLab) Edit(number int, e IssueEdit) error {
+func (g *GitLab) Edit(ctx context.Context, number int, e IssueEdit) error {
 	args := []string{"issue", "update", strconv.Itoa(number)}
 	if e.Title != nil {
 		args = append(args, "--title", *e.Title)
@@ -220,14 +235,14 @@ func (g *GitLab) Edit(number int, e IssueEdit) error {
 		// glab has no remove flag; an empty title clears the milestone.
 		args = append(args, "--milestone", "")
 	}
-	_, err := g.run(args, "")
+	_, err := g.run(ctx, args, "")
 	return err
 }
 
 // Comments returns the comments oldest first, system notes excluded.
-func (g *GitLab) Comments(number int) ([]Comment, error) {
+func (g *GitLab) Comments(ctx context.Context, number int) ([]Comment, error) {
 	var raw []glNote
-	if err := g.pages(fmt.Sprintf("projects/:id/issues/%d/notes?sort=asc&order_by=created_at", number), &raw); err != nil {
+	if err := g.pages(ctx, fmt.Sprintf("projects/:id/issues/%d/notes?sort=asc&order_by=created_at", number), &raw); err != nil {
 		return nil, err
 	}
 	out := []Comment{}
@@ -239,64 +254,76 @@ func (g *GitLab) Comments(number int) ([]Comment, error) {
 	return out, nil
 }
 
-func (g *GitLab) AddComment(number int, body string) (string, error) {
-	return g.createdID([]string{"api", "-X", "POST", fmt.Sprintf("projects/:id/issues/%d/notes", number), "-f", "body=" + body})
+func (g *GitLab) AddComment(ctx context.Context, number int, body string) (string, error) {
+	return g.createdID(ctx, []string{"api", "-X", "POST", fmt.Sprintf("projects/:id/issues/%d/notes", number), "-f", "body=" + body})
 }
 
-func (g *GitLab) EditComment(number int, commentID, body string) error {
-	_, err := g.run([]string{"api", "-X", "PUT", fmt.Sprintf("projects/:id/issues/%d/notes/%s", number, commentID), "-f", "body=" + body}, "")
+func (g *GitLab) EditComment(ctx context.Context, number int, commentID, body string) error {
+	_, err := g.run(ctx, []string{"api", "-X", "PUT", fmt.Sprintf("projects/:id/issues/%d/notes/%s", number, commentID), "-f", "body=" + body}, "")
 	return err
 }
 
-func (g *GitLab) DeleteComment(number int, commentID string) error {
-	_, err := g.run([]string{"api", "-X", "DELETE", fmt.Sprintf("projects/:id/issues/%d/notes/%s", number, commentID)}, "")
+func (g *GitLab) DeleteComment(ctx context.Context, number int, commentID string) error {
+	_, err := g.run(ctx, []string{"api", "-X", "DELETE", fmt.Sprintf("projects/:id/issues/%d/notes/%s", number, commentID)}, "")
 	return err
 }
 
-func (g *GitLab) Close(number int, reason, comment string) error {
+func (g *GitLab) Close(ctx context.Context, number int, reason, comment string) error {
 	n := strconv.Itoa(number)
 	if comment != "" {
-		if _, err := g.run([]string{"issue", "note", n, "-m", comment}, ""); err != nil {
+		if _, err := g.run(ctx, []string{"issue", "note", n, "-m", comment}, ""); err != nil {
 			return err
 		}
 	}
 	if reason == "not_planned" {
-		if err := g.AddLabels(number, []string{g.NotPlannedLabel}, true); err != nil {
+		if err := g.AddLabels(ctx, number, []string{g.NotPlannedLabel}, true); err != nil {
 			return err
 		}
 	}
-	_, err := g.run([]string{"issue", "close", n}, "")
+	_, err := g.run(ctx, []string{"issue", "close", n}, "")
 	return err
 }
 
-func (g *GitLab) Reopen(number int) error {
-	if _, err := g.run([]string{"issue", "reopen", strconv.Itoa(number)}, ""); err != nil {
+func (g *GitLab) Reopen(ctx context.Context, number int) error {
+	if _, err := g.run(ctx, []string{"issue", "reopen", strconv.Itoa(number)}, ""); err != nil {
 		return err
 	}
-	return g.RemoveLabels(number, []string{g.NotPlannedLabel})
+	return g.RemoveLabels(ctx, number, []string{g.NotPlannedLabel})
 }
 
 // AssignSelf adds the authenticated user without replacing other assignees.
 // glab documents --assignee as usernames (no @me), so the username is
 // resolved once per adapter.
-func (g *GitLab) AssignSelf(number int) error {
+func (g *GitLab) AssignSelf(ctx context.Context, number int) error {
+	me, err := g.username(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = g.run(ctx, []string{"issue", "update", strconv.Itoa(number), "--assignee", "+" + me}, "")
+	return err
+}
+
+// username resolves the authenticated user once; a failure is retried on the
+// next call.
+func (g *GitLab) username(ctx context.Context) (string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if g.me == "" {
 		var u struct {
 			Username string `json:"username"`
 		}
-		if err := g.json([]string{"api", "user"}, &u); err != nil {
-			return err
+		if err := g.json(ctx, []string{"api", "user"}, &u); err != nil {
+			return "", err
 		}
 		if u.Username == "" {
-			return failed("cannot resolve the authenticated GitLab username")
+			return "", failed("cannot resolve the authenticated GitLab username")
 		}
 		g.me = u.Username
 	}
-	_, err := g.run([]string{"issue", "update", strconv.Itoa(number), "--assignee", "+" + g.me}, "")
-	return err
+	return g.me, nil
 }
 
-func (g *GitLab) OpenPRs() ([]PR, error) {
+func (g *GitLab) OpenPRs(ctx context.Context) ([]PR, error) {
 	var raw []struct {
 		IID          int    `json:"iid"`
 		Title        string `json:"title"`
@@ -304,7 +331,7 @@ func (g *GitLab) OpenPRs() ([]PR, error) {
 		SourceBranch string `json:"source_branch"`
 		WebURL       string `json:"web_url"`
 	}
-	if err := g.json([]string{"mr", "list", "--output", "json"}, &raw); err != nil {
+	if err := g.list(ctx, []string{"mr", "list", "--output", "json"}, glPerPage, glPaging, &raw); err != nil {
 		return nil, err
 	}
 	out := []PR{}
@@ -314,39 +341,75 @@ func (g *GitLab) OpenPRs() ([]PR, error) {
 	return out, nil
 }
 
-func (g *GitLab) PRsClosing(number int) ([]PR, error) { return g.prsClosing(g, number) }
+func (g *GitLab) PRsClosing(ctx context.Context, number int) ([]PR, error) {
+	return g.prsClosing(ctx, g, number)
+}
 
-func (g *GitLab) PRCheckout(pr int) error {
-	_, err := g.run([]string{"mr", "checkout", strconv.Itoa(pr)}, "")
+func (g *GitLab) PRCheckout(ctx context.Context, pr int) error {
+	_, err := g.run(ctx, []string{"mr", "checkout", strconv.Itoa(pr)}, "")
 	return err
 }
 
-func (g *GitLab) PRMerge(pr int) (string, error) {
-	if _, err := g.run([]string{"mr", "merge", strconv.Itoa(pr), "--yes", "--remove-source-branch"}, ""); err != nil {
+// PRMerge merges with auto-merge off (glab otherwise schedules a merge while a
+// pipeline runs, reports success and merges nothing). A squash merge returns
+// the squash commit. A fast-forward or rebase merge has no merge commit: the
+// MR must then be merged and its head an ancestor of origin/<target>, and the
+// head sha is returned.
+func (g *GitLab) PRMerge(ctx context.Context, pr int) (string, error) {
+	n := strconv.Itoa(pr)
+	if _, err := g.run(ctx, []string{"mr", "merge", n, "--yes", "--remove-source-branch", "--auto-merge=false"}, ""); err != nil {
 		return "", err
 	}
 	var d struct {
+		State          string `json:"state"`
+		SHA            string `json:"sha"`
+		TargetBranch   string `json:"target_branch"`
 		MergeCommitSHA string `json:"merge_commit_sha"`
+		SquashSHA      string `json:"squash_commit_sha"`
 	}
-	if err := g.json([]string{"mr", "view", strconv.Itoa(pr), "--output", "json"}, &d); err != nil {
+	if err := g.json(ctx, []string{"mr", "view", n, "--output", "json"}, &d); err != nil {
 		return "", err
 	}
-	if d.MergeCommitSHA == "" {
+	switch {
+	case d.MergeCommitSHA != "":
+		return d.MergeCommitSHA, nil
+	case d.SquashSHA != "":
+		return d.SquashSHA, nil
+	case d.State != "merged":
+		return "", failed("MR %d is %s after the merge call (a scheduled auto-merge?); nothing was merged", pr, d.State)
+	case d.SHA == "" || d.TargetBranch == "":
 		return "", failed("cannot read the merge commit of MR %d", pr)
 	}
-	return d.MergeCommitSHA, nil
+	return d.SHA, g.onBase(ctx, pr, d.SHA, d.TargetBranch)
 }
 
-func (g *GitLab) PRComment(pr int, body string) error {
-	_, err := g.run([]string{"mr", "note", strconv.Itoa(pr), "--message", body}, "")
+// onBase checks a fast-forwarded MR's head is on origin/<target>.
+func (g *GitLab) onBase(ctx context.Context, pr int, sha, target string) error {
+	x := g.cli.exec()
+	if _, errb, code, err := x(ctx, g.cli.Dir, "git", []string{"fetch", "-q", "origin"}, nil); err != nil || code != 0 {
+		return failed("MR %d merged without a merge commit, and git fetch origin failed: %s", pr, strings.TrimSpace(string(errb)))
+	}
+	ref := "origin/" + target
+	_, errb, code, err := x(ctx, g.cli.Dir, "git", []string{"merge-base", "--is-ancestor", sha, ref}, nil)
+	switch {
+	case err == nil && code == 0:
+		return nil
+	case err == nil && code == 1:
+		return failed("MR %d is merged, but its head %s is not on %s", pr, sha, ref)
+	}
+	return failed("MR %d merged without a merge commit, and git merge-base --is-ancestor %s %s failed: %s", pr, sha, ref, strings.TrimSpace(string(errb)))
+}
+
+func (g *GitLab) PRComment(ctx context.Context, pr int, body string) error {
+	_, err := g.run(ctx, []string{"mr", "note", strconv.Itoa(pr), "--message", body}, "")
 	return err
 }
 
-func (g *GitLab) PRState(pr int) (string, error) {
+func (g *GitLab) PRState(ctx context.Context, pr int) (string, error) {
 	var d struct {
 		State string `json:"state"`
 	}
-	if err := g.json([]string{"mr", "view", strconv.Itoa(pr), "--output", "json"}, &d); err != nil {
+	if err := g.json(ctx, []string{"mr", "view", strconv.Itoa(pr), "--output", "json"}, &d); err != nil {
 		return "", err
 	}
 	st := strings.ToLower(d.State)

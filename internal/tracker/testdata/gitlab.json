@@ -7,7 +7,7 @@
     "title": "M07 Tracker",
     "description": "tracker port"
    },
-   "result": 1,
+   "result": 1001,
    "calls": [
     {
      "name": "glab",
@@ -22,7 +22,7 @@
       "description=tracker port"
      ],
      "stdin": "",
-     "stdout": "{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"tracker port\", \"state\": \"active\"}\n",
+     "stdout": "{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"tracker port\", \"state\": \"active\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -34,7 +34,7 @@
     "title": "M08",
     "description": ""
    },
-   "result": 2,
+   "result": 1002,
    "calls": [
     {
      "name": "glab",
@@ -49,7 +49,7 @@
       "description="
      ],
      "stdin": "",
-     "stdout": "{\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"active\"}\n",
+     "stdout": "{\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"active\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -60,13 +60,13 @@
    "args": {},
    "result": [
     {
-     "number": 1,
+     "number": 1001,
      "title": "M07 Tracker",
      "description": "tracker port",
      "state": "open"
     },
     {
-     "number": 2,
+     "number": 1002,
      "title": "M08",
      "description": "",
      "state": "open"
@@ -81,7 +81,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"tracker port\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"active\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"tracker port\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"active\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -90,7 +90,7 @@
   {
    "op": "edit_milestone",
    "args": {
-    "number": 2,
+    "number": 1002,
     "state": "closed"
    },
    "result": null,
@@ -101,12 +101,12 @@
       "api",
       "-X",
       "PUT",
-      "projects/:id/milestones/2",
+      "projects/:id/milestones/1002",
       "-f",
       "state_event=close"
      ],
      "stdin": "",
-     "stdout": "{\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}\n",
+     "stdout": "{\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -115,7 +115,7 @@
   {
    "op": "edit_milestone",
    "args": {
-    "number": 1,
+    "number": 1001,
     "title": "M07 Tracker",
     "description": "renamed"
    },
@@ -127,14 +127,14 @@
       "api",
       "-X",
       "PUT",
-      "projects/:id/milestones/1",
+      "projects/:id/milestones/1001",
       "-f",
       "title=M07 Tracker",
       "-f",
       "description=renamed"
      ],
      "stdin": "",
-     "stdout": "{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}\n",
+     "stdout": "{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -147,13 +147,13 @@
    },
    "result": [
     {
-     "number": 1,
+     "number": 1001,
      "title": "M07 Tracker",
      "description": "renamed",
      "state": "open"
     },
     {
-     "number": 2,
+     "number": 1002,
      "title": "M08",
      "description": "",
      "state": "closed"
@@ -168,7 +168,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -181,13 +181,13 @@
    },
    "result": [
     {
-     "number": 1,
+     "number": 1001,
      "title": "M07 Tracker",
      "description": "renamed",
      "state": "open"
     },
     {
-     "number": 2,
+     "number": 1002,
      "title": "M08",
      "description": "",
      "state": "closed"
@@ -202,7 +202,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -223,7 +223,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -244,7 +244,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -265,7 +265,7 @@
       "--paginate"
      ],
      "stdin": "",
-     "stdout": "[{\"id\": 1, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 2, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
+     "stdout": "[{\"id\": 1001, \"iid\": 1, \"title\": \"M07 Tracker\", \"description\": \"renamed\", \"state\": \"active\"}, {\"id\": 1002, \"iid\": 2, \"title\": \"M08\", \"description\": \"\", \"state\": \"closed\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -397,7 +397,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
      "stderr": "",
      "code": 0
     }
@@ -447,7 +447,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": null, \"assignees\": []}, {\"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
+     "stdout": "[{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": null, \"assignees\": []}, {\"id\": 5001, \"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
      "stderr": "",
      "code": 0
     }
@@ -491,7 +491,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
+     "stdout": "[{\"id\": 5001, \"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
      "stderr": "",
      "code": 0
     }
@@ -533,7 +533,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
+     "stdout": "[{\"id\": 5001, \"iid\": 1, \"title\": \"First\", \"description\": \"line1\\nline2 with `ticks` and $vars\", \"labels\": [\"bug\", \"p1\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
      "stderr": "",
      "code": 0
     }
@@ -655,7 +655,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\", \"extra\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\", \"extra\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
      "stderr": "",
      "code": 0
     }
@@ -750,7 +750,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}\n",
      "stderr": "",
      "code": 0
     }
@@ -816,7 +816,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
+     "stdout": "[{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": []}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1019,9 +1019,64 @@
       "--comments"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [], \"notes\": [{\"id\": 1, \"body\": \"edited\", \"author\": {\"username\": \"fake-user\"}}]}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [], \"notes\": [{\"id\": 1, \"body\": \"edited\", \"author\": {\"username\": \"fake-user\"}}]}\n",
      "stderr": "",
      "code": 0
+    }
+   ]
+  },
+  {
+   "op": "get",
+   "args": {
+    "number": 99
+   },
+   "error": {
+    "code": 1,
+    "message": "issue #99 not found"
+   },
+   "calls": [
+    {
+     "name": "glab",
+     "argv": [
+      "issue",
+      "view",
+      "99",
+      "--output",
+      "json"
+     ],
+     "stdin": "",
+     "stdout": "",
+     "stderr": "issue #99 not found\n",
+     "code": 1
+    }
+   ]
+  },
+  {
+   "op": "edit_comment",
+   "args": {
+    "number": 1,
+    "comment_id": 99,
+    "body": "gone"
+   },
+   "error": {
+    "code": 1,
+    "message": "404 Not found"
+   },
+   "calls": [
+    {
+     "name": "glab",
+     "argv": [
+      "api",
+      "-X",
+      "PUT",
+      "projects/:id/issues/1/notes/99",
+      "-f",
+      "body=gone"
+     ],
+     "stdin": "",
+     "stdout": "",
+     "stderr": "404 Not found\n",
+     "code": 1
     }
    ]
   },
@@ -1115,7 +1170,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }
@@ -1187,7 +1242,7 @@
     "milestone": null,
     "state": "closed",
     "state_reason": "not_planned",
-    "closed_at": "2026-10-02T11:21:08Z",
+    "closed_at": "2026-10-02T12:21:01Z",
     "url": "https://gitlab.com/fake/repo/-/issues/2",
     "assignees": [
      "fake-user"
@@ -1204,7 +1259,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [\"not-planned\"], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T11:21:08Z\", \"assignees\": [{\"username\": \"fake-user\"}]}\n",
+     "stdout": "{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [\"not-planned\"], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T12:21:01Z\", \"assignees\": [{\"username\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }
@@ -1275,7 +1330,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}\n",
+     "stdout": "{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }
@@ -1316,7 +1371,7 @@
      "milestone": null,
      "state": "closed",
      "state_reason": "completed",
-     "closed_at": "2026-10-02T11:21:09Z",
+     "closed_at": "2026-10-02T12:21:02Z",
      "url": "https://gitlab.com/fake/repo/-/issues/2",
      "assignees": [
       "fake-user"
@@ -1336,7 +1391,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T11:21:09Z\", \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
+     "stdout": "[{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T12:21:02Z\", \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1356,7 +1411,7 @@
      "milestone": null,
      "state": "closed",
      "state_reason": "completed",
-     "closed_at": "2026-10-02T11:21:09Z",
+     "closed_at": "2026-10-02T12:21:02Z",
      "url": "https://gitlab.com/fake/repo/-/issues/2",
      "assignees": [
       "fake-user"
@@ -1392,7 +1447,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T11:21:09Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
+     "stdout": "[{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T12:21:02Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1522,7 +1577,7 @@
     ]
    },
    "result": {
-    "stdout": "[{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T11:21:09Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
+    "stdout": "[{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T12:21:02Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
     "stderr": "",
     "code": 0
    },
@@ -1539,7 +1594,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T11:21:09Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
+     "stdout": "[{\"id\": 5002, \"iid\": 2, \"title\": \"Second\", \"description\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/2\", \"closed_at\": \"2026-10-02T12:21:02Z\", \"assignees\": [{\"username\": \"fake-user\"}]}, {\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": null, \"assignees\": [{\"username\": \"fake-user\"}]}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1605,7 +1660,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
+     "stdout": "[{\"id\": 7002, \"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1637,7 +1692,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
+     "stdout": "[{\"id\": 7002, \"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1669,7 +1724,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
+     "stdout": "[{\"id\": 7002, \"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1693,7 +1748,7 @@
       "100"
      ],
      "stdin": "",
-     "stdout": "[{\"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
+     "stdout": "[{\"id\": 7002, \"iid\": 2, \"title\": \"Other\", \"description\": \"nothing here\", \"source_branch\": \"feat-2\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/2\"}, {\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1740,7 +1795,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}\n",
+     "stdout": "{\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"opened\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -1798,7 +1853,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"merged\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\", \"merge_commit_sha\": \"e1e993f27c91c738ad983b760bd6c82a583300af\"}\n",
+     "stdout": "{\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"merged\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\", \"merge_commit_sha\": \"e1e993f27c91c738ad983b760bd6c82a583300af\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -1821,7 +1876,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"merged\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\", \"merge_commit_sha\": \"e1e993f27c91c738ad983b760bd6c82a583300af\"}\n",
+     "stdout": "{\"id\": 7001, \"iid\": 1, \"title\": \"Fix it\", \"description\": \"Implements #1, fixes: #2\", \"source_branch\": \"feat-1\", \"target_branch\": \"main\", \"state\": \"merged\", \"web_url\": \"https://gitlab.com/fake/repo/-/merge_requests/1\", \"merge_commit_sha\": \"e1e993f27c91c738ad983b760bd6c82a583300af\"}\n",
      "stderr": "",
      "code": 0
     }
@@ -1842,7 +1897,7 @@
     "milestone": "M07 Tracker",
     "state": "closed",
     "state_reason": "completed",
-    "closed_at": "2026-10-02T11:21:11Z",
+    "closed_at": "2026-10-02T12:21:04Z",
     "url": "https://gitlab.com/fake/repo/-/issues/1",
     "assignees": [
      "fake-user"
@@ -1859,7 +1914,7 @@
       "json"
      ],
      "stdin": "",
-     "stdout": "{\"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": \"2026-10-02T11:21:11Z\", \"assignees\": [{\"username\": \"fake-user\"}]}\n",
+     "stdout": "{\"id\": 5001, \"iid\": 1, \"title\": \"First!\", \"description\": \"new body\\nmore\", \"labels\": [\"bug\"], \"milestone\": {\"title\": \"M07 Tracker\", \"iid\": 1}, \"state\": \"closed\", \"web_url\": \"https://gitlab.com/fake/repo/-/issues/1\", \"closed_at\": \"2026-10-02T12:21:04Z\", \"assignees\": [{\"username\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }

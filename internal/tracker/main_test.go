@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestTripwireCatchesRealCLI(t *testing.T) {
-	r, err := (&CLI{Provider: "github"}).Run([]string{"issue", "list"}, nil)
+	r, err := (&CLI{Provider: "github"}).Run(context.Background(), []string{"issue", "list"}, nil)
 	if err != nil || r.ExitCode != 99 {
 		t.Fatalf("default executor did not hit the tripwire: %+v, %v", r, err)
 	}

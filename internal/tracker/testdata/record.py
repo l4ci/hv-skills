@@ -59,12 +59,13 @@ def scenario(prov):
     """Steps as (op, kwargs[, env]). op "call" runs hv-tracker-call directly; "closed_numbers"
     makes no call."""
     ms = "M07 Tracker"
+    mid = 0 if prov == "github" else 1000  # glab milestones are edited by their global id
     s = [
         ("create_milestone", {"title": ms, "description": "tracker port"}),
         ("create_milestone", {"title": "M08", "description": ""}),
         ("milestones", {}),
-        ("edit_milestone", {"number": 2, "state": "closed"}),
-        ("edit_milestone", {"number": 1, "title": ms, "description": "renamed"}),
+        ("edit_milestone", {"number": mid + 2, "state": "closed"}),
+        ("edit_milestone", {"number": mid + 1, "title": ms, "description": "renamed"}),
         ("milestones", {"state": "open"}),
         ("milestones", {"state": "closed"}),
         ("find_milestone", {"hv_id": "M07"}),
@@ -97,6 +98,8 @@ def scenario(prov):
         ("delete_comment", {"number": 1, "comment_id": 2}),
         ("comments", {"number": 1}),
         ("get", {"number": 1, "comments": True}),
+        ("get", {"number": 99}),
+        ("edit_comment", {"number": 1, "comment_id": 99, "body": "gone"}),
         ("assign_self", {"number": 1}),
         ("assign_self", {"number": 2}),
         ("get", {"number": 1}),
