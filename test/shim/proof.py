@@ -34,3 +34,20 @@ def proof_add(ctx):
     return ({"id": item, "type": type_of(ctx, item), "check": one(f["check"]), "result": f["result"],
              "sha": sha, "evidence": one(f["evidence"]), "changed": changed},
             f"proof recorded for {item}")
+
+
+@verb("proof", "show", bools=("count",), pos=(1, 1), repo=False)
+def proof_show(ctx):
+    item = ctx.pos[0]
+    rc, out, err = ctx.helper("hv-proof-show", item)
+    if rc != 0:
+        raise backend_error(rc, err)
+    rows = []
+    for line in out.splitlines():
+        if not line.startswith("- "):
+            continue
+        parts = line[2:].split(" · ", 4)
+        parts += [""] * (5 - len(parts))
+        rows.append(dict(zip(("date", "check", "result", "sha", "evidence"), parts)))
+    return ({"id": item, "type": type_of(ctx, item), "count": len(rows), "rows": rows},
+            f"{len(rows)}" if ctx.flags.get("count") else out)

@@ -1,4 +1,4 @@
-echo "hv-proof-add / hv-proof-show / hv-complete proof gate"
+echo "proof add / proof show / item complete proof gate"
 
 TMP_PF="$(mktemp -d)"
 trap 'rm -rf "$TMP_PF"' EXIT
@@ -18,52 +18,66 @@ mkdir -p "$TMP_PF/proj"
   cd "$TMP_PF/proj"
   H=$(git log -1 --format=%h)
 
-  [ "$("$BIN/hv-proof-show" B01 --count)" = "0" ] || fail "no proof yet: count should be 0"
-  "$BIN/hv-proof-add" B01 --check unit --result PASS --evidence "12 passed · 0 failed" --sha "$H"
-  [ -f .hv/bugs/B01.md ] || fail "hv-proof-add should create the detail file"
+  [ "$(hvj proof show B01 | jget data.count)" = "0" ] || fail "no proof yet: count should be 0"
+  [ "$("$HV_BIN" proof show B01 --count)" = "0" ] || fail "no proof yet: --count should print 0"
+  OUT=$(hvj proof add B01 --check unit --result PASS --evidence "12 passed · 0 failed" --sha "$H") || fail "proof add B01 failed"
+  [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "first proof row should report changed: $OUT"
+  [ "$(jget data.type <<<"$OUT")" = "B" ] || fail "proof add type should be B: $OUT"
+  [ -f .hv/bugs/B01.md ] || fail "proof add should create the detail file"
   grep -q '^## Proof$' .hv/bugs/B01.md || fail "missing ## Proof section"
   grep -q "^# B01: Proven bug" .hv/bugs/B01.md || fail "new detail file should carry the item title"
-  pass "hv-proof-add creates the detail file and Proof section"
+  pass "proof add creates the detail file and Proof section"
 
-  "$BIN/hv-proof-add" B01 --check unit --result PASS --evidence "12 passed · 0 failed" --sha "$H"
-  [ "$("$BIN/hv-proof-show" B01 --count)" = "1" ] || fail "identical row must be idempotent"
-  "$BIN/hv-proof-add" B01 --check lint --result FAIL --evidence "lint.log" --sha "$H"
-  [ "$("$BIN/hv-proof-show" B01 --count)" = "2" ] || fail "distinct row should append"
-  "$BIN/hv-proof-show" B01 | grep -F "· unit · PASS · $H · 12 passed · 0 failed" >/dev/null || fail "row format"
-  pass "hv-proof-add is idempotent on identical rows; hv-proof-show prints rows"
+  OUT=$(hvj proof add B01 --check unit --result PASS --evidence "12 passed · 0 failed" --sha "$H") || fail "repeat proof add failed"
+  [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "identical row must report changed=false: $OUT"
+  [ "$(hvj proof show B01 | jget data.count)" = "1" ] || fail "identical row must be idempotent"
+  hvj proof add B01 --check lint --result FAIL --evidence "lint.log" --sha "$H" >/dev/null || fail "distinct proof add failed"
+  [ "$(hvj proof show B01 | jget data.count)" = "2" ] || fail "distinct row should append"
+  OUT=$(hvj proof show B01) || fail "proof show failed"
+  [ "$(jget data.rows[0].check <<<"$OUT")" = "unit" ] || fail "row 0 check: $OUT"
+  [ "$(jget data.rows[0].result <<<"$OUT")" = "PASS" ] || fail "row 0 result: $OUT"
+  [ "$(jget data.rows[0].sha <<<"$OUT")" = "$H" ] || fail "row 0 sha: $OUT"
+  [ "$(jget data.rows[0].evidence <<<"$OUT")" = "12 passed · 0 failed" ] || fail "row 0 evidence: $OUT"
+  [ "$(jget data.rows[1].result <<<"$OUT")" = "FAIL" ] || fail "row 1 result: $OUT"
+  grep -F "· unit · PASS · $H · 12 passed · 0 failed" .hv/bugs/B01.md >/dev/null || fail "row format in the detail file"
+  pass "proof add is idempotent on identical rows; proof show reports rows"
 
-  rc=0; "$BIN/hv-proof-add" B01 --check x --result MAYBE --evidence e 2>/dev/null || rc=$?
-  [ "$rc" = "1" ] || fail "bad --result should exit 1"
-  rc=0; "$BIN/hv-proof-add" B99 --check x --result PASS --evidence e 2>/dev/null || rc=$?
-  [ "$rc" = "1" ] || fail "unknown ID should exit 1"
-  pass "hv-proof-add rejects bad result and unknown ID"
+  rc=0; hvj proof add B01 --check x --result MAYBE --evidence e >/dev/null 2>&1 || rc=$?
+  [ "$rc" = "2" ] || fail "bad --result should exit 2, got $rc"
+  rc=0; hvj proof add B99 --check x --result PASS --evidence e >/dev/null 2>&1 || rc=$?
+  [ "$rc" = "3" ] || fail "unknown ID should exit 3, got $rc"
+  pass "proof add rejects bad result and unknown ID"
 
   # Existing detail file with content keeps it; Proof is appended.
   printf '# B02: Bare bug\n\n## Summary\n\nbody\n\n## Notes\n\nlater\n' > .hv/bugs/B02.md
-  rc=0; "$BIN/hv-complete" B02 "$H" 2>"$TMP_PF/err" || rc=$?
-  [ "$rc" = "3" ] || fail "no proof: expected exit 3, got $rc"
-  grep -q "no proof recorded, pass --no-proof" "$TMP_PF/err" || fail "refusal message"
+  rc=0; OUT=$(hvj item complete B02 --commit "$H" 2>/dev/null) || rc=$?
+  [ "$rc" = "4" ] || fail "no proof: expected exit 4, got $rc"
+  [ "$(jget data.blockedBy <<<"$OUT")" = "proof missing" ] || fail "no proof: blockedBy should be 'proof missing': $OUT"
   grep -q '^- \*\*\[B02\]' .hv/BACKLOG.md || fail "refusal must not modify BACKLOG"
-  "$BIN/hv-proof-add" B02 --check smoke --result PASS --evidence ok --sha "$H"
+  hvj proof add B02 --check smoke --result PASS --evidence ok --sha "$H" >/dev/null || fail "proof add B02 failed"
   grep -q '^## Summary' .hv/bugs/B02.md && grep -q '^later' .hv/bugs/B02.md || fail "existing sections lost"
-  pass "hv-complete refuses without proof (exit 3), BACKLOG untouched"
+  pass "item complete refuses without proof (exit 4), BACKLOG untouched"
 
-  "$BIN/hv-complete" B02 "$H"
+  hvj item complete B02 --commit "$H" >/dev/null || fail "proven close failed"
   grep -qF "~~**[B02] [P1] Bare bug.** Desc.~~ Done $(date +%Y-%m-%d) [\`$H\`]" .hv/BACKLOG.md || fail "proven close should render the plain marker"
-  "$BIN/hv-complete" B02 "$H" || fail "already-completed must stay a no-op"
-  pass "hv-complete with proof renders the unchanged marker"
+  OUT=$(hvj item complete B02 --commit "$H") || fail "already-completed must stay a no-op"
+  [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "already-completed should report changed=false: $OUT"
+  pass "item complete with proof renders the unchanged marker"
 
-  "$BIN/hv-complete" B03 "$H" --reason dropped
+  hvj item complete B03 --commit "$H" --reason dropped >/dev/null || fail "dropped close failed"
   grep -q '(dropped)' .hv/BACKLOG.md || fail "dropped close needs no proof"
   pass "non-done reasons skip the proof gate"
 )
 
 # T119: every skill that calls hv-complete must also give it a proof path.
+# white-box: kept until A9 (#53)
 callers=$(cd "$REPO" && grep -l 'hv-complete' hv-*/SKILL.md)
 [ -n "$callers" ] || fail "expected at least one SKILL.md calling hv-complete"
 for f in $callers; do
+  # white-box: kept until A9 (#53)
   grep -q 'hv-proof-add' "$REPO/$f" || fail "$f calls hv-complete without an hv-proof-add path"
 done
 pass "hv-complete callers document a proof path"
 
 trap 'rm -rf "$TMP"' EXIT
+rm -rf "$TMP_PF"

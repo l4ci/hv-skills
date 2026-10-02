@@ -1,4 +1,4 @@
-echo "Issue mode: marker notes, item comments, proof, adapter lifecycle calls"
+echo "Issue mode: marker notes, item comments, proof, tracker lifecycle calls"
 
 TMP_IN="$(mktemp -d)"
 trap 'rm -rf "$TMP_IN"' EXIT
@@ -12,94 +12,101 @@ for prov in github gitlab; do
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov $1: expected [$2] got [$3]"; }
     WRITES() { grep -c 'api -X \(POST\|PATCH\|PUT\|DELETE\)' "$P/log" || true; }
-    # BODIES: every comment body of issue $1 as one marker line per comment (first line only)
-    MARKERS() { PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-print("|".join(c["body"].split("\n")[0] for c in adapter_for(load_config()).comments(int(sys.argv[1]))))' "$1"; }
-    ERR() { local rc=0; ERRMSG="$("$@" 2>&1 >/dev/null)" || rc=$?; ERRRC=$rc; }
+    # The fake tracker's store is the tracker's own state: no verb exposes raw comment markers.
+    # MARKERS <n>: first line of every comment of issue <n>, joined by |
+    MARKERS() { python3 -c '
+import json, sys
+issue = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
+print("|".join(c["body"].split("\n")[0] for c in issue["comments"]))' "$1" "$P/db.json"; }
+    # TRACKER_OF <id>: number of the tracking issue titled "<id> — …"
+    TRACKER_OF() { python3 -c '
+import json, sys
+print(next(i["number"] for i in json.load(open(sys.argv[2]))["issues"] if i["title"].startswith(sys.argv[1] + " ")))' "$1" "$P/db.json"; }
+    # RC <cmd…>: the command's exit code
+    RC() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
 
-    T1="$("$BIN/hv-item-create" tasks --title "First")"
-    T2="$("$BIN/hv-item-create" tasks --title "Second")"
-    eq "ids" "T1 T2" "$T1 $T2"
+    T1="$(hvj item create --kind tasks --title "First" | jget data.id)"
+    T2="$(hvj item create --kind tasks --title "Second" | jget data.id)"
+    eq "ids" "1 2" "$T1 $T2"
 
     # --- note put / get / idempotence / rm
-    eq "show absent" "" "$("$BIN/hv-item-note" T1 --kind design --show)"
+    OUT="$(hvj item note show T1 --kind design)"
+    eq "show absent" "false|" "$(jget data.exists <<<"$OUT")|$(jget data.body <<<"$OUT")"
     printf 'line one\nline two\n' > "$P/n.md"
-    "$BIN/hv-item-note" T1 --kind design --body-file "$P/n.md"
+    hvj item note add T1 --kind design --body-file "$P/n.md" >/dev/null
     eq "marker" "<!-- hv:design -->" "$(MARKERS 1)"
-    eq "show" "$(printf 'line one\nline two')" "$("$BIN/hv-item-note" T1 --kind design --show)"
+    eq "show" "$(printf 'line one\nline two')" "$(hvj item note show T1 --kind design | jget data.body)"
     : > "$P/log"
-    "$BIN/hv-item-note" T1 --kind design --body-file "$P/n.md"
+    hvj item note add T1 --kind design --body-file "$P/n.md" >/dev/null
     eq "idempotent put writes nothing" "0" "$(WRITES)"
-    printf 'changed\n' | "$BIN/hv-item-note" T1 --kind design --body-file -
+    printf 'changed\n' | hvj item note add T1 --kind design --body-file - >/dev/null
     eq "edited in place" "<!-- hv:design -->" "$(MARKERS 1)"
-    eq "show after edit" "changed" "$("$BIN/hv-item-note" '#1' --kind design --show)"
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/n.md"
+    eq "show after edit" "changed" "$(hvj item note show '#1' --kind design | jget data.body)"
+    hvj item note add T1 --kind plan --body-file "$P/n.md" >/dev/null
     eq "kinds independent" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 1)"
-    "$BIN/hv-item-note" T1 --kind design --rm
-    "$BIN/hv-item-note" T1 --kind design --rm
+    hvj item note rm T1 --kind design >/dev/null
+    hvj item note rm T1 --kind design >/dev/null
     eq "rm leaves other kind" "<!-- hv:plan -->" "$(MARKERS 1)"
-    "$BIN/hv-item-note" T1 --kind plan --rm
+    hvj item note rm T1 --kind plan >/dev/null
     eq "all removed" "" "$(MARKERS 1)"
 
     # --- split into parts and shrink back
     export HV_NOTE_LIMIT=200
     python3 -c 'print("\n".join("line %02d of the long note body" % i for i in range(15)))' > "$P/big.md"
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/big.md"
+    hvj item note add T1 --kind plan --body-file "$P/big.md" >/dev/null
     eq "three parts" "<!-- hv:plan 1/3 -->|<!-- hv:plan 2/3 -->|<!-- hv:plan 3/3 -->" "$(MARKERS 1)"
-    eq "parts round-trip" "$(cat "$P/big.md")" "$("$BIN/hv-item-note" T1 --kind plan --show)"
+    eq "parts round-trip" "$(cat "$P/big.md")" "$(hvj item note show T1 --kind plan | jget data.body)"
     : > "$P/log"
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/big.md"
+    hvj item note add T1 --kind plan --body-file "$P/big.md" >/dev/null
     eq "idempotent split put" "0" "$(WRITES)"
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/n.md"
+    hvj item note add T1 --kind plan --body-file "$P/n.md" >/dev/null
     eq "shrink deletes surplus parts" "<!-- hv:plan -->" "$(MARKERS 1)"
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/big.md"
+    hvj item note add T1 --kind plan --body-file "$P/big.md" >/dev/null
     eq "grow again" "<!-- hv:plan 1/3 -->|<!-- hv:plan 2/3 -->|<!-- hv:plan 3/3 -->" "$(MARKERS 1)"
     unset HV_NOTE_LIMIT
-    "$BIN/hv-item-note" T1 --kind plan --body-file "$P/n.md"
+    hvj item note add T1 --kind plan --body-file "$P/n.md" >/dev/null
     eq "single again" "<!-- hv:plan -->" "$(MARKERS 1)"
-    "$BIN/hv-item-note" T1 --kind plan --rm
+    hvj item note rm T1 --kind plan >/dev/null
 
-    ERR "$BIN/hv-item-note" T1 --kind bogus --show
-    eq "bad kind" "1" "$ERRRC"
-    ERR "$BIN/hv-item-note" T1 --kind plan
-    eq "no action" "1" "$ERRRC"
-    ERR "$BIN/hv-item-note" T99 --kind plan --show
-    eq "unknown item" "1" "$ERRRC"
+    eq "bad kind" "2" "$(RC hvj item note show T1 --kind bogus)"
+    eq "note add needs a body" "2" "$(RC hvj item note add T1 --kind plan)"
+    eq "unknown item" "3" "$(RC hvj item note show T99 --kind plan)"
 
     # --- comments
-    printf 'Which db?\nSecond line\n' | "$BIN/hv-item-comment" T1 --kind question --body-file - >/dev/null
+    OUT="$(printf 'Which db?\nSecond line\n' | hvj item comment add T1 --kind question --body-file -)"
+    eq "comment add changed" "true" "$(jget data.changed <<<"$OUT")"
     printf 'Postgres\n' > "$P/a.md"
-    id="$("$BIN/hv-item-comment" T1 --kind answer --body-file "$P/a.md")"
+    id="$(hvj item comment add T1 --kind answer --body-file "$P/a.md" | jget data.commentId)"
     case "$id" in ''|*[!0-9]*) fail "$prov comment id not numeric: $id" ;; esac
     eq "comment markers" "<!-- hv:comment question -->|<!-- hv:comment answer -->" "$(MARKERS 1)"
-    ERR "$BIN/hv-item-comment" T1 --kind bogus --body-file "$P/a.md"
-    eq "comment bad kind" "1" "$ERRRC"
+    eq "comment bad kind" "2" "$(RC hvj item comment add T1 --kind bogus --body-file "$P/a.md")"
 
     # --- proof round trip
-    eq "no proof" "0" "$("$BIN/hv-proof-show" T1 --count)"
-    "$BIN/hv-proof-add" T1 --check smoke --result PASS --evidence "all green" --sha abc1234
-    "$BIN/hv-proof-add" T1 --check lint --result FAIL --evidence "2 errors" --sha abc1234
+    eq "no proof" "0" "$(hvj proof show T1 | jget data.count)"
+    hvj proof add T1 --check smoke --result PASS --evidence "all green" --sha abc1234 >/dev/null
+    hvj proof add T1 --check lint --result FAIL --evidence "2 errors" --sha abc1234 >/dev/null
     : > "$P/log"
-    "$BIN/hv-proof-add" T1 --check smoke --result PASS --evidence "all green" --sha abc1234
-    eq "proof idempotent" "0" "$(WRITES)"
-    eq "proof count" "2" "$("$BIN/hv-proof-show" T1 --count)"
+    OUT="$(hvj proof add T1 --check smoke --result PASS --evidence "all green" --sha abc1234)"
+    eq "proof idempotent" "0|false" "$(WRITES)|$(jget data.changed <<<"$OUT")"
+    eq "proof count" "2" "$(hvj proof show T1 | jget data.count)"
     d="$(date +%Y-%m-%d)"
-    eq "proof rows" "$(printf -- '- %s · smoke · PASS · abc1234 · all green\n- %s · lint · FAIL · abc1234 · 2 errors' "$d" "$d")" "$("$BIN/hv-proof-show" '#1')"
-    eq "proof note shape" "$(printf '## Proof\n\n- %s · smoke · PASS · abc1234 · all green\n- %s · lint · FAIL · abc1234 · 2 errors' "$d" "$d")" "$("$BIN/hv-item-note" T1 --kind proof --show)"
+    OUT="$(hvj proof show '#1')"
+    eq "proof rows" "$d|smoke|PASS|abc1234|all green;$d|lint|FAIL|abc1234|2 errors" "$(python3 -c '
+import json, sys
+rows = json.load(sys.stdin)["data"]["rows"]
+print(";".join("|".join(r[k] for k in ("date", "check", "result", "sha", "evidence")) for r in rows))' <<<"$OUT")"
+    eq "proof note shape" "$(printf '## Proof\n\n- %s · smoke · PASS · abc1234 · all green\n- %s · lint · FAIL · abc1234 · 2 errors' "$d" "$d")" "$(hvj item note show T1 --kind proof | jget data.body)"
     eq "proof is a marker note" "<!-- hv:comment question -->|<!-- hv:comment answer -->|<!-- hv:proof -->" "$(MARKERS 1)"
-    ERR "$BIN/hv-proof-add" T99 --check c --result PASS --evidence e
-    eq "proof unknown item" "1" "$ERRRC"
+    eq "proof unknown item" "3" "$(RC hvj proof add T99 --check c --result PASS --evidence e)"
+    eq "proof show unknown item" "3" "$(RC hvj proof show T99)"
 
-    # --- hv-complete gate sees issue-mode proof
-    ERR "$BIN/hv-complete" T2 abc1234
-    eq "unproven item stops at the gate" "3" "$ERRRC"
-    ERR "$BIN/hv-complete" T1 abc1234
-    eq "proven item passes the gate and closes" "0" "$ERRRC"
-    "$BIN/hv-uncomplete" T1
+    # --- item complete gate sees issue-mode proof
+    eq "unproven item stops at the gate" "4" "$(RC hvj item complete T2 --commit abc1234)"
+    eq "proven item passes the gate and closes" "0" "$(RC hvj item complete T1 --commit abc1234)"
+    hvj item reopen T1 >/dev/null
 
     # --- adapter lifecycle calls
+    # white-box: kept until the A8 Go unit test lands (#52), then delete
     PYTHONPATH="$BIN" python3 - "$prov" <<'PY' || fail "$prov adapter lifecycle"
 import sys
 from hvlib import adapter_for, load_config, TrackerError
@@ -138,84 +145,73 @@ i = a.get(2)
 assert i["state"] == "closed" and i["state_reason"] == "not_planned", i
 a.reopen(2)
 PY
-    # --- item designs and plans as notes (design/plan add/show/rm/put, list helpers)
-    F1="$("$BIN/hv-item-create" features --title "Big")"
-    eq "design add" "$F1" "$("$BIN/hv-design-add" "$F1" "Big design")"
+
+    # --- item designs and plans as notes (design/plan add/show/rm/put, list verbs)
+    F1="F$(hvj item create --kind features --title "Big" | jget data.id)"
+    eq "feature ref" "F3" "$F1"
+    OUT="$(hvj design add "$F1" --title "Big design")"
+    eq "design add" "3|F|true" "$(jget data.id <<<"$OUT")|$(jget data.type <<<"$OUT")|$(jget data.changed <<<"$OUT")"
     eq "design marker" "<!-- hv:design -->" "$(MARKERS 3)"
-    "$BIN/hv-design-show" "$F1" | grep "^# $F1 — Big design" >/dev/null || fail "$prov design show stub"
-    "$BIN/hv-design-show" "$F1" | grep "^status: draft" >/dev/null || fail "$prov design show frontmatter"
-    ERR "$BIN/hv-design-add" "$F1" "again"
-    eq "design add twice refused" "1" "$ERRRC"
-    case "$ERRMSG" in *"already exists"*) ;; *) fail "$prov design exists msg: $ERRMSG";; esac
+    OUT="$("$HV_BIN" design show "$F1")"
+    grep "^# $F1 — Big design" >/dev/null <<<"$OUT" || fail "$prov design show stub"
+    grep "^status: draft" >/dev/null <<<"$OUT" || fail "$prov design show frontmatter"
+    OUT="$(RC hvj design add "$F1" --title "again")"
+    eq "design add twice refused" "4" "$OUT"
     eq "design add leaves one note" "<!-- hv:design -->" "$(MARKERS 3)"
     printf '%s\n' '---' "id: $F1" 'title: Big design' 'status: final' '---' '' 'new text' > "$P/d.md"
-    "$BIN/hv-design-put" "$F1" --body-file "$P/d.md"
-    eq "design put shows" "$(cat "$P/d.md")" "$("$BIN/hv-design-show" "$F1")"
+    hvj design put "$F1" --body-file "$P/d.md" >/dev/null
+    eq "design put shows" "$(cat "$P/d.md")" "$("$HV_BIN" design show "$F1")"
     : > "$P/log"
-    cat "$P/d.md" | "$BIN/hv-design-put" "$F1" --body-file -
-    eq "design put idempotent" "0" "$(WRITES)"
-    ERR "$BIN/hv-design-put" T1 --body-file "$P/d.md"
-    eq "design put needs existing" "1" "$ERRRC"
-    case "$ERRMSG" in *"not found"*"hv-design-add"*) ;; *) fail "$prov design put missing msg: $ERRMSG";; esac
-    eq "design put did not create" "" "$("$BIN/hv-item-note" T1 --kind design --show)"
-    ERR "$BIN/hv-design-put" "$F1" --body-file "$P/nope.md"
-    eq "design put unreadable body" "1" "$ERRRC"
-    ERR "$BIN/hv-design-put" "$F1"
-    eq "design put needs body" "1" "$ERRRC"
-    ERR "$BIN/hv-design-show" T1
-    eq "design show missing exit" "1" "$ERRRC"
-    ERR "$BIN/hv-design-list"
-    eq "design list unsupported exit" "2" "$ERRRC"
-    case "$ERRMSG" in *"not supported"*) ;; *) fail "$prov design list msg: $ERRMSG";; esac
+    OUT="$(cat "$P/d.md" | hvj design put "$F1" --body-file -)"
+    eq "design put idempotent" "0|false" "$(WRITES)|$(jget data.changed <<<"$OUT")"
+    eq "design put needs existing" "3" "$(RC hvj design put T1 --body-file "$P/d.md")"
+    eq "design put did not create" "false" "$(hvj item note show T1 --kind design | jget data.exists)"
+    eq "design put unreadable body" "2" "$(RC hvj design put "$F1" --body-file "$P/nope.md")"
+    eq "design put needs body" "2" "$(RC hvj design put "$F1")"
+    eq "design show missing exit" "3" "$(RC hvj design show T1)"
+    rc=0; OUT="$(hvj design list 2>/dev/null)" || rc=$?
+    eq "design list unsupported exit" "1|backend" "$rc|$(jget data.blockedBy <<<"$OUT")"
 
-    # item plan with --design pointer -> note:design; no plan file written
-    eq "plan add" "M07-$F1" "$("$BIN/hv-plan-add" --design ".hv/designs/$F1.md" M07 "$F1" "Big plan")"
-    [ ! -e .hv/plans/M07-$F1.md ] || fail "$prov item plan wrote a file"
+    # item plan with a --design pointer -> note:design; no plan file written
+    MID="$(hvj milestone add --title "Seven" --summary "Tracking issue" | jget data.id)"
+    TRK="$(TRACKER_OF "$MID")"
+    eq "plan add" "$MID-$F1" "$(hvj plan add "$MID-$F1" --title "Big plan" --design "$F1" | jget data.key)"
+    [ ! -e ".hv/plans/$MID-$F1.md" ] || fail "$prov item plan wrote a file"
     eq "plan marker" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
-    "$BIN/hv-plan-show" "M07-$F1" | grep "^design: note:design$" >/dev/null || fail "$prov plan show design pointer"
-    "$BIN/hv-plan-show" "M07-$F1" | grep "^key: M07-$F1$" >/dev/null || fail "$prov plan show key"
-    ERR "$BIN/hv-plan-add" M07 "$F1" "again"
-    eq "plan add twice refused" "1" "$ERRRC"
+    OUT="$("$HV_BIN" plan show "$MID-$F1")"
+    grep "^design: note:design$" >/dev/null <<<"$OUT" || fail "$prov plan show design pointer"
+    grep "^key: $MID-$F1$" >/dev/null <<<"$OUT" || fail "$prov plan show key"
+    eq "plan add twice refused" "4" "$(RC hvj plan add "$MID-$F1" --title "again")"
     printf 'plan body\n' > "$P/p.md"
-    "$BIN/hv-plan-put" "M07-$F1" --body-file "$P/p.md"
-    eq "plan put shows" "plan body" "$("$BIN/hv-plan-show" "M07-$F1")"
-    ERR "$BIN/hv-plan-put" "M07-T1" --body-file "$P/p.md"
-    eq "plan put needs existing" "1" "$ERRRC"
-    ERR "$BIN/hv-plan-show" "M07-T1"
-    eq "plan show missing exit" "1" "$ERRRC"
-    # slice plans are plan:S<NN> notes on the milestone's tracking issue (S05; see 61_milestones.sh)
-    PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-a.ensure_labels(["milestone-tracker"])
-a.create("M07 \u2014 Seven", "---\nid: M07\n---\n", ["milestone-tracker"])'
-    TRK="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().tracker_issue("M07")["number"])')"
-    eq "slice plan add" "M07-S01" "$("$BIN/hv-plan-add" M07 slice "A slice")"
-    [ ! -e .hv/plans/M07-S01.md ] || fail "$prov slice plan wrote a file"
+    hvj plan put "$MID-$F1" --body-file "$P/p.md" >/dev/null
+    eq "plan put shows" "plan body" "$("$HV_BIN" plan show "$MID-$F1")"
+    eq "plan put needs existing" "3" "$(RC hvj plan put "$MID-T1" --body-file "$P/p.md")"
+    eq "plan show missing exit" "3" "$(RC hvj plan show "$MID-T1")"
+    # slice plans are plan:S<NN> notes on the milestone's tracking issue (see 61_milestones.sh)
+    eq "slice plan add" "$MID-S01" "$(hvj plan add --milestone "$MID" --slice --title "A slice" | jget data.key)"
+    [ ! -e ".hv/plans/$MID-S01.md" ] || fail "$prov slice plan wrote a file"
     eq "slice plan marker" "<!-- hv:plan:S01 -->" "$(MARKERS "$TRK")"
-    "$BIN/hv-plan-show" M07-S01 | grep "^key: M07-S01$" >/dev/null || fail "$prov slice plan show"
-    ERR "$BIN/hv-plan-list"
-    eq "plan list ok" "0" "$ERRRC"
-    case "$ERRMSG" in *"live on their issues"*) ;; *) fail "$prov plan list note: $ERRMSG";; esac
-    eq "plan list stdout lists slice plans only" "M07-S01" "$("$BIN/hv-plan-list" 2>/dev/null | python3 -c 'import json,sys;print(" ".join(p["key"] for p in json.load(sys.stdin)))')"
-    printf 'slice body\n' | "$BIN/hv-plan-put" M07-S01 --body-file -
-    eq "slice plan put stores the note" "slice body" "$("$BIN/hv-plan-show" M07-S01)"
+    "$HV_BIN" plan show "$MID-S01" | grep "^key: $MID-S01$" >/dev/null || fail "$prov slice plan show"
+    rc=0; OUT="$(hvj plan list 2>/dev/null)" || rc=$?
+    eq "plan list ok" "0" "$rc"
+    [ -n "$(jget 'warnings[0]' <<<"$OUT")" ] || fail "$prov plan list should warn that item plans live on their issues: $OUT"
+    eq "plan list lists slice plans only" "$MID-S01" "$(python3 -c 'import json,sys;print(" ".join(p["key"] for p in json.load(sys.stdin)["data"]["plans"]))' <<<"$OUT")"
+    printf 'slice body\n' | hvj plan put "$MID-S01" --body-file - >/dev/null
+    eq "slice plan put stores the note" "slice body" "$("$HV_BIN" plan show "$MID-S01")"
     eq "slice plan makes no item note" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
-    "$BIN/hv-plan-rm" M07-S01
+    hvj plan rm "$MID-S01" >/dev/null
     eq "slice plan rm" "" "$(MARKERS "$TRK")"
-    "$BIN/hv-plan-rm" "M07-$F1"
+    hvj plan rm "$MID-$F1" >/dev/null
     eq "plan rm leaves design" "<!-- hv:design -->" "$(MARKERS 3)"
-    ERR "$BIN/hv-plan-rm" "M07-$F1"
-    eq "plan rm twice" "1" "$ERRRC"
-    "$BIN/hv-design-rm" "$F1"
+    eq "plan rm twice" "3" "$(RC hvj plan rm "$MID-$F1")"
+    hvj design rm "$F1" >/dev/null
     eq "design rm" "" "$(MARKERS 3)"
-    ERR "$BIN/hv-design-rm" "$F1"
-    eq "design rm twice" "1" "$ERRRC"
-    pass "$prov: marker notes, split/shrink, comments, proof and adapter lifecycle calls"
+    eq "design rm twice" "3" "$(RC hvj design rm "$F1")"
+    pass "$prov: marker notes, split/shrink, comments, proof and tracker lifecycle calls"
   )
 done
 
-# File mode: comment_add appends a Log row; proof/note behaviour unchanged
+# File mode: comment add appends a Log row; proof/note behaviour unchanged
 TMP_INF="$(mktemp -d)"
 trap 'rm -rf "$TMP_IN" "$TMP_INF"' EXIT
 mkdir -p "$TMP_INF/.hv"
@@ -223,56 +219,65 @@ mkdir -p "$TMP_INF/.hv"
   cd "$TMP_INF"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
   printf '# Backlog\n\n## Bugs\n\n- **[B01] [P1] Crash.** Desc.\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
-  printf 'Which db?\nsecond line\n' | "$BIN/hv-item-comment" B01 --kind question --body-file -
-  printf 'Postgres\n' | "$BIN/hv-item-comment" B01 --kind answer --body-file -
+  printf 'Which db?\nsecond line\n' | hvj item comment add B01 --kind question --body-file - >/dev/null
+  printf 'Postgres\n' | hvj item comment add B01 --kind answer --body-file - >/dev/null
   d="$(date +%Y-%m-%d)"
   exp="$(printf '# B01: Crash\n\n> Related TODO entry: `[B01]` in `.hv/BACKLOG.md`\n\n## Log\n\n- %s · question · Which db?\n  second line\n- %s · answer · Postgres\n' "$d" "$d")"
   [ "$(cat .hv/bugs/B01.md)" = "$exp" ] || fail "file-mode Log rows: $(cat .hv/bugs/B01.md)"
-  [ "$("$BIN/hv-item-comment" B01 --list)" = "$(printf -- '- %s · question · Which db?\n  second line\n- %s · answer · Postgres' "$d" "$d")" ] || fail "file-mode --list: $("$BIN/hv-item-comment" B01 --list)"
-  [ "$("$BIN/hv-item-comment" B01 --list --kind answer)" = "- $d · answer · Postgres" ] || fail "file-mode --list --kind"
-  rc=0; "$BIN/hv-item-show" B01 2>/dev/null || rc=$?
-  [ "$rc" = 2 ] || fail "file-mode hv-item-show exit: $rc"
-  rc=0; "$BIN/hv-item-comment" B99 --list 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "file-mode --list unknown item exit: $rc"
-  "$BIN/hv-proof-add" B01 --check smoke --result PASS --evidence ok --sha abc1234
-  [ "$("$BIN/hv-proof-show" B01 --count)" = 1 ] || fail "file-mode proof count"
-  rc=0; "$BIN/hv-item-note" B01 --kind design --show 2>/dev/null || rc=$?
-  [ "$rc" = 2 ] || fail "file-mode hv-item-note exit: $rc"
-  rc=0; "$BIN/hv-item-comment" B99 --kind answer --body-file - </dev/null 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "empty/unknown comment exit: $rc"
+  OUT="$(hvj item comment list B01)" || fail "file-mode comment list failed"
+  [ "$(jget data.comments[0].who <<<"$OUT")|$(jget data.comments[0].kind <<<"$OUT")|$(jget data.comments[0].text <<<"$OUT")" = "$d|question|$(printf 'Which db?\nsecond line')" ] \
+    || fail "file-mode comment list row 0: $OUT"
+  [ "$(jget data.comments[1].kind <<<"$OUT")|$(jget data.comments[1].text <<<"$OUT")" = "answer|Postgres" ] || fail "file-mode comment list row 1: $OUT"
+  OUT="$(hvj item comment list B01 --kind answer)" || fail "file-mode comment list --kind failed"
+  [ "$(jget data.comments[0].who <<<"$OUT")|$(jget data.comments[0].text <<<"$OUT")" = "$d|Postgres" ] || fail "file-mode comment list --kind: $OUT"
+  [ "$(jget data.comments[1] <<<"$OUT" 2>/dev/null || true)" = "" ] || fail "file-mode comment list --kind should hold one row: $OUT"
+  rc=0; hvj item show B01 >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 1 ] || fail "file-mode item show exit: $rc"
+  rc=0; hvj item comment list B99 >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "file-mode comment list unknown item exit: $rc"
+  hvj proof add B01 --check smoke --result PASS --evidence ok --sha abc1234 >/dev/null
+  [ "$(hvj proof show B01 | jget data.count)" = 1 ] || fail "file-mode proof count"
+  rc=0; hvj item note show B01 --kind design >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 1 ] || fail "file-mode item note show exit: $rc"
+  rc=0; hvj item comment add B99 --kind answer --body-file - </dev/null >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "empty comment exit: $rc"
+  rc=0; printf 'x\n' | hvj item comment add B99 --kind answer --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "unknown item comment exit: $rc"
 )
 trap 'rm -rf "$TMP"' EXIT
-pass "file backend: comment_add writes ## Log rows, hv-item-note refuses (exit 2), proof unchanged"
+rm -rf "$TMP_IN" "$TMP_INF"
+pass "file backend: comment add writes ## Log rows, item note show refuses (exit 1), proof unchanged"
 
 # File mode: design/plan put overwrite an existing file, refuse a missing one
 TMP_INP="$(mktemp -d)"
-trap 'rm -rf "$TMP_IN" "$TMP_INF" "$TMP_INP"' EXIT
+trap 'rm -rf "$TMP_IN" "$TMP_INP"' EXIT
 mkdir -p "$TMP_INP/.hv"
 (
   cd "$TMP_INP"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
-  rc=0; printf 'x\n' | "$BIN/hv-design-put" F01 --body-file - 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "file-mode design put on missing file: $rc"
+  rc=0; printf 'x\n' | hvj design put F01 --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "file-mode design put on missing file: $rc"
   [ ! -e .hv/designs/F01.md ] || fail "file-mode design put created a file"
-  "$BIN/hv-design-add" F01 "T" >/dev/null
-  printf 'new design\n' | "$BIN/hv-design-put" F01 --body-file -
+  hvj design add F01 --title "T" >/dev/null
+  printf 'new design\n' | hvj design put F01 --body-file - >/dev/null
   [ "$(cat .hv/designs/F01.md)" = "new design" ] || fail "file-mode design put content"
   printf 'from file\n' > body.txt; mkdir sub; cd sub
-  "$BIN/hv-design-put" F01 --body-file ../body.txt
+  hvj design put F01 --body-file ../body.txt >/dev/null
   [ "$(cat ../.hv/designs/F01.md)" = "from file" ] || fail "file-mode design put relative body"
   cd ..
-  rc=0; printf 'x\n' | "$BIN/hv-plan-put" M01-F01 --body-file - 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "file-mode plan put on missing file: $rc"
-  "$BIN/hv-plan-add" M01 F01 "T" >/dev/null
-  "$BIN/hv-plan-add" M01 slice "S" >/dev/null
-  printf 'new plan\n' | "$BIN/hv-plan-put" M01-F01 --body-file -
+  rc=0; printf 'x\n' | hvj plan put M01-F01 --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "file-mode plan put on missing file: $rc"
+  hvj plan add M01-F01 --title "T" >/dev/null
+  hvj plan add --milestone M01 --slice --title "S" >/dev/null
+  printf 'new plan\n' | hvj plan put M01-F01 --body-file - >/dev/null
   [ "$(cat .hv/plans/M01-F01.md)" = "new plan" ] || fail "file-mode plan put content"
-  printf 'new slice\n' | "$BIN/hv-plan-put" M01-S01 --body-file -
+  printf 'new slice\n' | hvj plan put M01-S01 --body-file - >/dev/null
   [ "$(cat .hv/plans/M01-S01.md)" = "new slice" ] || fail "file-mode slice plan put content"
-  rc=0; "$BIN/hv-plan-put" bogus --body-file body.txt 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "plan put bad key: $rc"
-  rc=0; "$BIN/hv-design-put" ../x --body-file body.txt 2>/dev/null || rc=$?
-  [ "$rc" = 1 ] || fail "design put bad id: $rc"
+  rc=0; hvj plan put bogus --body-file body.txt >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "plan put bad key: $rc"
+  rc=0; hvj design put ../x --body-file body.txt >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "design put bad id: $rc"
 )
 trap 'rm -rf "$TMP"' EXIT
+rm -rf "$TMP_INP"
 pass "file backend: design/plan put overwrite existing files and refuse missing ones"
