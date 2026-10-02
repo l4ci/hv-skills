@@ -151,7 +151,7 @@ func TestSchemaMatchesPython(t *testing.T) {
 		inputs[i], got[i] = c, goSchema(t, c)
 	}
 	var want []any
-	pytest.JSON(t, pySchema, cases, &want)
+	pytest.GoldenJSON(t, pySchema, cases, &want)
 	n := pytest.Compare(t, "schema", inputs, got, want)
 	t.Logf("compared %d cases (config_value, backlog_backend, tracker_label)", n)
 }
@@ -172,7 +172,7 @@ func TestKeysShape(t *testing.T) {
 // Keys must stay the same table as CONFIG_KEYS: name, default and required flag.
 func TestKeysMatchPython(t *testing.T) {
 	var want [][]any
-	pytest.JSON(t, `import json
+	pytest.GoldenJSON(t, `import json
 from hvlib_config import CONFIG_KEYS
 print(json.dumps([[k, d, r] for k, d, r in CONFIG_KEYS]))`, nil, &want)
 	var got [][]any

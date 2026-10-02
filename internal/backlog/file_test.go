@@ -112,7 +112,13 @@ func TestFileMatchesPython(t *testing.T) {
 		p.write(t)
 	}
 	var want []map[string]any
-	pytest.JSON(t, pyFile, projects, &want)
+	// Roots are fresh temp dirs; the golden records the inputs without them.
+	recorded := make([]project, len(projects))
+	copy(recorded, projects)
+	for i := range recorded {
+		recorded[i].Root = ""
+	}
+	pytest.Golden(t, map[string]any{"script": pyFile, "input": recorded}, &want, func() { pytest.JSON(t, pyFile, projects, &want) })
 
 	var got, inputs []any
 	items := 0
@@ -250,7 +256,7 @@ func TestNextIDMatchesPython(t *testing.T) {
 		{"- **[B100] a.**", "", str(`{"bugs": 1}`), []string{"bugs"}},
 	}
 	var want []map[string]any
-	pytest.JSON(t, pyNextID, scen, &want)
+	pytest.GoldenJSON(t, pyNextID, scen, &want)
 
 	var inputs, got, w []any
 	ids := 0

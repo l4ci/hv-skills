@@ -122,7 +122,7 @@ func TestMatchesPython(t *testing.T) {
 		got[i], inputs[i] = goResult(c), c
 	}
 	var want []any
-	pytest.JSON(t, pySection, cases, &want)
+	pytest.GoldenJSON(t, pySection, cases, &want)
 	n := pytest.Compare(t, "section", inputs, got, want)
 	t.Logf("compared %d cases (find, body, replace, append, topics)", n)
 }

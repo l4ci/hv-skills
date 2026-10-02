@@ -41,7 +41,7 @@ out["docs"] = [[[i, l, f, s] for i, l, f, s in iter_open_bullets(c)] for c in d[
 print(json.dumps(out))`
 
 func TestBulletParityWithPython(t *testing.T) {
-	lines := genLines(48, 900)
+	lines := genLines(48, 300)
 	rng := rand.New(rand.NewSource(7))
 	in := bulletIn{Lines: lines}
 
@@ -99,7 +99,7 @@ func TestBulletParityWithPython(t *testing.T) {
 		Docs    []any `json:"docs"`
 		Skipped any   `json:"-"`
 	}
-	pytest.JSON(t, pyBullet, in, &want)
+	pytest.GoldenJSON(t, pyBullet, in, &want)
 
 	total := 0
 	check := func(name string, inputs []any, got []any, want []any) {

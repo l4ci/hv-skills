@@ -50,7 +50,7 @@ func TestTypesMatchRegistry(t *testing.T) {
 
 func TestTypesMatchPython(t *testing.T) {
 	var want map[string]any
-	pytest.JSON(t, `import json
+	pytest.GoldenJSON(t, `import json
 import hvlib_types as h
 print(json.dumps({"items": h.ITEM_TYPES, "open": h.OPEN_SECTIONS, "countable": h.COUNTABLE_TYPES,
   "plannable": h.PLANNABLE_TYPES, "dir": h.DIR_FOR_PREFIX, "section": h.SECTION_FOR_DIR}))`, nil, &want)

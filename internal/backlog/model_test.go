@@ -60,7 +60,7 @@ func TestParseRefMatchesPython(t *testing.T) {
 		"a b#7", "repo:b07", "٢٣", "B٢", "repo#٢", "#B7", "7\n", " 7", "B7x", "repo:B7:x", "r#1#2", "r:#7", "r:#B7",
 		"t5", "T5", "f 5", "5 5", " B7 ", "web:F12", "web#012", "my-web.x:T3", "00", "0"}
 	var want []map[string]any
-	pytest.JSON(t, pyRefs, refs, &want)
+	pytest.GoldenJSON(t, pyRefs, refs, &want)
 	var got, w, inputs []any
 	for i, r := range refs {
 		ref, err := ParseRef(r)

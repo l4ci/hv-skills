@@ -185,7 +185,7 @@ func TestIssuesMatchPython(t *testing.T) {
 	}
 
 	var want []map[string]any
-	pytest.JSON(t, pyIssues, scen, &want)
+	pytest.GoldenJSON(t, pyIssues, scen, &want)
 
 	var inputs, got, w []any
 	items := 0
@@ -280,7 +280,7 @@ func TestFieldsBlockMatchesPython(t *testing.T) {
 		bodies = append(bodies, is.Body)
 	}
 	var want []map[string]any
-	pytest.JSON(t, pyBlock, bodies, &want)
+	pytest.GoldenJSON(t, pyBlock, bodies, &want)
 	var got, w, inputs []any
 	for i, body := range bodies {
 		text, fields, order := ParseFieldsBlock(body)

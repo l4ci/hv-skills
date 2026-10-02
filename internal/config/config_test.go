@@ -22,13 +22,23 @@ func TestLoadMatchesPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range cases {
+		if c.Name() == "golden" { // the recorded Python outputs, not a fixture
+			continue
+		}
 		t.Run(c.Name(), func(t *testing.T) {
 			path, _ := filepath.Abs(filepath.Join("testdata", c.Name(), "config.json"))
 			got, err := jsonx.Marshal(Load(path))
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := pytest.Run(t, ".", pyLoad, path)
+			files := map[string]string{}
+			for _, n := range []string{"config.json", "config.local.json"} {
+				if raw, err := os.ReadFile(filepath.Join("testdata", c.Name(), n)); err == nil {
+					files[n] = string(raw)
+				}
+			}
+			var want string
+			pytest.Golden(t, map[string]any{"script": pyLoad, "files": files}, &want, func() { want = pytest.Run(t, ".", pyLoad, path) })
 			if string(got) != want {
 				t.Fatalf("\n--- go\n%s\n--- python\n%s", got, want)
 			}
