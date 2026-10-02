@@ -47,7 +47,34 @@ for prov in github gitlab; do
     eq "queue fields" "True" "$(QUEUE 'd[0]["title"]=="One" and d[0]["number"]==1 and d[0]["prs"][0]["branch"]=="feat/a" and d[0]["prs"][0]["url"].endswith("/'$A'") and "Closes #1" in d[0]["prs"][0]["body"]')"
     pass "$prov: review queue lists needs-review items with closing-keyword PRs"
 
+    # white-box: kept until the A8 Go unit test lands (#52), then delete; see 5.0-smoke-whitebox.md
+    # --- keyword variants (adapter regex)
+    eq "keywords" "[1, 2, 3, 4, 40]" "$(PYTHONPATH="$BIN" python3 -c '
+from hvlib import adapter_for, load_config
+a = adapter_for(load_config())
+print(a.closed_numbers("closes #1\nFIXED: #2, resolve   #3 and Resolved #4; prefixes #9 unclosed #8 closes #40"))')"
+    eq "implements" "$([ $prov = gitlab ] && echo "[7]" || echo "[]")" "$(PYTHONPATH="$BIN" python3 -c '
+from hvlib import adapter_for, load_config
+print(adapter_for(load_config()).closed_numbers("Implements #7"))')"
+    eq "prs_closing" "[$A]" "$(PYTHONPATH="$BIN" python3 -c '
+from hvlib import adapter_for, load_config
+print([p["number"] for p in adapter_for(load_config()).prs_closing(1)])')"
+    pass "$prov: closing keyword matching"
+
+    # --- checkout, comment, state
     git checkout -q main
+    PYTHONPATH="$BIN" python3 -c '
+import sys
+from hvlib import adapter_for, load_config
+a = adapter_for(load_config()); a.pr_checkout(sys.argv[1]); a.pr_comment(sys.argv[1], "looks good\nsecond line")' "$A"
+    eq "checkout" "feat/a" "$(git rev-parse --abbrev-ref HEAD)"
+    eq "pr comment" "True" "$(DBQ '[p for p in d["prs"] if p["number"]==int("'$A'")][0]["comments"]==["looks good\nsecond line"]' )"
+    eq "pr_state open" "open" "$(PYTHONPATH="$BIN" python3 -c '
+import sys
+from hvlib import adapter_for, load_config
+print(adapter_for(load_config()).pr_state(sys.argv[1]))' "$A")"
+    git checkout -q main
+
 
     # --- merge A: host auto-closes (base main)
     out="$(hvj ship pr-merge "$A")" || fail "$prov: pr-merge $A failed [$out]"
@@ -91,6 +118,17 @@ for prov in github gitlab; do
     eq "unknown pr exit" 3 "$rc"
     rc=0; hvj ship pr-merge x 2>/dev/null >&2 || rc=$?
     eq "bad pr arg" 2 "$rc"
+    rc=0; hvj ship pr-merge "$A" 2>/dev/null >&2 || rc=$?
+    eq "already merged pr exit" 3 "$rc"
+    # the forge refuses the merge itself (only the merge call carries this flag)
+    git checkout -q main
+    E="$(prnum "$(pr_open feat/e 'no linked items')")"
+    git checkout -q main
+    MERGE_FLAG="$([ $prov = github ] && echo delete-branch || echo remove-source-branch)"
+    rc=0; out="$(FAKE_TRACKER_FAIL="$MERGE_FLAG" hvj ship pr-merge "$E" 2>/dev/null)" || rc=$?
+    eq "failed merge exit" 4 "$rc"
+    eq "failed merge data" "false false" "$(jget data.merged <<<"$out") $(jget data.changed <<<"$out")"
+    eq "failed merge pr open" "open" "$(DBQ '[p for p in d["prs"] if p["number"]==int("'$E'")][0]["state"]')"
     rc=0; FAKE_TRACKER_FAIL="list" hvj review queue 2>/dev/null >&2 || rc=$?
     eq "queue tracker failure" 5 "$rc"
     pass "$prov: error exits"
