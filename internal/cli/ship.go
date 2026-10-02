@@ -274,7 +274,7 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 			if base, ok, err = resolveBase(ctx, dir); err != nil {
 				return Result{}, err
 			} else if !ok {
-				return Result{}, Unavailable("could not determine base branch (tried git.baseBranch, main, master, trunk, origin/HEAD)")
+				return Result{}, Resolution("could not determine base branch (tried git.baseBranch, main, master, trunk, origin/HEAD)")
 			}
 		}
 		if err := shipClearWorktree(c, dir, branch); err != nil {
@@ -398,7 +398,7 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		if !ok {
-			return Result{}, Unavailable("could not determine base branch (tried git.baseBranch, main, master, trunk, origin/HEAD)")
+			return Result{}, Resolution("could not determine base branch (tried git.baseBranch, main, master, trunk, origin/HEAD)")
 		}
 		if base == branch {
 			return shipBlocked("base branch", "'%s' is the base branch", branch)
