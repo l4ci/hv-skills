@@ -102,7 +102,7 @@ func a4dProvider(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		p := issues.Provider(context.Background(), env, dir)
+		p := issues.Provider(c.Context(), env, dir)
 		return Result{Data: a4Obj("provider", p), Text: p}, nil
 	}
 }
@@ -129,7 +129,7 @@ func a4dList(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		list, err := issues.List(context.Background(), env, dir, issues.ListOpts{Mine: *mine, Label: *label, Limit: n})
+		list, err := issues.List(c.Context(), env, dir, issues.ListOpts{Mine: *mine, Label: *label, Limit: n})
 		if err != nil {
 			return Result{}, a4dErr(err)
 		}
@@ -181,7 +181,7 @@ func a4dLabel(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		auto, _ := config.Value(config.Load(filepath.Join(root, ".hv", "config.json")), "issues.autoCreateLabel")
-		changed, err := issues.Label(context.Background(), env, dir, number, name, action == "add", auto != false && auto != nil)
+		changed, err := issues.Label(c.Context(), env, dir, number, name, action == "add", auto != false && auto != nil)
 		if err != nil {
 			return Result{}, a4dErr(err)
 		}
@@ -205,7 +205,7 @@ func a4dImported(fs *flag.FlagSet) RunFunc {
 		}
 		entries := backlog.ScanImported(root, *forRepo)
 		if *openOnly {
-			ctx := context.Background()
+			ctx := c.Context()
 			env := issues.Env{Settings: tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".hv", "config.json"))), Opts: trackerOptions}
 			paths := repos.Paths(root)
 			var kept []backlog.Imported
@@ -255,7 +255,7 @@ func a4dClose(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		changed, err := issues.Close(context.Background(), env, dir, number, *commit, *item)
+		changed, err := issues.Close(c.Context(), env, dir, number, *commit, *item)
 		if err != nil {
 			return Result{}, a4dErr(err)
 		}
@@ -272,8 +272,8 @@ func a4dClose(fs *flag.FlagSet) RunFunc {
 // migrateSleep and migrateTracker are seams: tests pin the pace and the forge.
 var (
 	migrateSleep   func(d time.Duration)
-	migrateTracker = func(root string, cfg any) (backlog.MigrateTracker, error) {
-		return tracker.New(context.Background(), tracker.SettingsFromConfig(cfg), "", root, trackerOptions...)
+	migrateTracker = func(ctx context.Context, root string, cfg any) (backlog.MigrateTracker, error) {
+		return tracker.New(ctx, tracker.SettingsFromConfig(cfg), "", root, trackerOptions...)
 	}
 )
 
@@ -300,9 +300,9 @@ func a4dMigrateIssues(fs *flag.FlagSet) RunFunc {
 		// Notices are kept until the run's outcome is known: a failure answers
 		// with its error alone, so they go to stderr only.
 		var notices []string
-		opts := backlog.MigrateOptions{Root: root, Apply: *apply, Limit: lim, Cfg: cfg,
+		opts := backlog.MigrateOptions{Root: root, Apply: *apply, Limit: lim, Cfg: cfg, Ctx: c.Context(),
 			Sleep: migrateSleep, Warn: func(s string) { notices = append(notices, s) },
-			Tracker: func() (backlog.MigrateTracker, error) { return migrateTracker(root, cfg) }}
+			Tracker: func() (backlog.MigrateTracker, error) { return migrateTracker(c.Context(), root, cfg) }}
 		res, err := backlog.MigrateIssues(opts)
 		if err != nil {
 			for _, n := range notices {

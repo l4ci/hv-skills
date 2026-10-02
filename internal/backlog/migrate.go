@@ -50,6 +50,7 @@ type MigrateOptions struct {
 	Sleep   func(time.Duration) // the issues.bulkPaceMs pause; nil is time.Sleep
 	Warn    func(string)        // notices (dropped tags and milestones, duplicate tracking issues)
 	Today   func() string       // YYYY-MM-DD; nil is the local date
+	Ctx     context.Context     // for every tracker call; nil is context.Background()
 }
 
 // MigrateOp is one planned or run operation: Action is the first word of the
@@ -120,7 +121,7 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 	if len(repos.Load(o.Root)) > 0 {
 		return nil, ErrUmbrellaMigrate
 	}
-	m := &migrator{o: o, ctx: context.Background(), apply: o.Apply, msCache: map[string]bool{},
+	m := &migrator{o: o, ctx: migrateCtx(o.Ctx), apply: o.Apply, msCache: map[string]bool{},
 		mapRel: filepath.Join(hv, "issue-map.json"), res: &MigrateResult{}}
 	m.items = planItems(o.Root, text, o.Warn)
 	m.ms = planMilestones(o.Root)
@@ -768,4 +769,11 @@ func (m *migrator) putMilestone(mid string, ms *migMilestone) error {
 		return nil
 	}
 	return err
+}
+
+func migrateCtx(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }

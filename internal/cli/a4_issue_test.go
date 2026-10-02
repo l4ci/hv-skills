@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,7 @@ import (
 func withTracker(t *testing.T, tr backlog.Tracker) {
 	t.Helper()
 	old := newTracker
-	newTracker = func(string, any) (backlog.Tracker, error) { return tr, nil }
+	newTracker = func(context.Context, string, any) (backlog.Tracker, error) { return tr, nil }
 	t.Cleanup(func() { newTracker = old })
 }
 
