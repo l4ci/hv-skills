@@ -162,7 +162,7 @@ func (s Store) AutoSince() (since string, out []Decision, err error) {
 		return "", out, nil
 	}
 	sinceDate, _, _ := strings.Cut(since, "T")
-	raw, err := os.ReadFile(s.decisionsPath())
+	raw, err := readTextBytes(s.decisionsPath())
 	if os.IsNotExist(err) {
 		return since, out, nil
 	}

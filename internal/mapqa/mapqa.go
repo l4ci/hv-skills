@@ -15,6 +15,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
+	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
@@ -29,7 +30,7 @@ func Query(root, dir string, names []string) (text string, missing []string, err
 			missing = append(missing, name)
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join(root, ".hv", dir, name+".md"))
+		raw, err := readText(filepath.Join(root, ".hv", dir, name+".md"))
 		if os.IsNotExist(err) {
 			missing = append(missing, name)
 			continue
@@ -65,7 +66,7 @@ func mapEntries(dir string) []entry {
 	sort.Strings(files)
 	var out []entry
 	for _, f := range files {
-		raw, err := os.ReadFile(f)
+		raw, err := readText(f)
 		if err != nil {
 			continue
 		}
@@ -107,7 +108,7 @@ func QAIndexBlock(root string) string {
 	if len(files) > 0 {
 		var lines []string
 		for _, f := range files {
-			raw, err := os.ReadFile(f)
+			raw, err := readText(f)
 			if err != nil {
 				continue
 			}
@@ -167,7 +168,7 @@ func refBroken(root, file, line string) bool {
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(root, p)
 	}
-	raw, err := os.ReadFile(p)
+	raw, err := readText(p)
 	if err != nil {
 		return true
 	}
@@ -214,4 +215,10 @@ func SoftCap(root string) int {
 // CapNote is the nudge printed when count reaches cap.
 func CapNote(count, cap int) string {
 	return fmt.Sprintf("project map has %d subsystems (cap %d); consider merging or retiring stale .hv/map/<name>.md entries", count, cap)
+}
+
+// readText is fsio.ReadText for callers that work on bytes.
+func readText(path string) ([]byte, error) {
+	t, err := fsio.ReadText(path)
+	return []byte(t), err
 }

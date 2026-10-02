@@ -279,3 +279,43 @@ func TestMapStatsCap(t *testing.T) {
 		t.Errorf("text mode: %q", text.stdout)
 	}
 }
+
+func TestCRLFMatchesOldHelpersForDecisionsMapAndQA(t *testing.T) {
+	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
+	t.Run("auto-log rewrites as LF", func(t *testing.T) {
+		oldDir, newDir := decProject(t, crlf(decFixture), ""), decProject(t, crlf(decFixture), "")
+		knOld(t, oldDir, "", "hv-auto-decision-log", "Build", "New rule", "why", "", "2026-10-05")
+		knNew(t, newDir, "", "decisions", "auto-log", "--topic", "Build", "--title", "New rule", "--why", "why", "--date", "2026-10-05")
+		knSameTree(t, oldDir, newDir)
+		if strings.Contains(knTree(t, newDir)["DECISIONS.md"], "\r") {
+			t.Error("CR survived")
+		}
+	})
+	t.Run("decisions query and auto-since", func(t *testing.T) {
+		dir := decProject(t, crlf(decFixture), `{"loopStartedAt": "2026-10-01T09:00:00Z"}`)
+		if o, n := knOld(t, dir, "", "hv-decisions-query", "build"), knNew(t, dir, "", "decisions", "query", "build"); o.stdout != n.stdout {
+			t.Errorf("query old %q new %q", o.stdout, n.stdout)
+		}
+		if o, n := knOld(t, dir, "", "hv-auto-decisions-since"), knNew(t, dir, "", "decisions", "auto-since"); o.stdout != n.stdout {
+			t.Errorf("since old %q new %q", o.stdout, n.stdout)
+		}
+	})
+	t.Run("map query, stats and index", func(t *testing.T) {
+		dir := mapProject(t)
+		knWrite(t, filepath.Join(dir, ".hv", "map", "cli.md"), crlf(mapFileA))
+		knWrite(t, filepath.Join(dir, "cmd", "main.go"), crlf("package main\n\nfunc main() {}\n"))
+		if o, n := knOld(t, dir, "", "hv-map-query", "cli"), knNew(t, dir, "", "map", "query", "cli"); o.stdout != n.stdout || strings.Contains(n.stdout, "\r") {
+			t.Errorf("query old %q new %q", o.stdout, n.stdout)
+		}
+		o := knOld(t, dir, "", "hv-map-stats")
+		n := knNew(t, dir, "", "map", "stats", "--json")
+		for _, want := range []string{`"entry_points": 3`, `"broken_refs": 2`} {
+			if !strings.Contains(o.stdout, want) {
+				t.Fatalf("old: %s", o.stdout)
+			}
+		}
+		if !strings.Contains(n.stdout, `"entryPoints": 3, "brokenRefs": 2`) {
+			t.Errorf("new: %s", n.stdout)
+		}
+	})
+}
