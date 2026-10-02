@@ -1,19 +1,17 @@
 echo "F24 hv-preamble.sh — single-line preamble source"
 
+# white-box-begin: A9 #53 keep
 # Install canonical helpers at .hv/bin/ so walk-up from BASH_SOURCE lands
 # on the test umbrella's .hv/, not the dev tree's.
 mkdir -p .hv/bin
-# white-box: kept until A9 (#53)
 install_helpers
 
 # Sanity — the new helper landed via the canonical mirror.
-# white-box: kept until A9 (#53)
 [ -f .hv/bin/hv-preamble.sh ] || fail "F24: bin/hv-preamble.sh missing from installed helpers"
 pass "hv-preamble.sh installs under .hv/bin/ via canonical mirror"
 
 # Fast-path: cwd already contains .hv/. Sourcing hv-preamble.sh must
 # preserve cwd, export HERE pointing at bin/, and capture HV_ORIG_PWD.
-# white-box: kept until A9 (#53)
 (
   cd "$TMP"
   before_pwd="$(pwd -P)"
@@ -50,7 +48,6 @@ pass "verbs walk up from a sub-cwd to the project's .hv/ (also with -C)"
 # hv-self-locate.sh stays a pure library — sourcing it alone must NOT
 # auto-invoke hv_self_locate (preserves the "sourceable files define,
 # don't run" convention that hv-preamble.sh is the explicit exception to).
-# white-box: kept until A9 (#53)
 (
   cd "$TMP"
   before_pwd="$(pwd -P)"
@@ -67,3 +64,4 @@ pass "verbs walk up from a sub-cwd to the project's .hv/ (also with -C)"
 pass "hv-self-locate.sh stays library-shaped — no auto-invocation on source"
 
 rm -rf .hv/bin
+# white-box-end

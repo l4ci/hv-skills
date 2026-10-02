@@ -68,7 +68,7 @@ assert issues[1]["body"].count("hv:fields") == 0
 PY
 
     # gaps and closed milestones count toward the next ID
-    # white-box: kept until the A8 Go unit test lands (#52), then delete
+    # white-box-begin: go-unit A8 #52
     PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import adapter_for, load_config
 a = adapter_for(load_config())
@@ -84,6 +84,7 @@ PY
     RC hvj id next --kind milestones
     eq "id next still refuses" "4" "$RCV"
     eq "id next refusal names the backend" "backend" "$(jget data.blockedBy <<<"$OUT")"
+    # white-box-end
 
     # --- status transitions
     eq "status changed" "true" "$(hvj milestone status M01 --to active | jget data.changed)"
@@ -154,7 +155,7 @@ PY
     eq "put usage" "2" "$RCV"
 
     # --- plan:SNN notes on the tracking issue (backend level)
-    # white-box: kept until the A6 Go unit test lands (#50), then delete
+    # white-box-begin: go-unit A6 #50
     PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov slice notes"
 from hvlib import get_backend, adapter_for, load_config
 b = get_backend()
@@ -177,6 +178,7 @@ try:
 except ValueError:
     pass
 PY
+    # white-box-end
 
     # --- duplicate tracking issues: lowest open wins
     SEED_TRACKER "M02 — duplicate" $'---\nid: M02\n---\n' || fail "$prov seeding the duplicate tracking issue failed"

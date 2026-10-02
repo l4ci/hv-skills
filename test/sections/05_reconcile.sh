@@ -5,7 +5,7 @@ echo "backlog drift"
 TD_TMP="$(mktemp -d)"
 (
   cd "$TD_TMP"
-  mkdir -p .hv/bin
+  mkdir -p .hv
   cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 

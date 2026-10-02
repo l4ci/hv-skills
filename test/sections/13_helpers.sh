@@ -1,4 +1,4 @@
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 echo "hv-types.sh source contract"
 # Source the file in a subshell and assert the exported env vars.
 ( . "$BIN/hv-types.sh"
@@ -6,8 +6,9 @@ echo "hv-types.sh source contract"
   [ "$HV_OPEN_SECTIONS" = "Bugs|Features|Tasks" ] || { echo "HV_OPEN_SECTIONS=$HV_OPEN_SECTIONS"; exit 1; }
 ) || fail "hv-types.sh did not export expected values"
 pass "hv-types.sh exports HV_ITEM_TYPES=BFT and HV_OPEN_SECTIONS=Bugs|Features|Tasks"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 echo "hv-types.sh <-> hvlib_types registry parity"
 # Both sides parse the same HV_TYPE_REGISTRY line in bin/hv-types.sh — bash
 # via the sourcing loop, python via hvlib_types' regex parser. This pins the
@@ -37,6 +38,7 @@ if diverged:
 PY
 ) || fail "bash hv-types.sh and python hvlib_types diverge on HV_TYPE_REGISTRY"
 pass "hv-types.sh env exports match hvlib_types constants (registry parity)"
+# white-box-end
 
 echo "## git base + hv-worktree-clear + block + hv-fm-list (refactor)"
 
@@ -75,7 +77,7 @@ rm -rf "$BB2_TMP"
 pass "git base respects git.baseBranch config override"
 
 # 2. hv-worktree-clear
-# white-box: kept until the A8 Go unit test lands (#52), then delete
+# white-box-begin: go-unit A8 #52
 WC_TMP="$(mktemp -d)"
 (
   cd "$WC_TMP"
@@ -95,6 +97,7 @@ WC_TMP="$(mktemp -d)"
 )
 rm -rf "$WC_TMP"
 pass "hv-worktree-clear silently exits on missing branch; removes non-main worktree"
+# white-box-end
 
 # 3. block knowledge (flat-list mode)
 MB_TMP="$(mktemp -d)"
@@ -143,7 +146,7 @@ Custom intro.
 rm -rf "$BS_TMP"
 pass "block decisions --body-file - writes stdin body wrapped in markers"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 5. hv-fm-list
 FM_TMP="$(mktemp -d)"
 (
@@ -163,6 +166,7 @@ assert '_path' in data[0], '_path missing'
 )
 rm -rf "$FM_TMP"
 pass "hv-fm-list extracts FM fields, skips files without frontmatter, includes _path"
+# white-box-end
 
 echo "milestone index heals archived Status line"
 # Seed MILESTONES.md with a stale archived line; frontmatter says planned.
@@ -191,7 +195,7 @@ if not (m and m.group(1) == 'planned'):
 rm -rf "$HEAL_TMP"
 pass "milestone index heals stale 'archived' Status line to match frontmatter"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 ## hv-fm-list (CRLF tolerance)
 CRLF_TMP="$(mktemp -d)"
 (
@@ -213,10 +217,11 @@ assert data[0]['title'] == 'CRLF Milestone', f'title wrong: {data[0][\"title\"]}
 )
 rm -rf "$CRLF_TMP"
 pass "hv-fm-list parses frontmatter with CRLF line endings"
+# white-box-end
 
-echo "## hvlib.py (find_section, section, load_json, dump_json_atomic, update_json)"
+echo "## fsio and section helpers (find_section, section, load_json, dump_json_atomic, update_json)"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 1. find_section finds known section
 python3 -c "
 import sys; sys.path.insert(0, '$REPO/bin')
@@ -227,8 +232,9 @@ assert span is not None, 'find_section returned None'
 assert content[span[0]:span[1]].strip() == 'body-a', f'got: {content[span[0]:span[1]]!r}'
 " || fail "find_section did not locate known section body"
 pass "find_section returns correct (start, end) for known section"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 2. section returns empty string for missing heading
 python3 -c "
 import sys; sys.path.insert(0, '$REPO/bin')
@@ -237,8 +243,9 @@ result = section('foo', 'Bar')
 assert result == '', f'expected empty string, got {result!r}'
 " || fail "section did not return '' for missing heading"
 pass "section returns '' for missing heading"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 3. load_json returns default on corrupt file
 HVLIB_CORRUPT="$(mktemp)"
 printf 'not-json' > "$HVLIB_CORRUPT"
@@ -250,8 +257,9 @@ assert result == {'x': 1}, f'expected default, got {result!r}'
 " || fail "load_json did not return default on corrupt file"
 rm -f "$HVLIB_CORRUPT"
 pass "load_json returns default on corrupt file"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 4. dump_json_atomic writes pretty JSON with trailing newline; no .tmp leftover
 HVLIB_ATOMIC="$(mktemp -d)"
 python3 -c "
@@ -266,8 +274,9 @@ assert not os.path.exists(path + '.tmp'), '.tmp file was not cleaned up'
 " || fail "dump_json_atomic did not write expected content or left .tmp"
 rm -rf "$HVLIB_ATOMIC"
 pass "dump_json_atomic writes indent=2 JSON with trailing newline; no .tmp leftover"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 5. write_text_atomic writes text and cleans up .tmp
 HVLIB_TXT="$(mktemp -d)"
 python3 -c "
@@ -281,8 +290,9 @@ assert not os.path.exists(path + '.tmp'), '.tmp file was not cleaned up'
 " || fail "write_text_atomic did not write expected content or left .tmp"
 rm -rf "$HVLIB_TXT"
 pass "write_text_atomic writes text atomically; no .tmp leftover"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 # 6. update_json mutates and atomically writes
 HVLIB_UPDATE="$(mktemp -d)"
 python3 -c "
@@ -296,8 +306,9 @@ assert result == {'n': 2}, f'expected n=2, got {result!r}'
 " || fail "update_json did not mutate and write correctly"
 rm -rf "$HVLIB_UPDATE"
 pass "update_json mutates in place and atomically writes result"
+# white-box-end
 
-# white-box: kept until the A4 Go unit test lands (#48), then delete
+# white-box-begin: go-unit A4 #48
 # 7. find_origin_bullet returns origin bullet, ignores Related: references
 python3 -c "
 import sys; sys.path.insert(0, '$REPO/bin')
@@ -311,8 +322,9 @@ assert 'Done' not in line, f'Done suffix not stripped: {line!r}'
 assert '~~' not in line, f'strikethrough not unwrapped: {line!r}'
 " || fail "find_origin_bullet did not return correct origin bullet"
 pass "find_origin_bullet picks origin bullet over Related-link reference"
+# white-box-end
 
-# white-box: kept until the A4 Go unit test lands (#48), then delete
+# white-box-begin: go-unit A4 #48
 # 8. parse_todo_fields is order-agnostic
 python3 -c "
 import sys; sys.path.insert(0, '$REPO/bin')
@@ -329,6 +341,7 @@ assert r['related'] == '[F02]', f'related wrong reversed: {r}'
 assert r['milestone'] == 'M01', f'milestone wrong reversed: {r}'
 " || fail "parse_todo_fields not order-agnostic"
 pass "parse_todo_fields extracts Detail/Related/Milestone in any order"
+# white-box-end
 
 echo "## backlog milestones"
 FM4I_TMP="$(mktemp -d)"

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # === Helper existence + executable mode (F66) ===
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 echo "Section 32: hv-issues helper existence + mode"
 for h in hv-issues-provider hv-issues-list hv-issues-label hv-issues-close hv-issues-imported; do
   [ -f "$REPO/bin/$h" ] || fail "bin/$h missing"
@@ -13,6 +13,7 @@ for h in hv-issues-provider hv-issues-list hv-issues-label hv-issues-close hv-is
   [ "$mode" = "100755" ] || fail "bin/$h tracked mode is $mode, expected 100755"
 done
 pass "5 hv-issues-* helpers exist and tracked as 100755"
+# white-box-end
 
 # === Provider detection unit tests ===
 echo "Section 32: issues provider classification"
@@ -56,7 +57,7 @@ trap 'rm -rf "$TMP"' EXIT
 pass "issues provider classifies github/gitlab/unknown across 5 fixtures"
 
 # === SKILL.md manual-gate callouts (T7, T8, T9) ===
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 echo "Section 32: manual-gate callouts in SKILL.md files"
 
 # hv-capture/SKILL.md — Step I6 labeling gate (folded from /hv-issues in F16)
@@ -82,7 +83,6 @@ grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.l
 pass "3 manual-gate callouts present in hv-capture/SKILL.md (Step R3 + Step I6), hv-ship/SKILL.md (Step 6c)"
 
 # === references/manual-gates.md inventory rows (T11 must land before these pass) ===
-# white-box: kept until A9 (#53)
 echo "Section 32: manual-gates.md inventory rows"
 
 grep -q 'Step I6\|hv-capture --from-.*label\|label.*hv-capture --from' "$REPO/references/manual-gates.md" || \
@@ -95,6 +95,7 @@ grep -q 'Step 6c\|direct-push close' "$REPO/references/manual-gates.md" || \
   fail "manual-gates.md missing hv-ship Step 6c row (T11 not yet landed?)"
 
 pass "manual-gates.md inventory has rows for the 3 manual gates"
+# white-box-end
 
 # === issues imported smoke ===
 echo "Section 32: issues imported smoke"

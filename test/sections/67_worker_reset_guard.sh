@@ -166,7 +166,7 @@ sh -c 'sh -c "echo \$\$ > '"$ZF"'" & exec sleep 300' & ZPARENT=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$ZF" ] && break; sleep 0.2; done
 sleep 0.3
 ZPID="$(cat "$ZF")"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
+# white-box-begin: go-unit A7 #51
 ( . "$BIN/hv-host-select.sh"
   hv_pid_alive "$ZPID" && exit 1
   hv_pid_alive "$ZPARENT" || exit 2
@@ -174,6 +174,7 @@ ZPID="$(cat "$ZF")"
 ) || fail "hv_pid_alive/hv_pid_tree: zombie must be gone, parent alive, tree must list descendants (rc $?)"
 kill "$ZPARENT" 2>/dev/null || true; wait "$ZPARENT" 2>/dev/null || true
 pass "a zombie reads as exited, so a slow reaper cannot cause a false refusal"
+# white-box-end
 
 # ── (d) resume flags and unparseable commands ───────────────────────────────
 cfgj() { python3 -c 'import json,sys; print(json.dumps({"work":{"dispatch":"herdr","workerCommand":sys.argv[1]}}))' "$1" > "$TMP_RG/repo/.hv/config.json"; }
@@ -216,11 +217,11 @@ rm -f "$FK/dirty_on_close" "$WT/raced.txt"
 pass "a failure after the kill clears the slot's stale handle"
 
 # ── drift: SKILL.md carries the contract the helper header names ────────────
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 head -40 "$BIN/hv-worker-reset" | grep -F "reset guard" >/dev/null || fail "hv-worker-reset header lost the term 'reset guard'"
-# white-box: kept until A9 (#53)
 grep -qF "reset guard" "$REPO/hv-work/SKILL.md" || fail "hv-work/SKILL.md does not describe the slot reset guard"
 pass "hv-work/SKILL.md and the helper header share the 'reset guard' contract"
+# white-box-end
 
 # ── (g) a detached worktree is not registered as branch 'HEAD' ──────────────
 git -C "$WT" switch -q --detach

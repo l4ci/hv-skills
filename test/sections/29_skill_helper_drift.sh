@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 keep
 echo "F65 — SKILL.md ↔ helper docstring drift check"
 
 # Each entry: helper, citing SKILL.md (relative to $REPO), key term that
@@ -43,3 +44,4 @@ drift_check "hv-resolve-handoff"      "hv-next/SKILL.md"   "hv-resolve-handoff"
 drift_check "hv-guard-feature-branch" "hv-ship/SKILL.md"   "hv-guard-feature-branch"
 
 pass "F65 — sampled helper docstrings align with citing SKILL.md prose"
+# white-box-end

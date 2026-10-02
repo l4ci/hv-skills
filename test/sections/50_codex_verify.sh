@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 keep
 echo "hv-codex-verify — Codex verdict classification against a fake codex binary"
 # Live Codex is a manual gate (like tmux dispatch in section 49): the host sandbox may be
 # broken and a live run costs tokens. This section fakes `codex` on PATH and checks the
@@ -93,3 +94,4 @@ rc=0; ( cd "$TMP_CV/proj" && "$BIN/hv-codex-verify" --worktree ) >"$TMP_CV/u" 2>
 
 trap 'rm -rf "$TMP"' EXIT
 pass "hv-codex-verify — PASS/FAIL and every ERROR path classified; sandbox flag only when asked"
+# white-box-end

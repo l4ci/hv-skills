@@ -130,11 +130,9 @@ EVID=$( ( cd "$TMP_WD" && HV_TEST_POLL_FIXTURE="$FX/blocked_long.txt" "$HV_BIN" 
 # Every pane capture in the tree must join wrapped lines. hv-worker-dispatch's
 # captures live in the shared library, so assert against whichever files
 # actually call capture-pane rather than a fixed list that rots on refactor.
-# white-box: kept until the A7 Go unit test lands (#51), then delete
+# white-box-begin: go-unit A7 #51
 CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-host-tmux.sh 2>/dev/null || true )
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 [ -n "$CAPTURERS" ] || fail "no helper calls capture-pane — the pane classifier has gone missing"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 for H in $CAPTURERS; do
   if grep -q 'capture-pane -p ' "$H"; then
     fail "$(basename "$H") captures panes without -J; long sentinels silently truncate at pane width"
@@ -143,6 +141,7 @@ for H in $CAPTURERS; do
     || fail "$(basename "$H") calls capture-pane but not with -J (join wrapped lines)"
 done
 pass "worker poll preserves questions longer than the pane is wide (capture-pane -J)"
+# white-box-end
 
 # ── (b1) tmux precondition ──────────────────────────────────────────────────
 # Being inside tmux is load-bearing: outside it, worker windows land in a
@@ -178,58 +177,52 @@ pass "worker session detects tmux membership via \$TMUX, not session existence"
 # The paste path is shared by hv-worker-dispatch and hv-worker-session through
 # the host libs. It carries three separate traps (bracketed-paste eating Enter,
 # collapsed paste chips, unconfirmed pickup); two copies would drift.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 [ -f "$BIN/hv-host-tmux.sh" ] || fail "bin/hv-host-tmux.sh (tmux host library) is missing"
-# white-box: kept until A9 (#53)
 if [ -e "$BIN/hv-tmux-send.sh" ]; then
   fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
 fi
-# white-box: kept until the A7 Go unit test lands (#51), then delete
+# white-box-end
+# white-box-begin: go-unit A7 #51
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
   grep -q 'hv-host-select.sh' "$BIN/$H" \
     || fail "$H does not pick its host through hv-host-select.sh"
 done
 # Strip comments before grepping: the callers legitimately MENTION the paste
 # path in prose, and matching that reports a defect where none exists.
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
   SRC=$(sed 's/#.*//' "$BIN/$H") || fail "cannot read $H"
   if grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)' <<<"$SRC"; then
     fail "$H talks to a host directly; it must go through the hv_host_* primitives"
   fi
 done
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 SRC=$(sed 's/#.*//' "$BIN/hv-host-tmux.sh") || fail "cannot read hv-host-tmux.sh"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 grep -q 'paste-buffer' <<<"$SRC" \
   || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
 pass "worker helpers share one paste-and-confirm path through the host libs"
+# white-box-end
 
 # Workers and the operator run at deliberately different trust levels. Both
 # defaults are pinned because a silent drift either way is bad: narrowing the
 # worker stalls it mid-task on an unattended pane, and widening the operator
 # removes the gate on the process that merges into the cycle branch.
-# white-box: kept until the A7 Go unit test lands (#51), then delete
+# white-box-begin: go-unit A7 #51
 grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-dispatch" \
   || fail "worker default must skip permissions — a narrower mode stalls an unattended worker mid-task"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 if grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-session"; then
   fail "the operator must NOT skip permissions; it merges into the cycle branch and a human watches it"
 fi
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 grep -q 'permission-mode auto' "$BIN/hv-worker-session" \
   || fail "operator default must set --permission-mode auto"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 grep -q 'continue' "$BIN/hv-worker-session" \
   || fail "operator default must use --continue so the handoff keeps the cycle's context"
 # Both are overridable, or a project could never narrow the grant.
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 grep -q 'workerCommand' "$BIN/hv-worker-dispatch" \
   || fail "work.workerCommand override missing from worker dispatch"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 grep -q 'operatorCommand' "$BIN/hv-worker-session" \
   || fail "work.operatorCommand override missing from worker session"
 pass "worker skips permissions, operator runs auto, both overridable via config"
+# white-box-end
 
 # ── (b2) accounts + LIMITED ─────────────────────────────────────────────────
 # Meters come from per-account fixture payloads via HV_ACCOUNT_USAGE_DIR, which

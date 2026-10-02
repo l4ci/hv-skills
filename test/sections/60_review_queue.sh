@@ -47,7 +47,7 @@ for prov in github gitlab; do
     eq "queue fields" "True" "$(QUEUE 'd[0]["title"]=="One" and d[0]["number"]==1 and d[0]["prs"][0]["branch"]=="feat/a" and d[0]["prs"][0]["url"].endswith("/'$A'") and "Closes #1" in d[0]["prs"][0]["body"]')"
     pass "$prov: review queue lists needs-review items with closing-keyword PRs"
 
-    # white-box: kept until the A8 Go unit test lands (#52), then delete; see 5.0-smoke-whitebox.md
+    # white-box-begin: go-unit A8 #52
     # --- keyword variants (adapter regex)
     eq "keywords" "[1, 2, 3, 4, 40]" "$(PYTHONPATH="$BIN" python3 -c '
 from hvlib import adapter_for, load_config
@@ -60,7 +60,9 @@ print(adapter_for(load_config()).closed_numbers("Implements #7"))')"
 from hvlib import adapter_for, load_config
 print([p["number"] for p in adapter_for(load_config()).prs_closing(1)])')"
     pass "$prov: closing keyword matching"
+    # white-box-end
 
+    # white-box-begin: go-unit A8 #52
     # --- checkout, comment, state
     git checkout -q main
     PYTHONPATH="$BIN" python3 -c '
@@ -73,6 +75,7 @@ a = adapter_for(load_config()); a.pr_checkout(sys.argv[1]); a.pr_comment(sys.arg
 import sys
 from hvlib import adapter_for, load_config
 print(adapter_for(load_config()).pr_state(sys.argv[1]))' "$A")"
+    # white-box-end
     git checkout -q main
 
 

@@ -116,7 +116,7 @@ pass "release pending: custom nudgeAfterCommits=5 honored"
 rm -rf "$RP_TMP"
 trap 'rm -rf "$TMP"' EXIT
 
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 echo "F29: --repo flag uses strict form"
 # Structural guard: every helper that parses a literal --repo / --repos flag
 # must extract the value with the loud form ${2:?usage:...} so a missing
@@ -136,8 +136,9 @@ for f in hv-status-add-multi hv-multi-branch-create; do
   grep -qE '\$\{2:\?usage:' "$helper" || fail "F29: $f --repos extraction must use \${2:?usage:...} strict form (no silent \${2:-})"
 done
 pass "F29: all --repo / --repos helpers use the strict \${2:?usage:...} extraction"
+# white-box-end
 
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 echo "F30: walk-up helpers delegate to bin/hv-walk-up"
 # Structural guard: helpers that need to walk upward from a caller directory
 # must delegate to the canonical bin/hv-walk-up rather than reimplementing the
@@ -150,3 +151,4 @@ for f in hv-self-locate.sh hv-resolve-umbrella; do
   grep -q 'hv-walk-up' "$helper" || fail "F30: $f must invoke hv-walk-up (no inline walk-up loops)"
 done
 pass "F30: hv-self-locate.sh and hv-resolve-umbrella delegate to bin/hv-walk-up"
+# white-box-end

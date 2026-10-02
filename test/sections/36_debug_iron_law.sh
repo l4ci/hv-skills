@@ -3,7 +3,6 @@ echo "F02: debug counter Iron Law gate"
 # ── standalone fallbacks (runner.sh sets these; define here for direct bash invocation) ──
 _SECTION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _REPO_ROOT="$(cd "$_SECTION_DIR/../.." && pwd)"
-: "${BIN:=$_REPO_ROOT/bin}"
 : "${TMP:=$(mktemp -d)}"
 # Define pass/fail if not sourced from lib.sh
 if ! declare -f pass >/dev/null 2>&1; then

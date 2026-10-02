@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 doclint
 echo "F73: subagent-dispatch discipline"
 
 # Reference file must exist with all six sections.
@@ -75,3 +76,4 @@ grep -q -i 'when verification.*requires.*file reads' "$REPO/hv-debug/SKILL.md" \
 grep -q 'references/subagent-dispatch.md' "$REPO/hv-debug/SKILL.md" \
   || fail "F73: hv-debug missing reference cite"
 pass "hv-debug retrofitted with conditional reproduce + verify workers"
+# white-box-end

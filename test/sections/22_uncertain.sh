@@ -14,7 +14,7 @@ echo "plan uncertain"
 - **[F50] [Major] Major no detail file.** Just a brief.
 - **[F51] [Major] Major zero backticks.** Plain prose with no identifiers. Milestone: M01
 - **[F52] [Major] Major with questions?** What about this? And this? Detail: see `code`. Milestone: M01
-- **[F53] [Major] Certain item.** Use `helper` and `hvlib` to do X. Milestone: M01
+- **[F53] [Major] Certain item.** Use `helper` and `lib` to do X. Milestone: M01
 - **[F54] [Minor] Minor item.** No detail file no backticks no markers. Milestone: M01
 
 ## Tasks
@@ -40,7 +40,7 @@ EOF
   cat > .hv/features/F53.md <<'EOF'
 # F53 detail
 
-Use `helper` and `hvlib`. Concrete plan, no uncertainty.
+Use `helper` and `lib`. Concrete plan, no uncertainty.
 EOF
 
   # F54: detail file present with backticks; should still exit 1 (Minor).
@@ -99,7 +99,7 @@ EOF
 )
 echo "ok plan uncertain"
 
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 echo "F37: TaskCreate progress-checklist convention"
 TIER_SAB_F37=(hv-init hv-work hv-debug hv-ship hv-release \
               hv-refactor hv-learn hv-decide hv-spike hv-vision \
@@ -118,9 +118,10 @@ for skill in "${TIER_C_F37[@]}"; do
   fi
 done
 pass "Tier C SKILL.md files do not reference TaskCreate("
+# white-box-end
 echo "ok F37"
 
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 echo "hvlib parse_term_entry / first_sentence"
 PYTHONPATH="$BIN" python3 - <<'PY'
 import sys
@@ -185,3 +186,4 @@ assert "bar:".rstrip(".,;:") == "bar", "sanity: old rstrip strips trailing colon
 print("OK hvlib context helpers")
 PY
 pass "hvlib parse_term_entry + first_sentence"
+# white-box-end

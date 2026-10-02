@@ -58,7 +58,7 @@ done
 trap 'rm -rf "$TMP"' EXIT
 pass "tracker call exits 5 when the provider cannot be resolved"
 
-# white-box: kept until the A8 Go unit test lands (#52), then delete; see 5.0-smoke-whitebox.md
+# white-box-begin: go-unit A8 #52
 echo "tracker adapters (hvlib_tracker, white-box)"
 
 TMP_TAW="$(mktemp -d)"
@@ -140,8 +140,10 @@ PY
   )
   pass "$prov adapter: create/get/list/edit/comments/error"
 done
+# white-box-end
 
 # provider resolution failure
+# white-box-begin: go-unit A8 #52
 (
   cd "$TMP_TAW"; mkdir -p none/.hv; cd none; echo '{}' > .hv/config.json
   git init -q . 2>/dev/null
@@ -155,6 +157,7 @@ else:
     raise AssertionError
 PY
 )
+# white-box-end
 pass "adapter_for raises TrackerError(3) when provider unknown"
 
 trap 'rm -rf "$TMP"' EXIT

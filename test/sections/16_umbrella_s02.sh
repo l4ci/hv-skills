@@ -93,7 +93,7 @@ mkdir -p "$UMB/.claude/worktrees/web"
 pass "T4: ship merge --repo web removes the Layout B worktree"
 (cd "$UMB/web" && git branch -D hv/wt-x >/dev/null 2>&1) || true
 
-# white-box: kept until the A8 Go unit test lands (#52), then delete
+# white-box-begin: go-unit A8 #52
 (cd "$UMB/web" && git checkout -q main && git branch hv/wt-z 2>/dev/null || true)
 mkdir -p "$UMB/.claude/worktrees/web"
 (cd "$UMB/web" && git worktree add "$UMB/.claude/worktrees/web/hv-wt-z" hv/wt-z >/dev/null 2>&1)
@@ -101,6 +101,7 @@ mkdir -p "$UMB/.claude/worktrees/web"
 (cd "$UMB/web" && "$BIN/hv-worktree-clear" --repo web hv/wt-z)
 [ ! -d "$UMB/.claude/worktrees/web/hv-wt-z" ] || fail "Layout B worktree was not cleaned up"
 pass "T4: hv-worktree-clear --repo web removes Layout B worktree"
+# white-box-end
 (cd "$UMB/web" && git branch -D hv/wt-z >/dev/null 2>&1) || true
 
 cp "$TMP/.hv/status.json" "$TMP/.hv/status.json.bak"
@@ -119,7 +120,7 @@ assert d['active'] == [], d
 mv "$TMP/.hv/status.json.bak" "$TMP/.hv/status.json"
 pass "single-repo backward compat: status add and status rm without flags"
 
-# white-box: kept until the A4 Go unit test lands (#48), then delete
+# white-box-begin: go-unit A4 #48
 echo "parse_todo_fields Repos field"
 RESULT=$(PYTHONPATH="$BIN" python3 -c "
 from hvlib import parse_todo_fields
@@ -130,7 +131,9 @@ print(json.dumps(r, sort_keys=True))
 EXPECTED='{"captured": "", "detail": "x.", "milestone": "M02", "related": "", "repos": "web", "since": "", "subsystem": ""}'
 [ "$RESULT" = "$EXPECTED" ] || fail "parse_todo_fields Repos: expected $EXPECTED, got $RESULT"
 pass "parse_todo_fields captures Repos field without bleeding into Milestone"
+# white-box-end
 
+# white-box-begin: go-unit A4 #48
 RESULT2=$(PYTHONPATH="$BIN" python3 -c "
 from hvlib import parse_todo_fields
 r = parse_todo_fields('- **[B07] [P1] T.** D. Milestone: M01')
@@ -138,8 +141,9 @@ print(r['milestone'])
 ")
 [ "$RESULT2" = "M01" ] || fail "parse_todo_fields Milestone without Repos: expected M01, got '$RESULT2'"
 pass "parse_todo_fields Milestone capture without Repos field unchanged"
+# white-box-end
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 echo "hvlib.load_repos"
 mkdir lr-test && cd lr-test
 mkdir -p .hv web api
@@ -153,12 +157,15 @@ print(sorted(r.keys()))
 ")
 [ "$RESULT" = "['api', 'web']" ] || fail "load_repos keys: expected ['api', 'web'], got $RESULT"
 pass "load_repos returns name → path mapping"
+# white-box-end
 
+# white-box-begin: go-unit A3 #47
 # Empty registry case
 echo '{"repos": []}' > .hv/repos.json
 EMPTY=$(PYTHONPATH="$BIN" python3 -c "from hvlib import load_repos; print(load_repos())")
 [ "$EMPTY" = "{}" ] || fail "load_repos empty registry: expected {}, got '$EMPTY'"
 pass "load_repos returns {} for empty registry"
+# white-box-end
 
 cd ..
 
@@ -317,7 +324,7 @@ OUT=$(hvj repo umbrella) || fail "repo umbrella expected yes from repos.json reg
 pass "repo umbrella is true from repos.json regardless of config flag"
 cd ..
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 echo "hv-resolve-umbrella detects deep stray .hv/"
 mkdir ru-deep && cd ru-deep
 # umbrella + sub-repo registered + DEEP stray .hv/ inside sub-repo's source tree
@@ -329,4 +336,5 @@ cd web/src
 RC=0; "$BIN/hv-resolve-umbrella" 2>/dev/null || RC=$?
 [ "$RC" = "2" ] || fail "hv-resolve-umbrella deep stray expected exit 2, got $RC"
 pass "hv-resolve-umbrella exits 2 on deep stray .hv/ inside registered sub-repo"
+# white-box-end
 cd ../../..

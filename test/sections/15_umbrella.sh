@@ -69,11 +69,12 @@ OUT=$(cd "$UMB/web/src/components/deep" && hvj repo umbrella) || fail "repo umbr
 [ "$(echo "$OUT" | jget data.umbrella)" = "true" ] || fail "repo umbrella from a deep dir: $OUT"
 pass "T1: repo umbrella holds from root, sub-repo and deep cwd (3 cwd cases)"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 [ "$(cd "$UMB" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from umbrella root"
 [ "$(cd "$UMB/web" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from sub-repo"
 [ "$(cd "$UMB/web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from deep nested"
 pass "T1: hv-resolve-umbrella walks up correctly (3 cwd cases)"
+# white-box-end
 
 # T1: no .hv/ above cwd means no umbrella (exit 1, never 3)
 NOHV=$(mktemp -d)
@@ -83,11 +84,12 @@ rc=0; OUT=$(cd "$NOHV" && hvj repo umbrella 2>/dev/null) || rc=$?
 rm -rf "$NOHV"
 pass "T1: repo umbrella exits 1 when no .hv/ above cwd"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 if (cd /tmp && "$BIN/hv-resolve-umbrella" >/dev/null 2>&1); then
   fail "hv-resolve-umbrella should exit 1 in /tmp"
 fi
 pass "T1: hv-resolve-umbrella exits 1 when no .hv/ above cwd"
+# white-box-end
 
 # T1: symlink — the path is resolved physically
 ln -sfn "$UMB/web" "$TMP/symlink-web"
@@ -96,11 +98,12 @@ OUT=$(cd "$TMP/symlink-web/src/components/deep" && hvj repo umbrella) || fail "r
 rm -f "$TMP/symlink-web"
 pass "T1: repo umbrella handles symlinked sub-repo paths"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 ln -sfn "$UMB/web" "$TMP/symlink-web"
 [ "$(cd "$TMP/symlink-web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up via symlink"
 rm -f "$TMP/symlink-web"
 pass "T1: hv-resolve-umbrella handles symlinked sub-repo paths"
+# white-box-end
 
 # T1: masking — a stray .hv/ inside a registered sub-repo hides the umbrella from repo which
 mkdir -p "$UMB/web/.hv"
@@ -109,7 +112,7 @@ rc=0; (cd "$UMB/web/src" && "$HV_BIN" repo which >/dev/null 2>&1) || rc=$?
 rmdir "$UMB/web/.hv"
 pass "T1: repo which exits 3 on a stray .hv/ inside a registered sub-repo"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 mkdir -p "$UMB/web/.hv"
 if grep -q "masking" <<<"$( (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null))"; then
   pass "T1: hv-resolve-umbrella detects masking with stderr message"
@@ -120,6 +123,7 @@ else
   [ "$EC" = "2" ] || fail "masking should exit 2, got $EC"
   pass "T1: hv-resolve-umbrella detects masking (exit 2)"
 fi
+# white-box-end
 rmdir "$UMB/web/.hv"
 
 # T2: repo which from a sub-repo
@@ -154,9 +158,10 @@ OUT=$(cd "$WT" && hvj repo which) || fail "repo which from Layout B worktree: $O
 [ "$(echo "$OUT" | jget data.name)" = "web" ] || fail "repo which from Layout B worktree: $OUT"
 [ "$(echo "$OUT" | jget data.path)" = "$UMB/web" ] || fail "repo which should map the worktree to its main repo: $OUT"
 pass "T1+T2: composition from Layout B worktree path"
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 [ "$(cd "$WT" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from Layout B worktree"
 (cd "$UMB/web" && git worktree remove "$WT" >/dev/null 2>&1; git branch -D hv/feat-x >/dev/null 2>&1) || true
+# white-box-end
 
 # M03-T1: repo resolve resolves names
 OUT=$(cd "$UMB" && hvj repo resolve web api) || fail "repo resolve failed: $OUT"
@@ -264,7 +269,7 @@ rc=0; (cd "$UMB" && "$HV_BIN" status add hv/m3-bad --items M03-S01 --repos web,n
 pass "M03-T3: status add rejects unregistered repos"
 
 # M03-T5: hv-capture/SKILL.md Step 4.6 declares multi-select for Repos
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q "multiSelect:.*true" "$REPO/hv-capture/SKILL.md" \
   || fail "hv-capture Step 4.6 must declare multiSelect: true for the Repos question"
 grep -q "comma-separated list of registered sub-repos" "$REPO/hv-capture/SKILL.md" \
@@ -273,6 +278,7 @@ if grep -q "single name in V1" "$REPO/hv-capture/SKILL.md"; then
   fail "hv-capture must no longer carry the 'single name in V1' qualifier"
 fi
 pass "M03-T5: hv-capture/SKILL.md Step 4.6 supports multi-repo Repos tagging"
+# white-box-end
 
 # M03-T6: plan add accepts comma-separated --repos and validates each name
 PLANS_TMP=$(mktemp -d)
@@ -301,19 +307,21 @@ pass "M03-T6: plan add rejects unregistered name in --repos CSV"
 rm -rf "$PLANS_TMP"
 
 # M03-T6: hv-plan/SKILL.md prose mentions multi-repo flow
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'multi-repo items pass the full comma-list' "$REPO/hv-plan/SKILL.md" \
   || fail "hv-plan/SKILL.md must explain multi-repo --repo flow"
 pass "M03-T6: hv-plan/SKILL.md documents multi-repo --repo"
+# white-box-end
 
 # M03-T6: hv-work/SKILL.md Preview Mode peek shape supports multiple sub-repo lines
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q "one line per repo for multi-repo items" "$REPO/hv-work/SKILL.md" \
   || fail "hv-work/SKILL.md Preview Mode peek must show one Repo line per sub-repo for multi-repo items"
 pass "M03-T6: hv-work/SKILL.md Preview Mode peek renders one line per repo"
+# white-box-end
 
 # M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 grep -q "hv-multi-branch-create" "$REPO/hv-work/SKILL.md" \
   || fail "hv-work/SKILL.md must reference bin/hv-multi-branch-create for multi-repo branch creation"
 grep -q "hv-status-add-multi" "$REPO/hv-work/SKILL.md" \
@@ -327,6 +335,7 @@ if grep -q "wait for M03 multi-repo support" "$REPO/hv-work/SKILL.md"; then
   fail "hv-work/SKILL.md must no longer say 'wait for M03 multi-repo support'"
 fi
 pass "M03-T4: hv-work/SKILL.md documents multi-repo dispatch flow"
+# white-box-end
 
 # Cleanup status.json so it doesn't pollute later assertions
 rm -f "$UMB/.hv/status.json"
@@ -340,6 +349,7 @@ rc=0; OUT=$(cd "$TMP" && hvj repo umbrella 2>/dev/null) || rc=$?
 (cd "$TMP" && hvj config show work.dispatch >/dev/null) || fail "single-repo cwd still resolves to its own .hv/"
 pass "single-repo backward compat: the project resolves with no umbrella in scope"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 [ "$(cd "$TMP" && "$BIN/hv-resolve-umbrella")" = "$TMP" ] || fail "single-repo cwd still resolves to its own .hv/"
 pass "single-repo backward compat: hv-resolve-umbrella still works"
+# white-box-end

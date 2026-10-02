@@ -145,11 +145,12 @@ OUT=$(hvj -C "$BOOT_DIR" init) || fail "init failed: $OUT"
 [ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "init did not seed MILESTONES.md"
 [ -f "$BOOT_DIR/.hv/counters.json" ] || fail "init did not seed counters.json"
 [ -f "$BOOT_DIR/.hv/status.json" ] || fail "init did not seed status.json"
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 [ -d "$BOOT_DIR/.hv/bin" ] || fail "init did not create .hv/bin"
 grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "init did not add .hv/ to .gitignore"
 grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init counters.json missing milestones key"
 pass "init seeds dirs, data files, and .gitignore"
+# white-box-end
 
 HEADING=$(head -1 "$BOOT_DIR/.hv/MILESTONES.md")
 [ "$HEADING" = "# Milestones" ] || fail "init seeded MILESTONES.md with wrong H1: '$HEADING' (want '# Milestones')"
@@ -177,19 +178,21 @@ echo "init check"
 
 # 1. Helpers not yet installed in .hv/bin → exit 3 (partial install).
 rc=0
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 "$BIN/hv-preflight" 2>/dev/null || rc=$?
 [ "$rc" = "3" ] || fail "expected exit 3 (partial install), got $rc"
 pass "preflight exits 3 when helpers missing from .hv/bin"
+# white-box-end
 
 # 2. Everything present → init check passes.
+# white-box-begin: A9 #53 keep
 mkdir -p .hv/bin
-# white-box: kept until A9 (#53)
 install_helpers
 OUT=$(hvj init check) || fail "init check failed on fully initialized project: $OUT"
 [ "$(jget data.initialized <<<"$OUT")" = "true" ] || fail "init check should report initialized: $OUT"
 [ "$(jget data.missing <<<"$OUT")" = "[]" ] || fail "init check should report nothing missing: $OUT"
 pass "init check passes when fully initialized"
+# white-box-end
 
 # 3. Missing core data file → exit 1 (uninitialized), named in data.missing.
 mv .hv/BACKLOG.md .hv/BACKLOG.md.bak
@@ -203,13 +206,13 @@ pass "init check exits 1 when a data file is missing"
 mv .hv/BACKLOG.md.bak .hv/BACKLOG.md
 
 # 4. Missing helper → exit 3 (stale install after plugin upgrade).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 keep
 rm -f "$PWD/.hv/bin/hv-summary"
 rc=0
-# white-box: kept until A9 (#53)
 "$BIN/hv-preflight" 2>/dev/null || rc=$?
 [ "$rc" = "3" ] || fail "expected exit 3 (missing helper), got $rc"
 pass "preflight exits 3 when a helper is missing"
+# white-box-end
 
 echo "plan add / list / show / rm"
 KEY1=$(hvj plan add --milestone M01 --slice --title "Auth foundation" | jget data.key) || fail "plan add --slice failed"
