@@ -1,399 +1,367 @@
-# CLI helpers
-
-`.hv/bin/` contains bash scripts you can call directly when scripting against
-the backlog or extending hv-skills. The helpers are small and idempotent, and
-use `python3` where JSON parsing is needed. `/hv-init` refreshes them every
-time you rerun it. They evolve with hv-skills and are not a stable API.
-
-## Quick reference
-
-| Script | What it does | Example |
-|---|---|---|
-| `hv-next-id` | Increment counter, return zero-padded ID | `.hv/bin/hv-next-id bugs` → `B07` |
-| `hv-capture-audit` | Surface ship-evidence per candidate title before milestone-spec capture; exit 2 with `[STRONG]`/`[MEDIUM]`/`[PATH]` report when any title looks already shipped, exit 0 when clean | `.hv/bin/hv-capture-audit "Title 1" "Title 2"` |
-| `hv-migrate` | v3 → v4 codemod: rewrite cut-command references (skips fenced code, inline code, and helper-path tokens), migrate `CONTEXT.md` glossary, remove stale `hv-context-*` bins, strip orphan v3 managed blocks from `CLAUDE.md` (or `AGENTS.md` when it exists), and stamp `hvSkills.version` so `hv-preflight` reflects the post-migration state; reads the version from nested `hvSkills.version` with a top-level `version` fallback; `--dry-run` default, `--apply` writes (also bumps the stamp on the noop path), backs up to `.hv/migrate-backup/<ts>/` | `.hv/bin/hv-migrate v4 [--apply] [--verbose]` |
-| `hv-migrate-issues` | Move a file backlog onto the issue tracker: open items become issues (labels, native milestone, fields block, detail file as body); proof, design and plan notes, planned/active milestones and slice plans follow once every item exists, with `Related:` and old IDs rewritten; resumable via `.hv/issue-map.json`, paced by `issues.bulkPaceMs`; `--dry-run` default, `--apply` writes and freezes `BACKLOG.md` with a banner but never flips `backlog.backend`; exit 4 = rate-limited, re-run to continue; refuses umbrella mode | `.hv/bin/hv-migrate-issues --apply --limit 20` |
-| `hv-append` | Append entry to a section in BACKLOG.md | `.hv/bin/hv-append "## Bugs" "- **[B07] [P1] Title.** Desc."` |
-| `hv-item-create` | Capture one item in the configured backend and print its ID: file backend mints the ID, appends the bullet (Since stamped) and optionally writes the detail file; issue backend creates the issue | `.hv/bin/hv-item-create bugs --title "Crash" --tag P1 --desc "Why." --field Milestone=M01` → `B07` |
-| `hv-item-note` | Read, write or remove an item's durable `proof`, `design` or `plan` note (a marker comment on the issue, edited in place, split above 60,000 chars); `--show` prints it, `--rm` is idempotent; issue mode only (file backend exits 2) | `.hv/bin/hv-item-note F42 --kind design --body-file draft.md` |
-| `hv-item-comment` | Append a context comment (`question`, `answer`, `decision`, `feedback`) to an item: an issue comment in issue mode (prints its id), a `## Log` row in the detail file in file mode; always appends. `--list [--kind K]` prints the existing comments as `- <author or date> · <kind> · <text>` rows and writes nothing | `.hv/bin/hv-item-comment F42 --kind decision --body-file -` |
-| `hv-item-claim` | Take an item so two agents never work it at once (issue mode): claim comment, `in-progress` label, assignee; earliest unreleased claim wins, a loser exits 5; file mode is a no-op | `.hv/bin/hv-item-claim F42 --as hv/quick-switch` |
-| `hv-item-release` | Give an item back (issue mode): release marker, drops `in-progress` when no other claim is open; no-op when the claim-id holds none | `.hv/bin/hv-item-release F42 --as hv/quick-switch` |
-| `hv-item-ready` | Print one reason per line for what is missing before work can start (no acceptance criteria in the body, no design or plan note); exit 0 when ready, 1 when not | `.hv/bin/hv-item-ready F42` |
-| `hv-item-show` | Issue mode: print an item's status block read back from the issue (title, type, open/closed, state label, claim holder, assignee, milestone, notes present, comment rows) so a fresh session can resume it; read-only; exit 2 in file mode | `.hv/bin/hv-item-show F42` |
-| `hv-item-state` | Set the workflow label: exactly one of `in-progress` / `needs-review` / `changes-requested`, or none; no-op in file mode | `.hv/bin/hv-item-state F42 needs-review` |
-| `hv-design-put` | Replace an existing design's text with a prepared body (file mode: `.hv/designs/<ID>.md`; issue mode: the item's `design` note); create it first with `hv-design-add` | `.hv/bin/hv-design-put F42 --body-file draft.md` |
-| `hv-plan-put` | Replace an existing plan's text with a prepared body (file mode: `.hv/plans/<key>.md`; issue mode: the item's `plan` note, or a slice's `plan:SNN` note on the milestone's tracking issue); create it first with `hv-plan-add` | `.hv/bin/hv-plan-put M01-F42 --body-file draft.md` |
-| `hv-complete` | Move item to `## Completed` with strikethrough; `--reason done\|handed-off\|blocked\|dropped` (default `done`) and `--note <text>` append `(<reason>: <note>)` to the marker when the reason is not `done`; exits 3 on a `done` close with no recorded proof unless `--no-proof` | `.hv/bin/hv-complete B07 a1b2c3d --reason blocked --note "waits on API"` |
-| `hv-uncomplete` | Restore a completed item back to its active type section; inverse of `hv-complete`; idempotent no-op when already active; rewinds `counters.json#since_refactor` for non-`refactor:` commits | `.hv/bin/hv-uncomplete B07` |
-| `hv-undo` | Reset the last `/hv-work` merge commit on the base branch and restore each TODO via `hv-uncomplete`; engine for `/hv-ship --undo`; direct-merge cycles only; refuses on post-merge commits unless `--allow-post-merge` is passed | `.hv/bin/hv-undo [--dry-run] [--allow-post-merge]` |
-| `hv-archive-old` | Move `## Completed` items older than N days to `ARCHIVE.md` | `.hv/bin/hv-archive-old 5` |
-| `hv-rm` | Remove backlog item(s): strips TODO entry, Related cross-refs, detail/plan files; refuses if active in `status.json` unless `--force` | `.hv/bin/hv-rm [--force] [--scrub-archive] B07,F03` |
-| `hv-todo-by-milestone` | Print IDs of TODO items tagged with a milestone | `.hv/bin/hv-todo-by-milestone M01` |
-| `hv-proof-add` | Append a verification row (`<date> · <check> · PASS\|FAIL · <sha> · <evidence>`) to the `## Proof` section of `.hv/<kind>/<ID>.md`, creating the file if missing; idempotent on an identical row | `.hv/bin/hv-proof-add B07 --check unit --result PASS --evidence "12 passed"` |
-| `hv-proof-show` | Print an item's proof rows (`--count` prints only the number); `hv-complete` gates on it | `.hv/bin/hv-proof-show B07` |
-| `hv-todo-field` | Extract a single field (`detail`/`related`/`milestone`/`repos`/`subsystem`/`since`/`reason`/`note`) from the TODO bullet of an item ID | `.hv/bin/hv-todo-field B07 detail` |
-| `hv-todo-set-field` | Set, replace, or clear a single field (`milestone`/`related`/`repos`/`subsystem`/`detail`) on an open TODO bullet; writer counterpart of `hv-todo-field`; an empty value clears the field; idempotent on unchanged values | `.hv/bin/hv-todo-set-field B07 milestone M01` |
-| `hv-find-milestone-for-items` | Lookup the milestones tagged on a list of TODO item IDs; prints unique sorted M-IDs (one per line); always exits 0 | `.hv/bin/hv-find-milestone-for-items B07 F03` |
-| `hv-plan-rename-check` | List files that reference `<old-name>` (wraps `git grep -l`); used at plan + verify time for rename + link-sweep collision detection; always exits 0 | `.hv/bin/hv-plan-rename-check OldName.swift` |
-| `hv-uncertain` | Determine whether an item warrants `/hv-work --preview` before `/hv-plan` in loop mode; exits 0 (uncertain, reasons on stdout) or 1 (certain) | `.hv/bin/hv-uncertain B07` |
-| `hv-status-add` | Register an active work entry (idempotent on `(branch, repo)`) | `.hv/bin/hv-status-add [--repo <name>] hv/foo B01,F02 [worktree]` |
-| `hv-status-remove` | Clear an active entry by branch (or `(branch, repo)` in umbrella mode) | `.hv/bin/hv-status-remove [--repo <name>] hv/foo` |
-| `hv-status-repo-for` | Print the repo name for the active stream matching a branch (umbrella mode); empty when not found; always exits 0 | `.hv/bin/hv-status-repo-for hv/foo` |
-| `hv-loop-stamp` | Read/write the `loopStartedAt` ISO timestamp in `status.json`; subcommands: `start` (first-write-only), `clear`, `read` | `.hv/bin/hv-loop-stamp start` |
-| `hv-reconcile` | Validate `status.json` vs git, auto-clean stale entries, emit JSON (entries flag `noBase: true` for the umbrella cwd when umbrella has no base branch) | `.hv/bin/hv-reconcile` |
-| `hv-debug-counter` | Manage the persistent fix-attempt counter for `/hv-debug` Iron Law; subcommands: `init`, `record-attempt`, `fail`, `pass`, `show`, `summary`, `clear`, `inc-cycle` | `.hv/bin/hv-debug-counter show` |
-| `hv-todo-drift` | Walk git log per registered sub-repo for [ID] tags, cross-reference TODO open items, emit JSON of IDs that shipped but stayed open. Respects per-bullet `Since:` anchor (skips commits older than capture time, so reused IDs don't false-flag). Also emits an advisory `symbol_drift` array: Since-anchored items whose named code symbols entered the tree after capture — shipped by a refactor that never carried the [ID] | `.hv/bin/hv-todo-drift` |
-| `hv-backfill-since` | Stamp `Since: <HEAD-short-hash>` on every open TODO bullet lacking the field; idempotent (re-runs are silent no-ops). Used after upgrading to silence legacy entries that pre-date auto-stamping | `.hv/bin/hv-backfill-since` |
-| `hv-summary` | Compact project state: backlog counts, active work, recent completions | `.hv/bin/hv-summary` |
-| `hv-managed-block knowledge` | Regenerate the managed `hv-knowledge` block in `CLAUDE.md` | `.hv/bin/hv-managed-block knowledge` |
-| `hv-knowledge-query` | Print selected topic sections from `KNOWLEDGE.md` | `.hv/bin/hv-knowledge-query "Testing" "Networking"` |
-| `hv-knowledge-merge` | Insert a `**Title** — body` bullet under `## <topic>` in `.hv/KNOWLEDGE.md`; atomic dedup by (topic, title) | `printf '%s' "$BODY" \| .hv/bin/hv-knowledge-merge --topic Testing --title "Mock TLS handshake"` |
-| `hv-knowledge-amend` | Append text after the trailing `<!-- date -->` comment of a bullet matched by (topic, fragment) | `.hv/bin/hv-knowledge-amend --topic Testing --fragment "TLS handshake" --append "Upstream: hv-skills#42"` |
-| `hv-knowledge-stats` | JSON: bullet count + section bytes per `## Topic` in `KNOWLEDGE.md`. `/hv-learn` uses it to nudge when a topic crosses 25 bullets or 10 KB | `.hv/bin/hv-knowledge-stats` |
-| `hv-knowledge-tier` | F03 per-bullet `{tier, hits, lastSeen}` state manager in `.hv/knowledge-tier.json`; subcommands: `--get`, `--set`, `--init`, `--inc`, `--list` | `.hv/bin/hv-knowledge-tier --list --tier provisional` |
-| `hv-knowledge-hit` | Register a hit on a queried KNOWLEDGE bullet; auto-promotes `provisional → confirmed` when hits reach threshold (default 3); skips promotion if a contradiction is pending | `.hv/bin/hv-knowledge-hit --topic Testing --title "Mock TLS handshake"` |
-| `hv-knowledge-migrate` | One-shot migration: stamp every existing titled KNOWLEDGE bullet as `provisional` in the F03 sidecar; idempotent no-op on re-run | `.hv/bin/hv-knowledge-migrate` |
-| `hv-knowledge-contradiction` | Manage the pending-contradictions queue at `.hv/knowledge-contradictions.json`; gates auto-promotion when a correction overlaps a queried bullet | `.hv/bin/hv-knowledge-contradiction --list` |
-| `hv-config-set` | Set a single value in `.hv/config.json` at a dotted key path; preserves other keys, writes atomically (resolve; JSON-parse value, fallback to string) | `.hv/bin/hv-config-set docs.afterWork true` |
-| `hv-config-show` | Print each config key as `key = value  (source: local\|project\|default)`; no arg lists every known key, one key prints one line, unknown key exits 1. Defaults come from `bin/hvlib_config.py` `CONFIG_KEYS`, the same table `hv-config-schema-check` derives its expected keys from | `.hv/bin/hv-config-show work.dispatch` |
-| `hv-managed-block decisions` | Regenerate the managed `hv-decisions` block in `CLAUDE.md` | `.hv/bin/hv-managed-block decisions` |
-| `hv-decisions-query` | Print selected topic sections from `DECISIONS.md` | `.hv/bin/hv-decisions-query "Architecture" "Testing"` |
-| `hv-auto-decision-log` | Append an `[Auto:Loop]` entry to `DECISIONS.md` under a topic; idempotent on `(topic, rule-title)` | `.hv/bin/hv-auto-decision-log "Architecture" "no direct DB writes" "keeps layer clean"` |
-| `hv-auto-decisions-since` | Print a markdown summary of `[Auto:Loop]` decisions logged since `loopStartedAt` in `status.json`; empty when none match | `.hv/bin/hv-auto-decisions-since` |
-| `hv-section-query <key> <topic>...` | Generic section query: print `## <topic>` bodies from `KNOWLEDGE.md` or `DECISIONS.md`; backing helper for the typed `*-query` wrappers | `.hv/bin/hv-section-query knowledge "Testing"` |
-| `hv-skills-index` | Regenerate the managed `<!-- hv-skills-start -->` block in `CLAUDE.md` with the canonical slash-command index (static body, idempotent) | `.hv/bin/hv-skills-index` |
-| `hv-glossary-read <term>...` | Print matching nested-bullet term entries from the `## Glossary` topic of `KNOWLEDGE.md`; case-insensitive; preserves document order | `.hv/bin/hv-glossary-read backlog session` |
-| `hv-glossary-write <term>` | Insert or update a term entry under `## Glossary` in `KNOWLEDGE.md`; alphabetical insertion within the topic; exit 3 on alias collision | `.hv/bin/hv-glossary-write backlog --def "the canonical queue" --alias "todo list"` |
-| `hv-map-query` | Print selected subsystem detail file bodies from `.hv/map/` | `.hv/bin/hv-map-query capture work` |
-| `hv-map-index` | Regenerate the managed `hv-map` block in `CLAUDE.md` from `.hv/map/<name>.md` frontmatter `summary:` | `.hv/bin/hv-map-index` |
-| `hv-map-stats` | JSON: per-subsystem bytes, last-touched, entry-point counts, broken `file:line` refs | `.hv/bin/hv-map-stats` |
-| `hv-map-cap-check` | Emit a one-line nudge to stderr when subsystem count meets or exceeds the soft cap; silent below; always exits 0 (advisory, not a gate) | `.hv/bin/hv-map-cap-check` |
-| `hv-staleness` | List stale entries across MAP/KNOWLEDGE/TODO past a days threshold | `.hv/bin/hv-staleness map --days 90` |
-| `hv-stale-summary` | One-line summary wrapping hv-staleness × 3 (map/knowledge/todo); zero-kinds suppressed | `.hv/bin/hv-stale-summary --days 90` |
-| `hv-managed-block <key> [--body-stdin]` | Regenerate the managed `<!-- hv-<key>-start -->...<!-- hv-<key>-end -->` block in `CLAUDE.md` (or `AGENTS.md` when it exists); keys: `knowledge`, `decisions`, `vision`, `map`, `qa`, `skills` (`vision`, `map`, `qa`, and `skills` are `--body-stdin` only) | `.hv/bin/hv-managed-block knowledge` |
-| `hv-instructions-init` | Make `AGENTS.md` the project-instructions file and `CLAUDE.md` an `@AGENTS.md` importer: creates missing files, moves existing managed blocks from `CLAUDE.md` into a new `AGENTS.md`, adds the import line once. Idempotent (silent when nothing to do); no-op when the files are symlinked to each other. Invoked by `/hv-init` Step 4. | `.hv/bin/hv-instructions-init` |
-| `hv-managed-block-strip-deprecated` | Remove orphan v3 managed blocks from `CLAUDE.md` whose key is in `DEPRECATED_KEYS` (currently `context`, from the F18 cut). Idempotent: silent no-op on a clean file. Invoked by `/hv-init` Step 4 and `/hv-migrate v4 --apply` to scrub leftover blocks during upgrades. | `.hv/bin/hv-managed-block-strip-deprecated` |
-| `hv-fm-list <dir> <field1> [<field2> ...]` | Generic frontmatter extractor; emits JSON | `.hv/bin/hv-fm-list .hv/milestones id title status` |
-| `hv-vision-add` | Mint a milestone ID and append overview to `MILESTONES.md` Issue mode: creates the native milestone `MNN — <title>` and a `milestone-tracker` tracking issue (`status:planned`); no file. | `.hv/bin/hv-vision-add "Auth foundation" "OAuth + sessions." "M00,M02"` |
-| `hv-vision-status` | Set a milestone's status to `planned`, `active`, `shipped`, or `archived` Issue mode: also sets the `status:` label; `shipped`/`archived` close the tracking issue and native milestone, `planned`/`active` reopen. | `.hv/bin/hv-vision-status M01 active` |
-| `hv-vision-active` | Print active milestone IDs, one per line | `.hv/bin/hv-vision-active` |
-| `hv-vision-list` | JSON: every milestone with id, title, status, depends, ready | `.hv/bin/hv-vision-list` |
-| `hv-vision-index` | Regenerate `## Active milestones` in `MILESTONES.md` and the vision block in `CLAUDE.md` Issue mode: regenerates only the Active list and the managed instructions block. | `.hv/bin/hv-vision-index` |
-| `hv-vision-empty-active` | Print active milestone IDs with 0 open items, one per line | `.hv/bin/hv-vision-empty-active` |
-| `hv-vision-show` | Resolve: print a milestone detail file's contents; exit 1 when milestone ID not found or bad shape Issue mode: prints the tracking issue's body. | `.hv/bin/hv-vision-show M01` |
-| `hv-vision-put` | Replace an existing milestone's plan with a prepared body from `--body-file F\|-`; frontmatter `id` must match `<MNN>`. File mode overwrites `.hv/milestones/<MNN>.md` (must exist); issue mode writes the tracking issue's body (status follows the label, `depends` updates its Depends field). Exit 0 ok; 1 usage, unknown milestone or id mismatch; 2 backend unavailable; 3 tracker unavailable; 4 rate-limited | `.hv/bin/hv-vision-put M01 --body-file plan.md` |
-| `hv-design-add` | Writer: create `.hv/designs/<ID>.md` from an item ID (`[BFT]\d{2,}`); exit 1 on bad ID or conflict | `.hv/bin/hv-design-add F12 "Archive command"` |
-| `hv-design-show` | Resolve: print a design file's contents; exit 1 when design ID not found | `.hv/bin/hv-design-show F12` |
-| `hv-design-rm` | Writer: remove `.hv/designs/<ID>.md`; exit 1 when design ID not found | `.hv/bin/hv-design-rm F12` |
-| `hv-design-list` | Lookup: JSON of every design with id, title, status, created; always exits 0 | `.hv/bin/hv-design-list` |
-| `hv-design-amend` | Writer: amend a section of `.hv/designs/<ID>.md` in place — `--section <h>` with `--append` or `--replace`; exit 1 on bad ID, missing file, or missing section | `.hv/bin/hv-design-amend F12 --section Goal --replace "…"` |
-| `hv-plan-add` | Writer: create a plan file; mints next slice number when called with `slice`; accepts `--design <path>` to record a design artifact pointer in frontmatter Issue mode: slice plans mint `SNN` as `plan:SNN` notes on the tracking issue; `--design` records `design: note:<ID>:design`. | `.hv/bin/hv-plan-add [--design <path>] M01 slice "Auth foundation"` |
-| `hv-plan-list` | JSON: every plan with key, milestone, unit, title, status, created Issue mode: reads slice notes from the tracking issues. | `.hv/bin/hv-plan-list M01` |
-| `hv-plan-show` | Print a plan file's contents Issue mode: reads the note. | `.hv/bin/hv-plan-show M01-S01` |
-| `hv-plan-rm` | Delete a plan file Issue mode: removes the note. | `.hv/bin/hv-plan-rm M01-S01` |
-| `hv-spike-add` | Create `spike/<name>` branch and `.hv/spikes/<name>.md` stub | `.hv/bin/hv-spike-add sse-feasibility "Can SSE work over our nginx?"` |
-| `hv-spike-list` | JSON: every spike with name, branch, status, created, branchExists | `.hv/bin/hv-spike-list` |
-| `hv-spike-finish` | Flip a spike's status to `done` and stamp the date | `.hv/bin/hv-spike-finish sse-feasibility` |
-| `hv-spike-show` | Resolve: print a spike file's contents; exit 1 when spike name not found or bad shape | `.hv/bin/hv-spike-show sse-feasibility` |
-| `hv-base-branch` | Print the resolved base branch (`main`, `master`, `trunk`, or `origin/HEAD`) | `.hv/bin/hv-base-branch` |
-| `hv-worktree-clear` | Remove a non-main worktree that has `<branch>` checked out; silent if none | `.hv/bin/hv-worktree-clear [--repo <name>] hv/foo` |
-| `hv-worktree-path` | Print the canonical Layout B worktree path for a sub-repo branch (`<umbrella>/.claude/worktrees/<repo>/<branch>`) | `.hv/bin/hv-worktree-path --repo web hv/foo` |
-| `hv-merge` | Cleanup worktree, merge `--no-ff`, delete branch; msg on stdin | `echo "merge: ..." \| .hv/bin/hv-merge [--repo <name>] hv/foo` |
-| `hv-pr` | Cleanup worktree, push, then `gh pr create` (GitHub) or `glab mr create --source-branch --target-branch <base> --yes` (GitLab); body on stdin; `--closes <ID[,ID...]>` appends one `Closes #<n>` line per item in issue mode (ignored in file mode; an unknown item exits 1 before the push; in umbrella mode IDs resolve inside the `--repo` sub-repo) | `printf '%s' "$BODY" \| .hv/bin/hv-pr [--repo <name>] [--closes <ID[,ID...]>] hv/foo "title"` |
-| `hv-review-queue` | Issue mode: JSON list of open `needs-review` items, each with the open PRs / MRs whose body closes it (`[{"id","number","title","prs":[...]}]`; umbrella: iterates every sub-repo, `id` is `<repo>:<ID>`, plus a `repo` key); file mode prints `[]` and a stderr note | `.hv/bin/hv-review-queue` |
-| `hv-pr-merge` | Issue mode: merge a PR / MR (merge commit, branch deleted), then close any linked item the host left open via `hv-complete` semantics; prints `merged <pr> as <sha7>` and a `closed <ID>` per item. Proof is checked first: exit 5 = not merged, an item has no proof (set to `changes-requested`); exit 2 in file mode. `--repo <name>`: umbrella mode, merge in that sub-repo (required there) | `.hv/bin/hv-pr-merge 42 [--items F7,B9] [--repo web]` |
-| `hv-ship-body` | Build PR body (Summary + Items resolved) for a branch | `.hv/bin/hv-ship-body hv/foo` |
-| `hv-review-scope` | JSON: commits, touched files, referenced IDs, matched TODO entries | `.hv/bin/hv-review-scope [--repo <name>] hv/foo` |
-| `hv-review-scaffolding` | Surface stale per-task scaffolding text in the branch diff (Task N, placeholder, in flight, added later, not yet wired); empty stdout = no matches | `.hv/bin/hv-review-scaffolding [--repo <name>] [<base> [<branch>]]` |
-| `hv-second-opinion-brief` | Build an adversarial fresh-eyes brief (goal + commits + diff) for a branch, formatted for a no-prior-context subagent to find blind spots | `.hv/bin/hv-second-opinion-brief hv/foo` |
-| `hv-preflight` | Verify `.hv/` is initialized and all helpers are present. Exit 0/2/3 | `.hv/bin/hv-preflight` |
-| `hv-update-check` | JSON: install type, current/latest version, status, update command | `.hv/bin/hv-update-check` |
-| `hv-version-check` | Compare `.hv/config.json#hvSkills.version` with the currently-installed plugin version; nudge or JSON | `.hv/bin/hv-version-check` |
-| `hv-resolve-plugin-root` | Resolve the installed hv-skills plugin root (default `<kind>\|<root>`; `--root-only`; `--bin`) | `.hv/bin/hv-resolve-plugin-root --root-only` |
-| `hv-issue-suggest` | Open an upstream hv-skills issue via `gh` (or print a manual-fallback URL); reads body from stdin | `printf '%s' "$BODY" \| .hv/bin/hv-issue-suggest --title "Title"` |
-| `hv-issues-provider` | Print the issue-tracking provider for cwd (or `--repo <name>`): `github` / `gitlab` / `unknown`, based on the origin URL; always exits 0 | `.hv/bin/hv-issues-provider` |
-| `hv-tracker-call` | The one place `gh`/`glab` is invoked: resolves the provider (`--provider` > `issues.provider` > `hv-issues-provider`), injects `--limit 1000` / `--per-page 100` on list calls and `--paginate` on GET `api` calls, retries a primary rate limit once; exits 3 when the tracker is unavailable, 4 when rate-limited | `.hv/bin/hv-tracker-call -- issue list --state open --json number,title` |
-| `hv-issues-list` | List open upstream issues (GH via `gh`, GL via `glab`) as normalized JSON; exit 0 with `[]` when none; exit 1 when the matching CLI is missing or unauthed | `.hv/bin/hv-issues-list [--repo <name>] [--mine] [--label <name>] [--limit <N>]` |
-| `hv-issues-imported` | Index every `GH:`/`GL:` cross-reference across `BACKLOG.md`, `ARCHIVE.md`, and per-item detail files as JSON; multi-repo items emit one entry per `Repos:` member; `--open-only` post-filters to issues still open upstream (drops closed/unresolvable entries silently); always exits 0 | `.hv/bin/hv-issues-imported [--repo <name>] [--open-only]` |
-| `hv-issues-label` | Apply or remove a label on an upstream issue (GH/GL); idempotent on the already-present / already-absent transitions; auto-creates the label when `issues.autoCreateLabel` is true | `.hv/bin/hv-issues-label apply --issue 42 --label in-progress` |
-| `hv-issues-close` | Close an upstream issue and post a tracking comment naming the shipping commit; called by `/hv-ship` on the direct-push path after explicit user opt-in | `.hv/bin/hv-issues-close --issue 42 --commit a1b2c3d` |
-| `hv-refactor-age` | JSON: non-refactor features/bugs since last `refactor:` commit | `.hv/bin/hv-refactor-age` |
-| `hv-refactor-reset` | Zero `counters.json#since_refactor` (called by `/hv-refactor` after commit) | `.hv/bin/hv-refactor-reset` |
-| `hv-refactor-targets` | JSON: umbrella mode flag + `hasCode` for the umbrella + every registered sub-repo's name and abs path. Used by `/hv-refactor` Step 1.5 to ask the user which scope to refactor | `.hv/bin/hv-refactor-targets` |
-| `hv-backlog` | Render pre-sorted backlog tables (In Progress / Bugs / Features / Tasks); `--grep <pattern>` filters by substring | `.hv/bin/hv-backlog --grep dashboard` |
-| `hv-guard-clean` | Exit non-zero if git tree is dirty or not a repo | `.hv/bin/hv-guard-clean /hv-work` |
-| `hv-guard-feature-branch` | Refuse to operate on the project's base branch (main/master/trunk/configured); exit 1 with stderr on the base, exit 0 on a feature branch | `.hv/bin/hv-guard-feature-branch` |
-| `hv-require-git-context` | Preflight: exit 1 with a friendly error if cwd is an umbrella root with no git context; silent on pass | `.hv/bin/hv-require-git-context hv-merge --repo-flag-supported` |
-| `hv-bootstrap` | Seed `.hv/` directories and data files (run during `/hv-init` only) | `<source-bin>/hv-bootstrap` |
-| `hv-umbrella-init` | Bootstrap an umbrella registry: scan child git repos, register a chosen subset (via stdin), write `.hv/repos.json` and append umbrella `.gitignore` lines | `echo "all" \| <source-bin>/hv-umbrella-init` |
-| `hv-resolve-umbrella` | Walk up from cwd to find the umbrella's `.hv/`; detect masking by stray `.hv/` inside a registered sub-repo | `.hv/bin/hv-resolve-umbrella` |
-| `hv-resolve-repo` | Identify which registered sub-repo cwd belongs to (incl. Layout B worktrees) | `.hv/bin/hv-resolve-repo` |
-| `hv-resolve-repo-path` | Resolve a registered sub-repo name → absolute path via `.hv/repos.json`; symmetric counterpart to `hv-resolve-repo` | `.hv/bin/hv-resolve-repo-path web` |
-| `hv-resolve-handoff` | Resolve handoff-note path with umbrella-vs-flat fallback (lookup; empty stdout when no handoff). Default reads the filesystem; `--write` emits the canonical write path without probing | `.hv/bin/hv-resolve-handoff --repo web hv/feature-x` |
-| `hv-umbrella-on` | Print `yes` if umbrella mode is active (`.hv/repos.json` registers ≥1 sub-repo), `no` otherwise; always exits 0 | `.hv/bin/hv-umbrella-on` |
-| `hv-walk-up` | Walk up from an anchor directory to find a marker (default `.hv/`) and print the containing directory's absolute path; `--detect-masking` checks for stray sub-repo `.hv/` | `.hv/bin/hv-walk-up --marker .hv --detect-masking` |
-| `hv-release-detect-version` | Auto-detect the version file and emit current version as JSON | `.hv/bin/hv-release-detect-version` |
-| `hv-release-bump-version` | Apply a semver bump (patch/minor/major or explicit) to a version file in-place | `.hv/bin/hv-release-bump-version plugin.json plugin-json minor` |
-| `hv-release-changelog-from-commits` | Categorize commits in a git range by Conventional Commits prefix → markdown | `.hv/bin/hv-release-changelog-from-commits v1.0.0..HEAD` |
-| `hv-release-update-changelog` | Prepend a release section to CHANGELOG.md, creating it if absent (idempotent) | `.hv/bin/hv-release-update-changelog 1.2.0 notes.md` |
-| `hv-release-detect-host` | Detect remote hosting kind (github / gitlab / -enterprise / -self-hosted / none) | `.hv/bin/hv-release-detect-host` |
-| `hv-release-pending` | Emit JSON `{lastTag, commits, days, thresholdCommits, thresholdDays, shouldNudge, reason}` for "is it time to /hv-release?" gating | `.hv/bin/hv-release-pending` |
-| `hv-release-milestone-check` | Issue mode: gate a milestone release. Exit 0 clear; 6 blocked (`blocked: #<n> <title> [<label>]` for open issues labelled `in-progress`/`needs-review`/`changes-requested`); `warning: #<n> <title> (still open)` lines for other open issues do not block. Exit 1 usage or unknown milestone; 2 backend unavailable or file mode; 3 tracker unavailable; 4 rate-limited. `--repo <name>`: umbrella mode, check that sub-repo's native milestone (required there, exit 1 without) | `.hv/bin/hv-release-milestone-check M07 [--repo web]` |
-| `hv-release-notes-from-issues` | Issue mode: release notes from a milestone's issues closed as completed: `### New` (features), `### Fixed` (bugs), `### Changed` (tasks) with `- <Title> (#<n>)` lines, plus `### Other` (commit subjects with no item reference); `--since <tag>` bounds the commits. Exit 1/2/3/4 as above. `--repo <name>`: umbrella mode, that sub-repo's issues (required there) | `.hv/bin/hv-release-notes-from-issues M07 --since v4.1.0 [--repo web]` |
-| `hv-release-close-milestone` | Issue mode: after the tag, label each completed issue `released` (comment `Released in <tag>`), close the native milestone, set status `shipped`; idempotent; prints `closed-out <MNN> <tag>: <k> issues`. Exit 1/2/3/4 as above. `--repo <name>`: umbrella mode, close out that sub-repo only (required there); status becomes `shipped` once every sub-repo milestone is closed | `.hv/bin/hv-release-close-milestone M07 v4.2.0 [--repo web]` |
-| `hv-qa-index` | Regenerate the managed `<!-- hv-qa-start -->` block in `CLAUDE.md` from `summary:` frontmatter of every `.hv/qa/<target>.md` | `.hv/bin/hv-qa-index` |
-| `hv-qa-query` | Print the body (minus frontmatter) of named QA target files from `.hv/qa/`; missing targets are silent; always exits 0 | `.hv/bin/hv-qa-query hv-skills` |
-
-## ID and counter helpers
-
-`hv-next-id <namespace>` reads `.hv/counters.json`, increments the counter for
-the given namespace, writes it back, and prints the zero-padded ID (e.g. `B07`,
-`F03`, `T12`). It is safe to call concurrently; the write is atomic via a temp
-file. Every skill that mints a new backlog item calls this first.
-
-`counters.json` lives at `.hv/counters.json` and is never overwritten by
-`/hv-init`. Add namespaces freely; the file grows as you use new ones.
-
-## Backlog manipulation
-
-`hv-item-create <bugs|features|tasks> --title T [--tag TAG] [--desc D] [--body-file F] [--field Name=Value]...`
-is the capture entry point for both backends and prints the new ID. `--tag` is `P0`-`P3` for bugs and
-`Major`/`Minor`/`Cosmetic` for features (none for tasks); `--field` takes `Related`, `Milestone`, `Repos`,
-`Subsystem` or `Captured` (repeatable, non-empty). With `backlog.backend: "file"` the result is byte-identical to
-`hv-next-id` + `hv-append`; `--body-file` also writes `.hv/<kind>/<ID>.md` (`{ID}` replaced) and adds the `Detail:`
-field. With `"issues"` it creates the issue (type, priority and size labels; fields in the body's `hv:fields`
-block; `Milestone` as the native milestone, which must already exist; missing labels are created on GitHub unless
-`issues.autoCreateLabel` is false) and the ID is the type letter plus issue number. `--body-file` content follows
-`--desc` in the issue body. Exit 1 on bad input or a tracker failure, 3 tracker unavailable, 4 rate-limited.
-`hv-append` exits 2 in issue mode; `hv-todo-set-field` works in both modes.
-
-`hv-append` inserts a formatted entry under the matching `##` section heading in
-[`BACKLOG.md`](hv-folder.md). `hv-complete` rewrites an open item as a struck-through `~~line~~`
-and moves it under `## Completed`, stamping it with the supplied git SHA. A non-default `--reason` (`handed-off`, `blocked`, `dropped`) adds `(<reason>)` or `(<reason>: <note>)` after the SHA; `done` renders exactly as before. A `done` close also needs at least one proof row (`hv-proof-add`): without one `hv-complete` exits 3 with "no proof recorded, pass --no-proof to override"; `--no-proof` skips the check, and `handed-off`/`blocked`/`dropped` closes are exempt. `hv-todo-field <ID> reason|note` and `hv-summary` read it back.
-`hv-archive-old` sweeps `## Completed` entries older than N days into
-`ARCHIVE.md` to keep the working file short. `hv-todo-by-milestone` lets you
-filter the backlog by milestone tag; see also [Knowledge and vision
-indexes](#knowledge-and-vision-indexes) where milestone state lives.
-
-`hv-todo-field` extracts a single named field (`detail`, `related`, `milestone`, or `repos`) from the TODO bullet of a given item ID. It replaces the ad-hoc `grep | sed` chains that skill prose previously inlined for that purpose.
-
-`hv-todo-set-field` is the writer counterpart: it sets, replaces, or clears one field (`milestone`, `related`, `repos`, `subsystem`, or `detail`) on an open `BACKLOG.md` bullet, so a skill like `/hv-plan` can tag a milestone without hand-editing the file. `detail` takes an existing file path, writes it as a backticked `Detail:` pointer right after the summary, and refuses a missing file (file backend only; an issue body is its own detail). An empty value drops the field; rewriting an unchanged value writes nothing and exits 0. Only open bullets are mutated; completed and archived items are out of scope.
-
-`hv-find-milestone-for-items` answers the inverse of `hv-todo-by-milestone`: given a list of item IDs, it prints the milestone tags those items carry in BACKLOG.md (unique, numerically sorted, open sections only; completed/archived items don't surface). Always exits 0; an unknown ID or untagged item is a silent skip, not an error.
-
-`hv-plan-rename-check` wraps `git grep -l "<old-name>" [-- <scope>...]` so `/hv-work` Step 4 #3 ("Absorb wave-internal file collisions", rename + link-sweep sub-case) can name the check at both plan time and verify time. Always exits 0; no matches, no repo, and out-of-scope inputs are all silent. The pathspec scope is passed through to git grep, so `*.md`-style globs work.
-
-`hv-uncertain` evaluates whether a backlog item warrants a `/hv-work --preview` pass before `/hv-plan` runs in loop mode. Exit 0 means the item is uncertain (reasons on stdout); exit 1 means it is clear enough to proceed directly to planning.
-
-`hv-uncomplete` is the inverse of `hv-complete`: it lifts a struck-through entry out of `## Completed` (or `ARCHIVE.md`) and restores it to its original type section. Calling it on an ID that is already active is a silent no-op. On the completed→active transition it also rewinds `counters.json#since_refactor` for items whose resolved commit subject did not start with `refactor:`, mirroring `hv-complete`'s accounting. Used by `hv-undo` during cycle rollback; safe to call directly for one-off restorations.
-
-`hv-undo` is the CLI engine for the [`/hv-ship --undo`](slash-commands.md#hv-ship) mode. It resets the last `/hv-work` merge commit on the base branch and restores each TODO via `hv-uncomplete`, all in one transaction. Direct-merge cycles only (MVP); refuses on cycles with post-merge commits unless `--allow-post-merge` is passed, and refuses on a dirty tree (exit 2). Defaults to a dry-run preview; the slash command always asks before applying.
-
-## Status and reconciliation
-
-`hv-status-add` writes a branch record into `.hv/status.json` so the project knows a piece of work is in flight. It is idempotent: calling it twice for the same branch is safe. `hv-status-remove` drops the record when work merges or is abandoned.
-
-`hv-reconcile` cross-checks every entry in `status.json` against live git state and removes records whose branches no longer exist. It emits a JSON summary that skills use to avoid acting on stale context. `hv-summary` prints a human-readable snapshot of the same data: backlog counts, what's actively in progress, and recent completions. Its JSON output also includes a `todoDrift` array: IDs that appear in commit subjects (e.g. `[B07]`) but are still listed as open in `BACKLOG.md`, with the most recent commit hash for each. [`/hv-next`](../usage/picking-work.md) Step 2 surfaces this so users can `hv-complete` an entry that already shipped. Each open bullet's `Since:` anchor (the HEAD short-hash at capture, auto-stamped by `hv-append`) gates the walk: commits older than capture are skipped, preventing false-positives when IDs get reused after old items shipped (common across machine syncs). `hv-backfill-since` stamps existing legacy entries to silence retroactively.
-
-In umbrella mode, every status helper accepts `--repo <name>` to scope the entry to a registered sub-repo. `hv-status-add` keys uniqueness on `(branch, repo)`, so the same branch name can exist independently across multiple sub-repos. `hv-status-remove` without `--repo` removes only legacy entries (where `repo` is null or missing); add `--repo <name>` to remove an umbrella-tagged entry. `hv-reconcile` reads `.hv/repos.json` and validates each entry against its scoped sub-repo's `.git/`, with base-branch resolution per repo.
-
-In umbrella mode the umbrella tree itself often has no base branch (it's a coordinator, not a working repo). When that happens, `hv-reconcile` skips `commitCount` for umbrella-cwd entries and stamps each with `noBase: true`. Skill flows that recommend Ship vs Resume vs Abandon should treat `noBase: true` as "indeterminate" rather than zero commits.
-
-`hv-status-repo-for` is a lightweight lookup: given a branch name it prints the `repo` field from the matching active stream entry (umbrella mode), or an empty string when the branch is not active or the project is single-repo. It always exits 0, so skill prose can call it without error handling.
-
-`hv-loop-stamp` manages the `loopStartedAt` ISO timestamp in `status.json` that loop-mode skills use to scope auto-logged decisions to the current session. `start` writes the timestamp once (no-op if already set), `clear` removes it, and `read` prints the stored value (or empty stdout when unset).
-
-## Knowledge, vision, and decisions indexes
-
-`hv-managed-block knowledge` and `hv-knowledge-query` operate on `.hv/KNOWLEDGE.md`. `hv-managed-block knowledge` regenerates the `<!-- hv-knowledge-start -->` block in `CLAUDE.md` so the agent always sees an up-to-date topic list. `hv-knowledge-query` pulls specific topic sections out of `KNOWLEDGE.md` by name, useful when scripting post-session summaries.
-
-`hv-knowledge-merge` adds a new bullet to `.hv/KNOWLEDGE.md` under an existing topic, with the schema `- **<Title>** — <body> <!-- YYYY-MM-DD -->`. Dedup is exact (case-insensitive) title match within the topic; calling the helper twice with the same `--topic` + `--title` is a silent no-op (idempotent). The body comes via `--body <text>` or stdin. Creating a new `## <Topic>` heading is the caller's job; the helper requires the topic to already exist.
-
-`hv-knowledge-amend` mutates an existing bullet in place, appending text after the trailing `<!-- date -->` comment. The bullet is found by case-sensitive fragment match within the named topic, so pick a distinctive substring (typically a word or phrase from the body) so the match is unique. Used by `/hv-learn` Step 8.5 to attach the `Upstream: hv-skills#<N>` marker after filing an upstream issue.
-
-`hv-knowledge-stats` reports the bullet count and byte size of each topic in `KNOWLEDGE.md` as JSON. [`/hv-learn`](../usage/learning.md) Step 8 calls it after merging new bullets and prints a one-line nudge per topic that crosses 25 bullets or 10 KB, so editorial splits stay user-driven.
-
-`hv-managed-block decisions` and `hv-decisions-query` operate on `.hv/DECISIONS.md`
-identically. The file structure, marker shape, and query semantics all mirror
-the knowledge helpers. The distinction is semantic: decisions are *active*
-hard boundaries (committed via `/hv-decide` with mandatory forbids/permits),
-while knowledge is *passive* gotchas captured by `/hv-learn`. See
-[Decisions](../usage/decisions.md) for when to use which.
-
-`hv-auto-decision-log` writes an `[Auto:Loop]` entry into `DECISIONS.md` under a named topic. It is idempotent on `(topic, rule-title)`: calling it twice with the same arguments yields one entry. Used by loop-mode skills to record provisional decisions that still need user articulation of Forbids/Permits.
-
-`hv-auto-decisions-since` reads the `loopStartedAt` timestamp from `status.json` and prints a markdown summary of every `[Auto:Loop]` decision whose footer date falls on or after that date. It exits 0 with empty stdout when no entries match; terminal-path skills (`/hv-ship`, `/hv-pause`) use it to surface unresolved provisional decisions before closing out a loop session.
-
-`hv-section-query` is the shared backing helper for `hv-knowledge-query` and `hv-decisions-query`. Pass a key (`knowledge` or `decisions`) and one or more topic names; it prints the matching `## <topic>` section bodies from the corresponding file. The typed wrappers are preferred for human use; `hv-section-query` is useful when scripting against multiple files in one call. Glossary term lookup is term-keyed, not topic-keyed; use `hv-glossary-read` instead.
-
-`hv-skills-index` regenerates the `<!-- hv-skills-start -->` block in `CLAUDE.md` with the canonical slash-command index. The body is static and identical across every hv-skills project, so reruns are always idempotent. Called by `/hv-init` and `/hv-update`; you rarely need to invoke it directly.
-
-`hv-glossary-read` and `hv-glossary-write` operate on the `## Glossary` topic of `.hv/KNOWLEDGE.md`, the project glossary written via [`/hv-learn --term <name>`](slash-commands.md#hv-learn). Term entries are nested bullets under the Glossary topic: `- **<term>** — <definition>` followed by an indented `**Aliases:**` line, an optional `**Not:**` line, and a date stamp. `hv-glossary-read <term>...` prints matching entries (case-insensitive) prefixed with `> from: .hv/KNOWLEDGE.md (## Glossary)`. `hv-glossary-write <term> --def <text> [--alias ...] [--not ...] [--touch]` inserts or updates a term within the Glossary topic; alphabetical insertion is preserved; exit 3 on alias collision with another term in the same Glossary. The Glossary topic is special-cased: `hv-knowledge-tier` skips it (terms aren't tier-eligible), and `hv-managed-block knowledge` surfaces it like any other topic in the CLAUDE.md `## Project Knowledge` index. Umbrella-mode per-sub-repo glossaries are deferred to F21.
-
-The vision group manages milestones in `.hv/milestones/`. `hv-vision-add` mints the next `MNN` ID, creates the milestone file, and appends its overview line to `MILESTONES.md`. `hv-vision-status` updates both the file's frontmatter and the overview line atomically. `hv-vision-active`, `hv-vision-list`, `hv-vision-index`, and `hv-vision-empty-active` let you query and refresh milestone state. `hv-vision-index` also regenerates the `<!-- hv-vision-start -->` block injected into `CLAUDE.md`. `hv-vision-empty-active` prints active milestone IDs that have zero open TODO items, one per line; empty stdout is a valid answer and the helper always exits 0. `hv-vision-show` prints a milestone's detail file; exit 1 when the milestone ID is unknown or doesn't match `M\d{2,}`.
-
-`hv-todo-by-milestone` is covered in [Backlog manipulation](#backlog-manipulation).
-
-## Design helpers
-
-Designs live at `.hv/designs/<ID>.md` and are per-item: the ID must match `[BFT]\d{2,}` (e.g. `B07`, `F12`, `T11`). Milestone (`M01`) and slice (`S01`) IDs are rejected; project-level exploration belongs to `/hv-vision`, slice planning belongs to `/hv-plan`.
-
-`hv-design-add` is the writer: it mints `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and five empty sections (Goal, Design, Approaches considered, Open questions, Assumptions). It exits 1 on a bad ID or a pre-existing artifact. `hv-design-show` prints the file's contents and exits 1 when the artifact is missing. `hv-design-rm` deletes the file and exits 1 when the artifact is missing. `hv-design-list` returns JSON for every design with `id`, `title`, `status`, `created`. Always exits 0, useful for dashboards and post-cycle audits. `hv-design-amend` amends a section in place — `--section <heading>` with `--append` (add to the section) or `--replace` (swap its body); it exits 1 on a bad ID, a missing file, or a section that doesn't exist. It shares the sourceable `hv-artifact-amend.sh` lib with the other per-verb artifact wrappers, so design fixups go through a helper rather than hand edits.
-
-See [Brainstorming a design](../usage/brainstorm.md) for the user-facing flow these helpers back.
-
-## Plan and spike helpers
-
-Plans live at `.hv/plans/<milestone>-<unit>.md`. `hv-plan-add` creates a plan
-file; passing `slice` as the unit makes it auto-increment the slice number
-(`S01`, `S02`, …). The optional `--design <path>` flag records a `design:` pointer
-in the plan's frontmatter when a `.hv/designs/<ID>.md` artifact exists for the item;
-the path must start with `.hv/designs/` and the file must exist or the helper
-exits 1. `hv-plan-list` returns JSON you can pipe into other tools.
-`hv-plan-show` and `hv-plan-rm` are straightforward read/delete operations.
-`hv-plan-validate-docs <key>` scans the plan's `Files:` bullets, flags any
-doc-by-path deliverable (under a `docs/` segment) whose doc home is missing in
-the target repo, and points at sibling `<repo>-docs` sub-repos as alternatives
-when one is registered. Called from `/hv-plan` Step 6.5; runnable by hand as a
-pre-merge sanity check.
-
-Spikes live at `.hv/spikes/<name>.md` with a matching `spike/<name>` git branch.
-`hv-spike-add` creates both in one call. `hv-spike-finish` closes the spike and
-records the finish date. `hv-spike-list` returns JSON with a `branchExists` field
-so you can detect spikes whose branches were already deleted.
-`hv-spike-show` prints the spike file's contents; exit 1 when the spike is missing or the name doesn't match the slug shape `[a-z0-9][a-z0-9-]*`.
-
-## Merge and PR helpers
-
-`hv-merge` handles the full merge ceremony for a worktree branch: it removes the worktree, merges `--no-ff` into the current branch, and deletes the source branch. The commit message is read from stdin, so you can compose it before calling the helper. `hv-pr` does the equivalent for pull-request workflows: remove the worktree, push the branch, and call `gh pr create` (or `glab mr create` on GitLab) with a body read from stdin. In issue mode `--closes <ID[,ID...]>` adds the `Closes #<n>` lines.
-
-`hv-ship-body` builds a standardised PR body for a branch by scanning its
-commits for referenced IDs and matching them against open TODO entries.
-`hv-review-scope` emits a richer JSON payload (commits, touched files,
-referenced IDs, and matched TODO entries) that the [`/hv-review`](../usage/review-and-ship.md) skill consumes.
-`hv-review-scaffolding` complements `hv-review-scope` with a deterministic regex sweep over the diff between base and branch, surfacing candidate stale scaffolding comments as `<file>:<line>:<text>` for the reviewer to judge.
-
-All four helpers (`hv-merge`, `hv-pr`, `hv-review-scope`, `hv-review-scaffolding`) accept `--repo <name>` in umbrella mode to target a registered sub-repo's `.git/`. Without the flag they operate on cwd's git tree as before.
-
-## Diagnostics
-
-[`hv-preflight`](preflight.md) verifies that `.hv/` is initialised and every expected helper is
-present. It exits `0` on success, `2` if the folder is missing, and `3` if
-helpers are incomplete. Useful as a guard at the top of scripts.
-
-`hv-update-check` queries the hv-skills GitHub releases and returns JSON with
-the current and latest version, install type, and the command to upgrade.
-`/hv-init`'s Step 5 confirm reads the same JSON to append a one-line version +
-freshness hint to the init summary (`current` → `(latest)`, `behind` →
-`→ <latest> available — run /hv-update`, `ahead`/`unknown` fall back to a
-version-only line).
-
-`hv-version-check` is the local sibling: it compares `.hv/config.json#hvSkills.version` (stamped at `/hv-init` time) with the currently-installed plugin's version. On drift it prints a one-line nudge; with `--json` it always emits `{stamped, installed, status}`. `bin/hv-preflight` calls it informationally on every preflight, so any skill that runs preflight surfaces the nudge to the user when the project's helpers have fallen behind the plugin. Distinct from `hv-update-check`, which needs the network and compares installed vs latest GitHub release.
-
-`hv-refactor-age` reads `counters.json#since_refactor` and returns JSON with
-the number of features and bugs completed since the last refactor cycle.
-`/hv-refactor` uses this to decide whether a pass is overdue. The counter is
-maintained imperatively: `hv-complete` increments it on every active→completed
-transition whose resolved commit's subject does not start with `refactor:`,
-and `hv-refactor-reset` zeros it after a `/hv-refactor` cycle commits.
-`hv-refactor-targets` enumerates refactor targets (the umbrella's `hasCode` flag plus every registered sub-repo) so `/hv-refactor` Step 1.5 can ask which scope to fan out across.
-
-`hv-map-cap-check` is an advisory nudge: it emits a one-line message to stderr when the project map's subsystem count meets or exceeds the soft cap (see `.hv/config.json#map.softCapSubsystems`), and stays silent below. It always exits 0, never a gate, only a hint. `/hv-debug`, `/hv-go`, and `/hv-work` call it post-cycle so users see "you might want to consolidate `.hv/map/` entries" without ever being blocked.
-
-`hv-backlog` renders the full BACKLOG.md as sorted Markdown tables (In Progress,
-Bugs, Features, Tasks). Handy for a quick terminal overview or piping into
-other scripts. Pass `--grep <pattern>` to filter Bugs / Features / Tasks rows
-by case-insensitive substring against each item's bullet line (matches across
-ID, title, description, and `Related:` tags). The In Progress section is
-state and is never filtered; the Clusters section keeps clusters whose any
-member matched, preserving all member IDs for context.
-
-`hv-guard-clean` exits non-zero when the git working tree is dirty or the
-current directory is not inside a git repository. Skills call it as a safety
-check before making commits. On a fresh repo with no commits yet, a dirty tree
-produces a tailored message naming the `chore: import initial files` baseline
-commit pattern instead of the generic stash-or-commit hint.
-
-`hv-require-git-context` is a companion preflight for umbrella-mode tools: if cwd is an umbrella root that has no `.git/` of its own, it exits 1 with a friendly error pointing the user to a sub-repo. Pass `--repo-flag-supported` when the calling tool has a `--repo` option to name in the error message. The helper is a no-op (silent exit 0) when cwd already has git context.
-
-## Upstream issue helper
-
-`hv-issue-suggest` opens an issue against the hv-skills upstream repo when a learning or debug session surfaced a gotcha rooted in hv-skills behavior. The helper reads its body from stdin, takes a `--title` flag, and pre-fills the `gh issue create` call. If `gh` is missing or unauthed, it prints a manual-fallback block (URL + title + body) and exits 1 so the caller can show it to the user.
-
-The upstream repo defaults to `l4ci/hv-skills`; pass `--upstream-repo <owner/repo>` (or set the `HV_UPSTREAM_REPO` env var) to target a fork. `/hv-learn` Step 8.5 uses this helper after the user explicitly opts in. Filing a public issue is always a manual user-volition gate, never auto-invoked.
-
-## Issue tracker sync (`/hv-capture --from-github` / `--from-gitlab`)
-
-Distinct from the upstream-issue helper above. These five helpers back the project-level [`/hv-capture --from-github` / `--from-gitlab`](slash-commands.md#hv-capture---from-github----from-gitlab) flow that pulls open GitHub/GitLab issues into `BACKLOG.md` with round-trip closing via `/hv-ship`. They all accept `--repo <name>` in umbrella mode to scope the call to a registered sub-repo.
-
-`hv-issues-provider` detects whether the active git origin points at GitHub or GitLab, printing `github`, `gitlab`, or `unknown`. The match is hostname-based (`github*` → github, `gitlab*` → gitlab), so self-hosted and enterprise instances resolve correctly. Always exits 0; `unknown` is a valid result, not an error.
-
-`hv-issues-list` is the read path: it shells out to `gh issue list --state open` or `glab issue list --opened`, normalizes the output, and emits a uniform JSON array regardless of provider. Optional `--label <name>` and `--limit <N>` flags pass through to the underlying CLI; `--mine` maps to the provider's assignee-self filter (`--assignee @me` on `gh` and recent `glab`) and backs the `issues.filterMineOnly` config key. Note: old `glab` versions (pre-1.30) treat `@me` as a literal username and silently return `[]` — use a recent glab (≥1.30) when relying on `--mine`. An empty result (`[]`) and a missing CLI are distinguished: empty list exits 0, but a missing or unauthed `gh`/`glab` exits 1 with a stderr message. Skills should treat exit 1 as "fix your setup," not "nothing to do."
-
-`hv-issues-imported` is the dedupe index: it scans `BACKLOG.md`, `ARCHIVE.md`, and every per-item detail file under `.hv/bugs/`, `.hv/features/`, `.hv/tasks/` for `GH: #N` or `GL: #N` cross-references and emits JSON tagged with provider, issue number, item ID, and the resolved `Repos:` value (multi-repo items emit one entry per sub-repo). `/hv-capture --from-github` / `--from-gitlab` subtracts this set from `hv-issues-list` output so already-imported issues are never re-offered. Pass `--open-only` to drop entries whose upstream issue is already closed (one `gh`/`glab` issue view per entry; entries that can't be resolved, e.g. missing CLI, auth failure, deleted issue, are dropped silently because the close gate would no-op on them). `/hv-ship` Step 6c and `/hv-release` Step 13.4 both use the `--open-only` form to power their close-upstream-issues gates.
-
-`hv-issues-label` is the writer for upstream labeling, typically `in-progress` after import so collaborators see the issue is claimed. `apply` and `remove` are both idempotent (no-op on the already-present / already-absent transitions). When `issues.autoCreateLabel` is true in `.hv/config.json` (default), it creates the label upstream if absent rather than failing.
-
-`hv-issues-close` is the round-trip closer: given an issue number and the shipping commit SHA, it closes the upstream issue and posts a tracking comment naming the commit. Called by `/hv-ship` on the direct-push path after explicit user opt-in; the PR path relies on `Closes #N` lines in the body to auto-close on merge instead. Exit 0 on successful close or already-closed (no-op); exit 1 on bad inputs or auth/CLI failure.
-
-`hv-tracker-call [--provider auto|github|gitlab] -- <cli args...>` is the single wrapper around `gh`/`glab`. The CLI and provider detection run in the caller's cwd; config is read from the project root. It reads stdin once (when not a TTY) and feeds it to every attempt, so `-F -` bodies survive a retry. List calls without `-L`/`--limit` (gh) or `-P`/`--per-page` (glab) get `--limit 1000` / `--per-page 100`; a JSON array result of exactly that length prints a truncation warning to stderr. `api` calls get `--paginate` only when they are GET (no `-X` other than GET, no field flags). Exit codes: 0 success; the CLI's own code on a plain failure (stderr forwarded); 3 when the provider is unknown, the CLI is missing, or stderr shows an auth failure; 4 when rate-limited. A primary rate limit waits `issues.retryWaitSeconds` and retries once; a secondary (abuse) limit stops at once, since retrying extends the lockout.
-
-## Umbrella mode helpers
-
-When `umbrella.enabled` is true in `.hv/config.json`, the umbrella's `.hv/` coordinates work across multiple sub-repos registered in `.hv/repos.json`. Three helpers manage that registry and the cwd-to-sub-repo resolution.
-
-`hv-umbrella-init` runs once during [`/hv-init`](slash-commands.md#hv-init) Step 1.5 (see [Umbrella mode](../usage/umbrella-mode.md) for the user-facing flow). It scans immediate children for `<child>/.git/`, reads one line of stdin (`all` / `none` / comma-separated names) to pick a subset, writes `.hv/repos.json`, and, if the umbrella is itself a git repo, appends `.claude/`, `.hv/`, and `/<repo>/` lines to the umbrella's `.gitignore` under a `# ── hv umbrella ──` header.
-
-`hv-resolve-umbrella` walks up from cwd to find the umbrella's `.hv/`. It also detects a footgun: a stray `.hv/` directory inside a registered sub-repo (e.g., from a misplaced `/hv-init` from inside the sub-repo). It exits 2 with a `masking` message in that case. `hv-resolve-repo` identifies which registered sub-repo cwd belongs to, working transparently from a Layout B worktree at `<umbrella>/.claude/worktrees/<repo>/<branch>/` via `git rev-parse --git-common-dir`.
-
-`hv-resolve-repo-path` is the symmetric counterpart: given a registered sub-repo *name*, it returns the absolute path from `.hv/repos.json`. It replaces the inline Python heredocs that `hv-merge`, `hv-pr`, `hv-spike-add`, and `hv-review-scope` previously duplicated for the same lookup. Exits 1 with a friendly error if the registry is empty or the name is not registered.
-
-`hv-umbrella-on` prints `yes` when umbrella mode is in effect (`.hv/repos.json` registers at least one sub-repo) and `no` otherwise. It always exits 0 and treats any read error as `no`. Accepts an optional `<dir>` argument for callers that already know the umbrella root path. Use it instead of inspecting `config.json`; the repos.json registry is the authoritative source of truth.
-
-`hv-walk-up` walks up from an anchor directory looking for a marker (default `.hv/`) and prints the absolute path of the directory that contains it. Pass `--detect-masking` to additionally check whether the found marker is a stray `.hv/` inside a registered sub-repo that masks an umbrella further up the tree (exits 2 in that case). Most callers should source `hv-self-locate.sh` instead, which combines the walk-up with the `HV_ORIG_PWD` export; `hv-walk-up` is exposed for scripts that need the raw walk-up primitive.
-
-### hv-resolve-repos
-
-Resolve a comma-separated `Repos:` list into a JSON array of `{name, path}` entries. Used by multi-repo dispatch helpers to validate and locate every named sub-repo in one call.
-
-    hv-resolve-repos "<repos-csv>"
-
-Exits 0 with JSON on stdout, 1 if any name is not registered in `.hv/repos.json` (stderr names the missing sub-repo). Single names and empty input are valid; the result is a list whose length matches the input.
-
-### hv-multi-branch-create
-
-Atomically create the same branch in every named sub-repo. Used by `/hv-work` when an item's `Repos:` field names two or more sub-repos.
-
-    hv-multi-branch-create --branch <name> --repos <repos-csv>
-
-Two phases. Phase 1 precheck: scans every named repo for `refs/heads/<branch>`; if any has it, exits 1 listing the colliding repo names on stderr (*no repos are modified*). Phase 2 create: runs `git branch <name>` (no checkout) in each repo. Unregistered repo names are rejected via `hv-resolve-repos` (exit 1, missing names on stderr).
-
-### hv-status-add-multi
-
-Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv-work` wave. Loops `hv-status-add --repo <r>` once per name in `--repos`.
-
-    hv-status-add-multi [--if-absent] --branch <name> --items <ids-csv> --repos <repos-csv> [--worktrees <paths-csv>]
-
-`--worktrees` is optional; when given, its comma-list MUST match the length of `--repos` (paired by index). Unregistered repo names are rejected up front via `hv-resolve-repos` (no partial writes). `--if-absent` is forwarded to each underlying `hv-status-add` call.
-
-## Bootstrap (run during /hv-init only)
-
-`hv-bootstrap` seeds the `.hv/` folder structure. Concretely it:
-
-1. Creates subdirectories: `.hv/bin/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`,
-   `.hv/milestones/`, `.hv/plans/`, `.hv/spikes/`.
-2. Writes initial data files (skipping any that already exist): `BACKLOG.md`,
-   `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `counters.json`,
-   `status.json`.
-3. Appends per-file ignores to `.gitignore` under a `# ── hv-skills ──`
-   header (when any are missing): `.hv/bin/`, `.hv/status.json`,
-   `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`,
-   `.hv/qa-runs/`, and `.hv/**/*.lock`. Migrates legacy blanket `.hv/`
-   lines off the same file. The rest of `.hv/` is tracked. Also adds
-   `.worktrees/` (worker worktrees) to `.gitignore` once.
-
-It does **not** copy helper scripts; that is `/hv-init`'s job. It is called by
-`/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and
-it never overwrites files that already exist. You do not normally need to call
-this directly. Rerun `/hv-init` if you want to refresh the installation.
+# `hv` verb reference
+
+`hv` is the single binary behind every hv-skills skill. Skills call it for all
+backlog, knowledge, plan, status, git and release bookkeeping, and you can call
+it directly when scripting against `.hv/`. There is no helper copy to refresh in a
+project: `hv` ships with the plugin and updates with it.
+
+```sh
+hv item create --kind bugs --title "Crash on save" --tag P1 --desc "Why."
+hv backlog list --json
+hv knowledge query "Auth & Sessions"
+```
+
+## Conventions
+
+- **Global flags.** `--json` prints one JSON envelope on stdout, `-C <dir>` runs
+  as if started in `<dir>`, `--repo <name>` scopes a verb to an umbrella
+  sub-repo, `-h` prints help for any group or verb.
+- **No prompts.** `hv` never asks anything. A missing decision is exit 2 naming
+  the flag. Skills do the asking.
+- **Bodies on stdin.** Any flag that takes a file path also accepts `-`
+  (`--body-file -`).
+- **Project root.** Verbs walk up from the working directory to the nearest
+  `.hv/`. Only `hv init`, `hv init check`, `hv init umbrella`, `hv version` and
+  `hv update` run without one.
+- **Idempotent writes.** A mutating verb reports `changed: true|false`. A no-op
+  is exit 0.
+
+| Exit | Meaning |
+|---|---|
+| 0 | Success, including idempotent no-ops |
+| 1 | The verb ran and the answer is no (a guard or check failed) |
+| 2 | Usage error: unknown verb or flag, missing argument |
+| 3 | Something named could not be resolved (item, plan, sub-repo, base branch, `.hv/` itself) |
+| 4 | A mutating verb refused to break an invariant |
+| 5 | An external dependency is missing or failing (`git`, `gh`, `glab`, network) |
+| 6 | Transient: rate limit or lock timeout, retry later |
+| 70 | Bug in `hv`; report it |
+
+Not a stable API across major versions, but `--json` shapes only change
+additively within one. Full rules:
+[CLI conventions](../design/5.0-cli-conventions.md). Per-verb `data` shapes,
+exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
+`hv <group> --help` lists a group's verbs, `hv <group> <verb> --help` its flags.
+
+## Verbs
+
+## `hv version`
+
+| Usage | What it does |
+|---|---|
+| `hv version [--drift]` | print the hv version |
+
+## `hv update`
+
+| Usage | What it does |
+|---|---|
+| `hv update` | check for a newer hv-skills release |
+
+## `hv config`
+
+| Usage | What it does |
+|---|---|
+| `hv config show [<key>]` | effective value and source of config keys |
+| `hv config set <key> <value>` | set one key in .hv/config.json |
+| `hv config check` | compare .hv/config.json with the schema |
+| `hv config fill` | write the schema default for every missing key |
+
+## `hv repo`
+
+| Usage | What it does |
+|---|---|
+| `hv repo which` | the registered sub-repo the working directory is in |
+| `hv repo resolve [<name>…]` | names to registered sub-repo paths |
+| `hv repo umbrella` | is this an umbrella project |
+
+## `hv id`
+
+| Usage | What it does |
+|---|---|
+| `hv id next --kind <bugs\|features\|tasks\|milestones>` | mint the next counter ID |
+
+## `hv item`
+
+| Usage | What it does |
+|---|---|
+| `hv item create --kind <bugs\|features\|tasks> --title <text> [--tag <tag>] [--desc <text>] [--body-file <path\|->] [--related <text>] [--milestone <text>] [--repos <csv>] [--subsystem <text>] [--captured <YYYY-MM-DD>] \| --kind <kind> --raw-file <path\|->` | capture one item |
+| `hv item show <ID>` | status block of an issue-mode item |
+| `hv item claim <ID> --as <claim-id>` | take an item so two agents never work it at once |
+| `hv item release <ID> --as <claim-id>` | give a claimed item back |
+| `hv item ready <ID>` | is the item specified well enough to start |
+| `hv item state <ID> --to <in-progress\|needs-review\|changes-requested\|none>` | set the workflow state label of an item |
+| `hv item comment add <ID> --kind <question\|answer\|decision\|feedback> --body-file <path\|->` | append a comment |
+| `hv item comment list <ID> [--kind <question\|answer\|decision\|feedback>]` | list comments |
+| `hv item note add <ID> --kind <proof\|design\|plan> --body-file <path\|->` | write a note |
+| `hv item note show <ID> --kind <proof\|design\|plan>` | print a note |
+| `hv item note rm <ID> --kind <proof\|design\|plan>` | delete a note |
+| `hv item field get <ID> --name <title\|detail\|related\|milestone\|repos\|subsystem\|since\|reason\|note>` | print one field of an item |
+| `hv item field set <ID> --name <milestone\|related\|repos\|subsystem\|detail> --value <text>` | set, replace or clear a field of an open item |
+| `hv item field list <ID>` | every field of an item |
+| `hv item complete <ID> [--commit <hash>] [--reason <done\|handed-off\|blocked\|dropped>] [--note <text>] [--no-proof]` | close an item |
+| `hv item reopen <ID>` | restore a completed item |
+| `hv item rm <ID>... [--scrub-archive] [--apply]` | remove items with their cross-references and files |
+| `hv item shipped <title>...` | look for evidence that titles already shipped |
+
+## `hv backlog`
+
+| Usage | What it does |
+|---|---|
+| `hv backlog list [--grep <pattern>]` | open items as sorted tables, with clusters |
+| `hv backlog ids --milestone <id>` | IDs of the open items tagged with a milestone |
+| `hv backlog milestones <ID>...` | milestones the given items are tagged with |
+| `hv backlog drift` | open items that commits already mention |
+| `hv backlog backfill` | stamp Since: on open items that lack it |
+| `hv backlog archive [--days <n>]` | move old completed items to ARCHIVE.md |
+| `hv backlog stale --kind <map\|knowledge\|todo> [--days <n>]` | stale map, knowledge or backlog entries |
+
+## `hv summary`
+
+| Usage | What it does |
+|---|---|
+| `hv summary` | compact project state |
+
+## `hv issues`
+
+| Usage | What it does |
+|---|---|
+| `hv issues list [--mine] [--label <name>] [--limit <n>]` | open upstream issues |
+| `hv issues label <issue> (--add <name> \| --remove <name>)` | add or remove a label on an upstream issue |
+| `hv issues imported [--for-repo <name>] [--open-only]` | backlog items that point at upstream issues |
+| `hv issues close <issue> --commit <sha> [--item <ID>]` | close an upstream issue naming the shipping commit |
+| `hv issues provider` | github, gitlab or unknown for the origin remote |
+
+## `hv status`
+
+| Usage | What it does |
+|---|---|
+| `hv status add <branch> --items <csv> [--worktree <path>] [--if-absent]` | record an active work stream |
+| `hv status rm <branch>` | end a work stream and drop its handoff note |
+| `hv status show <branch>` | which repo a branch's stream is in |
+| `hv status handoff <branch> [--canonical]` | path of a branch's handoff note |
+| `hv status loop start` | stamp the loop start, first write wins |
+| `hv status loop clear` | remove the loop start stamp |
+| `hv status loop show` | print the loop start stamp |
+
+## `hv refactor`
+
+| Usage | What it does |
+|---|---|
+| `hv refactor age` | features and bugs completed since the last refactor |
+| `hv refactor reset` | zero the since-refactor counters |
+| `hv refactor targets` | what a refactor can cover |
+
+## `hv migrate`
+
+| Usage | What it does |
+|---|---|
+| `hv migrate issues [--apply] [--limit <n>]` | move the file backlog onto the issue tracker (preview unless --apply) |
+| `hv migrate v4 [--apply] [--verbose]` | migrate a v3 project to v4 (preview unless --apply) |
+
+## `hv knowledge`
+
+| Usage | What it does |
+|---|---|
+| `hv knowledge query <topic>… [--tier provisional\|confirmed\|deprecated] [--include-deprecated]` | print topic sections, tier-aware |
+| `hv knowledge stats` | bullet count and size per topic |
+| `hv knowledge add --topic <T> --title <S> --body-file <path\|-> [--date YYYY-MM-DD]` | add a bullet under a topic |
+| `hv knowledge amend --topic <T> --fragment <F> --mode append --body-file <path\|->` | append text to an existing bullet |
+| `hv knowledge rename-topic --from <X> --to <Y> [--title <T>]` | rename a topic or move one bullet |
+| `hv knowledge hit --topic <T> --title <S>` | register a consulted bullet |
+| `hv knowledge tier get --topic <T> --title <S>` | show one bullet's tier |
+| `hv knowledge tier set --topic <T> --title <S> --tier provisional\|confirmed\|deprecated` | set one bullet's tier |
+| `hv knowledge tier list [--tier provisional\|confirmed\|deprecated]` | list tracked bullets |
+| `hv knowledge contradiction add --topic <T> --title <S> --text <text>` | queue a contradiction candidate |
+| `hv knowledge contradiction list` | list the queue |
+| `hv knowledge contradiction clear` | empty the queue |
+| `hv knowledge contradiction has --topic <T> --title <S>` | exit 0 when the pair is queued |
+
+## `hv decisions`
+
+| Usage | What it does |
+|---|---|
+| `hv decisions query <topic>…` | print topic sections |
+| `hv decisions auto-log --topic <T> --title <rule-title> --why <text> [--plan-key <key>] [--date YYYY-MM-DD]` | log an [Auto:Loop] decision |
+| `hv decisions auto-since` | list this loop session's auto-logged decisions |
+
+## `hv glossary`
+
+| Usage | What it does |
+|---|---|
+| `hv glossary read <term>…` | print term entries |
+| `hv glossary write <term> --def <text> [--alias <a,b>] [--not <n,m>] [--touch]` | add or update one term |
+| `hv glossary import --body-file <path\|-> [--touch]` | add many terms atomically |
+
+## `hv block`
+
+| Usage | What it does |
+|---|---|
+| `hv block <key> [--body-file <path\|->]` | regenerate a managed block in the instructions file |
+| `hv block skills` | regenerate the skills block |
+
+## `hv instructions`
+
+| Usage | What it does |
+|---|---|
+| `hv instructions init` | make AGENTS.md the instructions file, CLAUDE.md its importer |
+
+## `hv map`
+
+| Usage | What it does |
+|---|---|
+| `hv map query <name>…` | print subsystem files |
+| `hv map index` | regenerate the map block |
+| `hv map stats [--cap]` | size and broken-reference counts |
+
+## `hv qa`
+
+| Usage | What it does |
+|---|---|
+| `hv qa query <target>…` | print QA target files |
+| `hv qa index` | regenerate the QA block |
+
+## `hv milestone`
+
+| Usage | What it does |
+|---|---|
+| `hv milestone add --title <text> --summary <text> [--depends M01,M02]` | mint a milestone |
+| `hv milestone list` | list milestones |
+| `hv milestone show <id>` | print a milestone |
+| `hv milestone put <id> --body-file <path\|->` | replace a milestone's text |
+| `hv milestone status <id> --to <planned\|active\|shipped\|archived>` | change a milestone's status |
+| `hv milestone active` | IDs of active milestones |
+| `hv milestone index` | regenerate the overview and vision block |
+
+## `hv plan`
+
+| Usage | What it does |
+|---|---|
+| `hv plan add <milestone>-<unit> --title <text> [--design <ID>] [--repos a,b]` | create a plan stub |
+| `hv plan list [--milestone M01]` | list plans |
+| `hv plan show <key>` | print a plan |
+| `hv plan put <key> --body-file <path\|->` | replace a plan's text |
+| `hv plan rm <key>` | delete a plan |
+| `hv plan validate-docs <key>` | check doc-by-path deliverables |
+| `hv plan rename-check <old> [-- <pathspec>…]` | files that mention a name |
+| `hv plan uncertain <ID>` | uncertainty pre-flight for an item |
+
+## `hv design`
+
+| Usage | What it does |
+|---|---|
+| `hv design add <ID> --title <text>` | create a design stub |
+| `hv design list` | list designs |
+| `hv design show <ID>` | print a design |
+| `hv design put <ID> --body-file <path\|->` | replace a design's text |
+| `hv design rm <ID>` | delete a design |
+| `hv design amend <ID> --section <heading> --mode <append\|replace> --body-file <path\|->` | amend one section of a design |
+
+## `hv spike`
+
+| Usage | What it does |
+|---|---|
+| `hv spike add <name> --question <text>` | create spike/<name> and its file |
+| `hv spike finish <name>` | mark a spike done |
+| `hv spike list` | list spikes |
+| `hv spike show <name>` | print a spike file |
+
+## `hv proof`
+
+| Usage | What it does |
+|---|---|
+| `hv proof add <ID> --check <text> --result <PASS\|FAIL> --evidence <text> [--sha <commit>]` | append a proof row |
+| `hv proof show <ID> [--count]` | list an item's proof rows |
+
+## `hv debug`
+
+| Usage | What it does |
+|---|---|
+| `hv debug counter init <bugId>` | start the counter for a bug |
+| `hv debug counter record-attempt --hypothesis <text> --commit <hash>` | record a pending fix attempt |
+| `hv debug counter fail` | mark the last attempt failed |
+| `hv debug counter pass` | mark the last attempt passed |
+| `hv debug counter show` | print the counter state |
+| `hv debug counter summary` | Iron Law halt note |
+| `hv debug counter clear` | delete the counter |
+| `hv debug counter inc-cycle` | count a hypothesis cycle |
+
+## `hv worker`
+
+| Usage | What it does |
+|---|---|
+| `hv worker pool init --slots <n> [--base <branch>] [--session <name>]` | create the slots' worktrees and register them |
+| `hv worker pool list` | list the registered slots |
+| `hv worker pool reap (<slot>... \| --all)` | remove slots, their worktrees and branches |
+| `hv worker reset <slot> [--task <id>] [--check-only]` | refuse a slot that holds work, else cut a fresh task branch |
+| `hv worker dispatch <slot> --body-file <path\|-> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>]` | send a brief into a slot's session |
+| `hv worker poll [<slot>] [--settle <seconds>] [--lines <n>]` | classify slot states from their panes |
+| `hv worker gate <slot> --base <branch> [--check-only] [--no-verify]` | merge gate for one slot's branch or PR |
+| `hv worker session check [--session <name>]` | inside a managed host session? (exit 1 when outside) |
+| `hv worker session ensure [--session <name>] [--body-file <path\|->] [--boot-timeout <s>]` | hand the orchestrator off into a host session |
+| `hv worker account list` | list accounts with their usage verdict |
+| `hv worker account pick [--exclude <name>[,<name>...]]` | name the account with the most headroom |
+| `hv worker account assign <slot> [--account <name>]` | put an account's config dir on a slot |
+
+## `hv tracker`
+
+| Usage | What it does |
+|---|---|
+| `hv tracker call [--provider auto\|github\|gitlab] -- <cli-arg>...` | run gh or glab with list limits and rate-limit handling |
+| `hv tracker suggest-upstream --title <text> --body-file <path\|-> [--upstream-repo <owner/repo>]` | file a hv-skills issue from a learning |
+
+## `hv git`
+
+| Usage | What it does |
+|---|---|
+| `hv git base` | print the resolved base branch |
+| `hv git guard clean [--context <text>]` | fail when the working tree is dirty |
+| `hv git guard feature-branch [<branch>]` | fail on the base branch or a detached HEAD |
+| `hv git branch <name> --repos <a,b,...>` | create one branch in several sub-repos, or in none |
+| `hv git worktree-path <branch>` | print the umbrella worktree path of a sub-repo branch |
+
+## `hv review`
+
+| Usage | What it does |
+|---|---|
+| `hv review scope [<branch>]` | commits, files, item IDs and origin entries of a branch |
+| `hv review brief [<branch>]` | fresh-eyes second-opinion brief for a branch |
+| `hv review scaffolding [<branch>] [--base <branch>]` | added diff lines that look like leftover task scaffolding |
+| `hv review queue` | open issues waiting for review |
+
+## `hv ship`
+
+| Usage | What it does |
+|---|---|
+| `hv ship body [<branch>]` | build a PR body from a branch's commits |
+| `hv ship pr <branch> --title <text> --body-file <path\|-> [--items <ID>[,<ID>…]]` | push a branch and open a PR or MR |
+| `hv ship merge <branch> --body-file <path\|->` | merge a branch into the base branch with --no-ff |
+| `hv ship pr-merge <pr> [--items <ID>[,<ID>…]]` | merge a PR in issue mode |
+| `hv ship undo [--cycle <hash>] [--allow-post-merge] [--apply]` | roll back the last cycle merge on the base branch |
+
+## `hv release`
+
+| Usage | What it does |
+|---|---|
+| `hv release version [--level patch\|minor\|major \| --to <X.Y.Z>]` | print the version file, and the next version with --level or --to |
+| `hv release bump (--level patch\|minor\|major \| --to <X.Y.Z>) [--file <path>] [--kind <kind>]` | write the next version into the version file |
+| `hv release host` | print the hosting kind of origin |
+| `hv release notes --from commits [--since <ref>]` | release notes from commits |
+| `hv release changelog <X.Y.Z> --body-file <path\|-> [--path <file>]` | add a release section to the changelog |
+| `hv release pending` | how much has landed since the last release tag |
+| `hv release milestone-check <MNN>` | list the open issues that block a milestone release |
+| `hv release close-milestone <MNN> --release <X.Y.Z>` | close out a released milestone |
+
+## `hv init`
+
+| Usage | What it does |
+|---|---|
+| `hv init` | create or refresh `.hv/`, the managed blocks and `.gitignore` |
+| `hv init check` | is `.hv/` initialized (exit 1 when not) |
+| `hv init umbrella (--repos <csv> \| --all \| --list)` | register sub-repos and make this directory an umbrella |
+
+## Keeping this page current
+
+The tables are generated from the usage lines in the
+[verb contract](../design/5.0-verb-contract.md) and the summaries from
+`hv <group> <verb> --help --json`. When a verb changes, regenerate the row
+rather than editing prose around it.

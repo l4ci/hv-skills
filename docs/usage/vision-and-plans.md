@@ -26,7 +26,7 @@ Each milestone carries one of four statuses:
 
 Multiple milestones can be `active` simultaneously when their dependencies allow. [`/hv-next`](picking-work.md) prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag still surface.
 
-When an active milestone has no open items remaining, `/hv-next` surfaces an empty-active notice so you know the milestone is ready to close. Run `.hv/bin/hv-vision-status <MID> shipped` to flip its status, which immediately unblocks any milestone that listed it as a dependency.
+When an active milestone has no open items remaining, `/hv-next` surfaces an empty-active notice so you know the milestone is ready to close. Run `hv milestone status <MID> shipped` to flip its status, which immediately unblocks any milestone that listed it as a dependency.
 
 Marking a milestone `shipped` immediately unblocks anything that depended on it. Marking it `archived` does not. Use `archived` for milestones you are intentionally dropping, not for ones that finished.
 
@@ -43,7 +43,7 @@ Before the plan is signed off, `/hv-plan` checks doc-by-path deliverables: any t
 
 When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
 
-After `/hv-work` ships an item that had its own plan (e.g. `M01-B07.md`), the plan file is removed automatically. Once the cycle commits, the plan's task decomposition and assumptions are stale, and leaving the file would confuse a future cycle on the same key. Slice plans (`M01-S01.md`) stay through their multi-item lifetime; remove the slice plan with `.hv/bin/hv-plan-rm M01-S01` once the slice is fully shipped.
+After `/hv-work` ships an item that had its own plan (e.g. `M01-B07.md`), the plan file is removed automatically. Once the cycle commits, the plan's task decomposition and assumptions are stale, and leaving the file would confuse a future cycle on the same key. Slice plans (`M01-S01.md`) stay through their multi-item lifetime; remove the slice plan with `hv plan rm M01-S01` once the slice is fully shipped.
 
 ## When to use /hv-plan vs skipping it
 

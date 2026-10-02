@@ -46,17 +46,14 @@ worker gate and the orchestrator's merge gate are the same commands.
 
 ## Repo rules that bind workers
 
-- Edit canonical sources only: `bin/`, `hv-*/SKILL.md`, `references/`, `docs/`, `test/`.
-  `.hv/bin/` is a gitignored mirror; never edit it, never commit it.
+- Edit canonical sources only: `cmd/`, `internal/`, `hv-*/SKILL.md`, `references/`, `docs/`, `test/`.
 - Never hand-edit tracked `.hv/` content. The backlog row for your issue is updated by the
   orchestrator at merge time.
-- Before touching a helper, pull the matching `.hv/KNOWLEDGE.md` topics with
-  `.hv/bin/hv-knowledge-query "<exact ## heading>"` (if `.hv/bin` is missing in your
-  worktree, run `bin/hv-knowledge-query`). The topics that bite most: *Architecture: Helper
+- Before touching a verb, pull the matching `.hv/KNOWLEDGE.md` topics with
+  `hv knowledge query "<exact ## heading>"`. The topics that bite most: *Architecture: Helper
   conventions & invariants*, *Architecture: Module extraction & migration safety*, *Build &
   Tooling: Smoke testing*.
-- New `bin/` files need `chmod +x`, the `hv-preamble.sh` sourcing line, and a header comment
-  sharing a key term with the SKILL.md that calls them (smoke section 29 checks this).
+- A new verb needs a contract entry in `docs/design/5.0-verb-contract.md` and a smoke section.
 - Config keys are documented in five places at once: `docs/reference/config-options.md`,
   `docs/usage/configuration.md`, `hv-config/SKILL.md`, `hv-init/SKILL.md`,
   `bin/hv-config-schema-check`. Touch only the lines about your key; a sibling may be adding
@@ -81,7 +78,7 @@ gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -F body=@body.md
 
 Slots are provisioned once and reused. Every worktree lives in the project root under
 `.worktrees/<agent>` (gitignored by `/hv-init`), so herdr groups the workspaces under the
-project and `/hv-work`'s `hv-worker-pool` (`.worktrees/<slot>`) shares the same root.
+project and `/hv-work`'s `hv worker pool` (`.worktrees/<slot>`) shares the same root.
 Provision a slot with:
 
 ```sh
@@ -90,7 +87,7 @@ git worktree add .worktrees/<agent> park/<agent>      # or, without herdr
 ```
 
 Tools that walk the tree without reading `.gitignore` see a second copy of every file
-under `.worktrees/`; none of this repo's helpers or tests do (smoke section 70 pins it).
+under `.worktrees/`; none of this repo's verbs or tests do (smoke section 70 pins it).
 
 Workspace ids are re-derived from
 `herdr workspace list` at the start of each round; the label is the handle.

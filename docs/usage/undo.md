@@ -8,7 +8,7 @@
 /hv-ship --undo
 ```
 
-With no arguments, `/hv-ship --undo` targets the most recent `merge: ...` commit on the base branch. The skill prints a preview, asks for confirmation, and only writes after you pick *Apply*. To target a specific cycle, invoke the engine directly: `.hv/bin/hv-undo --cycle <hash>` (rare; useful when you've made unrelated commits since and want to roll back further with `--allow-post-merge`).
+With no arguments, `/hv-ship --undo` targets the most recent `merge: ...` commit on the base branch. The skill prints a preview, asks for confirmation, and only writes after you pick *Apply*. To target a specific cycle, invoke the engine directly: `hv ship undo --cycle <hash>` (rare; useful when you've made unrelated commits since and want to roll back further with `--allow-post-merge`).
 
 ## Worked example
 
@@ -63,7 +63,7 @@ Not restored, by design: **handoff files** (`.hv/handoff/<branch>.md` are gitign
 
 **Clean tree required.** A dirty working tree exits with code 2. Commit, stash, or discard your in-flight changes before rolling back; `git reset --hard` cannot run safely otherwise.
 
-**Base branch required.** `/hv-ship --undo` must run on the base branch (whatever [`bin/hv-base-branch`](../reference/cli-helpers.md) returns, usually `main` or `master`). Running from a feature branch refuses with a pointer to switch first.
+**Base branch required.** `/hv-ship --undo` must run on the base branch (whatever [`hv git base`](../reference/cli-helpers.md) returns, usually `main` or `master`). Running from a feature branch refuses with a pointer to switch first.
 
 **Post-merge guard.** If the base branch has commits past the cycle merge, `/hv-ship --undo` refuses by default:
 

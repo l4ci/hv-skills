@@ -80,7 +80,7 @@ Rule-based alerting. Reads events, evaluates rules, dedups within a window, and 
 - Dedup window is hardcoded; per-rule windows are on the backlog.
 ```
 
-Run `.hv/bin/hv-map-index` once after writing the files; it pulls each file's `summary:` into the always-on `## Project Map` block in `CLAUDE.md`. The map isn't exhaustive; just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `touched:` date bumped automatically and the always-on block is regenerated. When subsystems drift or duplicate later, edit or retire the relevant `.hv/map/<name>.md` files by hand.
+Run `hv map index` once after writing the files; it pulls each file's `summary:` into the always-on `## Project Map` block in `CLAUDE.md`. The map isn't exhaustive; just enough for the orchestrator to know where to look. After every `/hv-work` cycle, touched subsystems get their `touched:` date bumped automatically and the always-on block is regenerated. When subsystems drift or duplicate later, edit or retire the relevant `.hv/map/<name>.md` files by hand.
 
 ## Step 3: /hv-capture --from-github (optional)
 
@@ -90,7 +90,7 @@ If your project has open GitHub or GitLab issues, sync them into `BACKLOG.md` ra
 $ /hv-capture --from-github
 ```
 
-`hv-issues-provider` detects whether your origin points at GitHub or GitLab. `hv-issues-list` fetches open issues from the right provider. `hv-issues-imported` checks what's already been pulled, so re-running the skill never double-imports. What's left shows up as a multiSelect picker:
+`hv issues provider` detects whether your origin points at GitHub or GitLab. `hv issues list` fetches open issues from the right provider. `hv issues imported` checks what's already been pulled, so re-running the skill never double-imports. What's left shows up as a multiSelect picker:
 
 ```
 Open issues on yourorg/pinpoint:
@@ -114,7 +114,7 @@ You pick the five you care about. The rest stay open upstream, untouched. Each p
 
 `/hv-capture` flagged B05 as P0 because it tagged "secrets in URL" as a security category. P0 always jumps the queue in `/hv-next`.
 
-Round-trip closing is automatic when `/hv-ship` runs: the PR body gets `Closes #N` lines (GitHub auto-closes on merge), or the direct-push path offers a manual-gated `hv-issues-close` prompt for each resolved upstream issue.
+Round-trip closing is automatic when `/hv-ship` runs: the PR body gets `Closes #N` lines (GitHub auto-closes on merge), or the direct-push path offers a manual-gated `hv issues close` prompt for each resolved upstream issue.
 
 If your project has no remote tracker, skip this step entirely.
 
@@ -256,7 +256,7 @@ $ /hv-ship
 
 `/hv-review` reads commits, resolved IDs, and any `KNOWLEDGE.md` topics matching touched files. For the B01 fix it returns `PASS`. `/hv-ship` builds a PR body from the commit subjects and the `GH: #14` cross-reference on B01, opens the PR via `gh`, and prints the URL. On merge, GitHub auto-closes #14 because the body includes `Closes #14`. `BACKLOG.md` moves B01 to `## Completed` and stamps it with the merge commit SHA.
 
-If you'd configured `work.mergeStrategy = direct` instead, `/hv-ship` would have merged into `main` directly and prompted the optional `hv-issues-close` step to close #14 upstream with a tracking comment naming the commit.
+If you'd configured `work.mergeStrategy = direct` instead, `/hv-ship` would have merged into `main` directly and prompted the optional `hv issues close` step to close #14 upstream with a tracking comment naming the commit.
 
 ## Step 10: over the next week
 

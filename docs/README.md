@@ -53,10 +53,10 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 
 - [Slash commands](reference/slash-commands.md): every `/hv-*` command, alphabetical
 - [The `.hv/` folder](reference/hv-folder.md): files and directories created by `/hv-init`
-- [CLI helpers](reference/cli-helpers.md): user-callable scripts in `.hv/bin/`
+- [`hv` verb reference](reference/cli-helpers.md): every `hv` verb, with conventions and exit codes
 - [Configuration options](reference/config-options.md): the questions `/hv-init` and `/hv-config` ask, with their option labels
 - [`/hv-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md): pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
-- [Preflight](reference/preflight.md): what `.hv/bin/hv-preflight` checks before each skill, plus exit-code meanings
+- [Project check](reference/preflight.md): what `hv init check` verifies, plus exit-code meanings
 
 ### Other
 

@@ -4,7 +4,7 @@ Quick-reference table of every `/hv-*` command. Detailed entries follow below.
 
 | Skill | Description |
 |-------|-------------|
-| `/hv-init` | Initialize `.hv/` with `BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and helpers |
+| `/hv-init` | Initialize `.hv/` with `BACKLOG.md`, `KNOWLEDGE.md`, `MILESTONES.md`, `CONTEXT.md`, `counters.json`, `config.json`, `status.json`, and the managed blocks in `AGENTS.md`. Runs `hv init` |
 | `/hv-migrate v4` | One-shot codemod for v3 → v4 upgrades. Rewrites cut-command references across `.hv/` and the project `CLAUDE.md`, migrates `.hv/CONTEXT.md` terms into `KNOWLEDGE.md` (`## Glossary`), removes stale `bin/hv-context-*`. Dry-run default; `--apply` writes; idempotent; refuses umbrella mode (F21) |
 | `/hv-config` | Edit `.hv/config.json` interactively (checklist + native pickers) or via positional shortcuts: `/hv-config <key>` jumps to the picker, `/hv-config <key>=<value>` applies directly |
 | `/hv-vision` | Brainstorm a project's bigger vision and milestones using Socratic discovery, web research, and a critique pass; writes `MILESTONES.md` plus per-milestone detail files |
@@ -66,7 +66,7 @@ Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, group
 
 ## /hv-migrate
 
-One-shot codemod for v3 → v4 upgrades, versioned via the required `v4` arg. Rewrites references to 8 commands cut by M01 (`/hv-c`, `/hv-assume`, `/hv-rm`, `/hv-undo`, `/hv-context`, `/hv-docs`, `/hv-issues`, `/hv-map`) across `BACKLOG.md`, plans, designs, handoffs, qa, milestones, `KNOWLEDGE.md`, `DECISIONS.md`, and the project `CLAUDE.md`. Migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (`## Glossary`) and removes stale `bin/hv-context-*` files. **Umbrella projects are supported** (F21): each registered sub-repo's `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary, while the umbrella-root `.hv/CONTEXT.md` migrates into the umbrella KNOWLEDGE.md. `--dry-run` is the default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent: a clean second `--apply` rewrites zero files. Backs up every touched file to `.hv/migrate-backup/<timestamp>/` before any write. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, or when run inside an existing backup directory.
+One-shot codemod for v3 → v4 upgrades, versioned via the required `v4` arg. Rewrites references to 8 commands cut by M01 (`/hv-c`, `/hv-assume`, `/hv-rm`, `/hv-undo`, `/hv-context`, `/hv-docs`, `/hv-issues`, `/hv-map`) across `BACKLOG.md`, plans, designs, handoffs, qa, milestones, `KNOWLEDGE.md`, `DECISIONS.md`, and the project `CLAUDE.md`. Migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (`## Glossary`) and removes stale `hv-context-*` helper copies left in the project. **Umbrella projects are supported** (F21): each registered sub-repo's `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary, while the umbrella-root `.hv/CONTEXT.md` migrates into the umbrella KNOWLEDGE.md. `--dry-run` is the default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent: a clean second `--apply` rewrites zero files. Backs up every touched file to `.hv/migrate-backup/<timestamp>/` before any write. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, or when run inside an existing backup directory.
 
 ## /hv-next
 
@@ -94,7 +94,7 @@ Cuts a release end-to-end: walks the project's release checklist (`.hv/RELEASE.m
 
 The checklist file is per-project and tracked by default; see [release checklist](../usage/review-and-ship.md#release-checklist) for the format. When absent, the skill offers to scaffold a starter (under `autonomy.level: off`) or silently skips the gate (under `auto`/`loop`). Items ending in `(manual)` always interject even in unattended modes.
 
-After publishing, an always-manual gate offers to close any upstream GitHub/GitLab issues that landed in the release but are still open. This covers the direct-push path where work skipped `/hv-ship` (or chose "leave open") and the linked issues never got closed. Candidates come from `hv-issues-imported --open-only`; the gate is silent when nothing is open. Skipped entirely in `--dry-run` mode.
+After publishing, an always-manual gate offers to close any upstream GitHub/GitLab issues that landed in the release but are still open. This covers the direct-push path where work skipped `/hv-ship` (or chose "leave open") and the linked issues never got closed. Candidates come from `hv issues imported --open-only`; the gate is silent when nothing is open. Skipped entirely in `--dry-run` mode.
 
 ## /hv-review
 
@@ -121,7 +121,7 @@ Throwaway feasibility experiment on a dedicated `spike/<name>` branch that is ne
 
 ## /hv-update
 
-Checks for a newer hv-skills release on GitHub and prints the exact update command for your install type (plugin, stow, repo clone, or override). Never runs the update itself; prints the command for you to run, after which you rerun `/hv-init` in each project to refresh helpers.
+Checks for a newer hv-skills release on GitHub and prints the exact update command for your install type (plugin, stow, repo clone, or override). Never runs the update itself; prints the command for you to run, after which `hv` is already current in every project.
 
 ## /hv-vision
 

@@ -73,7 +73,7 @@ Links are optional. [`/hv-next`](picking-work.md) infers the reverse link automa
 
 When you capture from a milestone spec (the text references an `M<NN>` tag or a `milestones/M<NN>.md` path), `/hv-capture` runs a ship-evidence audit before writing anything. Old specs drift behind code. Acceptance criteria written months ago often ship under different IDs, and capturing them again creates duplicate work or, under `autonomy.level: loop`, silently dispatches `/hv-work` on already-done work.
 
-The audit runs [`hv-capture-audit`](../reference/cli-helpers.md) against every parsed title and groups matches into three confidence tiers: `[STRONG]` (commit subject + title overlap), `[MEDIUM]` (subject hint only), `[PATH]` (file path hint). For each flagged title you get three options:
+The audit runs [`hv item shipped`](../reference/cli-helpers.md) against every parsed title and groups matches into three confidence tiers: `[STRONG]` (commit subject + title overlap), `[MEDIUM]` (subject hint only), `[PATH]` (file path hint). For each flagged title you get three options:
 
 - **Skip** (recommended). Drop the title from this capture run.
 - **Capture anyway.** You've reviewed the matches and confirmed the item is genuinely distinct (prior commit was an incomplete first pass, etc.).

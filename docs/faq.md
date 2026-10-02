@@ -8,7 +8,7 @@ That's how every workflow starts, and how most of them stay. The places it tends
 
 ## Is `.hv/` tracked by default?
 
-Yes. Backlog, knowledge, decisions, plans, designs, milestones, and per-item detail files all travel with the repo so team members share context from the first clone. These paths stay gitignored: `.hv/bin/` (regenerated mirror of canonical `bin/`, overwritten on every `/hv-init`), `.hv/status.json` (per-developer active work), `.hv/repos.json` (umbrella registry with absolute paths), `.hv/config.local.json` (per-developer config overrides, deep-merged on top of `.hv/config.json` by `load_config()`), `.hv/handoff/` (per-developer scratch notes from `/hv-pause`), `.hv/qa-runs/` (bulky timestamped artifacts from `/hv-qa`), and `.hv/**/*.lock` (transient sidecar lockfiles from `hvlib_io.locked`).
+Yes. Backlog, knowledge, decisions, plans, designs, milestones, and per-item detail files all travel with the repo so team members share context from the first clone. These paths stay gitignored: `.hv/status.json` (per-developer active work), `.hv/repos.json` (umbrella registry with absolute paths), `.hv/config.local.json` (per-developer config overrides, deep-merged on top of `.hv/config.json`), `.hv/handoff/` (per-developer scratch notes from `/hv-pause`), `.hv/qa-runs/` (bulky timestamped artifacts from `/hv-qa`), and `.hv/**/*.lock` (transient sidecar lockfiles).
 
 If you'd rather keep the whole backlog private (solo development, or experimentation that isn't ready to share), add a blanket `.hv/` line to `.gitignore` before your first commit. The default assumes you want context to travel.
 
@@ -20,7 +20,7 @@ This works well for small teams. For larger ones a real issue tracker is usually
 
 ## What if I'm not using Claude Code?
 
-hv-skills is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, CLI helpers, and `BACKLOG.md` format are agent-agnostic and work on their own; you can call the helpers from any shell. The slash commands themselves only run inside Claude Code.
+hv-skills is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, the `hv` binary, and the `BACKLOG.md` format are agent-agnostic and work on their own; you can call `hv` from any shell. The slash commands themselves only run inside Claude Code.
 
 Other agent harnesses with comparable primitives (Gemini CLI, some Copilot builds) may load the skills with reduced functionality. Where `AskUserQuestion` isn't available, those interactions fall back to plain text prompts instead of native UI. Don't expect full functionality outside Claude Code.
 
@@ -28,7 +28,7 @@ Other agent harnesses with comparable primitives (Gemini CLI, some Copilot build
 
 Run `/hv-update`. It detects your install type (plugin, repo clone, or stow), reads the current version, fetches the latest GitHub release, and prints the exact update command for your setup. It doesn't run the update itself, since there are too many install paths to handle automatically.
 
-After updating, rerun `/hv-init` in each project to refresh `.hv/bin/` with any new helpers.
+After updating, there is nothing to refresh in your projects: `hv` ships with the plugin. Run `hv version --drift` in a project to see whether its stamped version trails the installed one.
 
 Requires `gh` on the PATH. See the [/hv-update reference](reference/slash-commands.md#hv-update) for details.
 
@@ -39,4 +39,4 @@ Yes. `.hv/` lives at the root of whatever directory you run `/hv-init` from. For
 - **One `.hv/` at the monorepo root** for project-wide work and cross-package tracking.
 - **One `.hv/` per package or app subdirectory** for scoped backlogs that stay close to the code they track.
 
-The CLI helpers and managed `CLAUDE.md` blocks resolve relative to the current working directory, so per-package setups work as long as you run hv-skills from inside the package. You can mix both styles in one repo; each `.hv/` is independent.
+`hv` and the managed `CLAUDE.md` blocks resolve relative to the current working directory, so per-package setups work as long as you run hv-skills from inside the package. You can mix both styles in one repo; each `.hv/` is independent.

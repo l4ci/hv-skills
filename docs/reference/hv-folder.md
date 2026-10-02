@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only a handful of machine-specific, regenerated, or transient paths are gitignored. Use the skill helpers to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
+[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only a handful of machine-specific or transient paths are gitignored. Use the skills or `hv` verbs to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
 
 ## Overview
 
@@ -16,7 +16,6 @@
 | `config.local.json` | _(gitignored)_ Per-developer config overrides, deep-merged on top of `config.json` by `load_config()`. Use for `autonomy.level`, model preferences, or any setting that varies per machine. |
 | `status.json` | _(gitignored)_ Active work streams: which items are being worked on, on which branch/worktree (per-developer) |
 | `repos.json` | _(gitignored, umbrella mode only)_ Sub-repo registry with absolute paths (machine-specific) |
-| `bin/` | _(gitignored)_ CLI helpers (`hv-next-id`, `hv-append`, `hv-complete`, …). Regenerated mirror of canonical `bin/`, overwritten on every `/hv-init` |
 | `bugs/` | Overflow detail files for large bug reports |
 | `features/` | Overflow detail files for large feature specs |
 | `tasks/` | Overflow detail files for large task descriptions |
@@ -44,7 +43,7 @@ Edit this file by hand whenever you want: reorder items, bump priorities, or del
 
 `KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries sit under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
 
-One topic is special-cased: `## Glossary` holds domain-terminology entries as nested bullets (`- **<term>** — <definition>` with indented `**Aliases:**` / optional `**Not:**` / date stamp). The Glossary topic is pinned at `/hv-init` time; entries are written via `/hv-learn --term <name>` (helper `hv-glossary-write`) and read via `hv-glossary-read <term>`. The F03 tier lifecycle skips Glossary, since terms are canonical, not probationary.
+One topic is special-cased: `## Glossary` holds domain-terminology entries as nested bullets (`- **<term>** — <definition>` with indented `**Aliases:**` / optional `**Not:**` / date stamp). The Glossary topic is pinned at `/hv-init` time; entries are written via `/hv-learn --term <name>` (`hv glossary write`) and read via `hv glossary read <term>`. The F03 tier lifecycle skips Glossary, since terms are canonical, not probationary.
 
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
@@ -68,7 +67,7 @@ A companion managed block in `CLAUDE.md` lists active milestones so `/hv-next` a
 
 ## MAP.md: project map
 
-`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv-map-query <name>`. Write `.hv/map/<name>.md` files by hand as you discover subsystems: one file per coherent area, with `subsystem:`/`summary:`/`touched:` frontmatter and free-form body sections (Purpose, Entry points, Key files / dirs, Conventions, Notes / gotchas). Cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle when their changes overlap a subsystem's key files or entry points, and regenerate the always-on `## Project Map` block in `CLAUDE.md` via `.hv/bin/hv-map-index`. When subsystems drift or duplicate, edit or retire `.hv/map/<name>.md` entries directly; the index helper picks up the change on the next run.
+`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv map query <name>`. Write `.hv/map/<name>.md` files by hand as you discover subsystems: one file per coherent area, with `subsystem:`/`summary:`/`touched:` frontmatter and free-form body sections (Purpose, Entry points, Key files / dirs, Conventions, Notes / gotchas). Cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle when their changes overlap a subsystem's key files or entry points, and regenerate the always-on `## Project Map` block in `CLAUDE.md` via `hv map index`. When subsystems drift or duplicate, edit or retire `.hv/map/<name>.md` entries directly; the index verb picks up the change on the next run.
 
 A managed `## Project Map` block in `CLAUDE.md` surfaces the thin summary so the model can orient without loading detail files.
 
@@ -93,10 +92,6 @@ See [../usage/configuration.md](../usage/configuration.md) for the full list of 
 `status.json` records which items are currently being worked on and which git branch or worktree each one lives in. It is written when work starts and cleared when work completes or is paused.
 
 See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses this file to orient the model after a context clear.
-
-## bin/: CLI helpers
-
-`bin/` contains small shell scripts that the skills rely on for safe, idempotent file mutations: appending a new item, marking an item complete, or fetching the next available ID. `/hv-init` generates them, and they are not intended to be called directly. See the [CLI helpers reference](./cli-helpers.md) for full documentation.
 
 ## bugs/, features/, tasks/: overflow detail files
 
@@ -136,19 +131,18 @@ The backlog is shared by default: state travels with the repo so collaborators s
 
 | Path | Why ignored |
 |------|-------------|
-| `.hv/bin/` | Regenerated mirror of canonical `bin/`; overwritten on every `/hv-init` |
 | `.hv/status.json` | Per-developer active-work tracking, branch-aware |
 | `.hv/repos.json` | Umbrella sub-repo registry with absolute paths (machine-specific) |
 | `.hv/config.local.json` | Per-developer config overrides (see below) |
 | `.hv/handoff/` | Per-developer `/hv-pause` scratch notes |
 | `.hv/qa-runs/` | Bulky timestamped `/hv-qa` artifacts; regeneratable |
-| `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write (`hvlib_io.locked`) |
+| `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write |
 
 `/hv-init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
 
 ### `config.local.json`: per-developer overrides
 
-Drop a JSON file at `.hv/config.local.json` to override any setting from `.hv/config.json` for your machine only. `load_config()` (in `bin/hvlib_io.py`) deep-merges it on top of the shared config: nested keys merge recursively; scalars and arrays replace. Example:
+Drop a JSON file at `.hv/config.local.json` to override any setting from `.hv/config.json` for your machine only. `hv` deep-merges it on top of the shared config: nested keys merge recursively; scalars and arrays replace. Example:
 
 ```json
 {

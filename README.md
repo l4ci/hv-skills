@@ -76,17 +76,17 @@ Most workflows start that way and most stay there. Three things tend to drift, a
 
 ## Testing
 
-Smoke-test the CLI helpers against a throwaway `.hv/` in a tmpdir:
+Smoke-test the `hv` binary against a throwaway `.hv/` in a tmpdir:
 
 ```bash
 bash test/smoke.sh
 ```
 
-Exercises all `hv-*` helpers across 234 assertions. Exits non-zero on any failure.
+Exercises every `hv` verb group. Exits non-zero on any failure. The verbs are listed in the [`hv` verb reference](docs/reference/cli-helpers.md).
 
 ## Contributing
 
-Issues and PRs welcome. Keep changes minimal, include a smoke-test assertion if you touch or add a helper, and follow the commit style in `git log`.
+Issues and PRs welcome. Keep changes minimal, include a smoke-test assertion if you touch or add a verb, and follow the commit style in `git log`.
 
 ## License
 
