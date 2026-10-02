@@ -19,6 +19,28 @@
 pass() { printf '  \033[32mOK\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 
+# Black-box helpers (#46). Callers check the exit code themselves:
+#   rc=0; out=$(hvj item show B01) || rc=$?
+# hvj runs `"$HV_BIN" --json "$@"`, prints the envelope and returns the verb's
+# own exit code (stderr is left alone; redirect it where a failure is expected).
+hvj() { "$HV_BIN" --json "$@"; }
+
+# jget <path> reads one value from an envelope on stdin. The path is dotted
+# with [n] indexes (data.items[0].id). Strings print raw, bools as true/false,
+# everything else as compact JSON. A missing path prints nothing and fails.
+jget() {
+  python3 -c '
+import json, re, sys
+v = json.load(sys.stdin)
+try:
+    for k in re.findall(r"[^.\[\]]+|\[\d+\]", sys.argv[1]):
+        v = v[int(k[1:-1])] if k[0] == "[" else v[k]
+except (KeyError, IndexError, TypeError):
+    sys.exit(1)
+print(v if isinstance(v, str) else json.dumps(v, separators=(",", ":")))
+' "$1"
+}
+
 # F22 canonical mirror — strips stale helpers before copying fresh from $BIN.
 # Mirrors hv-init/SKILL.md Step 2. Callers must have $BIN set (runner provides it)
 # and .hv/bin/ already mkdir'd. Two-step delete-then-copy is intentional; matches

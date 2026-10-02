@@ -240,6 +240,399 @@ def load_contract_verbs():
         pass
 
 
+# ---------------------------------------------------------------- shared adapter helpers
+
+def backend_error(rc, err):
+    """Old backend helper failure -> HvError (the contract's rc mapping)."""
+    msg = first_error_line(err) or f"old helper failed (rc {rc})"
+    if rc == 1:
+        if re.search(r"usage:|unknown argument|expects|invalid|not a valid", err):
+            return HvError(2, msg)
+        return HvError(3, msg)
+    code = {2: 4, 3: 5, 4: 6}.get(rc, 70)
+    return HvError(code, msg)
+
+
+def call(ctx, helper, *args, **kw):
+    """Run an old helper; return stdout on rc 0, else raise via backend_error."""
+    rc, out, err = ctx.helper(helper, *args, **kw)
+    if rc != 0:
+        raise backend_error(rc, err)
+    return out
+
+
+def check_repo(ctx):
+    """Global --repo must name a registered sub-repo (exit 3)."""
+    if ctx.repo is None:
+        return
+    rc, _, err = ctx.helper("hv-resolve-repos", ctx.repo, cwd=find_root(ctx.cwd))
+    if rc != 0:
+        raise HvError(3, err.strip() or f"unregistered sub-repo: {ctx.repo}")
+
+
+def read_text(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def read_json_file(path, default):
+    try:
+        return json.loads(read_text(path))
+    except (TypeError, ValueError):
+        return default
+
+
+def status_entries(root):
+    return read_json_file(os.path.join(root, ".hv", "status.json"), {}).get("active", [])
+
+
+def stdin_to_file(path):
+    """`-` means stdin; old helpers want a path, so spool it to a temp file."""
+    if path != "-":
+        return path, None
+    fd, tmp = tempfile.mkstemp(prefix="hv-shim-stdin-")
+    with os.fdopen(fd, "w") as f:
+        f.write(sys.stdin.read())
+    return tmp, tmp
+
+
+def one_id(ctx, **kw):
+    flags, pos = parse_flags(ctx, min_pos=1, max_pos=1, **kw)
+    return flags, pos[0]
+
+
+KINDS = ("bugs", "features", "tasks")
+SECTION = {"bugs": "## Bugs", "features": "## Features", "tasks": "## Tasks"}
+
+
+# ---------------------------------------------------------------- adapters: ids and items
+
+@verb("id", "next")
+def id_next(ctx):
+    _, pos = parse_flags(ctx, min_pos=1, max_pos=1)
+    kind = pos[0]
+    if kind not in KINDS + ("milestones",):
+        raise usage(f"{ctx.name}: kind must be bugs|features|tasks|milestones")
+    check_repo(ctx)
+    new_id = call(ctx, "hv-next-id", kind).strip()
+    return {"kind": kind, "id": new_id, "changed": True}, new_id
+
+
+CREATE_FIELDS = {"related": "Related", "milestone": "Milestone", "repos": "Repos",
+                 "subsystem": "Subsystem", "captured": "Captured"}
+
+
+@verb("item", "create")
+def item_create(ctx):
+    f, _ = parse_flags(ctx, values=("kind", "title", "tag", "desc", "body-file", "raw-file",
+                                    *CREATE_FIELDS))
+    kind = f.get("kind")
+    if kind not in KINDS:
+        raise usage(f"{ctx.name}: --kind must be bugs|features|tasks")
+    check_repo(ctx)
+    if "raw-file" in f:
+        if set(f) - {"kind", "raw-file"}:
+            raise usage(f"{ctx.name}: --raw-file takes only --kind")
+        path, spool = stdin_to_file(f["raw-file"])
+        try:
+            # old: hv-append "<section>" "$(cat <file>)" (command substitution strips trailing newlines)
+            entry = (read_text(path) or "").rstrip("\n")
+        finally:
+            if spool:
+                os.unlink(spool)
+        m = re.search(r"\*\*\[([A-Z]\d+)\]", entry)
+        if not m:
+            raise usage(f"{ctx.name}: --raw-file bullet needs a **[ID]")
+        call(ctx, "hv-append", SECTION[kind], entry)
+        return {"id": m.group(1), "kind": kind, "changed": True}, m.group(1)
+    if not f.get("title"):
+        raise usage(f"{ctx.name}: --title is required")
+    tag = f.get("tag", "")
+    valid = {"bugs": ("P0", "P1", "P2", "P3"), "features": ("Major", "Minor", "Cosmetic"), "tasks": ()}[kind]
+    if tag and tag not in valid:
+        raise usage(f"{ctx.name}: --tag for {kind} must be one of {', '.join(valid) or '(none)'}")
+    args = [kind, "--title", f["title"]]
+    for name, val in (("--tag", tag), ("--desc", f.get("desc", ""))):
+        if val:
+            args += [name, val]
+    path, spool = None, None
+    if f.get("body-file"):
+        path, spool = stdin_to_file(f["body-file"])
+        args += ["--body-file", path]
+    for key, label in CREATE_FIELDS.items():
+        if f.get(key):
+            args += ["--field", f"{label}={f[key]}"]
+    try:
+        rc, out, err = ctx.helper("hv-item-create", *args)
+    finally:
+        if spool:
+            os.unlink(spool)
+    if rc != 0:
+        e = backend_error(rc, err)
+        raise HvError(2 if e.exit == 3 and "cannot read" in e.message else e.exit, e.message)
+    new_id = out.strip()
+    data = {"id": new_id, "kind": kind, "changed": True}
+    if f.get("body-file"):
+        data["detail"] = f".hv/{kind}/{new_id}.md"
+    return data, new_id
+
+
+@verb("item", "complete")
+def item_complete(ctx):
+    f, item = one_id(ctx, values=("commit", "reason", "note"), bools=("no-proof",))
+    reason = f.get("reason", "done")
+    if reason not in ("done", "handed-off", "blocked", "dropped"):
+        raise usage(f"{ctx.name}: --reason must be done|handed-off|blocked|dropped")
+    check_repo(ctx)
+    commit = f.get("commit")
+    if not commit:
+        proc = subprocess.run(["git", "log", "-1", "--format=%h"], cwd=ctx.cwd,
+                              capture_output=True, text=True)
+        commit = proc.stdout.strip()
+        if not commit:
+            raise HvError(5, "git has no HEAD to default --commit", hint="pass --commit <hash>")
+    args = [item, commit, "--reason", reason]
+    if f.get("note"):
+        args += ["--note", f["note"]]
+    if f.get("no-proof"):
+        args.append("--no-proof")
+    root = find_root(ctx.cwd)
+    backlog = os.path.join(root, ".hv", "BACKLOG.md")
+    before = read_text(backlog)
+    rc, _, err = ctx.helper("hv-complete", *args)
+    if rc == 3 and "no proof recorded" in err:
+        raise HvError(4, first_error_line(err), hint="record proof with `hv proof add`, or pass --no-proof")
+    if rc != 0:
+        raise backend_error(rc, err)
+    # File backend: an already-completed item is a silent no-op that leaves BACKLOG.md untouched.
+    changed = True if before is None else read_text(backlog) != before
+    return ({"id": item, "reason": reason, "commit": commit, "changed": changed},
+            f"completed {item} ({reason}) at {commit}")
+
+
+GET_FIELDS = ("title", "detail", "related", "milestone", "repos", "subsystem", "since", "reason", "note")
+SET_FIELDS = ("milestone", "related", "repos", "subsystem", "detail")
+
+
+@verb("item", "field")
+def item_field(ctx):
+    f, item = one_id(ctx, values=("name", "set"), bools=("all",))
+    if ("name" in f) == bool(f.get("all")):
+        raise usage(f"{ctx.name}: exactly one of --name or --all is required")
+    check_repo(ctx)
+    if f.get("all"):
+        if "set" in f:
+            raise usage(f"{ctx.name}: --all cannot be combined with --set")
+        fields = json_body(call(ctx, "hv-todo-field", "--dump", item))
+        return {"id": item, "fields": fields}, json.dumps(fields)
+    name = f["name"]
+    if name not in GET_FIELDS:
+        raise usage(f"{ctx.name}: unknown field {name}; pick one of {', '.join(GET_FIELDS)}")
+    if "set" not in f:
+        value = call(ctx, "hv-todo-field", item, name)[:-1]
+        return {"id": item, "field": name, "value": value}, value
+    if name not in SET_FIELDS:
+        raise usage(f"{ctx.name}: field {name} is read-only; settable: {', '.join(SET_FIELDS)}")
+    backlog = os.path.join(find_root(ctx.cwd), ".hv", "BACKLOG.md")
+    before = read_text(backlog)
+    rc, _, err = ctx.helper("hv-todo-set-field", item, name, f["set"])
+    if rc == 1 and "no open bullet" in err:
+        known = ctx.helper("hv-todo-field", item, "title")[0] == 0
+        raise HvError(4 if known else 3, first_error_line(err))
+    if rc == 1 and "detail" in err:
+        raise usage(first_error_line(err))
+    if rc != 0:
+        raise backend_error(rc, err)
+    # File backend: an unchanged value leaves BACKLOG.md byte-identical.
+    changed = True if before is None else read_text(backlog) != before
+    return {"id": item, "field": name, "value": f["set"], "changed": changed}, f["set"]
+
+
+# ---------------------------------------------------------------- adapters: backlog, summary, git
+
+def md_rows(lines):
+    """Rows of one markdown table as dicts keyed by the header cells."""
+    rows = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines if l.startswith("|")]
+    return [dict(zip(rows[0], r)) for r in rows[2:]] if len(rows) > 2 else []
+
+
+def ids_in(cell):
+    return re.findall(r"[A-Z]\d+", cell)
+
+
+@verb("backlog", "list")
+def backlog_list(ctx):
+    f, _ = parse_flags(ctx, values=("grep",), max_pos=0)
+    check_repo(ctx)
+    out = call(ctx, "hv-backlog", *(["--grep", f["grep"]] if "grep" in f else []))
+    blocks, cur = {}, None
+    for line in out.splitlines():
+        if line.startswith("### "):
+            cur = blocks.setdefault(line[4:].strip(), [])
+        elif cur is not None and line.strip():
+            cur.append(line)
+    starts = {}
+    for e in status_entries(find_root(ctx.cwd)):
+        for i in e.get("items") or []:
+            starts[(e.get("branch"), i)] = e.get("startedAt")
+    data = {"inProgress": [], "bugs": [], "features": [], "tasks": [], "clusters": []}
+    for r in md_rows(blocks.get("In Progress", [])):
+        row = {"id": r["ID"], "title": r["Title"], "branch": r["Branch"],
+               "startedAt": starts.get((r["Branch"], r["ID"])) or r["Started"]}
+        if r.get("Repo"):
+            row["repo"] = r["Repo"]
+        data["inProgress"].append(row)
+    for key, label, tagkey, tagname in (("bugs", "Bugs", "Prio", "priority"),
+                                        ("features", "Features", "Size", "size"),
+                                        ("tasks", "Tasks", None, None)):
+        for r in md_rows(blocks.get(label, [])):
+            row = {"id": r["ID"]}
+            if tagkey:
+                row[tagname] = r[tagkey]
+            row.update(title=r["Title"], related=ids_in(r["Related"]))
+            if r.get("Milestone"):
+                row["milestone"] = r["Milestone"]
+            data[key].append(row)
+    for line in blocks.get("Clusters", []):
+        data["clusters"].append(re.findall(r"(?:^- |, | ↔ )\[([A-Z]\d+)\]", line))
+    return data, out
+
+
+def to_int(s, default=0):
+    return int(s) if s else default
+
+
+@verb("summary")
+def summary(ctx):
+    parse_flags(ctx, max_pos=0)
+    check_repo(ctx)
+    out = call(ctx, "hv-summary")
+    if out.startswith("No .hv/ yet"):
+        raise HvError(3, "no .hv/ found in this directory or any parent", hint="run: hv init")
+    data = {"backlog": {"bugs": 0, "features": 0, "tasks": 0}, "active": [], "recent": [], "milestones": []}
+    for line in out.splitlines():
+        label, _, rest = line.partition(": ")
+        if label == "Backlog":
+            for n, word in re.findall(r"(\d+) (bug|feature|task)", rest):
+                data["backlog"][word + "s"] = int(n)
+        elif label == "Active":
+            m = re.match(r"(.*?) on (\S+?)(?: in (\S+))?(?: \(repo: ([^)]+)\))? \(since ([^)]*)\)$", rest)
+            if m:
+                e = {"items": m.group(1).split(", "), "branch": m.group(2)}
+                if m.group(3):
+                    e["worktree"] = m.group(3)
+                if m.group(4):
+                    e["repo"] = m.group(4)
+                e["since"] = m.group(5)
+                data["active"].append(e)
+        elif label == "Recent":
+            for iid, date, why in re.findall(r"\[([^\]]+)\] on (\d{4}-\d\d-\d\d)(?: \(([^)]+)\))?", rest):
+                data["recent"].append({"id": iid, "date": date, **({"reason": why} if why else {})})
+        elif label == "Active milestones":
+            for part in re.split(r", (?=[A-Z]\d+(?: |$))", rest):
+                mid, _, title = part.partition(" ")
+                data["milestones"].append({"id": mid, "title": title})
+        elif label in ("Knowledge", "Decisions"):
+            m = re.match(r"(\d+) topics? \((.*?)(?:, \.\.\.)?\)$", rest)
+            if m:
+                data[label.lower()] = {"count": int(m.group(1)), "topics": m.group(2).split(", ")}
+        elif label == "Archive":
+            data["archive"] = to_int(re.match(r"\d+", rest).group())
+    return data, out
+
+
+@verb("backlog", "archive")
+def backlog_archive(ctx):
+    f, _ = parse_flags(ctx, values=("days",), max_pos=0)
+    days = f.get("days", "5")
+    if not days.isdigit():
+        raise usage(f"{ctx.name}: --days must be a number")
+    check_repo(ctx)
+    moved = to_int(call(ctx, "hv-archive-old", days).strip())
+    return {"days": int(days), "moved": moved, "changed": moved > 0}, f"archived {moved}"
+
+
+@verb("git", "guard", "clean")
+def guard_clean(ctx):
+    f, _ = parse_flags(ctx, values=("context",), max_pos=0)
+    rc, _, err = ctx.helper("hv-guard-clean", f.get("context", "this command"))
+    if rc == 0:
+        return {"clean": True, "greenfield": False, "dirtyRepos": []}, "clean"
+    if rc == 2:
+        raise HvError(3, first_error_line(err))
+    dirty = [l.strip() for l in err.splitlines() if l.startswith("  ") and "git add" not in l]
+    raise HvError(1, first_error_line(err), data={
+        "clean": False, "greenfield": "fresh repo (no commits yet)" in err,
+        "dirtyRepos": dirty if "sub-repo" in err else []})
+
+
+# ---------------------------------------------------------------- adapters: status
+
+@verb("status", "add")
+def status_add(ctx):
+    f, pos = parse_flags(ctx, values=("items", "worktree", "repos", "worktrees"),
+                         bools=("if-absent",), min_pos=1, max_pos=1)
+    branch = pos[0]
+    if not f.get("items"):
+        raise usage(f"{ctx.name}: --items is required")
+    multi = "repos" in f
+    if multi and ctx.repo is not None:
+        raise usage(f"{ctx.name}: --repo and --repos are mutually exclusive")
+    if ("worktree" in f) == multi and ("worktree" in f or "worktrees" in f):
+        raise usage(f"{ctx.name}: use --worktree with one repo, --worktrees with --repos")
+    root = find_root(ctx.cwd)
+    if multi:
+        names = [n.strip() for n in f["repos"].split(",") if n.strip()]
+        if "worktrees" in f and len([w for w in f["worktrees"].split(",")]) != len(names):
+            raise usage(f"{ctx.name}: --worktrees must list one path per --repos name")
+        rc, _, err = ctx.helper("hv-resolve-repos", f["repos"], cwd=root)
+        if rc != 0:
+            raise HvError(3, err.strip())
+        scope = names
+    else:
+        check_repo(ctx)
+        scope = [ctx.repo]
+    matching = lambda: [e for e in status_entries(root)
+                        if e.get("branch") == branch and (e.get("repo") or None) in scope]
+    existing = len(matching())
+    flag = ["--if-absent"] if f.get("if-absent") else []
+    if multi:
+        args = [*flag, "--branch", branch, "--items", f["items"], "--repos", f["repos"]]
+        if "worktrees" in f:
+            args += ["--worktrees", f["worktrees"]]
+        call(ctx, "hv-status-add-multi", *args)
+    else:
+        args = [*flag, *(["--repo", ctx.repo] if ctx.repo else []), branch, f["items"]]
+        if f.get("worktree"):
+            args.append(f["worktree"])
+        call(ctx, "hv-status-add", *args)
+    entries = [{"repo": e.get("repo") or None, "items": e.get("items") or [],
+                "worktree": e.get("worktree") or None, "startedAt": e.get("startedAt", "")}
+               for e in matching()]
+    changed = not (f.get("if-absent") and existing == len(scope))
+    return {"branch": branch, "entries": entries, "changed": changed}, f"active: {branch}"
+
+
+@verb("status", "rm")
+def status_rm(ctx):
+    _, pos = parse_flags(ctx, min_pos=1, max_pos=1)
+    branch = pos[0]
+    root = find_root(ctx.cwd)
+    suffix = f"@{ctx.repo}" if ctx.repo else ""
+    handoff = os.path.join(root, ".hv", "handoff", f"{branch}{suffix}.md")
+    mine = lambda: [e for e in status_entries(root)
+                    if e.get("branch") == branch and (e.get("repo") or None) == ctx.repo]
+    before, had_handoff = len(mine()), os.path.exists(handoff)
+    call(ctx, "hv-status-remove", *(["--repo", ctx.repo] if ctx.repo else []), branch)
+    removed = before - len(mine())
+    swept = had_handoff and not os.path.exists(handoff)
+    return ({"branch": branch, "removed": removed, "handoffRemoved": swept,
+             "changed": removed > 0 or swept}, f"removed {branch}")
+
+
 # ---------------------------------------------------------------- main
 
 def resolve(words):
