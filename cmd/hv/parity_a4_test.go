@@ -12,6 +12,10 @@ package main
 // directly with the old argv from the contract's `old:` line; the Go envelope
 // is then checked against what the old stdout implies.
 //
+// The A4 backlog, summary, status and refactor verbs (parity_a4b_test.go) run
+// on this same harness: scn gained env, text, normTS and norm for them, and fx
+// gained after and subs for umbrella and git-history fixtures.
+//
 // Safety: TestMain puts test/fakes first on PATH and checks that gh resolves
 // there; helpers never reach the real gh or glab. Fixtures live in temp dirs.
 
@@ -28,6 +32,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -96,7 +101,10 @@ func TestFakesFirst(t *testing.T) {
 
 // ---- fixtures ---------------------------------------------------------------
 
-type info struct{ h1, refactor, head string }
+type info struct {
+	h1, refactor, head string
+	x                  map[string]string
+}
 
 // fx describes a fixture project; the zero value is the standard one.
 type fx struct {
@@ -110,6 +118,12 @@ type fx struct {
 	status    string            // status.json content
 	commits   int               // extra commits that mention parser-core and lexer-v2
 	files     map[string]string // extra files, path relative to the project; "{h1}" etc. expanded
+	// subs makes umbrella sub-repos after the project's last commit: name to the
+	// commit subjects to create, and a .hv/repos.json registering them by name.
+	subs map[string][]string
+	// after runs last, with the project built; it may commit, write files and
+	// publish tokens with in.x["name"], which expand as {x:name}.
+	after func(t *testing.T, dir string, in *info)
 }
 
 const stdBacklog = `# TODO
@@ -175,8 +189,29 @@ var stdFiles = map[string]string{
 	"body.md":              "# {ID}\n\nSee [{ID}] in the backlog.\n",
 }
 
+var (
+	dayTok = regexp.MustCompile(`\{d(\d+)\}`)
+	xTok   = regexp.MustCompile(`\{x:([a-z0-9-]+)\}`)
+)
+
+// expand fills {h1}, {refactor}, {head}, {dN} (the date N days ago, local, as
+// the helpers' date.today() sees it) and {x:name} (hook tokens).
 func expand(s string, i info) string {
-	return strings.NewReplacer("{h1}", i.h1, "{refactor}", i.refactor, "{head}", i.head).Replace(s)
+	s = strings.NewReplacer("{h1}", i.h1, "{refactor}", i.refactor, "{head}", i.head).Replace(s)
+	s = dayTok.ReplaceAllStringFunc(s, func(m string) string {
+		n, _ := strconv.Atoi(dayTok.FindStringSubmatch(m)[1])
+		return time.Now().AddDate(0, 0, -n).Format("2006-01-02")
+	})
+	return xTok.ReplaceAllStringFunc(s, func(m string) string { return i.x[xTok.FindStringSubmatch(m)[1]] })
+}
+
+// commitFile writes path and commits it, returning the short hash.
+func commitFile(t *testing.T, dir, subject, path, content string) string {
+	t.Helper()
+	write(t, dir, path, content)
+	git(t, dir, "add", path)
+	git(t, dir, "commit", "-q", "-m", subject)
+	return git(t, dir, "rev-parse", "--short", "HEAD")
 }
 
 func git(t *testing.T, dir string, args ...string) string {
@@ -278,6 +313,33 @@ func (f fx) build(t *testing.T) (string, info) {
 		}
 		in.head = git(t, dir, "rev-parse", "--short", "HEAD")
 	}
+	in.x = map[string]string{}
+	if len(f.subs) > 0 {
+		var names []string
+		for n := range f.subs {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		var entries []string
+		for _, n := range names {
+			sub := filepath.Join(dir, n)
+			if err := os.MkdirAll(sub, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			git(t, sub, "init", "-q", "-b", "main")
+			git(t, sub, "config", "user.name", "Fixture")
+			git(t, sub, "config", "user.email", "fixture@example.com")
+			git(t, sub, "config", "commit.gpgsign", "false")
+			for k, subject := range f.subs[n] {
+				commitFile(t, sub, subject, fmt.Sprintf("f%d.txt", k), "x\n")
+			}
+			entries = append(entries, fmt.Sprintf(`{"name": %q, "path": %q}`, n, n))
+		}
+		write(t, dir, ".hv/repos.json", `{"repos": [`+strings.Join(entries, ", ")+`]}`+"\n")
+	}
+	if f.after != nil {
+		f.after(t, dir, &in)
+	}
 	return dir, in
 }
 
@@ -341,13 +403,19 @@ func diffTrees(a, b map[string]string) string {
 type run struct {
 	code           int
 	stdout, stderr string
+	dir            string
 }
 
 func exec1(t *testing.T, dir, stdin string, name string, args ...string) run {
 	t.Helper()
+	return exec1e(t, dir, stdin, nil, name, args...)
+}
+
+func exec1e(t *testing.T, dir, stdin string, env []string, name string, args ...string) run {
+	t.Helper()
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	cmd.Env = baseEnv
+	cmd.Env = append(append([]string{}, baseEnv...), env...)
 	cmd.Stdin = strings.NewReader(stdin)
 	var so, se bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &so, &se
@@ -360,7 +428,7 @@ func exec1(t *testing.T, dir, stdin string, name string, args ...string) run {
 		}
 		code = ee.ExitCode()
 	}
-	return run{code, so.String(), se.String()}
+	return run{code, so.String(), se.String(), dir}
 }
 
 type envl map[string]any
@@ -445,6 +513,17 @@ type scn struct {
 	goOnly bool
 	// shimNoData: the shim sends no failure data on exit 4; the contract does.
 	shimNoData bool
+	// env is extra environment for every run of the scenario (HV_TEST_* hooks).
+	env []string
+	// text also compares the plain, non --json stdout of both sides, for the
+	// read-only verbs whose text the old helper's stdout defines.
+	text bool
+	// normTS replaces timestamps taken after the harness started with <TS> in
+	// status.json and in the envelopes, so the stamps the verbs write compare.
+	normTS bool
+	// norm rewrites both envelopes before they are compared: the places where
+	// the shim and the contract disagree.
+	norm func(envl) envl
 }
 
 // variants runs a scenario with no archive, a plain archive and a sectioned one.
@@ -463,12 +542,65 @@ func variants(s scn) []scn {
 	return out
 }
 
+var tsRe = regexp.MustCompile(`\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ`)
+
+// startDay is the UTC date the harness started; a timestamp on or after it was
+// written by the run under test, an older one came from a fixture.
+var startDay = time.Now().UTC().Format("2006-01-02")
+
+func normStamps(s string) string {
+	return tsRe.ReplaceAllStringFunc(s, func(m string) string {
+		if m[:10] >= startDay {
+			return "<TS>"
+		}
+		return m
+	})
+}
+
+func normTree(m map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range m {
+		if k == ".hv/status.json" {
+			v = normStamps(v)
+		}
+		out[k] = v
+	}
+	return out
+}
+
+func normEnvStamps(t *testing.T, e envl) envl {
+	t.Helper()
+	b, err := json.Marshal(map[string]any(e))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out envl
+	if err := json.Unmarshal([]byte(normStamps(string(b))), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// copyEnv is a deep copy, so a norm function can edit its own.
+func copyEnv(t *testing.T, e envl) envl {
+	t.Helper()
+	b, err := json.Marshal(map[string]any(e))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out envl
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
 func (s scn) exec(t *testing.T) {
 	t.Parallel()
 	base, in := s.fx.build(t)
 	goDir := copyTree(t, base)
 	argv := subst(s.argv, in)
-	goRun := exec1(t, goDir, s.in, hvBin, argv...)
+	goRun := exec1e(t, goDir, s.in, s.env, hvBin, argv...)
 	if goRun.code != s.want {
 		t.Errorf("go exit = %d, want %d\nargv: %v\nstdout: %s\nstderr: %s", goRun.code, s.want, argv, goRun.stdout, goRun.stderr)
 	}
@@ -477,6 +609,7 @@ func (s scn) exec(t *testing.T) {
 		t.Errorf("go envelope ok = %v for exit %d", goEnv["ok"], goRun.code)
 	}
 	goEnv["__info"] = in
+	goEnv["__godir"] = goDir
 	if s.goOnly {
 		if s.check != nil {
 			s.check(t, goEnv, run{})
@@ -488,14 +621,14 @@ func (s scn) exec(t *testing.T) {
 	var refCode int
 	if len(s.old) > 0 {
 		old := subst(s.old, in)
-		ref = exec1(t, refDir, s.in, filepath.Join(stagedBin, old[0]), old[1:]...)
+		ref = exec1e(t, refDir, s.in, s.env, filepath.Join(stagedBin, old[0]), old[1:]...)
 		m := s.oldMap
 		if m == nil {
 			m = mapOld
 		}
 		refCode = m(ref.code, ref.stderr)
 	} else {
-		ref = exec1(t, refDir, s.in, "python3", append([]string{shimPath}, argv...)...)
+		ref = exec1e(t, refDir, s.in, s.env, "python3", append([]string{shimPath}, argv...)...)
 		refCode = ref.code
 	}
 	if s.div != "" {
@@ -506,7 +639,11 @@ func (s scn) exec(t *testing.T) {
 		t.Errorf("exit differs: reference %d, go %d\nargv: %v\nref stdout: %s\nref stderr: %s\ngo stdout: %s\ngo stderr: %s",
 			refCode, goRun.code, argv, ref.stdout, ref.stderr, goRun.stdout, goRun.stderr)
 	}
-	if d := diffTrees(snapshot(t, refDir), snapshot(t, goDir)); d != "" {
+	refTree, goTree := snapshot(t, refDir), snapshot(t, goDir)
+	if s.normTS {
+		refTree, goTree = normTree(refTree), normTree(goTree)
+	}
+	if d := diffTrees(refTree, goTree); d != "" {
 		t.Errorf(".hv/ trees differ:\n%s", d)
 	}
 	if len(s.old) == 0 && s.div == "" {
@@ -521,13 +658,39 @@ func (s scn) exec(t *testing.T) {
 			}
 		}
 		refEnv, g = stripText(refEnv), stripText(g)
+		if s.normTS {
+			refEnv, g = normEnvStamps(t, refEnv), normEnvStamps(t, g)
+		}
+		if s.norm != nil {
+			refEnv, g = s.norm(copyEnv(t, refEnv)), s.norm(copyEnv(t, g))
+		}
 		if !reflect.DeepEqual(map[string]any(refEnv), map[string]any(g)) {
 			rj, _ := json.Marshal(refEnv)
 			gj, _ := json.Marshal(g)
 			t.Errorf("envelopes differ\nargv: %v\nshim: %s\ngo:   %s", argv, rj, gj)
 		}
 	}
+	if s.text {
+		var plain []string
+		for _, a := range argv {
+			if a != "--json" {
+				plain = append(plain, a)
+			}
+		}
+		gt := exec1e(t, goDir, s.in, s.env, hvBin, plain...)
+		var rt run
+		if len(s.old) > 0 {
+			old := subst(s.old, in)
+			rt = exec1e(t, refDir, s.in, s.env, filepath.Join(stagedBin, old[0]), old[1:]...)
+		} else {
+			rt = exec1e(t, refDir, s.in, s.env, "python3", append([]string{shimPath}, plain...)...)
+		}
+		if gt.stdout != rt.stdout {
+			t.Errorf("text output differs\nargv: %v\nref:\n%q\ngo:\n%q", plain, rt.stdout, gt.stdout)
+		}
+	}
 	goEnv["__info"] = in
+	goEnv["__godir"] = goDir
 	if s.check != nil {
 		s.check(t, goEnv, ref)
 	}
@@ -539,7 +702,7 @@ func (s scn) exec(t *testing.T) {
 func stripText(e envl) envl {
 	out := envl{}
 	for k, v := range e {
-		if k == "__info" {
+		if k == "__info" || k == "__godir" {
 			continue
 		}
 		if k == "error" {

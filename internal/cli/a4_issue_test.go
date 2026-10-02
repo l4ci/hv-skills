@@ -54,7 +54,7 @@ func issueFixture() *a4FakeTracker {
 	}}
 }
 
-func dataOf(t *testing.T, env map[string]any) *jsonx.Object {
+func issueData(t *testing.T, env map[string]any) *jsonx.Object {
 	t.Helper()
 	d, ok := env["data"].(*jsonx.Object)
 	if !ok {
@@ -63,7 +63,7 @@ func dataOf(t *testing.T, env map[string]any) *jsonx.Object {
 	return d
 }
 
-func get(o *jsonx.Object, k string) any { v, _ := o.Get(k); return v }
+func issueGet(o *jsonx.Object, k string) any { v, _ := o.Get(k); return v }
 
 // Issue mode: every accepted spelling of an issue resolves to the canonical
 // id (the number) with the type letter beside it (contract rule 11).
@@ -75,13 +75,13 @@ func TestIssueFieldGetCanonicalID(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("%s: exit %d: %s", ref, code, stderr)
 		}
-		d := dataOf(t, env)
-		if get(d, "id") != "7" || get(d, "type") != "F" || get(d, "value") != "Add export" {
+		d := issueData(t, env)
+		if issueGet(d, "id") != "7" || issueGet(d, "type") != "F" || issueGet(d, "value") != "Add export" {
 			t.Fatalf("%s: data %v", ref, d)
 		}
 	}
 	code, env, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "milestone")
-	if d := dataOf(t, env); code != 0 || get(d, "value") != "M02" {
+	if d := issueData(t, env); code != 0 || issueGet(d, "value") != "M02" {
 		t.Fatalf("milestone: exit %d, %v", code, d)
 	}
 }
@@ -93,10 +93,10 @@ func TestIssueFieldListClosedItem(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	d := dataOf(t, env)
-	f, _ := get(d, "fields").(*jsonx.Object)
-	if get(d, "id") != "9" || get(d, "type") != "B" || f == nil ||
-		get(f, "reason") != "dropped" || get(f, "detail") != "https://example.test/issues/9" {
+	d := issueData(t, env)
+	f, _ := issueGet(d, "fields").(*jsonx.Object)
+	if issueGet(d, "id") != "9" || issueGet(d, "type") != "B" || f == nil ||
+		issueGet(f, "reason") != "dropped" || issueGet(f, "detail") != "https://example.test/issues/9" {
 		t.Fatalf("data %v", d)
 	}
 }
