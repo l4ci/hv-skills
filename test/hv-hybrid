@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+# TEMPORARY: removed in A9 (#53), with test/hv-shim.
+#
+# Per-verb dispatcher for phase acceptance (#46). Smoke calls "$HV_BIN <group>
+# <verb> ...". With HV_BIN=test/hv-hybrid and HV_GO_BIN=<built hv>, a call goes
+# to the Go binary when that binary implements the verb, and to test/hv-shim
+# (the old bin/ helpers) otherwise. That lets a phase's sections run through Go
+# while the rest of the suite, and fixture setup such as `hv init`, still works
+# before every phase has been ported.
+#
+# "Implements" is read from the binary, not guessed from exit codes: `hv
+# __verbs` prints one verb path per line (internal/cli.VerbPaths). The verb of
+# a call is the longest prefix of its non-flag words that is in that list, with
+# the values of -C/--cwd/--repo skipped.
+#
+# Every call is logged to $HV_HYBRID_LOG (one "go <verb>" or "shim <verb>" line;
+# nothing when unset), so a run can prove which backend served which verb:
+#   sort $HV_HYBRID_LOG | uniq -c
+import hashlib
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+SHIM = os.path.join(HERE, "hv-shim")
+VALUE_FLAGS = {"-C", "--cwd", "--repo", "-cwd", "-repo"}
+
+
+# Verbs the binary lists but only partly implements: a call that carries one of
+# these flags goes to the shim. Each entry is a known gap in the port, not a
+# feature of the hybrid; delete it when the port catches up.
+PARTIAL = {("version", "--drift"): "A3: hv version --drift is not ported"}
+
+
+def die(msg):
+    sys.stderr.write("hv-hybrid: %s\n" % msg)
+    sys.exit(70)
+
+
+def go_verbs(go_bin):
+    st = os.stat(go_bin)
+    key = hashlib.sha1(("%s:%d:%d" % (os.path.realpath(go_bin), st.st_size, st.st_mtime_ns)).encode()).hexdigest()[:16]
+    cache = os.path.join(os.environ.get("TMPDIR", "/tmp"), "hv-hybrid-verbs-%s" % key)
+    try:
+        with open(cache) as f:
+            return set(f.read().split("\n")) - {""}
+    except OSError:
+        pass
+    out = subprocess.run([go_bin, "__verbs"], capture_output=True, text=True)
+    if out.returncode != 0:
+        die("%s __verbs failed: %s" % (go_bin, out.stderr.strip()))
+    try:
+        tmp = cache + ".%d" % os.getpid()
+        with open(tmp, "w") as f:
+            f.write(out.stdout)
+        os.replace(tmp, cache)
+    except OSError:
+        pass
+    return set(out.stdout.split("\n")) - {""}
+
+
+def words(argv):
+    out, skip = [], False
+    for a in argv:
+        if a == "--":
+            break
+        if skip:
+            skip = False
+        elif a in VALUE_FLAGS:
+            skip = True
+        elif a.startswith("-") and a != "-":
+            continue
+        else:
+            out.append(a)
+    return out
+
+
+def main(argv):
+    go_bin = os.environ.get("HV_GO_BIN", "")
+    if not go_bin or not os.access(go_bin, os.X_OK):
+        die("HV_GO_BIN must name the built hv binary")
+    verbs = go_verbs(go_bin)
+    w = words(argv)
+    verb = ""
+    for n in range(len(w), 0, -1):
+        if " ".join(w[:n]) in verbs:
+            verb = " ".join(w[:n])
+            break
+    for (pverb, flag), _why in PARTIAL.items():
+        if verb == pverb and flag in argv:
+            verb = ""
+    backend = "go" if verb else "shim"
+    log = os.environ.get("HV_HYBRID_LOG")
+    if log:
+        with open(log, "a") as f:
+            f.write("%s %s\n" % (backend, verb or " ".join(w[:2])))
+    if verb:
+        os.execv(go_bin, [go_bin] + argv)
+    os.execv(sys.executable, [sys.executable, SHIM] + argv)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

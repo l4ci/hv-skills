@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -119,8 +120,6 @@ func TestExitCodesAndEnvelope(t *testing.T) {
 		{[]string{"grp", "echo", "--title", "-h", "--json"}, 0, echo("", "-h", false, ""), ""},
 		{[]string{"grp", "echo", "-title=x", "--force=false", "--title", "y"}, 0, "title=y force=false args=\n", ""},
 		{[]string{"grp", "echo", "-", "--", "--json", "-h"}, 0, "title= force=false args=-,--json,-h\n", ""},
-		{[]string{"grp", "echo", "--repo", "web", "x"}, 0, "title= force=false args=x\n", ""},
-		{[]string{"--repo=web", "grp", "echo", "--json"}, 0, echo("web", "", false, ""), ""},
 		{[]string{"grp", "warn", "--json"}, 0, `{"ok": true, "data": {}, "warnings": ["careful"]}` + "\n", "hv grp warn: warning: careful\n"},
 		// Usage errors.
 		{[]string{"nope"}, 2, "", "hv: unknown command \"nope\"\nhint: run: hv --help\n"},
@@ -279,4 +278,52 @@ func TestTreeVerbsDoNotShadowGlobals(t *testing.T) {
 		g.register(fs, false, cmd.Repo)
 	}
 	walk(Tree())
+}
+
+func TestVerbsListsLeafVerbsOnly(t *testing.T) {
+	var so, se bytes.Buffer
+	if code := Main([]string{"__verbs"}, strings.NewReader(""), &so, &se); code != 0 {
+		t.Fatalf("exit %d: %s", code, se.String())
+	}
+	got := strings.Split(strings.TrimSpace(so.String()), "\n")
+	has := map[string]bool{}
+	for _, l := range got {
+		has[l] = true
+	}
+	for _, want := range []string{"version", "knowledge tier get", "worker pool init", "glossary write"} {
+		if !has[want] {
+			t.Errorf("missing verb %q in %v", want, got)
+		}
+	}
+	for _, group := range []string{"knowledge", "worker", "worker pool", "knowledge tier"} {
+		if has[group] {
+			t.Errorf("group %q listed as a verb", group)
+		}
+	}
+	if !sort.StringsAreSorted(got) {
+		t.Error("not sorted")
+	}
+}
+
+// --repo reaches a repo-scoped verb only once it resolves (rule 9): outside
+// umbrella mode or unregistered it is exit 3 before the verb runs.
+func TestRepoFlagResolvesBeforeTheVerb(t *testing.T) {
+	wd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(wd) })
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "web"), 0o755)
+	if got := call("-C", dir, "grp", "echo", "--repo", "web"); got.code != 3 {
+		t.Fatalf("outside umbrella mode: %+v", got)
+	}
+	os.WriteFile(filepath.Join(dir, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	if got := call("-C", dir, "grp", "echo", "--repo", "web", "x"); got.code != 0 || got.stdout != "title= force=false args=x\n" {
+		t.Fatalf("registered: %+v", got)
+	}
+	if got := call("-C", dir, "--repo=web", "grp", "echo", "--json"); got.code != 0 || got.stdout != `{"ok": true, "data": {"repo": "web", "title": "", "force": false, "args": []}}`+"\n" {
+		t.Fatalf("registered json: %+v", got)
+	}
+	if got := call("-C", dir, "grp", "echo", "--repo", "nope", "x"); got.code != 3 {
+		t.Fatalf("unregistered is exit 3 and the verb never runs: %+v", got)
+	}
 }

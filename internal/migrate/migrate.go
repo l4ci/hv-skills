@@ -147,12 +147,22 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 	}
 	rep.RemovedBinaries = bins
 
+	// The deprecated-block strip runs on every call (contract: a project whose
+	// only v3 leftover is such a block reports it with noop false).
+	stripped, err := store.StripDeprecatedBlocks(false)
+	if err != nil {
+		return nil, err
+	}
+	rep.StrippedBlocks = stripped
+
 	pending := len(jobs) > 0 || len(bins) > 0
 	for _, p := range plans {
 		if p.action != "none" {
 			pending = true
 		}
 	}
+	onlyStrip := !pending && len(stripped) > 0
+	pending = pending || len(stripped) > 0
 	if !pending {
 		rep.Noop = true
 		if o.Apply {
@@ -165,11 +175,6 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 		return rep, nil
 	}
 
-	stripped, err := store.StripDeprecatedBlocks(false)
-	if err != nil {
-		return nil, err
-	}
-	rep.StrippedBlocks = stripped
 	if !o.Apply {
 		return rep, nil
 	}
@@ -180,6 +185,19 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 		return nil, err
 	}
 	rep.Backup = rel
+	if len(stripped) > 0 && onlyStrip {
+		// A strip-only run (no old-helper equivalent: it skipped the strip)
+		// would otherwise leave the backup empty; keep the instructions file
+		// the strip rewrites. With other work pending the backup matches the
+		// old helper's: rewritten files only.
+		for _, rel := range []string{"AGENTS.md", "CLAUDE.md"} {
+			if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
+				if err := copyFile(filepath.Join(root, rel), filepath.Join(backup, rel)); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	for _, j := range jobs {
 		if err := copyFile(j.path, filepath.Join(backup, j.rel)); err != nil {
 			return nil, err
@@ -210,7 +228,7 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 					who += " for sub-repo '" + p.scope + "'"
 				}
 				kept, _ := filepath.Rel(root, dest)
-				return rep, refuse("glossary import", "%s: %v\n%s backed up at %s; not deleted. Resolve the conflict and re-run.", who, err, filepath.Base(p.file), kept)
+				return rep, refuse("glossary-import", "%s: %v\n%s backed up at %s; not deleted. Resolve the conflict and re-run.", who, err, filepath.Base(p.file), kept)
 			}
 		}
 		if err := os.Remove(p.file); err != nil {
@@ -271,7 +289,7 @@ func checkPreconditions(root, cwd string) error {
 		cwd = abs
 	}
 	if strings.Contains(cwd+"/", "/.hv/migrate-backup/") {
-		return refuse("backup dir", "cwd is inside .hv/migrate-backup/. Run from project root.")
+		return refuse("backup-dir", "cwd is inside .hv/migrate-backup/. Run from project root.")
 	}
 	cmd := exec.Command("git", "status", "--porcelain")
 	cmd.Dir = root
@@ -293,7 +311,7 @@ func checkPreconditions(root, cwd string) error {
 		}
 	}
 	if len(dirty) > 0 {
-		return refuse("dirty tree", "uncommitted changes outside .hv/:\n  %s\nCommit or stash these before running hv migrate v4.", strings.Join(dirty, "\n  "))
+		return refuse("dirty-tree", "uncommitted changes outside .hv/:\n  %s\nCommit or stash these before running hv migrate v4.", strings.Join(dirty, "\n  "))
 	}
 
 	cfg, err := loadConfig(root)
@@ -316,7 +334,7 @@ func checkPreconditions(root, cwd string) error {
 		return fmt.Errorf("%w: .hv/config.json version '%s' is not parseable", ErrConfig, version)
 	}
 	if n < 3 {
-		return refuse("version", "project hv-skills version is %s (pre-3.0). Bring it current with /hv-init before hv migrate v4.", version)
+		return refuse("pre-3.0", "project hv-skills version is %s (pre-3.0). Bring it current with /hv-init before hv migrate v4.", version)
 	}
 	return nil
 }

@@ -144,7 +144,10 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 set +e
 (
   set -e
-  for f in "$TESTDIR/sections/"*.sh; do
+  # SECTION_LIST (space-separated paths) narrows the run to those sections,
+  # in the order given: phase acceptance with test/hv-hybrid runs only the
+  # sections a phase owns. Unset runs them all.
+  for f in ${SECTION_LIST:-"$TESTDIR/sections/"*.sh}; do
     [ -f "$f" ] || continue
     cd "$TMP"
     source "$f"

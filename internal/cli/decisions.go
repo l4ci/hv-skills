@@ -28,7 +28,7 @@ func decQuery(c *Ctx, args []string) (Result, error) {
 	}
 	text, missing, err := st.DecisionsQuery(args)
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	return Result{Data: knObj("text", text, "missing", strSlice(missing)), Text: text}, nil
 }
@@ -52,7 +52,7 @@ func decAutoLog(fs *flag.FlagSet) RunFunc {
 		}
 		changed, err := st.AutoLog(*topic, *title, *why, *planKey, *date)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		text := fmt.Sprintf("logged: %s :: %s", *topic, *title)
 		if !changed {
@@ -72,7 +72,7 @@ func decAutoSince(c *Ctx, args []string) (Result, error) {
 	}
 	since, ds, err := st.AutoSince()
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	list := []any{}
 	for _, d := range ds {

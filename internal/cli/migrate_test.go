@@ -222,7 +222,7 @@ func TestMigrateV4KeepsBackupWhenImportFails(t *testing.T) {
 	// A Glossary heading is required for the import.
 	knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), "# Knowledge\n")
 	n := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
-	if n.rc != 4 || !strings.Contains(n.stdout, `"blockedBy": "glossary import"`) || !strings.Contains(n.stdout, `"changed": true`) {
+	if n.rc != 4 || !strings.Contains(n.stdout, `"blockedBy": "glossary-import"`) || !strings.Contains(n.stdout, `"changed": true`) {
 		t.Fatalf("rc=%d %s", n.rc, n.stdout)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".hv", "CONTEXT.md")); err != nil {
@@ -300,5 +300,35 @@ func TestMigrateV4StripNormalizesCRLF(t *testing.T) {
 	migSameTree(t, oldDir, newDir)
 	if strings.Contains(knTree(t, newDir)["../AGENTS.md"], "\r") {
 		t.Error("CR kept in AGENTS.md")
+	}
+}
+
+// The deprecated-block strip runs on every call: a project whose only v3
+// leftover is a context block reports it with noop false (contract, A5 gaps).
+func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
+	migPlugin(t)
+	dir := migProject(t, false)
+	knNew(t, dir, "", "migrate", "v4", "--apply")
+	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n")
+	migGit(t, dir, "add", "-A", "-f")
+	migGit(t, dir, "commit", "-q", "-m", "stray block")
+
+	p := knNew(t, dir, "", "migrate", "v4", "--json")
+	if !strings.Contains(p.stdout, `"noop": false`) || !strings.Contains(p.stdout, `"strippedBlocks": ["context"]`) {
+		t.Fatalf("preview: %s", p.stdout)
+	}
+	a := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
+	if a.rc != 0 || !strings.Contains(a.stdout, `"changed": true`) || !strings.Contains(a.stdout, `"backup": ".hv/migrate-backup/`) {
+		t.Fatalf("apply: %d %s", a.rc, a.stdout)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if strings.Contains(string(got), "hv-context") {
+		t.Errorf("block not stripped: %s", got)
+	}
+	migGit(t, dir, "add", "-A", "-f")
+	migGit(t, dir, "commit", "-q", "-m", "stripped")
+	b := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
+	if !strings.Contains(b.stdout, `"noop": true`) || !strings.Contains(b.stdout, `"changed": false`) {
+		t.Errorf("second apply: %s", b.stdout)
 	}
 }
