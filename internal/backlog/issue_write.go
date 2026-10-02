@@ -159,6 +159,12 @@ func (b *Issues) Create(in CreateInput) (CreateResult, error) {
 		names = append(names, f.Name)
 		values[f.Name] = f.Value
 	}
+	if pystr.Strip(in.Since) != "" {
+		if _, seen := values["Since"]; !seen {
+			names = append(names, "Since")
+		}
+		values["Since"] = oneLine(in.Since)
+	}
 	var parts []string
 	if d := pystr.Strip(in.Desc); d != "" {
 		parts = append(parts, d)
