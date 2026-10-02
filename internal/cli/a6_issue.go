@@ -120,7 +120,7 @@ func issuesBackend(c *Ctx) (*backlog.Issues, error) {
 	if err != nil {
 		return nil, err
 	}
-	be, err := a4Open(root, false, "")
+	be, err := a4Open(c, root, false, "")
 	if err != nil {
 		return nil, err
 	}
