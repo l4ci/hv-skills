@@ -1,4 +1,4 @@
-echo "hv-worker-gate — pushed refs, PR identity, merge confirmed on base (github + gitlab)"
+echo "worker gate — pushed refs, PR identity, merge confirmed on base (github + gitlab)"
 # The gate merges what was PUSHED, so it must judge origin/<base> vs origin/<branch>
 # after a fetch, refuse a PR that is not the verified branch, and confirm the merge
 # commit really sits on origin/<base>. Each case builds a fresh bare origin plus a
@@ -96,13 +96,16 @@ json.dump({"origin": sys.argv[2], "head": "w1", "sha": sys.argv[3], "base": "mai
 PYEOF
   GT_ORIGIN="$origin"; GT_WORKER="$worker"
 }
-# gt_gate [env...] -- <args> : run the gate in $GT_DIR, output to $GT_DIR.out, echo rc
+# gt_gate [env...] -- <args> : run `hv --json worker gate <args>` in $GT_DIR, envelope to
+# $GT_DIR.out, stderr to $GT_DIR.err, echo rc
 gt_gate() {
   local rc=0
   ( cd "$GT_DIR" && env PATH="$GT_BIN:$PATH" FORGE_DB="$FORGE_DB" FORGE_LOG="$FORGE_LOG" HV_GATE_SHA_WAIT=0 \
-      "$@" ) >"$GT_DIR.out" 2>&1 || rc=$?
+      "$@" ) >"$GT_DIR.out" 2>"$GT_DIR.err" || rc=$?
   echo "$rc"
 }
+# gt_verdict : data.verdict of the last gate run
+gt_verdict() { jget data.verdict <"$GT_DIR.out"; }
 GH_URL="https://github.com/o/r/pull/7"
 GL_URL="https://gitlab.com/o/r/-/merge_requests/7"
 set_forge() { python3 - "$FORGE_DB" "$1" "$2" <<'PYEOF'
@@ -119,44 +122,48 @@ gt_case a "$GH_URL"
 ( cd "$GT_DIR" && git fetch -q origin && git checkout -q -b w1 origin/w1 && gt_git merge -q origin/main -m sync && git checkout -q main ) \
   || fail "gate (a): local w1 should merge origin/main cleanly"
 ( cd "$GT_DIR" && git merge-base --is-ancestor origin/main w1 ) || fail "gate (a): fixture is vacuous, local w1 is not fresh"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 3 ] && grep -q "^STALE w1" "$GT_DIR.out" || fail "gate (a): pushed-stale branch must be STALE exit 3, got $RC: $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = stale ] || fail "gate (a): pushed-stale branch must be verdict stale, exit 1, got $RC: $(cat "$GT_DIR.out")"
+[ "$(jget data.changed <"$GT_DIR.out")" = false ] || fail "gate (a): a stale check must not report changed: $(cat "$GT_DIR.out")"
 pass "freshness is judged on origin/* after a fetch, not on local refs"
 
-# (b) a check that itself breaks is CHECK-BROKE (exit 5), never STALE
+# (b) a check that itself breaks is check-broke, never stale
 gt_case b "$GH_URL"
-RC="$(gt_gate env PATH="$TMP_GT/brokengit:$GT_BIN:$PATH" "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 5 ] && grep -q "CHECK-BROKE" "$GT_DIR.out" && ! grep -q "STALE" "$GT_DIR.out" \
-  || fail "gate (b): merge-base rc>1 must be CHECK-BROKE exit 5, not STALE (rc=$RC): $(cat "$GT_DIR.out")"
+# white-box: kept until the A7 Go unit test lands (#51), then delete
+RC="$(gt_gate env PATH="$TMP_GT/brokengit:$GT_BIN:$PATH" "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = check-broke ] \
+  || fail "gate (b): merge-base rc>1 must be verdict check-broke, not stale (rc=$RC): $(cat "$GT_DIR.out")"
 git -C "$GT_DIR" remote set-url origin "$TMP_GT/does-not-exist.git"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 5 ] && grep -q "CHECK-BROKE.*fetch" "$GT_DIR.out" || fail "gate (b): a failed fetch must be CHECK-BROKE (rc=$RC): $(cat "$GT_DIR.out")"
-pass "a broken check (merge-base rc>1, failed fetch) is CHECK-BROKE exit 5, not STALE"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = check-broke ] || fail "gate (b): a failed fetch must be check-broke (rc=$RC): $(cat "$GT_DIR.out")"
+pass "a broken check (merge-base rc>1, failed fetch) is check-broke, not stale"
 
 # (c) the PR must be the verified branch: head SHA, head branch, target branch, state
 gt_case c "$GH_URL"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 0 ] && grep -q "^FRESH w1" "$GT_DIR.out" || fail "gate (c): matching PR must be FRESH exit 0, got $RC: $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 0 ] && [ "$(gt_verdict)" = fresh ] || fail "gate (c): matching PR must be fresh exit 0, got $RC: $(cat "$GT_DIR.out")"
 set_forge sha 0000000000000000000000000000000000000000
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 3 ] && grep -q "head is 0000" "$GT_DIR.out" || fail "gate (c): head SHA mismatch must exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = pr-mismatch ] || fail "gate (c): head SHA mismatch must be pr-mismatch (rc=$RC): $(cat "$GT_DIR.out")"
 set_forge sha "$(git -C "$GT_WORKER" rev-parse HEAD)"
 set_forge base stack
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 3 ] && grep -q "stacked PR" "$GT_DIR.out" || fail "gate (c): stacked PR (other base) must exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = pr-mismatch ] || fail "gate (c): stacked PR (other base) must be pr-mismatch (rc=$RC): $(cat "$GT_DIR.out")"
 set_forge base main; set_forge head other
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 3 ] && grep -q "headed by 'other'" "$GT_DIR.out" || fail "gate (c): wrong head branch must exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = pr-mismatch ] || fail "gate (c): wrong head branch must be pr-mismatch (rc=$RC): $(cat "$GT_DIR.out")"
 set_forge head w1; set_forge state MERGED
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 3 ] && grep -q "not open" "$GT_DIR.out" || fail "gate (c): a non-open PR must exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = pr-mismatch ] || fail "gate (c): a non-open PR must be pr-mismatch (rc=$RC): $(cat "$GT_DIR.out")"
 pass "PR head SHA, head branch, base and state are checked against the verified branch"
 
 # (d) github merge: pinned to the verified SHA, confirmed on origin/main, then re-verified
 gt_case d "$GH_URL"
 printf '{"refactor":{"verifyCommands":["test -f work.txt"]}}' > "$GT_DIR/.hv/config.json"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 0 ] && grep -q "^GATE-PASS w1" "$GT_DIR.out" || fail "gate (d): clean github merge must pass (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 0 ] && [ "$(gt_verdict)" = pass ] || fail "gate (d): clean github merge must pass (rc=$RC): $(cat "$GT_DIR.out")"
+[ "$(jget data.changed <"$GT_DIR.out")" = true ] && [ "$(jget 'data.verified[0]' <"$GT_DIR.out")" = "test -f work.txt" ] \
+  || fail "gate (d): a pass must report changed and the verified command: $(cat "$GT_DIR.out")"
 grep -q "^gh pr merge 7 --merge --match-head-commit $(git -C "$GT_WORKER" rev-parse HEAD)$" "$FORGE_LOG" \
   || fail "gate (d): gh merge must be pinned to the verified SHA: $(cat "$FORGE_LOG")"
 git -C "$GT_ORIGIN" merge-base --is-ancestor "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["merge"])' "$FORGE_DB")" main \
@@ -166,66 +173,81 @@ pass "github: merge pinned to the verified SHA, confirmed on origin/main, local 
 
 # (e) success reported, nothing on base: no merge commit, or a merge into another branch
 gt_case e "$GL_URL"
-RC="$(gt_gate env FORGE_MODE=noop "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 4 ] && grep -q "^NOT-MERGED w1" "$GT_DIR.out" || fail "gate (e): a merge that merged nothing must be NOT-MERGED exit 4 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=noop "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = not-merged ] || fail "gate (e): a merge that merged nothing must be not-merged (rc=$RC): $(cat "$GT_DIR.out")"
 gt_case e2 "$GH_URL"
-RC="$(gt_gate env FORGE_MODE=elsewhere "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 4 ] && grep -q "^NOT-ON-BASE w1" "$GT_DIR.out" || fail "gate (e): a merge into another branch must be NOT-ON-BASE exit 4 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=elsewhere "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = not-on-base ] || fail "gate (e): a merge into another branch must be not-on-base (rc=$RC): $(cat "$GT_DIR.out")"
 gt_case e3 "$GH_URL"
-RC="$(gt_gate env FORGE_MODE=fail "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 3 ] && grep -q "branch protection" "$GT_DIR.out" || fail "gate (e): a refused merge must exit 3 and show the CLI output (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=fail "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = merge-failed ] || fail "gate (e): a refused merge must be merge-failed (rc=$RC): $(cat "$GT_DIR.out")"
+[ "$(jget data.changed <"$GT_DIR.out")" = false ] || fail "gate (e): a refused merge changed nothing: $(cat "$GT_DIR.out")"
+grep -q "branch protection" "$GT_DIR.out" "$GT_DIR.err" || fail "gate (e): a refused merge must show the CLI output: $(cat "$GT_DIR.out" "$GT_DIR.err")"
 pass "a merge that landed nothing, landed elsewhere, or was refused is reported, not passed"
 
 # (f) gitlab: glab with auto-merge off and a pinned sha; a squash puts the sha in squash_commit_sha
 gt_case f "$GL_URL"
-RC="$(gt_gate env FORGE_MODE=squash "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 0 ] && grep -q "^GATE-PASS w1\|NO-VERIFY w1" "$GT_DIR.out" || fail "gate (f): clean gitlab merge must pass (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=squash "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 0 ] && [ "$(gt_verdict)" = pass ] || fail "gate (f): clean gitlab merge must pass (rc=$RC): $(cat "$GT_DIR.out")"
+[ "$(jget data.verifySkipped <"$GT_DIR.out")" = true ] || fail "gate (f): no verifyCommands must report verifySkipped: $(cat "$GT_DIR.out")"
 grep -q "^glab mr merge 7 -y --auto-merge=false --sha $(git -C "$GT_WORKER" rev-parse HEAD)$" "$FORGE_LOG" \
   || fail "gate (f): glab merge must disable auto-merge and pin the sha: $(cat "$FORGE_LOG")"
 grep -q "^glab api projects/:fullpath/merge_requests/7" "$FORGE_LOG" || fail "gate (f): glab must read the MR through the API"
 gt_case f2 "$GL_URL"
 set_forge body $'## Approvals\n- x: orchestrator relay round 2\n'
 printf '{"slots":[{"name":"w1","branch":"w1","pr":"%s","relays":[]}]}' "$GL_URL" > "$GT_DIR/.hv/workers.json"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main --check-only)"
-[ "$RC" = 4 ] && grep -q PROVENANCE-FAIL "$GT_DIR.out" || fail "gate (f): provenance must read the MR description via glab (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = provenance-fail ] || fail "gate (f): provenance must read the MR description via glab (rc=$RC): $(cat "$GT_DIR.out")"
 pass "gitlab: glab path with auto-merge off, pinned sha, squash sha fallback, MR-description provenance"
 
 # (h) a recorded PR with no origin remote is refused, never merged locally
 gt_case h "$GH_URL"
 git -C "$GT_DIR" remote remove origin
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 5 ] && grep -q "no 'origin' remote" "$GT_DIR.out" || fail "gate (h): PR without origin must be refused exit 5 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = check-broke ] || fail "gate (h): PR without origin must be check-broke (rc=$RC): $(cat "$GT_DIR.out")"
 [ ! -f "$GT_DIR/work.txt" ] && ! grep -q "merge" "$FORGE_LOG" || fail "gate (h): nothing may be merged"
 pass "a recorded PR with no origin remote is refused, not merged locally"
 
 # (i) gitlab fast-forward method: merged MR, no merge or squash sha; the verified sha must be on base
 gt_case i "$GL_URL"
-RC="$(gt_gate env FORGE_MODE=ff "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 0 ] && grep -q "^MERGED w1" "$GT_DIR.out" || fail "gate (i): a fast-forward-merged MR must pass (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=ff "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 0 ] && [ "$(gt_verdict)" = pass ] || fail "gate (i): a fast-forward-merged MR must pass (rc=$RC): $(cat "$GT_DIR.out")"
 [ -f "$GT_DIR/work.txt" ] || fail "gate (i): local base not fast-forwarded"
 pass "gitlab fast-forward merge (no merge_commit_sha) falls back to the verified sha on base"
 
 # (j) the forge enforces the pin: a push after the gate's check makes the merge refuse
 gt_case j "$GH_URL"
-RC="$(gt_gate env FORGE_MODE=race "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 3 ] && grep -q "does not match the pin" "$GT_DIR.out" || fail "gate (j): a moved PR head must make the merge fail exit 3 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env FORGE_MODE=race "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = merge-failed ] || fail "gate (j): a moved PR head must make the merge fail (rc=$RC): $(cat "$GT_DIR.out")"
+grep -q "does not match the pin" "$GT_DIR.out" "$GT_DIR.err" || fail "gate (j): the forge's refusal must be shown: $(cat "$GT_DIR.out" "$GT_DIR.err")"
 pass "a PR head that moves after the check is refused by the pinned merge"
 
-# (k) merged remotely but local base diverged: distinct exit 6, never 'not merged'
+# (k) merged remotely but local base diverged: distinct verdict, never 'not merged'
 gt_case k "$GH_URL"
 ( cd "$GT_DIR" && echo local > local.txt && git add local.txt && gt_git commit -q -m "unpushed local work" ) || fail "gate (k): local commit failed"
-RC="$(gt_gate "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 6 ] && grep -q "^MERGED-REMOTELY w1" "$GT_DIR.out" || fail "gate (k): diverged local base after a remote merge must exit 6 (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = merged-remotely ] || fail "gate (k): diverged local base after a remote merge must be merged-remotely (rc=$RC): $(cat "$GT_DIR.out")"
+[ "$(jget data.changed <"$GT_DIR.out")" = true ] || fail "gate (k): merged-remotely must report changed true: $(cat "$GT_DIR.out")"
 git -C "$GT_ORIGIN" merge-base --is-ancestor "$(git -C "$GT_WORKER" rev-parse HEAD)" main || fail "gate (k): the PR should be on origin/main"
-pass "a remote merge whose local fast-forward fails exits 6 MERGED-REMOTELY, not as unmerged"
+pass "a remote merge whose local fast-forward fails is merged-remotely, not unmerged"
 
 # (g) verify output is kept: the failing command's output reaches stderr and a log survives
 gt_case g "$GH_URL"
 printf '{"refactor":{"verifyCommands":["echo boom-marker; exit 1"]}}' > "$GT_DIR/.hv/config.json"
-RC="$(gt_gate env TMPDIR="$TMP_GT" "$BIN/hv-worker-gate" --slot w1 --base main)"
-[ "$RC" = 4 ] && grep -q "^GATE-FAIL w1" "$GT_DIR.out" && grep -q "boom-marker" "$GT_DIR.out" \
-  || fail "gate (g): a failed verify must exit 4 and show its output (rc=$RC): $(cat "$GT_DIR.out")"
+RC="$(gt_gate env TMPDIR="$TMP_GT" "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 1 ] && [ "$(gt_verdict)" = verify-failed ] && [ "$(jget data.changed <"$GT_DIR.out")" = true ] \
+  || fail "gate (g): a failed verify must be verify-failed with changed true (rc=$RC): $(cat "$GT_DIR.out")"
+grep -q "boom-marker" "$GT_DIR.err" || fail "gate (g): a failed verify must show its output: $(cat "$GT_DIR.err")"
 grep -q "boom-marker" "$TMP_GT"/hv-gate-verify-* 2>/dev/null || fail "gate (g): the verify log must be kept on failure"
 pass "verify output is shown on failure and the log is kept"
+
+# (l) a merging gate run with the base branch not checked out is a resolution error
+# (exit 3) and merges nothing.
+gt_case nobase "$GH_URL"
+( cd "$GT_DIR" && git checkout -q -b elsewhere ) || fail "gate (l): checkout failed"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 3 ] || fail "gate (l): base not checked out must exit 3, got $RC: $(cat "$GT_DIR.out")"
+if grep "pr merge" "$FORGE_LOG" >/dev/null; then fail "gate (l): must not merge with the base not checked out: $(cat "$FORGE_LOG")"; fi
+pass "a merging gate refuses (exit 3) when the base branch is not checked out"
 
 trap 'rm -rf "$TMP"' EXIT

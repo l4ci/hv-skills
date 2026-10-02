@@ -1,8 +1,10 @@
-echo "hv-worker-reset — slot reset guard, provable session close, resume-flag rejection"
+echo "worker reset — slot reset guard, provable session close, resume-flag rejection"
 # Covers #38. A slot is reused across tasks; dispatch must (a) refuse a slot
 # holding uncommitted or unmerged work, (b) otherwise cut a fresh per-task
 # branch from the cycle branch, (c) refuse to spawn when the old session cannot
 # be confirmed closed, (d) reject a workerCommand that resumes a conversation.
+# A slot holding work and a resume flag are refusals (exit 4); a session that
+# will not close is the host failing (exit 5).
 # Hosts are FAKES on PATH: herdr with a stateful tab, tmux with a stateful window.
 
 TMP_RG="$(mktemp -d)"
@@ -67,67 +69,74 @@ slot_field() {
 }
 cfg() { printf '{"work":{"dispatch":"%s"%s}}\n' "$1" "${2:+,\"workerCommand\":\"$2\"}" > "$TMP_RG/repo/.hv/config.json"; }
 
-rg "$BIN/hv-worker-pool" init --slots 1 --base main >/dev/null || fail "pool init failed"
+rg hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "pool init failed"
 WT="$(slot_field w1 worktree)"
 echo brief > "$TMP_RG/brief.md"
 cfg herdr
 
-# ── (a) refuse a slot that holds work ───────────────────────────────────────
+# ── (a) refuse a slot that holds work ──────────────────────────────────────
 echo wip > "$WT/scratch.txt"
-RC=0; OUT="$(rg "$BIN/hv-worker-reset" --slot w1 --task T1 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "an untracked file must refuse the slot (exit 3), got $RC"
-case "$OUT" in *scratch.txt*) ;; *) fail "refusal must name the dirty path, got: $OUT" ;; esac
+RC=0; OUT="$(rg hvj worker reset w1 --task T1 2>/dev/null)" || RC=$?
+[ "$RC" = "4" ] || fail "an untracked file must refuse the slot (exit 4), got $RC"
+case "$(jget 'data.dirty' <<<"$OUT")" in *scratch.txt*) ;; *) fail "refusal data must name the dirty path, got: $OUT" ;; esac
+[ "$(jget 'data.changed' <<<"$OUT")" = "false" ] || fail "a refused reset changes nothing: $OUT"
+RC=0; OUT="$(rg hvj worker reset w1 --task T1 --check-only 2>/dev/null)" || RC=$?
+[ "$RC" = "1" ] || fail "--check-only on a slot holding work must exit 1, got $RC"
+[ "$(jget 'data.clean' <<<"$OUT")" = "false" ] || fail "--check-only verdict must be clean:false, got: $OUT"
 [ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "hv-worker/w1" ] || fail "a refused reset must not move the branch"
 rm "$WT/scratch.txt"
 
 echo more >> "$WT/seed.txt"
-RC=0; rg "$BIN/hv-worker-reset" --slot w1 --task T1 >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "a modified tracked file must refuse the slot, got $RC"
+RC=0; rg hvj worker reset w1 --task T1 >/dev/null 2>&1 || RC=$?
+[ "$RC" = "4" ] || fail "a modified tracked file must refuse the slot, got $RC"
 git -C "$WT" commit -q -am "worker work"
-RC=0; OUT="$(rg "$BIN/hv-worker-reset" --slot w1 --task T1 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "an unmerged commit must refuse the slot, got $RC"
-case "$OUT" in *"worker work"*) ;; *) fail "refusal must list the unmerged commit, got: $OUT" ;; esac
-pass "hv-worker-reset refuses a slot with uncommitted or unmerged work, naming what it found"
+RC=0; OUT="$(rg hvj worker reset w1 --task T1 2>/dev/null)" || RC=$?
+[ "$RC" = "4" ] || fail "an unmerged commit must refuse the slot, got $RC"
+case "$(jget 'data.unmerged' <<<"$OUT")" in *"worker work"*) ;; *) fail "refusal data must list the unmerged commit, got: $OUT" ;; esac
+pass "worker reset refuses a slot with uncommitted or unmerged work (exit 4), naming what it found"
 
 # Dispatch refuses before it touches the session.
 : >"$FK/log"
-RC=0; rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T1 >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "dispatch into a slot with unmerged work must exit 3, got $RC"
-if grep -q '^tab \|^agent ' "$FK/log"; then fail "a refused dispatch must not kill or spawn anything; log: $(cat "$FK/log")"; fi
-pass "hv-worker-dispatch exits 3 on a dirty slot without touching its session"
+RC=0; rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T1 >/dev/null 2>&1 || RC=$?
+[ "$RC" = "4" ] || fail "dispatch into a slot with unmerged work must exit 4, got $RC"
+if grep '^tab \|^agent ' "$FK/log" >/dev/null; then fail "a refused dispatch must not kill or spawn anything; log: $(cat "$FK/log")"; fi
+pass "worker dispatch exits 4 on a dirty slot without touching its session"
 
 # ── (b) clean slot gets a fresh branch from the cycle branch ────────────────
 git -C "$TMP_RG/repo" merge -q hv-worker/w1 || fail "fixture merge failed"
 git -C "$TMP_RG/repo" commit -q --allow-empty -m "landed since" || true
-rg "$BIN/hv-worker-reset" --slot w1 --task B07 >/dev/null || fail "a merged slot must reset cleanly"
+OUT="$(rg hvj worker reset w1 --task B07 2>/dev/null)" || fail "a merged slot must reset cleanly: $OUT"
+[ "$(jget 'data.branch' <<<"$OUT")" = "hv-worker/w1-b07" ] || fail "reset data must name the new branch, got: $OUT"
+[ "$(jget 'data.changed' <<<"$OUT")" = "true" ] || fail "a real reset reports changed:true: $OUT"
+[ "$(jget 'data.sha' <<<"$OUT")" = "$(git -C "$TMP_RG/repo" rev-parse --short=7 main)" ] || fail "reset data sha must be the base tip: $OUT"
+rg hvj worker reset w1 --task B07 --check-only >/dev/null 2>&1 || fail "--check-only must exit 0 on a clean slot"
 [ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "hv-worker/w1-b07" ] || fail "slot is on $(git -C "$WT" rev-parse --abbrev-ref HEAD), expected hv-worker/w1-b07"
 [ "$(git -C "$WT" rev-parse HEAD)" = "$(git -C "$TMP_RG/repo" rev-parse main)" ] || fail "fresh branch must start at the tip of the cycle branch"
-[ "$(slot_field w1 branch)" = "hv-worker/w1-b07" ] || fail "registry must record the per-task branch for hv-worker-gate"
+[ "$(slot_field w1 branch)" = "hv-worker/w1-b07" ] || fail "registry must record the per-task branch for worker gate"
 git -C "$TMP_RG/repo" rev-parse --verify --quiet hv-worker/w1 >/dev/null && fail "the proved-merged previous branch should be deleted"
-rg "$BIN/hv-worker-pool" init --slots 1 --base main >/dev/null || fail "re-init failed"
+rg hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "re-init failed"
 [ "$(slot_field w1 branch)" = "hv-worker/w1-b07" ] || fail "re-running pool init must not rewind the slot's branch"
-pass "a clean slot is cut a fresh per-task branch from the cycle branch; registry and pool init agree"
+pass "a clean slot is cut a fresh per-task branch from the cycle branch; registry and worker pool init agree"
 
 # ── (c) provable close ──────────────────────────────────────────────────────
-rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T2 >/dev/null || fail "first herdr dispatch failed"
+rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T2 >/dev/null || fail "first herdr dispatch failed"
 [ "$(slot_field w1 handle)" = "w9:t7" ] || fail "dispatch did not record the tab"
 
 touch "$FK/close_fails"; : >"$FK/log"
-RC=0; OUT="$(rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T3 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "herdr: a tab that will not close must exit 3, got $RC"
-case "$OUT" in *"still running"*) ;; *) fail "herdr: refusal must say the old session is still running, got: $OUT" ;; esac
-if grep -q '^tab create' "$FK/log"; then fail "herdr: must not spawn a second session when the first would not close"; fi
+RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T3 2>/dev/null)" || RC=$?
+[ "$RC" = "5" ] || fail "herdr: a tab that will not close must exit 5, got $RC: $OUT"
+if grep '^tab create' "$FK/log" >/dev/null; then fail "herdr: must not spawn a second session when the first would not close"; fi
 rm -f "$FK/close_fails"
 
 sleep 300 & SLEEPER=$!
 echo "$SLEEPER" > "$FK/pid"
-RC=0; OUT="$(rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T3 2>&1)" || RC=$?
+RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T3 2>/dev/null)" || RC=$?
 kill "$SLEEPER" 2>/dev/null || true
-[ "$RC" = "3" ] || fail "herdr: a surviving agent process must exit 3 even when the tab is gone, got $RC"
-case "$OUT" in *"$SLEEPER"*) ;; *) fail "herdr: refusal must name the surviving pid, got: $OUT" ;; esac
+[ "$RC" = "5" ] || fail "herdr: a surviving agent process must exit 5 even when the tab is gone, got $RC: $OUT"
+case "$(jget error.message <<<"$OUT")" in *"$SLEEPER"*) ;; *) fail "herdr: refusal must name the surviving pid, got: $OUT" ;; esac
 rm -f "$FK/pid"
 touch "$FK/tab_alive"
-rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T3 >/dev/null \
+rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T3 >/dev/null \
   || fail "herdr: dispatch must succeed once the old tab closes and its pids are gone"
 
 # tmux twin: first the window refuses to die, then it dies but a pid survives.
@@ -140,16 +149,15 @@ PY
 sleep 300 & SLEEPER=$!
 echo "$SLEEPER" > "$FK/pid"
 touch "$FK/window" "$FK/kill_fails"; : >"$FK/log"
-RC=0; OUT="$(rgt "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T4 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "tmux: a window that will not die must exit 3, got $RC"
-case "$OUT" in *"still running"*) ;; *) fail "tmux: refusal must say the old session is still running, got: $OUT" ;; esac
-if grep -q '^new-window' "$FK/log"; then fail "tmux: must not spawn a second window"; fi
+RC=0; OUT="$(rgt hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T4 2>/dev/null)" || RC=$?
+[ "$RC" = "5" ] || fail "tmux: a window that will not die must exit 5, got $RC: $OUT"
+if grep '^new-window' "$FK/log" >/dev/null; then fail "tmux: must not spawn a second window"; fi
 rm -f "$FK/kill_fails"; touch "$FK/window"
-RC=0; OUT="$(rgt "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T4 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "tmux: a surviving pane process must exit 3 even when the window is gone, got $RC"
-case "$OUT" in *"pids"*"$SLEEPER"*) ;; *) fail "tmux: refusal must name the surviving pid $SLEEPER, got: $OUT" ;; esac
+RC=0; OUT="$(rgt hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T4 2>/dev/null)" || RC=$?
+[ "$RC" = "5" ] || fail "tmux: a surviving pane process must exit 5 even when the window is gone, got $RC: $OUT"
+case "$(jget error.message <<<"$OUT")" in *"$SLEEPER"*) ;; *) fail "tmux: refusal must name the surviving pid $SLEEPER, got: $OUT" ;; esac
 kill "$SLEEPER" 2>/dev/null || true; wait "$SLEEPER" 2>/dev/null || true
-pass "dispatch exits 3 and spawns nothing when the old tab/window (or its pids) is not confirmed gone"
+pass "dispatch exits 5 and spawns nothing when the old tab/window (or its pids) is not confirmed gone"
 
 # A zombie has exited; it must read as gone, and a live process as alive. The
 # zombie's parent (an exec'd sleep) never reaps it.
@@ -158,6 +166,7 @@ sh -c 'sh -c "echo \$\$ > '"$ZF"'" & exec sleep 300' & ZPARENT=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$ZF" ] && break; sleep 0.2; done
 sleep 0.3
 ZPID="$(cat "$ZF")"
+# white-box: kept until the A7 Go unit test lands (#51), then delete
 ( . "$BIN/hv-host-select.sh"
   hv_pid_alive "$ZPID" && exit 1
   hv_pid_alive "$ZPARENT" || exit 2
@@ -168,58 +177,58 @@ pass "a zombie reads as exited, so a slow reaper cannot cause a false refusal"
 
 # ── (d) resume flags and unparseable commands ───────────────────────────────
 cfgj() { python3 -c 'import json,sys; print(json.dumps({"work":{"dispatch":"herdr","workerCommand":sys.argv[1]}}))' "$1" > "$TMP_RG/repo/.hv/config.json"; }
-dispatch_rc() { RC=0; OUT="$(rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T5 2>&1)" || RC=$?; }
+dispatch_rc() { RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T5 2>/dev/null)" || RC=$?; }
 for CMD in "claude --model sonnet --continue" "claude -r" "claude -c" "claude --resume" "claude --resume=abc" \
            "claude --continue=1" "claude -cr" 'sh -c "claude -c"' "env X=1 claude -c" "X=1 claude --resume abc"; do
   cfgj "$CMD"; dispatch_rc
-  [ "$RC" = "2" ] || fail "workerCommand '$CMD' must be rejected (exit 2), got $RC: $OUT"
-  case "$OUT" in *"fresh session"*) ;; *) fail "rejection of '$CMD' must say why, got: $OUT" ;; esac
+  [ "$RC" = "4" ] || fail "workerCommand '$CMD' must be refused (exit 4), got $RC: $OUT"
+  [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "refusing '$CMD' changes nothing: $OUT"
 done
 cfgj 'claude --model "sonnet'; dispatch_rc
 [ "$RC" = "2" ] || fail "an unbalanced quote must exit 2, not crash with 1, got $RC"
-case "$OUT" in *"cannot be parsed"*) ;; *) fail "unparseable workerCommand needs a clear message, got: $OUT" ;; esac
 # A wrapper's own -c is not a resume flag: the command is judged by what follows claude.
 cfgj "my-wrapper -c --x"; dispatch_rc
-[ "$RC" = "3" ] || fail "a wrapper without claude passes the resume check and fails herdr's own claude check (exit 3), got $RC: $OUT"
-case "$OUT" in *"must run claude"*) ;; *) fail "expected herdr's must-run-claude error, got: $OUT" ;; esac
+[ "$RC" = "5" ] || fail "a wrapper without claude passes the resume check and fails herdr's own claude check (exit 5), got $RC: $OUT"
 cfgj "claude --model sonnet -p"; dispatch_rc
 [ "$RC" = "0" ] || fail "a command with no resume flag must dispatch, got $RC: $OUT"
-pass "hv-worker-dispatch rejects resume flags in every spelling, even inside sh -c or env, and unparseable commands"
+pass "worker dispatch refuses resume flags in every spelling, even inside sh -c or env, and unparseable commands"
 
 # ── (e) retry of the slot's own task keeps its WIP ──────────────────────────
 cfg herdr
 echo wip > "$WT/retry.txt"; git -C "$WT" add retry.txt; git -C "$WT" commit -q -m "task wip"; echo dirty > "$WT/dirty.txt"
 BR="$(git -C "$WT" symbolic-ref --short HEAD)"; HEADSHA="$(git -C "$WT" rev-parse HEAD)"
-OUT="$(rg "$BIN/hv-worker-reset" --slot w1 --task T5 2>&1)" || fail "retry of the slot's own task must not be refused: $OUT"
+OUT="$(rg hvj worker reset w1 --task T5 2>/dev/null)" || fail "retry of the slot's own task must not be refused: $OUT"
+[ "$(jget data.retained <<<"$OUT")" = "true" ] && [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "a retry reports retained:true, changed:false: $OUT"
 [ "$(git -C "$WT" rev-parse HEAD)" = "$HEADSHA" ] && [ -f "$WT/dirty.txt" ] || fail "a retry must keep the branch's commits and edits"
-RC=0; OUT="$(rg "$BIN/hv-worker-reset" --slot w1 --task OTHER 2>&1)" || RC=$?
-[ "$RC" = "3" ] || fail "a different task must still be refused, got $RC"
-case "$OUT" in *"re-dispatch T5"*) ;; *) fail "refusal must tell the orchestrator to re-dispatch the slot's own task, got: $OUT" ;; esac
+RC=0; rg hvj worker reset w1 --task OTHER >/dev/null 2>&1 || RC=$?
+[ "$RC" = "4" ] || fail "a different task must still be refused, got $RC"
 rm "$WT/dirty.txt"; git -C "$WT" reset -q --hard main
 pass "re-dispatching the slot's own task continues it in place; any other task is still refused"
 
 # ── (f) the session died but the second reset refused: handle must not go stale
 [ "$(slot_field w1 handle)" != "None" ] || fail "fixture: slot should hold a handle here"
 touch "$FK/tab_alive"; echo "$WT/raced.txt" > "$FK/dirty_on_close"
-RC=0; OUT="$(rgh "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_RG/brief.md" --task T7 2>&1)" || RC=$?
+RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T7 2>/dev/null)" || RC=$?
 rm -f "$FK/dirty_on_close" "$WT/raced.txt"
-[ "$RC" = "3" ] || fail "a reset refused after the kill must exit 3, got $RC: $OUT"
+[ "$RC" = "4" ] || fail "a reset refused after the kill must exit 4, got $RC: $OUT"
 [ "$(slot_field w1 handle)" = "None" ] || fail "the dead session's handle must be cleared, got $(slot_field w1 handle)"
 [ "$(slot_field w1 state)" = "idle" ] || fail "the slot must not stay busy with no session, got $(slot_field w1 state)"
 pass "a failure after the kill clears the slot's stale handle"
 
 # ── drift: SKILL.md carries the contract the helper header names ────────────
+# white-box: kept until A9 (#53)
 head -40 "$BIN/hv-worker-reset" | grep -F "reset guard" >/dev/null || fail "hv-worker-reset header lost the term 'reset guard'"
+# white-box: kept until A9 (#53)
 grep -qF "reset guard" "$REPO/hv-work/SKILL.md" || fail "hv-work/SKILL.md does not describe the slot reset guard"
 pass "hv-work/SKILL.md and the helper header share the 'reset guard' contract"
 
 # ── (g) a detached worktree is not registered as branch 'HEAD' ──────────────
 git -C "$WT" switch -q --detach
 BEFORE_BR="$(slot_field w1 branch)"
-rg "$BIN/hv-worker-pool" init --slots 1 --base main >/dev/null || fail "re-init on a detached worktree failed"
+rg hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "re-init on a detached worktree failed"
 [ "$(slot_field w1 branch)" = "$BEFORE_BR" ] && [ "$(slot_field w1 branch)" != "HEAD" ] \
   || fail "pool init registered '$(slot_field w1 branch)' for a detached worktree, expected $BEFORE_BR (registry value kept)"
-pass "hv-worker-pool init keeps the slot's branch when its worktree is detached"
+pass "worker pool init keeps the slot's branch when its worktree is detached"
 
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-worker-reset guard contract"
+pass "worker reset guard contract"
