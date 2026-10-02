@@ -30,3 +30,6 @@ __pycache__/
 .hv/handoff/
 .hv/qa-runs/
 .hv/migrate-backup/
+
+# hv release builds (goreleaser)
+dist/
