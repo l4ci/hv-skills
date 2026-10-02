@@ -1,0 +1,262 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+)
+
+// issueTracker serves a fixed set of issues.
+type issueTracker struct{ issues []backlog.Issue }
+
+func (f issueTracker) List(state string) ([]backlog.Issue, error) {
+	var out []backlog.Issue
+	for _, is := range f.issues {
+		if is.State == state {
+			out = append(out, is)
+		}
+	}
+	return out, nil
+}
+
+func (f issueTracker) Get(n int) (backlog.Issue, bool, error) {
+	for _, is := range f.issues {
+		if is.Number == n {
+			return is, true, nil
+		}
+	}
+	return backlog.Issue{}, false, nil
+}
+
+func withTracker(t *testing.T, tr backlog.Tracker) {
+	t.Helper()
+	old := newTracker
+	t.Cleanup(func() { newTracker = old })
+	newTracker = func(string, any) (backlog.Tracker, error) { return tr, nil }
+}
+
+func get(v any, path ...string) any {
+	for _, p := range path {
+		switch t := v.(type) {
+		case map[string]any:
+			v = t[p]
+		case *jsonx.Object:
+			v, _ = t.Get(p)
+		default:
+			return nil
+		}
+	}
+	return v
+}
+
+func dataOf(env map[string]any) *jsonx.Object {
+	d, _ := env["data"].(*jsonx.Object)
+	return d
+}
+
+func TestA4bIssueModeStubExits5(t *testing.T) {
+	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
+	for _, argv := range [][]string{{"backlog", "list"}, {"backlog", "ids", "--milestone", "M01"}, {"backlog", "milestones", "12"}, {"summary"}} {
+		code, env, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "not ported yet") {
+			t.Errorf("%v: code=%d stderr=%s", argv, code, stderr)
+		}
+	}
+}
+
+func TestA4bFileOnlyVerbsAreRefusedUnderIssues(t *testing.T) {
+	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
+	for _, argv := range [][]string{{"backlog", "drift"}, {"backlog", "backfill"}, {"backlog", "archive"}} {
+		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		d := dataOf(env)
+		if code != ExitRefused || get(d, "blockedBy") != "backend" || get(d, "changed") != false {
+			t.Errorf("%v: code=%d env=%v", argv, code, env)
+		}
+	}
+}
+
+func TestA4bBacklogViewsInIssueMode(t *testing.T) {
+	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
+	withTracker(t, issueTracker{issues: []backlog.Issue{
+		{Number: 12, Title: "Crash on save", State: "open", Labels: []string{"type:bug"}, Milestone: "M02 — Next",
+			Body: "<!-- hv:fields\nRelated: F3\n-->"},
+		{Number: 3, Title: "Dark mode", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},
+		{Number: 5, Title: "Chore", State: "open"},
+	}})
+	code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "list")
+	if code != 0 {
+		t.Fatalf("list: exit %d env=%v", code, env)
+	}
+	d := dataOf(env)
+	bug := get(d, "bugs").([]any)[0]
+	if get(bug, "id") != "12" || get(bug, "milestone") != "M02" || !reflect.DeepEqual(get(bug, "related"), []any{"3"}) {
+		t.Errorf("bug row = %v", bug)
+	}
+	if got := get(d, "clusters").([]any); len(got) != 1 || !reflect.DeepEqual(got[0], []any{"12", "3"}) {
+		t.Errorf("clusters = %v", got)
+	}
+
+	code, env, _ = hvRun(t, "--json", "-C", root, "backlog", "ids", "--milestone", "M02")
+	if code != 0 || !reflect.DeepEqual(get(dataOf(env), "ids"), []any{"12"}) {
+		t.Errorf("ids: %d %v", code, env)
+	}
+	for _, ref := range []string{"12", "#12", "B12"} {
+		code, env, _ = hvRun(t, "--json", "-C", root, "backlog", "milestones", ref)
+		if code != 0 || !reflect.DeepEqual(get(dataOf(env), "milestones"), []any{"M02"}) {
+			t.Errorf("milestones %s: %d %v", ref, code, env)
+		}
+	}
+
+	// Active streams use the issue number as the in-progress ID; its type
+	// comes from the listing.
+	os.WriteFile(filepath.Join(root, ".hv", "status.json"), []byte(`{"active": [{"branch": "b", "items": ["12"], "startedAt": "2026-09-01T10:00:00Z"}]}`), 0o644)
+	_, env, _ = hvRun(t, "--json", "-C", root, "backlog", "list")
+	prog := get(dataOf(env), "inProgress").([]any)
+	if len(prog) != 1 || get(prog[0], "id") != "12" || get(prog[0], "type") != "B" {
+		t.Errorf("in progress = %v", prog)
+	}
+}
+
+func TestA4bUmbrellaFileModeScopes(t *testing.T) {
+	root := a4Project(t, "")
+	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	for _, argv := range [][]string{{"backlog", "list"}, {"summary"}, {"backlog", "ids", "--milestone", "M01"}} {
+		if code, _, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != 0 {
+			t.Errorf("%v in a file umbrella: exit %d: %s", argv, code, stderr)
+		}
+	}
+	if code, _, _ := hvRun(t, "--json", "-C", root, "backlog", "list", "--repo", "web"); code != 0 {
+		t.Errorf("registered --repo: exit %d", code)
+	}
+	if code, _, _ := hvRun(t, "--json", "-C", root, "backlog", "list", "--repo", "api"); code != ExitResolution {
+		t.Errorf("unregistered --repo: exit %d, want 3", code)
+	}
+}
+
+func TestA4bUsageErrors(t *testing.T) {
+	root := a4Project(t, "")
+	for _, argv := range [][]string{
+		{"backlog", "ids"}, {"backlog", "milestones"}, {"backlog", "stale"}, {"backlog", "stale", "--kind", "plans"},
+		{"backlog", "archive", "--days", "-1"}, {"status", "add", "b"}, {"status", "add", "b", "--items", "B01", "--repos", ""},
+		{"status", "rm"}, {"status", "show"}, {"status", "handoff"}, {"status", "loop", "start", "--repo", "web"},
+		{"refactor", "targets", "--repo", "web"}, {"summary", "extra"},
+	} {
+		if code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitUsage || env["ok"] != false {
+			t.Errorf("%v: exit %d, want 2", argv, code)
+		}
+	}
+}
+
+func TestA4bStaleBadTodayEnv(t *testing.T) {
+	root := a4Project(t, "")
+	t.Setenv("HV_TEST_TODAY", "tomorrow")
+	if code, _, stderr := hvRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo"); code != ExitUsage || !strings.Contains(stderr, "HV_TEST_TODAY") {
+		t.Errorf("exit %d, stderr %s", code, stderr)
+	}
+	t.Setenv("HV_TEST_TODAY", "2999-01-01")
+	os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte("## Bugs\n- **[B01] [P1] a.** x Captured: 2026-01-01\n"), 0o644)
+	code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo", "--days", "90")
+	entries := get(dataOf(env), "entries").([]any)
+	if code != 0 || len(entries) != 1 || get(entries[0], "name") != "B01" || get(entries[0], "date") != "2026-01-01" {
+		t.Errorf("stale todo: %d %v", code, env)
+	}
+}
+
+func TestA4bStatusLifecycle(t *testing.T) {
+	root := a4Project(t, "")
+	run := func(argv ...string) (int, map[string]any) {
+		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		return code, env
+	}
+	code, env := run("status", "add", "feat/x", "--items", "B01,T01", "--worktree", "../wt")
+	if code != 0 || get(dataOf(env), "changed") != true {
+		t.Fatalf("add: %d %v", code, env)
+	}
+	e := get(dataOf(env), "entries").([]any)[0]
+	if get(e, "repo") != nil || !reflect.DeepEqual(get(e, "items"), []any{"B01", "T01"}) || get(e, "worktree") != "../wt" {
+		t.Errorf("entry = %v", e)
+	}
+	if code, env = run("status", "add", "feat/x", "--items", "B02", "--if-absent"); code != 0 || get(dataOf(env), "changed") != false {
+		t.Errorf("if-absent: %d %v", code, env)
+	}
+	if _, env = run("status", "show", "feat/x"); get(dataOf(env), "active") != true || get(dataOf(env), "worktree") != "../wt" {
+		t.Errorf("show: %v", env)
+	}
+	if _, env = run("status", "show", "nope"); get(dataOf(env), "active") != false || get(dataOf(env), "repo") != nil {
+		t.Errorf("show inactive: %v", env)
+	}
+	hp := filepath.Join(root, ".hv", "handoff", "feat", "x.md")
+	os.MkdirAll(filepath.Dir(hp), 0o755)
+	os.WriteFile(hp, []byte("h"), 0o644)
+	if _, env = run("status", "handoff", "feat/x"); get(dataOf(env), "path") != ".hv/handoff/feat/x.md" || get(dataOf(env), "exists") != true {
+		t.Errorf("handoff: %v", env)
+	}
+	if code, env = run("status", "rm", "feat/x"); code != 0 || fmt.Sprint(get(dataOf(env), "removed")) != "1" || get(dataOf(env), "handoffRemoved") != true || get(dataOf(env), "changed") != true {
+		t.Errorf("rm: %d %v", code, env)
+	}
+	if _, err := os.Stat(hp); err == nil {
+		t.Error("handoff note survived rm")
+	}
+	if code, env = run("status", "rm", "feat/x"); code != 0 || get(dataOf(env), "changed") != false {
+		t.Errorf("second rm: %d %v", code, env)
+	}
+}
+
+func TestA4bLoopLifecycle(t *testing.T) {
+	root := a4Project(t, "")
+	run := func(argv ...string) map[string]any {
+		code, env, stderr := hvRun(t, append([]string{"--json", "-C", root, "status", "loop"}, argv...)...)
+		if code != 0 {
+			t.Fatalf("%v: %d %s", argv, code, stderr)
+		}
+		return env
+	}
+	if v := get(dataOf(run("show")), "loopStartedAt"); v != nil {
+		t.Errorf("show before start = %v", v)
+	}
+	first := get(dataOf(run("start")), "loopStartedAt").(string)
+	if again := dataOf(run("start")); get(again, "loopStartedAt") != first || get(again, "changed") != false {
+		t.Errorf("second start: %v", again)
+	}
+	if v := get(dataOf(run("show")), "loopStartedAt"); v != first {
+		t.Errorf("show = %v", v)
+	}
+	if get(dataOf(run("clear")), "changed") != true || get(dataOf(run("clear")), "changed") != false {
+		t.Error("clear changed flags")
+	}
+}
+
+func TestA4bRefactorTargetsNeedsNoProject(t *testing.T) {
+	dir := t.TempDir()
+	code, env, _ := hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	d := dataOf(env)
+	if code != 0 || get(d, "umbrella") != nil || len(get(d, "subRepos").([]any)) != 0 {
+		t.Errorf("no .hv: %d %v", code, env)
+	}
+	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "web"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	_, env, _ = hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	if get(dataOf(env), "umbrella", "hasCode") != false {
+		t.Errorf("only a sub-repo and .hv: %v", env)
+	}
+	os.WriteFile(filepath.Join(dir, "main.go"), nil, 0o644)
+	_, env, _ = hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	if get(dataOf(env), "umbrella", "hasCode") != true {
+		t.Errorf("a top-level file: %v", env)
+	}
+}
+
+func TestA4bSummaryNoBacklogIsResolution(t *testing.T) {
+	root := a4Project(t, "")
+	os.Remove(filepath.Join(root, ".hv", "BACKLOG.md"))
+	if code, _, stderr := hvRun(t, "--json", "-C", root, "summary"); code != ExitResolution || !strings.Contains(stderr, "hv init") {
+		t.Errorf("exit %d stderr %s", code, stderr)
+	}
+}
