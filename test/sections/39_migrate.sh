@@ -1,53 +1,43 @@
-echo "hv-migrate — version arg validation"
-set +e
-"$BIN/hv-migrate" 2>"$TMP/.hv/err_no_ver"; RC=$?
-set -e
+echo "migrate — version arg validation"
+RC=0; hvj migrate 2>/dev/null >&2 || RC=$?
 [ $RC -eq 2 ] || fail "missing version arg should exit 2, got $RC"
-grep -q "version arg required" "$TMP/.hv/err_no_ver" || fail "missing version arg message"
-
-set +e
-"$BIN/hv-migrate" v3 2>"$TMP/.hv/err_v3"; RC=$?
-set -e
+RC=0; hvj migrate v3 2>/dev/null >&2 || RC=$?
 [ $RC -eq 2 ] || fail "unknown version should exit 2, got $RC"
-grep -q "only 'v4' supported" "$TMP/.hv/err_v3" || fail "unknown version message"
-pass "hv-migrate — version arg validation"
+pass "migrate — version arg validation"
 
-echo "hv-migrate — refuses pre-3.0 project"
+echo "migrate v4 — refuses pre-3.0 project"
 TMP_OLD="$(mktemp -d)"
 trap 'rm -rf "$TMP_OLD"' EXIT
 ( cd "$TMP_OLD" && git init -q && git config user.email t@t && git config user.name t )
 mkdir -p "$TMP_OLD/.hv"
 echo '{"version":"2.9.0"}' > "$TMP_OLD/.hv/config.json"
-set +e
-( cd "$TMP_OLD" && "$BIN/hv-migrate" v4 2>"$TMP_OLD/.hv/err" ); RC=$?
-set -e
-[ $RC -eq 1 ] || fail "pre-3.0 should exit 1, got $RC"
-grep -q "pre-3.0" "$TMP_OLD/.hv/err" || fail "pre-3.0 refusal message"
+RC=0
+OUT=$( cd "$TMP_OLD" && hvj migrate v4 2>/dev/null ) || RC=$?
+[ $RC -eq 4 ] || fail "pre-3.0 should exit 4, got $RC"
+[ "$(jget data.blockedBy <<<"$OUT")" = "pre-3.0" ] || fail "pre-3.0 refusal data: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "refusal must report changed=false: $OUT"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — refuses pre-3.0 project"
+pass "migrate v4 — refuses pre-3.0 project"
 
-echo "hv-migrate — umbrella project no longer refused (F21)"
+echo "migrate v4 — umbrella project no longer refused (F21)"
 TMP_UMB="$(mktemp -d)"
 trap 'rm -rf "$TMP_UMB"' EXIT
 ( cd "$TMP_UMB" && git init -q && git config user.email t@t && git config user.name t )
 mkdir -p "$TMP_UMB/.hv"
 echo '{"version":"3.4.0"}' > "$TMP_UMB/.hv/config.json"
 echo '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > "$TMP_UMB/.hv/repos.json"
-set +e
-( cd "$TMP_UMB" && "$BIN/hv-migrate" v4 2>"$TMP_UMB/.hv/err" ); RC=$?
-set -e
+RC=0
+OUT=$( cd "$TMP_UMB" && hvj migrate v4 2>/dev/null ) || RC=$?
 # F21 lifted the umbrella refusal — migrate proceeds. With no per-sub-repo
 # CONTEXT.md in this fixture there is nothing to migrate, so it's a clean
 # no-op dry-run (exit 0). The deep umbrella migration path is covered by
 # test/sections/46_umbrella_knowledge.sh.
 [ $RC -eq 0 ] || fail "umbrella should no longer refuse (expected exit 0, got $RC)"
-if grep -q "umbrella project detected" "$TMP_UMB/.hv/err"; then
-  fail "stale umbrella refusal message still present"
-fi
+[ "$(jget data.noop <<<"$OUT")" = "true" ] || fail "umbrella with nothing to migrate should be a noop: $OUT"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — umbrella project no longer refused (F21)"
+pass "migrate v4 — umbrella project no longer refused (F21)"
 
-echo "hv-migrate — refuses dirty tree outside .hv/"
+echo "migrate v4 — refuses dirty tree outside .hv/"
 TMP_DIRTY="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIRTY"' EXIT
 ( cd "$TMP_DIRTY" && git init -q && git config user.email t@t && git config user.name t )
@@ -56,15 +46,17 @@ echo '{"version":"3.4.0"}' > "$TMP_DIRTY/.hv/config.json"
 echo "x" > "$TMP_DIRTY/src/foo.txt"
 ( cd "$TMP_DIRTY" && git add -A && git commit -q -m init )
 echo "dirty" >> "$TMP_DIRTY/src/foo.txt"
-set +e
-( cd "$TMP_DIRTY" && "$BIN/hv-migrate" v4 2>"$TMP_DIRTY/.hv/err" ); RC=$?
-set -e
-[ $RC -eq 1 ] || fail "dirty tree should exit 1, got $RC"
-grep -q "uncommitted changes outside .hv/" "$TMP_DIRTY/.hv/err" || fail "dirty-tree refusal message"
+RC=0
+OUT=$( cd "$TMP_DIRTY" && hvj migrate v4 2>/dev/null ) || RC=$?
+[ $RC -eq 4 ] || fail "dirty tree should exit 4, got $RC"
+[ "$(jget data.blockedBy <<<"$OUT")" = "dirty-tree" ] || fail "dirty-tree refusal data: $OUT"
+RC=0
+( cd "$TMP_DIRTY" && hvj migrate v4 --apply >/dev/null 2>&1 ) || RC=$?
+[ $RC -eq 4 ] || fail "dirty tree should also refuse --apply with exit 4, got $RC"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — refuses dirty tree outside .hv/"
+pass "migrate v4 — refuses dirty tree outside .hv/"
 
-echo "hv-migrate — dry-run reports rewrites; --apply writes; idempotent"
+echo "migrate v4 — dry-run reports rewrites; --apply writes; idempotent"
 TMP_REW="$(mktemp -d)"
 trap 'rm -rf "$TMP_REW"' EXIT
 ( cd "$TMP_REW" && git init -q && git config user.email t@t && git config user.name t )
@@ -82,15 +74,21 @@ EOF
 ( cd "$TMP_REW" && git add -A && git commit -q -m init )
 
 # Dry-run: should report 6 references rewritten, file unchanged on disk.
-OUT_DRY=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 )
-grep -q "dry-run" <<<"$OUT_DRY" || fail "dry-run header missing"
-grep -q "references rewritten: 7" <<<"$OUT_DRY" || fail "dry-run should count 7 references (6 in BACKLOG + 1 in CLAUDE)"
-grep -q "Run with --apply" <<<"$OUT_DRY" || fail "dry-run should suggest --apply"
+OUT_DRY=$( cd "$TMP_REW" && hvj migrate v4 )
+[ "$(jget data.applied <<<"$OUT_DRY")" = "false" ] || fail "dry-run must not report applied: $OUT_DRY"
+[ "$(jget data.changed <<<"$OUT_DRY")" = "false" ] || fail "dry-run must report changed=false: $OUT_DRY"
+[ "$(jget data.referencesRewritten <<<"$OUT_DRY")" = "7" ] || fail "dry-run should count 7 references (6 in BACKLOG + 1 in CLAUDE): $OUT_DRY"
+[ "$(jget data.filesRewritten <<<"$OUT_DRY")" = "2" ] || fail "dry-run should count 2 files: $OUT_DRY"
+grep -q "preview only" <<<"$(jget warnings <<<"$OUT_DRY")" || fail "dry-run should warn to pass --apply: $OUT_DRY"
+OUT_VERB=$( cd "$TMP_REW" && hvj migrate v4 --verbose )
+[ "$(jget data.diffs <<<"$OUT_VERB" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')" = "2" ] || fail "--verbose should add one diff per rewritten file: $OUT_VERB"
 grep -q "/hv-context" "$TMP_REW/.hv/BACKLOG.md" || fail "dry-run wrote to disk (must not)"
 
 # Apply.
-OUT_APPLY=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 --apply )
-grep -q "applied. backup at:" <<<"$OUT_APPLY" || fail "--apply should report backup path"
+OUT_APPLY=$( cd "$TMP_REW" && hvj migrate v4 --apply )
+[ "$(jget data.applied <<<"$OUT_APPLY")" = "true" ] || fail "--apply should report applied: $OUT_APPLY"
+[ "$(jget data.changed <<<"$OUT_APPLY")" = "true" ] || fail "--apply should report changed: $OUT_APPLY"
+[ -d "$TMP_REW/$(jget data.backup <<<"$OUT_APPLY")" ] || fail "--apply should report the backup path: $OUT_APPLY"
 
 # Verify rewrites.
 grep -q "/hv-learn --term" "$TMP_REW/.hv/BACKLOG.md" || fail "/hv-context not rewritten"
@@ -111,12 +109,14 @@ grep -q "/hv-context" "$BACKUP_DIR/.hv/BACKLOG.md" || fail "backup didn't preser
 
 # Idempotency — commit the apply's writes first (realistic UX), then re-run.
 ( cd "$TMP_REW" && git add -A && git commit -q -m "v4 migration" )
-OUT_AGAIN=$( cd "$TMP_REW" && "$BIN/hv-migrate" v4 --apply )
-grep -q "noop: project is already on v4" <<<"$OUT_AGAIN" || fail "second --apply should be noop"
+OUT_AGAIN=$( cd "$TMP_REW" && hvj migrate v4 --apply )
+[ "$(jget data.noop <<<"$OUT_AGAIN")" = "true" ] || fail "second --apply should be noop: $OUT_AGAIN"
+[ "$(jget data.changed <<<"$OUT_AGAIN")" = "false" ] || fail "second --apply should report changed=false: $OUT_AGAIN"
+[ "$(jget data.filesRewritten <<<"$OUT_AGAIN")" = "0" ] || fail "second --apply should rewrite zero files: $OUT_AGAIN"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — dry-run + apply + idempotency"
+pass "migrate v4 — dry-run + apply + idempotency"
 
-echo "hv-migrate — flags /hv-issues and /hv-map for manual review"
+echo "migrate v4 — flags /hv-issues and /hv-map for manual review"
 TMP_AMB="$(mktemp -d)"
 trap 'rm -rf "$TMP_AMB"' EXIT
 ( cd "$TMP_AMB" && git init -q && git config user.email t@t && git config user.name t )
@@ -129,25 +129,24 @@ cat > "$TMP_AMB/.hv/BACKLOG.md" <<'EOF'
 EOF
 ( cd "$TMP_AMB" && git add -A && git commit -q -m init )
 
-OUT_AMB=$( cd "$TMP_AMB" && "$BIN/hv-migrate" v4 )
-grep -q "manual review:" <<<"$OUT_AMB" || fail "manual review section missing"
-grep -qE "manual review:.*2|manual review:\s+2" <<<"$OUT_AMB" || fail "should report 2 manual-review items"
-grep -q "hv-issues" <<<"$OUT_AMB" || fail "should flag /hv-issues"
-grep -q "hv-map" <<<"$OUT_AMB" || fail "should flag /hv-map"
-grep -q "ambiguous" <<<"$OUT_AMB" || fail "should call out ambiguity"
+RC=0
+OUT_AMB=$( cd "$TMP_AMB" && hvj migrate v4 ) || RC=$?
+[ $RC -eq 0 ] || fail "a preview with manual-review items is still exit 0, got $RC"
+[ "$(jget data.manualReview <<<"$OUT_AMB")" = "2" ] || fail "should report 2 manual-review items: $OUT_AMB"
+[ "$(jget data.referencesRewritten <<<"$OUT_AMB")" = "0" ] || fail "ambiguous references must not count as rewritten: $OUT_AMB"
 
 # Apply should NOT rewrite ambiguous ones.
-( cd "$TMP_AMB" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_AMB" && "$HV_BIN" migrate v4 --apply >/dev/null )
 grep -q "/hv-issues" "$TMP_AMB/.hv/BACKLOG.md" || fail "/hv-issues should be preserved (manual review)"
 grep -q "/hv-map" "$TMP_AMB/.hv/BACKLOG.md" || fail "/hv-map should be preserved (manual review)"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — /hv-issues and /hv-map flagged, not rewritten"
+pass "migrate v4 — /hv-issues and /hv-map flagged, not rewritten"
 
-echo "hv-migrate — migrates CONTEXT.md terms into Glossary; deletes CONTEXT.md"
+echo "migrate v4 — migrates CONTEXT.md terms into Glossary; deletes CONTEXT.md"
 TMP_CTX="$(mktemp -d)"
 trap 'rm -rf "$TMP_CTX"' EXIT
 ( cd "$TMP_CTX" && git init -q && git config user.email t@t && git config user.name t )
-( cd "$TMP_CTX" && "$BIN/hv-bootstrap" >/dev/null )
+( cd "$TMP_CTX" && "$HV_BIN" init >/dev/null )
 echo '{"version":"3.4.0"}' > "$TMP_CTX/.hv/config.json"
 cat > "$TMP_CTX/.hv/CONTEXT.md" <<'EOF'
 # Context
@@ -169,7 +168,7 @@ A hard project boundary captured in DECISIONS.md.
 EOF
 ( cd "$TMP_CTX" && git add -A && git commit -q -m init )
 
-( cd "$TMP_CTX" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_CTX" && "$HV_BIN" migrate v4 --apply >/dev/null )
 [ ! -f "$TMP_CTX/.hv/CONTEXT.md" ] || fail "CONTEXT.md should be deleted after migration"
 grep -q "^- \*\*backlog\*\* — " "$TMP_CTX/.hv/KNOWLEDGE.md" || fail "backlog term missing from KNOWLEDGE.md Glossary"
 grep -q "^- \*\*decision\*\* — " "$TMP_CTX/.hv/KNOWLEDGE.md" || fail "decision term missing from KNOWLEDGE.md Glossary"
@@ -181,13 +180,13 @@ BACKUP_CTX=$(ls -d "$TMP_CTX"/.hv/migrate-backup/*/ 2>/dev/null | head -1)
 [ -f "$BACKUP_CTX/CONTEXT.md" ] || fail "CONTEXT.md backup missing"
 grep -q "^## backlog$" "$BACKUP_CTX/CONTEXT.md" || fail "CONTEXT.md backup content corrupted"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — CONTEXT.md → KNOWLEDGE.md Glossary migration"
+pass "migrate v4 — CONTEXT.md → KNOWLEDGE.md Glossary migration"
 
-echo "hv-migrate — empty CONTEXT.md is deleted, no batch call"
+echo "migrate v4 — empty CONTEXT.md is deleted, no batch call"
 TMP_CTX_EMPTY="$(mktemp -d)"
 trap 'rm -rf "$TMP_CTX_EMPTY"' EXIT
 ( cd "$TMP_CTX_EMPTY" && git init -q && git config user.email t@t && git config user.name t )
-( cd "$TMP_CTX_EMPTY" && "$BIN/hv-bootstrap" >/dev/null )
+( cd "$TMP_CTX_EMPTY" && "$HV_BIN" init >/dev/null )
 echo '{"version":"3.4.0"}' > "$TMP_CTX_EMPTY/.hv/config.json"
 cat > "$TMP_CTX_EMPTY/.hv/CONTEXT.md" <<'EOF'
 # Context
@@ -195,12 +194,12 @@ cat > "$TMP_CTX_EMPTY/.hv/CONTEXT.md" <<'EOF'
 _(no terms yet)_
 EOF
 ( cd "$TMP_CTX_EMPTY" && git add -A && git commit -q -m init )
-( cd "$TMP_CTX_EMPTY" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_CTX_EMPTY" && "$HV_BIN" migrate v4 --apply >/dev/null )
 [ ! -f "$TMP_CTX_EMPTY/.hv/CONTEXT.md" ] || fail "empty CONTEXT.md should be deleted"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — empty CONTEXT.md deleted with no batch call"
+pass "migrate v4 — empty CONTEXT.md deleted with no batch call"
 
-echo "hv-migrate — removes stale .hv/bin/hv-context-* files"
+echo "migrate v4 — removes stale .hv/bin/hv-context-* files"
 TMP_BIN="$(mktemp -d)"
 trap 'rm -rf "$TMP_BIN"' EXIT
 ( cd "$TMP_BIN" && git init -q && git config user.email t@t && git config user.name t )
@@ -211,19 +210,20 @@ echo '#!/bin/sh' > "$TMP_BIN/.hv/bin/hv-context-query"
 chmod +x "$TMP_BIN/.hv/bin/hv-context-add" "$TMP_BIN/.hv/bin/hv-context-query"
 ( cd "$TMP_BIN" && git add -A && git commit -q -m init )
 
-OUT_BIN=$( cd "$TMP_BIN" && "$BIN/hv-migrate" v4 )
-grep -q "removed binaries:.*2\|removed binaries: \+2" <<<"$OUT_BIN" || fail "should report 2 removed binaries in dry-run"
+OUT_BIN=$( cd "$TMP_BIN" && hvj migrate v4 )
+[ "$(jget data.removedBinaries <<<"$OUT_BIN")" = "2" ] || fail "should report 2 removed binaries in dry-run: $OUT_BIN"
+[ -e "$TMP_BIN/.hv/bin/hv-context-add" ] || fail "dry-run must not remove binaries"
 
-( cd "$TMP_BIN" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_BIN" && "$HV_BIN" migrate v4 --apply >/dev/null )
 [ ! -e "$TMP_BIN/.hv/bin/hv-context-add" ] || fail "hv-context-add should be removed"
 [ ! -e "$TMP_BIN/.hv/bin/hv-context-query" ] || fail "hv-context-query should be removed"
 # Backup tree
 BACKUP_BIN=$(ls -d "$TMP_BIN"/.hv/migrate-backup/*/bin/ 2>/dev/null | head -1)
 [ -f "$BACKUP_BIN/hv-context-add" ] || fail "hv-context-add backup missing"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — removes stale .hv/bin/hv-context-* with backup"
+pass "migrate v4 — removes stale .hv/bin/hv-context-* with backup"
 
-echo "hv-migrate — word boundary: /hv-capture is NOT rewritten by /hv-c\\b rule"
+echo "migrate v4 — word boundary: /hv-capture is NOT rewritten by /hv-c\\b rule"
 TMP_WB="$(mktemp -d)"
 trap 'rm -rf "$TMP_WB"' EXIT
 ( cd "$TMP_WB" && git init -q && git config user.email t@t && git config user.name t )
@@ -236,15 +236,15 @@ cat > "$TMP_WB/.hv/BACKLOG.md" <<'EOF'
 EOF
 ( cd "$TMP_WB" && git add -A && git commit -q -m init )
 
-( cd "$TMP_WB" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_WB" && "$HV_BIN" migrate v4 --apply >/dev/null )
 # Expected after rewrite: "/hv-capture is correct; /hv-capture is the old alias."
 [ "$(grep -c "/hv-capture is correct" "$TMP_WB/.hv/BACKLOG.md")" = "1" ] || fail "/hv-capture survived unscathed"
 [ "$(grep -c "/hv-capture is the old alias" "$TMP_WB/.hv/BACKLOG.md")" = "1" ] || fail "/hv-c should rewrite to /hv-capture"
 grep -q "/hv-c is" "$TMP_WB/.hv/BACKLOG.md" && fail "stale /hv-c left after rewrite"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — word boundary: /hv-capture preserved, /hv-c rewritten"
+pass "migrate v4 — word boundary: /hv-capture preserved, /hv-c rewritten"
 
-echo "hv-migrate — B07: reads hvSkills.version when top-level 'version' absent"
+echo "migrate v4 — B07: reads hvSkills.version when top-level 'version' absent"
 TMP_B07="$(mktemp -d)"
 trap 'rm -rf "$TMP_B07"' EXIT
 ( cd "$TMP_B07" && git init -q && git config user.email t@t && git config user.name t )
@@ -252,42 +252,48 @@ mkdir -p "$TMP_B07/.hv"
 # Fresh v4 init shape: ONLY hvSkills.version, no top-level "version" field.
 echo '{"hvSkills":{"version":"4.0.0"}}' > "$TMP_B07/.hv/config.json"
 ( cd "$TMP_B07" && git add -A && git commit -q -m init )
-# Should pass the safety precondition (no "refusing: no version field") — exits
-# either 0 (noop) or 3 (F18 dep missing in $BIN). Anything that mentions "version
-# field" is B07 still firing.
-set +e
-( cd "$TMP_B07" && "$BIN/hv-migrate" v4 2>"$TMP_B07/.hv/err" >"$TMP_B07/.hv/out" ); RC=$?
-set -e
-grep -q "no 'version' field" "$TMP_B07/.hv/err" "$TMP_B07/.hv/out" && fail "B07: nested hvSkills.version should not trigger the missing-version refusal"
+# Should pass the safety precondition: exit 3 (config has no version) is B07 still firing.
+RC=0
+OUT=$( cd "$TMP_B07" && hvj migrate v4 2>/dev/null ) || RC=$?
+[ $RC -eq 0 ] || fail "B07: nested hvSkills.version should not trigger the missing-version refusal, got exit $RC"
+[ "$(jget data.noop <<<"$OUT")" = "true" ] || fail "B07: a v4 project with nothing to rewrite should be a noop: $OUT"
+# A config with no version at all is exit 3.
+echo '{}' > "$TMP_B07/.hv/config.json"
+RC=0; ( cd "$TMP_B07" && hvj migrate v4 >/dev/null 2>&1 ) || RC=$?
+[ $RC -eq 3 ] || fail "B07: a config with no version should exit 3, got $RC"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — B07: reads hvSkills.version when top-level 'version' absent"
+pass "migrate v4 — B07: reads hvSkills.version when top-level 'version' absent"
 
-echo "hv-migrate — B08: --apply bumps hvSkills.version to installed plugin"
+echo "migrate v4 — B08: --apply bumps hvSkills.version to installed plugin"
 TMP_B08="$(mktemp -d)"
 trap 'rm -rf "$TMP_B08"' EXIT
 ( cd "$TMP_B08" && git init -q && git config user.email t@t && git config user.name t )
-( cd "$TMP_B08" && "$BIN/hv-bootstrap" >/dev/null )
+( cd "$TMP_B08" && "$HV_BIN" init >/dev/null )
 echo '{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}' > "$TMP_B08/.hv/config.json"
 ( cd "$TMP_B08" && git add -A && git commit -q -m init )
 
-# Force HV_INSTALL_ROOT to point at $REPO so resolve-plugin-root returns it,
-# and the version stamp picks up $REPO/.claude-plugin/plugin.json's version.
+# Force HV_INSTALL_ROOT to point at $REPO so the version stamp picks up
+# $REPO/.claude-plugin/plugin.json's version.
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 INSTALLED_VER=$(python3 -c "import json; print(json.load(open('$REPO/.claude-plugin/plugin.json'))['version'])")
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 [ -n "$INSTALLED_VER" ] || fail "test setup: could not read .claude-plugin/plugin.json version"
 
-( cd "$TMP_B08" && HV_INSTALL_ROOT="$REPO" "$BIN/hv-migrate" v4 --apply >/dev/null )
+OUT=$( cd "$TMP_B08" && HV_INSTALL_ROOT="$REPO" hvj migrate v4 --apply )
 
 # hvSkills.version must equal the installed plugin version after apply.
 STAMPED=$(python3 -c "import json; print(json.load(open('$TMP_B08/.hv/config.json')).get('hvSkills',{}).get('version',''))")
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 [ "$STAMPED" = "$INSTALLED_VER" ] || fail "B08: hvSkills.version is '$STAMPED', expected '$INSTALLED_VER'"
+[ "$(jget data.versionStamp <<<"$OUT")" = "$STAMPED" ] || fail "B08: versionStamp should report the stamped version: $OUT"
 
 # Legacy top-level "version" should be cleaned up.
 HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")
 [ "$HAS_LEGACY" = "no" ] || fail "B08: legacy top-level 'version' should be removed after migration"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — B08: --apply bumps hvSkills.version"
+pass "migrate v4 — B08: --apply bumps hvSkills.version"
 
-echo "hv-managed-block-strip-deprecated — B09: removes orphan v3 blocks"
+echo "migrate v4 — B09: strips orphan v3 blocks"
 TMP_STRIP="$(mktemp -d)"
 trap 'rm -rf "$TMP_STRIP"' EXIT
 mkdir -p "$TMP_STRIP/.hv/bin"
@@ -310,6 +316,7 @@ Orphan block — must be stripped.
 Regular prose stays.
 EOF
 
+# white-box: kept until the A5 Go unit test lands (#49), then delete
 "$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip.out"
 
 grep -q "hv-knowledge-start" CLAUDE.md || fail "B09-d1: live hv-knowledge block should survive strip"
@@ -318,14 +325,52 @@ grep -q "Regular prose stays" CLAUDE.md || fail "B09-d1: surrounding prose must 
 grep -q "stripped: context" "$TMP_STRIP/strip.out" || fail "B09-d1: strip output should report 'stripped: context'"
 
 # Idempotency: second run is silent and a no-op.
+# white-box: kept until the A5 Go unit test lands (#49), then delete
 "$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip2.out"
+# white-box: kept until the A5 Go unit test lands (#49), then delete
 [ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running hv-managed-block-strip-deprecated on clean CLAUDE.md should be silent"
 
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-managed-block-strip-deprecated — B09: removes orphan v3 blocks"
 
-echo "hv-migrate — B09: rewrite_text skips fenced/inline code + helper-path tokens"
+# The same strip through the verb: the preview names the block, --apply removes it.
+TMP_STRIP2="$(mktemp -d)"
+trap 'rm -rf "$TMP_STRIP2"' EXIT
+( cd "$TMP_STRIP2" && git init -q && git config user.email t@t && git config user.name t )
+mkdir -p "$TMP_STRIP2/.hv"
+echo '{"version":"3.4.0"}' > "$TMP_STRIP2/.hv/config.json"
+# A /hv-rm reference gives the run something to rewrite: a project with nothing to do is a noop
+# that skips the strip step.
+cat > "$TMP_STRIP2/CLAUDE.md" <<'EOF'
+# Project
+
+Use /hv-rm to delete.
+
+<!-- hv-knowledge-start -->
+## Project Knowledge
+Live block — must survive.
+<!-- hv-knowledge-end -->
+
+<!-- hv-context-start -->
+## Project Context
+Orphan block — must be stripped.
+<!-- hv-context-end -->
+
+Regular prose stays.
+EOF
+( cd "$TMP_STRIP2" && git add -A && git commit -q -m init )
+OUT=$( cd "$TMP_STRIP2" && hvj migrate v4 )
+[ "$(jget data.strippedBlocks <<<"$OUT")" = '["context"]' ] || fail "B09-d1: preview should name the context block: $OUT"
+grep -q "hv-context-start" "$TMP_STRIP2/CLAUDE.md" || fail "B09-d1: preview must not strip the block"
+OUT=$( cd "$TMP_STRIP2" && hvj migrate v4 --apply )
+[ "$(jget data.strippedBlocks <<<"$OUT")" = '["context"]' ] || fail "B09-d1: --apply should report the stripped block: $OUT"
+grep -q "hv-context-start" "$TMP_STRIP2/CLAUDE.md" && fail "B09-d1: --apply should strip the orphan hv-context block"
+grep -q "hv-knowledge-start" "$TMP_STRIP2/CLAUDE.md" || fail "B09-d1: live hv-knowledge block should survive --apply"
+grep -q "Regular prose stays" "$TMP_STRIP2/CLAUDE.md" || fail "B09-d1: surrounding prose must survive --apply"
+trap 'rm -rf "$TMP"' EXIT
+pass "migrate v4 — B09: strips orphan v3 blocks"
+
+echo "migrate v4 — B09: rewrite_text skips fenced/inline code + helper-path tokens"
 TMP_B09D2="$(mktemp -d)"
 trap 'rm -rf "$TMP_B09D2"' EXIT
 ( cd "$TMP_B09D2" && git init -q && git config user.email t@t && git config user.name t )
@@ -351,7 +396,7 @@ cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
 EOF
 ( cd "$TMP_B09D2" && git add -A && git commit -q -m init )
 
-( cd "$TMP_B09D2" && "$BIN/hv-migrate" v4 --apply >/dev/null )
+( cd "$TMP_B09D2" && "$HV_BIN" migrate v4 --apply >/dev/null )
 
 # (a) inline-code mention preserved
 grep -q '`/hv-context`' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: inline-code /hv-context should be preserved"
@@ -362,4 +407,4 @@ grep -q 'hv-map-query' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: hv-map-query
 # (d) bare prose mention rewritten to /hv-learn --term (control — proves rewriting still works outside masks)
 grep -q 'Bare /hv-learn --term in prose' "$TMP_B09D2/.hv/BACKLOG.md" || fail "B09-d2: bare /hv-context in prose should rewrite to /hv-learn --term"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-migrate — B09: rewrite_text skips fenced/inline code + helper-path tokens"
+pass "migrate v4 — B09: rewrite_text skips fenced/inline code + helper-path tokens"
