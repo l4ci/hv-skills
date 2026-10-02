@@ -184,7 +184,9 @@ func (g *GitLab) Get(ctx context.Context, number int, withComments bool) (Issue,
 	if withComments {
 		is.Comments = []Comment{}
 		for _, n := range d.Notes {
-			is.Comments = append(is.Comments, n.comment())
+			if !n.System { // as in Comments
+				is.Comments = append(is.Comments, n.comment())
+			}
 		}
 	}
 	return is, nil
@@ -385,12 +387,16 @@ func (g *GitLab) PRMerge(ctx context.Context, pr int) (string, error) {
 
 // onBase checks a fast-forwarded MR's head is on origin/<target>.
 func (g *GitLab) onBase(ctx context.Context, pr int, sha, target string) error {
-	x := g.cli.exec()
-	if _, errb, code, err := x(ctx, g.cli.Dir, "git", []string{"fetch", "-q", "origin"}, nil); err != nil || code != 0 {
+	x := func(args ...string) ([]byte, []byte, int, error) {
+		actx, cancel := context.WithTimeout(ctx, g.cli.timeout())
+		defer cancel()
+		return g.cli.exec()(actx, g.cli.Dir, "git", args, nil)
+	}
+	if _, errb, code, err := x("fetch", "-q", "origin"); err != nil || code != 0 {
 		return failed("MR %d merged without a merge commit, and git fetch origin failed: %s", pr, strings.TrimSpace(string(errb)))
 	}
 	ref := "origin/" + target
-	_, errb, code, err := x(ctx, g.cli.Dir, "git", []string{"merge-base", "--is-ancestor", sha, ref}, nil)
+	_, errb, code, err := x("merge-base", "--is-ancestor", sha, ref)
 	switch {
 	case err == nil && code == 0:
 		return nil
