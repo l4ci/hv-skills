@@ -15,7 +15,7 @@ import (
 // (internal/backlog/milestones.go, shared with the issue migration).
 
 func milestoneAddIssue(c *Ctx, title, summary, depends string) (Result, error) {
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -38,7 +38,7 @@ func entriesOf(rows []backlog.MilestoneRow) []ms.Entry {
 }
 
 func milestoneListIssue(c *Ctx) (Result, error) {
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -53,7 +53,7 @@ func milestoneShowIssue(c *Ctx, id string) (Result, error) {
 	if !ms.ValidID(id) {
 		return Result{}, Usage("milestone ID must match M\\d{2,} (e.g. M01, M03), got %q", id)
 	}
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -76,7 +76,7 @@ func milestonePutIssue(c *Ctx, id, file string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -104,7 +104,7 @@ func milestoneStatusIssue(c *Ctx, id, to string) (Result, error) {
 	if !ms.ValidID(id) {
 		return Result{}, Usage("milestone ID must match M\\d{2,} (e.g. M01, M03), got %q", id)
 	}
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -132,7 +132,7 @@ func milestoneStatusIssue(c *Ctx, id, to string) (Result, error) {
 }
 
 func milestoneActiveIssue(c *Ctx) (Result, error) {
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}
@@ -149,7 +149,7 @@ func milestoneActiveIssue(c *Ctx) (Result, error) {
 	return milestoneActiveResult(ids), nil
 }
 
-func indexIssue(c *Ctx, be *backlog.Issues) (bool, error) {
+func indexIssue(c *Ctx, be milestoneBackend) (bool, error) {
 	rows, err := be.MilestoneList()
 	if err != nil {
 		_, ferr := a4Fail(err)
@@ -164,7 +164,7 @@ func indexIssue(c *Ctx, be *backlog.Issues) (bool, error) {
 }
 
 func milestoneIndexIssue(c *Ctx) (Result, error) {
-	be, err := issuesBackend(c)
+	be, err := milestonesBackend(c)
 	if err != nil {
 		return a4Fail(err)
 	}

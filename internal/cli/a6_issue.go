@@ -116,20 +116,63 @@ func errOf[T any](_ T, err error) error { return err }
 // rather than an item; duplicate-tracking-issue notices go to stderr and
 // into the envelope's warnings.
 func issuesBackend(c *Ctx) (*backlog.Issues, error) {
+	be, err := openIssues(c)
+	if err != nil {
+		return nil, err
+	}
+	switch b := be.(type) {
+	case *backlog.Issues:
+		b.Warn = func(msg string) { c.Warn("%s", msg) }
+		return b, nil
+	case *backlog.Umbrella:
+		// Slice plans, and the plan of a milestone, live on the home sub-repo.
+		home, err := b.HomeSub()
+		if err != nil {
+			return nil, err
+		}
+		home.Warn = func(msg string) { c.Warn("%s", msg) }
+		return home, nil
+	}
+	return nil, Refused("%s works on the issue backend only", c.Path)
+}
+
+// milestoneBackend is what the milestone verbs need of either issue backend:
+// one repo, or an umbrella that mints IDs and aggregates status over every
+// sub-repo's native milestones.
+type milestoneBackend interface {
+	MilestoneAdd(mid, title, summary string, depends []string, today string) (string, error)
+	MilestoneList() ([]backlog.MilestoneRow, error)
+	MilestoneShow(mid string) (string, error)
+	MilestonePut(mid, text string) error
+	MilestoneStatus(mid, status string) error
+}
+
+func milestonesBackend(c *Ctx) (milestoneBackend, error) {
+	be, err := openIssues(c)
+	if err != nil {
+		return nil, err
+	}
+	switch b := be.(type) {
+	case *backlog.Issues:
+		b.Warn = func(msg string) { c.Warn("%s", msg) }
+		return b, nil
+	case *backlog.Umbrella:
+		if home, err := b.HomeSub(); err == nil {
+			home.Warn = func(msg string) { c.Warn("%s", msg) }
+		}
+		return b, nil
+	}
+	return nil, Refused("%s works on the issue backend only", c.Path)
+}
+
+// openIssues opens the backlog backend for a verb that addresses a milestone
+// rather than an item.
+func openIssues(c *Ctx) (backlog.Backend, error) {
 	root, err := a4Scope(c)
 	if err != nil {
 		return nil, err
 	}
-	be, err := a4Open(c, root, false, "")
-	if err != nil {
-		return nil, err
-	}
-	is, ok := be.(*backlog.Issues)
-	if !ok {
-		return nil, Refused("%s works on the issue backend only", c.Path)
-	}
-	is.Warn = func(msg string) { c.Warn("%s", msg) }
-	return is, nil
+	return a4Open(c, root, false, "")
 }
 
 func planAddIssue(c *Ctx, root string, o plan.AddOpts) (Result, error) {
