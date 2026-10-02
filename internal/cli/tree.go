@@ -31,6 +31,7 @@ func Tree() *Command {
 	root.Subs = append(root.Subs, workerCommands())
 	root.Subs = append(root.Subs, trackerCommands(), gitCommands())
 	root.Subs = append(root.Subs, reviewCommands(), shipCommands(), releaseCommands())
+	addStubs(root)
 	return root
 }
 

@@ -31,6 +31,10 @@ type Command struct {
 	// runs with the parsed values. Nil for a group.
 	Verb func(fs *flag.FlagSet) RunFunc
 	Subs []*Command
+	// Stub marks a contract verb the Go binary does not implement yet: any call
+	// exits 71 (not_implemented). Stubs never appear in VerbPaths, so
+	// `hv __verbs` still lists only what really works.
+	Stub bool
 }
 
 // RunFunc runs a verb with its positional args.
@@ -242,7 +246,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	g.register(pre, true, false)
 	cmd := root
 	i := 0
-	for ; i < len(args) && cmd.Verb == nil; i++ {
+	for ; i < len(args) && (cmd.Verb == nil || stubDescends(cmd, args[i])); i++ {
 		tok := args[i]
 		switch {
 		case tok == "--":
@@ -265,6 +269,12 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	if g.version && cmd == root {
 		cmd = root.sub("version")
 		c.Path = "hv version"
+	}
+
+	// A stub verb answers before any argument parsing: its flags are not known,
+	// so none can be unknown. -h and --help still reach the help below.
+	if cmd.Stub && !hasHelp(args[i:]) {
+		return fail(c, stdout, NotImplemented(c.Path).WithHint("not ported to the Go binary yet; see docs/design/5.0-verb-contract.md"))
 	}
 
 	// After the verb: verb and global flags, mixed with positional args.
@@ -488,7 +498,7 @@ func VerbPaths(root *Command) []string {
 	walk = func(c *Command, prefix string) {
 		for _, s := range c.Subs {
 			p := strings.TrimSpace(prefix + " " + s.Name)
-			if s.Verb != nil {
+			if s.Verb != nil && !s.Stub {
 				out = append(out, p)
 			}
 			walk(s, p)
@@ -497,4 +507,22 @@ func VerbPaths(root *Command) []string {
 	walk(root, "")
 	sort.Strings(out)
 	return out
+}
+
+// stubDescends: a stub verb may still have stub sub-verbs (`init` and `init
+// check`), so a command word after it keeps the command-word scan going.
+func stubDescends(cmd *Command, tok string) bool {
+	return cmd.Stub && !isFlag(tok) && cmd.sub(tok) != nil
+}
+
+func hasHelp(args []string) bool {
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		if a == "-h" || a == "--help" || a == "-help" {
+			return true
+		}
+	}
+	return false
 }
