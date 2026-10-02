@@ -489,7 +489,7 @@ func TestGateLocalMergeFailureIsAbortedAndReported(t *testing.T) {
 	e.Git = func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
 		seen = append(seen, strings.Join(args, " "))
 		if len(args) > 0 && args[0] == "merge" && args[1] == "--no-ff" {
-			return "", "conflict", 1, nil
+			return "CONFLICT (content): Merge conflict in work.txt", "", 1, nil
 		}
 		return inner(ctx, dir, args...)
 	}
@@ -592,5 +592,25 @@ func TestGateShellRunsUnderTheContext(t *testing.T) {
 	res, err := w.env(false).Gate(ctx, w.dir, GateOpts{Slot: "w1", Base: "main"})
 	if err != nil || res.Verdict != GateVerifyFailed || time.Since(start) > 10*time.Second {
 		t.Errorf("a cancelled context must stop the verify command: %+v %v after %v", res, err, time.Since(start))
+	}
+}
+
+// A merge that fails for a reason other than a conflict (no committer identity
+// was the CI case) is reported with git's own stderr, not called a conflict.
+func TestGateLocalMergeNonConflictFailureShowsGitsWords(t *testing.T) {
+	w := newWorld(t, "")
+	gitq(t, w.dir, "fetch", "-q", "origin", "w1:w1")
+	e := w.env(false)
+	inner := ExecGit
+	e.Git = func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
+		if len(args) > 1 && args[0] == "merge" && args[1] == "--no-ff" {
+			return "", "fatal: unable to auto-detect email address", 128, nil
+		}
+		return inner(ctx, dir, args...)
+	}
+	res, err := e.Gate(bg, w.dir, GateOpts{Slot: "w1", Base: "main"})
+	if err != nil || res.Verdict != GateMergeFailed || strings.Contains(res.Err, "conflicted") ||
+		!strings.Contains(res.Err, "failed (exit 128): fatal: unable to auto-detect email address") {
+		t.Errorf("%+v %v", res, err)
 	}
 }
