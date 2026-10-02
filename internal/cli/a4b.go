@@ -100,7 +100,7 @@ func a4BacklogList(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -188,7 +188,7 @@ func a4BacklogIDs(fs *flag.FlagSet) RunFunc {
 		if *milestone == "" {
 			return Result{}, Usage("--milestone is required")
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -210,7 +210,7 @@ func a4BacklogMilestones(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -224,7 +224,7 @@ func a4BacklogMilestones(fs *flag.FlagSet) RunFunc {
 		}
 		issues := be.Name() == "issues"
 		ms := backlog.MilestonesFor(rows, func(r backlog.Row) bool {
-			return wanted[r.ID] || (issues && (wanted[r.Key] || wanted["#"+r.ID]))
+			return wanted[r.ID] || (issues && r.IssueMatches(wanted))
 		})
 		return Result{Data: a4Obj("milestones", ms), Text: strings.Join(ms, "\n")}, nil
 	}
@@ -241,7 +241,7 @@ func a4Drift(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, true, `PRs carry "Closes #N", so the tracker closes shipped issues`)
+		be, err := a4Open(c, root, true, `PRs carry "Closes #N", so the tracker closes shipped issues`)
 		if err != nil {
 			return a4FailRead(err)
 		}
@@ -286,7 +286,7 @@ func a4Backfill(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, true, "Since: anchors exist only in the file backend")
+		be, err := a4Open(c, root, true, "Since: anchors exist only in the file backend")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -318,7 +318,7 @@ func a4Archive(fs *flag.FlagSet) RunFunc {
 		if *days < 0 {
 			return Result{}, Usage("--days must be a number")
 		}
-		be, err := a4Open(root, true, "closed issues are the archive")
+		be, err := a4Open(c, root, true, "closed issues are the archive")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -457,7 +457,7 @@ func a4Summary(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -521,6 +521,12 @@ func a4Summary(fs *flag.FlagSet) RunFunc {
 			id := d.ID
 			if be.Name() == "issues" {
 				id = id[1:]
+				if _, ok := be.(*backlog.Umbrella); ok {
+					// The Done line names its sub-repo in the Repos field.
+					if repo := backlog.ParseFields("- " + d.Inner).Get("repos"); repo != "" {
+						id = repo + ":" + id
+					}
+				}
 			}
 			o := a4Obj("id", id, "type", d.ID[:1], "date", d.Date)
 			if d.Reason != "done" {

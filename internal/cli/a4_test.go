@@ -120,11 +120,13 @@ func TestA4Scope(t *testing.T) {
 	}
 	reg := `{"repos": [{"name": "web", "path": "web"}]}`
 	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(reg), 0o644)
-	if code, _, stderr := hvRun(t, "--json", "-C", root, "item", "reopen", "B01"); code != ExitUnavailable || !strings.Contains(stderr, "umbrella mode not ported yet") {
+	// A file-mode umbrella keeps one backlog at its root: the verbs work there,
+	// with or without a registered --repo.
+	if code, _, stderr := hvRun(t, "--json", "-C", root, "item", "reopen", "B01"); code != 0 {
 		t.Errorf("umbrella: exit %d, stderr %s", code, stderr)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != ExitUnavailable {
-		t.Errorf("registered --repo: exit %d, want 5", code)
+	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != 0 {
+		t.Errorf("registered --repo: exit %d, want 0", code)
 	}
 	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "api"); code != ExitResolution {
 		t.Errorf("unregistered --repo: exit %d, want 3", code)
