@@ -160,3 +160,15 @@ func TestDirSyncUnsupportedIsNotAFailure(t *testing.T) {
 		t.Errorf("the rename happened before the dir fsync; file = %q", got)
 	}
 }
+
+func TestReadTextNormalizesNewlines(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "f.md")
+	os.WriteFile(p, []byte("a\r\nb\rc\nd\r\r\ne"), 0o666)
+	got, err := ReadText(p)
+	if err != nil || got != "a\nb\nc\nd\n\ne" {
+		t.Errorf("got %q, %v", got, err)
+	}
+	if _, err := ReadText(filepath.Join(t.TempDir(), "none")); !os.IsNotExist(err) {
+		t.Errorf("missing file: %v", err)
+	}
+}
