@@ -400,7 +400,9 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 		}
 		defer cleanup()
 		opts.BodyFile = path
-		res, err := workerEnv().Dispatch(context.Background(), root, opts)
+		ctx, stop := workerContext()
+		defer stop()
+		res, err := workerEnvCtx(ctx).Dispatch(ctx, root, opts)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}
@@ -441,7 +443,9 @@ func workerPoll(fs *flag.FlagSet) RunFunc {
 			if root, err = c.Root(); err != nil {
 				return Result{}, err
 			}
-			res, err = workerEnv().Poll(context.Background(), root, worker.PollOpts{
+			ctx, stop := workerContext()
+			defer stop()
+			res, err = workerEnvCtx(ctx).Poll(ctx, root, worker.PollOpts{
 				Slot: slot, Settle: time.Duration(*settle * float64(time.Second)), Lines: *lines})
 		}
 		if err != nil {
@@ -483,7 +487,9 @@ func sessionCheck(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		st := workerEnv().SessionCheck(context.Background(), root)
+		ctx, stop := workerContext()
+		defer stop()
+		st := workerEnvCtx(ctx).SessionCheck(ctx, root)
 		if !st.Inside {
 			return Result{Data: sessionData(st), Text: "outside"}, Failed("not inside a managed host session")
 		}
@@ -512,7 +518,9 @@ func sessionEnsure(fs *flag.FlagSet) RunFunc {
 			defer cleanup()
 			opts.BodyFile = path
 		}
-		st, err := workerEnv().SessionEnsure(context.Background(), root, opts)
+		ctx, stop := workerContext()
+		defer stop()
+		st, err := workerEnvCtx(ctx).SessionEnsure(ctx, root, opts)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}

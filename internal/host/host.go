@@ -32,8 +32,14 @@ type Result struct {
 // (missing binary).
 type Runner func(ctx context.Context, name string, args []string) (Result, error)
 
+// CallTimeout bounds one host command. The longest legitimate call is
+// `herdr agent start/wait` with a boot timeout, which is a minute by default.
+const CallTimeout = 10 * time.Minute
+
 // ExecRunner is the production Runner.
 func ExecRunner(ctx context.Context, name string, args []string) (Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, CallTimeout)
+	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
