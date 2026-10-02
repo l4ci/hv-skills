@@ -17,7 +17,7 @@ import (
 // The packages cannot register themselves because cli imports them.
 
 func a6Commands() []*Command {
-	return []*Command{
+	return append(docsCommands(), []*Command{
 		{Name: "debug", Summary: "Iron Law fix-attempt counter", Subs: []*Command{
 			{Name: "counter", Summary: "per-branch debug session counter", Subs: []*Command{
 				{Name: "init", Summary: "start the counter for a bug", Verb: noFlags(runCounterInit)},
@@ -36,7 +36,7 @@ func a6Commands() []*Command {
 			{Name: "list", Summary: "list spikes", Verb: noFlags(runSpikeList)},
 			{Name: "show", Summary: "print a spike file", Verb: noFlags(runSpikeShow)},
 		}},
-	}
+	}...)
 }
 
 // fromArtifact maps a domain error onto the exit table.
