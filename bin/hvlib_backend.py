@@ -188,6 +188,10 @@ class FileBackend:
                 f"(unknown, completed, or archived)"
             )
         raw_line = m.group(0)
+        if field == "detail" and value.strip("` \t"):
+            rel = value.strip("` \t")
+            if not Path(rel).is_file():
+                raise ValueError(f"detail file {rel} does not exist")
         new_line = set_todo_field(raw_line, field, value)
         if new_line == raw_line:
             return False
@@ -859,9 +863,10 @@ class IssueBackend:
         closed item. ValueError: field not settable (Detail included).
         """
         field = field.lower()
-        if field not in _SETTABLE_FIELDS:
+        settable = tuple(f for f in _SETTABLE_FIELDS if f != "detail")
+        if field not in settable:
             raise ValueError(
-                f"{field} is not a settable field; pick one of {'/'.join(_SETTABLE_FIELDS)}")
+                f"{field} is not a settable field; pick one of {'/'.join(settable)}")
         issue = self._lookup(ref)
         if issue is None or issue["state"] != "open":
             raise LookupError(f"[{ref}] is not an open item on the issue tracker (unknown or closed)")

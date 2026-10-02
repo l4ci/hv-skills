@@ -7,10 +7,12 @@
 # Resolve helper: exits 1 when ID has no open bullet or field is not settable.
 #
 # Usage: hv-todo-set-field <ID> <field> <value>
-#          <field>: milestone | related | repos | subsystem
+#          <field>: milestone | related | repos | subsystem | detail
 #          <value>: new field value; an empty value ("") clears the field
 #          exit:   0 on success (incl. idempotent no-op), 1 on unknown
 #                  open ID / bad field, 2 on usage error
+#
+# detail takes the path of an existing file and is file-backend only.
 #
 # With backlog.backend "issues" the field lands on the open issue (Milestone is
 # the native milestone); tracker failures exit 1 (3/4 pass through).
