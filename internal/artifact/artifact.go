@@ -17,6 +17,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
 // Exit codes an Error may carry; same numbers as docs/design/5.0-cli-conventions.md.
@@ -154,4 +155,21 @@ func SplitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// AppendSection splices addition into the body of "## <name>" just before
+// the next "## " heading (or at EOF), like hvlib_section.append_to_section:
+// the body gains a newline first if it lacks one. A missing section is
+// appended at the end as "## <name>\n<addition>". ok reports whether the
+// section existed.
+func AppendSection(content, name, addition string) (updated string, ok bool) {
+	start, end, ok := section.Find(content, name)
+	if !ok {
+		return strings.TrimRight(content, "\n") + "\n\n## " + name + "\n" + addition, false
+	}
+	body := content[start:end]
+	if !strings.HasSuffix(body, "\n") {
+		body += "\n"
+	}
+	return content[:start] + body + addition + content[end:], true
 }

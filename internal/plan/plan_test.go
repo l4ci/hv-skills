@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
+	"github.com/l4ci/hv-skills/v5/internal/proof"
 )
 
 func exitOf(err error) int {
@@ -322,5 +323,47 @@ func TestExplicitAndMintedSliceRace(t *testing.T) {
 			!strings.Contains(string(got), "title: explicit") && mintedKey.Load() == "M01-S02" {
 			t.Fatalf("round %d: minted plan overwrote the explicit one", round)
 		}
+	}
+}
+
+// Uncertain runs on the proof fixture (../proof/testdata/fixture) and must
+// agree with hv-uncertain: the .rc and .txt goldens are its exit code and stdout.
+func TestUncertainMatchesOldHelper(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join("..", "proof", "testdata", "fixture")
+	hv := filepath.Join(root, ".hv")
+	filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
+		rel, _ := filepath.Rel(src, p)
+		if fi.IsDir() {
+			return os.MkdirAll(filepath.Join(hv, rel), 0o777)
+		}
+		b, _ := os.ReadFile(p)
+		return os.WriteFile(filepath.Join(hv, rel), b, 0o644)
+	})
+	// gen_golden.sh runs uncertain after its proof adds, so B07 has the detail file they create.
+	if _, _, err := proof.Add(root, "B07", proof.AddOpts{Check: "unit  tests", Result: "PASS", Evidence: "go test ./... ok", Sha: "abc1234"}); err != nil {
+		t.Fatal(err)
+	}
+	gold := filepath.Join("..", "proof", "testdata", "golden")
+	for _, id := range []string{"B07", "B08", "B09", "F12", "F13", "T03"} {
+		rc, _ := os.ReadFile(filepath.Join(gold, "uncertain-"+id+".rc"))
+		txt, _ := os.ReadFile(filepath.Join(gold, "uncertain-"+id+".txt"))
+		typ, reasons, err := Uncertain(root, id)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		wantUncertain := strings.TrimSpace(string(rc)) == "0"
+		if (len(reasons) > 0) != wantUncertain || typ != id[:1] {
+			t.Errorf("%s: reasons %v, old rc %s", id, reasons, rc)
+		}
+		if got := strings.Join(reasons, "\n"); strings.TrimRight(string(txt), "\n") != got {
+			t.Errorf("%s: reasons %q, old stdout %q", id, got, txt)
+		}
+	}
+	if _, _, err := Uncertain(root, "B99"); exitOf(err) != 3 {
+		t.Errorf("missing item: %v", err)
+	}
+	if _, _, err := Uncertain(t.TempDir(), "B07"); exitOf(err) != 3 {
+		t.Errorf("missing BACKLOG.md: %v", err)
 	}
 }

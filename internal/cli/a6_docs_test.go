@@ -102,9 +102,6 @@ func TestPlanVerbs(t *testing.T) {
 	if d := data(t, out); d["valid"] != true {
 		t.Errorf("validate-docs: %s", out)
 	}
-	if code, _, _ := hvIn(t, dir, "plan", "uncertain", "B07"); code != 71 {
-		t.Errorf("uncertain: %d", code)
-	}
 	if code, _, _ := hvIn(t, dir, "plan", "rm", "M01-S01"); code != 0 {
 		t.Errorf("rm: %d", code)
 	}

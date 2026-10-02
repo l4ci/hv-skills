@@ -17,7 +17,7 @@ import (
 // The packages cannot register themselves because cli imports them.
 
 func a6Commands() []*Command {
-	return append(docsCommands(), []*Command{
+	return append(append(docsCommands(), proofCommands()...), []*Command{
 		{Name: "debug", Summary: "Iron Law fix-attempt counter", Subs: []*Command{
 			{Name: "counter", Summary: "per-branch debug session counter", Subs: []*Command{
 				{Name: "init", Summary: "start the counter for a bug", Verb: noFlags(runCounterInit)},
