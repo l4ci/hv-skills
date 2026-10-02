@@ -1,0 +1,13 @@
+// Command hv is the hv-skills CLI: the 5.0 home of every bin/ helper.
+// The command tree and conventions are in docs/design/5.0-cli-conventions.md.
+package main
+
+import (
+	"os"
+
+	"github.com/l4ci/hv-skills/v5/internal/cli"
+)
+
+func main() {
+	os.Exit(cli.Main(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
