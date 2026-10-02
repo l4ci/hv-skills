@@ -344,16 +344,27 @@ func shipClosesLines(c *Ctx, root string, cfg any, ids []string) (string, error)
 	if name == "file" {
 		return "", nil
 	}
-	if backlog.IsUmbrella(root) {
-		return "", NotImplemented(c.Path)
-	}
 	b, err := a4Open(c, root, false, "")
 	if err != nil {
 		return "", shipBackendErr(err)
 	}
+	// In an umbrella the PR opens in one sub-repo, so its items resolve there:
+	// --repo, else the sub-repo the working directory is in.
+	sub := ""
+	if u, ok := b.(*backlog.Umbrella); ok {
+		if sub = u.Scope; sub == "" {
+			sub = u.CwdRepo
+		}
+		if sub == "" {
+			return "", Usage("umbrella issue mode needs --repo <name> with --items")
+		}
+	}
 	var lines []string
 	for _, ref := range ids {
 		it, err := b.Get(ref)
+		if err == nil && sub != "" && !strings.HasPrefix(it.ID, sub+":") {
+			err = backlog.ErrNotFound // qualified with another sub-repo
+		}
 		if errors.Is(err, backlog.ErrNotFound) {
 			return "", Resolution("--items %s: no such item in the issue tracker", ref)
 		}

@@ -349,12 +349,21 @@ func reviewScaffolding(fs *flag.FlagSet) RunFunc {
 	}
 }
 
+// a8Backend is what the issue-only verbs need of the issue backend; the
+// single-repo *backlog.Issues and the *backlog.Umbrella both have it.
+type a8Backend interface {
+	ReviewQueue() ([]backlog.QueueEntry, error)
+	MergePR(pr int, items []string) (backlog.MergeResult, error)
+	ReleaseGate(mid string) ([]backlog.Blocker, []backlog.Issue, error)
+	ReleaseNotes(mid string) ([]backlog.NoteSection, error)
+	ReleaseClose(mid, tag string) (int, bool, error)
+}
+
 // a8Issues opens the issue backend for an issue-only verb. An unknown --repo
 // is exit 3 and the file backend is refused (RefusedError, backend; map it
 // with a4Fail, or a4FailRead for a read-only verb). At an umbrella root a verb
-// that acts on one sub-repo (perRepo) needs --repo (exit 2); past those
-// checks umbrella issue mode is not ported (exit 71).
-func a8Issues(c *Ctx, hint string, perRepo bool) (*backlog.Issues, error) {
+// that acts on one sub-repo (perRepo) needs --repo (exit 2).
+func a8Issues(c *Ctx, hint string, perRepo bool) (a8Backend, error) {
 	root, err := c.Root()
 	if err != nil {
 		return nil, err
@@ -367,21 +376,18 @@ func a8Issues(c *Ctx, hint string, perRepo bool) (*backlog.Issues, error) {
 		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
 			Msg: c.Path + ` is not available with backlog.backend "file"`}
 	}
-	if backlog.IsUmbrella(root) {
-		if perRepo && c.Repo == "" {
-			return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
-		}
-		return nil, NotImplemented(c.Path)
+	if perRepo && c.Repo == "" && backlog.IsUmbrella(root) {
+		return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
 	}
 	be, err := a4Open(c, root, false, hint)
 	if err != nil {
 		return nil, err
 	}
-	is, ok := be.(*backlog.Issues)
+	ab, ok := be.(a8Backend)
 	if !ok {
-		return nil, NotImplemented(c.Path)
+		return nil, &Error{Exit: ExitInternal, Message: fmt.Sprintf("%s: backend %T has no issue verbs", c.Path, be)}
 	}
-	return is, nil
+	return ab, nil
 }
 
 func reviewQueue(c *Ctx, args []string) (Result, error) {
@@ -402,8 +408,13 @@ func reviewQueue(c *Ctx, args []string) (Result, error) {
 		for _, p := range r.PRs {
 			prs = append(prs, a4Obj("number", p.Number, "title", p.Title, "branch", p.Branch, "url", p.URL, "body", p.Body))
 		}
-		items = append(items, a4Obj("id", r.ID, "type", r.Type, "number", r.Number, "title", r.Title, "prs", prs))
-		lines = append(lines, r.Type+r.ID+" "+r.Title)
+		row := a4Obj("id", r.ID, "type", r.Type, "number", r.Number, "title", r.Title)
+		if r.Repo != "" {
+			row.Set("repo", r.Repo)
+		}
+		row.Set("prs", prs)
+		items = append(items, row)
+		lines = append(lines, r.Type+strconv.Itoa(r.Number)+" "+r.Title)
 	}
 	return Result{Data: a4Obj("items", items), Text: strings.Join(lines, "\n")}, nil
 }

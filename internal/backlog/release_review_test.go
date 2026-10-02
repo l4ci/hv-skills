@@ -14,6 +14,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
@@ -697,5 +698,72 @@ func TestIssuesReleaseClose(t *testing.T) {
 		case "add_labels", "add_comment", "edit", "close", "reopen", "remove_labels", "edit_milestone":
 			t.Fatalf("second run wrote: %v", f.Fake.Calls)
 		}
+	}
+}
+
+// rrUmbrella is two sub-repos seeded like rrOne; only gh (home, first
+// registered) holds the M07 tracking issue #3.
+func rrUmbrella(t *testing.T) (*Umbrella, map[string]*rrFake) {
+	t.Helper()
+	fakes := map[string]*rrFake{}
+	for _, name := range []string{"gh", "gl"} {
+		issues := rrIssues()
+		if name == "gl" {
+			issues = slices.DeleteFunc(issues, func(i wSeedIssue) bool { return i.Number == 3 })
+		}
+		_, f := rrBackend(t, rrSeed{Cfg: defaultCfg, Issues: issues, Comments: rrComments(), Native: rrNativeSeed(), PRs: rrPRs()})
+		fakes[name] = f
+	}
+	u := &Umbrella{Cfg: mustDecode(t, defaultCfg),
+		Repos:      []repos.Repo{{Name: "gh", Rel: "gh", Path: "/umb/gh"}, {Name: "gl", Rel: "gl", Path: "/umb/gl"}},
+		NewTracker: func(dir string) (Tracker, error) { return fakes[strings.TrimPrefix(dir, "/umb/")], nil }}
+	return u, fakes
+}
+
+func TestUmbrellaReleaseReview(t *testing.T) {
+	u, f := rrUmbrella(t)
+	q, err := u.ReviewQueue()
+	if err != nil || len(q) == 0 || q[0].ID != "gh:1" || q[0].Repo != "gh" || q[len(q)-1].Repo != "gl" ||
+		!strings.HasPrefix(q[len(q)-1].ID, "gl:") {
+		t.Fatalf("queue %+v %v", q, err)
+	}
+	u.Scope = "gl"
+	if q, _ := u.ReviewQueue(); len(q) == 0 || q[0].Repo != "gl" {
+		t.Fatalf("--repo gl queue %+v", q)
+	}
+
+	u.Scope = ""
+	if _, err := u.MergePR(20, nil); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("merge without --repo: %v", err)
+	}
+	u.Scope = "gl"
+	if _, err := u.MergePR(20, []string{"gh:1"}); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "belongs to gh") {
+		t.Fatalf("cross-repo item: %v", err)
+	}
+	res, err := u.MergePR(20, []string{"gl:1"})
+	if err != nil || len(res.Closed) != 1 || res.Closed[0].ID != "gl:1" || !slices.Contains(f["gl"].merged, "20") || slices.Contains(f["gh"].merged, "20") {
+		t.Fatalf("merge gl: %+v %v", res, err)
+	}
+
+	// gl has no tracking issue of its own; its gate and notes still read its milestone.
+	if blocked, _, err := u.ReleaseGate("M07"); err != nil || len(blocked) == 0 {
+		t.Fatalf("gate gl: %v %v", blocked, err)
+	}
+	// Closing out gl closes its native milestone only; the milestone ships with the last sub-repo.
+	if _, changed, err := u.ReleaseClose("M07", "v1.0.0"); err != nil || !changed {
+		t.Fatalf("close gl: %v %v", changed, err)
+	}
+	if f["gl"].MS.Native[0].State != "closed" || f["gh"].MS.Native[0].State != "open" || rrIssue(f["gh"], 3).State != "open" {
+		t.Fatalf("after gl: gl %v gh %v tracker %v", f["gl"].MS.Native, f["gh"].MS.Native, rrIssue(f["gh"], 3).State)
+	}
+	u.Scope = "gh"
+	if _, _, err := u.ReleaseClose("M07", "v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if f["gh"].MS.Native[0].State != "closed" || rrIssue(f["gh"], 3).State != "closed" {
+		t.Fatalf("after gh: gh %v tracker %v", f["gh"].MS.Native, rrIssue(f["gh"], 3).State)
+	}
+	if _, changed, err := u.ReleaseClose("M07", "v1.0.0"); err != nil || changed {
+		t.Fatalf("re-run: changed %v %v", changed, err)
 	}
 }

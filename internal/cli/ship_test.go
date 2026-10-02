@@ -490,9 +490,21 @@ func TestShipPRIssueModeUmbrella(t *testing.T) {
 	shipBranchOf(t, svc, "feat/u", [3]string{"u.txt", "work", ""})
 	withTracker(t, issueFixture())
 	useForge(t, shipPRForge("https://x.test/pr/1"))
-	o := trRun(t, u, "b", "ship", "pr", "feat/u", "--title", "T", "--body-file", "-", "--items", "7", "--repo", "svc")
-	if o.code != ExitNotImplemented {
-		t.Errorf("umbrella issue mode must be 71: %+v", o)
+	origin := t.TempDir()
+	gitT(t, origin, "init", "-q", "--bare")
+	gitT(t, svc, "remote", "add", "origin", origin)
+	// The items resolve inside the --repo sub-repo, and one qualified with
+	// another sub-repo is unknown there.
+	o := trRun(t, u, "b", "ship", "pr", "feat/u", "--title", "T", "--body-file", "-", "--items", "web:7", "--repo", "svc")
+	if o.code != 3 {
+		t.Errorf("item of another sub-repo: %+v", o)
+	}
+	o = trRun(t, u, "b", "ship", "pr", "feat/u", "--title", "T", "--body-file", "-", "--items", "7", "--repo", "svc", "--json")
+	if o.code != 0 {
+		t.Fatalf("umbrella ship pr --items: %+v", o)
+	}
+	if d := envelope(t, o.stdout)["data"].(map[string]any); d["url"] != "https://x.test/pr/1" {
+		t.Errorf("data %v", d)
 	}
 }
 
@@ -635,8 +647,8 @@ func TestShipPRMergeBackend(t *testing.T) {
 		t.Errorf("file-backend umbrella --repo: exit %d, want 4 (backend)", o.code)
 	}
 	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
-	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 71 {
-		t.Errorf("umbrella --repo: exit %d", o.code)
+	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 5 {
+		t.Errorf("umbrella --repo, no forge: exit %d, want 5", o.code)
 	}
 }
 
