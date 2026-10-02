@@ -50,6 +50,7 @@ func workerCommands() *Command {
 			{Name: "check", Summary: "inside a managed host session? (exit 1 when outside)", Verb: sessionCheck},
 			{Name: "ensure", Summary: "hand the orchestrator off into a host session", Verb: sessionEnsure},
 		}},
+		{Name: "gate", Summary: "merge gate for one slot's branch or PR", Verb: workerGate},
 		{Name: "reset", Summary: "refuse a slot that holds work, else cut a fresh task branch", Verb: workerReset},
 		{Name: "account", Summary: "per-account usage headroom and slot assignment", Subs: []*Command{
 			{Name: "list", Summary: "list accounts with their usage verdict", Verb: noFlags(runAccountList)},
@@ -534,5 +535,65 @@ func sessionEnsure(fs *flag.FlagSet) RunFunc {
 			return Result{Data: d, Text: "inside " + st.Where + " — no handoff needed"}, nil
 		}
 		return Result{Data: d, Text: fmt.Sprintf("handed off to tmux session '%s'\n\n  Attach:   tmux attach -t %s\n  Windows:  operator  — the cycle continues here\n            w1..wN    — workers (created on dispatch)\n\nThis terminal is no longer the orchestrator and can be closed.\nAnswer a worker's question in that worker's window, or in 'operator'.", st.Session, st.Session)}, nil
+	}
+}
+
+func gateData(r worker.GateResult) *jsonx.Object {
+	d := jsonx.NewObject()
+	d.Set("slot", r.Slot)
+	d.Set("verdict", r.Verdict)
+	d.Set("base", r.Base)
+	if r.Branch != "" {
+		d.Set("branch", r.Branch)
+	}
+	if r.SHA != "" {
+		d.Set("sha", r.SHA)
+	}
+	if r.PR != "" {
+		d.Set("pr", r.PR)
+	}
+	d.Set("verified", strList(r.Verified))
+	d.Set("verifySkipped", r.VerifySkipped)
+	d.Set("changed", r.Changed)
+	return d
+}
+
+func workerGate(fs *flag.FlagSet) RunFunc {
+	base := fs.String("base", "", "the cycle branch the slot merges into")
+	check := fs.Bool("check-only", false, "judge freshness, PR identity and provenance; merge nothing")
+	noVerify := fs.Bool("no-verify", false, "merge without running refactor.verifyCommands")
+	return func(c *Ctx, args []string) (Result, error) {
+		slot, err := oneArg(args, "slot")
+		if err != nil {
+			return Result{}, err
+		}
+		if *base == "" {
+			return Result{}, Usage("--base is required")
+		}
+		root, err := c.Root()
+		if err != nil {
+			return Result{}, err
+		}
+		ctx, stop := workerContext()
+		defer stop()
+		r, err := workerEnvCtx(ctx).Gate(ctx, root, worker.GateOpts{Slot: slot, Base: *base, CheckOnly: *check, NoVerify: *noVerify})
+		if err != nil {
+			return Result{}, fromWorker(err)
+		}
+		for _, n := range r.Notes {
+			fmt.Fprintln(c.Stderr, n)
+		}
+		res := Result{Data: gateData(r)}
+		if r.OK() {
+			if r.Verdict == worker.GateFresh {
+				res.Text = fmt.Sprintf("fresh: %s %s", slot, r.Branch)
+			} else {
+				res.Text = fmt.Sprintf("pass: %s %s -> %s (%s)", slot, r.Branch, r.Base, r.SHA)
+			}
+			return res, nil
+		}
+		e := Failed("%s", r.Err)
+		e.Hint = r.Hint
+		return res, e
 	}
 }
