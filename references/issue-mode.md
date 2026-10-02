@@ -17,7 +17,8 @@ An ID is the type letter plus the issue number: `#42` is `F42` (feature), `B42` 
 | Workflow label | `hv-item-state <ref> in-progress\|needs-review\|changes-requested\|none` |
 | Proof rows | `hv-proof-add <ID> --check <name> --result PASS\|FAIL --evidence <text> [--sha <commit>]` (stored in the item's proof note) |
 | Design / plan artifact | `hv-design-add` / `hv-plan-add` create it, `hv-design-put <ID> --body-file F\|-` / `hv-plan-put <key> --body-file F\|-` fill it, `hv-design-show` / `hv-plan-show` read it; raw access: `hv-item-note <ref> --kind proof\|design\|plan (--body-file F\|- \| --show \| --rm)`. Slice plans stay files. |
-| Question, answer, decision, feedback | `hv-item-comment <ref> --kind question\|answer\|decision\|feedback --body-file F\|-` |
+| Question, answer, decision, feedback | `hv-item-comment <ref> --kind question\|answer\|decision\|feedback --body-file F\|-`; read back with `hv-item-comment <ref> --list [--kind K]` |
+| Status of one item | `hv-item-show <ref>` (state label, claim, assignee, milestone, notes present, comment rows; read-only; exit 2 in file mode) |
 | Open the PR / MR | `hv-pr --closes <ID[,ID...]> <branch> "<title>"` (body on stdin) |
 | What needs review | `hv-review-queue` (JSON: `needs-review` items with the open PRs / MRs whose body closes them) |
 | Merge a reviewed PR / MR | `hv-pr-merge <pr> [--items <ID[,ID...]>]` (checks proof first, then merges and closes what the host left open; exit 5 = not merged, an item unproven) |
@@ -49,11 +50,10 @@ A milestone is a native tracker milestone `MNN — <title>` plus a tracking issu
 
 A fresh session has only the tracker. Load an item's context before working it:
 
-1. `hv-todo-field --dump <ID>`: the issue body and fields.
-2. `hv-item-note <ID> --kind design --show` and `--kind plan --show`: the design and plan notes (empty when absent).
-3. The comments (questions, answers, decisions, feedback, claim history):
-   - GitHub: `hv-tracker-call -- issue view <n> --comments`
-   - GitLab: `hv-tracker-call -- issue view <n> --comments --output json`
+1. `hv-item-show <ID>`: state label, claim holder, assignee, milestone, which notes exist (design / plan / proof) and every question / answer / decision / feedback comment. Read-only.
+2. `hv-todo-field --dump <ID>`: the issue body and fields.
+3. `hv-item-note <ID> --kind design --show` and `--kind plan --show`: the design and plan notes (empty when absent).
+4. `hv-item-comment <ID> --list [--kind K]`: just the comment rows, when only those are needed.
 
 Treat `decision` comments as binding and `feedback` comments (from review) as the to-do list for a `changes-requested` item.
 

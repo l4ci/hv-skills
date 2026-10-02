@@ -62,6 +62,25 @@ print(len(adapter_for(load_config()).get(int(sys.argv[1]))["assignees"]))' "$1";
     "$BIN/hv-item-claim" T1 --as ann/t1 >/dev/null
     eq "claim swaps state" "in-progress,type:task" "$(LABELS 1)"
 
+    # --- hv-item-show reads state, claim, assignee and comments back, writing nothing
+    printf 'Which db?\nsecond line\n' | "$BIN/hv-item-comment" T1 --kind question --body-file - >/dev/null
+    : > "$P/log"
+    "$BIN/hv-item-show" T1 > "$P/show"
+    eq "show writes nothing" 0 "$(WRITES)"
+    eq "show head" "$(printf '[T1] Race\ntype: task\nstatus: open\nstate: in-progress\nclaimed by: ann/t1')" "$(sed -n 1,5p "$P/show")"
+    eq "show assignee" "assignee: fake-user" "$(sed -n 6p "$P/show")"
+    eq "show tail" "$(printf 'milestone: none\nnotes: none\ncomments: 1')" "$(sed -n 7,9p "$P/show")"
+    eq "show comment row" "- fake-user · question · Which db?" "$(sed -n 10p "$P/show")"
+    eq "show comment continuation" "  second line" "$(sed -n 11p "$P/show")"
+    eq "list kind filter" "" "$("$BIN/hv-item-comment" T1 --list --kind answer)"
+    eq "list matches show" "$(sed -n '10,$p' "$P/show")" "$("$BIN/hv-item-comment" T1 --list --kind question)"
+    "$BIN/hv-item-release" T1 --as ann/t1
+    eq "show after release" "$(printf 'state: none\nclaimed by: none')" "$("$BIN/hv-item-show" T1 | sed -n '4,5p')"
+    "$BIN/hv-item-claim" T1 --as ann/t1 >/dev/null
+    ERR "$BIN/hv-item-show" T99; eq "show unknown" "1" "$ERRRC"
+    ERR "$BIN/hv-item-comment" T1 --list --kind bogus; eq "list bad kind" "1" "$ERRRC"
+    ERR "$BIN/hv-item-comment" T1 --list --body-file x; eq "list with body" "1" "$ERRRC"
+
     # --- errors
     ERR "$BIN/hv-item-claim" T99 --as ann; eq "claim unknown" "1:error: hv-item-claim: [T99] not found in the issue tracker" "$ERRRC:$ERRMSG"
     ERR "$BIN/hv-item-claim" T1; eq "claim no --as" 1 "$ERRRC"

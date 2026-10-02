@@ -228,6 +228,12 @@ mkdir -p "$TMP_INF/.hv"
   d="$(date +%Y-%m-%d)"
   exp="$(printf '# B01: Crash\n\n> Related TODO entry: `[B01]` in `.hv/BACKLOG.md`\n\n## Log\n\n- %s · question · Which db?\n  second line\n- %s · answer · Postgres\n' "$d" "$d")"
   [ "$(cat .hv/bugs/B01.md)" = "$exp" ] || fail "file-mode Log rows: $(cat .hv/bugs/B01.md)"
+  [ "$("$BIN/hv-item-comment" B01 --list)" = "$(printf -- '- %s · question · Which db?\n  second line\n- %s · answer · Postgres' "$d" "$d")" ] || fail "file-mode --list: $("$BIN/hv-item-comment" B01 --list)"
+  [ "$("$BIN/hv-item-comment" B01 --list --kind answer)" = "- $d · answer · Postgres" ] || fail "file-mode --list --kind"
+  rc=0; "$BIN/hv-item-show" B01 2>/dev/null || rc=$?
+  [ "$rc" = 2 ] || fail "file-mode hv-item-show exit: $rc"
+  rc=0; "$BIN/hv-item-comment" B99 --list 2>/dev/null || rc=$?
+  [ "$rc" = 1 ] || fail "file-mode --list unknown item exit: $rc"
   "$BIN/hv-proof-add" B01 --check smoke --result PASS --evidence ok --sha abc1234
   [ "$("$BIN/hv-proof-show" B01 --count)" = 1 ] || fail "file-mode proof count"
   rc=0; "$BIN/hv-item-note" B01 --kind design --show 2>/dev/null || rc=$?

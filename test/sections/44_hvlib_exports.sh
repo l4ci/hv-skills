@@ -44,6 +44,7 @@ NAMES = [
     "find_open_bullet",
     "find_origin_bullet",
     "find_section",
+    "format_comment_rows",
     "get_backend",
     "get_version_or_die",
     "git_mtime",
