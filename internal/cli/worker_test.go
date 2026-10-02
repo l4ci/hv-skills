@@ -132,7 +132,7 @@ func TestWorkerResetVerb(t *testing.T) {
 		t.Fatalf("check-only on a dirty slot: %d %v %s", code, d, errOut)
 	}
 	code, out, _ = hvIn(t, dir, "worker", "reset", "w1", "--task", "T1", "--json")
-	if d = data(t, out); code != 4 || d["clean"] != false || d["changed"] != false {
+	if d = data(t, out); code != 4 || d["clean"] != false || d["changed"] != false || d["blockedBy"] != "slot holds work" {
 		t.Fatalf("reset of a dirty slot: %d %v", code, d)
 	}
 
@@ -199,12 +199,18 @@ func TestWorkerAccountVerbs(t *testing.T) {
 // ── host verbs, with the host swapped for a fake ────────────────────────────
 
 type cliHost struct {
+	herdr     bool
 	inSession bool
 	sendErr   error
 	calls     []string
 }
 
-func (h *cliHost) Name() string    { return "tmux" }
+func (h *cliHost) Name() string {
+	if h.herdr {
+		return "herdr"
+	}
+	return "tmux"
+}
 func (h *cliHost) Require() error  { return nil }
 func (h *cliHost) InSession() bool { return h.inSession }
 func (h *cliHost) Where() string   { return "main" }
@@ -401,7 +407,17 @@ func TestWorkerDispatchRefusalEnvelopeCarriesData(t *testing.T) {
 	os.WriteFile(brief, []byte("x"), 0o644)
 	code, out, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T1", "--json")
 	d := data(t, out)
-	if code != 4 || d["blockedBy"] != "resume-flag" || d["changed"] != false {
+	if code != 4 || d["blockedBy"] != "resume flag" || d["changed"] != false {
+		t.Errorf("%d %s", code, out)
+	}
+}
+
+func TestWorkerSessionEnsureHerdrOutsideCarriesBlockedBy(t *testing.T) {
+	dir := workerProject(t, `{"work":{"dispatch":"herdr"}}`)
+	useHost(t, &cliHost{herdr: true})
+	code, out, _ := hvIn(t, dir, "worker", "session", "ensure", "--json")
+	d := data(t, out)
+	if code != 4 || d["blockedBy"] != "outside herdr" || d["changed"] != false {
 		t.Errorf("%d %s", code, out)
 	}
 }

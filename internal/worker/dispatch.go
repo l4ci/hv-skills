@@ -229,7 +229,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 		}
 		if bad != "" {
 			e := fail(ExitRefused, fmt.Sprintf("work.workerCommand contains '%s', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it.", bad))
-			e.Data = BlockData{BlockedBy: "resume-flag"}
+			e.Data = BlockData{BlockedBy: "resume flag"}
 			return res, e
 		}
 		// Refuse a slot that still holds work, before its session is killed.
@@ -324,7 +324,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 func resetRefusal(err error, changed bool) error {
 	var we *Error
 	if errors.As(err, &we) && we.Data != nil {
-		return &Error{Exit: ExitRefused, Message: we.Message, Data: BlockData{BlockedBy: "slot-holds-work", Changed: changed}}
+		return &Error{Exit: ExitRefused, Message: we.Message, Data: BlockData{BlockedBy: "reset guard", Changed: changed}}
 	}
 	return err
 }

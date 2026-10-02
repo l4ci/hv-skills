@@ -222,6 +222,9 @@ func workerReset(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			var we *worker.Error
 			if errors.As(err, &we) && we.Data != nil {
+				if we.Exit == ExitRefused { // exit 4 failure data names what blocked it
+					res.Data.(*jsonx.Object).Set("blockedBy", "slot holds work")
+				}
 				return res, fromWorker(err)
 			}
 			return Result{}, fromWorker(err)
@@ -529,6 +532,12 @@ func sessionEnsure(fs *flag.FlagSet) RunFunc {
 		defer stop()
 		st, err := workerEnvCtx(ctx).SessionEnsure(ctx, root, opts)
 		if err != nil {
+			var we *worker.Error
+			if errors.As(err, &we) {
+				if bd, ok := we.Data.(worker.BlockData); ok && we.Exit == ExitRefused {
+					return Result{Data: knObj("blockedBy", bd.BlockedBy, "changed", bd.Changed)}, fromWorker(err)
+				}
+			}
 			return Result{}, fromWorker(err)
 		}
 		d := sessionData(st)

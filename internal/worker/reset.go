@@ -124,7 +124,7 @@ func (e Env) Reset(root, slot, task string, checkOnly bool) (ResetResult, error)
 	}
 	if len(unmerged) > 0 {
 		for _, sha := range unmerged {
-			line, _ := e.git(worktree, "log", "-1", "--format=%h %s", sha)
+			line, _ := e.git(worktree, "log", "-1", "--abbrev=7", "--format=%h %s", sha)
 			res.Unmerged = append(res.Unmerged, line)
 		}
 		return refuse(fmt.Sprintf("REFUSED %s — %d commit(s) not on %s: gate and merge them (hv worker gate), or hv worker pool reap %s, before giving the slot another task; re-dispatch %s to continue it in place.\n%s",

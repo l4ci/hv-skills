@@ -205,6 +205,8 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 		return g.verdict(GateProvenanceFail, failMsg, ""), nil
 	}
 	if o.CheckOnly {
+		// the checked tip: origin/<branch> when a PR is recorded
+		res.SHA, _ = e.git(root, "rev-parse", "--short=7", g.headRef)
 		res.Verdict = GateFresh
 		return res, nil
 	}
@@ -235,7 +237,7 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 		}
 	}
 	res.Changed = true
-	res.SHA, _ = e.git(root, "rev-parse", "--short", "HEAD")
+	res.SHA, _ = e.git(root, "rev-parse", "--short=7", "HEAD")
 
 	if o.NoVerify {
 		res.Verdict, res.VerifySkipped = GatePass, true
@@ -631,6 +633,9 @@ func (g *gate) mergeRemote() (GateResult, bool) {
 	// Past this point the PR IS merged: report local trouble distinctly so
 	// nobody retries an already-merged PR.
 	g.res.Changed = true
+	if len(sha) >= 7 {
+		g.res.SHA = sha[:7] // the merge that landed on origin, for the merged-remotely verdicts
+	}
 	if _, code := e.git(g.root, "merge", "--ff-only", g.baseRef); code != 0 {
 		return g.verdict(GateMergedRemotely, fmt.Sprintf("MERGED-REMOTELY %s — PR %s is on %s but local %s could not fast-forward (diverged); do not re-merge, reconcile %s by hand", o.Slot, g.prNum, g.baseRef, o.Base, o.Base), ""), true
 	}

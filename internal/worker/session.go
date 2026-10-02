@@ -100,6 +100,7 @@ func (e Env) SessionEnsure(ctx context.Context, root string, o SessionOpts) (Ses
 	if h.Name() == "herdr" {
 		cwd, _ := os.Getwd()
 		err := fail(ExitRefused, "work.dispatch=herdr needs /hv-work to run inside a herdr pane")
+		err.Data = BlockData{BlockedBy: "outside herdr"}
 		err.Hint = fmt.Sprintf("open herdr, start Claude Code in a pane at %s, and run /hv-work there; worker tabs then open in that workspace, beside the orchestrator", cwd)
 		return SessionState{}, err
 	}

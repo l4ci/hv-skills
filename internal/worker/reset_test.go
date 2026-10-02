@@ -286,3 +286,18 @@ func TestExecGitRunsInTheCLocale(t *testing.T) {
 		t.Errorf("%q %d %v", out, code, err)
 	}
 }
+
+// Contract: each unmerged entry is `<sha7> <subject>`.
+func TestResetUnmergedEntriesAreSevenCharSHAAndSubject(t *testing.T) {
+	_, b := pair(t)
+	sh(t, b, "git", "config", "core.abbrev", "12")
+	commitIn(t, wt(b), "work.txt")
+	res, err := Env{}.Reset(b, "w1", "T1", true)
+	if err == nil || len(res.Unmerged) != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	sha, subject, _ := strings.Cut(res.Unmerged[0], " ")
+	if len(sha) != 7 || subject != "add work.txt" {
+		t.Errorf("entry = %q", res.Unmerged[0])
+	}
+}
