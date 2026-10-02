@@ -310,7 +310,7 @@ func spikeAdd(fs *flag.FlagSet) RunFunc {
 		}
 		branch, err := spike.Add(root, gitDir, name, *question, c.Repo)
 		if err != nil {
-			return Result{}, fromArtifact(err)
+			return Result{Data: refusal(err)}, fromArtifact(err)
 		}
 		d := jsonx.NewObject()
 		d.Set("name", name)

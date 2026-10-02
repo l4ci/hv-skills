@@ -133,8 +133,9 @@ func TestSpikeLifecycle(t *testing.T) {
 	if !strings.HasPrefix(string(raw), "---\nname: sse\nbranch: spike/sse\nstatus: open\ncreated: ") || !strings.Contains(string(raw), "## Question\n\nCan SSE work?\n") {
 		t.Errorf("spike file:\n%s", raw)
 	}
-	if code, _, _ := hvIn(t, dir, "spike", "add", "sse", "--question", "again"); code != 4 {
-		t.Errorf("duplicate: exit %d, want 4", code)
+	code, out, _ = hvIn(t, dir, "spike", "add", "sse", "--question", "again", "--json")
+	if d := data(t, out); code != 4 || d["blockedBy"] != "exists" || d["changed"] != false {
+		t.Errorf("duplicate: exit %d data %v, want 4 with blockedBy exists", code, d)
 	}
 	if _, out, _ = hvIn(t, dir, "spike", "list", "--json"); !strings.Contains(out, `"branchExists": true`) || !strings.Contains(out, `"status": "open"`) {
 		t.Errorf("list: %s", out)

@@ -457,10 +457,12 @@ PY
     pass "$prov: plan uncertain reads the issue body as the detail text"
 
     # tracker failure: exit 5 (unavailable)
-    for call in "backlog list" "summary" "backlog ids --milestone M07" "backlog milestones F2" "plan uncertain F2"; do
+    for call in "backlog list" "summary" "backlog ids --milestone M07" "backlog milestones F2"; do
       # shellcheck disable=SC2086
       eq "$call list failure rc" 5 "$(FAKE_TRACKER_FAIL=list rcof hvj $call)"
     done
+    # plan uncertain resolves F2 with one view by number and never lists
+    eq "plan uncertain F2 view failure rc" 5 "$(FAKE_TRACKER_FAIL=view rcof hvj plan uncertain F2)"
     eq "field get view failure" 5 "$(FAKE_TRACKER_FAIL=view rcof hvj item field get F2 --name title)"
     pass "$prov: tracker failures surface as exit 5"
 
