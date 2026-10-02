@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 )
@@ -20,9 +22,7 @@ func reviewCommands() *Command {
 		{Name: "scope", Summary: "commits, files, item IDs and origin entries of a branch", Repo: true, Verb: noFlags(reviewScope)},
 		{Name: "brief", Summary: "fresh-eyes second-opinion brief for a branch", Repo: true, Verb: noFlags(reviewBrief)},
 		{Name: "scaffolding", Summary: "added diff lines that look like leftover task scaffolding", Repo: true, Verb: reviewScaffolding},
-		{Name: "queue", Summary: "open issues waiting for review", Repo: true, Verb: noFlags(func(c *Ctx, _ []string) (Result, error) {
-			return Result{}, NotImplemented(c.Path)
-		})},
+		{Name: "queue", Summary: "open issues waiting for review", Repo: true, Verb: noFlags(reviewQueue)},
 	}}
 }
 
@@ -347,4 +347,63 @@ func reviewScaffolding(fs *flag.FlagSet) RunFunc {
 		}
 		return Result{Data: gitObj("findings", findings), Text: strings.Join(lines, "\n")}, nil
 	}
+}
+
+// a8Issues opens the issue backend for an issue-only verb. An unknown --repo
+// is exit 3 and the file backend is refused (RefusedError, backend; map it
+// with a4Fail, or a4FailRead for a read-only verb). At an umbrella root a verb
+// that acts on one sub-repo (perRepo) needs --repo (exit 2); past those
+// checks umbrella issue mode is not ported (exit 71).
+func a8Issues(c *Ctx, hint string, perRepo bool) (*backlog.Issues, error) {
+	root, err := c.Root()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := c.RepoPath(); err != nil {
+		return nil, err
+	}
+	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	if name, err := config.Backend(cfg); err == nil && name == "file" {
+		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
+			Msg: c.Path + ` is not available with backlog.backend "file"`}
+	}
+	if backlog.IsUmbrella(root) {
+		if perRepo && c.Repo == "" {
+			return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
+		}
+		return nil, NotImplemented(c.Path)
+	}
+	be, err := a4Open(c, root, false, hint)
+	if err != nil {
+		return nil, err
+	}
+	is, ok := be.(*backlog.Issues)
+	if !ok {
+		return nil, NotImplemented(c.Path)
+	}
+	return is, nil
+}
+
+func reviewQueue(c *Ctx, args []string) (Result, error) {
+	if len(args) > 0 {
+		return Result{}, Usage("usage: hv review queue")
+	}
+	be, err := a8Issues(c, "", false)
+	if err != nil {
+		return a4FailRead(err)
+	}
+	rows, err := be.ReviewQueue()
+	if err != nil {
+		return a4FailRead(err)
+	}
+	items, lines := []any{}, []string{}
+	for _, r := range rows {
+		prs := []any{}
+		for _, p := range r.PRs {
+			prs = append(prs, a4Obj("number", p.Number, "title", p.Title, "branch", p.Branch, "url", p.URL, "body", p.Body))
+		}
+		items = append(items, a4Obj("id", r.ID, "type", r.Type, "number", r.Number, "title", r.Title, "prs", prs))
+		lines = append(lines, r.Type+r.ID+" "+r.Title)
+	}
+	return Result{Data: a4Obj("items", items), Text: strings.Join(lines, "\n")}, nil
 }

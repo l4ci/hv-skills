@@ -444,11 +444,54 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 
 // ---- ship pr-merge ---------------------------------------------------------
 
-// shipPRMerge is issue-only and not ported: it needs the issue backend's
-// write side and proof checks.
+// shipPRMerge merges a PR in issue mode (hv-pr-merge).
 func shipPRMerge(fs *flag.FlagSet) RunFunc {
-	fs.String("items", "", "item IDs the PR closes, comma separated")
-	return func(c *Ctx, args []string) (Result, error) { return Result{}, NotImplemented(c.Path) }
+	itemsFlag := fs.String("items", "", "item IDs the PR closes, comma separated")
+	return func(c *Ctx, args []string) (Result, error) {
+		if len(args) != 1 {
+			return Result{}, Usage("usage: hv ship pr-merge <pr> [--items <ID>[,<ID>...]]")
+		}
+		pr, err := strconv.Atoi(args[0])
+		if err != nil || strings.Trim(args[0], "0123456789") != "" {
+			return Result{}, Usage("<pr> must be all digits")
+		}
+		if err := releaseNotAtUmbrella(c); err != nil {
+			return Result{}, err
+		}
+		var items []string
+		for _, s := range strings.Split(*itemsFlag, ",") {
+			if s = pystr.Strip(s); s != "" {
+				items = append(items, s)
+			}
+		}
+		be, err := a8Issues(c, "use: hv ship merge", true)
+		if err != nil {
+			return a4Fail(err)
+		}
+		res, err := be.MergePR(pr, items)
+		var mf *backlog.MergeFailedError
+		switch {
+		case errors.As(err, &mf):
+			return Result{Data: a4Obj("pr", pr, "merged", false, "unproven", []string{}, "changesRequested", []string{}, "changed", false)},
+				Refused("%s", err.Error())
+		case err != nil:
+			return a4Fail(err)
+		case len(res.Unproven) > 0:
+			ids := []string{}
+			for _, u := range res.Unproven {
+				ids = append(ids, u.ID)
+			}
+			return Result{Data: a4Obj("pr", pr, "merged", false, "unproven", ids, "changesRequested", ids, "changed", true)},
+				Refused("an item has no proof; not merged")
+		}
+		closed, lines := []string{}, []string{"merged " + args[0] + " as " + res.SHA[:min(7, len(res.SHA))]}
+		for _, r := range res.Closed {
+			closed = append(closed, r.ID)
+			lines = append(lines, "closed "+r.Ref())
+		}
+		return Result{Data: a4Obj("pr", pr, "sha", res.SHA[:min(7, len(res.SHA))], "closed", closed, "changed", true),
+			Text: strings.Join(lines, "\n")}, nil
+	}
 }
 
 // ---- ship undo -------------------------------------------------------------
