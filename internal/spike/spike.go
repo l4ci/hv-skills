@@ -15,7 +15,6 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -36,39 +35,6 @@ func git(dir string, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	return cmd.Run()
-}
-
-// Repos is the sub-repo registry, name to absolute path, from .hv/repos.json.
-// Paths there are relative to the project root.
-func Repos(root string) map[string]string {
-	out := map[string]string{}
-	reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object)
-	if !ok {
-		return out
-	}
-	lv, _ := reg.Get("repos")
-	list, _ := lv.([]any)
-	for _, e := range list {
-		o, ok := e.(*jsonx.Object)
-		if !ok {
-			continue
-		}
-		n, _ := o.Get("name")
-		p, _ := o.Get("path")
-		name, _ := n.(string)
-		rel, _ := p.(string)
-		if name == "" || rel == "" {
-			continue
-		}
-		if !filepath.IsAbs(rel) {
-			rel = filepath.Join(root, rel)
-		}
-		if real, err := filepath.EvalSymlinks(rel); err == nil {
-			rel = real
-		}
-		out[name] = rel
-	}
-	return out
 }
 
 // Add (under the spike file's lock) creates branch spike/<name> in gitDir (the sub-repo named by repo, or
@@ -98,7 +64,7 @@ func add(root, gitDir, path, name, question, repo string) (branch string, err er
 		return "", artifact.Errf(artifact.ExitRefused, ".hv/spikes/%s.md already exists", name)
 	}
 	if git(gitDir, "rev-parse", "--git-dir") != nil {
-		regs := Repos(root)
+		regs := artifact.Repos(root)
 		if repo == "" && len(regs) > 0 {
 			names := make([]string, 0, len(regs))
 			for n := range regs {
@@ -162,11 +128,10 @@ func Finish(root, name string) (changed bool, err error) {
 		return
 	}
 	path := file(root, name)
-	raw, rerr := readText(path)
+	content, rerr := artifact.ReadText(path)
 	if rerr != nil {
 		return false, artifact.Errf(artifact.ExitResolution, "spike %s not found (.hv/spikes/%s.md)", name, name)
 	}
-	content := string(raw)
 	fm, _, _ := frontmatter.Parse(content)
 	if _, has := fm["status"]; !has {
 		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .hv/spikes/%s.md", name)
@@ -243,7 +208,7 @@ func List(root, dir string) ([]Entry, error) {
 			s = spikeBranches(dir)
 		} else {
 			if regs == nil {
-				regs = Repos(root)
+				regs = artifact.Repos(root)
 			}
 			if p, ok := regs[repo]; ok {
 				s = spikeBranches(p)
@@ -256,11 +221,11 @@ func List(root, dir string) ([]Entry, error) {
 	}
 	out := []Entry{}
 	for _, f := range files {
-		raw, err := readText(f)
+		text, err := artifact.ReadText(f)
 		if err != nil {
 			return nil, err
 		}
-		fm, _, _ := frontmatter.Parse(string(raw))
+		fm, _, _ := frontmatter.Parse(text)
 		if fm == nil {
 			continue
 		}
@@ -276,13 +241,6 @@ func List(root, dir string) ([]Entry, error) {
 		out = append(out, e)
 	}
 	return out, nil
-}
-
-// readText reads like Python's read_text: CRLF becomes LF. Replace with
-// fsio.ReadText once #89 lands.
-func readText(path string) ([]byte, error) {
-	b, err := os.ReadFile(path)
-	return []byte(strings.ReplaceAll(string(b), "\r\n", "\n")), err
 }
 
 func orDefault(v, d string) string {
