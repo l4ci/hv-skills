@@ -175,7 +175,7 @@ func (f *File) AddComment(ref, kind, text string) (string, error) {
 		return "", err
 	}
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if errors.Is(err, os.ErrNotExist) {
 			content = "# " + ref + ": " + title + "\n\n> Related TODO entry: `[" + ref + "]` in `.hv/BACKLOG.md`\n"
 		} else if err != nil {

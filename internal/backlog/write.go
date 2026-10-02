@@ -86,7 +86,7 @@ var ProofCount = func(root, id string) (int, error) {
 	if dir == "" {
 		return 0, nil
 	}
-	content, err := readText(filepath.Join(root, ".hv", dir, id+".md"))
+	content, err := fsio.ReadText(filepath.Join(root, ".hv", dir, id+".md"))
 	if err != nil || content == "" {
 		return 0, nil
 	}
@@ -158,7 +158,7 @@ func (f *File) Append(sec, line string) error {
 	}
 	path := f.backlogPath()
 	return fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if err != nil {
 			return err
 		}
@@ -285,7 +285,7 @@ func (f *File) SetField(ref, field, value string) (bool, error) {
 	path := f.backlogPath()
 	changed := false
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if err != nil {
 			return err
 		}
@@ -343,7 +343,7 @@ func (f *File) Complete(ref string, in CompleteInput) (bool, error) {
 	path := f.backlogPath()
 	moved := false
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if err != nil {
 			return err
 		}
@@ -451,7 +451,7 @@ func (f *File) Reopen(ref string) (bool, error) {
 	restored := false
 	doneHash, dirName := "", ""
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
-		content, err := readText(path)
+		content, err := fsio.ReadText(path)
 		if err != nil {
 			return err
 		}
@@ -478,7 +478,7 @@ func (f *File) Reopen(ref string) (bool, error) {
 			}
 		}
 		if source == "" {
-			if raw, err := readText(apath); err == nil {
+			if raw, err := fsio.ReadText(apath); err == nil {
 				if lstart, lend, d, ok := findDoneIn(raw, ref); ok {
 					done = d
 					cut := lend

@@ -20,6 +20,7 @@ func Tree() *Command {
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
+	root.Subs = append(root.Subs, a4Commands()...)
 	return root
 }
 

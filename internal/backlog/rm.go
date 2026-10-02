@@ -280,8 +280,8 @@ func (f *File) planFiles(id string) []string {
 func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) {
 	var res RmResult
 	run := func() error {
-		todo, _ := readText(f.hv("BACKLOG.md"))
-		archive, _ := readText(f.hv("ARCHIVE.md"))
+		todo, _ := fsio.ReadText(f.hv("BACKLOG.md"))
+		archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
 		infos := map[string]RmItem{}
 		for _, id := range ids {
 			if sec, line, ok := findBulletIn(todo, id, allSections); ok {
