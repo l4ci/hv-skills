@@ -47,6 +47,7 @@ type Ctx struct {
 	JSON   bool
 	Repo   string // the --repo value; resolve it with RepoPath
 	Stdin  io.Reader
+	Stdout io.Writer // for passthrough verbs only; others return Text
 	Stderr io.Writer
 
 	warnings []string
@@ -219,7 +220,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	// Until the arguments parse, an error answers in JSON if any token
 	// before "--" is exactly --json.
-	c := &Ctx{Path: "hv", Stdin: stdin, Stderr: stderr, JSON: containsJSON(args)}
+	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args)}
 	defer func() {
 		if r := recover(); r != nil {
 			code = fail(c, stdout, asError(fmt.Errorf("panic: %v", r)))
