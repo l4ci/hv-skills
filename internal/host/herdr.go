@@ -1,0 +1,330 @@
+package host
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/l4ci/hv-skills/v5/internal/shlex"
+)
+
+// herdr ports bin/hv-host-herdr.sh. A herdr slot is a TAB in the current
+// workspace whose root pane runs Claude Code in the slot's worktree. The
+// handle is the tab id (`w1:t7`). Tab ids are never reused, so the handle
+// changes on every dispatch and the caller must persist it. The agent's name
+// derives from slot + handle (`hv-w1-w1-t7`): herdr agent names are unique per
+// SERVER, and a bare `w1` would collide with another repo's pool.
+//
+// Every herdr command prints JSON on stdout and, on failure, a JSON error on
+// stderr with exit 1. herdr reports agent state natively, so none of tmux's
+// paste tricks apply: `agent prompt` submits text and Enter as one write.
+type herdr struct{ d Deps }
+
+func (h *herdr) Name() string { return "herdr" }
+
+func (h *herdr) Require() error {
+	if _, err := h.d.LookPath("herdr"); err != nil {
+		return fmt.Errorf("herdr is not installed")
+	}
+	return nil
+}
+
+// InSession: herdr injects HERDR_ENV=1 into every pane it manages.
+// Controlling a herdr server from outside one is what herdr's own guide
+// forbids: commands then land in whatever workspace a human has focused.
+func (h *herdr) InSession() bool {
+	return h.d.Getenv("HERDR_ENV") == "1" && h.d.Getenv("HERDR_WORKSPACE_ID") != ""
+}
+
+func (h *herdr) Where() string {
+	ws := h.d.Getenv("HERDR_WORKSPACE_ID")
+	if ws == "" {
+		ws = "?"
+	}
+	return "herdr workspace " + ws
+}
+
+// AgentName is the herdr agent name for a slot and handle.
+func AgentName(slot, handle string) string {
+	return "hv-" + slot + "-" + strings.ReplaceAll(handle, ":", "-")
+}
+
+func (h *herdr) herdr(ctx context.Context, args ...string) Result {
+	r, err := h.d.Run(ctx, "herdr", args)
+	if err != nil {
+		return Result{ExitCode: 127, Stderr: err.Error()}
+	}
+	return r
+}
+
+// jget reads the value at a dotted key path from a herdr JSON reply, "" on a
+// missing key, bad JSON, or null.
+func jget(doc, path string) string {
+	var v any
+	if json.Unmarshal([]byte(doc), &v) != nil {
+		return ""
+	}
+	for _, k := range strings.Split(path, ".") {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return ""
+		}
+		if v, ok = m[k]; !ok {
+			return ""
+		}
+	}
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(x)
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
+// LaunchArgs splits a worker launch command for `herdr agent start --kind
+// claude`, which runs the claude binary itself and takes only its arguments.
+// Leading KEY=VALUE tokens are returned as env (passed to the tab as --env),
+// everything after the binary as args. It fails when the command does not
+// launch claude, since agent start cannot run it.
+func LaunchArgs(launch string) (env, args []string, err error) {
+	toks, err := shlex.Split(launch)
+	if err != nil {
+		return nil, nil, err
+	}
+	i := 0
+	for i < len(toks) && envAssign.MatchString(toks[i]) {
+		env = append(env, toks[i])
+		i++
+	}
+	if i >= len(toks) || baseName(toks[i]) != "claude" {
+		return nil, nil, fmt.Errorf("not a claude launch")
+	}
+	return env, toks[i+1:], nil
+}
+
+var envAssign = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
+func baseName(p string) string {
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
+
+var dialogLine = regexp.MustCompile(`^\s*(❯|>)?\s*(\d+)\.\s+(.*\S)`)
+
+var dialogAccept = []string{"Yes, I trust this folder", "Yes, I accept", "Yes, proceed"}
+
+// DialogKeys reads a startup dialog off the pane text. Claude Code can open
+// on the folder-trust prompt for a fresh worktree, or the Bypass Permissions
+// warning on a config dir that has not accepted it yet. The two put their
+// accepting option in different positions, so a fixed keypress picks "No,
+// exit" on one of them. It finds the accepting option and the cursor (❯) and
+// returns the keys that move between them plus `enter`; ok is false on an
+// unknown dialog.
+func DialogKeys(pane string) (keys []string, ok bool) {
+	cursor, target := 0, 0
+	for _, line := range strings.Split(pane, "\n") {
+		m := dialogLine.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		n, _ := strconv.Atoi(m[2])
+		if m[1] != "" {
+			cursor = n
+		}
+		if target == 0 {
+			for _, a := range dialogAccept {
+				if strings.Contains(m[3], a) {
+					target = n
+					break
+				}
+			}
+		}
+	}
+	if target == 0 {
+		return nil, false
+	}
+	if cursor == 0 {
+		cursor = 1
+	}
+	step, n := "down", target-cursor
+	if target < cursor {
+		step, n = "up", cursor-target
+	}
+	for i := 0; i < n; i++ {
+		keys = append(keys, step)
+	}
+	return append(keys, "enter"), true
+}
+
+// Spawn adopts the worktree as a new background tab, starts Claude Code in
+// it, clears any startup dialog, and waits for it to idle. It returns the tab
+// id (the handle). Session is unused: herdr tabs live in the caller's own
+// workspace.
+func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
+	env, agentArgs, err := LaunchArgs(o.Launch)
+	if err != nil {
+		return "", fmt.Errorf("work.dispatch=herdr launches claude itself; workerCommand must run claude, got: %s", o.Launch)
+	}
+	args := []string{"tab", "create", "--workspace", h.d.Getenv("HERDR_WORKSPACE_ID"),
+		"--cwd", o.Cwd, "--label", o.Slot, "--no-focus"}
+	for _, e := range env {
+		args = append(args, "--env", e)
+	}
+	// Account selection must happen at tab creation: agent start runs the
+	// binary directly and ignores shell aliases or wrappers.
+	if o.ConfigDir != "" {
+		args = append(args, "--env", "CLAUDE_CONFIG_DIR="+o.ConfigDir)
+	}
+	r := h.herdr(ctx, args...)
+	if r.ExitCode != 0 {
+		return "", fmt.Errorf("herdr tab create failed for slot '%s': %s", o.Slot, strings.TrimSpace(r.Stderr))
+	}
+	tab := jget(r.Stdout, "result.tab.tab_id")
+	pane := jget(r.Stdout, "result.root_pane.pane_id")
+	if tab == "" || pane == "" {
+		return "", fmt.Errorf("herdr tab create returned no tab/pane id for slot '%s'", o.Slot)
+	}
+
+	name := AgentName(o.Slot, tab)
+	timeoutMs := strconv.Itoa(o.BootTimeout * 1000)
+	start := append([]string{"agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", timeoutMs, "--"}, agentArgs...)
+	r = h.herdr(ctx, start...)
+	if r.ExitCode == 0 {
+		return tab, nil
+	}
+	if jget(r.Stderr, "error.code") != "agent_not_ready" {
+		return "", fmt.Errorf("herdr agent start failed for slot '%s' (%s): %s", o.Slot, tab, strings.TrimSpace(r.Stderr))
+	}
+	// Blocked at startup: answer up to two dialogs (trust, then bypass).
+	for i := 0; ; {
+		text := jget(h.herdr(ctx, "agent", "read", name, "--source", "visible").Stdout, "result.read.text")
+		keys, ok := DialogKeys(text)
+		if !ok {
+			return "", fmt.Errorf("slot '%s' is stuck on an unrecognised startup dialog in tab %s", o.Slot, tab)
+		}
+		h.herdr(ctx, append([]string{"agent", "send-keys", name}, keys...)...)
+		w := h.herdr(ctx, "agent", "wait", name, "--until", "idle", "--until", "blocked", "--timeout", timeoutMs)
+		if jget(w.Stdout, "result.agent.agent_status") == "idle" {
+			return tab, nil
+		}
+		if i++; i >= 3 {
+			return "", fmt.Errorf("slot '%s' did not reach idle after its startup dialogs (tab %s)", o.Slot, tab)
+		}
+	}
+}
+
+// Send submits the file and confirms pickup: it returns once the agent is
+// observed working (or blocked on a dialog), NOT when the task finishes,
+// since a plain --wait would hold until the whole task settled. ErrNotSubmitted
+// means no activity followed the submission; ErrDialogOpen means a dialog was
+// already up and nothing was sent.
+func (h *herdr) Send(ctx context.Context, slot, handle, file string) error {
+	text, err := readFile(file)
+	if err != nil {
+		return ErrNotSubmitted
+	}
+	text = strings.TrimRight(text, "\n") // the shell host read it with $(cat)
+	r := h.herdr(ctx, "agent", "prompt", AgentName(slot, handle), text,
+		"--wait", "--until", "working", "--until", "blocked", "--timeout", "60000")
+	if r.ExitCode == 0 {
+		return nil
+	}
+	if jget(r.Stderr, "error.code") == "agent_blocked" {
+		return ErrDialogOpen
+	}
+	return ErrNotSubmitted
+}
+
+// Capture prints recent pane text with soft wraps joined (the herdr twin of
+// capture-pane -J).
+func (h *herdr) Capture(ctx context.Context, slot, handle string, lines int) string {
+	if handle == "" {
+		return ""
+	}
+	r := h.herdr(ctx, "agent", "read", AgentName(slot, handle), "--source", "recent-unwrapped",
+		"--lines", strconv.Itoa(lines))
+	if r.ExitCode != 0 {
+		return ""
+	}
+	return jget(r.Stdout, "result.read.text")
+}
+
+// Status is herdr's native agent state, or `gone` when the slot has a tab but
+// no agent in it (the session exited back to a shell). A never-dispatched
+// slot yields "".
+func (h *herdr) Status(ctx context.Context, slot, handle string) string {
+	if handle == "" {
+		return ""
+	}
+	r := h.herdr(ctx, "agent", "get", AgentName(slot, handle))
+	if r.ExitCode != 0 {
+		return "gone"
+	}
+	return jget(r.Stdout, "result.agent.agent_status")
+}
+
+// Kill asks the session to exit, closes its tab, and proves it is gone. It
+// records the pane's process PIDs first (claude plus its MCP children) and
+// fails unless `tab get` fails and every recorded PID has exited. Closed tab
+// ids are never reused, so a failing `tab get` is unambiguous. `/exit` is a
+// client-side command, so there is no wait: it produces no turn to observe;
+// it lets Claude Code flush its session first.
+func (h *herdr) Kill(ctx context.Context, slot, handle string) error {
+	if handle == "" {
+		return nil
+	}
+	name := AgentName(slot, handle)
+	var pids []int
+	if pane := jget(h.herdr(ctx, "agent", "get", name).Stdout, "result.agent.pane_id"); pane != "" {
+		pids = processPIDs(h.herdr(ctx, "pane", "process-info", "--pane", pane).Stdout)
+	}
+	h.herdr(ctx, "agent", "prompt", name, "/exit")
+	h.herdr(ctx, "tab", "close", handle)
+	alive, ok := killLoop(&h.d, pids, func() bool { return h.herdr(ctx, "tab", "get", handle).ExitCode != 0 })
+	if ok {
+		return nil
+	}
+	return fmt.Errorf("slot '%s' previous session is still running (tab %s%s); not spawning a second one",
+		slot, handle, pidSuffix(alive))
+}
+
+// processPIDs reads foreground process pids and the shell pid out of
+// `herdr pane process-info`.
+func processPIDs(doc string) []int {
+	var v struct {
+		Result struct {
+			Info struct {
+				Fg []struct {
+					Pid int `json:"pid"`
+				} `json:"foreground_processes"`
+				Shell int `json:"shell_pid"`
+			} `json:"process_info"`
+		} `json:"result"`
+	}
+	if json.Unmarshal([]byte(doc), &v) != nil {
+		return nil
+	}
+	var pids []int
+	for _, p := range v.Result.Info.Fg {
+		pids = append(pids, p.Pid)
+	}
+	if v.Result.Info.Shell != 0 {
+		pids = append(pids, v.Result.Info.Shell)
+	}
+	return pids
+}
+
+func (h *herdr) Notify(ctx context.Context, title, body string) {
+	h.herdr(ctx, "notification", "show", title, "--body", body, "--sound", "request")
+}
