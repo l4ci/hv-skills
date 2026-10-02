@@ -30,13 +30,13 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 EXIT_CODES = {
-    1: "failed", 2: "usage", 3: "not_found", 4: "refused",
+    1: "failed", 2: "usage", 3: "resolution", 4: "refused",
     5: "unavailable", 6: "retry", 70: "internal", 71: "not_implemented",
 }
 
 
 class HvError(Exception):
-    """Ends the verb with a contract exit code; data rides along on exit 1."""
+    """Ends the verb with a contract exit code; data rides along on exit 1 and 4."""
 
     def __init__(self, exit, message, hint=None, data=None):
         super().__init__(message)
@@ -51,11 +51,34 @@ def usage(message):
 
 
 # ---------------------------------------------------------------- invocation
+#
+# Argument rule from the CLI conventions: before the verb only command words
+# and global flags may appear; after it, one parser reads global and verb
+# flags mixed with positionals. A value flag always takes the next token, a
+# boolean takes none (`--flag=false` allowed), a repeated flag keeps its last
+# value, and `--` ends flag parsing.
+
+GLOBAL_VALUES = {"C": "cwd", "cwd": "cwd", "repo": "repo"}
+GLOBAL_BOOLS = {"json": "json", "h": "help", "help": "help"}
+BOOL_WORDS = {"1": True, "t": True, "T": True, "true": True, "TRUE": True, "True": True,
+              "0": False, "f": False, "F": False, "false": False, "FALSE": False, "False": False}
+
+
+class Spec:
+    """A verb's own flags and positional count, declared with @verb."""
+
+    def __init__(self, values=(), bools=(), pos=(0, 0), root=True, repo=True):
+        self.values, self.bools = set(values), set(bools)
+        self.min_pos, self.max_pos = pos
+        self.root = root            # needs a .hv/ root (conventions: all but init/version/update)
+        self.repo = repo            # accepts the global --repo
+
 
 class Ctx:
-    def __init__(self, path, args, repo, cwd):
+    def __init__(self, path, flags, pos, repo, cwd):
         self.path = path            # ("item", "field")
-        self.args = args            # verb args, globals removed
+        self.flags = flags          # verb flags, by name without dashes
+        self.pos = pos              # positional args
         self.repo = repo            # global --repo value or None
         self.cwd = cwd              # effective working directory
         self.warnings = []
@@ -75,80 +98,93 @@ class Ctx:
         )
         return proc.returncode, proc.stdout, proc.stderr
 
-    def no_repo(self):
-        if self.repo is not None:
-            raise usage(f"{self.name} has no repo scope; drop --repo")
+
+def is_flag(tok):
+    return tok.startswith("-") and tok != "-"
 
 
-def parse_globals(argv):
-    """Split global flags (anywhere before `--`) from the verb words and args."""
-    as_json, cwd, repo, help_ = False, None, None, False
-    rest = []
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a == "--":
-            rest.extend(argv[i:])
+def to_bool(name, val):
+    if val not in BOOL_WORDS:
+        raise usage(f"invalid boolean value {val!r} for --{name}")
+    return BOOL_WORDS[val]
+
+
+def take_value(argv, i, name, eq, val):
+    """Value of the flag at argv[i]; returns (value, next index)."""
+    if eq:
+        return val, i + 1
+    if i + 1 >= len(argv):
+        raise usage(f"flag needs an argument: --{name}")
+    return argv[i + 1], i + 2
+
+
+def take_global(argv, i, g):
+    """Apply a global flag at argv[i] to g; next index, or None if not global."""
+    name, eq, val = argv[i].lstrip("-").partition("=")
+    if name in GLOBAL_BOOLS:
+        g[GLOBAL_BOOLS[name]] = to_bool(name, val) if eq else True
+        return i + 1
+    if name in GLOBAL_VALUES:
+        g[GLOBAL_VALUES[name]], i = take_value(argv, i, name, eq, val)
+        return i
+    return None
+
+
+def scan_command(argv, known):
+    """Command words and globals up to the verb. Returns (path, rest, globals)."""
+    g = {"json": False, "help": False, "cwd": None, "repo": None}
+    words, i = [], 0
+    while i < len(argv) and argv[i] != "--":
+        tok = argv[i]
+        if is_flag(tok):
+            if tuple(words) in known:
+                break                   # the verb is reached; the rest is its parser's
+            if tok == "--version" and not words:
+                words, i = ["version"], i + 1
+                continue
+            nxt = take_global(argv, i, g)
+            if nxt is None:
+                raise usage(f"unknown flag before the verb: {tok}")
+            i = nxt
+            continue
+        cand = tuple(words + [tok])
+        if not any(p[:len(cand)] == cand for p in known):
             break
-        if a in ("--json", "-json"):
-            as_json = True
-        elif a in ("-h", "--help", "-help"):
-            help_ = True
-        elif a in ("-C", "--cwd", "-cwd", "--repo", "-repo"):
-            if i + 1 >= len(argv):
-                raise usage(f"flag needs an argument: {a}")
-            if a.endswith("repo"):
-                repo = argv[i + 1]
-            else:
-                cwd = argv[i + 1]
+        words.append(tok)
+        i += 1
+    path = tuple(words)
+    if path not in known:
+        raise usage(f"unknown command: hv {' '.join(argv[:i + 1]) or '(none)'}")
+    return path, argv[i:], g
+
+
+def parse_args(name, rest, spec, g):
+    """One pass over the tokens after the verb: verb flags, globals, positionals."""
+    flags, pos, i = {}, [], 0
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            pos.extend(rest[i + 1:])
+            break
+        if not is_flag(tok):
+            pos.append(tok)
             i += 1
-        elif a.startswith(("--cwd=", "-cwd=")):
-            cwd = a.split("=", 1)[1]
-        elif a.startswith(("--repo=", "-repo=")):
-            repo = a.split("=", 1)[1]
-        elif a == "--version":
-            rest.insert(0, "version")
+            continue
+        fname, eq, val = tok.lstrip("-").partition("=")
+        if fname in spec.bools:
+            flags[fname] = to_bool(fname, val) if eq else True
+            i += 1
+        elif fname in spec.values:
+            flags[fname], i = take_value(rest, i, fname, eq, val)
+        elif fname == "repo" and not spec.repo:
+            raise usage(f"{name}: unknown flag --repo (the verb has no repo scope)")
         else:
-            rest.append(a)
-        i += 1
-    return as_json, cwd, repo, help_, rest
-
-
-def parse_flags(ctx, values=(), bools=(), min_pos=0, max_pos=None):
-    """Go-flag-style parse of ctx.args, flags and positionals interleaved.
-
-    `values` and `bools` name the verb's flags without dashes. Returns
-    (flags dict, positionals list). Unknown flags and wrong positional
-    counts are usage errors (exit 2).
-    """
-    flags, pos = {}, []
-    args = ctx.args
-    i = 0
-    while i < len(args):
-        a = args[i]
-        if a == "--":
-            pos.extend(args[i + 1:])
-            break
-        if a.startswith("-") and a != "-" and not re.match(r"^-\d", a):
-            name, eq, val = a.lstrip("-").partition("=")
-            if name in bools:
-                if eq:
-                    raise usage(f"{ctx.name}: --{name} takes no value")
-                flags[name] = True
-            elif name in values:
-                if not eq:
-                    if i + 1 >= len(args):
-                        raise usage(f"{ctx.name}: flag needs an argument: --{name}")
-                    val = args[i + 1]
-                    i += 1
-                flags[name] = val
-            else:
-                raise usage(f"{ctx.name}: unknown flag --{name}")
-        else:
-            pos.append(a)
-        i += 1
-    if len(pos) < min_pos or (max_pos is not None and len(pos) > max_pos):
-        raise usage(f"{ctx.name}: wrong number of arguments")
+            nxt = take_global(rest, i, g)
+            if nxt is None:
+                raise usage(f"{name}: unknown flag {tok.partition('=')[0]}")
+            i = nxt
+    if len(pos) < spec.min_pos or (spec.max_pos is not None and len(pos) > spec.max_pos):
+        raise usage(f"{name}: wrong number of arguments")
     return flags, pos
 
 
@@ -208,17 +244,16 @@ def json_body(stdout):
 # An adapter takes a Ctx and returns (data, text). `text` is what the verb
 # prints without --json; the shim passes the old helper's stdout through
 # there, since the contract leaves text output free. Raise HvError to fail.
-# Register with @verb(..., root=False) for verbs that run without a .hv/ root.
+# @verb declares the verb's flags and positional count; main parses them
+# before the adapter runs, so ctx.flags and ctx.pos are ready.
 
 ADAPTERS = {}
-NO_ROOT = set()
 
 
-def verb(*path, root=True):
+def verb(*path, **spec):
+    """Register an adapter for `hv <path>` with its Spec (flags, positionals)."""
     def register(fn):
-        ADAPTERS[path] = fn
-        if not root:
-            NO_ROOT.add(path)
+        ADAPTERS[path] = (fn, Spec(**spec))
         return fn
     return register
 
@@ -299,24 +334,17 @@ def stdin_to_file(path):
     return tmp, tmp
 
 
-def one_id(ctx, **kw):
-    flags, pos = parse_flags(ctx, min_pos=1, max_pos=1, **kw)
-    return flags, pos[0]
-
-
 KINDS = ("bugs", "features", "tasks")
 SECTION = {"bugs": "## Bugs", "features": "## Features", "tasks": "## Tasks"}
 
 
 # ---------------------------------------------------------------- adapters: ids and items
 
-@verb("id", "next")
+@verb("id", "next", pos=(1, 1))
 def id_next(ctx):
-    _, pos = parse_flags(ctx, min_pos=1, max_pos=1)
-    kind = pos[0]
+    kind = ctx.pos[0]
     if kind not in KINDS + ("milestones",):
         raise usage(f"{ctx.name}: kind must be bugs|features|tasks|milestones")
-    check_repo(ctx)
     new_id = call(ctx, "hv-next-id", kind).strip()
     return {"kind": kind, "id": new_id, "changed": True}, new_id
 
@@ -325,14 +353,13 @@ CREATE_FIELDS = {"related": "Related", "milestone": "Milestone", "repos": "Repos
                  "subsystem": "Subsystem", "captured": "Captured"}
 
 
-@verb("item", "create")
+@verb("item", "create",
+      values=("kind", "title", "tag", "desc", "body-file", "raw-file", *CREATE_FIELDS))
 def item_create(ctx):
-    f, _ = parse_flags(ctx, values=("kind", "title", "tag", "desc", "body-file", "raw-file",
-                                    *CREATE_FIELDS))
+    f = ctx.flags
     kind = f.get("kind")
     if kind not in KINDS:
         raise usage(f"{ctx.name}: --kind must be bugs|features|tasks")
-    check_repo(ctx)
     if "raw-file" in f:
         if set(f) - {"kind", "raw-file"}:
             raise usage(f"{ctx.name}: --raw-file takes only --kind")
@@ -380,13 +407,12 @@ def item_create(ctx):
     return data, new_id
 
 
-@verb("item", "complete")
+@verb("item", "complete", values=("commit", "reason", "note"), bools=("no-proof",), pos=(1, 1))
 def item_complete(ctx):
-    f, item = one_id(ctx, values=("commit", "reason", "note"), bools=("no-proof",))
+    f, item = ctx.flags, ctx.pos[0]
     reason = f.get("reason", "done")
     if reason not in ("done", "handed-off", "blocked", "dropped"):
         raise usage(f"{ctx.name}: --reason must be done|handed-off|blocked|dropped")
-    check_repo(ctx)
     commit = f.get("commit")
     if not commit:
         proc = subprocess.run(["git", "log", "-1", "--format=%h"], cwd=ctx.cwd,
@@ -417,12 +443,11 @@ GET_FIELDS = ("title", "detail", "related", "milestone", "repos", "subsystem", "
 SET_FIELDS = ("milestone", "related", "repos", "subsystem", "detail")
 
 
-@verb("item", "field")
+@verb("item", "field", values=("name", "set"), bools=("all",), pos=(1, 1))
 def item_field(ctx):
-    f, item = one_id(ctx, values=("name", "set"), bools=("all",))
+    f, item = ctx.flags, ctx.pos[0]
     if ("name" in f) == bool(f.get("all")):
         raise usage(f"{ctx.name}: exactly one of --name or --all is required")
-    check_repo(ctx)
     if f.get("all"):
         if "set" in f:
             raise usage(f"{ctx.name}: --all cannot be combined with --set")
@@ -463,10 +488,9 @@ def ids_in(cell):
     return re.findall(r"[A-Z]\d+", cell)
 
 
-@verb("backlog", "list")
+@verb("backlog", "list", values=("grep",))
 def backlog_list(ctx):
-    f, _ = parse_flags(ctx, values=("grep",), max_pos=0)
-    check_repo(ctx)
+    f = ctx.flags
     out = call(ctx, "hv-backlog", *(["--grep", f["grep"]] if "grep" in f else []))
     blocks, cur = {}, None
     for line in out.splitlines():
@@ -507,8 +531,6 @@ def to_int(s, default=0):
 
 @verb("summary")
 def summary(ctx):
-    parse_flags(ctx, max_pos=0)
-    check_repo(ctx)
     out = call(ctx, "hv-summary")
     if out.startswith("No .hv/ yet"):
         raise HvError(3, "no .hv/ found in this directory or any parent", hint="run: hv init")
@@ -544,20 +566,19 @@ def summary(ctx):
     return data, out
 
 
-@verb("backlog", "archive")
+@verb("backlog", "archive", values=("days",))
 def backlog_archive(ctx):
-    f, _ = parse_flags(ctx, values=("days",), max_pos=0)
+    f = ctx.flags
     days = f.get("days", "5")
     if not days.isdigit():
         raise usage(f"{ctx.name}: --days must be a number")
-    check_repo(ctx)
     moved = to_int(call(ctx, "hv-archive-old", days).strip())
     return {"days": int(days), "moved": moved, "changed": moved > 0}, f"archived {moved}"
 
 
-@verb("git", "guard", "clean")
+@verb("git", "guard", "clean", values=("context",))
 def guard_clean(ctx):
-    f, _ = parse_flags(ctx, values=("context",), max_pos=0)
+    f = ctx.flags
     rc, _, err = ctx.helper("hv-guard-clean", f.get("context", "this command"))
     if rc == 0:
         return {"clean": True, "greenfield": False, "dirtyRepos": []}, "clean"
@@ -571,11 +592,10 @@ def guard_clean(ctx):
 
 # ---------------------------------------------------------------- adapters: status
 
-@verb("status", "add")
+@verb("status", "add", values=("items", "worktree", "repos", "worktrees"), bools=("if-absent",),
+      pos=(1, 1))
 def status_add(ctx):
-    f, pos = parse_flags(ctx, values=("items", "worktree", "repos", "worktrees"),
-                         bools=("if-absent",), min_pos=1, max_pos=1)
-    branch = pos[0]
+    f, branch = ctx.flags, ctx.pos[0]
     if not f.get("items"):
         raise usage(f"{ctx.name}: --items is required")
     multi = "repos" in f
@@ -593,7 +613,6 @@ def status_add(ctx):
             raise HvError(3, err.strip())
         scope = names
     else:
-        check_repo(ctx)
         scope = [ctx.repo]
     matching = lambda: [e for e in status_entries(root)
                         if e.get("branch") == branch and (e.get("repo") or None) in scope]
@@ -616,10 +635,9 @@ def status_add(ctx):
     return {"branch": branch, "entries": entries, "changed": changed}, f"active: {branch}"
 
 
-@verb("status", "rm")
+@verb("status", "rm", pos=(1, 1))
 def status_rm(ctx):
-    _, pos = parse_flags(ctx, min_pos=1, max_pos=1)
-    branch = pos[0]
+    branch = ctx.pos[0]
     root = find_root(ctx.cwd)
     suffix = f"@{ctx.repo}" if ctx.repo else ""
     handoff = os.path.join(root, ".hv", "handoff", f"{branch}{suffix}.md")
@@ -635,15 +653,6 @@ def status_rm(ctx):
 
 # ---------------------------------------------------------------- main
 
-def resolve(words):
-    """Longest prefix of `words` that names an adapter or a contract verb."""
-    known = set(ADAPTERS) | CONTRACT_VERBS
-    for n in range(min(len(words), 4), 0, -1):
-        if tuple(words[:n]) in known:
-            return tuple(words[:n]), words[n:]
-    return None, words
-
-
 def emit(as_json, name, data=None, text=None, err=None, warnings=()):
     for w in warnings:
         print(f"{name}: warning: {w}", file=sys.stderr)
@@ -656,6 +665,8 @@ def emit(as_json, name, data=None, text=None, err=None, warnings=()):
         elif text:
             sys.stdout.write(text if text.endswith("\n") else text + "\n")
         return 0
+    if err.message.startswith(name + ": "):
+        err.message = err.message[len(name) + 2:]
     print(f"{name}: {err.message}", file=sys.stderr)
     if err.hint:
         print(f"hint: {err.hint}", file=sys.stderr)
@@ -665,7 +676,7 @@ def emit(as_json, name, data=None, text=None, err=None, warnings=()):
         if err.hint:
             e["hint"] = err.hint
         env = {"ok": False, "error": e}
-        if err.exit == 1 and err.data is not None:
+        if err.exit in (1, 4) and err.data is not None:
             env["data"] = err.data
         if warnings:
             env["warnings"] = list(warnings)
@@ -674,26 +685,31 @@ def emit(as_json, name, data=None, text=None, err=None, warnings=()):
 
 
 def main(argv):
-    as_json, name = False, "hv"
+    # Conventions: a usage error is an envelope when any token before `--` is
+    # exactly `--json`, since no parse exists yet to say otherwise.
+    head = argv[:argv.index("--")] if "--" in argv else argv
+    as_json, name = "--json" in head, "hv"
     try:
-        as_json, cwd, repo, help_, rest = parse_globals(argv)
         load_contract_verbs()
-        path, args = resolve(rest)
-        if path is None:
-            raise usage(f"unknown command: {' '.join(rest[:2]) or '(none)'}")
+        path, rest, g = scan_command(argv, set(ADAPTERS) | CONTRACT_VERBS)
         name = "hv " + " ".join(path)
-        if help_:
+        if path not in ADAPTERS:
+            raise HvError(71, "not ported to the test shim yet")
+        fn, spec = ADAPTERS[path]
+        flags, pos = parse_args(name, rest, spec, g)
+        as_json = g["json"]
+        if g["help"]:
             print(f"usage: {name} … (see docs/design/5.0-verb-contract.md)")
             return 0
-        cwd = os.path.realpath(cwd or os.getcwd())
+        if g["repo"] is not None and not spec.repo:
+            raise usage(f"{name}: unknown flag --repo (the verb has no repo scope)")
+        cwd = os.path.realpath(g["cwd"] or os.getcwd())
         if not os.path.isdir(cwd):
-            raise usage(f"-C {cwd}: not a directory")
-        fn = ADAPTERS.get(path)
-        if fn is None:
-            raise HvError(71, "not ported to the test shim yet")
-        ctx = Ctx(path, args, repo, cwd)
-        if path not in NO_ROOT:
+            raise HvError(3, f"-C {g['cwd']}: not a directory")
+        ctx = Ctx(path, flags, pos, g["repo"], cwd)
+        if spec.root:
             require_root(ctx)
+        check_repo(ctx)
         data, text = fn(ctx)
         return emit(as_json, name, data, text, warnings=ctx.warnings)
     except HvError as e:
