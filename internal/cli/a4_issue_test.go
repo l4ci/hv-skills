@@ -6,32 +6,9 @@ import (
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
-
-// a4FakeTracker is an in-memory backlog.Tracker, so the issue-mode branches
-// run without gh or glab. The real adapter to internal/tracker (#90) is a
-// follow-up.
-type a4FakeTracker struct{ issues []backlog.Issue }
-
-func (f *a4FakeTracker) List(state string) ([]backlog.Issue, error) {
-	var out []backlog.Issue
-	for _, is := range f.issues {
-		if is.State == state {
-			out = append(out, is)
-		}
-	}
-	return out, nil
-}
-
-func (f *a4FakeTracker) Get(n int) (backlog.Issue, bool, error) {
-	for _, is := range f.issues {
-		if is.Number == n {
-			return is, true, nil
-		}
-	}
-	return backlog.Issue{}, false, nil
-}
 
 // withTracker swaps newTracker for one serving tr, for the test's duration.
 func withTracker(t *testing.T, tr backlog.Tracker) {
@@ -43,8 +20,8 @@ func withTracker(t *testing.T, tr backlog.Tracker) {
 
 const issuesConfig = `{"backlog": {"backend": "issues"}}`
 
-func issueFixture() *a4FakeTracker {
-	return &a4FakeTracker{issues: []backlog.Issue{
+func issueFixture() *trackertest.Fake {
+	return &trackertest.Fake{Issues: []backlog.Issue{
 		{Number: 7, Title: "Add export", Body: "Export the backlog.\n\n<!-- hv:fields\nRelated: B9\n-->",
 			Labels: []string{"type:feature", "size:Major"}, Milestone: "M02 — Sharing", State: "open",
 			URL: "https://example.test/issues/7"},
@@ -113,38 +90,29 @@ func TestIssueRefsThatDoNotResolve(t *testing.T) {
 	}
 }
 
-// What this PR does not port in issue mode fails cleanly: file-only verbs are
-// refused (4, backend); the tracker-backed writes are not implemented (71).
-func TestIssueModeUnportedAndFileOnly(t *testing.T) {
+// File-only verbs are refused under issues (4, backend) before the tracker is built.
+func TestIssueModeFileOnly(t *testing.T) {
 	root := a4Project(t, issuesConfig)
 	withTracker(t, issueFixture())
 	raw := filepath.Join(t.TempDir(), "bullet.md")
 	if err := os.WriteFile(raw, []byte("- **[B05] [P1] Raw.** x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cases := []struct {
-		argv []string
-		exit int
-	}{
-		{[]string{"id", "next", "--kind", "bugs"}, ExitRefused},
-		{[]string{"item", "rm", "7"}, ExitRefused},
-		{[]string{"item", "create", "--kind", "bugs", "--raw-file", raw}, ExitRefused},
-		{[]string{"item", "complete", "7", "--commit", "abc", "--no-proof"}, ExitNotImplemented},
-		{[]string{"item", "reopen", "7"}, ExitNotImplemented},
-		{[]string{"item", "ready", "7"}, ExitNotImplemented},
-		{[]string{"item", "comment", "list", "7"}, ExitNotImplemented},
-		{[]string{"item", "field", "set", "7", "--name", "related", "--value", "B9"}, ExitNotImplemented},
-		{[]string{"item", "create", "--kind", "bugs", "--title", "x"}, ExitNotImplemented},
-	}
-	for _, c := range cases {
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, c.argv...)...)
-		if code != c.exit {
-			t.Fatalf("%v: exit %d, want %d (%v)", c.argv, code, c.exit, env)
+	for _, argv := range [][]string{
+		{"id", "next", "--kind", "bugs"},
+		{"item", "rm", "7"},
+		{"item", "create", "--kind", "bugs", "--raw-file", raw},
+		{"item", "field", "set", "7", "--name", "detail", "--value", "x"},
+	} {
+		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		if code != ExitRefused {
+			t.Fatalf("%v: exit %d, want %d (%v)", argv, code, ExitRefused, env)
 		}
 	}
 }
 
-// Without an injected tracker, issue mode stops at the stub: exit 5.
+// Without an injected tracker the real one is built; a project with no
+// origin remote has no provider to pick, which is exit 5.
 func TestIssueModeWithoutTracker(t *testing.T) {
 	root := a4Project(t, issuesConfig)
 	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "title"); code != ExitUnavailable {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 // The A4 item verbs: `hv id next` and `hv item create|field|complete|reopen|
@@ -23,10 +25,10 @@ import (
 // (docs/design/5.0-verb-contract.md); the file backend does the work.
 
 // newTracker builds the issue tracker the issue backend reads and writes
-// through. The tracker adapter (A8, internal/tracker) is not ported, so issue
-// mode stops here with exit 5 until it is.
+// through: the gh or glab adapter for the project's origin, configured by
+// issues.*. It is a variable so unit tests inject a fake.
 var newTracker = func(root string, cfg any) (backlog.Tracker, error) {
-	return nil, Unavailable("issue tracker adapter not ported yet (A8 internal/tracker)")
+	return tracker.New(context.Background(), tracker.SettingsFromConfig(cfg), "", root)
 }
 
 func a4Commands() []*Command {
@@ -50,6 +52,15 @@ func a4ItemCommands() []*Command {
 			{Name: "rm", Summary: "remove items with their cross-references and files", Repo: true, Verb: a4Rm},
 			{Name: "shipped", Summary: "look for evidence that titles already shipped", Repo: true, Verb: a4Shipped},
 			{Name: "ready", Summary: "is the item specified well enough to start", Repo: true, Verb: a4Ready},
+			{Name: "show", Summary: "status block of an issue-mode item", Repo: true, Verb: a4Show},
+			{Name: "claim", Summary: "take an item so two agents never work it at once", Repo: true, Verb: a4Claim},
+			{Name: "release", Summary: "give a claimed item back", Repo: true, Verb: a4Release},
+			{Name: "state", Summary: "set the workflow state label of an item", Repo: true, Verb: a4State},
+			{Name: "note", Summary: "durable item notes (issue mode)", Subs: []*Command{
+				{Name: "add", Summary: "write a note", Repo: true, Verb: a4NoteAdd},
+				{Name: "show", Summary: "print a note", Repo: true, Verb: a4NoteShow},
+				{Name: "rm", Summary: "delete a note", Repo: true, Verb: a4NoteRm},
+			}},
 			{Name: "comment", Summary: "item comments", Subs: []*Command{
 				{Name: "add", Summary: "append a comment", Repo: true, Verb: a4CommentAdd},
 				{Name: "list", Summary: "list comments", Repo: true, Verb: a4CommentList},
@@ -124,9 +135,12 @@ func a4Fail(err error) (Result, error) {
 	var ref *backlog.RefusedError
 	var act *backlog.ActiveError
 	var ex interface{ Exit() int }
+	var te *tracker.Error
 	switch {
 	case errors.As(err, &e):
 		return Result{}, err
+	case errors.As(err, &te):
+		return Result{}, &Error{Exit: te.Kind.Exit(), Message: te.Message}
 	case errors.As(err, &ex):
 		return Result{}, &Error{Exit: ex.Exit(), Message: err.Error()}
 	case errors.As(err, &ref):
@@ -156,6 +170,21 @@ func a4FailRead(err error) (Result, error) {
 		e.Exit = ExitFailed
 	}
 	return res, ferr
+}
+
+// a4Item is the canonical ID and type of the item behind ref (contract rule 11).
+// File mode keeps the reference as typed. Issue mode asks the tracker, so an
+// unknown number, a type-letter mismatch or a milestone tracker is exit 3
+// before anything is written, and "F7" or "#7" both answer "7" and "F".
+func a4Item(be backlog.Backend, ref string) (id, typ string, err error) {
+	if be.Name() != "issues" {
+		return ref, a4Type(ref), nil
+	}
+	it, err := be.Get(ref)
+	if err != nil {
+		return "", "", err
+	}
+	return it.ID, it.Type, nil
 }
 
 func a4Type(id string) string {
@@ -427,12 +456,16 @@ func a4FieldSet(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
+		id, typ, err := a4Item(be, args[0])
+		if err != nil {
+			return a4Fail(err)
+		}
 		changed, err := be.SetField(args[0], *name, *value)
 		if err != nil {
 			return a4Fail(err)
 		}
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "field", *name, "value", *value, "changed", changed),
-			Text: fmt.Sprintf("%s %s: %s", args[0], *name, *value)}, nil
+		return Result{Data: a4Obj("id", id, "type", typ, "field", *name, "value", *value, "changed", changed),
+			Text: fmt.Sprintf("%s %s: %s", id, *name, *value)}, nil
 	}
 }
 
@@ -465,6 +498,10 @@ func a4Complete(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
+		id, typ, err := a4Item(be, args[0])
+		if err != nil {
+			return a4Fail(err)
+		}
 		changed, err := be.Complete(args[0], backlog.CompleteInput{
 			Commit: hash, Date: a4Today(), Reason: *reason,
 			Note: strings.ReplaceAll(*note, "\n", " "), NoProof: *noProof,
@@ -476,8 +513,8 @@ func a4Complete(fs *flag.FlagSet) RunFunc {
 			}
 			return res, e
 		}
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "reason", *reason, "commit", hash, "changed", changed),
-			Text: fmt.Sprintf("completed %s (%s) at %s", args[0], *reason, hash)}, nil
+		return Result{Data: a4Obj("id", id, "type", typ, "reason", *reason, "commit", hash, "changed", changed),
+			Text: fmt.Sprintf("completed %s (%s) at %s", id, *reason, hash)}, nil
 	}
 }
 
@@ -494,15 +531,19 @@ func a4Reopen(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
+		id, typ, err := a4Item(be, args[0])
+		if err != nil {
+			return a4Fail(err)
+		}
 		changed, err := be.Reopen(args[0])
 		if err != nil {
 			return a4Fail(err)
 		}
-		text := "reopened " + args[0]
+		text := "reopened " + id
 		if !changed {
-			text = args[0] + " is already active"
+			text = id + " is already active"
 		}
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "changed", changed), Text: text}, nil
+		return Result{Data: a4Obj("id", id, "type", typ, "changed", changed), Text: text}, nil
 	}
 }
 
@@ -667,6 +708,10 @@ func a4Ready(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
+		id, typ, err := a4Item(be, args[0])
+		if err != nil {
+			return a4Fail(err)
+		}
 		reasons, err := be.Ready(args[0])
 		if err != nil {
 			return a4Fail(err)
@@ -675,13 +720,13 @@ func a4Ready(fs *flag.FlagSet) RunFunc {
 			reasons = []string{}
 		}
 		ready := len(reasons) == 0
-		res := Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "ready", ready, "reasons", reasons)}
+		res := Result{Data: a4Obj("id", id, "type", typ, "ready", ready, "reasons", reasons)}
 		if ready {
-			res.Text = args[0] + " is ready"
+			res.Text = id + " is ready"
 			return res, nil
 		}
 		res.Text = strings.Join(reasons, "\n")
-		return res, Failed("%s is not ready: %s", args[0], strings.Join(reasons, "; "))
+		return res, Failed("%s is not ready: %s", id, strings.Join(reasons, "; "))
 	}
 }
 
@@ -716,16 +761,20 @@ func a4CommentAdd(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
-		id, err := be.AddComment(args[0], *kind, text)
+		id, typ, err := a4Item(be, args[0])
 		if err != nil {
 			return a4Fail(err)
 		}
-		data := a4Obj("id", args[0], "type", a4Type(args[0]), "kind", *kind)
-		if id != "" {
-			data.Set("commentId", id)
+		cid, err := be.AddComment(args[0], *kind, text)
+		if err != nil {
+			return a4Fail(err)
+		}
+		data := a4Obj("id", id, "type", typ, "kind", *kind)
+		if cid != "" {
+			data.Set("commentId", cid)
 		}
 		data.Set("changed", true)
-		return Result{Data: data, Text: fmt.Sprintf("commented on %s (%s)", args[0], *kind)}, nil
+		return Result{Data: data, Text: fmt.Sprintf("commented on %s (%s)", id, *kind)}, nil
 	}
 }
 
@@ -746,6 +795,10 @@ func a4CommentList(fs *flag.FlagSet) RunFunc {
 			return Result{}, Usage("--kind must be %s", strings.Join(backlog.CommentKinds, "|"))
 		}
 		be, err := a4Open(root, false, "")
+		if err != nil {
+			return a4Fail(err)
+		}
+		id, typ, err := a4Item(be, args[0])
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -773,7 +826,7 @@ func a4CommentList(fs *flag.FlagSet) RunFunc {
 				}
 			}
 		}
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "comments", list), Text: strings.Join(lines, "\n")}, nil
+		return Result{Data: a4Obj("id", id, "type", typ, "comments", list), Text: strings.Join(lines, "\n")}, nil
 	}
 }
 
