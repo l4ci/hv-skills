@@ -169,6 +169,12 @@ func (b *Issues) MergePR(pr int, items []string) (MergeResult, error) {
 			linked = append(linked, b.Letter(is)+strconv.Itoa(is.Number))
 		}
 	}
+	// The contract makes a PR that is not open exit 3 with --items too. The
+	// Python checked it only without them and let the forge refuse the merge;
+	// checking here, after the items resolve, keeps its call order.
+	if found == nil {
+		return MergeResult{}, errf(ErrNotFound, "PR %d is not open", pr)
+	}
 	var unproven []string
 	for _, ref := range linked {
 		is, id, err := b.require(ref)

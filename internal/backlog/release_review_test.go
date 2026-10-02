@@ -584,6 +584,14 @@ func TestIssuesMergePR(t *testing.T) {
 	if _, err := b.MergePR(23, []string{"#99"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("unknown item: %v", err)
 	}
+	// A PR that is not open is not found with --items too (the contract), and
+	// nothing reaches the forge's merge.
+	if _, err := b.MergePR(99, []string{"F1"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("PR not open with --items: %v", err)
+	}
+	if slices.Contains(f.merged, "99") {
+		t.Fatal("PR 99 reached the merge")
+	}
 }
 
 func TestIssuesMergePRHostClosed(t *testing.T) {
