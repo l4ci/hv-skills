@@ -324,6 +324,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 			return fail(c, stdout, Resolution("cannot use -C %s: %v", g.cwd, unwrapPathErr(err)))
 		}
 	}
+	physicalCwd()
 	// An unregistered --repo is exit 3 on every repo-scoped verb, ahead of
 	// the verb's own checks (contract rule 9).
 	if c.Repo != "" {
@@ -525,4 +526,19 @@ func hasHelp(args []string) bool {
 		}
 	}
 	return false
+}
+
+// physicalCwd makes the working directory its symlink-free path, as Python's
+// os.getcwd() is. Go's os.Getwd returns $PWD while it still names the cwd, so
+// from a symlinked directory (link -> umb/web) every walk-up and sub-repo
+// match would see the link instead. Setting PWD too keeps later os.Getwd
+// calls, in every verb, on the physical path.
+func physicalCwd() {
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	if real := repos.Realpath(wd); real != wd && os.Chdir(real) == nil {
+		os.Setenv("PWD", real)
+	}
 }
