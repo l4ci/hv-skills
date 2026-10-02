@@ -122,6 +122,13 @@ func runEnv(t *testing.T, environ []string, launcher string, args ...string) (in
 	return code, so.String(), se.String()
 }
 
+// isVersion reports whether out is `hv version` text for version v. The
+// "(commit, date)" suffix is left open: it depends on whether the build saw
+// VCS info, which Go embeds in a main checkout but not in a linked worktree.
+func isVersion(out, v string) bool {
+	return out == "hv "+v+"\n" || strings.HasPrefix(out, "hv "+v+" (")
+}
+
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
@@ -132,7 +139,7 @@ func must(t *testing.T, err error) {
 func TestLauncherDownloadsVerifiesAndCaches(t *testing.T) {
 	p := newPlugin(t)
 	code, out, errOut := p.run(t, p.launcher, "version")
-	if code != 0 || out != "hv 9.9.9\n" {
+	if code != 0 || !isVersion(out, "9.9.9") {
 		t.Fatalf("first run: code=%d out=%q err=%q", code, out, errOut)
 	}
 	cached := filepath.Join(p.cache, "9.9.9", runtime.GOOS+"-"+runtime.GOARCH, "hv")
@@ -183,7 +190,7 @@ func TestLauncherFollowsSymlink(t *testing.T) {
 	p := newPlugin(t)
 	link := filepath.Join(t.TempDir(), "hv")
 	must(t, os.Symlink(p.launcher, link))
-	if code, out, errOut := p.run(t, link, "version"); code != 0 || out != "hv 9.9.9\n" {
+	if code, out, errOut := p.run(t, link, "version"); code != 0 || !isVersion(out, "9.9.9") {
 		t.Fatalf("code=%d out=%q err=%q", code, out, errOut)
 	}
 }
@@ -210,7 +217,7 @@ func TestLauncherConcurrentColdStarts(t *testing.T) {
 			defer wg.Done()
 			code, out, errOut := p.run(t, p.launcher, "version")
 			results[i] = fmt.Sprintf("code=%d out=%q err=%q", code, out, errOut)
-			if code == 0 && out == "hv 9.9.9\n" {
+			if code == 0 && isVersion(out, "9.9.9") {
 				results[i] = ""
 			}
 		}()
@@ -244,12 +251,12 @@ func TestLauncherReleaseURLSchemes(t *testing.T) {
 	srv := httptest.NewServer(http.FileServer(http.Dir(filepath.Dir(p.releases))))
 	defer srv.Close()
 	base := env(map[string]string{"HV_LAUNCHER_MODE": "release", "HV_CACHE_DIR": p.cache})
-	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+srv.URL), p.launcher, "version"); code != 0 || out != "hv 9.9.9\n" {
+	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+srv.URL), p.launcher, "version"); code != 0 || !isVersion(out, "9.9.9") {
 		t.Fatalf("http on 127.0.0.1 must be allowed: code=%d out=%q err=%q", code, out, errOut)
 	}
 	must(t, os.RemoveAll(p.cache))
 	local := strings.Replace(srv.URL, "127.0.0.1", "localhost", 1) + "/"
-	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+local), p.launcher, "version"); code != 0 || out != "hv 9.9.9\n" {
+	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+local), p.launcher, "version"); code != 0 || !isVersion(out, "9.9.9") {
 		t.Fatalf("http on localhost:<port>/ must be allowed: code=%d out=%q err=%q", code, out, errOut)
 	}
 	for _, url := range []string{"http://example.com/releases", "ftp://127.0.0.1/x", "http://127.0.0.1.evil.example/x",
