@@ -559,12 +559,7 @@ func shipUndoBoth(t *testing.T, name string, src string, wantCode int, args ...s
 	if a, b := gitT(t, old, "rev-parse", "HEAD"), gitT(t, nu, "rev-parse", "HEAD"); a != b {
 		t.Errorf("%s: HEAD old %s new %s", name, a, b)
 	}
-	// File.Reopen takes its lock even for an item that is already active, which
-	// the old helper did not; the sidecar is gitignored, so it is not compared.
-	status := func(d string) string {
-		return strings.ReplaceAll(gitT(t, d, "status", "--porcelain"), "?? .hv/BACKLOG.md.lock", "")
-	}
-	if a, b := status(old), status(nu); strings.TrimSpace(a) != strings.TrimSpace(b) {
+	if a, b := gitT(t, old, "status", "--porcelain"), gitT(t, nu, "status", "--porcelain"); a != b {
 		t.Errorf("%s: status old %q new %q", name, a, b)
 	}
 	return nenv

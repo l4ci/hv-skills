@@ -17,6 +17,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/section"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
@@ -684,15 +685,35 @@ func shipPlan(short, subject, base string, postCount int, ids []string, apply bo
 
 // shipRestore reopens each item through the backlog, as hv-uncomplete did.
 // The backend is opened after the reset, so it reads the restored config.
+// shipActive reports whether BACKLOG.md under root holds id as an active
+// bullet outside ## Completed, the no-op case of hv-uncomplete. Checking it
+// unlocked keeps the no-op from leaving a .lock sidecar, which the old
+// helper never created and which dirties a tree that does not ignore it.
+func shipActive(root, id string) bool {
+	content, err := fsio.ReadText(filepath.Join(root, ".hv", "BACKLOG.md"))
+	if err != nil {
+		return false
+	}
+	cs, ce, hasC := section.Find(content, "Completed")
+	for _, m := range regexp.MustCompile(`(?m)^- \*\*\[`+regexp.QuoteMeta(id)+`\]`).FindAllStringIndex(content, -1) {
+		if !hasC || m[0] < cs || m[0] >= ce {
+			return true
+		}
+	}
+	return false
+}
+
 func shipRestore(c *Ctx, root string, ids []string) error {
 	b, err := a4Open(root, false, "")
 	if err != nil {
 		return err
 	}
 	for _, id := range ids {
-		changed, err := b.Reopen(id)
-		if err != nil {
-			return err
+		changed := false
+		if b.Name() != "file" || !shipActive(root, id) {
+			if changed, err = b.Reopen(id); err != nil {
+				return err
+			}
 		}
 		if !changed {
 			fmt.Fprintf(c.Stderr, "noop: [%s] already active in BACKLOG.md\n", id)
