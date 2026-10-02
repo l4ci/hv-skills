@@ -4,33 +4,88 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // rule is one retired slash command. repl == "" marks a command whose
-// replacement is ambiguous, so it is reported instead of rewritten.
+// replacement is ambiguous, so it is reported instead of rewritten. A match
+// is lit followed by a word boundary; the boundary is checked by hand because
+// RE2's \b and \w are ASCII-only while Python's are Unicode-aware.
 type rule struct {
-	re   *regexp.Regexp
+	lit  string
 	repl string
 	why  string
 }
 
-// rules are the eight commands cut in v4. Word-boundary safe.
+// rules are the eight commands cut in v4.
 var rules = []rule{
-	{regexp.MustCompile(`/hv-c\b`), "/hv-capture", ""},
-	{regexp.MustCompile(`/hv-assume\b`), "/hv-work --preview", ""},
-	{regexp.MustCompile(`/hv-rm\b`), "/hv-capture --remove", ""},
-	{regexp.MustCompile(`/hv-undo\b`), "/hv-ship --undo", ""},
-	{regexp.MustCompile(`/hv-context\b`), "/hv-learn --term", ""},
-	{regexp.MustCompile(`/hv-docs\b`), "/hv-ship --docs", ""},
-	{regexp.MustCompile(`/hv-issues\b`), "", "ambiguous — could be --from-github or --from-gitlab"},
-	{regexp.MustCompile(`/hv-map\b`), "", "ambiguous — could be --init --map (first-run) or delete-the-line"},
+	{"/hv-c", "/hv-capture", ""},
+	{"/hv-assume", "/hv-work --preview", ""},
+	{"/hv-rm", "/hv-capture --remove", ""},
+	{"/hv-undo", "/hv-ship --undo", ""},
+	{"/hv-context", "/hv-learn --term", ""},
+	{"/hv-docs", "/hv-ship --docs", ""},
+	{"/hv-issues", "", "ambiguous — could be --from-github or --from-gitlab"},
+	{"/hv-map", "", "ambiguous — could be --init --map (first-run) or delete-the-line"},
+}
+
+// pattern is how the rule is shown in manual-review lines.
+func (r rule) pattern() string { return r.lit[1:] + `\b` }
+
+// isWord reports whether r is a Python \w character.
+func isWord(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) }
+
+// find returns the [start, end) of every lit followed by a word boundary.
+func (r rule) find(text string) [][]int {
+	var out [][]int
+	for from := 0; ; {
+		i := strings.Index(text[from:], r.lit)
+		if i < 0 {
+			return out
+		}
+		start := from + i
+		end := start + len(r.lit)
+		next, _ := utf8.DecodeRuneInString(text[end:])
+		if end == len(text) || !isWord(next) {
+			out = append(out, []int{start, end})
+			from = end
+		} else {
+			from = start + 1
+		}
+	}
 }
 
 var (
 	fenced     = regexp.MustCompile("(?s)```.*?```")
 	inlineCode = regexp.MustCompile("`[^`\n]+`")
-	helperPath = regexp.MustCompile(`(?:[\w./]+/)?\bhv-\w+(?:-\w+)+`)
+	// helperTail is a helper name from "hv-" on: two or more dash-joined
+	// Unicode word segments. A name with no path prefix also needs a word
+	// boundary before "hv-", checked in helperPaths.
+	helperTail = regexp.MustCompile(`(?:[\p{L}\p{N}_./]+/)?hv-[\p{L}\p{N}_]+(?:-[\p{L}\p{N}_]+)+`)
 )
+
+// helperPaths returns the spans of literal helper names such as hv-map-query
+// or .hv/bin/hv-foo.
+func helperPaths(text string) []span {
+	var out []span
+	for from := 0; from < len(text); {
+		loc := helperTail.FindStringIndex(text[from:])
+		if loc == nil {
+			break
+		}
+		start, end := from+loc[0], from+loc[1]
+		if strings.HasPrefix(text[start:], "hv-") {
+			if prev, _ := utf8.DecodeLastRuneInString(text[:start]); start > 0 && isWord(prev) {
+				from = start + 1
+				continue
+			}
+		}
+		out = append(out, span{start, end})
+		from = end
+	}
+	return out
+}
 
 type span struct{ start, end int }
 
@@ -39,12 +94,12 @@ type span struct{ start, end int }
 // or `.hv/bin/hv-foo`, which are not slash-command usages.
 func skipMask(text string) []span {
 	var out []span
-	for _, re := range []*regexp.Regexp{fenced, inlineCode, helperPath} {
+	for _, re := range []*regexp.Regexp{fenced, inlineCode} {
 		for _, m := range re.FindAllStringIndex(text, -1) {
 			out = append(out, span{m[0], m[1]})
 		}
 	}
-	return out
+	return append(out, helperPaths(text)...)
 }
 
 func overlaps(start, end int, masks []span) bool {
@@ -66,12 +121,12 @@ func Rewrite(text, file string) (string, int, []string) {
 		if r.repl != "" {
 			continue
 		}
-		for _, m := range r.re.FindAllStringIndex(text, -1) {
+		for _, m := range r.find(text) {
 			if overlaps(m[0], m[1], masks) {
 				continue
 			}
 			line := strings.Count(text[:m[0]], "\n") + 1
-			manual = append(manual, fmt.Sprintf("%s:%d: %s — %s", file, line, r.re.String()[1:], r.why))
+			manual = append(manual, fmt.Sprintf("%s:%d: %s — %s", file, line, r.pattern(), r.why))
 		}
 	}
 	out, count := text, 0
@@ -82,7 +137,7 @@ func Rewrite(text, file string) (string, int, []string) {
 		masks := skipMask(out)
 		var b strings.Builder
 		last, n := 0, 0
-		for _, m := range r.re.FindAllStringIndex(out, -1) {
+		for _, m := range r.find(out) {
 			if overlaps(m[0], m[1], masks) {
 				continue
 			}

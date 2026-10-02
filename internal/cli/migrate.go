@@ -46,7 +46,7 @@ func migrateV4(fs *flag.FlagSet) RunFunc {
 			}
 			return Result{}, knErr(err)
 		}
-		if !*apply && !rep.Noop {
+		if !*apply {
 			c.Warn("preview only; pass --apply")
 		}
 		return migrateResult(rep), nil

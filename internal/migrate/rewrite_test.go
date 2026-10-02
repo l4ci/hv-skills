@@ -48,3 +48,26 @@ func TestUnifiedDiffMergesCloseHunks(t *testing.T) {
 		t.Error("identical texts produced a diff")
 	}
 }
+
+func TestRewriteBoundariesAreUnicodeAware(t *testing.T) {
+	// Python's \b and \w see é and ٣ as word characters, so none of these match.
+	for _, in := range []string{"/hv-cé é", "/hv-c٣", "/hv-rm_x", "/hv-issuesé"} {
+		out, n, manual := Rewrite(in, "f")
+		if out != in || n != 0 || len(manual) != 0 {
+			t.Errorf("%q rewritten to %q (%d, %v)", in, out, n, manual)
+		}
+	}
+	// A non-word rune after the command still matches.
+	if out, n, _ := Rewrite("/hv-c— é", "f"); out != "/hv-capture— é" || n != 1 {
+		t.Errorf("out=%q n=%d", out, n)
+	}
+	// Helper names mask with Unicode segments, and not after a word character.
+	out, _, _ := Rewrite("hv-é-x /hv-c", "f")
+	if out != "hv-é-x /hv-capture" {
+		t.Errorf("out=%q", out)
+	}
+	out, n, _ := Rewrite("xhv-a-b/hv-c", "f")
+	if out != "xhv-a-b/hv-capture" || n != 1 {
+		t.Errorf("out=%q n=%d", out, n)
+	}
+}

@@ -111,18 +111,18 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 	rep := &Report{Applied: o.Apply, FilesScanned: len(targets)}
 	var jobs []rewriteJob
 	for _, rel := range targets {
-		raw, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil || !utf8.Valid(raw) {
+		raw, err := fsio.ReadText(filepath.Join(root, rel))
+		if err != nil || !utf8.ValidString(raw) {
 			continue
 		}
-		text, n, manual := Rewrite(string(raw), rel)
+		text, n, manual := Rewrite(raw, rel)
 		rep.ManualReview = append(rep.ManualReview, manual...)
 		if n > 0 {
-			jobs = append(jobs, rewriteJob{filepath.Join(root, rel), rel, string(raw), text, n})
+			jobs = append(jobs, rewriteJob{filepath.Join(root, rel), rel, raw, text, n})
 			rep.Rewritten = append(rep.Rewritten, rel)
 			rep.ReferencesRewritten += n
 			if o.Verbose {
-				rep.Diffs = append(rep.Diffs, UnifiedDiff(string(raw), text, rel))
+				rep.Diffs = append(rep.Diffs, UnifiedDiff(raw, text, rel))
 			}
 		}
 	}
@@ -380,7 +380,7 @@ func stampVersion(root string) (string, error) {
 func planContexts(root string, repos map[string]string) ([]ctxPlan, error) {
 	var plans []ctxPlan
 	one := func(scope, file, label, where string) error {
-		raw, err := os.ReadFile(file)
+		raw, err := fsio.ReadText(file)
 		if os.IsNotExist(err) {
 			if scope == "" {
 				plans = append(plans, ctxPlan{scope: scope, file: file, action: "none", message: "no CONTEXT.md"})
@@ -391,7 +391,7 @@ func planContexts(root string, repos map[string]string) ([]ctxPlan, error) {
 			return err
 		}
 		var terms []knowledge.TermEntryNamed
-		for _, t := range knowledge.TopicEntries(string(raw)) {
+		for _, t := range knowledge.TopicEntries(raw) {
 			if t.Definition != "" {
 				terms = append(terms, t)
 			}

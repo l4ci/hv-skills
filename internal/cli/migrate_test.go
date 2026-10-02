@@ -233,3 +233,37 @@ func TestMigrateV4KeepsBackupWhenImportFails(t *testing.T) {
 		t.Errorf("backup of CONTEXT.md missing: %v", matches)
 	}
 }
+
+func TestMigrateV4CRLFMatchesOldHelper(t *testing.T) {
+	migPlugin(t)
+	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
+	oldDir, newDir := migProject(t, false), migProject(t, false)
+	for _, d := range []string{oldDir, newDir} {
+		knWrite(t, filepath.Join(d, ".hv", "BACKLOG.md"), crlf(migBacklog))
+		knWrite(t, filepath.Join(d, ".hv", "CONTEXT.md"), crlf(migContext))
+		knWrite(t, filepath.Join(d, "AGENTS.md"), crlf("# Agents\n\nrun /hv-context\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n"))
+		migGit(t, d, "add", "-A", "-f")
+		migGit(t, d, "commit", "-q", "-m", "crlf")
+	}
+	o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
+	n := knNew(t, newDir, "", "migrate", "v4", "--apply")
+	if o.rc != 0 || n.rc != 0 {
+		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+	}
+	migSameTree(t, oldDir, newDir)
+	if strings.Contains(knTree(t, newDir)["BACKLOG.md"], "\r") {
+		t.Error("CR survived the rewrite")
+	}
+}
+
+func TestMigrateV4NoopPreviewWarns(t *testing.T) {
+	migPlugin(t)
+	dir := migProject(t, false)
+	knNew(t, dir, "", "migrate", "v4", "--apply")
+	migGit(t, dir, "add", "-A", "-f")
+	migGit(t, dir, "commit", "-q", "-m", "done")
+	n := knNew(t, dir, "", "migrate", "v4", "--json")
+	if !strings.Contains(n.stdout, `"noop": true`) || !strings.Contains(n.stdout, `preview only; pass --apply`) {
+		t.Errorf("%s", n.stdout)
+	}
+}
