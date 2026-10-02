@@ -20,6 +20,9 @@ func Tree() *Command {
 			glossaryCommands(),
 			blockCommand(),
 			instructionsCommands(),
+			decisionsCommands(),
+			mapCommands(),
+			qaCommands(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
