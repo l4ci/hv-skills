@@ -69,7 +69,7 @@ func (s Store) InstructionsInit() ([]Action, error) {
 		var moved []string
 		body, rest := "", ""
 		if exists(claude) {
-			raw, err := os.ReadFile(claude)
+			raw, err := readTextBytes(claude)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +128,7 @@ func (s Store) InstructionsInit() ([]Action, error) {
 		}
 		acts = append(acts, Action{Action: "created", File: "CLAUDE.md"})
 	} else {
-		raw, err := os.ReadFile(claude)
+		raw, err := readTextBytes(claude)
 		if err != nil {
 			return nil, err
 		}

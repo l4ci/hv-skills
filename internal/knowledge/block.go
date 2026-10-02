@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -44,7 +43,7 @@ func UmbrellaOnlyBlock(key string) bool { return blockKinds[key].umbrellaOnly }
 // instructions file. A missing source file just yields no topics.
 func (s Store) BlockInputs(key, scope string) (topics []string, target string, err error) {
 	topicsOf := func(path string) []string {
-		raw, err := os.ReadFile(path)
+		raw, err := readTextBytes(path)
 		if err != nil {
 			return nil
 		}

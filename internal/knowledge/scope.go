@@ -90,3 +90,9 @@ func writeText(path, text string, write func(string, []byte) error) error {
 	}
 	return write(path, []byte(text))
 }
+
+// readTextBytes is fsio.ReadText for callers that work on bytes.
+func readTextBytes(path string) ([]byte, error) {
+	t, err := fsio.ReadText(path)
+	return []byte(t), err
+}

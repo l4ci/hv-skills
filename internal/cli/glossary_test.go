@@ -287,3 +287,42 @@ func TestInstructionsInitSkipsSymlinks(t *testing.T) {
 		t.Errorf("AGENTS.md was rewritten: %q", b)
 	}
 }
+
+// CRLF files are read as LF and rewritten as pure LF, like the old helpers.
+func TestCRLFMatchesOldHelpersForGlossaryBlocksAndInstructions(t *testing.T) {
+	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
+	t.Run("glossary write and block", func(t *testing.T) {
+		oldDir, newDir := glProject(t, false, crlf(glFixtureTerms)), glProject(t, false, crlf(glFixtureTerms))
+		for _, d := range []string{oldDir, newDir} {
+			knWrite(t, filepath.Join(d, "AGENTS.md"), crlf("# Agents\n\ntext\n"))
+		}
+		o := knOld(t, oldDir, "", "hv-glossary-write", "Batch", "--def", "a group")
+		n := knNew(t, newDir, "", "glossary", "write", "Batch", "--def", "a group")
+		if o.rc != 0 || n.rc != 0 {
+			t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+		}
+		knSameTree(t, oldDir, newDir)
+		for k, v := range knTree(t, newDir) {
+			if strings.Contains(v, "\r") && !strings.HasSuffix(k, ".lock") {
+				t.Errorf("%s kept CR", k)
+			}
+		}
+	})
+	t.Run("glossary read", func(t *testing.T) {
+		dir := glProject(t, false, crlf(glFixtureTerms))
+		o := knOld(t, dir, "", "hv-glossary-read", "worker")
+		n := knNew(t, dir, "", "glossary", "read", "worker")
+		if o.stdout != n.stdout {
+			t.Errorf("old %q new %q", o.stdout, n.stdout)
+		}
+	})
+	t.Run("instructions init", func(t *testing.T) {
+		oldDir, newDir := knProject(t, false), knProject(t, false)
+		for _, d := range []string{oldDir, newDir} {
+			knWrite(t, filepath.Join(d, "CLAUDE.md"), crlf("# Mine\n\n<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\nafter\n"))
+		}
+		knOld(t, oldDir, "", "hv-instructions-init")
+		knNew(t, newDir, "", "instructions", "init")
+		knSameTree(t, oldDir, newDir)
+	})
+}

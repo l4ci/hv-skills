@@ -247,7 +247,7 @@ func (s Store) glossaryTarget(scope string) (path, text string, start, end int, 
 	if err != nil {
 		return
 	}
-	raw, rerr := os.ReadFile(path)
+	raw, rerr := readTextBytes(path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
 			err = notFound("%s missing — run /hv-init first", path)
@@ -400,7 +400,7 @@ func (s Store) GlossaryRead(scope string, terms []string) (string, []string, err
 	printed := false
 	matched := map[string]bool{}
 	for _, sc := range srcs {
-		raw, err := os.ReadFile(sc.path)
+		raw, err := readTextBytes(sc.path)
 		if os.IsNotExist(err) {
 			continue
 		}
