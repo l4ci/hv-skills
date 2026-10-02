@@ -241,4 +241,13 @@ grep -q "boom-marker" "$GT_DIR.err" || fail "gate (g): a failed verify must show
 grep -q "boom-marker" "$TMP_GT"/hv-gate-verify-* 2>/dev/null || fail "gate (g): the verify log must be kept on failure"
 pass "verify output is shown on failure and the log is kept"
 
+# (l) a merging gate run with the base branch not checked out is a resolution error
+# (exit 3) and merges nothing.
+gt_case nobase "$GH_URL"
+( cd "$GT_DIR" && git checkout -q -b elsewhere ) || fail "gate (l): checkout failed"
+RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main)"
+[ "$RC" = 3 ] || fail "gate (l): base not checked out must exit 3, got $RC: $(cat "$GT_DIR.out")"
+if grep "pr merge" "$FORGE_LOG" >/dev/null; then fail "gate (l): must not merge with the base not checked out: $(cat "$FORGE_LOG")"; fi
+pass "a merging gate refuses (exit 3) when the base branch is not checked out"
+
 trap 'rm -rf "$TMP"' EXIT

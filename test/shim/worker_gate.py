@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import subprocess
 
 from core import *  # noqa: F401,F403  (shared shim helpers and @verb)
 
@@ -59,6 +60,15 @@ def worker_gate(ctx):
     if rc == 0:
         data["verdict"] = "pass" if re.search(r"^(?:MERGED|GATE-PASS|NO-VERIFY) ", out, re.M) else "fresh"
         data["changed"] = data["verdict"] == "pass"
+        m = re.search(r"^FRESH \S+ (\S+)", out, re.M)
+        if m:
+            # The old FRESH line names no SHA: report the tip that was checked
+            # (the pushed branch when a PR is recorded).
+            ref = ("origin/" if data.get("pr") else "") + m.group(1)
+            sha = subprocess.run(["git", "-C", ctx.cwd, "rev-parse", "--short=7", ref],
+                                 capture_output=True, text=True).stdout.strip()
+            if sha:
+                data["sha"] = sha
         return data, out
     if rc == 3 and re.search(GATE_MISSING, err):
         raise HvError(3, first_error_line(err))

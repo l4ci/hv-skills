@@ -193,12 +193,15 @@ done
 # path in prose, and matching that reports a defect where none exists.
 # white-box: kept until the A7 Go unit test lands (#51), then delete
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
-  if grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)' <<<"$(sed 's/#.*//' "$BIN/$H")"; then
+  SRC=$(sed 's/#.*//' "$BIN/$H") || fail "cannot read $H"
+  if grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)' <<<"$SRC"; then
     fail "$H talks to a host directly; it must go through the hv_host_* primitives"
   fi
 done
 # white-box: kept until the A7 Go unit test lands (#51), then delete
-grep -q 'paste-buffer' <<<"$(sed 's/#.*//' "$BIN/hv-host-tmux.sh")" \
+SRC=$(sed 's/#.*//' "$BIN/hv-host-tmux.sh") || fail "cannot read hv-host-tmux.sh"
+# white-box: kept until the A7 Go unit test lands (#51), then delete
+grep -q 'paste-buffer' <<<"$SRC" \
   || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
 pass "worker helpers share one paste-and-confirm path through the host libs"
 
@@ -402,6 +405,8 @@ pass "worker gate bounces a stale slot (exit 1, verdict stale) instead of mergin
 GATE_OUT=$( cd "$TMP_WD" && "$HV_BIN" --json worker gate w2 --base main --check-only 2>/dev/null ) \
   || fail "worker gate should report fresh after w2 merged main: $GATE_OUT"
 [ "$(jget data.verdict <<<"$GATE_OUT")" = "fresh" ] || fail "worker gate should answer verdict=fresh after w2 merged main, got: $GATE_OUT"
+[ "$(jget data.sha <<<"$GATE_OUT")" = "$(git -C "$W2" rev-parse --short=7 HEAD)" ] \
+  || fail "worker gate fresh should report the checked branch tip as data.sha, got: $GATE_OUT"
 pass "worker gate reports FRESH once the slot has merged its base"
 
 # The payoff: clean merge, both branches were green, merged tree is broken.
