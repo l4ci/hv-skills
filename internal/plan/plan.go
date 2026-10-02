@@ -110,8 +110,11 @@ func Add(root string, o AddOpts) (key, unitKind string, err error) {
 	}
 
 	dir := filepath.Join(root, ".hv", "plans")
-	lockPath := path(root, milestone+"-slice") // one lock per milestone's slice minting
-	if unit != "" {
+	// One lock per milestone for every S-unit, minted or explicit, so the
+	// existence check and the minted number cannot race; an item plan locks
+	// its own key.
+	lockPath := path(root, milestone+"-slice")
+	if unit != "" && !strings.HasPrefix(unit, "S") {
 		lockPath = path(root, milestone+"-"+unit)
 	}
 	err = fsio.Locked(lockPath, fsio.LockTimeout, func() error {

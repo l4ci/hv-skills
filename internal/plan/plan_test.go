@@ -281,3 +281,46 @@ func TestRenameCheck(t *testing.T) {
 		t.Errorf("non-git = %#v", got)
 	}
 }
+
+// An explicit slice key and a minted one can name the same file; one lock
+// guards both, so exactly one plan is created per key and none is overwritten.
+func TestExplicitAndMintedSliceRace(t *testing.T) {
+	for round := 0; round < 20; round++ {
+		root := project(t)
+		Add(root, AddOpts{Key: "M01-S01", Title: "seed"}) // so minting targets S02
+		var wg sync.WaitGroup
+		var okExplicit, okMint atomic.Int32
+		var mintedKey atomic.Value
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if _, _, err := Add(root, AddOpts{Key: "M01-S02", Title: "explicit"}); err == nil {
+				okExplicit.Add(1)
+			} else if exitOf(err) != 4 {
+				t.Error(err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			key, _, err := Add(root, AddOpts{Milestone: "M01", Slice: true, Title: "minted"})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			okMint.Add(1)
+			mintedKey.Store(key)
+		}()
+		wg.Wait()
+		// Minting always succeeds; if it took S02 the explicit add must have been refused,
+		// otherwise it took S03 and both plans exist.
+		files, _ := filepath.Glob(filepath.Join(root, ".hv/plans/M01-S*.md"))
+		want := 2 + int(okExplicit.Load())
+		if okMint.Load() != 1 || len(files) != want {
+			t.Fatalf("round %d: explicit ok=%d mint=%v files=%v", round, okExplicit.Load(), mintedKey.Load(), files)
+		}
+		if got, _ := os.ReadFile(path(root, "M01-S02")); okExplicit.Load() == 1 &&
+			!strings.Contains(string(got), "title: explicit") && mintedKey.Load() == "M01-S02" {
+			t.Fatalf("round %d: minted plan overwrote the explicit one", round)
+		}
+	}
+}
