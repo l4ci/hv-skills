@@ -221,14 +221,42 @@ hv_host_status() {
   fi
 }
 
-# hv_host_kill <slot> <handle> — ask the session to exit, then close its tab.
-# `/exit` is a client-side command, so no wait: it produces no turn to
-# observe. Closing the tab alone would also end it; the /exit lets Claude
-# Code flush its session first.
+# hv_host_kill <slot> <handle> — ask the session to exit, close its tab, and
+# prove it is gone. Records the pane's process PIDs first (claude plus its MCP
+# children); returns 1 (with a message) unless `tab get` fails and every
+# recorded PID has exited. Closed tab ids are never reused, so a failing
+# `tab get` is unambiguous. `/exit` is a client-side command, so no wait: it
+# produces no turn to observe; it lets Claude Code flush its session first.
 hv_host_kill() {
   [ -n "$2" ] || return 0
-  herdr agent prompt "$(hv_herdr_agent_name "$1" "$2")" "/exit" >/dev/null 2>&1 || true
+  local name pane pids="" pid alive="" i=0
+  name="$(hv_herdr_agent_name "$1" "$2")"
+  pane="$(herdr agent get "$name" 2>/dev/null | _hv_herdr_get result.agent.pane_id || true)"
+  [ -z "$pane" ] || pids="$(herdr pane process-info --pane "$pane" 2>/dev/null | python3 -c '
+import json, sys
+try:
+    info = json.load(sys.stdin)["result"]["process_info"]
+    pids = [p["pid"] for p in info.get("foreground_processes", [])]
+    if info.get("shell_pid"):
+        pids.append(info["shell_pid"])
+    print(" ".join(str(p) for p in pids))
+except Exception:
+    pass
+' || true)"
+  herdr agent prompt "$name" "/exit" >/dev/null 2>&1 || true
   herdr tab close "$2" >/dev/null 2>&1 || true
+  while :; do
+    alive=""
+    for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+    if ! herdr tab get "$2" >/dev/null 2>&1 && [ -z "$alive" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+    [ "$i" -lt "${HV_HOST_KILL_WAIT:-10}" ] || break
+    sleep 1
+  done
+  echo "error: slot '$1' previous session is still running (tab $2${alive:+, pids$alive}); not spawning a second one" >&2
+  return 1
 }
 
 # hv_host_notify <title> <body> — raise a herdr notification with sound.

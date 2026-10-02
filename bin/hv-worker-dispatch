@@ -15,8 +15,15 @@
 # Records the dispatch in .hv/workers.json: the slot's handle (a herdr tab id
 # changes on every dispatch), its task, and state=busy.
 #
+# A task dispatch also guards the slot (hv-worker-reset: refuse when the
+# worktree holds uncommitted or unmerged work, else cut a fresh per-task branch
+# from the cycle branch) and refuses to spawn unless the old session is
+# provably gone (hv_host_kill). A work.workerCommand that resumes a previous
+# conversation (-c, -r, --continue, --resume) is rejected.
+#
 # Tool: exit 0 on confirmed pickup; exit 2 on usage error;
-#       exit 3 on host/slot failure; exit 4 if the brief never submitted;
+#       exit 3 on host/slot failure, a slot holding work, or an old session
+#       that would not close; exit 4 if the brief never submitted;
 #       exit 5 if a dialog in the session refused input (herdr only).
 #
 # Provenance: every payload, brief or relay, is signed with a first line
@@ -152,8 +159,30 @@ print(cmd)
 PY
 )"
 
-  # Fresh session every task dispatch — see the /clear note above.
-  hv_host_kill "$SLOT" "$HANDLE"
+  # A resume flag reopens the previous conversation in the "fresh" session,
+  # which undoes the reset. Only tokens after the claude binary count: a
+  # wrapper's own `-c` is not ours to judge.
+  BAD_FLAG="$(python3 - "$LAUNCH" <<'PY'
+import os, shlex, sys
+toks = shlex.split(sys.argv[1])
+i = next((i for i, t in enumerate(toks) if os.path.basename(t) == "claude"), None)
+bad = [t for t in toks[i + 1:] if t in ("-c", "-r", "--continue", "--resume") or t.startswith("--resume=")] if i is not None else []
+print(bad[0] if bad else "")
+PY
+)"
+  if [ -n "$BAD_FLAG" ]; then
+    echo "error: work.workerCommand contains '$BAD_FLAG', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it." >&2
+    exit 2
+  fi
+
+  # Refuse a slot that still holds work, before its session is killed.
+  "$HERE/hv-worker-reset" --slot "$SLOT" --check-only || exit 3
+
+  # Fresh session every task dispatch — see the /clear note above. The kill
+  # must be provable: a window that survives it would run beside the new one.
+  hv_host_kill "$SLOT" "$HANDLE" || exit 3
+  # Re-check: the old session may have written between the check and its exit.
+  "$HERE/hv-worker-reset" --slot "$SLOT" ${TASK:+--task "$TASK"} || exit 3
   HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || exit 3
 elif [ -z "$HANDLE" ]; then
   echo "error: slot '$SLOT' has no session to relay into — dispatch a task first" >&2; exit 3

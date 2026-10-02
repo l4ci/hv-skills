@@ -27,7 +27,7 @@ Read `.hv/config.json`:
 - `work.mergeStrategy` — `"direct"` (default) or `"pr"`
 - `work.dispatch` — `"subagent"` (default), `"tmux"` or `"herdr"`. Selects the worker backend. `"subagent"` dispatches in-process `Agent` workers that write files while the orchestrator commits. `"tmux"` runs each worker as its own Claude Code session in its own worktree, committing and opening a PR against the cycle branch. See [`references/tmux-dispatch.md`](../references/tmux-dispatch.md). `"herdr"` runs the same workers as herdr tabs in the orchestrator's workspace, with herdr's native agent state; see [`references/herdr-dispatch.md`](../references/herdr-dispatch.md).
 - `work.workerSlots` — integer, default `3`. Size of the tmux worker pool; ignored under `"subagent"`.
-- `work.workerCommand` — string, default `""`. Launch command for a tmux worker session; empty builds `claude --model <models.worker> --dangerously-skip-permissions` (workers commit, open PRs and run tests unattended).
+- `work.workerCommand` — string, default `""`. Launch command for a tmux worker session (must not resume a conversation: no `-c`, `-r`, `--continue`, `--resume`); empty builds `claude --model <models.worker> --dangerously-skip-permissions` (workers commit, open PRs and run tests unattended).
 - `work.accounts` — array of `{name, configDir}`, default `[]`. Maps tmux slots to independent `CLAUDE_CONFIG_DIR`s so each authenticates as its own account. Empty means every slot inherits the ambient config dir.
 - `work.operatorCommand` — string, default `""`. Used to relaunch the orchestrator inside tmux when the cycle starts outside one; empty builds `claude --continue --model <models.orchestrator> --permission-mode auto`.
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 13 (Learn), Step 14 (Refactor), and Step 15 (Loop continuation) nudge or invoke the next skill directly.
@@ -441,6 +441,8 @@ Same brief, different transport. Write each task's brief to a file and dispatch 
 ```
 
 `--task` records the task in `.hv/workers.json` beside the slot's handle and `state: busy`.
+
+A task dispatch runs the slot **reset guard** first (`hv-worker-reset`): it refuses (exit 3) when the slot's worktree has uncommitted changes or commits that never reached the cycle branch, and otherwise cuts a fresh `hv-worker/<slot>-<task>` branch from the cycle branch tip and records it in `.hv/workers.json`, which `hv-worker-gate` reads. A refused slot needs its work gated and merged, or `hv-worker-pool reap --slot <wN>`; do not dispatch around it. Dispatch also exits 3 when the previous tab or window (and its processes) cannot be confirmed closed, and exits 2 when `work.workerCommand` carries `-c`, `-r`, `--continue` or `--resume`, which would reopen the old conversation in the fresh session.
 
 Two differences from the subagent path, and only two:
 

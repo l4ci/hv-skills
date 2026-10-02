@@ -157,6 +157,9 @@ case "$CMD" in
       fi
 
       ABS="$(cd "$REL" && pwd -P)"
+      # A healthy slot may sit on a per-task branch (hv-worker-reset); register
+      # what is actually checked out, not the init-time name.
+      BRANCH="$(git -C "$ABS" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$BRANCH")"
       HANDLE="$SESSION:$NAME"
       [ "$DISPATCH" != herdr ] || HANDLE=""
       register_slot "$NAME" "$BRANCH" "$ABS" "$BASE" "$SESSION" "$HANDLE"
