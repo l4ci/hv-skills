@@ -16,6 +16,7 @@ var contractVerbs = []string{
 	"block",
 	"block skills",
 	"config check",
+	"config fill",
 	"config set",
 	"config show",
 	"debug counter clear",
