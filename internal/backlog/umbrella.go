@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -510,7 +509,6 @@ func (u *Umbrella) NoteRm(ref, kind string) (bool, error) {
 
 // ---- milestones ------------------------------------------------------------
 
-var msTitleRe = regexp.MustCompile(`\A(M\p{Nd}+)`)
 
 // msTitleID is _MS_TITLE_RE's group 1 for a tracking issue title, "" when it
 // does not start with a milestone ID.
