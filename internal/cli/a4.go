@@ -32,7 +32,48 @@ var newTracker = func(ctx context.Context, root string, cfg any) (backlog.Tracke
 }
 
 func a4Commands() []*Command {
-	return append(append(append(a4ItemCommands(), a4bCommands()...), a4cCommands()...), a4dCommands()...)
+	cmds := append(append(append(a4ItemCommands(), a4bCommands()...), a4cCommands()...), a4dCommands()...)
+	a4MarkReadOnly(cmds, "")
+	return cmds
+}
+
+// a4ReadOnlyVerbs are the A4 verbs whose contract data carries no "changed".
+// The conventions forbid exit 4 for them, so a refusal (the wrong backend)
+// answers exit 1 with the same failure data (contract: backend). A test checks
+// this set against docs/design/5.0-verb-contract.md.
+var a4ReadOnlyVerbs = map[string]bool{
+	"update": true, "config show": true, "config check": true,
+	"repo which": true, "repo resolve": true, "repo umbrella": true,
+	"item show": true, "item ready": true, "item comment list": true, "item note show": true,
+	"item field get": true, "item field list": true, "item shipped": true,
+	"backlog list": true, "backlog ids": true, "backlog milestones": true, "backlog drift": true,
+	"backlog stale": true, "summary": true,
+	"issues list": true, "issues imported": true, "issues provider": true,
+	"status show": true, "status handoff": true, "status loop show": true,
+	"refactor age": true, "refactor targets": true,
+}
+
+// a4MarkReadOnly wraps every verb in a4ReadOnlyVerbs under cmds so an exit 4
+// becomes exit 1; prefix is the command path above cmds.
+func a4MarkReadOnly(cmds []*Command, prefix string) {
+	for _, cmd := range cmds {
+		path := strings.TrimSpace(prefix + " " + cmd.Name)
+		if cmd.Verb != nil && a4ReadOnlyVerbs[path] {
+			verb := cmd.Verb
+			cmd.Verb = func(fs *flag.FlagSet) RunFunc {
+				run := verb(fs)
+				return func(c *Ctx, args []string) (Result, error) {
+					res, err := run(c, args)
+					var e *Error
+					if errors.As(err, &e) && e.Exit == ExitRefused {
+						e.Exit = ExitFailed
+					}
+					return res, err
+				}
+			}
+		}
+		a4MarkReadOnly(cmd.Subs, path)
+	}
 }
 
 func a4ItemCommands() []*Command {

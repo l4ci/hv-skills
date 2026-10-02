@@ -649,7 +649,8 @@ func TestParityA4Issue(t *testing.T) {
 			check: showCheck(map[string]any{"milestone": "M07"})},
 		isc{name: "show/closed", argv: j("item", "show", "9"), old: []string{"hv-item-show", "9"}, want: 0, textSame: true,
 			check: showCheck(map[string]any{"status": "closed"})},
-		isc{name: "show/file-backend", file: true, remote: "none", argv: j("item", "show", "B01"), old: []string{"hv-item-show", "B01"}, want: 4},
+		isc{name: "show/file-backend", file: true, remote: "none", argv: j("item", "show", "B01"), old: []string{"hv-item-show", "B01"}, want: 1,
+			div: "read-only verb under the wrong backend: contract (#106) exit 1, old rc 2 maps to 4", refWant: 4},
 	)
 	both(isc{name: "show/noted", argv: j("item", "show", "5"), old: []string{"hv-item-show", "5"}, want: 0, textSame: true})
 
@@ -750,13 +751,15 @@ func TestParityA4Issue(t *testing.T) {
 			}}
 	}
 	add(nshow("proof", "5", "proof", 0, true), nshow("design", "5", "design", 0, true), nshow("multipart-plan", "11", "plan", 0, true),
-		nshow("absent", "2", "plan", 0, false), nshow("bad-kind", "2", "bogus", 2, false), nshow("file-backend", "B01", "design", 4, false),
+		nshow("absent", "2", "plan", 0, false), nshow("bad-kind", "2", "bogus", 2, false), nshow("file-backend", "B01", "design", 1, false),
 		isc{name: "note-show/wrong-letter", argv: j("item", "note", "show", "F2", "--kind", "proof"),
 			old: []string{"hv-item-note", "F2", "--kind", "proof", "--show"}, want: 3, div: "7: old ignores the type letter", refWant: 0})
-	// file-backend scenarios need file:true; patch the two above
+	// file-backend scenarios need file:true; patch the two above. note show is
+	// read-only, so the contract (#106) wants exit 1 where old rc 2 maps to 4.
 	for i := range all {
 		if strings.HasPrefix(all[i].name, "note-show/file-backend") {
 			all[i].file, all[i].remote = true, "none"
+			all[i].div, all[i].refWant = "read-only verb under the wrong backend: contract (#106) exit 1, old rc 2 maps to 4", 4
 		}
 	}
 	both(nshow("proof", "5", "proof", 0, true))
