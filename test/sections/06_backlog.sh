@@ -91,7 +91,8 @@ EOF
 OUT=$(hvj backlog list)
 [ "$(echo "$OUT" | jget 'data.inProgress[0].id')" = "F20" ] || fail "In Progress should list F20: $OUT"
 # F20 should no longer appear in the features list
-echo "$OUT" | jget data.features | grep -q "F20" && fail "active F20 leaked into features"
+_grep_in=$(echo "$OUT" | jget data.features || true)
+if grep -q "F20" <<<"$_grep_in"; then fail "active F20 leaked into features"; fi
 pass "active items excluded from features"
 "$HV_BIN" status rm hv/real-branch >/dev/null
 
@@ -155,7 +156,8 @@ OUT=$(hvj backlog list --grep "Auth refactor")
 [ "$(echo "$OUT" | jget 'data.features[0].id')" = "F80" ] || fail "F80 missing in filtered output: $OUT"
 # The cluster keeps both members, even though only F80 matched
 [ "$(echo "$OUT" | jget data.clusters)" = '[["F80","F81"]]' ] || fail "cluster should preserve both members: $OUT"
-echo "$OUT" | jget data.features | grep -q "F82" && fail "F82 (no match) should not appear: $OUT"
+_grep_in=$(echo "$OUT" | jget data.features || true)
+if grep -q "F82" <<<"$_grep_in"; then fail "F82 (no match) should not appear: $OUT"; fi
 pass "backlog list --grep filters clusters but preserves all members"
 
 echo "backlog list no-flag regression"

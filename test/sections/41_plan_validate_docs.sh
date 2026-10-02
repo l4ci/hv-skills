@@ -31,10 +31,10 @@ created: 2026-05-20
   - Verify: build
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-B07) || { echo "FAIL: exit non-zero"; exit 1; }
-  echo "$OUT" | grep -q "docs/api/auth.md" || { echo "FAIL: missing doc path in warning"; exit 1; }
-  echo "$OUT" | grep -q "expected doc home" || { echo "FAIL: missing 'expected doc home' phrase"; exit 1; }
+  grep -q "docs/api/auth.md" <<<"$OUT" || { echo "FAIL: missing doc path in warning"; exit 1; }
+  grep -q "expected doc home" <<<"$OUT" || { echo "FAIL: missing 'expected doc home' phrase"; exit 1; }
   # Non-doc paths are silent.
-  echo "$OUT" | grep -q "src/x.ts" && { echo "FAIL: non-doc path leaked into warnings"; exit 1; }
+  if grep -q "src/x.ts" <<<"$OUT"; then echo "FAIL: non-doc path leaked into warnings"; exit 1; fi
   pass "T1: single-repo plan with missing doc home → warning"
 
   # 2. Single-repo: doc home exists → silent exit 0
@@ -65,7 +65,7 @@ created: 2026-05-20
   - Verify: open
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-B08) || { echo "FAIL: exit non-zero on indented form"; exit 1; }
-  echo "$OUT" | grep -q "docs/howto/run.md" || { echo "FAIL: indented Files: bullet not parsed"; exit 1; }
+  grep -q "docs/howto/run.md" <<<"$OUT" || { echo "FAIL: indented Files: bullet not parsed"; exit 1; }
   pass "T3: indented 'Files:' bullet form is parsed"
 
   # 4. Stub placeholder is ignored (no false positive)
@@ -135,8 +135,8 @@ created: 2026-05-20
   - Verify: tests
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-B07) || { echo "FAIL: exit non-zero"; exit 1; }
-  echo "$OUT" | grep -q "target repo: runlog" || { echo "FAIL: missing 'target repo: runlog'"; exit 1; }
-  echo "$OUT" | grep -q "sibling sub-repo 'runlog-docs'" || {
+  grep -q "target repo: runlog" <<<"$OUT" || { echo "FAIL: missing 'target repo: runlog'"; exit 1; }
+  grep -q "sibling sub-repo 'runlog-docs'" <<<"$OUT" || {
     echo "FAIL: missing sibling -docs suggestion: $OUT"; exit 1;
   }
   pass "U1: umbrella sub-repo missing docs/ → suggests sibling <repo>-docs"
@@ -161,10 +161,10 @@ created: 2026-05-20
   - Verify: tests
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-B08)
-  echo "$OUT" | grep -q "runlog/docs/NN-compliance.md" || {
+  grep -q "runlog/docs/NN-compliance.md" <<<"$OUT" || {
     echo "FAIL: umbrella-relative path not recognized: $OUT"; exit 1;
   }
-  echo "$OUT" | grep -q "sibling sub-repo 'runlog-docs'" || {
+  grep -q "sibling sub-repo 'runlog-docs'" <<<"$OUT" || {
     echo "FAIL: sibling suggestion missing on umbrella-relative form"; exit 1;
   }
   pass "U2: umbrella-relative path '<repo>/docs/x.md' is normalized and flagged"
@@ -190,12 +190,12 @@ created: 2026-05-20
   - Verify: build
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-F09)
-  echo "$OUT" | grep -q "target repo: runlog$" || {
+  grep -q "target repo: runlog$" <<<"$OUT" || {
     echo "FAIL: should warn runlog (no docs/): $OUT"; exit 1;
   }
-  echo "$OUT" | grep -q "target repo: runlog-docs" && {
+  if grep -q "target repo: runlog-docs" <<<"$OUT"; then
     echo "FAIL: should NOT warn runlog-docs (has docs/): $OUT"; exit 1;
-  }
+  fi
   pass "U3: multi-repo plan validates each repo independently"
 
   # Unregistered repo tag → issue-level warning
@@ -218,7 +218,7 @@ created: 2026-05-20
   - Verify: nope
 PLAN
   OUT=$(.hv/bin/hv-plan-validate-docs M01-T01)
-  echo "$OUT" | grep -q "sub-repo 'ghost' is not registered" || {
+  grep -q "sub-repo 'ghost' is not registered" <<<"$OUT" || {
     echo "FAIL: unregistered repo should be flagged: $OUT"; exit 1;
   }
   pass "U4: plan tagged with unregistered sub-repo is flagged"

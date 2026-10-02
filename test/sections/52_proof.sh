@@ -29,7 +29,8 @@ mkdir -p "$TMP_PF/proj"
   [ "$("$BIN/hv-proof-show" B01 --count)" = "1" ] || fail "identical row must be idempotent"
   "$BIN/hv-proof-add" B01 --check lint --result FAIL --evidence "lint.log" --sha "$H"
   [ "$("$BIN/hv-proof-show" B01 --count)" = "2" ] || fail "distinct row should append"
-  "$BIN/hv-proof-show" B01 | grep -qF "· unit · PASS · $H · 12 passed · 0 failed" || fail "row format"
+  _grep_in=$("$BIN/hv-proof-show" B01 || true)
+  grep -qF "· unit · PASS · $H · 12 passed · 0 failed" <<<"$_grep_in" || fail "row format"
   pass "hv-proof-add is idempotent on identical rows; hv-proof-show prints rows"
 
   rc=0; "$BIN/hv-proof-add" B01 --check x --result MAYBE --evidence e 2>/dev/null || rc=$?

@@ -72,9 +72,9 @@ legacy skills block
 <!-- hv:skills:end -->
 MD
 OUT="$(init_ii "$TMP_II/mig")"
-echo "$OUT" | grep -q '^created: AGENTS.md$' || fail "F84[e]: AGENTS.md not reported created"
-echo "$OUT" | grep -q '^moved: knowledge, skills → AGENTS.md$' || fail "F84[e]: moved line wrong: $OUT"
-echo "$OUT" | grep -q '^linked: CLAUDE.md → @AGENTS.md$' || fail "F84[e]: linked line missing: $OUT"
+grep -q '^created: AGENTS.md$' <<<"$OUT" || fail "F84[e]: AGENTS.md not reported created"
+grep -q '^moved: knowledge, skills → AGENTS.md$' <<<"$OUT" || fail "F84[e]: moved line wrong: $OUT"
+grep -q '^linked: CLAUDE.md → @AGENTS.md$' <<<"$OUT" || fail "F84[e]: linked line missing: $OUT"
 grep -q "hv-knowledge-start" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: knowledge block not in AGENTS.md"
 grep -q "legacy skills block" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: legacy block not in AGENTS.md"
 if grep -q "hv-knowledge\|hv:skills" "$TMP_II/mig/CLAUDE.md"; then fail "F84[e]: blocks remain in CLAUDE.md"; fi
@@ -109,7 +109,7 @@ mkdir -p "$TMP_II/sym/.hv"
 printf '# Agents\n' > "$TMP_II/sym/AGENTS.md"
 ln -s AGENTS.md "$TMP_II/sym/CLAUDE.md"
 OUT="$(init_ii "$TMP_II/sym")"
-echo "$OUT" | grep -q '^note:' || fail "F84[h]: expected a note, got: $OUT"
+grep -q '^note:' <<<"$OUT" || fail "F84[h]: expected a note, got: $OUT"
 [ "$(cat "$TMP_II/sym/AGENTS.md")" = "# Agents" ] || fail "F84[h]: AGENTS.md modified through symlink"
 [ -L "$TMP_II/sym/CLAUDE.md" ] || fail "F84[h]: CLAUDE.md symlink replaced"
 pass "F84[h]: symlinked pair left untouched"

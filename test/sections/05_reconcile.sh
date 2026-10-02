@@ -2,7 +2,7 @@ echo "hv-reconcile"
 # Seed an entry whose branch doesn't exist — should be cleaned
 "$BIN/hv-status-add" hv/dead-branch B05
 OUTPUT=$("$BIN/hv-reconcile")
-echo "$OUTPUT" | grep -q '"reason": "branch_gone"' || fail "reconcile did not flag dead branch"
+grep -q '"reason": "branch_gone"' <<<"$OUTPUT" || fail "reconcile did not flag dead branch"
 pass "reconcile cleans stale branch entry"
 
 # Seed an entry with a real branch
@@ -11,12 +11,12 @@ echo "work" > work.txt && git add -A && git commit -q -m "wip"
 git checkout -q main
 "$BIN/hv-status-add" hv/real-branch F02
 OUTPUT=$("$BIN/hv-reconcile")
-echo "$OUTPUT" | grep -q '"branch": "hv/real-branch"' || fail "real branch not in needsAction"
-echo "$OUTPUT" | grep -q '"hasCommits": true' || fail "hasCommits should be true"
+grep -q '"branch": "hv/real-branch"' <<<"$OUTPUT" || fail "real branch not in needsAction"
+grep -q '"hasCommits": true' <<<"$OUTPUT" || fail "hasCommits should be true"
 pass "reconcile reports real branch with commits"
 
 # todoDrift field is always present (empty when no drift)
-echo "$OUTPUT" | grep -q '"todoDrift"' || fail "reconcile output missing todoDrift field"
+grep -q '"todoDrift"' <<<"$OUTPUT" || fail "reconcile output missing todoDrift field"
 pass "reconcile emits todoDrift field"
 
 echo "hv-todo-drift"
@@ -43,7 +43,7 @@ EOF
   git commit -q --allow-empty -m "fix: do thing [B07]"
   install_helpers
   OUT=$(.hv/bin/hv-todo-drift)
-  echo "$OUT" | grep -q '"id": "B07"' || fail "drift missing B07: $OUT"
+  grep -q '"id": "B07"' <<<"$OUT" || fail "drift missing B07: $OUT"
   pass "hv-todo-drift detects shipped-but-open ID"
 
   # Completed (strikethrough) IDs are NOT drift — even if they appear in commits.
@@ -60,7 +60,7 @@ EOF
 - ~~**[B07] [P1] Pretend bug.**~~ Done 2026-05-07 [`abc1234`]
 EOF
   OUT2=$(.hv/bin/hv-todo-drift)
-  if echo "$OUT2" | grep -q '"id": "B07"'; then
+  if grep -q '"id": "B07"' <<<"$OUT2"; then
     fail "drift should not flag completed B07: $OUT2"
   fi
   pass "hv-todo-drift ignores completed IDs"
@@ -98,7 +98,7 @@ SA_TMP="$(mktemp -d)"
 ## Completed
 EOF
   OUT=$(.hv/bin/hv-todo-drift)
-  if echo "$OUT" | grep -q '"id": "B07"'; then
+  if grep -q '"id": "B07"' <<<"$OUT"; then
     fail "drift should NOT flag pre-anchor commit for new [B07]: $OUT"
   fi
   pass "hv-todo-drift skips commits older than Since: anchor"
@@ -107,7 +107,7 @@ EOF
   # MUST still trigger drift (the anchor is a floor, not a mute).
   git commit -q --allow-empty -m "feat: real shipment [B07]"
   OUT_B=$(.hv/bin/hv-todo-drift)
-  echo "$OUT_B" | grep -q '"id": "B07"' || fail "drift missed post-anchor commit: $OUT_B"
+  grep -q '"id": "B07"' <<<"$OUT_B" || fail "drift missed post-anchor commit: $OUT_B"
   pass "hv-todo-drift detects commits newer than Since: anchor"
 
   # Scenario C: legacy entry (no Since:) preserves full-log behavior.
@@ -124,7 +124,7 @@ EOF
 ## Completed
 EOF
   OUT_C=$(.hv/bin/hv-todo-drift)
-  echo "$OUT_C" | grep -q '"id": "B07"' || fail "legacy (no Since) should still drift: $OUT_C"
+  grep -q '"id": "B07"' <<<"$OUT_C" || fail "legacy (no Since) should still drift: $OUT_C"
   pass "hv-todo-drift legacy entries keep full-log behavior"
 
   # Scenario D: hv-append auto-stamps Since on fresh captures.
@@ -232,7 +232,7 @@ assert 'B21' not in by, f'B21 (pre-existing symbol) should NOT be flagged: {sd}'
   # hv-reconcile must surface todoSymbolDrift with the B20 entry.
   echo '{"active":[]}' > .hv/status.json
   ROUT=$(.hv/bin/hv-reconcile)
-  echo "$ROUT" | grep -q '"todoSymbolDrift"' || fail "reconcile missing todoSymbolDrift field: $ROUT"
+  grep -q '"todoSymbolDrift"' <<<"$ROUT" || fail "reconcile missing todoSymbolDrift field: $ROUT"
   echo "$ROUT" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -258,9 +258,9 @@ cat > .hv/KNOWLEDGE.md <<'EOF'
 - net bullet
 EOF
 OUT=$("$BIN/hv-knowledge-query" "Testing" "Networking")
-echo "$OUT" | grep -q "testing bullet" || fail "testing topic missing from query"
-echo "$OUT" | grep -q "net bullet" || fail "networking topic missing from query"
-echo "$OUT" | grep -q "arch bullet" && fail "architecture topic leaked into query"
+grep -q "testing bullet" <<<"$OUT" || fail "testing topic missing from query"
+grep -q "net bullet" <<<"$OUT" || fail "networking topic missing from query"
+if grep -q "arch bullet" <<<"$OUT"; then fail "architecture topic leaked into query"; fi
 pass "knowledge-query returns only requested topics"
 
 echo "hv-knowledge-stats"
@@ -284,8 +284,8 @@ EOF
   mkdir -p .hv/bin
   install_helpers
   OUT=$(.hv/bin/hv-knowledge-stats)
-  echo "$OUT" | grep -q '"name": "Tiny"' || fail "stats missing Tiny: $OUT"
-  echo "$OUT" | grep -q '"name": "Big"' || fail "stats missing Big: $OUT"
+  grep -q '"name": "Tiny"' <<<"$OUT" || fail "stats missing Tiny: $OUT"
+  grep -q '"name": "Big"' <<<"$OUT" || fail "stats missing Big: $OUT"
   BIG_BULLETS=$(echo "$OUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(t['bullets'] for t in d['topics'] if t['name']=='Big'))")
   [ "$BIG_BULLETS" = "30" ] || fail "Big bullet count != 30: $BIG_BULLETS"
   pass "hv-knowledge-stats counts bullets per topic"
@@ -303,7 +303,7 @@ trap 'rm -rf "$KS2_TMP"' EXIT
   mkdir -p .hv/bin
   install_helpers
   OUT=$(.hv/bin/hv-knowledge-stats)
-  echo "$OUT" | grep -q '"topics": \[\]' || fail "missing-file should yield empty: $OUT"
+  grep -q '"topics": \[\]' <<<"$OUT" || fail "missing-file should yield empty: $OUT"
   pass "hv-knowledge-stats silent-empty on missing KNOWLEDGE.md"
 )
 trap 'rm -rf "$TMP"' EXIT
@@ -336,14 +336,14 @@ Only TLS 1.3+.
 **Permits.** Cert pinning.
 EOF
 OUT_D=$("$BIN/hv-decisions-query" "Testing" "Networking")
-echo "$OUT_D" | grep -q "No mocked DB" || fail "Testing decision missing from query"
-echo "$OUT_D" | grep -q "Strict TLS" || fail "Networking decision missing from query"
-echo "$OUT_D" | grep -q "No background queues" && fail "Architecture decision leaked into query"
+grep -q "No mocked DB" <<<"$OUT_D" || fail "Testing decision missing from query"
+grep -q "Strict TLS" <<<"$OUT_D" || fail "Networking decision missing from query"
+if grep -q "No background queues" <<<"$OUT_D"; then fail "Architecture decision leaked into query"; fi
 pass "decisions-query returns only requested topics"
 
 # Forbids/permits content must come through verbatim
-echo "$OUT_D" | grep -q "Forbids.*Mock DB" || fail "Forbids line missing for Testing decision"
-echo "$OUT_D" | grep -q "Permits.*Cert pinning" || fail "Permits line missing for Networking decision"
+grep -q "Forbids.*Mock DB" <<<"$OUT_D" || fail "Forbids line missing for Testing decision"
+grep -q "Permits.*Cert pinning" <<<"$OUT_D" || fail "Permits line missing for Networking decision"
 pass "decisions-query preserves forbids/permits structure"
 
 # Empty/missing file is silent (exit 0, no output)

@@ -22,7 +22,8 @@ EOF
 
   OUT=$(hvj review scaffolding feat --base main)
   [ "$(echo "$OUT" | jget data.findings[0].file)" = "b.sh" ] || fail "scaffolding scan missed b.sh: $OUT"
-  echo "$OUT" | jget data.findings[0].text | grep -q "Task 7" || fail "scaffolding scan missed 'Task 7' in b.sh: $OUT"
+  _grep_in=$(echo "$OUT" | jget data.findings[0].text || true)
+  grep -q "Task 7" <<<"$_grep_in" || fail "scaffolding scan missed 'Task 7' in b.sh: $OUT"
   [ "$(echo "$OUT" | jget data.findings[0].line)" = "2" ] || fail "scaffolding finding should sit on line 2: $OUT"
   [ "$(echo "$OUT" | jget data.findings | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')" = "1" ] \
     || fail "scaffolding scan should flag only the Task 7 line: $OUT"
@@ -30,7 +31,8 @@ EOF
   # Add a clean-only commit; the verb should still surface the existing match
   echo "more" >> a.txt && git add a.txt && git commit -q -m "feat: tweak a"
   OUT2=$(hvj review scaffolding feat --base main)
-  echo "$OUT2" | jget data.findings[0].text | grep -q "Task 7" || fail "scaffolding scan lost match after benign commit: $OUT2"
+  _grep_in=$(echo "$OUT2" | jget data.findings[0].text || true)
+  grep -q "Task 7" <<<"$_grep_in" || fail "scaffolding scan lost match after benign commit: $OUT2"
 
   # Empty diff (branch == base) -> no findings, exit 0
   git checkout -q main

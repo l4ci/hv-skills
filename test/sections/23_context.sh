@@ -28,18 +28,18 @@ cat > "$TMP/.hv/KNOWLEDGE.md" <<'EOF'
   <!-- 2026-05-10 -->
 EOF
 OUT=$( cd "$TMP" && "$BIN/hv-glossary-read" backlog )
-echo "$OUT" | grep -q "^- \*\*backlog\*\*" || fail "hv-glossary-read missing entry header"
-echo "$OUT" | grep -q "canonical project queue" || fail "hv-glossary-read missing body"
+grep -q "^- \*\*backlog\*\*" <<<"$OUT" || fail "hv-glossary-read missing entry header"
+grep -q "canonical project queue" <<<"$OUT" || fail "hv-glossary-read missing body"
 # Case-insensitive
 OUT2=$( cd "$TMP" && "$BIN/hv-glossary-read" Backlog )
-echo "$OUT2" | grep -q "canonical project queue" || fail "hv-glossary-read case-insensitive"
+grep -q "canonical project queue" <<<"$OUT2" || fail "hv-glossary-read case-insensitive"
 # Unknown term returns empty + exit 0
 OUT3=$( cd "$TMP" && "$BIN/hv-glossary-read" nonexistent )
 [ -z "$OUT3" ] || fail "hv-glossary-read unknown term should be empty"
 # `> from:` prefix is always present and names KNOWLEDGE.md + ## Glossary
 OUT4=$( cd "$TMP" && "$BIN/hv-glossary-read" backlog )
-echo "$OUT4" | grep -q "^> from: " || fail "hv-glossary-read missing > from: prefix"
-echo "$OUT4" | grep -q "^> from: .hv/KNOWLEDGE.md (## Glossary)$" || fail "hv-glossary-read prefix should name KNOWLEDGE.md (## Glossary)"
+grep -q "^> from: " <<<"$OUT4" || fail "hv-glossary-read missing > from: prefix"
+grep -q "^> from: .hv/KNOWLEDGE.md (## Glossary)$" <<<"$OUT4" || fail "hv-glossary-read prefix should name KNOWLEDGE.md (## Glossary)"
 
 # Document order preserved when querying multiple terms (decision is later in the file than backlog)
 OUT5=$( cd "$TMP" && "$BIN/hv-glossary-read" decision backlog )
@@ -66,7 +66,8 @@ pass "hv-glossary-write — new term inserts + indexes"
 
 echo "hv-glossary-write — no aliases writes _none_"
 ( cd "$TMP_ADD" && "$BIN/hv-glossary-write" session --def "An active hv-skills work cycle." )
-grep -A2 "^- \*\*session\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "^  - \*\*Aliases:\*\* _none_$" || fail "missing _none_"
+_grep_in=$(grep -A2 "^- \*\*session\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "^  - \*\*Aliases:\*\* _none_$" <<<"$_grep_in" || fail "missing _none_"
 pass "hv-glossary-write — empty aliases produce _none_"
 
 echo "hv-glossary-write — alphabetical insertion"
@@ -81,20 +82,25 @@ ORIG_DATE=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -oE
 ( cd "$TMP_ADD" && "$BIN/hv-glossary-write" backlog \
     --def "The canonical project queue, refined." \
     --alias "queue" )
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "queue, refined" || fail "def not replaced"
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "\*\*Aliases:\*\* task list, todo list, queue" || fail "aliases not unioned"
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "$ORIG_DATE" || fail "date should be preserved without --touch"
+_grep_in=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "queue, refined" <<<"$_grep_in" || fail "def not replaced"
+_grep_in=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "\*\*Aliases:\*\* task list, todo list, queue" <<<"$_grep_in" || fail "aliases not unioned"
+_grep_in=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "$ORIG_DATE" <<<"$_grep_in" || fail "date should be preserved without --touch"
 pass "hv-glossary-write — update preserves date, unions aliases"
 
 echo "hv-glossary-write — --touch updates the date"
 TODAY=$(date +%Y-%m-%d)
 ( cd "$TMP_ADD" && "$BIN/hv-glossary-write" backlog --def "X." --touch )
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "<!-- $TODAY -->" || fail "--touch didn't bump date"
+_grep_in=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "<!-- $TODAY -->" <<<"$_grep_in" || fail "--touch didn't bump date"
 pass "hv-glossary-write --touch"
 
 echo "hv-glossary-write — --not field"
 ( cd "$TMP_ADD" && "$BIN/hv-glossary-write" zterm --def "Z thing." --not "X, Y" )
-grep -A3 "^- \*\*zterm\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -q "^  - \*\*Not:\*\* X, Y$" || fail "Not line missing"
+_grep_in=$(grep -A3 "^- \*\*zterm\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" || true)
+grep -q "^  - \*\*Not:\*\* X, Y$" <<<"$_grep_in" || fail "Not line missing"
 pass "hv-glossary-write --not"
 
 trap 'rm -rf "$TMP"' EXIT

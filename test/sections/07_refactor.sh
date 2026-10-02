@@ -15,21 +15,21 @@ echo "b1" > b1.txt && git add b1.txt && git commit -q -m "fix: resolve b1"
 echo "r1" > r1.txt && git add r1.txt && git commit -q -m "refactor: clean up"
 "$BIN/hv-complete" F41 --no-proof
 OUT=$("$BIN/hv-refactor-age")
-echo "$OUT" | grep -q '"features": 1' || fail "expected 1 non-refactor feature, got: $OUT"
-echo "$OUT" | grep -q '"bugs": 1' || fail "expected 1 non-refactor bug, got: $OUT"
+grep -q '"features": 1' <<<"$OUT" || fail "expected 1 non-refactor feature, got: $OUT"
+grep -q '"bugs": 1' <<<"$OUT" || fail "expected 1 non-refactor bug, got: $OUT"
 pass "refactor-age counts non-refactor completions only"
 
 # Re-completing an already-completed item must not re-bump.
 "$BIN/hv-complete" F40 --no-proof
 OUT=$("$BIN/hv-refactor-age")
-echo "$OUT" | grep -q '"features": 1' || fail "idempotent re-completion bumped counter, got: $OUT"
+grep -q '"features": 1' <<<"$OUT" || fail "idempotent re-completion bumped counter, got: $OUT"
 pass "hv-complete is idempotent (no double-bump)"
 
 # hv-refactor-reset zeros the field.
 "$BIN/hv-refactor-reset"
 OUT=$("$BIN/hv-refactor-age")
-echo "$OUT" | grep -q '"features": 0' || fail "reset failed, features != 0: $OUT"
-echo "$OUT" | grep -q '"bugs": 0' || fail "reset failed, bugs != 0: $OUT"
+grep -q '"features": 0' <<<"$OUT" || fail "reset failed, features != 0: $OUT"
+grep -q '"bugs": 0' <<<"$OUT" || fail "reset failed, bugs != 0: $OUT"
 pass "hv-refactor-reset zeros since_refactor"
 
 # Scoped refactor subjects (refactor(scope):) also count as refactor commits.
@@ -39,7 +39,7 @@ EOF
 echo "r2" > r2.txt && git add r2.txt && git commit -q -m "refactor(hosts): consolidate"
 "$BIN/hv-complete" F42 --no-proof
 OUT=$("$BIN/hv-refactor-age")
-echo "$OUT" | grep -q '"features": 0' || fail "scoped refactor(scope): subject bumped counter, got: $OUT"
+grep -q '"features": 0' <<<"$OUT" || fail "scoped refactor(scope): subject bumped counter, got: $OUT"
 pass "hv-complete recognises scoped refactor(scope): subjects"
 
 echo "hv-merge / hv-pr"

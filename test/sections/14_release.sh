@@ -88,7 +88,8 @@ TMP_DV="$DV5"
   OUT=$(hvj release version 2>/dev/null) || rc=$?
   [ "$rc" = "3" ] || { echo "FAIL: expected exit 3, got $rc"; exit 1; }
   [ "$(echo "$OUT" | jget ok)" = "false" ] || { echo "FAIL: expected ok:false envelope: $OUT"; exit 1; }
-  echo "$OUT" | jget error.message | grep -q "no version file detected" || { echo "FAIL: error message missing: $OUT"; exit 1; }
+  _grep_in=$(echo "$OUT" | jget error.message || true)
+  grep -q "no version file detected" <<<"$_grep_in" || { echo "FAIL: error message missing: $OUT"; exit 1; }
 )
 rm -rf "$DV5"
 pass "release version exits 3 with no version files"
@@ -207,10 +208,10 @@ TMP_DV="$CL1"
   MD=$(echo "$OUT" | jget data.markdown)
   [ "$(echo "$OUT" | jget data.empty)" = "false" ] || { echo "FAIL: empty should be false: $OUT"; exit 1; }
   for h in New Fixed Performance Changed Documentation Other Stats; do
-    echo "$MD" | grep -q "^### $h" || { echo "FAIL: ### $h missing"; exit 1; }
+    grep -q "^### $h" <<<"$MD" || { echo "FAIL: ### $h missing"; exit 1; }
   done
-  if echo "$MD" | grep -q "^## "; then echo "FAIL: headings must be normalised to ###"; exit 1; fi
-  if echo "$MD" | grep -qx "### Test"; then echo "FAIL: ### Test heading should be absent"; exit 1; fi
+  if grep -q "^## " <<<"$MD"; then echo "FAIL: headings must be normalised to ###"; exit 1; fi
+  if grep -qx "### Test" <<<"$MD"; then echo "FAIL: ### Test heading should be absent"; exit 1; fi
 )
 pass "release notes --from commits emits expected sections, skips test commits"
 
@@ -219,7 +220,7 @@ pass "release notes --from commits emits expected sections, skips test commits"
   cd "$CL1"
   git commit --allow-empty -q -m "feat: breaking change" -m "BREAKING CHANGE: api removed"
   MD=$(hvj release notes --from commits --since v_cl1_base | jget data.markdown)
-  echo "$MD" | grep -q "^### Breaking" || { echo "FAIL: ### Breaking missing"; exit 1; }
+  grep -q "^### Breaking" <<<"$MD" || { echo "FAIL: ### Breaking missing"; exit 1; }
 )
 pass "release notes --from commits emits ### Breaking for BREAKING CHANGE body"
 
@@ -252,7 +253,8 @@ TODAY=$(date +%Y-%m-%d)
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || { echo "FAIL: changed not true: $OUT"; exit 1; }
   [ "$(echo "$OUT" | jget data.path)" = "CHANGELOG.md" ] || { echo "FAIL: path wrong: $OUT"; exit 1; }
   [ -f CHANGELOG.md ] || { echo "FAIL: CHANGELOG.md not created"; exit 1; }
-  head -1 CHANGELOG.md | grep -q "^# Changelog" || { echo "FAIL: missing # Changelog header"; exit 1; }
+  _grep_in=$(head -1 CHANGELOG.md || true)
+  grep -q "^# Changelog" <<<"$_grep_in" || { echo "FAIL: missing # Changelog header"; exit 1; }
   grep -q "^## v1.0.0 — $TODAY" CHANGELOG.md || { echo "FAIL: missing v1.0.0 section with today's date"; exit 1; }
 )
 pass "release changelog creates CHANGELOG.md with correct header and date"

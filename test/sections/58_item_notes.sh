@@ -142,8 +142,10 @@ PY
     F1="$("$BIN/hv-item-create" features --title "Big")"
     eq "design add" "$F1" "$("$BIN/hv-design-add" "$F1" "Big design")"
     eq "design marker" "<!-- hv:design -->" "$(MARKERS 3)"
-    "$BIN/hv-design-show" "$F1" | grep -q "^# $F1 — Big design" || fail "$prov design show stub"
-    "$BIN/hv-design-show" "$F1" | grep -q "^status: draft" || fail "$prov design show frontmatter"
+    _grep_in=$("$BIN/hv-design-show" "$F1" || true)
+    grep -q "^# $F1 — Big design" <<<"$_grep_in" || fail "$prov design show stub"
+    _grep_in=$("$BIN/hv-design-show" "$F1" || true)
+    grep -q "^status: draft" <<<"$_grep_in" || fail "$prov design show frontmatter"
     ERR "$BIN/hv-design-add" "$F1" "again"
     eq "design add twice refused" "1" "$ERRRC"
     case "$ERRMSG" in *"already exists"*) ;; *) fail "$prov design exists msg: $ERRMSG";; esac
@@ -172,8 +174,10 @@ PY
     eq "plan add" "M07-$F1" "$("$BIN/hv-plan-add" --design ".hv/designs/$F1.md" M07 "$F1" "Big plan")"
     [ ! -e .hv/plans/M07-$F1.md ] || fail "$prov item plan wrote a file"
     eq "plan marker" "<!-- hv:design -->|<!-- hv:plan -->" "$(MARKERS 3)"
-    "$BIN/hv-plan-show" "M07-$F1" | grep -q "^design: note:design$" || fail "$prov plan show design pointer"
-    "$BIN/hv-plan-show" "M07-$F1" | grep -q "^key: M07-$F1$" || fail "$prov plan show key"
+    _grep_in=$("$BIN/hv-plan-show" "M07-$F1" || true)
+    grep -q "^design: note:design$" <<<"$_grep_in" || fail "$prov plan show design pointer"
+    _grep_in=$("$BIN/hv-plan-show" "M07-$F1" || true)
+    grep -q "^key: M07-$F1$" <<<"$_grep_in" || fail "$prov plan show key"
     ERR "$BIN/hv-plan-add" M07 "$F1" "again"
     eq "plan add twice refused" "1" "$ERRRC"
     printf 'plan body\n' > "$P/p.md"
@@ -193,7 +197,8 @@ a.create("M07 \u2014 Seven", "---\nid: M07\n---\n", ["milestone-tracker"])'
     eq "slice plan add" "M07-S01" "$("$BIN/hv-plan-add" M07 slice "A slice")"
     [ ! -e .hv/plans/M07-S01.md ] || fail "$prov slice plan wrote a file"
     eq "slice plan marker" "<!-- hv:plan:S01 -->" "$(MARKERS "$TRK")"
-    "$BIN/hv-plan-show" M07-S01 | grep -q "^key: M07-S01$" || fail "$prov slice plan show"
+    _grep_in=$("$BIN/hv-plan-show" M07-S01 || true)
+    grep -q "^key: M07-S01$" <<<"$_grep_in" || fail "$prov slice plan show"
     ERR "$BIN/hv-plan-list"
     eq "plan list ok" "0" "$ERRRC"
     case "$ERRMSG" in *"live on their issues"*) ;; *) fail "$prov plan list note: $ERRMSG";; esac

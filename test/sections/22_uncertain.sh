@@ -55,7 +55,7 @@ EOF
   out=$("$BIN/hv-uncertain" F99 2>&1); rc=$?
   set -e
   [ "$rc" = "2" ] || fail "hv-uncertain F99: expected exit 2, got $rc"
-  echo "$out" | grep -q "not found" || fail "hv-uncertain F99: missing 'not found' in stderr: $out"
+  grep -q "not found" <<<"$out" || fail "hv-uncertain F99: missing 'not found' in stderr: $out"
   pass "hv-uncertain returns 2 when item missing"
 
   # F50: Major, no detail file -> exit 0 with "no detail file".
@@ -63,9 +63,9 @@ EOF
   out=$("$BIN/hv-uncertain" F50); rc=$?
   set -e
   [ "$rc" = "0" ] || fail "hv-uncertain F50: expected exit 0, got $rc"
-  echo "$out" | grep -q "no detail file" || fail "hv-uncertain F50: missing 'no detail file': $out"
+  grep -q "no detail file" <<<"$out" || fail "hv-uncertain F50: missing 'no detail file': $out"
   # F50 also has zero backticks, so unknown-surface should also fire.
-  echo "$out" | grep -q "no concrete identifiers" || fail "hv-uncertain F50: missing unknown-surface gate: $out"
+  grep -q "no concrete identifiers" <<<"$out" || fail "hv-uncertain F50: missing unknown-surface gate: $out"
   pass "hv-uncertain F50 fires no-detail-file gate"
 
   # F51: Major, detail file but zero backticks -> exit 0 with unknown-surface.
@@ -73,8 +73,8 @@ EOF
   out=$("$BIN/hv-uncertain" F51); rc=$?
   set -e
   [ "$rc" = "0" ] || fail "hv-uncertain F51: expected exit 0, got $rc"
-  echo "$out" | grep -q "no concrete identifiers" || fail "hv-uncertain F51: missing unknown-surface: $out"
-  echo "$out" | grep -q "no detail file" && fail "hv-uncertain F51: should not fire no-detail-file: $out"
+  grep -q "no concrete identifiers" <<<"$out" || fail "hv-uncertain F51: missing unknown-surface: $out"
+  if grep -q "no detail file" <<<"$out"; then fail "hv-uncertain F51: should not fire no-detail-file: $out"; fi
   pass "hv-uncertain F51 fires unknown-surface gate"
 
   # F52: Major, detail file + backticks but >=2 ? -> exit 0 with open-question signals.
@@ -82,7 +82,7 @@ EOF
   out=$("$BIN/hv-uncertain" F52); rc=$?
   set -e
   [ "$rc" = "0" ] || fail "hv-uncertain F52: expected exit 0, got $rc"
-  echo "$out" | grep -q "multiple open-question signals" || fail "hv-uncertain F52: missing open-question gate: $out"
+  grep -q "multiple open-question signals" <<<"$out" || fail "hv-uncertain F52: missing open-question gate: $out"
   pass "hv-uncertain F52 fires multiple-open-question-signals gate"
 
   # F53: Major, detail file + backticks + 0 ? + no markers -> exit 1 (certain).

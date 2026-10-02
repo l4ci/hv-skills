@@ -55,8 +55,8 @@ EOF
 OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Some Topic" 2>"$KQ_TMP/err.txt"); RC=$?
 ERR=$(cat "$KQ_TMP/err.txt")
 [ "$RC" = "0" ] || fail "knowledge-query existing topic exit $RC (want 0)"
-printf '%s\n' "$OUT" | grep -q "^## Some Topic" || fail "existing topic missing '## Some Topic' on stdout"
-printf '%s\n' "$OUT" | grep -q "Rule one" || fail "existing topic missing bullet on stdout"
+grep -q "^## Some Topic" <<<"$OUT" || fail "existing topic missing '## Some Topic' on stdout"
+grep -q "Rule one" <<<"$OUT" || fail "existing topic missing bullet on stdout"
 [ -z "$ERR" ] || fail "existing topic emitted unexpected stderr: $ERR"
 
 # (b) bogus topic: empty stdout, warning on stderr, exit 0
@@ -64,16 +64,16 @@ OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Bogus" 2>"$KQ_TMP/err.txt"); RC
 ERR=$(cat "$KQ_TMP/err.txt")
 [ "$RC" = "0" ] || fail "knowledge-query bogus topic exit $RC (want 0)"
 [ -z "$OUT" ] || fail "bogus topic produced stdout: $OUT"
-printf '%s\n' "$ERR" | grep -q "warning:" || fail "bogus topic missing 'warning:' on stderr"
-printf '%s\n' "$ERR" | grep -q "Bogus" || fail "bogus topic warning missing topic text"
+grep -q "warning:" <<<"$ERR" || fail "bogus topic missing 'warning:' on stderr"
+grep -q "Bogus" <<<"$ERR" || fail "bogus topic warning missing topic text"
 
 # (c) mixed real + bogus: real section on stdout, warn only about bogus, exit 0
 OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Some Topic" "Bogus" 2>"$KQ_TMP/err.txt"); RC=$?
 ERR=$(cat "$KQ_TMP/err.txt")
 [ "$RC" = "0" ] || fail "knowledge-query mixed topics exit $RC (want 0)"
-printf '%s\n' "$OUT" | grep -q "^## Some Topic" || fail "mixed query missing real topic on stdout"
-printf '%s\n' "$ERR" | grep -q "Bogus" || fail "mixed query missing warning for bogus topic"
-printf '%s\n' "$ERR" | grep -q "Some Topic" && fail "mixed query warned about matched topic"
+grep -q "^## Some Topic" <<<"$OUT" || fail "mixed query missing real topic on stdout"
+grep -q "Bogus" <<<"$ERR" || fail "mixed query missing warning for bogus topic"
+if grep -q "Some Topic" <<<"$ERR"; then fail "mixed query warned about matched topic"; fi
 rm -rf "$KQ_TMP"
 pass "hv-knowledge-query warns on unmatched topics, silent on matches, exits 0"
 

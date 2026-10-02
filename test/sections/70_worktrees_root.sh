@@ -35,7 +35,8 @@ for SPELL in '.worktrees' '/.worktrees' '/.worktrees/' '.worktrees/'"$(printf '\
   mkdir -p "$TMP_WR/boot3"
   ( cd "$TMP_WR/boot3" && rm -rf .git .gitignore && git init -q -b main . && printf '%s\n' "$SPELL" > .gitignore \
       && "$BIN/hv-bootstrap" >/dev/null 2>&1 ) || fail "hv-bootstrap failed with an existing '$SPELL' line"
-  tr -d '\r' < "$TMP_WR/boot3/.gitignore" | grep -qxE '/?\.worktrees/?' || fail "fixture lost its ignore line"
+  _grep_in=$(tr -d '\r' < "$TMP_WR/boot3/.gitignore" || true)
+  grep -qxE '/?\.worktrees/?' <<<"$_grep_in" || fail "fixture lost its ignore line"
   [ "$(tr -d '\r' < "$TMP_WR/boot3/.gitignore" | grep -cE '^/?\.worktrees/?$')" = "1" ] \
     || fail "an existing '$SPELL' line must not be duplicated: $(cat "$TMP_WR/boot3/.gitignore")"
 done
@@ -131,10 +132,10 @@ WALK='rglob\(|os\.walk\(|os\.scandir\(|recursive ?= ?True|glob\([^)]*\*\*|find +
 # The pattern must bite: each of these walks has to trip it.
 for SAMPLE in 'Path(".").rglob("SKILL.md")' 'os.walk(".")' 'os.scandir(root)' 'glob.glob("**/SKILL.md", recursive=True)' \
               'glob.glob(f"{d}/**/x")' 'find . -name SKILL.md' 'find "$PWD" -type f' 'find $PWD -type f'; do
-  printf '%s\n' "$SAMPLE" | grep -qE "$WALK" || fail "census pattern does not catch: $SAMPLE"
+  grep -qE "$WALK" <<<"$SAMPLE" || fail "census pattern does not catch: $SAMPLE"
 done
 for SAMPLE in 'find "$root/cmd" -newer "$bin"' 'sorted(Path(".").glob("hv-*/SKILL.md"))'; do
-  printf '%s\n' "$SAMPLE" | grep -qE "$WALK" && fail "census pattern flags an anchored lookup: $SAMPLE"
+  if grep -qE "$WALK" <<<"$SAMPLE"; then fail "census pattern flags an anchored lookup: $SAMPLE"; fi
 done
 HITS="$(cd "$REPO" && grep -nE "$WALK" bin/* test/validate-skills.py 2>/dev/null || true)"
 [ -z "$HITS" ] || fail "recursive tree walk found — it would pick up .worktrees/ checkouts; prune them or anchor the walk: $HITS"

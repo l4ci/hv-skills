@@ -216,7 +216,7 @@ cat > .hv/status.json <<'EOF'
 EOF
 echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
 OUT=$("$BIN/hv-summary")
-echo "$OUT" | grep -q "(repo: web)" || fail "hv-summary missing (repo: web): $OUT"
+grep -q "(repo: web)" <<<"$OUT" || fail "hv-summary missing (repo: web): $OUT"
 pass "hv-summary shows (repo: <name>) for umbrella active entry"
 
 # And: legacy entry without repo doesn't show parenthetical
@@ -224,7 +224,7 @@ cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
 EOF
 OUT=$("$BIN/hv-summary")
-if echo "$OUT" | grep -q "repo:"; then fail "hv-summary unexpectedly shows 'repo:' for non-umbrella entry: $OUT"; fi
+if grep -q "repo:" <<<"$OUT"; then fail "hv-summary unexpectedly shows 'repo:' for non-umbrella entry: $OUT"; fi
 pass "hv-summary does not show repo: for legacy active entries"
 cd ..
 
@@ -258,7 +258,7 @@ cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z", "repo": "web"}]}
 EOF
 OUT=$("$BIN/hv-backlog")
-echo "$OUT" | grep -q "| Repo |" || fail "hv-backlog missing Repo column: $OUT"
+grep -q "| Repo |" <<<"$OUT" || fail "hv-backlog missing Repo column: $OUT"
 pass "hv-backlog adds Repo column when active entry has repo"
 
 # Legacy entry: column should NOT appear
@@ -266,7 +266,7 @@ cat > .hv/status.json <<'EOF'
 {"active": [{"branch": "hv/foo", "items": ["B01"], "startedAt": "2026-05-01T12:00:00Z"}]}
 EOF
 OUT=$("$BIN/hv-backlog")
-if echo "$OUT" | grep -q "| Repo |"; then fail "hv-backlog unexpectedly shows Repo column: $OUT"; fi
+if grep -q "| Repo |" <<<"$OUT"; then fail "hv-backlog unexpectedly shows Repo column: $OUT"; fi
 pass "hv-backlog omits Repo column when no active entry has repo"
 cd ..
 
@@ -296,7 +296,7 @@ echo '{"umbrella": {"enabled": false}}' > .hv/config.json
 # of preflight blocked here; the rule was relaxed to advisory in v3.x.
 echo '{"umbrella": {"enabled": true}}' > .hv/config.json
 WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json missing"
-echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about umbrella mismatch, got: $WARN"
+grep -q "umbrella.enabled=true" <<<"$WARN" || fail "hv-preflight expected warning about umbrella mismatch, got: $WARN"
 pass "hv-preflight warns advisory when umbrella.enabled and repos.json missing"
 
 # Umbrella enabled, repos.json with at least one entry: pass (silent)
@@ -306,7 +306,7 @@ echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json
 # Umbrella enabled, repos.json empty: ADVISORY (warn to stderr, exit 0).
 echo '{"repos": []}' > .hv/repos.json
 WARN=$(.hv/bin/hv-preflight 2>&1 >/dev/null) || fail "hv-preflight should exit 0 (advisory) when umbrella.enabled and repos.json empty"
-echo "$WARN" | grep -q "umbrella.enabled=true" || fail "hv-preflight expected warning about empty repos.json, got: $WARN"
+grep -q "umbrella.enabled=true" <<<"$WARN" || fail "hv-preflight expected warning about empty repos.json, got: $WARN"
 pass "hv-preflight warns advisory when umbrella.enabled and repos.json empty"
 
 # Umbrella DISABLED but repos.json valid: pass (data is truth; flag is informational).

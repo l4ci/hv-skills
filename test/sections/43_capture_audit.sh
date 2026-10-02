@@ -35,8 +35,8 @@ git commit --allow-empty -q -m "refactor: rename bin/hv-flagship to bin/hv-flags
 OUT="$("$BIN/hv-capture-audit" "Implement Driver for postgres backend" 2>&1)" || RC=$?
 RC=${RC:-0}
 [ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 on matched title, got $RC"
-echo "$OUT" | grep -q "STRONG" || fail "hv-capture-audit did not emit [STRONG] for matched title (output: $OUT)"
-echo "$OUT" | grep -q "F76" || fail "hv-capture-audit report missing the F76 commit reference (output: $OUT)"
+grep -q "STRONG" <<<"$OUT" || fail "hv-capture-audit did not emit [STRONG] for matched title (output: $OUT)"
+grep -q "F76" <<<"$OUT" || fail "hv-capture-audit report missing the F76 commit reference (output: $OUT)"
 pass "F27 audit — exit 2 + STRONG match on shipped title"
 
 # Path match: title contains `runner/postgres.go`, which exists.
@@ -44,7 +44,7 @@ unset RC
 OUT_PATH="$("$BIN/hv-capture-audit" "Add tests for \`runner/postgres.go\`" 2>&1)" || RC=$?
 RC=${RC:-0}
 [ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 on path-match, got $RC"
-echo "$OUT_PATH" | grep -q "PATH" || fail "hv-capture-audit did not emit [PATH] for an existing file (output: $OUT_PATH)"
+grep -q "PATH" <<<"$OUT_PATH" || fail "hv-capture-audit did not emit [PATH] for an existing file (output: $OUT_PATH)"
 pass "F27 audit — exit 2 + PATH marker when title names an existing file"
 
 # Exit 0: a title with no overlap. Use distinctive made-up tokens so common
@@ -67,8 +67,8 @@ unset RC
 OUT_MIX="$("$BIN/hv-capture-audit" "Add zorblax-foofoo zonkmind handler" "Implement Driver for postgres backend" 2>&1)" || RC=$?
 RC=${RC:-0}
 [ "$RC" = "2" ] || fail "hv-capture-audit exit code: expected 2 when any input flags, got $RC"
-echo "$OUT_MIX" | grep -q "Implement Driver" || fail "multi-arg audit did not report on the flagged title"
-echo "$OUT_MIX" | grep -q "zorblax" && fail "multi-arg audit reported on the clean title (should be silent)"
+grep -q "Implement Driver" <<<"$OUT_MIX" || fail "multi-arg audit did not report on the flagged title"
+if grep -q "zorblax" <<<"$OUT_MIX"; then fail "multi-arg audit reported on the clean title (should be silent)"; fi
 pass "F27 audit — multi-arg call reports only the flagged titles"
 
 cd "$TMP"

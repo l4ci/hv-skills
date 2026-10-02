@@ -86,7 +86,8 @@ WC_TMP="$(mktemp -d)"
   WT_PATH="$WC_TMP/wt-feat-x"
   git worktree add "$WT_PATH" feat-x -q
   "$BIN/hv-worktree-clear" feat-x
-  git worktree list | grep -q "$WT_PATH" && { echo "FAIL: worktree still present"; exit 1; }
+  _grep_in=$(git worktree list || true)
+  if grep -q "$WT_PATH" <<<"$_grep_in"; then echo "FAIL: worktree still present"; exit 1; fi
   true
 )
 rm -rf "$WC_TMP"
@@ -347,8 +348,8 @@ EOF
 
   # 3. Multi-tag
   OUT=$("$BIN/hv-find-milestone-for-items" F70)
-  echo "$OUT" | grep -qx "M02" || fail "multi-tag missing M02: '$OUT'"
-  echo "$OUT" | grep -qx "M10" || fail "multi-tag missing M10: '$OUT'"
+  grep -qx "M02" <<<"$OUT" || fail "multi-tag missing M02: '$OUT'"
+  grep -qx "M10" <<<"$OUT" || fail "multi-tag missing M10: '$OUT'"
 
   # 4. Dedup across input IDs sharing M01
   OUT=$("$BIN/hv-find-milestone-for-items" B70 T70)
@@ -399,9 +400,9 @@ PRC_TMP="$(mktemp -d)"
   printf 'unrelated content\n' > baz.txt
   git add bar.md baz.txt && git commit -q -m "add more"
   OUT=$("$BIN/hv-plan-rename-check" OLDNAME)
-  echo "$OUT" | grep -qx "foo.txt" || fail "multi-file missing foo.txt: '$OUT'"
-  echo "$OUT" | grep -qx "bar.md" || fail "multi-file missing bar.md: '$OUT'"
-  echo "$OUT" | grep -qx "baz.txt" && fail "matched unrelated baz.txt: '$OUT'"
+  grep -qx "foo.txt" <<<"$OUT" || fail "multi-file missing foo.txt: '$OUT'"
+  grep -qx "bar.md" <<<"$OUT" || fail "multi-file missing bar.md: '$OUT'"
+  if grep -qx "baz.txt" <<<"$OUT"; then fail "matched unrelated baz.txt: '$OUT'"; fi
 
   # 4. No matches → silent, exit 0
   OUT=$("$BIN/hv-plan-rename-check" NEVER_REFERENCED) || fail "no-match exit non-zero"

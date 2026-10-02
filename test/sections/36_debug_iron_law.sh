@@ -82,14 +82,14 @@ assert d['failed_fixes'] == 3, f\"failed_fixes={d['failed_fixes']}\"
 
   # ── (e) summary renders Iron Law markdown ─────────────────────────────────
   SUMMARY="$("$COUNTER" summary)"
-  echo "$SUMMARY" | grep -q "Iron Law triggered for \[F02\]" || { echo "FAIL: summary missing Iron Law header"; exit 1; }
-  echo "$SUMMARY" | grep -q "abc1111" || { echo "FAIL: summary missing commit abc1111"; exit 1; }
-  echo "$SUMMARY" | grep -q "abc2222" || { echo "FAIL: summary missing commit abc2222"; exit 1; }
-  echo "$SUMMARY" | grep -q "abc3333" || { echo "FAIL: summary missing commit abc3333"; exit 1; }
-  echo "$SUMMARY" | grep -q "hyp-one" || { echo "FAIL: summary missing hypothesis hyp-one"; exit 1; }
-  echo "$SUMMARY" | grep -q "hyp-two" || { echo "FAIL: summary missing hypothesis hyp-two"; exit 1; }
-  echo "$SUMMARY" | grep -q "hyp-three" || { echo "FAIL: summary missing hypothesis hyp-three"; exit 1; }
-  echo "$SUMMARY" | grep -q "Next steps" || { echo "FAIL: summary missing Next steps section"; exit 1; }
+  grep -q "Iron Law triggered for \[F02\]" <<<"$SUMMARY" || { echo "FAIL: summary missing Iron Law header"; exit 1; }
+  grep -q "abc1111" <<<"$SUMMARY" || { echo "FAIL: summary missing commit abc1111"; exit 1; }
+  grep -q "abc2222" <<<"$SUMMARY" || { echo "FAIL: summary missing commit abc2222"; exit 1; }
+  grep -q "abc3333" <<<"$SUMMARY" || { echo "FAIL: summary missing commit abc3333"; exit 1; }
+  grep -q "hyp-one" <<<"$SUMMARY" || { echo "FAIL: summary missing hypothesis hyp-one"; exit 1; }
+  grep -q "hyp-two" <<<"$SUMMARY" || { echo "FAIL: summary missing hypothesis hyp-two"; exit 1; }
+  grep -q "hyp-three" <<<"$SUMMARY" || { echo "FAIL: summary missing hypothesis hyp-three"; exit 1; }
+  grep -q "Next steps" <<<"$SUMMARY" || { echo "FAIL: summary missing Next steps section"; exit 1; }
 
   # ── (f) pass flow (clear + re-init to start fresh) ────────────────────────
   "$COUNTER" clear
