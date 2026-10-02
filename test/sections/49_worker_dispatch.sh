@@ -42,9 +42,9 @@ PYEOF
 ROWS=$( cd "$TMP_WD" && "$BIN/hv-worker-pool" list | wc -l | tr -d ' ' )
 [ "$ROWS" = "2" ] || fail "hv-worker-pool list: expected 2 slots, got $ROWS"
 
-[ -d "$TMP_WD/.claude/worktrees/hv-worker/w1" ] \
+[ -d "$TMP_WD/.worktrees/w1" ] \
   || fail "hv-worker-pool init did not create the w1 worktree"
-WT_BRANCH=$( git -C "$TMP_WD/.claude/worktrees/hv-worker/w1" rev-parse --abbrev-ref HEAD )
+WT_BRANCH=$( git -C "$TMP_WD/.worktrees/w1" rev-parse --abbrev-ref HEAD )
 [ "$WT_BRANCH" = "hv-worker/w1" ] \
   || fail "w1 worktree is on '$WT_BRANCH', expected hv-worker/w1"
 pass "hv-worker-pool init creates one worktree + branch per slot"
@@ -69,10 +69,10 @@ AFTER=$( cat "$TMP_WD/.hv/workers.json" )
 pass "hv-worker-pool init is idempotent on an unchanged pool"
 
 # Debris recovery: an interrupted reap leaves a directory with no git dir.
-rm -rf "$TMP_WD/.claude/worktrees/hv-worker/w2"
+rm -rf "$TMP_WD/.worktrees/w2"
 ( cd "$TMP_WD" && "$BIN/hv-worker-pool" init --slots 2 --base main ) >/dev/null 2>&1 \
   || fail "hv-worker-pool init did not recover from a missing worktree directory"
-git -C "$TMP_WD/.claude/worktrees/hv-worker/w2" rev-parse --git-dir >/dev/null 2>&1 \
+git -C "$TMP_WD/.worktrees/w2" rev-parse --git-dir >/dev/null 2>&1 \
   || fail "hv-worker-pool init did not rebuild the w2 worktree"
 pass "hv-worker-pool init rebuilds a slot whose worktree went missing"
 
@@ -335,8 +335,8 @@ json.dump({"refactor": {"verifyCommands": [
 ]}}, open(sys.argv[1], "w"))
 PYEOF
 
-W1="$TMP_WD/.claude/worktrees/hv-worker/w1"
-W2="$TMP_WD/.claude/worktrees/hv-worker/w2"
+W1="$TMP_WD/.worktrees/w1"
+W2="$TMP_WD/.worktrees/w2"
 
 # w1 widens greet and updates its only existing caller. Files: lib.py, main.py
 cat > "$W1/lib.py" <<'PYEOF'
@@ -485,7 +485,7 @@ LEFT=$( cd "$TMP_WD" && "$BIN/hv-worker-pool" list | wc -l | tr -d ' ' )
 [ "$LEFT" = "0" ] || fail "reap --all left $LEFT slots in the registry"
 BRANCHES=$( git -C "$TMP_WD" branch --list 'hv-worker/*' | wc -l | tr -d ' ' )
 [ "$BRANCHES" = "0" ] || fail "reap --all left $BRANCHES hv-worker/* branches behind"
-if [ -d "$TMP_WD/.claude/worktrees/hv-worker/w1" ]; then
+if [ -d "$TMP_WD/.worktrees/w1" ]; then
   fail "reap --all left the w1 worktree on disk"
 fi
 pass "hv-worker-pool reap --all removes worktrees, branches, and registry entries"

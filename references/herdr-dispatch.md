@@ -25,10 +25,10 @@ Helpers: the same four (`hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`
 | Session per slot | window `<session>:<slot>` | tab in the current workspace, labelled `<slot>` |
 | `slot.handle` | `hv:w1`, stable | tab id `w1:t7`, **new on every dispatch** |
 | Agent name | n/a | `hv-<slot>-<tab id>` (e.g. `hv-w1-w1-t7`) |
-| Worktree | `.claude/worktrees/hv-worker/wN` | same: adopted with `tab create --cwd` |
+| Worktree | `.worktrees/wN` | same: adopted with `tab create --cwd` |
 | Account | `CLAUDE_CONFIG_DIR=… claude` typed into the shell | `tab create --env CLAUDE_CONFIG_DIR=…` |
 
-Slots keep hv-managed worktrees from `hv-worker-pool`. herdr's own `worktree create` is not used, so the pool, the gate and the account helpers work the same on both hosts.
+Slots keep hv-managed worktrees from `hv-worker-pool`. herdr's own `worktree create` is not used for slots (rounds provision with `--path .worktrees/<agent>`, the same root), so the pool, the gate and the account helpers work the same on both hosts.
 
 Agent names are unique per herdr **server**, not per workspace, so a bare `w1` would collide with another repo's pool. Tab ids are never reused, which makes `hv-<slot>-<tab id>` unique.
 

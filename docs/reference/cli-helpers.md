@@ -390,7 +390,8 @@ Register one `status.json` entry per `(branch, repo)` pair for a multi-repo `/hv
    header (when any are missing): `.hv/bin/`, `.hv/status.json`,
    `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`,
    `.hv/qa-runs/`, and `.hv/**/*.lock`. Migrates legacy blanket `.hv/`
-   lines off the same file. The rest of `.hv/` is tracked.
+   lines off the same file. The rest of `.hv/` is tracked. Also adds
+   `.worktrees/` (worker worktrees) to `.gitignore` once.
 
 It does **not** copy helper scripts; that is `/hv-init`'s job. It is called by
 `/hv-init` from the hv-skills *source* `bin/`, not from `.hv/bin/` itself, and

@@ -345,7 +345,7 @@ git checkout -b <cycle-branch>
 .hv/bin/hv-worker-pool init --slots <work.workerSlots> --base <cycle-branch>
 ```
 
-`hv-worker-pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
+`hv-worker-pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots live in `<project>/.worktrees/<slot>` (gitignored by `/hv-init`; a slot registered at the older `.claude/worktrees/hv-worker/<slot>` keeps that path until it is moved). Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
 
 `work.isolation` does not apply on this path: each slot has its own worktree and therefore its own `.git/index`, which is the precondition the isolation guard exists to enforce. Don't also evaluate the guard — it would be checking a condition that cannot occur.
 

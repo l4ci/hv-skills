@@ -62,7 +62,11 @@ while [ $# -gt 0 ]; do
 done
 
 REGISTRY=".hv/workers.json"
-WT_ROOT=".claude/worktrees/hv-worker"
+# One worktree root for every mode (hv-work slots and herdr rounds): inside the
+# project, gitignored (/hv-init writes `.worktrees/` to .gitignore), so herdr
+# groups the workspaces under the project. Slots created before this lived in
+# .claude/worktrees/hv-worker/<slot>; init leaves those where they are (below).
+WT_ROOT=".worktrees"
 
 # Register or update one slot in .hv/workers.json. Idempotent on slot name.
 register_slot() {
@@ -129,6 +133,10 @@ case "$CMD" in
 
     [ -n "$SESSION" ] || SESSION="hv"
     mkdir -p "$WT_ROOT"
+    # A tracked-looking .worktrees/ makes every `git status` in the project
+    # noisy. Warn rather than edit .gitignore here: /hv-init owns that line.
+    git check-ignore -q "$WT_ROOT/" 2>/dev/null || \
+      echo "warning: $WT_ROOT/ is not gitignored — re-run /hv-init to add it" >&2
 
     # tmux handles are known now; herdr tab ids exist only after a dispatch.
     DISPATCH="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
@@ -139,6 +147,24 @@ case "$CMD" in
       NAME="w$i"
       BRANCH="hv-worker/$NAME"
       REL="$WT_ROOT/$NAME"
+      # A slot registered at another path (the pre-.worktrees root) keeps it
+      # while that worktree is healthy. Re-adding it here would fail on the
+      # branch it already has checked out; moving it is `git worktree move`,
+      # done by hand while the slot is idle.
+      REG_WT="$(PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$NAME" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import load_json
+data = load_json(Path(sys.argv[1]), {"slots": []})
+s = next((s for s in data.get("slots", []) if s.get("name") == sys.argv[2]), None)
+print((s or {}).get("worktree") or "")
+PY
+)"
+      if [ -n "$REG_WT" ] && [ "$REG_WT" != "$(cd "$REL" 2>/dev/null && pwd -P)" ] \
+         && git -C "$REG_WT" rev-parse --git-dir >/dev/null 2>&1; then
+        REL="$REG_WT"
+        echo "note: slot $NAME stays at $REG_WT (outside $WT_ROOT/); git worktree move it to relocate" >&2
+      fi
 
       if [ -d "$REL" ] && git -C "$REL" rev-parse --git-dir >/dev/null 2>&1; then
         : # healthy slot — leave it alone
