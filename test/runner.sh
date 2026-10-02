@@ -10,6 +10,46 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$REPO/bin"
 TESTDIR="$REPO/test"
 
+# Which sections run. SECTION_LIST (newline-separated paths, so paths may hold
+# spaces) narrows the run to those sections, in the order given: phase
+# acceptance with test/hv-hybrid runs only the sections a phase owns. Unset runs
+# them all. Checked before anything is set up, and loudly: a typo must never end
+# in "All smoke tests passed." for sections that did not run. A relative entry
+# is taken from the repo root; every entry must be an existing test/sections/*.sh
+# file; a list with no entries (set but empty) is an error too.
+SECTIONS=()
+if [ "${SECTION_LIST+set}" = set ]; then
+  SECTIONS_DIR="$(cd "$TESTDIR/sections" && pwd -P)"
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    case "$entry" in /*) path="$entry" ;; *) path="$REPO/$entry" ;; esac
+    if [ ! -f "$path" ]; then
+      echo "runner: SECTION_LIST entry is not an existing file: $entry" >&2
+      exit 2
+    fi
+    dir="$(cd "$(dirname "$path")" && pwd -P)"
+    case "$path" in
+      *.sh) ;;
+      *) echo "runner: SECTION_LIST entry is not a .sh section: $entry" >&2; exit 2 ;;
+    esac
+    if [ "$dir" != "$SECTIONS_DIR" ]; then
+      echo "runner: SECTION_LIST entry is not in test/sections/: $entry" >&2
+      exit 2
+    fi
+    SECTIONS+=("$dir/$(basename "$path")")
+  done <<<"$SECTION_LIST"
+  if [ "${#SECTIONS[@]}" -eq 0 ]; then
+    echo "runner: SECTION_LIST is set but names no section" >&2
+    exit 2
+  fi
+else
+  SECTIONS=("$TESTDIR/sections/"*.sh)
+  if [ ! -f "${SECTIONS[0]}" ]; then
+    echo "runner: no sections found under $TESTDIR/sections" >&2
+    exit 2
+  fi
+fi
+
 # Pin hv-resolve-plugin-root to the canonical repo bin/ during smoke. Without
 # this, hv-preflight walks ~/.claude/plugins/* and may pick up a stale
 # marketplace install with helpers that have since been removed (false-positive
@@ -144,17 +184,7 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 set +e
 (
   set -e
-  # SECTION_LIST (newline-separated paths, so paths may hold spaces) narrows
-  # the run to those sections, in the order given: phase acceptance with
-  # test/hv-hybrid runs only the sections a phase owns. Unset runs them all.
-  sections=()
-  if [ -n "${SECTION_LIST:-}" ]; then
-    while IFS= read -r f; do [ -n "$f" ] && sections+=("$f"); done <<<"$SECTION_LIST"
-  else
-    sections=("$TESTDIR/sections/"*.sh)
-  fi
-  for f in "${sections[@]}"; do
-    [ -f "$f" ] || continue
+  for f in "${SECTIONS[@]}"; do
     cd "$TMP"
     source "$f"
   done
