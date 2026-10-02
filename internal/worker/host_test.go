@@ -526,14 +526,14 @@ func TestDispatchRefusalsCarryFailureData(t *testing.T) {
 	dir := newProject(t, `{"work":{"workerCommand":"claude -c"}}`)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
 	_, err := envWith(tmuxFake()).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "t"), Task: "T1"})
-	if bd := data(err); bd != (BlockData{BlockedBy: "resume-flag"}) {
+	if bd := data(err); bd != (BlockData{BlockedBy: "resume flag"}) {
 		t.Errorf("resume flag: %+v", bd)
 	}
 	dir = newProject(t, `{}`)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
 	os.WriteFile(filepath.Join(dir, ".worktrees", "w1", "wip.txt"), []byte("x"), 0o644)
 	_, err = envWith(tmuxFake()).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "t"), Task: "T2"})
-	if bd := data(err); bd != (BlockData{BlockedBy: "slot-holds-work"}) {
+	if bd := data(err); bd != (BlockData{BlockedBy: "reset guard"}) {
 		t.Errorf("slot holds work: %+v", bd)
 	}
 }

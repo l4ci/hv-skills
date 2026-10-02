@@ -137,15 +137,24 @@ def main(argv):
         if " ".join(w[:n]) in verbs:
             verb = " ".join(w[:n])
             break
+    # A group named in HV_HYBRID_EXPECT is claimed by the phase under test, so a
+    # call under it that names no verb (a typo, `worker pool bogus`) belongs to
+    # the Go binary too: its unknown-verb error is what the section checks.
+    owned = False
+    if not verb:
+        for entry in os.environ.get("HV_HYBRID_EXPECT", "").split(","):
+            ew = entry.split()
+            if ew and w[:len(ew)] == ew and len(w) > len(ew):
+                owned = True
     for (pverb, flag), _why in PARTIAL.items():
         if verb == pverb and flag in argv:
             verb = ""
-    backend = "go" if verb else "shim"
+    backend = "go" if (verb or owned) else "shim"
     log = os.environ.get("HV_HYBRID_LOG")
     if log:
         with open(log, "a") as f:
             f.write("%s %s\n" % (backend, verb or " ".join(w[:2])))
-    if verb:
+    if verb or owned:
         os.execv(go_bin, [go_bin] + argv)
     os.execv(sys.executable, [sys.executable, SHIM] + argv)
 

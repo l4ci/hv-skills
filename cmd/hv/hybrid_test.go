@@ -107,3 +107,22 @@ func TestHybridCheckProvesAPhaseWentThroughGo(t *testing.T) {
 		t.Errorf("no expected groups must not pass as acceptance: %d", code)
 	}
 }
+
+// A group the phase claims through HV_HYBRID_EXPECT owns its unknown sub-verbs:
+// `worker pool bogus` must reach the Go binary, whose unknown-verb error is
+// what the section checks. Groups it does not claim keep falling to the shim.
+func TestHybridClaimedGroupOwnsUnknownSubVerbs(t *testing.T) {
+	goBin := fakeGo(t, "version\nworker pool init\nmigrate v4\n")
+	log := filepath.Join(t.TempDir(), "log")
+	env := []string{"HV_HYBRID_EXPECT=worker,migrate v4"}
+	out, _, _ := hybrid(t, goBin, log, env, "worker", "pool", "bogus")
+	if !strings.HasPrefix(out, "GO worker pool bogus") {
+		t.Errorf("claimed group, unknown verb: %q", out)
+	}
+	hybrid(t, goBin, log, env, "migrate", "issues")
+	hybrid(t, goBin, log, env, "worker")
+	got, _ := os.ReadFile(log)
+	if want := "go worker pool\nshim migrate issues\nshim worker\n"; string(got) != want {
+		t.Errorf("log =\n%s\nwant\n%s", got, want)
+	}
+}
