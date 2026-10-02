@@ -40,11 +40,11 @@ func a4Show(fs *flag.FlagSet) RunFunc {
 		}
 		_, wf, _, _, err := a4Flow(c, args[0])
 		if err != nil {
-			return a4Fail(err)
+			return a4FailRead(err)
 		}
 		st, err := wf.Status(args[0])
 		if err != nil {
-			return a4Fail(err)
+			return a4FailRead(err)
 		}
 		comments := []any{}
 		var rows []string
@@ -271,11 +271,11 @@ func a4NoteShow(fs *flag.FlagSet) RunFunc {
 		}
 		_, wf, id, typ, err := a4Flow(c, args[0])
 		if err != nil {
-			return a4Fail(err)
+			return a4FailRead(err)
 		}
 		body, ok, err := wf.NoteGet(args[0], *kind)
 		if err != nil {
-			return a4Fail(err)
+			return a4FailRead(err)
 		}
 		return Result{Data: a4Obj("id", id, "type", typ, "kind", *kind, "exists", ok, "body", body), Text: body}, nil
 	}

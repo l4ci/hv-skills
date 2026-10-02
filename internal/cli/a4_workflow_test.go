@@ -148,15 +148,20 @@ func TestWorkflowVerbsFileMode(t *testing.T) {
 		unknown[2] = "B99"
 		runOK(t, root, ExitResolution, unknown...)
 	}
-	for _, argv := range [][]string{
-		{"item", "show", "B01"},
-		{"item", "note", "show", "B01", "--kind", "plan"},
-		{"item", "note", "add", "B01", "--kind", "plan", "--body-file", body},
-		{"item", "note", "rm", "B01", "--kind", "plan"},
+	// Issue-only verbs under the file backend: read-only ones exit 1, mutating
+	// ones 4; both carry {blockedBy: backend, changed: false}.
+	for _, c := range []struct {
+		exit int
+		argv []string
+	}{
+		{ExitFailed, []string{"item", "show", "B01"}},
+		{ExitFailed, []string{"item", "note", "show", "B01", "--kind", "plan"}},
+		{ExitRefused, []string{"item", "note", "add", "B01", "--kind", "plan", "--body-file", body}},
+		{ExitRefused, []string{"item", "note", "rm", "B01", "--kind", "plan"}},
 	} {
-		d := runOK(t, root, ExitRefused, argv...)
+		d := runOK(t, root, c.exit, c.argv...)
 		if get(d, "blockedBy") != "backend" || get(d, "changed") != false {
-			t.Errorf("%v: %v", argv, d)
+			t.Errorf("%v: %v", c.argv, d)
 		}
 	}
 }
