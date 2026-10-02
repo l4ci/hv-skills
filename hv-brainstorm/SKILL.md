@@ -17,13 +17,7 @@ user-invocable: true
 
 `/hv-brainstorm` fills the gap between `/hv-capture` (records what to build) and `/hv-plan` (decomposes how to build it) by negotiating *whether this is the right thing and what its shape should be*. Scope is a single backlog item (`[B##]` or `[F##]` or `[T##]`); project-level exploration stays with `/hv-vision`. The artifact lands at `.hv/designs/<ID>.md` and feeds `/hv-plan` as soft input — never required.
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Setup
 
 **Autonomy gate.** Read `autonomy.level` and parse the `--auto-loop` flag:
 
@@ -58,10 +52,10 @@ Parse the item ID from the invocation. It must match `[BFT]\d{2,}`. Reject miles
 Verify the item exists in `.hv/BACKLOG.md`:
 
 ```bash
-.hv/bin/hv-todo-field <ID> title
+hv item field get <ID> --name title
 ```
 
-Exit 1 from the helper means the ID is not in the backlog. Refuse with: *"Error: [<ID>] not found in BACKLOG.md. Run /hv-capture first to add it."*
+Exit 3 means the ID is not in the backlog. Refuse with: *"Error: [<ID>] not found in BACKLOG.md. Run /hv-capture first to add it."*
 
 **Re-run check.** Under `--auto-loop`, if `.hv/designs/<ID>.md` already exists, exit silently with a one-line note **`Design already exists — no auto-action.`** Loop calls are idempotent; replacing a design requires manual `/hv-brainstorm <ID>` invocation.
 
@@ -73,19 +67,19 @@ If `.hv/designs/<ID>.md` already exists (interactive mode), ask via `AskUserQues
 
 Plain-text fallback per `references/ask-user-question-fallback.md`; default rule: opt-in-off / cancel (replace is destructive). Routing:
 
-- **View** → invoke `.hv/bin/hv-design-show <ID>` and exit 0.
+- **View** → invoke `hv design show <ID>` and exit 0.
 - **Edit** → load the existing design content; the first Step 4 clarifying question is *"What would you change about the existing design?"*
-- **Replace** → run `.hv/bin/hv-design-rm <ID>` then proceed to Step 3.
+- **Replace** → run `hv design rm <ID>` then proceed to Step 3.
 
 ## Step 3 — Load Context Silently
 
 Pull the picture in parallel — these reads are independent and latency-bound:
 
-- `.hv/bin/hv-todo-field --dump <ID>` — JSON with `title`, `milestone`, `related`, `detail`, `repos`, `subsystem`, `since` (single corpus load; avoids re-parsing BACKLOG.md per field)
+- `hv item field list --json <ID>` — `data.fields` with `title`, `milestone`, `related`, `detail`, `repos`, `subsystem`, `since` (single corpus load; avoids re-parsing BACKLOG.md per field)
 - Detail file: `.hv/bugs/<ID>.md`, `.hv/features/<ID>.md`, or `.hv/tasks/<ID>.md` (read whichever exists)
-- `.hv/bin/hv-knowledge-query <topic>` for topics inferred from the TODO entry and detail file
-- `.hv/bin/hv-decisions-query <topic>` for the same topics — committed boundaries the design must respect
-- `.hv/bin/hv-glossary-read <term>` for any domain terms the item references
+- `hv knowledge query <topic>` for topics inferred from the TODO entry and detail file
+- `hv decisions query <topic>` for the same topics — committed boundaries the design must respect
+- `hv glossary read <term>` for any domain terms the item references
 
 **Issue all of these as parallel tool calls in a single response.** Don't narrate the loading. Form a picture; carry findings forward into Steps 4 and 5.
 
@@ -114,7 +108,7 @@ Don't guess at the answer to keep the brainstorm moving.
 
 ## Step 5 — Propose 2-3 Approaches
 
-**Under `--auto-loop`**, the orchestrator picks the most consistent approach via the auto-resolution pipeline (no `AskUserQuestion`). Filters: any candidate that violates a DECISIONS entry is auto-rejected; remaining candidates ranked by KNOWLEDGE pattern match and architectural consistency with adjacent skills. The pick is logged via `hv-auto-decision-log` under the rule title `Brainstorm approach pick for <ID>`.
+**Under `--auto-loop`**, the orchestrator picks the most consistent approach via the auto-resolution pipeline (no `AskUserQuestion`). Filters: any candidate that violates a DECISIONS entry is auto-rejected; remaining candidates ranked by KNOWLEDGE pattern match and architectural consistency with adjacent skills. The pick is logged via `hv decisions auto-log` under the rule title `Brainstorm approach pick for <ID>`.
 
 Present 2 or 3 candidate approaches inline as plain markdown — not yet committed to disk. Each approach gets:
 
@@ -146,14 +140,14 @@ Section content rules:
 Mint the design stub:
 
 ```bash
-.hv/bin/hv-design-add <ID> "<title>"
+hv design add <ID> --title "<title>"
 ```
 
-The helper creates `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and the five placeholder section headers. Use the `Edit` tool to overwrite each placeholder section body with the approved content from Step 6. Keep the frontmatter intact.
+The verb creates `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status: draft`, `created`) and the five placeholder section headers. Use the `Edit` tool to overwrite each placeholder section body with the approved content from Step 6. Keep the frontmatter intact.
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): the design is a note on the item's issue, not a file. `hv-design-add` still creates it; draft the approved sections in a scratch file (not under `.hv/designs/`) and publish with `.hv/bin/hv-design-put <ID> --body-file <scratch-file>` instead of `Edit`. Read it back with `.hv/bin/hv-design-show <ID>`. Post each answer that changed the design's direction with `.hv/bin/hv-item-comment <ID> --kind decision --body-file -`.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): the design is a note on the item's issue, not a file. `hv design add` still creates it; draft the approved sections in a scratch file (not under `.hv/designs/`) and publish with `hv design put <ID> --body-file <scratch-file>` instead of `Edit`. Read it back with `hv design show <ID>`. Post each answer that changed the design's direction with `hv item comment add <ID> --kind decision --body-file -`.
 
-Under `--auto-loop`, after `hv-design-add` runs, use `Edit` to insert `auto: true` into the frontmatter (between the `status:` and `created:` lines). The `auto: true` key marks the artifact as auto-written, matching the `/hv-plan --auto-loop` convention.
+Under `--auto-loop`, after `hv design add` runs, use `Edit` to insert `auto: true` into the frontmatter (between the `status:` and `created:` lines). The `auto: true` key marks the artifact as auto-written, matching the `/hv-plan --auto-loop` convention.
 
 ## Step 8 — Self-Review
 
@@ -161,9 +155,9 @@ Scan per the shared shape — see `references/design-exploration.md` (placeholde
 
 ## Step 9 — User Review Gate
 
-**Skipped under `--auto-loop`** — the design is final on write; users review via terminal-path surfacing (`/hv-next` empty-backlog, `/hv-work` guard-fail, `/hv-pause`) where `hv-auto-decisions-since` prints the logged decisions.
+**Skipped under `--auto-loop`** — the design is final on write; users review via terminal-path surfacing (`/hv-next` empty-backlog, `/hv-work` guard-fail, `/hv-pause`) where `hv decisions auto-since` prints the logged decisions.
 
-Print the final artifact (or invoke `.hv/bin/hv-design-show <ID>`) and ask via `AskUserQuestion` per the shared review-gate shape (see `references/design-exploration.md`). Item-specific routes:
+Print the final artifact (or invoke `hv design show <ID>`) and ask via `AskUserQuestion` per the shared review-gate shape (see `references/design-exploration.md`). Item-specific routes:
 
 - **Approve and hand off to `/hv-plan`**
 - **Revise** — return to Step 6 with the user's redlines
@@ -198,8 +192,8 @@ Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in
 
 For each clarifying question that Step 4 would normally surface to the user, and for each Step 5 approach pick, run three steps in order:
 
-1. **Local-first.** Grep `DECISIONS.md` / `MILESTONES.md` / `KNOWLEDGE.md` via `hv-decisions-query` / `hv-knowledge-query`, and `hv-glossary-read` for any domain terms, on the question's topic keywords. If a matching commitment exists, the answer is "honor the existing commitment" — do **not** log a new `[Auto:Loop]` entry; the existing commitment IS the record.
-2. **Bounded web (opt-in).** If unmatched AND the question references an external library, API, or protocol (anything outside the F14 hv-skills surface scan: `/hv-(\w+)`, `bin/hv-*`, `.hv/*` artifacts), AND `loop.webResearch == true` in `.hv/config.json` (default `false`), call `WebSearch` with a budget of **2 queries per question, 6 queries per design**. Block on results; no async fetch.
+1. **Local-first.** Grep `DECISIONS.md` / `MILESTONES.md` / `KNOWLEDGE.md` via `hv decisions query` / `hv knowledge query`, and `hv glossary read` for any domain terms, on the question's topic keywords. If a matching commitment exists, the answer is "honor the existing commitment" — do **not** log a new `[Auto:Loop]` entry; the existing commitment IS the record.
+2. **Bounded web (opt-in).** If unmatched AND the question references an external library, API, or protocol (anything outside the F14 hv-skills surface scan: `/hv-(\w+)`, `hv <verb>` calls, `.hv/*` artifacts), AND `loop.webResearch == true` in `.hv/config.json` (default `false`), call `WebSearch` with a budget of **2 queries per question, 6 queries per design**. Block on results; no async fetch.
 3. **Placeholder fallback.** If still unresolved, retain the question literally in the written design's "Open questions" section with `_(Unresolved — surfaced for review)_` after the question text. The auto-write proceeds — never stop the loop.
 
 ### Logging
@@ -207,16 +201,16 @@ For each clarifying question that Step 4 would normally surface to the user, and
 Each fresh pick from step 1 (when no existing commitment matched and you made a new pick) and step 2 produces an `[Auto:Loop]` entry via:
 
 ```bash
-.hv/bin/hv-auto-decision-log "<topic>" "<rule-title>" "<why-text>" "<design-key>" "$(date +%Y-%m-%d)"
+hv decisions auto-log --topic "<topic>" --title "<rule-title>" --why "<why-text>" --plan-key "<design-key>" --date "$(date +%Y-%m-%d)"
 ```
 
-Where `<design-key>` is `<milestone>-<itemId>` when the item has a `Milestone:` tag, else just `<itemId>`. The entry follows the standard `DECISIONS.md` template, but **only the rule and `*Why.*` are auto-filled**; `**Forbids.**` and `**Permits.**` stay as `_(Unresolved — user must articulate)_` placeholders. A footer comment encodes provenance: `<!-- [Auto:Loop] <design-key> <date> — review and articulate Forbids/Permits -->`. The helper is idempotent on `(topic, rule-title)`.
+Where `<design-key>` is `<milestone>-<itemId>` when the item has a `Milestone:` tag, else just `<itemId>`. The entry follows the standard `DECISIONS.md` template, but **only the rule and `*Why.*` are auto-filled**; `**Forbids.**` and `**Permits.**` stay as `_(Unresolved — user must articulate)_` placeholders. A footer comment encodes provenance: `<!-- [Auto:Loop] <design-key> <date> — review and articulate Forbids/Permits -->`. The verb is idempotent on `(topic, rule-title)`.
 
-After all questions and the approach pick are resolved, write the design via `hv-design-add` + `Edit` (per Step 7), then add `auto: true` to the frontmatter. The design's "Open questions" section lists every step-3 placeholder verbatim.
+After all questions and the approach pick are resolved, write the design via `hv design add` + `Edit` (per Step 7), then add `auto: true` to the frontmatter. The design's "Open questions" section lists every step-3 placeholder verbatim.
 
 ### Surfacing
 
-`/hv-brainstorm --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-next` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `bin/hv-auto-decisions-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer.
+`/hv-brainstorm --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-next` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `hv decisions auto-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer.
 
 ## Anti-pattern guard
 

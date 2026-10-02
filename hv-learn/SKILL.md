@@ -15,13 +15,7 @@ user-invocable: true
 
 # hv-learn — Capture Session Learnings
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task list
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -30,7 +24,7 @@ Phases:
 1. *Scan session* — transcript + recent commits sifted for durable gotchas (Step 2)
 2. *Classify topic* — each candidate matched to a `KNOWLEDGE.md` topic (Steps 3–4)
 3. *Merge into KNOWLEDGE.md* — entries appended under topic headings (Step 5)
-4. *Update CLAUDE.md index* — `hv-managed-block knowledge` regenerates the managed block (Step 6)
+4. *Update CLAUDE.md index* — `hv block knowledge` regenerates the managed block (Step 6)
 5. *Verify (Opus)* — optional cold pass when `learn.verify: true` (Steps 7–8)
 6. *Contradictions* — pending demotion candidates surfaced per-bullet at session end (Step 9)
 
@@ -52,16 +46,16 @@ This step fires only when a manual flag (`--term`, `--promote`, `--deprecate`, o
 Captures a domain term into the pinned `## Glossary` topic of `.hv/KNOWLEDGE.md`.
 
 **Required:** `--def "<text>"` — one-paragraph canonical definition (single paragraph, no nested headings).
-**Optional:** `--alias "a, b, c"` (comma-separated synonyms), `--not "x, y"` (near-miss disambiguators), `--touch` (force-bump the date stamp on an existing-term update).
+**Optional:** `--alias "a,b,c"` (comma-separated synonyms), `--not "x,y"` (near-miss disambiguators), `--touch` (force-bump the date stamp on an existing-term update).
 
 Shell command shape:
 ```bash
-.hv/bin/hv-glossary-write "<name>" --def "<text>" [--alias "..."] [--not "..."] [--touch]
+hv glossary write "<name>" --def "<text>" [--alias "a,b"] [--not "x,y"] [--touch]
 ```
 
-Reads the existing Glossary topic, performs cross-term alias-collision uniqueness check, inserts (alphabetically) or updates the entry, regenerates the CLAUDE.md `<!-- hv-knowledge-start -->` block. Exit 3 on alias collision (an alias matches one already attached to a different term in Glossary); on collision, surface the helper's stderr and stop without writing.
+Reads the existing Glossary topic, performs cross-term alias-collision uniqueness check, inserts (alphabetically) or updates the entry, regenerates the CLAUDE.md `<!-- hv-knowledge-start -->` block. Exit 4 on alias collision (`blockedBy: alias-collision`: an alias matches one already attached to a different term in Glossary); on collision, surface the error and stop without writing.
 
-Definitional-signal autowrite — when the user phrases something like *"by X I mean Y"*, *"let's call this X"*, or *"X means Y"* during a normal session (not via the explicit `--term` flag), the orchestrator may invoke this same helper inline without going through `/hv-learn`. The flag form is the user-facing entry point; the inline form keeps the trio's old conversational-write behavior alive.
+Definitional-signal autowrite — when the user phrases something like *"by X I mean Y"*, *"let's call this X"*, or *"X means Y"* during a normal session (not via the explicit `--term` flag), the orchestrator may run this same verb inline without going through `/hv-learn`. The flag form is the user-facing entry point; the inline form keeps the trio's old conversational-write behavior alive.
 
 Report one line:
 
@@ -77,10 +71,10 @@ Sets the bullet's tier to `confirmed`, bypassing the hit-threshold path.
 
 Shell command shape:
 ```bash
-.hv/bin/hv-knowledge-tier --set --topic "<topic>" --title "<title>" --tier confirmed
+hv knowledge tier set --topic "<topic>" --title "<title>" --tier confirmed
 ```
 
-`--set` always writes the new tier (idempotent — promoting an already-confirmed bullet is a no-op in effect). Report one line:
+`tier set` always writes the new tier (idempotent — promoting an already-confirmed bullet is a no-op in effect). Report one line:
 
 ```
 Promoted: <topic> :: <title> → confirmed
@@ -94,7 +88,7 @@ Sets the bullet's tier to `deprecated`.
 
 Shell command shape:
 ```bash
-.hv/bin/hv-knowledge-tier --set --topic "<topic>" --title "<title>" --tier deprecated
+hv knowledge tier set --topic "<topic>" --title "<title>" --tier deprecated
 ```
 
 Report one line:
@@ -103,7 +97,7 @@ Report one line:
 Deprecated: <topic> :: <title> → deprecated
 ```
 
-**Important:** manual deprecations do NOT touch the contradictions queue. Do NOT call `bin/hv-knowledge-contradiction --clear` here — the queue is for heuristic candidates only, not for manually declared deprecations.
+**Important:** manual deprecations do NOT touch the contradictions queue. Do NOT call `hv knowledge contradiction clear` here — the queue is for heuristic candidates only, not for manually declared deprecations.
 
 Then exit (skip remaining steps).
 
@@ -111,7 +105,7 @@ Then exit (skip remaining steps).
 
 Rewrites the body of one bullet while preserving its tier and hits in the sidecar.
 
-**V1 limitation:** the current `hv-knowledge-amend` helper APPENDS to the bullet body rather than replacing it in-place. Full rewrite-in-place is a follow-up (tracked as a known V1 gap). For V1, the user should craft a body suffix that reads well when appended.
+**V1 limitation:** the current `hv knowledge amend` verb APPENDS to the bullet body rather than replacing it in-place. Full rewrite-in-place is a follow-up (tracked as a known V1 gap). For V1, the user should craft a body suffix that reads well when appended.
 
 Flow:
 1. Prompt the user via `AskUserQuestion` for the new body suffix:
@@ -121,32 +115,17 @@ Flow:
    - In loop-mode (`autonomy.level: loop`), this is an error — `--amend` requires explicit body input from the user; print `"Error: --amend requires user-provided body — cannot auto-pick in loop mode."` and exit 1.
 2. Call:
    ```bash
-   .hv/bin/hv-knowledge-amend --topic "<topic>" --fragment "<unique fragment from existing title>" --append "<new body suffix>"
+   printf '%s' "<new body suffix>" | hv knowledge amend --topic "<topic>" --fragment "<unique fragment from existing title>" --mode append --body-file -
    ```
    The `--fragment` can be the title text itself (it is unique by (topic, title)).
 3. The sidecar entry is left untouched — tier and hits are preserved.
-4. Read back the current tier and hits via `hv-knowledge-tier --get --topic "<topic>" --title "<title>"` and report:
+4. Read back the current tier and hits via `hv knowledge tier get --topic "<topic>" --title "<title>"` and report:
 
 ```
 Amended: <topic> :: <title> (tier=<tier>, hits=<hits> preserved)
 ```
 
 Then exit (skip remaining steps).
-
-## Step 1.6 — Migration Hook
-
-On every `/hv-learn` invocation (including manual-override paths), run:
-
-```bash
-.hv/bin/hv-knowledge-migrate
-```
-
-This stamps every existing bullet `provisional` in the sidecar (`.hv/knowledge-tier.json`) if the sidecar hasn't been initialized yet. The helper is idempotent — re-runs print `nothing to migrate` and exit 0. So firing this unconditionally is cheap.
-
-- If entries were migrated: print one line — `Migrated N bullets to provisional`.
-- If already up-to-date: silent (suppress the helper's "nothing to migrate" stdout).
-
-This ensures that `--promote`, `--deprecate`, `--amend`, and all discovery-path calls operate against a populated sidecar.
 
 ## Step 2 — Scan the Session for Learnings
 
@@ -179,7 +158,7 @@ Verification is **on by default**. Read `.hv/config.json` — if `learn.verify` 
 
 ## Step 5 — Merge into KNOWLEDGE.md
 
-Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`hv-knowledge-stats`-driven). It is informational only — the merge always proceeds.
+Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`hv knowledge stats`-driven). It is informational only — the merge always proceeds.
 
 `.hv/KNOWLEDGE.md` is organized as:
 
@@ -191,33 +170,33 @@ Topics that grow past 25 bullets or 10 KB get a one-line size-nudge in Step 8 (`
 - <older legacy learning without title>
 ```
 
-Each new bullet has a short bold `**Title**` (sentence-case, identifies the rule), an em-dash separator (em-dash U+2014, not a hyphen), the body, and a trailing ISO-8601 date stamp in an HTML comment (`<!-- YYYY-MM-DD -->`). The schema is normative — `bin/hv-knowledge-merge` dedups by (topic, title), so calling it twice with the same title under the same topic is a silent no-op. Sharper-wording replacement requires manual `Edit` on the existing bullet; the helper refuses to overwrite a title hit. Existing bullets without a title are legacy — leave them as-is.
+Each new bullet has a short bold `**Title**` (sentence-case, identifies the rule), an em-dash separator (em-dash U+2014, not a hyphen), the body, and a trailing ISO-8601 date stamp in an HTML comment (`<!-- YYYY-MM-DD -->`). The schema is normative — `hv knowledge add` dedups by (topic, title), so calling it twice with the same title under the same topic is a silent no-op. Sharper-wording replacement requires manual `Edit` on the existing bullet; the helper refuses to overwrite a title hit. Existing bullets without a title are legacy — leave them as-is.
 
 For each captured bullet, call:
 
 ```bash
-printf '%s' "$BODY" | .hv/bin/hv-knowledge-merge --topic "<Topic>" --title "<Short rule title>"
+printf '%s' "$BODY" | hv knowledge add --topic "<Topic>" --title "<Short rule title>" --body-file -
 ```
 
-The helper handles insertion at the top of the topic, the date stamp, and atomic dedup by (topic, title) — calling it twice with the same title under the same topic is a silent no-op.
+The verb handles insertion at the top of the topic, the date stamp, and atomic dedup by (topic, title) — calling it twice with the same title under the same topic is a silent no-op.
 
-**Pre-step rules (handle in prose, helper assumes them):**
+**Pre-step rules (handle in prose, the verb assumes them):**
 
-- **New topics:** the helper requires `## <Topic>` to already exist. If you're introducing a new topic, append the `## <Topic>` heading to `.hv/KNOWLEDGE.md` first (alphabetical order, except `Build & Tooling` and `Architecture` may be pinned near the top), then call `hv-knowledge-merge` to insert the first bullet.
-- **Sharpened wording:** the helper dedups on exact title match; it does NOT replace an older entry with sharper wording. If a captured learning is a sharper version of an existing bullet, use `Edit` to update the existing bullet directly, then skip the merge call for that learning.
-- **Preserve existing topics:** the helper writes only to the named topic's section. Other topics are untouched.
+- **New topics:** the verb requires `## <Topic>` to already exist. If you're introducing a new topic, append the `## <Topic>` heading to `.hv/KNOWLEDGE.md` first (alphabetical order, except `Build & Tooling` and `Architecture` may be pinned near the top), then call `hv knowledge add` to insert the first bullet.
+- **Sharpened wording:** the verb dedups on a case-insensitive title match; it does NOT replace an older entry with sharper wording. If a captured learning is a sharper version of an existing bullet, use `Edit` to update the existing bullet directly, then skip the `knowledge add` call for that learning.
+- **Preserve existing topics:** the verb writes only to the named topic's section. Other topics are untouched.
 
-`hv-knowledge-merge` is a writer helper — exit 0 on insert OR on idempotent no-op; exit 1 if the topic doesn't exist (handle topic creation first as above).
+`hv knowledge add` exits 0 on insert OR on idempotent no-op (`changed: false`); exit 3 if the topic doesn't exist (handle topic creation first as above).
 
 ### Umbrella-mode routing
 
-When `.hv/repos.json` registers at least one sub-repo (umbrella mode), `hv-knowledge-merge` accepts a `--repo umbrella|<name>` flag that controls which `KNOWLEDGE.md` receives the write:
+When `.hv/repos.json` registers at least one sub-repo (umbrella mode), `hv knowledge add` honors the global `--repo umbrella|<name>` flag that controls which `KNOWLEDGE.md` receives the write:
 
 - **`--repo <name>`** — writes to `.hv/knowledge/<name>/KNOWLEDGE.md` (the sub-repo's scoped file).
 - **`--repo umbrella`** — writes to `.hv/KNOWLEDGE.md` (the shared umbrella file).
-- **No `--repo`** — scope auto-resolves from cwd: inside a registered sub-repo's directory the helper writes that sub-repo's scoped file; at the umbrella root it falls back to `.hv/KNOWLEDGE.md`.
+- **No `--repo`** — scope auto-resolves from cwd: inside a registered sub-repo's directory the verb writes that sub-repo's scoped file; at the umbrella root it falls back to `.hv/KNOWLEDGE.md`.
 
-**At the umbrella root**, when a learning is clearly repo-local rather than cross-repo, ask once via `AskUserQuestion` before calling the merge helper:
+**At the umbrella root**, when a learning is clearly repo-local rather than cross-repo, ask once via `AskUserQuestion` before calling `hv knowledge add`:
 
 - Header: `"Learning scope"`
 - Question: *"Capture this learning as umbrella-shared, or scoped to a specific sub-repo?"*
@@ -225,18 +204,18 @@ When `.hv/repos.json` registers at least one sub-repo (umbrella mode), `hv-knowl
   1. `"Umbrella-shared (Recommended)"` — *"Write to `.hv/KNOWLEDGE.md`; visible across all sub-repos."*
   2. `"<name>"` (one option per registered sub-repo) — *"Write to `.hv/knowledge/<name>/KNOWLEDGE.md`; scoped to that repo."*
 
-Pass the chosen scope as `--repo <scope>` to `hv-knowledge-merge`. `/hv-learn --term` (F18 Glossary entries) uses the same routing — per the *"Persistence-trio scoping"* decision the Glossary topic follows KNOWLEDGE's hybrid scoping, so a `--repo`-scoped term lands in that sub-repo's `## Glossary` (wired in T5).
+Pass the chosen scope as `--repo <scope>` to `hv knowledge add`. `/hv-learn --term` (F18 Glossary entries) uses the same routing — per the *"Persistence-trio scoping"* decision the Glossary topic follows KNOWLEDGE's hybrid scoping, so a `--repo`-scoped term lands in that sub-repo's `## Glossary` (wired in T5).
 
 **Single-repo projects:** no `--repo` needed — scope always resolves to `"umbrella"` and the `.hv/KNOWLEDGE.md` path is used unchanged; behavior is byte-identical to pre-F21.
 
-**New topics in a scoped file:** the "append `## <Topic>` heading first" rule applies to the *resolved* file. A fresh sub-repo `KNOWLEDGE.md` starts empty — seed the heading in that scoped file before calling `hv-knowledge-merge`, just as you would for the umbrella file.
+**New topics in a scoped file:** the "append `## <Topic>` heading first" rule applies to the *resolved* file. A fresh sub-repo `KNOWLEDGE.md` starts empty — seed the heading in that scoped file before calling `hv knowledge add`, just as you would for the umbrella file.
 
 **DECISIONS stay umbrella-only.** Per the *"Persistence-trio scoping under umbrella mode"* decision in `.hv/DECISIONS.md`, only KNOWLEDGE is hybrid (umbrella + per-sub-repo). DECISIONS is umbrella-only — do not offer or pass a `--repo` scope when writing decisions.
 
 ## Step 6 — Update CLAUDE.md Topic Index
 
 ```bash
-.hv/bin/hv-managed-block knowledge
+hv block knowledge
 ```
 
 Reads `.hv/KNOWLEDGE.md`, extracts `## Topic` headings in order, and updates the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md` (or `AGENTS.md` when present). Creates or appends as needed; never touches other content. `/hv-work` reads this block to know when to consult `KNOWLEDGE.md`.
@@ -259,7 +238,7 @@ Captured 3 learnings into .hv/KNOWLEDGE.md:
 Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 ```
 
-**Topic-size handling.** Run `.hv/bin/hv-knowledge-stats` and check the JSON. If any topic has `bullets >= 25` OR `bytes >= 10240`, branch on `autonomy.level` (read `.hv/config.json`):
+**Topic-size handling.** Run `hv knowledge stats --json` and check `data.topics`. If any topic has `bullets >= 25` OR `bytes >= 10240`, branch on `autonomy.level` (read `.hv/config.json`):
 
 - `"off"` (default) — append a single nudge line per offender to the confirm output:
 
@@ -271,12 +250,12 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 
 - `"auto"` or `"loop"` — **perform the split immediately — no prompt, no confirmation, no "want me to" question.** Per the `hv-init` authoring convention for loop-mode routine auto-picks. For each offender topic:
 
-  1. Read the topic's bullets via `.hv/bin/hv-knowledge-query "<topic>"`.
+  1. Read the topic's bullets via `hv knowledge query "<topic>"`.
   2. Group bullets into 2 or 3 cohesive facets by semantic theme (e.g. `Helpers` / `Workers & Parallelism`, `Conventions` / `References`). Each facet must hold ≥3 bullets; `Misc` / `Other` / `Etc.` facets are forbidden — every bullet gets a substantive home. If no plausible split axis exists (bullets are byte-equivalent in theme), fall back to the `"off"` nudge for that topic and skip steps 3–7.
   3. Append `## <Topic>: <FacetA>` and `## <Topic>: <FacetB>` headings to `.hv/KNOWLEDGE.md` immediately before the old `## <Topic>` heading.
-  4. For each bullet in `<Topic>`, call `.hv/bin/hv-knowledge-rename-topic --from "<Topic>" --to "<Topic>: <Facet>" --title "<bullet-title>"`. The helper relocates the bullet body byte-identical AND re-keys its `.hv/knowledge-tier.json` entry from `<Topic>::<title>` to `<Topic>: <Facet>::<title>` in one atomic step — tier and hit state survive the split. Issue all calls for one offender as a single parallel batch (each invocation is atomic on a different bullet). Do NOT hand-edit bullets via `Edit` for this — that path silently orphans sidecar entries (the T03 / hv-skills#13 regression this auto-split was fixed to prevent).
+  4. For each bullet in `<Topic>`, call `hv knowledge rename-topic --from "<Topic>" --to "<Topic>: <Facet>" --title "<bullet-title>"`. The verb relocates the bullet body byte-identical AND re-keys its `.hv/knowledge-tier.json` entry from `<Topic>::<title>` to `<Topic>: <Facet>::<title>` in one atomic step — tier and hit state survive the split. Issue all calls for one offender as a single parallel batch (each invocation is atomic on a different bullet). Do NOT hand-edit bullets via `Edit` for this — that path silently orphans sidecar entries (the T03 / hv-skills#13 regression this auto-split was fixed to prevent).
   5. Remove the now-empty old `## <Topic>` heading.
-  6. Re-run `.hv/bin/hv-managed-block knowledge` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
+  6. Re-run `hv block knowledge` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
   7. Append one line to the confirm output: `Auto-split <topic> → <topic>: <FacetA> + <topic>: <FacetB> — N → A+B bullets.`
 
   Format KB as `{bytes/1024:.1f}` in any size figures appearing in the confirm line. Split each offender at most once per session — a topic that re-trips the threshold mid-session is a planning failure, not a re-split target.
@@ -290,7 +269,7 @@ This step is **always manual** — never auto-invoked, regardless of `autonomy.l
 **Trigger heuristic.** Scan the just-captured bullets for any of:
 
 - A skill slash-command name: `/hv-init`, `/hv-config`, `/hv-capture`, `/hv-go`, `/hv-vision`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-refactor`, `/hv-update`, `/hv-release`.
-- A hv-skills helper path: `bin/hv-*` or `.hv/bin/hv-*` (regex `\b(?:\.hv/)?bin/hv-[a-z-]+`).
+- An `hv` verb invocation (regex `\bhv [a-z]+( [a-z-]+)?`), e.g. `hv knowledge add`.
 - An `.hv/` artifact path: `.hv/BACKLOG.md`, `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, `.hv/MILESTONES.md`, `.hv/status.json`, `.hv/config.json`, `.hv/handoff/`, `.hv/plans/`, `.hv/spikes/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`, `.hv/milestones/`.
 
 If no bullet matches any of those, skip the step silently.
@@ -300,7 +279,7 @@ If no bullet matches any of those, skip the step silently.
 - Header: `"Upstream"`
 - Question: *"This learning touches hv-skills behavior. File an issue on the hv-skills repo?"*
 - Options (single-select):
-  1. `"File a hv-skills issue (Recommended)"` — *"Pre-fill title + body and run `bin/hv-issue-suggest` to open the issue."*
+  1. `"File a hv-skills issue (Recommended)"` — *"Pre-fill title + body and run `hv tracker suggest-upstream` to open the issue."*
   2. `"Skip"` — *"No upstream issue; the local KNOWLEDGE bullet stands on its own."*
 
 Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
@@ -321,18 +300,18 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    - Captured topic: <KNOWLEDGE.md topic name>
    - Date: <today, YYYY-MM-DD>
    ```
-3. Run the helper:
+3. Run the verb:
    ```bash
-   printf '%s' "$BODY" | .hv/bin/hv-issue-suggest --title "$TITLE"
+   printf '%s' "$BODY" | hv tracker suggest-upstream --json --title "$TITLE" --body-file -
    ```
-   - On exit 0 (gh available, issue filed): parse `url` and `number` from the JSON output.
-   - On exit 1 (manual fallback printed): show the helper's stdout to the user, then prompt once: *"Paste the issue number when you've filed it manually (or 'skip' to skip):"* Read the user's reply; if a number, use it; if "skip" or empty, abandon the tracking step.
+   - On exit 0 (gh available, issue filed): read `url` and `number` from `data`.
+   - On exit 5 (`gh` missing or not authenticated): show the error hint (the manual issue URL) to the user, then prompt once: *"Paste the issue number when you've filed it manually (or 'skip' to skip):"* Read the user's reply; if a number, use it; if "skip" or empty, abandon the tracking step.
 
 4. **Append the upstream marker to the bullet** in `.hv/KNOWLEDGE.md`. Call:
    ```bash
-   .hv/bin/hv-knowledge-amend --topic "<Topic>" --fragment "<unique body fragment>" --append "Upstream: hv-skills#<N>"
+   printf '%s' "Upstream: hv-skills#<N>" | hv knowledge amend --topic "<Topic>" --fragment "<unique body fragment>" --mode append --body-file -
    ```
-   The fragment can be any case-sensitive substring of the bullet that uniquely identifies it within the topic — typically a distinctive word or phrase from the body. The helper appends ` Upstream: hv-skills#<N>` after the bullet's trailing `<!-- date -->` comment, leaving the rest of the file byte-identical.
+   The fragment can be any case-sensitive substring of the bullet that uniquely identifies it within the topic — typically a distinctive word or phrase from the body. The verb appends ` Upstream: hv-skills#<N>` after the bullet's trailing `<!-- date -->` comment, leaving the rest of the file byte-identical.
 
 5. Add a final line to the Step 8 confirm output:
    ```
@@ -380,17 +359,17 @@ Ran /runlog-author for the <topic> bullet.
 Read pending contradictions:
 
 ```bash
-.hv/bin/hv-knowledge-contradiction --list
+hv knowledge contradiction list --json
 ```
 
-Parse the JSON array. If empty, skip this step silently.
+Read `data.items`. If empty, skip this step silently.
 
 For each candidate `{topic, title, correctionText, loggedAt}`, surface via `AskUserQuestion`:
 
 - **Header:** `"Demote?"`
 - **Question:** *"This learning was implicated by user feedback during the session: `<correctionText>`. Demote `<topic> :: <title>` to `deprecated`?"*
 - **Options** (single-select):
-  1. *"Demote (Recommended)"* — call `hv-knowledge-tier --set --topic <T> --title <S> --tier deprecated`
+  1. *"Demote (Recommended)"* — call `hv knowledge tier set --topic <T> --title <S> --tier deprecated`
   2. *"Keep — false positive"* — leave tier unchanged
   3. *"Defer to next session"* — keep candidate in the queue
 
@@ -399,7 +378,7 @@ For each candidate `{topic, title, correctionText, loggedAt}`, surface via `AskU
 **V1 simplification:** after processing ALL candidates (regardless of per-candidate choice), call:
 
 ```bash
-.hv/bin/hv-knowledge-contradiction --clear
+hv knowledge contradiction clear
 ```
 
 This clears the entire queue. Fine-grained deferral (keeping only deferred items) is a V2 polish.

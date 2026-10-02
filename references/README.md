@@ -21,7 +21,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`humanizing-prose.md`](humanizing-prose.md) | Rule sheet + silent self-audit pass applied to user-facing prose (release notes, PR body, doc-page edits) before the draft is shown to the user. | `/hv-release`, `/hv-ship` |
 | [`isolation-guard.md`](isolation-guard.md) | Why the parallel-waves-require-worktree-isolation guard fires, with the M02-S01 incident rationale and **Forbids / Permits** block for `/hv-work` Step 5. | `/hv-work` |
 | [`isolation-patterns.md`](isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. | `/hv-work` |
-| [`knowledge-consult.md`](knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. | `/hv-debug`, `/hv-next`, `/hv-review`, `/hv-work` |
+| [`knowledge-consult.md`](knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. | `/hv-debug`, `/hv-next`, `/hv-review`, `/hv-work` |
 | [`loop-mode-plan-dispatch.md`](loop-mode-plan-dispatch.md) | Loop-mode auto-plan dispatch (uncertainty pre-flight, orchestrator-model contract) plus rename + link-sweep collision detection for `/hv-work` Step 4. | `/hv-work` |
 | [`manual-gates.md`](manual-gates.md) | Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch). | `/hv-capture` (`--remove`, `--from-*`), `/hv-learn`, `/hv-release`, `/hv-ship` |
 | [`merge-strategy-gate.md`](merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. | `/hv-ship`, `/hv-work` |

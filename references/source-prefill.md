@@ -10,7 +10,7 @@ Substitute `<source>` with `KNOWLEDGE.md <topic>` or `spike <name>` as appropria
 
 ## `--from-learning <topic>`
 
-1. Run `.hv/bin/hv-knowledge-query "<topic>"` to load the topic section. If the helper output is empty, error: *"Topic `<topic>` not found in `.hv/KNOWLEDGE.md`. Run `.hv/bin/hv-knowledge-stats` to list topics."* and stop.
+1. Run `hv knowledge query "<topic>"` to load the topic section. If the output is empty, error: *"Topic `<topic>` not found in `.hv/KNOWLEDGE.md`. Run `hv knowledge stats` to list topics."* and stop.
 2. Parse the matched topic's bullets. Each is a one-line `- <text> <!-- YYYY-MM-DD -->`.
 3. Pick the bullet to promote:
    - **1 bullet** — use it directly, no question.
@@ -25,7 +25,7 @@ Substitute `<source>` with `KNOWLEDGE.md <topic>` or `spike <name>` as appropria
 
 ## `--from-spike <name>`
 
-1. Read `.hv/spikes/<name>.md`. If absent, error: *"Spike `<name>` not found at `.hv/spikes/<name>.md`. Run `.hv/bin/hv-spike-list` to see open and closed spikes."* and stop. (Spike files always live at `.hv/spikes/<name>.md` even in umbrella mode — the `repo:` frontmatter only points at the branch's git history.)
+1. Read `.hv/spikes/<name>.md`. If absent, error: *"Spike `<name>` not found at `.hv/spikes/<name>.md`. Run `hv spike list` to see open and closed spikes."* and stop. (Spike files always live at `.hv/spikes/<name>.md` even in umbrella mode — the `repo:` frontmatter only points at the branch's git history.)
 2. Parse the spike file:
    - YAML frontmatter (`status`, `created`, `finished`, optional `repo`).
    - `## Question` — the original yes/no/conditional question.

@@ -10,16 +10,16 @@ Run as a checklist. Items are ordered by broadening scope (target item → plan 
 - **The plan file** at `.hv/plans/<key>.md` if one exists for this work. Use:
 
   ```
-  .hv/bin/hv-plan-show <key>
+  hv plan show <key>
   ```
 
-  Absent file → empty stdout, not an error. Treat empty as "no plan yet".
+  A missing plan exits 3 with empty stdout, not a failure. Treat that as "no plan yet".
 
 - **The milestone file** at `.hv/milestones/<MID>.md` if the work is milestone-scoped.
 - **Items scoped to the milestone** via:
 
   ```
-  .hv/bin/hv-todo-by-milestone <MID>
+  hv backlog ids --milestone <MID>
   ```
 
   Used by `/hv-plan` and `/hv-vision` to see siblings under the same milestone.
@@ -43,9 +43,9 @@ A recent path-encoding helper audit confirmed why: when load steps drift between
 
 Each calling skill adds its own reads inline. The protocol lists only the common subset. Concretely:
 
-- `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` (via `hv-glossary-read`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
-- `/hv-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `.hv/bin/hv-resolve-repos` when umbrella mode is on).
-- `/hv-plan` Step 3 adds `.hv/bin/hv-plan-list <MID>` to see existing plans under the milestone.
+- `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` (via `hv glossary read`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
+- `/hv-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `hv repo resolve` when umbrella mode is on).
+- `/hv-plan` Step 3 adds `hv plan list --milestone <MID>` to see existing plans under the milestone.
 
 ## What to do with the loaded context
 
@@ -55,7 +55,7 @@ If a skill finds itself wanting to recite the loaded context back at the user, t
 
 ## Lookup, not resolve
 
-Reads in this list are lookups. Empty stdout from `hv-plan-show`, `hv-todo-by-milestone`, or a missing detail file is the answer, not a failure. Do not wrap these calls in `2>/dev/null` or fallbacks — the helpers exit 0 with empty output when there's nothing to return.
+Reads in this list are lookups. A missing plan (`hv plan show` exits 3), an empty `hv backlog ids` list, or a missing detail file is the answer, not a failure. Do not wrap these calls in `2>/dev/null` or fallbacks; handle the exit code or read `--json` `data`.
 
 ## What this reference does NOT cover
 
