@@ -2,6 +2,11 @@
 // design, spike, proof, debug counter) share: the exit-coded error their
 // packages return and the flat frontmatter subset their files use. It does
 // not import internal/cli; internal/cli's A6 glue maps Error to the exit table.
+//
+// ParseFrontmatter and UpdateFrontmatterField are hv's one frontmatter
+// implementation, byte-compatible with bin/hvlib_frontmatter.py; other
+// phases (A5 map and qa files) reuse them rather than parse again. Keep the
+// API to those two plus Str: flat `key: value` and inline `[a, b]` lists only.
 package artifact
 
 import (

@@ -100,17 +100,23 @@ func attemptsOf(o *jsonx.Object) []any {
 }
 
 // Init creates the state file; false when it already existed (idempotent).
-func (c *Counter) Init(bugID string) (bool, error) {
-	if c.exists() {
-		return false, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(c.Path), 0o777); err != nil {
-		return false, err
-	}
-	o := c.def()
-	o.Set("bug_id", bugID)
-	o.Set("started_at", nowISO())
-	return true, fsio.WriteJSONAtomic(c.Path, o)
+// The existence check runs under the file's lock, so of two concurrent
+// calls exactly one reports changed.
+func (c *Counter) Init(bugID string) (created bool, err error) {
+	err = fsio.Locked(c.Path, fsio.LockTimeout, func() error {
+		if c.exists() {
+			return nil
+		}
+		o := c.def()
+		o.Set("bug_id", bugID)
+		o.Set("started_at", nowISO())
+		if err := fsio.WriteJSONAtomic(c.Path, o); err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return
 }
 
 func (c *Counter) update(mutate func(*jsonx.Object) error) error {

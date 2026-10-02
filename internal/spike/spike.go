@@ -70,15 +70,29 @@ func Repos(root string) map[string]string {
 	return out
 }
 
-// Add creates branch spike/<name> in gitDir (the sub-repo named by repo, or
+// Add (under the spike file's lock) creates branch spike/<name> in gitDir (the sub-repo named by repo, or
 // the working repository) and .hv/spikes/<name>.md under root. The spike
 // file check runs first, so an existing file leaves no branch behind.
 func Add(root, gitDir, name, question, repo string) (branch string, err error) {
 	if err = checkName(name); err != nil {
 		return
 	}
-	branch = "spike/" + name
 	path := file(root, name)
+	err = fsio.Locked(path, fsio.LockTimeout, func() error {
+		var aerr error
+		branch, aerr = add(root, gitDir, path, name, question, repo)
+		return aerr
+	})
+	if err != nil {
+		branch = ""
+	}
+	return
+}
+
+// add is Add's body; the caller holds the spike file's lock, so the
+// existence checks and the writes cannot interleave with another add.
+func add(root, gitDir, path, name, question, repo string) (branch string, err error) {
+	branch = "spike/" + name
 	if _, serr := os.Stat(path); serr == nil {
 		return "", artifact.Errf(artifact.ExitRefused, ".hv/spikes/%s.md already exists", name)
 	}
