@@ -13,7 +13,7 @@ type Item struct {
 	ID     string // file: "B07"; issue: "12"; umbrella issue: "repo:12" (contract rule 11)
 	Type   string // "B" | "F" | "T"
 	Tag    string // "P1", "Major", "" ...
-	Title  string // without the trailing "."; file: up to the first "." (see File.Get)
+	Title  string // without the trailing "."; the full title in both backends
 	Fields Fields
 	Closed bool
 	Reason string // closed only: done|handed-off|blocked|dropped ("" when open)

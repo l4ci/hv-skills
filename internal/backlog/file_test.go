@@ -97,7 +97,7 @@ for p in json.load(open(sys.argv[1])):
         line, title = find_origin_bullet(corpus, iid)
         b = parse_open_bullet("- " + line)
         f["tag"] = b["tag"] if b else ""
-        f["title"] = f["title"] or ""
+        f["title"] = b["title"] if b else (title or "")
         f["closed"] = f["reason"] != ""
         f["line"] = line
         r["items"].append(f)
@@ -182,7 +182,7 @@ func TestFileItemShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if it.Type != "B" || it.Tag != "P1" || it.Title != "Title" || it.Closed || it.Fields.Milestone != "M01" {
+	if it.Type != "B" || it.Tag != "P1" || it.Title != "Title. Part two" || it.Closed || it.Fields.Milestone != "M01" {
 		t.Fatalf("B07 = %+v", it)
 	}
 	it, err = f.Get("B09")

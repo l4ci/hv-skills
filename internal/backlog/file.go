@@ -50,9 +50,9 @@ func (f *File) Corpus() string {
 
 // Get looks up an item by its exact ID ("B07"; B7 does not find B07), in the
 // backlog or the archive. Fields come from the origin line; Closed, Reason and
-// Note from the done line. Title is FileBackend.fields' title, which stops at
-// the first "." ("Fix v1.2" gives "Fix v1"): hv item field get prints it, so
-// it keeps the old helper's value; ParseOpen(Line) has the full title.
+// Note from the done line. Title is the full bullet title, as in issue mode;
+// the old helpers' title cut at the first "." is FindOrigin's, for the verbs
+// that must print it.
 func (f *File) Get(ref string) (*Item, error) {
 	corpus := f.Corpus()
 	line, title, ok := FindOrigin(corpus, ref)
@@ -64,7 +64,7 @@ func (f *File) Get(ref string) (*Item, error) {
 		it.Type = string(r)
 	}
 	if b, ok := ParseOpen("- " + line); ok {
-		it.Tag = b.Tag
+		it.Tag, it.Title = b.Tag, b.Title
 	}
 	// The closure reason lives on the done marker, which FindOrigin strips.
 	doneLine := regexp.MustCompile(`(?m)^- ~~\*\*\[` + regexp.QuoteMeta(ref) + `\].*$`).FindString(corpus)
