@@ -373,7 +373,7 @@ func a8Issues(c *Ctx, hint string, perRepo bool) (*backlog.Issues, error) {
 		}
 		return nil, NotImplemented(c.Path)
 	}
-	be, err := a4Open(root, false, hint)
+	be, err := a4Open(c, root, false, hint)
 	if err != nil {
 		return nil, err
 	}
