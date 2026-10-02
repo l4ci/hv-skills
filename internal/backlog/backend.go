@@ -71,3 +71,8 @@ func hasRepos(root string) bool {
 	}
 	return false
 }
+
+var (
+	_ Backend = (*File)(nil)
+	_ Backend = (*Issues)(nil)
+)
