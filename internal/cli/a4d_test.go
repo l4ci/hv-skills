@@ -155,7 +155,7 @@ func TestA4dMigrateIssues(t *testing.T) {
 	root := a4dRepo(t, "https://github.com/o/r.git")
 	stub := &msStub{Fake: &trackertest.Fake{}}
 	old := migrateTracker
-	migrateTracker = func(string, any) (backlog.MigrateTracker, error) { return stub, nil }
+	migrateTracker = func(context.Context, string, any) (backlog.MigrateTracker, error) { return stub, nil }
 	defer func() { migrateTracker = old }()
 
 	code, env, stderr := hvRun(t, "--json", "-C", root, "migrate", "issues")

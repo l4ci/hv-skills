@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +45,7 @@ func umbrellaProject(t *testing.T) (root string, fakes map[string]*trackertest.F
 		t.Fatal(err)
 	}
 	old := newTracker
-	newTracker = func(dir string, _ any) (backlog.Tracker, error) {
+	newTracker = func(_ context.Context, dir string, _ any) (backlog.Tracker, error) {
 		name := filepath.Base(dir)
 		built[name]++
 		return fakes[name], nil

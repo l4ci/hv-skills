@@ -27,8 +27,8 @@ import (
 // newTracker builds the issue tracker the issue backend reads and writes
 // through: the gh or glab adapter for the project's origin, configured by
 // issues.*. It is a variable so unit tests inject a fake.
-var newTracker = func(root string, cfg any) (backlog.Tracker, error) {
-	return tracker.New(context.Background(), tracker.SettingsFromConfig(cfg), "", root)
+var newTracker = func(ctx context.Context, root string, cfg any) (backlog.Tracker, error) {
+	return tracker.New(ctx, tracker.SettingsFromConfig(cfg), "", root)
 }
 
 func a4Commands() []*Command {
@@ -120,7 +120,9 @@ func a4Open(c *Ctx, root string, fileOnly bool, hint string) (backlog.Backend, e
 			Msg: `not available with backlog.backend "issues"`}
 	}
 	if name != "file" && backlog.IsUmbrella(root) {
-		u := backlog.NewUmbrella(root, cfg, func(dir string) (backlog.Tracker, error) { return newTracker(dir, cfg) })
+		ctx := c.Context()
+		u := backlog.NewUmbrella(root, cfg, func(dir string) (backlog.Tracker, error) { return newTracker(ctx, dir, cfg) })
+		u.Ctx = ctx
 		u.Scope = c.Repo
 		if cwd, err := os.Getwd(); err == nil {
 			u.CwdRepo = backlog.CwdSubRepo(cwd, u.Repos)
@@ -129,11 +131,15 @@ func a4Open(c *Ctx, root string, fileOnly bool, hint string) (backlog.Backend, e
 	}
 	var tr backlog.Tracker
 	if name != "file" {
-		if tr, err = newTracker(root, cfg); err != nil {
+		if tr, err = newTracker(c.Context(), root, cfg); err != nil {
 			return nil, err
 		}
 	}
-	return backlog.Open(root, cfg, tr)
+	be, err := backlog.Open(root, cfg, tr)
+	if is, ok := be.(*backlog.Issues); ok {
+		is.Ctx = c.Context()
+	}
+	return be, err
 }
 
 // a4Fail maps a backlog error to a verb failure and, for a refusal, its

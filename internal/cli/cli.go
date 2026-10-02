@@ -5,14 +5,17 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/repos"
@@ -50,7 +53,17 @@ type Ctx struct {
 	Stdout io.Writer // for passthrough verbs only; others return Text
 	Stderr io.Writer
 
+	ctx      context.Context // set by run: cancelled on SIGINT and SIGTERM
 	warnings []string
+}
+
+// Context is the verb's context. run cancels it on SIGINT and SIGTERM, so a
+// Ctrl-C reaches the forge and git calls in flight.
+func (c *Ctx) Context() context.Context {
+	if c.ctx == nil {
+		return context.Background()
+	}
+	return c.ctx
 }
 
 // Warn records a warning: it goes to stderr now and into the envelope.
@@ -214,6 +227,9 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	// Until the arguments parse, an error answers in JSON if any token
 	// before "--" is exactly --json.
 	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args)}
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	c.ctx = sigCtx
 	defer func() {
 		if r := recover(); r != nil {
 			code = fail(c, stdout, asError(fmt.Errorf("panic: %v", r)))
