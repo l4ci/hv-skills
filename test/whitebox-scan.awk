@@ -36,9 +36,12 @@ FNR == 1 { if (open) bad(open_file, open_line, "white-box-begin never closed"); 
 }
 /^[[:space:]]*# white-box/ { bad(FILENAME, FNR, "malformed white-box marker (use white-box-begin: / white-box-end)"); next }
 open || /^[[:space:]]*#/ { next }
-/\$\{?BIN\}?([^A-Za-z0-9_]|$)/ || /hvlib/ || /\.hv\/bin/ || /\$\{?REPO\}?\/bin/ || /bin\/hv-\*|bin\/\*/ || \
+/\$\{?BIN\}?([^A-Za-z0-9_]|$)/ || /hvlib/ || /\.hv\/bin/ || /\$\{?REPO\}?"?\/bin/ || \
+/(^|[^A-Za-z_])bin\/hv-/ || /bin\/\*/ || \
 /install_helpers/ || /SKILL\.md/ || /PYTHONPATH=/ || /git ls-(tree|files)/ || \
-/\$\{?REPO\}?\/(hv-|references|docs|README|CHANGELOG|test\/validate)/ {
+/(^|[^A-Za-z0-9_])BIN=|export +BIN([^A-Za-z0-9_]|$)|environ\["BIN"\]/ || \
+(/(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*=\(?"?\$\{?REPO\}?"?([ ;)]|$)/ && $0 !~ /HV_INSTALL_ROOT=/) || \
+/\$\{?REPO\}?"?\/(hv-|references|docs|README|CHANGELOG|test\/validate)/ {
   bad(FILENAME, FNR, "white-box assertion outside a white-box block: " substr($0, 1, 90))
 }
 END { if (open) bad(open_file, open_line, "white-box-begin never closed") }

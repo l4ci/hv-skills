@@ -14,7 +14,15 @@ END_MARK='# white-box-end'
 SAMPLES=(
   '"$''BIN/hv-x" arg'
   'from hv''lib import x'
-  'ls .hv/''bin/hv-x'
+  'ls .hv/''bin/''hv-x'
+  'ls bin/''hv-x'
+  'ls "$''REPO"/bin/x'
+  'D="$''REPO"'
+  'D=$''REPO/bin'
+  'D=$''BIN'
+  'B''IN=/x'
+  'export B''IN'
+  'os.environ["B''IN"]'
   'ls "$''REPO/bin"'
   'ls bin/''*'
   'install_''helpers'
@@ -30,6 +38,12 @@ wb_file() { printf '%s\n' "$@" > "$WB_TMP/t.sh"; echo "$WB_TMP/t.sh"; }
 # Clean input and comments are accepted.
 OUT="$(wb_scan "$(wb_file 'echo ok' '"$HV_BIN" status' "# ${SAMPLES[0]}")")"
 [ -z "$OUT" ] || fail "scanner flagged a clean file: $OUT"
+
+# Near misses stay clean: the version-stamp seam, plugin metadata, and a name that merely ends in bin.
+for S in 'HV_INSTALL_ROOT="$''REPO" hvj migrate v4' 'cat "$''REPO/.claude-plugin/plugin.json"' 'ls abin/''hv-x' 'D="$TMP_B''IN"'; do
+  OUT="$(wb_scan "$(wb_file 'echo ok' "$S")")"
+  [ -z "$OUT" ] || fail "scanner flagged a harmless line: $S => $OUT"
+done
 
 # Every signature must trip the scan outside a block, and pass inside every tag form.
 for S in "${SAMPLES[@]}"; do

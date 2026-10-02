@@ -22,14 +22,14 @@ mkdir -p bin runner
 cat > runner/postgres.go <<'EOF'
 package runner
 EOF
-cat > bin/hv-flagship <<'EOF'
+cat > bin/flagship <<'EOF'
 #!/bin/sh
 EOF
-chmod +x bin/hv-flagship
+chmod +x bin/flagship
 git add -A
-git commit -q -m "seed runner/postgres.go and bin/hv-flagship"
+git commit -q -m "seed runner/postgres.go and bin/flagship"
 git commit --allow-empty -q -m "feat: implement Driver for postgres backend [F76]"
-git commit --allow-empty -q -m "refactor: rename bin/hv-flagship to bin/hv-flagship-v2"
+git commit --allow-empty -q -m "refactor: rename bin/flagship to bin/flagship-v2"
 
 # The verb needs a project root (no `.hv/` walk-up past the fixture), but audits
 # the git repo it runs in.
