@@ -59,7 +59,7 @@ type Backend interface {
 // Open returns the backend selected by backlog.backend in cfg, the loaded
 // config, for the project rooted at root (the directory holding .hv/). The
 // issue backend reads through tr. Umbrella issue mode, where .hv/repos.json
-// registers sub-repos, is not ported yet and is an error.
+// registers sub-repos and every one has its own tracker, is NewUmbrella's.
 func Open(root string, cfg any, tr Tracker) (Backend, error) {
 	name, err := config.Backend(cfg)
 	if err != nil {
@@ -69,7 +69,7 @@ func Open(root string, cfg any, tr Tracker) (Backend, error) {
 		return &File{Root: root}, nil
 	}
 	if hasRepos(root) {
-		return nil, errors.New("umbrella issue mode not ported yet")
+		return nil, errors.New("umbrella issue mode opens through NewUmbrella")
 	}
 	if tr == nil {
 		return nil, errors.New("backlog.backend \"issues\" needs a tracker")

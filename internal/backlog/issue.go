@@ -55,6 +55,10 @@ type Issues struct {
 	ProofCount func(itemID string) (int, error)
 	Warn       func(string) // notices (duplicate tracking issues); nil drops them
 	Repo       string       // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
+	// OnMissingMilestone is the umbrella hook (on_missing_milestone): called
+	// with an hv milestone ID the tracker has no native milestone for, it
+	// creates it and returns its title; ok false leaves the ID unknown.
+	OnMissingMilestone func(mid string) (title string, ok bool, err error)
 }
 
 func (b *Issues) ctx() context.Context {
@@ -348,6 +352,12 @@ func (b *Issues) Markdown(closedLimit int) (string, error) {
 			done = done[:closedLimit]
 		}
 	}
+	return renderBacklog(sections, done), nil
+}
+
+// renderBacklog is _render_backlog: the open bullets by type letter, then the
+// Done lines, as BACKLOG.md-shaped text.
+func renderBacklog(sections map[string][]string, done []string) string {
 	out := []string{"# Backlog", ""}
 	for _, l := range ItemLetters {
 		bullets := sections[string(l)]
@@ -359,7 +369,7 @@ func (b *Issues) Markdown(closedLimit int) (string, error) {
 	}
 	out = append(out, "## Completed", "")
 	out = append(out, done...)
-	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n", nil
+	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
 }
 
 // lookup finds the issue behind ref, or reports not found for a malformed

@@ -87,28 +87,28 @@ func a4Args(c *Ctx, args []string, min, max int, usage string) error {
 	return nil
 }
 
-// a4Scope finds the project root and settles --repo: umbrella mode is not
-// ported, so a valid scope stops here.
+// a4Scope finds the project root and checks --repo against the registry (exit
+// 3 for an unregistered name, before any check of the verb's own). A file-mode
+// umbrella keeps one backlog at its root, so a valid scope needs nothing more;
+// issue mode narrows the backend to the sub-repo in a4Open.
 func a4Scope(c *Ctx) (string, error) {
 	root, err := c.Root()
 	if err != nil {
 		return "", err
 	}
-	if c.Repo != "" {
-		if _, err := c.RepoPath(); err != nil {
-			return "", err
-		}
-		return "", Unavailable("umbrella mode not ported yet")
-	}
-	if backlog.IsUmbrella(root) {
-		return "", Unavailable("umbrella mode not ported yet")
+	if _, err := c.RepoPath(); err != nil {
+		return "", err
 	}
 	return root, nil
 }
 
 // a4Open selects the backlog backend from backlog.backend. A file-only verb
-// under issues is refused (exit 4, backend) before the tracker is built.
-func a4Open(root string, fileOnly bool, hint string) (backlog.Backend, error) {
+// under issues is refused (exit 4, backend) before the tracker is built. In an
+// umbrella, issue mode opens one tracker per sub-repo, built on first use;
+// --repo narrows reads and bare references to one sub-repo and names the
+// capture target, and a capture with none goes to the sub-repo the working
+// directory is in.
+func a4Open(c *Ctx, root string, fileOnly bool, hint string) (backlog.Backend, error) {
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
 	name, err := config.Backend(cfg)
 	if err != nil {
@@ -118,6 +118,14 @@ func a4Open(root string, fileOnly bool, hint string) (backlog.Backend, error) {
 	if name != "file" && fileOnly {
 		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
 			Msg: `not available with backlog.backend "issues"`}
+	}
+	if name != "file" && backlog.IsUmbrella(root) {
+		u := backlog.NewUmbrella(root, cfg, func(dir string) (backlog.Tracker, error) { return newTracker(dir, cfg) })
+		u.Scope = c.Repo
+		if cwd, err := os.Getwd(); err == nil {
+			u.CwdRepo = backlog.CwdSubRepo(cwd, u.Repos)
+		}
+		return u, nil
 	}
 	var tr backlog.Tracker
 	if name != "file" {
@@ -233,7 +241,7 @@ func a4IDNext(fs *flag.FlagSet) RunFunc {
 		if !a4In(a4Counters, *kind) {
 			return Result{}, Usage("--kind must be bugs|features|tasks|milestones")
 		}
-		be, err := a4Open(root, true, "IDs are issue numbers; capture creates the issue")
+		be, err := a4Open(c, root, true, "IDs are issue numbers; capture creates the issue")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -300,7 +308,7 @@ func a4Create(fs *flag.FlagSet) RunFunc {
 			if m == nil {
 				return Result{}, Usage("--raw-file bullet needs a **[ID]")
 			}
-			be, err := a4Open(root, true, "--raw-file appends to BACKLOG.md; use item create --title")
+			be, err := a4Open(c, root, true, "--raw-file appends to BACKLOG.md; use item create --title")
 			if err != nil {
 				return a4Fail(err)
 			}
@@ -330,7 +338,7 @@ func a4Create(fs *flag.FlagSet) RunFunc {
 			}
 			in.Body, in.HasBody = body, true
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -396,7 +404,7 @@ func a4FieldGet(fs *flag.FlagSet) RunFunc {
 		if err := a4FieldName(*name, a4GetFields, "unknown"); err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -418,7 +426,7 @@ func a4FieldList(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -452,7 +460,7 @@ func a4FieldSet(fs *flag.FlagSet) RunFunc {
 		if !a4Given(fs)["value"] {
 			return Result{}, Usage("--value is required (--value '' clears the field)")
 		}
-		be, err := a4Open(root, *name == "detail", "--name detail points at a file; issues have a body instead")
+		be, err := a4Open(c, root, *name == "detail", "--name detail points at a file; issues have a body instead")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -494,7 +502,7 @@ func a4Complete(fs *flag.FlagSet) RunFunc {
 				return Result{}, Unavailable("git has no HEAD to default --commit").WithHint("pass --commit <hash>")
 			}
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -527,7 +535,7 @@ func a4Reopen(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -570,7 +578,7 @@ func a4Rm(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, true, "hv item complete <ID> --reason dropped")
+		be, err := a4Open(c, root, true, "hv item complete <ID> --reason dropped")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -704,7 +712,7 @@ func a4Ready(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -757,7 +765,7 @@ func a4CommentAdd(fs *flag.FlagSet) RunFunc {
 		if pystr.Strip(text) == "" {
 			return Result{}, Usage("empty comment body")
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -794,7 +802,7 @@ func a4CommentList(fs *flag.FlagSet) RunFunc {
 		if *kind != "" && !a4In(backlog.CommentKinds, *kind) {
 			return Result{}, Usage("--kind must be %s", strings.Join(backlog.CommentKinds, "|"))
 		}
-		be, err := a4Open(root, false, "")
+		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)
 		}

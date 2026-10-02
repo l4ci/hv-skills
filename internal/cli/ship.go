@@ -348,7 +348,7 @@ func shipClosesLines(c *Ctx, root string, cfg any, ids []string) (string, error)
 	if backlog.IsUmbrella(root) {
 		return "", NotImplemented(c.Path)
 	}
-	b, err := a4Open(root, false, "")
+	b, err := a4Open(c, root, false, "")
 	if err != nil {
 		return "", shipBackendErr(err)
 	}
@@ -704,7 +704,7 @@ func shipActive(root, id string) bool {
 }
 
 func shipRestore(c *Ctx, root string, ids []string) error {
-	b, err := a4Open(root, false, "")
+	b, err := a4Open(c, root, false, "")
 	if err != nil {
 		return err
 	}

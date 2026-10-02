@@ -20,7 +20,7 @@ func a4Flow(c *Ctx, ref string) (backlog.Backend, backlog.Workflow, string, stri
 	if err != nil {
 		return nil, nil, "", "", err
 	}
-	be, err := a4Open(root, false, "")
+	be, err := a4Open(c, root, false, "")
 	if err != nil {
 		return nil, nil, "", "", err
 	}
@@ -65,7 +65,7 @@ func a4Show(fs *flag.FlagSet) RunFunc {
 			"milestone", a4Null(st.Milestone), "notes", notes, "comments", comments)
 		word := map[string]string{"B": "bug", "F": "feature", "T": "task"}[st.Type]
 		lines := []string{
-			fmt.Sprintf("[%s%s] %s", st.Type, st.ID, st.Title),
+			fmt.Sprintf("[%s] %s", a4Spell(st.Type, st.ID), st.Title),
 			"type: " + word,
 			"status: " + st.Status,
 			"state: " + a4None(st.State),
@@ -77,6 +77,15 @@ func a4Show(fs *flag.FlagSet) RunFunc {
 		}
 		return Result{Data: data, Text: strings.Join(append(lines, rows...), "\n")}, nil
 	}
+}
+
+// a4Spell is the bullet spelling of an item: "F12", and "repo:F12" for the
+// umbrella ID "repo:12".
+func a4Spell(typ, id string) string {
+	if repo, n, ok := strings.Cut(id, ":"); ok {
+		return repo + ":" + typ + n
+	}
+	return typ + id
 }
 
 // a4Null is s, or JSON null when it is empty.

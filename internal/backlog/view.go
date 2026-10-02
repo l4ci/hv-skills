@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
@@ -13,8 +14,10 @@ import (
 // Row is one open item as the listing views (hv-backlog, hv-todo-by-milestone,
 // hv-find-milestone-for-items) read it.
 type Row struct {
-	ID      string // data spelling: "B07" in file mode, "12" in issue mode
+	ID      string // data spelling: "B07" in file mode, "12" in issue mode, "repo:12" in umbrella issue mode
 	Key     string // identity inside Related cells: "B07", and "F12" for issue 12
+	Repo    string // umbrella issue mode: the owning sub-repo; "" otherwise
+	Number  int    // issue mode: the issue number
 	Type    string // "B" | "F" | "T"
 	Tag     string
 	Title   string
@@ -50,11 +53,52 @@ func OpenRows(be Backend) (rows []Row, md string, ok bool, err error) {
 	if err != nil {
 		return nil, "", false, err
 	}
+	_, umbrella := be.(*Umbrella)
 	for _, it := range items {
-		rows = append(rows, Row{ID: it.ID, Key: it.Type + it.ID, Type: it.Type, Tag: it.Tag, Title: it.Title,
-			Section: sectionOfType[it.Type], Raw: it.Line, Fields: it.Fields})
+		r := Row{ID: it.ID, Key: it.Type + strconv.Itoa(it.Number), Number: it.Number, Type: it.Type, Tag: it.Tag,
+			Title: it.Title, Section: sectionOfType[it.Type], Raw: it.Line, Fields: it.Fields}
+		if umbrella {
+			r.Repo = it.Fields.Get("repos")
+		}
+		rows = append(rows, r)
 	}
 	return rows, md, true, nil
+}
+
+// activeIn is whether an umbrella issue row is claimed by an active stream. A
+// stream names its items in any spelling an issue answers to; a spelling that
+// does not name the sub-repo ("F12", "12") counts only when the stream is in
+// that sub-repo or in none, because another sub-repo's F12 is another item.
+func (r Row) activeIn(active []Active) bool {
+	if r.Repo == "" {
+		return false
+	}
+	for _, e := range active {
+		for _, id := range e.Items {
+			if !r.IssueMatches(map[string]bool{id: true}) {
+				continue
+			}
+			qualified := strings.Contains(id, ":") || strings.Index(id, "#") > 0
+			if qualified || e.Repo == "" || e.Repo == r.Repo {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IssueMatches is whether r is one of the wanted references, in every
+// spelling an issue answers to: "12", "#12", "F12" and, in an umbrella,
+// "repo:12", "repo:F12", "repo:#12" and "repo#12".
+func (r Row) IssueMatches(wanted map[string]bool) bool {
+	n := strconv.Itoa(r.Number)
+	if wanted[r.ID] || wanted[r.Key] || wanted["#"+n] {
+		return true
+	}
+	if r.Repo == "" {
+		return false
+	}
+	return wanted[n] || wanted[r.Repo+":"+r.Key] || wanted[r.Repo+":#"+n] || wanted[r.Repo+"#"+n]
 }
 
 var milestoneIDRe = regexp.MustCompile(`M\p{Nd}+`)
@@ -213,7 +257,7 @@ func BuildListing(rows []Row, md string, active []Active, grep string) *Listing 
 		return 3
 	}
 	for _, r := range rows {
-		if activeIDs[r.ID] || !match(r) {
+		if activeIDs[r.ID] || r.activeIn(active) || !match(r) {
 			continue
 		}
 		lr := ListRow{Row: r, Related: strings.TrimRight(r.Fields.Get("related"), "."),
@@ -238,10 +282,15 @@ func BuildListing(rows []Row, md string, active []Active, grep string) *Listing 
 // cluster finds the connected components of the Related graph, over every
 // open item, active ones included.
 func (l *Listing) cluster(rows []Row, match func(Row) bool) {
+	// An umbrella's sub-repos number their items independently and Related
+	// names items of the same sub-repo, so identity is the key plus the repo.
+	// It sorts by key first, as the old helper's bare IDs did.
+	ident := func(key, repo string) string { return key + "\x00" + repo }
 	title := map[string]string{}
 	outID := map[string]string{}
 	for _, r := range rows {
-		title[r.Key], outID[r.Key] = r.Title, r.ID
+		id := ident(r.Key, r.Repo)
+		title[id], outID[id] = r.Title, r.ID
 	}
 	adj := map[string]map[string]bool{}
 	link := func(a, b string) {
@@ -251,10 +300,12 @@ func (l *Listing) cluster(rows []Row, match func(Row) bool) {
 		adj[a][b] = true
 	}
 	for _, r := range rows {
+		self := ident(r.Key, r.Repo)
 		for _, m := range idInRelatedRe.FindAllStringSubmatch(strings.TrimRight(r.Fields.Get("related"), "."), -1) {
-			if _, ok := title[m[1]]; ok && m[1] != r.Key {
-				link(r.Key, m[1])
-				link(m[1], r.Key)
+			other := ident(m[1], r.Repo)
+			if _, ok := title[other]; ok && other != self {
+				link(self, other)
+				link(other, self)
 			}
 		}
 	}
@@ -292,7 +343,7 @@ func (l *Listing) cluster(rows []Row, match func(Row) bool) {
 	matched := map[string]bool{}
 	for _, r := range rows {
 		if match(r) {
-			matched[r.Key] = true
+			matched[ident(r.Key, r.Repo)] = true
 		}
 	}
 	var kept [][]string
@@ -389,7 +440,8 @@ func (l *Listing) render(md string, active []Active, grep string) {
 			}
 			parts := make([]string, len(c))
 			for i, k := range c {
-				parts[i] = "[" + k + "] " + l.titles[k]
+				key, _, _ := strings.Cut(k, "\x00")
+				parts[i] = "[" + key + "] " + l.titles[k]
 			}
 			out = append(out, "- "+strings.Join(parts, sep))
 		}
