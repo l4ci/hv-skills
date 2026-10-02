@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -81,11 +80,5 @@ func TestPlanUncertain(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".hv/config.json"), []byte(`{"backlog": {"backend": "bogus"}}`), 0o644)
 	if code, _, _ := hvIn(t, dir, "plan", "uncertain", "B07"); code != 70 {
 		t.Errorf("invalid backend: %d, want 70", code)
-	}
-	os.WriteFile(filepath.Join(dir, ".hv/config.json"), []byte(`{"backlog": {"backend": "issues"}}`), 0o644)
-	for _, args := range [][]string{{"plan", "uncertain", "B07"}, {"proof", "show", "B07"}} {
-		if code, _, stderr := hvIn(t, dir, args...); code != 71 || !strings.Contains(stderr, "issue mode") {
-			t.Errorf("%v issue mode: %d %s", args, code, stderr)
-		}
 	}
 }

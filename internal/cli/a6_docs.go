@@ -94,12 +94,15 @@ func designAdd(fs *flag.FlagSet) RunFunc {
 		if *title == "" {
 			return Result{}, Usage("--title is required")
 		}
-		if !design.ValidID(id) {
-			return Result{}, fromArtifact(design.Add("", id, *title)) // reports the bad ID
-		}
-		root, err := fileRoot(c, false)
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return designAddIssue(c, id, *title)
+		}
+		if !design.ValidID(id) {
+			return Result{}, fromArtifact(design.Add("", id, *title)) // reports the bad ID
 		}
 		if err := design.Add(root, id, *title); err != nil {
 			return Result{Data: refusal(err)}, fromArtifact(err)
@@ -151,9 +154,12 @@ func runDesignShow(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return designShowIssue(c, id)
 	}
 	body, err := design.Show(root, id)
 	if err != nil {
@@ -171,15 +177,18 @@ func designPut(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
+		root, issue, err := modeRoot(c)
+		if err != nil {
+			return Result{}, err
+		}
+		if issue {
+			return designPutIssue(c, id, *file)
+		}
 		if !design.ValidID(id) {
 			_, err := design.Put("", id, "")
 			return Result{}, fromArtifact(err)
 		}
 		text, err := readBody(c, *file)
-		if err != nil {
-			return Result{}, err
-		}
-		root, err := fileRoot(c, false)
 		if err != nil {
 			return Result{}, err
 		}
@@ -196,9 +205,12 @@ func runDesignRm(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return designRmIssue(c, id)
 	}
 	if err := design.Rm(root, id); err != nil {
 		return Result{}, fromArtifact(err)
@@ -215,6 +227,10 @@ func designAmend(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
+		root, err := fileRoot(c, true) // issue mode refuses: file-only
+		if err != nil {
+			return Result{}, err
+		}
 		if *heading == "" {
 			return Result{}, Usage("--section is required")
 		}
@@ -226,10 +242,6 @@ func designAmend(fs *flag.FlagSet) RunFunc {
 			return Result{}, fromArtifact(err)
 		}
 		text, err := readBody(c, *file)
-		if err != nil {
-			return Result{}, err
-		}
-		root, err := fileRoot(c, true)
 		if err != nil {
 			return Result{}, err
 		}
@@ -261,18 +273,12 @@ func planAdd(fs *flag.FlagSet) RunFunc {
 		if len(args) == 1 {
 			o.Key = args[0]
 		}
-		root, err := c.Root()
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
 		}
-		if artifact.IssueMode(root) {
-			// Argument errors stay exit 2 under issue mode; only the write is unported.
-			if _, _, err := plan.Add(os.DevNull, o); err != nil {
-				if ae, ok := err.(*artifact.Error); ok && ae.Exit == artifact.ExitUsage {
-					return Result{}, fromArtifact(err)
-				}
-			}
-			return Result{}, fromArtifact(artifact.ErrIssueMode(c.Path))
+		if issue {
+			return planAddIssue(c, root, o)
 		}
 		key, kind, err := plan.Add(root, o)
 		if err != nil {
@@ -341,9 +347,12 @@ func runPlanShow(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return planShowIssue(c, key)
 	}
 	body, err := plan.Show(root, key)
 	if err != nil {
@@ -361,15 +370,18 @@ func planPut(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
+		root, issue, err := modeRoot(c)
+		if err != nil {
+			return Result{}, err
+		}
+		if issue {
+			return planPutIssue(c, key, *file)
+		}
 		if !plan.ValidKey(key) {
 			_, err := plan.Put("", key, "")
 			return Result{}, fromArtifact(err)
 		}
 		text, err := readBody(c, *file)
-		if err != nil {
-			return Result{}, err
-		}
-		root, err := fileRoot(c, false)
 		if err != nil {
 			return Result{}, err
 		}
@@ -386,9 +398,12 @@ func runPlanRm(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return planRmIssue(c, key)
 	}
 	if err := plan.Rm(root, key); err != nil {
 		return Result{}, fromArtifact(err)

@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/plan"
@@ -24,22 +23,19 @@ func proofCommands() []*Command {
 	}
 }
 
-// backlogRoot is the project root for a verb that reads the backlog. An
-// invalid backlog.backend is an internal error (exit 70, as the old helpers
-// exited 1 on it); issue mode is not ported yet (71).
-func backlogRoot(c *Ctx) (string, error) {
-	root, err := c.Root()
+// backlogMode is the project root and whether backlog.backend is "issues".
+// An invalid backlog.backend is an internal error (exit 70, as the old
+// helpers exited 1 on it).
+func backlogMode(c *Ctx) (root string, issue bool, err error) {
+	root, err = c.Root()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	name, err := config.Backend(config.Load(root + "/.hv/config.json"))
 	if err != nil {
-		return "", &Error{Exit: ExitInternal, Message: err.Error()}
+		return "", false, &Error{Exit: ExitInternal, Message: err.Error()}
 	}
-	if name == "issues" {
-		return "", fromArtifact(artifact.ErrIssueMode(c.Path))
-	}
-	return root, nil
+	return root, name == "issues", nil
 }
 
 func proofData(id string, changed any) *jsonx.Object {
@@ -68,9 +64,12 @@ func proofAdd(fs *flag.FlagSet) RunFunc {
 		if *result != "PASS" && *result != "FAIL" {
 			return Result{}, Usage("--result must be exactly PASS or FAIL")
 		}
-		root, err := backlogRoot(c)
+		root, issue, err := backlogMode(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return proofAddIssue(c, root, id, proof.AddOpts{Check: *check, Result: *result, Evidence: *evidence, Sha: *sha})
 		}
 		row, changed, err := proof.Add(root, id, proof.AddOpts{Check: *check, Result: *result, Evidence: *evidence, Sha: *sha})
 		if err != nil {
@@ -93,35 +92,42 @@ func proofShow(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		root, err := backlogRoot(c)
+		root, issue, err := backlogMode(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return proofShowIssue(c, id, *count)
 		}
 		rows, lines, err := proof.Show(root, id)
 		if err != nil {
 			return Result{}, fromArtifact(err)
 		}
-		out := make([]any, len(rows))
-		for i, r := range rows {
-			o := jsonx.NewObject()
-			o.Set("date", r.Date)
-			o.Set("check", r.Check)
-			o.Set("result", r.Result)
-			o.Set("sha", r.Sha)
-			o.Set("evidence", r.Evidence)
-			out[i] = o
-		}
-		d := proofData(id, nil)
-		d.Set("count", len(rows))
-		d.Set("rows", out)
-		text := strings.Join(lines, "\n")
-		if *count {
-			text = strconv.Itoa(len(rows))
-		} else if len(lines) == 0 {
-			text = ""
-		}
-		return Result{Data: d, Text: text}, nil
+		return proofResult(id, id[:1], rows, lines, *count), nil
 	}
+}
+
+// proofResult is proof show's answer: the rows as JSON, or their lines (the
+// count alone with --count) as text.
+func proofResult(id, typ string, rows []proof.Row, lines []string, countOnly bool) Result {
+	out := make([]any, len(rows))
+	for i, r := range rows {
+		o := jsonx.NewObject()
+		o.Set("date", r.Date)
+		o.Set("check", r.Check)
+		o.Set("result", r.Result)
+		o.Set("sha", r.Sha)
+		o.Set("evidence", r.Evidence)
+		out[i] = o
+	}
+	d := typedData(id, typ, nil)
+	d.Set("count", len(rows))
+	d.Set("rows", out)
+	text := strings.Join(lines, "\n")
+	if countOnly {
+		text = strconv.Itoa(len(rows))
+	}
+	return Result{Data: d, Text: text}
 }
 
 func runPlanUncertain(c *Ctx, args []string) (Result, error) {
@@ -129,14 +135,21 @@ func runPlanUncertain(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := backlogRoot(c)
+	root, issue, err := backlogMode(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return uncertainIssue(c, id)
 	}
 	typ, reasons, err := plan.Uncertain(root, id)
 	if err != nil {
 		return Result{}, fromArtifact(err)
 	}
+	return uncertainResult(id, typ, reasons)
+}
+
+func uncertainResult(id, typ string, reasons []string) (Result, error) {
 	rs := make([]any, len(reasons))
 	for i, r := range reasons {
 		rs[i] = r

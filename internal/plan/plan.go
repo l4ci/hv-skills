@@ -21,6 +21,7 @@ import (
 var (
 	keyRe       = regexp.MustCompile(`^M\d{2,}-(?:S\d+|[BFT]\d+)$`)
 	addKeyRe    = regexp.MustCompile(`^(M\d{2,})-([BFTS]\d{2,})$`)
+	addKeyIssue = regexp.MustCompile(`^(M\d{2,})-([BFTS]\d+)$`) // issue numbers have any number of digits
 	milestoneRe = regexp.MustCompile(`^M\d{2,}$`)
 	designIDRe  = regexp.MustCompile(`^[BFT]\d{2,}$`)
 )
@@ -55,42 +56,54 @@ type AddOpts struct {
 	Repos     string // comma list, "" for none
 }
 
-// Add creates a plan stub and returns its key and kind ("slice"|"item").
-func Add(root string, o AddOpts) (key, unitKind string, err error) {
-	var milestone, unit string
+// parseAdd settles which plan AddOpts names: its milestone, and its unit
+// ("" for a slice that still has to be minted).
+func parseAdd(o AddOpts, issue bool) (milestone, unit string, err error) {
 	switch {
 	case o.Key != "" && (o.Slice || o.Milestone != ""):
 		return "", "", artifact.Errf(artifact.ExitUsage, "a key cannot be combined with --slice or --milestone")
 	case o.Key != "":
-		m := addKeyRe.FindStringSubmatch(o.Key)
+		re := addKeyRe
+		if issue {
+			re = addKeyIssue
+		}
+		m := re.FindStringSubmatch(o.Key)
 		if m == nil {
 			return "", "", artifact.Errf(artifact.ExitUsage, "key must look like M01-B07 or M01-S02, got %q", o.Key)
 		}
-		milestone, unit = m[1], m[2]
+		return m[1], m[2], nil
 	case o.Slice && o.Milestone == "":
 		return "", "", artifact.Errf(artifact.ExitUsage, "--slice needs --milestone <M01>")
 	case o.Slice:
 		if !ValidMilestone(o.Milestone) {
 			return "", "", artifact.Errf(artifact.ExitUsage, "milestone must look like M01/M02/…, got %q", o.Milestone)
 		}
-		milestone = o.Milestone
-	default:
-		return "", "", artifact.Errf(artifact.ExitUsage, "give a plan key (M01-B07) or --milestone <M01> --slice")
+		return o.Milestone, "", nil
 	}
+	return "", "", artifact.Errf(artifact.ExitUsage, "give a plan key (M01-B07) or --milestone <M01> --slice")
+}
+
+// extras validates --title, --design and --repos and returns the stub's
+// design pointer and repo list. The design pointer is a file path in file
+// mode (the file must exist) and "note:design" in issue mode, where the
+// design is a note on the item's issue.
+func extras(root string, o AddOpts, issue bool) (design, repo string, err error) {
 	if o.Title == "" {
 		return "", "", artifact.Errf(artifact.ExitUsage, "--title is required")
 	}
-	design := ""
 	if o.Design != "" {
 		if !designIDRe.MatchString(o.Design) {
 			return "", "", artifact.Errf(artifact.ExitUsage, "--design must be an item ID like B07, got %q", o.Design)
 		}
-		design = ".hv/designs/" + o.Design + ".md"
-		if _, serr := os.Stat(filepath.Join(root, design)); serr != nil {
-			return "", "", artifact.Errf(artifact.ExitResolution, "--design file not found: %s", design)
+		if issue {
+			design = "note:design"
+		} else {
+			design = ".hv/designs/" + o.Design + ".md"
+			if _, serr := os.Stat(filepath.Join(root, design)); serr != nil {
+				return "", "", artifact.Errf(artifact.ExitResolution, "--design file not found: %s", design)
+			}
 		}
 	}
-	repo := ""
 	if o.Repos != "" {
 		names := artifact.SplitCSV(o.Repos)
 		if len(names) == 0 {
@@ -108,36 +121,19 @@ func Add(root string, o AddOpts) (key, unitKind string, err error) {
 		}
 		repo = strings.Join(names, ", ")
 	}
+	return design, repo, nil
+}
 
-	dir := filepath.Join(root, ".hv", "plans")
-	// One lock per milestone for every S-unit, minted or explicit, so the
-	// existence check and the minted number cannot race; an item plan locks
-	// its own key.
-	lockPath := path(root, milestone+"-slice")
-	if unit != "" && !strings.HasPrefix(unit, "S") {
-		lockPath = path(root, milestone+"-"+unit)
+// stub is the starter text of a plan.
+func stub(key, milestone, unit, unitKind, repo, design, title string) string {
+	repoLine, designLine := "", ""
+	if repo != "" {
+		repoLine = "repo: " + repo + "\n"
 	}
-	err = fsio.Locked(lockPath, fsio.LockTimeout, func() error {
-		if unit == "" {
-			unit = fmt.Sprintf("S%02d", nextSlice(dir, milestone))
-		}
-		key = milestone + "-" + unit
-		unitKind = "item"
-		if strings.HasPrefix(unit, "S") {
-			unitKind = "slice"
-		}
-		p := path(root, key)
-		if _, serr := os.Stat(p); serr == nil {
-			return artifact.Errf(artifact.ExitRefused, ".hv/plans/%s.md already exists", key)
-		}
-		repoLine, designLine := "", ""
-		if repo != "" {
-			repoLine = "repo: " + repo + "\n"
-		}
-		if design != "" {
-			designLine = "design: " + design + "\n"
-		}
-		stub := fmt.Sprintf(`---
+	if design != "" {
+		designLine = "design: " + design + "\n"
+	}
+	return fmt.Sprintf(`---
 key: %[1]s
 milestone: %[2]s
 unit: %[3]s
@@ -170,11 +166,47 @@ _(3–6 sentences — the shape of the implementation, the design choice, why th
 ## Assumptions
 
 - _(named assumptions made implicit by the approach)_
-`, key, milestone, unit, unitKind, repoLine, designLine, o.Title, time.Now().Format("2006-01-02"))
+`, key, milestone, unit, unitKind, repoLine, designLine, title, time.Now().Format("2006-01-02"))
+}
+
+func kindOfUnit(unit string) string {
+	if strings.HasPrefix(unit, "S") {
+		return "slice"
+	}
+	return "item"
+}
+
+// Add creates a plan stub and returns its key and kind ("slice"|"item").
+func Add(root string, o AddOpts) (key, unitKind string, err error) {
+	milestone, unit, err := parseAdd(o, false)
+	if err != nil {
+		return "", "", err
+	}
+	design, repo, err := extras(root, o, false)
+	if err != nil {
+		return "", "", err
+	}
+	dir := filepath.Join(root, ".hv", "plans")
+	// One lock per milestone for every S-unit, minted or explicit, so the
+	// existence check and the minted number cannot race; an item plan locks
+	// its own key.
+	lockPath := path(root, milestone+"-slice")
+	if unit != "" && !strings.HasPrefix(unit, "S") {
+		lockPath = path(root, milestone+"-"+unit)
+	}
+	err = fsio.Locked(lockPath, fsio.LockTimeout, func() error {
+		if unit == "" {
+			unit = fmt.Sprintf("S%02d", nextSlice(dir, milestone))
+		}
+		key, unitKind = milestone+"-"+unit, kindOfUnit(unit)
+		p := path(root, key)
+		if _, serr := os.Stat(p); serr == nil {
+			return artifact.Errf(artifact.ExitRefused, ".hv/plans/%s.md already exists", key)
+		}
 		if err := os.MkdirAll(dir, 0o777); err != nil {
 			return err
 		}
-		return fsio.WriteFileAtomic(p, []byte(stub))
+		return fsio.WriteFileAtomic(p, []byte(stub(key, milestone, unit, unitKind, repo, design, o.Title)))
 	})
 	if err != nil {
 		return "", "", err

@@ -122,17 +122,9 @@ func TestPlanRenameCheckRunsInCwd(t *testing.T) {
 	}
 }
 
-func TestIssueModeVerbs(t *testing.T) {
+func TestIssueModeFileOnlyVerbs(t *testing.T) {
 	dir := gitRepo(t)
 	os.WriteFile(filepath.Join(dir, ".hv/config.json"), []byte(`{"backlog": {"backend": "issues"}}`), 0o644)
-	for _, args := range [][]string{
-		{"design", "show", "B07"}, {"design", "add", "B07", "--title", "t"},
-		{"plan", "show", "M01-B07"}, {"plan", "add", "M01-B07", "--title", "t"}, {"plan", "list"},
-	} {
-		if code, _, _ := hvIn(t, dir, args...); code != 71 {
-			t.Errorf("%v: exit %d, want 71", args, code)
-		}
-	}
 	if code, _, _ := hvIn(t, dir, "plan", "add", "M01-B07"); code != 2 {
 		t.Errorf("argument errors stay exit 2 in issue mode, got %d", code)
 	}
@@ -140,5 +132,9 @@ func TestIssueModeVerbs(t *testing.T) {
 		if code, _, _ := hvIn(t, dir, args...); code != 4 {
 			t.Errorf("%v: exit %d, want 4 (file-only)", args, code)
 		}
+	}
+	// Listing plans in issue mode is the slice-plan half, still unported.
+	if code, _, _ := hvIn(t, dir, "plan", "list"); code != 71 {
+		t.Errorf("plan list: exit %d, want 71", code)
 	}
 }
