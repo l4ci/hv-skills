@@ -31,7 +31,8 @@ trap 'rm -rf "$HI2_TMP"' EXIT
 exit 7
 EOS
   chmod +x stub-bin/gh
-  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - <<<"y" 2>/dev/null) || true
+  rc=0; OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - <<<"y" 2>/dev/null) || rc=$?
+  [ "$rc" = 5 ] || fail "suggest-upstream with a failing gh should exit 5 (got $rc): $OUT"
   echo "$OUT" | jget error.hint | grep -q "github.com/fork/repo" || fail "--upstream-repo override ignored: $OUT"
   pass "tracker suggest-upstream --upstream-repo override flows through to the hint URL"
 )

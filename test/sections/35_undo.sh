@@ -361,6 +361,37 @@ PYEOF
     || { echo "FAIL F24(k): blockedBy should be 'merge subject': $OUT"; exit 1; }
 ) || exit 1
 
+# ── (l) ship undo --apply: restore fails after the reset → exit 5 saying so ──
+# F03 exists only in the merge commit's Completed line, so after the reset to
+# the pre-merge commit there is nothing for the restore to reopen.
+(
+  cd "$UNDO_TMP"
+  build_undo_fixture "$UNDO_TMP"
+  python3 -c 'import pathlib; p = pathlib.Path(".hv/BACKLOG.md"); p.write_text("".join(l for l in p.read_text().splitlines(True) if "[F03]" not in l))'
+  git commit -q -am "drop F03 from the base"
+  git checkout -q -b hv/F03-test
+  echo impl > impl.txt && git add impl.txt && git commit -q -m "feat: implement F03"
+  SHORT=$(git rev-parse --short HEAD)
+  git checkout -q main
+  git merge --no-ff hv/F03-test -q -m "merge: F03 — test cycle"
+  git branch -q -d hv/F03-test
+  python3 - "$SHORT" <<'PYEOF'
+import sys, pathlib
+p = pathlib.Path(".hv/BACKLOG.md")
+done = f"- ~~**[F03] [Minor] Sample feature.** Body.~~ Done 2026-01-15 [`{sys.argv[1]}`]\n"
+p.write_text(p.read_text().replace("## Completed\n", "## Completed\n" + done))
+PYEOF
+  git add .hv/BACKLOG.md && git commit -q --amend --no-edit
+  EXPECTED_HEAD=$(git rev-parse HEAD^1)
+
+  RC=0; OUT=$(hvj ship undo --apply 2>/dev/null) || RC=$?
+  [ "$RC" = "5" ] || { echo "FAIL F24(l): failed restore expected exit 5, got $RC: $OUT"; exit 1; }
+  echo "$OUT" | jget error.message | grep -q "reset already happened" \
+    || { echo "FAIL F24(l): exit 5 message must say the reset already happened: $OUT"; exit 1; }
+  [ "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" ] \
+    || { echo "FAIL F24(l): the reset should have happened before the restore failed"; exit 1; }
+) || exit 1
+
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$UNDO_TMP"
 pass "F24 item reopen + ship undo smoke"

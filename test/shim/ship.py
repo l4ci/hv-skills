@@ -1,5 +1,6 @@
 # Part of the temporary hv test shim (#46); removed in A9 (#53). See test/hv-shim.
 # `hv ship` adapters.
+import os
 import re
 import sys
 
@@ -22,7 +23,15 @@ def read_body(ctx, what):
     return body
 
 
+def need_repo_at_umbrella(ctx):
+    """Exit 2 at an umbrella root without --repo (listed before the branch check)."""
+    if not ctx.repo and ctx.helper("hv-umbrella-on")[1].strip() == "yes" \
+            and not os.path.isdir(os.path.join(ctx.cwd, ".git")):
+        raise usage(f"{ctx.name}: umbrella root needs --repo <name>")
+
+
 def need_branch(ctx, cwd, branch):
+    need_repo_at_umbrella(ctx)
     if not git_out(cwd, "rev-parse", "--verify", "--quiet", branch + "^{commit}"):
         raise HvError(3, f"branch '{branch}' not found")
 
@@ -122,6 +131,10 @@ def ship_pr_merge(ctx):
             raise HvError(2, msg)
         if re.search(r"not found|no such|unknown|is not open", err):
             raise HvError(3, msg)
+        if re.search(r"\b(pr|mr) merge\b", err):
+            # The forge refused the merge itself: the requested outcome didn't happen (4).
+            raise HvError(4, msg, data={"pr": int(pr), "merged": False, "unproven": [],
+                                        "changesRequested": [], "changed": False})
         raise HvError(5, msg)
     if rc != 0:
         raise HvError({3: 5, 4: 6}.get(rc, 5), first_error_line(err) or f"hv-pr-merge failed (rc {rc})")
@@ -136,11 +149,15 @@ def ship_undo(ctx):
     args = (["--cycle", f["cycle"]] if f.get("cycle") else []) \
         + (["--force"] if f.get("apply") else []) \
         + (["--allow-post-merge"] if f.get("allow-post-merge") else [])
-    rc, out, err = ctx.helper("hv-undo", *args, cwd=repo_dir(ctx))
+    cwd = repo_dir(ctx)
+    rc, out, err = ctx.helper("hv-undo", *args, cwd=cwd)
     if rc != 0:
         msg = first_error_line(err) or f"hv-undo failed (rc {rc})"
         if "hv-uncomplete failed" in err:
-            raise HvError(5, msg)
+            # Contract: exit 5 carries no failure data, so the message says what changed.
+            head = git_out(cwd, "rev-parse", "--short", "HEAD")
+            raise HvError(5, f"the reset already happened (HEAD is now {head}), "
+                             f"but restoring an item failed: {msg}")
         if re.search(r"no merge commit found|not a valid commit", err):
             raise HvError(3, msg)
         if re.search(r"unknown flag|unexpected positional|requires a commit hash", err):
