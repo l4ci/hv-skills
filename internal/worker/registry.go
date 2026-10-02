@@ -7,6 +7,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 // Error is a verb failure with its exit code from the exit table. Data is the
@@ -181,6 +183,15 @@ type Env struct {
 	Sleep func(time.Duration)
 	// Now defaults to time.Now (relay timestamps).
 	Now func() time.Time
+	// Getenv defaults to os.Getenv (HV_GATE_SHA_WAIT).
+	Getenv func(string) string
+	// Forge returns the forge CLI runner for a provider ("github" or
+	// "gitlab") running in dir. Every forge call goes through internal/tracker,
+	// never an exec of gh or glab from here. Tests inject a fake Exec.
+	Forge func(provider, dir string, retryWait time.Duration) *tracker.CLI
+	// Shell runs one verification command through `sh -c` in dir and returns
+	// its combined output and exit code.
+	Shell func(dir, command string) (output string, code int)
 }
 
 func (e Env) context() context.Context {
@@ -203,5 +214,30 @@ func (e Env) withDefaults() Env {
 	if e.Now == nil {
 		e.Now = time.Now
 	}
+	if e.Getenv == nil {
+		e.Getenv = os.Getenv
+	}
+	if e.Forge == nil {
+		e.Forge = func(provider, dir string, wait time.Duration) *tracker.CLI {
+			return &tracker.CLI{Provider: provider, Dir: dir, RetryWait: wait}
+		}
+	}
+	if e.Shell == nil {
+		e.Shell = execShell
+	}
 	return e
+}
+
+func execShell(dir, command string) (string, int) {
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return string(out), ee.ExitCode()
+	}
+	if err != nil {
+		return err.Error(), 127
+	}
+	return string(out), 0
 }

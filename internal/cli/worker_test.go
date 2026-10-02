@@ -333,3 +333,58 @@ func TestWorkerSessionVerbs(t *testing.T) {
 		t.Errorf("ensure inside: %d %v", code, d)
 	}
 }
+
+func TestWorkerGateVerb(t *testing.T) {
+	dir := workerProject(t, `{"refactor":{"verifyCommands":["test -f feature.txt"]}}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	wt := filepath.Join(dir, ".worktrees", "w1")
+	git := func(d string, args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-c", "user.email=a@b", "-c", "user.name=n"}, args...)...)
+		c.Dir = d
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "gate", "w1"); code != 2 {
+		t.Errorf("no --base: %d", code)
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "gate", "ghost", "--base", "main"); code != 3 {
+		t.Errorf("unknown slot: %d", code)
+	}
+	os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("f"), 0o644)
+	git(wt, "add", "feature.txt")
+	git(wt, "commit", "-q", "-m", "feature")
+
+	code, out, _ := hvIn(t, dir, "worker", "gate", "w1", "--base", "main", "--check-only", "--json")
+	d := data(t, out)
+	if code != 0 || d["verdict"] != "fresh" || d["changed"] != false || d["branch"] != "hv-worker/w1" {
+		t.Fatalf("check-only: %d %v", code, d)
+	}
+
+	// main moves: the slot is stale, a verdict on exit 1 with the answer in data
+	os.WriteFile(filepath.Join(dir, "main.txt"), []byte("m"), 0o644)
+	git(dir, "add", "main.txt")
+	git(dir, "commit", "-q", "-m", "main moves")
+	code, out, errOut := hvIn(t, dir, "worker", "gate", "w1", "--base", "main", "--json")
+	if d = data(t, out); code != 1 || d["verdict"] != "stale" || d["changed"] != false || !strings.Contains(errOut, "STALE w1") {
+		t.Fatalf("stale: %d %v %s", code, d, errOut)
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "gate", "w1", "--base", "nope"); code != 3 {
+		t.Errorf("unknown base: %d", code)
+	}
+
+	git(wt, "merge", "-q", "main", "-m", "sync")
+	code, out, _ = hvIn(t, dir, "worker", "gate", "w1", "--base", "main", "--json")
+	d = data(t, out)
+	if code != 0 || d["verdict"] != "pass" || d["changed"] != true || d["verified"].([]any)[0] != "test -f feature.txt" || d["verifySkipped"] != false || d["sha"] == nil {
+		t.Fatalf("pass: %d %v", code, d)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "feature.txt")); err != nil {
+		t.Error("the slot's work is not on main")
+	}
+	// the merge commit is on main but not on the slot's branch, so it is stale again
+	if code, _, _ = hvIn(t, dir, "worker", "gate", "w1", "--base", "main"); code != 1 {
+		t.Errorf("re-gating a merged slot: %d, want 1 (stale)", code)
+	}
+}
