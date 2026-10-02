@@ -4,7 +4,7 @@ hv-skills is a Claude Code workflow that plans before coding, makes one commit p
 
 ## Active milestones
 
-- M07 — Issue-tracker backend
+_(none active — set with `/hv-vision`)_
 
 ## Milestones
 
@@ -27,7 +27,7 @@ Close the umbrella gap left open in v4.0: per-sub-repo .hv/knowledge/<repo>/KNOW
 
 ### M07 — Issue-tracker backend
 
-**Status:** active · **Depends:** —
+**Status:** shipped · **Depends:** —
 
 backlog.backend: issues makes GitHub/GitLab issues + native milestones the source of truth; file mode unchanged
 
