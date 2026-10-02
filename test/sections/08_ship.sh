@@ -4,7 +4,7 @@ rc=0; echo "" | hvj ship merge hv/real-branch --body-file - >/dev/null 2>&1 || r
 [ "$rc" = 2 ] || fail "ship merge should reject an empty message with exit 2 (got $rc)"
 rc=0; hvj ship merge hv/real-branch >/dev/null 2>&1 || rc=$?
 [ "$rc" = 2 ] || fail "ship merge without --body-file should exit 2 (got $rc)"
-rc=0; echo "msg" | hvj ship merge hv/real-branch --body-file - >/dev/null 2>&1 || rc=$?
+rc=0; echo "msg" | hvj ship merge hv/no-such-branch --body-file - >/dev/null 2>&1 || rc=$?
 [ "$rc" = 3 ] || fail "ship merge of an unknown branch should exit 3 (got $rc)"
 pass "ship merge rejects empty message and unknown branch"
 
