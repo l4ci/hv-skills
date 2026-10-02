@@ -20,7 +20,17 @@ export HV_INSTALL_ROOT="$REPO"
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
 # from helpers like hv-resolve-umbrella (which would otherwise mismatch on Darwin).
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
-trap 'rm -rf "$TMP"' EXIT
+
+# Black-box target (#46): sections call "$HV_BIN <group> <verb>". It defaults
+# to the temporary shim, which maps verbs onto the old bin/ helpers; point it
+# at a real `hv` binary to run the same sections against the Go port. The
+# shim runs helpers from a copy of bin/ staged outside every project, so a
+# helper that walks up from its own directory can never reach this dev tree.
+export HV_BIN="${HV_BIN:-$TESTDIR/hv-shim}"
+HV_SHIM_STAGE="$(mktemp -d)"
+export HV_SHIM_HELPERS="$HV_SHIM_STAGE/bin"
+cp -R "$BIN" "$HV_SHIM_HELPERS"
+trap 'rm -rf "$TMP" "$HV_SHIM_STAGE"' EXIT
 
 # Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .hv/
 # content before any section runs. Under v4.1's partial-tracking model
@@ -102,11 +112,22 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 # This pin is defensive — sections following the F38 local-trap convention
 # should already restore cwd, but enforcing it at the boundary makes the
 # leak guard catch only true walk-up clobbers, not cwd-drift residue.
-for f in "$TESTDIR/sections/"*.sh; do
-  [ -f "$f" ] || continue
-  cd "$TMP"
-  source "$f"
-done
+#
+# The loop runs in a subshell: sections replace the EXIT trap (F38), and the
+# runner's own trap above must survive them to remove the shim stage.
+# It is not written `( … ) || rc=$?`: bash ignores set -e inside a subshell
+# that is the left side of `||`, so a failing section would carry on.
+set +e
+(
+  set -e
+  for f in "$TESTDIR/sections/"*.sh; do
+    [ -f "$f" ] || continue
+    cd "$TMP"
+    source "$f"
+  done
+)
+SECTIONS_RC=$?
+set -e
 
 # Leak guard assertion: if any section wrote to $REPO/CLAUDE.md or any
 # tracked .hv/ file in the dev tree, restore from snapshot and fail.
@@ -143,5 +164,6 @@ fi
 [ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
 [ "$LEAKED" = 1 ] && exit 1
+[ "$SECTIONS_RC" = 0 ] || exit "$SECTIONS_RC"
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

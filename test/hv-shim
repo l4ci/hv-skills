@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+# TEMPORARY: removed in A9 (#53), when the Go `hv` binary replaces bin/.
+#
+# Test shim for the black-box smoke suite (A2, #46). It accepts `hv <group>
+# <verb>` calls in the shape docs/design/5.0-verb-contract.md defines,
+# translates each one into the old bin/ helper call, and maps the helper's
+# output and exit code back onto the contract: the --json envelope, the exit
+# table and the stderr format from docs/design/5.0-cli-conventions.md.
+#
+# Smoke reaches it through $HV_BIN, so pointing HV_BIN at a real `hv` binary
+# runs the same sections against the port with no other change.
+#
+# Leak guard: helpers run from a staged copy of bin/ ($HV_SHIM_HELPERS) that
+# lives outside every project. hv_self_locate's last fallback walks up from the
+# helper's own directory; from the repo's bin/ that walk lands on the dev
+# tree's .hv/, but from the staged copy it finds nothing and fails. Verbs that
+# need a project also check for a .hv/ root here first (exit 3), so a helper is
+# never started without one.
+#
+# A verb in the contract with no adapter yet exits 71 (not_implemented). Each
+# phase batch of #46 adds the adapters its sections need.
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+EXIT_CODES = {
+    1: "failed", 2: "usage", 3: "not_found", 4: "refused",
+    5: "unavailable", 6: "retry", 70: "internal", 71: "not_implemented",
+}
+
+
+class HvError(Exception):
+    """Ends the verb with a contract exit code; data rides along on exit 1."""
+
+    def __init__(self, exit, message, hint=None, data=None):
+        super().__init__(message)
+        self.exit = exit
+        self.message = message
+        self.hint = hint
+        self.data = data
+
+
+def usage(message):
+    return HvError(2, message)
+
+
+# ---------------------------------------------------------------- invocation
+
+class Ctx:
+    def __init__(self, path, args, repo, cwd):
+        self.path = path            # ("item", "field")
+        self.args = args            # verb args, globals removed
+        self.repo = repo            # global --repo value or None
+        self.cwd = cwd              # effective working directory
+        self.warnings = []
+
+    @property
+    def name(self):
+        return "hv " + " ".join(self.path)
+
+    def helper(self, name, *args, stdin=None, cwd=None, env=None):
+        """Run a staged old helper. Returns (rc, stdout, stderr)."""
+        full_env = dict(os.environ)
+        full_env.update(env or {})
+        proc = subprocess.run(
+            [os.path.join(helpers_dir(), name), *args],
+            input=stdin, capture_output=True, text=True,
+            cwd=cwd or self.cwd, env=full_env,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+
+    def no_repo(self):
+        if self.repo is not None:
+            raise usage(f"{self.name} has no repo scope; drop --repo")
+
+
+def parse_globals(argv):
+    """Split global flags (anywhere before `--`) from the verb words and args."""
+    as_json, cwd, repo, help_ = False, None, None, False
+    rest = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--":
+            rest.extend(argv[i:])
+            break
+        if a in ("--json", "-json"):
+            as_json = True
+        elif a in ("-h", "--help", "-help"):
+            help_ = True
+        elif a in ("-C", "--cwd", "-cwd", "--repo", "-repo"):
+            if i + 1 >= len(argv):
+                raise usage(f"flag needs an argument: {a}")
+            if a.endswith("repo"):
+                repo = argv[i + 1]
+            else:
+                cwd = argv[i + 1]
+            i += 1
+        elif a.startswith(("--cwd=", "-cwd=")):
+            cwd = a.split("=", 1)[1]
+        elif a.startswith(("--repo=", "-repo=")):
+            repo = a.split("=", 1)[1]
+        elif a == "--version":
+            rest.insert(0, "version")
+        else:
+            rest.append(a)
+        i += 1
+    return as_json, cwd, repo, help_, rest
+
+
+def parse_flags(ctx, values=(), bools=(), min_pos=0, max_pos=None):
+    """Go-flag-style parse of ctx.args, flags and positionals interleaved.
+
+    `values` and `bools` name the verb's flags without dashes. Returns
+    (flags dict, positionals list). Unknown flags and wrong positional
+    counts are usage errors (exit 2).
+    """
+    flags, pos = {}, []
+    args = ctx.args
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--":
+            pos.extend(args[i + 1:])
+            break
+        if a.startswith("-") and a != "-" and not re.match(r"^-\d", a):
+            name, eq, val = a.lstrip("-").partition("=")
+            if name in bools:
+                if eq:
+                    raise usage(f"{ctx.name}: --{name} takes no value")
+                flags[name] = True
+            elif name in values:
+                if not eq:
+                    if i + 1 >= len(args):
+                        raise usage(f"{ctx.name}: flag needs an argument: --{name}")
+                    val = args[i + 1]
+                    i += 1
+                flags[name] = val
+            else:
+                raise usage(f"{ctx.name}: unknown flag --{name}")
+        else:
+            pos.append(a)
+        i += 1
+    if len(pos) < min_pos or (max_pos is not None and len(pos) > max_pos):
+        raise usage(f"{ctx.name}: wrong number of arguments")
+    return flags, pos
+
+
+# ---------------------------------------------------------------- environment
+
+_staged = None
+
+
+def helpers_dir():
+    """Directory holding the old helpers, outside every project (leak guard)."""
+    global _staged
+    d = os.environ.get("HV_SHIM_HELPERS")
+    if d:
+        return d
+    if _staged is None:
+        _staged = os.path.join(tempfile.mkdtemp(prefix="hv-shim-"), "bin")
+        shutil.copytree(os.path.join(REPO, "bin"), _staged, symlinks=True)
+    return _staged
+
+
+def find_root(start):
+    d = os.path.realpath(start)
+    while True:
+        if os.path.isdir(os.path.join(d, ".hv")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def require_root(ctx):
+    root = find_root(ctx.cwd)
+    if root is None:
+        raise HvError(3, "no .hv/ found in this directory or any parent", hint="run: hv init")
+    return root
+
+
+def first_error_line(stderr):
+    """The old helper's message, without its `error: hv-foo:` prefix."""
+    for line in stderr.splitlines():
+        line = line.strip()
+        if line:
+            return re.sub(r"^(error|warn(ing)?):\s*(hv-[\w-]+:\s*)?", "", line)
+    return ""
+
+
+def json_body(stdout):
+    try:
+        return json.loads(stdout)
+    except ValueError as e:
+        raise HvError(70, f"old helper printed unparseable JSON: {e}")
+
+
+# ---------------------------------------------------------------- adapters
+#
+# An adapter takes a Ctx and returns (data, text). `text` is what the verb
+# prints without --json; the shim passes the old helper's stdout through
+# there, since the contract leaves text output free. Raise HvError to fail.
+# Register with @verb(..., root=False) for verbs that run without a .hv/ root.
+
+ADAPTERS = {}
+NO_ROOT = set()
+
+
+def verb(*path, root=True):
+    def register(fn):
+        ADAPTERS[path] = fn
+        if not root:
+            NO_ROOT.add(path)
+        return fn
+    return register
+
+
+# Every verb the contract defines. A path here with no adapter exits 71.
+CONTRACT_VERBS = set()
+
+
+def load_contract_verbs():
+    """Read the verb list from the contract's `### hv …` headings."""
+    path = os.path.join(REPO, "docs", "design", "5.0-verb-contract.md")
+    try:
+        with open(path) as f:
+            for line in f:
+                m = re.match(r"^### hv ((?:[a-z][\w-]*)(?: [a-z][\w-]*)*)\s*$", line)
+                if m:
+                    CONTRACT_VERBS.add(tuple(m.group(1).split()))
+    except OSError:
+        pass
+
+
+# ---------------------------------------------------------------- main
+
+def resolve(words):
+    """Longest prefix of `words` that names an adapter or a contract verb."""
+    known = set(ADAPTERS) | CONTRACT_VERBS
+    for n in range(min(len(words), 4), 0, -1):
+        if tuple(words[:n]) in known:
+            return tuple(words[:n]), words[n:]
+    return None, words
+
+
+def emit(as_json, name, data=None, text=None, err=None, warnings=()):
+    for w in warnings:
+        print(f"{name}: warning: {w}", file=sys.stderr)
+    if err is None:
+        if as_json:
+            env = {"ok": True, "data": data if data is not None else {}}
+            if warnings:
+                env["warnings"] = list(warnings)
+            print(json.dumps(env))
+        elif text:
+            sys.stdout.write(text if text.endswith("\n") else text + "\n")
+        return 0
+    print(f"{name}: {err.message}", file=sys.stderr)
+    if err.hint:
+        print(f"hint: {err.hint}", file=sys.stderr)
+    if as_json:
+        e = {"code": EXIT_CODES.get(err.exit, "internal"), "exit": err.exit,
+             "message": err.message}
+        if err.hint:
+            e["hint"] = err.hint
+        env = {"ok": False, "error": e}
+        if err.exit == 1 and err.data is not None:
+            env["data"] = err.data
+        if warnings:
+            env["warnings"] = list(warnings)
+        print(json.dumps(env))
+    return err.exit
+
+
+def main(argv):
+    as_json, name = False, "hv"
+    try:
+        as_json, cwd, repo, help_, rest = parse_globals(argv)
+        load_contract_verbs()
+        path, args = resolve(rest)
+        if path is None:
+            raise usage(f"unknown command: {' '.join(rest[:2]) or '(none)'}")
+        name = "hv " + " ".join(path)
+        if help_:
+            print(f"usage: {name} … (see docs/design/5.0-verb-contract.md)")
+            return 0
+        cwd = os.path.realpath(cwd or os.getcwd())
+        if not os.path.isdir(cwd):
+            raise usage(f"-C {cwd}: not a directory")
+        fn = ADAPTERS.get(path)
+        if fn is None:
+            raise HvError(71, "not ported to the test shim yet")
+        ctx = Ctx(path, args, repo, cwd)
+        if path not in NO_ROOT:
+            require_root(ctx)
+        data, text = fn(ctx)
+        return emit(as_json, name, data, text, warnings=ctx.warnings)
+    except HvError as e:
+        return emit(as_json, name, err=e)
+    finally:
+        if _staged:
+            shutil.rmtree(os.path.dirname(_staged), ignore_errors=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
