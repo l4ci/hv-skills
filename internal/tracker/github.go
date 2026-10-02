@@ -99,7 +99,8 @@ func (g *GitHub) EnsureLabels(ctx context.Context, names []string, autoCreate bo
 			continue
 		}
 		if !autoCreate {
-			return failed("label '%s' does not exist (issues.autoCreateLabel is off)", n)
+			// A missing label is a missing object (exit 3); Code stays 1, as Python's.
+			return &Error{Kind: KindNotFound, Code: 1, Message: fmt.Sprintf("label '%s' does not exist (issues.autoCreateLabel is off)", n)}
 		}
 		if _, err := g.run(ctx, []string{"label", "create", n, "--force"}, ""); err != nil {
 			return err

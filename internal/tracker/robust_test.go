@@ -383,3 +383,39 @@ func TestGitLabMergeGitCallsTimeOut(t *testing.T) {
 		t.Fatal("git fetch ran without the per-attempt timeout")
 	}
 }
+
+// TestMissingLabelIsNotFound: with autoCreateLabel off, a label the tracker
+// lacks is exit 3 (contract #106), through EnsureLabels and AddLabels; with
+// it on, the label is created. glab creates labels on first use, so GitLab
+// never refuses.
+func TestMissingLabelIsNotFound(t *testing.T) {
+	ctx := context.Background()
+	s := &scripted{answer: func(_ string, args []string) (string, string, int) {
+		if args[0] == "label" && args[1] == "list" {
+			return `[{"name":"bug"}]`, "", 0
+		}
+		return "", "", 0
+	}}
+	gh := newAdapter(t, "github", s)
+	for name, err := range map[string]error{
+		"EnsureLabels": gh.EnsureLabels(ctx, []string{"bug", "nope"}, false),
+		"AddLabels":    gh.AddLabels(ctx, 1, []string{"nope"}, false),
+	} {
+		var e *Error
+		if !errors.As(err, &e) || e.Kind != KindNotFound || e.Kind.Exit() != 3 || !strings.Contains(e.Message, "label 'nope' does not exist") {
+			t.Errorf("%s: %#v", name, err)
+		}
+	}
+	for _, c := range s.calls {
+		if strings.Contains(c, "label create") || strings.Contains(c, "issue edit") {
+			t.Fatalf("a refused label must change nothing: %q", s.calls)
+		}
+	}
+	if err := gh.EnsureLabels(ctx, []string{"nope"}, true); err != nil || s.calls[len(s.calls)-1] != "gh label create nope --force" {
+		t.Fatalf("autoCreate on: %v, %q", err, s.calls)
+	}
+	gl := newAdapter(t, "gitlab", &scripted{answer: func(string, []string) (string, string, int) { return "", "", 0 }})
+	if err := gl.AddLabels(ctx, 1, []string{"nope"}, false); err != nil {
+		t.Fatalf("gitlab: %v", err)
+	}
+}
