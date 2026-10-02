@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
@@ -31,11 +32,13 @@ func dataOf(env map[string]any) *jsonx.Object {
 	return d
 }
 
-func TestA4bIssueModeStubExits5(t *testing.T) {
+// Issue mode with no resolvable forge (no origin, no issues.provider) is the
+// tracker's unavailable: exit 5, before any read.
+func TestA4bIssueModeWithoutProviderExits5(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
 	for _, argv := range [][]string{{"backlog", "list"}, {"backlog", "ids", "--milestone", "M01"}, {"backlog", "milestones", "12"}, {"summary"}} {
 		code, env, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
-		if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "not ported yet") {
+		if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "provider") {
 			t.Errorf("%v: code=%d stderr=%s", argv, code, stderr)
 		}
 	}
@@ -59,7 +62,7 @@ func TestA4bFileOnlyVerbsAreRefusedUnderIssues(t *testing.T) {
 
 func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
-	withTracker(t, &a4FakeTracker{issues: []backlog.Issue{
+	withTracker(t, &trackertest.Fake{Issues: []backlog.Issue{
 		{Number: 12, Title: "Crash on save", State: "open", Labels: []string{"type:bug"}, Milestone: "M02 — Next",
 			Body: "<!-- hv:fields\nRelated: F3\n-->"},
 		{Number: 3, Title: "Dark mode", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},

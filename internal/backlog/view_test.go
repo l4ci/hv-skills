@@ -67,7 +67,7 @@ func TestOpenRowsFile(t *testing.T) {
 }
 
 func TestOpenRowsIssues(t *testing.T) {
-	tr := &fakeTracker{issues: []Issue{
+	tr := &fakeTracker{Issues: []Issue{
 		{Number: 12, Title: "Crash", State: "open", Labels: []string{"type:bug"}},
 		{Number: 3, Title: "Idea", State: "open", Labels: []string{"type:feature"}},
 		{Number: 7, Title: "Closed", State: "closed", Labels: []string{"type:bug"}},
@@ -231,7 +231,7 @@ func TestBuildListingActiveAndGrep(t *testing.T) {
 }
 
 func TestBuildListingIssuesKeepSpellings(t *testing.T) {
-	tr := &fakeTracker{issues: []Issue{
+	tr := &fakeTracker{Issues: []Issue{
 		{Number: 12, Title: "Crash", State: "open", Labels: []string{"type:bug"}, Body: "<!-- hv:fields\nRelated: F3\n-->"},
 		{Number: 3, Title: "Idea", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},
 	}}

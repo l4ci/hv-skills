@@ -69,7 +69,7 @@ func TestItemStateClaimReleaseShow(t *testing.T) {
 		t.Fatalf("claim: %v", d)
 	}
 	d = runOK(t, root, ExitRefused, "item", "claim", "7", "--as", "bob")
-	if get(d, "blockedBy") != "claimed by alice" || get(d, "changed") != false {
+	if get(d, "blockedBy") != "claimed" || get(d, "changed") != true {
 		t.Fatalf("lost claim: %v", d)
 	}
 	d = runOK(t, root, 0, "item", "show", "7")
@@ -125,7 +125,7 @@ func TestItemNotes(t *testing.T) {
 	runOK(t, root, ExitUsage, "item", "note", "show", "7", "--kind", "nope")
 	runOK(t, root, ExitUsage, "item", "note", "add", "7", "--kind", "plan", "--body-file", empty)
 	runOK(t, root, ExitUsage, "item", "note", "add", "7", "--kind", "plan")
-	runOK(t, root, ExitUsage, "item", "note", "add", "7", "--kind", "plan", "--body-file", filepath.Join(t.TempDir(), "missing"))
+	runOK(t, root, ExitResolution, "item", "note", "add", "7", "--kind", "plan", "--body-file", filepath.Join(t.TempDir(), "missing"))
 	runOK(t, root, ExitResolution, "item", "note", "add", "99", "--kind", "plan", "--body-file", body)
 }
 

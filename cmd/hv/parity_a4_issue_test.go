@@ -28,8 +28,9 @@ package main
 //     and drop the key from the envelope comparison.
 //  4. a milestone that is not M<digits>: Go 2, old rc 1 -> 3.
 //  5. an empty note body: Go 2 (contract), old writes an empty note.
-//  6. the loser of a claim: Go sends failure data {blockedBy: "claimed by X",
-//     changed: false}; old prints only the message.
+//  6. the loser of a claim: Go sends failure data {blockedBy: "claimed",
+//     changed: true} (#106 contract: its claim and release were posted);
+//     old prints only the message.
 //  7. comment add / note on a milestone tracker issue or with a wrong type
 //     letter: old never looks the issue up (works), Go resolves it first (3).
 //  8. file backend, claim/release on an unknown item: old exits 0 silently,
@@ -200,7 +201,7 @@ func envRun(t *testing.T, dir, stdin string, extra []string, name string, args .
 		}
 		code = ee.ExitCode()
 	}
-	return run{code, so.String(), se.String()}
+	return run{code: code, stdout: so.String(), stderr: se.String(), dir: dir}
 }
 
 // mapIssueOld maps an old helper's rc to the contract: usage text 2, not found
@@ -469,7 +470,7 @@ func TestParityA4Issue(t *testing.T) {
 		cr("bad-tag", 2, "--kind", "bugs", "--title", "x", "--tag", "Major"),
 		cr("no-title", 2, "--kind", "bugs"),
 		isc{name: "create/milestone-bad-format", argv: j("item", "create", "--kind", "bugs", "--title", "x", "--milestone", "next"), want: 2,
-			div: "4: Go usage 2, old rc 1 -> 3", refWant: 3},
+			div: "4: Go usage 2 (contract: one milestone ID), the shim maps the old ValueError to 5", refWant: 5},
 		isc{name: "create/rate-limit", argv: j("item", "create", "--kind", "bugs", "--title", "x"), want: 6,
 			env: []string{"FAKE_TRACKER_FAIL=issue create", "FAKE_TRACKER_FAIL_MSG=secondary rate limit"}},
 		isc{name: "create/forge-unavailable", remote: "none", argv: j("item", "create", "--kind", "bugs", "--title", "x"), want: 5},
@@ -502,13 +503,11 @@ func TestParityA4Issue(t *testing.T) {
 		fs("related-clear", "1", "related", "", 0, yes()),
 		fs("repos", "2", "repos", "web, api", 0, yes()),
 		fs("milestone-missing", "2", "milestone", "M99", 3, nil),
-		isc{name: "fieldset/detail-refused", argv: j("item", "field", "set", "2", "--name", "detail", "--value", "x"), want: 4,
-			div: "11: contract and Go 4 (backend), old path 2", refWant: 2},
+		isc{name: "fieldset/detail-refused", argv: j("item", "field", "set", "2", "--name", "detail", "--value", "x"), want: 4},
 		fs("bad-field", "2", "title", "x", 2, nil),
-		isc{name: "fieldset/closed", argv: j("item", "field", "set", "4", "--name", "related", "--value", "B1"), want: 4,
-			div: "2: closed issue is 4 in the contract, old rc 1 -> 3", refWant: 3},
+		isc{name: "fieldset/closed", argv: j("item", "field", "set", "4", "--name", "related", "--value", "B1"), want: 4},
 		isc{name: "fieldset/milestone-bad-format", argv: j("item", "field", "set", "2", "--name", "milestone", "--value", "later"), want: 2,
-			div: "4: Go usage 2, old rc 1 -> 3", refWant: 3},
+			div: "4: Go usage 2 (contract: one milestone ID), the shim maps the old ValueError to 5", refWant: 5},
 		isc{name: "fieldget/title", argv: j("item", "field", "get", "1", "--name", "title"), want: 0},
 		isc{name: "fieldget/milestone", argv: j("item", "field", "get", "1", "--name", "milestone"), want: 0},
 		isc{name: "fieldget/related-bracketed", argv: j("item", "field", "get", "1", "--name", "related"), want: 0},
@@ -574,8 +573,8 @@ func TestParityA4Issue(t *testing.T) {
 		cl("already-holder", "7", "me", 0, func(t *testing.T, e envl, _ run, _ map[string]any) { eq(t, e, "data.type", "T") }),
 		cl("held-by-other", "6", "me", 4, func(t *testing.T, e envl, ref run, _ map[string]any) {
 			// divergence 6: failure data the old helper has no way to send
-			eq(t, e, "data.blockedBy", "claimed by other")
-			eq(t, e, "data.changed", false)
+			eq(t, e, "data.blockedBy", "claimed")
+			eq(t, e, "data.changed", true)
 			if !strings.Contains(ref.stderr, "claimed by other") {
 				t.Errorf("old message does not name the holder: %s", ref.stderr)
 			}

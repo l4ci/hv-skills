@@ -143,8 +143,9 @@ func a4Claim(fs *flag.FlagSet) RunFunc {
 			return a4Fail(err)
 		}
 		if !won {
-			// The loser posted its claim and its release, so the item is as it was.
-			return Result{Data: a4Obj("blockedBy", "claimed by "+holder, "changed", false)},
+			// The loser posted its claim and then its release on the issue, so
+			// it did change state on the way to the refusal (contract: changed true).
+			return Result{Data: a4Obj("blockedBy", "claimed", "changed", true)},
 				Refused("%s is claimed by %s", id, holder)
 		}
 		issue := be.Name() == "issues"
