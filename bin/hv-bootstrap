@@ -161,7 +161,9 @@ fi
 # A nested checkout must stay out of `git status`; .gitignore, not
 # .git/info/exclude, so every clone gets it. Separate from IGNORE_LINES above:
 # that block is appended whole, which would repeat it in existing projects.
-if ! grep -qxF '.worktrees/' .gitignore 2>/dev/null; then
+# Any spelling git treats the same counts: .worktrees, /.worktrees, trailing
+# slash, CRLF line ends.
+if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxE '/?\.worktrees/?'; then
   printf '\n# Worker worktrees (hv-worker-pool, parallel rounds)\n.worktrees/\n' >> .gitignore
 fi
 

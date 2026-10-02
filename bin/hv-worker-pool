@@ -162,6 +162,14 @@ PY
 )"
       if [ -n "$REG_WT" ] && [ "$REG_WT" != "$(cd "$REL" 2>/dev/null && pwd -P)" ] \
          && git -C "$REG_WT" rev-parse --git-dir >/dev/null 2>&1; then
+        # Only a worktree of THIS repository may be adopted: a registry path
+        # that is a checkout of some other repo would be handed to dispatch,
+        # reset and the gate as if it were a slot.
+        OURS="$(cd "$(git rev-parse --git-common-dir)" && pwd -P)"
+        THEIRS="$(cd "$REG_WT" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
+        [ "$OURS" = "$THEIRS" ] || {
+          echo "error: slot $NAME is registered at $REG_WT, a worktree of another repository ($THEIRS, not $OURS); fix or remove the registry entry" >&2
+          exit 3; }
         REL="$REG_WT"
         echo "note: slot $NAME stays at $REG_WT (outside $WT_ROOT/); git worktree move it to relocate" >&2
       fi
