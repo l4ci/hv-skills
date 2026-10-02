@@ -200,6 +200,13 @@ func parseFlag(fs *flag.FlagSet, args []string, i int) (int, error) {
 
 // Main runs hv with the default command tree and returns the exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	// Hidden: test/hv-hybrid asks the binary which verbs it implements.
+	if len(args) == 1 && args[0] == "__verbs" {
+		for _, v := range VerbPaths(Tree()) {
+			fmt.Fprintln(stdout, v)
+		}
+		return ExitOK
+	}
 	return run(Tree(), args, stdin, stdout, stderr)
 }
 
@@ -289,6 +296,13 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	if g.cwd != "" {
 		if err := os.Chdir(g.cwd); err != nil {
 			return fail(c, stdout, Resolution("cannot use -C %s: %v", g.cwd, unwrapPathErr(err)))
+		}
+	}
+	// An unregistered --repo is exit 3 on every repo-scoped verb, ahead of
+	// the verb's own checks (contract rule 9).
+	if c.Repo != "" {
+		if _, err := c.RepoPath(); err != nil {
+			return fail(c, stdout, err)
 		}
 	}
 	res, err := runVerb(c, positional)
@@ -448,4 +462,23 @@ func helpResult(path string, cmd *Command, verbFlags *flag.FlagSet) Result {
 	}
 	b.WriteString("\nGlobal flags: --json, -C/--cwd <dir>, --repo <name>, -h/--help\n")
 	return Result{Data: data, Text: b.String()}
+}
+
+// VerbPaths lists every verb in the tree as its space-separated command path
+// ("knowledge tier get"), sorted. It is what `hv __verbs` prints.
+func VerbPaths(root *Command) []string {
+	var out []string
+	var walk func(c *Command, prefix string)
+	walk = func(c *Command, prefix string) {
+		for _, s := range c.Subs {
+			p := strings.TrimSpace(prefix + " " + s.Name)
+			if s.Verb != nil {
+				out = append(out, p)
+			}
+			walk(s, p)
+		}
+	}
+	walk(root, "")
+	sort.Strings(out)
+	return out
 }

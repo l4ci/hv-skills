@@ -139,7 +139,7 @@ func knQuery(fs *flag.FlagSet) RunFunc {
 		}
 		text, missing, err := st.Query(scope, args, knowledge.QueryOpts{IncludeDeprecated: *incl, Tier: *tier})
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		for _, m := range missing {
 			c.Warn("no topic heading matches %q — topic args must be the exact '## ' heading text", m)
@@ -162,7 +162,7 @@ func knStats(c *Ctx, args []string) (Result, error) {
 	}
 	stats, err := st.Stats()
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	topics := []any{}
 	var lines []string
@@ -195,7 +195,7 @@ func knAdd(fs *flag.FlagSet) RunFunc {
 		}
 		res, err := st.Add(scope, *topic, *title, body, *date)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		text := fmt.Sprintf("added: %s :: %s", *topic, *title)
 		if !res.Changed {
@@ -234,7 +234,7 @@ func knAmend(fs *flag.FlagSet) RunFunc {
 		}
 		file, changed, err := st.Amend(scope, c.Repo != "", *topic, *fragment, body)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		return Result{Data: knObj("topic", *topic, "changed", changed), Text: "amended: " + file}, nil
 	}
@@ -257,7 +257,7 @@ func knRename(fs *flag.FlagSet) RunFunc {
 		}
 		res, err := st.RenameTopic(scope, *from, *to, *title)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		d := knObj("from", *from, "to", *to)
 		if *title != "" {
@@ -292,7 +292,7 @@ func knHit(fs *flag.FlagSet) RunFunc {
 		}
 		res, err := st.Hit(scope, *topic, *title)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		if res.PromotionBlocked {
 			c.Warn("skip-auto-promote: %s :: %s has pending contradiction", *topic, *title)
@@ -320,7 +320,7 @@ func knTierGet(fs *flag.FlagSet) RunFunc {
 		}
 		e, found, err := st.TierGet(scope, *topic, *title)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		d := knObj("topic", *topic, "title", *title, "found", found)
 		if !found {
@@ -353,7 +353,7 @@ func knTierSet(fs *flag.FlagSet) RunFunc {
 		}
 		prev, changed, err := st.TierSet(scope, *topic, *title, *tier)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		d := knObj("topic", *topic, "title", *title, "tier", *tier)
 		if prev != "" {
@@ -383,7 +383,7 @@ func knTierList(fs *flag.FlagSet) RunFunc {
 		}
 		list, err := st.TierList(scope, *tier)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		entries := []any{}
 		var lines []string
@@ -412,7 +412,7 @@ func knContraAdd(fs *flag.FlagSet) RunFunc {
 		}
 		n, err := st.AddContradiction(*topic, *title, *text)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		return Result{Data: knObj("topic", *topic, "title", *title, "pending", n, "changed", true), Text: fmt.Sprintf("queued: %s :: %s (%d pending)", *topic, *title, n)}, nil
 	}
@@ -428,7 +428,7 @@ func knContraList(c *Ctx, args []string) (Result, error) {
 	}
 	list, err := st.Contradictions()
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	items := []any{}
 	var lines []string
@@ -449,7 +449,7 @@ func knContraClear(c *Ctx, args []string) (Result, error) {
 	}
 	n, err := st.ClearContradictions()
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	return Result{Data: knObj("cleared", n, "changed", n > 0), Text: fmt.Sprintf("cleared %d", n)}, nil
 }
@@ -470,7 +470,7 @@ func knContraHas(fs *flag.FlagSet) RunFunc {
 		}
 		has, err := st.HasContradiction(*topic, *title)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		res := Result{Data: knObj("has", has), Text: fmt.Sprintf("%v", has)}
 		if !has {
@@ -478,4 +478,17 @@ func knContraHas(fs *flag.FlagSet) RunFunc {
 		}
 		return res, nil
 	}
+}
+
+// knFail is knErr for a verb that can also decline (exit 4): the failure
+// data names what blocked it, per the contract's default exit-4 shape.
+func knFail(err error) (Result, error) {
+	e := knErr(err)
+	switch {
+	case errors.Is(err, knowledge.ErrAliasCollision):
+		return Result{Data: knObj("blockedBy", "alias-collision", "changed", false)}, e
+	case errors.Is(err, knowledge.ErrExists):
+		return Result{Data: knObj("blockedBy", "exists", "changed", false)}, e
+	}
+	return Result{}, e
 }

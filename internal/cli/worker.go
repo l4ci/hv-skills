@@ -405,6 +405,12 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 		defer stop()
 		res, err := workerEnvCtx(ctx).Dispatch(ctx, root, opts)
 		if err != nil {
+			var we *worker.Error
+			if errors.As(err, &we) {
+				if bd, ok := we.Data.(worker.BlockData); ok && we.Exit == ExitRefused {
+					return Result{Data: knObj("blockedBy", bd.BlockedBy, "changed", bd.Changed)}, fromWorker(err)
+				}
+			}
 			return Result{}, fromWorker(err)
 		}
 		d := jsonx.NewObject()

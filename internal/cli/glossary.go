@@ -37,7 +37,7 @@ func glRead(fs *flag.FlagSet) RunFunc {
 		}
 		text, missing, err := st.GlossaryRead(scope, args)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		return Result{Data: knObj("text", text, "missing", strSlice(missing)), Text: text}, nil
 	}
@@ -68,7 +68,7 @@ func glWrite(fs *flag.FlagSet) RunFunc {
 		term := knowledge.Term{Name: strings.TrimSpace(args[0]), Definition: *def, Aliases: knowledge.SplitCSV(*alias), Nots: knowledge.SplitCSV(*not)}
 		name, changed, err := st.GlossaryWrite(scope, term, *touch, notsProvided)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		text := "wrote: Glossary/" + name
 		if !changed {
@@ -98,7 +98,7 @@ func glImport(fs *flag.FlagSet) RunFunc {
 		}
 		terms, changed, err := st.GlossaryImport(scope, manifest, *touch)
 		if err != nil {
-			return Result{}, knErr(err)
+			return knFail(err)
 		}
 		text := fmt.Sprintf("imported %d term(s)", len(terms))
 		return Result{Data: knObj("imported", len(terms), "terms", strSlice(terms), "changed", changed), Text: text}, nil
@@ -133,7 +133,7 @@ func blockVerb(fs *flag.FlagSet) RunFunc {
 				return Result{}, err
 			}
 			if status, err = st.WriteCustomBlock("skills", knowledge.SkillsBlockBody()); err != nil {
-				return Result{}, knErr(err)
+				return knFail(err)
 			}
 		case *bodyFile != "":
 			if c.Repo != "" {
@@ -148,7 +148,7 @@ func blockVerb(fs *flag.FlagSet) RunFunc {
 				return Result{}, err
 			}
 			if status, err = st.WriteCustomBlock(key, body); err != nil {
-				return Result{}, knErr(err)
+				return knFail(err)
 			}
 		default:
 			if !knowledge.IsGeneratedBlock(key) {
@@ -165,7 +165,7 @@ func blockVerb(fs *flag.FlagSet) RunFunc {
 				scope = knowledge.Umbrella
 			}
 			if status, err = st.RegenerateBlock(key, scope); err != nil {
-				return Result{}, knErr(err)
+				return knFail(err)
 			}
 		}
 		return Result{Data: knObj("key", key, "status", status, "changed", status != "unchanged"), Text: status}, nil
@@ -188,7 +188,7 @@ func instructionsInit(c *Ctx, args []string) (Result, error) {
 	}
 	acts, err := st.InstructionsInit()
 	if err != nil {
-		return Result{}, knErr(err)
+		return knFail(err)
 	}
 	list := []any{}
 	var lines []string
