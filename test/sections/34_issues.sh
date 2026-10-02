@@ -187,13 +187,13 @@ count_all=$(echo "$out_all" | jq '.data.entries | length')
 
 # With --open-only, every entry fails the state probe silently, so the result
 # is []. Two ways to fail: no gh/glab on PATH at all, and a gh/glab that fails
-# every call. NOGH links every tool from /usr/bin and /bin except gh and glab:
+# every call. NOGH links every tool from /usr/bin and /bin except gh, glab, herdr and tmux:
 # a real "CLI missing" PATH that can't reach a real forge (the runner's poison
 # stand-ins would count as present).
 NOGH="$TMP_OO/nogh-bin"; mkdir -p "$NOGH"
 for d in /usr/bin /bin; do
   for t in "$d"/*; do
-    n="${t##*/}"; case "$n" in gh|glab) continue ;; esac
+    n="${t##*/}"; case "$n" in gh|glab|herdr|tmux) continue ;; esac
     [ -e "$NOGH/$n" ] || ln -s "$t" "$NOGH/$n"
   done
 done

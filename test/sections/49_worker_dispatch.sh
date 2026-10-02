@@ -152,17 +152,19 @@ OUT=$( cd "$TMP_WD" && env -u TMUX "$BIN/hv-worker-session" check 2>&1 || true )
 [ "$OUT" = "outside" ] || fail "hv-worker-session check should print 'outside', got '$OUT'"
 
 # A session existing is NOT the same as being inside it. With TMUX unset the
-# verdict must still be 'outside' even when a session by that name is up.
-if command -v tmux >/dev/null 2>&1; then
-  tmux new-session -d -s hvsmoke -c "$TMP_WD" 2>/dev/null || true
-  RC=0
-  ( cd "$TMP_WD" && env -u TMUX "$BIN/hv-worker-session" check --session hvsmoke ) >/dev/null 2>&1 || RC=$?
-  [ "$RC" = "1" ] \
-    || fail "check must key on \$TMUX, not on whether a session exists (got exit $RC with hvsmoke up)"
-  tmux kill-session -t hvsmoke 2>/dev/null || true
-fi
+# verdict must still be 'outside' even when a session by that name is up. A fake
+# tmux answers every call with success (so has-session says the session
+# exists); the real tmux server is never touched (the runner's guard fails the
+# run if it is).
+mkdir -p "$TMP_WD/faketmux"
+printf '#!/bin/sh\necho "$*" >> "%s/faketmux/log"\nexit 0\n' "$TMP_WD" > "$TMP_WD/faketmux/tmux"
+chmod +x "$TMP_WD/faketmux/tmux"
+RC=0
+( cd "$TMP_WD" && PATH="$TMP_WD/faketmux:$PATH" env -u TMUX "$BIN/hv-worker-session" check --session hvsmoke ) >/dev/null 2>&1 || RC=$?
+[ "$RC" = "1" ] \
+  || fail "check must key on \$TMUX, not on whether a session exists (got exit $RC with hvsmoke up)"
 # Inside a pane, $TMUX is set — simulate that without needing a live server.
-OUT=$( cd "$TMP_WD" && TMUX="/tmp/fake,1,0" "$BIN/hv-worker-session" check 2>&1 || true )
+OUT=$( cd "$TMP_WD" && PATH="$TMP_WD/faketmux:$PATH" TMUX="/tmp/fake,1,0" "$BIN/hv-worker-session" check 2>&1 || true )
 case "$OUT" in
   inside*) : ;;
   *) fail "hv-worker-session check should report 'inside ...' when \$TMUX is set, got '$OUT'" ;;
