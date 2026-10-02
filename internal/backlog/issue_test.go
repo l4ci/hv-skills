@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -327,4 +328,101 @@ func mustDecode(t *testing.T, s string) any {
 		t.Fatal(err)
 	}
 	return v
+}
+
+func scenarioBackend(t *testing.T, s issueScenario) *Issues {
+	tr := &fakeTracker{}
+	for _, is := range s.Issues {
+		tr.issues = append(tr.issues, is.issue())
+	}
+	return &Issues{Cfg: mustDecode(t, s.Cfg), Tracker: tr, Repo: s.Repo}
+}
+
+// Every listed item is what Get returns for it (by number: a qualified
+// "repo:12" ID is Get's output, not an input), on generated issue sets.
+func TestIssuesListEqualsGet(t *testing.T) {
+	rng := rand.New(rand.NewSource(33))
+	listed := 0
+	for i := 0; i < 30; i++ {
+		s := issueScenario{Cfg: defaultCfg, Issues: genIssues(rng, 4+rng.Intn(12), false)}
+		if i%3 == 1 {
+			s.Cfg, s.Issues = customCfg, genIssues(rng, 4+rng.Intn(12), true)
+		}
+		if i%4 == 2 {
+			s.Repo = "web"
+		}
+		b := scenarioBackend(t, s)
+		all, err := b.List(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		open, _ := b.List(false)
+		if len(open) > len(all) || (len(open) > 0 && !sameJSON(open, all[:len(open)])) {
+			t.Fatalf("scenario %d: List(false) is not the prefix of List(true)", i)
+		}
+		for j, it := range all {
+			want, err := b.Get(strconv.Itoa(it.Number))
+			if err != nil {
+				t.Fatalf("scenario %d: Get(%d): %v", i, it.Number, err)
+			}
+			if !reflect.DeepEqual(&all[j], want) {
+				t.Fatalf("scenario %d: List()[%d] = %+v, Get = %+v", i, j, it, *want)
+			}
+			if s.Repo == "" && it.ID != strconv.Itoa(it.Number) {
+				t.Fatalf("ID %q, want the number", it.ID)
+			}
+			if s.Repo != "" && it.ID != s.Repo+":"+strconv.Itoa(it.Number) {
+				t.Fatalf("ID %q, want repo-qualified", it.ID)
+			}
+			listed++
+		}
+	}
+	if listed < 200 {
+		t.Fatalf("only %d items listed", listed)
+	}
+}
+
+type countingTracker struct {
+	fakeTracker
+	lists, gets int
+}
+
+func (c *countingTracker) List(state string) ([]Issue, error) {
+	c.lists++
+	return c.fakeTracker.List(state)
+}
+
+func (c *countingTracker) Get(n int) (Issue, bool, error) {
+	c.gets++
+	return c.fakeTracker.Get(n)
+}
+
+func TestIssuesListOrderAndCalls(t *testing.T) {
+	tr := &countingTracker{fakeTracker: fakeTracker{issues: []Issue{
+		{Number: 9, Title: "Task", State: "open"},
+		{Number: 5, Title: "Feat", State: "open", Labels: []string{"type:feature"}},
+		{Number: 7, Title: "Bug b", State: "open", Labels: []string{"type:bug"}},
+		{Number: 3, Title: "Bug a", State: "open", Labels: []string{"type:bug"}},
+		{Number: 4, Title: "Tracker", State: "open", Labels: []string{"milestone-tracker"}},
+		{Number: 1, Title: "Old", State: "closed", ClosedAt: "2026-01-01T00:00:00Z"},
+		{Number: 2, Title: "New", State: "closed", ClosedAt: "2026-02-01T00:00:00Z", StateReason: "not_planned"},
+		{Number: 6, Title: "Done tracker", State: "closed", Labels: []string{"milestone-tracker"}},
+	}}}
+	b := &Issues{Cfg: mustDecode(t, `{}`), Tracker: tr}
+	all, err := b.List(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(ids(all), ","); got != "3,7,5,9,2,1" {
+		t.Fatalf("order = %s", got)
+	}
+	if tr.lists != 2 || tr.gets != 0 {
+		t.Fatalf("%d List and %d Get calls, want 2 and 0", tr.lists, tr.gets)
+	}
+	if all[4].Reason != "dropped" || !all[4].Closed {
+		t.Fatalf("issue 2 = %+v", all[4])
+	}
+	if _, err := (&Issues{Cfg: mustDecode(t, `{}`)}).List(true); err == nil {
+		t.Fatal("nil tracker must be an error")
+	}
 }

@@ -16,7 +16,16 @@ type Backend interface {
 	// Get returns an item, open or closed/archived. The error wraps
 	// ErrNotFound when the reference is unknown.
 	Get(ref string) (*Item, error)
-	// Markdown renders the backlog as BACKLOG.md-shaped text. The file backend
+	// List returns the backlog's items with canonical IDs (contract rule 11):
+	// open items first, in BACKLOG order (Bugs, Features, Tasks; issue mode sorts by
+	// number within each type, as Markdown renders them), then, when includeClosed,
+	// the closed ones (file: ## Completed in file order, then ARCHIVE.md; issue: newest
+	// closed first, as Markdown renders them). Each Item is what Get(item.ID)
+	// returns. This is how callers enumerate; they must not parse Markdown.
+	List(includeClosed bool) ([]Item, error)
+	// Markdown renders the backlog as BACKLOG.md-shaped text, for renderers
+	// only: its bullets spell IDs differently per backend ("F12" in issue mode
+	// where Item.ID is "12"), so enumerate with List. The file backend
 	// returns the file verbatim and ignores closedLimit; a missing BACKLOG.md
 	// is an error wrapping ErrNotFound. The issue backend renders the open
 	// issues and the newest closedLimit closed ones (all when negative).

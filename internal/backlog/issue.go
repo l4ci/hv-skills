@@ -240,17 +240,10 @@ func (b *Issues) doneLine(is Issue) string {
 // openByLetter is the open item bullets by type letter, each section sorted by
 // issue number.
 func (b *Issues) openByLetter() (map[string][]string, error) {
-	issues, err := b.Tracker.List("open")
+	items, err := b.openIssues()
 	if err != nil {
 		return nil, err
 	}
-	var items []Issue
-	for _, is := range issues {
-		if !b.IsMilestoneTracker(is) {
-			items = append(items, is)
-		}
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Number < items[j].Number })
 	out := map[string][]string{"B": nil, "F": nil, "T": nil}
 	for _, is := range items {
 		l := b.Letter(is)
@@ -259,9 +252,9 @@ func (b *Issues) openByLetter() (map[string][]string, error) {
 	return out, nil
 }
 
-// closedLines is the Done lines of the closed items, newest first.
-func (b *Issues) closedLines() ([]string, error) {
-	issues, err := b.Tracker.List("closed")
+// items returns the tracker's issues in state without the milestone trackers.
+func (b *Issues) items(state string) ([]Issue, error) {
+	issues, err := b.Tracker.List(state)
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +264,25 @@ func (b *Issues) closedLines() ([]string, error) {
 			items = append(items, is)
 		}
 	}
+	return items, nil
+}
+
+// openIssues is the open items sorted by issue number.
+func (b *Issues) openIssues() ([]Issue, error) {
+	items, err := b.items("open")
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Number < items[j].Number })
+	return items, nil
+}
+
+// closedIssues is the closed items, newest first.
+func (b *Issues) closedIssues() ([]Issue, error) {
+	items, err := b.items("closed")
+	if err != nil {
+		return nil, err
+	}
 	// reverse=True with a stable sort keeps the input order of equal keys.
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].ClosedAt != items[j].ClosedAt {
@@ -278,6 +290,15 @@ func (b *Issues) closedLines() ([]string, error) {
 		}
 		return items[i].Number > items[j].Number
 	})
+	return items, nil
+}
+
+// closedLines is the Done lines of the closed items, newest first.
+func (b *Issues) closedLines() ([]string, error) {
+	items, err := b.closedIssues()
+	if err != nil {
+		return nil, err
+	}
 	out := make([]string, len(items))
 	for i, is := range items {
 		out[i] = b.doneLine(is)
@@ -352,6 +373,43 @@ func (b *Issues) Get(ref string) (*Item, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, ref)
 	}
+	return b.item(is), nil
+}
+
+// List returns the open items by type (Bugs, Features, Tasks), each sorted by
+// issue number, then, with includeClosed, the closed ones newest first: the
+// order Markdown renders. Milestone tracking issues are not items. One tracker
+// call per state.
+func (b *Issues) List(includeClosed bool) ([]Item, error) {
+	if b.Tracker == nil {
+		return nil, errors.New("issues backend has no tracker")
+	}
+	open, err := b.openIssues()
+	if err != nil {
+		return nil, err
+	}
+	var out []Item
+	for _, l := range ItemLetters {
+		for _, is := range open {
+			if b.Letter(is) == string(l) {
+				out = append(out, *b.item(is))
+			}
+		}
+	}
+	if includeClosed {
+		closed, err := b.closedIssues()
+		if err != nil {
+			return nil, err
+		}
+		for _, is := range closed {
+			out = append(out, *b.item(is))
+		}
+	}
+	return out, nil
+}
+
+// item builds the Item for an issue; Get and List share it.
+func (b *Issues) item(is Issue) *Item {
 	_, block, _ := ParseFieldsBlock(is.Body)
 	letter := b.Letter(is)
 	it := &Item{
@@ -382,7 +440,7 @@ func (b *Issues) Get(ref string) (*Item, error) {
 	} else {
 		it.Line = "- " + b.bulletInner(is)
 	}
-	return it, nil
+	return it
 }
 
 // Detail returns the issue body without its fields block; ok is false when

@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -309,5 +310,82 @@ func TestNextIDRefusesFractionalCounter(t *testing.T) {
 		if got, _ := os.ReadFile(filepath.Join(hv, "counters.json")); string(got) != raw {
 			t.Fatalf("%s: counters.json rewritten to %s", raw, got)
 		}
+	}
+}
+
+func ids(items []Item) []string {
+	var out []string
+	for _, it := range items {
+		out = append(out, it.ID)
+	}
+	return out
+}
+
+// Every listed item is what Get returns for its ID, on generated trees.
+func TestFileListEqualsGet(t *testing.T) {
+	listed := 0
+	for i, p := range genProjects(t, 200) {
+		p.write(t)
+		f := &File{Root: p.Root}
+		all, err := f.List(true)
+		if p.NoBacklog {
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("project %d: missing BACKLOG.md: %v", i, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		open, err := f.List(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(open) > len(all) || (len(open) > 0 && !sameJSON(open, all[:len(open)])) {
+			t.Fatalf("project %d: List(false) is not the prefix of List(true)", i)
+		}
+		seen := map[string]bool{}
+		for j, it := range all {
+			want, err := f.Get(it.ID)
+			if err != nil {
+				t.Fatalf("project %d item %d: Get(%q): %v", i, j, it.ID, err)
+			}
+			if !reflect.DeepEqual(&all[j], want) {
+				t.Fatalf("project %d: List()[%d] = %+v, Get(%q) = %+v", i, j, it, it.ID, *want)
+			}
+			if seen[it.ID] {
+				t.Fatalf("project %d: %q listed twice", i, it.ID)
+			}
+			seen[it.ID] = true
+			listed++
+		}
+	}
+	if listed < 100 {
+		t.Fatalf("only %d items listed; the generator is too weak", listed)
+	}
+}
+
+func TestFileListOrder(t *testing.T) {
+	root := t.TempDir()
+	p := project{Root: root,
+		Backlog: "## Bugs\n\n- **[B02] [P1] Two.** x\n- **[B01] [P2] One.** y\n\n## Features\n\n- **[F05] [Major] Five.** z\n\n## Tasks\n\n- **[T01] Task.** t\n\n" +
+			"## Completed\n\n- ~~**[B09] [P3] Nine.** n~~ Done 2026-01-01 [`abc`]\n- ~~**[B02] [P1] Two.** x~~ Done 2026-01-02 [`abd`]\n- ~~**[B08] Eight.**~~ Done 2026-01-03 [`abe`] (dropped: no)\n",
+		Archive: "- ~~**[B09] [P3] Nine.** n~~ Done 2026-01-01 [`abc`]\n- ~~**[F01] [Minor] Old.** o~~ Done 2025-01-01 [`old`]\n"}
+	p.write(t)
+	f := &File{Root: root}
+	open, err := f.List(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(ids(open), ","); got != "B02,B01,F05,T01" {
+		t.Fatalf("open = %s", got)
+	}
+	all, _ := f.List(true)
+	// B02 is open in the backlog and also on a done line: listed once, first.
+	if got := strings.Join(ids(all), ","); got != "B02,B01,F05,T01,B09,B08,F01" {
+		t.Fatalf("all = %s", got)
+	}
+	if all[5].Reason != "dropped" || all[5].Note != "no" || !all[5].Closed {
+		t.Fatalf("B08 = %+v", all[5])
 	}
 }

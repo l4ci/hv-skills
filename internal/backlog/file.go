@@ -14,6 +14,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
 // File is the backlog kept in .hv/BACKLOG.md, with finished items in
@@ -54,10 +55,19 @@ func (f *File) Corpus() string {
 // the old helpers' title cut at the first "." is FindOrigin's, for the verbs
 // that must print it.
 func (f *File) Get(ref string) (*Item, error) {
-	corpus := f.Corpus()
-	line, title, ok := FindOrigin(corpus, ref)
+	it, ok := itemFromCorpus(f.Corpus(), ref)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, ref)
+	}
+	return it, nil
+}
+
+// itemFromCorpus builds the Item for ref from the BACKLOG+ARCHIVE text; Get
+// and List share it.
+func itemFromCorpus(corpus, ref string) (*Item, bool) {
+	line, title, ok := FindOrigin(corpus, ref)
+	if !ok {
+		return nil, false
 	}
 	it := &Item{ID: ref, Fields: ParseFields(line), Line: line, Title: title}
 	if r, _ := utf8.DecodeRuneInString(ref); strings.ContainsRune(ItemLetters, r) {
@@ -71,7 +81,62 @@ func (f *File) Get(ref string) (*Item, error) {
 	if d, ok := ParseDone(doneLine); ok {
 		it.Closed, it.Reason, it.Note = true, d.Reason, d.Note
 	}
-	return it, nil
+	return it, true
+}
+
+// List returns the open items in BACKLOG.md order, then, with includeClosed,
+// the done lines of its ## Completed section and of ARCHIVE.md. An ID that
+// occurs more than once is listed once, at its first position. A bullet whose
+// origin line Get cannot find (an indented bullet) is left out, so that
+// List()[i] always equals Get(List()[i].ID). A missing BACKLOG.md wraps
+// ErrNotFound; a missing ARCHIVE.md is empty.
+func (f *File) List(includeClosed bool) ([]Item, error) {
+	md, err := f.Markdown(0)
+	if err != nil {
+		return nil, err
+	}
+	archive, _ := readText(f.hv("ARCHIVE.md"))
+	corpus := strings.TrimRight(md, "\n") + "\n" + archive
+
+	var ids []string
+	for _, e := range OpenBullets(md) {
+		ids = append(ids, e.ID)
+	}
+	if includeClosed {
+		ids = append(ids, doneIDs(sectionBody(md, "Completed"))...)
+		ids = append(ids, doneIDs(archive)...)
+	}
+	var out []Item
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if it, ok := itemFromCorpus(corpus, id); ok {
+			out = append(out, *it)
+		}
+	}
+	return out, nil
+}
+
+func sectionBody(content, name string) string {
+	s, e, ok := section.Find(content, name)
+	if !ok {
+		return ""
+	}
+	return content[s:e]
+}
+
+// doneIDs is the IDs of the done lines in text, in order.
+func doneIDs(text string) []string {
+	var ids []string
+	for _, raw := range pystr.Splitlines(text) {
+		if d, ok := ParseDone(pystr.Strip(raw)); ok && d.ID != "" {
+			ids = append(ids, d.ID)
+		}
+	}
+	return ids
 }
 
 // Markdown returns BACKLOG.md verbatim; closedLimit is ignored.

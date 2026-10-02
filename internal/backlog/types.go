@@ -7,6 +7,12 @@
 // are ASCII, so patterns without lookahead use pystr.SpaceClass and \p{Nd}
 // instead, and the ones with lookahead are hand-written scanners that
 // reproduce Python's lazy match plus lookahead exactly.
+//
+// To enumerate a backlog, call Backend.List: it returns Items with canonical
+// IDs ("B07" in file mode, "12" in issue mode) whichever backend is open.
+// Backend.Markdown renders BACKLOG.md-shaped text for renderers only; its
+// bullets spell issue IDs differently from Item.ID, so do not parse them to
+// find items.
 package backlog
 
 // Type is one row of the item-type registry (HV_TYPE_REGISTRY in bin/hv-types.sh).
