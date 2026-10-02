@@ -307,6 +307,12 @@ var (
 func a4FieldValue(it *backlog.Item, name string) string {
 	switch name {
 	case "title":
+		// The old helpers' title stops at the first "." (FindOrigin); issue
+		// mode keeps the full title, as hv-todo-field did there.
+		if it.Number == 0 {
+			_, t, _ := backlog.FindOrigin("- "+it.Line, it.ID)
+			return t
+		}
 		return it.Title
 	case "reason":
 		return it.Reason
