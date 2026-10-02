@@ -462,6 +462,7 @@ func TestReleaseNotesArgs(t *testing.T) {
 	if o := trRun(t, root, "", "release", "notes", "--from", "issues", "M01", "--json"); o.code != 2 {
 		t.Errorf("umbrella: exit %d", o.code)
 	}
+	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	if o := trRun(t, root, "", "release", "notes", "--from", "issues", "M01", "--repo", "svc", "--json"); o.code != 71 {
 		t.Errorf("umbrella with --repo: exit %d", o.code)
 	}

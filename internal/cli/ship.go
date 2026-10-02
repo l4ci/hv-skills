@@ -464,7 +464,7 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 				items = append(items, s)
 			}
 		}
-		be, err := a8Issues(c, "use: hv ship merge")
+		be, err := a8Issues(c, "use: hv ship merge", true)
 		if err != nil {
 			return a4Fail(err)
 		}

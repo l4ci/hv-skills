@@ -349,37 +349,29 @@ func reviewScaffolding(fs *flag.FlagSet) RunFunc {
 	}
 }
 
-// a8Scope finds the project root for an issue-only verb. Umbrella issue mode
-// is not ported, so an umbrella root or a --repo stops here (exit 71).
-func a8Scope(c *Ctx) (string, error) {
+// a8Issues opens the issue backend for an issue-only verb. An unknown --repo
+// is exit 3 and the file backend is refused (RefusedError, backend; map it
+// with a4Fail, or a4FailRead for a read-only verb). At an umbrella root a verb
+// that acts on one sub-repo (perRepo) needs --repo (exit 2); past those
+// checks umbrella issue mode is not ported (exit 71).
+func a8Issues(c *Ctx, hint string, perRepo bool) (*backlog.Issues, error) {
 	root, err := c.Root()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if c.Repo != "" {
-		if _, err := c.RepoPath(); err != nil {
-			return "", err
-		}
-		return "", NotImplemented(c.Path)
-	}
-	if backlog.IsUmbrella(root) {
-		return "", NotImplemented(c.Path)
-	}
-	return root, nil
-}
-
-// a8Issues opens the issue backend for an issue-only verb. The file backend is
-// refused (RefusedError, backend); map it with a4Fail, or a4FailRead for a
-// read-only verb.
-func a8Issues(c *Ctx, hint string) (*backlog.Issues, error) {
-	root, err := a8Scope(c)
-	if err != nil {
+	if _, err := c.RepoPath(); err != nil {
 		return nil, err
 	}
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
 	if name, err := config.Backend(cfg); err == nil && name == "file" {
 		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
 			Msg: c.Path + ` is not available with backlog.backend "file"`}
+	}
+	if backlog.IsUmbrella(root) {
+		if perRepo && c.Repo == "" {
+			return nil, Usage("%s from the umbrella root needs --repo <name>", c.Path)
+		}
+		return nil, NotImplemented(c.Path)
 	}
 	be, err := a4Open(root, false, hint)
 	if err != nil {
@@ -396,7 +388,7 @@ func reviewQueue(c *Ctx, args []string) (Result, error) {
 	if len(args) > 0 {
 		return Result{}, Usage("usage: hv review queue")
 	}
-	be, err := a8Issues(c, "")
+	be, err := a8Issues(c, "", false)
 	if err != nil {
 		return a4FailRead(err)
 	}

@@ -472,6 +472,14 @@ func TestReviewQueueExits(t *testing.T) {
 // Umbrella issue mode is not ported: exit 71, with and without --repo.
 func TestReviewQueueUmbrella(t *testing.T) {
 	_, umb := reviewProject(t)
+	// The backend rule comes first: a file-backend umbrella is refused.
+	if o := trRun(t, umb, "", "review", "queue", "--repo", "svc"); o.code != 1 {
+		t.Errorf("file backend: exit %d, want 1\n%s%s", o.code, o.stdout, o.stderr)
+	}
+	if o := trRun(t, umb, "", "review", "queue", "--repo", "nope"); o.code != 3 {
+		t.Errorf("unknown --repo: exit %d, want 3\n%s%s", o.code, o.stdout, o.stderr)
+	}
+	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	if o := trRun(t, umb, "", "review", "queue"); o.code != 71 {
 		t.Errorf("exit %d, want 71\n%s%s", o.code, o.stdout, o.stderr)
 	}

@@ -631,6 +631,10 @@ func TestShipPRMergeBackend(t *testing.T) {
 	if o := trRun(t, umb, "", "ship", "pr-merge", "1"); o.code != 2 {
 		t.Errorf("umbrella without --repo: exit %d", o.code)
 	}
+	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 4 {
+		t.Errorf("file-backend umbrella --repo: exit %d, want 4 (backend)", o.code)
+	}
+	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 71 {
 		t.Errorf("umbrella --repo: exit %d", o.code)
 	}
