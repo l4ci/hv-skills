@@ -72,7 +72,7 @@ A slot that newly turns `BLOCKED` or `NEEDS-PERMISSION` raises a herdr notificat
 
 ## The registry now carries state and PR
 
-On both hosts, live polls write `slot.state` (lowercased hv state) and, when `HV-DONE` carries a PR URL, `slot.pr`. `hv-worker-gate` then merges through `gh pr merge` instead of falling back to a local merge. A bare branch name after `HV-DONE` is not recorded, because handing a branch to `gh pr merge` fails where the local merge would have worked.
+On both hosts, live polls write `slot.state` (lowercased hv state) and, when `HV-DONE` carries a PR URL, `slot.pr`. `hv-worker-gate` then merges through `gh pr merge` (or `glab mr merge` on GitLab) instead of falling back to a local merge. A bare branch name after `HV-DONE` is not recorded, because handing a branch to `gh pr merge` fails where the local merge would have worked.
 
 ## Worker contract additions
 

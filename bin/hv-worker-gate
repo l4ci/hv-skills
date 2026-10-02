@@ -14,10 +14,23 @@
 #   1. FRESHNESS  — is the cycle branch an ancestor of the worker branch? If
 #                   not, the worker never merged what landed since it branched
 #                   and its green is stale. Bounce it rather than merging.
-#   2. MERGE      — via `gh pr merge` when the slot recorded a PR, else a
-#                   local `git merge` (repos with no remote still work).
+#                   With a recorded PR and an origin remote this is judged on
+#                   the PUSHED refs after a fetch (origin/<base> vs
+#                   origin/<branch>), because the PR merges what was pushed, not
+#                   what sits in a local worktree. The PR's head branch, head
+#                   SHA and target branch must match the verified ones, so a
+#                   re-pushed branch or a stacked PR cannot slip through.
+#                   Exit code 1 from git is STALE; anything above is the check
+#                   itself breaking (CHECK-BROKE), never reported as STALE.
+#   2. MERGE      — via `gh pr merge` / `glab mr merge` when the slot recorded a
+#                   PR (pinned to the verified head SHA; glab with auto-merge
+#                   off, since a scheduled merge is not a merge), else a local
+#                   `git merge` (repos with no remote still work). A PR merge is
+#                   confirmed: its merge commit must be an ancestor of
+#                   origin/<base> and of the local tree before RE-VERIFY runs.
 #   3. RE-VERIFY  — on the MERGED tree, never on the branch. This is the only
-#                   step that catches the two shapes above.
+#                   step that catches the two shapes above. Command output is
+#                   kept in a log; a failure shows its tail and the log path.
 #
 # Verification commands come from refactor.verifyCommands in .hv/config.json.
 # When that is empty the gate reports NO-VERIFY rather than inventing a check
@@ -32,9 +45,13 @@
 # recorded PR; without one (local-merge repos, no gh) it reports
 # PROVENANCE-SKIP, since there is no body to read.
 #
+# Provider: github (gh) or gitlab (glab), read from the PR URL, else origin.
+#
 # Tool: exit 0 gate passed (or --check-only and FRESH); exit 2 usage;
-#       exit 3 STALE / merge failure; exit 4 post-merge verification failed
-#       or PROVENANCE-FAIL.
+#       exit 3 STALE / merge failure / PR does not match the verified branch;
+#       exit 4 post-merge verification failed, merge not on base, or
+#       PROVENANCE-FAIL; exit 5 CHECK-BROKE (the gate could not decide: bad
+#       ref, failed fetch, unreadable PR).
 #
 # Usage:
 #   hv-worker-gate --slot <name> --base <cycle-branch> [--check-only] [--no-verify]
@@ -78,15 +95,59 @@ print("\t".join([slot.get("branch") or "", slot.get("pr") or ""]))
 PY
 )" || { echo "error: slot '$SLOT' is not in the pool" >&2; exit 3; }
 
+# ── Tracker ─────────────────────────────────────────────────────────────────
+# Provider comes from the PR URL (a bare number carries none), then origin, and
+# falls back to github, which is what this gate always assumed.
+detect_provider() {
+  case "$1" in
+    *gitlab*|*/-/merge_requests/*) echo gitlab; return ;;
+    *github*|*/pull/*)             echo github; return ;;
+  esac
+  local p; p="$("$HERE/hv-issues-provider" 2>/dev/null || true)"
+  case "$p" in gitlab) echo gitlab ;; *) echo github ;; esac
+}
+tcall() { "$HERE/hv-tracker-call" --provider "$PROVIDER" -- "$@" </dev/null; }
+# pr_body <pr> — the PR/MR description on stdout.
+pr_body() {
+  if [ "$PROVIDER" = gitlab ]; then
+    tcall api "projects/:fullpath/merge_requests/$(pr_number "$1")" | python3 -c 'import json,sys; sys.stdout.write(json.load(sys.stdin).get("description") or "")'
+  else
+    tcall pr view "$1" --json body -q .body
+  fi
+}
+# pr_number <pr-or-url> — the trailing number, which is all either CLI's API takes.
+pr_number() { printf '%s' "$1" | grep -Eo '[0-9]+$' || true; }
+# pr_info <number> — key=value lines: head, sha, base, state (OPEN|MERGED|CLOSED), merge.
+pr_info() {
+  local raw
+  if [ "$PROVIDER" = gitlab ]; then
+    raw="$(tcall api "projects/:fullpath/merge_requests/$1")" || return 1
+  else
+    raw="$(tcall pr view "$1" --json headRefName,headRefOid,baseRefName,state,mergeCommit)" || return 1
+  fi
+  printf '%s' "$raw" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+if sys.argv[1] == "gitlab":
+    st = {"opened": "OPEN", "merged": "MERGED"}.get(d.get("state"), "CLOSED")
+    f = (d["source_branch"], d["sha"], d["target_branch"], st, d.get("merge_commit_sha") or d.get("squash_commit_sha") or "")
+else:
+    f = (d["headRefName"], d["headRefOid"], d["baseRefName"], d["state"], (d.get("mergeCommit") or {}).get("oid") or "")
+print("head=%s\nsha=%s\nbase=%s\nstate=%s\nmerge=%s" % f)
+' "$PROVIDER"
+}
+info_field() { printf '%s\n' "$INFO" | sed -n "s/^$1=//p"; }
+broke() { echo "CHECK-BROKE $SLOT — $1" >&2; exit 5; }
+
 # ── Provenance ──────────────────────────────────────────────────────────────
 # check_provenance <pr> — exit 0 pass/skip, 1 on PROVENANCE-FAIL.
 check_provenance() {
   local body
-  if [ -z "$1" ] || ! command -v gh >/dev/null 2>&1; then
-    echo "PROVENANCE-SKIP $SLOT — no recorded PR (or no gh) to read approvals from" >&2
+  if [ -z "$1" ] || ! command -v "$CLI" >/dev/null 2>&1; then
+    echo "PROVENANCE-SKIP $SLOT — no recorded PR (or no $CLI) to read approvals from" >&2
     return 0
   fi
-  body="$("$HERE/hv-tracker-call" --provider github -- pr view "$1" --json body -q .body 2>/dev/null </dev/null)" || {
+  body="$(pr_body "$1" 2>/dev/null)" || {
     echo "PROVENANCE-SKIP $SLOT — could not read the body of $1" >&2
     return 0
   }
@@ -130,22 +191,67 @@ IFS="$(printf '\t')" read -r BRANCH PR <<EOF
 $SLOT_INFO
 EOF
 
-git rev-parse --verify --quiet "$BRANCH" >/dev/null || {
-  echo "error: worker branch '$BRANCH' does not exist" >&2; exit 3; }
+PROVIDER="$(detect_provider "$PR")"
+CLI=gh; [ "$PROVIDER" = gitlab ] && CLI=glab
+
+# A PR merges what was PUSHED, so with a PR and an origin remote the gate reads
+# origin/* refs. Without a PR the local merge takes the local branch, and local
+# refs are the right ones; a PR recorded in a repo with no origin cannot be
+# merged remotely and falls back to that path, loudly.
+PR_NUM=""
+REMOTE=0
+if [ -n "$PR" ]; then
+  PR_NUM="$(pr_number "$PR")"
+  if git remote get-url origin >/dev/null 2>&1; then
+    [ -n "$PR_NUM" ] || broke "cannot read a PR number from '$PR'"
+    REMOTE=1
+  else
+    echo "note: $SLOT has PR $PR but the repo has no origin remote — judging local refs, merging locally" >&2
+  fi
+fi
+
 git rev-parse --verify --quiet "$BASE" >/dev/null || {
   echo "error: base branch '$BASE' does not exist" >&2; exit 3; }
+if [ "$REMOTE" -eq 1 ]; then
+  git fetch origin -q </dev/null || broke "git fetch origin failed"
+  HEAD_REF="origin/$BRANCH"; BASE_REF="origin/$BASE"
+  git rev-parse --verify --quiet "$HEAD_REF^{commit}" >/dev/null || broke "$HEAD_REF does not exist — has the worker pushed $BRANCH?"
+  git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null || broke "$BASE_REF does not exist"
+else
+  HEAD_REF="$BRANCH"; BASE_REF="$BASE"
+  git rev-parse --verify --quiet "$BRANCH" >/dev/null || {
+    echo "error: worker branch '$BRANCH' does not exist" >&2; exit 3; }
+fi
 
 # ── 1. Freshness ────────────────────────────────────────────────────────────
 # Cheap, and it catches per-PR verification's structural blind spot: a worker
 # that branched before sibling work landed builds and tests honestly against a
-# tree that no longer exists.
-if git merge-base --is-ancestor "$BASE" "$BRANCH"; then
-  echo "FRESH $SLOT $BRANCH"
-else
-  BEHIND="$(git rev-list --count "$BRANCH..$BASE" 2>/dev/null || echo "?")"
-  echo "STALE $SLOT $BRANCH — $BEHIND commit(s) landed on $BASE since it branched" >&2
-  echo "  bounce: tell slot $SLOT to \`git merge $BASE\` and re-verify, then re-gate" >&2
-  exit 3
+# tree that no longer exists. Three-way on the exit code: `&& FRESH || STALE`
+# would print STALE when the check itself errors.
+RC=0
+git merge-base --is-ancestor "$BASE_REF" "$HEAD_REF" || RC=$?
+case "$RC" in
+  0) echo "FRESH $SLOT $BRANCH" ;;
+  1) BEHIND="$(git rev-list --count "$HEAD_REF..$BASE_REF" 2>/dev/null || echo "?")"
+     echo "STALE $SLOT $BRANCH — $BEHIND commit(s) landed on $BASE since it branched" >&2
+     echo "  bounce: tell slot $SLOT to \`git merge $BASE\` and re-verify, then re-gate" >&2
+     exit 3 ;;
+  *) broke "git merge-base --is-ancestor $BASE_REF $HEAD_REF exited $RC" ;;
+esac
+
+if [ "$REMOTE" -eq 1 ]; then
+  # The PR must be the thing that was just verified: open, aimed at the gate's
+  # base (a PR stacked on another worker's branch merges THERE, not here), and
+  # headed by the pushed commit.
+  VERIFIED="$(git rev-parse "$HEAD_REF")"
+  INFO="$(pr_info "$PR_NUM")" || broke "could not read PR $PR_NUM from $PROVIDER"
+  [ "$(info_field state)" = OPEN ] || { echo "error: PR $PR_NUM is $(info_field state), not open" >&2; exit 3; }
+  [ "$(info_field base)" = "$BASE" ] || {
+    echo "error: PR $PR_NUM targets '$(info_field base)', the gate's base is '$BASE' — stacked PR?" >&2; exit 3; }
+  [ "$(info_field head)" = "$BRANCH" ] || {
+    echo "error: PR $PR_NUM is headed by '$(info_field head)', slot $SLOT verified '$BRANCH'" >&2; exit 3; }
+  [ "$(info_field sha)" = "$VERIFIED" ] || {
+    echo "error: PR $PR_NUM head is $(info_field sha), the verified $HEAD_REF is $VERIFIED — pushed since?" >&2; exit 3; }
 fi
 
 check_provenance "$PR" || exit 4
@@ -157,11 +263,45 @@ CURRENT="$(git rev-parse --abbrev-ref HEAD)"
 [ "$CURRENT" = "$BASE" ] || {
   echo "error: gate must run with $BASE checked out (currently on $CURRENT)" >&2; exit 3; }
 
-if [ -n "$PR" ] && command -v gh >/dev/null 2>&1; then
-  "$HERE/hv-tracker-call" --provider github -- pr merge "$PR" --merge >/dev/null 2>&1 </dev/null || {
-    echo "error: gh pr merge failed for $PR" >&2; exit 3; }
-  git pull --ff-only >/dev/null 2>&1 || {
-    echo "error: could not fast-forward $BASE after merging $PR" >&2; exit 3; }
+if [ "$REMOTE" -eq 1 ]; then
+  MLOG="$(mktemp "${TMPDIR:-/tmp}/hv-gate-merge-XXXXXX")"
+  # Pinned to the verified SHA so a push after the check is refused. glab
+  # schedules an auto-merge while a pipeline runs unless told not to, and a
+  # scheduled merge reports success and merges nothing.
+  RC=0
+  if [ "$PROVIDER" = gitlab ]; then
+    tcall mr merge "$PR_NUM" -y --auto-merge=false --sha "$VERIFIED" >"$MLOG" 2>&1 || RC=$?
+  else
+    tcall pr merge "$PR_NUM" --merge --match-head-commit "$VERIFIED" >"$MLOG" 2>&1 || RC=$?
+  fi
+  if [ "$RC" -ne 0 ]; then
+    echo "error: $CLI merge failed for $PR (exit $RC):" >&2; tail -n 20 "$MLOG" >&2; rm -f "$MLOG"; exit 3
+  fi
+  rm -f "$MLOG"
+
+  # Confirm it landed: the tracker's word is not enough. The merge commit can
+  # take a moment to appear; an empty one afterwards is its own verdict (on
+  # GitLab, an auto-merge that is only scheduled).
+  SHA=""
+  for _ in 1 2 3 4 5; do
+    INFO="$(pr_info "$PR_NUM")" || broke "could not re-read PR $PR_NUM after merging"
+    SHA="$(info_field merge)"
+    [ -n "$SHA" ] && [ "$(info_field state)" = MERGED ] && break
+    SHA=""; sleep "${HV_GATE_SHA_WAIT:-2}"
+  done
+  [ -n "$SHA" ] || { echo "NOT-MERGED $SLOT — PR $PR_NUM has no merge commit (state $(info_field state)); nothing is on $BASE" >&2; exit 4; }
+
+  git fetch origin -q </dev/null || broke "git fetch origin failed after merging"
+  RC=0; git merge-base --is-ancestor "$SHA" "$BASE_REF" || RC=$?
+  case "$RC" in
+    0) ;;
+    1) echo "NOT-ON-BASE $SLOT — merge commit $SHA is not an ancestor of $BASE_REF (merged into another branch?)" >&2; exit 4 ;;
+    *) broke "git merge-base --is-ancestor $SHA $BASE_REF exited $RC" ;;
+  esac
+  git merge --ff-only "$BASE_REF" >/dev/null 2>&1 || {
+    echo "error: could not fast-forward $BASE to $BASE_REF after merging $PR" >&2; exit 3; }
+  git merge-base --is-ancestor "$SHA" HEAD || {
+    echo "NOT-ON-BASE $SLOT — merge commit $SHA is not in the local $BASE after fast-forward" >&2; exit 4; }
 else
   git merge --no-ff -m "merge: $BRANCH into $BASE" "$BRANCH" >/dev/null 2>&1 || {
     echo "error: merge of $BRANCH into $BASE conflicted — resolve with the slot that owns the context" >&2
@@ -190,10 +330,14 @@ if [ -z "$CMDS" ]; then
   exit 0
 fi
 
+# Output is kept so a failure can be diagnosed: the tail goes to stderr, the
+# whole log stays on disk when anything failed.
+VLOG="$(mktemp "${TMPDIR:-/tmp}/hv-gate-verify-XXXXXX")"
 FAILED=0
 while IFS= read -r CMD; do
   [ -n "$CMD" ] || continue
-  if sh -c "$CMD" >/dev/null 2>&1; then
+  printf '== %s\n' "$CMD" >>"$VLOG"
+  if sh -c "$CMD" >>"$VLOG" 2>&1 </dev/null; then
     echo "  verify ok: $CMD"
   else
     echo "  verify FAILED: $CMD" >&2
@@ -204,9 +348,12 @@ $CMDS
 EOF
 
 if [ "$FAILED" -eq 1 ]; then
+  echo "  last lines of the verify output (full log: $VLOG):" >&2
+  tail -n 20 "$VLOG" | sed 's/^/    /' >&2
   echo "GATE-FAIL $SLOT — merged tree does not pass verification at $MERGED" >&2
   echo "  fix forward on $BASE; the owning slot has usually moved on" >&2
   exit 4
 fi
+rm -f "$VLOG"
 
 echo "GATE-PASS $SLOT $MERGED"
