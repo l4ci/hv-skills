@@ -1,7 +1,8 @@
 // Package repos reads the umbrella sub-repo registry, .hv/repos.json. It is
-// the one parser of that file (hvlib_repos.load_repos): an entry counts when
-// it has a non-empty string name and path; paths are relative to the
-// project root.
+// the one parser of that file, a port of hvlib_repos.load_repos: an entry
+// counts when it has a non-empty string name and path, paths are relative to
+// the project root and resolve like os.path.realpath, and a repeated name
+// keeps its first position and takes the last path, as a Python dict does.
 package repos
 
 import (
@@ -12,7 +13,7 @@ import (
 )
 
 // Repo is one registered sub-repo: Rel as written in repos.json, Path
-// absolute, with symlinks resolved when it exists.
+// absolute and realpath-resolved.
 type Repo struct {
 	Name, Rel, Path string
 }
@@ -27,6 +28,7 @@ func Load(root string) []Repo {
 	entries, _ := reg.Get("repos")
 	items, _ := entries.([]any)
 	var out []Repo
+	at := map[string]int{}
 	for _, e := range items {
 		obj, ok := e.(*jsonx.Object)
 		if !ok {
@@ -43,19 +45,43 @@ func Load(root string) []Repo {
 		if !filepath.IsAbs(p) {
 			p = filepath.Join(root, p)
 		}
-		if real, err := filepath.EvalSymlinks(p); err == nil {
-			p = real
+		repo := Repo{Name: n, Rel: r, Path: Realpath(p)}
+		if i, seen := at[n]; seen {
+			out[i] = repo
+			continue
 		}
-		out = append(out, Repo{Name: n, Rel: r, Path: filepath.Clean(p)})
+		at[n] = len(out)
+		out = append(out, repo)
 	}
 	return out
 }
 
-// Paths is Load as name to absolute path; a repeated name keeps the last.
+// Paths is Load as name to absolute path.
 func Paths(root string) map[string]string {
 	out := map[string]string{}
 	for _, r := range Load(root) {
 		out[r.Name] = r.Path
 	}
 	return out
+}
+
+// Realpath is os.path.realpath: an absolute path with symlinks resolved as far
+// as the path exists, and the rest kept as written.
+func Realpath(p string) string {
+	p, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	rest := ""
+	for cur := p; ; {
+		if real, err := filepath.EvalSymlinks(cur); err == nil {
+			return filepath.Join(real, rest)
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return p
+		}
+		rest = filepath.Join(filepath.Base(cur), rest)
+		cur = parent
+	}
 }

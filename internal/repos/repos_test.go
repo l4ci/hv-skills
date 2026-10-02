@@ -29,13 +29,14 @@ func TestLoad(t *testing.T) {
 		{"svc", "svc", filepath.Join(real, "svc")},
 		{"link", "link", filepath.Join(real, "svc")},
 		{"abs", "/srv/abs/../web", "/srv/web"},
-		{"ghost", "ghost", filepath.Join(root, "ghost")},
-		{"svc", "other", filepath.Join(root, "other")},
+		{"ghost", "ghost", filepath.Join(real, "ghost")},
 	}
+	// A repeated name keeps its first position and takes the last entry.
+	want[0] = Repo{"svc", "other", filepath.Join(real, "other")}
 	if got := Load(root); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Load:\n got %+v\nwant %+v", got, want)
 	}
-	if p := Paths(root); len(p) != 4 || p["svc"] != filepath.Join(root, "other") {
+	if p := Paths(root); len(p) != 4 || p["svc"] != filepath.Join(real, "other") {
 		t.Fatalf("Paths keeps the last of a repeated name: %v", p)
 	}
 	for _, body := range []string{"", "not json", `{"repos":null}`, `[]`, `{"repos":{}}`} {
