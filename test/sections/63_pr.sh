@@ -1,4 +1,4 @@
-echo "hv-pr: GitHub PR / GitLab MR, --closes lines"
+echo "ship pr: GitHub PR / GitLab MR, --items lines"
 
 TMP_PR="$(mktemp -d)"
 trap 'rm -rf "$TMP_PR"' EXIT
@@ -22,10 +22,15 @@ for prov in github gitlab; do
       export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
       DB="$P/db.json"
       if [ "$mode" = issues ]; then
-        "$BIN/hv-item-create" features --title "One" >/dev/null   # F1
-        "$BIN/hv-item-create" bugs --title "Two" --tag P1 >/dev/null  # B2
+        "$HV_BIN" item create --kind features --title "One" >/dev/null   # F1
+        "$HV_BIN" item create --kind bugs --title "Two" --tag P1 >/dev/null  # B2
       fi
-      url="$(printf 'Summary line' | "$BIN/hv-pr" --closes F1,2 feat/x "My title" 2>/dev/null | tail -n 1)"
+      env="$(printf 'Summary line' | hvj ship pr feat/x --title "My title" --body-file - --items F1,2 2>/dev/null)" || fail "$prov/$mode: ship pr failed"
+      url="$(jget data.url <<<"$env")"
+      [ "$(jget data.provider <<<"$env")" = "$prov" ] || fail "$prov/$mode: provider [$env]"
+      [ "$(jget data.branch <<<"$env")" = feat/x ] && [ "$(jget data.items <<<"$env")" = '["F1","2"]' ] || fail "$prov/$mode: branch/items echo [$env]"
+      [ "$(jget data.number <<<"$env")" = "${url##*/}" ] || fail "$prov/$mode: number [$env]"
+      [ "$(jget data.changed <<<"$env")" = true ] || fail "$prov/$mode: changed [$env]"
       if [ "$prov" = github ]; then
         want_n=$([ "$mode" = issues ] && echo 3 || echo 1)
         [ "$url" = "https://github.com/fake/repo/pull/$want_n" ] || fail "$prov/$mode: url [$url]"
@@ -43,21 +48,28 @@ for prov in github gitlab; do
       fi
       [ "$(PRBODY "$DB")" = "$want" ] || fail "$prov/$mode: body [$(PRBODY "$DB")]"
     )
-    pass "hv-pr $prov / $mode mode"
+    pass "ship pr $prov / $mode mode"
   done
 done
 
-# a --closes item that does not exist fails before anything is pushed
+# an --items item that does not exist fails before anything is pushed
 P="$TMP_PR/github-issues"
 (
   cd "$P/work"
   git checkout -q -b feat/y && git commit -q --allow-empty -m more
   export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json"
-  rc=0; err="$(printf b | "$BIN/hv-pr" --closes F99 feat/y T 2>&1)" || rc=$?
-  [ "$rc" = 1 ] || fail "unknown --closes should exit 1 (got $rc)"
+  rc=0; err="$(printf b | "$HV_BIN" ship pr feat/y --title T --body-file - --items F99 2>&1)" || rc=$?
+  [ "$rc" = 3 ] || fail "unknown --items should exit 3 (got $rc)"
   case "$err" in *"F99"*) ;; *) fail "error should name F99: $err" ;; esac
-  git -C "$P/origin.git" rev-parse --verify -q refs/heads/feat/y >/dev/null && fail "nothing should be pushed on a bad --closes" || true
+  git -C "$P/origin.git" rev-parse --verify -q refs/heads/feat/y >/dev/null && fail "nothing should be pushed on a bad --items" || true
+  # usage errors: no title, empty body, unknown branch
+  rc=0; printf b | "$HV_BIN" ship pr feat/y --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "missing --title should exit 2 (got $rc)"
+  rc=0; printf '' | "$HV_BIN" ship pr feat/y --title T --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "empty body should exit 2 (got $rc)"
+  rc=0; printf b | "$HV_BIN" ship pr no/such --title T --body-file - >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 3 ] || fail "unknown branch should exit 3 (got $rc)"
 )
-pass "hv-pr rejects an unknown --closes item before pushing"
+pass "ship pr rejects an unknown --items item before pushing, and bad usage"
 
 trap 'rm -rf "$TMP"' EXIT

@@ -166,17 +166,17 @@ py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); s
   pass "fake gh pr / glab mr: merge, comment, auto-close on main"
 )
 
-# hv-tracker-call drives the fakes
+# tracker call drives the fakes
 (
   cd "$TMP_FT/proj"
   export PATH="$FAKES:$PATH" FAKE_TRACKER_DB="$TMP_FT/tc.json" FAKE_TRACKER_LOG="$TMP_FT/tc.log"
   gh label create t >/dev/null
   gh issue create --title A --body b --label t >/dev/null
   : > "$TMP_FT/tc.log"
-  out="$("$BIN/hv-tracker-call" --provider github -- issue list --json number </dev/null)"
-  py "$out" "d==[{'number':1}]" || fail "hv-tracker-call over fake gh: $out"
+  out="$(hvj tracker call --provider github -- issue list --json number </dev/null)"
+  py "$(echo "$out" | jget data.stdout)" "d==[{'number':1}]" || fail "tracker call over fake gh: $out"
   [ "$(cat "$TMP_FT/tc.log")" = "issue list --json number --limit 1000" ] || fail "tracker-call should inject --limit 1000 (log: $(cat "$TMP_FT/tc.log"))"
-  pass "hv-tracker-call works against the fakes"
+  pass "tracker call works against the fakes"
 )
 
 trap 'rm -rf "$TMP"' EXIT

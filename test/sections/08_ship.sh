@@ -1,12 +1,45 @@
-echo "hv-merge / hv-pr"
-# Check syntactic integrity — they should error cleanly without stdin input
-if echo "" | "$BIN/hv-merge" hv/real-branch 2>/dev/null; then
-  fail "hv-merge should reject empty message"
-fi
-pass "hv-merge rejects empty message"
-# Don't actually run hv-pr — no remote
+echo "ship merge / ship pr"
+# Check syntactic integrity — they should error cleanly without a body
+rc=0; echo "" | hvj ship merge hv/real-branch --body-file - >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "ship merge should reject an empty message with exit 2 (got $rc)"
+rc=0; hvj ship merge hv/real-branch >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "ship merge without --body-file should exit 2 (got $rc)"
+rc=0; echo "msg" | hvj ship merge hv/real-branch --body-file - >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "ship merge of an unknown branch should exit 3 (got $rc)"
+pass "ship merge rejects empty message and unknown branch"
 
-echo "regression: hv-backlog preserves periods in titles"
+# ship merge: --no-ff merge into the base branch with the body as message, branch deleted
+TMP_MG="$(mktemp -d)"
+trap 'rm -rf "$TMP_MG"' EXIT
+(
+  cd "$TMP_MG"
+  git init -q && git config user.email t@t && git config user.name t
+  git checkout -q -b main 2>/dev/null || git branch -m main
+  mkdir .hv && echo '{}' > .hv/config.json
+  echo base > a.txt && git add a.txt && git commit -q -m seed
+  git checkout -q -b hv/merge-ok && echo one > b.txt && git add b.txt && git commit -q -m "feat: one"
+  git checkout -q -b hv/merge-conflict main && echo two > a.txt && git commit -q -am "feat: two"
+  git checkout -q main && echo three > a.txt && git commit -q -am "feat: three"
+
+  OUT=$(printf 'merge: ok branch' | hvj ship merge hv/merge-ok --body-file -) || fail "ship merge failed: $OUT"
+  [ "$(echo "$OUT" | jget data.base)" = main ] && [ "$(echo "$OUT" | jget data.changed)" = true ] || fail "ship merge data: $OUT"
+  [ "$(echo "$OUT" | jget data.sha)" = "$(git rev-parse --short HEAD)" ] || fail "ship merge sha should be HEAD: $OUT"
+  [ "$(git log -1 --format=%s)" = "merge: ok branch" ] || fail "merge subject should be the body"
+  [ "$(git rev-list --parents -1 HEAD | wc -w | tr -d ' ')" = 3 ] || fail "ship merge should create a merge commit"
+  git rev-parse --verify -q refs/heads/hv/merge-ok >/dev/null && fail "ship merge should delete the branch" || true
+
+  rc=0; OUT=$(printf 'merge: x' | hvj ship merge main --body-file - 2>/dev/null) || rc=$?
+  [ "$rc" = 4 ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "base branch" ] || fail "merging the base branch should exit 4: rc=$rc $OUT"
+  rc=0; OUT=$(printf 'merge: x' | hvj ship merge hv/merge-conflict --body-file - 2>/dev/null) || rc=$?
+  [ "$rc" = 4 ] && [ "$(echo "$OUT" | jget data.blockedBy)" = conflict ] || fail "a conflicting merge should exit 4: rc=$rc $OUT"
+  [ -z "$(git status --porcelain --untracked-files=no)" ] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null \
+    || fail "a conflicting ship merge must abort and leave the tree clean"
+)
+trap 'rm -rf "$TMP"' EXIT
+pass "ship merge merges --no-ff, deletes the branch, refuses base branch and conflicts"
+# Don't actually run ship pr — no remote (63_pr covers it)
+
+echo "regression: backlog list preserves periods in titles"
 cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
@@ -19,11 +52,11 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-OUT=$("$BIN/hv-backlog")
-echo "$OUT" | grep -q "Add v1.2 support" || fail "title with period was truncated: $(echo "$OUT" | grep F50)"
+OUT=$(hvj backlog list)
+echo "$OUT" | jget data.features[0].title | grep -q "Add v1.2 support" || fail "title with period was truncated: $OUT"
 pass "backlog keeps mid-title periods intact"
 
-echo "regression: hv-archive-old always prints count"
+echo "regression: backlog archive always reports a count"
 cat > .hv/BACKLOG.md <<'EOF'
 # TODO
 
@@ -35,11 +68,12 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-COUNT=$("$BIN/hv-archive-old" 5)
-[ "$COUNT" = "0" ] || fail "expected '0' when nothing to archive, got '$COUNT'"
-pass "archive-old prints 0 when no items to move"
+OUT=$(hvj backlog archive --days 5)
+[ "$(echo "$OUT" | jget data.moved)" = "0" ] || fail "expected moved 0 when nothing to archive, got: $OUT"
+[ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "nothing archived should report changed=false: $OUT"
+pass "backlog archive reports 0 when no items to move"
 
-echo "regression: hv-archive-old only archives canonical completed shape"
+echo "regression: backlog archive only archives canonical completed shape"
 FAKE_HASH="abc1234"
 OLD_DATE="2024-01-01"
 cat > .hv/BACKLOG.md <<EOF
@@ -56,14 +90,15 @@ cat > .hv/BACKLOG.md <<EOF
 - ~~**[B01] Fix login crash.**~~ Done ${OLD_DATE} [\`${FAKE_HASH}\`]
 - Note: see issue [B05] which was Done 2024-01-01 by accident.
 EOF
-COUNT=$("$BIN/hv-archive-old" 1)
-[ "$COUNT" = "1" ] || fail "expected 1 item archived, got '$COUNT'"
+OUT=$(hvj backlog archive --days 1)
+[ "$(echo "$OUT" | jget data.moved)" = "1" ] || fail "expected 1 item archived, got: $OUT"
+[ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "archiving should report changed=true: $OUT"
 grep -q "Fix login crash" .hv/ARCHIVE.md || fail "canonical bullet not found in ARCHIVE.md"
 grep -q "by accident" .hv/BACKLOG.md || fail "free-form note was wrongly removed from BACKLOG.md"
 ! grep -q "Fix login crash" .hv/BACKLOG.md || fail "canonical bullet still present in BACKLOG.md"
-pass "archive-old only moves canonical completed bullets"
+pass "backlog archive only moves canonical completed bullets"
 
-echo "hv-ship-body"
+echo "ship body"
 # Fresh branch state for ship-body + review-scope
 git checkout -q main 2>/dev/null || true
 cat > .hv/BACKLOG.md <<'EOF'
@@ -85,15 +120,18 @@ echo ship1 > ship1.txt && git add ship1.txt && git commit -q -m "fix: badge inva
 echo ship2 > ship2.txt && git add ship2.txt && git commit -q -m "feat: overlay [F70]"
 git checkout -q main
 
-BODY=$("$BIN/hv-ship-body" hv/ship-demo)
-echo "$BODY" | grep -q "^## Summary" || fail "ship-body missing Summary section"
-echo "$BODY" | grep -q "^## Items resolved" || fail "ship-body missing Items resolved section"
-echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship-body missing B70 title"
-echo "$BODY" | grep -q "\[F70\] Ship demo feature" || fail "ship-body missing F70 title"
-pass "ship-body emits Summary + Items resolved with resolved titles"
+BODY=$(hvj ship body hv/ship-demo | jget data.body)
+echo "$BODY" | grep -q "^## Summary" || fail "ship body missing Summary section"
+echo "$BODY" | grep -q "^## Items resolved" || fail "ship body missing Items resolved section"
+echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship body missing B70 title"
+echo "$BODY" | grep -q "\[F70\] Ship demo feature" || fail "ship body missing F70 title"
+pass "ship body emits Summary + Items resolved with resolved titles"
 
-if "$BIN/hv-ship-body" main 2>/dev/null; then fail "ship-body should reject main (no commits vs base)"; fi
-pass "ship-body errors when base has no commits"
+rc=0; hvj ship body main >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] || fail "ship body should reject main with exit 1 (no commits vs base), got $rc"
+rc=0; hvj ship body hv/no-such-branch >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "ship body of an unknown branch should exit 3, got $rc"
+pass "ship body errors when base has no commits"
 
 # ship-body emits Closes #N for GH refs in resolved item bullets
 git checkout -q main
@@ -115,11 +153,11 @@ git checkout -q -b hv/ship-gh-closes
 echo g1 > g1.txt && git add g1.txt && git commit -q -m "fix: thing [B71]"
 echo g2 > g2.txt && git add g2.txt && git commit -q -m "feat: thing [F71]"
 git checkout -q main
-BODY=$("$BIN/hv-ship-body" hv/ship-gh-closes)
-echo "$BODY" | grep -q "^Closes #42$" || fail "ship-body missing Closes #42 line: $BODY"
+BODY=$(hvj ship body hv/ship-gh-closes | jget data.body)
+echo "$BODY" | grep -q "^Closes #42$" || fail "ship body missing Closes #42 line: $BODY"
 GH_LINES=$(echo "$BODY" | grep -c "^Closes #" || true)
-[ "$GH_LINES" = "1" ] || fail "ship-body expected 1 Closes line, got $GH_LINES: $BODY"
-pass "ship-body emits Closes #N from GH refs in TODO bullets"
+[ "$GH_LINES" = "1" ] || fail "ship body expected 1 Closes line, got $GH_LINES: $BODY"
+pass "ship body emits Closes #N from GH refs in TODO bullets"
 git checkout -q main
 git branch -D hv/ship-gh-closes >/dev/null 2>&1 || true
 rm -f g1.txt g2.txt
@@ -142,9 +180,9 @@ git add -A && git commit -q -m "seed gh-closes negative" || true
 git checkout -q -b hv/ship-gh-noclose
 echo g3 > g3.txt && git add g3.txt && git commit -q -m "fix: thing [B72]"
 git checkout -q main
-BODY=$("$BIN/hv-ship-body" hv/ship-gh-noclose)
-if echo "$BODY" | grep -q "^Closes #"; then fail "ship-body emitted Closes line with no GH refs: $BODY"; fi
-pass "ship-body emits no Closes lines when no GH refs present"
+BODY=$(hvj ship body hv/ship-gh-noclose | jget data.body)
+if echo "$BODY" | grep -q "^Closes #"; then fail "ship body emitted Closes line with no GH refs: $BODY"; fi
+pass "ship body emits no Closes lines when no GH refs present"
 git checkout -q main
 git branch -D hv/ship-gh-noclose >/dev/null 2>&1 || true
 rm -f g3.txt
@@ -168,10 +206,10 @@ git checkout -q -b hv/ship-gh-dedup
 echo g4 > g4.txt && git add g4.txt && git commit -q -m "fix: thing one [B73]"
 echo g5 > g5.txt && git add g5.txt && git commit -q -m "fix: thing two [B73]"
 git checkout -q main
-BODY=$("$BIN/hv-ship-body" hv/ship-gh-dedup)
+BODY=$(hvj ship body hv/ship-gh-dedup | jget data.body)
 DEDUP_LINES=$(echo "$BODY" | grep -c "^Closes #99$" || true)
-[ "$DEDUP_LINES" = "1" ] || fail "ship-body expected 1 Closes #99 line (dedup), got $DEDUP_LINES: $BODY"
-pass "ship-body dedups Closes #N across multiple commits referencing same ID"
+[ "$DEDUP_LINES" = "1" ] || fail "ship body expected 1 Closes #99 line (dedup), got $DEDUP_LINES: $BODY"
+pass "ship body dedups Closes #N across multiple commits referencing same ID"
 git checkout -q main
 git branch -D hv/ship-gh-dedup >/dev/null 2>&1 || true
 rm -f g4.txt g5.txt
@@ -192,17 +230,26 @@ cat > .hv/BACKLOG.md <<'EOF'
 EOF
 git add -A && git commit -q -m "restore ship demo TODO" || true
 
-echo "hv-review-scope"
-OUT=$("$BIN/hv-review-scope" hv/ship-demo)
-echo "$OUT" | grep -q '"commitCount": 2' || fail "review-scope commitCount != 2: $OUT"
-echo "$OUT" | grep -q '"B70"' || fail "review-scope missing B70"
-echo "$OUT" | grep -q '"F70"' || fail "review-scope missing F70"
-echo "$OUT" | grep -q '"title": "Ship demo bug"' || fail "review-scope missing B70 title"
-echo "$OUT" | grep -q '"ship1.txt"' || fail "review-scope missing touched file"
-pass "review-scope emits commits, IDs, titles, and files"
+echo "review scope"
+OUT=$(hvj review scope hv/ship-demo)
+[ "$(echo "$OUT" | jget data.commitCount)" = "2" ] || fail "review scope commitCount != 2: $OUT"
+[ "$(echo "$OUT" | jget data.base)" = "main" ] || fail "review scope base != main: $OUT"
+[ "$(echo "$OUT" | jget data.referencedIds)" = '["F70","B70"]' ] || fail "review scope referencedIds: $OUT"
+# intents follow the log order (newest commit first)
+[ "$(echo "$OUT" | jget data.intents[0].id)" = "F70" ] || fail "review scope missing F70: $OUT"
+[ "$(echo "$OUT" | jget data.intents[0].type)" = "F" ] || fail "review scope F70 type: $OUT"
+[ "$(echo "$OUT" | jget data.intents[1].id)" = "B70" ] || fail "review scope missing B70: $OUT"
+[ "$(echo "$OUT" | jget data.intents[1].type)" = "B" ] || fail "review scope B70 type: $OUT"
+[ "$(echo "$OUT" | jget data.intents[1].title)" = "Ship demo bug" ] || fail "review scope missing B70 title: $OUT"
+[ "$(echo "$OUT" | jget data.touchedFiles)" = '["ship1.txt","ship2.txt"]' ] || fail "review scope touchedFiles: $OUT"
+[ "$(echo "$OUT" | jget data.commits[0].subject)" = "feat: overlay [F70]" ] || fail "review scope commits: $OUT"
+pass "review scope emits commits, IDs, titles, and files"
 
-if "$BIN/hv-review-scope" main 2>/dev/null; then fail "review-scope should reject base branch"; fi
-pass "review-scope rejects base branch"
+rc=0; hvj review scope main >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] || fail "review scope should reject the base branch with exit 1, got $rc"
+rc=0; hvj review scope hv/no-such-branch >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "review scope of an unknown branch should exit 3, got $rc"
+pass "review scope rejects base branch"
 
 # Regression: review-scope must attribute an ID to its OWN bullet, not to
 # another item that mentions the ID in a `Related:` suffix.
@@ -228,9 +275,9 @@ git add -A && git commit -q -m "seed related-link test" || true
 git checkout -q -b hv/scope-regression
 echo r > r.txt && git add r.txt && git commit -q -m "fix: badge [B70]"
 git checkout -q main
-OUT=$("$BIN/hv-review-scope" hv/scope-regression)
-echo "$OUT" | grep -q '"title": "Ship demo bug"' || fail "review-scope picked wrong bullet for B70 (Related-link regression): $OUT"
-pass "review-scope picks origin bullet, ignores Related-link references"
+OUT=$(hvj review scope hv/scope-regression)
+[ "$(echo "$OUT" | jget data.intents[0].title)" = "Ship demo bug" ] || fail "review scope picked wrong bullet for B70 (Related-link regression): $OUT"
+pass "review scope picks origin bullet, ignores Related-link references"
 git branch -D hv/scope-regression >/dev/null 2>&1 || true
 rm -f r.txt
 
@@ -258,9 +305,9 @@ git add -A && git commit -q -m "seed ship-body related-link test" || true
 git checkout -q -b hv/ship-body-regression
 echo r > r2.txt && git add r2.txt && git commit -q -m "fix: badge [B70]"
 git checkout -q main
-BODY=$("$BIN/hv-ship-body" hv/ship-body-regression)
-echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship-body picked wrong bullet for B70 (Related-link regression): $BODY"
-pass "ship-body picks origin bullet, ignores Related-link references"
+BODY=$(hvj ship body hv/ship-body-regression | jget data.body)
+echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship body picked wrong bullet for B70 (Related-link regression): $BODY"
+pass "ship body picks origin bullet, ignores Related-link references"
 git checkout -q main
 git branch -D hv/ship-body-regression >/dev/null 2>&1 || true
 rm -f r2.txt
@@ -269,7 +316,7 @@ rm -f r2.txt
 git branch -D hv/ship-demo >/dev/null 2>&1 || true
 rm -f ship1.txt ship2.txt
 
-echo "hv-second-opinion-brief"
+echo "review brief"
 # Re-seed the ship-demo branch + TODO state for the second-opinion brief test.
 git checkout -q main
 cat > .hv/BACKLOG.md <<'EOF'
@@ -291,50 +338,53 @@ echo so1 > so1.txt && git add so1.txt && git commit -q -m "fix: badge invalidati
 echo so2 > so2.txt && git add so2.txt && git commit -q -m "feat: overlay [F70]"
 git checkout -q main
 
-BRIEF=$("$BIN/hv-second-opinion-brief" hv/second-opinion-demo)
+BRIEF_ENV=$(hvj review brief hv/second-opinion-demo)
+[ "$(echo "$BRIEF_ENV" | jget data.commitCount)" = "2" ] && [ "$(echo "$BRIEF_ENV" | jget data.base)" = "main" ] \
+  || fail "review brief commitCount/base: $BRIEF_ENV"
+BRIEF=$(echo "$BRIEF_ENV" | jget data.brief)
 echo "$BRIEF" | grep -qi "no prior conversation context" \
-  || fail "second-opinion-brief missing fresh-context framing"
+  || fail "review brief missing fresh-context framing"
 echo "$BRIEF" | grep -q "^\*\*Goal" \
-  || fail "second-opinion-brief missing Goal section"
+  || fail "review brief missing Goal section"
 echo "$BRIEF" | grep -q "\[B70\] Ship demo bug" \
-  || fail "second-opinion-brief missing B70 in goal"
+  || fail "review brief missing B70 in goal"
 echo "$BRIEF" | grep -q "\[F70\] Ship demo feature" \
-  || fail "second-opinion-brief missing F70 in goal"
+  || fail "review brief missing F70 in goal"
 echo "$BRIEF" | grep -q "^\*\*Commits" \
-  || fail "second-opinion-brief missing Commits section"
+  || fail "review brief missing Commits section"
 echo "$BRIEF" | grep -q "fix: badge invalidation" \
-  || fail "second-opinion-brief missing commit subject"
+  || fail "review brief missing commit subject"
 echo "$BRIEF" | grep -q "^\*\*Diff" \
-  || fail "second-opinion-brief missing Diff section"
+  || fail "review brief missing Diff section"
 echo "$BRIEF" | grep -q "so1.txt" \
-  || fail "second-opinion-brief missing per-file diff path"
+  || fail "review brief missing per-file diff path"
 echo "$BRIEF" | grep -q "PASS | CONCERNS | FAIL" \
-  || fail "second-opinion-brief missing verdict-instruction"
+  || fail "review brief missing verdict-instruction"
 if echo "$BRIEF" | grep -qi "KNOWLEDGE\.md\|DECISIONS\.md\|hard boundaries\|known gotchas"; then
-  fail "second-opinion-brief leaked KNOWLEDGE/DECISIONS context (must be diff+goal only)"
+  fail "review brief leaked KNOWLEDGE/DECISIONS context (must be diff+goal only)"
 fi
-pass "second-opinion-brief emits goal+commits+diff with no project-context leak"
+pass "review brief emits goal+commits+diff with no project-context leak"
 
-if "$BIN/hv-second-opinion-brief" main 2>/dev/null; then
-  fail "second-opinion-brief should reject base branch"
-fi
-pass "second-opinion-brief rejects base branch"
+rc=0; hvj review brief main >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] || fail "review brief should reject the base branch with exit 1, got $rc"
+rc=0; hvj review brief hv/no-such-branch >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] || fail "review brief of an unknown branch should exit 3, got $rc"
+pass "review brief rejects base branch"
 
-# Zero-commit branch — helper exits 2 with a clear error
+# Zero-commit branch — refused with exit 1
 git checkout -q -b hv/second-opinion-empty
 git checkout -q main
-if "$BIN/hv-second-opinion-brief" hv/second-opinion-empty 2>/dev/null; then
-  fail "second-opinion-brief should reject zero-commit branch"
-fi
-pass "second-opinion-brief rejects branch with no commits beyond base"
+rc=0; hvj review brief hv/second-opinion-empty >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] || fail "review brief should reject a zero-commit branch with exit 1, got $rc"
+pass "review brief rejects branch with no commits beyond base"
 git branch -D hv/second-opinion-empty >/dev/null 2>&1 || true
 
-# Schema parity — brief's commit count matches hv-review-scope JSON's commitCount.
-# Catches silent drift if hv-review-scope's schema changes without the brief noticing.
-SCOPE_COUNT=$("$BIN/hv-review-scope" hv/second-opinion-demo | python3 -c 'import json,sys;print(json.load(sys.stdin)["commitCount"])')
-BRIEF_COMMITS=$("$BIN/hv-second-opinion-brief" hv/second-opinion-demo | grep -cE '^- `[a-f0-9]+` ')
-[ "$SCOPE_COUNT" = "$BRIEF_COMMITS" ] || fail "schema drift: hv-review-scope reports $SCOPE_COUNT commits but hv-second-opinion-brief lists $BRIEF_COMMITS"
-pass "second-opinion-brief commit count matches hv-review-scope JSON (schema parity)"
+# Schema parity — brief's commit count matches review scope's commitCount.
+# Catches silent drift if the scope schema changes without the brief noticing.
+SCOPE_COUNT=$(hvj review scope hv/second-opinion-demo | jget data.commitCount)
+BRIEF_COMMITS=$(hvj review brief hv/second-opinion-demo | jget data.brief | grep -cE '^- `[a-f0-9]+` ')
+[ "$SCOPE_COUNT" = "$BRIEF_COMMITS" ] || fail "schema drift: review scope reports $SCOPE_COUNT commits but review brief lists $BRIEF_COMMITS"
+pass "review brief commit count matches review scope (schema parity)"
 
 # Cleanup
 git branch -D hv/second-opinion-demo >/dev/null 2>&1 || true

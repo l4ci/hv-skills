@@ -1,110 +1,97 @@
-echo "hv-issue-suggest manual fallback when gh unavailable"
+echo "tracker suggest-upstream manual fallback when gh unavailable"
 HI_TMP="$(mktemp -d)"
+trap 'rm -rf "$HI_TMP"' EXIT
 (
   cd "$HI_TMP"
-  mkdir -p .hv/bin stub-bin
-  install_helpers
-  # Stub `gh` to a script that always fails so the helper takes the manual-fallback path,
+  mkdir -p .hv stub-bin
+  # Stub `gh` to a script that always fails so the verb takes the unavailable path,
   # even on a host where the real gh is installed and authed.
-  cat > stub-bin/gh <<'EOF'
+  cat > stub-bin/gh <<'EOS'
 #!/bin/sh
 exit 7
-EOF
+EOS
   chmod +x stub-bin/gh
-  set +e
-  OUT=$(PATH="$HI_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "test title" <<<"test body" 2>&1)
-  RC=$?
-  set -e
-  [ "$RC" = "1" ] || fail "expected exit 1 when gh fails: rc=$RC"
-  echo "$OUT" | grep -q "test title" || fail "manual fallback missing title: $OUT"
-  echo "$OUT" | grep -q "test body" || fail "manual fallback missing body: $OUT"
-  echo "$OUT" | grep -q "github.com/l4ci/hv-skills" || fail "manual fallback missing repo URL: $OUT"
-  pass "hv-issue-suggest prints manual fallback when gh unavailable"
+  rc=0
+  OUT=$(PATH="$HI_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "test title" --body-file - <<<"test body" 2>/dev/null) || rc=$?
+  [ "$rc" = "5" ] || fail "expected exit 5 when gh fails: rc=$rc"
+  [ "$(echo "$OUT" | jget ok)" = "false" ] || fail "expected ok:false envelope: $OUT"
+  echo "$OUT" | jget error.hint | grep -q "github.com/l4ci/hv-skills/issues/new" || fail "unavailable hint missing repo URL: $OUT"
+  pass "tracker suggest-upstream exits 5 with the manual issue URL when gh unavailable"
 )
 rm -rf "$HI_TMP"
 
-echo "hv-issue-suggest --upstream-repo override"
+echo "tracker suggest-upstream --upstream-repo override"
 HI2_TMP="$(mktemp -d)"
+trap 'rm -rf "$HI2_TMP"' EXIT
 (
   cd "$HI2_TMP"
-  mkdir -p .hv/bin stub-bin
-  install_helpers
-  cat > stub-bin/gh <<'EOF'
+  mkdir -p .hv stub-bin
+  cat > stub-bin/gh <<'EOS'
 #!/bin/sh
 exit 7
-EOF
+EOS
   chmod +x stub-bin/gh
-  set +e
-  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" .hv/bin/hv-issue-suggest --title "x" --upstream-repo "fork/repo" <<<"y" 2>&1)
-  set -e
-  echo "$OUT" | grep -q "github.com/fork/repo" || fail "--upstream-repo override ignored: $OUT"
-  pass "hv-issue-suggest --upstream-repo override flows through to manual fallback URL"
+  OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - <<<"y" 2>/dev/null) || true
+  echo "$OUT" | jget error.hint | grep -q "github.com/fork/repo" || fail "--upstream-repo override ignored: $OUT"
+  pass "tracker suggest-upstream --upstream-repo override flows through to the hint URL"
 )
 rm -rf "$HI2_TMP"
 
-echo "hv-release-pending"
+echo "release pending"
 RP_TMP="$(mktemp -d)"
+trap 'rm -rf "$RP_TMP"' EXIT
 
-# Case 1: no tags → no nudge, lastTag empty.
+# Case 1: no tags -> no nudge, lastTag empty.
 (
   cd "$RP_TMP"
   mkdir no-tag && cd no-tag
+  mkdir -p .hv
   git init -q && git config user.email t@t && git config user.name t
   git commit -q --allow-empty -m "seed"
-  OUT=$("$BIN/hv-release-pending")
-  python3 -c "
-import json, sys
-d = json.loads(sys.argv[1])
-assert d['lastTag'] == '', d
-assert d['commits'] == 0, d
-assert d['shouldNudge'] is False, d
-assert d['reason'] == 'no-tag', d
-assert d['message'] == '', d
-" "$OUT" || fail "no-tag case: $OUT"
+  OUT=$(hvj release pending)
+  [ "$(echo "$OUT" | jget data.lastTag)" = "" ] || fail "no-tag case lastTag: $OUT"
+  [ "$(echo "$OUT" | jget data.commits)" = "0" ] || fail "no-tag case commits: $OUT"
+  [ "$(echo "$OUT" | jget data.shouldNudge)" = "false" ] || fail "no-tag case shouldNudge: $OUT"
+  [ "$(echo "$OUT" | jget data.reason)" = "no-tag" ] || fail "no-tag case reason: $OUT"
+  [ "$(echo "$OUT" | jget data.message)" = "" ] || fail "no-tag case message: $OUT"
 )
-pass "hv-release-pending: no tag -> no nudge"
+pass "release pending: no tag -> no nudge"
 
-# Case 2: tag + 3 commits, default thresholds → no nudge.
+# Case 2: tag + 3 commits, default thresholds -> no nudge.
 (
   cd "$RP_TMP"
   mkdir below && cd below
+  mkdir -p .hv
   git init -q && git config user.email t@t && git config user.name t
   git commit -q --allow-empty -m "seed"
   git tag v0.0.1
   for i in 1 2 3; do git commit -q --allow-empty -m "c$i"; done
-  OUT=$("$BIN/hv-release-pending")
-  python3 -c "
-import json, sys
-d = json.loads(sys.argv[1])
-assert d['lastTag'] == 'v0.0.1', d
-assert d['commits'] == 3, d
-assert d['shouldNudge'] is False, d
-assert d['reason'] == '', d
-assert d['message'] == '', d
-" "$OUT" || fail "below-threshold case: $OUT"
+  OUT=$(hvj release pending)
+  [ "$(echo "$OUT" | jget data.lastTag)" = "v0.0.1" ] || fail "below-threshold lastTag: $OUT"
+  [ "$(echo "$OUT" | jget data.commits)" = "3" ] || fail "below-threshold commits: $OUT"
+  [ "$(echo "$OUT" | jget data.shouldNudge)" = "false" ] || fail "below-threshold shouldNudge: $OUT"
+  [ "$(echo "$OUT" | jget data.reason)" = "" ] || fail "below-threshold reason: $OUT"
+  [ "$(echo "$OUT" | jget data.message)" = "" ] || fail "below-threshold message: $OUT"
 )
-pass "hv-release-pending: 3 commits past tag -> no nudge"
+pass "release pending: 3 commits past tag -> no nudge"
 
-# Case 3: tag + 11 commits → nudge, reason=commits.
+# Case 3: tag + 11 commits -> nudge, reason=commits.
 (
   cd "$RP_TMP"
   mkdir above && cd above
+  mkdir -p .hv
   git init -q && git config user.email t@t && git config user.name t
   git commit -q --allow-empty -m "seed"
   git tag v0.0.1
   for i in $(seq 1 11); do git commit -q --allow-empty -m "c$i"; done
-  OUT=$("$BIN/hv-release-pending")
-  python3 -c "
-import json, sys
-d = json.loads(sys.argv[1])
-assert d['lastTag'] == 'v0.0.1', d
-assert d['commits'] == 11, d
-assert d['shouldNudge'] is True, d
-assert d['reason'] == 'commits', d
-assert d['message'] == '11 commits since v0.0.1; consider /hv-release.', d
-" "$OUT" || fail "above-commit-threshold case: $OUT"
+  OUT=$(hvj release pending)
+  [ "$(echo "$OUT" | jget data.lastTag)" = "v0.0.1" ] || fail "above-threshold lastTag: $OUT"
+  [ "$(echo "$OUT" | jget data.commits)" = "11" ] || fail "above-threshold commits: $OUT"
+  [ "$(echo "$OUT" | jget data.shouldNudge)" = "true" ] || fail "above-threshold shouldNudge: $OUT"
+  [ "$(echo "$OUT" | jget data.reason)" = "commits" ] || fail "above-threshold reason: $OUT"
+  [ "$(echo "$OUT" | jget data.message)" = "11 commits since v0.0.1; consider /hv-release." ] || fail "above-threshold message: $OUT"
 )
-pass "hv-release-pending: 11 commits past tag -> nudge (reason=commits)"
+pass "release pending: 11 commits past tag -> nudge (reason=commits)"
 
 # Case 4: custom commit threshold via .hv/config.json.
 (
@@ -116,21 +103,19 @@ pass "hv-release-pending: 11 commits past tag -> nudge (reason=commits)"
   for i in $(seq 1 6); do git commit -q --allow-empty -m "c$i"; done
   mkdir -p .hv
   echo '{"release":{"nudgeAfterCommits":5}}' > .hv/config.json
-  OUT=$("$BIN/hv-release-pending")
-  python3 -c "
-import json, sys
-d = json.loads(sys.argv[1])
-assert d['thresholdCommits'] == 5, d
-assert d['commits'] == 6, d
-assert d['shouldNudge'] is True, d
-assert d['reason'] == 'commits', d
-assert d['message'] == '6 commits since v0.0.1; consider /hv-release.', d
-" "$OUT" || fail "custom-threshold case: $OUT"
+  OUT=$(hvj release pending)
+  [ "$(echo "$OUT" | jget data.thresholdCommits)" = "5" ] || fail "custom-threshold thresholdCommits: $OUT"
+  [ "$(echo "$OUT" | jget data.commits)" = "6" ] || fail "custom-threshold commits: $OUT"
+  [ "$(echo "$OUT" | jget data.shouldNudge)" = "true" ] || fail "custom-threshold shouldNudge: $OUT"
+  [ "$(echo "$OUT" | jget data.reason)" = "commits" ] || fail "custom-threshold reason: $OUT"
+  [ "$(echo "$OUT" | jget data.message)" = "6 commits since v0.0.1; consider /hv-release." ] || fail "custom-threshold message: $OUT"
 )
-pass "hv-release-pending: custom nudgeAfterCommits=5 honored"
+pass "release pending: custom nudgeAfterCommits=5 honored"
 
 rm -rf "$RP_TMP"
+trap 'rm -rf "$TMP"' EXIT
 
+# white-box: kept until A9 (#53)
 echo "F29: --repo flag uses strict form"
 # Structural guard: every helper that parses a literal --repo / --repos flag
 # must extract the value with the loud form ${2:?usage:...} so a missing
@@ -151,6 +136,7 @@ for f in hv-status-add-multi hv-multi-branch-create; do
 done
 pass "F29: all --repo / --repos helpers use the strict \${2:?usage:...} extraction"
 
+# white-box: kept until A9 (#53)
 echo "F30: walk-up helpers delegate to bin/hv-walk-up"
 # Structural guard: helpers that need to walk upward from a caller directory
 # must delegate to the canonical bin/hv-walk-up rather than reimplementing the
