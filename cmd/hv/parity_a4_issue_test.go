@@ -281,6 +281,51 @@ func dropChanged(e envl) {
 	}
 }
 
+// iscOracle is what the old side did for a scenario.
+type iscOracle struct {
+	Code           int // the old exit code, after mapping to the contract's
+	Stdout, Stderr string
+	Tree           map[string]string // file scenarios: the .hv/ tree after the run
+	DB             map[string]any    // the forge database after the run
+}
+
+// oracle runs the scenario's old side in a copy of base, or replays it from
+// the cache when none of its inputs changed (parity_cache_test.go).
+func (s isc) oracle(t *testing.T, base string, in info, remote string, argv []string) (ref run, refCode int, tree map[string]string, db map[string]any) {
+	t.Helper()
+	var old []string
+	if len(s.old) > 0 {
+		old = subst(s.old, in)
+	}
+	key := oracleKey(t, map[string]any{"kind": "isc", "project": projectDigest(base), "remote": remote, "seed": seedDB(),
+		"argv": argv, "old": old, "in": s.in, "env": s.env, "file": s.file})
+	var c iscOracle
+	if oracleLoad(key, &c) {
+		return run{stdout: c.Stdout, stderr: c.Stderr}, c.Code, c.Tree, c.DB
+	}
+	refDir := copyTree(t, base)
+	refDB := writeDB(t, seedDB())
+	env := append([]string{"FAKE_TRACKER_DB=" + refDB}, s.env...)
+	if len(old) > 0 {
+		ref = envRun(t, refDir, s.in, env, filepath.Join(stagedBin, old[0]), old[1:]...)
+		m := s.oldMap
+		if m == nil {
+			m = mapIssueOld
+		}
+		refCode = m(ref.code, ref.stderr)
+	} else {
+		ref = envRun(t, refDir, s.in, env, "python3", append([]string{shimPath}, argv...)...)
+		refCode = ref.code
+	}
+	ref.dir = refDir
+	if s.file {
+		tree = snapshot(t, refDir)
+	}
+	db = readDB(t, refDB)
+	oracleStore(t, key, iscOracle{refCode, ref.stdout, ref.stderr, tree, db})
+	return ref, refCode, tree, db
+}
+
 func (s isc) exec(t *testing.T) {
 	t.Parallel()
 	f := fx{config: issueCfg}
@@ -297,30 +342,16 @@ func (s isc) exec(t *testing.T) {
 	if remote != "" {
 		git(t, base, "remote", "add", "origin", remote)
 	}
-	goDir, refDir := copyTree(t, base), copyTree(t, base)
-	goDB, refDB := writeDB(t, seedDB()), writeDB(t, seedDB())
 	argv := subst(s.argv, in)
+	ref, refCode, refTree, rDB := s.oracle(t, base, in, remote, argv)
+	goDir := copyTree(t, base)
+	goDB := writeDB(t, seedDB())
 	goRun := envRun(t, goDir, s.in, append([]string{"FAKE_TRACKER_DB=" + goDB}, s.env...), hvBin, argv...)
 	if goRun.code != s.want {
 		t.Errorf("go exit = %d, want %d\nargv: %v\nstdout: %s\nstderr: %s", goRun.code, s.want, argv, goRun.stdout, goRun.stderr)
 	}
 	goEnv := parseEnv(t, "go", goRun)
 	goEnv["__info"] = in
-	var ref run
-	refEnv := append([]string{"FAKE_TRACKER_DB=" + refDB}, s.env...)
-	var refCode int
-	if len(s.old) > 0 {
-		old := subst(s.old, in)
-		ref = envRun(t, refDir, s.in, refEnv, filepath.Join(stagedBin, old[0]), old[1:]...)
-		m := s.oldMap
-		if m == nil {
-			m = mapIssueOld
-		}
-		refCode = m(ref.code, ref.stderr)
-	} else {
-		ref = envRun(t, refDir, s.in, refEnv, "python3", append([]string{shimPath}, argv...)...)
-		refCode = ref.code
-	}
 	if s.div != "" {
 		if refCode != s.refWant {
 			t.Errorf("reference exit = %d, want %d (divergence: %s)\nstdout: %s\nstderr: %s", refCode, s.refWant, s.div, ref.stdout, ref.stderr)
@@ -330,11 +361,11 @@ func (s isc) exec(t *testing.T) {
 			refCode, goRun.code, argv, ref.stdout, ref.stderr, goRun.stdout, goRun.stderr)
 	}
 	if s.file {
-		if d := diffTrees(snapshot(t, refDir), snapshot(t, goDir)); d != "" {
+		if d := diffTrees(refTree, snapshot(t, goDir)); d != "" {
 			t.Errorf(".hv/ trees differ:\n%s", d)
 		}
 	}
-	gDB, rDB := readDB(t, goDB), readDB(t, refDB)
+	gDB := readDB(t, goDB)
 	if !s.file && (gDB == nil || rDB == nil) {
 		t.Fatalf("a forge DB went missing (go %v, reference %v)", gDB != nil, rDB != nil)
 	}
