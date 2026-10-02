@@ -60,8 +60,11 @@ func TestDebugCounterLifecycle(t *testing.T) {
 	if _, out, _ = hvIn(t, dir, "debug", "counter", "init", "B07", "--json"); data(t, out)["changed"] != false {
 		t.Error("second init must be a no-op")
 	}
-	if code, _, _ := hvIn(t, dir, "debug", "counter", "fail"); code != 4 {
-		t.Errorf("fail with no attempt: exit %d, want 4", code)
+	for _, verb := range []string{"fail", "pass"} {
+		code, out, _ := hvIn(t, dir, "debug", "counter", verb, "--json")
+		if d := data(t, out); code != 4 || d["blockedBy"] != "attempt" || d["changed"] != false {
+			t.Errorf("%s with no attempt: exit %d data %v, want 4 with blockedBy attempt", verb, code, d)
+		}
 	}
 	if code, _, _ := hvIn(t, dir, "debug", "counter", "summary", "--json"); code != 1 {
 		t.Errorf("summary with no attempts: exit %d, want 1", code)

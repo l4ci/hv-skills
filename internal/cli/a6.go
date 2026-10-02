@@ -129,6 +129,19 @@ func counterRecordAttempt(fs *flag.FlagSet) RunFunc {
 	}
 }
 
+// counterRefusal maps a close-attempt error. A refusal (no attempt, or the
+// last one is not pending) carries {"blockedBy": "attempt", "changed": false}.
+func counterRefusal(err error) (Result, error) {
+	var ae *artifact.Error
+	if errors.As(err, &ae) && ae.Exit == artifact.ExitRefused {
+		d := jsonx.NewObject()
+		d.Set("blockedBy", "attempt")
+		d.Set("changed", false)
+		return Result{Data: d}, fromArtifact(err)
+	}
+	return Result{}, fromArtifact(err)
+}
+
 func runCounterFail(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {
 		return Result{}, err
@@ -139,7 +152,7 @@ func runCounterFail(c *Ctx, args []string) (Result, error) {
 	}
 	n, err := ctr.Fail()
 	if err != nil {
-		return Result{}, fromArtifact(err)
+		return counterRefusal(err)
 	}
 	d := jsonx.NewObject()
 	d.Set("failedFixes", n)
@@ -157,7 +170,7 @@ func runCounterPass(c *Ctx, args []string) (Result, error) {
 	}
 	n, err := ctr.Pass()
 	if err != nil {
-		return Result{}, fromArtifact(err)
+		return counterRefusal(err)
 	}
 	d := jsonx.NewObject()
 	d.Set("attempt", n)

@@ -129,8 +129,8 @@ func TestIssueModeFileOnlyVerbs(t *testing.T) {
 		t.Errorf("argument errors stay exit 2 in issue mode, got %d", code)
 	}
 	for _, args := range [][]string{{"design", "list"}, {"plan", "validate-docs", "M01-B07"}} {
-		if code, _, _ := hvIn(t, dir, args...); code != 4 {
-			t.Errorf("%v: exit %d, want 4 (file-only)", args, code)
+		if code, _, _ := hvIn(t, dir, args...); code != 1 {
+			t.Errorf("%v: exit %d, want 1 (read-only, file-only)", args, code)
 		}
 	}
 }
