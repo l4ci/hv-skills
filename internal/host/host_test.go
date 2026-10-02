@@ -1,0 +1,616 @@
+package host
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+var bg = context.Background()
+
+func TestNewSelectsByDispatch(t *testing.T) {
+	for dispatch, want := range map[string]string{"herdr": "herdr", "tmux": "tmux", "subagent": "tmux", "": "tmux"} {
+		if got := New(dispatch, Deps{}).Name(); got != want {
+			t.Errorf("New(%q) = %s, want %s", dispatch, got, want)
+		}
+	}
+}
+
+func TestInSession(t *testing.T) {
+	f := &fake{}
+	c := &clock{}
+	cases := []struct {
+		dispatch string
+		env      map[string]string
+		want     bool
+	}{
+		{"tmux", map[string]string{}, false},
+		{"tmux", map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"}, true},
+		{"herdr", map[string]string{}, false},
+		{"herdr", map[string]string{"HERDR_ENV": "1"}, false},
+		{"herdr", map[string]string{"HERDR_WORKSPACE_ID": "w9"}, false},
+		{"herdr", map[string]string{"HERDR_ENV": "1", "HERDR_WORKSPACE_ID": "w9"}, true},
+	}
+	for _, tc := range cases {
+		if got := New(tc.dispatch, deps(f, tc.env, c)).InSession(); got != tc.want {
+			t.Errorf("%s %v: InSession = %v, want %v", tc.dispatch, tc.env, got, tc.want)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("InSession must not run commands, ran %v", f.calls)
+	}
+}
+
+func TestRequire(t *testing.T) {
+	d := deps(&fake{}, nil, &clock{})
+	d.LookPath = func(string) (string, error) { return "", fmt.Errorf("nope") }
+	if err := New("herdr", d).Require(); err == nil || err.Error() != "herdr is not installed" {
+		t.Errorf("herdr Require = %v", err)
+	}
+	if err := New("tmux", d).Require(); err == nil || err.Error() != "tmux is not installed" {
+		t.Errorf("tmux Require = %v", err)
+	}
+}
+
+func TestWhere(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result { return Result{Stdout: "main\n"} }}
+	if got := New("tmux", deps(f, nil, &clock{})).Where(); got != "main" {
+		t.Errorf("tmux Where = %q", got)
+	}
+	f.handler = func(string, []string) Result { return Result{ExitCode: 1} }
+	if got := New("tmux", deps(f, nil, &clock{})).Where(); got != "?" {
+		t.Errorf("tmux Where on failure = %q", got)
+	}
+	if got := New("herdr", deps(f, map[string]string{"HERDR_WORKSPACE_ID": "w9"}, &clock{})).Where(); got != "herdr workspace w9" {
+		t.Errorf("herdr Where = %q", got)
+	}
+}
+
+func TestAgentName(t *testing.T) {
+	if got := AgentName("w1", "w9:t7"); got != "hv-w1-w9-t7" {
+		t.Errorf("AgentName = %q", got)
+	}
+}
+
+func TestLaunchArgs(t *testing.T) {
+	env, args, err := LaunchArgs(`FOO=bar BAZ=1 /usr/bin/claude --model sonnet --dangerously-skip-permissions`)
+	if err != nil || !reflect.DeepEqual(env, []string{"FOO=bar", "BAZ=1"}) ||
+		!reflect.DeepEqual(args, []string{"--model", "sonnet", "--dangerously-skip-permissions"}) {
+		t.Errorf("LaunchArgs = %q %q %v", env, args, err)
+	}
+	for _, bad := range []string{"codex --yolo", "", `claude "oops`, "FOO=1"} {
+		if _, _, err := LaunchArgs(bad); err == nil {
+			t.Errorf("LaunchArgs(%q) should fail", bad)
+		}
+	}
+}
+
+func TestDialogKeys(t *testing.T) {
+	trust := " Do you trust the files in this folder?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n"
+	bypass := " WARNING: Bypass Permissions mode\n   1. No, exit\n ❯ 2. Yes, I accept\n"
+	cursorOnNo := "   1. Yes, proceed\n ❯ 2. No\n"
+	noCursor := "   1. Yes, I trust this folder\n   2. No, exit\n"
+	cases := []struct {
+		name, pane string
+		want       []string
+		ok         bool
+	}{
+		{"trust", trust, []string{"enter"}, true},
+		{"bypass", bypass, []string{"enter"}, true},
+		{"accept above cursor", cursorOnNo, []string{"up", "enter"}, true},
+		{"accept below cursor", "❯ 1. No, exit\n  2. Other\n  3. Yes, I accept\n", []string{"down", "down", "enter"}, true},
+		{"no cursor defaults to 1", noCursor, []string{"enter"}, true},
+		{"unknown", "1. Something else\n2. Other\n", nil, false},
+		{"empty", "", nil, false},
+	}
+	for _, c := range cases {
+		got, ok := DialogKeys(c.pane)
+		if ok != c.ok || !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: DialogKeys = %v %v, want %v %v", c.name, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestJget(t *testing.T) {
+	doc := `{"result":{"tab":{"tab_id":"w9:t7"},"n":3,"nil":null,"ok":true}}`
+	for path, want := range map[string]string{
+		"result.tab.tab_id": "w9:t7", "result.n": "3", "result.nil": "", "result.ok": "true", "result.x.y": "", "a": "",
+	} {
+		if got := jget(doc, path); got != want {
+			t.Errorf("jget(%s) = %q, want %q", path, got, want)
+		}
+	}
+	if jget("not json", "a") != "" {
+		t.Error("bad JSON must read as empty")
+	}
+}
+
+// ── tmux ────────────────────────────────────────────────────────────────────
+
+func TestTmuxSpawn(t *testing.T) {
+	booted := false
+	f := &fake{handler: func(name string, a []string) Result {
+		switch a[0] {
+		case "has-session":
+			return Result{ExitCode: 1}
+		case "capture-pane":
+			if booted {
+				return Result{Stdout: "? for shortcuts"}
+			}
+			booted = true
+			return Result{Stdout: "$ "}
+		}
+		return Result{}
+	}}
+	c := &clock{}
+	h := New("tmux", deps(f, nil, c))
+	got, err := h.Spawn(bg, SpawnOpts{Slot: "w1", Session: "hv", Cwd: "/wt", ConfigDir: "/acct", Launch: "claude --model sonnet", BootTimeout: 10})
+	if err != nil || got != "hv:w1" {
+		t.Fatalf("Spawn = %q, %v", got, err)
+	}
+	for _, want := range []string{
+		"tmux new-session -d -s hv -c /wt",
+		"tmux new-window -d -t hv -n w1 -c /wt",
+		"tmux send-keys -t hv:w1 CLAUDE_CONFIG_DIR=/acct claude --model sonnet C-m",
+	} {
+		if !strings.Contains(f.log(), want) {
+			t.Errorf("missing call %q in\n%s", want, f.log())
+		}
+	}
+}
+
+func TestTmuxSpawnTimesOut(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "capture-pane" {
+			return Result{Stdout: "$ "}
+		}
+		return Result{}
+	}}
+	_, err := New("tmux", deps(f, nil, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Session: "hv", Cwd: "/wt", Launch: "claude", BootTimeout: 4})
+	if err == nil || err.Error() != "slot 'w1' session did not come up within 4s" {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestTmuxSpawnWindowFailure(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "new-window" {
+			return Result{ExitCode: 1}
+		}
+		return Result{}
+	}}
+	_, err := New("tmux", deps(f, nil, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Session: "hv", Cwd: "/wt", Launch: "claude", BootTimeout: 4})
+	if err == nil || err.Error() != "could not create tmux window hv:w1" {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestTmuxSend(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "p.md")
+	os.WriteFile(file, []byte("hi"), 0o644)
+	changed := false
+	f := &fake{handler: func(_ string, a []string) Result {
+		switch a[0] {
+		case "send-keys":
+			changed = true
+		case "capture-pane":
+			if changed {
+				return Result{Stdout: "after"}
+			}
+			return Result{Stdout: "before"}
+		}
+		return Result{}
+	}}
+	if err := New("tmux", deps(f, nil, &clock{})).Send(bg, "w1", "hv:w1", file); err != nil {
+		t.Fatalf("Send = %v", err)
+	}
+	for _, want := range []string{"tmux load-buffer -b hv-w1 " + file, "tmux paste-buffer -b hv-w1 -t hv:w1", "tmux delete-buffer -b hv-w1", "tmux send-keys -t hv:w1 C-m"} {
+		if !strings.Contains(f.log(), want) {
+			t.Errorf("missing %q in\n%s", want, f.log())
+		}
+	}
+}
+
+func TestTmuxSendNeverSubmitted(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result { return Result{Stdout: "static"} }}
+	err := New("tmux", deps(f, nil, &clock{})).Send(bg, "w1", "hv:w1", "/f")
+	if err != ErrNotSubmitted {
+		t.Fatalf("Send = %v, want ErrNotSubmitted", err)
+	}
+	if n := f.count("tmux send-keys"); n != 4 {
+		t.Errorf("send-keys attempts = %d, want 4", n)
+	}
+}
+
+func TestTmuxSendPasteFails(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "paste-buffer" {
+			return Result{ExitCode: 1}
+		}
+		return Result{}
+	}}
+	if err := New("tmux", deps(f, nil, &clock{})).Send(bg, "w1", "hv:w1", "/f"); err != ErrNotSubmitted {
+		t.Errorf("Send = %v", err)
+	}
+	if f.count("tmux send-keys") != 0 {
+		t.Error("must not press Enter after a failed paste")
+	}
+}
+
+func TestTmuxCaptureEmptyHandle(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result { return Result{Stdout: "CALLER PANE"} }}
+	h := New("tmux", deps(f, nil, &clock{}))
+	if h.Capture(bg, "w1", "", 40) != "" || len(f.calls) != 0 {
+		t.Error("an empty handle would capture the caller's pane; must return nothing and run nothing")
+	}
+	if h.Capture(bg, "w1", "hv:w1", 40) != "CALLER PANE" || !strings.Contains(f.log(), "capture-pane -pJ -t hv:w1") {
+		t.Errorf("capture call wrong: %s", f.log())
+	}
+	if h.Status(bg, "w1", "hv:w1") != "" {
+		t.Error("tmux has no native status")
+	}
+}
+
+func windows(list string) func(string, []string) Result {
+	return func(_ string, a []string) Result {
+		if a[0] == "list-windows" {
+			return Result{Stdout: list}
+		}
+		return Result{}
+	}
+}
+
+func TestTmuxKillExactWindowMatch(t *testing.T) {
+	// w10 exists but w1 does not: a prefix match would call w1 alive.
+	f := &fake{handler: windows("w10 4242\nother 1\n")}
+	h := New("tmux", deps(f, nil, &clock{}))
+	if err := h.Kill(bg, "w1", "hv:w1"); err != nil {
+		t.Fatalf("Kill = %v", err)
+	}
+}
+
+func TestTmuxKillProvesWindowGone(t *testing.T) {
+	var killed bool
+	f := &fake{}
+	f.handler = func(_ string, a []string) Result {
+		switch a[0] {
+		case "kill-window":
+			killed = true
+			return Result{}
+		case "list-windows":
+			if killed {
+				return Result{}
+			}
+			return Result{Stdout: "w1 4242\n"}
+		}
+		return Result{}
+	}
+	d := deps(f, nil, &clock{})
+	var treeOf int
+	d.Tree = func(p int) []int { treeOf = p; return []int{p, p + 1} }
+	if err := New("tmux", d).Kill(bg, "w1", "hv:w1"); err != nil {
+		t.Fatalf("Kill = %v", err)
+	}
+	if treeOf != 4242 {
+		t.Errorf("pid tree taken from %d, want the pane pid 4242, before the close", treeOf)
+	}
+	if !strings.Contains(f.log(), "tmux kill-window -t hv:w1") {
+		t.Errorf("no kill-window: %s", f.log())
+	}
+}
+
+func TestTmuxKillSurvivingWindowIsAnError(t *testing.T) {
+	f := &fake{handler: windows("w1 4242\n")} // kill-window changes nothing
+	c := &clock{}
+	d := deps(f, nil, c)
+	d.Alive = func(p int) bool { return p == 4242 }
+	err := New("tmux", d).Kill(bg, "w1", "hv:w1")
+	want := "slot 'w1' previous session is still running (window hv:w1, pids 4242); not spawning a second one"
+	if err == nil || err.Error() != want {
+		t.Fatalf("Kill = %v, want %q", err, want)
+	}
+	if c.slept.Seconds() != 2 { // KillWait 3 -> two sleeps between three checks
+		t.Errorf("slept %v, want 2s", c.slept)
+	}
+}
+
+func TestTmuxKillSurvivingPidIsAnError(t *testing.T) {
+	var killed bool
+	f := &fake{}
+	f.handler = func(_ string, a []string) Result {
+		if a[0] == "kill-window" {
+			killed = true
+		}
+		if a[0] == "list-windows" && !killed {
+			return Result{Stdout: "w1 77\n"}
+		}
+		return Result{}
+	}
+	d := deps(f, nil, &clock{})
+	d.Alive = func(p int) bool { return p == 77 }
+	if err := New("tmux", d).Kill(bg, "w1", "hv:w1"); err == nil || !strings.Contains(err.Error(), "pids 77") {
+		t.Fatalf("a window that is gone with a live pid must still fail: %v", err)
+	}
+}
+
+func TestKillEmptyHandleIsNoop(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result { t.Error("ran a command"); return Result{} }}
+	for _, d := range []string{"tmux", "herdr"} {
+		if err := New(d, deps(f, nil, &clock{})).Kill(bg, "w1", ""); err != nil {
+			t.Errorf("%s Kill with no handle = %v", d, err)
+		}
+	}
+}
+
+// ── herdr ───────────────────────────────────────────────────────────────────
+
+var herdrEnv = map[string]string{"HERDR_ENV": "1", "HERDR_WORKSPACE_ID": "w9"}
+
+const tabCreated = `{"id":"cli","result":{"type":"tab_created","tab":{"tab_id":"w9:t7"},"root_pane":{"pane_id":"w9:p17"}}}`
+
+func herdrErr(code string) string {
+	return fmt.Sprintf(`{"error":{"code":%q,"message":"fake"},"id":"cli"}`, code)
+}
+
+func agentJSON(status string) string {
+	return fmt.Sprintf(`{"id":"cli","result":{"agent":{"agent_status":%q,"pane_id":"w9:p17"}}}`, status)
+}
+
+func TestHerdrSpawn(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "tab" {
+			return Result{Stdout: tabCreated}
+		}
+		return Result{Stdout: agentJSON("idle")}
+	}}
+	h := New("herdr", deps(f, herdrEnv, &clock{}))
+	got, err := h.Spawn(bg, SpawnOpts{Slot: "w1", Cwd: "/wt", ConfigDir: "/acct/one", Launch: "FOO=1 claude --model sonnet --dangerously-skip-permissions", BootTimeout: 60})
+	if err != nil || got != "w9:t7" {
+		t.Fatalf("Spawn = %q, %v", got, err)
+	}
+	want := []string{
+		"herdr tab create --workspace w9 --cwd /wt --label w1 --no-focus --env FOO=1 --env CLAUDE_CONFIG_DIR=/acct/one",
+		"herdr agent start hv-w1-w9-t7 --kind claude --pane w9:p17 --timeout 60000 -- --model sonnet --dangerously-skip-permissions",
+	}
+	if !reflect.DeepEqual(f.calls, want) {
+		t.Errorf("calls =\n%s\nwant\n%s", strings.Join(f.calls, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestHerdrSpawnRejectsNonClaudeLaunch(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result { t.Error("ran a command"); return Result{} }}
+	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "codex --yolo", BootTimeout: 5})
+	if err == nil || !strings.Contains(err.Error(), "workerCommand must run claude, got: codex --yolo") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestHerdrSpawnTabCreateFailures(t *testing.T) {
+	for name, res := range map[string]Result{
+		"fails":    {ExitCode: 1, Stderr: "boom\n"},
+		"no ids":   {Stdout: `{"result":{}}`},
+		"bad json": {Stdout: "garbage"},
+		"only tab": {Stdout: `{"result":{"tab":{"tab_id":"w9:t7"}}}`},
+	} {
+		f := &fake{handler: func(string, []string) Result { return res }}
+		_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "claude", BootTimeout: 5})
+		if err == nil {
+			t.Errorf("%s: want error", name)
+		}
+		if f.count("herdr agent start") != 0 {
+			t.Errorf("%s: must not start an agent without a tab", name)
+		}
+	}
+}
+
+func TestHerdrSpawnAnswersStartupDialogs(t *testing.T) {
+	dialogs := []string{
+		"Do you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n",
+		"Bypass\n   1. No, exit\n ❯ 2. Yes, I accept\n",
+	}
+	read, waits := 0, 0
+	f := &fake{handler: func(_ string, a []string) Result {
+		switch a[0] + " " + a[1] {
+		case "tab create":
+			return Result{Stdout: tabCreated}
+		case "agent start":
+			return Result{ExitCode: 1, Stderr: herdrErr("agent_not_ready")}
+		case "agent read":
+			txt := dialogs[read]
+			read++
+			return Result{Stdout: fmt.Sprintf(`{"result":{"read":{"text":%q}}}`, txt)}
+		case "agent wait":
+			waits++
+			if waits == 1 {
+				return Result{Stdout: agentJSON("blocked")}
+			}
+			return Result{Stdout: agentJSON("idle")}
+		}
+		return Result{}
+	}}
+	got, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Cwd: "/wt", Launch: "claude", BootTimeout: 30})
+	if err != nil || got != "w9:t7" {
+		t.Fatalf("Spawn = %q, %v", got, err)
+	}
+	if f.count("herdr agent send-keys hv-w1-w9-t7 enter") != 2 {
+		t.Errorf("want two answered dialogs:\n%s", f.log())
+	}
+	if !strings.Contains(f.log(), "agent wait hv-w1-w9-t7 --until idle --until blocked --timeout 30000") {
+		t.Errorf("wait call wrong:\n%s", f.log())
+	}
+}
+
+func TestHerdrSpawnDialogFailures(t *testing.T) {
+	mk := func(pane string, status string) *fake {
+		return &fake{handler: func(_ string, a []string) Result {
+			switch a[0] + " " + a[1] {
+			case "tab create":
+				return Result{Stdout: tabCreated}
+			case "agent start":
+				return Result{ExitCode: 1, Stderr: herdrErr("agent_not_ready")}
+			case "agent read":
+				return Result{Stdout: fmt.Sprintf(`{"result":{"read":{"text":%q}}}`, pane)}
+			case "agent wait":
+				return Result{Stdout: agentJSON(status)}
+			}
+			return Result{}
+		}}
+	}
+	opts := SpawnOpts{Slot: "w1", Cwd: "/wt", Launch: "claude", BootTimeout: 5}
+	_, err := New("herdr", deps(mk("What is this?\n1. Foo\n", "idle"), herdrEnv, &clock{})).Spawn(bg, opts)
+	if err == nil || !strings.Contains(err.Error(), "unrecognised startup dialog in tab w9:t7") {
+		t.Errorf("unknown dialog: %v", err)
+	}
+	f := mk("❯ 1. Yes, proceed\n", "blocked")
+	_, err = New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, opts)
+	if err == nil || !strings.Contains(err.Error(), "did not reach idle after its startup dialogs") {
+		t.Errorf("never idle: %v", err)
+	}
+	if f.count("herdr agent send-keys") != 3 {
+		t.Errorf("want 3 dialog rounds, got %d", f.count("herdr agent send-keys"))
+	}
+}
+
+func TestHerdrSpawnOtherStartFailure(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "tab" {
+			return Result{Stdout: tabCreated}
+		}
+		return Result{ExitCode: 1, Stderr: herdrErr("server_down")}
+	}}
+	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "claude", BootTimeout: 5})
+	if err == nil || !strings.Contains(err.Error(), "herdr agent start failed for slot 'w1' (w9:t7)") {
+		t.Errorf("err = %v", err)
+	}
+	if f.count("herdr agent read") != 0 {
+		t.Error("only agent_not_ready may enter the dialog loop")
+	}
+}
+
+func TestHerdrSend(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "p.md")
+	os.WriteFile(file, []byte("do the task\n\n"), 0o644)
+	cases := []struct {
+		name string
+		res  Result
+		want error
+	}{
+		{"picked up", Result{Stdout: agentJSON("working")}, nil},
+		{"dialog", Result{ExitCode: 1, Stderr: herdrErr("agent_blocked")}, ErrDialogOpen},
+		{"other error", Result{ExitCode: 1, Stderr: herdrErr("timeout")}, ErrNotSubmitted},
+		{"garbage error", Result{ExitCode: 1, Stderr: "x"}, ErrNotSubmitted},
+	}
+	for _, c := range cases {
+		f := &fake{handler: func(string, []string) Result { return c.res }}
+		err := New("herdr", deps(f, herdrEnv, &clock{})).Send(bg, "w1", "w9:t7", file)
+		if err != c.want {
+			t.Errorf("%s: Send = %v, want %v", c.name, err, c.want)
+		}
+		want := "herdr agent prompt hv-w1-w9-t7 do the task --wait --until working --until blocked --timeout 60000"
+		if f.log() != want {
+			t.Errorf("%s: call = %q, want %q", c.name, f.log(), want)
+		}
+	}
+}
+
+func TestHerdrCaptureAndStatus(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		switch a[1] {
+		case "read":
+			return Result{Stdout: `{"result":{"read":{"text":"line1\nline2"}}}`}
+		case "get":
+			return Result{Stdout: agentJSON("working")}
+		}
+		return Result{}
+	}}
+	h := New("herdr", deps(f, herdrEnv, &clock{}))
+	if got := h.Capture(bg, "w1", "w9:t7", 60); got != "line1\nline2" {
+		t.Errorf("Capture = %q", got)
+	}
+	if !strings.Contains(f.log(), "herdr agent read hv-w1-w9-t7 --source recent-unwrapped --lines 60") {
+		t.Errorf("read call wrong: %s", f.log())
+	}
+	if got := h.Status(bg, "w1", "w9:t7"); got != "working" {
+		t.Errorf("Status = %q", got)
+	}
+	if h.Capture(bg, "w1", "", 60) != "" || h.Status(bg, "w1", "") != "" {
+		t.Error("a never-dispatched slot has no capture or status")
+	}
+	f.handler = func(string, []string) Result { return Result{ExitCode: 1, Stderr: herdrErr("agent_not_found")} }
+	if got := h.Status(bg, "w1", "w9:t7"); got != "gone" {
+		t.Errorf("a tab with no agent must read gone, got %q", got)
+	}
+}
+
+func TestHerdrKill(t *testing.T) {
+	closed := false
+	f := &fake{}
+	f.handler = func(_ string, a []string) Result {
+		switch a[0] + " " + a[1] {
+		case "agent get":
+			return Result{Stdout: agentJSON("idle")}
+		case "pane process-info":
+			return Result{Stdout: `{"result":{"process_info":{"foreground_processes":[{"pid":10},{"pid":11}],"shell_pid":9}}}`}
+		case "tab close":
+			closed = true
+		case "tab get":
+			if closed {
+				return Result{ExitCode: 1, Stderr: herdrErr("tab_not_found")}
+			}
+			return Result{Stdout: "{}"}
+		}
+		return Result{}
+	}
+	var checked []int
+	d := deps(f, herdrEnv, &clock{})
+	d.Alive = func(p int) bool { checked = append(checked, p); return false }
+	if err := New("herdr", d).Kill(bg, "w1", "w9:t7"); err != nil {
+		t.Fatalf("Kill = %v", err)
+	}
+	log := f.log()
+	iExit, iClose := strings.Index(log, "agent prompt hv-w1-w9-t7 /exit"), strings.Index(log, "tab close w9:t7")
+	if iExit < 0 || iClose < iExit {
+		t.Errorf("want /exit before tab close:\n%s", log)
+	}
+	if !reflect.DeepEqual(checked, []int{10, 11, 9}) {
+		t.Errorf("pids checked = %v, want [10 11 9]", checked)
+	}
+}
+
+func TestHerdrKillSurvivors(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0]+" "+a[1] == "tab get" {
+			return Result{Stdout: "{}"} // tab never goes away
+		}
+		return Result{Stdout: agentJSON("idle")}
+	}}
+	err := New("herdr", deps(f, herdrEnv, &clock{})).Kill(bg, "w1", "w9:t7")
+	want := "slot 'w1' previous session is still running (tab w9:t7); not spawning a second one"
+	if err == nil || err.Error() != want {
+		t.Errorf("Kill = %v, want %q", err, want)
+	}
+}
+
+func TestHerdrNotify(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result { return Result{} }}
+	New("herdr", deps(f, herdrEnv, &clock{})).Notify(bg, "T", "B")
+	if f.log() != "herdr notification show T --body B --sound request" {
+		t.Errorf("call = %s", f.log())
+	}
+	g := &fake{handler: func(string, []string) Result { t.Error("tmux has no notification surface"); return Result{} }}
+	New("tmux", deps(g, nil, &clock{})).Notify(bg, "T", "B")
+}
+
+func TestPidTreeParsesPS(t *testing.T) {
+	f := &fake{handler: func(string, []string) Result {
+		return Result{Stdout: "  1     0\n 10     1\n 11    10\n 12    10\n 13    11\n 99     1\n"}
+	}}
+	got := pidTree(f.run, 10)
+	if !reflect.DeepEqual(got, []int{10, 11, 12, 13}) {
+		t.Errorf("pidTree = %v", got)
+	}
+}
