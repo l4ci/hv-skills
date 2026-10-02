@@ -530,7 +530,11 @@ Loop until no slot is `BUSY`, routing each state as it appears. Each poll also w
   | 0 | merged and the merged tree verified (or `NO-VERIFY`) | continue |
   | 3 | `STALE` — the slot branched before sibling work landed | bounce to the slot to `git merge <cycle-branch>` and re-verify, then re-gate. Bounce **once**; if it goes stale again while re-syncing, resolve it yourself in the worker's worktree and document that on the PR |
   | 3 | merge conflicted | route the resolution to the slot that owns the branch context, with a summary of what landed. Never resolve a cross-worker semantic conflict blind |
+  | 3 | PR is not the verified branch (head SHA moved, wrong head or base, not open) | re-poll the slot; a stacked PR needs its base retargeted |
   | 4 | `GATE-FAIL` — the merged tree is broken | fix forward on the cycle branch; the owning slot has usually moved on |
+  | 4 | `NOT-MERGED` / `NOT-ON-BASE` — the tracker reported a merge that is not on the base branch | treat as unmerged; check for a scheduled auto-merge or a stacked base, then re-gate |
+  | 5 | `CHECK-BROKE` — the gate could not decide (bad ref, failed fetch, unreadable PR, a recorded PR but no `origin` remote) | fix the environment and re-run; do not read it as STALE. A PR is never merged locally |
+  | 6 | `MERGED-REMOTELY` — the PR is on `origin/<base>` but the local base could not fast-forward | do **not** re-merge; reconcile the local base by hand, then re-verify |
 
   Exit 4 is the case this gate exists for: two workers with disjoint file sets, each honestly green, merging cleanly into a broken tree. Per-task verification cannot see it — the conflicting change was never in either worker's tree. Do not skip the gate because both diffs looked fine; that is exactly the condition under which it fires.
 
