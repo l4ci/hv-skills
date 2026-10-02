@@ -4,6 +4,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; BIN="$1/bin"; OUT="$2"
 W="$(mktemp -d)"; W="$(cd "$W" && pwd -P)"; cd "$W"
+trap 'cd /; rm -rf "$W"' EXIT
 mkdir -p .hv/bugs .hv/features .hv/tasks "$OUT"
 cp -R "$HERE/fixture/." .hv/
 mask() { sed -E 's/^- [0-9]{4}-[0-9]{2}-[0-9]{2} · /- DATE · /' "$1"; }
