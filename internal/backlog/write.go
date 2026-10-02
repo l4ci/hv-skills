@@ -305,7 +305,7 @@ func (f *File) SetField(ref, field, value string) (bool, error) {
 				return errf(ErrInvalid, `detail path is empty; pass "" to clear the pointer`)
 			}
 			if !f.isFile(rel) {
-				return errf(ErrInvalid, "detail file %s does not exist", rel)
+				return errf(ErrNotFound, "detail file %s does not exist", rel)
 			}
 		}
 		line, err := SetField(raw, field, value)

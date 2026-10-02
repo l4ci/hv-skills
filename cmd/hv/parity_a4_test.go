@@ -761,7 +761,7 @@ func TestParityA4(t *testing.T) {
 		scn{name: "idnext/unknown-flag", argv: j("id", "next", "--kind", "bugs", "--bogus"), want: 2},
 		scn{name: "idnext/no-hv", fx: fx{noHV: true}, argv: j("id", "next", "--kind", "bugs"), want: 3},
 		scn{name: "idnext/repo-outside-umbrella", argv: j("id", "next", "--kind", "bugs", "--repo", "web"), want: 3},
-		scn{name: "idnext/issues-backend", fx: fx{config: issuesConfig}, argv: j("id", "next", "--kind", "bugs"), want: 4, shimNoData: true,
+		scn{name: "idnext/issues-backend", fx: fx{config: issuesConfig}, argv: j("id", "next", "--kind", "bugs"), want: 4,
 			check: func(t *testing.T, e envl, _ run) {
 				eq(t, e, "data.blockedBy", "backend")
 				eq(t, e, "data.changed", false)
@@ -780,7 +780,12 @@ func TestParityA4(t *testing.T) {
 		scn{name: "create/body-file", fx: bodyFx, argv: j("item", "create", "--kind", "features", "--title", "With body", "--body-file", "body.md"), want: 0,
 			check: func(t *testing.T, e envl, _ run) { eq(t, e, "data.detail", ".hv/features/F09.md") }},
 		scn{name: "create/body-stdin", argv: j("item", "create", "--kind", "bugs", "--title", "Stdin body", "--body-file", "-"), in: "# {ID}\nbody from stdin\n", want: 0},
-		scn{name: "create/empty-flag-values-skipped", argv: j("item", "create", "--kind", "bugs", "--title", "Skips", "--desc", "", "--related", "", "--tag", ""), want: 0},
+		scn{name: "create/empty-flag-values", argv: j("item", "create", "--kind", "bugs", "--title", "Skips", "--desc", "", "--related", "", "--tag", ""), want: 2},
+		scn{name: "create/empty-desc-and-tag-ok", argv: j("item", "create", "--kind", "bugs", "--title", "Skips", "--desc", "", "--tag", ""), want: 0},
+		scn{name: "create/unreadable-raw-file", div: "the shim reads a missing --raw-file as empty and reports the missing **[ID] (2); the contract says 3", refWant: 2,
+			argv: j("item", "create", "--kind", "bugs", "--raw-file", "missing.md"), want: 3},
+		scn{name: "create/invalid-backend", fx: fx{config: `{"backlog": {"backend": "jira"}}`}, goOnly: true, want: 70,
+			argv: j("item", "create", "--kind", "bugs", "--title", "x")},
 		scn{name: "create/bad-tag-bug", argv: j("item", "create", "--kind", "bugs", "--title", "x", "--tag", "Major"), want: 2},
 		scn{name: "create/tag-on-task", argv: j("item", "create", "--kind", "tasks", "--title", "x", "--tag", "P1"), want: 2},
 		scn{name: "create/missing-title", argv: j("item", "create", "--kind", "bugs"), want: 2},
@@ -788,7 +793,7 @@ func TestParityA4(t *testing.T) {
 		scn{name: "create/no-backlog", fx: fx{noBacklog: true}, argv: j("item", "create", "--kind", "bugs", "--title", "x"), want: 3},
 		scn{name: "create/missing-section-burns-id", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] Only.** x\n"},
 			argv: j("item", "create", "--kind", "tasks", "--title", "x"), want: 3},
-		scn{name: "create/unreadable-body", argv: j("item", "create", "--kind", "bugs", "--title", "x", "--body-file", "missing.md"), want: 2},
+		scn{name: "create/unreadable-body", argv: j("item", "create", "--kind", "bugs", "--title", "x", "--body-file", "missing.md"), want: 3},
 		scn{name: "create/section-in-middle", fx: fx{backlog: "# TODO\n\n## Bugs\n\n## Features\n- **[F01] [Major] f.** x\n\n## Completed\n"},
 			argv: j("item", "create", "--kind", "bugs", "--title", "First bug"), want: 0},
 		scn{name: "create/raw-file", fx: fx{files: map[string]string{"raw.md": "- **[B77] [P2] Raw bullet.** Verbatim body.\n\n"}},
@@ -801,9 +806,9 @@ func TestParityA4(t *testing.T) {
 			argv: j("item", "create", "--kind", "bugs", "--raw-file", "raw.md", "--title", "t"), want: 2},
 		scn{name: "create/raw-file-missing-section", fx: fx{backlog: "# TODO\n\n## Bugs\n", files: map[string]string{"raw.md": "- **[T77] x.** y\n"}},
 			argv: j("item", "create", "--kind", "tasks", "--raw-file", "raw.md"), want: 3},
-		scn{name: "create/whitespace-title", div: "the shim reports 3 for a blank title (helper rc 1 not matched as usage); the contract wants usage", refWant: 3,
+		scn{name: "create/whitespace-title", div: "the shim passes a blank title to the helper and maps its rc to 5; the contract wants usage", refWant: 5,
 			argv: j("item", "create", "--kind", "bugs", "--title", "   "), want: 2},
-		scn{name: "create/whitespace-field", div: "the shim reports 3 for a blank --related (helper rc 1 not matched as usage)", refWant: 3,
+		scn{name: "create/whitespace-field",
 			argv: j("item", "create", "--kind", "bugs", "--title", "x", "--related", "  "), want: 2},
 		scn{name: "create/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, want: 5,
 			argv: j("item", "create", "--kind", "bugs", "--title", "x")},
@@ -845,7 +850,8 @@ func TestParityA4(t *testing.T) {
 			argv: j("item", "complete", "B01", "--commit", "{h1}", "--no-proof"), want: 0},
 		scn{name: "complete/section-after-completed", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] Only.** x\n\n## Completed\n- ~~**[B08] x.**~~ Done 2026-09-30 [`abc`]\n\n## Notes\nhello\n"},
 			argv: j("item", "complete", "B01", "--commit", "{h1}", "--no-proof"), want: 0},
-		scn{name: "complete/no-backlog", fx: fx{noBacklog: true}, argv: j("item", "complete", "B01", "--commit", "{h1}", "--no-proof"), want: 3},
+		scn{name: "complete/no-backlog", fx: fx{noBacklog: true}, argv: j("item", "complete", "B01", "--commit", "{h1}", "--no-proof"), want: 3,
+			div: "the old helper crashes on a missing BACKLOG.md and the shim maps the traceback to 5; the contract says 3", refWant: 5},
 		scn{name: "complete/last-line-no-newline", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] Last.** x"},
 			argv: j("item", "complete", "B01", "--commit", "{h1}", "--no-proof"), want: 0},
 		scn{name: "complete/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, want: 5,
@@ -904,7 +910,7 @@ func TestParityA4(t *testing.T) {
 		set("detail-existing-file", "B04", "detail", ".hv/features/F01.md", 0),
 		set("detail-backticked", "B04", "detail", "`.hv/features/F01.md`", 0),
 		set("detail-clear", "B01", "detail", "", 0),
-		set("detail-missing-file", "B04", "detail", ".hv/features/nope.md", 2),
+		set("detail-missing-file", "B04", "detail", ".hv/features/nope.md", 3),
 		set("detail-only-backticks", "B04", "detail", "``", 2),
 		set("closed-item", "B08", "milestone", "M01", 4),
 		set("unknown-id", "B99", "milestone", "M01", 3),
@@ -1027,10 +1033,10 @@ func TestParityA4(t *testing.T) {
 		}),
 		rmPlan("active-branch-apply-refused", fx{status: "{\n  \"active\": [\n    {\n      \"branch\": \"feat/x\",\n      \"items\": [\"B01\"]\n    }\n  ]\n}\n"},
 			"B01", true, false, 4, func(t *testing.T, e envl, _ run) {
+				eq(t, e, "data.blockedBy", "active")
+				eq(t, e, "data.id", "B01")
+				eq(t, e, "data.activeBranch", "feat/x")
 				eq(t, e, "data.changed", false)
-				if at(e, "data.blockedBy") == nil {
-					t.Error("blockedBy missing")
-				}
 			}),
 		rmPlan("active-csv-items-apply-refused", fx{status: "{\n  \"active\": [\n    {\n      \"branch\": \"feat/y\",\n      \"items\": \"B03, T01\"\n    }\n  ]\n}\n"},
 			"T01", true, false, 4, nil),
