@@ -156,3 +156,38 @@ func contains(l []string, s string) bool {
 	}
 	return false
 }
+
+// DeprecatedBlockKeys are managed-block keys earlier versions wrote that no
+// current helper regenerates. Add a key here when a cut orphans a block.
+var DeprecatedBlockKeys = []string{"context"}
+
+// StripDeprecatedBlocks removes the managed blocks of DeprecatedBlockKeys
+// from the project's instructions file and returns the keys it found. With
+// write false it only reports. A missing instructions file strips nothing.
+func (s Store) StripDeprecatedBlocks(write bool) ([]string, error) {
+	path := section.InstructionsFile(s.Root)
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	content := string(raw)
+	next := content
+	var stripped []string
+	for _, key := range DeprecatedBlockKeys {
+		re := section.BlockRegex(key, key, true)
+		if re.MatchString(next) {
+			next = re.ReplaceAllString(next, "")
+			stripped = append(stripped, key)
+		}
+	}
+	if next != content && write {
+		next = blankRuns.ReplaceAllString(next, "\n\n")
+		if err := fsio.WriteFileAtomic(path, []byte(next)); err != nil {
+			return nil, err
+		}
+	}
+	return stripped, nil
+}

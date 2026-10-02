@@ -23,6 +23,7 @@ func Tree() *Command {
 			decisionsCommands(),
 			mapCommands(),
 			qaCommands(),
+			migrateCommands(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
