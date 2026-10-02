@@ -102,7 +102,7 @@ MD
   rc=0; err="$("$BIN/hv-todo-set-field" B99 milestone M1 2>&1)" || rc=$?
   eq "set-field unknown" "1:error: [B99] has no open bullet in .hv/BACKLOG.md (unknown, completed, or archived)" "$rc:$err"
   rc=0; err="$("$BIN/hv-todo-set-field" B01 title X 2>&1)" || rc=$?
-  eq "set-field bad field" "1:error: title is not a settable field; pick one of milestone/related/repos/subsystem" "$rc:$err"
+  eq "set-field bad field" "1:error: title is not a settable field; pick one of milestone/related/repos/subsystem/detail" "$rc:$err"
   rc=0; err="$("$BIN/hv-todo-set-field" B01 2>&1)" || rc=$?
   eq "set-field usage" "2:usage: hv-todo-set-field <ID> <field> <value>" "$rc:$err"
   pass "hv-todo-set-field golden"

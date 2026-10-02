@@ -102,10 +102,12 @@ def parse_todo_fields(line: str) -> dict[str, str]:
 
 
 # Fields a writer is allowed to mutate on an existing bullet. Deliberately
-# narrower than parse_todo_fields: Detail/Since/Captured are auto-stamped by
+# narrower than parse_todo_fields: Since/Captured are auto-stamped by
 # capture/append and must not be hand-set; title is structural (part of the
-# `[ID] [tag] Title.` header, not a trailing field).
-_SETTABLE_FIELDS = ("milestone", "related", "repos", "subsystem")
+# `[ID] [tag] Title.` header, not a trailing field). Detail is settable so a
+# detail file written after capture can be linked (file backend only: an issue
+# has no detail file, its body is the detail).
+_SETTABLE_FIELDS = ("milestone", "related", "repos", "subsystem", "detail")
 
 
 def set_todo_field(line: str, field: str, value: str) -> str:
@@ -118,7 +120,12 @@ def set_todo_field(line: str, field: str, value: str) -> str:
     - field present  → value replaced in place (other fields untouched)
     - field absent    → ` Cap: value` appended at end of line. parse_todo_fields
                          is order-agnostic, so append-at-end is parse-safe and
-                         matches hv-append's Since auto-stamp precedent.
+                         matches hv-append's Since auto-stamp precedent. Detail
+                         is the exception: canonical order puts it right after
+                         the summary, so it is inserted before the first other
+                         field marker (end of line when there is none).
+    - detail value    → written as a backticked path, as capture writes it;
+                         surrounding backticks in the input are accepted.
     - empty value     → the ` Cap: ...` segment is dropped, value-delimited by
                          the same next-field/EOL lookahead the parser uses.
 
@@ -133,6 +140,8 @@ def set_todo_field(line: str, field: str, value: str) -> str:
     cap = field.capitalize()
     end_lookahead = "|".join(n for n in _TODO_FIELD_NAMES if n != cap)
     value = value.strip()
+    if field == "detail" and value:
+        value = f"`{value.strip('`').strip()}`"
     present = re.search(rf"\b{cap}:\s", line) is not None
 
     if not value:
@@ -144,6 +153,11 @@ def set_todo_field(line: str, field: str, value: str) -> str:
     if present:
         repl = re.compile(rf"({cap}:\s*)(.+?)(?=\s+(?:{end_lookahead}):|$)")
         return repl.sub(lambda m: m.group(1) + value, line, count=1)
+
+    if field == "detail":
+        first = re.search(rf"\s(?:{end_lookahead}):", line)
+        if first:
+            return f"{line[:first.start()]} {cap}: {value}{line[first.start():]}"
 
     return f"{line.rstrip()} {cap}: {value}"
 
