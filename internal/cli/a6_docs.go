@@ -37,20 +37,26 @@ func docsCommands() []*Command {
 	}
 }
 
-// fileRoot returns the project root for a file-mode verb. Under issue mode
-// it returns the not-ported error, or, for a file-only verb, exit 4.
-func fileRoot(c *Ctx, fileOnly bool) (string, error) {
+// fileRoot returns the project root for a file-only verb. Under issue mode
+// the verb is under the wrong backend: a mutating verb exits 4, a read-only
+// one exits 1 (the conventions forbid 4 there), both with the failure data
+// {"blockedBy": "backend", "changed": false}.
+func fileRoot(c *Ctx, readOnly bool) (string, Result, error) {
 	root, err := c.Root()
 	if err != nil {
-		return "", err
+		return "", Result{}, err
 	}
-	if artifact.IssueMode(root) {
-		if fileOnly {
-			return "", Refused("%s works on the file backend only (backlog.backend is \"issues\")", c.Path)
-		}
-		return "", fromArtifact(artifact.ErrIssueMode(c.Path))
+	if !artifact.IssueMode(root) {
+		return root, Result{}, nil
 	}
-	return root, nil
+	d := jsonx.NewObject()
+	d.Set("blockedBy", "backend")
+	d.Set("changed", false)
+	msg := "%s works on the file backend only (backlog.backend is \"issues\")"
+	if readOnly {
+		return "", Result{Data: d}, Failed(msg, c.Path)
+	}
+	return "", Result{Data: d}, Refused(msg, c.Path)
 }
 
 func bodyFlag(fs *flag.FlagSet) *string {
@@ -126,9 +132,9 @@ func runDesignList(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, true)
+	root, res, err := fileRoot(c, true)
 	if err != nil {
-		return Result{}, err
+		return res, err
 	}
 	list, err := design.List(root)
 	if err != nil {
@@ -227,9 +233,9 @@ func designAmend(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		root, err := fileRoot(c, true) // issue mode refuses: file-only
+		root, res, err := fileRoot(c, false) // mutating, file-only
 		if err != nil {
-			return Result{}, err
+			return res, err
 		}
 		if *heading == "" {
 			return Result{}, Usage("--section is required")
@@ -424,9 +430,9 @@ func runPlanValidateDocs(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, true)
+	root, res, err := fileRoot(c, true)
 	if err != nil {
-		return Result{}, err
+		return res, err
 	}
 	ms, text, err := plan.ValidateDocs(root, key)
 	if err != nil {

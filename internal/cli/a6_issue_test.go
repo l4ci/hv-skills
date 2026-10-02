@@ -77,9 +77,19 @@ func TestIssueModeDesign(t *testing.T) {
 	if code, _, _ := issueRun(t, root, "design", "put", "F7", "--body-file", bodyFile(t, "x")); code != 3 {
 		t.Errorf("put without a note: %d", code)
 	}
-	for _, args := range [][]string{{"design", "list"}, {"design", "amend", "F7", "--section", "Goal", "--mode", "append", "--body-file", bodyFile(t, "x")}} {
-		if code, _, _ := issueRun(t, root, args...); code != 4 {
-			t.Errorf("%v: %d, want 4 (file-only)", args, code)
+	// File-only verbs under issue mode: a mutating one is refused (4), a
+	// read-only one fails (1); both carry {blockedBy: backend, changed: false}.
+	for _, c := range []struct {
+		want int
+		args []string
+	}{
+		{1, []string{"design", "list"}},
+		{4, []string{"design", "amend", "F7", "--section", "Goal", "--mode", "append", "--body-file", bodyFile(t, "x")}},
+	} {
+		code, env, _ := issueRun(t, root, c.args...)
+		d := ddata(t, env)
+		if code != c.want || d["blockedBy"] != "backend" || d["changed"] != false {
+			t.Errorf("%v: exit %d data %v, want %d with blockedBy backend", c.args, code, d, c.want)
 		}
 	}
 }
