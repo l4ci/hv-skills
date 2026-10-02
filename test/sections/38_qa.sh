@@ -1,4 +1,4 @@
-echo "hv-qa-query + hv-qa-index"
+echo "qa query + qa index"
 
 # Build a .hv/qa/ tree with one well-formed target.
 mkdir -p .hv/qa
@@ -46,17 +46,23 @@ Web UI (Next.js, deployed at staging.example.com).
 - Real-payment flows
 EOF
 
-# hv-qa-query prints body of named target.
-"$BIN/hv-qa-query" web > /tmp/qa-query-out.txt
-grep -q "^## Executable checks" /tmp/qa-query-out.txt || fail "hv-qa-query body missing Executable checks heading"
-grep -q "^## Audit checks" /tmp/qa-query-out.txt || fail "hv-qa-query body missing Audit checks heading"
-grep -q "^---" /tmp/qa-query-out.txt && fail "hv-qa-query leaked frontmatter into stdout"
-pass "hv-qa-query prints body, strips frontmatter"
+# qa query prints body of named target.
+QA_OUT=$(hvj qa query web | jget data.text)
+grep -q "^## Executable checks" <<<"$QA_OUT" || fail "qa query body missing Executable checks heading"
+grep -q "^## Audit checks" <<<"$QA_OUT" || fail "qa query body missing Audit checks heading"
+grep -q "^---" <<<"$QA_OUT" && fail "qa query leaked frontmatter into the body"
+pass "qa query prints body, strips frontmatter"
 
-# Missing target is silent (exit 0, empty stdout).
-"$BIN/hv-qa-query" nonexistent > /tmp/qa-query-miss.txt
-[ ! -s /tmp/qa-query-miss.txt ] || fail "hv-qa-query emitted output for missing target"
-pass "hv-qa-query silent on missing target"
+# Missing target is silent (exit 0, empty body).
+rc=0; QA_MISS=$(hvj qa query nonexistent | jget data.text) || rc=$?
+[ "$rc" = 0 ] || fail "qa query must exit 0 for a missing target, got $rc"
+[ -z "$QA_MISS" ] || fail "qa query emitted output for missing target"
+pass "qa query silent on missing target"
+
+# No target is a usage error.
+rc=0; hvj qa query >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "qa query without a target must exit 2, got $rc"
+pass "qa query without a target is a usage error"
 
 # Multi-target ordering: requested order is preserved.
 cat > .hv/qa/api.md <<'EOF'
@@ -72,31 +78,35 @@ touched: 2026-05-15
 
 HTTP API.
 EOF
-"$BIN/hv-qa-query" api web > /tmp/qa-query-multi.txt
-FIRST_HEAD=$(grep -m1 "^## " /tmp/qa-query-multi.txt)
-[ "$FIRST_HEAD" = "## Surface" ] || fail "hv-qa-query order not preserved"
-pass "hv-qa-query preserves argument order"
+QA_MULTI=$(hvj qa query api web | jget data.text)
+FIRST_HEAD=$(grep -m1 "^## " <<<"$QA_MULTI")
+[ "$FIRST_HEAD" = "## Surface" ] || fail "qa query order not preserved"
+pass "qa query preserves argument order"
 
-# hv-qa-index regenerates the managed block.
-"$BIN/hv-qa-index" >/dev/null
+# qa index regenerates the managed block.
+QA_IDX=$(hvj qa index)
+[ "$(jget data.key <<<"$QA_IDX")" = "qa" ] || fail "qa index data.key wrong: $QA_IDX"
+[ "$(jget data.changed <<<"$QA_IDX")" = "true" ] || fail "first qa index must report changed: $QA_IDX"
 grep -q "<!-- hv-qa-start -->" CLAUDE.md || fail "hv-qa managed block not in CLAUDE.md"
 grep -q "^## Project QA" CLAUDE.md || fail "Project QA heading missing"
 grep -q "\*\*web\*\*" CLAUDE.md || fail "web target bullet missing from index"
 grep -q "\*\*api\*\*" CLAUDE.md || fail "api target bullet missing from index"
-pass "hv-qa-index seeds Project QA block"
+pass "qa index seeds Project QA block"
 
 # Re-running is idempotent (no duplicate markers).
-"$BIN/hv-qa-index" >/dev/null
+QA_IDX=$(hvj qa index)
+[ "$(jget data.status <<<"$QA_IDX")" = "unchanged" ] || fail "repeat qa index must be unchanged: $QA_IDX"
+[ "$(jget data.changed <<<"$QA_IDX")" = "false" ] || fail "repeat qa index must report changed=false: $QA_IDX"
 COUNT_START=$(grep -c "hv-qa-start" CLAUDE.md)
 [ "$COUNT_START" = "1" ] || fail "hv-qa managed block duplicated on re-run"
-pass "hv-qa-index updates in place"
+pass "qa index updates in place"
 
 # Empty .hv/qa/ renders the no-strategy hint.
 rm -f .hv/qa/web.md .hv/qa/api.md
-"$BIN/hv-qa-index" >/dev/null
+hvj qa index >/dev/null
 grep -q "no QA strategy yet" CLAUDE.md || fail "empty-state hint missing"
-pass "hv-qa-index renders empty-state hint"
+pass "qa index renders empty-state hint"
 
 # Cleanup so later sections start fresh.
 rm -rf .hv/qa
-"$BIN/hv-qa-index" >/dev/null
+hvj qa index >/dev/null

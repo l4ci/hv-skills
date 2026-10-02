@@ -1,18 +1,18 @@
-echo "hv-bootstrap pins ## Glossary in KNOWLEDGE.md"
+echo "init pins ## Glossary in KNOWLEDGE.md"
 TMP_BOOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_BOOT"' EXIT
-( cd "$TMP_BOOT" && "$BIN/hv-bootstrap" >/dev/null )
-[ -f "$TMP_BOOT/.hv/KNOWLEDGE.md" ] || fail "hv-bootstrap: missing .hv/KNOWLEDGE.md"
+"$HV_BIN" -C "$TMP_BOOT" init >/dev/null
+[ -f "$TMP_BOOT/.hv/KNOWLEDGE.md" ] || fail "init: missing .hv/KNOWLEDGE.md"
 grep -q "^## Glossary$" "$TMP_BOOT/.hv/KNOWLEDGE.md" || fail "KNOWLEDGE.md missing pinned Glossary topic"
 grep -q "no terms yet" "$TMP_BOOT/.hv/KNOWLEDGE.md" || fail "KNOWLEDGE.md Glossary missing placeholder"
 # Idempotency: re-running doesn't overwrite existing content
 echo "manual marker" >> "$TMP_BOOT/.hv/KNOWLEDGE.md"
-( cd "$TMP_BOOT" && "$BIN/hv-bootstrap" >/dev/null )
-grep -q "manual marker" "$TMP_BOOT/.hv/KNOWLEDGE.md" || fail "hv-bootstrap clobbered existing KNOWLEDGE.md"
+"$HV_BIN" -C "$TMP_BOOT" init >/dev/null
+grep -q "manual marker" "$TMP_BOOT/.hv/KNOWLEDGE.md" || fail "init clobbered existing KNOWLEDGE.md"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-bootstrap pins Glossary + is idempotent"
+pass "init pins Glossary + is idempotent"
 
-echo "hv-glossary-read"
+echo "glossary read"
 mkdir -p "$TMP/.hv"
 cat > "$TMP/.hv/KNOWLEDGE.md" <<'EOF'
 # Knowledge
@@ -27,90 +27,101 @@ cat > "$TMP/.hv/KNOWLEDGE.md" <<'EOF'
   - **Aliases:** _none_
   <!-- 2026-05-10 -->
 EOF
-OUT=$( cd "$TMP" && "$BIN/hv-glossary-read" backlog )
-grep -q "^- \*\*backlog\*\*" <<<"$OUT" || fail "hv-glossary-read missing entry header"
-grep -q "canonical project queue" <<<"$OUT" || fail "hv-glossary-read missing body"
+gread() { hvj glossary read "$@" | jget data.text; }
+OUT=$(gread backlog)
+grep -q "^- \*\*backlog\*\*" <<<"$OUT" || fail "glossary read missing entry header"
+grep -q "canonical project queue" <<<"$OUT" || fail "glossary read missing body"
 # Case-insensitive
-OUT2=$( cd "$TMP" && "$BIN/hv-glossary-read" Backlog )
-grep -q "canonical project queue" <<<"$OUT2" || fail "hv-glossary-read case-insensitive"
+OUT2=$(gread Backlog)
+grep -q "canonical project queue" <<<"$OUT2" || fail "glossary read case-insensitive"
 # Unknown term returns empty + exit 0
-OUT3=$( cd "$TMP" && "$BIN/hv-glossary-read" nonexistent )
-[ -z "$OUT3" ] || fail "hv-glossary-read unknown term should be empty"
+OUT3=$(gread nonexistent)
+[ -z "$OUT3" ] || fail "glossary read unknown term should be empty"
 # `> from:` prefix is always present and names KNOWLEDGE.md + ## Glossary
-OUT4=$( cd "$TMP" && "$BIN/hv-glossary-read" backlog )
-grep -q "^> from: " <<<"$OUT4" || fail "hv-glossary-read missing > from: prefix"
-grep -q "^> from: .hv/KNOWLEDGE.md (## Glossary)$" <<<"$OUT4" || fail "hv-glossary-read prefix should name KNOWLEDGE.md (## Glossary)"
+OUT4=$(gread backlog)
+grep -q "^> from: " <<<"$OUT4" || fail "glossary read missing > from: prefix"
+grep -q "^> from: .hv/KNOWLEDGE.md (## Glossary)$" <<<"$OUT4" || fail "glossary read prefix should name KNOWLEDGE.md (## Glossary)"
+# No terms is a usage error
+rc=0; hvj glossary read >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "glossary read with no term should exit 2, got $rc"
 
 # Document order preserved when querying multiple terms (decision is later in the file than backlog)
-OUT5=$( cd "$TMP" && "$BIN/hv-glossary-read" decision backlog )
-B_LINE=$(echo "$OUT5" | grep -n "^- \*\*backlog\*\*" | head -1 | cut -d: -f1)
-D_LINE=$(echo "$OUT5" | grep -n "^- \*\*decision\*\*" | head -1 | cut -d: -f1)
-[ -n "$B_LINE" ] && [ -n "$D_LINE" ] && [ "$B_LINE" -lt "$D_LINE" ] || fail "hv-glossary-read document order not preserved"
-pass "hv-glossary-read"
+OUT5=$(gread decision backlog)
+B_LINE=$(grep -n "^- \*\*backlog\*\*" <<<"$OUT5" | head -1 | cut -d: -f1)
+D_LINE=$(grep -n "^- \*\*decision\*\*" <<<"$OUT5" | head -1 | cut -d: -f1)
+[ -n "$B_LINE" ] && [ -n "$D_LINE" ] && [ "$B_LINE" -lt "$D_LINE" ] || fail "glossary read document order not preserved"
+pass "glossary read"
 
-echo "hv-glossary-write — new term"
+echo "glossary write — new term"
 TMP_ADD="$(mktemp -d)"
 trap 'rm -rf "$TMP_ADD"' EXIT
-( cd "$TMP_ADD" && "$BIN/hv-bootstrap" >/dev/null )
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" backlog \
+"$HV_BIN" -C "$TMP_ADD" init >/dev/null
+out=$(hvj -C "$TMP_ADD" glossary write backlog \
     --def "The canonical project queue (.hv/BACKLOG.md). Items are zero-padded IDs." \
-    --alias "task list,todo list" )
+    --alias "task list,todo list")
+[ "$(jget data.term <<<"$out")" = "backlog" ] || fail "glossary write term wrong: $out"
+[ "$(jget data.changed <<<"$out")" = "true" ] || fail "glossary write new term should report changed: $out"
 grep -q "^- \*\*backlog\*\* — " "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "missing backlog entry"
 grep -q "^  - \*\*Aliases:\*\* task list, todo list$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "aliases line wrong"
 grep -q "^  <!-- $(date +%Y-%m-%d) -->$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "date stamp missing"
 grep -q "no terms yet" "$TMP_ADD/.hv/KNOWLEDGE.md" && fail "placeholder should be stripped after first term added"
-# CLAUDE.md picks up Glossary via the hv-managed-block knowledge regeneration
+# CLAUDE.md picks up Glossary via the knowledge block regeneration
 grep -q "<!-- hv-knowledge-start -->" "$TMP_ADD/CLAUDE.md" || fail "knowledge block missing"
 grep -q "^- Glossary$" "$TMP_ADD/CLAUDE.md" || fail "Glossary topic not surfaced in CLAUDE.md"
-pass "hv-glossary-write — new term inserts + indexes"
+pass "glossary write — new term inserts + indexes"
 
-echo "hv-glossary-write — no aliases writes _none_"
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" session --def "An active hv-skills work cycle." )
-grep -A2 "^- \*\*session\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "^  - \*\*Aliases:\*\* _none_$" >/dev/null || fail "missing _none_"
-pass "hv-glossary-write — empty aliases produce _none_"
+echo "glossary write — no aliases writes _none_"
+"$HV_BIN" -C "$TMP_ADD" glossary write session --def "An active hv-skills work cycle." >/dev/null
+SESSION_ENTRY=$(grep -A2 "^- \*\*session\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md")
+grep -q "^  - \*\*Aliases:\*\* _none_$" <<<"$SESSION_ENTRY" || fail "missing _none_"
+pass "glossary write — empty aliases produce _none_"
 
-echo "hv-glossary-write — alphabetical insertion"
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" alpha --def "First alphabetically." )
+echo "glossary write — alphabetical insertion"
+"$HV_BIN" -C "$TMP_ADD" glossary write alpha --def "First alphabetically." >/dev/null
 ORDER=$(grep -E '^- \*\*' "$TMP_ADD/.hv/KNOWLEDGE.md" | sed -E 's/^- \*\*([^*]+)\*\*.*/\1/')
 EXPECTED=$'alpha\nbacklog\nsession'
 [ "$ORDER" = "$EXPECTED" ] || fail "alphabetical insertion failed: got '$ORDER'"
-pass "hv-glossary-write — alphabetical insertion"
+pass "glossary write — alphabetical insertion"
 
-echo "hv-glossary-write — update existing (def replace, alias union, date preserved)"
+echo "glossary write — update existing (def replace, alias union, date preserved)"
 ORIG_DATE=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep -oE '<!-- [0-9-]+ -->' | head -1)
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" backlog \
+"$HV_BIN" -C "$TMP_ADD" glossary write backlog \
     --def "The canonical project queue, refined." \
-    --alias "queue" )
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "queue, refined" >/dev/null || fail "def not replaced"
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "\*\*Aliases:\*\* task list, todo list, queue" >/dev/null || fail "aliases not unioned"
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "$ORIG_DATE" >/dev/null || fail "date should be preserved without --touch"
-pass "hv-glossary-write — update preserves date, unions aliases"
+    --alias "queue" >/dev/null
+ENTRY_BACKLOG=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md")
+grep -q "queue, refined" <<<"$ENTRY_BACKLOG" || fail "def not replaced"
+grep -q "\*\*Aliases:\*\* task list, todo list, queue" <<<"$ENTRY_BACKLOG" || fail "aliases not unioned"
+grep -q "$ORIG_DATE" <<<"$ENTRY_BACKLOG" || fail "date should be preserved without --touch"
+pass "glossary write — update preserves date, unions aliases"
 
-echo "hv-glossary-write — --touch updates the date"
+echo "glossary write — --touch updates the date"
 TODAY=$(date +%Y-%m-%d)
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" backlog --def "X." --touch )
-grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "<!-- $TODAY -->" >/dev/null || fail "--touch didn't bump date"
-pass "hv-glossary-write --touch"
+"$HV_BIN" -C "$TMP_ADD" glossary write backlog --def "X." --touch >/dev/null
+ENTRY_BACKLOG=$(grep -A3 "^- \*\*backlog\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md")
+grep -q "<!-- $TODAY -->" <<<"$ENTRY_BACKLOG" || fail "--touch didn't bump date"
+pass "glossary write --touch"
 
-echo "hv-glossary-write — --not field"
-( cd "$TMP_ADD" && "$BIN/hv-glossary-write" zterm --def "Z thing." --not "X, Y" )
-grep -A3 "^- \*\*zterm\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md" | grep "^  - \*\*Not:\*\* X, Y$" >/dev/null || fail "Not line missing"
-pass "hv-glossary-write --not"
+echo "glossary write — --not field"
+"$HV_BIN" -C "$TMP_ADD" glossary write zterm --def "Z thing." --not "X, Y" >/dev/null
+ENTRY_ZTERM=$(grep -A3 "^- \*\*zterm\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md")
+grep -q "^  - \*\*Not:\*\* X, Y$" <<<"$ENTRY_ZTERM" || fail "Not line missing"
+pass "glossary write --not"
 
 trap 'rm -rf "$TMP"' EXIT
 
-echo "hv-glossary-write — alias collision refused"
+echo "glossary write — alias collision refused"
 TMP_CC="$(mktemp -d)"
 trap 'rm -rf "$TMP_CC"' EXIT
-( cd "$TMP_CC" && "$BIN/hv-bootstrap" >/dev/null )
-( cd "$TMP_CC" && "$BIN/hv-glossary-write" backlog --def "Q." --alias "task list" )
-set +e
-( cd "$TMP_CC" && "$BIN/hv-glossary-write" inbox --def "I." --alias "task list" 2>"$TMP_CC/err" )
-RC=$?
-set -e
-[ $RC -ne 0 ] || fail "alias collision should exit non-zero"
-grep -q "already an alias of term 'backlog'" "$TMP_CC/err" || fail "missing collision error message"
+"$HV_BIN" -C "$TMP_CC" init >/dev/null
+"$HV_BIN" -C "$TMP_CC" glossary write backlog --def "Q." --alias "task list" >/dev/null
+rc=0; out=$(hvj -C "$TMP_CC" glossary write inbox --def "I." --alias "task list" 2>/dev/null) || rc=$?
+[ "$rc" = 4 ] || fail "alias collision should exit 4, got $rc"
+[ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused write should report changed=false: $out"
+[ "$(jget data.blockedBy <<<"$out")" = "alias-collision" ] || fail "refused write should report blockedBy=alias-collision: $out"
+# A missing --def is a usage error
+rc=0; hvj -C "$TMP_CC" glossary write inbox >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || fail "glossary write without --def should exit 2, got $rc"
 # Source file should NOT have been mutated
 grep -q "^- \*\*inbox\*\*" "$TMP_CC/.hv/KNOWLEDGE.md" && fail "inbox should not be written on collision"
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-glossary-write — alias collision refused"
+pass "glossary write — alias collision refused"

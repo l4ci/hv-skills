@@ -1,14 +1,18 @@
 echo "F32: loop-mode auto-planning helpers"
 
 # (a) /hv-plan SKILL.md exposes --auto-loop with the inline dispatch language.
+# white-box: kept until A9 (#53)
 grep -q -- '--auto-loop' "$REPO/hv-plan/SKILL.md" \
   || fail "F32: hv-plan/SKILL.md must document the --auto-loop flag"
+# white-box: kept until A9 (#53)
 grep -q 'Auto-loop mode' "$REPO/hv-plan/SKILL.md" \
   || fail "F32: hv-plan/SKILL.md must include the dedicated 'Auto-loop mode' section"
 
 # (b) /hv-work Step 4 carries the inline loop-mode auto-dispatch chain directive (renamed under B28).
+# white-box: kept until A9 (#53)
 grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-dispatch chain language"
+# white-box: kept until A9 (#53)
 grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
 
@@ -20,6 +24,7 @@ grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
 # helper becoming orphaned — if neither prose nor invocations reference it, the
 # helper exists with no consumer. Update the expected set when explicit invocations
 # land in the terminal-path skills.
+# white-box: kept until A9 (#53)
 SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
   | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
   | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
@@ -27,58 +32,74 @@ SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev
   || fail "F32: hv-auto-decisions-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
 
 # (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
+# white-box: kept until A9 (#53)
 grep -q 'hv-loop-stamp start' "$REPO/hv-next/SKILL.md" \
   || fail "F32: hv-next/SKILL.md must call hv-loop-stamp start"
+# white-box: kept until A9 (#53)
 grep -q 'hv-loop-stamp clear' "$REPO/hv-pause/SKILL.md" \
   || fail "F32: hv-pause/SKILL.md must call hv-loop-stamp clear"
+# white-box: kept until A9 (#53)
 grep -q 'hv-loop-stamp clear' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must call hv-loop-stamp clear"
 
 # (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
+# white-box: kept until A9 (#53)
 grep -q '"loop":.*"webResearch": False' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the fresh config block"
+# white-box: kept until A9 (#53)
 grep -q 'hv-config-set loop.webResearch false' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the STALE migration block"
 pass "F32: SKILL.md wiring + config defaults"
 
-# (f) hv-loop-stamp: start writes ISO timestamp; idempotent first-write; clear removes; read is silent-empty.
+# (f) status loop: start writes ISO timestamp; idempotent first-write; clear removes; show is null when unset.
 F32_TMP="$(mktemp -d)"
+trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP"
-  mkdir .hv
+  cd "$F32_TMP" && mkdir .hv
   echo '{"active": []}' > .hv/status.json
-  # read on empty
-  OUT=$("$BIN/hv-loop-stamp" read)
-  [ -z "$OUT" ] || fail "F32(f): hv-loop-stamp read on unset must be empty, got '$OUT'"
-  # start writes
-  "$BIN/hv-loop-stamp" start
-  T1=$("$BIN/hv-loop-stamp" read)
+  OUT=$(hvj status loop show)
+  [ "$(jget data.loopStartedAt <<<"$OUT")" = "null" ] \
+    || fail "F32(f): status loop show on unset must be null, got '$OUT'"
+  OUT=$(hvj status loop start)
+  T1=$(jget data.loopStartedAt <<<"$OUT")
   grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' <<<"$T1" \
-    || fail "F32(f): hv-loop-stamp start must write ISO timestamp, got '$T1'"
-  # idempotent first-write — second start must not overwrite
+    || fail "F32(f): status loop start must write ISO timestamp, got '$T1'"
+  [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F32(f): first start must report changed: $OUT"
+  [ "$(jget data.loopStartedAt <<<"$(hvj status loop show)")" = "$T1" ] \
+    || fail "F32(f): status loop show must return the stamp start wrote"
+  # idempotent first-write: a second start must not overwrite
   sleep 1
-  "$BIN/hv-loop-stamp" start
-  T2=$("$BIN/hv-loop-stamp" read)
-  [ "$T1" = "$T2" ] || fail "F32(f): hv-loop-stamp start must be idempotent first-write (T1='$T1' T2='$T2')"
+  OUT=$(hvj status loop start)
+  [ "$(jget data.loopStartedAt <<<"$OUT")" = "$T1" ] \
+    || fail "F32(f): status loop start must be idempotent first-write (T1='$T1' got: $OUT)"
+  [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "F32(f): repeat start must report changed=false: $OUT"
   # active array preserved
-  grep -q '"active": \[\]' .hv/status.json \
-    || fail "F32(f): hv-loop-stamp must preserve the active array"
+  python3 -c 'import json; d = json.load(open(".hv/status.json")); assert d["active"] == [] and d["loopStartedAt"]' \
+    || fail "F32(f): status loop must preserve the active array"
   # clear removes
-  "$BIN/hv-loop-stamp" clear
-  OUT=$("$BIN/hv-loop-stamp" read)
-  [ -z "$OUT" ] || fail "F32(f): hv-loop-stamp clear must remove loopStartedAt, got '$OUT'"
+  OUT=$(hvj status loop clear)
+  [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F32(f): clear of a set stamp must report changed: $OUT"
+  [ "$(jget data.loopStartedAt <<<"$(hvj status loop show)")" = "null" ] \
+    || fail "F32(f): status loop clear must remove loopStartedAt"
+  [ "$(jget data.changed <<<"$(hvj status loop clear)")" = "false" ] \
+    || fail "F32(f): clear of an unset stamp must report changed=false"
 )
+trap 'rm -rf "$TMP"' EXIT
 rm -rf "$F32_TMP"
-pass "F32(f): hv-loop-stamp start/clear/read"
+pass "F32(f): status loop start/clear/show"
 
-# (g) hv-auto-decision-log: writes placeholder template + footer; idempotent on (topic, rule-title).
+# (g) decisions auto-log: writes placeholder template + footer; idempotent on (topic, rule-title).
 F32_TMP="$(mktemp -d)"
+trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP"
-  mkdir .hv
+  cd "$F32_TMP" && mkdir .hv
   echo "# Decisions" > .hv/DECISIONS.md
   echo "" >> .hv/DECISIONS.md
-  "$BIN/hv-auto-decision-log" "Test Topic" "Test rule" "Because reasons" "M04-F32" "2026-05-09"
+  OUT=$(hvj decisions auto-log --topic "Test Topic" --title "Test rule" --why "Because reasons" \
+    --plan-key "M04-F32" --date "2026-05-09")
+  [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F32(g): first auto-log must report changed: $OUT"
+  [ "$(jget data.topic <<<"$OUT")" = "Test Topic" ] || fail "F32(g): data.topic missing: $OUT"
+  [ "$(jget data.title <<<"$OUT")" = "Test rule" ] || fail "F32(g): data.title missing: $OUT"
   grep -q '## Test Topic' .hv/DECISIONS.md \
     || fail "F32(g): topic header missing"
   grep -q '### Test rule' .hv/DECISIONS.md \
@@ -88,18 +109,24 @@ F32_TMP="$(mktemp -d)"
   grep -q '\[Auto:Loop\] M04-F32 2026-05-09' .hv/DECISIONS.md \
     || fail "F32(g): provenance footer missing or malformed"
   # idempotent — second run must not duplicate the entry
-  "$BIN/hv-auto-decision-log" "Test Topic" "Test rule" "Because reasons" "M04-F32" "2026-05-09"
+  OUT=$(hvj decisions auto-log --topic "Test Topic" --title "Test rule" --why "Because reasons" \
+    --plan-key "M04-F32" --date "2026-05-09")
+  [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "F32(g): repeat auto-log must report changed=false: $OUT"
   COUNT=$(grep -c '### Test rule' .hv/DECISIONS.md)
-  [ "$COUNT" = "1" ] || fail "F32(g): hv-auto-decision-log must be idempotent on (topic, rule-title), got $COUNT entries"
+  [ "$COUNT" = "1" ] || fail "F32(g): decisions auto-log must be idempotent on (topic, rule-title), got $COUNT entries"
+  # required flags: missing --why is a usage error
+  rc=0; hvj decisions auto-log --topic "T" --title "R" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "F32(g): auto-log without --why must exit 2, got $rc"
 )
+trap 'rm -rf "$TMP"' EXIT
 rm -rf "$F32_TMP"
-pass "F32(g): hv-auto-decision-log placeholder template + idempotent"
+pass "F32(g): decisions auto-log placeholder template + idempotent"
 
-# (h) hv-auto-decisions-since: filters by loopStartedAt date; lookup-empty when no match.
+# (h) decisions auto-since: filters by loopStartedAt date; empty when no loop.
 F32_TMP="$(mktemp -d)"
+trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP"
-  mkdir .hv
+  cd "$F32_TMP" && mkdir .hv
   cat > .hv/status.json <<'EOFJ'
 {"active": [], "loopStartedAt": "2026-05-09T00:00:00Z"}
 EOFJ
@@ -132,20 +159,26 @@ EOFJ
 
 <!-- [Auto:Loop] M04-F32 2026-05-09 — review and articulate Forbids/Permits -->
 EOFD
-  OUT=$("$BIN/hv-auto-decisions-since")
-  grep -q 'In-loop rule' <<<"$OUT" \
+  OUT=$(hvj decisions auto-since)
+  [ "$(jget data.since <<<"$OUT")" = "2026-05-09T00:00:00Z" ] || fail "F32(h): data.since missing: $OUT"
+  [ "$(jget data.decisions <<<"$OUT" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')" = "1" ] \
+    || fail "F32(h): only the post-loopStart entry must remain: $OUT"
+  [ "$(jget 'data.decisions[0].title' <<<"$OUT")" = "In-loop rule" ] \
     || fail "F32(h): post-loopStart entry missing from output: $OUT"
-  grep -q 'Pre-loop rule' <<<"$OUT" \
-    && fail "F32(h): pre-loopStart entry must be filtered out: $OUT"
-  grep -q 'Forbids/Permits unresolved' <<<"$OUT" \
-    || fail "F32(h): unresolved status tag missing: $OUT"
-  # lookup-empty when loopStartedAt is unset
+  [ "$(jget 'data.decisions[0].topic' <<<"$OUT")" = "Topic A" ] || fail "F32(h): topic wrong: $OUT"
+  [ "$(jget 'data.decisions[0].date' <<<"$OUT")" = "2026-05-09" ] || fail "F32(h): date wrong: $OUT"
+  [ "$(jget 'data.decisions[0].status' <<<"$OUT")" = "unresolved" ] \
+    || fail "F32(h): unresolved status missing: $OUT"
+  # no loop: decisions is empty and since is absent
   echo '{"active": []}' > .hv/status.json
-  OUT=$("$BIN/hv-auto-decisions-since")
-  [ -z "$OUT" ] || fail "F32(h): empty when loopStartedAt unset, got '$OUT'"
+  OUT=$(hvj decisions auto-since)
+  [ "$(jget data.decisions <<<"$OUT")" = "[]" ] || fail "F32(h): empty when loopStartedAt unset, got '$OUT'"
+  jget data.since <<<"$OUT" >/dev/null && fail "F32(h): since must be absent without a loop: $OUT"
+  true
 )
+trap 'rm -rf "$TMP"' EXIT
 rm -rf "$F32_TMP"
-pass "F32(h): hv-auto-decisions-since filter + lookup-empty"
+pass "F32(h): decisions auto-since filter + lookup-empty"
 
 # --- hvlib: parse_frontmatter & iter_map_entries -------------------
 mkdir -p .hv/map
@@ -171,6 +204,7 @@ EOF
 # malformed: no frontmatter
 echo "no frontmatter here" > .hv/map/broken.md
 
+# white-box: kept until the A3 Go unit test lands (#47), then delete
 PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import parse_frontmatter, iter_map_entries
 fm, body = parse_frontmatter(open(".hv/map/capture.md").read())
@@ -190,16 +224,18 @@ assert names == ["capture", "plan"], names  # malformed file is skipped
 PY
 echo "ok hvlib parse_frontmatter / iter_map_entries"
 
-# --- hv-map-query --------------------------------------------------
-out="$("$BIN/hv-map-query" capture)"
-[[ "$out" == *"## Purpose"* ]] || { echo "FAIL: hv-map-query body missing"; exit 1; }
-out="$("$BIN/hv-map-query" capture plan)"
-[[ "$out" == *"## Purpose"* && "$out" == *"body"* ]] || { echo "FAIL: hv-map-query multi"; exit 1; }
-out="$("$BIN/hv-map-query" nonexistent)"
-[[ -z "$out" ]] || { echo "FAIL: hv-map-query missing should be empty, got: $out"; exit 1; }
-echo "ok hv-map-query"
+# --- map query -----------------------------------------------------
+out="$(hvj map query capture | jget data.text)"
+[[ "$out" == *"## Purpose"* ]] || { echo "FAIL: map query body missing"; exit 1; }
+out="$(hvj map query capture plan | jget data.text)"
+[[ "$out" == *"## Purpose"* && "$out" == *"body"* ]] || { echo "FAIL: map query multi"; exit 1; }
+out="$(hvj map query nonexistent | jget data.text)"
+[[ -z "$out" ]] || { echo "FAIL: map query missing should be empty, got: $out"; exit 1; }
+rc=0; hvj map query >/dev/null 2>&1 || rc=$?
+[ "$rc" = 2 ] || { echo "FAIL: map query with no name must exit 2, got $rc"; exit 1; }
+echo "ok map query"
 
-# --- hv-map-stats --------------------------------------------------
+# --- map stats -----------------------------------------------------
 # Add an entry-point referencing this very file to test the file:line check
 mkdir -p src
 echo "line1" > src/sample.txt
@@ -215,95 +251,94 @@ touched: 2026-05-09
 - src/sample.txt:2 — second line
 - src/missing.txt:42 — broken ref
 EOF
-out="$("$BIN/hv-map-stats")"
-grep -q '"name": "capture"' <<<"$out" || { echo "FAIL: stats missing capture"; exit 1; }
-grep -q '"broken_refs"' <<<"$out" || { echo "FAIL: stats missing broken_refs"; exit 1; }
-# work has 1 broken ref out of 2 entry points
-echo "$out" | python3 -c '
+hvj map stats | python3 -c '
 import json, sys
-data = json.load(sys.stdin)
+data = json.load(sys.stdin)["data"]
+names = [s["name"] for s in data["subsystems"]]
+assert "capture" in names, names
+assert data["count"] == len(data["subsystems"]), data
 work = next(s for s in data["subsystems"] if s["name"] == "work")
-assert work["broken_refs"] == 1, work
-assert work["entry_points"] == 2, work
-'
-echo "ok hv-map-stats"
+# work has 1 broken ref out of 2 entry points
+assert work["brokenRefs"] == 1, work
+assert work["entryPoints"] == 2, work
+assert work["touched"] == "2026-05-09", work
+assert "cap" not in data, data
+' || { echo "FAIL: map stats shape"; exit 1; }
+# --cap adds the advisory fields and never fails
+hvj map stats --cap | python3 -c '
+import json, sys
+data = json.load(sys.stdin)["data"]
+assert data["cap"] == 20 and data["overCap"] is False, data
+' || { echo "FAIL: map stats --cap shape"; exit 1; }
+echo "ok map stats"
 
-# --- hv-map-index --------------------------------------------------
+# --- map index -----------------------------------------------------
 [ -f CLAUDE.md ] || : > CLAUDE.md
-"$BIN/hv-map-index" >/dev/null
+OUT="$(hvj map index)"
+[ "$(jget data.key <<<"$OUT")" = "map" ] || { echo "FAIL: map index data.key: $OUT"; exit 1; }
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || { echo "FAIL: first map index must report changed: $OUT"; exit 1; }
 grep -q '<!-- hv-map-start -->' CLAUDE.md || { echo "FAIL: map block not in CLAUDE.md"; exit 1; }
 grep -q '## Project Map' CLAUDE.md || { echo "FAIL: heading missing"; exit 1; }
 grep -q '\*\*capture\*\* — Captures items into BACKLOG.md' CLAUDE.md || { echo "FAIL: capture summary missing"; exit 1; }
 # Idempotence
 sha1=$(sha1sum CLAUDE.md | cut -d' ' -f1)
-"$BIN/hv-map-index" >/dev/null
+OUT="$(hvj map index)"
 sha2=$(sha1sum CLAUDE.md | cut -d' ' -f1)
-[ "$sha1" = "$sha2" ] || { echo "FAIL: hv-map-index not idempotent"; exit 1; }
+[ "$sha1" = "$sha2" ] || { echo "FAIL: map index not idempotent"; exit 1; }
+[ "$(jget data.status <<<"$OUT")" = "unchanged" ] || { echo "FAIL: repeat map index must be unchanged: $OUT"; exit 1; }
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || { echo "FAIL: repeat map index must report changed=false: $OUT"; exit 1; }
 # Empty case: hide the block when .hv/map/ has no valid entries
 mv .hv/map .hv/map.bak
 mkdir .hv/map
-"$BIN/hv-map-index" >/dev/null
+hvj map index >/dev/null
 grep -q '_(no subsystems yet' CLAUDE.md || { echo "FAIL: empty placeholder missing"; exit 1; }
 mv .hv/map .hv/map.empty
 mv .hv/map.bak .hv/map
-echo "ok hv-map-index"
+echo "ok map index"
 
-# --- hv-staleness --------------------------------------------------
-# Capture (touched 2026-04-01) is older than 30 days from "today=2026-05-09";
+# --- backlog stale -------------------------------------------------
+# Plan (touched 2026-04-01) is older than 30 days from "today=2026-05-09";
 # work is touched 2026-05-09 and should not be flagged at days=30.
-out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-09)"
-grep -q '^plan ' <<<"$out" || { echo "FAIL: plan should be stale"; exit 1; }
-if grep -q '^work ' <<<"$out"; then echo "FAIL: work should NOT be stale"; exit 1; fi
+out="$(HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 30 | jget data.entries)"
+grep -q '"name":"plan"' <<<"$out" || { echo "FAIL: plan should be stale"; exit 1; }
+if grep -q '"name":"work"' <<<"$out"; then echo "FAIL: work should NOT be stale"; exit 1; fi
 # days=0 lists all
-out="$("$BIN/hv-staleness" map --days 0 --today 2026-05-09)"
-[ "$(echo "$out" | wc -l)" -ge 2 ] || { echo "FAIL: days=0 should list all"; exit 1; }
+HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 0 | jget 'data.entries[1].name' >/dev/null \
+  || { echo "FAIL: days=0 should list all"; exit 1; }
+# Nothing is stale when the window is huge (what hv-stale-summary reported as silence)
+out="$(HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 999999 | jget data.entries)"
+[ "$out" = "[]" ] || { echo "FAIL: backlog stale should be empty when nothing is stale (got: $out)"; exit 1; }
 # Knowledge: KNOWLEDGE.md exists from bootstrap-style fixture; should not error
-"$BIN/hv-staleness" knowledge --days 0 >/dev/null
-echo "ok hv-staleness"
+hvj backlog stale --kind knowledge --days 0 >/dev/null
+echo "ok backlog stale"
 
-# --- hv-stale-summary ---------------------------------------------
-# Wraps hv-staleness × 3 into one summary line; zero-kinds suppressed.
-out="$("$BIN/hv-stale-summary" --days 0 --today 2026-05-09 map)"
-case "$out" in
-  "stale: map="*) ;;
-  *) echo "FAIL: hv-stale-summary did not emit stale: map=N (got: $out)"; exit 1 ;;
-esac
-# Multi-kind case must use ", " separator (comma + space) per the documented format
-# Seed a stale TODO item so the todo kind also reports ≥1 stale at --days 0
-"$BIN/hv-append" "## Tasks" "- **[T99] Stale task for separator test.** Captured: 2026-01-01"
-out_multi="$("$BIN/hv-stale-summary" --days 0 --today 2026-05-09 map todo)"
-case "$out_multi" in
-  "stale: map="*", todo="*) ;;
-  *) echo "FAIL: hv-stale-summary multi-kind separator wrong (expected ', '; got: $out_multi)"; exit 1 ;;
-esac
-# All-fresh: --days 999999 yields zero stale → empty output
-out="$("$BIN/hv-stale-summary" --days 999999 --today 2026-05-09)"
-[ -z "$out" ] || { echo "FAIL: hv-stale-summary should be silent when nothing is stale (got: $out)"; exit 1; }
-echo "ok hv-stale-summary"
-
-# --- hv-bootstrap seeds map ---------------------------------------
+# --- init seeds map ------------------------------------------------
 TMP2=$(mktemp -d)
 trap 'rm -rf "$TMP" "$TMP2"' EXIT
 (
-  cd "$TMP2"
-  git init -q
-  "$BIN/hv-bootstrap" >/dev/null
+  cd "$TMP2" && git init -q
+  "$HV_BIN" init >/dev/null
   [ -d .hv/map ] || { echo "FAIL: .hv/map not created"; exit 1; }
   [ -f .hv/MAP.md ] || { echo "FAIL: .hv/MAP.md not seeded"; exit 1; }
   grep -q "Project map" .hv/MAP.md || { echo "FAIL: .hv/MAP.md content missing"; exit 1; }
 )
-echo "ok hv-bootstrap seeds map"
+echo "ok init seeds map"
 
 # --- skill touchpoints reference map ------------------------------
+# white-box: kept until A9 (#53)
 grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
+# white-box: kept until A9 (#53)
 grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
+# white-box: kept until A9 (#53)
 grep -q "post-cycle map\|hv-map-index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 
 # --- status/next/resume reference hv-stale-summary ---------------
 # Note: hv-status and hv-resume were merged into hv-next (F26).
 # hv-next now uses bin/hv-stale-summary as a single wrapper (F48).
+# white-box: kept until A9 (#53)
 grep -q "hv-stale-summary" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
+# white-box: kept until A9 (#53)
 grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
 
@@ -311,11 +346,10 @@ echo "ok status/next/resume/capture touchpoints"
 TMP3=$(mktemp -d)
 trap 'rm -rf "$TMP3" "$TMP" "$TMP2"' EXIT
 (
-  cd "$TMP3"
-  git init -q
+  cd "$TMP3" && git init -q
   git config user.email test@example.com
   git config user.name Test
-  "$BIN/hv-bootstrap" >/dev/null
+  "$HV_BIN" init >/dev/null
   : > CLAUDE.md
   cat > .hv/map/capture.md <<'EOF'
 ---
@@ -342,7 +376,7 @@ created: 2025-12-01
 ## Purpose
 Work flow.
 EOF
-  "$BIN/hv-map-index" >/dev/null
+  hvj map index >/dev/null
 
   python3 - <<'PY'
 from pathlib import Path
@@ -352,21 +386,24 @@ p.write_text(text)
 PY
   grep -q "touched: 2026-05-10" .hv/map/capture.md || { echo "FAIL: after-work bump"; exit 1; }
 
-  out="$("$BIN/hv-staleness" map --days 30 --today 2026-05-10)"
-  grep -q "^work " <<<"$out" || { echo "FAIL: work should be stale at days=30"; exit 1; }
+  out="$(HV_TEST_TODAY=2026-05-10 hvj backlog stale --kind map --days 30 | jget data.entries)"
+  grep -q '"name":"work"' <<<"$out" || { echo "FAIL: work should be stale at days=30"; exit 1; }
 
-  count=$("$BIN/hv-map-stats" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["subsystems"]))')
+  count=$(hvj map stats | jget data.count)
   [ "$count" = "2" ] || { echo "FAIL: stats count $count != 2"; exit 1; }
 
-  "$BIN/hv-map-index" >/dev/null
+  hvj map index >/dev/null
   sha1=$(sha1sum CLAUDE.md | cut -d' ' -f1)
-  "$BIN/hv-map-index" >/dev/null
+  hvj map index >/dev/null
   sha2=$(sha1sum CLAUDE.md | cut -d' ' -f1)
   [ "$sha1" = "$sha2" ] || { echo "FAIL: integration idempotence"; exit 1; }
 )
+trap 'rm -rf "$TMP"' EXIT
+rm -rf "$TMP2" "$TMP3"
 echo "ok end-to-end map flow"
 
 # --- parse_todo_fields handles Subsystem ---------------------------
+# white-box: kept until the A4 Go unit test lands (#48), then delete
 PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import parse_todo_fields
 line = "- [B07] [P1] Title. Repos: web Subsystem: capture Captured: 2026-05-09"
@@ -384,22 +421,28 @@ echo "ok parse_todo_fields handles Subsystem"
 echo "B28: /hv-brainstorm --auto-loop dispatch chain"
 
 # (a) /hv-brainstorm SKILL.md exposes --auto-loop with the inline dispatch language.
+# white-box: kept until A9 (#53)
 grep -q -- '--auto-loop' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must document the --auto-loop flag"
+# white-box: kept until A9 (#53)
 grep -q '## Auto-loop mode' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must include the dedicated 'Auto-loop mode' section"
 
 # (b) /hv-work Step 4 carries the inline loop-mode auto-brainstorm dispatch directive.
+# white-box: kept until A9 (#53)
 grep -q '/hv-brainstorm --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md must reference /hv-brainstorm --auto-loop dispatch"
+# white-box: kept until A9 (#53)
 grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md must title Step 4 chain as 'Loop-mode auto-dispatch chain'"
 
 # (c) /hv-work Step 2 carve-out for Major + Milestone-tagged items defers to Step 4 chain.
+# white-box: kept until A9 (#53)
 grep -q 'defer to Step 4' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md Step 2 must defer Major + Milestone-tagged ambiguity to Step 4 chain"
 
 # (d) references/loop-mode-plan-dispatch.md describes the design pre-flight.
+# white-box: kept until A9 (#53)
 grep -q 'Design pre-flight' "$REPO/references/loop-mode-plan-dispatch.md" \
   || fail "B28: references/loop-mode-plan-dispatch.md must include the Design pre-flight section"
 
