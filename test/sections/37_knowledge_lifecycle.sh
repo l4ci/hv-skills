@@ -48,11 +48,11 @@ pass "hv-knowledge-tier --set rejects invalid tier"
 # --- hv-knowledge-migrate idempotency ---
 rm -f .hv/knowledge-tier.json
 OUT=$("$BIN/hv-knowledge-migrate")
-echo "$OUT" | grep -q "migrated 3 entries" || fail "first migration didn't claim 3 entries: $OUT"
+grep -q "migrated 3 entries" <<<"$OUT" || fail "first migration didn't claim 3 entries: $OUT"
 pass "hv-knowledge-migrate stamps all titled bullets on first run"
 
 OUT2=$("$BIN/hv-knowledge-migrate")
-echo "$OUT2" | grep -qi "nothing to migrate" || fail "second migration not idempotent: $OUT2"
+grep -qi "nothing to migrate" <<<"$OUT2" || fail "second migration not idempotent: $OUT2"
 pass "hv-knowledge-migrate is idempotent on re-run"
 
 COUNT=$("$BIN/hv-knowledge-tier" --list | python3 -c 'import json,sys;print(len(json.load(sys.stdin)))')
@@ -68,7 +68,7 @@ TIER=$("$BIN/hv-knowledge-tier" --get --topic "Architecture" --title "Bar rule" 
 [ "$TIER" = "provisional" ] || fail "Bar rule should stay provisional at 2 hits; got $TIER"
 pass "hv-knowledge-hit doesn't promote below threshold"
 
-"$BIN/hv-knowledge-hit" --topic "Architecture" --title "Bar rule" 2>&1 | grep -q "auto-promoted" \
+"$BIN/hv-knowledge-hit" --topic "Architecture" --title "Bar rule" 2>&1 | grep "auto-promoted" >/dev/null \
   || fail "third hit should print auto-promoted line"
 TIER=$("$BIN/hv-knowledge-tier" --get --topic "Architecture" --title "Bar rule" | python3 -c 'import json,sys;print(json.load(sys.stdin)["tier"])')
 [ "$TIER" = "confirmed" ] || fail "third hit should auto-promote to confirmed; got $TIER"
@@ -95,7 +95,7 @@ pass "hv-knowledge-contradiction --has exits 1 for missing entry"
 for i in 1 2 3; do
   OUT=$("$BIN/hv-knowledge-hit" --topic "Build and Tooling" --title "Baz rule" 2>&1)
 done
-echo "$OUT" | grep -q "skip-auto-promote" || fail "third hit on Baz rule should print skip-auto-promote: $OUT"
+grep -q "skip-auto-promote" <<<"$OUT" || fail "third hit on Baz rule should print skip-auto-promote: $OUT"
 TIER=$("$BIN/hv-knowledge-tier" --get --topic "Build and Tooling" --title "Baz rule" | python3 -c 'import json,sys;print(json.load(sys.stdin)["tier"])')
 [ "$TIER" = "provisional" ] || fail "Baz rule should stay provisional under contradiction; got $TIER"
 pass "hv-knowledge-hit skips auto-promote when contradiction pending"
@@ -113,23 +113,23 @@ pass "hv-knowledge-contradiction --clear wipes the queue"
 "$BIN/hv-knowledge-tier" --set --topic "Build and Tooling" --title "Baz rule" --tier provisional >/dev/null
 
 OUT=$("$BIN/hv-knowledge-query" Architecture)
-echo "$OUT" | grep -q "Foo rule" || fail "confirmed Foo rule should appear in default query"
-if echo "$OUT" | grep -q "Bar rule"; then
+grep -q "Foo rule" <<<"$OUT" || fail "confirmed Foo rule should appear in default query"
+if grep -q "Bar rule" <<<"$OUT"; then
   fail "deprecated Bar rule should be hidden in default query: $OUT"
 fi
 pass "hv-knowledge-query hides deprecated bullets by default"
 
 OUT=$("$BIN/hv-knowledge-query" --include-deprecated Architecture)
-echo "$OUT" | grep -q "Bar rule" || fail "--include-deprecated should surface Bar rule"
+grep -q "Bar rule" <<<"$OUT" || fail "--include-deprecated should surface Bar rule"
 pass "hv-knowledge-query --include-deprecated re-surfaces hidden bullets"
 
 OUT=$("$BIN/hv-knowledge-query" "Build and Tooling")
-echo "$OUT" | grep -q "(provisional)" || fail "provisional Baz rule should carry suffix: $OUT"
+grep -q "(provisional)" <<<"$OUT" || fail "provisional Baz rule should carry suffix: $OUT"
 pass "hv-knowledge-query suffixes (provisional) on probation bullets"
 
 OUT=$("$BIN/hv-knowledge-query" --tier confirmed Architecture)
-echo "$OUT" | grep -q "Foo rule" || fail "--tier confirmed should keep Foo rule"
-if echo "$OUT" | grep -q "Bar rule"; then
+grep -q "Foo rule" <<<"$OUT" || fail "--tier confirmed should keep Foo rule"
+if grep -q "Bar rule" <<<"$OUT"; then
   fail "--tier confirmed should drop deprecated Bar rule: $OUT"
 fi
 pass "hv-knowledge-query --tier filter works"

@@ -24,7 +24,7 @@ drift_check() {
 
   # Helper's header: comment block before `set -...` / first non-comment line.
   # Grep for the term within the first 40 lines (covers any reasonable header).
-  if ! head -40 "$helper_path" | grep -qF "$term"; then
+  if ! head -40 "$helper_path" | grep -F "$term" >/dev/null; then
     fail "F65 drift — bin/$helper header missing term: \"$term\""
   fi
 

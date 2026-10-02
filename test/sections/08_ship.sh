@@ -53,7 +53,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 OUT=$(hvj backlog list)
-echo "$OUT" | jget data.features[0].title | grep -q "Add v1.2 support" || fail "title with period was truncated: $OUT"
+echo "$OUT" | jget data.features[0].title | grep "Add v1.2 support" >/dev/null || fail "title with period was truncated: $OUT"
 pass "backlog keeps mid-title periods intact"
 
 echo "regression: backlog archive always reports a count"
@@ -121,10 +121,10 @@ echo ship2 > ship2.txt && git add ship2.txt && git commit -q -m "feat: overlay [
 git checkout -q main
 
 BODY=$(hvj ship body hv/ship-demo | jget data.body)
-echo "$BODY" | grep -q "^## Summary" || fail "ship body missing Summary section"
-echo "$BODY" | grep -q "^## Items resolved" || fail "ship body missing Items resolved section"
-echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship body missing B70 title"
-echo "$BODY" | grep -q "\[F70\] Ship demo feature" || fail "ship body missing F70 title"
+grep -q "^## Summary" <<<"$BODY" || fail "ship body missing Summary section"
+grep -q "^## Items resolved" <<<"$BODY" || fail "ship body missing Items resolved section"
+grep -q "\[B70\] Ship demo bug" <<<"$BODY" || fail "ship body missing B70 title"
+grep -q "\[F70\] Ship demo feature" <<<"$BODY" || fail "ship body missing F70 title"
 pass "ship body emits Summary + Items resolved with resolved titles"
 
 rc=0; hvj ship body main >/dev/null 2>&1 || rc=$?
@@ -154,7 +154,7 @@ echo g1 > g1.txt && git add g1.txt && git commit -q -m "fix: thing [B71]"
 echo g2 > g2.txt && git add g2.txt && git commit -q -m "feat: thing [F71]"
 git checkout -q main
 BODY=$(hvj ship body hv/ship-gh-closes | jget data.body)
-echo "$BODY" | grep -q "^Closes #42$" || fail "ship body missing Closes #42 line: $BODY"
+grep -q "^Closes #42$" <<<"$BODY" || fail "ship body missing Closes #42 line: $BODY"
 GH_LINES=$(echo "$BODY" | grep -c "^Closes #" || true)
 [ "$GH_LINES" = "1" ] || fail "ship body expected 1 Closes line, got $GH_LINES: $BODY"
 pass "ship body emits Closes #N from GH refs in TODO bullets"
@@ -181,7 +181,7 @@ git checkout -q -b hv/ship-gh-noclose
 echo g3 > g3.txt && git add g3.txt && git commit -q -m "fix: thing [B72]"
 git checkout -q main
 BODY=$(hvj ship body hv/ship-gh-noclose | jget data.body)
-if echo "$BODY" | grep -q "^Closes #"; then fail "ship body emitted Closes line with no GH refs: $BODY"; fi
+if grep -q "^Closes #" <<<"$BODY"; then fail "ship body emitted Closes line with no GH refs: $BODY"; fi
 pass "ship body emits no Closes lines when no GH refs present"
 git checkout -q main
 git branch -D hv/ship-gh-noclose >/dev/null 2>&1 || true
@@ -306,7 +306,7 @@ git checkout -q -b hv/ship-body-regression
 echo r > r2.txt && git add r2.txt && git commit -q -m "fix: badge [B70]"
 git checkout -q main
 BODY=$(hvj ship body hv/ship-body-regression | jget data.body)
-echo "$BODY" | grep -q "\[B70\] Ship demo bug" || fail "ship body picked wrong bullet for B70 (Related-link regression): $BODY"
+grep -q "\[B70\] Ship demo bug" <<<"$BODY" || fail "ship body picked wrong bullet for B70 (Related-link regression): $BODY"
 pass "ship body picks origin bullet, ignores Related-link references"
 git checkout -q main
 git branch -D hv/ship-body-regression >/dev/null 2>&1 || true
@@ -342,25 +342,25 @@ BRIEF_ENV=$(hvj review brief hv/second-opinion-demo)
 [ "$(echo "$BRIEF_ENV" | jget data.commitCount)" = "2" ] && [ "$(echo "$BRIEF_ENV" | jget data.base)" = "main" ] \
   || fail "review brief commitCount/base: $BRIEF_ENV"
 BRIEF=$(echo "$BRIEF_ENV" | jget data.brief)
-echo "$BRIEF" | grep -qi "no prior conversation context" \
+grep -qi "no prior conversation context" <<<"$BRIEF" \
   || fail "review brief missing fresh-context framing"
-echo "$BRIEF" | grep -q "^\*\*Goal" \
+grep -q "^\*\*Goal" <<<"$BRIEF" \
   || fail "review brief missing Goal section"
-echo "$BRIEF" | grep -q "\[B70\] Ship demo bug" \
+grep -q "\[B70\] Ship demo bug" <<<"$BRIEF" \
   || fail "review brief missing B70 in goal"
-echo "$BRIEF" | grep -q "\[F70\] Ship demo feature" \
+grep -q "\[F70\] Ship demo feature" <<<"$BRIEF" \
   || fail "review brief missing F70 in goal"
-echo "$BRIEF" | grep -q "^\*\*Commits" \
+grep -q "^\*\*Commits" <<<"$BRIEF" \
   || fail "review brief missing Commits section"
-echo "$BRIEF" | grep -q "fix: badge invalidation" \
+grep -q "fix: badge invalidation" <<<"$BRIEF" \
   || fail "review brief missing commit subject"
-echo "$BRIEF" | grep -q "^\*\*Diff" \
+grep -q "^\*\*Diff" <<<"$BRIEF" \
   || fail "review brief missing Diff section"
-echo "$BRIEF" | grep -q "so1.txt" \
+grep -q "so1.txt" <<<"$BRIEF" \
   || fail "review brief missing per-file diff path"
-echo "$BRIEF" | grep -q "PASS | CONCERNS | FAIL" \
+grep -q "PASS | CONCERNS | FAIL" <<<"$BRIEF" \
   || fail "review brief missing verdict-instruction"
-if echo "$BRIEF" | grep -qi "KNOWLEDGE\.md\|DECISIONS\.md\|hard boundaries\|known gotchas"; then
+if grep -qi "KNOWLEDGE\.md\|DECISIONS\.md\|hard boundaries\|known gotchas" <<<"$BRIEF"; then
   fail "review brief leaked KNOWLEDGE/DECISIONS context (must be diff+goal only)"
 fi
 pass "review brief emits goal+commits+diff with no project-context leak"

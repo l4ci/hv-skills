@@ -55,7 +55,7 @@ pass "T1: hv-resolve-umbrella handles symlinked sub-repo paths"
 
 # T1: masking — stray .hv/ inside a registered sub-repo
 mkdir -p "$UMB/web/.hv"
-if (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null) | grep -q "masking"; then
+if (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null) | grep "masking" >/dev/null; then
   pass "T1: hv-resolve-umbrella detects masking with stderr message"
 else
   # stderr may not flow through subshell — check exit code instead

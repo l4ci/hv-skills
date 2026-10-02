@@ -14,7 +14,7 @@ for h in hv-knowledge-merge hv-knowledge-tier hv-knowledge-amend \
          hv-glossary-import; do
   out="$( cd "$TMP" && "$BIN/$h" --repo 2>&1 )" || rc=$? && rc=${rc:-0}
   [ "$rc" -ne 0 ] || fail "T103: $h accepted bare trailing --repo (rc=0; expected non-zero)"
-  echo "$out" | grep -q "usage:" || fail "T103: $h did not emit usage line on bare --repo (got: $out)"
+  grep -q "usage:" <<<"$out" || fail "T103: $h did not emit usage line on bare --repo (got: $out)"
   unset rc
 done
 

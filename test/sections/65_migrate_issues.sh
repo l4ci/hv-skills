@@ -136,7 +136,7 @@ print(eval(sys.argv[1]))' "$1"; }
     has "slice bracket rewrite only" "Slice: [F4] first, then T1 of the plan." "$N1"
     has "milestone body rewritten" "Needs [F4]." "$(BODY 1)"
     has "milestone status kept" "status: active" "$(BODY 1)"
-    eq "banner first line" "true" "$(head -1 .hv/BACKLOG.md | grep -q '^> Frozen: this backlog moved to the issue tracker on ' && echo true)"
+    eq "banner first line" "true" "$(head -1 .hv/BACKLOG.md | grep '^> Frozen: this backlog moved to the issue tracker on ' >/dev/null && echo true)"
     eq "banner once" "1" "$(grep -c '^> Frozen:' .hv/BACKLOG.md)"
     grep -q 'Old thing' .hv/BACKLOG.md || fail "$prov migrate: completed item lost"
     case "$(cat .hv/config.json)" in *backend*) fail "$prov migrate: backend flipped";; esac

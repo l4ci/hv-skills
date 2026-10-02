@@ -46,9 +46,9 @@ build_rm_fixture "$RM_TMP"
   RC=$?
   set -e
   [ "$RC" = "0" ] || { echo "FAIL F36(a): dry-run should exit 0, got $RC"; exit 1; }
-  echo "$OUT" | grep -q '\[F01\] removal plan:' \
+  grep -q '\[F01\] removal plan:' <<<"$OUT" \
     || { echo "FAIL F36(a): stdout missing '[F01] removal plan:': $OUT"; exit 1; }
-  echo "$OUT" | grep -q 'dry-run — no files modified\.' \
+  grep -q 'dry-run — no files modified\.' <<<"$OUT" \
     || { echo "FAIL F36(a): stdout missing 'dry-run — no files modified.': $OUT"; exit 1; }
   NEW_TODO=$(cat .hv/BACKLOG.md)
   [ "$ORIG_TODO" = "$NEW_TODO" ] \
@@ -63,7 +63,7 @@ build_rm_fixture "$RM_TMP"
   RC=$?
   set -e
   [ "$RC" = "1" ] || { echo "FAIL F36(b): not-found should exit 1, got $RC"; exit 1; }
-  echo "$ERR" | grep -q 'not found' \
+  grep -q 'not found' <<<"$ERR" \
     || { echo "FAIL F36(b): stderr missing 'not found': $ERR"; exit 1; }
 )
 
@@ -75,7 +75,7 @@ build_rm_fixture "$RM_TMP"
   RC=$?
   set -e
   [ "$RC" = "2" ] || { echo "FAIL F36(c): active-stream guard should exit 2, got $RC"; exit 1; }
-  echo "$ERR" | grep -q 'is active on branch hv/feature-f02' \
+  grep -q 'is active on branch hv/feature-f02' <<<"$ERR" \
     || { echo "FAIL F36(c): stderr missing branch name: $ERR"; exit 1; }
 )
 
@@ -111,7 +111,7 @@ build_rm_fixture "$RM_TMP"
   RC=$?
   set -e
   [ "$RC" = "0" ] || { echo "FAIL F36(e): --force active-stream should exit 0, got $RC"; exit 1; }
-  echo "$ERR" | grep -q 'warning: \[F02\] was active' \
+  grep -q 'warning: \[F02\] was active' <<<"$ERR" \
     || { echo "FAIL F36(e): stderr missing 'warning: [F02] was active': $ERR"; exit 1; }
   # The active entry whose only item was F02 must be dropped from status.json.
   python3 -c "
@@ -195,11 +195,11 @@ FIXEOF
   [ "$RC" = "0" ] || { echo "FAIL F36(h): multi-ID batch should exit 0, got $RC"; exit 1; }
   F01_LINE=$(grep '\[F01\]' .hv/BACKLOG.md) \
     || { echo "FAIL F36(h): surviving [F01] bullet missing from BACKLOG.md"; exit 1; }
-  echo "$F01_LINE" | grep -q '\[B01\]' \
+  grep -q '\[B01\]' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): [B01] cross-ref still on F01 line: $F01_LINE"; exit 1; }
-  echo "$F01_LINE" | grep -q '\[B02\]' \
+  grep -q '\[B02\]' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): [B02] cross-ref still on F01 line: $F01_LINE"; exit 1; }
-  echo "$F01_LINE" | grep -q 'Related:' \
+  grep -q 'Related:' <<<"$F01_LINE" \
     && { echo "FAIL F36(h): dangling 'Related:' remnant on F01 line: $F01_LINE"; exit 1; }
   true
 )

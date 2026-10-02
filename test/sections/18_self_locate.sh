@@ -98,28 +98,28 @@ UMB_TMP="$(mktemp -d)"
 
   # hv-base-branch: should error with umbrella hint
   if OUT=$("$BIN/hv-base-branch" 2>&1); then echo "FAIL: hv-base-branch should fail on umbrella"; exit 1; fi
-  echo "$OUT" | grep -q "umbrella" || { echo "FAIL: hv-base-branch error missing 'umbrella': $OUT"; exit 1; }
+  grep -q "umbrella" <<<"$OUT" || { echo "FAIL: hv-base-branch error missing 'umbrella': $OUT"; exit 1; }
 
   # hv-merge: should refuse without --repo
   if OUT=$(echo "msg" | "$BIN/hv-merge" feat-x 2>&1); then echo "FAIL: hv-merge should fail on umbrella"; exit 1; fi
-  echo "$OUT" | grep -q "requires --repo" || { echo "FAIL: hv-merge error missing '--repo': $OUT"; exit 1; }
+  grep -q "requires --repo" <<<"$OUT" || { echo "FAIL: hv-merge error missing '--repo': $OUT"; exit 1; }
 
   # hv-pr: should refuse without --repo
   if OUT=$(echo "body" | "$BIN/hv-pr" feat-x "title" 2>&1); then echo "FAIL: hv-pr should fail on umbrella"; exit 1; fi
-  echo "$OUT" | grep -q "requires --repo" || { echo "FAIL: hv-pr error missing '--repo': $OUT"; exit 1; }
+  grep -q "requires --repo" <<<"$OUT" || { echo "FAIL: hv-pr error missing '--repo': $OUT"; exit 1; }
 
   # hv-ship-body: should error with umbrella hint
   if OUT=$("$BIN/hv-ship-body" feat-x 2>&1); then echo "FAIL: hv-ship-body should fail on umbrella"; exit 1; fi
-  echo "$OUT" | grep -q "umbrella" || { echo "FAIL: hv-ship-body error missing 'umbrella': $OUT"; exit 1; }
+  grep -q "umbrella" <<<"$OUT" || { echo "FAIL: hv-ship-body error missing 'umbrella': $OUT"; exit 1; }
 
   # hv-review-scope: should error with umbrella hint
   if OUT=$("$BIN/hv-review-scope" feat-x 2>&1); then echo "FAIL: hv-review-scope should fail on umbrella"; exit 1; fi
-  echo "$OUT" | grep -q "umbrella" || { echo "FAIL: hv-review-scope error missing 'umbrella': $OUT"; exit 1; }
+  grep -q "umbrella" <<<"$OUT" || { echo "FAIL: hv-review-scope error missing 'umbrella': $OUT"; exit 1; }
 
   # hv-reconcile: should NOT abort at the upfront hv-base-branch call
   # (it should print valid JSON for an empty active list)
   OUT=$("$BIN/hv-reconcile" 2>&1) || { echo "FAIL: hv-reconcile aborted on umbrella: $OUT"; exit 1; }
-  echo "$OUT" | grep -q '"cleaned"' || { echo "FAIL: hv-reconcile didn't emit JSON: $OUT"; exit 1; }
+  grep -q '"cleaned"' <<<"$OUT" || { echo "FAIL: hv-reconcile didn't emit JSON: $OUT"; exit 1; }
 )
 rm -rf "$UMB_TMP"
 pass "B02 umbrella-cwd guards: 6 helpers refuse cleanly or operate correctly"

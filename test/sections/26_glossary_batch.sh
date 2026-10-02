@@ -66,9 +66,9 @@ cat > "$TMP_BATCH/.hv/knowledge-tier.json" <<'EOF'
 {"version": 1, "entries": {"Glossary::leaked": {"tier": "provisional", "hits": 5, "lastSeen": "2026-05-10"}, "Architecture::real": {"tier": "confirmed", "hits": 3, "lastSeen": "2026-05-10"}}}
 EOF
 LIST_OUT=$( cd "$TMP_BATCH" && "$BIN/hv-knowledge-tier" --list )
-echo "$LIST_OUT" | grep -q "Architecture" || fail "non-Glossary topic should appear in --list"
-echo "$LIST_OUT" | grep -q "Glossary" && fail "--list should filter Glossary entries"
-echo "$LIST_OUT" | grep -q "leaked" && fail "--list should filter leaked Glossary entries"
+grep -q "Architecture" <<<"$LIST_OUT" || fail "non-Glossary topic should appear in --list"
+if grep -q "Glossary" <<<"$LIST_OUT"; then fail "--list should filter Glossary entries"; fi
+if grep -q "leaked" <<<"$LIST_OUT"; then fail "--list should filter leaked Glossary entries"; fi
 pass "hv-knowledge-tier — Glossary skip enforced on --init/--get/--list"
 
 trap 'rm -rf "$TMP"' EXIT

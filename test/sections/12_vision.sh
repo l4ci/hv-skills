@@ -105,28 +105,28 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 TAGGED=$("$BIN/hv-todo-by-milestone" M01)
-echo "$TAGGED" | grep -qx "B60" || fail "hv-todo-by-milestone missed B60 (M01): '$TAGGED'"
-echo "$TAGGED" | grep -qx "F60" || fail "hv-todo-by-milestone missed F60 (M01): '$TAGGED'"
-echo "$TAGGED" | grep -qx "F61" && fail "hv-todo-by-milestone returned untagged F61"
+grep -qx "B60" <<<"$TAGGED" || fail "hv-todo-by-milestone missed B60 (M01): '$TAGGED'"
+grep -qx "F60" <<<"$TAGGED" || fail "hv-todo-by-milestone missed F60 (M01): '$TAGGED'"
+if grep -qx "F61" <<<"$TAGGED"; then fail "hv-todo-by-milestone returned untagged F61"; fi
 pass "hv-todo-by-milestone returns only tagged items"
 TAGGED2=$("$BIN/hv-todo-by-milestone" M02)
-echo "$TAGGED2" | grep -qx "F60" || fail "hv-todo-by-milestone missed F60 (M02 multi-tag)"
+grep -qx "F60" <<<"$TAGGED2" || fail "hv-todo-by-milestone missed F60 (M02 multi-tag)"
 pass "hv-todo-by-milestone handles multi-milestone tags"
 
 echo "hv-backlog regression: Milestone field doesn't leak into Related"
 OUT=$("$BIN/hv-backlog")
 B60_ROW=$(echo "$OUT" | grep " B60 ")
 # Related cell should be exactly "[F60]" (no Milestone bleed)
-echo "$B60_ROW" | grep -q "| \[F60\] |" || fail "B60 row Related cell looks wrong: $B60_ROW"
-echo "$B60_ROW" | grep -q "Milestone:" && fail "Milestone: leaked into a backlog row"
+grep -q "| \[F60\] |" <<<"$B60_ROW" || fail "B60 row Related cell looks wrong: $B60_ROW"
+if grep -q "Milestone:" <<<"$B60_ROW"; then fail "Milestone: leaked into a backlog row"; fi
 # Milestone column should appear when any item carries the field
-echo "$OUT" | grep -q "| Milestone |" || fail "backlog header missing Milestone column"
-echo "$OUT" | grep -q " M01, M02 " || fail "F60 multi-milestone cell missing"
+grep -q "| Milestone |" <<<"$OUT" || fail "backlog header missing Milestone column"
+grep -q " M01, M02 " <<<"$OUT" || fail "F60 multi-milestone cell missing"
 pass "backlog adds Milestone column without breaking Related parsing"
 
 echo "hv-summary surfaces active milestones"
 OUT=$("$BIN/hv-summary")
-echo "$OUT" | grep -q "Active milestones: M01" || fail "summary missing active milestone line: $OUT"
+grep -q "Active milestones: M01" <<<"$OUT" || fail "summary missing active milestone line: $OUT"
 pass "summary lists active milestones"
 
 # Reset summary fixtures (no Milestone field) to keep later assertions clean.
@@ -256,7 +256,7 @@ assert mss == {'M01'}, f'leak: {mss}'
 pass "hv-plan-list filters by milestone"
 
 SHOW=$("$BIN/hv-plan-show" M01-S01)
-echo "$SHOW" | grep -q "^# M01-S01 — Auth foundation" || fail "show output missing title"
+grep -q "^# M01-S01 — Auth foundation" <<<"$SHOW" || fail "show output missing title"
 pass "hv-plan-show prints content"
 
 if "$BIN/hv-plan-show" M99-S99 2>/dev/null; then
@@ -277,7 +277,7 @@ echo "hv-vision-show"
 
 # vision-show positive — M01 fixture exists from earlier in this section
 SHOW=$("$BIN/hv-vision-show" M01)
-echo "$SHOW" | grep -q "^id: M01$" || fail "hv-vision-show should print id: M01 frontmatter"
+grep -q "^id: M01$" <<<"$SHOW" || fail "hv-vision-show should print id: M01 frontmatter"
 pass "hv-vision-show prints M01 content"
 
 # vision-show miss — exit 1 with stderr
@@ -340,7 +340,7 @@ echo "hv-spike-show"
 
 # spike-show positive — sse-feasibility fixture exists from earlier in this block
 SHOW=$("$BIN/hv-spike-show" sse-feasibility)
-echo "$SHOW" | grep -q "^name: sse-feasibility$" || fail "hv-spike-show should print name: sse-feasibility frontmatter"
+grep -q "^name: sse-feasibility$" <<<"$SHOW" || fail "hv-spike-show should print name: sse-feasibility frontmatter"
 pass "hv-spike-show prints sse-feasibility content"
 
 # spike-show miss — exit 1 with stderr
@@ -376,7 +376,7 @@ EOF
 TRI_BUG=$("$BIN/hv-next-id" bugs)
 "$BIN/hv-append" "## Bugs" "- **[$TRI_BUG] [P1] Triangle bug.** Desc. Milestone: M01"
 TAGGED=$("$BIN/hv-todo-by-milestone" M01)
-echo "$TAGGED" | grep -qx "$TRI_BUG" || fail "triangle: $TRI_BUG not found in M01 items: '$TAGGED'"
+grep -qx "$TRI_BUG" <<<"$TAGGED" || fail "triangle: $TRI_BUG not found in M01 items: '$TAGGED'"
 pass "triangle: tagged bug surfaces in hv-todo-by-milestone M01"
 
 TRI_KEY=$("$BIN/hv-plan-add" M01 "$TRI_BUG" "Triangle bug fix")
@@ -418,7 +418,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 EOF
 TAGGED=$("$BIN/hv-todo-by-milestone" M01)
 for ID in B71 B72 B73; do
-  echo "$TAGGED" | grep -qx "$ID" || fail "field-order: $ID missing from M01 items (regex regressed?): '$TAGGED'"
+  grep -qx "$ID" <<<"$TAGGED" || fail "field-order: $ID missing from M01 items (regex regressed?): '$TAGGED'"
 done
 pass "hv-todo-by-milestone is order-agnostic across Detail/Related/Milestone"
 
@@ -438,20 +438,20 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 BL_OUT=$("$BIN/hv-backlog")
-echo "$BL_OUT" | grep -q "M01" || fail "hv-backlog field-order: Milestone column missing from output: '$BL_OUT'"
-echo "$BL_OUT" | grep "B74" | grep -q "M01" || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
-echo "$BL_OUT" | grep "B75" | grep -q "M01" || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
+grep -q "M01" <<<"$BL_OUT" || fail "hv-backlog field-order: Milestone column missing from output: '$BL_OUT'"
+echo "$BL_OUT" | grep "B74" | grep "M01" >/dev/null || fail "hv-backlog field-order: B74 (MS before Related) missing M01: '$BL_OUT'"
+echo "$BL_OUT" | grep "B75" | grep "M01" >/dev/null || fail "hv-backlog field-order: B75 (MS after Related) missing M01: '$BL_OUT'"
 pass "hv-backlog Milestone column correct regardless of field order"
 
 echo "archived milestone status"
 # Mint a fresh milestone, archive it, and verify exclusion + frontmatter + overview.
 ARCH_ID=$("$BIN/hv-vision-add" "Throwaway prototype" "Will be abandoned for testing.")
 ACTIVE_BEFORE=$("$BIN/hv-vision-active")
-echo "$ACTIVE_BEFORE" | grep -qx "$ARCH_ID" && fail "archived test: $ARCH_ID was active before archival (unexpected)"
+if grep -qx "$ARCH_ID" <<<"$ACTIVE_BEFORE"; then fail "archived test: $ARCH_ID was active before archival (unexpected)"; fi
 
 "$BIN/hv-vision-status" "$ARCH_ID" archived
 ACTIVE_AFTER=$("$BIN/hv-vision-active")
-echo "$ACTIVE_AFTER" | grep -qx "$ARCH_ID" && fail "archived: $ARCH_ID still appears in hv-vision-active"
+if grep -qx "$ARCH_ID" <<<"$ACTIVE_AFTER"; then fail "archived: $ARCH_ID still appears in hv-vision-active"; fi
 pass "archived milestone excluded from hv-vision-active"
 
 grep -q "^status: archived$" ".hv/milestones/$ARCH_ID.md" || fail "archived: frontmatter status not 'archived'"
@@ -491,7 +491,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 OUT_A=$("$BIN/hv-vision-empty-active")
-echo "$OUT_A" | grep -qx "$ID_M4" && fail "empty-active Case A: $ID_M4 should NOT appear when it has open items (got: '$OUT_A')"
+if grep -qx "$ID_M4" <<<"$OUT_A"; then fail "empty-active Case A: $ID_M4 should NOT appear when it has open items (got: '$OUT_A')"; fi
 pass "hv-vision-empty-active: active milestone with open items emits empty stdout"
 
 # Case B: active milestone with ZERO open items → helper emits the ID.
@@ -507,7 +507,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 EOF
 OUT_B=$("$BIN/hv-vision-empty-active")
-echo "$OUT_B" | grep -qx "$ID_M4" || fail "empty-active Case B: $ID_M4 should appear when it has no open items (got: '$OUT_B')"
+grep -qx "$ID_M4" <<<"$OUT_B" || fail "empty-active Case B: $ID_M4 should appear when it has no open items (got: '$OUT_B')"
 pass "hv-vision-empty-active: active milestone with zero open items is reported"
 
 # Case C: no active milestones at all → helper emits empty stdout.

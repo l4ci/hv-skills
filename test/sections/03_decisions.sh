@@ -22,8 +22,8 @@ EOF
 "$BIN/hv-managed-block" decisions >/dev/null
 grep -q "<!-- hv-decisions-start -->" CLAUDE.md || fail "hv-decisions managed block not in CLAUDE.md"
 grep -q "## Project Decisions" CLAUDE.md || fail "Project Decisions heading missing"
-grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Architecture" || fail "Architecture topic missing in decisions block"
-grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "^- Testing" || fail "Testing topic missing in decisions block"
+grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep "^- Architecture" >/dev/null || fail "Architecture topic missing in decisions block"
+grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep "^- Testing" >/dev/null || fail "Testing topic missing in decisions block"
 pass "decisions managed block created with topics"
 
 # Re-running should update in place, not duplicate
@@ -39,6 +39,6 @@ cat > .hv/DECISIONS.md <<'EOF'
 Hard boundaries for this project.
 EOF
 "$BIN/hv-managed-block" decisions >/dev/null
-grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md | grep -q "no decisions yet" || fail "empty-state placeholder missing"
+grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md | grep "no decisions yet" >/dev/null || fail "empty-state placeholder missing"
 pass "decisions block handles empty file"
 

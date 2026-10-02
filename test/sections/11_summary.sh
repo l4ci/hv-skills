@@ -26,10 +26,10 @@ cat > .hv/KNOWLEDGE.md <<'EOF'
 - t
 EOF
 OUT=$("$BIN/hv-summary")
-echo "$OUT" | grep -q "1 bug," || fail "bug count wrong: $OUT"
-echo "$OUT" | grep -q "2 features," || fail "feature count wrong: $OUT"
-echo "$OUT" | grep -q "0 tasks" || fail "task count wrong: $OUT"
-echo "$OUT" | grep -q "Recent: \[B01\]" || fail "recent completion missing: $OUT"
-echo "$OUT" | grep -q "Knowledge: 2 topics" || fail "knowledge topic count wrong: $OUT"
+grep -q "1 bug," <<<"$OUT" || fail "bug count wrong: $OUT"
+grep -q "2 features," <<<"$OUT" || fail "feature count wrong: $OUT"
+grep -q "0 tasks" <<<"$OUT" || fail "task count wrong: $OUT"
+grep -q "Recent: \[B01\]" <<<"$OUT" || fail "recent completion missing: $OUT"
+grep -q "Knowledge: 2 topics" <<<"$OUT" || fail "knowledge topic count wrong: $OUT"
 pass "summary reports backlog/recent/knowledge correctly"
 
