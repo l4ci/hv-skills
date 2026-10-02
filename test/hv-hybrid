@@ -14,7 +14,8 @@
 # the values of -C/--cwd/--repo skipped.
 #
 # Every call is logged to $HV_HYBRID_LOG (one "go <verb>" or "shim <verb>" line;
-# nothing when unset), so a run can prove which backend served which verb:
+# nothing when unset), so a run can prove which backend served which verb
+# ("stub <verb>" is a Go call that exited 71, not implemented):
 #   sort $HV_HYBRID_LOG | uniq -c
 import hashlib
 import os
@@ -93,7 +94,8 @@ def words(argv):
 def check():
     """Post-run acceptance check: HV_HYBRID_EXPECT=<group,...> names the verb
     groups, or verb paths such as "migrate v4", a phase owns. Fails (exit 1) unless the log has at least one Go call
-    for each group and no shim call for any of them. An unset log or an empty
+    for each group and no shim or stub call for any of them (a stub is a verb the
+    binary lists but answers with exit 71, not implemented). An unset log or an empty
     one cannot prove anything and fails too."""
     groups = [g for g in os.environ.get("HV_HYBRID_EXPECT", "").split(",") if g.strip()]
     log = os.environ.get("HV_HYBRID_LOG", "")
@@ -113,11 +115,15 @@ def check():
             return v == g or v.startswith(g + " ")
         go = sum(1 for b, v in lines if b == "go" and inside(v))
         shim = sorted({v for b, v in lines if b == "shim" and inside(v)})
+        stub = sorted({v for b, v in lines if b == "stub" and inside(v)})
         if go == 0:
             sys.stderr.write("hv-hybrid --check: no call to the %r group was served by Go\n" % g)
             bad = True
         for v in shim:
             sys.stderr.write("hv-hybrid --check: %r was served by the shim\n" % v)
+            bad = True
+        for v in stub:
+            sys.stderr.write("hv-hybrid --check: %r is a stub (the Go binary exited 71, not implemented)\n" % v)
             bad = True
         if not bad:
             sys.stderr.write("hv-hybrid --check: %-12s %d call(s) served by Go, none by the shim\n" % (g, go))
@@ -151,12 +157,21 @@ def main(argv):
             verb = ""
     backend = "go" if (verb or owned) else "shim"
     log = os.environ.get("HV_HYBRID_LOG")
-    if log:
-        with open(log, "a") as f:
-            f.write("%s %s\n" % (backend, verb or " ".join(w[:2])))
-    if verb or owned:
-        os.execv(go_bin, [go_bin] + argv)
-    os.execv(sys.executable, [sys.executable, SHIM] + argv)
+
+    def record(kind):
+        if log:
+            with open(log, "a") as f:
+                f.write("%s %s\n" % (kind, verb or " ".join(w[:2])))
+
+    if not (verb or owned):
+        record("shim")
+        os.execv(sys.executable, [sys.executable, SHIM] + argv)
+    # The binary lists a verb it has only registered: exit 71 (not_implemented)
+    # means Go did not serve it. Run it as a child to see the code, and log such
+    # a call as "stub" so --check cannot pass a phase on a stub.
+    rc = subprocess.run([go_bin] + argv).returncode
+    record("stub" if rc == 71 else "go")
+    sys.exit(rc if rc >= 0 else 128 - rc)
 
 
 if __name__ == "__main__":
