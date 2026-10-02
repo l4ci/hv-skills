@@ -1,0 +1,456 @@
+package backlog
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv-skills/v5/internal/pystr"
+)
+
+// Issue is the tracker's view of one issue (hvlib_tracker _norm).
+type Issue struct {
+	Number      int
+	Title, Body string
+	Labels      []string
+	Milestone   string // native milestone title, "" when none
+	State       string // "open" | "closed"
+	StateReason string // "completed" | "not_planned" | ""
+	ClosedAt    string // RFC 3339 or ""
+	URL         string
+	Assignees   []string
+}
+
+// Tracker is the narrow slice of internal/tracker that the item view needs.
+type Tracker interface {
+	// List returns the issues in the given state, "open" or "closed".
+	List(state string) ([]Issue, error)
+	// Get returns one issue; found is false when it does not exist.
+	Get(number int) (Issue, bool, error)
+}
+
+// Issues is the backlog served from an issue tracker, read-only
+// (IssueBackend in hvlib_backend.py). Rendered bullets keep the letter
+// ("[F12]"); only Item.ID drops it, since an issue number is the identity.
+type Issues struct {
+	Cfg     any     // loaded config, for the label names
+	Tracker Tracker // where the issues come from
+	Repo    string  // umbrella sub-repo name, "" otherwise
+}
+
+// Name is "issues".
+func (b *Issues) Name() string { return "issues" }
+
+// Letter is the item type of an issue: the letter of the first type label it
+// carries, else "T" (_letter).
+func (b *Issues) Letter(is Issue) string {
+	for _, c := range []struct{ letter, role string }{{"B", "types.bug"}, {"F", "types.feature"}, {"T", "types.task"}} {
+		if slices.Contains(is.Labels, config.Label(b.Cfg, c.role)) {
+			return c.letter
+		}
+	}
+	return "T"
+}
+
+// IsMilestoneTracker reports whether the issue is a milestone tracking issue,
+// which is not an item (_is_tracker).
+func (b *Issues) IsMilestoneTracker(is Issue) bool {
+	return slices.Contains(is.Labels, config.Label(b.Cfg, "milestoneTracker"))
+}
+
+// tag is the priority (bugs) or size (features) taken from the labels (_tag).
+func (b *Issues) tag(is Issue, letter string) string {
+	switch letter {
+	case "B":
+		pre := config.Label(b.Cfg, "priorityPrefix")
+		for _, l := range is.Labels {
+			rest, ok := strings.CutPrefix(l, pre)
+			if ok && rest != "" && allDigits(rest) {
+				return "P" + rest
+			}
+		}
+	case "F":
+		pre := config.Label(b.Cfg, "sizePrefix")
+		for _, l := range is.Labels {
+			if strings.HasPrefix(l, pre) && len(l) > len(pre) {
+				return l[len(pre):]
+			}
+		}
+	}
+	return ""
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if !pystr.IsDigit(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// oneLine collapses whitespace runs to one space and strips (_one_line).
+func oneLine(s string) string {
+	return pystr.Strip(spaceRun.ReplaceAllString(s, " "))
+}
+
+var spaceRun = regexp.MustCompile(`[` + pystr.SpaceClass + `]+`)
+
+// kv is one rendered field, in render order.
+type kv struct{ name, value string }
+
+// blockFields are the fields that live in the issue body block: everything the
+// tracker does not supply (Milestone, Detail).
+var blockFields = []string{"Related", "Repos", "Subsystem", "Captured", "Since"}
+
+// milestone is the hv ID of the issue's native milestone ("M07" out of
+// "M07 — Title"), the whole title when it has none, else the body block's.
+func milestone(is Issue, block map[string]string) string {
+	if title := oneLine(is.Milestone); title != "" {
+		if m := milestoneRe.FindString(title); m != "" {
+			return m
+		}
+		return title
+	}
+	return block["Milestone"]
+}
+
+var milestoneRe = regexp.MustCompile(`\AM\p{Nd}+`)
+
+// fields renders the field values in canonical order, Milestone first (_fields).
+func (b *Issues) fields(is Issue, block map[string]string) []kv {
+	var out []kv
+	if ms := milestone(is, block); ms != "" {
+		out = append(out, kv{"Milestone", ms})
+	}
+	for _, name := range blockFields {
+		if v := block[name]; v != "" {
+			if name == "Related" {
+				v = bracketIDs(v)
+			}
+			out = append(out, kv{name, v})
+		}
+	}
+	if b.Repo != "" {
+		for i := range out {
+			if out[i].name == "Repos" {
+				out[i].value = b.Repo
+				return out
+			}
+		}
+		out = append(out, kv{"Repos", b.Repo})
+	}
+	return out
+}
+
+// bracketIDs turns "F12, B03" into "[F12], [B03]" so Related matches the file
+// grammar: (?<![\[\w])([BFT]\d+)(?![\]\w]).
+func bracketIDs(v string) string {
+	var out strings.Builder
+	for i := 0; i < len(v); {
+		r, n := utf8.DecodeRuneInString(v[i:])
+		if n == 1 && strings.IndexByte(ItemLetters, v[i]) >= 0 {
+			prev, _ := utf8.DecodeLastRuneInString(v[:i])
+			j, digits := i+1, 0
+			for j < len(v) {
+				d, dn := utf8.DecodeRuneInString(v[j:])
+				if !pystr.IsDigit(d) {
+					break
+				}
+				j += dn
+				digits++
+			}
+			next, _ := utf8.DecodeRuneInString(v[j:])
+			before := i == 0 || (prev != '[' && !pystr.IsWord(prev))
+			after := j == len(v) || (next != ']' && !pystr.IsWord(next))
+			if digits > 0 && before && after {
+				out.WriteString("[" + v[i:j] + "]")
+				i = j
+				continue
+			}
+		}
+		out.WriteRune(r)
+		i += n
+	}
+	return out.String()
+}
+
+// bulletInner is `**[F3] [Major] Title.** text Milestone: M07 ...` for one
+// issue (_bullet_inner).
+func (b *Issues) bulletInner(is Issue) string {
+	letter := b.Letter(is)
+	text, block, _ := ParseFieldsBlock(is.Body)
+	title := oneLine(strings.ReplaceAll(is.Title, "*", ""))
+	if title == "" {
+		title = "(untitled)"
+	}
+	if last, _ := utf8.DecodeLastRuneInString(title); !strings.ContainsRune(".!?", last) {
+		title += "."
+	}
+	head := "**[" + letter + strconv.Itoa(is.Number) + "] "
+	if tag := b.tag(is, letter); tag != "" {
+		head += "[" + tag + "] "
+	}
+	head += title + "**"
+
+	desc := ""
+	for _, p := range paraSplit.Split(text, -1) {
+		if pystr.Strip(p) != "" {
+			desc = oneLine(p)
+			break
+		}
+	}
+	if rs := []rune(desc); len(rs) > 200 {
+		desc = pystr.Rstrip(string(rs[:199])) + "…"
+	}
+	parts := []string{head}
+	if desc != "" {
+		parts = append(parts, desc)
+	}
+	for _, f := range b.fields(is, block) {
+		parts = append(parts, f.name+": "+f.value)
+	}
+	return strings.Join(parts, " ")
+}
+
+var paraSplit = regexp.MustCompile(`\n[` + pystr.SpaceClass + `]*\n`)
+
+// doneLine is the closed form of the bullet (_done_line).
+func (b *Issues) doneLine(is Issue) string {
+	date := is.ClosedAt
+	if date == "" {
+		date = "1970-01-01"
+	}
+	if rs := []rune(date); len(rs) > 10 {
+		date = string(rs[:10])
+	}
+	suffix := ""
+	if is.StateReason == "not_planned" {
+		suffix = " (dropped)"
+	}
+	return "- ~~" + b.bulletInner(is) + "~~ Done " + date + " [`#" + strconv.Itoa(is.Number) + "`]" + suffix
+}
+
+// openByLetter is the open item bullets by type letter, each section sorted by
+// issue number.
+func (b *Issues) openByLetter() (map[string][]string, error) {
+	issues, err := b.Tracker.List("open")
+	if err != nil {
+		return nil, err
+	}
+	var items []Issue
+	for _, is := range issues {
+		if !b.IsMilestoneTracker(is) {
+			items = append(items, is)
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Number < items[j].Number })
+	out := map[string][]string{"B": nil, "F": nil, "T": nil}
+	for _, is := range items {
+		l := b.Letter(is)
+		out[l] = append(out[l], "- "+b.bulletInner(is))
+	}
+	return out, nil
+}
+
+// closedLines is the Done lines of the closed items, newest first.
+func (b *Issues) closedLines() ([]string, error) {
+	issues, err := b.Tracker.List("closed")
+	if err != nil {
+		return nil, err
+	}
+	var items []Issue
+	for _, is := range issues {
+		if !b.IsMilestoneTracker(is) {
+			items = append(items, is)
+		}
+	}
+	// reverse=True with a stable sort keeps the input order of equal keys.
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].ClosedAt != items[j].ClosedAt {
+			return items[i].ClosedAt > items[j].ClosedAt
+		}
+		return items[i].Number > items[j].Number
+	})
+	out := make([]string, len(items))
+	for i, is := range items {
+		out[i] = b.doneLine(is)
+	}
+	return out, nil
+}
+
+var sectionForLetter = map[string]string{"B": "Bugs", "F": "Features", "T": "Tasks"}
+
+// Markdown renders the backlog as BACKLOG.md-shaped text: the open issues by
+// type, then the newest closedLimit closed ones as Done lines (all when
+// closedLimit is negative, none when 0). The usual caller passes 20.
+func (b *Issues) Markdown(closedLimit int) (string, error) {
+	if b.Tracker == nil {
+		return "", errors.New("issues backend has no tracker")
+	}
+	sections, err := b.openByLetter()
+	if err != nil {
+		return "", err
+	}
+	var done []string
+	if closedLimit != 0 {
+		if done, err = b.closedLines(); err != nil {
+			return "", err
+		}
+		if closedLimit > 0 && len(done) > closedLimit {
+			done = done[:closedLimit]
+		}
+	}
+	out := []string{"# Backlog", ""}
+	for _, l := range ItemLetters {
+		bullets := sections[string(l)]
+		out = append(out, "## "+sectionForLetter[string(l)], "")
+		out = append(out, bullets...)
+		if len(bullets) > 0 {
+			out = append(out, "")
+		}
+	}
+	out = append(out, "## Completed", "")
+	out = append(out, done...)
+	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n", nil
+}
+
+// lookup finds the issue behind ref, or reports not found for a malformed
+// reference, an absent issue, a milestone tracking issue or a type-letter
+// mismatch (_lookup). Other tracker failures are returned as they are.
+func (b *Issues) lookup(ref string) (Issue, bool, error) {
+	if b.Tracker == nil {
+		return Issue{}, false, errors.New("issues backend has no tracker")
+	}
+	n, letter, err := resolveItemRef(ref)
+	if err != nil {
+		return Issue{}, false, nil
+	}
+	is, found, err := b.Tracker.Get(n)
+	if err != nil || !found {
+		return Issue{}, false, err
+	}
+	if b.IsMilestoneTracker(is) || (letter != "" && letter != b.Letter(is)) {
+		return Issue{}, false, nil
+	}
+	return is, true, nil
+}
+
+// Get returns the item behind ref ("12", "#12" or "F12"). The error wraps
+// ErrNotFound when there is no such item. Fields.Detail is the issue URL.
+func (b *Issues) Get(ref string) (*Item, error) {
+	is, ok, err := b.lookup(ref)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, ref)
+	}
+	_, block, _ := ParseFieldsBlock(is.Body)
+	letter := b.Letter(is)
+	it := &Item{
+		ID:     strconv.Itoa(is.Number),
+		Type:   letter,
+		Tag:    b.tag(is, letter),
+		Title:  pystr.Strip(strings.TrimRight(oneLine(strings.ReplaceAll(is.Title, "*", "")), ".")),
+		Closed: is.State == "closed",
+		Number: is.Number,
+		URL:    is.URL,
+	}
+	if it.Title == "" {
+		it.Title = "(untitled)"
+	}
+	if b.Repo != "" {
+		it.ID = b.Repo + ":" + it.ID
+	}
+	for _, f := range b.fields(is, block) {
+		it.Fields.set(strings.ToLower(f.name), f.value)
+	}
+	it.Fields.Detail = is.URL
+	if it.Closed {
+		it.Reason = "done"
+		if is.StateReason == "not_planned" {
+			it.Reason = "dropped"
+		}
+		it.Line = b.doneLine(is)
+	} else {
+		it.Line = "- " + b.bulletInner(is)
+	}
+	return it, nil
+}
+
+// Detail returns the issue body without its fields block; ok is false when
+// the issue is unknown or the text is blank.
+func (b *Issues) Detail(ref string) (string, bool, error) {
+	is, ok, err := b.lookup(ref)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	text, _, _ := ParseFieldsBlock(is.Body)
+	if pystr.Strip(text) == "" {
+		return "", false, nil
+	}
+	return text, true, nil
+}
+
+var (
+	fieldsBlockRe = regexp.MustCompile(`(?s)\n*<!-- hv:fields\n(.*?)\n?-->[ \t]*\n*\z`)
+	fieldLineRe   = regexp.MustCompile(`\A([A-Za-z]+):[ \t]*(.*?)[ \t]*\z`)
+)
+
+// fieldsOpen opens the trailing fields comment of an issue body.
+const fieldsOpen = "<!-- hv:fields"
+
+// ParseFieldsBlock splits an issue body into its text and the trailing
+// "<!-- hv:fields ... -->" comment, one "Name: value" per line
+// (parse_fields_block). order lists the field names in block order; a name
+// that repeats keeps its first position and its last value. Without a block
+// the text is the body (CRLF turned into LF) and fields is empty.
+func ParseFieldsBlock(body string) (text string, fields map[string]string, order []string) {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	fields = map[string]string{}
+	loc := fieldsBlockRe.FindStringSubmatchIndex(body)
+	if loc == nil {
+		return body, fields, nil
+	}
+	for _, line := range strings.Split(body[loc[2]:loc[3]], "\n") {
+		m := fieldLineRe.FindStringSubmatch(line)
+		if m == nil || m[2] == "" {
+			continue
+		}
+		if _, seen := fields[m[1]]; !seen {
+			order = append(order, m[1])
+		}
+		fields[m[1]] = m[2]
+	}
+	return body[:loc[0]], fields, order
+}
+
+// RenderFieldsBlock is the inverse of ParseFieldsBlock: it appends the block
+// to text, writing the fields named in names (in that order) whose value is
+// not blank once whitespace is collapsed (render_fields_block). With no such
+// field the block is left out. It round-trips exactly for text without
+// trailing newlines.
+func RenderFieldsBlock(text string, names []string, values map[string]string) string {
+	text = strings.TrimRight(text, "\n")
+	var lines []string
+	for _, k := range names {
+		if v := oneLine(values[k]); v != "" {
+			lines = append(lines, k+": "+v)
+		}
+	}
+	if len(lines) == 0 {
+		return text
+	}
+	block := fieldsOpen + "\n" + strings.Join(lines, "\n") + "\n-->"
+	if text == "" {
+		return block
+	}
+	return text + "\n\n" + block
+}
