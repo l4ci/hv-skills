@@ -228,11 +228,13 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 			return res, fail(ExitUsage, "work.workerCommand cannot be parsed (unbalanced quote?): "+launch)
 		}
 		if bad != "" {
-			return res, fail(ExitRefused, fmt.Sprintf("work.workerCommand contains '%s', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it.", bad))
+			e := fail(ExitRefused, fmt.Sprintf("work.workerCommand contains '%s', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it.", bad))
+			e.Data = BlockData{BlockedBy: "resume-flag"}
+			return res, e
 		}
 		// Refuse a slot that still holds work, before its session is killed.
 		if _, err := e.Reset(root, o.Slot, o.Task, true); err != nil {
-			return res, resetRefusal(err)
+			return res, resetRefusal(err, false)
 		}
 		// Fresh session every task dispatch. The kill must be provable: a
 		// window that survives it would run beside the new one.
@@ -244,7 +246,8 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 		// leave its handle in the registry for a poll or relay to chase.
 		if _, err := e.Reset(root, o.Slot, o.Task, false); err != nil {
 			clearHandle(root, o.Slot)
-			return res, resetRefusal(err)
+			// The old session was killed and its handle cleared on the way here.
+			return res, resetRefusal(err, true)
 		}
 		handle, err = h.Spawn(ctx, host.SpawnOpts{Slot: o.Slot, Session: session, Cwd: worktree,
 			ConfigDir: configDir, Launch: launch, BootTimeout: timeout})
@@ -318,12 +321,19 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 
 // resetRefusal maps a reset-guard error onto dispatch's exits: a slot holding
 // work is a refusal (4), anything else keeps its own exit.
-func resetRefusal(err error) error {
+func resetRefusal(err error, changed bool) error {
 	var we *Error
 	if errors.As(err, &we) && we.Data != nil {
-		return &Error{Exit: ExitRefused, Message: we.Message}
+		return &Error{Exit: ExitRefused, Message: we.Message, Data: BlockData{BlockedBy: "slot-holds-work", Changed: changed}}
 	}
 	return err
+}
+
+// BlockData is the failure data of an exit-4 refusal: what blocked it and
+// whether the verb changed state on the way (contract: exit 4 data).
+type BlockData struct {
+	BlockedBy string
+	Changed   bool
 }
 
 // relaySummary is the first non-blank line of the brief that is not the

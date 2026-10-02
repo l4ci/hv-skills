@@ -511,3 +511,29 @@ func hostDeps(run host.Runner, env map[string]string) host.Deps {
 		LookPath: func(n string) (string, error) { return "/fake/" + n, nil }, KillWait: 2,
 	}
 }
+
+// Contract: an exit-4 refusal carries {blockedBy, changed}. The resume-flag
+// refusal changes nothing; a slot holding work is refused before the kill.
+func TestDispatchRefusalsCarryFailureData(t *testing.T) {
+	data := func(err error) BlockData {
+		we, ok := err.(*Error)
+		if !ok {
+			t.Fatalf("err = %v", err)
+		}
+		bd, _ := we.Data.(BlockData)
+		return bd
+	}
+	dir := newProject(t, `{"work":{"workerCommand":"claude -c"}}`)
+	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
+	_, err := envWith(tmuxFake()).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "t"), Task: "T1"})
+	if bd := data(err); bd != (BlockData{BlockedBy: "resume-flag"}) {
+		t.Errorf("resume flag: %+v", bd)
+	}
+	dir = newProject(t, `{}`)
+	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
+	os.WriteFile(filepath.Join(dir, ".worktrees", "w1", "wip.txt"), []byte("x"), 0o644)
+	_, err = envWith(tmuxFake()).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "t"), Task: "T2"})
+	if bd := data(err); bd != (BlockData{BlockedBy: "slot-holds-work"}) {
+		t.Errorf("slot holds work: %+v", bd)
+	}
+}

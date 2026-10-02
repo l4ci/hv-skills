@@ -392,3 +392,16 @@ func TestWorkerGateVerb(t *testing.T) {
 		t.Errorf("re-gating a merged slot: %d, want 1 (stale)", code)
 	}
 }
+
+func TestWorkerDispatchRefusalEnvelopeCarriesData(t *testing.T) {
+	dir := workerProject(t, `{"work":{"workerCommand":"claude --resume"}}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	useHost(t, &cliHost{inSession: true})
+	brief := filepath.Join(t.TempDir(), "b.md")
+	os.WriteFile(brief, []byte("x"), 0o644)
+	code, out, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T1", "--json")
+	d := data(t, out)
+	if code != 4 || d["blockedBy"] != "resume-flag" || d["changed"] != false {
+		t.Errorf("%d %s", code, out)
+	}
+}
