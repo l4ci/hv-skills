@@ -355,7 +355,7 @@ func a4FieldGet(fs *flag.FlagSet) RunFunc {
 			return a4Fail(err)
 		}
 		v := a4FieldValue(it, *name)
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "field", *name, "value", v), Text: v}, nil
+		return Result{Data: a4Obj("id", it.ID, "type", it.Type, "field", *name, "value", v), Text: v}, nil
 	}
 }
 
@@ -381,7 +381,7 @@ func a4FieldList(fs *flag.FlagSet) RunFunc {
 			fields.Set(n, a4FieldValue(it, n))
 		}
 		text, _ := jsonx.MarshalCompact(fields)
-		return Result{Data: a4Obj("id", args[0], "type", a4Type(args[0]), "fields", fields), Text: string(text)}, nil
+		return Result{Data: a4Obj("id", it.ID, "type", it.Type, "fields", fields), Text: string(text)}, nil
 	}
 }
 
