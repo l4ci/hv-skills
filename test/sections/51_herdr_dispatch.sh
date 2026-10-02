@@ -1,4 +1,4 @@
-echo "hv-worker-* — herdr dispatch backend (work.dispatch: herdr)"
+echo "worker verbs — herdr dispatch backend (work.dispatch: herdr)"
 # Covers the herdr host against a FAKE `herdr` on PATH: canned JSON replies in
 # the shapes `herdr api schema --json` documents (protocol 22), errors as JSON
 # on stderr with exit 1. A live herdr server stays a manual gate — tabs and
@@ -76,7 +76,7 @@ slot_field() {
 }
 
 # ── (a) pool ────────────────────────────────────────────────────────────────
-hd "$BIN/hv-worker-pool" init --slots 2 --base main >/dev/null || fail "hv-worker-pool init failed under herdr"
+hd "$HV_BIN" worker pool init --slots 2 --base main >/dev/null || fail "worker pool init failed under herdr"
 [ "$(slot_field w1 handle)" = "None" ] \
   || fail "herdr pool slot should start with a null handle (tab ids exist only after dispatch), got $(slot_field w1 handle)"
 python3 - "$TMP_HD/repo/.hv/workers.json" <<'PY'
@@ -85,10 +85,10 @@ p = sys.argv[1]; d = json.load(open(p))
 s = d["slots"][1]; s.pop("handle", None); s["window"] = "hv:w2"
 json.dump(d, open(p, "w"))
 PY
-hd "$BIN/hv-worker-pool" init --slots 2 --base main >/dev/null || fail "hv-worker-pool re-init failed"
+hd "$HV_BIN" worker pool init --slots 2 --base main >/dev/null || fail "worker pool re-init failed"
 [ "$(slot_field w2 handle)" = "hv:w2" ] || fail "init did not migrate window -> handle, got $(slot_field w2 handle)"
 [ "$(slot_field w2 window)" = "None" ] || fail "init left the legacy window field behind"
-pass "hv-worker-pool: herdr slots start without a handle; init migrates window -> handle"
+pass "worker pool: herdr slots start without a handle; init migrates window -> handle"
 
 # ── (b) dispatch ────────────────────────────────────────────────────────────
 WT1="$(slot_field w1 worktree)"
@@ -100,7 +100,7 @@ json.dump(d, open(p, "w"))
 PY
 echo "do the task" > "$TMP_HD/brief.md"
 : >"$FAKE/log"
-OUT="$(hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --task T1)" \
+OUT="$(hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --task T1)" \
   || fail "herdr dispatch failed: $OUT"
 grep -q "^tab create --workspace w9 --cwd $WT1 --label w1 --no-focus --env CLAUDE_CONFIG_DIR=/acct/one\$" "$FAKE/log" \
   || fail "tab create must adopt the slot worktree with the account env; log: $(cat "$FAKE/log")"
@@ -111,18 +111,18 @@ grep -q '^do the task --wait --until working --until blocked --timeout 60000$' "
 [ "$(slot_field w1 handle)" = "w9:t7" ] || fail "dispatch did not record the tab id as handle"
 [ "$(slot_field w1 task)" = "T1" ] || fail "dispatch did not record slot.task"
 [ "$(slot_field w1 state)" = "busy" ] || fail "dispatch did not set slot.state=busy"
-pass "hv-worker-dispatch: tab create -> agent start -> confirmed prompt; handle, task, state recorded"
+pass "worker dispatch: tab create -> agent start -> confirmed prompt; handle, task, state recorded"
 
 : >"$FAKE/log"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --task T2 >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --task T2 >/dev/null \
   || fail "herdr re-dispatch failed"
 grep -q '^agent prompt hv-w1-w9-t7 /exit$' "$FAKE/log" || fail "re-dispatch did not /exit the old session"
 grep -q '^tab close w9:t7$' "$FAKE/log" || fail "re-dispatch did not close the old tab"
 [ "$(slot_field w1 handle)" = "w9:t8" ] || fail "re-dispatch did not record the new tab"
-pass "hv-worker-dispatch: a task re-dispatch closes the old tab and starts fresh"
+pass "worker dispatch: a task re-dispatch closes the old tab and starts fresh"
 
 : >"$FAKE/log"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --relay >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --relay >/dev/null \
   || fail "herdr relay failed"
 if grep -q '^tab \|^agent start' "$FAKE/log"; then
   fail "a relay must go into the running session, not a fresh one; log: $(cat "$FAKE/log")"
@@ -138,9 +138,9 @@ d["slots"][1]["handle"] = None
 json.dump(d, open(p, "w"))
 PY
 RC=0
-hd "$BIN/hv-worker-dispatch" --slot w2 --brief-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
+hd "$HV_BIN" worker dispatch w2 --body-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
 [ "$RC" = "3" ] || fail "relay into a never-dispatched herdr slot should exit 3, got $RC"
-pass "hv-worker-dispatch --relay reuses the live session and keeps the relay marker"
+pass "worker dispatch --relay reuses the live session and keeps the relay marker"
 
 # ── (b1) provenance: signature + relay log ──────────────────────────────────
 relays_json() { slot_field "$1" relays; }
@@ -150,7 +150,7 @@ r = json.load(open(sys.argv[1]))["slots"][0]["relays"]
 assert len(r) == 1 and r[0]["round"] == 1 and r[0]["summary"] == "do the task" and r[0]["ts"].endswith("Z"), r
 PY
 printf 'use the per-user cache\n' > "$TMP_HD/answer.md"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/answer.md" --relay --round 3 >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/answer.md" --relay --round 3 >/dev/null \
   || fail "relay with --round failed"
 [ "$(head -n 1 "$FAKE/last_prompt")" = "--- ORCHESTRATOR (round 3) ---" ] || fail "--round must set the signature"
 python3 - "$TMP_HD/repo/.hv/workers.json" <<'PY' || fail "relays[] must hold both relays, newest round 3 with its summary"
@@ -160,28 +160,28 @@ r = d["slots"][0]["relays"]
 assert d["round"] == 3 and [x["round"] for x in r] == [1, 3] and r[1]["summary"] == "use the per-user cache", d
 PY
 # A task brief is signed too, and a new task starts a clean relay log.
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --task T3 >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --task T3 >/dev/null \
   || fail "T3 dispatch failed"
 [ "$(head -n 1 "$FAKE/last_prompt")" = "--- ORCHESTRATOR (round 3) ---" ] \
   || fail "a task brief must open with the signature, got: $(head -n 1 "$FAKE/last_prompt")"
 [ "$(relays_json w1)" = "[]" ] || fail "a new task dispatch must reset relays[], got $(relays_json w1)"
 # A refused relay (dialog up, nothing sent) is not logged.
 echo agent_blocked > "$FAKE/prompt_error"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/answer.md" --relay >/dev/null 2>&1 || true
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/answer.md" --relay >/dev/null 2>&1 || true
 rm -f "$FAKE/prompt_error"
 [ "$(relays_json w1)" = "[]" ] || fail "a relay refused by a dialog must not be logged"
-pass "hv-worker-dispatch signs every payload with the round and logs relays in relays[]"
+pass "worker dispatch signs every payload with the round and logs relays in relays[]"
 
 RC=0
 ( cd "$TMP_HD/repo" && PATH="$FAKE/bin:$PATH" FAKE_HERDR="$FAKE" env -u HERDR_ENV \
-    "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" ) >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "herdr dispatch from outside a herdr pane should exit 3, got $RC"
+    "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" ) >/dev/null 2>&1 || RC=$?
+[ "$RC" = "5" ] || fail "herdr dispatch from outside a herdr pane should exit 5 (host not usable), got $RC"
 
 cp "$TMP_HD/repo/.hv/config.json" "$TMP_HD/config.bak"
 printf '{"work":{"dispatch":"herdr","workerCommand":"FOO=1 claude --model haiku --settings s.json"}}\n' \
   > "$TMP_HD/repo/.hv/config.json"
 : >"$FAKE/log"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null \
   || fail "dispatch with a custom workerCommand failed"
 grep -q -- '--env FOO=1 --env CLAUDE_CONFIG_DIR=/acct/one$' "$FAKE/log" \
   || fail "leading env assignments in workerCommand must become tab --env; log: $(cat "$FAKE/log")"
@@ -189,10 +189,10 @@ grep -q -- '-- --model haiku --settings s.json$' "$FAKE/log" \
   || fail "workerCommand args must pass through to agent start; log: $(cat "$FAKE/log")"
 printf '{"work":{"dispatch":"herdr","workerCommand":"my-wrapper --x"}}\n' > "$TMP_HD/repo/.hv/config.json"
 RC=0
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "a workerCommand that does not run claude should exit 3 under herdr, got $RC"
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null 2>&1 || RC=$?
+[ "$RC" = "5" ] || fail "a workerCommand that does not run claude should exit 5 under herdr, got $RC"
 cp "$TMP_HD/config.bak" "$TMP_HD/repo/.hv/config.json"
-pass "hv-worker-dispatch: outside herdr refused; workerCommand env + args map onto tab/agent start"
+pass "worker dispatch: outside herdr refused; workerCommand env + args map onto tab/agent start"
 
 # ── (c) startup dialogs ─────────────────────────────────────────────────────
 # Bypass Permissions puts "No, exit" first; folder trust puts "Yes" first. A
@@ -200,25 +200,28 @@ pass "hv-worker-dispatch: outside herdr refused; workerCommand env + args map on
 printf 'WARNING: Claude Code running in Bypass Permissions mode\n ❯ 1. No, exit\n   2. Yes, I accept\n' > "$TMP_HD/bypass.txt"
 printf 'Do you trust this folder?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n' > "$TMP_HD/trust.txt"
 printf 'Pick a colour\n ❯ 1. Red\n   2. Blue\n' > "$TMP_HD/other.txt"
+# white-box: kept until the A7 Go unit test lands (#51), then delete
 K1="$( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/bypass.txt" )"
+# white-box: kept until the A7 Go unit test lands (#51), then delete
 K2="$( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/trust.txt" )"
 [ "$K1" = "down enter" ] || fail "bypass dialog should be answered 'down enter', got '$K1'"
 [ "$K2" = "enter" ] || fail "trust dialog should be answered 'enter', got '$K2'"
 RC=0
+# white-box: kept until the A7 Go unit test lands (#51), then delete
 ( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/other.txt" ) >/dev/null || RC=$?
 [ "$RC" = "1" ] || fail "an unknown dialog must not be answered, got exit $RC"
 
 touch "$FAKE/start_not_ready"
 cp "$TMP_HD/bypass.txt" "$FAKE/pane.txt"
 : >"$FAKE/log"
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null \
   || fail "dispatch through a startup dialog failed"
 grep -q '^agent send-keys hv-w1-w9-t1[0-9] down enter$' "$FAKE/log" \
   || fail "dispatch did not answer the bypass dialog from the pane; log: $(cat "$FAKE/log")"
 cp "$TMP_HD/other.txt" "$FAKE/pane.txt"
 RC=0
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "dispatch stuck on an unknown startup dialog should exit 3, got $RC"
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null 2>&1 || RC=$?
+[ "$RC" = "5" ] || fail "dispatch stuck on an unknown startup dialog should exit 5, got $RC"
 rm -f "$FAKE/start_not_ready"
 : >"$FAKE/pane.txt"
 pass "startup dialogs are answered by reading the pane, unknown ones refused"
@@ -226,18 +229,18 @@ pass "startup dialogs are answered by reading the pane, unknown ones refused"
 # ── (d) prompt errors ───────────────────────────────────────────────────────
 # The refused dialog above left the slot without a session (its handle is
 # cleared), so start one for the relays below to land in.
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" >/dev/null \
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null \
   || fail "re-dispatch after a failed spawn did not start a session"
 echo agent_blocked > "$FAKE/prompt_error"
 RC=0
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
 [ "$RC" = "5" ] || fail "agent_blocked should exit 5 (dialog up, nothing sent), got $RC"
 echo agent_prompt_stalled > "$FAKE/prompt_error"
 RC=0
-hd "$BIN/hv-worker-dispatch" --slot w1 --brief-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
-[ "$RC" = "4" ] || fail "agent_prompt_stalled should exit 4 (never picked up), got $RC"
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" --relay >/dev/null 2>&1 || RC=$?
+[ "$RC" = "6" ] || fail "agent_prompt_stalled should exit 6 (never picked up, safe to resend), got $RC"
 rm -f "$FAKE/prompt_error"
-pass "hv-worker-dispatch maps agent_blocked to exit 5 and agent_prompt_stalled to exit 4"
+pass "worker dispatch maps agent_blocked to exit 5 and agent_prompt_stalled to exit 6"
 
 # ── (e) poll ────────────────────────────────────────────────────────────────
 FX="$TMP_HD/fx"
@@ -249,59 +252,60 @@ printf 'API Error: 529 Overloaded\n' > "$FX/dead.txt"
 printf "You've reached your usage limit\n" > "$FX/limited.txt"
 check_map() {
   local fx="$1" status="$2" want="$3" got
-  got="$( cd "$TMP_HD/repo" && "$BIN/hv-worker-poll" --fixture "$FX/$fx" --slot w1 --status "$status" \
-          | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["state"])' )"
+  got="$( cd "$TMP_HD/repo" && HV_TEST_POLL_FIXTURE="$FX/$fx" HV_TEST_POLL_STATUS="$status" \
+          "$HV_BIN" --json worker poll w1 | jget 'data.slots[0].state' )"
   [ "$got" = "$want" ] || fail "herdr $status + $fx: expected $want, got $got"
 }
-check_map plain.txt   working BUSY
-check_map plain.txt   blocked NEEDS-PERMISSION
-check_map blocked.txt blocked BLOCKED
-check_map done.txt    idle    DONE
-check_map done.txt    working DONE
-check_map plain.txt   idle    IDLE
-check_map plain.txt   done    IDLE
-check_map plain.txt   unknown UNKNOWN
-check_map dead.txt    unknown DEAD
-check_map plain.txt   gone    DEAD
-check_map limited.txt working LIMITED
-pass "hv-worker-poll maps herdr agent states (sentinels win; unknown is never done)"
+check_map plain.txt   working busy
+check_map plain.txt   blocked needs-permission
+check_map blocked.txt blocked blocked
+check_map done.txt    idle    done
+check_map done.txt    working done
+check_map plain.txt   idle    idle
+check_map plain.txt   done    idle
+check_map plain.txt   unknown unknown
+check_map dead.txt    unknown dead
+check_map plain.txt   gone    dead
+check_map limited.txt working limited
+pass "worker poll maps herdr agent states (sentinels win; unknown is never done)"
 
 echo blocked > "$FAKE/status"
 : >"$FAKE/log"
-hd "$BIN/hv-worker-poll" --slot w1 --settle 0 >/dev/null || fail "live herdr poll failed"
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null || fail "live herdr poll failed"
 [ "$(slot_field w1 state)" = "needs-permission" ] || fail "poll did not write slot.state, got $(slot_field w1 state)"
 [ "$(grep -c '^notification show' "$FAKE/log")" = "1" ] || fail "a newly blocked slot should notify once"
 : >"$FAKE/log"
-hd "$BIN/hv-worker-poll" --slot w1 --settle 0 >/dev/null || fail "second live herdr poll failed"
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null || fail "second live herdr poll failed"
 if grep -q '^notification show' "$FAKE/log"; then
   fail "a slot that stays blocked must not re-notify on every poll"
 fi
 echo idle > "$FAKE/status"
 printf 'HV-DONE w1 hv-worker/w1\n' > "$FAKE/pane.txt"
-hd "$BIN/hv-worker-poll" --slot w1 --settle 0 >/dev/null
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
 [ "$(slot_field w1 pr)" = "None" ] || fail "a branch name in HV-DONE must not become slot.pr"
 printf 'HV-DONE w1 https://github.com/o/r/pull/9\n' > "$FAKE/pane.txt"
-hd "$BIN/hv-worker-poll" --slot w1 --settle 0 >/dev/null
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
 [ "$(slot_field w1 state)" = "done" ] || fail "poll did not write state=done"
 [ "$(slot_field w1 pr)" = "https://github.com/o/r/pull/9" ] || fail "poll did not record the PR URL in slot.pr"
 touch "$FAKE/gone"
-STATE="$( hd "$BIN/hv-worker-poll" --slot w1 --settle 0 | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["state"])' )"
-[ "$STATE" = "DEAD" ] || fail "a slot whose agent is gone should poll DEAD, got $STATE"
+STATE="$( hd "$HV_BIN" --json worker poll w1 --settle 0 | jget 'data.slots[0].state' )"
+[ "$STATE" = "dead" ] || fail "a slot whose agent is gone should poll dead, got $STATE"
 rm -f "$FAKE/gone" "$FAKE/status"
 : >"$FAKE/pane.txt"
-pass "hv-worker-poll writes slot.state and slot.pr, notifies once per transition"
+pass "worker poll writes slot.state and slot.pr, notifies once per transition"
 
 # ── (f) session ─────────────────────────────────────────────────────────────
-OUT="$(hd "$BIN/hv-worker-session" check)" || fail "session check inside herdr should exit 0"
-[ "$OUT" = "inside herdr workspace w9" ] || fail "session check inside herdr printed '$OUT'"
+OUT="$(hd "$HV_BIN" --json worker session check)" || fail "session check inside herdr should exit 0"
+[ "$(jget data.inside <<<"$OUT")" = "true" ] || fail "session check inside herdr should report inside, got '$OUT'"
+[ "$(jget data.where <<<"$OUT")" = "herdr workspace w9" ] || fail "session check inside herdr reported '$OUT'"
 RC=0
-( cd "$TMP_HD/repo" && env -u HERDR_ENV TMUX=/tmp/fake,1,0 "$BIN/hv-worker-session" check ) >/dev/null 2>&1 || RC=$?
+( cd "$TMP_HD/repo" && env -u HERDR_ENV TMUX=/tmp/fake,1,0 "$HV_BIN" --json worker session check ) >/dev/null 2>&1 || RC=$?
 [ "$RC" = "1" ] || fail "under herdr, being in tmux is not being in herdr (expected exit 1, got $RC)"
 RC=0
-( cd "$TMP_HD/repo" && PATH="$FAKE/bin:$PATH" env -u HERDR_ENV "$BIN/hv-worker-session" ensure ) >/dev/null 2>&1 || RC=$?
-[ "$RC" = "3" ] || fail "ensure outside herdr should refuse with exit 3, got $RC"
-hd "$BIN/hv-worker-session" ensure >/dev/null || fail "ensure inside herdr should be a no-op exit 0"
-pass "hv-worker-session keys on HERDR_ENV; ensure refuses outside herdr"
+( cd "$TMP_HD/repo" && PATH="$FAKE/bin:$PATH" env -u HERDR_ENV "$HV_BIN" worker session ensure ) >/dev/null 2>&1 || RC=$?
+[ "$RC" = "4" ] || fail "ensure outside herdr should refuse with exit 4, got $RC"
+hd "$HV_BIN" worker session ensure >/dev/null || fail "ensure inside herdr should be a no-op exit 0"
+pass "worker session keys on HERDR_ENV; ensure refuses outside herdr"
 
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-worker-* herdr dispatch contract"
+pass "worker verbs herdr dispatch contract"
