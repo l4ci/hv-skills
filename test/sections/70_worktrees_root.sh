@@ -103,6 +103,7 @@ jget 'warnings[0]' <<<"$OUT" >/dev/null || fail "init must warn when .worktrees/
 pass "worker pool init: slots go under .worktrees/; legacy slots keep their path; unignored root warns"
 
 # ── (c) decoys under .worktrees/ are not picked up ──────────────────────────
+# white-box-begin: A9 #53 doclint
 VS="$TMP_WR/vs"
 mkdir -p "$VS"
 cp -R "$REPO"/hv-* "$REPO/references" "$REPO/.claude-plugin" "$REPO/CHANGELOG.md" "$VS/"
@@ -136,11 +137,13 @@ for K in filesScanned filesRewritten referencesRewritten manualReview; do
     || fail "migrate v4 $K changed with decoys under .worktrees/: $(jget "data.$K" <<<"$BASE_M") vs $(jget "data.$K" <<<"$MOUT")"
 done
 pass "a decoy SKILL.md/CLAUDE.md under .worktrees/ is invisible to validate-skills and migrate v4"
+# white-box-end
 
 # ── (d) census: nothing walks the project tree recursively ──────────────────
 # validate-skills globs `hv-*/SKILL.md` (one level) and the helpers read fixed
 # .hv/ paths or one-level globs. A recursive walk of the project root would
 # find nested checkouts; fail on one. No exemptions.
+# white-box-begin: A9 #53 keep
 WALK='rglob\(|os\.walk\(|os\.scandir\(|recursive ?= ?True|glob\([^)]*\*\*|find +(\.|\./|"\$PWD"|\$PWD|"\$\(pwd\)"|\$\(pwd\))( |$)'
 # The pattern must bite: each of these walks has to trip it.
 for SAMPLE in 'Path(".").rglob("SKILL.md")' 'os.walk(".")' 'os.scandir(root)' 'glob.glob("**/SKILL.md", recursive=True)' \
@@ -150,10 +153,10 @@ done
 for SAMPLE in 'find "$root/cmd" -newer "$bin"' 'sorted(Path(".").glob("hv-*/SKILL.md"))'; do
   if grep -qE "$WALK" <<<"$SAMPLE"; then fail "census pattern flags an anchored lookup: $SAMPLE"; fi
 done
-# white-box: kept until A9 (#53)
 HITS="$(cd "$REPO" && grep -nE "$WALK" bin/* test/validate-skills.py 2>/dev/null || true)"
 [ -z "$HITS" ] || fail "recursive tree walk found — it would pick up .worktrees/ checkouts; prune them or anchor the walk: $HITS"
 pass "no bin/ helper or validator walks the project tree recursively"
+# white-box-end
 
 trap 'rm -rf "$TMP"' EXIT
 pass "worktrees-root contract"

@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 keep
 echo "F25 T1 hvlib export sentinel — caller-imported public names resolve via from hvlib import X"
 
 # Enumerates every public name actively imported by `bin/hv-*` helpers
@@ -148,3 +149,4 @@ print(f"OK: {len(NAMES)} public names resolve via from hvlib import X; NAMES mat
 PY
 
 pass "hvlib export sentinel — caller-imported public names resolve via shim"
+# white-box-end

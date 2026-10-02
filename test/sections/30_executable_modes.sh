@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 keep
 echo "F66 — bin/ executables tracked at mode 100755 in git index"
 
 # Walk every file in $REPO/bin/ whose on-disk executable bit is set, and
@@ -31,3 +32,4 @@ if [ -n "$violations" ]; then
 fi
 
 pass "F66 — all bin/ executables track at mode 100755 in git index"
+# white-box-end

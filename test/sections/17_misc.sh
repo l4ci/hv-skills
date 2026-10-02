@@ -1,4 +1,4 @@
-# white-box: kept until the A8 Go unit test lands (#52), then delete; see 5.0-smoke-whitebox.md
+# white-box-begin: go-unit A8 #52
 echo "hvlib.parse_toml_version"
 mkdir ptv-test && cd ptv-test
 RESULT=$(PYTHONPATH="$BIN" python3 -c "
@@ -20,6 +20,7 @@ $EXPECTED
 got:
 $RESULT"
 pass "parse_toml_version handles project, tool.poetry, package, missing-section, and empty-string version"
+# white-box-end
 cd ..
 
 echo "release bump"

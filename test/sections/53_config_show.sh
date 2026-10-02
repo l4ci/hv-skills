@@ -33,7 +33,7 @@ OUT=$(show work.accounts)
   || fail "T118: entry should name its key: $OUT"
 pass "T118: config show resolves local > project > default"
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 N="$( cd "$CS" && "$BIN/hv-config-show" | wc -l )"
 [ "$N" -eq "$(PYTHONPATH="$BIN" python3 -c 'from hvlib import CONFIG_KEYS; print(len(CONFIG_KEYS))')" ] \
   || fail "T118: no-arg output should have one line per known key, got $N"
@@ -51,6 +51,7 @@ RC=0; show no.such.key >/dev/null 2>&1 || RC=$?
 RC=0; show work.dispatch autonomy.level >/dev/null 2>&1 || RC=$?
 [ "$RC" = "2" ] || fail "T118: two keys should exit 2, got $RC"
 pass "T118: no-arg lists every key; unknown key exits 3; extra key exits 2"
+# white-box-end
 
 # Schema check derives from the same table: dropping one required key names it.
 printf '{}\n' > "$CS/.hv/config.json"

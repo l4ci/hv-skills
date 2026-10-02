@@ -13,7 +13,7 @@ mkdir -p "$TMP_BK/proj/.hv"
   [ "$(CS value):$(CS source)" = "file:local" ] || fail "local backlog.backend: got '$(CS value):$(CS source)'"
   pass "config show reports backlog.backend default/project/local"
 
-  # white-box: kept until the A3 Go unit test lands (#47), then delete; see 5.0-smoke-whitebox.md
+  # white-box-begin: go-unit A3 #47
   PYTHONPATH="$BIN" python3 - <<'PY' || fail "backend accessors"
 from hvlib import config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
 assert BACKLOG_BACKENDS == ("file", "issues")
@@ -36,6 +36,7 @@ except KeyError:
     pass
 PY
   pass "backlog_backend / tracker_label / config_value behave"
+  # white-box-end
 )
 
 echo "FileBackend: create/read verbs byte-identical"
@@ -110,18 +111,17 @@ MD
 
   # hv-append (Since: stamped from HEAD when absent)
   head="$(git rev-parse --short HEAD)"
-  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
+  # white-box-begin: go-unit A4 #48
   "$BIN/hv-append" "## Bugs" '- **[B09] [P2] New.** d.'
   eq "append stamp" "- **[B09] [P2] New.** d. Since: $head" "$(grep -F '[B09]' .hv/BACKLOG.md)"
-  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
   "$BIN/hv-append" "Tasks" '- **[T09] t.** d. Since: zzz9999'
   eq "append keeps Since" '- **[T09] t.** d. Since: zzz9999' "$(grep -F '[T09]' .hv/BACKLOG.md)"
   eq "append placement" "$(printf '%s\n%s' '- **[B02] [P0] Second bug.** Desc two. Since: abc1234' "- **[B09] [P2] New.** d. Since: $head")" "$(grep -A1 -F '[B02]' .hv/BACKLOG.md)"
-  # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
   rc=0; err="$("$BIN/hv-append" "## Nope" '- **[B10] x**' 2>&1)" || rc=$?
   eq "append missing section" "1:error: section '## Nope' not found" "$rc:$err"
   cp "$TMP_GB/orig.md" .hv/BACKLOG.md
   pass "hv-append golden"
+  # white-box-end
 
   # backlog list
   IDS() { hvj backlog list "${@:2}" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(r["id"] for r in json.load(sys.stdin)))'; }
@@ -285,7 +285,7 @@ echo "IssueBackend: reads served from the tracker"
 TMP_IB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT
 
-# white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
+# white-box-begin: go-unit A4 #48
 # Pure helpers: item refs and the fields block.
 PYTHONPATH="$BIN" python3 - <<'PY' || fail "item ref / fields block helpers"
 from hvlib import resolve_item_ref, parse_fields_block, render_fields_block
@@ -310,6 +310,7 @@ assert render_fields_block("", f).startswith("<!-- hv:fields")
 assert parse_fields_block("a\r\n<!-- hv:fields\r\nRepos: web\r\n-->\r\n") == ("a", {"Repos": "web"})
 PY
 pass "resolve_item_ref and fields block round-trip"
+# white-box-end
 
 for prov in github gitlab; do
   P="$TMP_IB/$prov"; mkdir -p "$P/.hv"
@@ -345,7 +346,7 @@ for prov in github gitlab; do
     sleep 1
     CLOSE_DROP 7
 
-    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
+    # white-box-begin: go-unit A4 #48
     # rendering
     md="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(), end="")')"
     exp="# Backlog
@@ -380,7 +381,6 @@ $md";; esac
     esac
     case "$md" in *"[T5]"*|*"M07 tracking"*) fail "$prov milestone-tracker issue rendered";; esac
     pass "$prov: backlog_markdown shape, tags, fields, completed, tracker issue excluded"
-    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov closed_limit / truncation"
 from hvlib import get_backend
 b = get_backend()
@@ -391,9 +391,9 @@ assert [n for n, _ in secs] == ["Bugs", "Features", "Tasks"] and "Done" not in c
 PY
     BIG="$(python3 -c 'print("word " * 80)')"
     IC "Long one" "$BIG" "type:task"
-    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
     long="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(closed_limit=0))' | grep -F '[T8]')"
     [ "${#long}" -lt 260 ] && case "$long" in *"…"*) ;; *) fail "$prov truncation: $long";; esac
+    # white-box-end
 
     # backlog list
     IDS() { echo "$OUT" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))'; }
@@ -465,9 +465,10 @@ PY
     pass "$prov: tracker failures surface as exit 5"
 
     # hv-append stays refused (capture is item create)
-    # white-box: kept until the A4 Go unit test lands (#48), then delete; see 5.0-smoke-whitebox.md
+    # white-box-begin: go-unit A4 #48
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
     pass "$prov: hv-append still refused in issue mode"
+    # white-box-end
   )
 done
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT

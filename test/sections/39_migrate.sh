@@ -199,6 +199,7 @@ EOF
 trap 'rm -rf "$TMP"' EXIT
 pass "migrate v4 — empty CONTEXT.md deleted with no batch call"
 
+# white-box-begin: A9 #53 keep
 echo "migrate v4 — removes stale .hv/bin/hv-context-* files"
 TMP_BIN="$(mktemp -d)"
 trap 'rm -rf "$TMP_BIN"' EXIT
@@ -222,6 +223,7 @@ BACKUP_BIN=$(ls -d "$TMP_BIN"/.hv/migrate-backup/*/bin/ 2>/dev/null | head -1)
 [ -f "$BACKUP_BIN/hv-context-add" ] || fail "hv-context-add backup missing"
 trap 'rm -rf "$TMP"' EXIT
 pass "migrate v4 — removes stale .hv/bin/hv-context-* with backup"
+# white-box-end
 
 echo "migrate v4 — word boundary: /hv-capture is NOT rewritten by /hv-c\\b rule"
 TMP_WB="$(mktemp -d)"
@@ -274,18 +276,19 @@ echo '{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}' > "$TMP_B08/.hv/config
 
 # Force HV_INSTALL_ROOT to point at $REPO so the version stamp picks up
 # $REPO/.claude-plugin/plugin.json's version.
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 INSTALLED_VER=$(python3 -c "import json; print(json.load(open('$REPO/.claude-plugin/plugin.json'))['version'])")
-# white-box: kept until the A3 Go unit test lands (#47), then delete
 [ -n "$INSTALLED_VER" ] || fail "test setup: could not read .claude-plugin/plugin.json version"
+# white-box-end
 
 OUT=$( cd "$TMP_B08" && HV_INSTALL_ROOT="$REPO" hvj migrate v4 --apply )
 
 # hvSkills.version must equal the installed plugin version after apply.
 STAMPED=$(python3 -c "import json; print(json.load(open('$TMP_B08/.hv/config.json')).get('hvSkills',{}).get('version',''))")
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 [ "$STAMPED" = "$INSTALLED_VER" ] || fail "B08: hvSkills.version is '$STAMPED', expected '$INSTALLED_VER'"
 [ "$(jget data.versionStamp <<<"$OUT")" = "$STAMPED" ] || fail "B08: versionStamp should report the stamped version: $OUT"
+# white-box-end
 
 # Legacy top-level "version" should be cleaned up.
 HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")
@@ -296,7 +299,9 @@ pass "migrate v4 — B08: --apply bumps hvSkills.version"
 echo "migrate v4 — B09: strips orphan v3 blocks"
 TMP_STRIP="$(mktemp -d)"
 trap 'rm -rf "$TMP_STRIP"' EXIT
+# white-box-begin: A9 #53 keep
 mkdir -p "$TMP_STRIP/.hv/bin"
+# white-box-end
 cd "$TMP_STRIP"
 # Seed a CLAUDE.md with an orphan hv-context block, a live hv-knowledge block,
 # and unrelated prose. After strip: orphan gone, live block kept, prose intact.
@@ -316,8 +321,9 @@ Orphan block — must be stripped.
 Regular prose stays.
 EOF
 
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 "$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip.out"
+# white-box-end
 
 grep -q "hv-knowledge-start" CLAUDE.md || fail "B09-d1: live hv-knowledge block should survive strip"
 grep -q "hv-context-start" CLAUDE.md && fail "B09-d1: orphan hv-context block should be removed"
@@ -325,10 +331,10 @@ grep -q "Regular prose stays" CLAUDE.md || fail "B09-d1: surrounding prose must 
 grep -q "stripped: context" "$TMP_STRIP/strip.out" || fail "B09-d1: strip output should report 'stripped: context'"
 
 # Idempotency: second run is silent and a no-op.
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 "$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip2.out"
-# white-box: kept until the A5 Go unit test lands (#49), then delete
 [ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running hv-managed-block-strip-deprecated on clean CLAUDE.md should be silent"
+# white-box-end
 
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
@@ -382,6 +388,7 @@ echo '{"version":"3.4.0"}' > "$TMP_B09D2/.hv/config.json"
 #   (b) `/hv-context` in a fenced block — must NOT be rewritten
 #   (c) `hv-map-query` substring inside a helper-path token — must NOT be rewritten
 #   (d) bare `/hv-context` in prose — must be rewritten (control case)
+# white-box-begin: A9 #53 keep
 cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
 # TODO
 ## Bugs
@@ -395,6 +402,7 @@ cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
 
   Bare /hv-context in prose should still rewrite (control).
 EOF
+# white-box-end
 ( cd "$TMP_B09D2" && git add -A && git commit -q -m init )
 
 ( cd "$TMP_B09D2" && "$HV_BIN" migrate v4 --apply >/dev/null )

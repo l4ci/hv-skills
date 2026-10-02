@@ -66,8 +66,8 @@ rm -rf "$GUARD_TMP"
 pass "git guard feature-branch refuses base and detached HEAD / passes feature / honors git.baseBranch"
 
 echo "hv-ship and hv-pause reference hv-guard-feature-branch"
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q "hv-guard-feature-branch" "$REPO/hv-ship/SKILL.md" || fail "hv-ship missing hv-guard-feature-branch call"
-# white-box: kept until A9 (#53)
 grep -q "hv-guard-feature-branch" "$REPO/hv-pause/SKILL.md" || fail "hv-pause missing hv-guard-feature-branch call"
 pass "hv-ship and hv-pause both reference the new helper"
+# white-box-end

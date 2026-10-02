@@ -40,8 +40,9 @@ trap 'rm -rf "$DSN_TMP"' EXIT
   [ "$rc" = "3" ] || { echo "FAIL: design show F99 (missing) should exit 3, got $rc"; exit 1; }
 
   # 6b. F26: design show sources the shared lib
-  # white-box: kept until the A6 Go unit test lands (#50), then delete
+  # white-box-begin: go-unit A6 #50
   grep -q "hv-artifact-show.sh" "$BIN/hv-design-show" || { echo "FAIL: hv-design-show should source hv-artifact-show.sh after F26"; exit 1; }
+  # white-box-end
 
   # 7. design list non-empty — one F00 entry
   OUT=$(hvj design list) || { echo "FAIL: design list exited non-zero"; exit 1; }
@@ -113,12 +114,13 @@ trap 'rm -rf "$AMD_TMP"' EXIT
   [ "$rc" = "2" ] || { echo "FAIL: bad ID shape S01 should exit 2, got $rc"; exit 1; }
 
   # f. wrapper sources the shared lib (mirrors F26 design show assertion)
-  # white-box: kept until the A6 Go unit test lands (#50), then delete
+  # white-box-begin: go-unit A6 #50
   grep -q "hv-artifact-amend.sh" "$BIN/hv-design-amend" || { echo "FAIL: hv-design-amend should source hv-artifact-amend.sh"; exit 1; }
 ) || fail "design amend assertions"
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$AMD_TMP"
 pass "design amend: replace/append section contracts hold; rejects bad section, missing design, bad ID; sources shared lib"
+  # white-box-end
 
 echo "## /hv-plan integration with --design pointer"
 
@@ -149,13 +151,15 @@ pass "plan add --design records design pointer in frontmatter; rejects a missing
 echo "B28: hv-brainstorm --auto-loop frontmatter convention"
 
 # Auto-loop mode marks the design artifact with auto: true frontmatter (per hv-plan F32 convention).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'auto: true' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must document 'auto: true' frontmatter under --auto-loop"
+# white-box-end
 
 # Auto-loop autonomy gate is wired in Step 1 (mode entered when flag is present under loop autonomy).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'AUTO_LOOP' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must parse the --auto-loop flag in Step 1"
+# white-box-end
 
 pass "B28: hv-brainstorm --auto-loop frontmatter + autonomy gate wired"

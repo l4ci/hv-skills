@@ -1,4 +1,4 @@
-echo "hvlib_io.locked — sidecar read-modify-write survives concurrent writers"
+echo "sidecar lock — sidecar read-modify-write survives concurrent writers"
 # locked() (bin/hvlib_io.py) serializes sidecar read-modify-write cycles via
 # fcntl.flock on a sibling <path>.lock file. These assertions pin the contract:
 # (a) N concurrent knowledge hit calls lose no increments;
@@ -41,7 +41,7 @@ pass "6 concurrent knowledge contradiction add calls keep all 6 entries"
 # Simulate a crashed writer's residue: a pre-existing empty lockfile. flock
 # locks are kernel-held per open fd, so a stale file carries no lock — the
 # next acquirer must proceed within the timeout, not hang or fail.
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 rm -f "$TMP_LCK/.hv/knowledge-tier.json.lock"
 touch "$TMP_LCK/.hv/knowledge-tier.json.lock"
 hvj -C "$TMP_LCK" knowledge hit \
@@ -51,6 +51,7 @@ HITS=$(hvj -C "$TMP_LCK" knowledge tier get \
           --topic "Concurrency" --title "Lock rule" | jget data.hits)
 [ "$HITS" = "9" ] || fail "post-leftover-lock hit did not land: expected hits=9, got $HITS"
 pass "leftover .lock file does not block subsequent sidecar writes"
+# white-box-end
 
 trap 'rm -rf "$TMP"' EXIT
-pass "hvlib_io.locked sidecar concurrency contract"
+pass "sidecar lock concurrency contract"

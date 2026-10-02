@@ -141,8 +141,9 @@ cat > "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
 - **TLS rule** — body. <!-- 2026-05-15 -->
 EOF
 
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 ( cd "$TMP_KR" && "$BIN/hv-knowledge-migrate" >/dev/null )
+# white-box-end
 
 # Step 3: append facet headings before old topic.
 cat >> "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'

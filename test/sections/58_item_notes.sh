@@ -106,7 +106,7 @@ print(";".join("|".join(r[k] for k in ("date", "check", "result", "sha", "eviden
     hvj item reopen T1 >/dev/null
 
     # --- adapter lifecycle calls
-    # white-box: kept until the A8 Go unit test lands (#52), then delete
+    # white-box-begin: go-unit A8 #52
     PYTHONPATH="$BIN" python3 - "$prov" <<'PY' || fail "$prov adapter lifecycle"
 import sys
 from hvlib import adapter_for, load_config, TrackerError
@@ -145,6 +145,7 @@ i = a.get(2)
 assert i["state"] == "closed" and i["state_reason"] == "not_planned", i
 a.reopen(2)
 PY
+    # white-box-end
 
     # --- item designs and plans as notes (design/plan add/show/rm/put, list verbs)
     F1="F$(hvj item create --kind features --title "Big" | jget data.id)"

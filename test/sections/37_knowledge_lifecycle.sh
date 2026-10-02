@@ -50,17 +50,17 @@ pass "knowledge tier set rejects invalid tier"
 
 # --- hv-knowledge-migrate idempotency ---
 rm -f .hv/knowledge-tier.json
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 OUT=$("$BIN/hv-knowledge-migrate")
-# white-box: kept until the A5 Go unit test lands (#49), then delete
 grep -q "migrated 3 entries" <<<"$OUT" || fail "first migration didn't claim 3 entries: $OUT"
 pass "hv-knowledge-migrate stamps all titled bullets on first run"
+# white-box-end
 
-# white-box: kept until the A5 Go unit test lands (#49), then delete
+# white-box-begin: go-unit A5 #49
 OUT2=$("$BIN/hv-knowledge-migrate")
-# white-box: kept until the A5 Go unit test lands (#49), then delete
 grep -qi "nothing to migrate" <<<"$OUT2" || fail "second migration not idempotent: $OUT2"
 pass "hv-knowledge-migrate is idempotent on re-run"
+# white-box-end
 
 COUNT=$(hvj knowledge tier list | jget data.entries | python3 -c 'import json,sys;print(len(json.load(sys.stdin)))')
 [ "$COUNT" = "3" ] || fail "expected 3 sidecar entries after migrate, got $COUNT"

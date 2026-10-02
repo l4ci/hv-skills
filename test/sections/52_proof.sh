@@ -70,14 +70,14 @@ mkdir -p "$TMP_PF/proj"
 )
 
 # T119: every skill that calls hv-complete must also give it a proof path.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 callers=$(cd "$REPO" && grep -l 'hv-complete' hv-*/SKILL.md)
 [ -n "$callers" ] || fail "expected at least one SKILL.md calling hv-complete"
 for f in $callers; do
-  # white-box: kept until A9 (#53)
   grep -q 'hv-proof-add' "$REPO/$f" || fail "$f calls hv-complete without an hv-proof-add path"
 done
 pass "hv-complete callers document a proof path"
+# white-box-end
 
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$TMP_PF"

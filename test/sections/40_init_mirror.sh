@@ -1,3 +1,4 @@
+# white-box-begin: A9 #53 keep
 echo "F22 /hv-init mirror — strips stale helpers before copy"
 
 # Builds a fixture .hv/bin/ that holds stale helpers (simulating a v3 → v4
@@ -81,3 +82,4 @@ pass "F22 mirror — idempotent re-run leaves canonical bin/ intact"
 
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
+# white-box-end

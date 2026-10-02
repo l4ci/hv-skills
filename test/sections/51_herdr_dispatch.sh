@@ -200,16 +200,15 @@ pass "worker dispatch: outside herdr refused; workerCommand env + args map onto 
 printf 'WARNING: Claude Code running in Bypass Permissions mode\n ❯ 1. No, exit\n   2. Yes, I accept\n' > "$TMP_HD/bypass.txt"
 printf 'Do you trust this folder?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n' > "$TMP_HD/trust.txt"
 printf 'Pick a colour\n ❯ 1. Red\n   2. Blue\n' > "$TMP_HD/other.txt"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
+# white-box-begin: go-unit A7 #51
 K1="$( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/bypass.txt" )"
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 K2="$( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/trust.txt" )"
 [ "$K1" = "down enter" ] || fail "bypass dialog should be answered 'down enter', got '$K1'"
 [ "$K2" = "enter" ] || fail "trust dialog should be answered 'enter', got '$K2'"
 RC=0
-# white-box: kept until the A7 Go unit test lands (#51), then delete
 ( . "$BIN/hv-host-herdr.sh"; hv_herdr_dialog_keys "$TMP_HD/other.txt" ) >/dev/null || RC=$?
 [ "$RC" = "1" ] || fail "an unknown dialog must not be answered, got exit $RC"
+# white-box-end
 
 touch "$FAKE/start_not_ready"
 cp "$TMP_HD/bypass.txt" "$FAKE/pane.txt"

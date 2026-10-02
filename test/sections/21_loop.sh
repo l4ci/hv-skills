@@ -1,20 +1,20 @@
 echo "F32: loop-mode auto-planning helpers"
 
 # (a) /hv-plan SKILL.md exposes --auto-loop with the inline dispatch language.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q -- '--auto-loop' "$REPO/hv-plan/SKILL.md" \
   || fail "F32: hv-plan/SKILL.md must document the --auto-loop flag"
-# white-box: kept until A9 (#53)
 grep -q 'Auto-loop mode' "$REPO/hv-plan/SKILL.md" \
   || fail "F32: hv-plan/SKILL.md must include the dedicated 'Auto-loop mode' section"
+# white-box-end
 
 # (b) /hv-work Step 4 carries the inline loop-mode auto-dispatch chain directive (renamed under B28).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-dispatch chain language"
-# white-box: kept until A9 (#53)
 grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
+# white-box-end
 
 # (c) Surfacing call sites — pre-execution skills reference hv-auto-decisions-since
 # to consult recent decisions before suggesting an approach. The original intent
@@ -24,32 +24,32 @@ grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
 # helper becoming orphaned — if neither prose nor invocations reference it, the
 # helper exists with no consumer. Update the expected set when explicit invocations
 # land in the terminal-path skills.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
   | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
   | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
 [ "$SURFACING_SITES" = "hv-brainstorm hv-plan" ] \
   || fail "F32: hv-auto-decisions-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
+# white-box-end
 
 # (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'hv-loop-stamp start' "$REPO/hv-next/SKILL.md" \
   || fail "F32: hv-next/SKILL.md must call hv-loop-stamp start"
-# white-box: kept until A9 (#53)
 grep -q 'hv-loop-stamp clear' "$REPO/hv-pause/SKILL.md" \
   || fail "F32: hv-pause/SKILL.md must call hv-loop-stamp clear"
-# white-box: kept until A9 (#53)
 grep -q 'hv-loop-stamp clear' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must call hv-loop-stamp clear"
+# white-box-end
 
 # (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q '"loop":.*"webResearch": False' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the fresh config block"
-# white-box: kept until A9 (#53)
 grep -q 'hv-config-set loop.webResearch false' "$REPO/hv-init/SKILL.md" \
   || fail "F32: hv-init must seed loop.webResearch in the STALE migration block"
 pass "F32: SKILL.md wiring + config defaults"
+# white-box-end
 
 # (f) status loop: start writes ISO timestamp; idempotent first-write; clear removes; show is null when unset.
 F32_TMP="$(mktemp -d)"
@@ -204,7 +204,7 @@ EOF
 # malformed: no frontmatter
 echo "no frontmatter here" > .hv/map/broken.md
 
-# white-box: kept until the A3 Go unit test lands (#47), then delete
+# white-box-begin: go-unit A3 #47
 PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import parse_frontmatter, iter_map_entries
 fm, body = parse_frontmatter(open(".hv/map/capture.md").read())
@@ -223,6 +223,7 @@ names = sorted(e[0] for e in entries)
 assert names == ["capture", "plan"], names  # malformed file is skipped
 PY
 echo "ok hvlib parse_frontmatter / iter_map_entries"
+# white-box-end
 
 # --- map query -----------------------------------------------------
 out="$(hvj map query capture | jget data.text)"
@@ -325,22 +326,21 @@ trap 'rm -rf "$TMP" "$TMP2"' EXIT
 echo "ok init seeds map"
 
 # --- skill touchpoints reference map ------------------------------
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
-# white-box: kept until A9 (#53)
 grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
-# white-box: kept until A9 (#53)
 grep -q "post-cycle map\|hv-map-index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
+# white-box-end
 
 # --- status/next/resume reference hv-stale-summary ---------------
 # Note: hv-status and hv-resume were merged into hv-next (F26).
 # hv-next now uses bin/hv-stale-summary as a single wrapper (F48).
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q "hv-stale-summary" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
-# white-box: kept until A9 (#53)
 grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
+# white-box-end
 
 # --- end-to-end: scaffold + after-work bump + consolidate prep ----
 TMP3=$(mktemp -d)
@@ -403,7 +403,7 @@ rm -rf "$TMP2" "$TMP3"
 echo "ok end-to-end map flow"
 
 # --- parse_todo_fields handles Subsystem ---------------------------
-# white-box: kept until the A4 Go unit test lands (#48), then delete
+# white-box-begin: go-unit A4 #48
 PYTHONPATH="$BIN" python3 - <<'PY'
 from hvlib import parse_todo_fields
 line = "- [B07] [P1] Title. Repos: web Subsystem: capture Captured: 2026-05-09"
@@ -417,33 +417,36 @@ assert fields2.get("milestone") == "M01", f"milestone={fields2.get('milestone')!
 assert fields2.get("subsystem") == "capture", f"subsystem={fields2.get('subsystem')!r}"
 PY
 echo "ok parse_todo_fields handles Subsystem"
+# white-box-end
 
 echo "B28: /hv-brainstorm --auto-loop dispatch chain"
 
 # (a) /hv-brainstorm SKILL.md exposes --auto-loop with the inline dispatch language.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q -- '--auto-loop' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must document the --auto-loop flag"
-# white-box: kept until A9 (#53)
 grep -q '## Auto-loop mode' "$REPO/hv-brainstorm/SKILL.md" \
   || fail "B28: hv-brainstorm/SKILL.md must include the dedicated 'Auto-loop mode' section"
+# white-box-end
 
 # (b) /hv-work Step 4 carries the inline loop-mode auto-brainstorm dispatch directive.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q '/hv-brainstorm --auto-loop' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md must reference /hv-brainstorm --auto-loop dispatch"
-# white-box: kept until A9 (#53)
 grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md must title Step 4 chain as 'Loop-mode auto-dispatch chain'"
+# white-box-end
 
 # (c) /hv-work Step 2 carve-out for Major + Milestone-tagged items defers to Step 4 chain.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'defer to Step 4' "$REPO/hv-work/SKILL.md" \
   || fail "B28: hv-work/SKILL.md Step 2 must defer Major + Milestone-tagged ambiguity to Step 4 chain"
+# white-box-end
 
 # (d) references/loop-mode-plan-dispatch.md describes the design pre-flight.
-# white-box: kept until A9 (#53)
+# white-box-begin: A9 #53 doclint
 grep -q 'Design pre-flight' "$REPO/references/loop-mode-plan-dispatch.md" \
   || fail "B28: references/loop-mode-plan-dispatch.md must include the Design pre-flight section"
 
 pass "B28: /hv-brainstorm --auto-loop dispatch chain is wired across SKILL.md + reference"
+# white-box-end
