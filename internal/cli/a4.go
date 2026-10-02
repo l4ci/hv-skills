@@ -32,7 +32,7 @@ var newTracker = func(root string, cfg any) (backlog.Tracker, error) {
 }
 
 func a4Commands() []*Command {
-	return append(append(a4ItemCommands(), a4bCommands()...), a4cCommands()...)
+	return append(append(append(a4ItemCommands(), a4bCommands()...), a4cCommands()...), a4dCommands()...)
 }
 
 func a4ItemCommands() []*Command {

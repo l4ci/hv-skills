@@ -34,6 +34,10 @@ type CreateInput struct {
 	Fields  []Field
 	Body    []byte // detail file content; used only when HasBody
 	HasBody bool
+	// Since is a file-backend Since: anchor the issue backend keeps in its
+	// fields block (IssueBackend.create(since=), migration only). The file
+	// backend stamps its own and ignores this.
+	Since string
 }
 
 // CreateResult is what Create made.
