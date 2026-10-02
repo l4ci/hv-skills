@@ -11,13 +11,15 @@ import (
 // Tree is the hv command tree. Groups and verbs are added here as they are
 // ported (A4-A8); their flags and --json shapes come from the verb contract (#46).
 func Tree() *Command {
-	return &Command{
+	root := &Command{
 		Name:    "hv",
 		Summary: "hv-skills command line",
 		Subs: []*Command{
 			{Name: "version", Summary: "print the hv version", Verb: noFlags(runVersion)},
 		},
 	}
+	root.Subs = append(root.Subs, a6Commands()...)
+	return root
 }
 
 // noFlags is the Verb for a verb with no flags of its own.
