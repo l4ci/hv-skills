@@ -1315,7 +1315,7 @@
     "milestone": null,
     "state": "closed",
     "state_reason": "not_planned",
-    "closed_at": "2026-10-02T12:20:50Z",
+    "closed_at": "2026-10-02T12:33:49Z",
     "url": "https://github.com/fake/repo/issues/2",
     "assignees": [
      "fake-user"
@@ -1332,7 +1332,7 @@
       "number,title,body,labels,milestone,state,stateReason,closedAt,url,assignees"
      ],
      "stdin": "",
-     "stdout": "{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"NOT_PLANNED\", \"closedAt\": \"2026-10-02T12:20:50Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}\n",
+     "stdout": "{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"NOT_PLANNED\", \"closedAt\": \"2026-10-02T12:33:49Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }
@@ -1432,7 +1432,7 @@
      "milestone": null,
      "state": "closed",
      "state_reason": "completed",
-     "closed_at": "2026-10-02T12:20:50Z",
+     "closed_at": "2026-10-02T12:33:50Z",
      "url": "https://github.com/fake/repo/issues/2",
      "assignees": [
       "fake-user"
@@ -1453,7 +1453,7 @@
       "1000"
      ],
      "stdin": "",
-     "stdout": "[{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:20:50Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}]\n",
+     "stdout": "[{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:33:50Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1473,7 +1473,7 @@
      "milestone": null,
      "state": "closed",
      "state_reason": "completed",
-     "closed_at": "2026-10-02T12:20:50Z",
+     "closed_at": "2026-10-02T12:33:50Z",
      "url": "https://github.com/fake/repo/issues/2",
      "assignees": [
       "fake-user"
@@ -1510,7 +1510,7 @@
       "1000"
      ],
      "stdin": "",
-     "stdout": "[{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:20:50Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}, {\"number\": 1, \"title\": \"First!\", \"body\": \"new body\\nmore\", \"labels\": [{\"name\": \"bug\"}], \"milestone\": {\"title\": \"M07 Tracker\", \"number\": 1}, \"state\": \"OPEN\", \"stateReason\": null, \"closedAt\": null, \"url\": \"https://github.com/fake/repo/issues/1\", \"assignees\": [{\"login\": \"fake-user\"}]}]\n",
+     "stdout": "[{\"number\": 2, \"title\": \"Second\", \"body\": \"b2\", \"labels\": [], \"milestone\": null, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:33:50Z\", \"url\": \"https://github.com/fake/repo/issues/2\", \"assignees\": [{\"login\": \"fake-user\"}]}, {\"number\": 1, \"title\": \"First!\", \"body\": \"new body\\nmore\", \"labels\": [{\"name\": \"bug\"}], \"milestone\": {\"title\": \"M07 Tracker\", \"number\": 1}, \"state\": \"OPEN\", \"stateReason\": null, \"closedAt\": null, \"url\": \"https://github.com/fake/repo/issues/1\", \"assignees\": [{\"login\": \"fake-user\"}]}]\n",
      "stderr": "",
      "code": 0
     }
@@ -1970,7 +1970,7 @@
     "milestone": "M07 Tracker",
     "state": "closed",
     "state_reason": "completed",
-    "closed_at": "2026-10-02T12:20:53Z",
+    "closed_at": "2026-10-02T12:33:52Z",
     "url": "https://github.com/fake/repo/issues/1",
     "assignees": [
      "fake-user"
@@ -1987,7 +1987,7 @@
       "number,title,body,labels,milestone,state,stateReason,closedAt,url,assignees"
      ],
      "stdin": "",
-     "stdout": "{\"number\": 1, \"title\": \"First!\", \"body\": \"new body\\nmore\", \"labels\": [{\"name\": \"bug\"}], \"milestone\": {\"title\": \"M07 Tracker\", \"number\": 1}, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:20:53Z\", \"url\": \"https://github.com/fake/repo/issues/1\", \"assignees\": [{\"login\": \"fake-user\"}]}\n",
+     "stdout": "{\"number\": 1, \"title\": \"First!\", \"body\": \"new body\\nmore\", \"labels\": [{\"name\": \"bug\"}], \"milestone\": {\"title\": \"M07 Tracker\", \"number\": 1}, \"state\": \"CLOSED\", \"stateReason\": \"COMPLETED\", \"closedAt\": \"2026-10-02T12:33:52Z\", \"url\": \"https://github.com/fake/repo/issues/1\", \"assignees\": [{\"login\": \"fake-user\"}]}\n",
      "stderr": "",
      "code": 0
     }

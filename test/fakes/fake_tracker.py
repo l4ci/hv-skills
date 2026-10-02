@@ -10,7 +10,7 @@ Env: FAKE_TRACKER_DB   JSON store path (required unless FAKE_TRACKER_DB_DIR; cre
 Only the subset hv uses is implemented; anything else exits 2.
 Ids are realistic where hv must not mix them up: gh `issue view --json comments` gives
 GraphQL node ids (the REST id is in the comment url), and glab's global `id` differs from
-the project-scoped `iid` (milestone ids are offset by GL_MILESTONE_ID).
+the project-scoped `iid` for milestones, which the API edits by `id` (offset by GL_MILESTONE_ID).
 """
 import json
 import os
@@ -22,8 +22,6 @@ from datetime import datetime, timezone
 
 USER = "fake-user"
 GL_MILESTONE_ID = 1000  # glab milestone `id` = iid + this
-GL_ISSUE_ID = 5000      # glab issue `id` = iid + this
-GL_MR_ID = 7000         # glab MR `id` = iid + this
 
 
 class Fail(Exception):
@@ -188,7 +186,7 @@ def gh_pr(p):
 
 
 def gl_mr(p):
-    out = {"id": p["number"] + GL_MR_ID, "iid": p["number"], "title": p["title"], "description": p["body"],
+    out = {"iid": p["number"], "title": p["title"], "description": p["body"],
            "source_branch": p["head"], "target_branch": p["base"],
            "state": "opened" if p["state"] == "open" else p["state"],
            "web_url": "https://gitlab.com/fake/repo/-/merge_requests/%d" % p["number"]}
@@ -532,7 +530,7 @@ def run_gh(db, args):
 # ---------------------------------------------------------------- glab
 def gl_issue(i):
     return {
-        "id": i["number"] + GL_ISSUE_ID, "iid": i["number"], "title": i["title"], "description": i["body"],
+        "iid": i["number"], "title": i["title"], "description": i["body"],
         "labels": list(i["labels"]),
         "milestone": ({"title": i["milestone"][0], "iid": i["milestone"][1]}
                       if i["milestone"] else None),
