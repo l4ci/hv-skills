@@ -73,9 +73,9 @@ func knErr(err error) error {
 		return nil
 	case errors.Is(err, knowledge.ErrScope), errors.Is(err, knowledge.ErrNotFound):
 		return Resolution("%s", trimSentinel(err))
-	case errors.Is(err, knowledge.ErrExists):
+	case errors.Is(err, knowledge.ErrExists), errors.Is(err, knowledge.ErrAliasCollision):
 		return Refused("%s", trimSentinel(err))
-	case errors.Is(err, knowledge.ErrAmbiguous):
+	case errors.Is(err, knowledge.ErrAmbiguous), errors.Is(err, knowledge.ErrManifest):
 		return Usage("%s", trimSentinel(err))
 	}
 	return err
@@ -83,7 +83,7 @@ func knErr(err error) error {
 
 // trimSentinel drops the "sentinel: " prefix wrapping adds to a message.
 func trimSentinel(err error) string {
-	for _, s := range []error{knowledge.ErrScope, knowledge.ErrNotFound, knowledge.ErrExists, knowledge.ErrAmbiguous} {
+	for _, s := range []error{knowledge.ErrScope, knowledge.ErrNotFound, knowledge.ErrExists, knowledge.ErrAmbiguous, knowledge.ErrAliasCollision, knowledge.ErrManifest} {
 		if errors.Is(err, s) {
 			return strings.TrimPrefix(err.Error(), s.Error()+": ")
 		}

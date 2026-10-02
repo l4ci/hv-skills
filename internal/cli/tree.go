@@ -17,6 +17,9 @@ func Tree() *Command {
 		Subs: []*Command{
 			{Name: "version", Summary: "print the hv version", Verb: noFlags(runVersion)},
 			knowledgeCommands(),
+			glossaryCommands(),
+			blockCommand(),
+			instructionsCommands(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)

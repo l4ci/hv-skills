@@ -149,7 +149,8 @@ func knNew(t *testing.T, dir, stdin string, args ...string) knOut {
 	return knOut{so.String(), se.String(), rc}
 }
 
-// knTree reads every regular file under dir/.hv into a path → content map.
+// knTree reads every regular file under dir/.hv, plus the instructions files
+// of the project root and of the fixture sub-repos, into a path → content map.
 func knTree(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -168,6 +169,13 @@ func knTree(t *testing.T, dir string) map[string]string {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, sub := range []string{"", "web", "api"} {
+		for _, f := range []string{"AGENTS.md", "CLAUDE.md"} {
+			if b, err := os.ReadFile(filepath.Join(dir, sub, f)); err == nil {
+				out[filepath.Join("..", sub, f)] = string(b)
+			}
+		}
 	}
 	return out
 }

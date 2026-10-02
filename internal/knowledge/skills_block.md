@@ -1,0 +1,17 @@
+## hv-skills
+
+This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/bin/` (regenerated mirror of canonical `bin/`, overwritten on every `/hv-init`), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored. Use the skill helpers to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
+
+**Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
+**Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
+**Review & ship** — `/hv-review`, `/hv-qa` (opt-in gate via `ship.qa`), `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
+**Persist** — `/hv-learn` (durable knowledge; `--term <name>` for glossary), `/hv-decide` (hard boundaries — manual only)
+**Vision & maps** — `/hv-vision`, `/hv-refactor`
+**Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-migrate` (v3→v4 codemod), `/hv-release`
+
+Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
+
+- `.hv/bin/hv-knowledge-query <topic>…`
+- `.hv/bin/hv-decisions-query <topic>…`
+- `.hv/bin/hv-glossary-read <term>…` (terms live as nested-bullet entries under `## Glossary` in `.hv/KNOWLEDGE.md`)
+- `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
