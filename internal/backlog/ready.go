@@ -25,6 +25,10 @@ func hasCriteria(text string) bool {
 }
 
 // readyReasons is _ready_reasons: ready when there are criteria or a note.
+// The wording says "issue body" in file mode too, where the criteria live in
+// the detail file: the old helper printed exactly this in both backends, and
+// item ready's data.reasons carries it verbatim (the shim parses those lines),
+// so changing it is a contract change, not a port detail.
 func readyReasons(criteria, note bool) []string {
 	if criteria || note {
 		return []string{}
