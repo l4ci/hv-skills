@@ -119,3 +119,15 @@ func TestLinesMatchesPythonSplitlines(t *testing.T) {
 		t.Error("edge cases")
 	}
 }
+
+func TestUpsertBlockNormalizesCRLF(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "AGENTS.md")
+	os.WriteFile(path, []byte("# A\r\n\r\ntext\r\n"), 0o666)
+	if _, err := UpsertBlock(path, "x", "<!-- hv-x-start -->\nb\n<!-- hv-x-end -->", ""); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	if strings.Contains(string(raw), "\r") {
+		t.Errorf("mixed endings: %q", raw)
+	}
+}

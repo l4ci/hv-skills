@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/l4ci/hv-skills/v5/internal/fsio"
 )
 
 // Umbrella is the scope name of the project-level files.
@@ -71,16 +73,14 @@ func (s Store) TierPath(scope string) (string, error) {
 	return filepath.Join(s.dir(scope), "knowledge-tier.json"), nil
 }
 
-// ReadFile returns the file's text, or "" when it does not exist. Line
-// endings are normalized to \n (\r\n and lone \r), as Python's read_text does,
-// so a CRLF file is rewritten as LF by the verbs that write it back.
+// ReadFile returns the file's text with newlines normalized (fsio.ReadText),
+// or "" when it does not exist.
 func ReadFile(path string) (string, error) {
-	b, err := os.ReadFile(path)
+	t, err := fsio.ReadText(path)
 	if os.IsNotExist(err) {
 		return "", nil
 	}
-	t := strings.ReplaceAll(string(b), "\r\n", "\n")
-	return strings.ReplaceAll(t, "\r", "\n"), err
+	return t, err
 }
 
 // writeText writes text atomically, creating the parent directory first.

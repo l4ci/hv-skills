@@ -132,14 +132,13 @@ const (
 // appends one when none exists, or creates the file holding just the block.
 // A second identical call is Unchanged and does not touch the file.
 func UpsertBlock(path, key, block, legacy string) (string, error) {
-	raw, err := os.ReadFile(path)
+	content, err := fsio.ReadText(path)
 	if os.IsNotExist(err) {
 		return Created, fsio.WriteFileAtomic(path, []byte(block+"\n"))
 	}
 	if err != nil {
 		return "", err
 	}
-	content := string(raw)
 	re := BlockRegex(key, legacy, false)
 	var next, status string
 	if re.MatchString(content) {
