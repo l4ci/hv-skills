@@ -27,7 +27,12 @@ type Issue struct {
 	Assignees   []string
 }
 
-// Tracker is the narrow slice of internal/tracker that the item view needs.
+// Tracker is the narrow read seam the issue view needs. It is NOT
+// internal/tracker's Adapter (#90), which has List(ListFilter),
+// Get(n, withComments) and reports a missing issue as an error. A small
+// adapter lands in a follow-up once #90 merges: it adds ctx, passes the state
+// filter through, and maps tracker.KindNotFound to found=false, so nothing here
+// sniffs error messages.
 type Tracker interface {
 	// List returns the issues in the given state, "open" or "closed".
 	List(state string) ([]Issue, error)
