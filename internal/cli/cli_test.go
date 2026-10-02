@@ -64,6 +64,16 @@ func testTree() *Command {
 				panic("kaboom")
 			case "refused":
 				return Result{}, Refused("already exists").WithHint("pick another name")
+			case "answer":
+				o := jsonx.NewObject()
+				o.Set("clean", false)
+				return Result{Data: o, Text: "dirty"}, Failed("working tree is dirty")
+			case "recorded":
+				o := jsonx.NewObject()
+				o.Set("changed", true)
+				return Result{Data: o}, Refused("item has no proof")
+			case "leak":
+				return Result{Data: jsonx.NewObject(), Text: "x"}, Resolution("gone")
 			}
 			return Result{}, NotImplemented(c.Path)
 		})},
@@ -130,6 +140,12 @@ func TestExitCodesAndEnvelope(t *testing.T) {
 		{[]string{"grp", "echo", "--bogus", "--json"}, 2, `{"ok": false, "error": {"code": "usage", "exit": 2, "message": "unknown flag \"--bogus\""}}` + "\n", ""},
 		// Verb outcomes.
 		{[]string{"fail", "refused", "--json"}, 4, `{"ok": false, "error": {"code": "refused", "exit": 4, "message": "already exists", "hint": "pick another name"}}` + "\n", "hv fail: already exists\nhint: pick another name\n"},
+		// Failure data rides beside error on exit 1 and 4 only.
+		{[]string{"fail", "answer", "--json"}, 1, `{"ok": false, "error": {"code": "failed", "exit": 1, "message": "working tree is dirty"}, "data": {"clean": false}}` + "\n", "hv fail: working tree is dirty\n"},
+		{[]string{"fail", "answer"}, 1, "dirty\n", "hv fail: working tree is dirty\n"},
+		{[]string{"fail", "recorded", "--json"}, 4, `{"ok": false, "error": {"code": "refused", "exit": 4, "message": "item has no proof"}, "data": {"changed": true}}` + "\n", ""},
+		{[]string{"fail", "leak", "--json"}, 3, `{"ok": false, "error": {"code": "resolution", "exit": 3, "message": "gone"}}` + "\n", ""},
+		{[]string{"fail", "leak"}, 3, "", "hv fail: gone\n"},
 		{[]string{"fail", "lock"}, 6, "", "hv fail: saving: lock timeout\n"},
 		{[]string{"fail", "plain"}, 70, "", "hv fail: boom\nhint: this is a bug in hv"},
 		{[]string{"fail", "panic"}, 70, "", "hv fail: panic: kaboom"},

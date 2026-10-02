@@ -33,8 +33,9 @@ type Command struct {
 // RunFunc runs a verb with its positional args.
 type RunFunc func(c *Ctx, args []string) (Result, error)
 
-// Result is a verb's success output: Data goes into the --json envelope,
-// Text is printed otherwise. Data nil means {}.
+// Result is a verb's output: Data goes into the --json envelope, Text is
+// printed otherwise. Data nil means {}. A verb failing with exit 1 or 4 may
+// return a Result too: its answer, or what blocked it and what it changed.
 type Result struct {
 	Data any
 	Text string
@@ -293,7 +294,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	}
 	res, err := runVerb(c, positional)
 	if err != nil {
-		return fail(c, stdout, err)
+		return failWith(c, stdout, err, res)
 	}
 	return ok(c, stdout, res)
 }
@@ -360,8 +361,18 @@ func ok(c *Ctx, stdout io.Writer, res Result) int {
 	return ExitOK
 }
 
-func fail(c *Ctx, stdout io.Writer, err error) int {
+func fail(c *Ctx, stdout io.Writer, err error) int { return failWith(c, stdout, err, Result{}) }
+
+// failWith reports err; res is kept only on exit 1 and 4, the codes whose
+// failure may carry data.
+func failWith(c *Ctx, stdout io.Writer, err error, res Result) int {
 	e := asError(err)
+	if e.Exit != ExitFailed && e.Exit != ExitRefused {
+		res = Result{}
+	}
+	if !c.JSON && res.Text != "" {
+		fmt.Fprint(stdout, strings.TrimSuffix(res.Text, "\n")+"\n")
+	}
 	fmt.Fprintf(c.Stderr, "%s: %s\n", c.Path, e.Message)
 	if e.Hint != "" {
 		fmt.Fprintf(c.Stderr, "hint: %s\n", e.Hint)
@@ -377,6 +388,9 @@ func fail(c *Ctx, stdout io.Writer, err error) int {
 		env := jsonx.NewObject()
 		env.Set("ok", false)
 		env.Set("error", eo)
+		if res.Data != nil {
+			env.Set("data", res.Data)
+		}
 		if len(c.warnings) > 0 {
 			env.Set("warnings", append([]string(nil), c.warnings...))
 		}
