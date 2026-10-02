@@ -39,26 +39,39 @@ func LoadJSON(path string, def any) any {
 
 // WriteFileAtomic writes data to "<path>.tmp" in the same directory and
 // renames it over path, so readers see the old or the new file, never half.
+// Unlike hvlib_io it also fsyncs the file before the rename and the
+// directory after it, so a crash cannot leave an empty or missing file.
 func WriteFileAtomic(path string, data []byte) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	if err != nil {
 		os.Remove(tmp)
 		return err
 	}
-	if err := f.Close(); err != nil {
-		os.Remove(tmp)
+	return syncDir(filepath.Dir(path))
+}
+
+// syncDir makes a rename in dir durable.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	return nil
+	defer d.Close()
+	return d.Sync()
 }
 
 // WriteJSONAtomic writes v as json.dumps(v, indent=2) plus a newline.

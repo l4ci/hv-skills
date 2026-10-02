@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
@@ -14,9 +15,14 @@ func Tree() *Command {
 		Name:    "hv",
 		Summary: "hv-skills command line",
 		Subs: []*Command{
-			{Name: "version", Summary: "print the hv version", Run: runVersion},
+			{Name: "version", Summary: "print the hv version", Verb: noFlags(runVersion)},
 		},
 	}
+}
+
+// noFlags is the Verb for a verb with no flags of its own.
+func noFlags(run RunFunc) func(*flag.FlagSet) RunFunc {
+	return func(*flag.FlagSet) RunFunc { return run }
 }
 
 func runVersion(c *Ctx, args []string) (Result, error) {

@@ -4,6 +4,7 @@
 package pytest
 
 import (
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -11,31 +12,43 @@ import (
 	"testing"
 )
 
-// BinDir is the repo's bin/ directory, found from this source file.
-func BinDir(t testing.TB) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("pytest: cannot locate source file")
-	}
+// binDir is the repo's bin/ directory, found from this source file.
+func binDir() string {
+	_, file, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(file), "..", "..", "bin")
 }
 
 // Run executes a Python snippet with bin/ on PYTHONPATH and returns stdout.
+// It fails the test when Python exits non-zero.
 func Run(t testing.TB, dir, script string, args ...string) string {
 	t.Helper()
-	py, err := exec.LookPath("python3")
+	Require(t)
+	out, err := Try(dir, script, args...)
 	if err != nil {
+		t.Fatalf("python3 failed: %v", err)
+	}
+	return out
+}
+
+// Require skips the test when python3 is not on PATH.
+func Require(t testing.TB) {
+	t.Helper()
+	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not on PATH")
 	}
-	cmd := exec.Command(py, append([]string{"-c", script}, args...)...)
+}
+
+// Try is Run for snippets that are expected to fail: it returns the error
+// (with stderr) instead of failing the test.
+func Try(dir, script string, args ...string) (string, error) {
+	cmd := exec.Command("python3", append([]string{"-c", script}, args...)...)
 	cmd.Dir = dir
-	cmd.Env = append(cmd.Environ(), "PYTHONPATH="+BinDir(t))
+	cmd.Env = append(cmd.Environ(), "PYTHONPATH="+binDir())
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("python3 failed: %v\n%s", err, stderr.String())
+		return string(out), fmt.Errorf("%w\n%s", err, stderr.String())
 	}
-	return string(out)
+	return string(out), nil
 }

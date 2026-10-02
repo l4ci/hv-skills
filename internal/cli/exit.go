@@ -12,7 +12,7 @@ const (
 	ExitOK             = 0
 	ExitFailed         = 1
 	ExitUsage          = 2
-	ExitNotFound       = 3
+	ExitResolution     = 3
 	ExitRefused        = 4
 	ExitUnavailable    = 5
 	ExitRetry          = 6
@@ -23,7 +23,7 @@ const (
 var codeNames = map[int]string{
 	ExitFailed:         "failed",
 	ExitUsage:          "usage",
-	ExitNotFound:       "not_found",
+	ExitResolution:     "resolution",
 	ExitRefused:        "refused",
 	ExitUnavailable:    "unavailable",
 	ExitRetry:          "retry",
@@ -53,8 +53,8 @@ func Failed(format string, a ...any) *Error { return newErr(ExitFailed, "", form
 // Usage: bad invocation (exit 2).
 func Usage(format string, a ...any) *Error { return newErr(ExitUsage, "", format, a...) }
 
-// NotFound: something named or required could not be resolved (exit 3).
-func NotFound(format string, a ...any) *Error { return newErr(ExitNotFound, "", format, a...) }
+// Resolution: something named or required could not be resolved (exit 3).
+func Resolution(format string, a ...any) *Error { return newErr(ExitResolution, "", format, a...) }
 
 // Refused: a mutating verb declined to break an invariant (exit 4).
 func Refused(format string, a ...any) *Error { return newErr(ExitRefused, "", format, a...) }

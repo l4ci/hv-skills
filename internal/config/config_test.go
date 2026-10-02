@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
@@ -33,6 +34,35 @@ func TestLoadMatchesPython(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Divergences from Python, kept on purpose and listed in the conventions doc
+// (Config). The test also runs Python, so the doc stays true if Python changes.
+func TestDivergentInputs(t *testing.T) {
+	t.Run("NaN and Infinity", func(t *testing.T) {
+		path, _ := filepath.Abs("divergent/nan/config.json")
+		// Go: not valid JSON, so the file counts as absent.
+		if got, _ := jsonx.MarshalCompact(Load(path)); string(got) != "{}" {
+			t.Fatalf("Go Load = %s, want {}", got)
+		}
+		// Python: json.loads accepts NaN and Infinity.
+		if py := pytest.Run(t, ".", pyLoad, path); !strings.Contains(py, "NaN") {
+			t.Fatalf("Python no longer loads NaN; update the doc. Got %s", py)
+		}
+	})
+	t.Run("invalid UTF-8", func(t *testing.T) {
+		path, _ := filepath.Abs("divergent/badutf8/config.json")
+		// Go: loads, with U+FFFD for the bad byte.
+		v, ok := Lookup(Load(path), "work.dispatch")
+		if !ok || v != "tm\uFFFDux" {
+			t.Fatalf("Go Load work.dispatch = %q", v)
+		}
+		pytest.Require(t)
+		// Python: read_text raises UnicodeDecodeError, which load_json does not catch.
+		if _, err := pytest.Try(".", pyLoad, path); err == nil {
+			t.Fatal("Python no longer fails on invalid UTF-8; update the doc")
+		}
+	})
 }
 
 func TestMergeDoesNotMutateInputs(t *testing.T) {
