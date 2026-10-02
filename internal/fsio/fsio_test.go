@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -138,5 +139,24 @@ func TestLoadJSONDefaults(t *testing.T) {
 	os.WriteFile(bad, []byte("{not json"), 0o644)
 	if LoadJSON(bad, "d") != "d" {
 		t.Fatal("corrupt file must return default")
+	}
+}
+
+func TestDirSyncUnsupportedIsNotAFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	orig := dirSync
+	t.Cleanup(func() { dirSync = orig })
+	for _, errno := range []syscall.Errno{syscall.EINVAL, syscall.ENOTSUP} {
+		dirSync = func(*os.File) error { return &os.PathError{Op: "sync", Path: "dir", Err: errno} }
+		if err := WriteFileAtomic(path, []byte("x")); err != nil {
+			t.Errorf("%v from dir fsync must be ignored, got %v", errno, err)
+		}
+	}
+	dirSync = func(*os.File) error { return &os.PathError{Op: "sync", Path: "dir", Err: syscall.EIO} }
+	if err := WriteFileAtomic(path, []byte("y")); !errors.Is(err, syscall.EIO) {
+		t.Errorf("EIO from dir fsync must be reported, got %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "y" {
+		t.Errorf("the rename happened before the dir fsync; file = %q", got)
 	}
 }

@@ -64,15 +64,23 @@ func WriteFileAtomic(path string, data []byte) error {
 	return syncDir(filepath.Dir(path))
 }
 
-// syncDir makes a rename in dir durable.
+// syncDir makes a rename in dir durable. It runs after the rename has
+// succeeded, so a filesystem that does not support fsync on a directory
+// (EINVAL, ENOTSUP) must not turn a completed write into a reported failure.
 func syncDir(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
 		return err
 	}
 	defer d.Close()
-	return d.Sync()
+	if err := dirSync(d); err != nil && !errors.Is(err, syscall.EINVAL) && !errors.Is(err, syscall.ENOTSUP) {
+		return err
+	}
+	return nil
 }
+
+// dirSync is a seam for tests.
+var dirSync = func(d *os.File) error { return d.Sync() }
 
 // WriteJSONAtomic writes v as json.dumps(v, indent=2) plus a newline.
 func WriteJSONAtomic(path string, v any) error {

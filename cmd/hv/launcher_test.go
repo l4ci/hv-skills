@@ -247,7 +247,14 @@ func TestLauncherReleaseURLSchemes(t *testing.T) {
 	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+srv.URL), p.launcher, "version"); code != 0 || out != "hv 9.9.9\n" {
 		t.Fatalf("http on 127.0.0.1 must be allowed: code=%d out=%q err=%q", code, out, errOut)
 	}
-	for _, url := range []string{"http://example.com/releases", "ftp://127.0.0.1/x", "http://127.0.0.1.evil.example/x"} {
+	must(t, os.RemoveAll(p.cache))
+	local := strings.Replace(srv.URL, "127.0.0.1", "localhost", 1) + "/"
+	if code, out, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+local), p.launcher, "version"); code != 0 || out != "hv 9.9.9\n" {
+		t.Fatalf("http on localhost:<port>/ must be allowed: code=%d out=%q err=%q", code, out, errOut)
+	}
+	for _, url := range []string{"http://example.com/releases", "ftp://127.0.0.1/x", "http://127.0.0.1.evil.example/x",
+		"http://localhost:1@evil.example/x", "http://127.0.0.1@evil.example", "https://user@github.com/x",
+		"http://localhost:/x", "http://localhost:80x/x", "http://localhostevil.example/x"} {
 		must(t, os.RemoveAll(p.cache))
 		code, _, errOut := runEnv(t, append(base, "HV_RELEASE_BASE_URL="+url), p.launcher, "version")
 		if code != 5 || !strings.Contains(errOut, "refusing release URL") {

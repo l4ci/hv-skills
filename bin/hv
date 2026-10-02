@@ -90,10 +90,24 @@ dir=$cache/$version/$os-$arch
 bin=$dir/hv
 if [ ! -x "$bin" ]; then
   base=${HV_RELEASE_BASE_URL:-https://github.com/l4ci/hv-skills/releases/download}
+  # No userinfo anywhere (http://localhost:1@evil.example is evil.example).
+  # Plain http only when the whole host is localhost or 127.0.0.1, with an
+  # optional numeric port.
+  url_ok=
   case $base in
-    https://* | file://* | http://localhost[:/]* | http://localhost | http://127.0.0.1[:/]* | http://127.0.0.1) ;;
-    *) die "refusing release URL $base" "use https (plain http only for localhost or 127.0.0.1)" ;;
+    *@*) ;;
+    https://* | file://*) url_ok=1 ;;
+    http://*)
+      hostport=${base#http://}
+      hostport=${hostport%%/*}
+      case $hostport in
+        localhost | 127.0.0.1) url_ok=1 ;;
+        localhost:* | 127.0.0.1:*)
+          port=${hostport#*:}
+          case $port in '' | *[!0-9]*) ;; *) url_ok=1 ;; esac ;;
+      esac ;;
   esac
+  [ -n "$url_ok" ] || die "refusing release URL $base" "use https without userinfo (plain http only for localhost or 127.0.0.1)"
   base=$base/v$version
   asset=hv_${os}_${arch}
   mkdir -p "$dir" || die "cannot create $dir"
@@ -104,6 +118,9 @@ if [ ! -x "$bin" ]; then
     if command -v curl >/dev/null 2>&1; then
       curl -fsSL --connect-timeout 10 --max-time 300 --proto-redir =https -o "$2" "$1"
     elif command -v wget >/dev/null 2>&1; then
+      # wget cannot limit redirects to https (GitHub release assets always
+      # redirect, so refusing redirects would break every download). The
+      # sha256 check still applies; see the conventions doc.
       wget -q --tries=1 --timeout=30 -O "$2" "$1"
     else
       die "need curl or wget to download hv v$version"
