@@ -1,12 +1,18 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/l4ci/hv-skills/v5/internal/host"
+	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
 // hostTripwire puts failing herdr, tmux, gh and glab first on PATH for one
@@ -183,5 +189,147 @@ func TestWorkerAccountVerbs(t *testing.T) {
 	}
 	if code, _, _ := hvIn(t, dir, "worker", "account", "assign", "w1", "--account", "ghost"); code != 3 {
 		t.Errorf("unknown account: %d", code)
+	}
+}
+
+// ── host verbs, with the host swapped for a fake ────────────────────────────
+
+type cliHost struct {
+	inSession bool
+	sendErr   error
+	calls     []string
+}
+
+func (h *cliHost) Name() string    { return "tmux" }
+func (h *cliHost) Require() error  { return nil }
+func (h *cliHost) InSession() bool { return h.inSession }
+func (h *cliHost) Where() string   { return "main" }
+func (h *cliHost) Spawn(_ context.Context, o host.SpawnOpts) (string, error) {
+	h.calls = append(h.calls, "spawn")
+	return "hv:" + o.Slot, nil
+}
+func (h *cliHost) Send(_ context.Context, slot, handle, file string) error {
+	b, _ := os.ReadFile(file)
+	h.calls = append(h.calls, "send:"+string(b))
+	return h.sendErr
+}
+func (h *cliHost) Capture(context.Context, string, string, int) string { return "static\n" }
+func (h *cliHost) Status(context.Context, string, string) string       { return "" }
+func (h *cliHost) Kill(context.Context, string, string) error {
+	h.calls = append(h.calls, "kill")
+	return nil
+}
+func (h *cliHost) Notify(context.Context, string, string) {}
+
+func useHost(t *testing.T, h host.Host) {
+	t.Helper()
+	old := workerEnv
+	workerEnv = func() worker.Env {
+		return worker.Env{NewHost: func(string) host.Host { return h }, Sleep: func(time.Duration) {}}
+	}
+	t.Cleanup(func() { workerEnv = old })
+}
+
+func TestWorkerDispatchVerb(t *testing.T) {
+	dir := workerProject(t, `{}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	h := &cliHost{inSession: true}
+	useHost(t, h)
+	brief := filepath.Join(t.TempDir(), "b.md")
+	os.WriteFile(brief, []byte("hello\n"), 0o644)
+
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "w1"); code != 2 {
+		t.Errorf("no --body-file: %d", code)
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--round", "x"); code != 2 {
+		t.Errorf("bad --round: %d", code)
+	}
+	code, out, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T1", "--round", "2", "--json")
+	d := data(t, out)
+	if code != 0 || d["slot"] != "w1" || d["handle"] != "hv:w1" || d["task"] != "T1" || d["round"] != 2.0 || d["relay"] != false || d["changed"] != true {
+		t.Fatalf("dispatch: %d %v", code, d)
+	}
+	if got := strings.Join(h.calls, ","); got != "kill,spawn,send:--- ORCHESTRATOR (round 2) ---\nhello\n" {
+		t.Errorf("calls = %q", got)
+	}
+	code, out, _ = hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--relay", "--json")
+	if d = data(t, out); code != 0 || d["relay"] != true {
+		t.Errorf("relay: %d %v", code, d)
+	}
+
+	// the contract's split: never submitted is retry (6), a dialog is unavailable (5)
+	h.sendErr = host.ErrNotSubmitted
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--relay"); code != 6 {
+		t.Errorf("never submitted: %d, want 6", code)
+	}
+	h.sendErr = host.ErrDialogOpen
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--relay"); code != 5 {
+		t.Errorf("dialog open: %d, want 5", code)
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "ghost", "--body-file", brief); code != 3 {
+		t.Errorf("unknown slot: %d", code)
+	}
+}
+
+func TestWorkerDispatchBodyFromStdin(t *testing.T) {
+	dir := workerProject(t, `{}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	h := &cliHost{inSession: true}
+	useHost(t, h)
+	old, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(old)
+	var so, se bytes.Buffer
+	code := Main([]string{"worker", "dispatch", "w1", "--body-file", "-", "--task", "T1"}, strings.NewReader("from stdin\n"), &so, &se)
+	if code != 0 || !strings.HasSuffix(strings.Join(h.calls, ","), "from stdin\n") {
+		t.Errorf("exit %d calls %q err %s", code, h.calls, se.String())
+	}
+}
+
+func TestWorkerPollVerb(t *testing.T) {
+	dir := workerProject(t, `{}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	useHost(t, &cliHost{inSession: true})
+	code, out, _ := hvIn(t, dir, "worker", "poll", "--settle", "0", "--json")
+	d := data(t, out)
+	rows := d["slots"].([]any)
+	if code != 0 || len(rows) != 1 || rows[0].(map[string]any)["state"] != "idle" || d["changed"] != false {
+		t.Fatalf("poll: %d %v", code, d)
+	}
+	if code, _, _ := hvIn(t, dir, "worker", "poll", "ghost"); code != 3 {
+		t.Errorf("unknown slot: %d", code)
+	}
+
+	fx := filepath.Join(t.TempDir(), "pane.txt")
+	os.WriteFile(fx, []byte("HV-BLOCKED w1: which?\n"), 0o644)
+	t.Setenv("HV_TEST_POLL_FIXTURE", fx)
+	t.Setenv("HV_TEST_POLL_STATUS", "working")
+	code, out, _ = hvIn(t, dir, "worker", "poll", "--json")
+	rows = data(t, out)["slots"].([]any)
+	if code != 0 || rows[0].(map[string]any)["state"] != "blocked" || rows[0].(map[string]any)["name"] != "fixture" {
+		t.Errorf("fixture mode: %d %v", code, rows)
+	}
+	t.Setenv("HV_TEST_POLL_FIXTURE", "/no/such")
+	if code, _, _ := hvIn(t, dir, "worker", "poll"); code != 2 {
+		t.Errorf("missing fixture: %d", code)
+	}
+}
+
+func TestWorkerSessionVerbs(t *testing.T) {
+	dir := workerProject(t, `{}`)
+	h := &cliHost{}
+	useHost(t, h)
+	code, out, _ := hvIn(t, dir, "worker", "session", "check", "--json")
+	if d := data(t, out); code != 1 || d["inside"] != false {
+		t.Errorf("outside: %d %v", code, d)
+	}
+	h.inSession = true
+	code, out, _ = hvIn(t, dir, "worker", "session", "check", "--json")
+	if d := data(t, out); code != 0 || d["inside"] != true || d["where"] != "main" {
+		t.Errorf("inside: %d %v", code, d)
+	}
+	code, out, _ = hvIn(t, dir, "worker", "session", "ensure", "--json")
+	if d := data(t, out); code != 0 || d["handedOff"] != false || d["changed"] != false || d["inside"] != true {
+		t.Errorf("ensure inside: %d %v", code, d)
 	}
 }

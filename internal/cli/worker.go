@@ -5,11 +5,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -41,6 +43,12 @@ func workerCommands() *Command {
 			{Name: "init", Summary: "create the slots' worktrees and register them", Verb: poolInit},
 			{Name: "list", Summary: "list the registered slots", Verb: noFlags(runPoolList)},
 			{Name: "reap", Summary: "remove slots, their worktrees and branches", Verb: poolReap},
+		}},
+		{Name: "dispatch", Summary: "send a brief into a slot's session", Verb: workerDispatch},
+		{Name: "poll", Summary: "classify slot states from their panes", Verb: workerPoll},
+		{Name: "session", Summary: "attachable host session guarantee", Subs: []*Command{
+			{Name: "check", Summary: "inside a managed host session? (exit 1 when outside)", Verb: sessionCheck},
+			{Name: "ensure", Summary: "hand the orchestrator off into a host session", Verb: sessionEnsure},
 		}},
 		{Name: "reset", Summary: "refuse a slot that holds work, else cut a fresh task branch", Verb: workerReset},
 		{Name: "account", Summary: "per-account usage headroom and slot assignment", Subs: []*Command{
@@ -339,5 +347,184 @@ func accountAssign(fs *flag.FlagSet) RunFunc {
 		d.Set("account", name)
 		d.Set("changed", changed)
 		return Result{Data: d, Text: fmt.Sprintf("assigned: %s -> %s", slot, name)}, nil
+	}
+}
+
+// bodyPath resolves a --body-file value: "-" spools stdin to a temp file.
+func bodyPath(c *Ctx, path string) (string, func(), error) {
+	if path != "-" {
+		return path, func() {}, nil
+	}
+	f, err := os.CreateTemp("", "hv-body-*")
+	if err != nil {
+		return "", nil, err
+	}
+	if _, err := io.Copy(f, c.Stdin); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", nil, err
+	}
+	f.Close()
+	return f.Name(), func() { os.Remove(f.Name()) }, nil
+}
+
+func workerDispatch(fs *flag.FlagSet) RunFunc {
+	body := fs.String("body-file", "", "brief to send; - reads stdin")
+	task := fs.String("task", "", "task id: recreates the slot's session and cuts its branch")
+	relay := fs.Bool("relay", false, "inject into the running session as an orchestrator relay")
+	round := fs.String("round", "", "orchestrator round for the signature")
+	boot := fs.Int("boot-timeout", 60, "seconds to wait for the session to boot")
+	return func(c *Ctx, args []string) (Result, error) {
+		slot, err := oneArg(args, "slot")
+		if err != nil {
+			return Result{}, err
+		}
+		if *body == "" {
+			return Result{}, Usage("--body-file is required")
+		}
+		opts := worker.DispatchOpts{Slot: slot, Task: *task, Relay: *relay, BootTimeout: *boot}
+		if *round != "" {
+			n, err := strconv.Atoi(*round)
+			if err != nil || n < 0 || strings.TrimLeft(*round, "0123456789") != "" {
+				return Result{}, Usage("--round must be a number")
+			}
+			opts.Round = &n
+		}
+		root, err := c.Root()
+		if err != nil {
+			return Result{}, err
+		}
+		path, cleanup, err := bodyPath(c, *body)
+		if err != nil {
+			return Result{}, err
+		}
+		defer cleanup()
+		opts.BodyFile = path
+		res, err := workerEnv().Dispatch(context.Background(), root, opts)
+		if err != nil {
+			return Result{}, fromWorker(err)
+		}
+		d := jsonx.NewObject()
+		d.Set("slot", res.Slot)
+		d.Set("handle", res.Handle)
+		if res.Task != "" {
+			d.Set("task", res.Task)
+		}
+		if res.Round != nil {
+			d.Set("round", *res.Round)
+		}
+		d.Set("relay", res.Relay)
+		d.Set("changed", true)
+		return Result{Data: d, Text: fmt.Sprintf("dispatched: %s (%s)", res.Slot, res.Handle)}, nil
+	}
+}
+
+func workerPoll(fs *flag.FlagSet) RunFunc {
+	settle := fs.Float64("settle", 3, "seconds between the two pane captures")
+	lines := fs.Int("lines", 60, "pane lines to classify")
+	return func(c *Ctx, args []string) (Result, error) {
+		if len(args) > 1 {
+			return Result{}, Usage("expected at most one slot, got %d arguments", len(args))
+		}
+		slot := ""
+		if len(args) == 1 {
+			slot = args[0]
+		}
+		var res worker.PollResult
+		var err error
+		// HV_TEST_POLL_FIXTURE classifies a file as a static pane: no host, no
+		// registry writes. Test hooks, not part of the CLI.
+		if fx := os.Getenv("HV_TEST_POLL_FIXTURE"); fx != "" {
+			res, err = worker.PollFixture(fx, slot, os.Getenv("HV_TEST_POLL_STATUS"), *lines)
+		} else {
+			var root string
+			if root, err = c.Root(); err != nil {
+				return Result{}, err
+			}
+			res, err = workerEnv().Poll(context.Background(), root, worker.PollOpts{
+				Slot: slot, Settle: time.Duration(*settle * float64(time.Second)), Lines: *lines})
+		}
+		if err != nil {
+			return Result{}, fromWorker(err)
+		}
+		rows := make([]any, 0, len(res.Slots))
+		var text []string
+		for _, r := range res.Slots {
+			o := jsonx.NewObject()
+			o.Set("name", r.Name)
+			o.Set("state", strings.ToLower(r.State))
+			o.Set("evidence", r.Evidence)
+			rows = append(rows, o)
+			text = append(text, fmt.Sprintf("%s\t%s\t%s", r.Name, strings.ToLower(r.State), r.Evidence))
+		}
+		d := jsonx.NewObject()
+		d.Set("slots", rows)
+		d.Set("changed", res.Changed)
+		return Result{Data: d, Text: strings.Join(text, "\n")}, nil
+	}
+}
+
+func sessionData(st worker.SessionState) *jsonx.Object {
+	d := jsonx.NewObject()
+	d.Set("inside", st.Inside)
+	if st.Where != "" {
+		d.Set("where", st.Where)
+	}
+	return d
+}
+
+func sessionCheck(fs *flag.FlagSet) RunFunc {
+	fs.String("session", "", "tmux session name (unused by check)")
+	return func(c *Ctx, args []string) (Result, error) {
+		if err := noArgs(args); err != nil {
+			return Result{}, err
+		}
+		root, err := c.Root()
+		if err != nil {
+			return Result{}, err
+		}
+		st := workerEnv().SessionCheck(context.Background(), root)
+		if !st.Inside {
+			return Result{Data: sessionData(st), Text: "outside"}, Failed("not inside a managed host session")
+		}
+		return Result{Data: sessionData(st), Text: "inside " + st.Where}, nil
+	}
+}
+
+func sessionEnsure(fs *flag.FlagSet) RunFunc {
+	session := fs.String("session", "", "tmux session name (default: hv)")
+	body := fs.String("body-file", "", "instruction pasted into the operator window; - reads stdin")
+	boot := fs.Int("boot-timeout", 60, "seconds to wait for the operator session to boot")
+	return func(c *Ctx, args []string) (Result, error) {
+		if err := noArgs(args); err != nil {
+			return Result{}, err
+		}
+		root, err := c.Root()
+		if err != nil {
+			return Result{}, err
+		}
+		opts := worker.SessionOpts{Session: *session, BootTimeout: *boot}
+		if *body != "" {
+			path, cleanup, err := bodyPath(c, *body)
+			if err != nil {
+				return Result{}, err
+			}
+			defer cleanup()
+			opts.BodyFile = path
+		}
+		st, err := workerEnv().SessionEnsure(context.Background(), root, opts)
+		if err != nil {
+			return Result{}, fromWorker(err)
+		}
+		d := sessionData(st)
+		d.Set("handedOff", st.HandedOff)
+		if st.HandedOff {
+			d.Set("session", st.Session)
+		}
+		d.Set("changed", st.HandedOff)
+		if !st.HandedOff {
+			return Result{Data: d, Text: "inside " + st.Where + " — no handoff needed"}, nil
+		}
+		return Result{Data: d, Text: fmt.Sprintf("handed off to tmux session '%s'\n\n  Attach:   tmux attach -t %s\n  Windows:  operator  — the cycle continues here\n            w1..wN    — workers (created on dispatch)\n\nThis terminal is no longer the orchestrator and can be closed.\nAnswer a worker's question in that worker's window, or in 'operator'.", st.Session, st.Session)}, nil
 	}
 }
