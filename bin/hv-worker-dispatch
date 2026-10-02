@@ -15,8 +15,15 @@
 # Records the dispatch in .hv/workers.json: the slot's handle (a herdr tab id
 # changes on every dispatch), its task, and state=busy.
 #
+# A task dispatch also guards the slot (hv-worker-reset: refuse when the
+# worktree holds uncommitted or unmerged work, else cut a fresh per-task branch
+# from the cycle branch) and refuses to spawn unless the old session is
+# provably gone (hv_host_kill). A work.workerCommand that resumes a previous
+# conversation (-c, -r, --continue, --resume) is rejected.
+#
 # Tool: exit 0 on confirmed pickup; exit 2 on usage error;
-#       exit 3 on host/slot failure; exit 4 if the brief never submitted;
+#       exit 3 on host/slot failure, a slot holding work, or an old session
+#       that would not close; exit 4 if the brief never submitted;
 #       exit 5 if a dialog in the session refused input (herdr only).
 #
 # Provenance: every payload, brief or relay, is signed with a first line
@@ -106,6 +113,22 @@ EOF
 
 [ -d "$WORKTREE" ] || { echo "error: slot '$SLOT' worktree missing: $WORKTREE" >&2; exit 3; }
 
+# clear_handle — the slot's session is gone: drop its handle, mark it idle.
+clear_handle() {
+  PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$REGISTRY" "$SLOT" <<'PY'
+import sys
+from pathlib import Path
+from hvlib import update_json
+path, name = sys.argv[1:3]
+def mutator(data):
+    for s in data.get("slots", []):
+        if s.get("name") == name:
+            s["handle"] = None
+            s["state"] = "idle"
+update_json(Path(path), {"slots": []}, mutator)
+PY
+}
+
 # record_dispatch <handle> — write handle, state=busy and, for a task, the
 # task id (clearing the previous task's PR and relay log).
 record_dispatch() {
@@ -152,9 +175,51 @@ print(cmd)
 PY
 )"
 
-  # Fresh session every task dispatch — see the /clear note above.
-  hv_host_kill "$SLOT" "$HANDLE"
-  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || exit 3
+  # A resume flag reopens the previous conversation in the "fresh" session,
+  # which undoes the reset. Only tokens after the claude binary count: a
+  # wrapper's own `-c` is not ours to judge.
+  # Quoted arguments are scanned too (`sh -c "claude -c"`), as are `--resume=x`
+  # and short clusters (`-cr`). A command that cannot be parsed is rejected.
+  BAD_FLAG="$(python3 - "$LAUNCH" <<'PY'
+import os, re, shlex, sys
+def scan(cmd):
+    seen = False
+    for t in shlex.split(cmd):
+        if seen:
+            if (t in ("--continue", "--resume") or t.startswith(("--continue=", "--resume="))
+                    or re.fullmatch(r"-[A-Za-z]*[cr][A-Za-z]*", t)):
+                return t
+        elif os.path.basename(t) == "claude":
+            seen = True
+        elif re.search(r"\s", t):
+            hit = scan(t)
+            if hit:
+                return hit
+    return ""
+try:
+    print("bad " + hit if (hit := scan(sys.argv[1])) else "ok")
+except ValueError:
+    print("err")
+PY
+)"
+  case "$BAD_FLAG" in
+    ok) ;;
+    err) echo "error: work.workerCommand cannot be parsed (unbalanced quote?): $LAUNCH" >&2; exit 2 ;;
+    *)   echo "error: work.workerCommand contains '${BAD_FLAG#bad }', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it." >&2
+         exit 2 ;;
+  esac
+
+  # Refuse a slot that still holds work, before its session is killed.
+  "$HERE/hv-worker-reset" --slot "$SLOT" --check-only ${TASK:+--task "$TASK"} || exit 3
+
+  # Fresh session every task dispatch — see the /clear note above. The kill
+  # must be provable: a window that survives it would run beside the new one.
+  hv_host_kill "$SLOT" "$HANDLE" || exit 3
+  # Re-check: the old session may have written between the check and its exit.
+  # The old session is dead from here on, so a failure must not leave its
+  # handle in the registry for a poll or relay to chase.
+  "$HERE/hv-worker-reset" --slot "$SLOT" ${TASK:+--task "$TASK"} || { clear_handle; exit 3; }
+  HANDLE="$(hv_host_spawn "$SLOT" "$SESSION" "$WORKTREE" "$CONFIG_DIR" "$LAUNCH" "$BOOT_TIMEOUT")" || { clear_handle; exit 3; }
 elif [ -z "$HANDLE" ]; then
   echo "error: slot '$SLOT' has no session to relay into — dispatch a task first" >&2; exit 3
 fi

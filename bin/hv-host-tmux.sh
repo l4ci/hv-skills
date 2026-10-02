@@ -121,10 +121,37 @@ hv_host_status() {
   :
 }
 
-# hv_host_kill <slot> <handle> — destroy the slot's window if it exists.
+# _hv_tmux_window_pid <session:window> — the pane PID of the window with that
+# exact name, empty when there is none. Exact match: a bare `-t` target would
+# also take a prefix, so `w1` could be answered by `w10`.
+_hv_tmux_window_pid() {
+  tmux list-windows -t "${1%%:*}" -F '#{window_name} #{pane_pid}' 2>/dev/null \
+    | awk -v n="${1#*:}" '$1 == n { print $2; exit }'
+}
+
+# hv_host_kill <slot> <handle> — destroy the slot's window and prove it is
+# gone. Records the pane PID and its descendants first (claude plus its MCP
+# children); returns 1 (with a message) unless the window no longer exists and
+# every recorded PID has exited. A swallowed failure here
+# would leave the old session running beside the next one in the same worktree.
 hv_host_kill() {
   [ -n "$2" ] || return 0
+  local pid pids="" p alive="" i=0
+  pid="$(_hv_tmux_window_pid "$2")"
+  [ -z "$pid" ] || pids="$(hv_pid_tree "$pid")"
   tmux kill-window -t "$2" 2>/dev/null || true
+  while :; do
+    alive=""
+    for p in $pids; do hv_pid_alive "$p" && alive="$alive $p"; done
+    if [ -z "$(_hv_tmux_window_pid "$2")" ] && [ -z "$alive" ]; then
+      return 0
+    fi
+    i=$((i + 1))
+    [ "$i" -lt "${HV_HOST_KILL_WAIT:-10}" ] || break
+    sleep 1
+  done
+  echo "error: slot '$1' previous session is still running (window $2${alive:+, pids$alive}); not spawning a second one" >&2
+  return 1
 }
 
 # hv_host_notify <title> <body> — tmux has no notification surface.
