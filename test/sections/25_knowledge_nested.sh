@@ -1,4 +1,4 @@
-echo "hv-knowledge-merge preserves nested bullets in non-Glossary topics"
+echo "knowledge add preserves nested bullets in non-Glossary topics"
 TMP_NEST="$(mktemp -d)"
 trap 'rm -rf "$TMP_NEST"' EXIT
 mkdir -p "$TMP_NEST/.hv"
@@ -20,14 +20,17 @@ Durable learnings captured from sessions.
 - **Existing build note** — Body. <!-- 2026-05-12 -->
 EOF
 
-# Insert a new bullet under ## Architecture. The hv-knowledge-merge parser
+# Insert a new bullet under ## Architecture. The knowledge add parser
 # uses column-0 `## ` regex via hvlib.find_section — nested bullets (which
 # start with whitespace) MUST NOT be treated as topic boundaries.
-( cd "$TMP_NEST" && "$BIN/hv-knowledge-merge" \
+RC=0
+OUT=$(hvj -C "$TMP_NEST" knowledge add \
     --topic "Architecture" \
     --title "New constraint" \
     --date "2026-05-16" \
-    --body "Body of the new constraint." >/dev/null )
+    --body-file - <<<"Body of the new constraint.") || RC=$?
+[ "$RC" = "0" ] || fail "knowledge add exit $RC: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "knowledge add should report changed: $OUT"
 
 grep -q "New constraint" "$TMP_NEST/.hv/KNOWLEDGE.md" || fail "new bullet not inserted"
 grep -q "Existing constraint" "$TMP_NEST/.hv/KNOWLEDGE.md" || fail "existing bullet lost"
@@ -49,4 +52,4 @@ BUILD_LINE=$(grep -n "^## Build & Tooling$" "$TMP_NEST/.hv/KNOWLEDGE.md" | head 
 [ "$NESTED_ONE_LINE" -lt "$BUILD_LINE" ] || fail "topic order disturbed"
 
 trap 'rm -rf "$TMP"' EXIT
-pass "hv-knowledge-merge preserves nested bullets in non-Glossary topics"
+pass "knowledge add preserves nested bullets in non-Glossary topics"

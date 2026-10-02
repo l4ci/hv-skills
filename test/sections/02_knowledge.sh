@@ -1,4 +1,4 @@
-echo "hv-managed-block knowledge"
+echo "block knowledge"
 mkdir -p .hv
 cat > .hv/KNOWLEDGE.md <<'EOF'
 # Knowledge
@@ -9,14 +9,14 @@ cat > .hv/KNOWLEDGE.md <<'EOF'
 ## Testing
 - another thing
 EOF
-"$BIN/hv-managed-block" knowledge >/dev/null
+"$HV_BIN" block knowledge >/dev/null
 grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || fail "managed block not in CLAUDE.md"
 grep -q "^- Architecture" CLAUDE.md || fail "Architecture topic missing"
 grep -q "^- Testing" CLAUDE.md || fail "Testing topic missing"
 pass "CLAUDE.md managed block created with topics"
 
 # Re-running should update in place, not duplicate
-"$BIN/hv-managed-block" knowledge >/dev/null
+"$HV_BIN" block knowledge >/dev/null
 COUNT_START=$(grep -c "hv-knowledge-start" CLAUDE.md)
 [ "$COUNT_START" = "1" ] || fail "managed block duplicated"
 pass "managed block updated in place"
@@ -32,14 +32,14 @@ cat > CLAUDE.md <<'EOF'
 
 # Postamble
 EOF
-"$BIN/hv-managed-block" knowledge >/dev/null
+"$HV_BIN" block knowledge >/dev/null
 grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || fail "legacy markers not migrated to new format"
 grep -q "hv:knowledge:start" CLAUDE.md && fail "legacy colon markers still present after migration"
 grep -q "^# Preamble" CLAUDE.md || fail "preamble lost during migration"
 grep -q "^# Postamble" CLAUDE.md || fail "postamble lost during migration"
 pass "legacy colon markers migrated to dashed format in place"
 
-# hv-knowledge-query — unmatched topic warns on stderr, exits 0, stdout untouched (T109/#16)
+# knowledge query — unmatched topic warns, exits 0, text untouched (T109/#16)
 # No EXIT trap here — clean up explicitly so the runner's global `$TMP` trap
 # stays intact (F38 local-trap convention).
 KQ_TMP="$(mktemp -d)"
@@ -51,29 +51,31 @@ cat > "$KQ_TMP/.hv/KNOWLEDGE.md" <<'EOF'
 - **Rule one** — body text here <!-- 2026-01-01 -->
 EOF
 
-# (a) existing topic: bullets on stdout, NO warning on stderr, exit 0
-OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Some Topic" 2>"$KQ_TMP/err.txt"); RC=$?
-ERR=$(cat "$KQ_TMP/err.txt")
-[ "$RC" = "0" ] || fail "knowledge-query existing topic exit $RC (want 0)"
-grep -q "^## Some Topic" <<<"$OUT" || fail "existing topic missing '## Some Topic' on stdout"
-grep -q "Rule one" <<<"$OUT" || fail "existing topic missing bullet on stdout"
-[ -z "$ERR" ] || fail "existing topic emitted unexpected stderr: $ERR"
+# (a) existing topic: bullets in data.text, nothing missing, no warnings, exit 0
+RC=0; OUT=$(hvj -C "$KQ_TMP" knowledge query "Some Topic" 2>/dev/null) || RC=$?
+[ "$RC" = "0" ] || fail "knowledge query existing topic exit $RC (want 0)"
+TEXT=$(jget data.text <<<"$OUT")
+grep -q "^## Some Topic" <<<"$TEXT" || fail "existing topic missing '## Some Topic' in text"
+grep -q "Rule one" <<<"$TEXT" || fail "existing topic missing bullet in text"
+[ "$(jget data.missing <<<"$OUT")" = "[]" ] || fail "existing topic reported missing: $OUT"
+if jget warnings <<<"$OUT" >/dev/null 2>&1; then fail "existing topic emitted warnings: $OUT"; fi
 
-# (b) bogus topic: empty stdout, warning on stderr, exit 0
-OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Bogus" 2>"$KQ_TMP/err.txt"); RC=$?
-ERR=$(cat "$KQ_TMP/err.txt")
-[ "$RC" = "0" ] || fail "knowledge-query bogus topic exit $RC (want 0)"
-[ -z "$OUT" ] || fail "bogus topic produced stdout: $OUT"
-grep -q "warning:" <<<"$ERR" || fail "bogus topic missing 'warning:' on stderr"
-grep -q "Bogus" <<<"$ERR" || fail "bogus topic warning missing topic text"
+# (b) bogus topic: empty text, topic reported missing, a warning, exit 0
+RC=0; OUT=$(hvj -C "$KQ_TMP" knowledge query "Bogus" 2>/dev/null) || RC=$?
+[ "$RC" = "0" ] || fail "knowledge query bogus topic exit $RC (want 0)"
+[ -z "$(jget data.text <<<"$OUT")" ] || fail "bogus topic produced text: $OUT"
+[ "$(jget data.missing <<<"$OUT")" = '["Bogus"]' ] || fail "bogus topic not in missing: $OUT"
+grep -q "Bogus" <<<"$(jget 'warnings[0]' <<<"$OUT")" || fail "bogus topic warning missing topic text: $OUT"
 
-# (c) mixed real + bogus: real section on stdout, warn only about bogus, exit 0
-OUT=$(cd "$KQ_TMP" && "$BIN/hv-knowledge-query" "Some Topic" "Bogus" 2>"$KQ_TMP/err.txt"); RC=$?
-ERR=$(cat "$KQ_TMP/err.txt")
-[ "$RC" = "0" ] || fail "knowledge-query mixed topics exit $RC (want 0)"
-grep -q "^## Some Topic" <<<"$OUT" || fail "mixed query missing real topic on stdout"
-grep -q "Bogus" <<<"$ERR" || fail "mixed query missing warning for bogus topic"
-if grep -q "Some Topic" <<<"$ERR"; then fail "mixed query warned about matched topic"; fi
+# (c) mixed real + bogus: real section in text, only the bogus one missing, exit 0
+RC=0; OUT=$(hvj -C "$KQ_TMP" knowledge query "Some Topic" "Bogus" 2>/dev/null) || RC=$?
+[ "$RC" = "0" ] || fail "knowledge query mixed topics exit $RC (want 0)"
+grep -q "^## Some Topic" <<<"$(jget data.text <<<"$OUT")" || fail "mixed query missing real topic in text"
+[ "$(jget data.missing <<<"$OUT")" = '["Bogus"]' ] || fail "mixed query should list only Bogus as missing: $OUT"
+if grep -q "Some Topic" <<<"$(jget warnings <<<"$OUT")"; then fail "mixed query warned about matched topic"; fi
+
+# no topic given is a usage error (exit 2)
+RC=0; hvj -C "$KQ_TMP" knowledge query >/dev/null 2>&1 || RC=$?
+[ "$RC" = "2" ] || fail "knowledge query with no topic exit $RC (want 2)"
 rm -rf "$KQ_TMP"
-pass "hv-knowledge-query warns on unmatched topics, silent on matches, exits 0"
-
+pass "knowledge query warns on unmatched topics, silent on matches, exits 0"
