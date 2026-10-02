@@ -604,3 +604,35 @@ func withFields(is Issue, lines ...string) Issue {
 	is.Body = "<!-- hv:fields\n" + strings.Join(lines, "\n") + "\n-->"
 	return is
 }
+
+func TestListingActiveStreamsHideOnlyTheirOwnRepoRow(t *testing.T) {
+	u, _, _ := twoRepos(t)
+	rows, md, _, err := OpenRows(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	features := func(active ...Active) string {
+		var out []string
+		for _, r := range BuildListing(rows, md, active, "").Features {
+			out = append(out, r.ID)
+		}
+		return strings.Join(out, " ")
+	}
+	for name, c := range map[string]struct {
+		active Active
+		want   string
+	}{
+		"bare in api":         {Active{Branch: "b", Repo: "api", Items: []string{"F1"}}, "web:1"},
+		"bare in web":         {Active{Branch: "b", Repo: "web", Items: []string{"1"}}, "api:1"},
+		"bare hash":           {Active{Branch: "b", Repo: "web", Items: []string{"#1"}}, "api:1"},
+		"bare without repo":   {Active{Branch: "b", Items: []string{"F1"}}, ""},
+		"qualified":           {Active{Branch: "b", Items: []string{"web:F1"}}, "api:1"},
+		"qualified hash":      {Active{Branch: "b", Repo: "api", Items: []string{"web#1"}}, "api:1"},
+		"qualified id":        {Active{Branch: "b", Items: []string{"api:1"}}, "web:1"},
+		"other repo's number": {Active{Branch: "b", Repo: "api", Items: []string{"B2"}}, "web:1 api:1"},
+	} {
+		if got := features(c.active); got != c.want {
+			t.Errorf("%s: features %q, want %q", name, got, c.want)
+		}
+	}
+}

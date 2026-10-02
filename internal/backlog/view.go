@@ -65,6 +65,28 @@ func OpenRows(be Backend) (rows []Row, md string, ok bool, err error) {
 	return rows, md, true, nil
 }
 
+// activeIn is whether an umbrella issue row is claimed by an active stream. A
+// stream names its items in any spelling an issue answers to; a spelling that
+// does not name the sub-repo ("F12", "12") counts only when the stream is in
+// that sub-repo or in none, because another sub-repo's F12 is another item.
+func (r Row) activeIn(active []Active) bool {
+	if r.Repo == "" {
+		return false
+	}
+	for _, e := range active {
+		for _, id := range e.Items {
+			if !r.IssueMatches(map[string]bool{id: true}) {
+				continue
+			}
+			qualified := strings.Contains(id, ":") || strings.Index(id, "#") > 0
+			if qualified || e.Repo == "" || e.Repo == r.Repo {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IssueMatches is whether r is one of the wanted references, in every
 // spelling an issue answers to: "12", "#12", "F12" and, in an umbrella,
 // "repo:12", "repo:F12", "repo:#12" and "repo#12".
@@ -235,7 +257,7 @@ func BuildListing(rows []Row, md string, active []Active, grep string) *Listing 
 		return 3
 	}
 	for _, r := range rows {
-		if activeIDs[r.ID] || !match(r) {
+		if activeIDs[r.ID] || r.activeIn(active) || !match(r) {
 			continue
 		}
 		lr := ListRow{Row: r, Related: strings.TrimRight(r.Fields.Get("related"), "."),

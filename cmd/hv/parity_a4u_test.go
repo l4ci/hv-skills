@@ -34,6 +34,7 @@ package main
 //  6. item show, bare ref: the old helper prints the bare canonical ID, Go
 //     always the qualified one (the contract's rule 11).
 //  7. create with --repo X --repos Y (X != Y): Go 2, the shim ignores --repo.
+//  11. a stream's item hides only its own sub-repo's row (backlog list).
 //  8. data.changed: the shim says true for every issue write; Go reports
 //     whether the tracker changed (dropped, then asserted on Go's side).
 
@@ -147,6 +148,7 @@ type ubcase struct {
 	name   string
 	repos  []ubRepo // default ubDefault
 	cfg    string   // config.json, default ubCfg
+	status string   // .hv/status.json
 	cwd    string   // working directory relative to the umbrella ("" root, "web", "web/src/deep")
 	argv   []string // new-shape argv, --json included
 	in     string
@@ -179,7 +181,7 @@ func ubInit(t *testing.T, c ubcase) (dir string, repos []ubRepo) {
 	for _, r := range repos {
 		subs[r.name] = nil
 	}
-	f := fx{config: cfg, noBacklog: true, subs: subs, after: func(t *testing.T, dir string, _ *info) {
+	f := fx{config: cfg, status: c.status, noBacklog: true, subs: subs, after: func(t *testing.T, dir string, _ *info) {
 		for _, r := range repos {
 			if r.remote != "none" {
 				git(t, filepath.Join(dir, r.name), "remote", "add", "origin", fmt.Sprintf(map[string]string{"github": ubGH, "gitlab": ubGL}[r.remote], r.name))
@@ -890,6 +892,32 @@ func TestParityA4Umbrella(t *testing.T) {
 					}
 				}
 			}},
+		ubcase{name: "backlog-list/active-stream-hides-its-repos-item", argv: j("backlog", "list"), want: 0,
+			status: `{"active": [{"branch": "feat/x", "repo": "api", "items": ["F1"], "startedAt": "2026-10-01T10:00:00Z"}]}`,
+			div:    "11: the old helper hides every sub-repo's F1; Go hides only the stream's own (api)", refWant: 0,
+			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+				var got []string
+				for _, r := range at(e, "data.features").([]any) {
+					got = append(got, r.(map[string]any)["id"].(string))
+				}
+				if !reflect.DeepEqual(got, []string{"web:1", "api:5"}) {
+					t.Errorf("features %v", got)
+				}
+				eq(t, e, "data.inProgress.0.id", "F1")
+				eq(t, e, "data.inProgress.0.repo", "api")
+			}},
+		ubcase{name: "backlog-list/active-stream-qualified-item", argv: j("backlog", "list"), want: 0,
+			status: `{"active": [{"branch": "feat/x", "repo": null, "items": ["web:F1"], "startedAt": "2026-10-01T10:00:00Z"}]}`,
+			div:    "11: the old helper compares bare bullet IDs and never hides a qualified one", refWant: 0,
+			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+				var got []string
+				for _, r := range at(e, "data.features").([]any) {
+					got = append(got, r.(map[string]any)["id"].(string))
+				}
+				if !reflect.DeepEqual(got, []string{"api:1", "api:5"}) {
+					t.Errorf("features %v", got)
+				}
+			}},
 		ubcase{name: "backlog-list/clusters", argv: j("backlog", "list"), want: 0, norm: ubNormList,
 			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
 				cl, _ := at(e, "data.clusters").([]any)
@@ -1013,3 +1041,111 @@ func withCwdCase(c ubcase, cw string) ubcase {
 }
 
 var _ = exec.Command
+
+// TestParityA4UmbrellaFile runs the item verbs in a file-backend umbrella: one
+// BACKLOG.md at the umbrella root, sub-repos registered in .hv/repos.json, the
+// verbs run from the root, a sub-repo or a deep directory, with --repo valid
+// and unregistered. The old helpers self-locate to the umbrella .hv/; the
+// exceptions (hv-todo-field and hv-todo-set-field, which read .hv/ from the
+// cwd) are marked with a divergence where the scenario runs below the root.
+func TestParityA4UmbrellaFile(t *testing.T) {
+	var all []scn
+	add := func(s ...scn) { all = append(all, s...) }
+	umb := umbFx
+	raw := "- **[B77] [P2] Raw bullet.** Verbatim body.\n"
+	umb.files = map[string]string{"raw.md": raw, "web/raw.md": raw, "web/src/raw.md": raw, "api/raw.md": raw}
+	umb.after = func(t *testing.T, dir string, _ *info) {
+		if err := os.MkdirAll(filepath.Join(dir, "web", "src"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, cw := range []string{"", "web", "web/src", "api"} {
+		cw := cw
+		tag := map[bool]string{true: "root", false: strings.ReplaceAll(cw, "/", "_")}[cw == ""]
+		mk := func(name string, s scn) scn {
+			s.name, s.cwd, s.fx = name+"/"+tag, cw, umb
+			return s
+		}
+		// the verbs whose helpers self-locate behave the same from anywhere
+		add(
+			mk("complete", scn{argv: j("item", "complete", "B01", "--commit", "{h1}"), want: 0}),
+			mk("complete-no-proof-refused", scn{argv: j("item", "complete", "B02", "--commit", "{h1}"), want: 4}),
+			mk("complete-unknown", scn{argv: j("item", "complete", "B99", "--commit", "{h1}"), want: 3}),
+			mk("reopen", scn{argv: j("item", "reopen", "B08"), want: 0}),
+			mk("create-repos", scn{argv: j("item", "create", "--kind", "tasks", "--title", "Umb task", "--repos", "web"), want: 0}),
+			mk("create-multi-repos", scn{argv: j("item", "create", "--kind", "bugs", "--title", "Both", "--tag", "P2", "--repos", "web, api"), want: 0}),
+			mk("create-no-repos", scn{argv: j("item", "create", "--kind", "features", "--title", "None", "--tag", "Minor"), want: 0}),
+			mk("raw-file", scn{argv: j("item", "create", "--kind", "bugs", "--raw-file", "raw.md"), want: 0}),
+			mk("idnext", scn{argv: j("id", "next", "--kind", "bugs"), want: 0}),
+			mk("ready", scn{argv: j("item", "ready", "B01"), old: []string{"hv-item-ready", "B01"}, want: 0}),
+			mk("comment-add", scn{argv: j("item", "comment", "add", "B01", "--kind", "question", "--body-file", "-"), in: "Why?", want: 0,
+				old: []string{"hv-item-comment", "B01", "--kind", "question", "--body-file", "-"}}),
+			mk("rm-preview", scn{argv: j("item", "rm", "B03"), want: 0}),
+			mk("rm-apply", scn{argv: j("item", "rm", "B03", "--apply"), want: 0}),
+			mk("shipped", scn{argv: j("item", "shipped", "parser-core lexer-v2"), want: map[bool]int{true: 0, false: 1}[cw == ""], old: []string{"hv-capture-audit", "parser-core lexer-v2"},
+				oldMap: func(rc int, _ string) int { return map[int]int{2: 0, 0: 1, 1: 2}[rc] }}),
+		)
+		// the field verbs read .hv/ from the cwd in the old helpers
+		fget := mk("fieldget-repos", scn{argv: j("item", "field", "get", "B03", "--name", "repos"), want: 0,
+			check: func(t *testing.T, e envl, _ run) { eq(t, e, "data.value", "web") }})
+		fset := mk("fieldset-repos", scn{argv: j("item", "field", "set", "B03", "--name", "repos", "--value", "web, api"), want: 0})
+		flst := mk("fieldlist", scn{argv: j("item", "field", "list", "B03"), want: 0})
+		if cw != "" {
+			// divergence 10: the old hv-todo-field and hv-todo-set-field do not
+			// self-locate, so the reference exits 3 below the root; Go's own
+			// result is asserted instead
+			for _, f := range []*scn{&fget, &fset, &flst} {
+				f.goOnly = true
+				f.name += "/go-only"
+			}
+			fset.check = func(t *testing.T, e envl, _ run) {
+				eq(t, e, "data.changed", true)
+				eq(t, e, "data.value", "web, api")
+			}
+			flst.check = func(t *testing.T, e envl, _ run) { eq(t, e, "data.fields.repos", "web") }
+		}
+		add(fget, fset, flst)
+	}
+	// --repo: validated before the verb's own checks (3), a registered name changes nothing in file mode
+	for _, c := range []struct {
+		n    string
+		argv []string
+		want int
+	}{
+		{"complete", j("item", "complete", "B01", "--commit", "{h1}"), 0},
+		{"reopen", j("item", "reopen", "B08"), 0},
+		{"create", j("item", "create", "--kind", "tasks", "--title", "x", "--repos", "web"), 0},
+		{"fieldget", j("item", "field", "get", "B03", "--name", "repos"), 0},
+		{"fieldset", j("item", "field", "set", "B03", "--name", "milestone", "--value", "M02"), 0},
+		{"idnext", j("id", "next", "--kind", "tasks"), 0},
+		{"ready", j("item", "ready", "B01"), 0},
+		{"rm-apply", j("item", "rm", "B03", "--apply"), 0},
+	} {
+		c := c
+		reg := append(append([]string{}, c.argv...), "--repo", "web")
+		add(scn{name: "repoflag-registered/" + c.n, fx: umb, argv: reg, want: c.want,
+			div: "1: the shim only validates --repo on item verbs; file mode keeps one backlog, so the result is the unscoped one", refWant: c.want})
+		bad := append(append([]string{}, c.argv...), "--repo", "nope")
+		add(scn{name: "repoflag-unregistered/" + c.n, fx: umb, argv: bad, want: 3})
+	}
+	// an unknown ID under --repo is the verb's own 3, a bad flag still 2 after a valid --repo
+	add(
+		scn{name: "repoflag-then-verb-error/unknown-id", fx: umb, argv: j("item", "complete", "B99", "--commit", "{h1}", "--repo", "api"), want: 3},
+		scn{name: "repoflag-then-verb-error/bad-reason", fx: umb, argv: j("item", "complete", "B01", "--reason", "wontfix", "--repo", "api"), want: 2},
+		scn{name: "repoflag-then-verb-error/missing-title", fx: umb, argv: j("item", "create", "--kind", "bugs", "--repo", "api"), want: 2},
+		scn{name: "repoflag-unregistered-first/bad-flag-value", fx: umb, argv: j("item", "complete", "B01", "--reason", "wontfix", "--repo", "nope"), want: 3},
+		scn{name: "create/repos-names-are-not-validated", fx: umb, argv: j("item", "create", "--kind", "tasks", "--title", "Free text", "--repos", "elsewhere"), want: 0},
+	)
+	seen := map[string]bool{}
+	for _, s := range all {
+		if seen[s.name] {
+			t.Fatalf("duplicate scenario %s", s.name)
+		}
+		seen[s.name] = true
+	}
+	t.Logf("%d file-umbrella scenarios", len(all))
+	for _, s := range all {
+		s := s
+		t.Run(s.name, s.exec)
+	}
+}
