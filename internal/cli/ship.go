@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -33,8 +32,8 @@ func shipCommands() *Command {
 }
 
 // shipGit runs git in dir; a failure to run it is mapped onto the exit table.
-func shipGit(dir string, args ...string) (git.Result, error) {
-	res, err := git.Repo{Dir: dir}.Run(context.Background(), args...)
+func shipGit(c *Ctx, dir string, args ...string) (git.Result, error) {
+	res, err := git.Repo{Dir: dir}.Run(c.Context(), args...)
 	return res, gitErr(err)
 }
 
@@ -95,7 +94,7 @@ func shipExistingBranch(c *Ctx, branch string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ok, err := git.Repo{Dir: dir}.Verify(context.Background(), branch+"^{commit}")
+	ok, err := git.Repo{Dir: dir}.Verify(c.Context(), branch+"^{commit}")
 	if err != nil {
 		return "", gitErr(err)
 	}
@@ -108,7 +107,7 @@ func shipExistingBranch(c *Ctx, branch string) (string, error) {
 // shipClearWorktree removes the linked worktree that has branch checked out
 // (hv-worktree-clear), so the branch can be pushed or merged and deleted.
 func shipClearWorktree(c *Ctx, dir, branch string) error {
-	res, err := shipGit(dir, "worktree", "list", "--porcelain")
+	res, err := shipGit(c, dir, "worktree", "list", "--porcelain")
 	if err != nil {
 		return err
 	}
@@ -123,7 +122,7 @@ func shipClearWorktree(c *Ctx, dir, branch string) error {
 	if wt == "" {
 		return nil
 	}
-	rm, err := shipGit(dir, "worktree", "remove", wt)
+	rm, err := shipGit(c, dir, "worktree", "remove", wt)
 	if err != nil {
 		return err
 	}
@@ -158,11 +157,11 @@ func shipBody(c *Ctx, args []string) (Result, error) {
 		return Result{}, err
 	}
 	rng := t.Base + ".." + t.Branch
-	subj, err := shipGit(t.Dir, "log", "--no-merges", "--format=%s", rng)
+	subj, err := shipGit(c, t.Dir, "log", "--no-merges", "--format=%s", rng)
 	if err != nil {
 		return Result{}, err
 	}
-	full, err := shipGit(t.Dir, "log", "--no-merges", "--format=%B", rng)
+	full, err := shipGit(c, t.Dir, "log", "--no-merges", "--format=%B", rng)
 	if err != nil {
 		return Result{}, err
 	}
@@ -244,7 +243,7 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		root := shipRoot(dir)
 		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
 
@@ -281,7 +280,7 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 		if err := shipClearWorktree(c, dir, branch); err != nil {
 			return Result{}, err
 		}
-		push, err := shipGit(dir, "push", "-u", "origin", branch)
+		push, err := shipGit(c, dir, "push", "-u", "origin", branch)
 		if err != nil {
 			return Result{}, err
 		}
@@ -394,7 +393,7 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		base, ok, err := resolveBase(context.Background(), dir)
+		base, ok, err := resolveBase(c.Context(), dir)
 		if err != nil {
 			return Result{}, err
 		}
@@ -407,33 +406,33 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 		if err := shipClearWorktree(c, dir, branch); err != nil {
 			return Result{}, err
 		}
-		co, err := shipGit(dir, "checkout", "-q", base)
+		co, err := shipGit(c, dir, "checkout", "-q", base)
 		if err != nil {
 			return Result{}, err
 		}
 		if co.Code != 0 {
 			return Result{}, Unavailable("git checkout %s: %s", base, shipFirstLine(co.Stderr))
 		}
-		mg, err := shipGit(dir, "merge", "--no-ff", branch, "-m", msg)
+		mg, err := shipGit(c, dir, "merge", "--no-ff", branch, "-m", msg)
 		if err != nil {
 			return Result{}, err
 		}
 		if mg.Code != 0 {
 			if all := mg.Stdout + mg.Stderr; strings.Contains(all, "CONFLICT") || strings.Contains(all, "Automatic merge failed") {
 				// The tree is left as it was.
-				shipGit(dir, "merge", "--abort")
+				shipGit(c, dir, "merge", "--abort")
 				return shipBlocked("conflict", "merge conflict; merge aborted")
 			}
 			return Result{}, Unavailable("git merge %s: %s", branch, shipFirstLine(mg.Stderr+mg.Stdout))
 		}
-		del, err := shipGit(dir, "branch", "-d", branch)
+		del, err := shipGit(c, dir, "branch", "-d", branch)
 		if err != nil {
 			return Result{}, err
 		}
 		if del.Code != 0 {
 			return Result{}, Unavailable("git branch -d %s: %s", branch, shipFirstLine(del.Stderr))
 		}
-		sha, err := shipGit(dir, "log", "-1", "--format=%h")
+		sha, err := shipGit(c, dir, "log", "-1", "--format=%h")
 		if err != nil {
 			return Result{}, err
 		}
@@ -531,13 +530,13 @@ func shipUndo(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		g := func(a ...string) (string, error) {
-			res, err := shipGit(dir, a...)
+			res, err := shipGit(c, dir, a...)
 			if err == nil && res.Code != 0 {
 				err = Unavailable("git %s: %s", strings.Join(a, " "), shipFirstLine(res.Stderr))
 			}
 			return shipLine(res.Stdout), err
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		base, ok, err := resolveBase(ctx, dir)
 		if err != nil {
 			return Result{}, err
@@ -546,7 +545,7 @@ func shipUndo(fs *flag.FlagSet) RunFunc {
 			return shipBlocked("refused", "could not determine base branch (tried git.baseBranch, main, master, trunk, origin/HEAD)")
 		}
 		cur := ""
-		if res, err := shipGit(dir, "symbolic-ref", "--short", "HEAD"); err != nil {
+		if res, err := shipGit(c, dir, "symbolic-ref", "--short", "HEAD"); err != nil {
 			return Result{}, err
 		} else if res.Code == 0 {
 			cur = shipLine(res.Stdout)
@@ -583,7 +582,7 @@ func shipUndo(fs *flag.FlagSet) RunFunc {
 
 		var merge string
 		if *cycle != "" {
-			res, err := shipGit(dir, "rev-parse", "--verify", *cycle+"^{commit}")
+			res, err := shipGit(c, dir, "rev-parse", "--verify", *cycle+"^{commit}")
 			if err != nil {
 				return Result{}, err
 			}

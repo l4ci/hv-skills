@@ -208,7 +208,7 @@ func releaseHost(c *Ctx, args []string) (Result, error) {
 	}
 	url := ""
 	// A failing git (no origin, not a repo, no git) means no host, as before.
-	if res, err := (git.Repo{Dir: dir}).Run(context.Background(), "remote", "get-url", "origin"); err == nil && res.Code == 0 {
+	if res, err := (git.Repo{Dir: dir}).Run(c.Context(), "remote", "get-url", "origin"); err == nil && res.Code == 0 {
 		url = strings.TrimRight(res.Stdout, "\n")
 	}
 	host := release.Host(url)
@@ -258,7 +258,7 @@ func releaseNotes(fs *flag.FlagSet) RunFunc {
 		if *since != "" {
 			rng = *since + "..HEAD"
 		}
-		res, err := git.Repo{Dir: dir}.Run(context.Background(), "log", rng, "--pretty="+release.LogFormat, "--no-merges")
+		res, err := git.Repo{Dir: dir}.Run(c.Context(), "log", rng, "--pretty="+release.LogFormat, "--no-merges")
 		if err != nil {
 			return Result{}, gitErr(err)
 		}
@@ -361,7 +361,7 @@ func releasePending(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	ctx, r := context.Background(), git.Repo{Dir: dir}
+	ctx, r := c.Context(), git.Repo{Dir: dir}
 	tag, commits, tagTS := "", 0, int64(0)
 	// describe failing (no tag, not a repo, no git) means no tag yet.
 	if res, err := r.Run(ctx, "describe", "--tags", "--abbrev=0"); err == nil && res.Code == 0 {
@@ -483,7 +483,7 @@ func releaseNotesIssues(c *Ctx, mid, since string) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
-		res, err := git.Repo{Dir: dir}.Run(context.Background(), "log", "--format=%s", since+"..HEAD")
+		res, err := git.Repo{Dir: dir}.Run(c.Context(), "log", "--format=%s", since+"..HEAD")
 		if err != nil {
 			return Result{}, gitErr(err)
 		}

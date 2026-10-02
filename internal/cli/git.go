@@ -95,7 +95,7 @@ func gitBase(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	base, ok, err := resolveBase(context.Background(), dir)
+	base, ok, err := resolveBase(c.Context(), dir)
 	if err != nil {
 		return Result{}, err
 	}
@@ -111,7 +111,7 @@ func gitGuardClean(fs *flag.FlagSet) RunFunc {
 		if len(args) > 0 {
 			return Result{}, Usage("unexpected argument %q; the context goes in --context", args[0])
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		what := *context_
 		dir, err := c.RepoPath()
 		if err != nil {
@@ -182,7 +182,7 @@ func gitGuardFeature(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	ctx := context.Background()
+	ctx := c.Context()
 	branch := ""
 	if len(args) == 1 {
 		branch = args[0]
@@ -245,7 +245,7 @@ func gitBranch(fs *flag.FlagSet) RunFunc {
 		if len(missing) > 0 {
 			return Result{}, Resolution("unregistered sub-repo(s): %s", strings.Join(missing, ", "))
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		var taken []string
 		for _, n := range names {
 			exists, err := git.Repo{Dir: repos[n]}.BranchExists(ctx, branch)

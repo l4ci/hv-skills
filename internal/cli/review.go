@@ -127,7 +127,7 @@ func reviewScope(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	info, err := reviewScan(context.Background(), t)
+	info, err := reviewScan(c.Context(), t)
 	if err != nil {
 		return Result{}, err
 	}
@@ -159,7 +159,7 @@ func reviewBrief(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	ctx := context.Background()
+	ctx := c.Context()
 	info, err := reviewScan(ctx, t)
 	if err != nil {
 		return Result{}, err
@@ -302,7 +302,7 @@ func reviewScaffolding(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		ctx := context.Background()
+		ctx := c.Context()
 		r := git.Repo{Dir: dir}
 		base := *baseFlag
 		if base == "" {

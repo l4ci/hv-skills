@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 
@@ -46,7 +45,7 @@ func resolveBranch(c *Ctx, args []string) (branchTarget, error) {
 	if t.Dir == "" {
 		t.Dir = cwd
 	}
-	ctx := context.Background()
+	ctx := c.Context()
 	r := git.Repo{Dir: t.Dir}
 	if len(args) == 1 && args[0] != "" {
 		t.Branch = args[0]
