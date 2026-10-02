@@ -1,6 +1,6 @@
 # Parallel rounds
 
-A round is one orchestrator session plus two to four workers, each a standing agent in
+A round is one orchestrator session plus two to five workers, each a standing agent in
 its own git worktree and herdr workspace, each holding one GitHub issue at a time. Workers
 implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
 decisions, merges PRs and re-verifies on `main` after every merge.
@@ -22,8 +22,8 @@ bash test/smoke.sh                   # ~75 s on main; sequential by design
 Read the final `All smoke tests passed.` line, not a pipe's exit code. If the suite fails,
 run it on `origin/main` in a throwaway worktree before triaging your branch
 (`.hv/KNOWLEDGE.md`, "Pre-existing smoke failures"). Smoke sections are sourced by
-`test/runner.sh`, never executable alone. New sections take the number the dispatch
-assigns; `50` and `51` are claimed by the current round.
+`test/runner.sh`, never executable alone. New sections take the number your dispatch assigns;
+do not pick one yourself, siblings are numbering theirs at the same time.
 
 There are no servers and no ports in this repo. The full suite is cheap enough that the
 worker gate and the orchestrator's merge gate are the same commands.
@@ -51,17 +51,41 @@ worker gate and the orchestrator's merge gate are the same commands.
   acted on, and labels your own calls as unratified. Reference the issue so it closes on
   merge, unless the PR is a partial slice.
 
+## Tracker CLI gotchas
+
+On this repo `gh issue view <N> --comments` and `gh pr edit` fail with a Projects-classic
+GraphQL deprecation error. Read an issue with `gh issue view <N> --json title,body,comments`
+(the brief says `--comments`; use this instead), and edit a PR body through the REST API:
+
+```sh
+gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -F body=@body.md
+```
+
 ## Roster
 
-Slots are provisioned once and reused. Workspace ids are re-derived from
+Slots are provisioned once and reused. Every worktree lives in the project root under
+`.worktrees/<agent>` (gitignored by `/hv-init`), so herdr groups the workspaces under the
+project and `/hv-work`'s `hv-worker-pool` (`.worktrees/<slot>`) shares the same root.
+Provision a slot with:
+
+```sh
+herdr worktree create --path .worktrees/<agent> ...   # from the project root
+git worktree add .worktrees/<agent> park/<agent>      # or, without herdr
+```
+
+Tools that walk the tree without reading `.gitignore` see a second copy of every file
+under `.worktrees/`; none of this repo's helpers or tests do (smoke section 70 pins it).
+
+Workspace ids are re-derived from
 `herdr workspace list` at the start of each round; the label is the handle.
 
 | name | kind | worktree | parking branch | account (`CLAUDE_CONFIG_DIR`) |
 |---|---|---|---|---|
-| ben  | claude | `~/.herdr/worktrees/hv-skills/park-ben`  | `park/ben`  | `/home/vo/.claude-work` |
-| dana | claude | `~/.herdr/worktrees/hv-skills/park-dana` | `park/dana` | `/home/vo/.claude-personal` |
-| nia  | claude | `~/.herdr/worktrees/hv-skills/park-nia`  | `park/nia`  | `/home/vo/.claude-work` |
-| kit  | claude | `~/.herdr/worktrees/hv-skills/park-kit`  | `park/kit`  | `/home/vo/.claude-personal` |
+| ben  | claude | `.worktrees/ben`  | `park/ben`  | `/home/vo/.claude-work` |
+| dana | claude | `.worktrees/dana` | `park/dana` | `/home/vo/.claude-personal` |
+| nia  | claude | `.worktrees/nia`  | `park/nia`  | `/home/vo/.claude-work` |
+| kit  | claude | `.worktrees/kit`  | `park/kit`  | `/home/vo/.claude-personal` |
+| finn | claude | `.worktrees/finn` | `park/finn` | `/home/vo/.claude-personal` |
 
 Model per dispatch is the orchestrator's call (`-- --model <m>` after `agent start`);
 default Sonnet, Opus for multi-helper features.

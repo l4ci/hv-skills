@@ -157,6 +157,16 @@ else
   for line in "${IGNORE_LINES[@]}"; do printf '%s\n' "$line" >> .gitignore; done
 fi
 
+# Worker worktrees (hv-worker-pool, herdr rounds) live in <root>/.worktrees/.
+# A nested checkout must stay out of `git status`; .gitignore, not
+# .git/info/exclude, so every clone gets it. Separate from IGNORE_LINES above:
+# that block is appended whole, which would repeat it in existing projects.
+# Any spelling git treats the same counts: .worktrees, /.worktrees, trailing
+# slash, CRLF line ends.
+if ! tr -d '\r' < .gitignore 2>/dev/null | grep -qxE '/?\.worktrees/?'; then
+  printf '\n# Worker worktrees (hv-worker-pool, parallel rounds)\n.worktrees/\n' >> .gitignore
+fi
+
 # Umbrella scaffolding: per-sub-repo glossary support is deferred to F21
 # (Umbrella-aware KNOWLEDGE.md); v4.0 ships single-repo Glossary only.
 

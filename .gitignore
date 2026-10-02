@@ -31,5 +31,8 @@ __pycache__/
 .hv/qa-runs/
 .hv/migrate-backup/
 
+# Worker worktrees (hv-worker-pool, parallel rounds): nested checkouts
+.worktrees/
+
 # hv release builds (goreleaser)
 dist/
