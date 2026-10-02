@@ -176,6 +176,10 @@ DECISIONS_RC=0
 ( cd "$TMP_UK" && hvj block decisions --repo web >/dev/null 2>&1 ) || DECISIONS_RC=$?
 [ "$DECISIONS_RC" -eq 2 ] \
   || fail "F21[8]: block decisions --repo web must exit 2 (Persistence-trio scoping boundary), got $DECISIONS_RC"
+DECISIONS_RC=0
+( cd "$TMP_UK" && hvj block decisions --repo nosuch >/dev/null 2>&1 ) || DECISIONS_RC=$?
+[ "$DECISIONS_RC" -eq 3 ] \
+  || fail "F21[8]: an unregistered --repo must exit 3 (resolution) before the verb's own check, got $DECISIONS_RC"
 pass "F21[8]: decisions block rejects non-umbrella --repo (Persistence-trio boundary)"
 
 # ── Restore global trap and terminal pass ────────────────────────────────────

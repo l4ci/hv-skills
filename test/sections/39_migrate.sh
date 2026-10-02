@@ -339,8 +339,9 @@ trap 'rm -rf "$TMP_STRIP2"' EXIT
 ( cd "$TMP_STRIP2" && git init -q && git config user.email t@t && git config user.name t )
 mkdir -p "$TMP_STRIP2/.hv"
 echo '{"version":"3.4.0"}' > "$TMP_STRIP2/.hv/config.json"
-# A /hv-rm reference gives the run something to rewrite: a project with nothing to do is a noop
-# that skips the strip step.
+# A /hv-rm reference gives the run something to rewrite. The contract strips on every call, but
+# the old helper (behind the shim) skips the strip on an otherwise-noop project, so this fixture
+# avoids that case rather than assert either behaviour.
 cat > "$TMP_STRIP2/CLAUDE.md" <<'EOF'
 # Project
 

@@ -117,6 +117,7 @@ trap 'rm -rf "$TMP_CC"' EXIT
 rc=0; out=$(hvj -C "$TMP_CC" glossary write inbox --def "I." --alias "task list" 2>/dev/null) || rc=$?
 [ "$rc" = 4 ] || fail "alias collision should exit 4, got $rc"
 [ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused write should report changed=false: $out"
+[ "$(jget data.blockedBy <<<"$out")" = "alias-collision" ] || fail "refused write should report blockedBy=alias-collision: $out"
 # A missing --def is a usage error
 rc=0; hvj -C "$TMP_CC" glossary write inbox >/dev/null 2>&1 || rc=$?
 [ "$rc" = 2 ] || fail "glossary write without --def should exit 2, got $rc"

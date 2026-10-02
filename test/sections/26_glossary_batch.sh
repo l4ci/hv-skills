@@ -34,6 +34,7 @@ EOF
 rc=0; out=$(hvj -C "$TMP_BATCH" glossary import --body-file "$TMP_BATCH/manifest_intra.tsv" 2>/dev/null) || rc=$?
 [ "$rc" = 4 ] || fail "intra-batch collision should exit 4, got $rc"
 [ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused batch should report changed=false: $out"
+[ "$(jget data.blockedBy <<<"$out")" = "alias-collision" ] || fail "refused batch should report blockedBy=alias-collision: $out"
 grep -q "^- \*\*foo\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "foo should NOT be written"
 grep -q "^- \*\*bar\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "bar should NOT be written"
 SNAPSHOT_AFTER=$(cat "$TMP_BATCH/.hv/KNOWLEDGE.md")
@@ -47,6 +48,7 @@ EOF
 rc=0; out=$(hvj -C "$TMP_BATCH" glossary import --body-file "$TMP_BATCH/manifest_existing.tsv" 2>/dev/null) || rc=$?
 [ "$rc" = 4 ] || fail "pre-batch collision should exit 4, got $rc"
 [ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused batch should report changed=false: $out"
+[ "$(jget data.blockedBy <<<"$out")" = "alias-collision" ] || fail "refused batch should report blockedBy=alias-collision: $out"
 grep -q "^- \*\*inbox\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "inbox should NOT be written"
 pass "glossary import — pre-batch collision refuses all"
 
