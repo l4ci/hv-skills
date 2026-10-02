@@ -144,10 +144,16 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 set +e
 (
   set -e
-  # SECTION_LIST (space-separated paths) narrows the run to those sections,
-  # in the order given: phase acceptance with test/hv-hybrid runs only the
-  # sections a phase owns. Unset runs them all.
-  for f in ${SECTION_LIST:-"$TESTDIR/sections/"*.sh}; do
+  # SECTION_LIST (newline-separated paths, so paths may hold spaces) narrows
+  # the run to those sections, in the order given: phase acceptance with
+  # test/hv-hybrid runs only the sections a phase owns. Unset runs them all.
+  sections=()
+  if [ -n "${SECTION_LIST:-}" ]; then
+    while IFS= read -r f; do [ -n "$f" ] && sections+=("$f"); done <<<"$SECTION_LIST"
+  else
+    sections=("$TESTDIR/sections/"*.sh)
+  fi
+  for f in "${sections[@]}"; do
     [ -f "$f" ] || continue
     cd "$TMP"
     source "$f"
@@ -206,5 +212,10 @@ if [ -s "$HV_POISON_LOG" ]; then
   exit 1
 fi
 [ "$SECTIONS_RC" = 0 ] || exit "$SECTIONS_RC"
+# Phase acceptance (#49): with HV_HYBRID_EXPECT=<group,...> the run only counts
+# if every one of those verb groups was served by the Go binary, never the shim.
+if [ -n "${HV_HYBRID_EXPECT:-}" ]; then
+  "$TESTDIR/hv-hybrid" --check || exit 1
+fi
 
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'
