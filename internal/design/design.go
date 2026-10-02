@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
 	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
 var idRe = regexp.MustCompile(`^[BFT]\d{2,}$`)
@@ -154,4 +156,48 @@ func Rm(root, id string) error {
 		}
 		return nil
 	})
+}
+
+// Amend replaces or appends to the body of "## <heading>" in a design, as
+// hv-design-amend did: trailing newlines of text are dropped and the block
+// is "\n<text>\n\n". mode is "append" or "replace". A missing design or
+// heading is exit 3. changed is false when the file would not change.
+func Amend(root, id, heading, mode, text string) (changed bool, err error) {
+	if err = check(id); err != nil {
+		return
+	}
+	if mode != "append" && mode != "replace" {
+		return false, artifact.Errf(artifact.ExitUsage, "mode must be 'append' or 'replace', got %q", mode)
+	}
+	p := path(root, id)
+	if _, serr := os.Stat(p); serr != nil {
+		return false, notFound(root, id)
+	}
+	block := "\n" + strings.TrimRight(text, "\n") + "\n\n"
+	err = fsio.Locked(p, fsio.LockTimeout, func() error {
+		content, rerr := fsio.ReadText(p)
+		if rerr != nil {
+			return notFound(root, id)
+		}
+		start, end, ok := section.Find(content, heading)
+		if !ok {
+			return artifact.Errf(artifact.ExitResolution, "section '## %s' not found in .hv/designs/%s.md", heading, id)
+		}
+		var updated string
+		if mode == "replace" {
+			updated = section.Replace(content, heading, block)
+		} else {
+			body := content[start:end]
+			if !strings.HasSuffix(body, "\n") {
+				body += "\n"
+			}
+			updated = content[:start] + body + block + content[end:]
+		}
+		if updated == content {
+			return nil
+		}
+		changed = true
+		return fsio.WriteFileAtomic(p, []byte(updated))
+	})
+	return
 }

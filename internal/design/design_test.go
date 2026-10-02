@@ -117,3 +117,55 @@ func TestAddConcurrent(t *testing.T) {
 		t.Fatalf("ok=%d refused=%d", ok.Load(), refused.Load())
 	}
 }
+
+// Same three amend calls as testdata/gen_golden.sh, against the old helper's output.
+func TestAmendMatchesOldHelper(t *testing.T) {
+	root := project(t)
+	Add(root, "B07", "Title: with colon & é")
+	steps := []struct{ heading, mode, text, golden string }{
+		{"Goal", "append", "first line\nsecond line\n\n", ""},
+		{"Open questions", "append", "- one more", "B07.amend-append.md"},
+		{"Design", "replace", "replaced body", "B07.amend-replace.md"},
+	}
+	for _, s := range steps {
+		if changed, err := Amend(root, "B07", s.heading, s.mode, s.text); err != nil || !changed {
+			t.Fatalf("Amend(%s): %v %v", s.heading, changed, err)
+		}
+		if s.golden == "" {
+			continue
+		}
+		got, _ := os.ReadFile(path(root, "B07"))
+		if g := created.ReplaceAllString(string(got), "created: DATE"); g != golden(t, s.golden) {
+			t.Errorf("%s differs from golden:\n%s", s.golden, g)
+		}
+	}
+}
+
+func golden(t *testing.T, name string) string {
+	b, err := os.ReadFile(filepath.Join("testdata", "golden", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestAmendExits(t *testing.T) {
+	root := project(t)
+	if _, err := Amend(root, "B07", "Goal", "append", "x"); exitOf(err) != 3 {
+		t.Errorf("missing design: %v", err)
+	}
+	Add(root, "B07", "t")
+	if _, err := Amend(root, "B07", "No such", "append", "x"); exitOf(err) != 3 {
+		t.Errorf("missing section: %v", err)
+	}
+	if _, err := Amend(root, "B07", "Goal", "prepend", "x"); exitOf(err) != 2 {
+		t.Errorf("bad mode: %v", err)
+	}
+	if _, err := Amend(root, "S01", "Goal", "append", "x"); exitOf(err) != 2 {
+		t.Errorf("bad id: %v", err)
+	}
+	Amend(root, "B07", "Goal", "replace", "same")
+	if changed, _ := Amend(root, "B07", "Goal", "replace", "same\n\n"); changed {
+		t.Error("amend with identical result reported changed")
+	}
+}

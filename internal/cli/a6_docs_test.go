@@ -35,24 +35,28 @@ func TestDesignVerbs(t *testing.T) {
 			t.Errorf("%v: exit %d, want 2", args, code)
 		}
 	}
-	if code, _, _ := hvStdin(t, dir, "new\n", "design", "put", "B07", "--body-file", "-"); code != 0 {
+	if code, _, _ := hvStdin(t, dir, "## Goal\nnew\n", "design", "put", "B07", "--body-file", "-"); code != 0 {
 		t.Errorf("put via stdin: %d", code)
 	}
-	if code, out, _ := hvIn(t, dir, "design", "show", "B07"); code != 0 || out != "new\n" {
+	if code, out, _ := hvIn(t, dir, "design", "show", "B07"); code != 0 || out != "## Goal\nnew\n" {
 		t.Errorf("show: %d %q", code, out)
 	}
 	if code, _, _ := hvStdin(t, dir, "", "design", "put", "B07", "--body-file", filepath.Join(dir, "missing")); code != 2 {
 		t.Errorf("unreadable body file: %d", code)
 	}
-	_, out, _ = hvStdin(t, dir, "new\n", "design", "put", "B07", "--body-file", "-", "--json")
+	_, out, _ = hvStdin(t, dir, "## Goal\nnew\n", "design", "put", "B07", "--body-file", "-", "--json")
 	if data(t, out)["changed"] != false {
 		t.Errorf("identical put: %s", out)
 	}
 	if _, out, _ = hvIn(t, dir, "design", "list", "--json"); !strings.Contains(out, `"designs"`) {
 		t.Errorf("list: %s", out)
 	}
-	if code, _, _ := hvIn(t, dir, "design", "amend", "B07", "--section", "Goal", "--mode", "append", "--body-file", "-"); code != 71 {
-		t.Errorf("amend: exit %d, want 71", code)
+	_, out, _ = hvStdin(t, dir, "more\n", "design", "amend", "B07", "--section", "Goal", "--mode", "append", "--body-file", "-", "--json")
+	if d := data(t, out); d["changed"] != true || d["section"] != "Goal" || d["mode"] != "append" {
+		t.Errorf("amend: %s", out)
+	}
+	if code, _, _ := hvIn(t, dir, "design", "amend", "B07", "--section", "Goal", "--mode", "x", "--body-file", "-"); code != 2 {
+		t.Errorf("amend bad mode: %d", code)
 	}
 	if code, _, _ := hvIn(t, dir, "design", "rm", "B07"); code != 0 {
 		t.Errorf("rm: %d", code)

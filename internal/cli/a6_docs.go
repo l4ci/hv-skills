@@ -209,11 +209,41 @@ func runDesignRm(c *Ctx, args []string) (Result, error) {
 }
 
 func designAmend(fs *flag.FlagSet) RunFunc {
-	fs.String("section", "", "heading to amend")
-	fs.String("mode", "", "append or replace")
-	bodyFlag(fs)
-	return func(*Ctx, []string) (Result, error) {
-		return Result{}, NotImplemented("hv design amend").WithHint("needs the section package")
+	heading := fs.String("section", "", "heading to amend (without ##)")
+	mode := fs.String("mode", "", "append or replace")
+	file := bodyFlag(fs)
+	return func(c *Ctx, args []string) (Result, error) {
+		id, err := oneArg(args, "item ID")
+		if err != nil {
+			return Result{}, err
+		}
+		if *heading == "" {
+			return Result{}, Usage("--section is required")
+		}
+		if *mode != "append" && *mode != "replace" {
+			return Result{}, Usage("--mode must be append or replace")
+		}
+		if !design.ValidID(id) {
+			_, err := design.Amend("", id, *heading, *mode, "")
+			return Result{}, fromArtifact(err)
+		}
+		text, err := readBody(c, *file)
+		if err != nil {
+			return Result{}, err
+		}
+		root, err := fileRoot(c, true)
+		if err != nil {
+			return Result{}, err
+		}
+		changed, err := design.Amend(root, id, *heading, *mode, text)
+		if err != nil {
+			return Result{}, fromArtifact(err)
+		}
+		d := idData(id, nil)
+		d.Set("section", *heading)
+		d.Set("mode", *mode)
+		d.Set("changed", changed)
+		return Result{Data: d, Text: id}, nil
 	}
 }
 

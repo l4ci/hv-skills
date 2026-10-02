@@ -128,7 +128,7 @@ func Finish(root, name string) (changed bool, err error) {
 		return
 	}
 	path := file(root, name)
-	content, rerr := artifact.ReadText(path)
+	content, rerr := fsio.ReadText(path)
 	if rerr != nil {
 		return false, artifact.Errf(artifact.ExitResolution, "spike %s not found (.hv/spikes/%s.md)", name, name)
 	}
@@ -221,7 +221,7 @@ func List(root, dir string) ([]Entry, error) {
 	}
 	out := []Entry{}
 	for _, f := range files {
-		text, err := artifact.ReadText(f)
+		text, err := fsio.ReadText(f)
 		if err != nil {
 			return nil, err
 		}

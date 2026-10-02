@@ -51,3 +51,9 @@ PLAN
 cp .hv/plans/M03-B01.md "$OUT/plan/validate-docs.plan.md"
 "$BIN/hv-plan-validate-docs" M03-B01 | sed "s|$W|ROOT|g" > "$OUT/plan/validate-docs.out"
 echo "$W" > /dev/null
+# design amend goldens (consumed by internal/design tests)
+"$BIN/hv-design-amend" B07 --section Goal --append $'first line\nsecond line\n\n' >/dev/null
+"$BIN/hv-design-amend" B07 --section "Open questions" --append "- one more" >/dev/null
+mask .hv/designs/B07.md > "$OUT/design/B07.amend-append.md"
+"$BIN/hv-design-amend" B07 --section Design --replace "replaced body" >/dev/null
+mask .hv/designs/B07.md > "$OUT/design/B07.amend-replace.md"

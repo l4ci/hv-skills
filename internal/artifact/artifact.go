@@ -62,13 +62,6 @@ func ErrIssueMode(verb string) *Error {
 		WithHint("needs internal/tracker (A8)")
 }
 
-// ReadText reads like Python's read_text: CRLF becomes LF. Replace with
-// fsio.ReadText once that lands (#89).
-func ReadText(path string) (string, error) {
-	b, err := os.ReadFile(path)
-	return strings.ReplaceAll(string(b), "\r\n", "\n"), err
-}
-
 // ReadBody reads a --body-file ("-" is stdin) the way the old put helpers
 // did: raw bytes, each invalid UTF-8 byte replaced by U+FFFD, no newline
 // normalisation. An unreadable file is a usage error.
@@ -107,7 +100,7 @@ func ListDocs(dir string) ([]Doc, error) {
 	sort.Strings(files)
 	docs := []Doc{}
 	for _, f := range files {
-		text, err := ReadText(f)
+		text, err := fsio.ReadText(f)
 		if err != nil {
 			return nil, err
 		}

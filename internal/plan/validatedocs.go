@@ -36,7 +36,7 @@ func ValidateDocs(root, key string) (mismatches []Mismatch, text string, err err
 		return
 	}
 	planPath := filepath.Join(".hv", "plans", key+".md")
-	content, rerr := artifact.ReadText(filepath.Join(root, planPath))
+	content, rerr := fsio.ReadText(filepath.Join(root, planPath))
 	if rerr != nil {
 		return nil, "", artifact.Errf(artifact.ExitResolution, "plan not found: %s", planPath)
 	}
