@@ -73,6 +73,7 @@ func TestConcurrentWritersLoseNoUpdates(t *testing.T) {
 // Python's hvlib_io.locked and Go's Locked must exclude each other, since
 // hv and the old helpers share state files until A9.
 func TestLockExcludesPythonWriters(t *testing.T) {
+	pytest.Require(t) // live: this tests Python's lock itself; skip here, not in the goroutine
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 	const pyRounds, goRounds = 40, 40
@@ -120,12 +121,17 @@ func TestWriteJSONAtomicMatchesPython(t *testing.T) {
 	if err := WriteJSONAtomic(goPath, v); err != nil {
 		t.Fatal(err)
 	}
-	pytest.Run(t, dir, `import sys, json
+	const script = `import sys, json
 from hvlib_io import dump_json_atomic
-dump_json_atomic(sys.argv[1], json.loads('{"b": [1, {"x": "é"}], "a": {}}'))`, pyPath)
+dump_json_atomic(sys.argv[1], json.loads('{"b": [1, {"x": "é"}], "a": {}}'))`
+	var p string
+	pytest.Golden(t, map[string]any{"script": script}, &p, func() {
+		pytest.Run(t, dir, script, pyPath)
+		raw, _ := os.ReadFile(pyPath)
+		p = string(raw)
+	})
 	g, _ := os.ReadFile(goPath)
-	p, _ := os.ReadFile(pyPath)
-	if string(g) != string(p) {
+	if string(g) != p {
 		t.Fatalf("\n--- go\n%s--- python\n%s", g, p)
 	}
 }

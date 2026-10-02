@@ -25,7 +25,8 @@ func TestRoundTripMatchesPython(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := pytest.Run(t, ".", pyDump, path)
+	var want string
+	pytest.Golden(t, map[string]any{"script": pyDump, "file": string(raw)}, &want, func() { want = pytest.Run(t, ".", pyDump, path) })
 	if string(got) != want {
 		t.Fatalf("Go and Python disagree.\n--- go\n%s\n--- python\n%s", got, want)
 	}
@@ -39,8 +40,10 @@ func TestCompactMatchesPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := MarshalCompact(v)
-	want := pytest.Run(t, ".", `import json, sys
-print(json.dumps(json.loads(open(sys.argv[1]).read())), end="")`, path)
+	const script = `import json, sys
+print(json.dumps(json.loads(open(sys.argv[1]).read())), end="")`
+	var want string
+	pytest.Golden(t, map[string]any{"script": script, "file": string(raw)}, &want, func() { want = pytest.Run(t, ".", script, path) })
 	if string(got) != want {
 		t.Fatalf("\n--- go\n%s\n--- python\n%s", got, want)
 	}

@@ -1,0 +1,1 @@
+{"inputs":{"script":"import sys, json\nfrom hvlib_io import dump_json_atomic\ndump_json_atomic(sys.argv[1], json.loads('{\"b\": [1, {\"x\": \"é\"}], \"a\": {}}'))"},"outputs":"{\n  \"b\": [\n    1,\n    {\n      \"x\": \"\\u00e9\"\n    }\n  ],\n  \"a\": {}\n}\n"}

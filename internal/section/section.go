@@ -9,26 +9,57 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv-skills/v5/internal/pystr"
 )
 
-var nextHeading = regexp.MustCompile(`(?m)^## `)
-
-// Find locates the body of "## <name>": the offsets just after the heading
-// line and of the next "## " heading (or len(content)). ok is false when the
-// heading is missing. A column-0 "## " line inside the body ends the section.
+// Find locates the body of "## name": start is the byte offset where the
+// body begins (right after the heading text and its trailing whitespace) and
+// end is the offset of the next "## " heading, or len(content). ok is false
+// when the heading is missing.
+//
+// Python's `^## name\s*$` lets \s* eat newlines and then backs off until the
+// match ends at a line end, so start is the end of the longest whitespace run
+// after the heading that stops at a "\n" or at the end of the text. The body
+// may therefore begin with "\n" or not, exactly as in Python.
 func Find(content, name string) (start, end int, ok bool) {
-	re := regexp.MustCompile(`(?m)^## ` + regexp.QuoteMeta(name) + `\s*$`)
-	m := re.FindStringIndex(content)
-	if m == nil {
-		return 0, 0, false
+	head := "## " + name
+	for p := 0; p <= len(content); p++ {
+		if p > 0 && content[p-1] != '\n' {
+			continue
+		}
+		if !strings.HasPrefix(content[p:], head) {
+			continue
+		}
+		s := p + len(head)
+		runEnd := s
+		for runEnd < len(content) {
+			r, n := decode(content[runEnd:])
+			if !pystr.IsSpace(r) {
+				break
+			}
+			runEnd += n
+		}
+		for j := runEnd; j >= s; j-- {
+			if j == len(content) || content[j] == '\n' {
+				return j, nextHeading(content, j), true
+			}
+		}
 	}
-	start = m[1]
-	if n := nextHeading.FindStringIndex(content[start:]); n != nil {
-		return start, start + n[0], true
+	return 0, 0, false
+}
+
+// nextHeading is the offset of the first "## " that starts a line at or after
+// from+1 (Python searches content[from:] with ^ matching only after "\n").
+func nextHeading(content string, from int) int {
+	for i := from + 1; i+3 <= len(content); i++ {
+		if content[i-1] == '\n' && content[i:i+3] == "## " {
+			return i
+		}
 	}
-	return start, len(content), true
+	return len(content)
 }
 
 // Body returns the body of "## <name>", or "" when it is missing.
@@ -49,28 +80,59 @@ func Replace(content, name, newBody string) string {
 	return content[:s] + newBody + content[e:]
 }
 
+// Append splices addition at the end of the body of "## name", just before
+// the next "## " heading. If the body does not end in a newline one is added
+// first; addition controls the rest of the layout. A missing section is
+// appended as "## name\n" followed by addition.
+func Append(content, name, addition string) string {
+	s, e, ok := Find(content, name)
+	if !ok {
+		return strings.TrimRight(content, "\n") + "\n\n## " + name + "\n" + addition
+	}
+	body := content[s:e]
+	if strings.HasSuffix(body, "\n") {
+		return content[:s] + body + addition + content[e:]
+	}
+	return content[:s] + body + "\n" + addition + content[e:]
+}
+
 // Topic is one "## Name" section: Body runs from after the heading line to the
 // next "## " heading or EOF, whitespace untouched.
 type Topic struct{ Name, Body string }
 
-var topicHeading = regexp.MustCompile(`(?m)^## .+$`)
-
-// Topics returns every "## Topic" section in document order.
+// Topics lists every "## Name" heading in document order, like
+// re.split(r"^(## .+)$", MULTILINE): a heading is a line that starts with
+// "## " and has at least one more character. Text before the first heading is
+// dropped.
 func Topics(content string) []Topic {
-	locs := topicHeading.FindAllStringIndex(content, -1)
-	out := make([]Topic, 0, len(locs))
-	for i, l := range locs {
-		end := len(content)
-		if i+1 < len(locs) {
-			end = locs[i+1][0]
+	type head struct{ start, end int } // heading line [start, end), without its "\n"
+	var heads []head
+	for pos := 0; pos < len(content); {
+		lineEnd, next := len(content), len(content)
+		if eol := strings.IndexByte(content[pos:], '\n'); eol >= 0 {
+			lineEnd = pos + eol
+			next = lineEnd + 1
+		}
+		if lineEnd-pos > 3 && content[pos:pos+3] == "## " {
+			heads = append(heads, head{pos, lineEnd})
+		}
+		pos = next
+	}
+	out := make([]Topic, 0, len(heads))
+	for i, h := range heads {
+		bodyEnd := len(content)
+		if i+1 < len(heads) {
+			bodyEnd = heads[i+1].start
 		}
 		out = append(out, Topic{
-			Name: strings.TrimSpace(content[l[0]+3 : l[1]]),
-			Body: content[l[1]:end],
+			Name: pystr.Strip(content[h.start+3 : h.end]),
+			Body: content[h.end:bodyEnd],
 		})
 	}
 	return out
 }
+
+func decode(s string) (rune, int) { return utf8.DecodeRuneInString(s) }
 
 // Matching renders each section whose lowercased title is in wanted, in
 // document order, separated by a blank line, bodies right-trimmed. Every line
