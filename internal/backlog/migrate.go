@@ -8,14 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
@@ -40,12 +37,7 @@ var (
 
 // MigrateTracker is the part of tracker.Adapter the migration calls: the
 // issue backend's subset plus the native milestone calls.
-type MigrateTracker interface {
-	Tracker
-	Milestones(ctx context.Context, state string) ([]tracker.Milestone, error)
-	CreateMilestone(ctx context.Context, title, description string) (int, error)
-	EditMilestone(ctx context.Context, number int, e tracker.MilestoneEdit) error
-}
+type MigrateTracker = MilestoneTracker
 
 // MigrateOptions are the inputs of one run.
 type MigrateOptions struct {
@@ -96,19 +88,11 @@ type migrator struct {
 }
 
 var (
-	migItemKey   = regexp.MustCompile(`\A[` + ItemLetters + `]\p{Nd}+\z`)
-	msTitleRe    = regexp.MustCompile(`\A(M\p{Nd}+)`)
-	frontmatterM = regexp.MustCompile(`(?s)\A---\n(.*?)\n---[ \t]*(?:\n|\z)`)
-	fmIDRe       = regexp.MustCompile(`(?m)^id:[ \t]*(\S+)`)
-	fmDependsRe  = regexp.MustCompile(`(?m)^depends:[ \t]*(.*)$`)
+	migItemKey = regexp.MustCompile(`\A[` + ItemLetters + `]\p{Nd}+\z`)
 )
 
 // frozenPrefix starts the banner a finished migration puts on BACKLOG.md.
 const frozenPrefix = "> Frozen:"
-
-const msStatusPrefix = "status:"
-
-var msStatuses = []string{"planned", "active", "shipped", "archived"}
 
 // MigrateIssues runs the migration. The error is ErrNothingToMigrate,
 // ErrUmbrellaMigrate, ErrBadMap, a *tracker.Error when the forge stopped the
@@ -344,7 +328,7 @@ func (m *migrator) backend() (*Issues, error) {
 		return nil, err
 	}
 	m.tr = tr
-	m.be = &Issues{Cfg: m.o.Cfg, Tracker: tr, Ctx: m.ctx}
+	m.be = &Issues{Cfg: m.o.Cfg, Tracker: tr, Ctx: m.ctx, Warn: m.o.Warn}
 	return m.be, nil
 }
 
@@ -743,79 +727,15 @@ func jn(n int) json.Number { return json.Number(strconv.Itoa(n)) }
 
 // ---- milestones: a native milestone and a tracking issue ----------------------------
 
-func oneLineMS(s string) string { return oneLine(s) }
+// The milestone calls live on Issues (milestones.go), shared with hv
+// milestone; the migrator only builds the backend and passes its inputs.
 
-func (m *migrator) trackingIssues() (map[string]Issue, error) {
-	if _, err := m.backend(); err != nil {
-		return nil, err
-	}
-	label := config.Label(m.o.Cfg, "milestoneTracker")
-	list, err := m.tr.List(m.ctx, tracker.ListFilter{State: "all", Labels: []string{label}})
-	if err != nil {
-		return nil, err
-	}
-	groups := map[string][]Issue{}
-	var order []string
-	for _, is := range list {
-		if t := msTitleRe.FindStringSubmatchIndex(pystr.Strip(is.Title)); t != nil {
-			t0 := pystr.Strip(is.Title)
-			end := t[3]
-			if end < len(t0) {
-				if r, _ := utf8.DecodeRuneInString(t0[end:]); pystr.IsWord(r) {
-					continue
-				}
-			}
-			id := t0[:end]
-			if _, ok := groups[id]; !ok {
-				order = append(order, id)
-			}
-			groups[id] = append(groups[id], is)
-		}
-	}
-	out := map[string]Issue{}
-	for _, mid := range order {
-		g := groups[mid]
-		sort.SliceStable(g, func(i, j int) bool {
-			if (g[i].State != "open") != (g[j].State != "open") {
-				return g[j].State != "open"
-			}
-			return g[i].Number < g[j].Number
-		})
-		out[mid] = g[0]
-		if len(g) > 1 {
-			nums := make([]int, len(g))
-			for i, is := range g {
-				nums[i] = is.Number
-			}
-			sort.Ints(nums)
-			var parts []string
-			for _, n := range nums {
-				parts = append(parts, "#"+strconv.Itoa(n))
-			}
-			m.o.Warn(fmt.Sprintf("%d tracking issues carry %s (%s); using #%d", len(g), mid, strings.Join(parts, ", "), g[0].Number))
-		}
-	}
-	return out, nil
-}
-
-// trackerIssue is the tracking issue of milestone mid (a LookupError there).
 func (m *migrator) trackerIssue(mid string) (Issue, error) {
-	all, err := m.trackingIssues()
+	be, err := m.backend()
 	if err != nil {
 		return Issue{}, err
 	}
-	is, ok := all[mid]
-	if !ok {
-		return Issue{}, errf(ErrNotFound, "milestone %s not found on the issue tracker", mid)
-	}
-	return is, nil
-}
-
-func milestoneStub(mid, title, summary string, depends []string, today string) string {
-	return "---\nid: " + mid + "\ntitle: " + title + "\nstatus: planned\ndepends: [" + strings.Join(depends, ", ") + "]\ncreated: " + today + "\n---\n\n" +
-		"# " + mid + " — " + title + "\n\n## Goal\n\n" + summary + "\n\n## Acceptance criteria\n\n- _(define what shipped looks like)_\n\n" +
-		"## Rationale\n\n_(why this milestone, why now)_\n\n## Open risks\n\n_(unknowns, technical risks, dependencies that could shift)_\n\n" +
-		"## Research findings\n\n_(prior art, references, lessons from /hv-vision web search)_\n\n## Notes\n\n_(free-form brainstorm)_\n"
+	return be.TrackerIssue(mid)
 }
 
 func (m *migrator) milestoneAdd(mid string, ms *migMilestone) error {
@@ -823,33 +743,8 @@ func (m *migrator) milestoneAdd(mid string, ms *migMilestone) error {
 	if err != nil {
 		return err
 	}
-	native := mid + " — " + ms.title
-	labels := []string{config.Label(m.o.Cfg, "milestoneTracker"), msStatusPrefix + "planned"}
-	if err := m.tr.EnsureLabels(m.ctx, labels, be.autoCreate()); err != nil {
-		return err
-	}
-	if _, err := m.tr.CreateMilestone(m.ctx, native, oneLineMS(ms.summary)); err != nil {
-		return err
-	}
-	body := RenderFieldsBlock(milestoneStub(mid, ms.title, ms.summary, ms.depends, m.o.Today()),
-		[]string{"Depends"}, map[string]string{"Depends": strings.Join(ms.depends, ", ")})
-	_, err = m.tr.Create(m.ctx, native, body, labels, native)
+	_, err = be.MilestoneAdd(mid, ms.title, ms.summary, ms.depends, m.o.Today())
 	return err
-}
-
-func msStatusOf(is Issue) string {
-	for _, l := range is.Labels {
-		if strings.HasPrefix(l, msStatusPrefix) && has(msStatuses, l[len(msStatusPrefix):]) {
-			return l[len(msStatusPrefix):]
-		}
-	}
-	if is.State == "closed" {
-		if is.StateReason == "not_planned" {
-			return "archived"
-		}
-		return "shipped"
-	}
-	return "planned"
 }
 
 func (m *migrator) milestoneStatus(mid, status string) error {
@@ -857,118 +752,20 @@ func (m *migrator) milestoneStatus(mid, status string) error {
 	if err != nil {
 		return err
 	}
-	is, err := m.trackerIssue(mid)
-	if err != nil {
-		return err
-	}
-	n := is.Number
-	label := msStatusPrefix + status
-	var stale []string
-	for _, l := range is.Labels {
-		if strings.HasPrefix(l, msStatusPrefix) && l != label {
-			stale = append(stale, l)
-		}
-	}
-	if !has(is.Labels, label) {
-		if err := m.tr.AddLabels(m.ctx, n, []string{label}, be.autoCreate()); err != nil {
-			return err
-		}
-	}
-	if len(stale) > 0 {
-		if err := m.tr.RemoveLabels(m.ctx, n, stale); err != nil {
-			return err
-		}
-	}
-	text, block, order := ParseFieldsBlock(is.Body)
-	if newText, _ := frontmatter.UpdateField(text, "status", status); newText != text {
-		body := RenderFieldsBlock(newText, order, block)
-		if err := m.tr.Edit(m.ctx, n, tracker.IssueEdit{Body: &body}); err != nil {
-			return err
-		}
-	}
-	wantClosed := status == "shipped" || status == "archived"
-	reason := "completed"
-	if status == "archived" {
-		reason = "not_planned"
-	}
-	if is.State == "closed" && (!wantClosed || is.StateReason != reason) {
-		if err := m.tr.Reopen(m.ctx, n); err != nil {
-			return err
-		}
-		is.State = "open"
-	}
-	if wantClosed && is.State == "open" {
-		if err := m.tr.Close(m.ctx, n, reason, ""); err != nil {
-			return err
-		}
-	}
-	nm, err := m.nativeMilestone(mid, is)
-	if err != nil {
-		return err
-	}
-	want := "open"
-	if wantClosed {
-		want = "closed"
-	}
-	if nm != nil && nm.State != want {
-		return m.tr.EditMilestone(m.ctx, nm.Number, tracker.MilestoneEdit{State: &want})
-	}
-	return nil
+	return be.MilestoneStatus(mid, status)
 }
 
-// nativeMilestone is the native milestone of mid: the issue's own, else the
-// one whose title starts with mid, open ones first.
-func (m *migrator) nativeMilestone(mid string, is Issue) (*tracker.Milestone, error) {
-	found, err := m.tr.Milestones(m.ctx, "all")
-	if err != nil {
-		return nil, err
-	}
-	for i := range found {
-		if is.Milestone != "" && found[i].Title == is.Milestone {
-			return &found[i], nil
-		}
-	}
-	var hits []tracker.Milestone
-	for _, nm := range found {
-		t := pystr.Strip(nm.Title)
-		if strings.HasPrefix(t, mid) {
-			if r, _ := utf8.DecodeRuneInString(t[len(mid):]); t[len(mid):] == "" || !pystr.IsWord(r) {
-				hits = append(hits, nm)
-			}
-		}
-	}
-	sort.SliceStable(hits, func(i, j int) bool { return hits[i].State != "closed" && hits[j].State == "closed" })
-	if len(hits) == 0 {
-		return nil, nil
-	}
-	return &hits[0], nil
-}
-
-// putMilestone replaces the milestone plan text of the tracking issue; a text
+// putMilestone copies the milestone plan text to the tracking issue; a text
 // without `id: <mid>` frontmatter is skipped with a notice.
 func (m *migrator) putMilestone(mid string, ms *migMilestone) error {
-	text := strings.ReplaceAll(m.rewrite(ms.text, false), "\r\n", "\n")
-	fm := frontmatterM.FindStringSubmatch(text)
-	var idm []string
-	if fm != nil {
-		idm = fmIDRe.FindStringSubmatch(fm[1])
-	}
-	if idm == nil || idm[1] != mid {
-		m.o.Warn(fmt.Sprintf("%s: plan body not copied (milestone text needs frontmatter with 'id: %s')", mid, mid))
-		return nil
-	}
-	is, err := m.trackerIssue(mid)
+	be, err := m.backend()
 	if err != nil {
 		return err
 	}
-	_, block, order := ParseFieldsBlock(is.Body)
-	if dm := fmDependsRe.FindStringSubmatch(fm[1]); dm != nil {
-		if _, ok := block["Depends"]; !ok {
-			order = append(order, "Depends")
-		}
-		block["Depends"] = strings.Join(migMSAllRe.FindAllString(dm[1], -1), ", ")
+	err = be.MilestonePut(mid, m.rewrite(ms.text, false))
+	if errors.Is(err, ErrMilestoneText) {
+		m.o.Warn(fmt.Sprintf("%s: plan body not copied (%s)", mid, err.Error()))
+		return nil
 	}
-	text, _ = frontmatter.UpdateField(text, "status", msStatusOf(is))
-	body := RenderFieldsBlock(text, order, block)
-	return m.tr.Edit(m.ctx, is.Number, tracker.IssueEdit{Body: &body})
+	return err
 }

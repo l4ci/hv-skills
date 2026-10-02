@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -55,15 +53,5 @@ func TestMilestoneVerbs(t *testing.T) {
 	}
 	if code, _, _ := hvIn(t, dir, "milestone", "rm", "M01"); code != 2 {
 		t.Errorf("no milestone rm: exit %d, want 2", code)
-	}
-}
-
-func TestMilestoneIssueMode(t *testing.T) {
-	dir := gitRepo(t)
-	os.WriteFile(filepath.Join(dir, ".hv/config.json"), []byte(`{"backlog": {"backend": "issues"}}`), 0o644)
-	for _, args := range [][]string{{"milestone", "list"}, {"milestone", "active"}, {"milestone", "index"}, {"milestone", "show", "M01"}, {"milestone", "add", "--title", "T", "--summary", "S"}} {
-		if code, _, _ := hvIn(t, dir, args...); code != 71 {
-			t.Errorf("%v: exit %d, want 71", args, code)
-		}
 	}
 }

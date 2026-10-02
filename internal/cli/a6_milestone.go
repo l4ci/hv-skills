@@ -36,9 +36,12 @@ func milestoneAdd(fs *flag.FlagSet) RunFunc {
 		if *title == "" || *summary == "" {
 			return Result{}, Usage("--title and --summary are required")
 		}
-		root, err := fileRoot(c, false)
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return milestoneAddIssue(c, *title, *summary, *depends)
 		}
 		id, err := ms.Add(root, *title, *summary, *depends)
 		if err != nil {
@@ -55,14 +58,22 @@ func runMilestoneList(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return milestoneListIssue(c)
 	}
 	list, err := ms.List(root)
 	if err != nil {
 		return Result{}, err
 	}
+	return milestoneListResult(list), nil
+}
+
+// milestoneListResult is milestone list's answer for either mode.
+func milestoneListResult(list []ms.Entry) Result {
 	rows, text := []any{}, ""
 	for _, m := range list {
 		o := jsonx.NewObject()
@@ -80,7 +91,7 @@ func runMilestoneList(c *Ctx, args []string) (Result, error) {
 	}
 	d := jsonx.NewObject()
 	d.Set("milestones", rows)
-	return Result{Data: d, Text: text}, nil
+	return Result{Data: d, Text: text}
 }
 
 func runMilestoneShow(c *Ctx, args []string) (Result, error) {
@@ -88,9 +99,12 @@ func runMilestoneShow(c *Ctx, args []string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return milestoneShowIssue(c, id)
 	}
 	body, err := ms.Show(root, id)
 	if err != nil {
@@ -112,11 +126,14 @@ func milestonePut(fs *flag.FlagSet) RunFunc {
 		if !ms.ValidID(id) {
 			return Result{}, Usage("milestone ID must match M\\d{2,} (e.g. M01, M03), got %q", id)
 		}
-		text, err := readBody(c, *file)
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
 		}
-		root, err := fileRoot(c, false)
+		if issue {
+			return milestonePutIssue(c, id, *file)
+		}
+		text, err := readBody(c, *file)
 		if err != nil {
 			return Result{}, err
 		}
@@ -152,9 +169,12 @@ func milestoneStatus(fs *flag.FlagSet) RunFunc {
 		if !ms.ValidStatus(*to) {
 			return Result{}, Usage("--to must be one of: %s", strings.Join(ms.Statuses, ", "))
 		}
-		root, err := fileRoot(c, false)
+		root, issue, err := modeRoot(c)
 		if err != nil {
 			return Result{}, err
+		}
+		if issue {
+			return milestoneStatusIssue(c, id, *to)
 		}
 		changed, err := ms.SetStatus(root, id, *to)
 		if err != nil {
@@ -172,30 +192,40 @@ func runMilestoneActive(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return milestoneActiveIssue(c)
 	}
 	ids, err := ms.Active(root)
 	if err != nil {
 		return Result{}, err
 	}
+	return milestoneActiveResult(ids), nil
+}
+
+func milestoneActiveResult(ids []string) Result {
 	rows := make([]any, len(ids))
 	for i, id := range ids {
 		rows[i] = id
 	}
 	d := jsonx.NewObject()
 	d.Set("ids", rows)
-	return Result{Data: d, Text: strings.Join(ids, "\n")}, nil
+	return Result{Data: d, Text: strings.Join(ids, "\n")}
 }
 
 func runMilestoneIndex(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {
 		return Result{}, err
 	}
-	root, err := fileRoot(c, false)
+	root, issue, err := modeRoot(c)
 	if err != nil {
 		return Result{}, err
+	}
+	if issue {
+		return milestoneIndexIssue(c)
 	}
 	changed, err := ms.Index(root)
 	if err != nil {

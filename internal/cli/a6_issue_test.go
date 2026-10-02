@@ -130,12 +130,6 @@ func TestIssueModePlan(t *testing.T) {
 	if code, _, _ := issueRun(t, root, "plan", "rm", "M02-F7"); code != 3 {
 		t.Errorf("second rm: %d", code)
 	}
-	// Slice plans live on the milestone's tracking issue: not in this slice.
-	for _, args := range [][]string{{"plan", "show", "M02-S01"}, {"plan", "add", "--milestone", "M02", "--slice", "--title", "t"}, {"plan", "add", "M02-S01", "--title", "t"}} {
-		if code, _, _ := issueRun(t, root, args...); code != 71 {
-			t.Errorf("%v: exit %d, want 71", args, code)
-		}
-	}
 	if code, _, _ := issueRun(t, root, "plan", "add", "--slice", "--title", "t"); code != 2 {
 		t.Errorf("argument errors stay exit 2: %d", code)
 	}

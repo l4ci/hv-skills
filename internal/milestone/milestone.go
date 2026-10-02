@@ -63,42 +63,10 @@ func notFound(id string) *artifact.Error {
 	return artifact.Errf(artifact.ExitResolution, "milestone %s not found (.hv/milestones/%s.md)", id, id)
 }
 
-// Stub is the starter text of a milestone detail file (milestone_stub).
+// Stub is the starter text of a milestone detail file (milestone_stub); the
+// issue-mode tracking issue body shares it.
 func Stub(id, title, summary string, depends []string) string {
-	return fmt.Sprintf(`---
-id: %[1]s
-title: %[2]s
-status: planned
-depends: [%[3]s]
-created: %[4]s
----
-
-# %[1]s — %[2]s
-
-## Goal
-
-%[5]s
-
-## Acceptance criteria
-
-- _(define what shipped looks like)_
-
-## Rationale
-
-_(why this milestone, why now)_
-
-## Open risks
-
-_(unknowns, technical risks, dependencies that could shift)_
-
-## Research findings
-
-_(prior art, references, lessons from /hv-vision web search)_
-
-## Notes
-
-_(free-form brainstorm)_
-`, id, title, strings.Join(depends, ", "), time.Now().Format("2006-01-02"), summary)
+	return backlog.MilestoneStub(id, title, summary, depends, time.Now().Format("2006-01-02"))
 }
 
 // Add mints the next milestone ID, writes its detail file and appends its
@@ -303,6 +271,19 @@ func Index(root string) (changed bool, err error) {
 	if err != nil {
 		return false, err
 	}
+	return IndexFrom(root, items, false)
+}
+
+// seed is the MILESTONES.md an issue-mode index starts from when there is none
+// (hv-bootstrap's text).
+const seed = "# Milestones\n\n_(no vision yet \u2014 run `/hv-vision` to brainstorm milestones)_\n\n" +
+	"## Active milestones\n\n_(none active \u2014 set with `/hv-vision`)_\n\n## Milestones\n"
+
+// IndexFrom is Index over milestones the caller already listed. In issue mode
+// (issue true) the list comes from the tracking issues, a missing
+// MILESTONES.md is seeded, the per-milestone **Status:** lines are left
+// alone, and the vision block points at the tracking issues.
+func IndexFrom(root string, items []Entry, issue bool) (changed bool, err error) {
 	var active []Entry
 	shipped := map[string]bool{}
 	for _, i := range items {
@@ -315,6 +296,17 @@ func Index(root string) (changed bool, err error) {
 	}
 
 	ms := overviewPath(root)
+	if issue {
+		if _, serr := os.Stat(ms); serr != nil {
+			if err := os.MkdirAll(filepath.Dir(ms), 0o777); err != nil {
+				return false, err
+			}
+			if err := fsio.WriteFileAtomic(ms, []byte(seed)); err != nil {
+				return false, err
+			}
+			changed = true
+		}
+	}
 	if _, serr := os.Stat(ms); serr == nil {
 		err = fsio.Locked(ms, fsio.LockTimeout, func() error {
 			original, rerr := fsio.ReadText(ms)
@@ -322,8 +314,10 @@ func Index(root string) (changed bool, err error) {
 				return artifact.Errf(artifact.ExitInternal, "cannot read %s: %v", ms, rerr)
 			}
 			text := original
-			for _, i := range items {
-				text = updateStatusLine(text, i.ID, i.Status)
+			if !issue {
+				for _, i := range items {
+					text = updateStatusLine(text, i.ID, i.Status)
+				}
 			}
 			body := "_(none active — set with `/hv-vision`)_"
 			if len(active) > 0 {
@@ -376,7 +370,11 @@ func Index(root string) (changed bool, err error) {
 			lines[k] = fmt.Sprintf("- **%s** — %s (depends: %s)%s", i.ID, i.Title, deps, flag)
 		}
 		body = strings.Join(lines, "\n")
-		intro = "Active milestones live in `.hv/MILESTONES.md` (detail in `.hv/milestones/MNN.md`). Tag captured items with their milestone via the `Milestone:` field where applicable."
+		where := "`.hv/milestones/MNN.md`"
+		if issue {
+			where = "the tracking issues (`hv-vision-show MNN`)"
+		}
+		intro = "Active milestones live in `.hv/MILESTONES.md` (detail in " + where + "). Tag captured items with their milestone via the `Milestone:` field where applicable."
 	case len(items) > 0:
 		planned := 0
 		for _, i := range items {

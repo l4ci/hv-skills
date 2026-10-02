@@ -133,8 +133,4 @@ func TestIssueModeFileOnlyVerbs(t *testing.T) {
 			t.Errorf("%v: exit %d, want 4 (file-only)", args, code)
 		}
 	}
-	// Listing plans in issue mode is the slice-plan half, still unported.
-	if code, _, _ := hvIn(t, dir, "plan", "list"); code != 71 {
-		t.Errorf("plan list: exit %d, want 71", code)
-	}
 }
