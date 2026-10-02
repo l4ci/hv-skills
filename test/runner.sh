@@ -19,6 +19,12 @@ export HV_INSTALL_ROOT="$REPO"
 # macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
 # from helpers like hv-resolve-umbrella (which would otherwise mismatch on Darwin).
+# Root every temp dir of this run under one base (#110). Sections, the shim and
+# the helpers all call mktemp, and sections replace the EXIT trap (F38), so
+# per-site cleanup cannot be relied on: TMPDIR rooting lets the runner remove
+# everything in one rm -rf. Go and Python callers inherit it too.
+RUN_TMP="$(cd "$(mktemp -d)" && pwd -P)"
+export TMPDIR="$RUN_TMP"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 
 # Black-box target (#46): sections call "$HV_BIN <group> <verb>". It defaults
@@ -30,7 +36,7 @@ export HV_BIN="${HV_BIN:-$TESTDIR/hv-shim}"
 HV_SHIM_STAGE="$(mktemp -d)"
 export HV_SHIM_HELPERS="$HV_SHIM_STAGE/bin"
 cp -R "$BIN" "$HV_SHIM_HELPERS"
-trap 'rm -rf "$TMP" "$HV_SHIM_STAGE"' EXIT
+trap 'rm -rf "$RUN_TMP"' EXIT
 
 # Forge and host guard: no section may reach a real gh, glab, herdr or tmux.
 # The round runs inside herdr, so a real herdr or tmux call could close live
@@ -181,6 +187,15 @@ fi
 [ -n "$REPO_CLAUDE_SNAP" ] && rm -f "$REPO_CLAUDE_SNAP"
 [ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
+# Temp-dir guard (#110): everything the run made is under $RUN_TMP. Entries
+# other than the runner's own were left behind by sections, helpers or the
+# shim; report the count so growth shows up, then the EXIT trap removes it all.
+RUN_LEFT="$(find "$RUN_TMP" -mindepth 1 -maxdepth 1 ! -path "$TMP" ! -path "$HV_SHIM_STAGE" 2>/dev/null | wc -l | tr -d ' ')"
+[ "$RUN_LEFT" -eq 0 ] || printf 'note: %s temp entries left under %s by sections; removing them\n' "$RUN_LEFT" "$RUN_TMP" >&2
+if [ "$RUN_LEFT" -gt "${HV_SMOKE_TMP_MAX:-150}" ]; then
+  printf '\n\033[31merror: %s temp entries left under %s (limit %s); a section or helper is leaking\033[0m\n' "$RUN_LEFT" "$RUN_TMP" "${HV_SMOKE_TMP_MAX:-150}" >&2
+  LEAKED=1
+fi
 [ "$LEAKED" = 1 ] && exit 1
 if [ -s "$HV_POISON_LOG" ]; then
   printf '\n\033[31merror: a section called a real forge or host CLI (poison gh/glab/herdr/tmux on PATH):\033[0m\n' >&2

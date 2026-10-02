@@ -65,6 +65,14 @@ func runMain(m *testing.M) int {
 		return 1
 	}
 	defer os.RemoveAll(harnessTmp)
+	// The old helpers and the shim run as children and call mktemp: root their
+	// temp dirs under harnessTmp so the RemoveAll above takes them too (#110).
+	childTmp := filepath.Join(harnessTmp, "tmp")
+	if err := os.Mkdir(childTmp, 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	os.Setenv("TMPDIR", childTmp)
 	hvBin = filepath.Join(harnessTmp, "hv")
 	build := exec.Command("go", "build", "-o", hvBin, ".")
 	build.Dir = filepath.Join(repoDir, "cmd", "hv")
