@@ -90,7 +90,7 @@ func TestStringHelpersMatchPython(t *testing.T) {
 	pytest.GoldenJSON(t, `import json, sys
 out = []
 for s in json.load(open(sys.argv[1])):
-    out.append({"strip": s.strip(), "rstrip": s.rstrip(), "lines": s.splitlines(), "univ": s.replace("\r\n", "\n").replace("\r", "\n")})
+    out.append({"strip": s.strip(), "rstrip": s.rstrip(), "lines": s.splitlines()})
 print(json.dumps(out))`, cases, &want)
 	var got, w, in []any
 	for i, s := range cases {
@@ -98,7 +98,7 @@ print(json.dumps(out))`, cases, &want)
 		if lines == nil {
 			lines = []string{}
 		}
-		got = append(got, map[string]any{"strip": Strip(s), "rstrip": Rstrip(s), "lines": lines, "univ": Universal(s)})
+		got = append(got, map[string]any{"strip": Strip(s), "rstrip": Rstrip(s), "lines": lines})
 		w, in = append(w, want[i]), append(in, s)
 	}
 	pytest.Compare(t, "pystr", in, got, w)

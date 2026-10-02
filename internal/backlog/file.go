@@ -30,22 +30,12 @@ func (f *File) hv(parts ...string) string {
 	return filepath.Join(append([]string{f.Root, ".hv"}, parts...)...)
 }
 
-// readText reads a file the way Path.read_text does: universal newlines, so
-// CRLF files read as LF.
-func readText(path string) (string, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return pystr.Universal(string(raw)), nil
-}
-
 // Corpus is BACKLOG.md with its trailing newlines trimmed, a newline, then
 // ARCHIVE.md: the text an item ID is looked up in (load_backlog_corpus). A
 // missing or unreadable file counts as empty.
 func (f *File) Corpus() string {
-	primary, _ := readText(f.hv("BACKLOG.md"))
-	archive, _ := readText(f.hv("ARCHIVE.md"))
+	primary, _ := fsio.ReadText(f.hv("BACKLOG.md"))
+	archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
 	return strings.TrimRight(primary, "\n") + "\n" + archive
 }
 
@@ -95,7 +85,7 @@ func (f *File) List(includeClosed bool) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	archive, _ := readText(f.hv("ARCHIVE.md"))
+	archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
 	corpus := strings.TrimRight(md, "\n") + "\n" + archive
 
 	var ids []string
@@ -141,7 +131,7 @@ func doneIDs(text string) []string {
 
 // Markdown returns BACKLOG.md verbatim; closedLimit is ignored.
 func (f *File) Markdown(int) (string, error) {
-	text, err := readText(f.hv("BACKLOG.md"))
+	text, err := fsio.ReadText(f.hv("BACKLOG.md"))
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("%w: .hv/BACKLOG.md does not exist", ErrNotFound)
 	}
@@ -160,7 +150,7 @@ func (f *File) Detail(ref string) (string, bool, error) {
 	if !ok || t.Kind == "" {
 		return "", false, nil
 	}
-	text, err := readText(f.hv(t.Kind, ref+".md"))
+	text, err := fsio.ReadText(f.hv(t.Kind, ref+".md"))
 	if err != nil {
 		return "", false, nil
 	}
@@ -182,7 +172,7 @@ func (f *File) NextID(kind string) (string, error) {
 	pat := regexp.MustCompile(`\[` + prefix + `(\p{Nd}+)\]`)
 	highest := 0
 	for _, name := range []string{"BACKLOG.md", "ARCHIVE.md"} {
-		text, err := readText(f.hv(name))
+		text, err := fsio.ReadText(f.hv(name))
 		if err != nil {
 			continue
 		}

@@ -73,12 +73,3 @@ func Splitlines(s string) []string {
 	}
 	return out
 }
-
-// Universal translates \r\n and lone \r to \n, as Path.read_text does.
-func Universal(s string) string {
-	if !strings.Contains(s, "\r") {
-		return s
-	}
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	return strings.ReplaceAll(s, "\r", "\n")
-}
