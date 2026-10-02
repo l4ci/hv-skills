@@ -1,4 +1,4 @@
-echo "hv-managed-block decisions"
+echo "block decisions"
 mkdir -p .hv
 cat > .hv/DECISIONS.md <<'EOF'
 # Decisions
@@ -19,15 +19,19 @@ Integration tests must hit a real database.
 **Forbids.** Mock DB libraries in tests/integration.
 **Permits.** Mocks elsewhere.
 EOF
-"$BIN/hv-managed-block" decisions >/dev/null
+"$HV_BIN" block decisions >/dev/null
 grep -q "<!-- hv-decisions-start -->" CLAUDE.md || fail "hv-decisions managed block not in CLAUDE.md"
 grep -q "## Project Decisions" CLAUDE.md || fail "Project Decisions heading missing"
-grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep "^- Architecture" >/dev/null || fail "Architecture topic missing in decisions block"
-grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md | grep "^- Testing" >/dev/null || fail "Testing topic missing in decisions block"
+DEC_BLOCK=$(grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md)
+grep -q "^- Architecture" <<<"$DEC_BLOCK" || fail "Architecture topic missing in decisions block"
+grep -q "^- Testing" <<<"$DEC_BLOCK" || fail "Testing topic missing in decisions block"
 pass "decisions managed block created with topics"
 
 # Re-running should update in place, not duplicate
-"$BIN/hv-managed-block" decisions >/dev/null
+rc=0; out=$(hvj block decisions) || rc=$?
+[ "$rc" = 0 ] || fail "block decisions re-run exit $rc"
+[ "$(jget data.key <<<"$out")" = "decisions" ] || fail "block decisions key wrong: $out"
+[ "$(jget data.changed <<<"$out")" = "false" ] || fail "re-run of unchanged block should report changed=false: $out"
 COUNT_DEC=$(grep -c "hv-decisions-start" CLAUDE.md)
 [ "$COUNT_DEC" = "1" ] || fail "decisions managed block duplicated"
 pass "decisions block updated in place"
@@ -38,7 +42,8 @@ cat > .hv/DECISIONS.md <<'EOF'
 
 Hard boundaries for this project.
 EOF
-"$BIN/hv-managed-block" decisions >/dev/null
-grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md | grep "no decisions yet" >/dev/null || fail "empty-state placeholder missing"
+"$HV_BIN" block decisions >/dev/null
+EMPTY_BLOCK=$(grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md)
+grep -q "no decisions yet" <<<"$EMPTY_BLOCK" || fail "empty-state placeholder missing"
 pass "decisions block handles empty file"
 

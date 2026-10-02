@@ -1,7 +1,7 @@
-echo "hv-glossary-import — atomic multi-term import"
+echo "glossary import — atomic multi-term import"
 TMP_BATCH="$(mktemp -d)"
 trap 'rm -rf "$TMP_BATCH"' EXIT
-( cd "$TMP_BATCH" && "$BIN/hv-bootstrap" >/dev/null )
+"$HV_BIN" -C "$TMP_BATCH" init >/dev/null
 git -C "$TMP_BATCH" init -q
 git -C "$TMP_BATCH" config user.email t@t
 git -C "$TMP_BATCH" config user.name t
@@ -13,13 +13,17 @@ backlog	The canonical project queue.	task list, todo list
 decision	A hard project boundary.
 session	An active work cycle.	cycle, run
 EOF
-( cd "$TMP_BATCH" && "$BIN/hv-glossary-import" manifest.tsv >/dev/null 2>&1 ) || fail "valid batch should succeed"
+rc=0; out=$(hvj -C "$TMP_BATCH" glossary import --body-file "$TMP_BATCH/manifest.tsv" 2>/dev/null) || rc=$?
+[ "$rc" = 0 ] || fail "valid batch should succeed, got exit $rc"
+[ "$(jget data.imported <<<"$out")" = "3" ] || fail "imported count wrong: $out"
+[ "$(jget data.terms <<<"$out")" = '["backlog","decision","session"]' ] || fail "imported terms wrong: $out"
+[ "$(jget data.changed <<<"$out")" = "true" ] || fail "valid batch should report changed: $out"
 ORDER=$(grep -E '^- \*\*' "$TMP_BATCH/.hv/KNOWLEDGE.md" | sed -E 's/^- \*\*([^*]+)\*\*.*/\1/')
 EXPECTED=$'backlog\ndecision\nsession'
 [ "$ORDER" = "$EXPECTED" ] || fail "batch order wrong: got '$ORDER'"
 grep -q "^  - \*\*Aliases:\*\* task list, todo list$" "$TMP_BATCH/.hv/KNOWLEDGE.md" || fail "backlog aliases missing"
 grep -q "^  - \*\*Aliases:\*\* _none_$" "$TMP_BATCH/.hv/KNOWLEDGE.md" || fail "decision _none_ missing"
-pass "hv-glossary-import — valid batch writes alphabetically"
+pass "glossary import — valid batch writes alphabetically"
 
 # 2. Intra-batch alias collision — refusal with conflict line; KNOWLEDGE.md unchanged.
 SNAPSHOT_BEFORE=$(cat "$TMP_BATCH/.hv/KNOWLEDGE.md")
@@ -27,48 +31,43 @@ cat > "$TMP_BATCH/manifest_intra.tsv" <<'EOF'
 foo	Foo def.	shared
 bar	Bar def.	shared
 EOF
-set +e
-( cd "$TMP_BATCH" && "$BIN/hv-glossary-import" manifest_intra.tsv 2>"$TMP_BATCH/err_intra" )
-RC=$?
-set -e
-[ $RC -eq 3 ] || fail "intra-batch collision should exit 3, got $RC"
-grep -q "intra-batch" "$TMP_BATCH/err_intra" || fail "missing intra-batch label"
-grep -q "'foo'" "$TMP_BATCH/err_intra" || fail "error should name 'foo'"
-grep -q "'bar'" "$TMP_BATCH/err_intra" || fail "error should name 'bar'"
+rc=0; out=$(hvj -C "$TMP_BATCH" glossary import --body-file "$TMP_BATCH/manifest_intra.tsv" 2>/dev/null) || rc=$?
+[ "$rc" = 4 ] || fail "intra-batch collision should exit 4, got $rc"
+[ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused batch should report changed=false: $out"
 grep -q "^- \*\*foo\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "foo should NOT be written"
 grep -q "^- \*\*bar\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "bar should NOT be written"
 SNAPSHOT_AFTER=$(cat "$TMP_BATCH/.hv/KNOWLEDGE.md")
 [ "$SNAPSHOT_BEFORE" = "$SNAPSHOT_AFTER" ] || fail "KNOWLEDGE.md changed despite refusal"
-pass "hv-glossary-import — intra-batch collision refuses all"
+pass "glossary import — intra-batch collision refuses all"
 
 # 3. Collision with pre-batch existing entry — same refusal shape.
 cat > "$TMP_BATCH/manifest_existing.tsv" <<'EOF'
 inbox	Inbox def.	task list
 EOF
-set +e
-( cd "$TMP_BATCH" && "$BIN/hv-glossary-import" manifest_existing.tsv 2>"$TMP_BATCH/err_pre" )
-RC=$?
-set -e
-[ $RC -eq 3 ] || fail "pre-batch collision should exit 3, got $RC"
-grep -q "existing term 'backlog'" "$TMP_BATCH/err_pre" || fail "error should name existing owner 'backlog'"
+rc=0; out=$(hvj -C "$TMP_BATCH" glossary import --body-file "$TMP_BATCH/manifest_existing.tsv" 2>/dev/null) || rc=$?
+[ "$rc" = 4 ] || fail "pre-batch collision should exit 4, got $rc"
+[ "$(jget data.changed <<<"$out")" = "false" ] || fail "refused batch should report changed=false: $out"
 grep -q "^- \*\*inbox\*\*" "$TMP_BATCH/.hv/KNOWLEDGE.md" && fail "inbox should NOT be written"
-pass "hv-glossary-import — pre-batch collision refuses all"
+pass "glossary import — pre-batch collision refuses all"
 
-echo "hv-knowledge-tier — Glossary topic is skipped (terms aren't tier-eligible)"
-# --init on Glossary should be a silent no-op (no sidecar entry, no error)
-"$BIN/hv-knowledge-tier" --init --topic "Glossary" --title "backlog" >/dev/null 2>&1 || fail "Glossary --init should exit 0"
-# --get on Glossary returns empty object
-OUT_TIER=$( "$BIN/hv-knowledge-tier" --get --topic "Glossary" --title "backlog" )
-[ "$OUT_TIER" = "{}" ] || fail "Glossary --get should return empty, got '$OUT_TIER'"
-# Even if we force-set a Glossary entry into the sidecar by hand, --list filters it out
+echo "knowledge tier — Glossary topic is skipped (terms aren't tier-eligible)"
+# `tier set` on Glossary is a silent no-op (the old --init case): exit 0, nothing recorded
+rc=0; out=$(hvj -C "$TMP_BATCH" knowledge tier set --topic "Glossary" --title "backlog" --tier provisional 2>/dev/null) || rc=$?
+[ "$rc" = 0 ] || fail "Glossary tier set should exit 0, got $rc"
+[ "$(jget data.changed <<<"$out")" = "false" ] || fail "Glossary tier set should report changed=false: $out"
+# tier get on Glossary is never found
+rc=0; out=$(hvj -C "$TMP_BATCH" knowledge tier get --topic "Glossary" --title "backlog" 2>/dev/null) || rc=$?
+[ "$rc" = 0 ] || fail "Glossary tier get should exit 0, got $rc"
+[ "$(jget data.found <<<"$out")" = "false" ] || fail "Glossary tier get should be found=false: $out"
+# Even if we force-set a Glossary entry into the sidecar by hand, tier list filters it out
 mkdir -p "$TMP_BATCH/.hv"
 cat > "$TMP_BATCH/.hv/knowledge-tier.json" <<'EOF'
 {"version": 1, "entries": {"Glossary::leaked": {"tier": "provisional", "hits": 5, "lastSeen": "2026-05-10"}, "Architecture::real": {"tier": "confirmed", "hits": 3, "lastSeen": "2026-05-10"}}}
 EOF
-LIST_OUT=$( cd "$TMP_BATCH" && "$BIN/hv-knowledge-tier" --list )
-grep -q "Architecture" <<<"$LIST_OUT" || fail "non-Glossary topic should appear in --list"
-if grep -q "Glossary" <<<"$LIST_OUT"; then fail "--list should filter Glossary entries"; fi
-if grep -q "leaked" <<<"$LIST_OUT"; then fail "--list should filter leaked Glossary entries"; fi
-pass "hv-knowledge-tier — Glossary skip enforced on --init/--get/--list"
+rc=0; LIST_OUT=$(hvj -C "$TMP_BATCH" knowledge tier list 2>/dev/null) || rc=$?
+[ "$rc" = 0 ] || fail "tier list should exit 0, got $rc"
+[ "$(jget 'data.entries[0].topic' <<<"$LIST_OUT")" = "Architecture" ] || fail "non-Glossary topic should appear in tier list: $LIST_OUT"
+[ -z "$(jget 'data.entries[1]' <<<"$LIST_OUT" || true)" ] || fail "tier list should filter Glossary entries: $LIST_OUT"
+pass "knowledge tier — Glossary skip enforced on tier set/get/list"
 
 trap 'rm -rf "$TMP"' EXIT

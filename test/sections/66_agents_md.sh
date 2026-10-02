@@ -4,11 +4,11 @@ TMP_AG="$(mktemp -d)"
 trap 'rm -rf "$TMP_AG"' EXIT
 mkdir -p "$TMP_AG/.hv"
 printf '# Knowledge\n\n## Architecture\n- x\n' > "$TMP_AG/.hv/KNOWLEDGE.md"
-run_ag() { ( cd "$TMP_AG" && "$BIN/$1" "${@:2}" ); }
+blk() { "$HV_BIN" -C "$TMP_AG" block "$@"; }
 
 # (a) no AGENTS.md -> CLAUDE.md, exactly as before
-printf 'vision body\n' | run_ag hv-managed-block vision --body-stdin >/dev/null
-run_ag hv-managed-block knowledge >/dev/null
+printf 'vision body\n' | blk vision --body-file - >/dev/null
+blk knowledge >/dev/null
 grep -q "<!-- hv-vision-start -->" "$TMP_AG/CLAUDE.md" || fail "F84[a]: vision block missing from CLAUDE.md"
 grep -q "^- Architecture" "$TMP_AG/CLAUDE.md" || fail "F84[a]: knowledge block missing from CLAUDE.md"
 [ ! -e "$TMP_AG/AGENTS.md" ] || fail "F84[a]: AGENTS.md must not be created"
@@ -17,8 +17,8 @@ pass "F84[a]: no AGENTS.md -> blocks land in CLAUDE.md"
 # (b) AGENTS.md present -> blocks land there, CLAUDE.md untouched
 printf '# Agents\n' > "$TMP_AG/AGENTS.md"
 cp "$TMP_AG/CLAUDE.md" "$TMP_AG/CLAUDE.before"
-printf 'vision body\n' | run_ag hv-managed-block vision --body-stdin >/dev/null
-run_ag hv-managed-block knowledge >/dev/null
+printf 'vision body\n' | blk vision --body-file - >/dev/null
+blk knowledge >/dev/null
 grep -q "<!-- hv-vision-start -->" "$TMP_AG/AGENTS.md" || fail "F84[b]: vision block missing from AGENTS.md"
 grep -q "^- Architecture" "$TMP_AG/AGENTS.md" || fail "F84[b]: knowledge block missing from AGENTS.md"
 cmp -s "$TMP_AG/CLAUDE.md" "$TMP_AG/CLAUDE.before" || fail "F84[b]: CLAUDE.md must be untouched"
@@ -28,7 +28,7 @@ pass "F84[b]: AGENTS.md present -> blocks land in AGENTS.md, CLAUDE.md untouched
 mkdir -p "$TMP_AG/web"
 printf '{"repos":[{"name":"web","path":"./web"}]}' > "$TMP_AG/.hv/repos.json"
 printf '# web agents\n' > "$TMP_AG/web/AGENTS.md"
-run_ag hv-managed-block knowledge --repo web >/dev/null
+blk knowledge --repo web >/dev/null
 grep -q "<!-- hv-knowledge-start -->" "$TMP_AG/web/AGENTS.md" || fail "F84[c]: sub-repo block missing from web/AGENTS.md"
 [ ! -e "$TMP_AG/web/CLAUDE.md" ] || fail "F84[c]: web/CLAUDE.md must not be created"
 pass "F84[c]: sub-repo scope honours the sub-repo's AGENTS.md"
@@ -36,19 +36,21 @@ pass "F84[c]: sub-repo scope honours the sub-repo's AGENTS.md"
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$TMP_AG"
 
-echo "F84: hv-instructions-init sets up AGENTS.md + CLAUDE.md @AGENTS.md"
+echo "F84: instructions init sets up AGENTS.md + CLAUDE.md @AGENTS.md"
 
 TMP_II="$(mktemp -d)"
 trap 'rm -rf "$TMP_II"' EXIT
-init_ii() { ( cd "$1" && "$BIN/hv-instructions-init" ); }
+# Prints one `action:file[:keys]` line per action, so the cases below compare plain text.
+actions_of() { python3 -c 'import json,sys; [print(a["action"]+":"+a["file"]+(":"+",".join(a["keys"]) if "keys" in a else "")) for a in json.load(sys.stdin)["data"]["actions"]]'; }
+init_ii() { hvj -C "$1" instructions init | actions_of; }
 
 # (d) fresh dir: both files created, blocks then land in AGENTS.md
 mkdir -p "$TMP_II/fresh/.hv"
 printf '# Knowledge\n\n## Architecture\n- x\n' > "$TMP_II/fresh/.hv/KNOWLEDGE.md"
 OUT="$(init_ii "$TMP_II/fresh")"
-[ "$OUT" = "$(printf 'created: AGENTS.md\ncreated: CLAUDE.md')" ] || fail "F84[d]: unexpected output: $OUT"
+[ "$OUT" = "$(printf 'created:AGENTS.md\ncreated:CLAUDE.md')" ] || fail "F84[d]: unexpected output: $OUT"
 grep -qx '@AGENTS.md' "$TMP_II/fresh/CLAUDE.md" || fail "F84[d]: CLAUDE.md missing @AGENTS.md"
-( cd "$TMP_II/fresh" && "$BIN/hv-managed-block" knowledge >/dev/null )
+"$HV_BIN" -C "$TMP_II/fresh" block knowledge >/dev/null
 grep -q "<!-- hv-knowledge-start -->" "$TMP_II/fresh/AGENTS.md" || fail "F84[d]: block not in AGENTS.md"
 if grep -q "hv-knowledge" "$TMP_II/fresh/CLAUDE.md"; then fail "F84[d]: block leaked into CLAUDE.md"; fi
 pass "F84[d]: fresh dir -> both files created, blocks land in AGENTS.md"
@@ -72,9 +74,9 @@ legacy skills block
 <!-- hv:skills:end -->
 MD
 OUT="$(init_ii "$TMP_II/mig")"
-grep -q '^created: AGENTS.md$' <<<"$OUT" || fail "F84[e]: AGENTS.md not reported created"
-grep -q '^moved: knowledge, skills → AGENTS.md$' <<<"$OUT" || fail "F84[e]: moved line wrong: $OUT"
-grep -q '^linked: CLAUDE.md → @AGENTS.md$' <<<"$OUT" || fail "F84[e]: linked line missing: $OUT"
+grep -q '^created:AGENTS.md$' <<<"$OUT" || fail "F84[e]: AGENTS.md not reported created"
+grep -q '^moved:AGENTS.md:knowledge,skills$' <<<"$OUT" || fail "F84[e]: moved line wrong: $OUT"
+grep -q '^linked:CLAUDE.md$' <<<"$OUT" || fail "F84[e]: linked line missing: $OUT"
 grep -q "hv-knowledge-start" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: knowledge block not in AGENTS.md"
 grep -q "legacy skills block" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: legacy block not in AGENTS.md"
 if grep -q "hv-knowledge\|hv:skills" "$TMP_II/mig/CLAUDE.md"; then fail "F84[e]: blocks remain in CLAUDE.md"; fi
@@ -98,7 +100,7 @@ printf '# Agents\n\n<!-- hv-skills-start -->\nkeep\n<!-- hv-skills-end -->\n' > 
 printf '# Notes\n\n<!-- hv-qa-start -->\nstay\n<!-- hv-qa-end -->\n' > "$TMP_II/ex/CLAUDE.md"
 cp "$TMP_II/ex/AGENTS.md" "$TMP_II/ex.agents"
 OUT="$(init_ii "$TMP_II/ex")"
-[ "$OUT" = "linked: CLAUDE.md → @AGENTS.md" ] || fail "F84[g]: unexpected output: $OUT"
+[ "$OUT" = "linked:CLAUDE.md" ] || fail "F84[g]: unexpected output: $OUT"
 cmp -s "$TMP_II/ex/AGENTS.md" "$TMP_II/ex.agents" || fail "F84[g]: AGENTS.md must be untouched"
 grep -q "stay" "$TMP_II/ex/CLAUDE.md" || fail "F84[g]: CLAUDE.md content must be kept (no block move)"
 [ "$(grep -cx '@AGENTS.md' "$TMP_II/ex/CLAUDE.md")" = "1" ] || fail "F84[g]: reference not added once"
@@ -109,7 +111,7 @@ mkdir -p "$TMP_II/sym/.hv"
 printf '# Agents\n' > "$TMP_II/sym/AGENTS.md"
 ln -s AGENTS.md "$TMP_II/sym/CLAUDE.md"
 OUT="$(init_ii "$TMP_II/sym")"
-grep -q '^note:' <<<"$OUT" || fail "F84[h]: expected a note, got: $OUT"
+grep -q '^skippedSymlink:' <<<"$OUT" || fail "F84[h]: expected skippedSymlink, got: $OUT"
 [ "$(cat "$TMP_II/sym/AGENTS.md")" = "# Agents" ] || fail "F84[h]: AGENTS.md modified through symlink"
 [ -L "$TMP_II/sym/CLAUDE.md" ] || fail "F84[h]: CLAUDE.md symlink replaced"
 pass "F84[h]: symlinked pair left untouched"
