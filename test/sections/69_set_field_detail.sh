@@ -48,6 +48,25 @@ rc=0; err="$(SD F10 detail .hv/features/F99.md 2>&1)" || rc=$?
 [ "$BEFORE" = "$(md5sum "$TMP_SD/.hv/BACKLOG.md")" ] || fail "detail[missing]: file changed"
 pass "detail[missing]: nonexistent file refused, backlog untouched"
 
+BEFORE="$(md5sum "$TMP_SD/.hv/BACKLOG.md")"
+rc=0; err="$(SD F10 detail '``' 2>&1)" || rc=$?
+[ "$rc" = 1 ] || fail "detail[empty]: backticks-only value expected exit 1, got $rc"
+[ "$BEFORE" = "$(md5sum "$TMP_SD/.hv/BACKLOG.md")" ] || fail "detail[empty]: backticks-only value changed the backlog"
+pass "detail[empty]: a backticks-only path is rejected, backlog untouched"
+
+# the issues backend has no detail files: refused before any tracker call
+( cd "$TMP_SD" && PYTHONPATH="$BIN" python3 - <<'PY'
+from hvlib_backend import IssueBackend
+try:
+    IssueBackend({}).set_field("F10", "detail", "x")
+except ValueError as e:
+    assert str(e) == "detail is not a settable field; pick one of milestone/related/repos/subsystem", e
+else:
+    raise SystemExit("issues backend accepted detail")
+PY
+) || fail "detail[issues]: issues backend must refuse detail"
+pass "detail[issues]: issues backend still refuses detail"
+
 # the parsed field round-trips (value keeps its backticks, like capture's entries)
 SD F10 detail .hv/features/F10.md
 [ "$(cd "$TMP_SD" && "$BIN/hv-todo-field" F10 detail)" = '`.hv/features/F10.md`' ] \

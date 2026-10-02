@@ -188,8 +188,10 @@ class FileBackend:
                 f"(unknown, completed, or archived)"
             )
         raw_line = m.group(0)
-        if field == "detail" and value.strip("` \t"):
+        if field == "detail" and value.strip():
             rel = value.strip("` \t")
+            if not rel:
+                raise ValueError("detail path is empty; pass \"\" to clear the pointer")
             if not Path(rel).is_file():
                 raise ValueError(f"detail file {rel} does not exist")
         new_line = set_todo_field(raw_line, field, value)
