@@ -133,6 +133,8 @@ var contractVerbs = []string{
 	"review scope",
 	"round reconcile",
 	"round status",
+	"round escalate check",
+	"round escalate send",
 	"round wait",
 	"ship body",
 	"ship merge",
