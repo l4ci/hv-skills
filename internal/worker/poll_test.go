@@ -1,12 +1,13 @@
 package worker
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
 // paneFixtures are static pane texts covering every rule of the classifier,
@@ -38,28 +39,22 @@ var paneFixtures = map[string]string{
 	"long limit line":     "usage limit reached " + strings.Repeat("x", 200) + "\n",
 }
 
-func TestClassifyMatchesTheOldClassifier(t *testing.T) {
-	dir := newProject(t, `{}`)
+// TestClassify checks every pane fixture under every polled status against the
+// state and evidence the retired shell classifier gave.
+func TestClassify(t *testing.T) {
+	statuses := []string{"", "idle", "working", "blocked", "done", "unknown", "gone"}
+	var want map[string][2]string // "<pane>/<status>" -> state, evidence
+	pytest.Golden(t, map[string]any{"panes": paneFixtures, "statuses": statuses, "argv": "--fixture <pane> --slot w1 [--status <status>]"}, &want)
 	for name, text := range paneFixtures {
-		for _, status := range []string{"", "idle", "working", "blocked", "done", "unknown", "gone"} {
+		for _, status := range statuses {
 			t.Run(name+"/"+status, func(t *testing.T) {
-				fx := filepath.Join(t.TempDir(), "pane.txt")
-				os.WriteFile(fx, []byte(text), 0o644)
-				args := []string{"--fixture", fx, "--slot", "w1"}
-				if status != "" {
-					args = append(args, "--status", status)
-				}
-				r := runOld(t, dir, nil, "hv-worker-poll", args...)
-				if r.Code != 0 {
-					t.Fatalf("old: %+v", r)
-				}
-				var rows []struct{ Name, State, Evidence string }
-				if err := json.Unmarshal([]byte(r.Stdout), &rows); err != nil || len(rows) != 1 {
-					t.Fatalf("old output %q: %v", r.Stdout, err)
+				old, ok := want[name+"/"+status]
+				if !ok {
+					t.Fatal("no recorded result")
 				}
 				state, evidence := Classify(text, false, 60, status)
-				if state != rows[0].State || evidence != rows[0].Evidence {
-					t.Errorf("go %s %q, old %s %q", state, evidence, rows[0].State, rows[0].Evidence)
+				if state != old[0] || evidence != old[1] {
+					t.Errorf("go %s %q, golden %s %q", state, evidence, old[0], old[1])
 				}
 			})
 		}

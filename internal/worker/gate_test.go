@@ -13,14 +13,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
 // The gate tests rebuild smoke section 68's world: a bare origin, a gate
 // checkout on main, a worker clone with a pushed branch w1, and a fake forge
 // (test/fakes/fake_forge.py) that can lie the ways a real one does. Each case
-// runs the OLD bin/hv-worker-gate and the Go port on twin worlds and compares
-// outcomes. The fake forge only talks to the local bare origin.
+// runs the Go port and compares the outcome with what the retired shell gate
+// produced, frozen under testdata/golden. The fake forge only talks to the
+// local bare origin.
 
 const (
 	ghURL = "https://github.com/o/r/pull/7"
@@ -140,16 +142,6 @@ func (w *world) pathWith(brokenMergeBase bool) string {
 	return dir + string(os.PathListSeparator) + os.Getenv("PATH")
 }
 
-func (w *world) old(args ...string) oldResult {
-	return w.oldWith(false, args...)
-}
-
-func (w *world) oldWith(brokenMergeBase bool, args ...string) oldResult {
-	env := []string{"PATH=" + w.pathWith(brokenMergeBase), "FORGE_DB=" + w.forgeDB, "FORGE_LOG=" + w.log,
-		"FORGE_MODE=" + w.mode, "HV_GATE_SHA_WAIT=0"}
-	return runOld(w.t, w.dir, env, "hv-worker-gate", args...)
-}
-
 // env builds the Go Env: forge calls run the same fake script through
 // tracker.CLI's Exec, never a real gh or glab.
 func (w *world) env(brokenMergeBase bool) Env {
@@ -190,8 +182,9 @@ func (w *world) gate(brokenMergeBase bool, o GateOpts) (GateResult, error) {
 	return w.env(brokenMergeBase).Gate(bg, w.dir, o)
 }
 
-// wantExit maps the old gate's exit code to the verdict(s) the Go port may
-// report: contract rule, old 3 is split by message, old 4, 5 and 6 are verdicts.
+// oldExitVerdicts maps the retired gate's exit code to the verdict(s) the Go
+// port may report: contract rule, old 3 is split by message, old 4, 5 and 6 are
+// verdicts.
 var oldExitVerdicts = map[int][]string{
 	0: {GateFresh, GatePass},
 	3: {GateStale, GatePRMismatch, GateMergeFailed},
@@ -209,68 +202,77 @@ func inList(v string, l []string) bool {
 	return false
 }
 
-// compare runs the case on twin worlds (set up by mk) and checks the Go
-// verdict is the one expected and the old exit code maps onto it.
+// gateCase is one gate scenario; the Go verdict must be the one expected and
+// the retired gate's recorded exit code must map onto it.
 type gateCase struct {
-	name     string
-	pr       string
-	setup    func(w *world)
-	opts     GateOpts
-	mode     string
-	broken   bool
-	verdict  string
-	oldToken string // substring of the old helper's output
-	changed  bool
-	files    []string // files the gate checkout must hold afterwards
-	noFiles  []string
+	name    string
+	pr      string
+	setup   func(w *world)
+	opts    GateOpts
+	mode    string
+	broken  bool
+	verdict string
+	changed bool
+	files   []string // files the gate checkout must hold afterwards
+	noFiles []string
+	body    string // forge PR body (provenance cases)
+	relays  string // relays recorded on the slot (provenance cases)
 }
 
-func runGateCase(t *testing.T, c gateCase) {
+// gateOutcome is what the retired gate left behind for a case: its exit code,
+// the sorted commit subjects on origin/main and on the local base, and the
+// forge calls it made (shas normalised).
+type gateOutcome struct {
+	Exit                 int
+	Origin, Local, Forge string
+}
+
+// gateGolden loads the recorded outcomes of cases, keyed by case name. The
+// golden's inputs describe every case, so a changed case fails loudly.
+func gateGolden(t *testing.T, cases []gateCase) map[string]gateOutcome {
 	t.Helper()
-	oldW, goW := newWorld(t, c.pr), newWorld(t, c.pr)
-	for _, w := range []*world{oldW, goW} {
-		w.mode = c.mode
-		if c.mode == "" {
-			w.mode = "ok"
-		}
-		if c.setup != nil {
-			c.setup(w)
-		}
+	var descs []map[string]any
+	for _, c := range cases {
+		descs = append(descs, map[string]any{"name": c.name, "pr": c.pr, "mode": c.mode, "broken": c.broken,
+			"checkOnly": c.opts.CheckOnly, "noVerify": c.opts.NoVerify, "verdict": c.verdict, "changed": c.changed,
+			"files": c.files, "noFiles": c.noFiles, "body": c.body, "relays": c.relays})
 	}
-	args := []string{"--slot", "w1", "--base", "main"}
-	if c.opts.CheckOnly {
-		args = append(args, "--check-only")
+	var want map[string]gateOutcome
+	pytest.Golden(t, map[string]any{"cases": descs}, &want)
+	return want
+}
+
+func runGateCase(t *testing.T, c gateCase, want gateOutcome) {
+	t.Helper()
+	w := newWorld(t, c.pr)
+	w.mode = c.mode
+	if c.mode == "" {
+		w.mode = "ok"
 	}
-	if c.opts.NoVerify {
-		args = append(args, "--no-verify")
+	if c.setup != nil {
+		c.setup(w)
 	}
-	or := oldW.oldWith(c.broken, args...)
-	res, err := goW.gate(c.broken, c.opts)
+	res, err := w.gate(c.broken, c.opts)
 	if err != nil {
 		t.Fatalf("go: %v", err)
 	}
 	if res.Verdict != c.verdict {
 		t.Errorf("go verdict = %s (%s), want %s", res.Verdict, res.Err, c.verdict)
 	}
-	if !inList(res.Verdict, oldExitVerdicts[or.Code]) {
-		t.Errorf("old exited %d (%s) which allows %v, go said %s", or.Code, strings.TrimSpace(or.Stdout+or.Stderr), oldExitVerdicts[or.Code], res.Verdict)
-	}
-	if c.oldToken != "" && !strings.Contains(or.Stdout+or.Stderr, c.oldToken) {
-		t.Errorf("old output lacks %q: %s", c.oldToken, or.Stdout+or.Stderr)
+	if !inList(res.Verdict, oldExitVerdicts[want.Exit]) {
+		t.Errorf("the retired gate exited %d which allows %v, go said %s", want.Exit, oldExitVerdicts[want.Exit], res.Verdict)
 	}
 	if res.Changed != c.changed {
 		t.Errorf("changed = %v, want %v", res.Changed, c.changed)
 	}
-	for _, w := range []*world{oldW, goW} {
-		for _, f := range c.files {
-			if _, err := os.Stat(filepath.Join(w.dir, f)); err != nil {
-				t.Errorf("%s: %s missing after the gate", w.dir, f)
-			}
+	for _, f := range c.files {
+		if _, err := os.Stat(filepath.Join(w.dir, f)); err != nil {
+			t.Errorf("%s: %s missing after the gate", w.dir, f)
 		}
-		for _, f := range c.noFiles {
-			if _, err := os.Stat(filepath.Join(w.dir, f)); err == nil {
-				t.Errorf("%s: %s must not exist", w.dir, f)
-			}
+	}
+	for _, f := range c.noFiles {
+		if _, err := os.Stat(filepath.Join(w.dir, f)); err == nil {
+			t.Errorf("%s: %s must not exist", w.dir, f)
 		}
 	}
 	// the same commits end up on origin/main and on the local base (the order
@@ -280,21 +282,14 @@ func runGateCase(t *testing.T, c gateCase) {
 		sort.Strings(l)
 		return strings.Join(l, "\n")
 	}
-	if a, b := subjects(oldW.origin), subjects(goW.origin); a != b {
-		t.Errorf("origin main differs:\nold:\n%s\ngo:\n%s", a, b)
-	}
-	if a, b := subjects(oldW.dir), subjects(goW.dir); a != b {
-		t.Errorf("local main differs:\nold:\n%s\ngo:\n%s", a, b)
-	}
+	mustEqual(t, "origin main", want.Origin, subjects(w.origin))
+	mustEqual(t, "local main", want.Local, subjects(w.dir))
 	// forge calls are the same, argument for argument (shas differ per world)
-	ol, _ := os.ReadFile(oldW.log)
-	gl, _ := os.ReadFile(goW.log)
-	if shaRe.ReplaceAllString(string(ol), "SHA") != shaRe.ReplaceAllString(string(gl), "SHA") {
-		t.Errorf("forge calls differ:\nold:\n%s\ngo:\n%s", ol, gl)
-	}
+	gl, _ := os.ReadFile(w.log)
+	mustEqual(t, "forge calls", want.Forge, shaRe.ReplaceAllString(string(gl), "SHA"))
 }
 
-func TestGateParity(t *testing.T) {
+func TestGate(t *testing.T) {
 	advanceMain := func(w *world) {
 		gitq(t, w.worker, "checkout", "-q", "main")
 		os.WriteFile(filepath.Join(w.worker, "more.txt"), []byte("more\n"), 0o644)
@@ -303,7 +298,7 @@ func TestGateParity(t *testing.T) {
 		gitq(t, w.worker, "push", "-q", "origin", "main")
 	}
 	cases := []gateCase{
-		{name: "a: stale on pushed refs even though local w1 merged main", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateStale, oldToken: "STALE w1",
+		{name: "a: stale on pushed refs even though local w1 merged main", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateStale,
 			setup: func(w *world) {
 				advanceMain(w)
 				gitq(t, w.dir, "fetch", "-q", "origin")
@@ -311,59 +306,61 @@ func TestGateParity(t *testing.T) {
 				gitq(t, w.dir, "merge", "-q", "origin/main", "-m", "sync")
 				gitq(t, w.dir, "checkout", "-q", "main")
 			}},
-		{name: "b: a merge-base that dies is check-broke, not stale", pr: ghURL, opts: GateOpts{CheckOnly: true}, broken: true, verdict: GateCheckBroke, oldToken: "CHECK-BROKE"},
-		{name: "b2: a failed fetch is check-broke", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateCheckBroke, oldToken: "CHECK-BROKE",
+		{name: "b: a merge-base that dies is check-broke, not stale", pr: ghURL, opts: GateOpts{CheckOnly: true}, broken: true, verdict: GateCheckBroke},
+		{name: "b2: a failed fetch is check-broke", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateCheckBroke,
 			setup: func(w *world) {
 				gitq(t, w.dir, "remote", "set-url", "origin", filepath.Join(filepath.Dir(w.dir), "nope.git"))
 			}},
-		{name: "c: matching PR is fresh", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateFresh, oldToken: "FRESH w1"},
-		{name: "c: head sha moved", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch, oldToken: "head is 0000",
+		{name: "c: matching PR is fresh", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GateFresh},
+		{name: "c: head sha moved", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch,
 			setup: func(w *world) { w.forge("sha", strings.Repeat("0", 40)) }},
-		{name: "c: stacked PR", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch, oldToken: "stacked PR",
+		{name: "c: stacked PR", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch,
 			setup: func(w *world) { w.forge("base", "stack") }},
-		{name: "c: wrong head branch", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch, oldToken: "headed by 'other'",
+		{name: "c: wrong head branch", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch,
 			setup: func(w *world) { w.forge("head", "other") }},
-		{name: "c: PR not open", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch, oldToken: "not open",
+		{name: "c: PR not open", pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: GatePRMismatch,
 			setup: func(w *world) { w.forge("state", "MERGED") }},
-		{name: "d: github merge, verified on the merged tree", pr: ghURL, verdict: GatePass, oldToken: "GATE-PASS w1", changed: true, files: []string{"work.txt"},
+		{name: "d: github merge, verified on the merged tree", pr: ghURL, verdict: GatePass, changed: true, files: []string{"work.txt"},
 			setup: func(w *world) { w.setConfig(`{"refactor":{"verifyCommands":["test -f work.txt"]}}`) }},
-		{name: "d: no verify commands", pr: ghURL, verdict: GatePass, oldToken: "NO-VERIFY w1", changed: true, files: []string{"work.txt"}},
-		{name: "d: --no-verify", pr: ghURL, opts: GateOpts{NoVerify: true}, verdict: GatePass, oldToken: "MERGED w1", changed: true, files: []string{"work.txt"},
+		{name: "d: no verify commands", pr: ghURL, verdict: GatePass, changed: true, files: []string{"work.txt"}},
+		{name: "d: --no-verify", pr: ghURL, opts: GateOpts{NoVerify: true}, verdict: GatePass, changed: true, files: []string{"work.txt"},
 			setup: func(w *world) { w.setConfig(`{"refactor":{"verifyCommands":["false"]}}`) }},
-		{name: "d: verify fails after the merge landed", pr: ghURL, verdict: GateVerifyFailed, oldToken: "verify FAILED: false", changed: true, files: []string{"work.txt"},
+		{name: "d: verify fails after the merge landed", pr: ghURL, verdict: GateVerifyFailed, changed: true, files: []string{"work.txt"},
 			setup: func(w *world) { w.setConfig(`{"refactor":{"verifyCommands":["true","false"]}}`) }},
-		{name: "e: merge that merged nothing", pr: glURL, mode: "noop", verdict: GateNotMerged, oldToken: "NOT-MERGED w1", noFiles: []string{"work.txt"}},
-		{name: "e: merge into another branch", pr: ghURL, mode: "elsewhere", verdict: GateNotOnBase, oldToken: "NOT-ON-BASE w1", noFiles: []string{"work.txt"}},
-		{name: "e: refused merge shows the CLI output", pr: ghURL, mode: "fail", verdict: GateMergeFailed, oldToken: "branch protection", noFiles: []string{"work.txt"}},
-		{name: "e: a push after the check is refused by the pin", pr: ghURL, mode: "race", verdict: GateMergeFailed, oldToken: "does not match the pin", noFiles: []string{"work.txt"}},
-		{name: "f: gitlab squash falls back to squash_commit_sha", pr: glURL, mode: "squash", verdict: GatePass, oldToken: "w1", changed: true, files: []string{"work.txt"}},
-		{name: "f: gitlab fast-forward merge has no merge commit", pr: glURL, mode: "ff", verdict: GatePass, oldToken: "w1", changed: true, files: []string{"work.txt"}},
-		{name: "f2: gitlab provenance reads the MR description", pr: glURL, opts: GateOpts{CheckOnly: true}, verdict: GateProvenanceFail, oldToken: "PROVENANCE-FAIL",
+		{name: "e: merge that merged nothing", pr: glURL, mode: "noop", verdict: GateNotMerged, noFiles: []string{"work.txt"}},
+		{name: "e: merge into another branch", pr: ghURL, mode: "elsewhere", verdict: GateNotOnBase, noFiles: []string{"work.txt"}},
+		{name: "e: refused merge shows the CLI output", pr: ghURL, mode: "fail", verdict: GateMergeFailed, noFiles: []string{"work.txt"}},
+		{name: "e: a push after the check is refused by the pin", pr: ghURL, mode: "race", verdict: GateMergeFailed, noFiles: []string{"work.txt"}},
+		{name: "f: gitlab squash falls back to squash_commit_sha", pr: glURL, mode: "squash", verdict: GatePass, changed: true, files: []string{"work.txt"}},
+		{name: "f: gitlab fast-forward merge has no merge commit", pr: glURL, mode: "ff", verdict: GatePass, changed: true, files: []string{"work.txt"}},
+		{name: "f2: gitlab provenance reads the MR description", pr: glURL, opts: GateOpts{CheckOnly: true}, verdict: GateProvenanceFail,
 			setup: func(w *world) {
 				w.forge("body", "## Approvals\n- x: orchestrator relay round 2\n")
 				w.setSlot(glURL, "[]")
 			}},
-		{name: "g: PR without an origin remote is refused, never merged locally", pr: ghURL, verdict: GateCheckBroke, oldToken: "no 'origin' remote", noFiles: []string{"work.txt"},
+		{name: "g: PR without an origin remote is refused, never merged locally", pr: ghURL, verdict: GateCheckBroke, noFiles: []string{"work.txt"},
 			setup: func(w *world) { gitq(t, w.dir, "remote", "remove", "origin") }},
-		{name: "h: local merge without a PR", pr: "", verdict: GatePass, oldToken: "MERGED w1", changed: true, files: []string{"work.txt"},
+		{name: "h: local merge without a PR", pr: "", verdict: GatePass, changed: true, files: []string{"work.txt"},
 			setup: func(w *world) { gitq(t, w.dir, "fetch", "-q", "origin", "w1:w1") }},
-		{name: "h: no PR means no provenance to read", pr: "", opts: GateOpts{CheckOnly: true}, verdict: GateFresh, oldToken: "FRESH w1",
+		{name: "h: no PR means no provenance to read", pr: "", opts: GateOpts{CheckOnly: true}, verdict: GateFresh,
 			setup: func(w *world) { gitq(t, w.dir, "fetch", "-q", "origin", "w1:w1") }},
-		{name: "i: merged on origin but local base diverged", pr: ghURL, verdict: GateMergedRemotely, oldToken: "MERGED-REMOTELY w1", changed: true,
+		{name: "i: merged on origin but local base diverged", pr: ghURL, verdict: GateMergedRemotely, changed: true,
 			setup: func(w *world) {
 				os.WriteFile(filepath.Join(w.dir, "local.txt"), []byte("local only\n"), 0o644)
 				gitq(t, w.dir, "add", "local.txt")
 				gitq(t, w.dir, "commit", "-q", "-m", "local only commit")
 			}},
 	}
+	want := gateGolden(t, cases)
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) { runGateCase(t, c) })
+		t.Run(c.name, func(t *testing.T) { runGateCase(t, c, want[c.name]) })
 	}
 }
 
 func TestGateProvenance(t *testing.T) {
 	relay := `[{"round":2,"ts":"2026-10-02T10:00:00Z","summary":"use the shared cache for the lookup"}]`
-	cases := []struct {
+	var cases []gateCase
+	for _, c := range []struct {
 		name, body, relays string
 		verdict            string
 	}{
@@ -379,15 +376,17 @@ func TestGateProvenance(t *testing.T) {
 		{"section ends at the next heading", "## Approvals\n- orchestrator relay round 2\n## Notes\n- the maintainer: use the shared cache for the lookup\n", relay, GateFresh},
 		{"heading is case-insensitive", "## approvals\n- x: orchestrator relay round 9\n", relay, GateProvenanceFail},
 		{"only one section counts: ### is not a new heading", "## Approvals\n### detail\n- orchestrator relay round 9\n", relay, GateProvenanceFail},
+	} {
+		c := c
+		cases = append(cases, gateCase{name: c.name, pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: c.verdict, body: c.body, relays: c.relays,
+			setup: func(w *world) {
+				w.forge("body", c.body)
+				w.setSlot(ghURL, c.relays)
+			}})
 	}
+	want := gateGolden(t, cases)
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			runGateCase(t, gateCase{name: c.name, pr: ghURL, opts: GateOpts{CheckOnly: true}, verdict: c.verdict,
-				setup: func(w *world) {
-					w.forge("body", c.body)
-					w.setSlot(ghURL, c.relays)
-				}})
-		})
+		t.Run(c.name, func(t *testing.T) { runGateCase(t, c, want[c.name]) })
 	}
 }
 
@@ -546,7 +545,7 @@ func TestGateProvenanceFailsClosedWhenTheBodyCannotBeRead(t *testing.T) {
 			}
 		})
 	}
-	// a missing CLI still skips (the old helper's one legitimate skip) and then
+	// a missing CLI still skips (the retired helper's one legitimate skip) and then
 	// the PR read fails, so the gate stops there instead
 	w := newWorld(t, ghURL)
 	e := w.env(false)

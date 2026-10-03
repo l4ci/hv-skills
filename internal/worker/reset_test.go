@@ -6,27 +6,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-// pair builds two identical projects with one initialised slot: a for the old
-// helper, b for the Go port.
-func pair(t *testing.T) (a, b string) {
+// slotProject builds a project with one initialised slot.
+func slotProject(t *testing.T) string {
 	t.Helper()
-	a, b = newProject(t, `{}`), newProject(t, `{}`)
-	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "1", "--base", "main")
+	b := newProject(t, `{}`)
 	if _, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"}); err != nil {
 		t.Fatal(err)
 	}
-	return a, b
+	return b
 }
 
 func wt(d string) string { return filepath.Join(d, ".worktrees", "w1") }
-
-func both(t *testing.T, a, b string, f func(t *testing.T, d string)) {
-	t.Helper()
-	f(t, a)
-	f(t, b)
-}
 
 func commitIn(t *testing.T, dir, file string) {
 	t.Helper()
@@ -35,28 +29,17 @@ func commitIn(t *testing.T, dir, file string) {
 	sh(t, dir, "git", "commit", "-q", "-m", "add "+file)
 }
 
-// oldReset runs the old guard; goReset the port. Exit codes are compared
-// through the contract's mapping: old 3 for held work is 4 (1 with --check-only).
-func oldReset(t *testing.T, d string, args ...string) oldResult {
-	return runOld(t, d, nil, "hv-worker-reset", append([]string{"--slot", "w1"}, args...)...)
-}
-
 func TestResetCleanSlotCutsTaskBranch(t *testing.T) {
-	a, b := pair(t)
-	r := oldReset(t, a, "--task", "T-7/Fix Me")
-	if r.Code != 0 {
-		t.Fatalf("old: %+v", r)
-	}
+	b := slotProject(t)
+	var want map[string]string
+	pytest.Golden(t, map[string]any{"config": `{}`, "pool": "init --slots 1 --base main", "argv": "reset --slot w1 --task 'T-7/Fix Me'"}, &want)
 	res, err := Env{}.Reset(b, "w1", "T-7/Fix Me", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+	mustEqual(t, "workers.json", want["workers.json"], registry(t, b))
 	if res.Branch != "hv-worker/w1-t-7-fix-me" || !res.Changed || !res.Clean || res.Retained {
 		t.Errorf("%+v", res)
-	}
-	if want := "reset: w1 on hv-worker/w1-t-7-fix-me at " + res.SHA + "\n"; r.Stdout != strings.Replace(want, res.SHA, strings.TrimSpace(r.Stdout[strings.LastIndex(r.Stdout, " ")+1:]), 1) {
-		t.Errorf("old stdout %q", r.Stdout)
 	}
 	if want := sh(t, b, "git", "rev-parse", "--short", "main"); res.SHA != want {
 		t.Errorf("sha = %s, want %s", res.SHA, want)
@@ -70,7 +53,7 @@ func TestResetCleanSlotCutsTaskBranch(t *testing.T) {
 }
 
 func TestResetCheckOnlyChangesNothing(t *testing.T) {
-	_, b := pair(t)
+	b := slotProject(t)
 	before := registry(t, b)
 	res, err := Env{}.Reset(b, "w1", "T1", true)
 	if err != nil || !res.Clean || res.Changed || res.Branch != "" || res.SHA != "" {
@@ -83,14 +66,8 @@ func TestResetCheckOnlyChangesNothing(t *testing.T) {
 }
 
 func TestResetRefusesDirtyWorktree(t *testing.T) {
-	a, b := pair(t)
-	both(t, a, b, func(t *testing.T, d string) {
-		os.WriteFile(filepath.Join(wt(d), "untracked.txt"), []byte("x"), 0o644)
-	})
-	r := oldReset(t, a, "--task", "T2")
-	if r.Code != 3 || !strings.Contains(r.Stderr, "REFUSED w1 — uncommitted changes") {
-		t.Fatalf("old: %+v", r)
-	}
+	b := slotProject(t)
+	os.WriteFile(filepath.Join(wt(b), "untracked.txt"), []byte("x"), 0o644)
 	before := registry(t, b)
 	res, err := Env{}.Reset(b, "w1", "T2", false)
 	we, ok := err.(*Error)
@@ -112,12 +89,8 @@ func TestResetRefusesDirtyWorktree(t *testing.T) {
 }
 
 func TestResetRefusesUnmergedCommits(t *testing.T) {
-	a, b := pair(t)
-	both(t, a, b, func(t *testing.T, d string) { commitIn(t, wt(d), "work.txt") })
-	r := oldReset(t, a, "--task", "T3")
-	if r.Code != 3 || !strings.Contains(r.Stderr, "REFUSED w1 — 1 commit(s) not on main") {
-		t.Fatalf("old: %+v", r)
-	}
+	b := slotProject(t)
+	commitIn(t, wt(b), "work.txt")
 	res, err := Env{}.Reset(b, "w1", "T3", false)
 	we, ok := err.(*Error)
 	if !ok || we.Exit != ExitRefused || !strings.Contains(we.Message, "REFUSED w1 — 1 commit(s) not on main") {
@@ -130,15 +103,10 @@ func TestResetRefusesUnmergedCommits(t *testing.T) {
 
 // git cherry compares by patch: a cherry-picked merge counts as merged.
 func TestResetTreatsACherryPickedCommitAsMerged(t *testing.T) {
-	a, b := pair(t)
-	both(t, a, b, func(t *testing.T, d string) {
-		commitIn(t, wt(d), "work.txt")
-		sha := sh(t, wt(d), "git", "rev-parse", "HEAD")
-		sh(t, d, "git", "cherry-pick", sha)
-	})
-	if r := oldReset(t, a, "--check-only"); r.Code != 0 {
-		t.Fatalf("old: %+v", r)
-	}
+	b := slotProject(t)
+	commitIn(t, wt(b), "work.txt")
+	sha := sh(t, wt(b), "git", "rev-parse", "HEAD")
+	sh(t, b, "git", "cherry-pick", sha)
 	res, err := Env{}.Reset(b, "w1", "", true)
 	if err != nil || !res.Clean {
 		t.Errorf("%+v %v", res, err)
@@ -146,31 +114,24 @@ func TestResetTreatsACherryPickedCommitAsMerged(t *testing.T) {
 }
 
 func TestResetRetryKeepsTheTasksOwnWork(t *testing.T) {
-	a, b := pair(t)
-	both(t, a, b, func(t *testing.T, d string) {})
-	if r := oldReset(t, a, "--task", "T4"); r.Code != 0 {
-		t.Fatalf("old setup: %+v", r)
-	}
+	b := slotProject(t)
+	var want map[string]string
+	pytest.Golden(t, map[string]any{"config": `{}`, "pool": "init --slots 1 --base main",
+		"steps": []string{"reset --slot w1 --task T4", "write wip.txt in w1, record task T4 on the slot", "reset --slot w1 --task T4"}}, &want)
 	if _, err := (Env{}).Reset(b, "w1", "T4", false); err != nil {
 		t.Fatal(err)
 	}
-	both(t, a, b, func(t *testing.T, d string) {
-		os.WriteFile(filepath.Join(wt(d), "wip.txt"), []byte("wip"), 0o644)
-		// dispatch records the task on the slot; the guard compares against it
-		raw, _ := os.ReadFile(RegistryPath(d))
-		os.WriteFile(RegistryPath(d), []byte(strings.Replace(string(raw), `"task": null`, `"task": "T4"`, 1)), 0o644)
-	})
-	r := oldReset(t, a, "--task", "T4")
-	if r.Code != 0 || !strings.HasPrefix(r.Stdout, "retry: w1 keeps its work on hv-worker/w1-t4") {
-		t.Fatalf("old: %+v", r)
-	}
+	os.WriteFile(filepath.Join(wt(b), "wip.txt"), []byte("wip"), 0o644)
+	// dispatch records the task on the slot; the guard compares against it
+	raw, _ := os.ReadFile(RegistryPath(b))
+	os.WriteFile(RegistryPath(b), []byte(strings.Replace(string(raw), `"task": null`, `"task": "T4"`, 1)), 0o644)
 	before := registry(t, b)
 	res, err := Env{}.Reset(b, "w1", "T4", false)
 	if err != nil || !res.Retained || res.Changed || res.Clean || res.Branch != "hv-worker/w1-t4" {
 		t.Fatalf("%+v %v", res, err)
 	}
 	mustEqual(t, "registry", before, registry(t, b))
-	mustEqual(t, "registry vs old", registry(t, a), registry(t, b))
+	mustEqual(t, "registry vs golden", want["workers.json"], registry(t, b))
 	if _, err := os.Stat(filepath.Join(wt(b), "wip.txt")); err != nil {
 		t.Error("the WIP was dropped")
 	}
@@ -230,10 +191,10 @@ func TestBranchForMatchesTr(t *testing.T) {
 }
 
 // A git call that fails must not read as "clean": the reset would then switch
-// -C over unpushed commits. The old helper aborted here under set -e.
+// -C over unpushed commits. The retired shell helper aborted here under set -e.
 func TestResetTreatsAFailingGitAsUnavailableNotClean(t *testing.T) {
 	for _, failing := range []string{"status", "cherry"} {
-		_, b := pair(t)
+		b := slotProject(t)
 		commitIn(t, wt(b), "unpushed.txt")
 		before := registry(t, b)
 		e := Env{Git: func(ctx context.Context, dir string, args ...string) (string, string, int, error) {
@@ -261,7 +222,7 @@ func TestResetTreatsAFailingGitAsUnavailableNotClean(t *testing.T) {
 	e := Env{Git: func(context.Context, string, ...string) (string, string, int, error) {
 		return "", "", 0, os.ErrNotExist
 	}}
-	_, b := pair(t)
+	b := slotProject(t)
 	if _, err := e.Reset(b, "w1", "", false); err == nil {
 		t.Error("an unrunnable git must fail the reset")
 	}
@@ -289,7 +250,7 @@ func TestExecGitRunsInTheCLocale(t *testing.T) {
 
 // Contract: each unmerged entry is `<sha7> <subject>`.
 func TestResetUnmergedEntriesAreSevenCharSHAAndSubject(t *testing.T) {
-	_, b := pair(t)
+	b := slotProject(t)
 	sh(t, b, "git", "config", "core.abbrev", "12")
 	commitIn(t, wt(b), "work.txt")
 	res, err := Env{}.Reset(b, "w1", "T1", true)

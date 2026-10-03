@@ -53,32 +53,6 @@ func migProject(t *testing.T, umbrella bool) string {
 
 var migTS = regexp.MustCompile(`migrate-backup/\d{8}T\d{6}`)
 
-// migNormalise makes two trees comparable: backup timestamps differ.
-func migNormalise(tree map[string]string) map[string]string {
-	out := map[string]string{}
-	for k, v := range tree {
-		out[migTS.ReplaceAllString(k, "migrate-backup/TS")] = v
-	}
-	return out
-}
-
-func migSameTree(t *testing.T, a, b string) {
-	t.Helper()
-	ta, tb := migNormalise(knTree(t, a)), migNormalise(knTree(t, b))
-	for k, va := range ta {
-		if vb, ok := tb[k]; !ok {
-			t.Errorf(".hv/%s only in old", k)
-		} else if va != vb {
-			t.Errorf(".hv/%s differs\n--- old ---\n%s\n--- new ---\n%s", k, va, vb)
-		}
-	}
-	for k := range tb {
-		if _, ok := ta[k]; !ok {
-			t.Errorf(".hv/%s only in new", k)
-		}
-	}
-}
-
 func migPlugin(t *testing.T) {
 	root := t.TempDir()
 	knWrite(t, filepath.Join(root, ".claude-plugin", "plugin.json"), `{"name": "hv-skills", "version": "4.9.9"}`)
@@ -88,16 +62,15 @@ func migPlugin(t *testing.T) {
 	t.Cleanup(func() { installedVersionFn = old })
 }
 
-func TestMigrateV4ApplyMatchesOldHelper(t *testing.T) {
+func TestMigrateV4ApplyMatchGolden(t *testing.T) {
 	for _, umbrella := range []bool{false, true} {
 		migPlugin(t)
-		oldDir, newDir := migProject(t, umbrella), migProject(t, umbrella)
-		o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
-		n := knNew(t, newDir, "", "migrate", "v4", "--apply")
-		if o.rc != 0 || n.rc != 0 {
-			t.Fatalf("umbrella=%v rc old=%d new=%d\nold: %s %s\nnew: %s %s", umbrella, o.rc, n.rc, o.stdout, o.stderr, n.stdout, n.stderr)
+		newDir := migProject(t, umbrella)
+		want, got := knFrozen(t, newDir, "", "migrate", "v4", "--apply")
+		if want.RC != 0 || got.RC != 0 {
+			t.Fatalf("umbrella=%v rc frozen=%d new=%d\nfrozen: %s %s\nnew: %s %s", umbrella, want.RC, got.RC, want.Stdout, want.Stderr, got.Stdout, got.Stderr)
 		}
-		migSameTree(t, oldDir, newDir)
+		knSameDelta(t, want, got)
 		tree := knTree(t, newDir)
 		if got := tree["BACKLOG.md"]; !strings.Contains(got, "/hv-capture to add") || !strings.Contains(got, "`/hv-c`") || !strings.Contains(got, "/hv-undo inside a fence") || !strings.Contains(got, "/hv-issues") {
 			t.Errorf("rewrite rules misapplied:\n%s", got)
@@ -106,9 +79,9 @@ func TestMigrateV4ApplyMatchesOldHelper(t *testing.T) {
 			t.Errorf("version not stamped:\n%s", tree["config.json"])
 		}
 		// Summary lines agree on the counts.
-		for _, want := range []string{"files scanned:", "files rewritten:", "references rewritten:", "manual review:", "removed binaries:"} {
-			if line(o.stdout, want) != line(n.stdout, want) {
-				t.Errorf("%q old=%q new=%q", want, line(o.stdout, want), line(n.stdout, want))
+		for _, w := range []string{"files scanned:", "files rewritten:", "references rewritten:", "manual review:", "removed binaries:"} {
+			if line(want.Stdout, w) != line(got.Stdout, w) {
+				t.Errorf("%q frozen=%q new=%q", w, line(want.Stdout, w), line(got.Stdout, w))
 			}
 		}
 		// A second run is a no-op once the first one's changes are committed.
@@ -134,10 +107,10 @@ func TestMigrateV4PreviewWritesNothingAndMatchesVerboseDiffs(t *testing.T) {
 	migPlugin(t)
 	dir := migProject(t, true)
 	before := knTree(t, dir)
-	o := knOld(t, dir, "", "hv-migrate", "v4", "--verbose")
-	n := knNew(t, dir, "", "migrate", "v4", "--verbose")
+	want, got := knFrozen(t, dir, "", "migrate", "v4", "--verbose")
+	o, n := knOut{want.Stdout, want.Stderr, want.RC}, knOut{got.Stdout, got.Stderr, got.RC}
 	if o.rc != 0 || n.rc != 0 {
-		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+		t.Fatalf("rc frozen=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
 	}
 	after := knTree(t, dir)
 	if len(before) != len(after) {
@@ -175,26 +148,23 @@ func TestMigrateV4Refusals(t *testing.T) {
 	cases := []struct {
 		name   string
 		mutate func(t *testing.T, dir string)
-		oldRC  int
 		wantRC int
 	}{
-		{"dirty outside .hv", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, "stray.txt"), "x") }, 1, 4},
+		{"dirty outside .hv", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, "stray.txt"), "x") }, 4},
 		{"pre-3.0 project", func(t *testing.T, d string) {
 			knWrite(t, filepath.Join(d, ".hv", "config.json"), `{"version": "2.1.0"}`)
-		}, 1, 4},
-		{"no version field", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, ".hv", "config.json"), `{}`) }, 1, 3},
-		{"no config", func(t *testing.T, d string) { os.Remove(filepath.Join(d, ".hv", "config.json")) }, 1, 3},
-		{"not a git repo", func(t *testing.T, d string) { os.RemoveAll(filepath.Join(d, ".git")) }, 1, 5},
+		}, 4},
+		{"no version field", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, ".hv", "config.json"), `{}`) }, 3},
+		{"no config", func(t *testing.T, d string) { os.Remove(filepath.Join(d, ".hv", "config.json")) }, 3},
+		{"not a git repo", func(t *testing.T, d string) { os.RemoveAll(filepath.Join(d, ".git")) }, 5},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := migProject(t, false), migProject(t, false)
-			c.mutate(t, oldDir)
+			newDir := migProject(t, false)
 			c.mutate(t, newDir)
-			o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
 			n := knNew(t, newDir, "", "migrate", "v4", "--apply")
-			if o.rc != c.oldRC || n.rc != c.wantRC {
-				t.Fatalf("rc old=%d (want %d) new=%d (want %d)\n%s\n%s", o.rc, c.oldRC, n.rc, c.wantRC, o.stderr, n.stderr)
+			if n.rc != c.wantRC {
+				t.Fatalf("rc new=%d (want %d)\n%s", n.rc, c.wantRC, n.stderr)
 			}
 			if _, err := os.Stat(filepath.Join(newDir, ".hv", "migrate-backup")); err == nil {
 				t.Error("a refused run left a backup")
@@ -235,23 +205,20 @@ func TestMigrateV4KeepsBackupWhenImportFails(t *testing.T) {
 	}
 }
 
-func TestMigrateV4CRLFMatchesOldHelper(t *testing.T) {
+func TestMigrateV4CRLFMatchGolden(t *testing.T) {
 	migPlugin(t)
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
-	oldDir, newDir := migProject(t, false), migProject(t, false)
-	for _, d := range []string{oldDir, newDir} {
-		knWrite(t, filepath.Join(d, ".hv", "BACKLOG.md"), crlf(migBacklog))
-		knWrite(t, filepath.Join(d, ".hv", "CONTEXT.md"), crlf(migContext))
-		knWrite(t, filepath.Join(d, "AGENTS.md"), crlf("# Agents\n\nrun /hv-context\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n"))
-		migGit(t, d, "add", "-A", "-f")
-		migGit(t, d, "commit", "-q", "-m", "crlf")
+	newDir := migProject(t, false)
+	knWrite(t, filepath.Join(newDir, ".hv", "BACKLOG.md"), crlf(migBacklog))
+	knWrite(t, filepath.Join(newDir, ".hv", "CONTEXT.md"), crlf(migContext))
+	knWrite(t, filepath.Join(newDir, "AGENTS.md"), crlf("# Agents\n\nrun /hv-context\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n"))
+	migGit(t, newDir, "add", "-A", "-f")
+	migGit(t, newDir, "commit", "-q", "-m", "crlf")
+	want, got := knFrozen(t, newDir, "", "migrate", "v4", "--apply")
+	if want.RC != 0 || got.RC != 0 {
+		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
-	o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
-	n := knNew(t, newDir, "", "migrate", "v4", "--apply")
-	if o.rc != 0 || n.rc != 0 {
-		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
-	}
-	migSameTree(t, oldDir, newDir)
+	knSameDelta(t, want, got)
 	if strings.Contains(knTree(t, newDir)["BACKLOG.md"], "\r") {
 		t.Error("CR survived the rewrite")
 	}
@@ -287,18 +254,15 @@ func TestMigrateV4DevBuildWarnsAndSkipsStamp(t *testing.T) {
 // CRLF AGENTS.md that only needs the context block removed ends up pure LF.
 func TestMigrateV4StripNormalizesCRLF(t *testing.T) {
 	migPlugin(t)
-	oldDir, newDir := migProject(t, false), migProject(t, false)
-	for _, d := range []string{oldDir, newDir} {
-		knWrite(t, filepath.Join(d, "AGENTS.md"), "# Agents\r\n\r\n<!-- hv-context-start -->\r\nold\r\n<!-- hv-context-end -->\r\n\r\nend\r\n")
-		migGit(t, d, "add", "-A", "-f")
-		migGit(t, d, "commit", "-q", "-m", "crlf agents")
+	newDir := migProject(t, false)
+	knWrite(t, filepath.Join(newDir, "AGENTS.md"), "# Agents\r\n\r\n<!-- hv-context-start -->\r\nold\r\n<!-- hv-context-end -->\r\n\r\nend\r\n")
+	migGit(t, newDir, "add", "-A", "-f")
+	migGit(t, newDir, "commit", "-q", "-m", "crlf agents")
+	want, got := knFrozen(t, newDir, "", "migrate", "v4", "--apply")
+	if want.RC != 0 || got.RC != 0 {
+		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
-	o := knOld(t, oldDir, "", "hv-migrate", "v4", "--apply")
-	n := knNew(t, newDir, "", "migrate", "v4", "--apply")
-	if o.rc != 0 || n.rc != 0 {
-		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
-	}
-	migSameTree(t, oldDir, newDir)
+	knSameDelta(t, want, got)
 	if strings.Contains(knTree(t, newDir)["../AGENTS.md"], "\r") {
 		t.Error("CR kept in AGENTS.md")
 	}

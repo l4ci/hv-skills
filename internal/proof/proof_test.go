@@ -34,7 +34,7 @@ func golden(t *testing.T, name string) string {
 	return string(b)
 }
 
-// project copies testdata/fixture into a fresh .hv/, as gen_golden.sh does.
+// project copies testdata/fixture into a fresh .hv/, as the goldens were recorded.
 func project(t *testing.T) string {
 	root := t.TempDir()
 	hv := filepath.Join(root, ".hv")
@@ -58,8 +58,9 @@ func project(t *testing.T) string {
 	return root
 }
 
-// The detail files and the shown rows must stay byte-identical to what
-// hv-proof-add and hv-proof-show produce (testdata/gen_golden.sh).
+// The detail files and the shown rows must stay byte-identical to what the
+// retired hv-proof-add and hv-proof-show produced (testdata/golden, frozen,
+// changed only by reviewed edit).
 func TestAddAndShowMatchOldHelpers(t *testing.T) {
 	root := project(t)
 	steps := []struct {

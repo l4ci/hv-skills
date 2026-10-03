@@ -1,0 +1,19 @@
+{
+  "inputs": {
+    "argv": [
+      "block",
+      "knowledge"
+    ],
+    "fixture": "d4da84627fe6386866ac5e36efbac350e56b73d91ce23573b46d73286a6818f7",
+    "stdin": ""
+  },
+  "outputs": {
+    "stdout": "updated\n",
+    "stderr": "",
+    "rc": 0,
+    "changed": {
+      "../AGENTS.md": "# Project\n\n\u003c!-- hv-knowledge-start --\u003e\n## Project Knowledge\n\nDurable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n- Architecture\n- Glossary\n\n\u003c!-- hv-knowledge-end --\u003e\n\ntail\n"
+    },
+    "removed": []
+  }
+}

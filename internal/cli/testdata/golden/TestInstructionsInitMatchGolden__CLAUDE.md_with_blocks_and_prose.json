@@ -1,0 +1,20 @@
+{
+  "inputs": {
+    "argv": [
+      "instructions",
+      "init"
+    ],
+    "fixture": "077ea0f5c0654b24b292dbb6f2cb89fae2cf576c088cfb92cf27ea95ef0bfa73",
+    "stdin": ""
+  },
+  "outputs": {
+    "stdout": "created: AGENTS.md\nmoved: knowledge, decisions → AGENTS.md\nlinked: CLAUDE.md → @AGENTS.md\n",
+    "stderr": "",
+    "rc": 0,
+    "changed": {
+      "../AGENTS.md": "\u003c!-- hv-knowledge-start --\u003e\nK\n\u003c!-- hv-knowledge-end --\u003e\n\n\u003c!-- hv:decisions:start --\u003e\nD\n\u003c!-- hv:decisions:end --\u003e\n",
+      "../CLAUDE.md": "# Mine\n\nafter\n\n@AGENTS.md\n"
+    },
+    "removed": []
+  }
+}

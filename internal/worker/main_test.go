@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -32,13 +31,13 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	// Root the temp dirs of child processes (the old bin/ helpers mktemp) under
-	// the tripwire dir, which is removed below (#110).
+	// Root the temp dirs of child processes (the fake forge and host scripts
+	// mktemp) under the tripwire dir, which is removed below (#110).
 	if tmp := filepath.Join(dir, "tmp"); os.Mkdir(tmp, 0o755) == nil {
 		os.Setenv("TMPDIR", tmp)
 	}
 	// The gate's local merge commits as the caller. CI runners have no git
-	// identity, so the tests bring their own, for git and for the old helpers.
+	// identity, so the tests bring their own.
 	for k, v := range map[string]string{"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"} {
 		os.Setenv(k, v)
 	}
@@ -54,16 +53,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// ── fixtures shared by the parity tests ─────────────────────────────────────
-
-func binDir(t *testing.T) string {
-	t.Helper()
-	d, err := filepath.Abs("../../bin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return d
-}
+// ── fixtures shared by the tests ────────────────────────────────────────────
 
 func sh(t *testing.T, dir string, name string, args ...string) string {
 	t.Helper()
@@ -95,31 +85,8 @@ func newProject(t *testing.T, config string) string {
 	return dir
 }
 
-type oldResult struct {
-	Stdout, Stderr string
-	Code           int
-}
-
-// runOld runs a bin/ helper in dir with a clean host environment.
-func runOld(t *testing.T, dir string, env []string, helper string, args ...string) oldResult {
-	t.Helper()
-	cmd := exec.Command(filepath.Join(binDir(t), helper), args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), env...)
-	var out, errb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errb
-	err := cmd.Run()
-	code := 0
-	if ee, ok := err.(*exec.ExitError); ok {
-		code = ee.ExitCode()
-	} else if err != nil {
-		t.Fatalf("%s: %v", helper, err)
-	}
-	return oldResult{out.String(), errb.String(), code}
-}
-
-// registry returns workers.json with the project path replaced by ROOT, so two
-// projects in different temp dirs compare byte for byte.
+// registry returns workers.json with the project path replaced by ROOT, so a
+// project in any temp dir compares byte for byte with a golden.
 func registry(t *testing.T, dir string) string {
 	t.Helper()
 	b, err := os.ReadFile(RegistryPath(dir))
@@ -129,10 +96,10 @@ func registry(t *testing.T, dir string) string {
 	return strings.ReplaceAll(string(b), dir, "ROOT")
 }
 
-func mustEqual(t *testing.T, what, old, got string) {
+func mustEqual(t *testing.T, what, want, got string) {
 	t.Helper()
-	if old != got {
-		t.Errorf("%s differs from the old helper\n--- old\n%s\n--- go\n%s", what, old, got)
+	if want != got {
+		t.Errorf("%s differs\n--- want\n%s\n--- got\n%s", what, want, got)
 	}
 }
 

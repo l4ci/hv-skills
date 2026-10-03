@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -63,18 +62,10 @@ type gitCase struct {
 	args []string
 	code int
 	data map[string]any // compared key by key against the envelope
-	// old helper run on the same scenario while bin/ has it: rc and stdout.
-	oldArgs []string
-	oldRC   int
-	oldOut  string
 }
 
-func runGitCases(t *testing.T, helper string, cases []gitCase) {
+func runGitCases(t *testing.T, cases []gitCase) {
 	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	bin := filepath.Join(filepath.Dir(file), "..", "..", "bin", helper)
-	_, err := os.Stat(bin)
-	haveOld := err == nil
 	for _, c := range cases {
 		o := trRun(t, c.dir, "", append(append([]string{}, c.args...), "--json")...)
 		if o.code != c.code {
@@ -90,16 +81,6 @@ func runGitCases(t *testing.T, helper string, cases []gitCase) {
 		}
 		if c.data != nil && len(data) != len(c.data) {
 			t.Errorf("%s: data %v has keys beyond %v", c.name, data, c.data)
-		}
-		if !haveOld || c.oldArgs == nil {
-			continue
-		}
-		cmd := exec.Command("bash", append([]string{bin}, c.oldArgs...)...)
-		cmd.Dir = c.dir
-		out, _ := cmd.Output()
-		rc := cmd.ProcessState.ExitCode()
-		if rc != c.oldRC || strings.TrimSpace(string(out)) != c.oldOut {
-			t.Errorf("%s: old %s gave rc %d %q; the case says rc %d %q", c.name, helper, rc, out, c.oldRC, c.oldOut)
 		}
 	}
 }
@@ -128,16 +109,16 @@ func TestGitBase(t *testing.T) {
 	write(t, filepath.Join(masked, ".hv", "config.json"), `{"git":{"baseBranch":"dev"}}`)
 
 	b := func(s string) map[string]any { return map[string]any{"base": s} }
-	runGitCases(t, "hv-base-branch", []gitCase{
-		{name: "main", dir: main, args: []string{"git", "base"}, data: b("main"), oldArgs: []string{}, oldOut: "main"},
-		{name: "master", dir: master, args: []string{"git", "base"}, data: b("master"), oldArgs: []string{}, oldOut: "master"},
-		{name: "configured", dir: dev, args: []string{"git", "base"}, data: b("dev"), oldArgs: []string{}, oldOut: "dev"},
-		{name: "configured missing", dir: stale, args: []string{"git", "base"}, data: b("main"), oldArgs: []string{}, oldOut: "main"},
-		{name: "origin/HEAD", dir: remote, args: []string{"git", "base"}, data: b("develop"), oldArgs: []string{}, oldOut: "develop"},
-		{name: "none", dir: fresh, args: []string{"git", "base"}, code: 3, oldArgs: []string{}, oldRC: 1},
-		{name: "umbrella root", dir: u, args: []string{"git", "base"}, code: 2, oldArgs: []string{}, oldRC: 1},
-		{name: "--repo", dir: u, args: []string{"git", "base", "--repo", "svc"}, data: b("trunk"), oldArgs: nil},
-		{name: "masked", dir: masked, args: []string{"git", "base"}, data: b("main"), oldArgs: []string{}, oldOut: "main"},
+	runGitCases(t, []gitCase{
+		{name: "main", dir: main, args: []string{"git", "base"}, data: b("main")},
+		{name: "master", dir: master, args: []string{"git", "base"}, data: b("master")},
+		{name: "configured", dir: dev, args: []string{"git", "base"}, data: b("dev")},
+		{name: "configured missing", dir: stale, args: []string{"git", "base"}, data: b("main")},
+		{name: "origin/HEAD", dir: remote, args: []string{"git", "base"}, data: b("develop")},
+		{name: "none", dir: fresh, args: []string{"git", "base"}, code: 3},
+		{name: "umbrella root", dir: u, args: []string{"git", "base"}, code: 2},
+		{name: "--repo", dir: u, args: []string{"git", "base", "--repo", "svc"}, data: b("trunk")},
+		{name: "masked", dir: masked, args: []string{"git", "base"}, data: b("main")},
 	})
 }
 
@@ -163,13 +144,13 @@ func TestGitGuardClean(t *testing.T) {
 		}
 		return map[string]any{"clean": clean, "greenfield": green, "dirtyRepos": ds}
 	}
-	runGitCases(t, "hv-guard-clean", []gitCase{
-		{name: "clean", dir: clean, args: []string{"git", "guard", "clean"}, data: res(true, false), oldArgs: []string{}},
-		{name: "dirty", dir: dirty, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, false), oldArgs: []string{}, oldRC: 1},
-		{name: "fresh", dir: fresh, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, true), oldArgs: []string{}, oldRC: 1},
-		{name: "not a repo", dir: plain, args: []string{"git", "guard", "clean"}, code: 3, oldArgs: []string{}, oldRC: 2},
+	runGitCases(t, []gitCase{
+		{name: "clean", dir: clean, args: []string{"git", "guard", "clean"}, data: res(true, false)},
+		{name: "dirty", dir: dirty, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, false)},
+		{name: "fresh", dir: fresh, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, true)},
+		{name: "not a repo", dir: plain, args: []string{"git", "guard", "clean"}, code: 3},
 		{name: "umbrella", dir: u, args: []string{"git", "guard", "clean", "--context", "/hv-work"}, code: 1,
-			data: res(false, false, "web", "ghost (not a git repo at ghost)"), oldArgs: []string{"/hv-work"}, oldRC: 1},
+			data: res(false, false, "web", "ghost (not a git repo at ghost)")},
 		{name: "umbrella --repo clean", dir: u, args: []string{"git", "guard", "clean", "--repo", "svc"}, data: res(true, false)},
 		{name: "umbrella --repo dirty", dir: u, args: []string{"git", "guard", "clean", "--repo", "web"}, code: 1, data: res(false, false)},
 	})
@@ -191,22 +172,22 @@ func TestGitGuardFeatureBranch(t *testing.T) {
 	gitT(t, fresh, "init", "-q", "-b", "trunk")
 	u := umbrella(t)
 
-	runGitCases(t, "hv-guard-feature-branch", []gitCase{
+	runGitCases(t, []gitCase{
 		{name: "feature", dir: feat, args: []string{"git", "guard", "feature-branch"},
-			data: map[string]any{"feature": true, "branch": "ben/1-x", "base": "main"}, oldArgs: []string{}},
+			data: map[string]any{"feature": true, "branch": "ben/1-x", "base": "main"}},
 		{name: "on base", dir: onMain, args: []string{"git", "guard", "feature-branch"}, code: 1,
-			data: map[string]any{"feature": false, "branch": "main", "base": "main", "reason": "base"}, oldArgs: []string{}, oldRC: 1},
+			data: map[string]any{"feature": false, "branch": "main", "base": "main", "reason": "base"}},
 		{name: "named base", dir: feat, args: []string{"git", "guard", "feature-branch", "main"}, code: 1,
-			data: map[string]any{"feature": false, "branch": "main", "base": "main", "reason": "base"}, oldArgs: []string{"main"}, oldRC: 1},
+			data: map[string]any{"feature": false, "branch": "main", "base": "main", "reason": "base"}},
 		{name: "detached", dir: detached, args: []string{"git", "guard", "feature-branch"}, code: 1,
-			data: map[string]any{"feature": false, "reason": "detached"}, oldArgs: []string{}, oldRC: 1},
+			data: map[string]any{"feature": false, "reason": "detached"}},
 		{name: "explicit HEAD", dir: feat, args: []string{"git", "guard", "feature-branch", "HEAD"}, code: 1,
-			data: map[string]any{"feature": false, "reason": "detached"}, oldArgs: []string{"HEAD"}, oldRC: 1},
+			data: map[string]any{"feature": false, "reason": "detached"}},
 		{name: "no base, conventional name", dir: fresh, args: []string{"git", "guard", "feature-branch", "trunk"}, code: 1,
-			data: map[string]any{"feature": false, "branch": "trunk", "reason": "base"}, oldArgs: []string{"trunk"}, oldRC: 1},
+			data: map[string]any{"feature": false, "branch": "trunk", "reason": "base"}},
 		{name: "no base, other name", dir: fresh, args: []string{"git", "guard", "feature-branch", "x"},
-			data: map[string]any{"feature": true, "branch": "x"}, oldArgs: []string{"x"}},
-		{name: "umbrella root", dir: u, args: []string{"git", "guard", "feature-branch"}, code: 2, oldArgs: []string{}, oldRC: 1},
+			data: map[string]any{"feature": true, "branch": "x"}},
+		{name: "umbrella root", dir: u, args: []string{"git", "guard", "feature-branch"}, code: 2},
 		{name: "--repo", dir: u, args: []string{"git", "guard", "feature-branch", "--repo", "svc"}, code: 1,
 			data: map[string]any{"feature": false, "branch": "main", "base": "main", "reason": "base"}},
 	})
@@ -223,11 +204,10 @@ func TestGitBranch(t *testing.T) {
 		}
 		return out
 	}
-	runGitCases(t, "hv-multi-branch-create", []gitCase{
+	runGitCases(t, []gitCase{
 		{name: "collision", dir: u, args: []string{"git", "branch", "taken", "--repos", "svc,web"}, code: 4,
 			data: map[string]any{"branch": "taken", "repos": list("svc", "web"), "changed": false}},
-		{name: "unknown", dir: u, args: []string{"git", "branch", "x", "--repos", "svc,nope"}, code: 3,
-			oldArgs: []string{"--branch", "x", "--repos", "svc,nope"}, oldRC: 1},
+		{name: "unknown", dir: u, args: []string{"git", "branch", "x", "--repos", "svc,nope"}, code: 3},
 		{name: "spaces", dir: u, args: []string{"git", "branch", "x", "--repos", "svc, web"}, code: 2},
 		{name: "empty entry", dir: u, args: []string{"git", "branch", "x", "--repos", "svc,"}, code: 2},
 		{name: "no repos", dir: u, args: []string{"git", "branch", "x"}, code: 2},
@@ -261,12 +241,12 @@ func TestGitWorktreePath(t *testing.T) {
 	u := umbrella(t)
 	real, _ := filepath.EvalSymlinks(u)
 	want := real + "/.claude/worktrees/svc/feat/x"
-	runGitCases(t, "hv-worktree-path", []gitCase{
+	runGitCases(t, []gitCase{
 		{name: "path", dir: u, args: []string{"git", "worktree-path", "--repo", "svc", "feat/x"},
-			data: map[string]any{"path": want}, oldArgs: []string{"--repo", "svc", "feat/x"}, oldOut: want},
+			data: map[string]any{"path": want}},
 		{name: "from a sub-repo", dir: filepath.Join(u, "svc"), args: []string{"git", "worktree-path", "--repo", "svc", "feat/x"},
-			data: map[string]any{"path": want}, oldArgs: []string{"--repo", "svc", "feat/x"}, oldOut: want},
-		{name: "no --repo", dir: u, args: []string{"git", "worktree-path", "feat/x"}, code: 2, oldArgs: []string{"feat/x"}, oldRC: 1},
+			data: map[string]any{"path": want}},
+		{name: "no --repo", dir: u, args: []string{"git", "worktree-path", "feat/x"}, code: 2},
 		{name: "unknown repo", dir: u, args: []string{"git", "worktree-path", "--repo", "nope", "feat/x"}, code: 3},
 		{name: "no branch", dir: u, args: []string{"git", "worktree-path", "--repo", "svc"}, code: 2},
 	})

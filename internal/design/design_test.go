@@ -28,8 +28,9 @@ func project(t *testing.T) string {
 	return root
 }
 
-// testdata/golden holds what bin/hv-design-add wrote (date masked); see
-// ../plan/testdata/gen_golden.sh. The files must stay byte-identical.
+// testdata/golden holds what the retired bin/hv-design-add wrote (date
+// masked). It is frozen: the files must stay byte-identical, and change only by
+// reviewed edit.
 func TestAddMatchesOldHelper(t *testing.T) {
 	root := project(t)
 	for id, title := range map[string]string{"B07": "Title: with colon & é", "F12": "Second"} {
@@ -118,7 +119,7 @@ func TestAddConcurrent(t *testing.T) {
 	}
 }
 
-// Same three amend calls as testdata/gen_golden.sh, against the old helper's output.
+// Three amend calls against the frozen output of the retired helper.
 func TestAmendMatchesOldHelper(t *testing.T) {
 	root := project(t)
 	Add(root, "B07", "Title: with colon & é")

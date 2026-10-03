@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -290,9 +288,9 @@ func TestResolveProvider(t *testing.T) {
 	}
 }
 
-// TestProviderFromURLMatchesHelper checks the classification against
-// bin/hv-issues-provider while it exists.
-func TestProviderFromURLMatchesHelper(t *testing.T) {
+// TestProviderFromURL pins the classification table, which the retired
+// bin/hv-issues-provider agreed with on every row.
+func TestProviderFromURL(t *testing.T) {
 	cases := map[string]string{
 		"git@github.com:o/r.git":                 "github",
 		"https://github.com/o/r":                 "github",
@@ -308,31 +306,6 @@ func TestProviderFromURLMatchesHelper(t *testing.T) {
 	for url, want := range cases {
 		if got := ProviderFromURL(url); got != want {
 			t.Errorf("ProviderFromURL(%q) = %q, want %q", url, got, want)
-		}
-	}
-	helper := filepath.Join("..", "..", "bin", "hv-issues-provider")
-	if _, err := os.Stat(helper); err != nil {
-		t.Skip("bin/hv-issues-provider is gone")
-	}
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-	abs, _ := filepath.Abs(helper)
-	for url, want := range cases {
-		dir := t.TempDir()
-		run := func(name string, args ...string) string {
-			cmd := exec.Command(name, args...)
-			cmd.Dir = dir
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("%s %v: %v\n%s", name, args, err, out)
-			}
-			return strings.TrimSpace(string(out))
-		}
-		run("git", "init", "-q")
-		run("git", "remote", "add", "origin", url)
-		if got := run("bash", abs); got != want {
-			t.Errorf("hv-issues-provider for %q = %q; the table says %q", url, got, want)
 		}
 	}
 }

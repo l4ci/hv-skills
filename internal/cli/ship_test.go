@@ -1,50 +1,23 @@
 package cli
 
 import (
-	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
-// The ship verbs are checked against the old helpers through the test shim
-// (test/hv-shim, which maps bin/hv-ship-body, hv-pr, hv-merge and hv-undo onto
-// the contract): same exit code and `data` on copies of one fixture, and for
-// the writers the same .hv/ bytes and git state.
-
-var (
-	shipStageOnce sync.Once
-	shipStageDir  string
-)
-
-func shipRepoRoot() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..")
-}
-
-// shipHelpers stages a copy of bin/ outside every project, as the smoke runner does.
-func shipHelpers(t *testing.T) string {
-	t.Helper()
-	shipStageOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "hv-ship-stage-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		shipStageDir = filepath.Join(dir, "bin")
-		if out, err := exec.Command("cp", "-R", filepath.Join(shipRepoRoot(), "bin"), shipStageDir).CombinedOutput(); err != nil {
-			t.Fatalf("staging bin/: %v\n%s", err, out)
-		}
-	})
-	return shipStageDir
-}
+// The ship verbs run against fixtures in temp repos: exit code and `data`
+// against goldens that freeze what the retired helpers answered (through the
+// old test shim) on copies of the same fixture, and for the writers the same
+// .hv/ bytes and git state. Fixed git identity and dates (shipDeterministic)
+// keep the commit hashes in the goldens stable.
 
 // shipDeterministic pins git identity and dates so two runs on copies of a
 // fixture make identical commits.
@@ -58,33 +31,32 @@ func shipDeterministic(t *testing.T) {
 	}
 }
 
-// shipOld runs the old helper through the shim in dir.
-func shipOld(t *testing.T, dir, stdin string, env []string, args ...string) (int, map[string]any) {
-	t.Helper()
-	cmd := exec.Command("python3", append([]string{filepath.Join(shipRepoRoot(), "test", "hv-shim"), "--json"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), append([]string{"HV_SHIM_HELPERS=" + shipHelpers(t)}, env...)...)
-	cmd.Stdin = strings.NewReader(stdin)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Run()
-	code := cmd.ProcessState.ExitCode()
-	return code, envelope(t, out.String())
+// shipCallIn describes one call; the golden holds the retired helper's data for it.
+type shipCallIn struct {
+	Name  string
+	Args  []string
+	Stdin string
+	Code  int
 }
 
-// shipSame runs args against the old helper in oldDir and the Go verb in
-// newDir (copies of one fixture) and requires the same exit code and data.
-func shipSame(t *testing.T, name, oldDir, newDir, stdin string, wantCode int, args ...string) map[string]any {
+// shipSame runs args as the Go verb in dir and requires the exit code and the
+// data the golden recorded.
+func shipSame(t *testing.T, name, dir, stdin string, wantCode int, args ...string) map[string]any {
 	t.Helper()
-	oc, oenv := shipOld(t, oldDir, stdin, nil, args...)
-	n := trRun(t, newDir, stdin, append(append([]string{}, args...), "--json")...)
+	var want any
+	masked := make([]string, len(args)) // the project's temp dir is not part of the case
+	for i, a := range args {
+		masked[i] = strings.ReplaceAll(a, dir, "DIR")
+	}
+	pytest.Golden(t, shipCallIn{name, masked, stdin, wantCode}, &want)
+	n := trRun(t, dir, stdin, append(append([]string{}, args...), "--json")...)
 	nenv := envelope(t, n.stdout)
-	if oc != wantCode || n.code != wantCode {
-		t.Errorf("%s: exit old %d, new %d, want %d\nold: %v\nnew: %s%s", name, oc, n.code, wantCode, oenv, n.stdout, n.stderr)
+	if n.code != wantCode {
+		t.Errorf("%s: exit %d, want %d\n%s%s", name, n.code, wantCode, n.stdout, n.stderr)
 		return nenv
 	}
-	if !reflect.DeepEqual(oenv["data"], nenv["data"]) {
-		t.Errorf("%s: data differs\nold: %#v\nnew: %#v", name, oenv["data"], nenv["data"])
+	if !reflect.DeepEqual(want, nenv["data"]) {
+		t.Errorf("%s: data differs\ngolden: %#v\nnew:    %#v", name, want, nenv["data"])
 	}
 	return nenv
 }
@@ -185,23 +157,20 @@ func TestShipBody(t *testing.T) {
 		[3]string{"b.txt", "feat: overlay [F70]", "Refs [B70] again and [F99]"},
 		[3]string{"c.txt", "chore: plain", ""})
 	shipBranchOf(t, work, "hv/plain", [3]string{"p.txt", "chore: nothing", ""})
-	old := shipCopy(t, work)
 
-	nenv := shipSame(t, "items and closes", old, work, "", 0, "ship", "body", "hv/ship-demo")
+	nenv := shipSame(t, "items and closes", work, "", 0, "ship", "body", "hv/ship-demo")
 	body := nenv["data"].(map[string]any)["body"].(string)
 	for _, want := range []string{"## Summary\n\n- chore: plain\n- feat: overlay [F70]\n- fix: badge invalidation [B70]\n\n", "## Items resolved\n\n- [F70] Ship demo feature\n- [B70] Ship demo bug\n- [F99]\n\n", "Closes #43\nCloses #42\n\n"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body lacks %q:\n%s", want, body)
 		}
 	}
-	shipSame(t, "no items", old, work, "", 0, "ship", "body", "hv/plain")
+	shipSame(t, "no items", work, "", 0, "ship", "body", "hv/plain")
 	gitT(t, work, "checkout", "-q", "hv/plain")
-	gitT(t, old, "checkout", "-q", "hv/plain")
-	shipSame(t, "current branch", old, work, "", 0, "ship", "body")
+	shipSame(t, "current branch", work, "", 0, "ship", "body")
 	gitT(t, work, "checkout", "-q", "main")
-	gitT(t, old, "checkout", "-q", "main")
-	shipSame(t, "base branch has no commits", old, work, "", 1, "ship", "body", "main")
-	shipSame(t, "unknown branch", old, work, "", 3, "ship", "body", "hv/none")
+	shipSame(t, "base branch has no commits", work, "", 1, "ship", "body", "main")
+	shipSame(t, "unknown branch", work, "", 3, "ship", "body", "hv/none")
 
 	o := trRun(t, work, "", "ship", "body", "hv/plain")
 	if o.code != 0 || !strings.HasPrefix(o.stdout, "## Summary\n\n- chore: nothing\n") || strings.HasSuffix(o.stdout, "\n\n\n") {
@@ -211,8 +180,8 @@ func TestShipBody(t *testing.T) {
 
 	u := umbrella(t)
 	shipBranchOf(t, filepath.Join(u, "svc"), "feat/x", [3]string{"x.txt", "feat: x [B01]", ""})
-	shipSame(t, "umbrella root", u, u, "", 2, "ship", "body", "feat/x")
-	shipSame(t, "--repo", u, u, "", 0, "ship", "body", "feat/x", "--repo", "svc")
+	shipSame(t, "umbrella root", u, "", 2, "ship", "body", "feat/x")
+	shipSame(t, "--repo", u, "", 0, "ship", "body", "feat/x", "--repo", "svc")
 }
 
 // ---- ship merge --------------------------------------------------------------
@@ -224,18 +193,17 @@ func TestShipMerge(t *testing.T) {
 	shipBranchOf(t, work, "hv/wt", [3]string{"wt.txt", "feat: wt", ""})
 	shipBranchOf(t, work, "hv/clash", [3]string{"clash.txt", "feat: other side", ""})
 	shipCommit(t, work, "clash.txt", "chore: base side", "")
-	old := shipCopy(t, work)
 
 	// ok: a linked worktree on the branch is removed first.
-	for _, d := range []string{work, old} {
-		gitT(t, d, "worktree", "add", "-q", filepath.Join(t.TempDir(), "wt"), "hv/wt")
-	}
-	nenv := shipSame(t, "merge with worktree", old, work, "merge: wt branch\n\nbody\n", 0, "ship", "merge", "hv/wt", "--body-file", "-")
+	gitT(t, work, "worktree", "add", "-q", filepath.Join(t.TempDir(), "wt"), "hv/wt")
+	nenv := shipSame(t, "merge with worktree", work, "merge: wt branch\n\nbody\n", 0, "ship", "merge", "hv/wt", "--body-file", "-")
 	if d := nenv["data"].(map[string]any); d["base"] != "main" || d["changed"] != true || d["sha"] != gitT(t, work, "rev-parse", "--short", "HEAD") {
 		t.Errorf("merge data %v", d)
 	}
-	if gitT(t, work, "rev-parse", "HEAD") != gitT(t, old, "rev-parse", "HEAD") {
-		t.Errorf("merge commits differ")
+	var wantHead string // the merge commit the retired helper made
+	pytest.Golden(t, "HEAD after the merge of hv/wt", &wantHead)
+	if gitT(t, work, "rev-parse", "HEAD") != wantHead {
+		t.Errorf("merge commit differs from the golden %s", wantHead)
 	}
 	if gitT(t, work, "branch", "--list", "hv/wt") != "" || strings.Contains(gitT(t, work, "worktree", "list", "--porcelain"), "hv/wt") {
 		t.Errorf("branch or worktree left behind: %s", gitT(t, work, "worktree", "list", "--porcelain"))
@@ -243,12 +211,12 @@ func TestShipMerge(t *testing.T) {
 	if msg := gitT(t, work, "log", "-1", "--format=%B"); msg != "merge: wt branch\n\nbody" {
 		t.Errorf("merge message %q", msg)
 	}
-	shipSame(t, "plain merge", old, work, "merge: ok", 0, "ship", "merge", "hv/ok", "--body-file", "-")
+	shipSame(t, "plain merge", work, "merge: ok", 0, "ship", "merge", "hv/ok", "--body-file", "-")
 
 	// refusals
-	shipSame(t, "base branch", old, work, "merge: x", 4, "ship", "merge", "main", "--body-file", "-")
+	shipSame(t, "base branch", work, "merge: x", 4, "ship", "merge", "main", "--body-file", "-")
 	head := gitT(t, work, "rev-parse", "HEAD")
-	shipSame(t, "conflict", old, work, "merge: x", 4, "ship", "merge", "hv/clash", "--body-file", "-")
+	shipSame(t, "conflict", work, "merge: x", 4, "ship", "merge", "hv/clash", "--body-file", "-")
 	if gitT(t, work, "rev-parse", "HEAD") != head || gitT(t, work, "status", "--porcelain") != "" {
 		t.Errorf("a conflicting merge must leave the tree as it was")
 	}
@@ -256,10 +224,10 @@ func TestShipMerge(t *testing.T) {
 		t.Errorf("the conflicting branch must stay")
 	}
 	// usage and resolution
-	shipSame(t, "empty body", old, work, "\n", 2, "ship", "merge", "hv/clash", "--body-file", "-")
-	shipSame(t, "no --body-file", old, work, "", 2, "ship", "merge", "hv/clash")
-	shipSame(t, "unknown branch", old, work, "merge: x", 3, "ship", "merge", "hv/none", "--body-file", "-")
-	shipSame(t, "unreadable file", old, work, "", 2, "ship", "merge", "hv/clash", "--body-file", filepath.Join(work, "nope"))
+	shipSame(t, "empty body", work, "\n", 2, "ship", "merge", "hv/clash", "--body-file", "-")
+	shipSame(t, "no --body-file", work, "", 2, "ship", "merge", "hv/clash")
+	shipSame(t, "unknown branch", work, "merge: x", 3, "ship", "merge", "hv/none", "--body-file", "-")
+	shipSame(t, "unreadable file", work, "", 2, "ship", "merge", "hv/clash", "--body-file", filepath.Join(work, "nope"))
 	// a body file
 	bf := filepath.Join(t.TempDir(), "msg")
 	write(t, bf, "merge: from file\n")
@@ -279,7 +247,7 @@ func TestShipMerge(t *testing.T) {
 
 	u := umbrella(t)
 	shipBranchOf(t, filepath.Join(u, "svc"), "feat/x", [3]string{"x.txt", "feat: x", ""})
-	shipSame(t, "umbrella root", u, u, "merge: x", 2, "ship", "merge", "feat/x", "--body-file", "-")
+	shipSame(t, "umbrella root", u, "merge: x", 2, "ship", "merge", "feat/x", "--body-file", "-")
 	n := trRun(t, u, "merge: x", "ship", "merge", "feat/x", "--body-file", "-", "--repo", "svc", "--json")
 	if n.code != 0 || gitT(t, filepath.Join(u, "svc"), "branch", "--list", "feat/x") != "" {
 		t.Errorf("--repo merge: %+v", n)
@@ -299,7 +267,6 @@ func shipPRForge(url string) *forge {
 
 func TestShipPRFileMode(t *testing.T) {
 	shipDeterministic(t)
-	fakes := filepath.Join(shipRepoRoot(), "test", "fakes")
 	for _, tc := range []struct{ prov, url string }{
 		{"github", "https://github.com/fake/repo/pull/1"},
 		{"gitlab", "https://gitlab.com/fake/repo/-/merge_requests/1"},
@@ -308,21 +275,19 @@ func TestShipPRFileMode(t *testing.T) {
 			cfg := `{"backlog":{"backend":"file"},"issues":{"provider":"` + tc.prov + `","retryWaitSeconds":0}}`
 			work := shipFixture(t, cfg)
 			shipBranchOf(t, work, "feat/x", [3]string{"x.txt", "work", ""})
-			old := shipCopy(t, work)
 			f := shipPRForge(tc.url)
 			useForge(t, f)
 
-			oc, oenv := shipOld(t, old, "Summary line", []string{
-				"PATH=" + fakes + ":" + os.Getenv("PATH"),
-				"FAKE_TRACKER_DB=" + filepath.Join(t.TempDir(), "db.json"),
-			}, "ship", "pr", "feat/x", "--title", "My title", "--body-file", "-", "--items", "F1,2")
+			var want any // the retired helper's data against its fake forge
+			pytest.Golden(t, map[string]any{"provider": tc.prov, "url": tc.url, "stdin": "Summary line",
+				"args": []string{"ship", "pr", "feat/x", "--title", "My title", "--body-file", "-", "--items", "F1,2"}}, &want)
 			n := trRun(t, work, "Summary line\n", "ship", "pr", "feat/x", "--title", "My title", "--body-file", "-", "--items", "F1,2", "--json")
-			if oc != 0 || n.code != 0 {
-				t.Fatalf("exit old %d new %d\n%v\n%s%s", oc, n.code, oenv, n.stdout, n.stderr)
+			if n.code != 0 {
+				t.Fatalf("exit %d\n%s%s", n.code, n.stdout, n.stderr)
 			}
 			nenv := envelope(t, n.stdout)
-			if !reflect.DeepEqual(oenv["data"], nenv["data"]) {
-				t.Errorf("data\nold: %#v\nnew: %#v", oenv["data"], nenv["data"])
+			if !reflect.DeepEqual(want, nenv["data"]) {
+				t.Errorf("data\ngolden: %#v\nnew:    %#v", want, nenv["data"])
 			}
 			d := nenv["data"].(map[string]any)
 			if d["provider"] != tc.prov || d["number"] != 1.0 || d["changed"] != true || !reflect.DeepEqual(d["items"], []any{"F1", "2"}) {
@@ -358,17 +323,16 @@ func TestShipPRUsageAndResolution(t *testing.T) {
 	shipDeterministic(t)
 	work := shipFixture(t, "")
 	shipBranchOf(t, work, "feat/y", [3]string{"y.txt", "work", ""})
-	old := shipCopy(t, work)
 	f := shipPRForge("https://github.com/fake/repo/pull/9")
 	useForge(t, f)
 	pr := []string{"ship", "pr", "feat/y", "--title", "T", "--body-file", "-"}
-	shipSame(t, "no title", old, work, "b", 2, "ship", "pr", "feat/y", "--body-file", "-")
-	shipSame(t, "no body-file", old, work, "b", 2, "ship", "pr", "feat/y", "--title", "T")
-	shipSame(t, "empty body", old, work, "\n", 2, pr...)
-	shipSame(t, "unknown branch", old, work, "b", 3, "ship", "pr", "no/such", "--title", "T", "--body-file", "-")
+	shipSame(t, "no title", work, "b", 2, "ship", "pr", "feat/y", "--body-file", "-")
+	shipSame(t, "no body-file", work, "b", 2, "ship", "pr", "feat/y", "--title", "T")
+	shipSame(t, "empty body", work, "\n", 2, pr...)
+	shipSame(t, "unknown branch", work, "b", 3, "ship", "pr", "no/such", "--title", "T", "--body-file", "-")
 	u := umbrella(t)
 	shipBranchOf(t, filepath.Join(u, "svc"), "feat/y", [3]string{"y.txt", "work", ""})
-	shipSame(t, "umbrella root", u, u, "b", 2, pr...)
+	shipSame(t, "umbrella root", u, "b", 2, pr...)
 	if len(f.calls) != 0 {
 		t.Errorf("no forge call expected: %q", f.calls)
 	}
@@ -691,29 +655,39 @@ func shipCycle(t *testing.T) string {
 	return root
 }
 
-// shipUndoBoth runs ship undo on two copies and compares exit, data, the .hv/
-// trees and HEAD.
+// shipUndoWant is what the retired undo helper left behind and answered: data,
+// the .hv/ tree, HEAD and git status.
+type shipUndoWant struct {
+	Data   any
+	Tree   map[string]string
+	Head   string
+	Status string
+}
+
+// shipUndoBoth runs ship undo on a copy of src and compares exit, data, the
+// .hv/ tree, HEAD and status with the golden.
 func shipUndoBoth(t *testing.T, name string, src string, wantCode int, args ...string) map[string]any {
 	t.Helper()
-	old, nu := shipCopy(t, src), shipCopy(t, src)
+	nu := shipCopy(t, src)
 	oargs := append([]string{"ship", "undo"}, args...)
-	oc, oenv := shipOld(t, old, "", nil, oargs...)
+	var want shipUndoWant
+	pytest.Golden(t, shipCallIn{Name: name, Args: oargs, Code: wantCode}, &want)
 	n := trRun(t, nu, "", append(append([]string{}, oargs...), "--json")...)
 	nenv := envelope(t, n.stdout)
-	if oc != wantCode || n.code != wantCode {
-		t.Fatalf("%s: exit old %d new %d want %d\nold %v\nnew %s%s", name, oc, n.code, wantCode, oenv, n.stdout, n.stderr)
+	if n.code != wantCode {
+		t.Fatalf("%s: exit %d want %d\n%s%s", name, n.code, wantCode, n.stdout, n.stderr)
 	}
-	if !reflect.DeepEqual(oenv["data"], nenv["data"]) {
-		t.Errorf("%s: data\nold: %#v\nnew: %#v", name, oenv["data"], nenv["data"])
+	if !reflect.DeepEqual(want.Data, nenv["data"]) {
+		t.Errorf("%s: data\ngolden: %#v\nnew:    %#v", name, want.Data, nenv["data"])
 	}
-	if !reflect.DeepEqual(shipTree(t, old), shipTree(t, nu)) {
-		t.Errorf("%s: .hv/ trees differ\nold: %v\nnew: %v", name, shipTree(t, old), shipTree(t, nu))
+	if !reflect.DeepEqual(want.Tree, shipTree(t, nu)) {
+		t.Errorf("%s: .hv/ trees differ\ngolden: %v\nnew:    %v", name, want.Tree, shipTree(t, nu))
 	}
-	if a, b := gitT(t, old, "rev-parse", "HEAD"), gitT(t, nu, "rev-parse", "HEAD"); a != b {
-		t.Errorf("%s: HEAD old %s new %s", name, a, b)
+	if b := gitT(t, nu, "rev-parse", "HEAD"); b != want.Head {
+		t.Errorf("%s: HEAD golden %s new %s", name, want.Head, b)
 	}
-	if a, b := gitT(t, old, "status", "--porcelain"), gitT(t, nu, "status", "--porcelain"); a != b {
-		t.Errorf("%s: status old %q new %q", name, a, b)
+	if b := gitT(t, nu, "status", "--porcelain"); b != want.Status {
+		t.Errorf("%s: status golden %q new %q", name, want.Status, b)
 	}
 	return nenv
 }
@@ -880,17 +854,16 @@ func TestShipUndoRestoreFails(t *testing.T) {
 	gitT(t, root, "merge", "--no-ff", "-q", "hv/F03-x", "-m", "merge: F03")
 	gitT(t, root, "branch", "-q", "-d", "hv/F03-x")
 	// the done line must carry a hash of the cycle: it does (short is on the branch)
-	old, nu := shipCopy(t, root), shipCopy(t, root)
-	oc, oenv := shipOld(t, old, "", nil, "ship", "undo", "--apply")
+	nu := shipCopy(t, root)
 	n := trRun(t, nu, "", "ship", "undo", "--apply", "--json")
-	if oc != 5 || n.code != 5 {
-		t.Fatalf("old %d (%v) new %d %s%s", oc, oenv, n.code, n.stdout, n.stderr)
+	if n.code != 5 {
+		t.Fatalf("exit %d %s%s", n.code, n.stdout, n.stderr)
 	}
 	if !strings.Contains(n.stderr, "the reset already happened (HEAD is now "+gitT(t, nu, "rev-parse", "--short", "HEAD")+")") {
 		t.Errorf("message %q", n.stderr)
 	}
-	if gitT(t, nu, "rev-parse", "HEAD") != gitT(t, old, "rev-parse", "HEAD") {
-		t.Errorf("both runs must stop at the reset")
+	if gitT(t, nu, "rev-parse", "HEAD") != gitT(t, root, "rev-parse", "HEAD^1") {
+		t.Errorf("the run must stop at the reset")
 	}
 }
 
