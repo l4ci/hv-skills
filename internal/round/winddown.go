@@ -144,6 +144,18 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 		} else {
 			so.Issue = ""
 		}
+		// End the session before the checkout moves under it, but only for a
+		// slot that will park: a slot holding work keeps its session.
+		handle := worker.Str(s, "handle")
+		sessionKept := false
+		if handle != "" {
+			if _, cerr := w.ResetTo(root, name, "", park, true); cerr == nil {
+				if kerr := w.KillSlot(ctx, root, name); kerr != nil {
+					sessionKept = true
+					res.Warnings = append(res.Warnings, fmt.Sprintf("SESSION-KEPT %s: session still running (%v)", name, kerr))
+				}
+			}
+		}
 		rr, rerr := w.ResetTo(root, name, "", park, false)
 		var we *worker.Error
 		switch {
@@ -170,7 +182,10 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 				s.Set("state", "idle")
 				// A parked slot has no pane: a handle left behind reads as a
 				// dead-tab to reconcile once the tab closes (as reclaim does).
-				s.Set("handle", nil)
+				// A session that could not be killed keeps its handle.
+				if !sessionKept {
+					s.Set("handle", nil)
+				}
 			}); err != nil {
 				return res, err
 			}

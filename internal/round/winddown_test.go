@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
@@ -130,9 +131,14 @@ func TestWindDownRefusesWhileASlotHoldsWork(t *testing.T) {
 	}
 	wt := filepath.Join(f.root, ".worktrees", "ben")
 	os.WriteFile(filepath.Join(wt, "wip.txt"), []byte("x"), 0o644)
+	var killed []string
+	f.env.Worker.NewHost = func(string) host.Host { return &killHost{hostFake: f.host, killed: &killed} }
 	res, err := f.windDown(nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(killed) != 0 || worker.Str(worker.LoadRegistry(f.root).Slot("ben"), "handle") == "" {
+		t.Errorf("a retained slot keeps its session and handle: killed %v", killed)
 	}
 	if res.Verdict != VerdictHoldsWork || !res.Retained || res.Lease == nil {
 		t.Fatalf("%+v", res)
@@ -188,5 +194,50 @@ func TestWindDownWithoutVerifyCommandsSaysSo(t *testing.T) {
 	res, err := f.windDown(nil)
 	if err != nil || res.Verdict != VerdictClean || !res.VerifySkipped || len(res.Warnings) == 0 {
 		t.Fatalf("%v %+v", err, res)
+	}
+}
+
+func TestWindDownEndsAParkedSlotsSession(t *testing.T) {
+	f := newAssignFixture(t)
+	if _, err := f.assign("12", "ben", nil); err != nil {
+		t.Fatal(err)
+	}
+	var killed []string
+	f.env.Worker.NewHost = func(string) host.Host { return &killHost{hostFake: f.host, killed: &killed} }
+	f.verifyWith(t, `["true"]`)
+	if _, err := f.windDown(nil); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(killed, []string{"ben"}) {
+		t.Errorf("wind-down kills the parked slot's session, once, and skips slots with no handle: %v", killed)
+	}
+}
+
+type deadKillHost struct{ *hostFake }
+
+func (deadKillHost) Kill(context.Context, string, string) error {
+	return errors.New("close not proved")
+}
+
+func TestWindDownKeepsHandleWhenTheKillIsNotProved(t *testing.T) {
+	f := newAssignFixture(t)
+	if _, err := f.assign("12", "ben", nil); err != nil {
+		t.Fatal(err)
+	}
+	f.env.Worker.NewHost = func(string) host.Host { return deadKillHost{f.host} }
+	f.verifyWith(t, `["true"]`)
+	res, err := f.windDown(nil)
+	if err != nil || res.Verdict != VerdictClean || outcomes(res)["ben"] != OutcomeParked {
+		t.Fatalf("still parks: %v %+v", err, res)
+	}
+	if worker.Str(worker.LoadRegistry(f.root).Slot("ben"), "handle") == "" {
+		t.Error("an unproved kill keeps the handle")
+	}
+	found := false
+	for _, w := range res.Warnings {
+		found = found || strings.Contains(w, "SESSION-KEPT ben")
+	}
+	if !found {
+		t.Errorf("warnings: %v", res.Warnings)
 	}
 }

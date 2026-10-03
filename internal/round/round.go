@@ -220,6 +220,11 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 			break
 		}
 		wt := rep.views[r.Name].worktree
+		// A parked slot owns no agent: one still running in its worktree is a
+		// leftover, reported as unclaimed rather than absorbed by the slot.
+		if r.Tab == "" && (r.Branch == "" || r.Branch == "park/"+r.Name) {
+			wt = ""
+		}
 		if i := matchAgent(agents, r.Tab, wt); i >= 0 {
 			claimed[i] = true
 			r.Agent, r.HostState = agents[i].Name, agents[i].Status

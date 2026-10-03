@@ -8,7 +8,7 @@ That's how every workflow starts, and how most of them stay. The places it tends
 
 ## Is `.hv/` tracked by default?
 
-Yes. Backlog, knowledge, decisions, plans, designs, milestones, and per-item detail files all travel with the repo so team members share context from the first clone. These paths stay gitignored: `.hv/status.json` (per-developer active work), `.hv/repos.json` (umbrella registry with absolute paths), `.hv/config.local.json` (per-developer config overrides, deep-merged on top of `.hv/config.json`), `.hv/handoff/` (per-developer scratch notes from `/hv-pause`), `.hv/qa-runs/` (bulky timestamped artifacts from `/hv-qa`), `.hv/gate-audit.jsonl` (the log of manual-gate approvals), and `.hv/**/*.lock` (transient sidecar lockfiles).
+Yes. Backlog, knowledge, decisions, plans, designs, milestones, and per-item detail files all travel with the repo so team members share context from the first clone. These paths stay gitignored: `.hv/status.json` (per-developer active work), `.hv/repos.json` (umbrella registry with absolute paths), `.hv/config.local.json` (per-developer config overrides, deep-merged on top of `.hv/config.json`), `.hv/handoff/` (per-developer scratch notes from `/hv-pause`), `.hv/qa-runs/` (bulky timestamped artifacts from `/hv-qa`), `.hv/gate-audit.jsonl` (the log of manual-gate approvals), `.hv/workers.json` (the worker slot registry), and `.hv/**/*.lock` (transient sidecar lockfiles).
 
 If you'd rather keep the whole backlog private (solo development, or experimentation that isn't ready to share), add a blanket `.hv/` line to `.gitignore` before your first commit. The default assumes you want context to travel.
 

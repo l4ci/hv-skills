@@ -382,3 +382,23 @@ func TestOpenEscalationsAreReported(t *testing.T) {
 		t.Errorf("escalations must not add drift: %v", kinds(out.Drift))
 	}
 }
+
+// A parked slot owns no agent: every agent still running in its worktree is
+// reported unclaimed, not just the first one (#212).
+func TestParkedSlotAgentsAreAllUnclaimed(t *testing.T) {
+	root := newRepo(t, map[string]string{"ben": "park/ben"})
+	writeRegistry(t, root, slot(root, "ben", "park/ben", nil))
+	wt := filepath.Join(root, ".worktrees", "ben")
+	e := env([]host.Agent{
+		{Tab: "w1:t5", Name: "hv-ben-t5", Cwd: wt, Status: "idle"},
+		{Tab: "w1:t6", Name: "hv-ben-t6", Cwd: wt, Status: "idle"},
+	}, &fakeForge{})
+	rep, err := e.Status(bg, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]string{"hv-ben-t5": {UnclaimedTab}, "hv-ben-t6": {UnclaimedTab}}
+	if got := kinds(rep.Findings); !reflect.DeepEqual(got, want) {
+		t.Errorf("findings\n got %v\nwant %v", got, want)
+	}
+}
