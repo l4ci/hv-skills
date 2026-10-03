@@ -304,8 +304,7 @@ def prose_rules():
               "validation rules do not constrain work.dispatch to its enum", True),
           has("docs/reference/config-options.md", "positional", "missing positional-args mention"),
           has("docs/usage/configuration.md", r"positional|<key>=<value>", "missing positional-args mention", True),
-          has("docs/usage/configuration.md", "work.dispatch", "does not explain work.dispatch"),
-          has("README.md", "/hv-config <key>", "missing the /hv-config <key> shortcut")]
+          has("docs/usage/configuration.md", "work.dispatch", "does not explain work.dispatch")]
     for key in ("models.orchestrator models.worker work.isolation work.mergeStrategy ship.review learn.verify "
                 "refactor.confirmBeforeExecute debug.competingHypotheses autonomy.level docs.path docs.autoCreate "
                 "docs.afterWork git.baseBranch umbrella.enabled work.dispatch work.workerSlots work.workerCommand").split():

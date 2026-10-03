@@ -26,7 +26,7 @@ BIN_LS="$(git ls-files bin | sort | tr '\n' ' ')"
 # source under internal/ is out of scope (A9 ruling, option a): it cites the
 # helper each verb was ported from, and some of it has to know the old names
 # (init deleting the 4.x mirror, the migrate v4 codemod). History keeps them
-# too: announcements and the 5.0 design docs cite helpers as what they
+# too: the 5.0 design docs cite helpers as what they
 # replaced. The validator owns the name list, and the white-box scanner, its
 # guard section, the doclint section and this gate spell the patterns.
 NAMES="$(python3 test/validate-skills.py --list-legacy | paste -sd'|')"
@@ -36,7 +36,6 @@ SCOPE=(
   'hv-*/' 'references/' 'docs/' 'test/' '*.md'
   ':(glob)**/*_test.go' ':(glob)**/testdata/**'
   ':(exclude)CHANGELOG.md'
-  ':(exclude)docs/announcements'
   ':(exclude)docs/design/5.0-*'
   ':(exclude).hv'
   ':(exclude)test/grep-gate.sh'
