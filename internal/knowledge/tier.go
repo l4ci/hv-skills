@@ -10,6 +10,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/section"
 )
 
 // Tiers a bullet can hold.
@@ -294,6 +295,7 @@ func (s Store) TierGet(scope, topic, title string) (Entry, bool, error) {
 	if err != nil {
 		return Entry{}, false, err
 	}
+	s.backfillTiers(scope)
 	sc, err := LoadSidecar(p)
 	if err != nil {
 		return Entry{}, false, err
@@ -326,9 +328,44 @@ func (s Store) TierList(scope, tier string) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.backfillTiers(scope)
 	sc, err := LoadSidecar(p)
 	if err != nil {
 		return nil, err
 	}
 	return sc.List(tier), nil
+}
+
+// backfillTiers registers every titled bullet of scope's KNOWLEDGE.md that has
+// no sidecar entry as provisional, so bullets written before tiers existed read
+// like new ones. It is the lazy form of the retired hv-knowledge-migrate and
+// runs on `tier get` and `tier list`; `query` stays read-only. Like initTier it is best effort: a failure leaves the
+// read to see the untracked bullets rather than failing it.
+func (s Store) backfillTiers(scope string) {
+	km, err := s.KnowledgePath(scope)
+	if err != nil {
+		return
+	}
+	p, err := s.TierPath(scope)
+	if err != nil {
+		return
+	}
+	content, err := ReadFile(km)
+	if err != nil || content == "" {
+		return
+	}
+	_ = Update(p, func(sc *Sidecar) (bool, error) {
+		changed := false
+		for _, t := range section.Topics(content) {
+			if t.Name == GlossaryTopic {
+				continue
+			}
+			for _, line := range section.Lines(t.Body) {
+				if m := titleRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+					changed = sc.Init(t.Name, m[1]) || changed
+				}
+			}
+		}
+		return changed, nil
+	})
 }
