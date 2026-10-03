@@ -117,7 +117,7 @@ func TestIssueModeMilestones(t *testing.T) {
 		t.Errorf("MILESTONES.md:\n%s", ms)
 	}
 	block, _ := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
-	if !strings.Contains(string(block), "the tracking issues (`hv-vision-show MNN`)") || !strings.Contains(string(block), "- **M02** — Sharing (depends: M01, M09) ⚠ blocked") {
+	if !strings.Contains(string(block), "the tracking issues (`hv milestone show MNN`)") || !strings.Contains(string(block), "- **M02** — Sharing (depends: M01, M09) ⚠ blocked") {
 		t.Errorf("vision block:\n%s", block)
 	}
 	if _, env, _ = issueRun(t, root, "milestone", "index"); ddata(t, env)["changed"] != false {

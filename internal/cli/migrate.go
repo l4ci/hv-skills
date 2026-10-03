@@ -128,9 +128,9 @@ func migrateResult(r *migrate.Report) Result {
 		b.WriteString("\n")
 	}
 	if len(r.RemovedBinaries) > 0 {
-		b.WriteString("— removed binaries —\n")
+		b.WriteString("— removed stale helper copies —\n")
 		for _, p := range r.RemovedBinaries {
-			fmt.Fprintf(&b, "  .hv/bin/%s\n", p)
+			fmt.Fprintf(&b, "  %s\n", p)
 		}
 		b.WriteString("\n")
 	}

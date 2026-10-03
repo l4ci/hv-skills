@@ -3,8 +3,11 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/knowledge"
 )
 
 const glFixture = `# Knowledge
@@ -224,6 +227,18 @@ func TestBlockSkillsMatchesOldHelper(t *testing.T) {
 	if o.rc != 0 || n.rc != 0 {
 		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
 	}
+	// The body names hv verbs, a deliberate break from the old helper's text
+	// (contract, A9 G4): everything around the body must still match.
+	agents := filepath.Join(oldDir, "AGENTS.md")
+	b, err := os.ReadFile(agents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := regexp.MustCompile(`(?s)<!-- hv-skills-start -->\n.*?\n<!-- hv-skills-end -->`)
+	if !block.Match(b) {
+		t.Fatalf("old helper wrote no skills block:\n%s", b)
+	}
+	knWrite(t, agents, string(block.ReplaceAllLiteral(b, []byte("<!-- hv-skills-start -->\n"+knowledge.SkillsBlockBody()+"\n<!-- hv-skills-end -->"))))
 	knSameTree(t, oldDir, newDir)
 	if got := knNew(t, newDir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
 		t.Errorf("skills with a body: rc=%d", got.rc)
