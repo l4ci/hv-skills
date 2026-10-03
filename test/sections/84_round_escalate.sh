@@ -120,10 +120,15 @@ RC=0; OUT="$(es "$HV_BIN" --json round escalate check 2>/dev/null)" || RC=$?
 [ "$RC" = "0" ] || fail "a timed-out escalation still exits 0, got $RC: $OUT"
 [ "$(jget 'data.escalations[0].status' <<<"$OUT")" = "timed-out" ] && [ "$(jget data.timedOut <<<"$OUT")" = "1" ] && [ "$(jget data.pending <<<"$OUT")" = "0" ] || fail "past its deadline e2 must read timed-out: $OUT"
 [ "$(reg '[e["status"] for e in d["escalations"]]')" = '["answered", "pending"]' ] || fail "timed-out must not be stored: $(cat "$PROJ/.hv/workers.json")"
+# round status and reconcile list it from the registry (no tmux or herdr on PATH: host unavailable).
+RC=0; OUT="$(es_noherdr "$HV_BIN" --json round status 2>/dev/null)" || RC=$?
+[ "$RC" = "0" ] && [ "$(jget 'data.escalations[0].id' <<<"$OUT")" = "e2" ] && [ "$(jget 'data.escalations[0].status' <<<"$OUT")" = "timed-out" ] || fail "round status must list the open escalation: rc=$RC $OUT"
+RC=0; OUT="$(es_noherdr "$HV_BIN" --json round reconcile 2>/dev/null)" || RC=$?
+[ "$RC" = "0" ] && [ "$(python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["escalations"]))' <<<"$OUT")" = "1" ] || fail "round reconcile must list the open escalation: rc=$RC $OUT"
 es gh api -X POST repos/o/r/issues/2/comments -f body="late but fine" >/dev/null
 OUT="$(es "$HV_BIN" --json round escalate check 2>/dev/null)"
 [ "$(jget 'data.escalations[0].status' <<<"$OUT")" = "answered" ] || fail "a late answer must still land: $OUT"
-pass "timed-out is derived from the deadline on read, and a late answer still lands"
+pass "timed-out is derived on read, round status and reconcile list it, and a late answer still lands"
 
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "${TMP_ES:?}"
