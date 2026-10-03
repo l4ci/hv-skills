@@ -22,7 +22,7 @@ dl_fixture() {
 }
 # dl_run <dir> <allowlist> prints the validator output and returns its exit code.
 # HV_DOCLINT_PROSE=off: the fixtures carry no real skills, so the prose lint is off.
-dl_run() { ( cd "$1" && HV_DOCLINT_PROSE=off HV_DOCLINT_UNCONVERTED="$2" python3 "$VALIDATE" 2>&1 ); }
+dl_run() { ( cd "$1" && HV_DOCLINT_PROSE=off HV_SPEC_PENDING="" HV_DOCLINT_UNCONVERTED="$2" python3 "$VALIDATE" 2>&1 ); }
 
 F="$DL_TMP/clean"; dl_fixture "$F"
 OUT="$(dl_run "$F" "")" || fail "doclint flagged a clean fixture (slash commands, hv-skills, hv verbs): $OUT"
