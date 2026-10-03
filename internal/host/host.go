@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -70,6 +71,8 @@ type Deps struct {
 	KillWait int
 	// LookPath reports whether a binary is installed.
 	LookPath func(string) (string, error)
+	// Dial opens the herdr API socket (a unix socket path).
+	Dial func(ctx context.Context, path string) (net.Conn, error)
 }
 
 func (d *Deps) fill() {
@@ -84,6 +87,11 @@ func (d *Deps) fill() {
 	}
 	if d.LookPath == nil {
 		d.LookPath = exec.LookPath
+	}
+	if d.Dial == nil {
+		d.Dial = func(ctx context.Context, path string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", path)
+		}
 	}
 	if d.Alive == nil {
 		d.Alive = func(pid int) bool { return pidAlive(d.Run, pid) }
