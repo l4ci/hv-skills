@@ -252,14 +252,12 @@ LEASE="$(git -C "$DY" rev-parse --path-format=absolute --git-common-dir)/hv/roun
 [ ! -f "$LEASE" ] || fail "dry round: wind-down should release the lease"
 pass "wind-down: clean, ben parked on park/ben, lease released"
 
-# What is left (the skill: reconcile, then reap): the worker's tab is gone from the
-# host but the registry still holds its handle, a dead-tab that --apply clears.
+# What is left (the skill: reconcile, then reap): wind-down clears the slot's handle,
+# so nothing is left for reconcile to report.
 OUT="$(dyj round reconcile)"
-[ "$(jget data.drift[0].kind <<<"$OUT")" = "dead-tab" ] && [ "$(jget data.drift[0].slot <<<"$OUT")" = "ben" ] && [ "$(jget data.changed <<<"$OUT")" = "false" ] \
-  || fail "dry round: reconcile after wind-down should report ben's dead tab and write nothing: $OUT"
-OUT="$(dyj round reconcile --apply)"
-[ "$(jget data.drift <<<"$OUT")" = "[]" ] && [ "$(jget data.repaired[0].kind <<<"$OUT")" = "dead-tab" ] || fail "dry round: reconcile --apply should repair the dead tab: $OUT"
-pass "reconcile: the left-over dead tab is reported, then repaired by --apply, leaving no drift"
+[ "$(jget data.clean <<<"$OUT")" = "true" ] && [ "$(jget data.drift <<<"$OUT")" = "[]" ] && [ "$(jget data.changed <<<"$OUT")" = "false" ] \
+  || fail "dry round: reconcile after wind-down should be clean and write nothing: $OUT"
+pass "reconcile: clean after wind-down, no dead tab left behind"
 
 printf '{"workspaces":[],"agents":[],"processes":[]}\n' > "$TMP_DY/host.json"
 rc=0; OUT="$(HV_TEST_REAP_HOST="$TMP_DY/host.json" "$HV_BIN" --json -C "$DY" reap 2>/dev/null)" || rc=$?
