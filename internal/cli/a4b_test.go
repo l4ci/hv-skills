@@ -147,6 +147,23 @@ func TestA4bStaleBadTodayEnv(t *testing.T) {
 	}
 }
 
+func TestA4bArchiveHonoursTestToday(t *testing.T) {
+	root := a4Project(t, "")
+	os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte("# TODO\n\n## Completed\n- ~~**[B01] [P1] a.** x~~ Done 2026-01-10 [`abc1234`]\n"), 0o644)
+	t.Setenv("HV_TEST_TODAY", "2026-01-12")
+	if code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "0" {
+		t.Fatalf("2 days old moved: %d %v", code, env)
+	}
+	t.Setenv("HV_TEST_TODAY", "2026-01-20")
+	if code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "1" {
+		t.Fatalf("10 days old not moved: %d %v", code, env)
+	}
+	t.Setenv("HV_TEST_TODAY", "soon")
+	if code, _, stderr := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != ExitUsage || !strings.Contains(stderr, "HV_TEST_TODAY") {
+		t.Errorf("bad HV_TEST_TODAY: exit %d, stderr %s", code, stderr)
+	}
+}
+
 func TestA4bStatusLifecycle(t *testing.T) {
 	root := a4Project(t, "")
 	run := func(argv ...string) (int, map[string]any) {

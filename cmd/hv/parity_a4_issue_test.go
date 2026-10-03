@@ -326,8 +326,9 @@ func (s isc) oracle(t *testing.T, base string, in info, remote string, argv []st
 	return ref, refCode, tree, db
 }
 
-func (s isc) exec(t *testing.T) {
-	t.Parallel()
+// fixture builds the scenario's project with its origin remote.
+func (s isc) fixture(t *testing.T) (base string, in info, remote string) {
+	t.Helper()
 	f := fx{config: issueCfg}
 	if s.file {
 		f = fx{}
@@ -337,11 +338,21 @@ func (s isc) exec(t *testing.T) {
 	if s.cfg != "" {
 		f.config = s.cfg
 	}
-	base, in := f.build(t)
-	remote := map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
+	base, in = f.build(t)
+	remote = map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
 	if remote != "" {
 		git(t, base, "remote", "add", "origin", remote)
 	}
+	return base, in, remote
+}
+
+func (s isc) exec(t *testing.T) {
+	t.Parallel()
+	if frozenOn != nil {
+		frozenCheck(t, s.goSide)
+		return
+	}
+	base, in, remote := s.fixture(t)
 	argv := subst(s.argv, in)
 	ref, refCode, refTree, rDB := s.oracle(t, base, in, remote, argv)
 	goDir := copyTree(t, base)
@@ -419,6 +430,7 @@ func (s isc) exec(t *testing.T) {
 	if s.check != nil {
 		s.check(t, goEnv, ref, rDB)
 	}
+	record(t, s.goSide)
 }
 
 func TestIssueFakesFirst(t *testing.T) {

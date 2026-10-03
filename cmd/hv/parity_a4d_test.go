@@ -135,21 +135,31 @@ func (s dsc) oracle(t *testing.T, base string, in info, remote string, seed map[
 	return steps
 }
 
-func (s dsc) exec(t *testing.T) {
-	t.Parallel()
+// fixture builds the scenario's project with its origin remote and the seed.
+func (s dsc) fixture(t *testing.T) (base string, in info, remote string, seed map[string]any) {
+	t.Helper()
 	f := s.fx
 	if f.config == "" {
 		f.config = dCfg
 	}
-	base, in := f.build(t)
-	remote := map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
+	base, in = f.build(t)
+	remote = map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
 	if remote != "" {
 		git(t, base, "remote", "add", "origin", remote)
 	}
-	var seed map[string]any
 	if s.db != nil {
 		seed = s.db()
 	}
+	return base, in, remote, seed
+}
+
+func (s dsc) exec(t *testing.T) {
+	t.Parallel()
+	if frozenOn != nil {
+		frozenCheck(t, s.goSide)
+		return
+	}
+	base, in, remote, seed := s.fixture(t)
 	ref := s.oracle(t, base, in, remote, seed)
 	goDir := copyTree(t, base)
 	goDB := filepath.Join(t.TempDir(), "go.json")
@@ -217,6 +227,7 @@ func (s dsc) exec(t *testing.T) {
 			r.check(t, goEnv, gDB)
 		}
 	}
+	record(t, s.goSide)
 }
 
 func TestDFakesFirst(t *testing.T) { TestIssueFakesFirst(t) }

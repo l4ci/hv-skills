@@ -225,6 +225,10 @@ func ubReadAll(t *testing.T, dbDir string, repos []ubRepo) map[string]map[string
 
 func (c ubcase) exec(t *testing.T) {
 	t.Parallel()
+	if frozenOn != nil {
+		frozenCheck(t, c.goSide)
+		return
+	}
 	base, repos := ubInit(t, c)
 	goDir, refDir := copyTree(t, base), copyTree(t, base)
 	goDBDir, refDBDir := ubSeed(t, repos), ubSeed(t, repos)
@@ -316,6 +320,7 @@ func (c ubcase) exec(t *testing.T) {
 		goEnv["__info"] = info{}
 		c.check(t, goEnv, ref, rDB)
 	}
+	record(t, c.goSide)
 }
 
 // ubIssue is issue n of a repo's final store, nil when absent.

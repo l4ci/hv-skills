@@ -60,6 +60,7 @@ func runMain(m *testing.M) int {
 		fmt.Fprintf(os.Stderr, "gh does not resolve into %s (got %q, %v); refusing to run\n", fakes, gh, err)
 		return 1
 	}
+	pinDay()
 	pruneOracleCache(3 * 24 * time.Hour)
 	harnessTmp, err = os.MkdirTemp("", "hv-parity-*")
 	if err != nil {
@@ -95,7 +96,14 @@ func runMain(m *testing.M) int {
 		"FAKE_TRACKER_DB=" + filepath.Join(harnessTmp, "tracker.json"),
 		"LC_ALL=C.UTF-8",
 	}
-	return m.Run()
+	code := m.Run()
+	if recording {
+		if err := writeRecords(); err != nil {
+			fmt.Fprintln(os.Stderr, "frozen:", err)
+			return 1
+		}
+	}
+	return code
 }
 
 // TestFakesFirst is the guard: tests must never reach the real gh or glab.
@@ -210,7 +218,8 @@ func expand(s string, i info) string {
 	s = strings.NewReplacer("{h1}", i.h1, "{refactor}", i.refactor, "{head}", i.head).Replace(s)
 	s = dayTok.ReplaceAllStringFunc(s, func(m string) string {
 		n, _ := strconv.Atoi(dayTok.FindStringSubmatch(m)[1])
-		return time.Now().AddDate(0, 0, -n).Format("2006-01-02")
+		d, _ := time.ParseInLocation("2006-01-02", localDay, time.Local)
+		return d.AddDate(0, 0, -n).Format("2006-01-02")
 	})
 	return xTok.ReplaceAllStringFunc(s, func(m string) string { return i.x[xTok.FindStringSubmatch(m)[1]] })
 }
@@ -744,6 +753,10 @@ func (s scn) oracle(t *testing.T, base string, in info, argv []string) (ref run,
 
 func (s scn) exec(t *testing.T) {
 	t.Parallel()
+	if frozenOn != nil && !s.goOnly {
+		frozenCheck(t, s.goSide)
+		return
+	}
 	base, in := s.fx.build(t)
 	goDir := copyTree(t, base)
 	if s.prep != nil {
@@ -833,6 +846,7 @@ func (s scn) exec(t *testing.T) {
 	if s.check != nil {
 		s.check(t, goEnv, ref)
 	}
+	record(t, s.goSide)
 }
 
 // stripText drops error.message and error.hint, which are free text per the
