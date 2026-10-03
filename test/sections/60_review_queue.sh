@@ -47,35 +47,6 @@ for prov in github gitlab; do
     eq "queue fields" "True" "$(QUEUE 'd[0]["title"]=="One" and d[0]["number"]==1 and d[0]["prs"][0]["branch"]=="feat/a" and d[0]["prs"][0]["url"].endswith("/'$A'") and "Closes #1" in d[0]["prs"][0]["body"]')"
     pass "$prov: review queue lists needs-review items with closing-keyword PRs"
 
-    # white-box-begin: go-unit A8 #52
-    # --- keyword variants (adapter regex)
-    eq "keywords" "[1, 2, 3, 4, 40]" "$(PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-print(a.closed_numbers("closes #1\nFIXED: #2, resolve   #3 and Resolved #4; prefixes #9 unclosed #8 closes #40"))')"
-    eq "implements" "$([ $prov = gitlab ] && echo "[7]" || echo "[]")" "$(PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-print(adapter_for(load_config()).closed_numbers("Implements #7"))')"
-    eq "prs_closing" "[$A]" "$(PYTHONPATH="$BIN" python3 -c '
-from hvlib import adapter_for, load_config
-print([p["number"] for p in adapter_for(load_config()).prs_closing(1)])')"
-    pass "$prov: closing keyword matching"
-    # white-box-end
-
-    # white-box-begin: go-unit A8 #52
-    # --- checkout, comment, state
-    git checkout -q main
-    PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config()); a.pr_checkout(sys.argv[1]); a.pr_comment(sys.argv[1], "looks good\nsecond line")' "$A"
-    eq "checkout" "feat/a" "$(git rev-parse --abbrev-ref HEAD)"
-    eq "pr comment" "True" "$(DBQ '[p for p in d["prs"] if p["number"]==int("'$A'")][0]["comments"]==["looks good\nsecond line"]' )"
-    eq "pr_state open" "open" "$(PYTHONPATH="$BIN" python3 -c '
-import sys
-from hvlib import adapter_for, load_config
-print(adapter_for(load_config()).pr_state(sys.argv[1]))' "$A")"
-    # white-box-end
     git checkout -q main
 
 

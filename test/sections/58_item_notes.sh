@@ -105,48 +105,6 @@ print(";".join("|".join(r[k] for k in ("date", "check", "result", "sha", "eviden
     eq "proven item passes the gate and closes" "0" "$(RC hvj item complete T1 --commit abc1234)"
     hvj item reopen T1 >/dev/null
 
-    # --- adapter lifecycle calls
-    # white-box-begin: go-unit A8 #52
-    PYTHONPATH="$BIN" python3 - "$prov" <<'PY' || fail "$prov adapter lifecycle"
-import sys
-from hvlib import adapter_for, load_config, TrackerError
-a = adapter_for(load_config())
-assert a.comments(2) == []
-c1 = a.add_comment(2, "first\nmulti-line\n\nbody")
-c2 = a.add_comment(2, "second")
-cs = a.comments(2)
-assert [c["id"] for c in cs] == [c1, c2] and cs[0]["body"] == "first\nmulti-line\n\nbody" and cs[0]["author"], cs
-a.edit_comment(2, c1, "edited")
-assert a.comments(2)[0]["body"] == "edited"
-a.delete_comment(2, c2)
-assert [c["id"] for c in a.comments(2)] == [c1]
-try:
-    a.delete_comment(2, 9999)
-    raise SystemExit("delete of unknown comment accepted")
-except TrackerError:
-    pass
-a.add_labels(2, ["in-progress", "blocked"])
-assert sorted(a.get(2)["labels"]) == ["blocked", "in-progress", "type:task"], a.get(2)["labels"]
-a.add_labels(2, ["in-progress"])
-a.remove_labels(2, ["blocked"])
-assert sorted(a.get(2)["labels"]) == ["in-progress", "type:task"]
-a.remove_labels(2, [])
-a.assign_self(2)
-a.assign_self(2)
-assert len(a.get(2)["assignees"]) == 1 and a.get(2)["assignees"][0], a.get(2)["assignees"]
-a.close(2, "completed", comment="Done in abc")
-i = a.get(2)
-assert i["state"] == "closed" and i["state_reason"] == "completed", i
-assert a.comments(2)[-1]["body"] == "Done in abc"
-a.reopen(2)
-assert a.get(2)["state"] == "open" and a.get(2)["state_reason"] is None
-a.close(2, "not_planned")
-i = a.get(2)
-assert i["state"] == "closed" and i["state_reason"] == "not_planned", i
-a.reopen(2)
-PY
-    # white-box-end
-
     # --- item designs and plans as notes (design/plan add/show/rm/put, list verbs)
     F1="F$(hvj item create --kind features --title "Big" | jget data.id)"
     eq "feature ref" "F3" "$F1"

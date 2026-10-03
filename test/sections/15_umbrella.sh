@@ -69,13 +69,6 @@ OUT=$(cd "$UMB/web/src/components/deep" && hvj repo umbrella) || fail "repo umbr
 [ "$(echo "$OUT" | jget data.umbrella)" = "true" ] || fail "repo umbrella from a deep dir: $OUT"
 pass "T1: repo umbrella holds from root, sub-repo and deep cwd (3 cwd cases)"
 
-# white-box-begin: go-unit A3 #47
-[ "$(cd "$UMB" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from umbrella root"
-[ "$(cd "$UMB/web" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from sub-repo"
-[ "$(cd "$UMB/web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from deep nested"
-pass "T1: hv-resolve-umbrella walks up correctly (3 cwd cases)"
-# white-box-end
-
 # T1: no .hv/ above cwd means no umbrella (exit 1, never 3)
 NOHV=$(mktemp -d)
 rc=0; OUT=$(cd "$NOHV" && hvj repo umbrella 2>/dev/null) || rc=$?
@@ -84,13 +77,6 @@ rc=0; OUT=$(cd "$NOHV" && hvj repo umbrella 2>/dev/null) || rc=$?
 rm -rf "$NOHV"
 pass "T1: repo umbrella exits 1 when no .hv/ above cwd"
 
-# white-box-begin: go-unit A3 #47
-if (cd /tmp && "$BIN/hv-resolve-umbrella" >/dev/null 2>&1); then
-  fail "hv-resolve-umbrella should exit 1 in /tmp"
-fi
-pass "T1: hv-resolve-umbrella exits 1 when no .hv/ above cwd"
-# white-box-end
-
 # T1: symlink — the path is resolved physically
 ln -sfn "$UMB/web" "$TMP/symlink-web"
 OUT=$(cd "$TMP/symlink-web/src/components/deep" && hvj repo umbrella) || fail "repo umbrella via symlink: $OUT"
@@ -98,33 +84,12 @@ OUT=$(cd "$TMP/symlink-web/src/components/deep" && hvj repo umbrella) || fail "r
 rm -f "$TMP/symlink-web"
 pass "T1: repo umbrella handles symlinked sub-repo paths"
 
-# white-box-begin: go-unit A3 #47
-ln -sfn "$UMB/web" "$TMP/symlink-web"
-[ "$(cd "$TMP/symlink-web/src/components/deep" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up via symlink"
-rm -f "$TMP/symlink-web"
-pass "T1: hv-resolve-umbrella handles symlinked sub-repo paths"
-# white-box-end
-
 # T1: masking — a stray .hv/ inside a registered sub-repo hides the umbrella from repo which
 mkdir -p "$UMB/web/.hv"
 rc=0; (cd "$UMB/web/src" && "$HV_BIN" repo which >/dev/null 2>&1) || rc=$?
 [ "$rc" = 3 ] || fail "repo which should exit 3 when a stray .hv/ masks the umbrella, got $rc"
 rmdir "$UMB/web/.hv"
 pass "T1: repo which exits 3 on a stray .hv/ inside a registered sub-repo"
-
-# white-box-begin: go-unit A3 #47
-mkdir -p "$UMB/web/.hv"
-if grep -q "masking" <<<"$( (cd "$UMB/web/src" 2>/dev/null && "$BIN/hv-resolve-umbrella" 2>&1 1>/dev/null))"; then
-  pass "T1: hv-resolve-umbrella detects masking with stderr message"
-else
-  # stderr may not flow through subshell — check exit code instead
-  EC=0
-  (cd "$UMB/web" && "$BIN/hv-resolve-umbrella" >/dev/null 2>/dev/null) || EC=$?
-  [ "$EC" = "2" ] || fail "masking should exit 2, got $EC"
-  pass "T1: hv-resolve-umbrella detects masking (exit 2)"
-fi
-# white-box-end
-rmdir "$UMB/web/.hv"
 
 # T2: repo which from a sub-repo
 OUT=$(cd "$UMB/web" && hvj repo which) || fail "repo which from web root: $OUT"
@@ -158,10 +123,7 @@ OUT=$(cd "$WT" && hvj repo which) || fail "repo which from Layout B worktree: $O
 [ "$(echo "$OUT" | jget data.name)" = "web" ] || fail "repo which from Layout B worktree: $OUT"
 [ "$(echo "$OUT" | jget data.path)" = "$UMB/web" ] || fail "repo which should map the worktree to its main repo: $OUT"
 pass "T1+T2: composition from Layout B worktree path"
-# white-box-begin: go-unit A3 #47
-[ "$(cd "$WT" && "$BIN/hv-resolve-umbrella")" = "$UMB" ] || fail "walk-up from Layout B worktree"
 (cd "$UMB/web" && git worktree remove "$WT" >/dev/null 2>&1; git branch -D hv/feat-x >/dev/null 2>&1) || true
-# white-box-end
 
 # M03-T1: repo resolve resolves names
 OUT=$(cd "$UMB" && hvj repo resolve web api) || fail "repo resolve failed: $OUT"
@@ -349,7 +311,3 @@ rc=0; OUT=$(cd "$TMP" && hvj repo umbrella 2>/dev/null) || rc=$?
 (cd "$TMP" && hvj config show work.dispatch >/dev/null) || fail "single-repo cwd still resolves to its own .hv/"
 pass "single-repo backward compat: the project resolves with no umbrella in scope"
 
-# white-box-begin: go-unit A3 #47
-[ "$(cd "$TMP" && "$BIN/hv-resolve-umbrella")" = "$TMP" ] || fail "single-repo cwd still resolves to its own .hv/"
-pass "single-repo backward compat: hv-resolve-umbrella still works"
-# white-box-end

@@ -12,31 +12,6 @@ mkdir -p "$TMP_BK/proj/.hv"
   echo '{"backlog":{"backend":"file"}}' > .hv/config.local.json
   [ "$(CS value):$(CS source)" = "file:local" ] || fail "local backlog.backend: got '$(CS value):$(CS source)'"
   pass "config show reports backlog.backend default/project/local"
-
-  # white-box-begin: go-unit A3 #47
-  PYTHONPATH="$BIN" python3 - <<'PY' || fail "backend accessors"
-from hvlib import config_value, backlog_backend, tracker_label, BACKLOG_BACKENDS
-assert BACKLOG_BACKENDS == ("file", "issues")
-assert backlog_backend({}) == "file"
-assert backlog_backend({"backlog": {"backend": "issues"}}) == "issues"
-try:
-    backlog_backend({"backlog": {"backend": "bogus"}})
-    raise SystemExit("bogus backend accepted")
-except ValueError:
-    pass
-assert tracker_label({}, "inProgress") == "in-progress"
-assert tracker_label({"issues": {"label": "wip"}}, "inProgress") == "wip"
-assert tracker_label({"issues": {"label": "wip", "labels": {"inProgress": "doing"}}}, "inProgress") == "doing"
-assert tracker_label({"issues": {"label": "wip"}}, "needsReview") == "needs-review"
-assert tracker_label({}, "types.bug") == "type:bug"
-try:
-    config_value({}, "nope")
-    raise SystemExit("unknown key accepted")
-except KeyError:
-    pass
-PY
-  pass "backlog_backend / tracker_label / config_value behave"
-  # white-box-end
 )
 
 echo "FileBackend: create/read verbs byte-identical"
@@ -285,33 +260,6 @@ echo "IssueBackend: reads served from the tracker"
 TMP_IB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT
 
-# white-box-begin: go-unit A4 #48
-# Pure helpers: item refs and the fields block.
-PYTHONPATH="$BIN" python3 - <<'PY' || fail "item ref / fields block helpers"
-from hvlib import resolve_item_ref, parse_fields_block, render_fields_block
-assert resolve_item_ref("#42") == (42, None)
-assert resolve_item_ref("42") == (42, None)
-assert resolve_item_ref("F42") == (42, "F")
-assert resolve_item_ref("b07") == (7, "B")
-for bad in ("", "x", "Q9", "#", "F", "4 2"):
-    try:
-        resolve_item_ref(bad)
-        raise AssertionError(bad)
-    except ValueError:
-        pass
-f = {"Related": "F12, B03", "Repos": "web"}
-body = render_fields_block("Some text\n\nmore", f)
-assert body == "Some text\n\nmore\n\n<!-- hv:fields\nRelated: F12, B03\nRepos: web\n-->", repr(body)
-assert parse_fields_block(body) == ("Some text\n\nmore", f)
-assert render_fields_block("t", {}) == "t" and render_fields_block("t", {"Repos": " "}) == "t"
-assert parse_fields_block("no block") == ("no block", {})
-assert parse_fields_block(render_fields_block("", f)) == ("", f)
-assert render_fields_block("", f).startswith("<!-- hv:fields")
-assert parse_fields_block("a\r\n<!-- hv:fields\r\nRepos: web\r\n-->\r\n") == ("a", {"Repos": "web"})
-PY
-pass "resolve_item_ref and fields block round-trip"
-# white-box-end
-
 for prov in github gitlab; do
   P="$TMP_IB/$prov"; mkdir -p "$P/.hv"
   echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
@@ -346,54 +294,8 @@ for prov in github gitlab; do
     sleep 1
     CLOSE_DROP 7
 
-    # white-box-begin: go-unit A4 #48
-    # rendering
-    md="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(), end="")')"
-    exp="# Backlog
-
-## Bugs
-
-- **[B1] [P1] Crash on start.** Crashes when config is missing.
-
-## Features
-
-- **[F2] [Major] Big feature.** Adds the thing. Milestone: M07 Related: [F3], [B1] Repos: web
-- **[F3] Other feature.**
-
-## Tasks
-
-- **[T4] Chore.** do the \`thing\`
-
-## Completed
-"
-    case "$md" in "$exp"*) ;; *) fail "$prov rendering head: got
-$md";; esac
-    comp="$(printf '%s\n' "$md" | sed -n '/^## Completed/,$p' | tail -n +3)"
-    n=0; while IFS= read -r line; do n=$((n+1)); done <<< "$comp"
-    eq "completed count" 2 "$n"
-    case "$(printf '%s\n' "$comp" | sed -n 1p)" in
-      '- ~~**[T7] Dropped task.** never mind~~ Done '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' [`#7`] (dropped)') ;;
-      *) fail "$prov completed dropped line: $(printf '%s\n' "$comp" | sed -n 1p)" ;;
-    esac
-    case "$(printf '%s\n' "$comp" | sed -n 2p)" in
-      '- ~~**[B6] Old bug.** fixed long ago~~ Done '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' [`#6`]') ;;
-      *) fail "$prov completed line: $(printf '%s\n' "$comp" | sed -n 2p)" ;;
-    esac
-    case "$md" in *"[T5]"*|*"M07 tracking"*) fail "$prov milestone-tracker issue rendered";; esac
-    pass "$prov: backlog_markdown shape, tags, fields, completed, tracker issue excluded"
-    PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov closed_limit / truncation"
-from hvlib import get_backend
-b = get_backend()
-assert "Done" not in b.backlog_markdown(closed_limit=0)
-assert b.backlog_markdown(closed_limit=1).count("~~**[") == 1
-c, secs = b.list_open()
-assert [n for n, _ in secs] == ["Bugs", "Features", "Tasks"] and "Done" not in c
-PY
     BIG="$(python3 -c 'print("word " * 80)')"
     IC "Long one" "$BIG" "type:task"
-    long="$(PYTHONPATH="$BIN" python3 -c 'from hvlib import get_backend; print(get_backend().backlog_markdown(closed_limit=0))' | grep -F '[T8]')"
-    [ "${#long}" -lt 260 ] && case "$long" in *"…"*) ;; *) fail "$prov truncation: $long";; esac
-    # white-box-end
 
     # backlog list
     IDS() { echo "$OUT" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))'; }

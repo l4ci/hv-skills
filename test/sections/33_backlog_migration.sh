@@ -56,15 +56,6 @@ OUT=$(cd "$BOOT_DIR" && hvj backlog list) || fail "backlog list failed in the mi
   || fail "backlog list did not read BACKLOG.md content: $OUT"
 pass "backlog list reads BACKLOG.md (legacy TODO.md fallback removed in v4.1)"
 
-# white-box-begin: go-unit A4 #48
-PYTHONPATH="$BIN" python3 -c "
-from hvlib import load_backlog_corpus
-corpus = load_backlog_corpus('$BOOT_DIR')
-assert 'B99' in corpus, f'load_backlog_corpus did not include BACKLOG.md content; corpus={corpus!r}'
-" || fail "load_backlog_corpus did not read BACKLOG.md"
-pass "load_backlog_corpus reads BACKLOG.md (legacy TODO.md fallback removed in v4.1)"
-# white-box-end
-
 # ── Not initialized: init check names what is missing ────────────────────────
 rm -rf "$BOOT_DIR"
 mkdir -p "$BOOT_DIR"
