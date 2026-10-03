@@ -169,7 +169,8 @@ if [ -e "$BIN/hv-tmux-send.sh" ]; then
   fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
 fi
 # white-box-end
-# white-box-begin: go-unit A7 #51
+# S7 deletes: asserts bash helper structure; the Go worker has no such layer
+# white-box-begin: A9 #53 keep
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
   grep -q 'hv-host-select.sh' "$BIN/$H" \
     || fail "$H does not pick its host through hv-host-select.sh"

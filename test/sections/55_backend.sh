@@ -84,20 +84,6 @@ MD
   cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "rejected item field set changed BACKLOG.md"
   pass "item field set golden"
 
-  # hv-append (Since: stamped from HEAD when absent)
-  head="$(git rev-parse --short HEAD)"
-  # white-box-begin: go-unit A4 #48
-  "$BIN/hv-append" "## Bugs" '- **[B09] [P2] New.** d.'
-  eq "append stamp" "- **[B09] [P2] New.** d. Since: $head" "$(grep -F '[B09]' .hv/BACKLOG.md)"
-  "$BIN/hv-append" "Tasks" '- **[T09] t.** d. Since: zzz9999'
-  eq "append keeps Since" '- **[T09] t.** d. Since: zzz9999' "$(grep -F '[T09]' .hv/BACKLOG.md)"
-  eq "append placement" "$(printf '%s\n%s' '- **[B02] [P0] Second bug.** Desc two. Since: abc1234' "- **[B09] [P2] New.** d. Since: $head")" "$(grep -A1 -F '[B02]' .hv/BACKLOG.md)"
-  rc=0; err="$("$BIN/hv-append" "## Nope" '- **[B10] x**' 2>&1)" || rc=$?
-  eq "append missing section" "1:error: section '## Nope' not found" "$rc:$err"
-  cp "$TMP_GB/orig.md" .hv/BACKLOG.md
-  pass "hv-append golden"
-  # white-box-end
-
   # backlog list
   IDS() { hvj backlog list "${@:2}" | jget "data.$1" | python3 -c 'import json,sys; print(",".join(r["id"] for r in json.load(sys.stdin)))'; }
   eq "backlog in progress" "B02" "$(IDS inProgress)"
@@ -369,7 +355,8 @@ PY
     pass "$prov: tracker failures surface as exit 5"
 
     # hv-append stays refused (capture is item create)
-    # white-box-begin: go-unit A4 #48
+    # S7 deletes: Go has no append on the issues backend; hv-append goes with bin/
+    # white-box-begin: A9 #53 keep
     rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
     pass "$prov: hv-append still refused in issue mode"
     # white-box-end

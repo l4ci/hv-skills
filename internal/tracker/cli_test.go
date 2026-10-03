@@ -277,7 +277,9 @@ func TestResolveProvider(t *testing.T) {
 	} {
 		p, err := ResolveProvider(context.Background(), c.want, c.configured, "/repo", c.x)
 		if c.out == "" {
-			if !IsKind(err, KindUnavailable) || err.Error() != "cannot determine provider (set issues.provider)" {
+			var te *Error
+			if !IsKind(err, KindUnavailable) || err.Error() != "cannot determine provider (set issues.provider)" ||
+				!errors.As(err, &te) || te.Code != 3 {
 				t.Errorf("%+v: %q, %v", c, p, err)
 			}
 			continue

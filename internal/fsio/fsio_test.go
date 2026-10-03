@@ -114,6 +114,25 @@ func TestLockTimeout(t *testing.T) {
 	}
 }
 
+// A crashed writer leaves an empty .lock file behind; flock state lives in
+// the kernel, so the next acquirer must proceed, not hang or fail.
+func TestLockedIgnoresLeftoverLockFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path+".lock", nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ran := false
+	if err := Locked(path, 200*time.Millisecond, func() error { ran = true; return nil }); err != nil || !ran {
+		t.Fatalf("leftover lockfile blocked Locked: ran=%v err=%v", ran, err)
+	}
+	if err := UpdateJSON(path, nil, bump); err != nil {
+		t.Fatalf("UpdateJSON with leftover lockfile: %v", err)
+	}
+	if got := counter(LoadJSON(path, nil)); got != 1 {
+		t.Fatalf("counter = %d, want 1", got)
+	}
+}
+
 func TestWriteJSONAtomicMatchesPython(t *testing.T) {
 	dir := t.TempDir()
 	goPath, pyPath := filepath.Join(dir, "go.json"), filepath.Join(dir, "py.json")

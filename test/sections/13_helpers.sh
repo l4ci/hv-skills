@@ -34,29 +34,6 @@ BB2_TMP="$(mktemp -d)"
 rm -rf "$BB2_TMP"
 pass "git base respects git.baseBranch config override"
 
-# 2. hv-worktree-clear
-# white-box-begin: go-unit A8 #52
-WC_TMP="$(mktemp -d)"
-(
-  cd "$WC_TMP"
-  git init -q
-  git config user.email t@t && git config user.name t
-  git checkout -q -b main 2>/dev/null || git branch -m main
-  echo seed > seed.txt && git add seed.txt && git commit -q -m "seed"
-  "$BIN/hv-worktree-clear" nonexistent-branch
-  git checkout -q -b feat-x
-  echo wip > wip.txt && git add wip.txt && git commit -q -m "wip"
-  git checkout -q main
-  WT_PATH="$WC_TMP/wt-feat-x"
-  git worktree add "$WT_PATH" feat-x -q
-  "$BIN/hv-worktree-clear" feat-x
-  if git worktree list | grep "$WT_PATH" >/dev/null; then echo "FAIL: worktree still present"; exit 1; fi
-  true
-)
-rm -rf "$WC_TMP"
-pass "hv-worktree-clear silently exits on missing branch; removes non-main worktree"
-# white-box-end
-
 # 3. block knowledge (flat-list mode)
 MB_TMP="$(mktemp -d)"
 (

@@ -90,6 +90,19 @@ func TestWhichMaskedByStrayHV(t *testing.T) {
 	}
 }
 
+// A stray .hv/ deep inside a registered sub-repo's source tree masks the
+// umbrella just like one at the sub-repo root.
+func TestFindUmbrellaMaskedByDeepStrayHV(t *testing.T) {
+	root := umbrella(t, `{"repos": [{"name": "web", "path": "./web"}]}`)
+	deep := filepath.Join(root, "web", "src")
+	os.MkdirAll(filepath.Join(deep, ".hv"), 0o755)
+	_, err := FindUmbrella(deep)
+	var m *MaskedError
+	if !errors.As(err, &m) || m.Name != "web" || m.Stray != filepath.Join(deep, ".hv") {
+		t.Errorf("deep stray: %v", err)
+	}
+}
+
 func TestFindUmbrellaNone(t *testing.T) {
 	if _, err := FindUmbrella(t.TempDir()); !errors.Is(err, ErrNoUmbrella) {
 		t.Errorf("%v", err)

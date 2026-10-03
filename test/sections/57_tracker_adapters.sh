@@ -58,27 +58,4 @@ done
 trap 'rm -rf "$TMP"' EXIT
 pass "tracker call exits 5 when the provider cannot be resolved"
 
-echo "tracker adapters: provider resolution"
-
-TMP_TAW="$(mktemp -d)"
-trap 'rm -rf "$TMP_TAW"' EXIT
-
-# provider resolution failure
-# white-box-begin: go-unit A8 #52
-(
-  cd "$TMP_TAW"; mkdir -p none/.hv; cd none; echo '{}' > .hv/config.json
-  git init -q . 2>/dev/null
-  PYTHONPATH="$BIN" python3 - <<'PY' || fail "adapter_for unknown provider"
-from hvlib import adapter_for, TrackerError
-try:
-    adapter_for({})
-except TrackerError as e:
-    assert e.code == 3 and "issues.provider" in e.message
-else:
-    raise AssertionError
-PY
-)
-# white-box-end
-pass "adapter_for raises TrackerError(3) when provider unknown"
-
 trap 'rm -rf "$TMP"' EXIT

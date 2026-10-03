@@ -141,7 +141,8 @@ cat > "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
 - **TLS rule** — body. <!-- 2026-05-15 -->
 EOF
 
-# white-box-begin: go-unit A5 #49
+# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
+# white-box-begin: A9 #53 keep
 ( cd "$TMP_KR" && "$BIN/hv-knowledge-migrate" >/dev/null )
 # white-box-end
 

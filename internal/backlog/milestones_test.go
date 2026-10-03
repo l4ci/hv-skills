@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -52,6 +53,35 @@ func TestNextMilestoneIDAndAdd(t *testing.T) {
 	}
 	if want := MilestoneStub("M08", "Title", "Sum  mary.", []string{"M01"}, "2026-10-02"); !strings.HasPrefix(f.Issues[0].Body, want) {
 		t.Errorf("body does not start with the stub:\n%s", f.Issues[0].Body)
+	}
+}
+
+// A gap in the numbering and a closed milestone both count toward the next ID.
+func TestNextMilestoneIDCountsGapsAndClosed(t *testing.T) {
+	f := &trackertest.MS{Fake: &trackertest.Fake{}}
+	b := msIssues(f)
+	if _, err := b.MilestoneAdd("M05", "gap", "", nil, "2026-10-02"); err != nil {
+		t.Fatal(err)
+	}
+	if id, err := b.NextMilestoneID(); err != nil || id != "M06" {
+		t.Fatalf("after M05 (gap below it): %q %v", id, err)
+	}
+	if _, err := b.MilestoneAdd("M09", "closed holder", "", nil, "2026-10-02"); err != nil {
+		t.Fatal(err)
+	}
+	closed := "closed"
+	if err := f.EditMilestone(nil, f.Native[len(f.Native)-1].Number, tracker.MilestoneEdit{State: &closed}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.Native[len(f.Native)-1]; got.Title != "M09 — closed holder" || got.State != "closed" {
+		t.Fatalf("native = %+v", got)
+	}
+	id, err := b.MilestoneAdd("", "Tenth", "Skips ahead", nil, "2026-10-02")
+	if err != nil || id != "M10" {
+		t.Fatalf("add after gap and closed max = %q %v", id, err)
+	}
+	if got := f.Native[len(f.Native)-1].Title; got != "M10 — Tenth" {
+		t.Errorf("native title = %q", got)
 	}
 }
 
@@ -121,5 +151,67 @@ func TestSlicePlansAcrossParts(t *testing.T) {
 	}
 	if p, _ := b.SlicePlans("M09"); len(p) != 0 {
 		t.Errorf("plans of an unknown milestone: %v", p)
+	}
+}
+
+// A tracking issue carries slice notes (plan:SNN) and a plain plan note side
+// by side; each kind reads, upserts and removes independently.
+func TestSliceNotesMixedWithPlainPlan(t *testing.T) {
+	f := &trackertest.MS{Fake: &trackertest.Fake{Issues: []tracker.Issue{
+		{Number: 3, Title: "M02 — Sharing", Labels: []string{"milestone-tracker"}, State: "open"},
+	}}}
+	b := msIssues(f)
+	const n = "3"
+	if _, ok, err := b.NoteGet(n, "plan:S01"); err != nil || ok {
+		t.Fatalf("empty issue: ok=%v err=%v", ok, err)
+	}
+	if u, err := b.SliceUnits("M02"); err != nil || len(u) != 0 {
+		t.Fatalf("units on an empty issue = %v %v", u, err)
+	}
+	for _, p := range []struct{ kind, text string }{
+		{"plan:S01", "slice one\nline two"}, {"plan:S02", "slice two"}, {"plan", "plain plan note"},
+	} {
+		if ch, err := b.NotePut(n, p.kind, p.text); err != nil || !ch {
+			t.Fatalf("put %s = %v %v", p.kind, ch, err)
+		}
+	}
+	if got, ok, _ := b.NoteGet(n, "plan:S01"); !ok || got != "slice one\nline two" {
+		t.Errorf("plan:S01 = %q %v", got, ok)
+	}
+	if got, ok, _ := b.NoteGet(n, "plan"); !ok || got != "plain plan note" {
+		t.Errorf("plan = %q %v", got, ok)
+	}
+	if u, _ := b.SliceUnits("M02"); !reflect.DeepEqual(u, []string{"S01", "S02"}) {
+		t.Errorf("units = %v (the plain plan note is not a unit)", u)
+	}
+	var marks []string
+	for _, c := range f.Fake.Issues[0].Comments {
+		marks = append(marks, strings.SplitN(c.Body, "\n", 2)[0])
+	}
+	if want := []string{"<!-- hv:plan:S01 -->", "<!-- hv:plan:S02 -->", "<!-- hv:plan -->"}; !reflect.DeepEqual(marks, want) {
+		t.Errorf("markers = %v", marks)
+	}
+	if ch, err := b.NotePut(n, "plan:S01", "slice one\nline two"); err != nil || ch {
+		t.Errorf("idempotent put = %v %v", ch, err)
+	}
+	if rm, err := b.NoteRm(n, "plan:S01"); err != nil || !rm {
+		t.Fatalf("rm = %v %v", rm, err)
+	}
+	if rm, _ := b.NoteRm(n, "plan:S01"); rm {
+		t.Error("second rm reported removal")
+	}
+	if u, _ := b.SliceUnits("M02"); !reflect.DeepEqual(u, []string{"S02"}) {
+		t.Errorf("units after rm = %v", u)
+	}
+	if got, ok, _ := b.NoteGet(n, "plan"); !ok || got != "plain plan note" {
+		t.Errorf("plain plan after slice rm = %q %v", got, ok)
+	}
+	b.NoteRm(n, "plan:S02")
+	b.NoteRm(n, "plan")
+	if len(f.Fake.Issues[0].Comments) != 0 {
+		t.Errorf("comments left: %+v", f.Fake.Issues[0].Comments)
+	}
+	if _, err := b.NotePut(n, "plan:x1", "bad"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("bad slice kind: %v", err)
 	}
 }

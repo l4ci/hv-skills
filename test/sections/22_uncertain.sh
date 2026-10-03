@@ -121,7 +121,8 @@ pass "Tier C SKILL.md files do not reference TaskCreate("
 # white-box-end
 echo "ok F37"
 
-# white-box-begin: go-unit A5 #49
+# S7 deletes: first_sentence has no Go port; goes with hvlib
+# white-box-begin: A9 #53 keep
 echo "hvlib parse_term_entry / first_sentence"
 PYTHONPATH="$BIN" python3 - <<'PY'
 import sys

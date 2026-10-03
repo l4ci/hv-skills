@@ -1,28 +1,3 @@
-# white-box-begin: go-unit A8 #52
-echo "hvlib.parse_toml_version"
-mkdir ptv-test && cd ptv-test
-RESULT=$(PYTHONPATH="$BIN" python3 -c "
-from hvlib import parse_toml_version
-text1 = '[project]\nname = \"foo\"\nversion = \"1.2.3\"\n'
-text2 = '[tool.poetry]\nname = \"foo\"\nversion = \"2.0.0\"\n'
-text3 = '[package]\nname = \"foo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n'
-text4 = '[other]\nfoo = 1\n'  # no version field
-text5 = '[project]\nname = \"foo\"\nversion = \"\"\n'  # empty version
-print(parse_toml_version(text1, ['project']))
-print(parse_toml_version(text2, ['project', 'tool.poetry']))
-print(parse_toml_version(text3, ['package']))
-print(repr(parse_toml_version(text4, ['project'])))
-print(repr(parse_toml_version(text5, ['project'])))
-")
-EXPECTED=$'1.2.3\n2.0.0\n0.1.0\nNone\n\'\''
-[ "$RESULT" = "$EXPECTED" ] || fail "parse_toml_version: expected:
-$EXPECTED
-got:
-$RESULT"
-pass "parse_toml_version handles project, tool.poetry, package, missing-section, and empty-string version"
-# white-box-end
-cd ..
-
 echo "release bump"
 mkdir bv-dry && cd bv-dry
 
