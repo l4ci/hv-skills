@@ -137,6 +137,9 @@ def main(argv):
     if not go_bin or not os.access(go_bin, os.X_OK):
         die("HV_GO_BIN must name the built hv binary")
     verbs = go_verbs(go_bin)
+    if argv == ["__verbs"]:  # the verbs Go serves here, for sections that probe for one
+        sys.stdout.write("".join(v + "\n" for v in sorted(verbs)))
+        sys.exit(0)
     w = words(argv)
     verb = ""
     for n in range(len(w), 0, -1):
