@@ -1,8 +1,8 @@
 # Handoff note template
 
-Used by `/hv-pause` (writes the note) and `/hv-next` (reads it). Both skills point here so the template lives in one place.
+Used by `/hv-pause` (writes the note) and `/hv-work` with no argument (reads it). Both skills point here so the template lives in one place.
 
-Fill each section from the current session — omit sections that don't apply, but don't manufacture content. The four sections below are exactly what `/hv-next` consumes; anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere (`git log`, `git status`, `/hv-learn`).
+Fill each section from the current session — omit sections that don't apply, but don't manufacture content. The four sections below are exactly what `/hv-work` consumes (Stage, Next planned step and Current hypothesis are what its no-argument mode reads); anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere (`git log`, `git status`, `/hv-learn`).
 
 ## Template
 
@@ -20,7 +20,7 @@ Fill each section from the current session — omit sections that don't apply, b
 
 ## Next planned step
 
-<one or two sentences — the concrete action /hv-next should dispatch. Not a summary; a directive.>
+<one or two sentences — the concrete action `/hv-work` should dispatch. Not a summary; a directive.>
 
 ## Current hypothesis (if debugging)
 

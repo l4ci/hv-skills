@@ -3,16 +3,14 @@
 What each `/hv-*` skill does, one line each. For details: [`reference/slash-commands.md`](reference/slash-commands.md).
 
 ## Capture & pick
-- **`/hv-capture`**: add bugs, features, tasks to the backlog. No code yet. Flags: `--from-github`, `--from-gitlab`, `--remove`.
-- **`/hv-go`**: capture + implement in one shot.
-- **`/hv-next`**: show the backlog, suggest what to work on next.
+- **`/hv-capture`**: add bugs, features, tasks to the backlog. No code yet. Ends with an optional hand-off to `/hv-work`. Flags: `--from-github`, `--from-gitlab`, `--remove`.
 - **`/hv-pause`**: stop cleanly; leave a handoff note for the next session.
 
 ## Plan & build
 - **`/hv-brainstorm`**: design exploration before planning. For big items.
 - **`/hv-plan`**: write the implementation plan with verifiable tasks.
 - **`/hv-spike`**: throwaway experiment on a dedicated branch. Only findings come back.
-- **`/hv-work`**: execute the plan in parallel with per-task commits. `--preview` for a read-only peek.
+- **`/hv-work`**: execute the plan in parallel with per-task commits. `--preview` for a read-only peek. No argument: reconcile the backlog and suggest the next item.
 - **`/hv-debug`**: systematic bug cycle. Reproduce, hypothesize, fix.
 - **`/hv-orchestrate`**: run a parallel round: choose the slate, route workers, merge. The `hv round` verbs do the mechanics.
 
@@ -30,8 +28,10 @@ What each `/hv-*` skill does, one line each. For details: [`reference/slash-comm
 - **`/hv-refactor`**: full architectural refactor cycle.
 
 ## Maintenance
-- **`/hv-init`**: scaffold `.hv/` in a new project.
-- **`/hv-config`**: change settings.
-- **`/hv-update`**: check for a newer release.
-- **`/hv-migrate v4`**: codemod for v3 → v4 upgrades.
 - **`/hv-release`**: cut a release.
+
+## Verbs, not skills
+- **`hv init`** (`hv init umbrella`): scaffold `.hv/` and fill config defaults.
+- **`hv config show` / `hv config set`**: read and change settings.
+- **`hv update`**: check for a newer release.
+- **`hv migrate v4` / `hv migrate issues`**: v3 to v4 codemod; backlog to issues.

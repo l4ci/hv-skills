@@ -1,8 +1,8 @@
 # Configuration
 
-All settings live in [`.hv/config.json`](../reference/hv-folder.md). Edit the file directly or run `/hv-config` for an interactive picker that offers four common profiles (Balanced, Premium, Fast, Minimal) that map to the values below. `/hv-config <key>` jumps straight to the value picker for that key; `/hv-config <key>=<value>` applies the value directly.
+All settings live in [`.hv/config.json`](../reference/hv-folder.md). Run `hv config show` to list every key with its value and source, and `hv config set <key> <value>` to change one (positional arguments; see [config options](../reference/config-options.md)). `hv init` fills any missing key with its default. Don't hand-edit the file.
 
-For the exact wording of the interactive picker's questions and option labels, see [Configuration options](../reference/config-options.md).
+For the allowed values and option labels of each key, see [Configuration options](../reference/config-options.md).
 
 Default config:
 
@@ -54,7 +54,7 @@ Default config:
 | `"sonnet"` | Fast execution of well-specified tasks |
 | `"haiku"` | Quick, cheap fixes and small tasks |
 
-`/hv-config` and [`/hv-init`](../reference/slash-commands.md#hv-init) offer four ready-made profiles (Balanced, Premium, Fast, Minimal) that set both values at once.
+`hv init` writes the Balanced profile. The four profiles (Balanced, Premium, Fast, Minimal) are listed in [config options](../reference/config-options.md); set both keys to switch.
 
 ## work.isolation: branch or worktree
 
@@ -223,7 +223,7 @@ Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-mer
 
 ## round keys
 
-Settings for `hv round` (parallel rounds). All are silent defaults; none is written by `/hv-init`.
+Settings for `hv round` (parallel rounds). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -242,7 +242,7 @@ A custom `work.workerCommand` receives the tier's model only through a `{model}`
 
 ## orchestrator keys
 
-Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)) and its restart (`hv keepalive run`; see [keepalive](pausing-and-resuming.md#keepalive)). All are silent defaults; none is written by `/hv-init`.
+Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)) and its restart (`hv keepalive run`; see [keepalive](pausing-and-resuming.md#keepalive)). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -260,7 +260,7 @@ An out-of-range value exits 70 in a verb that reads it (`hv keepalive run` inclu
 
 ## limits keys
 
-Settings for the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`; see [usage limits](pausing-and-resuming.md#usage-limits)). All are silent defaults; none is written by `/hv-init`.
+Settings for the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`; see [usage limits](pausing-and-resuming.md#usage-limits)). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -380,7 +380,7 @@ Set higher to suppress the prompt for typical project velocities; set lower (e.g
 - **Type:** integer
 - **Default:** `10`
 
-Number of commits since the last release tag at which [`/hv-next`](picking-work.md) (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only; no skill is auto-invoked.
+Number of commits since the last release tag at which [`/hv-work` (no argument)](picking-work.md) (terminal paths only) and `/hv-ship` (post-ship report) start surfacing a one-line nudge: *"<N> commits since <tag>; consider `/hv-release`."* Informational only; no skill is auto-invoked.
 
 ## release.nudgeAfterDays
 
@@ -420,7 +420,7 @@ Skills that use the base branch (including `/hv-ship`, `/hv-review` and `/hv-wor
 | `issues.labels.released` | `"released"` | Label name. |
 | `issues.labels.notPlanned` | `"not-planned"` | Label name. |
 | `issues.labels.blocked` | `"blocked"` | Label name set by `hv item complete --reason blocked`; the issue stays open. |
-| `issues.labels.needsHuman` | `"needs-human"` | Label `hv round transfer --to human` puts on an issue handed to the human. `hv round candidates` skips an issue that carries it; removing the label puts it back in the set. Silent default, not written by `/hv-init`. |
+| `issues.labels.needsHuman` | `"needs-human"` | Label `hv round transfer --to human` puts on an issue handed to the human. `hv round candidates` skips an issue that carries it; removing the label puts it back in the set. Silent default, not written by `hv init`. |
 | `issues.labels.milestoneTracker` | `"milestone-tracker"` | Label name. |
 | `issues.labels.types.bug` / `.feature` / `.task` | `"type:bug"` / `"type:feature"` / `"type:task"` | Label names per item type. |
 | `issues.labels.priorityPrefix` | `"p"` | Prefix for priority labels. |
@@ -431,12 +431,12 @@ Skills that use the base branch (including `/hv-ship`, `/hv-review` and `/hv-wor
 ## hvSkills.version (auto-managed)
 
 - **Type:** string
-- **Default:** `""` (unstamped until `/hv-init` first runs)
+- **Default:** `""` (unstamped until `hv init` first runs)
 
-Records the hv-skills plugin version that was installed when `/hv-init` last ran. Auto-managed: `/hv-init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
+Records the hv-skills plugin version that was installed when `hv init` last ran. Auto-managed: `hv init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
 
 `hv version --drift` compares the stamped value with the installed `hv` binary, and [`hv init check`](../reference/preflight.md) surfaces the same drift as a warning. `--json` returns `stamped`, `installed` and `status` (`match`, `drift` or `unknown`).
 
-Re-running `/hv-init` re-stamps `hvSkills.version`; there are no project files to refresh. Distinct from `/hv-update` (which compares installed vs latest GitHub release): this is *project drift*, visible when the plugin updated under you and the project hasn't been re-stamped yet.
+Re-running `hv init` re-stamps `hvSkills.version`; there are no project files to refresh. Distinct from `hv update` (which compares installed vs latest GitHub release): this is *project drift*, visible when the plugin updated under you and the project hasn't been re-stamped yet.
 
-When `autonomy.level` is `"auto"` or `"loop"`, [`/hv-update`](../reference/slash-commands.md#hv-update) Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.
+When `hv version --drift` reports drift, re-run `hv init` after a plugin upgrade to clear it.

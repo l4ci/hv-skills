@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
@@ -299,4 +300,131 @@ func TestInitDefaultHasNoCodex(t *testing.T) {
 	if strings.Contains(string(gi), ".agents") {
 		t.Error("gitignore mentions .agents")
 	}
+}
+
+func TestInitFillsConfigAndStampsVersion(t *testing.T) {
+	old := installedVersionFn
+	t.Cleanup(func() { installedVersionFn = old })
+	cfgPath := func(dir string) string { return filepath.Join(dir, ".hv", "config.json") }
+	check := func(t *testing.T, dir string) string {
+		t.Helper()
+		_, env, _ := initRun(t, dir, "config", "check")
+		d := initData(env)
+		s, _ := d.Get("status")
+		st, _ := s.(string)
+		return st
+	}
+	cases := []struct {
+		name    string
+		version string
+		seed    string // config.json before the first init ("" = none)
+		wantCfg map[string]any
+		stamped string
+	}{
+		{"fresh", "5.0.0", "", map[string]any{"hvSkills.version": "5.0.0"}, "5.0.0"},
+		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"hvSkills":{"version":"4.9.0"}}`,
+			map[string]any{"docs.path": "mydocs", "hvSkills.version": "5.0.0"}, "5.0.0"},
+		{"dev binary stamps nothing", "", "", map[string]any{"hvSkills.version": ""}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			installedVersionFn = func() string { return tc.version }
+			dir := t.TempDir()
+			if tc.seed != "" {
+				os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+				os.WriteFile(cfgPath(dir), []byte(tc.seed), 0o644)
+			}
+			code, env, _ := initRun(t, dir, "init", "--no-blocks")
+			d := initData(env)
+			if code != 0 {
+				t.Fatal(env)
+			}
+			if v, _ := d.Get("versionStamped"); v != tc.stamped {
+				t.Errorf("versionStamped %v, want %q", v, tc.stamped)
+			}
+			f, _ := d.Get("configFilled")
+			if l, _ := f.([]any); len(l) == 0 {
+				t.Error("nothing filled")
+			}
+			if st := check(t, dir); st != "upToDate" {
+				t.Errorf("config check %q after init", st)
+			}
+			cfg := readCfg(t, cfgPath(dir))
+			for k, want := range tc.wantCfg {
+				if got, _ := lookupDotted(cfg, k); got != want {
+					t.Errorf("%s = %v, want %v", k, got, want)
+				}
+			}
+			// second run: nothing to fill or stamp, file untouched
+			before, _ := os.ReadFile(cfgPath(dir))
+			_, env, _ = initRun(t, dir, "init", "--no-blocks")
+			d = initData(env)
+			f, _ = d.Get("configFilled")
+			if l, _ := f.([]any); len(l) != 0 {
+				t.Errorf("second run filled %v", l)
+			}
+			if v, _ := d.Get("versionStamped"); v != "" {
+				t.Errorf("second run stamped %v", v)
+			}
+			if ch, _ := d.Get("changed"); ch != false {
+				t.Errorf("second run changed: %v", env)
+			}
+			if after, _ := os.ReadFile(cfgPath(dir)); string(after) != string(before) {
+				t.Error("second run rewrote config.json")
+			}
+		})
+	}
+}
+
+func TestInitClearsVersionDrift(t *testing.T) {
+	old := installedVersionFn
+	installedVersionFn = func() string { return "5.0.0" }
+	t.Cleanup(func() { installedVersionFn = old })
+	dir := t.TempDir()
+	initRun(t, dir, "init", "--no-blocks")
+	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hvSkills":{"version":"4.9.0"}}`), 0o644)
+	initRun(t, dir, "init", "--no-blocks")
+	_, env, _ := initRun(t, dir, "init", "check")
+	if w, _ := env.Get("warnings"); w != nil {
+		t.Errorf("drift not cleared: %v", w)
+	}
+}
+
+func TestInitUmbrellaEnablesUmbrella(t *testing.T) {
+	old := installedVersionFn
+	installedVersionFn = func() string { return "5.0.0" }
+	t.Cleanup(func() { installedVersionFn = old })
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "api", ".git"), 0o755)
+	code, env, _ := initRun(t, dir, "init", "umbrella", "--all")
+	d := initData(env)
+	if code != 0 {
+		t.Fatal(env)
+	}
+	if v, _ := d.Get("umbrellaEnabled"); v != true {
+		t.Errorf("umbrellaEnabled %v", v)
+	}
+	cfg := readCfg(t, filepath.Join(dir, ".hv", "config.json"))
+	if got, _ := lookupDotted(cfg, "umbrella.enabled"); got != true {
+		t.Errorf("umbrella.enabled = %v", got)
+	}
+	_, env, _ = initRun(t, dir, "init", "umbrella", "--all")
+	if v, _ := initData(env).Get("umbrellaEnabled"); v != false {
+		t.Errorf("second run umbrellaEnabled %v", v)
+	}
+}
+
+func lookupDotted(cfg any, key string) (any, bool) { return config.Lookup(cfg, key) }
+
+func readCfg(t *testing.T, path string) any {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := jsonx.Decode(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
 }

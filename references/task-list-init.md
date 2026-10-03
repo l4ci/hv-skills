@@ -33,4 +33,4 @@ Keep the Phases list inline; only the boilerplate citation extracts.
 ## See also
 
 - `authoring-conventions.md` rule #4 — original authoring requirement.
-- Cited from: `hv-init`, `hv-capture`, `hv-go`, `hv-next`, `hv-plan`, `hv-work`, `hv-debug`, `hv-review`, `hv-ship`, `hv-learn`, `hv-decide`, `hv-refactor`, and other multi-phase skills. New SKILL.md files cite this reference from their Step 1 instead of restating the boilerplate.
+- Cited from: `hv-capture`, `hv-plan`, `hv-work`, `hv-debug`, `hv-review`, `hv-ship`, `hv-learn`, `hv-decide`, `hv-refactor`, and other multi-phase skills. New SKILL.md files cite this reference from their Step 1 instead of restating the boilerplate.

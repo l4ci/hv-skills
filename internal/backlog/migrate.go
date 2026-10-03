@@ -209,7 +209,7 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 		}
 		m.say("froze .hv/BACKLOG.md")
 	}
-	m.say("Next: /hv-config backlog.backend=issues")
+	m.say("Next: hv config set backlog.backend issues")
 	m.res.Done = true
 	return m.finish(), nil
 }

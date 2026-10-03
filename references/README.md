@@ -8,23 +8,22 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 
 | Reference | Purpose | Cited by |
 |-----------|---------|----------|
-| [`ask-user-question-fallback.md`](ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. | `/hv-brainstorm`, `/hv-capture` (`--from-*`), `/hv-init`, `/hv-release`, `/hv-ship`, `/hv-vision`, `/hv-work` |
-| [`authoring-conventions.md`](authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). | `/hv-capture`, `/hv-init`, `/hv-next`, `/hv-refactor`, `/hv-ship` |
-| [`banner-preamble.md`](banner-preamble.md) | Banner-print rule shared by every skill. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-debug`, `/hv-decide`, `/hv-go`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-update`, `/hv-vision`, `/hv-work` |
+| [`ask-user-question-fallback.md`](ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. | `/hv-brainstorm`, `/hv-capture` (`--from-*`), `/hv-release`, `/hv-ship`, `/hv-vision`, `/hv-work` |
+| [`authoring-conventions.md`](authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). | `/hv-capture`, `/hv-refactor`, `/hv-ship` |
+| [`banner-preamble.md`](banner-preamble.md) | Banner-print rule shared by every skill. | `/hv-brainstorm`, `/hv-capture`, `/hv-debug`, `/hv-decide`, `/hv-learn`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
 | [`context-load-protocol.md`](context-load-protocol.md) | K+D context loading sequence shared by every cycle-starting skill. | `/hv-plan`, `/hv-vision`, `/hv-work` (including `--preview`) |
 | [`debug-hypothesize.md`](debug-hypothesize.md) | Both-modes hypothesize choreography (brief template, single vs competing, per-axis divergence) for `/hv-debug` Step 6. | `/hv-debug` |
 | [`debug-escalate.md`](debug-escalate.md) | Fresh-context handoff brief template + dispatch mechanics + user-surfacing fallback for `/hv-debug` Step 7.5. | `/hv-debug` |
 | [`design-exploration.md`](design-exploration.md) | Shared five-step spine for skills that negotiate what to build before downstream skills capture how. | `/hv-brainstorm`, `/hv-vision` |
 | [`detail-files.md`](detail-files.md) | Detail-file template used when an item's input exceeds 3 sentences. | `/hv-capture` |
 | [`docs-conventions.md`](docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). | `/hv-ship` (Docs Mode) |
-| [`handoff-template.md`](handoff-template.md) | Handoff-note template written by `/hv-pause` and read by `/hv-next`. | `/hv-pause` |
+| [`handoff-template.md`](handoff-template.md) | Handoff-note template written by `/hv-pause` and read by `/hv-work` (no argument). | `/hv-pause` |
 | [`humanizing-prose.md`](humanizing-prose.md) | Rule sheet + silent self-audit pass applied to user-facing prose (release notes, PR body, doc-page edits) before the draft is shown to the user. | `/hv-release`, `/hv-ship` |
 | [`isolation-guard.md`](isolation-guard.md) | Why the parallel-waves-require-worktree-isolation guard fires, with the M02-S01 incident rationale and **Forbids / Permits** block for `/hv-work` Step 5. | `/hv-work` |
 | [`isolation-patterns.md`](isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. | `/hv-work` |
-| [`knowledge-consult.md`](knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. | `/hv-debug`, `/hv-next`, `/hv-review`, `/hv-work` |
+| [`knowledge-consult.md`](knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. | `/hv-debug`, `/hv-review`, `/hv-work` |
 | [`loop-mode-plan-dispatch.md`](loop-mode-plan-dispatch.md) | Loop-mode auto-plan dispatch (uncertainty pre-flight, orchestrator-model contract) plus rename + link-sweep collision detection for `/hv-work` Step 4. | `/hv-work` |
 | [`manual-gates.md`](manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. | `/hv-capture` (`--remove`, `--from-*`), `/hv-learn`, `/hv-release`, `/hv-ship` |
-| [`merge-strategy-gate.md`](merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. | `/hv-ship`, `/hv-work` |
 | [`milestone-tagging.md`](milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. | `/hv-capture` |
 | [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`), plus umbrella scoping (hybrid KNOWLEDGE, umbrella-only DECISIONS). | `/hv-decide`, `/hv-learn` |
 | [`post-cycle-trigger-gate.md`](post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle skills. | `/hv-qa`, `/hv-ship`, `/hv-work` |
@@ -34,15 +33,14 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`review-verdict-routing.md`](review-verdict-routing.md) | Verdict semantics, `AskUserQuestion` shapes and plain-text fallback for `/hv-review` consumers. | `/hv-qa`, `/hv-review`, `/hv-ship` |
 | [`silent-failure-hunter.md`](silent-failure-hunter.md) | Rubric for detecting work that reports complete but didn't move the system, used in review passes. | `/hv-review`, `/hv-ship` |
 | [`source-prefill.md`](source-prefill.md) | Source-prefill / promote-between-artifacts semantics for `/hv-decide`. | `/hv-decide` |
-| [`subagent-dispatch.md`](subagent-dispatch.md) | Cross-skill rulebook for when and how skills push work into subagents instead of the orchestrator thread. | `/hv-debug`, `/hv-next`, `/hv-qa`, `/hv-vision` |
-| [`task-list-init.md`](task-list-init.md) | Canonical task-list initialization block cited by every skill with three or more phases. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-debug`, `/hv-decide`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
-| [`terminal-loop-surface.md`](terminal-loop-surface.md) | Canonical bash block for surfacing `[Auto:Loop]` decisions from terminal-path skills before halting. | `/hv-debug`, `/hv-next`, `/hv-pause`, `/hv-work` |
+| [`subagent-dispatch.md`](subagent-dispatch.md) | Cross-skill rulebook for when and how skills push work into subagents instead of the orchestrator thread. | `/hv-debug`, `/hv-qa`, `/hv-vision` |
+| [`task-list-init.md`](task-list-init.md) | Canonical task-list initialization block cited by every skill with three or more phases. | `/hv-brainstorm`, `/hv-capture`, `/hv-debug`, `/hv-decide`, `/hv-learn`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
+| [`terminal-loop-surface.md`](terminal-loop-surface.md) | Canonical bash block for surfacing `[Auto:Loop]` decisions from terminal-path skills before halting. | `/hv-debug`, `/hv-pause`, `/hv-work` |
 | [`worker-contract.md`](worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. | `/hv-work` |
 | [`herdr-dispatch.md`](herdr-dispatch.md) | What herdr changes versus tmux: tabs as slots, startup dialogs, worker-contract additions. | `/hv-work` |
 | [`tmux-dispatch.md`](tmux-dispatch.md) | Judgment `hv worker` verbs do not enforce for `work.dispatch: "tmux"`: permissions, relay provenance, merge-gate lore, failure modes. | `/hv-work` |
 | [`three-mode-skill-shape.md`](three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship` (Docs Mode) and `/hv-qa`. | `/hv-qa`, `/hv-ship` |
 | [`umbrella-mode.md`](umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. | `/hv-capture`, `/hv-qa`, `/hv-spike`, `/hv-work` |
-| [`update-verdicts.md`](update-verdicts.md) | Update-check verdicts and routing for `/hv-update`. | `/hv-update` |
 
 ## Conventions
 

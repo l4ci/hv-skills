@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/initproj"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
@@ -78,6 +79,12 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 		for _, p := range res.Created {
 			lines = append(lines, "created: "+p)
 		}
+		cfg, err := initConfig(dir)
+		if err != nil {
+			return Result{}, err
+		}
+		changed = changed || cfg.changed()
+		cfg.report(data, &lines)
 		if !*noBlocks {
 			b := initproj.Blocks(dir, func() (bool, error) { return initMilestoneIndex(c) })
 			changed = changed || b.Changed()
@@ -122,6 +129,53 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 		}
 		return Result{Data: data, Text: strings.Join(lines, "\n")}, nil
 	}
+}
+
+// initConfigResult is what init's config step did: the required keys it
+// filled and the version it stamped ("" when the stamp already matched or the
+// binary has no release version).
+type initConfigResult struct {
+	filled  []string
+	stamped string
+}
+
+func (r initConfigResult) changed() bool { return len(r.filled) > 0 || r.stamped != "" }
+
+func (r initConfigResult) report(data *jsonx.Object, lines *[]string) {
+	data.Set("configFilled", strSlice(r.filled))
+	data.Set("versionStamped", r.stamped)
+	if len(r.filled) > 0 {
+		*lines = append(*lines, "config filled: "+strings.Join(r.filled, ", "))
+	}
+	if r.stamped != "" {
+		*lines = append(*lines, "stamped hvSkills.version: "+r.stamped)
+	}
+}
+
+// initConfig is the config half of the old init skill: fill every missing
+// required key with its schema default (never touching a present key), then
+// stamp hvSkills.version with the binary's version, which clears the drift
+// nudge. Idempotent; an unreleased (dev) binary stamps nothing.
+func initConfig(root string) (initConfigResult, error) {
+	var r initConfigResult
+	filled, err := config.Fill(root)
+	if errors.Is(err, config.ErrCorrupt) {
+		return r, &Error{Exit: ExitInternal, Message: err.Error()}
+	}
+	if err != nil {
+		return r, err
+	}
+	r.filled = filled
+	if v := installedVersionFn(); v != "" {
+		cur, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "hvSkills.version")
+		if cur != v {
+			if _, err := config.Set(root, "hvSkills.version", v); err != nil {
+				return r, err
+			}
+			r.stamped = v
+		}
+	}
+	return r, nil
 }
 
 // executablePath is the running binary; a variable so a test can swap it.

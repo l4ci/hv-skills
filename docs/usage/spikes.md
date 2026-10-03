@@ -44,17 +44,17 @@ The findings feed back into whatever decision triggered the spike, usually a mil
 
 See [vision and plans](vision-and-plans.md) for how spikes fit the broader planning flow.
 
-## Spikes vs /hv-go vs /hv-work
+## Spikes vs capture-and-work vs /hv-work
 
 | Skill | Use when… |
 |-------|-----------|
 | `/hv-spike` | You don't know if something is even possible and need to find out before committing |
-| `/hv-go` | You know exactly what to do and want to capture and implement it in one pass |
+| `/hv-capture` (accept the hand-off) | You know exactly what to do and want to capture and implement it in one pass |
 | `/hv-work` | You have a captured backlog item and want the orchestrator to implement it properly |
 
 Spike when you don't know; work when you do. Skipping a spike on a hunch costs more than running one.
 
-See [running work](running-work.md) for how `/hv-go` and `/hv-work` behave once the question is settled.
+See [running work](running-work.md) for how the `/hv-capture` hand-off and `/hv-work` behave once the question is settled.
 
 ## Spike hygiene
 

@@ -80,7 +80,7 @@ hv plan show "<MNN>-<ID>"                    # only when tagged; exit 3 = no pla
 
 Issue the `hv item field get` and `hv plan show` calls in parallel — one pair per `referencedId` — and collect a `plans` map: `{ID -> plan-content-or-empty}`. Untagged items (no `Milestone:` field) and items with no plan file produce empty entries — those items don't contribute to Stage 1.
 
-**No-plan fallback.** If every entry in `plans` is empty (no referenced item has a plan file), Stage 1 cannot run as a meaningful spec check. Print one informational line — *"No plans found for referenced items; skipping Stage 1 (spec compliance). Running Stage 2 only."* — and proceed directly to Step 4 (effectively `--stage quality` behavior). The user may have skipped `/hv-plan` for this branch (e.g. `/hv-go` shortcut); that's legitimate, not an error.
+**No-plan fallback.** If every entry in `plans` is empty (no referenced item has a plan file), Stage 1 cannot run as a meaningful spec check. Print one informational line — *"No plans found for referenced items; skipping Stage 1 (spec compliance). Running Stage 2 only."* — and proceed directly to Step 4 (effectively `--stage quality` behavior). The user may have skipped `/hv-plan` for this branch (e.g. a one-shot `/hv-capture` hand-off); that's legitimate, not an error.
 
 When `--stage quality` is set, skip this step entirely — Stage 1 won't run.
 

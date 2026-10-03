@@ -12,7 +12,7 @@ import (
 )
 
 // WorktreeRoot is where slot worktrees live: one root for every mode (hv-work
-// slots and herdr rounds), inside the project and gitignored (/hv-init writes
+// slots and herdr rounds), inside the project and gitignored (hv init writes
 // `.worktrees/` to .gitignore), so herdr groups the workspaces under the
 // project. Slots created before this lived in .claude/worktrees/hv-worker/<slot>;
 // init leaves those where they are.
@@ -78,9 +78,9 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 		return res, fail(ExitUnavailable, err.Error())
 	}
 	// A tracked-looking .worktrees/ makes every `git status` in the project
-	// noisy. Warn rather than edit .gitignore: /hv-init owns that line.
+	// noisy. Warn rather than edit .gitignore: hv init owns that line.
 	if _, code := e.git(root, "check-ignore", "-q", WorktreeRoot+"/"); code != 0 {
-		res.Warnings = append(res.Warnings, WorktreeRoot+"/ is not gitignored — re-run /hv-init to add it")
+		res.Warnings = append(res.Warnings, WorktreeRoot+"/ is not gitignored — re-run hv init to add it")
 	}
 
 	// tmux handles are known now; herdr tab ids exist only after a dispatch.

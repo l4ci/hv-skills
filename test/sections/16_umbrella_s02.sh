@@ -292,7 +292,7 @@ OUT=$(hvj init check 2>/dev/null) || fail "init check should exit 0 (advisory) w
 pass "init check warns advisory when umbrella.enabled and repos.json empty"
 
 # Umbrella DISABLED but repos.json valid: pass (data is truth; flag is informational).
-# Exercises the B15 fix — /hv-next must reconcile when repos.json is present
+# Exercises the B15 fix — /hv-work (no argument) must reconcile when repos.json is present
 # even if a stale config has umbrella.enabled: false.
 echo '{"umbrella": {"enabled": false}}' > .hv/config.json
 echo '{"repos": [{"name": "web", "path": "./web"}]}' > .hv/repos.json

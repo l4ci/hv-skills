@@ -14,191 +14,111 @@ description: Bundle completed work on a feature branch into a PR (or direct merg
 
 ## Step 0 — Mode Dispatch
 
-Read `$ARGUMENTS` (the slash-command's free-text args). Route on the first flag present:
+Read `$ARGUMENTS`. Route on the first flag present:
 
-| Args contain | Route to | Purpose |
-|---|---|---|
-| `--undo` | **Undo Mode** (Steps U1–U5) | Guided rollback of the last `/hv-work` cycle on the base branch. |
-| `--docs` (or `--docs restructure`) | **Docs Mode** (Steps D1+) | Maintain public user-guide under `<docs.path>/`. Replaces the standalone `/hv-docs`. |
-| (no recognized flag) | **Normal Ship Mode** (Steps 1–10) | Bundle a feature branch into a PR or direct merge. |
-
-In Normal Ship Mode, the final step (`Step 8.6`) inline-runs Docs Mode's after-work flow when `docs.afterWork: true` AND the post-cycle trigger fires — no separate skill dispatch.
-
-`--undo` is **terminal** — it never falls through to Docs Mode auto-trigger (rolling back a cycle and then syncing docs would be incoherent).
+| Args contain | Route to |
+|---|---|
+| `--undo` | **Undo Mode**: guided rollback of the last cycle on the base branch. Terminal: never falls through to Docs Mode. |
+| `--docs` (or `--docs restructure`) | **Docs Mode**: maintain the public user guide under `<docs.path>/`. |
+| (none) | **Normal Ship Mode** (Steps 1–10). Step 8.6 inline-runs Docs Mode's after-work flow when `docs.afterWork: true` and the trigger fires. |
 
 # hv-ship — Finish a Feature Branch
 
 ## Configuration
 
-Read `.hv/config.json`:
+Read `.hv/config.json` (`hv config show`):
 
-- `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
-- `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
-- `ship.secondOpinion` — `false` (default) skips the fresh-eyes gate; `true` runs a no-prior-context adversarial review after `/hv-review` passes
-- `ship.secondOpinionRunner` — `"subagent"` (default, and the only runner): who runs the Step 3.5 gate. The subagent runner routes per the verdict reference. The `"codex"` runner was removed in 5.0; a leftover `"codex"` value runs the subagent in advisory mode (FAIL surfaced, never blocks; Step 3.5).
-- `ship.qa` — `false` (default) skips product QA; `true` runs `/hv-qa run` after `/hv-review` (and `secondOpinion`) and before merge/PR. Routed per `qa.gate` (`"advisory"` reports only; `"blocking"` halts on FAIL).
-- `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
-- `docs.path` — relative path to the docs folder used by Docs Mode (default `"docs"`)
-- `docs.autoCreate` — whether Docs Mode's after-work flow auto-writes without per-batch approval (default `false`)
-- `docs.afterWork` — whether `/hv-work` Step 13.6 and `/hv-ship` Step 8.6 trigger Docs Mode's after-work flow (default `false`)
+- `work.mergeStrategy` — `"pr"` or `"direct"`; unset means ask (Step 5)
+- `ship.review` — `true` (default) runs `/hv-review` first; `false` skips it
+- `ship.secondOpinion` — `false` (default); `true` runs a no-prior-context adversarial review after `/hv-review` (Step 3.5). A leftover `ship.secondOpinionRunner: "codex"` runs the subagent in advisory mode: print *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"* and carry on.
+- `ship.qa` — `false` (default); `true` runs `/hv-qa run` after the reviews (Step 3.75)
+- `autonomy.level` — `"off"` (default), `"auto"`, `"loop"`: whether Steps 8.5 and 10 nudge or invoke directly
+- `docs.path` (default `"docs"`), `docs.afterWork` (default `false`), `docs.autoCreate` (default `false`)
 
 ## When to Use
 
-- Feature branch has 1+ commits, work is done, you want to integrate
-- After `/hv-work` finished with `mergeStrategy: "pr"` and you want to open the PR now
-- Any branch you want reviewed + merged/pushed in one pass
-
-## When NOT to Use
-
-- Work is still in progress → finish implementing via `/hv-work`
-- Nothing committed yet → clean up, then come back
-- You want to resume a paused branch → `/hv-next`
+- A feature branch has 1+ commits, the work is done, you want to integrate (including after `/hv-work` with `mergeStrategy: "pr"`).
+- Not while work is in progress (finish via `/hv-work`), not with nothing committed, not to resume a paused branch (`/hv-work` with no argument).
 
 ## Step 1 — Branch Check
-
-Confirm a feature branch is checked out:
 
 ```bash
 hv git guard feature-branch
 ```
 
-Exit 1 (`data.reason` is `base` or `detached`; the message names the base branch) means the user is on `main`/`master`/`trunk` (or the configured base), or HEAD is detached — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
+Exit 1 (`data.reason` `base` or `detached`): pass the message through and stop.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow `references/task-list-init.md` (`TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed), one task per phase:
 
-Phases:
-
-1. *Branch check* — feature branch confirmed, not on main (Step 1)
-2. *Extract commits & items* — branch range read, item IDs resolved (Step 2)
-3. *Review* — `/hv-review` runs when `ship.review: true` (Step 3)
-4. *Second-opinion gate* — fresh-eyes adversarial review when `ship.secondOpinion: true` (Step 3.5)
-5. *QA gate* — product `/hv-qa run` when `ship.qa: true` (Step 3.75)
-6. *CONCERNS routing* — verdict-gated branch selection (Step 4)
-7. *Merge or PR* — integration via `hv ship merge` or `hv ship pr` (Steps 5–8)
-8. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
+1. *Branch check* (Step 1)
+2. *Extract commits & items* (Step 2)
+3. *Review* — `/hv-review` when `ship.review: true` (Step 3)
+4. *Second-opinion gate* — when `ship.secondOpinion: true` (Step 3.5)
+5. *QA gate* — `/hv-qa run` when `ship.qa: true` (Step 3.75)
+6. *Merge or PR* (Steps 4–8)
+7. *Report & nudges* (Steps 9–10)
 
 ## Step 2 — Scope the Work
 
-Resolve the active entry's repo (umbrella mode; empty in single-repo projects):
-
 ```bash
-hv status show --json <branch>
+hv status show --json <branch>        # data.repo is $REPO, null in single-repo projects
+hv review scope --json [--repo "$REPO"] <branch>
 ```
 
-`data.repo` is the repo name (`null` in single-repo projects); call it `$REPO` below.
-
-**Single-repo:**
-
-```bash
-hv review scope --json <branch>
-```
-
-**Umbrella mode** (when `$REPO` is non-empty):
-
-```bash
-hv review scope --json --repo "$REPO" <branch>
-```
-
-`data` carries commits, touched files, referenced IDs, and the matched item entries. Keep the JSON in memory — Step 4 needs it.
-
-If `commitCount` is 0, tell the user the branch has no commits beyond the base and stop.
+Keep the scope JSON (commits, `touchedFiles`, `referencedIds`, `intents`); later steps reuse it. Exit 1 means the branch has no commits beyond the base: tell the user and stop.
 
 ## Step 3 — Review (opt-in)
 
-Read `ship.review` from `.hv/config.json`. Default `true`.
-
-If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as the silent-failure rubric item (the dedicated SILENT-FAIL check in /hv-review's Stage 2 brief) — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. `/hv-review` records its verdict; route on it (umbrella: add `--repo "$REPO"`):
+Skipped when `ship.review` is `false`. Otherwise invoke `hv-review` via the `Skill` tool. Its brief carries the silent-failure rubric (`references/silent-failure-hunter.md`); `SILENT-FAIL` flags arrive as CONCERNS in the same verdict block. `/hv-review` records its verdict; route on it (umbrella: add `--repo "$REPO"`):
 
 ```bash
 hv verdict route <branch> --for ship-review --json
 ```
 
-Exit 3 means no review verdict was recorded: stop and rerun `/hv-review`; never fall back to reading the report. Act on `data.next` (`references/review-verdict-routing.md` has the option text):
+Exit 3 means no verdict was recorded: stop and rerun `/hv-review`; never read the report instead. Act on `data.next`; the same table serves Steps 3.5 and 3.75.
 
-- **`continue`** (PASS) → continue to Step 4.
-- **`ask`** (CONCERNS, `autonomy.level` off or auto) → surface each concern, then `AskUserQuestion` with three options (Address via `/hv-work` Recommended / Ship anyway / Stop).
-- **`address`** (CONCERNS, loop) → surface each concern, invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed.
-- **`stop`** (FAIL) → stop, and stop a loop. Surface the findings. Let the user fix and rerun `/hv-ship`.
+| `data.next` | Meaning | Do |
+|---|---|---|
+| `continue` | PASS | Go on silently. |
+| `ask` | CONCERNS, autonomy off or auto | Surface each concern, then `AskUserQuestion` with the options in `references/review-verdict-routing.md`: Address via `/hv-work` (Recommended) / Ship anyway / Stop. |
+| `address` | CONCERNS, loop | Surface each concern, invoke `hv-work` via `Skill` with the concerns as the brief, re-invoke `/hv-ship` after the fixes are committed. |
+| `surface` | Advisory gate (QA under `qa.gate: advisory`, any QA `INFRA-FAIL`, advisory second opinion) | Surface the findings, continue. A missing dev server or credentials never blocks a ship. |
+| `stop` | FAIL | Stop, and stop a loop. Surface the findings; the user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. |
 
-**Capture the choice.** When the verdict is CONCERNS and the user picks via `AskUserQuestion`, remember the answer in this cycle's working state as `REVIEW_CHOICE` (one of `address`, `ship-anyway`, `stop`). Step 3.5 reads `REVIEW_CHOICE` to skip the second-opinion gate when the user already accepted CONCERNS; Step 9 reads it to decide whether to append the "concerns the user proceeded through" line. Loop mode auto-picks `address` per the verdict-routing reference.
+Label surfaced concerns by producer (carrier labels in `references/review-verdict-routing.md`): "Second-opinion concerns", "QA concerns".
 
-If `ship.review` is `false`, skip this step.
+Remember a CONCERNS answer as `REVIEW_CHOICE` (`address`, `ship-anyway`, `stop`). Step 3.5 and 3.75 read it; Step 9 reads it. Loop mode auto-picks `address`, never `ship-anyway`. A review FAIL also makes `hv ship pr` and `hv ship merge` refuse (exit 4, `data.blockedBy: "verdict"`), but stop here rather than relying on that.
 
 ## Step 3.5 — Second-Opinion Gate (opt-in)
 
-Read `ship.secondOpinion` from `.hv/config.json`. Default `false`. If `false`, skip this step entirely.
+Skipped when `ship.secondOpinion` is `false`, when Step 3 was skipped and the user has not asked for a second opinion this session, or when `REVIEW_CHOICE == ship-anyway` (a second adversarial pass would re-litigate the accepted risk).
 
-When `true`, dispatch a fresh subagent with **no prior conversation context** and give it only the diff plus the stated goal. The /hv-review reviewer (Step 3) shares context with the work it produced — the same conventions, the same KNOWLEDGE bullets, the same plan. A reviewer with that context naturalizes blind spots. A reviewer without it must reason from the diff alone, catching what the contextualized reviewer normalized.
-
-Skip the gate when any of these apply (no work to second-opinion):
-
-- Step 3 was skipped (`ship.review: false`) AND the user hasn't explicitly asked for a second opinion this session — the trade-off is the user already opted out of pre-merge review.
-- Step 3 routed to **`stop`** — already stopped above.
-- Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — they already accepted residual risk; a second adversarial pass would re-litigate the decision.
-
-Otherwise, run the gate:
+The `/hv-review` reviewer shares context with the work it produced and normalizes its blind spots. This gate gives a fresh subagent only the diff and the goal:
 
 ```bash
 hv review brief [--repo "$REPO"] <branch>
 ```
 
-(Pass `--repo "$REPO"` in umbrella mode using the value from Step 2.)
-
-The verb prints a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
-
-Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, print one line, *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"*, and continue with the subagent below. The route verb then runs the gate in **advisory mode**, the same as the old Codex runner: findings are surfaced under the label "Second-opinion findings (advisory)" and the ship continues to Step 4. It never stops the ship or the loop.
-
-Dispatch the brief to a **fresh subagent**:
-
-- `Agent` tool, `subagent_type: "general-purpose"` (default — fresh context, no inherited project memory)
-- `model: "sonnet"` — the MVP is same-model-fresh-context per F04's note that cross-model (Codex/Gemini) is the gold standard but not the cheap MVP
-- Prompt: the brief's stdout verbatim. It ends by asking for the fenced `json` verdict block
-- `description: "Second-opinion review of <branch>"`
-
-The agent returns a markdown report ending in a fenced `json` verdict block. Save the block to a temp file, record it and route on it:
+Dispatch the brief verbatim to a fresh `Agent` (`subagent_type: "general-purpose"`, `model: "sonnet"`, `description: "Second-opinion review of <branch>"`). It returns a report ending in a fenced `json` verdict block. Save the block to a temp file, then:
 
 ```bash
 hv verdict add <branch> --kind second-opinion --verdict <PASS|CONCERNS|FAIL> --body-file "$VERDICT" --json
 hv verdict route <branch> --for ship-second-opinion --json
 ```
 
-Exit 2 from `add` names the malformed field: ask the agent to resend the block; never guess a verdict. Act on `data.next`, labelling surfaced concerns "Second-opinion concerns" (carrier-label convention in `references/review-verdict-routing.md`):
-
-- **`continue`** (PASS) → continue to Step 4 silently.
-- **`ask`** / **`address`** (CONCERNS) → same as Step 3.
-- **`surface`** (advisory runner) → surface the findings under "Second-opinion findings (advisory)" and continue to Step 4.
-- **`stop`** (FAIL) → stop, and stop a loop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`.
-
-The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
+Exit 2 from `add` names the malformed field: ask the agent to resend; never guess a verdict. Route per the Step 3 table. The gate runs after Step 3 so no round trip is spent on a diff that already failed, and before Step 4 because concerns may change the PR body's framing.
 
 ## Step 3.75 — QA Gate (opt-in)
 
-Read `ship.qa` from `.hv/config.json`. Default `false`. If `false`, skip this step entirely.
+Skipped when `ship.qa` is `false` or `REVIEW_CHOICE == ship-anyway`. If there is no `.hv/qa/` strategy for the scope (single repo: no `.hv/qa/*.md`; umbrella: no `.hv/qa/<REPO>.md`), say *"`ship.qa: true` but no QA strategy for `<scope>`. Run `/hv-qa first-run` to bootstrap, or set `ship.qa: false` to skip."* and continue.
 
-`/hv-review` (Step 3) and the second-opinion gate (Step 3.5) answer *"does the diff make sense"* — both reason from commits and diff. They do not run the product. `/hv-qa` answers the orthogonal question — *"does the product actually work"* — by executing the per-target strategy in `.hv/qa/<target>.md` (Playwright, smoke, lighthouse, axe, ZAP, contract tests, whatever the target's strategy declares). The two gates are deliberately separate; this step layers QA in after diff-level review without merging them.
-
-Skip the gate when any of these apply (no work to QA, or already short-circuited):
-
-- Step 3 routed to **`stop`** — already stopped above.
-- Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — the user already accepted residual risk; QA findings on the same diff are unlikely to change that decision. Loop mode picks `address` instead, which never reaches this step.
-- `.hv/qa/` is empty for the active target (single-repo: no `.hv/qa/*.md`; umbrella: no `.hv/qa/<REPO>.md`) — surface a one-line note *"`ship.qa: true` but no QA strategy for `<scope>`. Run `/hv-qa first-run` to bootstrap, or set `ship.qa: false` to skip."* and continue to Step 4 without running QA.
-
-Otherwise, invoke `/hv-qa run` via the `Skill` tool, scoped to the resolved repo in umbrella mode:
-
-- Single-repo: `Skill(skill="hv-skills:hv-qa", args="run")`.
-- Umbrella: `Skill(skill="hv-skills:hv-qa", args="run --repo $REPO")`.
-
-`/hv-qa` records its verdict. Route on it; the verb applies `qa.gate` (`"advisory"`, the default, never blocks the ship):
+Review and second opinion judge the diff; QA runs the product. Invoke `Skill(skill="hv-skills:hv-qa", args="run")` (umbrella: `args="run --repo $REPO"`), then:
 
 ```bash
 hv verdict route <branch> --for ship-qa --json
 ```
 
-Exit 3 means `/hv-qa` recorded no verdict: stop and rerun it. Act on `data.next`: `continue` → Step 4 silently; `surface` → surface the findings and continue to Step 4; `ask` / `address` → same as Step 3; `stop` → stop, surface the findings, the user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship` (a loop stops too).
-
-Surface QA concerns with the carrier label *"QA concerns:"* per `references/review-verdict-routing.md` (Carrier-label override) — keeps them visually distinct from `/hv-review` concerns and second-opinion concerns in a single ship pass.
-
-The gate runs after Step 3.5 because there's no point spinning up infra-bound QA runs on a diff that the contextualized or fresh-eyes reviewers already failed. It runs before Step 4 because QA findings may change the PR body's framing (test-plan adjustments, follow-up tasks). An `INFRA-FAIL` verdict (dev server / creds / binary missing) routes to `surface` under either gate: surface the missing requirements as a note and continue. QA can't run, but ship shouldn't break because the dev server happened to be down.
+Exit 3: `/hv-qa` recorded nothing; stop and rerun it. Route per the Step 3 table (`qa.gate` decides advisory versus blocking inside the verb).
 
 ## Step 4 — Build the PR Body
 
@@ -206,176 +126,98 @@ The gate runs after Step 3.5 because there's no point spinning up infra-bound QA
 hv ship body <branch>
 ```
 
-Prints `## Summary` and `## Items resolved`. Capture the output, then append a `## Test plan` section — 2-5 checkboxes, one per meaningful area (not per file), built from the scope JSON's touched files. Example:
-
-```markdown
-## Test plan
-
-- [ ] Start/stop the timer and confirm badge updates
-- [ ] Switch between projects with Cmd+Tab
-```
-
-If a scope area is unclear, pick the most visible behavior change. Don't pad with generic checks.
-
-**Run the self-audit before Step 5.** The PR body lands on GitHub/GitLab and stays in the PR history; the `## Summary` text is the first thing a reviewer reads. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to the assembled body silently — show the post-audit draft, not the pre-audit one.
+Capture the output (`## Summary`, `## Items resolved`) and append `## Test plan`: 2-5 checkboxes, one per meaningful area (not per file), from the scope JSON's touched files, each naming the most visible behavior change. No generic checks. Run the self-audit in `references/humanizing-prose.md` silently and show the post-audit draft.
 
 ## Step 5 — Pick Strategy
 
-**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`): no strategy question, whatever `work.mergeStrategy` says. Go to Step 6a; never direct-merge.
+**Issue mode** (`backlog.backend: "issues"`, `references/issue-mode.md`): no question; go to Step 6a, never direct-merge.
 
-Check `work.mergeStrategy` in `.hv/config.json`.
+If `work.mergeStrategy` is `"direct"` or `"pr"` and the user has not said otherwise this session, use it silently. If unset, or the user hinted at the other option, ask (single-select, header `"Strategy"`, *"How should I integrate `<branch>`?"*):
 
-- If set to `"direct"` or `"pr"` and the user hasn't explicitly overridden in this session, use it silently and skip to Step 6a or 6b accordingly.
-- If unset, or the user said something that suggests the other option, ask via `AskUserQuestion` using the Strategy picker shape in `references/merge-strategy-gate.md` (Header `"Strategy"`, Question *"How should I integrate `<branch>`?"*, two options with the matching strategy marked `(Recommended)`).
+- `"Direct merge"` — *"Merge into the base with `--no-ff` and delete the branch."*
+- `"PR"` — *"Push and open a PR with the body."*
 
-Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* — see `references/ask-user-question-fallback.md` for canonical fallback mechanics.
+Mark the configured strategy `(Recommended)`; unset defaults to Direct merge. Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* (`references/ask-user-question-fallback.md`).
 
 ## Step 6a — Open a PR
 
-**Issue mode:** pass the resolved items so the PR closes them, then mark each for review. Do not call `hv item release`: the claim stays until the PR merges.
+> **Manual gate — filing a public artifact (`pr-open`).** Opening a PR creates externally visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. `hv gate list` shows it is skill-enforced only (the verb does not refuse), so never skip the Step 5 question or the user's go-ahead. See `references/manual-gates.md`.
 
 ```bash
-printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file - --items <ID1>,<ID2>
-hv item state <ID> --to needs-review    # once per item
+printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file - [--repo <name>]
 ```
 
-In an umbrella add `--repo <name>` to `hv ship pr` (it falls back to the cwd's sub-repo); IDs are qualified `<repo>:<ID>`.
+Title: from the strongest commit subject, 70 characters at most, no `[ID]` tags (the body carries the linkage). Share the PR URL. Exit 4 with `data.blockedBy: "verdict"` is a recorded FAIL: surface it and stop.
 
-`/hv-review --queue` merges it later. Skip Steps 6b, 6c and 8.
-
-> **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs. See `references/manual-gates.md`.
-
-```bash
-printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file -
-```
-
-Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open a PR), including the exit-4 refusal after a recorded FAIL. Share the PR URL with the user.
+**Issue mode:** add `--items <ID1>,<ID2>` (qualified `<repo>:<ID>` in an umbrella) so the PR closes them, then `hv item state <ID> --to needs-review` per item. Do not call `hv item release`: the claim stays until the PR merges. `/hv-review --queue` merges later; skip Steps 6b, 6c and 8.
 
 ## Step 6b — Direct Merge
 
 ```bash
-printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge <branch> --body-file -
+printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge <branch> --body-file - [--repo <name>]
 ```
 
-Verb behavior — see `references/merge-strategy-gate.md` (Direct merge), including the exit-4 refusal after a recorded FAIL. Share the hash with the user. Exit 4 with `data.blockedBy: "manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human for this merge; `data.paths` names the files that put it there): nothing changed. Ask the user in an `AskUserQuestion` that loop mode never auto-picks, then re-run with `--confirm --confirm-note "<their answer>"`.
+The subject must start `merge: ` (undo recognizes cycles by it). Share the hash from `data.sha`. Exit 4: `data.blockedBy: "verdict"` is a recorded FAIL, surface and stop. `"manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human; `data.paths` names the files that triggered it) and nothing changed: ask in an `AskUserQuestion` that loop mode never auto-picks, then rerun with `--confirm --confirm-note "<their answer>"`. A merge conflict (also exit 4) is aborted by the verb; tell the user.
 
-## Step 6c — Close Upstream Issues (Direct-Push Path)
+## Step 6c — Close Upstream Issues (direct-merge path only)
 
-**Issue mode:** does not apply. The items are the tracker issues and close when `/hv-review --queue` merges the PR.
+Skip on the PR path (`hv ship body` already emits `Closes #N`) and in issue mode (the tracker issues close when the PR merges).
 
-This step runs only on the **direct-merge path** (after `hv ship merge` returns a commit hash). Skip entirely on the PR path — `hv ship body` already emits `Closes #N` lines into the PR body, and GitHub/GitLab auto-close the issues on PR merge.
+`hv issues imported --json --open-only`; keep `data.entries` whose `itemId` is in the shipped IDs from Step 2. None: skip silently.
 
-**1. Identify candidates.**
+> **Manual gate — closing public upstream issues (`issue-close`).** Closing posts a comment and changes issue state on the remote. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The registry marks it skill-enforced only. See `references/manual-gates.md`.
 
-From the scope JSON's `referencedIds` (already in memory from Step 2), call:
-
-```bash
-hv issues imported --json --open-only
-```
-
-`--open-only` drops entries whose upstream issue is already closed so the gate doesn't surface no-ops. Read `data.entries`; filter to entries whose `itemId` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
-
-**2. Manual gate.**
-
-> **Manual gate — closing public upstream issues.** Closing the issues posts a tracking comment and changes their state on the remote — externally-visible. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The merge already happened; this step decides whether to close the upstream issues too. See `references/manual-gates.md`.
-
-**3. Ask the user.**
-
-Invoke `AskUserQuestion` (single-select, ≤4 options):
-
-- Header: `"Close"`
-- Question: *"Close N upstream issue(s) tied to the shipped items? (`<comma-separated list of #N>`)"*
-- Options: `"Yes, close all"`, `"Pick subset"`, `"No, leave open"`
-
-This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
-
-**4. On "Yes, close all":** dispatch parallel `hv issues close` calls (one per candidate, all in a single batch of tool calls):
+Ask (header `"Close"`, *"Close N upstream issue(s) tied to the shipped items? (`#N, …`)"*): `"Yes, close all"` / `"Pick subset"` / `"No, leave open"`. Stop a loop here. For a subset, a second multiSelect `AskUserQuestion` (header `"Pick issues"`, options `"#N (item <ID>)"`, chunk by 4). Close each selected issue in one parallel batch:
 
 ```bash
 hv issues close <N> --commit <merge-sha> --item <ID> [--repo <name>]
 ```
 
-Pass `--repo` only in umbrella mode (`$REPO` non-empty from Step 2).
-
-**5. On "Pick subset":** invoke a second `AskUserQuestion` (multiSelect, ≤4 candidates per call; chunk if N>4):
-
-- Header: `"Pick issues"`
-- Question: *"Which issue(s) should be closed?"*
-- Options: one entry per candidate formatted as `"#N (item <ID>)"`
-
-Then dispatch parallel `hv issues close` calls for each selected entry as in step 4.
-
-**6. On "No, leave open":** print:
-
-```
-Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired.
-```
+On "No, leave open" print *"Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired."*
 
 ## Step 7 — Update Status
 
-**Single-repo:**
-
 ```bash
-hv status rm <branch>
+hv status rm [--repo "$REPO"] <branch>
 ```
 
-**Umbrella mode** (reuse `$REPO` from Step 2; re-derive if out of scope):
-
-```bash
-hv status rm --repo "$REPO" <branch>
-```
-
-Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
-
-Silently clears the entry if one existed. Harmless if not.
+Umbrella waves must pass `--repo`; without it only legacy `repo: null` entries are removed and the active entry leaks into the next `/hv-work`.
 
 ## Step 8 — Mark Unfinished Items Complete
 
-**Issue mode:** skip. Closing happens at the review merge (`hv ship pr-merge`); `hv item complete` here would close an issue before its PR is reviewed. Use it only for `--reason handed-off|blocked|dropped`.
+**Issue mode:** skip. Closing happens at the review merge (`hv ship pr-merge`). Use `hv item complete` only with `--reason handed-off|blocked|dropped`.
 
-Most IDs are already completed by `/hv-work`. This catches manual commits that referenced IDs without closing them.
-
-For each ID in the scope JSON's `referencedIds`:
+`/hv-work` completes most IDs already; this catches manual commits that referenced IDs without closing them. For each ID in `referencedIds`:
 
 ```bash
-hv item complete <ID> --commit <merge-or-last-commit-hash>
+hv item complete <ID> --commit <merge-or-last-commit-hash> [--reason handed-off|blocked|dropped --note <text>]
 ```
 
-`hv item complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
+Already-completed IDs are a no-op; an unknown ID exits 3.
 
-**Exit 4 (`blockedBy: proof missing`) = no proof recorded.** The ID is still open and has no `## Proof` row. Record one row per executed check that passed during this ship — the Step 3.75 QA run, or the project's test/smoke command run before merge — then re-run `hv item complete`:
+Exit 4 with `blockedBy: proof missing`: the item stays open with no `## Proof` row. Record one row per executed check that passed during this ship (the Step 3.75 QA run, or the project's test or smoke command run before merge), then rerun:
 
 ```bash
 hv proof add <ID> --check "<command that ran>" --result PASS --evidence "<summary line or log path>" --sha <merge-or-last-commit-hash>
 ```
 
-A `/hv-review` or second-opinion PASS is acceptance, not proof — it reads the diff, it doesn't run anything — so it never becomes a row. If no executed check ran, ask via `AskUserQuestion`: run the project's test command now and record it (Recommended), close with `--no-proof` (the user's call, said in the Step 9 report), or leave the item open. Loop mode never passes `--no-proof`: the item stays open and Step 9 lists it as unproven.
+A `/hv-review` or second-opinion PASS is acceptance, not proof: it reads the diff and runs nothing, so it never becomes a row. If no executed check exists, ask: run the project's test command now and record it (Recommended) / close with `--no-proof` (the user's call, named in the Step 9 report) / leave the item open. Loop mode never passes `--no-proof`; the item stays open and Step 9 lists it as unproven.
 
 ## Step 8.5 — Learn (Nudge or Auto-Invoke)
 
-Integration is a natural capture moment — the user just finished a cohesive unit of work and is about to move on, so session-specific insights are maximally fresh.
+Integration is a natural capture moment. Run `references/post-cycle-trigger-gate.md` with:
 
-Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
-
-- **Nudge (`"off"`):** append one line to the Step 9 report — *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
-- **Target (`"auto"`/`"loop"`):** **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.**
+- **Nudge (`"off"`):** append to the Step 9 report *"Capture learnings before context fades? Run `/hv-learn` — this cycle has the fresh session context."*
+- **Target (`"auto"`/`"loop"`):** dispatch `hv-learn` via `Skill` immediately, no prompt.
 - **Brief:** the resolved IDs and touched files.
 
 ## Step 8.6 — Docs After-Work (inline)
 
-Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` — **inline variant** — with these parameters:
-
-- **Config flag:** `docs.afterWork` (default `false`). Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
-- **On trigger:** **inline-run Docs Mode's after-work flow** — Steps D-A1 through D-A6 in this file. Do not dispatch a separate skill; the docs flow is part of /hv-ship. No `autonomy.level` branch here — Step D-A5's approval gate is the user checkpoint.
-- **Context:** the resolved item IDs and touched files from the cycle's scope JSON.
-
-If `<docs.path>/` doesn't exist or is empty, the after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
+Run `references/post-cycle-trigger-gate.md`, inline variant, with config flag `docs.afterWork` (default `false`; enable with `hv config set docs.afterWork true` or by running `/hv-ship --docs` once). On trigger, run Docs Mode's after-work flow (Steps D-A1 to D-A6) in this session, with the resolved IDs and touched files as context. No `autonomy.level` branch: Step D-A5's approval is the checkpoint. A missing or empty `<docs.path>/` makes the flow skip itself.
 
 ## Step 9 — Report to User
 
 One compact block.
-
-**PR flow:**
 
 ```
 PR opened: https://github.com/.../pull/42
@@ -383,261 +225,73 @@ Title: fix: timer badge and quick-switch overlay
 Resolved: [B01] [F03]
 ```
 
-**Direct-merge flow:**
-
-```
-Merged `hv/demo` into main — commit a1b2c3d
-Resolved: [B01] [F03]
-```
-
-If `REVIEW_CHOICE == ship-anyway`, append the concerns one-liner at the end of the report. If Step 8 left any ID open for lack of proof, append `Unproven (still open): [<ID>] …`; if the user chose `--no-proof`, append `Closed without proof: [<ID>] …`.
+or `Merged `hv/demo` into main — commit a1b2c3d` plus the `Resolved:` line. If `REVIEW_CHOICE == ship-anyway`, append a one-line list of the concerns the user proceeded through. If Step 8 left IDs open for lack of proof, append `Unproven (still open): [<ID>] …`; if the user chose `--no-proof`, append `Closed without proof: [<ID>] …`.
 
 ## Step 9.5 — Release Nudge
 
-After every successful ship, surface unreleased-commit accumulation so the user can decide whether to cut a release before moving on.
-
-```bash
-hv release pending --json
-```
-
-Read `data`. If `shouldNudge` is `false`, skip silently. If `lastTag` is empty (no release ever cut), skip silently — the first release is the user's call.
-
-When the nudge fires, append the `message` field as one line in the Step 9 report block (after `Resolved: [...]`). The verb renders the phrasing; the skill just prints it.
-
-This step runs after BOTH PR and direct-merge flows; the trigger is "ship completed", not the integration mechanism.
-
-Skip silently if /hv-review FAILed (Step 3) and the ship was halted — there's nothing to release that hasn't already been released.
+After a successful ship (PR or merge): `hv release pending --json`. If `shouldNudge` is false or `lastTag` is empty (the first release is the user's call), say nothing. Otherwise append `data.message` to the report as one line after `Resolved:`.
 
 ## Step 10 — Loop Continuation
 
-Only when `autonomy.level == "loop"`. After the report, **dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`. Loop stops naturally when `/hv-next` reports an empty backlog, a guard fails, or the user interrupts.
+Only when `autonomy.level == "loop"`. After the report, re-enter `/hv-work` with no argument via `Skill` immediately, no prompt. It reconciles, auto-picks the next item and stops itself on an empty backlog, a failed guard or a user interrupt.
 
 ## Undo Mode (--undo)
 
-> Entered via `/hv-ship --undo`. The inverse of `/hv-work`'s commit + completion steps: reset the most recent `merge: …` commit on the base branch and restore the resolved items as TODO entries under their original type sections. The safe default is dry-run — every invocation previews what would change before touching anything. PR-mode cycles are refused with a manual-recovery pointer (the merge happened upstream, not locally). Post-merge commits on the base branch are refused by default; `--allow-post-merge` is opt-in. The confirmation gate is manual and never auto-picked in loop mode — `git reset --hard` is destructive past `git reflog`'s window.
+The inverse of a `/hv-work` cycle: `hv ship undo` resets the most recent `merge: …` commit on the base branch and restores the resolved items to BACKLOG. It previews unless given `--apply`, and refuses PR-mode cycles (the merge happened upstream), post-merge commits without `--allow-post-merge`, a dirty tree, a non-base branch and a non-`merge: ` subject. A different cycle is `hv ship undo --cycle <hash>`, run by the user directly.
 
-The /hv-ship banner already printed at Step 0; Undo Mode runs from the same skill invocation.
+**Initialize task list** (`references/task-list-init.md`): *Preview*, *Confirm*, *Apply*, *Report*.
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**U1 — Preview.** `hv ship undo`, then show the plan verbatim. Exit 3: no cycle, say so and stop. Exit 4: surface the verb's message verbatim and stop. A dirty tree gets *"Working tree is dirty — commit, stash, or discard before /hv-ship --undo can run."* If post-merge commits block it, name `--allow-post-merge` (discards them) but do not pass it unasked.
 
-Phases:
+**U2 — Confirm.** One `AskUserQuestion` with the plan above it, header `"Apply"`, *"Apply this rollback plan?"*: `"Apply (Recommended)"` (resets the base branch, restores the entries) / `"Cancel"` (print *"No changes."*, stop). Plain-text fallback: *"Apply rollback? (yes/no)"*, only `yes` applies.
 
-1. *Detect cycle* — most recent `merge: ` commit on base branch identified (Step U1 dry-run)
-2. *Surface preview* — dry-run output rendered verbatim to user (Step U2)
-3. *Confirm* — manual `AskUserQuestion` gate (Step U3)
-4. *Apply rollback* — `hv ship undo --apply` runs, base resets, items restored (Step U4)
-5. *Report* — summary line printed; no post-cycle nudges (Step U5)
+> **Manual gate — destructive reset.** The gate always asks and loop mode does not accelerate it. `hv gate list` has no entry for it and the verb enforces nothing beyond the `--apply` preview split, so this confirmation is the only guard before `git reset --hard`, which is unrecoverable past the reflog window.
 
-### Step U1 — Detect Cycle (Dry-Run Preview)
+**U3 — Apply.** `hv ship undo --apply` (exit 5 means the reset happened but restoring an item failed: tell the user which). Print the verb's summary line. Undo is terminal: no `/hv-learn`, no docs, no loop continuation. The user reruns `/hv-work` to see the restored backlog.
 
-Run the verb without `--apply`; it previews what would change and writes nothing:
-
-```bash
-hv ship undo
-```
-
-Exit codes:
-
-- **0** — preview printed successfully (the `preview only; pass --apply` warning is expected). Surface stdout verbatim to the user, then continue to Step U2.
-- **3** — no cycle to undo. Surface the message and **stop**.
-- **4** — precondition refused (not on the base branch, subject doesn't match `^merge: `, post-merge commits without `--allow-post-merge`, PR-mode cycle, HEAD is not a merge). Surface the message verbatim and **stop** — do not proceed to Step U2.
-- **4** with a dirty tree — print *"Working tree is dirty — commit, stash, or discard before /hv-ship --undo can run."* and stop.
-
-If the user wants to target a specific cycle other than the most recent, they invoke `hv ship undo --cycle <hash>` directly; the slash-command default is always the most recent.
-
-If the base branch has commits past the cycle merge, `hv ship undo` refuses by default. Resolve manually (`git reset` to before those commits) or re-run with `--allow-post-merge` to discard them. Surface the verb's message verbatim — no extra prompting.
-
-### Step U2 — Surface the Plan
-
-Render the verb's stdout to the user verbatim. The preview shows the merge commit being reset, the items being restored to BACKLOG.md, and any caveats (e.g. post-merge commits flagged for discard when `--allow-post-merge` is in play).
-
-### Step U3 — Confirmation Gate
-
-Use a single `AskUserQuestion` call. Show the dry-run output above the question so the user can review the plan before committing.
-
-- **Header:** `"Apply"`
-- **Question:** `"Apply this rollback plan?"`
-- **Options** (single-select):
-  1. `"Apply (Recommended)"` — runs `hv ship undo --apply`. Resets the base branch and restores the TODO entries.
-  2. `"Cancel"` — print *"No changes."* and stop; nothing is written.
-
-Plain-text fallback (when `AskUserQuestion` is not available): ask once — *"Apply rollback? (yes/no)"* — `yes` → Apply; anything else → Cancel.
-
-> Per the `hv-init` authoring convention "manual gates that are destructive or file public artifacts are never auto-invoked regardless of autonomy", Undo Mode's confirmation gate always surfaces to the user — loop mode does not accelerate it. `git reset --hard` is destructive and unrecoverable past `git reflog`'s window; the user must confirm.
-
-### Step U4 — Apply (when not Cancel)
-
-```bash
-hv ship undo --apply
-```
-
-(Or `hv ship undo --apply --allow-post-merge` when the user opted into discarding post-merge commits in Step U1 — but Step U1 errored out and re-routed for that case; the simpler `--apply` is the common path.)
-
-Pass the verb's stdout to the user verbatim. Then continue to Step U5.
-
-### Step U5 — Report
-
-Print the verb's final summary line as-is. Do **not** invoke `/hv-learn`, `/hv-ship --docs`, `/hv-refactor`, or `/hv-next` — Undo Mode is terminal. The user re-runs `/hv-next` themselves to see the restored backlog.
-
-### When to Use Undo Mode
-
-Use `/hv-ship --undo` when:
-
-- The cycle landed but the implementation turned out wrong on closer inspection.
-- A reviewer flagged a regression and the simplest fix is "roll back, redesign, re-cycle".
-- The cycle resolved an item that should not have been resolved (premise was wrong; item should be re-opened for redesign).
-- A `/hv-go` cycle landed something the user didn't actually want — `/hv-ship --undo` is the fast inverse.
-
-`/hv-ship --undo` is **not** for:
-
-- Undoing a cycle whose merge was a PR — use `gh pr close <num>` for open PRs, `git revert` for merged PRs.
-- Undoing more than one cycle at a time — invoke twice.
-- Editing what landed — that's `/hv-go` or a new `/hv-capture` + `/hv-work`.
-
-### Undo Mode Rules
-
-- Default is preview; `--apply` is the only way to apply changes.
-- The base-branch + clean-tree preconditions are enforced by the verb; never bypass them.
-- Post-merge commits on the base branch refuse by default; `--allow-post-merge` is opt-in.
-- Manual confirmation gate; loop mode does not auto-pick.
-- Terminal mode — no post-cycle nudges. The user re-orients with `/hv-next`.
+Use undo when a landed cycle proved wrong, a reviewer found a regression and "roll back, redesign" is simplest, or the premise was wrong and the item needs reopening. Not for PR-mode cycles (`gh pr close` for open PRs, `git revert` for merged ones), not for more than one cycle at once (invoke twice), not for edits to what landed (`/hv-capture` then `/hv-work`).
 
 ## Docs Mode (--docs)
-
-*Docs Mode banner already printed at Step 0; this section runs from the same /hv-ship invocation.*
 
 ### Modes
 
 | Detected when | Mode |
 |---|---|
-| `<docs.path>/` doesn't exist or is empty | First-run (discovery + scaffold) |
-| Invoked by `/hv-work` / `/hv-ship` post-cycle | After-work (propose doc updates) |
-| Invoked by `/hv-refactor`, or `/hv-ship --docs restructure` | Restructure (audit + reorganize) |
-| Manual invoke, no signal | First-run if `<docs.path>/` missing; else after-work in manual mode (gate bypassed — see Step D1) |
+| `<docs.path>/` missing or empty | First-run (discovery + scaffold) |
+| Post-cycle, from `/hv-work` or Step 8.6 | After-work (propose updates) |
+| `/hv-refactor`, or `--docs restructure` | Restructure (audit + reorganize) |
+| Manual invoke, no signal | First-run if missing; else after-work in manual mode (trigger gate bypassed, Step D1) |
 
-If invoked in a not-yet-implemented mode, print one line citing the slice and exit cleanly.
+Docs Mode and `/hv-qa` share a three-mode skeleton and diverge on artifact root, gate strength and authoring tier: `references/three-mode-skill-shape.md`.
 
-Docs Mode and `/hv-qa` share the three-mode skeleton (scaffold / after-work / audit) and intentionally diverge on artifact root, gate strength, and authoring tier — see `references/three-mode-skill-shape.md`.
-
-> **Architecture rule — one `docs/` tree per project.** A single hv-skills project has exactly one `docs/` tree, located either at the umbrella root or inside one chosen sub-repo (recorded via `docs.repo` config when needed). Forbids: multiple `docs/` trees inside a single hv-skills project, per-sub-repo `docs/` *in addition to* an umbrella `docs/`, Docs Mode writing to more than one target. Permits: a single `docs/` at the umbrella root (cross-cutting docs); a single `docs/` inside one chosen sub-repo (when that sub-repo owns the project's public surface); cross-cutting documentation living in the chosen tree.
->
-> **`docs/` is the public surface.** It's consumer-facing — contributor and contract content lives in the skill that owns it (`hv-*/SKILL.md`), not in a parallel reference file. Cross-refs from `docs/` and `README.md` point at `docs/` pages or specific SKILL.md files, never at a centralized internals doc.
+> **One `docs/` tree per project**, at the umbrella root or inside one chosen sub-repo (`docs.repo` records the choice). Never several trees, never a per-sub-repo `docs/` beside an umbrella one, never writes to more than one target. `docs/` is the consumer-facing surface: contributor and contract content lives in the owning `hv-*/SKILL.md`, and cross-refs from `docs/` and `README.md` point at `docs/` pages or specific SKILL.md files, never a central internals doc.
 
 ### Step D1 — First-Run Detection
 
-Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs.path>/` exists and is non-empty:
+Read `docs.path` (default `"docs"`). Missing or empty `<docs.path>/` means first-run (D2–D6). Otherwise branch on `docs.afterWork`:
 
-```bash
-[ -d "<docs.path>" ] && [ -n "$(ls -A "<docs.path>" 2>/dev/null)" ]
-```
+- **`true`**: Route to the After-work sub-flow as manual mode. Print *"After-work mode is on. Checking docs against changes since the last `docs:` commit."* then start at D-A1. The user running `/hv-ship --docs` by hand is the trigger, so the trigger gate is bypassed and D-A6 omits `Resolves:`.
+- **`false`**: ask (header `"After-work"`, *"`<docs.path>/` is initialized but `docs.afterWork` is off. Enable after-work mode? `/hv-work` and `/hv-ship` will then propose doc updates after each cycle."*): `"Enable (Recommended)"` runs `hv config set docs.afterWork true`, prints *"After-work mode enabled."* and exits; `"Leave off"` exits. Ambiguous plain-text answers mean Leave off: never flip a flag the user did not ask for.
 
-- **Empty or missing** → continue with first-run mode (Steps D2–D6).
-- **Non-empty** → not a first-run scenario. Branch on `docs.afterWork`:
-  - **Already `true`** → After-work mode is already enabled. **Route to the After-work sub-flow (Step D-A1 onward) as manual mode** — the user re-invoked `/hv-ship --docs` precisely to check whether docs are still aligned with recent changes, which is what after-work does. Print one line first so the user sees the routing: *"After-work mode is on. Checking docs against changes since the last `docs:` commit."* Then proceed to Step D-A1. **Manual invocation bypasses the post-cycle trigger gate** (`references/post-cycle-trigger-gate.md`) — the user running `/hv-ship --docs` by hand is itself the trigger, so the gate's condition never applies on this path. There's also no upstream cycle brief, so Step D-A6 omits its `Resolves:` line.
-  - **`false` (default)** → ask via `AskUserQuestion`:
-    - **Header:** `"After-work"`
-    - **Question:** *"`<docs.path>/` is initialized but `docs.afterWork` is off. Enable after-work mode? `/hv-work` and `/hv-ship` will then auto-invoke `/hv-ship --docs` to propose doc updates after each cycle."*
-    - **Options** (single-select):
-      1. *"Enable (Recommended)"* — write `docs.afterWork: true` to `.hv/config.json`, print *"After-work mode enabled. `/hv-work` and `/hv-ship` will now invoke `/hv-ship --docs` post-cycle."*, exit.
-      2. *"Leave off"* — exit without changes.
-    - Plain-text fallback: ask once. Default to "Leave off" if ambiguous (opt-in semantics — never silently flip a config flag the user didn't ask for).
-
-The config write:
-
-```bash
-hv config set docs.afterWork true
-```
-
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
-
-Phases:
-
-1. *Mode select* — first-run / after-work / restructure resolved from `docs.path` state + config (Step D1)
-2. *Inspect docs/* — current pages and structure read (Step D2)
-3. *Discover topics* — touched files + recent commits scanned for doc-worthy changes (Step D3)
-4. *Propose plan* — doc updates drafted and shown to user (Step D4)
-5. *Write/update* — pages created or edited (Step D5)
-6. *Cross-link* — internal links and indices updated (Step D6)
-7. *Report* — summary printed, autonomy nudges fired
+**Initialize task list** (`references/task-list-init.md`): *Mode select* (D1), *Inspect docs/* (D2), *Discover topics* (D3), *Propose plan* (D4), *Write/update* (D5), *Cross-link* (D6), *Report*.
 
 ### Step D2 — Read Project Signals
 
-In a **single parallel batch** (one tool-call response, multiple reads), gather:
-
-- `README.md` (or `README.rst`) at repo root — if present
-- Manifest files at repo root: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `setup.py`, `*.gemspec`, `Gemfile` — read whichever exist
-- Top-level `bin/` listing (one level only) — entry points hint at CLI surface
-- Top-level `src/` listing (one level only) — high-level module shape; don't read contents
-- Recent git history: `git log --oneline -20`
-- Root-level `.md` files other than README (CHANGELOG, CONTRIBUTING, LICENSE) — note presence; don't duplicate
-
-Don't dump the contents to the user — form a picture and use what's relevant in Step D3.
+One parallel batch: `README.md`/`README.rst`; root manifests (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `setup.py`, `*.gemspec`, `Gemfile`); one-level listings of `bin/` and `src/` (shape only, no contents); `git log --oneline -20`; other root `.md` files (CHANGELOG, CONTRIBUTING, LICENSE: note, don't duplicate). Don't dump any of it to the user.
 
 ### Step D3 — Form Hypothesis (silent)
 
-Internally classify the project type. Pick one (or note "mixed" if genuinely ambiguous):
-
-- **CLI tool** — `bin/*` entry points, manifest declares CLI commands, README focuses on `command --flag` examples
-- **Library** — exports public functions/classes, README has API examples, no CLI
-- **Web app / service** — server entry point, route definitions, deployment-shaped manifest
-- **Plugin / extension** — manifest declares it as a plugin (e.g., `claude-plugin/plugin.json`), pairs with a host system
-- **Framework** — provides primitives others build on; README has "getting started" + "core concepts" structure
-- **Data project** — pipelines, notebooks, dataset-shaped repo
-
-Identify the **user-facing surface** for the chosen type — what consumers actually interact with. For a CLI tool, the commands and flags. For a library, the public API. For a web app, the routes / UI. For a plugin, the host-system integration points.
-
-**Don't dump this analysis to the user.** It shapes the proposal in Step D4.
+Classify the project: CLI tool (`bin/*`, flag examples), library (public API, no CLI), web app/service (routes, server entry), plugin/extension (host-system manifest), framework (primitives, "core concepts"), data project (pipelines, notebooks), or "mixed". Name the user-facing surface for that type: commands and flags, public API, routes and UI, host integration points. Don't narrate the analysis; it shapes D4.
 
 ### Step D4 — Propose Tailored Tree
 
-Output a clear proposal as plain markdown — file tree under `<docs.path>/`, one-line purpose per file. Example shape (the actual tree depends on the project type and surface from Step D3 — tailor it):
-
-```
-<docs.path>/
-├── README.md            # landing page + table of contents
-├── getting-started.md   # 5-minute first-run walkthrough
-├── usage/
-│   ├── basics.md        # core workflow
-│   └── <command>.md     # one page per major user surface
-├── configuration.md     # if config exists
-└── examples.md          # only if patterns are non-obvious
-```
-
-Then ask via `AskUserQuestion`:
-
-- **Header:** `"Scaffold"`
-- **Question:** *"Approve this docs structure?"*
-- **Options** (single-select):
-  1. *"Approve as proposed (Recommended)"*
-  2. *"Edit"* — free text. User describes changes; revise the proposal and re-ask Step D4.
-  3. *"Minimal — `README.md` + `getting-started.md` only"*
-  4. *"Cancel"* — don't scaffold; exit.
-
-Plain-text fallback: ask once in prose; default to Recommended on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
-
-On **Cancel** — print *"Scaffold cancelled. Run `/hv-ship --docs` again whenever you're ready."* and exit.
-
-#### Page-naming convention
-
-The tailored tree should follow the spine + usage + reference layout documented in `references/docs-conventions.md` (page-naming section). When the tailored proposal doesn't fit (e.g., a CLI tool with no usage phases, or a library with API references but no walkthroughs), describe the deviation in one line in your proposal — *"This project ships only reference material; no `usage/` pages proposed."* — so the user sees the conscious choice.
+Show a plain-markdown tree under `<docs.path>/` with a one-line purpose per file, tailored to the type and surface (spine + usage + reference layout, `references/docs-conventions.md` page-naming section). If the tailored tree departs from that layout, say so in one line (*"This project ships only reference material; no `usage/` pages proposed."*). Ask (header `"Scaffold"`, *"Approve this docs structure?"*): `"Approve as proposed (Recommended)"` / `"Edit"` (free text; revise and re-ask) / `"Minimal — README.md + getting-started.md only"` / `"Cancel"` (print *"Scaffold cancelled. Run `/hv-ship --docs` again whenever you're ready."* and exit). Fallback: `references/ask-user-question-fallback.md`, defaulting to Recommended by name.
 
 ### Step D5 — Scaffold on Approval
 
-For each proposed file, write it with:
-
-- Title heading (`# Page Title`)
-- One-line purpose comment (HTML comment or italics — match the convention you see in the existing project's `.md` files)
-- Honest empty section stubs (`## What you'll learn`, `## Steps`, etc., depending on page type) — **no LLM-hallucinated content**
-
-Write `<docs.path>/README.md` as a real index — TOC linking every other proposed page. This is the only page that ships with non-stub content (the TOC itself).
-
-Seed `.docsignore` at repo root if it doesn't already exist — use the template in `references/docs-conventions.md` (`.docsignore` seed section). Make all writes idempotent — never overwrite an existing file.
-
-After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use `hv config set docs.afterWork true` (same pattern as Step D1's manual-toggle branch). Skip silently if `docs.afterWork` is already `true`.
+Write each file with a title heading, a one-line purpose comment matching the project's `.md` style, and honest empty section stubs (`## What you'll learn`, `## Steps`): no invented content. `<docs.path>/README.md` is the only page with real content, a TOC linking every other page. Seed `.docsignore` from `references/docs-conventions.md` (`.docsignore` seed section) if absent. Never overwrite an existing file. Then `hv config set docs.afterWork true` unless already true: approving the scaffold is opting into the docs flow, so no second question.
 
 ### Step D6 — Closing Summary
-
-Print a short summary block:
 
 ```
 Scaffolded <docs.path>/ — N pages.
@@ -645,7 +299,6 @@ Scaffolded <docs.path>/ — N pages.
 Files:
   - <docs.path>/README.md  (index / TOC)
   - <docs.path>/getting-started.md
-  - <docs.path>/usage/basics.md
   - ...
 
 Next:
@@ -655,137 +308,56 @@ Next:
 
 ### Docs After-Work Sub-Flow
 
-This flow is invoked by `/hv-work` Step 13.6 dispatching `/hv-ship --docs`, and `/hv-ship` Step 8.6 running Docs Mode inline — those steps gate on `docs.afterWork` (default `false`); when on, they hand off the resolved item IDs + touched files. **Manual invocation** (`/hv-ship --docs`) also runs this flow when `<docs.path>/` exists and the flag is on; on that path the trigger gate is bypassed — see Step D1.
+Entered from Step 8.6, from `/hv-work` Step 13.6 (dispatching `/hv-ship --docs`), or manually per Step D1.
 
-### Step D-A1 — Trigger Gate
+**D-A1 — Trigger gate.** For post-cycle entries apply `references/post-cycle-trigger-gate.md`. Manual entry bypasses the gate (Step D1). If `<docs.path>/` is missing or empty, print *"`/hv-ship --docs` not yet initialized — run `/hv-ship --docs` to scaffold."* and exit; never scaffold mid-cycle.
 
-For **post-cycle dispatches** (called from `/hv-work` Step 13.6 via Skill dispatching `hv-ship --docs`, or `/hv-ship` Step 8.6 running inline), apply the post-cycle trigger condition defined in `references/post-cycle-trigger-gate.md`.
+**D-A2 — Gather context** in one parallel batch: `git log --oneline <last-docs-marker>..HEAD` (marker is the last `docs:` commit; fall back to the last 20 commits); `git diff <marker>..HEAD` over paths not matched by `.docsignore`; the `<docs.path>/` tree and each page's H1/H2 outline.
 
-**Manual entry bypasses the gate — see Step D1.** When Step D1 routed here, skip the trigger condition and proceed straight to Step D-A2.
+**D-A3 — Classify changes.** Per remaining diff file: user-facing surface (doc-relevant) or internal-only. Doc-relevant hints: `bin/*` entry points, public API exports, route handlers, CLI flags, config keys, plugin-manifest entries, README-shaped behavior. Internal hints: tests, build and CI and lint config, unexported helpers, behavior-neutral refactors, dependency bumps. Judgment leads; the hints do not gate. Nothing doc-relevant: print *"No user-facing changes since last `docs:` commit. Skipping."* and exit.
 
-If `<docs.path>/` doesn't exist or is empty, **don't run this flow** — print one line: *"`/hv-ship --docs` not yet initialized — run `/hv-ship --docs` to scaffold."* and exit. Don't auto-scaffold mid-cycle.
+**D-A4 — Map to pages and draft.** Per doc-relevant change pick an existing page (e.g. `usage/<command>.md` for a flag change) or `*needs new page*` with a proposed path and one-line rationale (never auto-create in propose mode). Draft a before/after fragment per page as a unified-diff-shaped block anchored to a real H2. If no concrete edit is possible, mark it "*needs prose — author yourself*" and leave it out of the apply set. Before showing, run the self-audit in `references/humanizing-prose.md` on every `+` line (not `-` lines) and show the post-audit drafts.
 
-### Step D-A2 — Gather Context
+**D-A5 — Approval gate.** Show all drafts in one batch, then ask (header `"Docs"`, *"Apply these doc updates?"*): `"Apply all (Recommended)"` / `"Apply selectively"` (free text: page paths) / `"Skip"` (write nothing, don't advance the `docs:` marker) / `"Cancel"` (same as Skip for now). `docs.autoCreate: true` skips this gate and commits directly.
 
-In a **single parallel batch** (one tool-call response, multiple reads), gather:
-
-- `git log --oneline <last-docs-marker>..HEAD` — boundary is the last `docs:` commit's SHA. Fall back to last 20 commits if no `docs:` commit exists yet.
-- `git diff <last-docs-marker>..HEAD -- <changed-paths>` — filtered through `.docsignore` (Layer-1 filter; the orchestrator reads `.docsignore` and skips matching paths from the diff).
-- Current `<docs.path>/` tree (one-level listing) and each existing page's H1+H2 outline (`grep -E '^#{1,2} ' <page>`).
-
-### Step D-A3 — Classify Changes
-
-For each non-ignored diff file, decide: user-facing surface change (doc-relevant) vs internal-only refactor/test/build (not doc-relevant).
-
-**Doc-relevant** heuristics:
-
-- Changes to `bin/*` entry points
-- Public API exports
-- Route handlers
-- CLI flag definitions
-- Config-key surface
-- Plugin-manifest entries
-- README-shaped behavior
-
-**Internal-only** heuristics:
-
-- Tests
-- Build scripts
-- Internal helpers not re-exported
-- Refactors with no visible behavior change
-- CI config, lint config
-- Dependency bumps
-
-LLM judgment is the primary signal; the heuristics are hints, not hard gates.
-
-If **no** files classify as doc-relevant after this pass, print one line (*"No user-facing changes since last `docs:` commit. Skipping."*) and exit cleanly.
-
-### Step D-A4 — Map to Pages + Draft Edits
-
-Per doc-relevant change, pick a target page from `<docs.path>/`:
-
-- An existing page that covers the surface (e.g., `usage/<command>.md` for a CLI flag change).
-- Or `*needs new page*` — propose a path under `<docs.path>/` with one-line rationale; never auto-create a page in propose mode.
-
-Draft a concrete before/after fragment per page using a simple unified-diff-shaped block:
-
-```
-<docs.path>/usage/foo.md
-- old line or section
-+ new line or section
-```
-
-Drafts should reference real file/section anchors (e.g., the H2 heading the edit lands under). No hallucinated content; if no concrete edit can be drafted, mark the entry "*needs prose — author yourself*" and skip it from the apply set.
-
-**Run the self-audit before Step D-A5 displays the drafts.** Doc-page edits ship to `<docs.path>/` and are the project's public surface. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to every `+` line in the draft fragments silently — show the post-audit drafts, not the pre-audit ones. The audit applies to *added* prose only; `-` lines are existing content and stay untouched.
-
-### Step D-A5 — Approval Gate
-
-Show all drafts in one batch (plain markdown — same as the first-run proposal in Step D4). Then ask via `AskUserQuestion`:
-
-- **Header:** `"Docs"`
-- **Question:** *"Apply these doc updates?"*
-- **Options** (single-select):
-  1. *"Apply all (Recommended)"*
-  2. *"Apply selectively"* — free text. User lists the page paths to apply; revise the apply set and proceed.
-  3. *"Skip"* — don't write anything; exit cleanly. Doesn't advance the `docs:` marker.
-  4. *"Cancel"* — same as Skip in this slice; reserved for future-divergent semantics.
-
-Plain-text fallback: ask once in prose; default to Recommended on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
-
-### Step D-A6 — Commit
-
-Write the chosen edits idempotently (don't overwrite unrelated content). Then a **single** `docs:` commit. Message format:
+**D-A6 — Commit.** Write the chosen edits without overwriting unrelated content, then one commit:
 
 ```
 docs: <one-line summary>
 
 - <page>: <one-line per-page change>
-- <page>: <…>
 
 Resolves: [B07], [F03]
 ```
 
-`Resolves:` lists the item IDs of the work cycle that triggered this run (passed in by the calling skill's brief). If no IDs were passed (manual `/hv-ship --docs` invocation), omit the `Resolves:` line.
-
-`autoCreate: true` (auto-write path, default `false`) skips the per-batch approval gate in Step D-A5 — drafts are written and committed directly. The propose-mode flow above still runs for review/manual-invoke.
+`Resolves:` lists the triggering cycle's IDs from the calling brief; omit it on manual entry.
 
 ### Docs Mode Principles
 
-- **First-run is interactive — never auto-scaffold.** Always go through Step D4's `AskUserQuestion` before writing.
-- **Stubs are honest empty sections, not hallucinated content.** The user fills the substance; the skill provides the spine.
-- **`<docs.path>/README.md` is the spine.** Every other page links from there.
-- **`.docsignore` is the safety boundary.** Seeded with safe defaults; user extends.
-- **Don't narrate the discovery analysis.** It shapes the proposal silently.
-- **After-work runs in propose mode by default.** `docs.autoCreate: false` (the default) means every batch goes through user approval; `true` skips the approval gate and commits directly.
-
-### When to Use Docs Mode
-
-- Manually: `/hv-ship --docs` runs the manual entry. Behavior depends on `<docs.path>/` state and `docs.afterWork`:
-  - Missing/empty `<docs.path>/` → first-run flow (Step D1 onward) — interactive scaffold.
-  - Existing `<docs.path>/` AND `docs.afterWork: true` → after-work flow in manual mode — check docs against changes since last `docs:` commit. Trigger gate bypassed — see Step D1.
-  - Existing `<docs.path>/` AND `docs.afterWork: false` → ask whether to enable after-work mode (per Step D1's `AskUserQuestion`).
-- Auto-invoked by `/hv-work` Step 13.6 (via Skill tool dispatching `hv-ship --docs`) when `docs.afterWork: true` AND the post-cycle trigger fires.
-- Inline at `/hv-ship` Step 8.6 when ship-cycle conditions match (same flag set).
-- For restructure: `/hv-ship --docs restructure` runs the audit + reorganize flow.
+- First-run is interactive: always pass D4's question before writing.
+- Stubs are honest empty sections; the user fills the substance.
+- `<docs.path>/README.md` is the spine, `.docsignore` the safety boundary.
+- After-work proposes by default; only `docs.autoCreate: true` commits without approval.
 
 ## Key Principles
 
-- **Read-only until Step 6.** Review, scoping, and body generation never mutate anything.
-- **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
-- **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
-- **`hv item complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 3); an open ID with no proof row exits 4 (Step 8 records proof or asks). No grep needed.
+- **Read-only until Step 6.** Review, scoping and body generation mutate nothing.
+- **One integration pass.** If review passes, ship; don't split it into "review, then ship later".
+- **Titles stay clean.** PR titles are for humans; the body carries the linkage.
 
 ## References
 
 | Reference | Purpose |
 |-----------|---------|
 | [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
-| [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). |
+| [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, manual gates, verb contract). |
 | [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
-| [`manual-gates.md`](../references/manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. |
-| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
-| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (8.5, 8.6, D-A1). |
-| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | Verdict semantics, `AskUserQuestion` shapes and plain-text fallback for `/hv-review` consumers. |
-| [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). Consumed by Docs Mode. |
-| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. Docs Mode follows this skeleton. |
+| [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (page naming, `.docsignore` seed). Consumed by Docs Mode. |
+| [`humanizing-prose.md`](../references/humanizing-prose.md) | Self-audit for the PR body and doc edits. |
+| [`issue-mode.md`](../references/issue-mode.md) | Issue-mode PR and item lifecycle. |
+| [`manual-gates.md`](../references/manual-gates.md) | The manual-gate registry (`hv gate list`): verb-enforced gates and skill-only callouts. |
+| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition and nudge-or-dispatch choreography for Steps 8.5, 8.6 and D-A1. |
+| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | Verdict meaning, the CONCERNS question text and carrier labels. |
+| [`silent-failure-hunter.md`](../references/silent-failure-hunter.md) | Silent-failure rubric carried in the review brief. |
+| [`task-list-init.md`](../references/task-list-init.md) | Task-list initialization pattern. |
+| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. |

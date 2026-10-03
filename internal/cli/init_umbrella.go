@@ -4,8 +4,10 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/initproj"
 )
 
@@ -60,11 +62,28 @@ func initUmbrella(fs *flag.FlagSet) RunFunc {
 		for _, w := range res.Warnings {
 			c.Warn("%s", w)
 		}
-		return Result{
-			Data: knObj("root", root, "created", strSlice(res.Created), "registered", strSlice(res.Registered),
-				"umbrellaIsGitRepo", res.IsGitRepo, "changed", res.Changed),
-			Text: "registered: " + listOrNone(res.Registered),
-		}, nil
+		cfg, err := initConfig(root)
+		if err != nil {
+			return Result{}, err
+		}
+		enabled := false
+		if len(res.Registered) > 0 {
+			if cur, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "umbrella.enabled"); cur != true {
+				if _, err := config.Set(root, "umbrella.enabled", "true"); err != nil {
+					return Result{}, err
+				}
+				enabled = true
+			}
+		}
+		data := knObj("root", root, "created", strSlice(res.Created), "registered", strSlice(res.Registered),
+			"umbrellaIsGitRepo", res.IsGitRepo, "changed", res.Changed || cfg.changed() || enabled)
+		text := []string{"registered: " + listOrNone(res.Registered)}
+		cfg.report(data, &text)
+		data.Set("umbrellaEnabled", enabled)
+		if enabled {
+			text = append(text, "set umbrella.enabled: true")
+		}
+		return Result{Data: data, Text: strings.Join(text, "\n")}, nil
 	}
 }
 

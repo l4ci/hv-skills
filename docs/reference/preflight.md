@@ -12,7 +12,7 @@ hv init check --json
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | `0` | `.hv/` and its core files are present. | Proceed. |
-| `1` | Not initialized: `.hv/` or one of the core files is missing. `--json` lists every missing path in `data.missing`. | Tell the user to run `/hv-init`, then **stop**. Never auto-init: initialization needs the user's consent. |
+| `1` | Not initialized: `.hv/` or one of the core files is missing. `--json` lists every missing path in `data.missing`. | Tell the user to run `hv init`, then **stop**. Never auto-init: initialization needs the user's consent. |
 
 `hv init check` acts on the working directory (after `-C`) with no walk-up, so it also runs where there is no `.hv/` yet.
 
@@ -30,14 +30,13 @@ Advisory findings come back as `warnings`, never as a failure: an umbrella flag 
 
 ## Missing `.hv/` from any other verb
 
-Exit `3` (`resolution`), with a message naming the missing root. Skills surface it the same way as above: point the user at `/hv-init` and stop.
+Exit `3` (`resolution`), with a message naming the missing root. Skills surface it the same way as above: point the user at `hv init` and stop.
 
-| Skill | When `.hv/` is missing |
+| Skill or verb | When `.hv/` is missing |
 |-------|------------------------|
-| `/hv-next` | Surface *"Nothing tracked yet. Run `/hv-init` then `/hv-capture`."* and stop. |
-| `/hv-pause` | Surface *"Nothing to pause. `/hv-init` the project first."* and stop. |
-| `/hv-config` | Hand off to `/hv-init`, which writes the initial config interactively. |
-| `/hv-update` | Not affected: it checks `gh` on `PATH`, then calls `hv update`, which runs without a project. |
-| `/hv-init` | Is the bootstrapper itself; it runs `hv init`. |
+| `/hv-work` (no argument) | Surface *"Nothing tracked yet. Run `hv init` then `/hv-capture`."* and stop. |
+| `/hv-pause` | Surface *"Nothing to pause. Run `hv init` first."* and stop. |
+| `hv update` | Not affected: it runs without a project. |
+| `hv init` | Is the bootstrapper itself. |
 
 All exit codes: [`hv` verb reference](cli-helpers.md#conventions).

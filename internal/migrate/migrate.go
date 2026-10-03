@@ -326,7 +326,7 @@ func checkPreconditions(root, cwd string) error {
 		version = getString(cfg, "version")
 	}
 	if version == "" {
-		return fmt.Errorf("%w: .hv/config.json has no 'version' field — run /hv-init", ErrConfig)
+		return fmt.Errorf("%w: .hv/config.json has no 'version' field — run hv init", ErrConfig)
 	}
 	major, _, _ := strings.Cut(version, ".")
 	n, err := strconv.Atoi(major)
@@ -334,7 +334,7 @@ func checkPreconditions(root, cwd string) error {
 		return fmt.Errorf("%w: .hv/config.json version '%s' is not parseable", ErrConfig, version)
 	}
 	if n < 3 {
-		return refuse("pre-3.0", "project hv-skills version is %s (pre-3.0). Bring it current with /hv-init before hv migrate v4.", version)
+		return refuse("pre-3.0", "project hv-skills version is %s (pre-3.0). Bring it current with hv init before hv migrate v4.", version)
 	}
 	return nil
 }
@@ -344,7 +344,7 @@ func configPath(root string) string { return filepath.Join(root, ".hv", "config.
 func loadConfig(root string) (*jsonx.Object, error) {
 	raw, err := os.ReadFile(configPath(root))
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("%w: .hv/config.json missing — run /hv-init first", ErrConfig)
+		return nil, fmt.Errorf("%w: .hv/config.json missing — run hv init first", ErrConfig)
 	}
 	if err != nil {
 		return nil, err

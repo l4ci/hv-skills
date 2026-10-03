@@ -110,9 +110,9 @@ cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/.cla
 mkdir -p "$VS/test"; cp "$REPO/test/validate-skills.py" "$VS/test/"
 BASE_OUT="$(cd "$VS" && python3 test/validate-skills.py 2>&1)" || fail "validate-skills fixture does not pass on its own: $BASE_OUT"
 # A decoy skill that would fail every check, and a duplicate of a real one.
-mkdir -p "$VS/.worktrees/x/hv-decoy" "$VS/.worktrees/x/hv-go"
+mkdir -p "$VS/.worktrees/x/hv-decoy" "$VS/.worktrees/x/hv-plan"
 printf 'no frontmatter, banner or references\n' > "$VS/.worktrees/x/hv-decoy/SKILL.md"
-cp "$VS/hv-go/SKILL.md" "$VS/.worktrees/x/hv-go/SKILL.md"
+cp "$VS/hv-plan/SKILL.md" "$VS/.worktrees/x/hv-plan/SKILL.md"
 DECOY_OUT="$(cd "$VS" && python3 test/validate-skills.py 2>&1)" || fail "validate-skills picked up .worktrees/: $DECOY_OUT"
 [ "$BASE_OUT" = "$DECOY_OUT" ] || fail "validate-skills output changed with a decoy: '$BASE_OUT' vs '$DECOY_OUT'"
 

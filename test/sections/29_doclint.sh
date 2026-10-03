@@ -15,7 +15,7 @@ SK='SKILL''.md'
 dl_fixture() {
   local d="$1"
   mkdir -p "$d/hv-a" "$d/references" "$d/.claude-plugin"
-  printf -- '---\nname: hv-a\ndescription: test\n---\n\nRun `hv status show`. See /hv-rm and /hv-migrate.\n' > "$d/hv-a/$SK"
+  printf -- '---\nname: hv-a\ndescription: test\n---\n\nRun `hv status show`. See /hv-rm and /hv-release.\n' > "$d/hv-a/$SK"
   printf '# ref\n\nUse `hv config set`; hv-skills owns this.\n' > "$d/references/r.md"
   printf '{"version": "1.0.0"}\n' > "$d/.claude-plugin/plugin.json"
   printf '# Changelog\n\n## v1.0.0\n' > "$d/CHANGELOG.md"
@@ -26,7 +26,7 @@ dl_run() { ( cd "$1" && HV_DOCLINT_PROSE=off HV_SPEC_PENDING="" HV_DOCLINT_UNCON
 
 F="$DL_TMP/clean"; dl_fixture "$F"
 OUT="$(dl_run "$F" "")" || fail "doclint flagged a clean fixture (slash commands, hv-skills, hv verbs): $OUT"
-pass "clean prose, slash commands and the hv-migrate skill name pass"
+pass "clean prose, slash commands and a skill name pass"
 
 # Every legacy form fails, in a skill, a nested skill file and a reference.
 N=0
@@ -65,9 +65,9 @@ PL="$DL_TMP/prose"; mkdir -p "$PL/.claude-plugin"
 cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/CHANGELOG.md" "$PL/"
 cp "$REPO/.claude-plugin/plugin.json" "$PL/.claude-plugin/"
 OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || fail "prose lint fails on a copy of the repo: $OUT"
-sed -i 's/hv status loop start/hv status loop begin/' "$PL/hv-next/$SK"
+sed -i 's/hv status loop start/hv status loop begin/' "$PL/hv-work/$SK"
 RC=0; OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || RC=$?
-[ "$RC" = 1 ] && grep -qF "hv-next/$SK: must call hv status loop start" <<<"$OUT" \
+[ "$RC" = 1 ] && grep -qF "hv-work/$SK: must call hv status loop start" <<<"$OUT" \
   || fail "prose lint missed a dropped phrase (rc $RC): $OUT"
 rm -f "$PL/references/manual-gates.md"
 RC=0; OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || RC=$?

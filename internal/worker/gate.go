@@ -285,7 +285,7 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	if len(cmds) == 0 {
 		res.Verdict, res.VerifySkipped = GatePass, true
 		res.Notes = append(res.Notes, fmt.Sprintf("NO-VERIFY %s — refactor.verifyCommands is empty; merged tree was NOT gated by a command.", o.Slot),
-			"set refactor.verifyCommands via /hv-config to make this gate real")
+			"set refactor.verifyCommands via hv config set to make this gate real")
 		return res, nil
 	}
 	// Output is kept so a failure can be diagnosed: the tail goes to the

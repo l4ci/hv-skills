@@ -8,7 +8,7 @@ Run after the terminal-path framing paragraph, before any final user message:
 
 ```bash
 hv decisions auto-since   # empty stdout when nothing matches
-hv status loop clear      # clear the session marker so the next /hv-next loop entry stamps a fresh start
+hv status loop clear      # clear the session marker so the next /hv-work loop entry stamps a fresh start
 ```
 
 If `hv decisions auto-since` produces no output, skip silently — there's nothing to surface.
@@ -29,4 +29,4 @@ Keep the surrounding terminal-path framing (which path, why it's terminal, what 
 ## See also
 
 - F19 terminal-path-only convention — surfacing fires only on terminal paths.
-- Cited from: `hv-work` Step 1 guard-fail, `hv-next` empty-backlog branch, `hv-pause` Step 5.5, `hv-debug` Iron Law halt.
+- Cited from: `hv-work` Step 1 guard-fail, `hv-work` no-argument empty-backlog branch, `hv-pause` Step 6, `hv-debug` Iron Law halt.

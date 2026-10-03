@@ -24,7 +24,7 @@ The pair shares the **spine** but diverges on every axis where scope, blast radi
 | Web research step | Yes — dedicated phase between discovery and proposal; gathers external context (prior art, pitfalls, patterns) via parallel `WebSearch` / `WebFetch` | No — local-context only; `/hv-spike` handoff when a question needs code-touching evidence |
 | Challenge step | Yes — deliberate counter-position before committing (scope check, risk frontloading, overlap detection, cut tradeoff, dependency surfacing, assumption naming) | No — challenge happens implicitly through approach-pick tradeoffs (Pros / Cons / Why) |
 | Self-review pass | No dedicated phase — surfaces inline during Challenge (Step 5) and the iterate loop (Step 7) | Dedicated Step 8 — placeholders, internal contradictions, scope creep, ambiguous adjectives |
-| Handoff | `/hv-next` for milestone-driven backlog work, or `/hv-capture` / `/hv-plan` to seed a newly active milestone | `/hv-plan` for per-item implementation plan (soft input — never required) |
+| Handoff | `/hv-work` for milestone-driven backlog work, or `/hv-capture` / `/hv-plan` to seed a newly active milestone | `/hv-plan` for per-item implementation plan (soft input — never required) |
 | Trigger | *"let's plan"*, *"create a roadmap"*, *"brainstorm milestones"*, *"what's the bigger picture"* | *"brainstorm F03"*, *"design B07"*; auto-invoked for `[Major]` features and `[P0]` bugs under `autonomy.level: auto` |
 
 ## Why the divergences stay

@@ -7,8 +7,8 @@
 | Value | Behavior |
 |-------|----------|
 | `"off"` (default) | Skills surface a one-line suggestion at each decision point and stop. The user picks. Same hand-on-the-wheel feel as 1.5.x. |
-| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. After `/hv-update` reports `behind`, Step 4 asks once via `AskUserQuestion` and dispatches `/hv-init` on confirm so drift clears in one step. The chain stops after the chained step; the user picks the next item themselves. |
-| `"loop"` | Auto chain plus loop continuation, plus auto-pick on routine routing. After each `/hv-work` or `/hv-ship` cycle, `/hv-next` is invoked. `/hv-next` (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. Routine routing/tagging questions that present a clear `(Recommended)` option (milestone tagging in `/hv-capture`, reconcile resolution in `/hv-next`, CONCERNS routing in `/hv-ship`, scope and candidate gates in `/hv-refactor`) are silently auto-picked without prompting. Design decisions, manual public-artifact gates, and config flips still surface for explicit user input. After `/hv-update` reports `behind`, Step 4 dispatches `/hv-init` unconditionally (no question); if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
+| `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. After `hv update` reports `behind`, Step 4 asks once via `AskUserQuestion` and dispatches `hv init` on confirm so drift clears in one step. The chain stops after the chained step; the user picks the next item themselves. |
+| `"loop"` | Auto chain plus loop continuation, plus auto-pick on routine routing. After each `/hv-work` or `/hv-ship` cycle, `/hv-work` (no argument) is invoked. `/hv-work` (no argument) (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. Routine routing/tagging questions that present a clear `(Recommended)` option (milestone tagging in `/hv-capture`, reconcile resolution in `/hv-work` (no argument), CONCERNS routing in `/hv-ship`, scope and candidate gates in `/hv-refactor`) are silently auto-picked without prompting. Design decisions, manual public-artifact gates, and config flips still surface for explicit user input. After `hv update` reports `behind`, Step 4 dispatches `hv init` unconditionally (no question); if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
 
 ## What still gates the chain
 
@@ -22,8 +22,8 @@ Autonomy decides whether to invoke the next skill; the destination skill's own g
 
 The loop stops cleanly on any of:
 
-- `/hv-next` reports an empty backlog (no items in active milestone, no items in general backlog).
-- `/hv-work` Step 2 detects an ambiguous brief on a non-Major or untagged item. (Major + Milestone-tagged items defer to Step 4's auto-dispatch chain, which auto-resolves design via `/hv-brainstorm --auto-loop` and plan via `/hv-plan --auto-loop` instead of stopping.) Invisible defaults across a queue defeat the loop's point for cheap items. The user resolves and re-invokes `/hv-next` to continue.
+- `/hv-work` (no argument) reports an empty backlog (no items in active milestone, no items in general backlog).
+- `/hv-work` Step 2 detects an ambiguous brief on a non-Major or untagged item. (Major + Milestone-tagged items defer to Step 4's auto-dispatch chain, which auto-resolves design via `/hv-brainstorm --auto-loop` and plan via `/hv-plan --auto-loop` instead of stopping.) Invisible defaults across a queue defeat the loop's point for cheap items. The user resolves and re-invokes `/hv-work` (no argument) to continue.
 - A guard fails (dirty tree, `/hv-review` FAIL, missing brief).
 - The user interrupts.
 
@@ -55,6 +55,6 @@ A rough phase mapping:
 
 - `"off"` for exploring or steering. You're shaping the work, not draining a queue.
 - `"auto"` once a milestone is in flight and a plan is sketched. The follow-up step of each cycle (learn, ship) gets handled; you still pick the next item.
-- `"loop"` for a known, well-specified queue. `/hv-next` picks and dispatches for you until the backlog is empty.
+- `"loop"` for a known, well-specified queue. `/hv-work` (no argument) picks and dispatches for you until the backlog is empty.
 
 See [vision and plans](vision-and-plans.md) for milestone-driven planning and [running work](running-work.md) for the work-cycle endpoints where autonomy fires.

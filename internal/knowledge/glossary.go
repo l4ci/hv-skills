@@ -250,7 +250,7 @@ func (s Store) glossaryTarget(scope string) (path, text string, start, end int, 
 	raw, rerr := readTextBytes(path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
-			err = notFound("%s missing — run /hv-init first", path)
+			err = notFound("%s missing — run hv init first", path)
 		} else {
 			err = rerr
 		}
@@ -259,7 +259,7 @@ func (s Store) glossaryTarget(scope string) (path, text string, start, end int, 
 	text = string(raw)
 	var ok bool
 	if start, end, ok = section.Find(text, GlossaryTopic); !ok {
-		err = notFound("## Glossary topic missing from %s — run /hv-init or add the heading manually", path)
+		err = notFound("## Glossary topic missing from %s — run hv init or add the heading manually", path)
 	}
 	return
 }

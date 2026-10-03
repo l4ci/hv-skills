@@ -9,12 +9,12 @@ import (
 )
 
 // Key is one known .hv/config.json key: its dotted name, the default used
-// when the key is absent, and whether /hv-init writes it. Defaults use the
+// when the key is absent, and whether hv init writes it. Defaults use the
 // jsonx value types: string, bool, json.Number and []any.
 type Key struct {
 	Name     string // dotted path, e.g. "work.mergeStrategy"
 	Default  any    // value when the key is missing or null
-	Required bool   // written by /hv-init; the schema check treats it as present-or-stale
+	Required bool   // written by hv init; the schema check treats it as present-or-stale
 }
 
 // Keys is the table of every known config key. Leaf keys only: object-valued

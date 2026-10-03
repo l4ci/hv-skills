@@ -220,7 +220,7 @@ def check_version(issues):
 # may name an old bin/ helper, the .hv/bin mirror or hvlib: skills call `hv
 # <verb>`. The name list is frozen from bin/ at the start of A9, so the check
 # keeps working once S7 deletes bin/. hv-migrate is left out because it is also
-# a skill name. A name preceded by "/" is a slash command, not a helper call;
+# the name of the `hv migrate` verb. A name preceded by "/" is a slash command, not a helper call;
 # bin/ paths are caught by the bin/hv- and .hv/bin patterns instead.
 LEGACY_HELPERS = """
     hv-append hv-archive-old hv-artifact-amend.sh hv-artifact-rm.sh
@@ -355,26 +355,22 @@ def prose_rules():
           has("references/loop-mode-plan-dispatch.md", "Design pre-flight", "must include the Design pre-flight section"),
           only_in("hv-*/SKILL.md", "hv decisions auto-since", {"hv-brainstorm", "hv-plan"},
                   "hv decisions auto-since is surfaced in exactly hv-brainstorm and hv-plan"),
-          has(sk("next"), "hv status loop start", "must call hv status loop start"),
+          has(sk("work"), "hv status loop start", "must call hv status loop start"),
           has(sk("pause"), "hv status loop clear", "must call hv status loop clear"),
           has(sk("work"), "hv status loop clear", "must call hv status loop clear"),
-          has(sk("init"), "hv config fill", "must fill missing config defaults with hv config fill"),
-          has(sk("next"), "hv status handoff", "must call hv status handoff"),
+          has(sk("work"), "hv status handoff", "must call hv status handoff"),
           has(sk("ship"), "hv git guard feature-branch", "must call hv git guard feature-branch"),
           has(sk("pause"), "hv git guard feature-branch", "must call hv git guard feature-branch")]
     # map / backlog touchpoints
     r += [has(sk("work"), r"hv map stats --cap|hv map index", "has no map touchpoint", True),
           has(sk("debug"), r"hv map stats --cap|hv map index", "has no map touchpoint", True),
-          has(sk("go"), r"post-cycle map|hv map index", "has no map touchpoint", True),
-          has(sk("next"), "hv backlog stale", "missing the stale-summary call"),
+          has(sk("work"), "hv backlog stale", "missing the stale-summary call"),
           has(sk("capture"), "Subsystem:", "missing the Subsystem field")]
     # F37 TaskCreate progress checklists: tiers S/A/B have it, tier C does not
-    for n in "init work debug ship release refactor learn decide spike vision capture next pause review plan config".split():
+    for n in "work debug ship release refactor learn decide spike vision capture pause review plan".split():
         r.append(has(sk(n), "TaskCreate(", "Tier S/A/B skill must reference TaskCreate("))
-    for n in ("go", "update"):
-        r.append(lacks(sk(n), "TaskCreate(", "Tier C skill must not reference TaskCreate("))
     # config verbs and the positional-args doc (F09, F78)
-    for n in ("ship", "config", "init"):
+    for n in ("ship",):
         r.append(has(sk(n), "hv config set", "missing hv config set call"))
     r += [has(sk("ship"), r"\| Manual invoke.*after-work.*manual mode",
               "Docs Mode Modes row for manual invocation must reflect after-work in manual mode", True),
@@ -382,18 +378,13 @@ def prose_rules():
           has(sk("ship"), "Manual entry bypasses the gate", "Docs Mode Step D-A1 missing the manual-entry bypass clause"),
           lacks(sk("ship"), r"Re-running .*hv-docs.* manually has no further effect",
                 "stale 'no further effect' no-op text is still present in Docs Mode", True),
-          has(sk("config"), "## Step 1.5 — Parse Positional Arguments", "missing Step 1.5"),
-          has(sk("config"), r"work\.isolation=worktree|<key>=<value>", "Step 1.5 missing positional-args syntax doc", True),
-          has(sk("config"), "models.orchestrator", "Step 1.5 missing the canonical key list"),
-          has(sk("config"), r"work.dispatch.*subagent.*tmux|`work.dispatch` accepts",
-              "validation rules do not constrain work.dispatch to its enum", True),
           has("docs/reference/config-options.md", "positional", "missing positional-args mention"),
           has("docs/usage/configuration.md", r"positional|<key>=<value>", "missing positional-args mention", True),
           has("docs/usage/configuration.md", "work.dispatch", "does not explain work.dispatch")]
     for key in ("models.orchestrator models.worker work.isolation work.mergeStrategy ship.review learn.verify "
                 "refactor.confirmBeforeExecute debug.competingHypotheses autonomy.level docs.path docs.autoCreate "
                 "docs.afterWork git.baseBranch umbrella.enabled work.dispatch work.workerSlots work.workerCommand").split():
-        r.append(has(sk("config"), f"`{key}`", f"Step 1.5 valid-key list missing {key}"))
+        r.append(has("docs/reference/config-options.md", key, f"does not document {key}"))
     for key in ("work.dispatch", "work.workerSlots", "work.workerCommand"):
         r.append(has("docs/reference/config-options.md", key, f"does not document {key}"))
     # multi-repo flow (M03)
@@ -431,17 +422,13 @@ def prose_rules():
           has("references/authoring-conventions.md", "^## Dispatch heavy work to subagents",
               "missing the 'Dispatch heavy work to subagents' rule", True, re.M),
           has("references/authoring-conventions.md", D, "missing the cross-reference to subagent-dispatch.md")]
-    for w, pat in (("A", r"Worker A.*[Rr]econcile"), ("B", r"Worker B.*[Aa]rchive"),
-                   ("C", r"Worker C.*[Mm]ilestone"), ("D", r"Worker D.*[Rr]elevance")):
-        r.append(has(sk("next"), pat, f"missing Worker {w}", True))
-    r.append(has(sk("next"), "single parallel wave", "missing 'single parallel wave' phrasing"))
     for n, pats in (("vision", ["context-bundle worker", "haiku", "research worker", "per angle"]),
                     ("debug", ["reproduce worker", "verification worker"])):
         for t in pats:
             r.append(has(sk(n), t, f"missing '{t}'"))
     r += [has(sk("debug"), "when the repro is heavy", "Step 5 missing conditional dispatch criteria", True, re.I),
           has(sk("debug"), "when verification.*requires.*file reads", "Step 7 missing conditional dispatch criteria", True, re.I)]
-    for n in ("next", "vision", "debug"):
+    for n in ("vision", "debug"):
         r.append(has(sk(n), D, "missing the subagent-dispatch reference cite"))
     return r
 

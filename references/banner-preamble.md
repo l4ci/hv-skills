@@ -39,13 +39,13 @@ A subagent's stdout is captured as a tool result by the orchestrator, not surfac
 
 ## Example
 
-From `hv-next/SKILL.md`:
+From `hv-pause/SKILL.md`:
 
 ````
 ```
 ════════════════════════════════════════════════════════════════════════
-  👉  hv-next  ·  current state, handoff detection, next item
-  triggers: "what's next", "where was I", "resume"  ·  pairs: hv-pause, hv-work
+  💤  hv-pause  ·  write handoff note for clean pause
+  triggers: "pause", "hand off"  ·  pairs: hv-work, hv-learn
 ════════════════════════════════════════════════════════════════════════
 ```
 ````

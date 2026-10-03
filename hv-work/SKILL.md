@@ -1,6 +1,6 @@
 ---
 name: hv-work
-description: Orchestrator-driven parallel implementation — plans tasks, dispatches workers, verifies, commits atomically per task. Workers run as in-process subagents (default) or, under work.dispatch=tmux or herdr, as separate Claude Code sessions in their own worktrees that open PRs behind a merge gate. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
+description: Orchestrator-driven parallel implementation — plans tasks, dispatches workers, verifies, commits atomically per task. Workers run as in-process subagents (default) or, under work.dispatch=tmux or herdr, as separate Claude Code sessions in their own worktrees that open PRs behind a merge gate. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); with no argument it reconciles active work and suggests the next item; for an item not yet captured use /hv-capture, which can hand off here.
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
@@ -42,6 +42,28 @@ Read `.hv/config.json`:
 ```
 Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → Verify → Commit → TODO → Merge/PR → Status
 ```
+
+## No-Argument Mode (reconcile, suggest, then work)
+
+`/hv-work` with no item, ID or brief reconciles what is in flight, shows the backlog, suggests one item and then continues into Step 1 with it. Rounds do not use this path; the orchestrator runs `/hv-orchestrate`.
+
+**1. Reconcile active streams.** `hv status show` lists them. Git is the source of truth over `status.json`. For each stream: a branch that no longer exists is dropped with `hv status rm <branch> [--repo <repo>]`; otherwise note whether it has commits past the base (`hv git base`) and whether `hv status handoff <branch> [--repo <repo>]` returns a `/hv-pause` note (read its Stage, Next planned step and Current hypothesis). Resolve each stream with `AskUserQuestion` (plain-text fallback), Recommended first:
+
+- handoff present: resume with the note as the brief (Recommended); leave it for later; abandon.
+- commits, no handoff: ship via `/hv-ship` (Recommended); resume; leave as-is.
+- no commits, no handoff: resume (Recommended); abandon; leave as-is.
+
+Resume continues on the existing branch. Abandon is `git branch -D <branch>` plus `hv status rm`, and removes that stream's handoff note. A handoff note is deleted only when its stream is resumed or abandoned. Under `autonomy.level == "loop"`, auto-pick Recommended; the downstream skills keep their own manual gates.
+
+**2. Orient.** Run `hv backlog archive --days 5` (silent), `hv milestone active` and one `hv backlog ids --milestone <MID>` per active milestone, then `hv backlog list`. Print the list in full, every row and section: the table is the point of the mode, and is exempt from length limits. Prefix it with `Active milestones: <ids and titles>` when there are any. Advisories, never blocking: for each ID in `hv backlog drift --json` print `[ID] looks shipped on <hash> but still open`, and suggest `hv proof add` then `hv item complete <ID> --commit <hash>` (or `--no-proof`), never auto-complete. Print `stale: map=N, knowledge=M, todo=K` from `hv backlog stale` (zero kinds dropped) and `empty-active: <MID>` for an active milestone with no open items. `hv backlog drift` refuses in issue mode; skip it there.
+
+**3. Suggest one item.** Order: P0 bugs; clusters holding a blocking bug; quick wins (Cosmetic, P2); the highest-impact P1; blocking tasks (`Related:`); Minor features; Major features only when nothing else is pending or the user asks. Milestone bias at every level except P0: items tagged to an active milestone first, then untagged, then non-active milestones. In issue mode, items labelled `changes-requested` rank right after P0. Skip items already active. An active milestone with no items: say so and point at `/hv-capture`. Print `Suggested next: [ID] Title (tag)` and one sentence why.
+
+Brainstorm nudge, only for a `[Major]` feature or `[P0]` bug with no `.hv/designs/<ID>.md`: `off` prints *"consider `/hv-brainstorm [ID]` before this"*; `auto` dispatches `hv-brainstorm` with the ID, then re-suggests; `loop` skips it (Step 4 handles design under loop).
+
+**4. Confirm.** Under `loop`: run `hv status loop start`, print `Loop: starting [ID] Title.` and go straight to Step 1. If nothing is suggestable, print `Loop: backlog empty — stopping.`, surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md`, and stop. Otherwise `AskUserQuestion`: Start (Recommended); Peek approach first (`--preview`, offered for Major, P0/P1 or a batch); Write a plan first (`/hv-plan`, offered for a Major item tagged to a milestone with no plan at `.hv/plans/`); Pick different items; Stop here. "Other" text is the item spec.
+
+On a terminal path (Stop here, or an empty backlog) run `hv release pending --json` and, when `shouldNudge` is true, print its `message` as one line. Skip it when work continues, and when there is no tag yet. Pass the item's BACKLOG text into Step 1 so it is not re-read.
 
 ## Preview Mode (`--preview`)
 
@@ -107,7 +129,7 @@ The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `
 - **Stop after the peek.** No auto-continuation; the user's pushback is the point.
 - **Plan beats peek for high-stakes work.** Offer `/hv-plan` if the user wants something durable rather than ephemeral.
 
-**Orchestrator-model contract (F35, loop mode).** When `/hv-work` Step 4's F34 uncertainty pre-flight needs a peek, it runs this Preview Mode procedure **inline** (not via recursive `Skill` dispatch) — the peek inherits the orchestrator model since the cycle is already running under it. The Step 4 chain reads the peek output from chat context and proceeds to `/hv-plan --auto-loop`. Manual invocations from `/hv-next` or the user's prompt (`/hv-work --preview <ID>`) are unconstrained — the user is in the loop and can correct any peek that under-performs.
+**Orchestrator-model contract (F35, loop mode).** When `/hv-work` Step 4's F34 uncertainty pre-flight needs a peek, it runs this Preview Mode procedure **inline** (not via recursive `Skill` dispatch) — the peek inherits the orchestrator model since the cycle is already running under it. The Step 4 chain reads the peek output from chat context and proceeds to `/hv-plan --auto-loop`. Manual invocations from the no-argument mode or the user's prompt (`/hv-work --preview <ID>`) are unconstrained — the user is in the loop and can correct any peek that under-performs.
 
 ## Step 1 — Guard
 
@@ -141,7 +163,7 @@ If **any** path is a user change, stop with the original guard message — the u
 
 Don't narrate the sweep unless it happened; silent pass-through is the common case.
 
-**On any Step 1 guard failure that stops `/hv-work` (exit 3 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
+**On any Step 1 guard failure that stops `/hv-work` (exit 3 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in the no-argument empty-backlog path and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
 
 Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the guard message.
 
@@ -191,7 +213,7 @@ Plain-text fallback: ask once; on ambiguity, default to Recommended and state it
 **Loop mode exception:** if `autonomy.level == "loop"` and the brief is genuinely ambiguous (you'd otherwise ask Step 2), the routing depends on the item's shape:
 
 - **Major + Milestone-tagged item** — defer to Step 4's auto-dispatch chain. The chain auto-resolves design via `/hv-brainstorm --auto-loop` (writes a design artifact with `[Auto:Loop]` decisions for fresh picks), then runs the uncertainty pre-flight + plan dispatch (`/hv-plan --auto-loop`). Step 2 does not stop in this case — the chain owns design resolution under loop.
-- **Non-Major or untagged item** — **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-next` (or this `/hv-work`) to continue the queue.
+- **Non-Major or untagged item** — **stop the loop** and surface the question for the user to resolve. Do not silently pick a default — invisible decisions across N looped items defeat the point of the loop. The user resolves and re-invokes `/hv-work` to continue the queue.
 
 ## Step 2.5 — Detect Knowledge-vs-Correction Contradictions (F03 lifecycle)
 
@@ -293,7 +315,7 @@ If it exits 0:
 
 2. **All items in a wave must resolve to the same repo set** (as a set, order-independent). Single-repo and multi-repo items can't mix in one wave; two multi-repo items must list the same names. On divergence, stop with: *"Error: items in this wave target different sub-repo sets: `<set-a>` vs `<set-b>`. Split into separate `/hv-work` runs."*
 
-3. **Validate every name in the resolved set** via `hv repo resolve <name>…`, one positional per name with the CSV's spaces dropped (exits 3 and names every missing one). On failure, stop with: *"Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `/hv-init` from the umbrella root to register sub-repos."*
+3. **Validate every name in the resolved set** via `hv repo resolve <name>…`, one positional per name with the CSV's spaces dropped (exits 3 and names every missing one). On failure, stop with: *"Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `hv init umbrella` from the umbrella root to register sub-repos."*
 
 4. **Walk-up convenience (single-repo only).** If `/hv-work` was invoked from a cwd that `hv repo which` resolves to a registered sub-repo, default that sub-repo as the wave's scope when items lack an explicit `Repos:` tag. Multi-repo items always come from the captured `Repos:` field — no cwd default.
 
@@ -337,7 +359,7 @@ hv status add <cycle-branch> --items <ID>[,<ID>...]
 hv worker pool init --slots <work.workerSlots> --base <cycle-branch>
 ```
 
-`hv worker pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots live in `<project>/.worktrees/<slot>` (gitignored by `/hv-init`; a slot registered at the older `.claude/worktrees/hv-worker/<slot>` keeps that path until it is moved). Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
+`hv worker pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots live in `<project>/.worktrees/<slot>` (gitignored by `hv init`; a slot registered at the older `.claude/worktrees/hv-worker/<slot>` keeps that path until it is moved). Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
 
 `work.isolation` does not apply on this path: each slot has its own worktree and therefore its own `.git/index`, which is the precondition the isolation guard exists to enforce. Don't also evaluate the guard — it would be checking a condition that cannot occur.
 
@@ -605,7 +627,7 @@ Item plans (`.hv/plans/M01-B07.md`) describe how to ship one specific item. Once
 Skip silently when:
 
 - The item carries no `Milestone:` tag — no plan key exists for it.
-- No plan file is at the resolved key — the `[ -f … ]` guard handles this (untagged items, items that one-shot through `/hv-go` or `/hv-work` without a written plan).
+- No plan file is at the resolved key — the `[ -f … ]` guard handles this (untagged items, items that one-shot through `/hv-work` without a written plan).
 
 **Slice plans (`M01-S01.md`) stay.** A slice covers multiple items; completing one item does not consume the slice plan. Slice cleanup is currently manual via `hv plan rm <key>` once the user is done with the slice.
 
@@ -622,9 +644,9 @@ Single commit per cycle keeps the loop atomic: the implementation commits ship t
 
 ## Step 10 — Merge or PR
 
-Use `work.mergeStrategy` from `.hv/config.json` to pick `hv ship merge` (direct) or `hv ship pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), verb contracts, and the Manual-gate rule for opening a PR.
+Use `work.mergeStrategy` from `.hv/config.json` to pick `hv ship merge` (direct) or `hv ship pr`. Invocations (umbrella `--repo`, exit-4 verdict and merge-approval handling) are in `hv-ship` Steps 6a/6b. Opening a PR is a manual gate.
 
-When `work.mergeStrategy == "direct"` (or unset — the default), use `hv ship merge`. When `work.mergeStrategy == "pr"`, use `hv ship pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `/hv-config`; respect it silently.
+When `work.mergeStrategy == "direct"` (or unset — the default), use `hv ship merge`. When `work.mergeStrategy == "pr"`, use `hv ship pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `hv config set`; respect it silently.
 
 **Issue mode forces the PR path**, whatever `work.mergeStrategy` says, and never merges:
 
@@ -649,7 +671,7 @@ hv status rm <branch>
 hv status rm <branch> --repo <repo>
 ```
 
-Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
+Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next no-argument `/hv-work`.
 
 ## Step 12 — Report to User
 
@@ -686,7 +708,7 @@ Trigger: same gating as Step 13, OR the orchestrator noticed a non-obvious pick 
 
 Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
 
-- **Config flag:** `docs.afterWork` (default `false`). Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
+- **Config flag:** `docs.afterWork` (default `false`). Users opt in via `hv config set docs.afterWork true` or by running `/hv-ship --docs` manually once.
 - **Nudge (`"off"`):** *"User-facing changes shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
 - **Target (`"auto"`/`"loop"`):** **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** (Skill dispatch, not inline — the inline variant belongs to `/hv-ship` Step 8.6.)
 - **Brief:** the cycle's resolved IDs and touched files, so the after-work flow has the right context.
@@ -713,10 +735,10 @@ Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with 
 
 ## Step 15 — Loop Continuation
 
-Only when `autonomy.level == "loop"`. **Dispatch `hv-next` via `Skill` immediately — no prompt, no confirmation.** `/hv-next` reads autonomy and auto-dispatches `/hv-work`, sustaining the loop.
+Only when `autonomy.level == "loop"`. **Re-enter `/hv-work` with no argument immediately — no prompt, no confirmation.** No-Argument Mode reads autonomy, auto-picks and starts the next item, sustaining the loop.
 
 Loop stops naturally when:
-- `/hv-next` reports an empty backlog (or the active milestone has no items and the general backlog is also empty)
+- No-Argument Mode reports an empty backlog (or the active milestone has no items and the general backlog is also empty)
 - A guard fails downstream (dirty tree, `/hv-review` FAIL, ambiguous brief in Step 2)
 - The user interrupts
 
@@ -737,7 +759,6 @@ Loop stops naturally when:
 | [`issue-mode.md`](../references/issue-mode.md) | Issue-mode helper map, state labels, PR flow, resuming an item, exit codes (`backlog.backend: "issues"`). |
 | [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. |
-| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus `hv ship` invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
 | [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
 | [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Judgment `hv worker` verbs do not enforce for `work.dispatch: "tmux"` (shared by `"herdr"`): permissions, relay provenance, merge-gate lore, failure modes. |

@@ -1,6 +1,6 @@
 # Humanizing user-facing prose
 
-Used by `/hv-release` Step 6 (release notes + summary line), `/hv-ship` Step 4 (PR body), and `/hv-ship` Docs Mode Step D-A4 (doc-page edits). Defines the rule sheet and self-audit pass that runs after the model drafts user-facing prose, before the draft is shown to the user.
+Used by `/hv-release` Step 5 (release notes + summary line), `/hv-ship` Step 4 (PR body), and `/hv-ship` Docs Mode Step D-A4 (doc-page edits). Defines the rule sheet and self-audit pass that runs after the model drafts user-facing prose, before the draft is shown to the user.
 
 The patterns are distilled from Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing). The voice rules are project-specific: pinned here so they ship with hv-skills and apply consistently across releases, PRs, and docs without depending on any external skill being installed.
 

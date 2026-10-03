@@ -192,13 +192,13 @@ func updFixtures(t *testing.T) {
 		upd.homeStow = mk("home-stow")
 		upd.stowRepo = mk("stow-repo")
 		manifest(t, upd.stowRepo, "hv-skills", instVersion)
-		if err := os.MkdirAll(filepath.Join(upd.stowRepo, "hv-update"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(upd.stowRepo, "hv-work"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.MkdirAll(filepath.Join(upd.homeStow, ".claude/skills"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Symlink(filepath.Join(upd.stowRepo, "hv-update"), filepath.Join(upd.homeStow, ".claude/skills/hv-update")); err != nil {
+		if err := os.Symlink(filepath.Join(upd.stowRepo, "hv-work"), filepath.Join(upd.homeStow, ".claude/skills/hv-work")); err != nil {
 			t.Fatal(err)
 		}
 		upd.clone = mk("clone")

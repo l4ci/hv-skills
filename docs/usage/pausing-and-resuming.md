@@ -1,6 +1,6 @@
 # Pausing and resuming
 
-Long sessions hit `/clear` or get interrupted. `/hv-pause` writes what was in your head before you leave, and [`/hv-next`](picking-work.md) picks it back up when you return.
+Long sessions hit `/clear` or get interrupted. `/hv-pause` writes what was in your head before you leave, and [`/hv-work` (no argument)](picking-work.md) picks it back up when you return.
 
 ## /hv-pause
 
@@ -27,24 +27,24 @@ The note's shape:
 ## Do not
 ```
 
-You don't need to manage this file directly. `/hv-next` reads and deletes it on resolve.
+You don't need to manage this file directly. `/hv-work` (no argument) reads and deletes it on resolve.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Working: /hv-work or /hv-debug starts
     Working --> Paused: /hv-pause writes handoff note
     Paused --> Cleared: /clear or session ends
-    Cleared --> Resuming: /hv-next in new session
+    Cleared --> Resuming: /hv-work in new session
     Resuming --> Working: handoff consumed (rm -f)
     Paused --> Working: resume in same session
     Working --> [*]: merge or PR
 ```
 
-## /hv-next reads handoff notes
+## /hv-work reads handoff notes
 
-When active streams exist, `/hv-next` reads any handoff note matching each stream and surfaces the **Stage**, **Next planned step**, and **Current hypothesis** inline. Path resolution mirrors `/hv-pause`'s write side: `.hv/handoff/<branch>@<repo>.md` for umbrella streams, with a fallback to `.hv/handoff/<branch>.md` for single-repo cycles or pre-umbrella handoffs.
+When active streams exist, `/hv-work` (no argument) reads any handoff note matching each stream and surfaces the **Stage**, **Next planned step**, and **Current hypothesis** inline. Path resolution mirrors `/hv-pause`'s write side: `.hv/handoff/<branch>@<repo>.md` for umbrella streams, with a fallback to `.hv/handoff/<branch>.md` for single-repo cycles or pre-umbrella handoffs.
 
-If a handoff is present, `/hv-next`'s per-stream question offers "Resume with `/hv-work`" as the recommended action. The handoff brief flows into the dispatched `/hv-work`, and the note is `rm -f`-ed once the user confirms the resume. "Leave handoff for later" preserves the file so the next `/hv-next` invocation surfaces it again.
+If a handoff is present, `/hv-work` (no argument)'s per-stream question offers "Resume with `/hv-work`" as the recommended action. The handoff brief flows into the dispatched `/hv-work`, and the note is `rm -f`-ed once the user confirms the resume. "Leave handoff for later" preserves the file so the next `/hv-work` (no argument) invocation surfaces it again.
 
 ## Recovering after /clear
 
@@ -52,7 +52,7 @@ A typical recovery looks like this:
 
 1. You're mid-investigation on branch `hv/my-feature`, context is filling. You run `/hv-pause`, which writes `.hv/handoff/hv-my-feature.md` with your current hypothesis and the next step you were about to try.
 2. You run `/clear`. All conversation context is gone.
-3. In the new session, you run `/hv-next`.
+3. In the new session, you run `/hv-work` (no argument).
 4. The skill reads `status.json`, validates active streams against git, finds the handoff note for `hv/my-feature`, and surfaces something like:
 
 ```
@@ -91,7 +91,7 @@ hv hook install --wrap-statusline    # when you already have a statusLine
 
 **The next session.** The SessionStart hook fires on `startup` and `clear`. When the new session holds the lease and the handoff exists, it injects the file as context and moves it to `<base>.md.consumed`. A restarted orchestrator has not run `hv round start` yet, so it holds no lease: a fresh handoff written by the Stop hook (first line `<!-- hv-handoff: orchestrator -->`) is injected anyway. Its first act is `hv round start`, then it reads the handoff. `resume` and `compact` keep the file.
 
-`hv doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`, `stop-hook`). The hooks are opt-in: until `hv hook install` has written something, both checks skip. After that they fail on a partial or broken install (one hook missing, a statusline without the dump, a hook command that no longer resolves). Restarting the orchestrator after the exit is the next section; usage limits are D3 (#67). Without the hooks, `/hv-pause` and `/hv-next` are the manual route.
+`hv doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`, `stop-hook`). The hooks are opt-in: until `hv hook install` has written something, both checks skip. After that they fail on a partial or broken install (one hook missing, a statusline without the dump, a hook command that no longer resolves). Restarting the orchestrator after the exit is the next section; usage limits are D3 (#67). Without the hooks, `/hv-pause` and `/hv-work` (no argument) are the manual route.
 
 ## Keepalive
 

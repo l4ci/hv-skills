@@ -64,7 +64,7 @@ If a new persistence skill needs a different gate, choose deliberately from {non
 
 How KNOWLEDGE.md, DECISIONS.md and the Glossary behave in an umbrella project (a root repo with registered sub-repos). Shipped in **F21**. The hard boundary is `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* (Architecture); this section describes the model and does not re-decide it. Changing the model means revisiting that decision first.
 
-**KNOWLEDGE.md is hybrid.** `.hv/KNOWLEDGE.md` (always present) holds cross-repo learnings and umbrella Glossary terms. `.hv/knowledge/<name>/KNOWLEDGE.md` (created on first write or by `/hv-init` umbrella setup) holds that sub-repo's learnings and Glossary terms. Learnings that apply across repos go in the umbrella file; one-repo learnings (*"`web`'s Postgres pool config differs from `api`'s"*) go in that repo's file.
+**KNOWLEDGE.md is hybrid.** `.hv/KNOWLEDGE.md` (always present) holds cross-repo learnings and umbrella Glossary terms. `.hv/knowledge/<name>/KNOWLEDGE.md` (created on first write or by `hv init` umbrella setup) holds that sub-repo's learnings and Glossary terms. Learnings that apply across repos go in the umbrella file; one-repo learnings (*"`web`'s Postgres pool config differs from `api`'s"*) go in that repo's file.
 
 **DECISIONS.md is umbrella-only.** One `.hv/DECISIONS.md` at the umbrella root, never split per sub-repo: hard boundaries are cross-repo. A truly repo-local "decision" is a learning; use `/hv-learn`.
 
@@ -84,4 +84,4 @@ The scoped `hv knowledge` and `hv glossary` verbs resolve the target file and ti
 
 **CLAUDE.md managed block.** A sub-repo's CLAUDE.md (or AGENTS.md when present) gets `hv block knowledge --repo <name>`, listing umbrella topics plus that sub-repo's own, so a reader in the sub-repo sees the full topic index. The umbrella-root file lists umbrella topics only. Single-repo projects are unchanged.
 
-**Migration.** `/hv-migrate v4` writes each `.hv/contexts/<name>/CONTEXT.md` into `.hv/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `hv glossary import --repo <name>`, and the umbrella-root `.hv/CONTEXT.md` into the umbrella Glossary. Originals are backed up under `.hv/migrate-backup/`. Existing umbrella KNOWLEDGE content is untouched.
+**Migration.** `hv migrate v4` writes each `.hv/contexts/<name>/CONTEXT.md` into `.hv/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `hv glossary import --repo <name>`, and the umbrella-root `.hv/CONTEXT.md` into the umbrella Glossary. Originals are backed up under `.hv/migrate-backup/`. Existing umbrella KNOWLEDGE content is untouched.

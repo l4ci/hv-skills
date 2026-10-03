@@ -20,7 +20,7 @@ The repo has the README, a `.gitignore`, and nothing else.
 
 ```mermaid
 flowchart LR
-  BRIEF[README.md brief] --> INIT["/hv-init"]
+  BRIEF[README.md brief] --> INIT["hv init"]
   INIT --> VISION["/hv-vision"]
   VISION --> MILES[(M01 active)]
   VISION --> SPIKE["/hv-spike<br/>sqlite-schema"]
@@ -38,13 +38,13 @@ flowchart LR
 
 Ten steps follow, in execution order.
 
-## Step 1: /hv-init
+## Step 1: hv init
 
 ```bash
-$ /hv-init
+$ hv init
 ```
 
-Five questions, about thirty seconds. For a solo greenfield I take the defaults: orchestrator `opus` and worker `sonnet`, branch isolation, direct merge, review gate on, autonomy off. Flip any of these later via `/hv-config`.
+No questions. For a solo greenfield the defaults are what I want: orchestrator `opus` and worker `sonnet`, branch isolation, direct merge, review gate on, autonomy off. Flip any of these later with `hv config set`.
 
 The command writes:
 
@@ -174,7 +174,7 @@ Single binary, `cobra` for the CLI, `database/sql` plus `mattn/go-sqlite3`. Deci
 
 ## Step 5: /hv-capture
 
-The plan named five tasks. You can either run `/hv-work` against the plan directly (it decomposes the same way), or capture the slice as backlog items first so each gets an ID, a detail file, and a KNOWLEDGE.md link. For greenfield I prefer the capture step: it gives me hooks for tracking, and `/hv-next` surfaces items in order.
+The plan named five tasks. You can either run `/hv-work` against the plan directly (it decomposes the same way), or capture the slice as backlog items first so each gets an ID, a detail file, and a KNOWLEDGE.md link. For greenfield I prefer the capture step: it gives me hooks for tracking, and `/hv-work` (no argument) surfaces items in order.
 
 ```bash
 $ /hv-capture "tally CLI skeleton, sqlite migrations engine, transactions schema with int64 minor units, tally add command, tally list command"
@@ -194,10 +194,10 @@ Each gets a row in `BACKLOG.md` under `## Features`, tagged `Milestone: M01`. De
 
 If any of these had been size-Major instead of Minor, `/hv-capture` would have nudged you toward `/hv-brainstorm` before plan to negotiate the design first. Minor items skip that layer.
 
-## Step 6: first cycle (/hv-next → /hv-work → /hv-ship → /hv-learn)
+## Step 6: first cycle (/hv-work → /hv-ship → /hv-learn)
 
 ```bash
-$ /hv-next
+$ /hv-work
 ```
 
 ```
@@ -288,7 +288,7 @@ The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time
 
 You loop steps 6–9 through additional slices: `tally summary` for monthly rollups, `tally yoy` for year-over-year compare, a CSV importer. Each `/hv-plan M01-S02`, `M01-S03`, `M01-S04` writes its own slice plan; `/hv-capture` seeds items; `/hv-work` ships them; `/hv-learn` catches anything subtle that surfaced.
 
-After the importer ships, `/hv-next` says:
+After the importer ships, `/hv-work` (no argument) says:
 
 ```
 M01 has no open items.
@@ -305,4 +305,4 @@ You run it. M02 and M03 (which both depend on M01) flip from blocked to ready in
 - `.hv/plans/` keeps the M01-S01 plan on disk (slice plans persist; item-specific plans are auto-cleaned on ship)
 - `.hv/spikes/sqlite-schema.md` is a permanent record of why M01 stayed single-currency
 
-The next session in a fresh `/clear` starts from `/hv-next`, which reads the active milestone, the open backlog, and the managed blocks in `CLAUDE.md`. Nothing important is in your head. It's on disk, and the orchestrator's planning context now starts with what you learned.
+The next session in a fresh `/clear` starts from `/hv-work` (no argument), which reads the active milestone, the open backlog, and the managed blocks in `CLAUDE.md`. Nothing important is in your head. It's on disk, and the orchestrator's planning context now starts with what you learned.

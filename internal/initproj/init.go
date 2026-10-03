@@ -288,7 +288,7 @@ func migrateKnowledgePreamble(path string) (bool, error) {
 	return true, nil
 }
 
-// removeMirror deletes the `.hv/bin` mirror that 4.x /hv-init wrote. 5.0 has no
+// removeMirror deletes the `.hv/bin` mirror that the 4.x init skill wrote. 5.0 has no
 // mirror: the hv binary is on PATH. It removes what the old mirror step
 // replaced (`hv-*` and `hvlib*.py` files) and the `__pycache__` Python left
 // there, then the directory itself if that emptied it. Anything else stays and

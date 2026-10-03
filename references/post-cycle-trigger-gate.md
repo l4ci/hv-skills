@@ -24,7 +24,7 @@ The downstream nudges (Learn, Docs After-Work) cost user attention or token budg
 
 Every post-cycle nudge step runs the same sequence. The call site supplies the **bolded parameters**; this reference supplies the sequence.
 
-1. **Config flag** *(only when the site names one, e.g. `docs.afterWork`)* — read it from `.hv/config.json` (default `false`). `false` → skip the step entirely. The flag is opt-in: users enable it via `/hv-config` or the owning skill's first-run / manual-toggle flow.
+1. **Config flag** *(only when the site names one, e.g. `docs.afterWork`)* — read it from `.hv/config.json` (default `false`). `false` → skip the step entirely. The flag is opt-in: users enable it via `hv config set` or the owning skill's first-run / manual-toggle flow.
 2. **Trigger** — apply *The condition* above, subject to *When the gate does NOT fire*. When the site names a **trigger override** (e.g. `/hv-work` Step 14's refactor-age counts), apply that instead of the default condition; the don't-repeat exclusion applies to every trigger, override or not. Not triggered → skip silently.
 3. **Branch on `autonomy.level`:**
    - `"off"` → emit the site's **nudge line**, placed where the site says (standalone message, or appended to the cycle's final report).
