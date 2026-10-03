@@ -330,7 +330,7 @@ func TestParityA4D(t *testing.T) {
 	listBoth(&all, "list/label-limit", dseed, "issues", "list", "--label", "existing", "--limit", "1")
 	listBoth(&all, "list/empty-forge", dempty, "issues", "list")
 	listBoth(&all, "list/mine", dseed, "issues", "list", "--mine")
-	add(one("list/unknown-provider", dr(3, "issues", "list").with("no resolvable provider is exit 3 here, an empty list or 5 in the shim (#48)", 0).msg("issues.provider")).on("none"))
+	add(one("list/unknown-provider", dr(3, "issues", "list").msg("issues.provider")).on("none"))
 	dboth(&all, one("list/limit-0", dr(2, "issues", "list", "--limit", "0")))
 	dboth(&all, one("list/limit-abc", dr(2, "issues", "list", "--limit", "abc")))
 	dboth(&all, one("list/limit-neg", dr(2, "issues", "list", "--limit", "-3")))
@@ -342,7 +342,7 @@ func TestParityA4D(t *testing.T) {
 	dboth(&all, one("list/rate-limited", dr(6, "issues", "list").env1(append([]string{"FAKE_TRACKER_FAIL=issue list"}, rate...)...)))
 	add(dsc{name: "list/umbrella-web", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(0, "issues", "list", "--repo", "web")}},
 		dsc{name: "list/umbrella-api", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(0, "issues", "list", "--repo", "api", "--limit", "3")}},
-		dsc{name: "list/umbrella-root-unknown", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(3, "issues", "list").with("no resolvable provider is exit 3 here, an empty list or 5 in the shim (#48)", 0)}},
+		dsc{name: "list/umbrella-root-unknown", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(3, "issues", "list")}},
 		dsc{name: "list/repo-unknown", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(3, "issues", "list", "--repo", "nope")}},
 		dsc{name: "list/no-hv", remote: "none", fx: fx{noHV: true}, runs: []drun{dr(3, "issues", "list")}},
 	)
@@ -357,8 +357,8 @@ func TestParityA4D(t *testing.T) {
 	dboth(&all, one("label/add-equals-form", dr(0, "issues", "label", "6", "--add=bug").ch(true)))
 	dboth(&all, one("label/unicode-label", dr(0, "issues", "label", "5", "--add", "prioé").ch(true)))
 	dboth(&all, one("label/spaced-label", dr(0, "issues", "label", "5", "--add", "needs review").ch(true)))
-	dboth(&all, one("label/missing-issue", dr(3, "issues", "label", "99", "--add", "bug").with("a missing issue is exit 3 here, 5 in the shim (#48)", 5)))
-	dboth(&all, one("label/missing-issue-remove", dr(3, "issues", "label", "99", "--remove", "bug").with("a missing issue is exit 3 here, 5 in the shim (#48)", 5)))
+	dboth(&all, one("label/missing-issue", dr(3, "issues", "label", "99", "--add", "bug")))
+	dboth(&all, one("label/missing-issue-remove", dr(3, "issues", "label", "99", "--remove", "bug")))
 	dboth(&all, one("label/both-flags", dr(2, "issues", "label", "1", "--add", "a", "--remove", "b")))
 	dboth(&all, one("label/neither-flag", dr(2, "issues", "label", "1")))
 	dboth(&all, one("label/empty-label", dr(2, "issues", "label", "1", "--add", "")))
@@ -370,7 +370,7 @@ func TestParityA4D(t *testing.T) {
 		one("label/rate-limited-remove/github", dr(6, "issues", "label", "1", "--remove", "bug").env1(append([]string{"FAKE_TRACKER_FAIL=issue edit"}, rate...)...)),
 		one("label/rate-limited/gitlab", dr(6, "issues", "label", "1", "--add", "bug").env1(append([]string{"FAKE_TRACKER_FAIL=issue update"}, rate...)...)).on("gitlab"),
 		one("label/rate-limited-remove/gitlab", dr(6, "issues", "label", "1", "--remove", "bug").env1(append([]string{"FAKE_TRACKER_FAIL=issue update"}, rate...)...)).on("gitlab"))
-	add(one("label/unknown-provider", dr(3, "issues", "label", "1", "--add", "bug").with("no resolvable provider is exit 3 here, an empty list or 5 in the shim (#48)", 5).msg("issues.provider")).on("none"))
+	add(one("label/unknown-provider", dr(3, "issues", "label", "1", "--add", "bug").msg("issues.provider")).on("none"))
 	add(dsc{name: "label/autocreate-off/github", db: dseed, fx: fx{config: `{"issues": {"retryWaitSeconds": 0, "autoCreateLabel": false}}`},
 		runs: []drun{func() drun {
 			r := dr(3, "issues", "label", "1", "--add", "brand-new").with("old reads autoCreateLabel with jq's `// true`, so false still creates (divergence 3)", 0)
@@ -405,11 +405,11 @@ func TestParityA4D(t *testing.T) {
 	dboth(&all, one("close/missing-commit", dr(2, "issues", "close", "1")))
 	dboth(&all, one("close/no-number", dr(2, "issues", "close", "--commit", "{head}")))
 	dboth(&all, one("close/bad-number", dr(2, "issues", "close", "x1", "--commit", "{head}")))
-	dboth(&all, one("close/missing-issue", dr(3, "issues", "close", "99", "--commit", "{head}").with("a missing issue is exit 3 here, 5 in the shim (#48)", 5)))
+	dboth(&all, one("close/missing-issue", dr(3, "issues", "close", "99", "--commit", "{head}")))
 	dboth(&all, one("close/forge-fails", dr(5, "issues", "close", "1", "--commit", "{head}").env1("FAKE_TRACKER_FAIL=issue close")))
 	dboth(&all, one("close/rate-limited", dr(6, "issues", "close", "1", "--commit", "{head}").env1(append([]string{"FAKE_TRACKER_FAIL=issue close"}, rate...)...)))
 	dboth(&all, one("close/auth-fails", dr(5, "issues", "close", "1", "--commit", "{head}").env1("FAKE_TRACKER_FAIL=auth status")))
-	add(one("close/unknown-provider", dr(3, "issues", "close", "1", "--commit", "{head}").with("no resolvable provider is exit 3 here, an empty list or 5 in the shim (#48)", 5).msg("issues.provider")).on("none"))
+	add(one("close/unknown-provider", dr(3, "issues", "close", "1", "--commit", "{head}").msg("issues.provider")).on("none"))
 	add(one("close/already-closed/gitlab", dr(0, "issues", "close", "3", "--commit", "{head}").ch(false)).on("gitlab"))
 	add(one("close/already-closed/github", dr(0, "issues", "close", "3", "--commit", "{head}").ch(false)))
 	add(dsc{name: "close/umbrella-web", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{
