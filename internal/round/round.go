@@ -98,6 +98,8 @@ type Row struct {
 	Drift      []string
 	// Escalations are the ids of the slot's open escalations.
 	Escalations []string
+	// Kind, Tier, Model and TierReason are the slot's C9 fields.
+	Kind, Tier, Model, TierReason string
 }
 
 // Finding is one drift. Repair names what Reconcile(apply) would do and is
@@ -176,6 +178,7 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 		}
 		r := &Row{Name: name, Branch: branch, PR: worker.Str(s, "pr"), Tab: worker.Str(s, "handle"), Registered: true}
 		r.Issue = issueOf(worker.Str(s, "task"), branch, name)
+		r.Kind, r.Tier, r.Model, r.TierReason = worker.Str(s, "kind"), worker.Str(s, "tier"), worker.Str(s, "model"), worker.Str(s, "tierReason")
 		add(r, &view{worktree: wt, base: firstNonEmpty(worker.Str(s, "base"), e.Base)})
 	}
 	sort.Slice(wts, func(i, j int) bool { return wts[i].name < wts[j].name })

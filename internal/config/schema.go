@@ -83,6 +83,13 @@ var Keys = []Key{
 	{"round.roster", []any{"ben", "dana", "nia", "kit"}, false},
 	{"round.brief", "", false},
 	{"round.sharedPaths", []any{}, false},
+	{"round.tier", "standard", false},
+	{"round.tiers.claude.light", "haiku", false},
+	{"round.tiers.claude.standard", "", false}, // empty: models.worker
+	{"round.tiers.claude.heavy", "opus", false},
+	{"round.tiers.codex.light", "", false},
+	{"round.tiers.codex.standard", "", false},
+	{"round.tiers.codex.heavy", "", false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.

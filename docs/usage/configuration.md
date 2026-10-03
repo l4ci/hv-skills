@@ -229,6 +229,11 @@ Settings for `hv round` (parallel rounds). All are silent defaults; none is writ
 | `round.roster` | `["ben","dana","nia","kit"]` | Agent names, one slot each (`.worktrees/<agent>`, parked on `park/<agent>`, working on `<agent>/<issue>-<slug>`). Lowercase letters, digits and `-`; no duplicates. |
 | `round.brief` | `""` | Path of the standing worker contract the assignment pointer names. Empty means `references/worker-contract.md` from the plugin or project. |
 | `round.sharedPaths` | `[]` | Repo-relative globs the file-overlap readiness check ignores, for files every issue touches (a command registry, a contract doc). |
+| `round.tier` | `"standard"` | Default worker tier: `light` (reading, searching), `standard` (code and tests) or `heavy` (hard reasoning). `hv round assign --tier heavy --tier-reason "…"` goes above it; a tier above the default needs the reason, which lands on the slot. |
+| `round.tiers.claude.light` / `.standard` / `.heavy` | `haiku` / `models.worker` / `opus` | The model each tier starts a Claude worker with. `standard` follows `models.worker` (so `/hv-work` and rounds agree) until set explicitly. |
+| `round.tiers.codex.light` / `.standard` / `.heavy` | empty | The same for Codex. A kind with any tier set must set all three. Starting a Codex worker is not built yet (#68); `assign --kind codex --check-only` shows the model it would use. |
+
+A custom `work.workerCommand` receives the tier's model only through a `{model}` placeholder in the command; without one, `hv round assign` warns and records the tier but not a model.
 
 `round.scope` is a different axis from `autonomy.level`: the level says how far skills chain on their own, the scope says which issues a round may take. Set with `hv config set round.scope slate`.
 

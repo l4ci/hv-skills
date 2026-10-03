@@ -162,6 +162,10 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 			if err := mutateSlot(root, name, func(s *jsonx.Object) {
 				s.Set("task", nil)
 				s.Set("claimId", nil)
+				s.Set("kind", nil)
+				s.Set("tier", nil)
+				s.Set("model", nil)
+				s.Set("tierReason", nil)
 				s.Set("pr", nil)
 				s.Set("state", "idle")
 			}); err != nil {

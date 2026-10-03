@@ -15,6 +15,12 @@ Work only this task, then stop.
   invisible in the body. Then dispute it before building: if the ticket is wrong,
   already decided or contradicted by the code, say so (`HV-BLOCKED`, or in your PR
   if you built a narrower thing) instead of implementing it as written.
+- Size your own subagents by tier, not by model name. Delegate reading, searching
+  and discovery to a `light` subagent, writing code and tests to a `standard` one,
+  and keep `heavy` for genuinely hard reasoning (design, a tricky debugging
+  hypothesis). If your brief names your tier and a tier table, use that table for
+  the model names; if it names none, use your harness's own defaults. Say which
+  tier you ran on in your PR body when the brief asks for it.
 - Stay in your worktree. Confirm `pwd` before editing and use worktree-rooted
   paths — an absolute path under the main checkout silently edits the WRONG tree.
 - Stage explicit paths. Never `git add -A` or `git add .`.

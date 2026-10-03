@@ -31,6 +31,9 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 	body := fs.String("body-file", "", "decisions already settled, passed verbatim to the worker (- for stdin)")
 	siblings := fs.String("siblings", "", "issues running alongside, comma-separated")
 	checkOnly := fs.Bool("check-only", false, "run the readiness checks and write nothing")
+	tier := fs.String("tier", "", "worker tier: light, standard or heavy (default round.tier)")
+	tierReason := fs.String("tier-reason", "", "one line on why; required above the default tier")
+	kind := fs.String("kind", "", "harness kind: claude or codex (default the slot's, else claude)")
 	accept := fs.Bool("accept-overlap", false, "skip the file-overlap check only")
 	pid := fs.Int("holder-pid", 0, "orchestrator pid, when its ancestry cannot be read")
 	return func(c *Ctx, args []string) (Result, error) {
@@ -78,8 +81,12 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 		res, err := env.Assign(ctx, root, be, round.AssignOpts{
 			ID: id, Agent: *agent, BodyFile: bf, Siblings: splitList(*siblings),
 			CheckOnly: *checkOnly, AcceptOverlap: *accept, HolderPID: *pid,
+			Tier: *tier, TierReason: *tierReason, Kind: *kind,
 			Settings: set, Getenv: os.Getenv,
 		})
+		for _, w := range res.Warnings {
+			c.Warn("%s", w)
+		}
 		d := jsonx.NewObject()
 		d.Set("id", id)
 		d.Set("type", typ)
@@ -107,6 +114,10 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 		d.Set("ready", res.Ready())
 		d.Set("checks", checkList(res.Checks))
 		setIf(d, "account", res.Account)
+		d.Set("kind", res.Kind)
+		d.Set("tier", res.Tier)
+		setIf(d, "model", res.Model)
+		setIf(d, "tierReason", res.TierReason)
 		d.Set("dispatched", res.Dispatched)
 		d.Set("changed", res.Changed)
 		if *checkOnly {
