@@ -213,6 +213,13 @@ hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null \
   || fail "dispatch through a startup dialog failed"
 grep -q '^agent send-keys hv-w1-w9-t1[0-9] down enter$' "$FAKE/log" \
   || fail "dispatch did not answer the bypass dialog from the pane; log: $(cat "$FAKE/log")"
+# Claude Code v2.1.288's real folder-trust dialog: unnumbered, cursor on "No, exit" (#209).
+cp "$REPO/internal/host/testdata/trust-dialog-2.1.288.txt" "$FAKE/pane.txt"
+: > "$FAKE/log"
+hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null \
+  || fail "dispatch through the unnumbered trust dialog should succeed: $(cat "$FAKE/log")"
+grep -q "agent send-keys hv-w1-w9-t[0-9]* down enter" "$FAKE/log" \
+  || fail "the unnumbered trust dialog is answered with down + enter: $(grep send-keys "$FAKE/log")"
 cp "$TMP_HD/other.txt" "$FAKE/pane.txt"
 RC=0
 hd "$HV_BIN" worker dispatch w1 --body-file "$TMP_HD/brief.md" >/dev/null 2>&1 || RC=$?
@@ -282,6 +289,10 @@ printf 'HV-DONE w1 https://github.com/o/r/pull/9\n' > "$FAKE/pane.txt"
 hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
 [ "$(slot_field w1 state)" = "done" ] || fail "poll did not write state=done"
 [ "$(slot_field w1 pr)" = "https://github.com/o/r/pull/9" ] || fail "poll did not record the PR URL in slot.pr"
+# Claude Code v2.1.288 starts a reply with "● ": a sentinel after it is still seen (#210).
+printf '● HV-DONE w1 https://github.com/o/r/pull/10\n' > "$FAKE/pane.txt"
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
+[ "$(slot_field w1 pr)" = "https://github.com/o/r/pull/10" ] || fail "HV-DONE after the reply bullet should be seen, pr is $(slot_field w1 pr)"
 touch "$FAKE/gone"
 STATE="$( hd "$HV_BIN" --json worker poll w1 --settle 0 | jget 'data.slots[0].state' )"
 [ "$STATE" = "dead" ] || fail "a slot whose agent is gone should poll dead, got $STATE"

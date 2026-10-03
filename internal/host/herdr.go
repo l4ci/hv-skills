@@ -153,42 +153,75 @@ func baseName(p string) string {
 	return p
 }
 
-var dialogLine = regexp.MustCompile(`^\s*(❯|>)?\s*(\d+)\.\s+(.*\S)`)
+// dialogLine is one option of a startup dialog: an optional cursor (❯, or >
+// on a plain terminal), an optional number (Claude Code numbered its options
+// before v2.1.288), then the text.
+var dialogLine = regexp.MustCompile(`^\s*(❯|>)?\s*(?:\d+\.\s+)?(.*\S)`)
 
 var dialogAccept = []string{"Yes, I trust this folder", "Yes, I accept", "Yes, proceed"}
+
+// numbered is an option line that carries a number.
+var numbered = regexp.MustCompile(`^\s*(❯|>)?\s*\d+\.\s+\S`)
 
 // DialogKeys reads a startup dialog off the pane text. Claude Code can open
 // on the folder-trust prompt for a fresh worktree, or the Bypass Permissions
 // warning on a config dir that has not accepted it yet. The two put their
 // accepting option in different positions, so a fixed keypress picks "No,
-// exit" on one of them. It finds the accepting option and the cursor (❯) and
-// returns the keys that move between them plus `enter`; ok is false on an
+// exit" on one of them. The options are the block of adjacent non-blank lines
+// that holds the cursor (❯), numbered or not; with no cursor on screen, the
+// block of numbered lines, cursor on the first. It returns the keys that move
+// from the cursor to the accepting option plus `enter`; ok is false on an
 // unknown dialog.
 func DialogKeys(pane string) (keys []string, ok bool) {
-	cursor, target := 0, 0
+	var blocks [][]string
+	var cur []string
 	for _, line := range strings.Split(pane, "\n") {
+		if strings.TrimSpace(line) == "" {
+			if cur != nil {
+				blocks, cur = append(blocks, cur), nil
+			}
+			continue
+		}
+		cur = append(cur, line)
+	}
+	if cur != nil {
+		blocks = append(blocks, cur)
+	}
+	var opts []string
+	cursor := -1
+	for _, b := range blocks {
+		for i, line := range b {
+			if m := dialogLine.FindStringSubmatch(line); m != nil && m[1] != "" {
+				opts, cursor = b, i
+			}
+		}
+	}
+	if opts == nil {
+		for _, b := range blocks {
+			if numbered.MatchString(b[0]) {
+				opts, cursor = b, 0
+				break
+			}
+		}
+	}
+	target := -1
+	for i, line := range opts {
 		m := dialogLine.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
-		n, _ := strconv.Atoi(m[2])
-		if m[1] != "" {
-			cursor = n
-		}
-		if target == 0 {
-			for _, a := range dialogAccept {
-				if strings.Contains(m[3], a) {
-					target = n
-					break
-				}
+		for _, a := range dialogAccept {
+			if strings.Contains(m[2], a) {
+				target = i
+				break
 			}
 		}
+		if target >= 0 {
+			break
+		}
 	}
-	if target == 0 {
+	if target < 0 {
 		return nil, false
-	}
-	if cursor == 0 {
-		cursor = 1
 	}
 	step, n := "down", target-cursor
 	if target < cursor {

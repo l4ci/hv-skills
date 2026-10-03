@@ -120,6 +120,10 @@ func TestDialogKeys(t *testing.T) {
 		{"trust dialog", "Do you trust this folder?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n", []string{"enter"}, true},
 		{"unknown dialog", "Pick a colour\n ❯ 1. Red\n   2. Blue\n", nil, false},
 		{"unknown", "1. Something else\n2. Other\n", nil, false},
+		// Claude Code v2.1.288 dropped the numbers (#209).
+		{"unnumbered trust", " ❯ No, exit\n   Yes, I trust this folder\n\n Enter to confirm · Esc to cancel\n", []string{"down", "enter"}, true},
+		{"unnumbered, cursor on yes", " Quick safety check\n\n   No, exit\n ❯ Yes, I trust this folder\n", []string{"enter"}, true},
+		{"unnumbered unknown", " ❯ Red\n   Blue\n", nil, false},
 		{"empty", "", nil, false},
 	}
 	for _, c := range cases {
@@ -127,6 +131,19 @@ func TestDialogKeys(t *testing.T) {
 		if ok != c.ok || !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: DialogKeys = %v %v, want %v %v", c.name, got, ok, c.want, c.ok)
 		}
+	}
+}
+
+// TestDialogKeysRealTrustDialog pins the folder-trust dialog exactly as
+// Claude Code v2.1.288 drew it under herdr 0.9.3 (captured in round 4's live
+// check, #209): unnumbered options, cursor on "No, exit".
+func TestDialogKeysRealTrustDialog(t *testing.T) {
+	b, err := os.ReadFile("testdata/trust-dialog-2.1.288.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys, ok := DialogKeys(string(b)); !ok || !reflect.DeepEqual(keys, []string{"down", "enter"}) {
+		t.Errorf("DialogKeys = %v %v, want [down enter] true", keys, ok)
 	}
 }
 
