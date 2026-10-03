@@ -274,7 +274,8 @@ func fakeLease(host string, alive ...int) roundlease.Env {
 
 func startOpts(scope string, pid int, items ...string) StartOpts {
 	set, _ := roundcfg.Load(os.TempDir()) // defaults: no config there
-	return StartOpts{Scope: scope, Items: items, HolderPID: pid, Settings: set, Getenv: func(string) string { return "" }, DefaultNum: 2}
+	// Dispatch tmux: these tests drive tab mode through a fake host.
+	return StartOpts{Scope: scope, Items: items, HolderPID: pid, Settings: set, Getenv: func(string) string { return "" }, DefaultNum: 2, Dispatch: "tmux"}
 }
 
 func TestStartProvisionsRosterAndTakesLease(t *testing.T) {

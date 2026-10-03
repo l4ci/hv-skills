@@ -146,6 +146,7 @@ var contractVerbs = []string{
 	"round escalate send",
 	"round reclaim",
 	"round reconcile",
+	"round report",
 	"round return",
 	"round start",
 	"round status",

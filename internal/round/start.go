@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
@@ -21,6 +22,10 @@ type StartOpts struct {
 	Settings   roundcfg.Settings
 	Getenv     func(string) string
 	DefaultNum int // slots when Slots is 0
+	// Dispatch is work.dispatch and LookPath the PATH probe; together with
+	// Getenv they resolve the round's host (C8). A nil LookPath is exec.LookPath.
+	Dispatch string
+	LookPath func(string) (string, error)
 }
 
 // Started is what Start did.
@@ -30,6 +35,7 @@ type Started struct {
 	Base       string
 	Slots      []*jsonx.Object
 	Slate      []string
+	Host       string // the round's host: herdr, tmux or solo
 	Lease      Lease
 	LeaseState LeaseState
 	Reclaimed  Lease // the stale lease replaced, zero when none
@@ -110,6 +116,14 @@ func (e Env) Start(ctx context.Context, root string, o StartOpts) (Started, erro
 	if err := worker.Update(root, slotsDefault(), func(doc *jsonx.Object) {
 		if out != roundlease.Renewed { // taken, reclaimed or numbered
 			doc.Set("round", l.Round)
+		}
+		// The host is chosen once per round: a restarted start keeps it, a new
+		// round (a newly taken lease) resolves again.
+		if rec := worker.Str(doc, "host"); rec != "" && out == roundlease.Renewed {
+			res.Host = rec
+		} else {
+			res.Host = host.ResolveRound(o.Dispatch, o.Getenv, o.LookPath)
+			doc.Set("host", res.Host)
 		}
 		doc.Set("scope", o.Scope)
 		if o.Scope == roundcfg.ScopeSlate {

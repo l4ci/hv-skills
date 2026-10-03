@@ -342,6 +342,9 @@ func pendingData(id string) *jsonx.Object {
 // notify raises the herdr notification when the host is herdr: work.dispatch
 // is herdr or the process runs inside herdr, and the binary is installed.
 func notify(ctx context.Context, env Env, root, id string, o SendOpts, warns []string) (bool, []string) {
+	if worker.RegistryHost(root) == "solo" { // the PR comment is the only channel
+		return false, append(warns, "no notification: the round is solo, there is no herdr")
+	}
 	if dispatchKind(root) != "herdr" && env.Getenv("HERDR_ENV") != "1" {
 		return false, append(warns, "no notification: the host is not herdr (work.dispatch is not herdr and HERDR_ENV is not 1)")
 	}

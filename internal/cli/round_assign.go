@@ -119,6 +119,11 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 		d.Set("tier", res.Tier)
 		setIf(d, "model", res.Model)
 		setIf(d, "tierReason", res.TierReason)
+		if res.Host != "" { // solo: the brief comes back instead of going to a pane
+			d.Set("host", res.Host)
+			d.Set("brief", res.Brief)
+			d.Set("worktree", res.Worktree)
+		}
 		d.Set("dispatched", res.Dispatched)
 		d.Set("changed", res.Changed)
 		if *checkOnly {

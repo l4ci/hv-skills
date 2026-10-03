@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
@@ -73,7 +74,10 @@ type Assigned struct {
 	Readiness
 	Account    string
 	Dispatched bool
-	Changed    bool
+	// Host, Brief and Worktree are set under solo (C8) in place of a dispatch:
+	// the brief to launch the subagent with, and its absolute working directory.
+	Host, Brief, Worktree string
+	Changed               bool
 	// Kind, Tier and Model are what the worker starts with; Model is "" when a
 	// custom work.workerCommand has no {model} placeholder.
 	Kind, Tier, Model, TierReason string
@@ -348,6 +352,11 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		return res, blk
 	}
 
+	// Solo runs Claude subagents only: a Codex subagent cannot be given a
+	// working directory (E3, #70), so it would edit the orchestrator's checkout.
+	if kind == roundcfg.KindCodex && isSolo(root) {
+		return res, usage("solo round: workers are Claude subagents; a Codex subagent cannot be given the slot's worktree")
+	}
 	// A codex worker that cannot start (version, host, login) is refused
 	// before anything is marked. dispatch runs the same preflight again.
 	if kind == roundcfg.KindCodex {
@@ -431,7 +440,9 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	// 8. The account is the pane's CLAUDE_CONFIG_DIR: keep the slot's own while
 	// it has headroom, else pick; none usable is a refusal to start.
 	// work.accounts is Anthropic's: a codex slot's CODEX_HOME is its account.
-	if kind != roundcfg.KindCodex && e.Accounts != nil && len(worker.Configured(root)) > 0 {
+	// Under solo every subagent runs on the orchestrator's own account.
+	solo := isSolo(root)
+	if !solo && kind != roundcfg.KindCodex && e.Accounts != nil && len(worker.Configured(root)) > 0 {
 		name, err := e.pickAccount(ctx, root, agent)
 		if err != nil {
 			undo()
@@ -441,12 +452,6 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 
 	// 9. Dispatch the pointer brief.
-	tmp, err := os.CreateTemp("", "hv-round-brief-")
-	if err != nil {
-		undo()
-		return res, err
-	}
-	defer os.Remove(tmp.Name())
 	decisions := ""
 	if o.BodyFile != "" {
 		b, _ := os.ReadFile(o.BodyFile)
@@ -456,6 +461,23 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	if hb := latestHandoffBranch(be, id); hb != "" {
 		text += fmt.Sprintf("\nAn earlier worker handed this issue back: read the latest `hv:handoff` comment on it. Its work is pushed on branch %s (origin/%s); fetch it before you start over.\n", hb, hb)
 	}
+	if solo {
+		// No pane: mark the slot busy and hand the brief back.
+		brief, wt, err := e.soloHandOff(root, agent, text, rnd)
+		if err != nil {
+			undo()
+			return res, err
+		}
+		res.Host, res.Brief, res.Worktree = host.Solo, brief, wt
+		res.Changed = true
+		return res, nil
+	}
+	tmp, err := os.CreateTemp("", "hv-round-brief-")
+	if err != nil {
+		undo()
+		return res, err
+	}
+	defer os.Remove(tmp.Name())
 	tmp.WriteString(text)
 	tmp.Close()
 	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch, Model: res.Model,

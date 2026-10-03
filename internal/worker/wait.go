@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
 // WaitOpts are the flags of `hv round wait`.
@@ -23,6 +24,7 @@ const (
 	SourceSnapshot = "snapshot"
 	SourceEvent    = "herdr-event"
 	SourcePoll     = "poll"
+	SourceRegistry = "registry" // solo: the recorded state, no pane to read
 )
 
 // WaitResult is the first slot that needs attention, or, with TimedOut, the
@@ -57,7 +59,10 @@ func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, err
 		o.Lines = 60
 	}
 	start := e.Now()
-	h := e.NewHost(dispatchKind(root))
+	if RegistryHost(root) == host.Solo {
+		return soloWait(root, o)
+	}
+	h := e.NewHost(hostKind(root))
 	if err := h.Require(); err != nil {
 		return WaitResult{}, fail(ExitUnavailable, err.Error())
 	}
@@ -151,4 +156,41 @@ func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, err
 			return WaitResult{}, fail(ExitUnavailable, strings.TrimSpace(err.Error()))
 		}
 	}
+}
+
+// soloWait is Wait for a solo round. Nothing but `round report` changes a solo
+// slot's state, so waiting would never end: it answers at once with the first
+// watched slot whose recorded state is not busy, else timed out. Watched slots
+// are the named ones, or every registered slot that is not idle; a solo slot
+// has no handle to require.
+func soloWait(root string, o WaitOpts) (WaitResult, error) {
+	reg := LoadRegistry(root)
+	var watched []*jsonx.Object
+	if len(o.Slots) > 0 {
+		for _, name := range o.Slots {
+			s := reg.Slot(name)
+			if s == nil {
+				return WaitResult{}, fail(ExitResolution, fmt.Sprintf("slot '%s' is not in the pool", name))
+			}
+			watched = append(watched, s)
+		}
+	} else {
+		for _, s := range reg.Slots() {
+			if strings.ToLower(Str(s, "state")) != "idle" {
+				watched = append(watched, s)
+			}
+		}
+	}
+	if len(watched) == 0 {
+		return WaitResult{}, fail(ExitResolution, "no slot to watch: every slot is idle")
+	}
+	var rows []PollRow
+	for _, s := range watched {
+		st := strings.ToLower(Str(s, "state"))
+		if st != "busy" {
+			return WaitResult{Slot: Str(s, "name"), State: st, Source: SourceRegistry}, nil
+		}
+		rows = append(rows, PollRow{Str(s, "name"), st, ""})
+	}
+	return WaitResult{TimedOut: true, Slots: rows}, nil
 }

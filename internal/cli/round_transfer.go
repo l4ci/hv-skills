@@ -80,6 +80,11 @@ func transferData(res round.Transferred) *jsonx.Object {
 	d.Set("head", sha7(res.Head))
 	d.Set("salvaged", res.Salvaged)
 	setIf(d, "claimId", res.ClaimID)
+	if res.Host != "" { // solo: the brief comes back instead of going to a pane
+		d.Set("host", res.Host)
+		d.Set("brief", res.Brief)
+		d.Set("worktree", res.Worktree)
+	}
 	d.Set("dispatched", res.Dispatched)
 	d.Set("changed", res.Changed)
 	return d

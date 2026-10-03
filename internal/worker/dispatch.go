@@ -88,6 +88,29 @@ func dispatchKind(root string) string {
 	return s
 }
 
+// RegistryHost is the round host `round start` recorded (C8), "" when no
+// round is in flight.
+func RegistryHost(root string) string { return Str(LoadRegistry(root).Doc, "host") }
+
+// hostKind is the host a pane verb drives: the round's recorded host when
+// there is one, else what work.dispatch says, exactly as before C8. Never
+// pass "solo" on to host.New: callers refuse it first (SoloRefusal).
+func hostKind(root string) string {
+	if h := RegistryHost(root); h != "" {
+		return h
+	}
+	return dispatchKind(root)
+}
+
+// SoloRefusal is the exit 2 a pane verb gives when the round's recorded host
+// is solo, nil otherwise. equiv names the solo verb that does the same job.
+func SoloRefusal(root, equiv string) error {
+	if RegistryHost(root) != host.Solo {
+		return nil
+	}
+	return &Error{Exit: ExitUsage, Message: "solo round: workers are subagents, there are no panes", Hint: equiv}
+}
+
 var shortResume = regexp.MustCompile(`^-[A-Za-z]*[cr][A-Za-z]*$`)
 
 // ResumeFlag returns the first token after the claude binary that reopens the
@@ -204,11 +227,14 @@ func roundOf(root string) int {
 func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (DispatchResult, error) {
 	e = e.withDefaults()
 	res := DispatchResult{Slot: o.Slot, Task: o.Task, Round: o.Round, Relay: o.Relay}
+	if err := SoloRefusal(root, "hv round assign hands a slot its brief and hv round report records the result"); err != nil {
+		return res, err
+	}
 	brief, err := os.ReadFile(o.BodyFile)
 	if err != nil {
 		return res, fail(ExitResolution, "body file not found: "+o.BodyFile)
 	}
-	h := e.NewHost(dispatchKind(root))
+	h := e.NewHost(hostKind(root))
 	if err := h.Require(); err != nil {
 		return res, fail(ExitUnavailable, err.Error())
 	}
@@ -487,11 +513,14 @@ func (e Env) KillSlot(ctx context.Context, root, slot string) error {
 	if s == nil {
 		return fail(ExitResolution, fmt.Sprintf("slot '%s' is not in the pool", slot))
 	}
+	if RegistryHost(root) == host.Solo {
+		return nil // a subagent has no pane to close
+	}
 	handle := Str(s, "handle")
 	if handle == "" {
 		handle = Str(s, "window")
 	}
-	h := e.NewHost(dispatchKind(root))
+	h := e.NewHost(hostKind(root))
 	if err := h.Require(); err != nil {
 		return fail(ExitUnavailable, err.Error())
 	}

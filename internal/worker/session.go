@@ -45,7 +45,7 @@ type SessionState struct {
 // reads.
 func (e Env) SessionCheck(ctx context.Context, root string) SessionState {
 	e = e.withDefaults()
-	h := e.NewHost(dispatchKind(root))
+	h := e.NewHost(hostKind(root))
 	if h.InSession() {
 		return SessionState{Inside: true, Where: h.Where()}
 	}
@@ -90,7 +90,10 @@ func (e Env) SessionEnsure(ctx context.Context, root string, o SessionOpts) (Ses
 	if o.BootTimeout <= 0 {
 		o.BootTimeout = 60
 	}
-	h := e.NewHost(dispatchKind(root))
+	if err := SoloRefusal(root, "a solo round has no host session to hand off into"); err != nil {
+		return SessionState{}, err
+	}
+	h := e.NewHost(hostKind(root))
 	if err := h.Require(); err != nil {
 		return SessionState{}, fail(ExitUnavailable, err.Error())
 	}

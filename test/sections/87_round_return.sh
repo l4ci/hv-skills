@@ -1,13 +1,13 @@
 echo "round return/transfer/reclaim: park, handoff comment, claim moves (C10, #76)"
 # A started round in an issue-mode project, driven end to end by FAKES only:
 # gh is test/fakes/gh (state in a JSON store), tmux is test/fakes/tmux (logs its
-# argv), herdr is a canned `api snapshot`, origin is a local bare repo. Nothing
+# argv; rrsnap feeds its host snapshot), origin is a local bare repo. Nothing
 # reaches a real forge, host or remote.
 
 TMP_RR="$(mktemp -d)"
 trap 'rm -rf "${TMP_RR:?}"' EXIT
 FK="$TMP_RR/fake"
-mkdir -p "$FK/tmux" "$FK/bin"
+mkdir -p "$FK/tmux"
 ORIGIN="$TMP_RR/origin.git"
 PROJ="$TMP_RR/proj"
 git init -q --bare "$ORIGIN"
@@ -22,14 +22,8 @@ printf '{"backlog":{"backend":"issues"},"issues":{"provider":"github","retryWait
 printf 'Welcome to Claude Code\n' > "$FK/tmux/pane"
 : > "$FK/tmux/log"
 
-# A canned herdr: only `api snapshot`, listing whichever agents $FK/agents.json holds.
-cat > "$FK/bin/herdr" <<SH
-#!/usr/bin/env bash
-[ "\$1 \$2" = "api snapshot" ] || { echo "fake herdr: unexpected call \$*" >&2; exit 98; }
-printf '{"id":"cli","result":{"snapshot":{"agents":%s}}}\n' "\$(cat "$FK/agents.json")"
-SH
-chmod +x "$FK/bin/herdr"
-echo '[]' > "$FK/agents.json"
+# The host snapshot: `session:window<TAB>path` lines the tmux fake lists for rrsnap.
+: > "$FK/snapshot"
 
 HOLDER=$$
 FAKES="$TESTDIR/fakes:$HV_POISON_BIN:$PATH"
@@ -37,7 +31,7 @@ FAKES="$TESTDIR/fakes:$HV_POISON_BIN:$PATH"
 rrin() { local d="$1"; shift; ( cd "$d" && PATH="$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" HV_HOST_KILL_WAIT=1 "$HV_BIN" --json "$@" 2>/dev/null ); }
 rr() { rrin "$PROJ" "$@"; }
 # rrsnap: the same with the host snapshot on, so liveness and stalls are known.
-rrsnap() { ( cd "$PROJ" && PATH="$FK/bin:$FAKES" HERDR_ENV=1 FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" HV_HOST_KILL_WAIT=1 "$HV_BIN" --json "$@" 2>/dev/null ); }
+rrsnap() { ( cd "$PROJ" && PATH="$FAKES" FAKE_TMUX_SNAPSHOT="$FK/snapshot" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" HV_HOST_KILL_WAIT=1 "$HV_BIN" --json "$@" 2>/dev/null ); }
 rc_of() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
 gh_() { ( cd "$PROJ" && PATH="$FAKES" FAKE_TRACKER_DB="$TMP_RR/db.json" gh "$@" ); }
 # The tracker's own state: labels and comment bodies of one issue.
@@ -151,7 +145,7 @@ OUT=$(rr round assign 2 --agent dana --holder-pid "$HOLDER") || fail "assign 2 t
 : > "$FK/tmux/log"
 echo wip > "$PROJ/.worktrees/dana/wip.txt"
 DWT="$PROJ/.worktrees/dana"
-printf '[{"agent":"claude","agent_status":"working","cwd":"%s","name":"dana","tab_id":"w2:t2"}]\n' "$DWT" > "$FK/agents.json"
+printf 'hvfake:dana\t%s\n' "$DWT" > "$FK/snapshot"
 RC=0; OUT=$(rrsnap round reclaim dana --holder-pid "$HOLDER") || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "healthy" ] || fail "a live, recently active slot is refused without --force: $RC $OUT"
 RC=0; OUT=$(rr round reclaim dana --holder-pid 1) || RC=$?
@@ -159,8 +153,8 @@ RC=0; OUT=$(rr round reclaim dana --holder-pid 1) || RC=$?
 # A host that cannot be asked: the agent cannot be proved gone, so even --force
 # may not move the worktree under it.
 mkdir -p "$FK/down"
-printf '#!/bin/sh\necho "herdr is not running" >&2\nexit 1\n' > "$FK/down/herdr"; chmod +x "$FK/down/herdr"
-RC=0; OUT=$( cd "$PROJ" && PATH="$FK/down:$FAKES" HERDR_ENV=1 FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" "$HV_BIN" --json round reclaim dana --force --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+printf '#!/bin/sh\necho "no server running" >&2\nexit 1\n' > "$FK/down/tmux"; chmod +x "$FK/down/tmux"
+RC=0; OUT=$( cd "$PROJ" && PATH="$FK/down:$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" "$HV_BIN" --json round reclaim dana --force --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "live agent" ] || fail "no host: a live agent cannot be proved gone: $RC $OUT"
 [ "$(branch_of dana)" = "dana/2-second-thing" ] && [ "$(dbq labels 2)" = "in-progress,type:task" ] || fail "refusals change nothing"
 if grep -q 'kill-window' "$FK/tmux/log"; then fail "a refused reclaim must not kill anything"; fi
@@ -180,7 +174,7 @@ pass "reclaim of a dead slot parks it, posts the handoff, releases the claim and
 # A live but stalled worker: reconcile reports it, reclaim kills the pane first.
 OUT=$(rr round assign 3 --agent ben --holder-pid "$HOLDER") || fail "assign 3 to ben failed: $OUT"
 BWT="$PROJ/.worktrees/ben"
-printf '[{"agent":"claude","agent_status":"working","cwd":"%s","name":"ben","tab_id":"w2:t1"}]\n' "$BWT" > "$FK/agents.json"
+printf 'hvfake:ben\t%s\n' "$BWT" > "$FK/snapshot"
 OUT=$(rrsnap round reconcile --apply)
 case "$(echo "$OUT" | drifts)" in *stalled*) fail "a worker that just started is not stalled: $OUT" ;; esac
 RC=0; OUT=$(rrsnap round reclaim ben --holder-pid "$HOLDER") || RC=$?

@@ -21,6 +21,8 @@ rt() { ( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ); }
 rtrc() { RC=0; OUT=$( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ) || RC=$?; }
 rt item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works' >/dev/null
 HOLDER=$$
+# Tab mode, explicitly: with no work.dispatch a round with no host would be solo (C8).
+rt config set work.dispatch tmux >/dev/null
 rt round start --holder-pid "$HOLDER" --slots 1 >/dev/null
 
 # Default tier: standard, on the claude map; standard follows models.worker.

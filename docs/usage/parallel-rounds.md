@@ -1,7 +1,8 @@
 # Parallel rounds
 
 A round is one orchestrator session plus two to five workers, each a standing agent in
-its own git worktree and herdr workspace, each holding one GitHub issue at a time. Workers
+its own git worktree and herdr workspace (or, with no terminal host, an in-harness
+subagent: see [Solo mode](#solo-mode)), each holding one GitHub issue at a time. Workers
 implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
 decisions, merges PRs and re-verifies on `main` after every merge.
 
@@ -197,6 +198,26 @@ session and whose recorded state is not `idle`; `worker dispatch` arms a slot.
   (`BASH_MAX_TIMEOUT_MS`). Raise the cap in `settings.json` under `env` (for example
   `"BASH_MAX_TIMEOUT_MS": "3600000"`) and pass a matching `timeout` on the Bash call, or
   loop on a finite `--timeout` shorter than the cap.
+
+## Solo mode
+
+`hv round start` resolves the round's host once and records it in `.hv/workers.json`. With
+`work.dispatch` unset or `subagent` it is herdr inside a herdr pane (`HERDR_ENV=1`), tmux
+inside tmux (`TMUX` set), and otherwise **solo**. An explicit `herdr` or `tmux` is used as
+set and fails when unavailable; solo is never a fallback from it.
+
+Under solo, each worker is a Claude `Agent` subagent the orchestrator launches in the slot's
+`.worktrees/<agent>` checkout. `hv round assign` returns the brief and the worktree instead
+of starting a pane, `hv round report <slot> --state ...` records what the subagent said,
+and `hv round wait` reads the registry without blocking. The pane verbs (`worker
+dispatch`, `poll`, `session`) refuse. The registry holds what tab mode writes (minus the
+pane fields), so `hv round reconcile`, the gate and the merge policy work unchanged.
+
+**Every solo worker shares the orchestrator's session limit.** The subagents run on the
+orchestrator's own account, rate window and context, so one usage limit stops every
+worker and the orchestrator together, and every result lands in the orchestrator's
+context. Keep solo rounds small (two or three slots) and the results short. Solo runs
+Claude workers only: a Codex subagent cannot be given a working directory.
 
 ## Roster
 

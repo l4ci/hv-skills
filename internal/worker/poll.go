@@ -219,7 +219,10 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 	if o.Lines <= 0 {
 		o.Lines = 60
 	}
-	h := e.NewHost(dispatchKind(root))
+	if err := SoloRefusal(root, "hv round report records a subagent's state"); err != nil {
+		return PollResult{}, err
+	}
+	h := e.NewHost(hostKind(root))
 	if err := h.Require(); err != nil {
 		return PollResult{}, fail(ExitUnavailable, err.Error())
 	}
@@ -328,3 +331,7 @@ func updateSlotsAll(root string, mutate func(s *jsonx.Object)) (bool, error) {
 	})
 	return err == nil, err
 }
+
+// IsPRURL reports whether s is a PR or MR URL, the shape `worker poll` stores
+// in slot.pr.
+func IsPRURL(s string) bool { return rePRURL.MatchString(s) }

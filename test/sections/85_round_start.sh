@@ -29,7 +29,9 @@ OUT=$(rn round candidates)
 [ "$(echo "$OUT" | jget data.candidates[2].checks[0].ok)" = "false" ] || fail "T01 lacks criteria: $OUT"
 pass "candidates reports criteria and dependency checks per item"
 
-# start: lease, roster slots on park branches, candidates.
+# start: lease, roster slots on park branches, candidates. Tab mode, explicitly:
+# with no work.dispatch a round with no host would be solo (C8).
+rn config set work.dispatch tmux >/dev/null
 HOLDER=$$
 OUT=$(rn round start --holder-pid "$HOLDER" --slots 2)
 [ "$(echo "$OUT" | jget data.round)" = "1" ] || fail "first start should be round 1: $OUT"

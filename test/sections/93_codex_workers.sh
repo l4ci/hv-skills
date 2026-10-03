@@ -34,8 +34,10 @@ cxc() { ( cd "$CX" && "$HV_BIN" --json "$@" 2>/dev/null ); }
 cxc item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works\nTouches internal/a.go' >/dev/null
 cxc item create --kind features --title Second --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] ok\nTouches internal/b.go' >/dev/null
 HOLDER=$$
+# A herdr round: the host is fixed when the round starts (C8), so set it first.
+cxc config set work.dispatch herdr >/dev/null || fail "config set work.dispatch failed"
 ( cd "$CX" && $CXSTART "$HV_BIN" --json round start --holder-pid "$HOLDER" --slots 2 >/dev/null 2>&1 ) || fail "round start failed"
-for kv in work.dispatch=herdr round.brief="$CX/contract.md" round.tiers.codex.light=c-light round.tiers.codex.standard=c-std round.tiers.codex.heavy=c-heavy; do
+for kv in round.brief="$CX/contract.md" round.tiers.codex.light=c-light round.tiers.codex.standard=c-std round.tiers.codex.heavy=c-heavy; do
   cxc config set "${kv%%=*}" "${kv#*=}" >/dev/null || fail "config set ${kv%%=*} failed"
 done
 HOME_BEN="$(git -C "$CX" rev-parse --path-format=absolute --git-common-dir)/hv/codex/ben"
