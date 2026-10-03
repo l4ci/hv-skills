@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/knowledge"
 )
 
@@ -33,6 +34,13 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// The usage-limit watcher (D3) types into panes: no test may reach the
+	// real tmux or herdr this round runs in. The default host is a fake that
+	// records, and the pane variables are cleared.
+	for _, k := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_PANE_ID", "HERDR_WORKSPACE_ID", "HERDR_SOCKET_PATH"} {
+		os.Unsetenv(k)
+	}
+	limitHost = func(string) host.Host { return &limFake{} }
 	code := m.Run()
 	if b, err := os.ReadFile(hit); err == nil {
 		fmt.Fprintf(os.Stderr, "FAIL: tests exec'd the forge CLI from PATH:\n%s", b)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -94,6 +95,7 @@ type Deps struct {
 // Watcher is the loop. Its methods run on one goroutine.
 type Watcher struct {
 	Deps
+	poll      atomic.Bool
 	warnings  []string
 	failed    int
 	dismissed map[string]string // session -> the message the meter or data said was no limit
@@ -113,8 +115,14 @@ func New(d Deps) *Watcher {
 	if d.Tick <= 0 {
 		d.Tick = 5 * time.Second
 	}
-	return &Watcher{Deps: d, dismissed: map[string]string{}}
+	w := &Watcher{Deps: d, dismissed: map[string]string{}}
+	w.poll.Store(d.Poll)
+	return w
 }
+
+// SetPoll switches the capture of every pane on every pass on or off, for a
+// feed that died.
+func (w *Watcher) SetPoll(on bool) { w.poll.Store(on) }
 
 // Warnings are what went wrong without stopping the loop.
 func (w *Watcher) Warnings() []string { return w.warnings }
@@ -134,7 +142,7 @@ func (w *Watcher) Run(ctx context.Context, feed <-chan Match) {
 	var matches []Match
 	for {
 		w.Step(ctx, matches, sweep)
-		matches, sweep = nil, w.Poll
+		matches, sweep = nil, w.poll.Load()
 		if ctx.Err() != nil {
 			return
 		}

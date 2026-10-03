@@ -95,6 +95,8 @@ var contractVerbs = []string{
 	"knowledge tier get",
 	"knowledge tier list",
 	"knowledge tier set",
+	"limit status",
+	"limit watch",
 	"map index",
 	"map query",
 	"map stats",
