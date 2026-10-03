@@ -46,6 +46,7 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 
 **Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
+**Rounds** — `/hv-orchestrate` (run a parallel round as the orchestrator)
 **Review & ship** — `/hv-review`, `/hv-qa` (opt-in gate via `ship.qa`), `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
 **Persist** — `/hv-learn` (durable knowledge; `--term <name>` for glossary), `/hv-decide` (hard boundaries — manual only)
 **Vision & maps** — `/hv-vision`, `/hv-refactor`
