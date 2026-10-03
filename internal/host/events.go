@@ -55,21 +55,31 @@ func checkHerdrVersion(out string) error {
 	return nil
 }
 
+// socket checks the installed herdr is a SupportedHerdr release and returns
+// its API socket path.
+func (h *herdr) socket(ctx context.Context) (string, error) {
+	r := h.herdr(ctx, "--version")
+	if r.ExitCode != 0 {
+		return "", fmt.Errorf("herdr --version failed: %s", strings.TrimSpace(r.Stderr))
+	}
+	if err := checkHerdrVersion(r.Stdout); err != nil {
+		return "", err
+	}
+	sock := h.d.Getenv("HERDR_SOCKET_PATH")
+	if sock == "" {
+		return "", errors.New("HERDR_SOCKET_PATH is not set: run from inside a herdr pane")
+	}
+	return sock, nil
+}
+
 // Watch implements Watcher over herdr's socket API: one `events.subscribe`
 // request carrying a `pane.agent_status_changed` subscription per watched
 // pane. The CLI's `herdr agent wait` takes one target, so waiting for the
 // first of N slots through it would need N child processes.
 func (h *herdr) Watch(ctx context.Context, targets []WatchTarget) (Watch, error) {
-	r := h.herdr(ctx, "--version")
-	if r.ExitCode != 0 {
-		return nil, fmt.Errorf("herdr --version failed: %s", strings.TrimSpace(r.Stderr))
-	}
-	if err := checkHerdrVersion(r.Stdout); err != nil {
+	sock, err := h.socket(ctx)
+	if err != nil {
 		return nil, err
-	}
-	sock := h.d.Getenv("HERDR_SOCKET_PATH")
-	if sock == "" {
-		return nil, errors.New("HERDR_SOCKET_PATH is not set: run from inside a herdr pane")
 	}
 	// A slot's handle is its tab; events carry pane ids. A slot whose agent is
 	// gone has no pane to watch, and the caller's classification reports it.
