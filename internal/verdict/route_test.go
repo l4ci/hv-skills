@@ -78,7 +78,8 @@ func TestRouteTable(t *testing.T) {
 		{"ship-qa", blocking, Concerns, NextAsk},
 		{"ship-qa", blockingLoop, Concerns, NextAddress},
 		{"ship-qa", blocking, Fail, NextStop},
-		{"ship-qa", blockingLoop, InfraFail, NextStop},
+		{"ship-qa", blocking, InfraFail, NextSurface},
+		{"ship-qa", blockingLoop, InfraFail, NextSurface},
 
 		{"queue", off, Pass, NextAsk},
 		{"queue", loop, Pass, NextMerge},

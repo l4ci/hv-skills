@@ -92,7 +92,9 @@ func Route(consumer, v string, s Settings) string {
 	switch {
 	case v == Pass:
 		return NextContinue
-	case Advisory(consumer, s):
+	case v == InfraFail, Advisory(consumer, s):
+		// QA that could not run never blocks a ship: the product was not
+		// judged, so there is nothing to stop on.
 		return NextSurface
 	case v != Concerns:
 		return NextStop
