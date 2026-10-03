@@ -170,9 +170,33 @@ session and whose recorded state is not `idle`; `worker dispatch` arms a slot.
 
 Slots are provisioned once and reused. `hv round start` creates any missing slot at
 `.worktrees/<agent>` on `park/<agent>` and leaves healthy ones alone. Every worktree lives in
-the project root under `.worktrees/<agent>` (gitignored by `/hv-init`), so herdr groups the
-workspaces under the project and `hv worker pool` shares the same root. `round.roster` sets
-the names; the default is `ben`, `dana`, `nia`, `kit`.
+the project root under `.worktrees/<agent>` (gitignored by `/hv-init`), and `hv worker pool`
+shares the same root. `round.roster` sets the names; the default is `ben`, `dana`, `nia`, `kit`.
+
+### Grouping a slot under the project in herdr
+
+herdr groups a slot under the project only when its workspace is a **linked worktree
+workspace** of the project's primary workspace. A workspace made with plain
+`herdr workspace create`, or a worktree moved with `git worktree move`, is not linked and
+shows up as a separate project. `hv round start` makes the worktree with git and calls no
+herdr, and `hv worker dispatch` opens its tabs in the orchestrator's own workspace, so
+neither is affected. This matters for a standing agent you run in its own herdr workspace.
+
+Provision such a slot from the primary workspace:
+
+```sh
+herdr worktree create --workspace "$HERDR_WORKSPACE_ID" --path .worktrees/<agent> \
+  --branch park/<agent> --base main --label <agent> --no-focus
+```
+
+To link an existing unlinked slot in place, leaving the agent running:
+
+```sh
+herdr worktree open --workspace <primary id> --path .worktrees/<agent>
+herdr workspace rename <id> <agent>
+```
+
+The maintainer checked both in the herdr sidebar (round 4, #79).
 
 Tools that walk the tree without reading `.gitignore` see a second copy of every file
 under `.worktrees/`; none of this repo's verbs or tests do (smoke section 70 pins it).
