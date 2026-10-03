@@ -181,3 +181,26 @@ func TestMergePolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestClearRecordsEscalation(t *testing.T) {
+	root := project(t, "")
+	if err := Clear(root, MergeApproval, "ship pr-merge", "PR 7", Confirm{Given: true, Note: "Approve.", Escalation: "e3"}, []string{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Clear(root, MergeApproval, "ship pr-merge", "PR 7", Confirm{Given: true, Note: "ok"}, []string{}); err != nil {
+		t.Fatal(err)
+	}
+	lines := auditLines(t, root)
+	if len(lines) != 2 || lines[0]["escalation"] != "e3" || lines[0]["note"] != "Approve." {
+		t.Fatalf("%v", lines)
+	}
+	if _, ok := lines[1]["escalation"]; ok {
+		t.Errorf("escalation must be omitted when empty: %v", lines[1])
+	}
+}
+
+func TestValidateIgnoresEscalation(t *testing.T) {
+	if err := (Confirm{Escalation: "e1"}).Validate(); err != nil {
+		t.Errorf("Validate must keep --confirm semantics: %v", err)
+	}
+}

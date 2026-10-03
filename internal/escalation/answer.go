@@ -2,6 +2,7 @@ package escalation
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
@@ -34,4 +35,38 @@ func FindAnswer(comments []tracker.Comment, escalationCommentID string) (answer 
 		}
 	}
 	return tracker.Comment{}, false, escFound
+}
+
+// ApprovalWords are the single words that approve a merge; ApprovalPhrase is
+// the two-word phrase that does. Approves is the only reader of either.
+var (
+	ApprovalWords  = []string{"approve", "approved", "yes", "lgtm"}
+	ApprovalPhrase = "ship it"
+)
+
+// Approves is the C5 allowlist: an answer approves a merge when the first
+// word of its first non-blank line, lowercased with trailing punctuation
+// removed, is in ApprovalWords, or the line's first two words are ApprovalPhrase.
+// Internal punctuation stays, so "yes-ish" does not approve.
+func Approves(answer string) bool {
+	var line string
+	for _, l := range strings.Split(answer, "\n") {
+		if strings.TrimSpace(l) != "" {
+			line = l
+			break
+		}
+	}
+	words := strings.Fields(line)
+	for i, w := range words {
+		words[i] = strings.ToLower(strings.TrimRightFunc(w, unicode.IsPunct))
+	}
+	if len(words) == 0 {
+		return false
+	}
+	for _, a := range ApprovalWords {
+		if words[0] == a {
+			return true
+		}
+	}
+	return len(words) > 1 && words[0]+" "+words[1] == ApprovalPhrase
 }

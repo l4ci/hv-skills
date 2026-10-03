@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/round"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
@@ -577,7 +578,7 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 	base := fs.String("base", "", "the cycle branch the slot merges into")
 	check := fs.Bool("check-only", false, "judge freshness, PR identity and provenance; merge nothing")
 	noVerify := fs.Bool("no-verify", false, "merge without running refactor.verifyCommands")
-	confirm := confirmFlags(fs)
+	confirm := approvalFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		slot, err := oneArg(args, "slot")
 		if err != nil {
@@ -586,7 +587,7 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 		if *base == "" {
 			return Result{}, Usage("--base is required")
 		}
-		conf, err := confirm()
+		conf, req, err := confirm()
 		if err != nil {
 			return Result{}, err
 		}
@@ -601,7 +602,8 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 		var gateRes Result
 		var gateErr error
 		approve := func(files func() ([]string, error)) error {
-			gateRes, gateErr = clearMerge(c, policy, slot+" into "+*base, conf, files, nil)
+			req.Thread = func() (approvalThread, error) { return slotApprovalThread(root, slot) }
+			gateRes, gateErr = clearMerge(c, policy, slot+" into "+*base, conf, req, files, nil)
 			return gateErr
 		}
 		ctx, stop := workerContext()
@@ -617,6 +619,11 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 				for _, k := range []string{"blockedBy", "gate", "paths", "changed"} {
 					v, _ := g.Get(k)
 					d.Set(k, v)
+				}
+				for _, k := range []string{"escalation", "status", "answer"} { // C5, only when set
+					if v, ok := g.Get(k); ok {
+						d.Set(k, v)
+					}
 				}
 			}
 			return Result{Data: d}, gateErr
@@ -640,4 +647,21 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 		e.Hint = r.Hint
 		return res, e
 	}
+}
+
+// slotApprovalThread is the approval thread of a worker gate (C5): the slot's
+// recorded PR, else the slot's issue. Neither is exit 2.
+func slotApprovalThread(root, slot string) (approvalThread, error) {
+	s := worker.LoadRegistry(root).Slot(slot)
+	if s == nil {
+		return approvalThread{}, Resolution("slot '%s' is not in the pool", slot)
+	}
+	branch := worker.Str(s, "branch")
+	if n, ok := round.PRNumber(worker.Str(s, "pr")); ok {
+		return approvalThread{Kind: "pr", Number: n, Slot: slot, Title: fmt.Sprintf("Merge approval: PR #%d", n)}, nil
+	}
+	if n, err := strconv.Atoi(round.SlotIssue(worker.Str(s, "task"), branch, slot)); err == nil {
+		return approvalThread{Kind: "issue", Number: n, Slot: slot, Title: fmt.Sprintf("Merge approval: %s (%s)", slot, branch)}, nil
+	}
+	return approvalThread{}, Usage("--approval and --escalate need an approval thread: slot %s has no PR and no issue number", slot)
 }

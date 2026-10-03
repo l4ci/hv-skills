@@ -57,10 +57,12 @@ var Registry = []Gate{
 const AuditFile = ".hv/gate-audit.jsonl"
 
 // Confirm is the human approval a gated verb was given: --confirm and the
-// quoted answer from --confirm-note.
+// quoted answer from --confirm-note. Escalation is the id of the C5 escalation
+// whose answer approved the step (--approval), recorded in the audit line.
 type Confirm struct {
-	Given bool
-	Note  string
+	Given      bool
+	Note       string
+	Escalation string
 }
 
 // ErrBadConfirm is a confirmation flag given without the other.
@@ -117,6 +119,9 @@ func Clear(root, name, verb, target string, c Confirm, paths []string) error {
 	rec.Set("target", target)
 	rec.Set("note", c.Note)
 	rec.Set("autonomy", autonomy)
+	if c.Escalation != "" {
+		rec.Set("escalation", c.Escalation)
+	}
 	line, err := jsonx.MarshalCompact(rec)
 	if err != nil {
 		return err
