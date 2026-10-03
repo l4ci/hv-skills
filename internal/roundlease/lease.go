@@ -153,7 +153,8 @@ func (e Env) Read(commonDir string) (Lease, State, error) {
 	return l, e.Classify(l), nil
 }
 
-func (h Holder) sameAs(l Lease, host string) bool {
+// SameAs reports whether h is the process or pane that wrote l.
+func (h Holder) SameAs(l Lease, host string) bool {
 	if l.Host != host {
 		return false
 	}
@@ -177,7 +178,7 @@ func (e Env) Acquire(commonDir, root string, h Holder, round int) (l Lease, out 
 		out = Taken
 		switch st {
 		case Live, Foreign:
-			if !h.sameAs(cur, e.Host) {
+			if !h.SameAs(cur, e.Host) {
 				return &HeldError{Lease: cur, State: st}
 			}
 			l, out = cur, Renewed
@@ -208,7 +209,7 @@ func (e Env) Release(commonDir string, h Holder) (bool, error) {
 	removed := false
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
 		cur, st, err := e.Read(commonDir)
-		if err != nil || st == None || !h.sameAs(cur, e.Host) {
+		if err != nil || st == None || !h.SameAs(cur, e.Host) {
 			return err
 		}
 		removed = true

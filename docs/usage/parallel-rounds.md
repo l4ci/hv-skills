@@ -92,6 +92,23 @@ hv round candidates                         # re-read the board with readiness c
   two issues editing the same function, generated files every issue touches (list those in
   `round.sharedPaths`), renames, or another machine's round.
 
+## Assigning an issue
+
+```sh
+hv round assign 59 --check-only             # readiness only; exit 1 when not ready
+hv round assign 59 --agent ben --body-file decisions.md --siblings 58,60,62
+```
+
+Without `--agent` the first idle roster slot takes it. Assign refuses (exit 4, `blockedBy`)
+with `no round`, `out of scope`, `not ready`, `overlap`, `claimed`, `slot busy`,
+`no free slot` or `brief missing`, and marks nothing in those cases. When it goes through it
+claims the item (`<agent>@<round>`), sets it in progress with a comment, cuts the slot's
+branch `<agent>/<issue>-<slug>`, picks the account and dispatches a short signed brief: a
+pointer to the standing contract (`round.brief`, else `references/worker-contract.md`), the
+issue to read and dispute, the siblings and the decisions from `--body-file`.
+`--accept-overlap` skips the file-overlap check only. A failure before dispatch undoes the
+claim and state; one at or after dispatch keeps them, and repeating the call resumes.
+
 ## Waiting on workers
 
 `hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints

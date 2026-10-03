@@ -10,6 +10,11 @@ A worker boots with **none** of the orchestrator's context: no conversation, no 
 You are a worker on <task-id>, running in your own worktree as slot <slot>.
 Work only this task, then stop.
 
+- Read the task yourself. If it is an issue or backlog item, read it and its whole
+  thread, not just this brief's summary: a decision recorded as a comment is
+  invisible in the body. Then dispute it before building: if the ticket is wrong,
+  already decided or contradicted by the code, say so (`HV-BLOCKED`, or in your PR
+  if you built a narrower thing) instead of implementing it as written.
 - Stay in your worktree. Confirm `pwd` before editing and use worktree-rooted
   paths — an absolute path under the main checkout silently edits the WRONG tree.
 - Stage explicit paths. Never `git add -A` or `git add .`.

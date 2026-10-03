@@ -24,6 +24,9 @@ type DispatchOpts struct {
 	Relay       bool
 	Round       *int
 	BootTimeout int // seconds; 0 means 60
+	// Branch is the per-task branch the reset guard cuts; "" means
+	// hv-worker/<slot>-<task>. A round slot works on <agent>/<issue>-<slug>.
+	Branch string
 }
 
 // DispatchResult is what a successful dispatch did.
@@ -233,7 +236,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 			return res, e
 		}
 		// Refuse a slot that still holds work, before its session is killed.
-		if _, err := e.Reset(root, o.Slot, o.Task, true); err != nil {
+		if _, err := e.ResetTo(root, o.Slot, o.Task, branchOr(o), true); err != nil {
 			return res, resetRefusal(err, false)
 		}
 		// Fresh session every task dispatch. The kill must be provable: a
@@ -244,7 +247,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 		// Re-check: the old session may have written between the check and its
 		// exit. The old session is dead from here on, so a failure must not
 		// leave its handle in the registry for a poll or relay to chase.
-		if _, err := e.Reset(root, o.Slot, o.Task, false); err != nil {
+		if _, err := e.ResetTo(root, o.Slot, o.Task, branchOr(o), false); err != nil {
 			clearHandle(root, o.Slot)
 			// The old session was killed and its handle cleared on the way here.
 			return res, resetRefusal(err, true)
@@ -373,4 +376,11 @@ func splitLines(s string) []string {
 		out = append(out, string(rs[start:]))
 	}
 	return out
+}
+
+func branchOr(o DispatchOpts) string {
+	if o.Branch != "" {
+		return o.Branch
+	}
+	return BranchFor(o.Slot, o.Task)
 }

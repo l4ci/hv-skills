@@ -77,6 +77,11 @@ type Env struct {
 	// Lease reads the orchestrator lease; the zero value is the real process
 	// table and host name.
 	Lease roundlease.Env
+	// Worker is the worker env assign resets and dispatches with; the zero
+	// value is a Git-only env. Accounts, when set, balances slots across
+	// work.accounts at assignment.
+	Worker   worker.Env
+	Accounts *worker.Accounts
 }
 
 // Row is one line of `hv round status`.
