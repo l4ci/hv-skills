@@ -36,7 +36,7 @@ Read `.hv/config.json`:
 - `work.mergeStrategy` — `"pr"` or `"direct"` (falls back to asking if the key is unset)
 - `ship.review` — `true` (default) runs `/hv-review` before integrating; `false` skips the review
 - `ship.secondOpinion` — `false` (default) skips the fresh-eyes gate; `true` runs a no-prior-context adversarial review after `/hv-review` passes
-- `ship.secondOpinionRunner` — `"subagent"` (default, and the only runner): who runs the Step 3.5 gate. The subagent runner routes per the verdict reference. The `"codex"` runner was removed in 5.0; a leftover `"codex"` value runs the subagent (Step 3.5).
+- `ship.secondOpinionRunner` — `"subagent"` (default, and the only runner): who runs the Step 3.5 gate. The subagent runner routes per the verdict reference. The `"codex"` runner was removed in 5.0; a leftover `"codex"` value runs the subagent in advisory mode (FAIL surfaced, never blocks; Step 3.5).
 - `ship.qa` — `false` (default) skips product QA; `true` runs `/hv-qa run` after `/hv-review` (and `secondOpinion`) and before merge/PR. Routed per `qa.gate` (`"advisory"` reports only; `"blocking"` halts on FAIL).
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 8.5 (Learn) and Step 10 (Loop continuation) nudge or invoke directly.
 - `docs.path` — relative path to the docs folder used by Docs Mode (default `"docs"`)
@@ -142,7 +142,7 @@ hv review brief [--repo "$REPO"] <branch>
 
 The verb prints a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
 
-Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, print one line, *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"*, and continue with the subagent below. Never stop on it.
+Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, print one line, *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"*, and continue with the subagent below in **advisory mode**, the same as the old Codex runner: a FAIL is surfaced under the label "Second-opinion findings (advisory)" and the ship continues to Step 4. It never stops the ship or the loop. With `"subagent"` (or the key unset) the gate keeps the blocking routing below.
 
 Dispatch the brief to a **fresh subagent**:
 
@@ -157,7 +157,7 @@ Route the verdict per `references/review-verdict-routing.md` — same contract a
 
 - **PASS** → continue to Step 4 silently.
 - **CONCERNS** → surface each concern with the label "Second-opinion concerns" (per the carrier-label convention in `references/review-verdict-routing.md`), then route per the reference's Consumer routing table.
-- **FAIL** → stop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
+- **FAIL** → stop (advisory mode: surface and continue, see above). Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
 
 The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
 

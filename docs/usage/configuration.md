@@ -194,7 +194,7 @@ Picks who runs the [`ship.secondOpinion`](#shipsecondopinion) gate. Has no effec
 |-------|----------|
 | `"subagent"` (default) | A fresh Sonnet subagent reviews the goal + diff brief. |
 
-5.0 removed the `"codex"` runner, which ran Codex headlessly. 5.0 has no headless sessions. A config that still says `"codex"` keeps working: `/hv-ship` prints a one-line note and runs the subagent. The subagent runner routes its verdict like `/hv-review`, so a FAIL now stops the ship where the advisory Codex runner only reported it.
+5.0 removed the `"codex"` runner, which ran Codex headlessly. 5.0 has no headless sessions. A config that still says `"codex"` keeps working: `/hv-ship` prints a one-line note and runs the subagent in advisory mode, as the Codex runner did. A FAIL is surfaced and the ship continues. With `"subagent"` (the default) a FAIL stops the ship, routed like `/hv-review`.
 
 ## ship.qa
 
