@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/l4ci/hv-skills/v5/internal/hook"
 )
 
 // Check statuses.
@@ -73,6 +75,13 @@ type Input struct {
 
 	Version string // the running binary's version, "" when unknown
 
+	// ProjectRoot is the directory holding .hv/, "" outside an hv project:
+	// the orchestrator checks (statusline, stop-hook) skip without it.
+	ProjectRoot string
+	// ConfigDirs are the Claude config dirs whose settings.json counts for
+	// those checks: each account's configDir, else the default user dir.
+	ConfigDirs []string
+
 	// PluginRoots are directories to search upward for
 	// .claude-plugin/plugin.json, in order.
 	PluginRoots []string
@@ -86,7 +95,7 @@ type Input struct {
 func Run(ctx context.Context, in Input) Report {
 	d := &runner{in: in, ctx: ctx}
 	return Report{Checks: []Check{
-		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.hv(), d.codex(),
+		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.hv(), d.codex(),
 	}}
 }
 
@@ -297,6 +306,154 @@ func ParseIntegration(out, agent string) string {
 		return rest
 	}
 	return "no status"
+}
+
+const (
+	statuslineHint = "hv hook install --wrap-statusline"
+	stopHookHint   = "hv hook install"
+)
+
+// projectFiles reads the project's two settings files, in precedence order.
+func (d *runner) projectFiles() []hookFile {
+	return []hookFile{
+		d.read(filepath.Join(d.in.ProjectRoot, ".claude", "settings.local.json")),
+		d.read(filepath.Join(d.in.ProjectRoot, ".claude", "settings.json")),
+	}
+}
+
+type hookFile struct {
+	path   string
+	events map[string]string
+	slCmd  string
+	hasSL  bool
+	exists bool
+	err    error
+}
+
+func (d *runner) read(path string) hookFile {
+	f := hookFile{path: path}
+	o, err := hook.ReadSettings(path)
+	if err != nil {
+		f.err, f.exists = err, true
+		return f
+	}
+	if o == nil {
+		return f
+	}
+	f.exists = true
+	f.events = hook.MarkedEvents(o)
+	_, f.slCmd, f.hasSL = hook.StatusLine(o)
+	return f
+}
+
+func (d *runner) userFile(dir string) hookFile {
+	return d.read(filepath.Join(d.expand(dir), "settings.json"))
+}
+
+func (d *runner) statusline() Check {
+	const name = "statusline"
+	if d.in.ProjectRoot == "" {
+		return skip(name, "not inside an hv project")
+	}
+	proj := d.projectFiles()
+	dirs := d.in.ConfigDirs
+	if len(dirs) == 0 {
+		dirs = []string{""}
+	}
+	anyFile := proj[0].exists || proj[1].exists
+	var parts, bad []string
+	for _, dir := range dirs {
+		files := append([]hookFile{}, proj...)
+		label := "project"
+		if dir != "" {
+			u := d.userFile(dir)
+			files = append(files, u)
+			label = dir
+			anyFile = anyFile || u.exists
+		}
+		var eff *hookFile
+		broken := ""
+		for i := range files {
+			if files[i].err != nil {
+				broken = files[i].path
+				break
+			}
+			if files[i].hasSL {
+				eff = &files[i]
+				break
+			}
+		}
+		switch {
+		case broken != "":
+			bad = append(bad, label+": cannot read "+broken)
+		case eff == nil:
+			bad = append(bad, label+": no statusLine")
+		case !strings.Contains(eff.slCmd, hook.StatuslineCmd):
+			bad = append(bad, label+": statusLine does not run hv statusline dump ("+eff.path+")")
+		default:
+			parts = append(parts, label+": "+eff.path)
+		}
+	}
+	if !anyFile {
+		return skip(name, "no Claude settings file in scope")
+	}
+	if len(bad) > 0 {
+		return fail(name, strings.Join(bad, "; "), statuslineHint)
+	}
+	return pass(name, "hv statusline dump runs ("+strings.Join(parts, "; ")+")")
+}
+
+func (d *runner) stopHook() Check {
+	const name = "stop-hook"
+	if d.in.ProjectRoot == "" {
+		return skip(name, "not inside an hv project")
+	}
+	files := d.projectFiles()
+	for _, dir := range d.in.ConfigDirs {
+		files = append(files, d.userFile(dir))
+	}
+	found := map[string]string{}
+	var unreadable []string
+	for _, f := range files {
+		if f.err != nil {
+			unreadable = append(unreadable, f.path)
+		}
+		for ev, c := range f.events {
+			if _, ok := found[ev]; !ok {
+				found[ev] = c
+			}
+		}
+	}
+	var missing []string
+	for _, ev := range []string{"Stop", "SessionStart"} {
+		if _, ok := found[ev]; !ok {
+			missing = append(missing, ev)
+		}
+	}
+	if len(missing) > 0 {
+		detail := "no # hv-hook entry for " + strings.Join(missing, " and ")
+		if len(unreadable) > 0 {
+			detail += " (cannot read " + strings.Join(unreadable, ", ") + ")"
+		}
+		return fail(name, detail, stopHookHint)
+	}
+	for _, ev := range []string{"Stop", "SessionStart"} {
+		first := strings.Fields(found[ev])[0]
+		if _, ok := d.resolve(first); !ok {
+			return fail(name, ev+" hook runs "+first+", which is not found", stopHookHint)
+		}
+	}
+	return pass(name, "Stop and SessionStart hooks run hv")
+}
+
+// resolve finds the executable a hook command starts with.
+func (d *runner) resolve(word string) (string, bool) {
+	if strings.Contains(word, "/") {
+		w := d.expand(word)
+		fi, err := os.Stat(w)
+		return w, err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o111 != 0
+	}
+	return d.in.Look(word)
 }
 
 func (d *runner) hv() Check {

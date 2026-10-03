@@ -195,7 +195,7 @@ func TestOrderAndOK(t *testing.T) {
 	for _, c := range r.Checks {
 		names = append(names, c.Name)
 	}
-	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,hv,codex" {
+	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,statusline,stop-hook,hv,codex" {
 		t.Errorf("order %s", got)
 	}
 	if r.OK() {
@@ -348,5 +348,105 @@ func TestCodexCheckUsesSlotHomes(t *testing.T) {
 	want := "codex --version @ /h/ben|codex login status @ /h/ben|codex login status @ /h/dana"
 	if got := strings.Join(f.homes, "|"); got != want {
 		t.Errorf("calls %s, want %s", got, want)
+	}
+}
+
+// orchFixture writes settings files under a project root and two config dirs.
+type orchFixture struct {
+	root, a, b string
+}
+
+func newOrch(t *testing.T) orchFixture {
+	t.Helper()
+	base := t.TempDir()
+	return orchFixture{root: filepath.Join(base, "proj"), a: filepath.Join(base, "a"), b: filepath.Join(base, "b")}
+}
+
+func (o orchFixture) write(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (o orchFixture) check(t *testing.T, have map[string]bool, name string) Check {
+	t.Helper()
+	f := &fake{have: have, reply: map[string]Result{}}
+	r := Run(context.Background(), Input{Exec: f.exec, Look: f.look, ProjectRoot: o.root, ConfigDirs: []string{o.a, o.b}})
+	return statusOf(r, name)
+}
+
+func TestOrchestratorChecksSkipOutsideProject(t *testing.T) {
+	f := &fake{have: map[string]bool{}, reply: map[string]Result{}}
+	r := Run(context.Background(), Input{Exec: f.exec, Look: f.look})
+	for _, n := range []string{"statusline", "stop-hook"} {
+		if c := statusOf(r, n); c.Status != Skip {
+			t.Errorf("%s: %+v", n, c)
+		}
+	}
+}
+
+func TestStatuslineCheck(t *testing.T) {
+	o := newOrch(t)
+	if c := o.check(t, nil, "statusline"); c.Status != Skip {
+		t.Fatalf("no settings file: %+v", c)
+	}
+	// Plain installed in the project, nothing user-level: both accounts see it.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"type":"command","command":"hv statusline dump"}}`)
+	if c := o.check(t, nil, "statusline"); c.Status != Pass {
+		t.Fatalf("current: %+v", c)
+	}
+	// Wrapped counts as running the dump.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"command":"hv statusline dump --then 'x'","hvWrapped":"x"}}`)
+	if c := o.check(t, nil, "statusline"); c.Status != Pass {
+		t.Fatalf("wrapped: %+v", c)
+	}
+	// The project file is removed: account a has its own plain line, b has none.
+	os.Remove(filepath.Join(o.root, ".claude", "settings.local.json"))
+	o.write(t, filepath.Join(o.a, "settings.json"), `{"statusLine":{"command":"~/bin/line.sh"}}`)
+	c := o.check(t, nil, "statusline")
+	if c.Status != Fail || c.Hint != "hv hook install --wrap-statusline" || !strings.Contains(c.Detail, o.a) || !strings.Contains(c.Detail, o.b+": no statusLine") {
+		t.Fatalf("missing: %+v", c)
+	}
+	// A project-local entry outranks both user files.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.json"), `{"statusLine":{"command":"hv statusline dump"}}`)
+	if c := o.check(t, nil, "statusline"); c.Status != Pass {
+		t.Fatalf("project outranks user: %+v", c)
+	}
+	// An unparseable file fails and says which.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{nope`)
+	if c := o.check(t, nil, "statusline"); c.Status != Fail || !strings.Contains(c.Detail, "settings.local.json") {
+		t.Fatalf("broken: %+v", c)
+	}
+}
+
+func TestStopHookCheck(t *testing.T) {
+	o := newOrch(t)
+	c := o.check(t, map[string]bool{"hv": true}, "stop-hook")
+	if c.Status != Fail || c.Hint != "hv hook install" || !strings.Contains(c.Detail, "Stop and SessionStart") {
+		t.Fatalf("missing: %+v", c)
+	}
+	// Only Stop installed.
+	o.write(t, filepath.Join(o.a, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "SessionStart") || strings.Contains(c.Detail, "Stop and") {
+		t.Fatalf("half: %+v", c)
+	}
+	// Both, spread over two scopes, resolving.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"hv hook session-start # hv-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Pass {
+		t.Fatalf("current: %+v", c)
+	}
+	// Command that does not resolve.
+	if c := o.check(t, nil, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "hv, which is not found") {
+		t.Fatalf("unresolved: %+v", c)
+	}
+	// A user's own unmarked Stop hook is not ours.
+	o2 := newOrch(t)
+	o2.write(t, filepath.Join(o2.root, ".claude", "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop"}]}]}}`)
+	if c := o2.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail {
+		t.Fatalf("unmarked: %+v", c)
 	}
 }
