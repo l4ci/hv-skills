@@ -1,5 +1,15 @@
 echo "umbrella mode S02 (--repo flags + worktree cleanup)"
 
+# Own state (#46): 15 builds $UMB in the ordered run; run alone, build the same
+# three-repo umbrella here.
+if [ ! -d "${UMB:-}/web/.git" ]; then
+  UMB="$TMP/umbrella16"
+  mkdir -p "$UMB"/{web,api,shared} "$UMB/.hv"
+  for r in web api shared; do
+    (cd "$UMB/$r" && git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init)
+  done
+fi
+
 echo '{"active":[]}' > "$UMB/.hv/status.json"
 (cd "$UMB" && hvj init umbrella --repos web,api >/dev/null) || fail "init umbrella failed"
 
