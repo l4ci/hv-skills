@@ -1,0 +1,32 @@
+# Builds the hv binaries for a version tag and attaches them to a DRAFT GitHub
+# release (see .goreleaser.yaml). Publishing is the gated `hv release publish`
+# step in /hv-release, which finishes this draft instead of creating a second
+# release. Push the tag first (`hv release push --tag-only`), wait for this
+# job, then publish, then push the branch.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

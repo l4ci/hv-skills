@@ -70,6 +70,39 @@ func gateRemote(t *testing.T, work string) {
 	gitT(t, work, "remote", "add", "origin", "github.com/fake/repo.git")
 }
 
+// releaseForge answers `gh release view` with view (stdout, stderr, code) and
+// everything else with the release URL, so publish tests reach release create.
+func releaseForge(view [3]any, onOther func(args []string)) *forge {
+	return &forge{answer: func(_ string, args []string) (string, string, int) {
+		if len(args) > 1 && args[0] == "release" && args[1] == "view" {
+			return view[0].(string), view[1].(string), view[2].(int)
+		}
+		if onOther != nil {
+			onOther(args)
+		}
+		tag := "v1.2.3"
+		if len(args) > 2 && args[0] == "release" {
+			tag = args[2]
+		}
+		return "https://github.com/fake/repo/releases/tag/" + tag + "\n", "", 0
+	}}
+}
+
+// releaseWrites are the forge calls that change a release, not the views.
+func releaseWrites(f *forge) []string {
+	var w []string
+	for _, c := range f.calls {
+		if !strings.HasPrefix(c, "gh release view ") {
+			w = append(w, c)
+		}
+	}
+	return w
+}
+
+const releaseAllAssets = `[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"hv_darwin_arm64"},{"name":"checksums.txt"}]`
+
+var releaseNone = [3]any{"", "release not found", 1}
+
 func gateCases() []gateCase {
 	tagged := func(t *testing.T, level string) string {
 		work := newRepo(t, t.TempDir(), "proj", "main")
@@ -89,12 +122,10 @@ func gateCases() []gateCase {
 		{gate.ReleasePublish, "release publish", func(t *testing.T, level string) (string, []string, string, func() bool) {
 			work := tagged(t, level)
 			gitT(t, work, "push", "-q", "origin", "main", "v1.2.3")
-			f := &forge{answer: func(string, []string) (string, string, int) {
-				return "https://github.com/fake/repo/releases/tag/v1.2.3\n", "", 0
-			}}
+			f := releaseForge(releaseNone, nil)
 			useForge(t, f)
 			return work, []string{"release", "publish", "1.2.3", "--title", "v1.2.3 — x", "--body-file", "-"}, "notes",
-				func() bool { return len(f.calls) == 0 }
+				func() bool { return len(releaseWrites(f)) == 0 }
 		}},
 		{gate.PublicFiling, "tracker suggest-upstream", func(t *testing.T, level string) (string, []string, string, func() bool) {
 			root := trProject(t, gateConfig(t, "", level, nil))
@@ -269,24 +300,136 @@ func TestReleasePublishHosts(t *testing.T) {
 	gitT(t, gh, "tag", "v1.0.0")
 	gitT(t, gh, "push", "-q", "origin", "v1.0.0")
 	var notes string
-	f := &forge{answer: func(_ string, args []string) (string, string, int) {
+	f := releaseForge(releaseNone, func(args []string) {
 		for i, a := range args {
 			if a == "--notes-file" {
 				b, _ := os.ReadFile(args[i+1])
 				notes = string(b)
 			}
 		}
-		return "https://github.com/fake/repo/releases/tag/v1.0.0\n", "", 0
-	}}
+	})
 	useForge(t, f)
 	o = trRun(t, gh, "## Fixed\n- x\n", append([]string{"--json", "release", "publish", "1.0.0", "--title", "v1.0.0 — x", "--body-file", "-", "--draft"}, gateYes...)...)
 	d, _ = envelope(t, o.stdout)["data"].(map[string]any)
 	if o.code != 0 || d["url"] != "https://github.com/fake/repo/releases/tag/v1.0.0" || d["draft"] != true || d["host"] != "github" {
 		t.Fatalf("github: %+v", o)
 	}
-	if len(f.calls) != 1 || !strings.HasPrefix(f.calls[0], "gh release create v1.0.0 --title v1.0.0 — x --notes-file ") ||
-		!strings.HasSuffix(f.calls[0], " --draft") || notes != "## Fixed\n- x\n" {
+	if len(f.calls) != 2 || !strings.HasPrefix(f.calls[0], "gh release view v1.0.0") ||
+		!strings.HasPrefix(f.calls[1], "gh release create v1.0.0 --title v1.0.0 — x --notes-file ") ||
+		!strings.HasSuffix(f.calls[1], " --draft") || notes != "## Fixed\n- x\n" {
 		t.Fatalf("calls %q notes %q", f.calls, notes)
+	}
+}
+
+// TestReleasePublishFinishesTheDraft: a release the workflow already made is
+// edited, never created a second time, and only once it carries the binaries.
+func TestReleasePublishFinishesTheDraft(t *testing.T) {
+	publish := func(t *testing.T, goreleaser bool, view [3]any) (trOut, *forge, string) {
+		work := newRepo(t, t.TempDir(), "proj", "main")
+		write(t, filepath.Join(work, ".hv", "config.json"), "{}")
+		if goreleaser {
+			write(t, filepath.Join(work, ".goreleaser.yaml"), "version: 2\n")
+		}
+		gateRemote(t, work)
+		gitT(t, work, "tag", "v1.0.0")
+		gitT(t, work, "push", "-q", "origin", "v1.0.0")
+		f := releaseForge(view, nil)
+		useForge(t, f)
+		return trRun(t, work, "notes\n", append([]string{"--json", "release", "publish", "1.0.0", "--title", "T", "--body-file", "-"}, gateYes...)...), f, work
+	}
+	draft := func(assets string) [3]any { return [3]any{`{"isDraft":true,"assets":` + assets + `}`, "", 0} }
+	o, f, _ := publish(t, true, draft(releaseAllAssets))
+	if o.code != 0 || len(f.calls) != 2 || !strings.HasPrefix(f.calls[1], "gh release edit v1.0.0 --title T --notes-file ") ||
+		!strings.HasSuffix(f.calls[1], " --draft=false") {
+		t.Fatalf("ready draft: %+v %q", o, f.calls)
+	}
+	for name, view := range map[string][3]any{
+		"no assets":     draft(`[]`),
+		"no checksum":   draft(`[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"hv_darwin_arm64"}]`),
+		"3 of 4":        draft(`[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"checksums.txt"}]`),
+		"tarballs only": draft(`[{"name":"hv_1.0.0_linux_amd64.tar.gz"},{"name":"hv_1.0.0_linux_arm64.tar.gz"},{"name":"hv_1.0.0_darwin_amd64.tar.gz"},{"name":"hv_1.0.0_darwin_arm64.tar.gz"},{"name":"checksums.txt"}]`),
+	} {
+		o, f, work := publish(t, true, view)
+		if o.code != 3 || len(f.calls) != 1 {
+			t.Errorf("%s: %+v %q", name, o, f.calls)
+		}
+		// a wait must not spend the approval
+		if _, err := os.Stat(filepath.Join(work, ".hv", "gate-audit.jsonl")); err == nil {
+			t.Errorf("%s: the exit-3 wait wrote an approval", name)
+		}
+	}
+	// goreleaser builds the releases here, so none yet means the workflow has not run
+	if o, f, work := publish(t, true, releaseNone); o.code != 3 || len(f.calls) != 1 {
+		t.Errorf("no release, goreleaser: %+v %q", o, f.calls)
+	} else if _, err := os.Stat(filepath.Join(work, ".hv", "gate-audit.jsonl")); err == nil {
+		t.Error("no release: the wait wrote an approval")
+	}
+	// without goreleaser a missing release is created, as before
+	if o, f, _ := publish(t, false, releaseNone); o.code != 0 || len(f.calls) != 2 || !strings.HasPrefix(f.calls[1], "gh release create ") {
+		t.Errorf("no release, no goreleaser: %+v %q", o, f.calls)
+	}
+	// a view that fails for another reason is not "no release"
+	if o, _, _ := publish(t, false, [3]any{"", "HTTP 502", 1}); o.code != 5 {
+		t.Errorf("view failure: %+v", o)
+	}
+}
+
+func TestReleasePushScopes(t *testing.T) {
+	work := newRepo(t, t.TempDir(), "proj", "main")
+	write(t, filepath.Join(work, ".hv", "config.json"), "{}")
+	gateRemote(t, work)
+	gitT(t, work, "tag", "v1.2.3")
+	view := [3]any{`{"isDraft":true,"assets":` + releaseAllAssets + `}`, "", 0}
+	f := &forge{answer: func(string, []string) (string, string, int) { return view[0].(string), view[1].(string), view[2].(int) }}
+	useForge(t, f)
+	push := func(extra ...string) trOut {
+		return trRun(t, work, "", append(append([]string{"--json", "release", "push", "1.2.3"}, extra...), gateYes...)...)
+	}
+	branchOnOrigin := func() bool { return gitT(t, work, "ls-remote", "--heads", "origin", "main") != "" }
+	if o := push("--tag-only", "--branch-only"); o.code != 2 {
+		t.Fatalf("both flags: %+v", o)
+	}
+	// the branch never leads the tag
+	if o := push("--branch-only"); o.code != 3 || branchOnOrigin() {
+		t.Fatalf("branch before tag: %+v", o)
+	}
+	o := push("--tag-only")
+	d, _ := envelope(t, o.stdout)["data"].(map[string]any)
+	if o.code != 0 || d["scope"] != "tag" || gitT(t, work, "ls-remote", "--tags", "origin", "refs/tags/v1.2.3") == "" || branchOnOrigin() {
+		t.Fatalf("tag-only: %+v", o)
+	}
+	// ... nor a tag whose release is still a draft, or missing
+	f.calls = nil
+	if o := push("--branch-only"); o.code != 3 || branchOnOrigin() {
+		t.Fatalf("branch with a draft release: %+v", o)
+	}
+	view = releaseNone
+	if o := push("--branch-only"); o.code != 3 || branchOnOrigin() {
+		t.Fatalf("branch with no release: %+v", o)
+	}
+	view = [3]any{`{"isDraft":false,"assets":` + releaseAllAssets + `}`, "", 0}
+	o = push("--branch-only")
+	d, _ = envelope(t, o.stdout)["data"].(map[string]any)
+	if o.code != 0 || d["scope"] != "branch" || !branchOnOrigin() {
+		t.Fatalf("branch-only: %+v", o)
+	}
+}
+
+// TestReleasePushRefusesUnflaggedOnGoreleaser: where goreleaser builds the
+// release, one push of branch and tag would put the plugin version ahead of
+// its binaries.
+func TestReleasePushRefusesUnflaggedOnGoreleaser(t *testing.T) {
+	work := newRepo(t, t.TempDir(), "proj", "main")
+	write(t, filepath.Join(work, ".hv", "config.json"), "{}")
+	write(t, filepath.Join(work, ".goreleaser.yaml"), "version: 2\n")
+	gateRemote(t, work)
+	gitT(t, work, "tag", "v1.2.3")
+	o := trRun(t, work, "", append([]string{"--json", "release", "push", "1.2.3"}, gateYes...)...)
+	if o.code != 4 || !strings.Contains(o.stdout, "--tag-only") || gitT(t, work, "ls-remote", "--tags", "origin") != "" {
+		t.Fatalf("unflagged push: %+v", o)
+	}
+	if o := trRun(t, work, "", append([]string{"release", "push", "1.2.3", "--tag-only"}, gateYes...)...); o.code != 0 {
+		t.Fatalf("tag-only: %+v", o)
 	}
 }
 
@@ -314,7 +457,7 @@ func TestReleasePushResolution(t *testing.T) {
 	}
 	o := trRun(t, work, "", append([]string{"--json", "release", "push", "1.2.3"}, gateYes...)...)
 	d, _ := envelope(t, o.stdout)["data"].(map[string]any)
-	if o.code != 0 || d["tag"] != "v1.2.3" || d["branch"] != "main" || d["remote"] != "origin" || d["changed"] != true {
+	if o.code != 0 || d["tag"] != "v1.2.3" || d["branch"] != "main" || d["remote"] != "origin" || d["scope"] != "both" || d["changed"] != true {
 		t.Fatalf("push: %+v", o)
 	}
 	if gitT(t, work, "ls-remote", "--heads", "origin", "main") == "" {

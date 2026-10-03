@@ -10,7 +10,10 @@
 #      cached under <cache>/<version>/<os>-<arch>/hv, where <cache> is
 #      $HV_CACHE_DIR, else $XDG_CACHE_HOME/hv, else $HOME/.cache/hv. First
 #      use downloads hv_<os>_<arch> and checksums.txt from the GitHub release
-#      and refuses a binary whose sha256 does not match.
+#      and refuses a binary whose sha256 does not match. That is an integrity
+#      check, not authenticity: checksums.txt comes from the same release as
+#      the binary, and in wget mode redirects cannot be limited to https, so
+#      the checksum is the only guard there. Signatures are a 5.1 follow-up.
 #
 # Not a helper: it does not source hv-preamble.sh, because it must run
 # outside any .hv/ project (hv init, hv version) and must not change the

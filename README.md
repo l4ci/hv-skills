@@ -40,7 +40,7 @@ brew install l4ci/tap/hv                                  # Homebrew
 go install github.com/l4ci/hv-skills/v5/cmd/hv@latest     # Go 1.22+
 ```
 
-or download `hv_<os>_<arch>` from the [releases](https://github.com/l4ci/hv-skills/releases) page (linux and macOS, amd64 and arm64) and put it on your PATH. Check with `hv version`.
+or download `hv_<os>_<arch>` from the [releases](https://github.com/l4ci/hv-skills/releases) page (linux and macOS, amd64 and arm64) and put it on your PATH. Check with `hv version`. The plugin launcher and `checksums.txt` give an integrity check (a corrupted or swapped download is refused), not proof of who built the release; signatures are planned for 5.1.
 
 Then run `hv init` once at the project root. [Getting started](docs/getting-started.md) has the first cycle; [install alternatives](docs/install.md) covers `npx skills` and GNU Stow.
 

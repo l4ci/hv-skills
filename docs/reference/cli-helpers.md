@@ -350,8 +350,8 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv release pending` | how much has landed since the last release tag |
 | `hv release milestone-check <MNN>` | list the open issues that block a milestone release |
 | `hv release close-milestone <MNN> --release <X.Y.Z>` | close out a released milestone |
-| `hv release push <X.Y.Z> [--branch <name>] --confirm --confirm-note <answer>` | push the release tag and branch to origin (manual gate) |
-| `hv release publish <X.Y.Z> --title <text> --body-file <path\|-> [--draft] --confirm --confirm-note <answer>` | create the GitHub or GitLab release (manual gate) |
+| `hv release push <X.Y.Z> [--branch <name>] [--tag-only\|--branch-only] --confirm --confirm-note <answer>` | push the release tag and branch to origin, or one of them (manual gate) |
+| `hv release publish <X.Y.Z> --title <text> --body-file <path\|-> [--draft] --confirm --confirm-note <answer>` | create the GitHub or GitLab release, or finish the draft the release workflow made (manual gate) |
 
 ## `hv gate`
 

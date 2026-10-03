@@ -45,8 +45,8 @@ Run each check; stop with a one-liner on failure.
 2. *Project checklist* — walk `.hv/RELEASE.md` items as gates (Step 2)
 3. *Bump version* — level chosen, version file and CHANGELOG written (Steps 4-5, 7-8)
 4. *Generate notes* — categorized notes drafted and approved (Steps 5-6)
-5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 9-10)
-6. *Publish* — remote release published if origin matches (Step 11)
+5. *Tag* — annotated tag created and pushed (Steps 9-10)
+6. *Publish* — remote release published if origin matches, then the branch pushed (Steps 11, 11b)
 7. *Close upstream issues / milestone* — manual gate (Steps 12-13)
 8. *Post-release nudges* — summary + docs (Steps 14-15)
 
@@ -133,15 +133,15 @@ If `data.to` differs from `new_version`, stop: the file may be partly modified, 
 
 `git tag -s` if `git config --get user.signingkey` is set, else `-a`: `git tag [-a|-s] v<new_version> -F "$NOTES_FILE"`. Skipped in `--dry-run`; print the command.
 
-## Step 10 — Push
+## Step 10 — Push the Tag
 
 > **Manual gate — pushing the release tag.** The remote tag is public and hard to retract. This step always asks, in every autonomy mode; loop mode does not accelerate it. `hv release push` enforces the `tag-push` gate (exit 4 without `--confirm`). Step 6's answer is the approval. See `references/manual-gates.md`.
 
 ```bash
-hv release push <new_version> --json --confirm --confirm-note "$APPROVAL"
+hv release push <new_version> --tag-only --json --confirm --confirm-note "$APPROVAL"
 ```
 
-One push carries the commit and the tag. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
+Only the tag goes now (an unflagged push is refused where goreleaser builds the release). The plugin version on the branch points at the release binaries, so the branch waits for Step 11b. Where the repo has a `.goreleaser.yaml`, the tag starts the release workflow, which builds the binaries into a draft release. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
 
 ## Step 11 — Publish Remote Release
 
@@ -152,7 +152,17 @@ hv release publish <new_version> --json --title "v<new_version> — <one-line su
   --body-file "$NOTES_FILE" [--draft] --confirm --confirm-note "$APPROVAL"
 ```
 
-Add `--draft` when `release.draft` is true and the host is GitHub (GitLab refuses it). Origin on neither host: the verb publishes nothing (`changed: false`) and the summary says `skipped`. `data.url` goes in the summary. Exit 5 (`gh`/`glab` missing): print the error and continue; the tag is already public. Skipped in `--dry-run`; print the command.
+Add `--draft` when `release.draft` is true and the host is GitHub (GitLab refuses it). There is one release per version: where the workflow already made a draft, the verb finishes it (notes, title, un-draft) and never creates a second. It exits 3 while that draft lacks any of the four `hv_<os>_<arch>` binaries or `checksums.txt`, or while no release exists and the repo builds with goreleaser, so wait for the workflow (`gh run watch`) and re-run. Origin on neither host: the verb publishes nothing (`changed: false`) and the summary says `skipped`. `data.url` goes in the summary. Exit 5 (`gh`/`glab` missing): print the error and continue; the tag is already public. Skipped in `--dry-run`; print the command.
+
+## Step 11b — Push the Branch
+
+Once the release is published and the binaries resolve, the same `tag-push` gate and Step 6's answer cover the branch:
+
+```bash
+hv release push <new_version> --branch-only --json --confirm --confirm-note "$APPROVAL"
+```
+
+It exits 3 while the tag is not on origin or its release is missing or still a draft, so the branch never leads the binaries. Skipped in `--dry-run`.
 
 ## Step 12 — Close Out the Milestone (issue mode)
 
@@ -193,7 +203,7 @@ List skipped checklist items under `Skipped checklist items:` so the release rec
 ## Edge Cases
 
 - **Multiple version files** — first match wins; pin with `release.versionFile`.
-- **`gh`/`glab` missing but origin matches** — Step 11 fails after the tag push. Recovery: install the CLI and re-run `hv release publish <X.Y.Z> --title … --body-file <path> --confirm --confirm-note "<answer>"`; to revert the tag, `git push --delete origin v<X.Y.Z>`.
+- **`gh`/`glab` missing but origin matches** — Step 11 fails after the tag push, so the branch is still unpushed. Recovery: install the CLI and re-run `hv release publish <X.Y.Z> --title … --body-file <path> --confirm --confirm-note "<answer>"`; to revert the tag, `git push --delete origin v<X.Y.Z>`.
 - **No origin** — push exits 3; publish is skipped. Tag and CHANGELOG stay committed locally.
 - **CHANGELOG without a `# Changelog` header** — the verb keeps existing content and inserts after the H1 if present, else prepends.
 

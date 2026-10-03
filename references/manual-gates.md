@@ -8,7 +8,7 @@ The registry lives in code. `hv gate list` prints every gate, whether a verb enf
 
 | Gate | Verb | Skill site |
 |------|------|------------|
-| `tag-push` | `hv release push` | `/hv-release` Step 10 |
+| `tag-push` | `hv release push` | `/hv-release` Steps 10 and 11b |
 | `release-publish` | `hv release publish` | `/hv-release` Step 11 |
 | `public-filing` | `hv tracker suggest-upstream` | `/hv-learn` Step 8.5 |
 | `merge-approval` | `hv ship merge`, `hv ship pr-merge`, `hv worker gate`, when `ship.mergeApproval` covers the merge (`all`, or `paths` matching `ship.mergeApprovalPaths`) | `/hv-ship` Step 6b, `/hv-review --queue`, `/hv-work` gate step |
