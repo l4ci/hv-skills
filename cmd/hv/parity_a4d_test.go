@@ -20,8 +20,8 @@ package main
 //  2. A forge CLI that exits with a code other than 1, 3 or 4: the old helpers
 //     pass the CLI's rc through and the shim maps unknown rcs to 70; Go says 5
 //     (the CLI failed). The fake gh exits 2 for the flags it does not
-//     implement (--assignee on `issue list`), and the fake glab has no --opened,
-//     so every gitlab `issues list` fails there; internal/issues covers it.
+//     implement (--assignee on `issue list`), so github `issues list --mine`
+//     fails there; internal/issues covers it.
 //  3. issues.autoCreateLabel false: old reads it with jq's `// true`, so false
 //     still reads as true and the label is created anyway; the contract (and
 //     Go) says false means no creation.
@@ -29,11 +29,8 @@ package main
 //     Go treats a corrupt state file as exit 70. (Any other non-tracker
 //     failure mid-run, which crashes the old helper with a traceback, is the
 //     same split: shim 2, Go 70, or 2 for a validation error.)
-//  5. The fake gh does not implement `issue view -q`, so `gh issue view N
-//     --json state -q .state` always fails there: the github idempotency check
-//     of close and the github --open-only probe never see CLOSED/OPEN. Both
-//     sides run the same call, so they agree; the real paths are covered by
-//     unit tests in internal/issues with a scripted executor.
+//  5. (retired) The fake gh now answers `issue view --json state -q .state`,
+//     so the github idempotency check of close sees CLOSED like gitlab does.
 
 import (
 	"encoding/json"
@@ -333,7 +330,7 @@ func TestParityA4D(t *testing.T) {
 	dboth(&all, one("list/auth-fails", dr(5, "issues", "list").env1("FAKE_TRACKER_FAIL=auth status")))
 	dboth(&all, one("list/rate-limited", dr(6, "issues", "list").env1(append([]string{"FAKE_TRACKER_FAIL=issue list"}, rate...)...)))
 	add(dsc{name: "list/umbrella-web", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(0, "issues", "list", "--repo", "web")}},
-		dsc{name: "list/umbrella-api", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(5, "issues", "list", "--repo", "api", "--limit", "3").with("the fake glab has no --opened flag (divergence 2)", 70)}},
+		dsc{name: "list/umbrella-api", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(0, "issues", "list", "--repo", "api", "--limit", "3")}},
 		dsc{name: "list/umbrella-root-unknown", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(0, "issues", "list")}},
 		dsc{name: "list/repo-unknown", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{dr(3, "issues", "list", "--repo", "nope")}},
 		dsc{name: "list/no-hv", remote: "none", fx: fx{noHV: true}, runs: []drun{dr(3, "issues", "list")}},
@@ -403,7 +400,7 @@ func TestParityA4D(t *testing.T) {
 	dboth(&all, one("close/auth-fails", dr(5, "issues", "close", "1", "--commit", "{head}").env1("FAKE_TRACKER_FAIL=auth status")))
 	add(one("close/unknown-provider", dr(5, "issues", "close", "1", "--commit", "{head}")).on("none"))
 	add(one("close/already-closed/gitlab", dr(0, "issues", "close", "3", "--commit", "{head}").ch(false)).on("gitlab"))
-	add(one("close/already-closed/github", dr(0, "issues", "close", "3", "--commit", "{head}").ch(true)))
+	add(one("close/already-closed/github", dr(0, "issues", "close", "3", "--commit", "{head}").ch(false)))
 	add(dsc{name: "close/umbrella-web", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{
 		{argv: []string{"--json", "issues", "close", "1", "--commit", "{x:web}", "--repo", "web"}, want: 0, changed: yes()}}})
 	add(dsc{name: "close/umbrella-api", remote: "none", fx: umbrella(fx{}), db: dseed, runs: []drun{
@@ -466,12 +463,10 @@ func TestParityA4D(t *testing.T) {
 	t.Logf("%d scenarios", len(all))
 }
 
-// listBoth is a successful `issues list`. The fake glab has no --opened flag
-// (the old helper's list call), so on gitlab both sides fail: Go 5 and the shim
-// 70 (divergence 2); the gitlab path is covered by internal/issues unit tests.
-// The fake gh rejects --assignee the same way, so --mine fails on github.
+// listBoth is a successful `issues list` on github and gitlab. The fake gh
+// rejects --assignee, so --mine fails on github: Go 5, the shim 70 (divergence 2).
 func listBoth(all *[]dsc, name string, db func() map[string]any, argv ...string) {
-	gh, gl := dr(0, argv...), dr(5, argv...).with("the fake glab has no --opened flag: rc 2, shim 70 (divergence 2)", 70)
+	gh, gl := dr(0, argv...), dr(0, argv...)
 	for _, a := range argv {
 		if a == "--mine" {
 			gh = dr(5, argv...).with("the fake gh rejects --assignee: rc 2, shim 70 (divergence 2)", 70)
