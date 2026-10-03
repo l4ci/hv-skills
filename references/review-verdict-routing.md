@@ -1,6 +1,11 @@
 # Review verdict routing
 
-`/hv-review` emits one of three verdicts on its final line, all caps — `PASS`, `CONCERNS`, or `FAIL`. Callers route on the verdict. Currently duplicated across `hv-review/SKILL.md` Step 10 (producer-side relay for standalone runs) and `hv-ship/SKILL.md` Step 3 (consumer-side routing); this reference is the canonical home. Any future skill that gates on a pre-merge review consumes the same contract.
+`/hv-review` ends with one of three verdicts — `PASS`, `CONCERNS`, or `FAIL` — and records it with `hv verdict add`, as do the `/hv-ship` second opinion and `/hv-qa` (which adds `INFRA-FAIL`). Callers route on the recorded verdict with `hv verdict route`, never on a report's last line. The routing table lives in code (`internal/verdict`, contract section "B2: verdicts" in `docs/design/5.0-verb-contract.md`); this reference holds what the code does not: what each verdict means, the question text, and the labels. Any future skill that gates on a pre-merge review consumes the same contract.
+
+## Recording and routing
+
+- **Producers** end their report with a fenced `json` block, `{"verdict", "summary", "findings": [{"severity", "title", "file", "line", "detail"}]}`, and the skill records it: `hv verdict add <branch> --kind review-spec|review-quality|second-opinion|qa --verdict <V> --body-file <block>`. Exit 2 names the malformed field; ask for the block again, never guess. `/hv-debug` records fix outcomes with `hv debug verdict <ID>`.
+- **Consumers** run `hv verdict route <branch> --for ship-review|ship-second-opinion|ship-qa|queue --json` and act on `data.next`. Exit 3 means no verdict was recorded: rerun the producer.
 
 ## Verdict semantics
 
@@ -12,11 +17,10 @@
 
 ## Consumer routing
 
-When a skill invokes `/hv-review` and gates on the verdict, this is the canonical routing:
+`data.next` from `hv verdict route` says what to do:
 
-- **`PASS`** — proceed to the next step silently. No surfacing needed.
-- **`CONCERNS`** — surface each concern inline, then branch on `autonomy.level`:
-  - **`"off"` or `"auto"`** — use `AskUserQuestion`:
+- **`continue`** (PASS) — proceed to the next step silently. No surfacing needed.
+- **`ask`** (CONCERNS, `autonomy.level` off or auto) — surface each concern inline, then use `AskUserQuestion`:
     - **Header:** `"Concerns"`
     - **Question:** *"Review surfaced N concerns on `<branch>`. How should I proceed?"*
     - **Options** (single-select):
@@ -24,8 +28,9 @@ When a skill invokes `/hv-review` and gates on the verdict, this is the canonica
       2. *"Ship anyway"* — *"Proceed with the integration despite the concerns."*
       3. *"Stop"* — *"Leave the branch as-is; no integration now."*
     - Plain-text fallback: *"Address first, ship anyway, or stop?"* (see `references/ask-user-question-fallback.md`).
-  - **`"loop"`** — silently auto-pick *"Address via `/hv-work` (Recommended)"*: invoke `/hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke the calling skill once the fixes are committed. Per the authoring convention *"routine routing/tagging auto-picks Recommended in loop mode"* (see `references/authoring-conventions.md` rule #5) — addressing surfaced concerns is the obvious safe routing.
-- **`FAIL`** — stop unconditionally. Surface the findings; do not auto-route to ship/merge. A `FAIL` stops loop mode as a guard failure regardless of autonomy.
+- **`address`** (CONCERNS, loop) — surface each concern, then invoke `/hv-work` via the `Skill` tool with the concerns as the brief, and re-invoke the calling skill once the fixes are committed. This is the *"Address via `/hv-work` (Recommended)"* answer, auto-picked per the authoring convention *"routine routing/tagging auto-picks Recommended in loop mode"* (`references/authoring-conventions.md` rule #5).
+- **`surface`** (an advisory gate: QA under `qa.gate: "advisory"`, any QA `INFRA-FAIL`, or a second opinion from the retired `codex` runner) — surface the findings and continue. `data.advisory` is true.
+- **`stop`** (FAIL) — stop unconditionally. Surface the findings; do not auto-route to ship/merge. A `FAIL` stops loop mode as a guard failure regardless of autonomy.
 
 ## Why "Ship anyway" never auto-picks under loop
 
@@ -33,13 +38,13 @@ When a skill invokes `/hv-review` and gates on the verdict, this is the canonica
 
 ## Queue routing (`/hv-review --queue`, issue mode)
 
-The queue loop is the consumer. It routes per PR / MR and always posts the verdict as a `feedback` comment on each linked item and on the PR.
+The queue loop is the consumer (`hv verdict route --for queue`). It routes per PR / MR and always posts the verdict as a `feedback` comment on each linked item and on the PR.
 
-| Verdict | Interactive | `autonomy.level: "loop"` |
-|---------|-------------|--------------------------|
-| `PASS` | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr>` (exit 4 = not merged, an item unproven and set to `changes-requested`) | merge, no question |
-| `CONCERNS` | findings as feedback, `hv item state <ID> --to changes-requested`; no merge | same |
-| `FAIL` | same as `CONCERNS`; no merge | same, and the guard-failure stop above still applies to the surrounding loop |
+| `data.next` | Verdict | Action |
+|---------|---------|--------|
+| `ask` | `PASS`, interactive | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr>` (exit 4 = not merged, an item unproven and set to `changes-requested`) |
+| `merge` | `PASS`, loop | merge, no question |
+| `request-changes` | `CONCERNS` or `FAIL` | findings as feedback, `hv item state <ID> --to changes-requested`; no merge. A `FAIL` still stops the surrounding loop as a guard failure |
 
 Exit 3 / 4 from any helper stops the queue. Label lifecycle: `references/issue-mode.md`.
 
@@ -57,13 +62,14 @@ When `/hv-review` is invoked from `/hv-ship`, the parent owns the routing — re
 
 - **`hv-review/SKILL.md` Step 5 (reviewer brief)** — the exact rubric text the reviewer evaluates against (intent match, convention compliance, etc.) is the producer's prompt-engineering content, not the verdict-routing pattern. Stays inline.
 - **`hv-ship/SKILL.md` Step 3 (ship.review gate)** — the `ship.review` config check, the *"If `ship.review` is `false`, skip"* guard, and the cycle position (between commit-bundling and PR-body composition) are skill-local carriers. Stays inline.
+- **The verdict rubric** — what makes a diff PASS, CONCERNS or FAIL is the reviewer's judgment and stays in each brief. Only the verdict-to-next-step mapping moved into code.
 - **The `AskUserQuestion` call site itself** — the call lives at the consumer's step; only the option text and routing logic extract to this reference.
 
 ## Carrier-label override
 
 When a non-canonical caller of this routing (e.g. `/hv-ship` Step 3.5 second-opinion gate, or any future producer that emits the same PASS/CONCERNS/FAIL verdict shape) surfaces concerns, the caller MAY label them with a carrier prefix so the user can distinguish them from the primary `/hv-review` concerns in a session that runs both.
 
-Convention: prefix surfaced concern lines with the producer's name and a dash, e.g. *"Second-opinion concerns:"* before listing the bullets. The routing logic (Consumer routing above) is unchanged — only the prose label differs. Codified for `/hv-ship` Step 3.5 second-opinion gate (F04); future producers follow the same shape.
+Convention: prefix surfaced concern lines with the producer's name and a dash, e.g. *"Second-opinion concerns:"* before listing the bullets. The routing (`hv verdict route`) is unchanged — only the prose label differs. Codified for `/hv-ship` Step 3.5 second-opinion gate (F04); future producers follow the same shape.
 
 ## See also
 

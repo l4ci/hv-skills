@@ -231,24 +231,21 @@ hv debug counter record-attempt --hypothesis "<one-line hypothesis from Step 6>"
 
 Re-run the reproducer from Step 5. It must now pass (or the symptom must be gone). If the regression test is new, confirm it's in the suite and runs under the default test command.
 
-If the fix holds, record the win:
+Record whether the fix held. The verb counts the bug's failed fixes and closes the Step 8.5 attempt in the counter:
 
 ```bash
-hv debug counter pass
+hv debug verdict <ID> --verdict <PASS|FAIL> --json
 ```
 
-If the fix doesn't hold, mark this attempt failed and check the Iron Law threshold:
+Route on `data.next`:
 
-```bash
-hv debug counter fail --json     # data.failedFixes
-```
-
-- `failedFixes < 3` — back to Step 6 (which re-runs the in-context hypothesis cycle counter). Don't commit a partial fix.
-- `failedFixes >= 3` — jump to **Step 9.5 (Iron Law hard stop)**. Do NOT loop back to Step 6.
+- `complete` — the fix held. Continue to Step 10.
+- `hypothesize` — the fix failed. Back to Step 6 (which re-runs the in-context hypothesis cycle counter). Don't commit a partial fix.
+- `halt` — the fix failed and the bug has reached the Iron Law limit (`data.failedFixes`). Jump to **Step 9.5 (Iron Law hard stop)**. Do NOT loop back to Step 6.
 
 ## Step 9.5 — Iron Law Hard Stop
 
-Fires when `hv debug counter fail` reports `failedFixes >= 3`. Three committed fix attempts have failed to resolve the bug — continuing to dispatch more workers in the same session burns context without converging. Iron Law: hard stop, no further attempts.
+Fires when `hv debug verdict` routes to `halt`. Three committed fix attempts have failed to resolve the bug — continuing to dispatch more workers in the same session burns context without converging. Iron Law: hard stop, no further attempts.
 
 Print the fail-loud summary verbatim to the user:
 

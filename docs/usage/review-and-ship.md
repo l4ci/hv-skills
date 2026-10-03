@@ -10,15 +10,15 @@
 
 Stage 1 answers exactly one question: *"does the diff fulfill the outcomes promised by the plan?"* The reviewer reads only the diff plus the resolved `.hv/plans/<key>.md` content for each referenced item (no `KNOWLEDGE.md`, no `DECISIONS.md`, no convention checks). Tighter brief, faster verdict.
 
-Stage 1 verdict prefixes:
+Stage 1 verdicts:
 
 | Verdict | Meaning |
 |---------|---------|
-| `SPEC-PASS` | Diff fulfills the plan's promised outcomes. |
-| `SPEC-CONCERNS` | Partial fulfillment or scope drift, not blocking. |
-| `SPEC-FAIL` | Diff doesn't deliver what was promised. Stage 2 short-circuits: no point quality-reviewing work that doesn't meet spec. |
+| `PASS` | Diff fulfills the plan's promised outcomes. |
+| `CONCERNS` | Partial fulfillment or scope drift, not blocking. |
+| `FAIL` | Diff doesn't deliver what was promised. Stage 2 short-circuits: no point quality-reviewing work that doesn't meet spec. |
 
-Stage 1 also runs a **refocus check**: each change is traced from plan task to backlog item to milestone intent (when the item has a milestone tag). Locally sensible steps that drift from the parent intent surface as `SPEC-CONCERNS` naming the drift path; drift alone never fails the review.
+Stage 1 also runs a **refocus check**: each change is traced from plan task to backlog item to milestone intent (when the item has a milestone tag). Locally sensible steps that drift from the parent intent surface as `CONCERNS` naming the drift path; drift alone never fails the review.
 
 **No-plan fallback.** If no referenced item has a plan file (common when `/hv-go` was used), Stage 1 can't run as a meaningful spec check. The skill prints one informational line and proceeds directly to Stage 2, which then absorbs intent-match as its first rubric item.
 
@@ -33,11 +33,11 @@ Rubric items:
 - **Stale scaffolding:** leftover *Task N* / *placeholder* / *in-flight* annotations that should have been removed once the corresponding work landed.
 - **Silent-failure hunter:** for every verification claim in the diff (new test, smoke section, assertion, helper-output check), apply a four-question rubric: *(a)* what does this verify concretely? *(b)* is the asserted-on shape the same shape the real consumer reads? *(c)* was the new code path actually exercised? *(d)* if you deleted the new code, would the assertion still pass? If any answer is *no* or *unclear*, the claim is flagged `SILENT-FAIL` with file:line. Flags surface as CONCERNS; they don't break the build alone, but you see them before merging.
 
-Stage 2 verdicts use the `QUALITY-` prefix (`QUALITY-PASS`, `QUALITY-CONCERNS`, `QUALITY-FAIL`).
+Stage 2 returns its own `PASS`, `CONCERNS` or `FAIL`.
 
 ### Combined verdict
 
-The final line of the report is the combined verdict (`PASS` / `CONCERNS` / `FAIL`) with file:line evidence where applicable. When only one stage ran (no-plan fallback or stage opt-out), the verdict strips the prefix.
+The report ends with the combined verdict (`PASS` / `CONCERNS` / `FAIL`) with file:line evidence where applicable: the worse of the two stages, or the one stage's verdict when only one ran (no-plan fallback or stage opt-out). Each stage's verdict is recorded with `hv verdict add` in the gitignored `.hv/verdicts.json`, and `/hv-ship` routes on the recorded verdict with `hv verdict route`, not on the report text.
 
 | Verdict | Meaning |
 |---------|---------|

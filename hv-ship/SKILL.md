@@ -108,13 +108,18 @@ If `commitCount` is 0, tell the user the branch has no commits beyond the base a
 
 Read `ship.review` from `.hv/config.json`. Default `true`.
 
-If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as the silent-failure rubric item (the dedicated SILENT-FAIL check in /hv-review's Stage 2 brief) — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. Route on the returned verdict per `references/review-verdict-routing.md` — short summary:
+If enabled, invoke `hv-review` via the `Skill` tool for this branch. The review brief carries the silent-failure-hunter rubric (`references/silent-failure-hunter.md`) as the silent-failure rubric item (the dedicated SILENT-FAIL check in /hv-review's Stage 2 brief) — `SILENT-FAIL` flags surface as CONCERNS in the same verdict block as intent / convention / quality concerns; no separate dispatch. `/hv-review` records its verdict; route on it (umbrella: add `--repo "$REPO"`):
 
-- **PASS** → continue to Step 4.
-- **CONCERNS** → surface each concern, then branch on `autonomy.level`:
-  - **`"off"` or `"auto"`** — ask via `AskUserQuestion` with three options (Address via `/hv-work` Recommended / Ship anyway / Stop). See the reference for the canonical option labels, descriptions, and plain-text fallback.
-  - **`"loop"`** — silently auto-pick "Address via `/hv-work` (Recommended)": invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed. Per the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (see `references/authoring-conventions.md` rule #5). A review FAIL still stops the loop unconditionally as a guard failure.
-- **FAIL** → stop. Surface the findings. Let the user fix and rerun `/hv-ship`.
+```bash
+hv verdict route <branch> --for ship-review --json
+```
+
+Exit 3 means no review verdict was recorded: stop and rerun `/hv-review`; never fall back to reading the report. Act on `data.next` (`references/review-verdict-routing.md` has the option text):
+
+- **`continue`** (PASS) → continue to Step 4.
+- **`ask`** (CONCERNS, `autonomy.level` off or auto) → surface each concern, then `AskUserQuestion` with three options (Address via `/hv-work` Recommended / Ship anyway / Stop).
+- **`address`** (CONCERNS, loop) → surface each concern, invoke `hv-work` via the `Skill` tool with the concerns as the brief, then re-invoke `/hv-ship` once the fixes are committed.
+- **`stop`** (FAIL) → stop, and stop a loop. Surface the findings. Let the user fix and rerun `/hv-ship`.
 
 **Capture the choice.** When the verdict is CONCERNS and the user picks via `AskUserQuestion`, remember the answer in this cycle's working state as `REVIEW_CHOICE` (one of `address`, `ship-anyway`, `stop`). Step 3.5 reads `REVIEW_CHOICE` to skip the second-opinion gate when the user already accepted CONCERNS; Step 9 reads it to decide whether to append the "concerns the user proceeded through" line. Loop mode auto-picks `address` per the verdict-routing reference.
 
@@ -129,7 +134,7 @@ When `true`, dispatch a fresh subagent with **no prior conversation context** an
 Skip the gate when any of these apply (no work to second-opinion):
 
 - Step 3 was skipped (`ship.review: false`) AND the user hasn't explicitly asked for a second opinion this session — the trade-off is the user already opted out of pre-merge review.
-- Step 3 returned **FAIL** — already stopped above.
+- Step 3 routed to **`stop`** — already stopped above.
 - Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — they already accepted residual risk; a second adversarial pass would re-litigate the decision.
 
 Otherwise, run the gate:
@@ -142,22 +147,28 @@ hv review brief [--repo "$REPO"] <branch>
 
 The verb prints a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
 
-Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, print one line, *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"*, and continue with the subagent below in **advisory mode**, the same as the old Codex runner: a FAIL is surfaced under the label "Second-opinion findings (advisory)" and the ship continues to Step 4. It never stops the ship or the loop. With `"subagent"` (or the key unset) the gate keeps the blocking routing below.
+Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, print one line, *"ship.secondOpinionRunner: codex was removed in 5.0; using subagent (run `hv config set ship.secondOpinionRunner subagent` to silence this)"*, and continue with the subagent below. The route verb then runs the gate in **advisory mode**, the same as the old Codex runner: findings are surfaced under the label "Second-opinion findings (advisory)" and the ship continues to Step 4. It never stops the ship or the loop.
 
 Dispatch the brief to a **fresh subagent**:
 
 - `Agent` tool, `subagent_type: "general-purpose"` (default — fresh context, no inherited project memory)
 - `model: "sonnet"` — the MVP is same-model-fresh-context per F04's note that cross-model (Codex/Gemini) is the gold standard but not the cheap MVP
-- Prompt: the brief's stdout verbatim
+- Prompt: the brief's stdout verbatim. It ends by asking for the fenced `json` verdict block
 - `description: "Second-opinion review of <branch>"`
 
-The agent returns a markdown report. Parse the last non-empty line for the all-caps verdict (`PASS` / `CONCERNS` / `FAIL`).
+The agent returns a markdown report ending in a fenced `json` verdict block. Save the block to a temp file, record it and route on it:
 
-Route the verdict per `references/review-verdict-routing.md` — same contract as Step 3:
+```bash
+hv verdict add <branch> --kind second-opinion --verdict <PASS|CONCERNS|FAIL> --body-file "$VERDICT" --json
+hv verdict route <branch> --for ship-second-opinion --json
+```
 
-- **PASS** → continue to Step 4 silently.
-- **CONCERNS** → surface each concern with the label "Second-opinion concerns" (per the carrier-label convention in `references/review-verdict-routing.md`), then route per the reference's Consumer routing table.
-- **FAIL** → stop (advisory mode: surface and continue, see above). Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats a second-opinion FAIL as a guard failure (loop stops), same as a /hv-review FAIL.
+Exit 2 from `add` names the malformed field: ask the agent to resend the block; never guess a verdict. Act on `data.next`, labelling surfaced concerns "Second-opinion concerns" (carrier-label convention in `references/review-verdict-routing.md`):
+
+- **`continue`** (PASS) → continue to Step 4 silently.
+- **`ask`** / **`address`** (CONCERNS) → same as Step 3.
+- **`surface`** (advisory runner) → surface the findings under "Second-opinion findings (advisory)" and continue to Step 4.
+- **`stop`** (FAIL) → stop, and stop a loop. Surface the findings. The user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`.
 
 The gate runs after Step 3 because there's no point burning a second-opinion roundtrip on a diff that already failed the contextualized review. It runs before Step 4 because surfaced concerns may change the PR body's framing.
 
@@ -169,7 +180,7 @@ Read `ship.qa` from `.hv/config.json`. Default `false`. If `false`, skip this st
 
 Skip the gate when any of these apply (no work to QA, or already short-circuited):
 
-- Step 3 returned **FAIL** — already stopped above.
+- Step 3 routed to **`stop`** — already stopped above.
 - Step 3 returned **CONCERNS** and `REVIEW_CHOICE == ship-anyway` — the user already accepted residual risk; QA findings on the same diff are unlikely to change that decision. Loop mode picks `address` instead, which never reaches this step.
 - `.hv/qa/` is empty for the active target (single-repo: no `.hv/qa/*.md`; umbrella: no `.hv/qa/<REPO>.md`) — surface a one-line note *"`ship.qa: true` but no QA strategy for `<scope>`. Run `/hv-qa first-run` to bootstrap, or set `ship.qa: false` to skip."* and continue to Step 4 without running QA.
 
@@ -178,16 +189,17 @@ Otherwise, invoke `/hv-qa run` via the `Skill` tool, scoped to the resolved repo
 - Single-repo: `Skill(skill="hv-skills:hv-qa", args="run")`.
 - Umbrella: `Skill(skill="hv-skills:hv-qa", args="run --repo $REPO")`.
 
-`/hv-qa` emits one of three verdicts on its final line, all caps — `PASS`, `CONCERNS`, or `FAIL`. Route per `references/review-verdict-routing.md`, **gated by `qa.gate`**:
+`/hv-qa` records its verdict. Route on it; the verb applies `qa.gate` (`"advisory"`, the default, never blocks the ship):
 
-| `qa.gate` | `PASS` | `CONCERNS` | `FAIL` |
-|---|---|---|---|
-| `"advisory"` (default) | continue to Step 4 silently | surface findings with carrier label *"QA concerns:"*; continue to Step 4 | surface findings with carrier label *"QA concerns:"*; continue to Step 4 (the ship is not blocked — advisory means advisory) |
-| `"blocking"` | continue to Step 4 silently | surface findings, branch on `autonomy.level` (same shape as Step 3): off/auto → `AskUserQuestion` Address-via-`/hv-work` (Recommended) / Ship anyway / Stop; loop → auto-pick `address` and re-invoke `/hv-work` then `/hv-ship` | stop; surface findings; user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship`. Loop mode treats `FAIL` as a guard failure (loop stops). |
+```bash
+hv verdict route <branch> --for ship-qa --json
+```
+
+Exit 3 means `/hv-qa` recorded no verdict: stop and rerun it. Act on `data.next`: `continue` → Step 4 silently; `surface` → surface the findings and continue to Step 4; `ask` / `address` → same as Step 3; `stop` → stop, surface the findings, the user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship` (a loop stops too).
 
 Surface QA concerns with the carrier label *"QA concerns:"* per `references/review-verdict-routing.md` (Carrier-label override) — keeps them visually distinct from `/hv-review` concerns and second-opinion concerns in a single ship pass.
 
-The gate runs after Step 3.5 because there's no point spinning up infra-bound QA runs on a diff that the contextualized or fresh-eyes reviewers already failed. It runs before Step 4 because QA findings may change the PR body's framing (test-plan adjustments, follow-up tasks). When `INFRA-FAIL` returns from `/hv-qa` (dev server / creds / binary missing), treat it as advisory — surface the missing requirements as a note and continue. QA can't run, but ship shouldn't break because the dev server happened to be down.
+The gate runs after Step 3.5 because there's no point spinning up infra-bound QA runs on a diff that the contextualized or fresh-eyes reviewers already failed. It runs before Step 4 because QA findings may change the PR body's framing (test-plan adjustments, follow-up tasks). An `INFRA-FAIL` verdict (dev server / creds / binary missing) routes to `surface` under either gate: surface the missing requirements as a note and continue. QA can't run, but ship shouldn't break because the dev server happened to be down.
 
 ## Step 4 — Build the PR Body
 

@@ -30,7 +30,7 @@ Strategies are written once via `/hv-qa first-run`, which probes the repo for te
 
 ## Verdicts
 
-`/hv-qa run` emits one of three verdicts on its final line:
+`/hv-qa run` ends with one of three verdicts and records it with `hv verdict add --kind qa`, which `/hv-ship` routes on:
 
 | Verdict | Meaning |
 |---------|---------|

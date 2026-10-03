@@ -55,7 +55,7 @@ Read `.hv/config.json`:
 | After-work approval gate | opt-in via `qa.afterWork: true`; default off — QA runs are slow and may need infra |
 | After-work trigger gate | `qa.afterWork: true` AND touched files match a target's `Watch globs` |
 | Authoring tier | Tier S for `run` (banner, `TaskCreate`, integer Step headers); Tier C for `first-run` / `restructure` (mode-numbered lists) |
-| Commit ownership | `run` does not commit (read-only verdict); `first-run` / `restructure` own a `chore(qa):` commit |
+| Commit ownership | `run` does not commit (read-only verdict, recorded with `hv verdict add`); `first-run` / `restructure` own a `chore(qa):` commit |
 
 ### Mode: first-run
 
@@ -122,7 +122,7 @@ For each target, verify everything under `Infra requirements`:
 - Process checks for required binaries (`command -v playwright`, etc.)
 - Env-var presence for credentials (don't print values)
 
-If any infra is missing, emit `INFRA-FAIL` with the missing items and halt — partial QA produces false confidence. Tell the user exactly what to start / install.
+If any infra is missing, record an `INFRA-FAIL` verdict (Step 7's `hv verdict add`, with the missing items as `info` findings) and halt — partial QA produces false confidence. Tell the user exactly what to start / install.
 
 #### Step 5 — Execute Checks
 
@@ -160,6 +160,14 @@ Aggregate per target:
 
 In umbrella `--all` mode, the rollup verdict is the worst-of across targets. Per-target verdicts still report individually.
 
+**Record the verdict** for the current branch, once per repo (umbrella: `--repo <name>` with that repo's verdict). The body carries the failed executable checks and the P0/P1 audit findings, mapping P0 `blocker` to `blocker`, other P0 and P1 to `major`, the rest to `minor`:
+
+```bash
+hv verdict add <branch> --kind qa --verdict <PASS|CONCERNS|FAIL|INFRA-FAIL> --body-file "$VERDICT" --json
+```
+
+Exit 2 names the field that failed validation; fix the body and re-run. `/hv-ship` routes on this record, not on the printed report.
+
 #### Step 8 — Report
 
 Print a structured report:
@@ -184,14 +192,12 @@ Audit findings (P0/P1 inline; full list at <path>):
 Evidence: .hv/qa-runs/<timestamp>/
 ```
 
-Route per `references/review-verdict-routing.md` — same PASS/CONCERNS/FAIL contract; use carrier label `QA concerns:` when invoked from `/hv-ship` (per the routing reference's "Carrier-label override").
+Same PASS/CONCERNS/FAIL contract as `references/review-verdict-routing.md`; use carrier label `QA concerns:` when invoked from `/hv-ship` (per the routing reference's "Carrier-label override").
 
 #### Step 9 — Routing
 
 - Standalone: relay verdict to user per `Producer-side relay` in the verdict-routing reference.
-- From `/hv-ship`: return the verdict only. `/hv-ship` consumes per `Consumer routing` table, gated by `qa.gate`:
-  - `qa.gate: "advisory"` — `/hv-ship` reports findings but never halts.
-  - `qa.gate: "blocking"` — `FAIL` halts; `CONCERNS` prompts the user.
+- From `/hv-ship`: return the verdict only. `/hv-ship` routes on the recorded verdict with `hv verdict route --for ship-qa`, which applies `qa.gate` (`"advisory"` never halts; `"blocking"` halts on `FAIL` and prompts on `CONCERNS`).
 
 ### Mode: restructure
 
@@ -214,7 +220,7 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 ## Failure Modes
 
 - **No strategy file** — halt; tell user to run `/hv-qa first-run`. Don't auto-scaffold.
-- **Infra unavailable** — `INFRA-FAIL` verdict; halt. User starts services, re-runs.
+- **Infra unavailable** — record an `INFRA-FAIL` verdict; halt. User starts services, re-runs.
 - **Runner subagent timeout** — re-run that check alone per Step 5 before recording it. If it passes solo, the original red was contention: record `met: true` with both `uptime` figures in `evidence`. If it times out solo too, record `met: false` with `evidence: "timeout after Ns at load <figure>, reproduced alone at load <figure>"`. QA continues either way; verdict reflects the confirmed result, never the contended one.
 - **Strategy references retired tool** — that check is `met: false` with `evidence: "command not found"`. Surface in `restructure` mode. This includes a `codex-verify` runner from a pre-5.0 strategy: the Codex runner was removed in 5.0, so `restructure` drops the entry.
 

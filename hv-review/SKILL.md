@@ -170,33 +170,39 @@ For each item with a plan, return PASS / CONCERN / FAIL with evidence:
 **Refocus check (per item, after the PASS/CONCERN/FAIL call):**
 1. Trace each change back up the chain: plan task → backlog item intent → milestone intent (only where the item carries a `Milestone:` tag; otherwise stop at the item). Use only the intent text already in this brief.
 2. Flag scope inflation: steps that are sensible on their own but drift from the parent intent (extra options, generalised helpers, adjacent cleanups no level of the chain asks for). Report it as CONCERN, naming the drift path (e.g. `task 3 → [F03] → M01: adds a project-sync mode neither asks for`).
-3. Drift alone is never SPEC-FAIL. Off-target edits to files the plan doesn't imply stay under FAIL above.
+3. Drift alone is never a Stage 1 FAIL. Off-target edits to files the plan doesn't imply stay under FAIL above.
 
-**Final verdict** (last line, all caps): SPEC-PASS | SPEC-CONCERNS | SPEC-FAIL
-- SPEC-PASS — every plan-bearing item delivered what its plan promised
-- SPEC-CONCERNS — works, but plan-vs-diff gaps surfaced
-- SPEC-FAIL — at least one plan outcome went un-fulfilled or the diff went off-target
+**Verdict block.** End the report with one fenced `json` block and nothing after it. Stage verdict is `PASS`, `CONCERNS` or `FAIL`:
+{"verdict": "PASS", "summary": "<one line>", "findings": [{"severity": "blocker|major|minor|info", "title": "<what>", "file": "<path>", "line": 42, "detail": "<evidence>"}], "items": [{"id": "<ID>", "verdict": "PASS"}]}
+- PASS — every plan-bearing item delivered what its plan promised
+- CONCERNS — works, but plan-vs-diff gaps surfaced
+- FAIL — at least one plan outcome went un-fulfilled or the diff went off-target
 ```
 
-**Parse the verdict** from the last all-caps line. Three routes:
+**Record the verdict.** Save the reviewer's JSON block to a temp file and record it (umbrella: add `--repo <name>`):
 
-| Verdict | Route |
+```bash
+hv verdict add <branch> --kind review-spec --verdict <PASS|CONCERNS|FAIL> --body-file "$VERDICT" --json
+```
+
+Exit 2 means the block is malformed or its `verdict` differs from `--verdict`: the message names the field. Ask the reviewer to resend the block; never guess a verdict. Route on `data.next`:
+
+| `data.next` | Route |
 |---------|-------|
-| `SPEC-PASS` | Continue to Step 8 (Stage 2). Carry the per-item evidence forward into the final report. |
-| `SPEC-CONCERNS` | Continue to Step 8 (Stage 2). The combined verdict in Step 9 may still be CONCERNS or FAIL depending on Stage 2's findings — Stage 1 concerns alone don't decide the merge. |
-| `SPEC-FAIL` | **Short-circuit.** Skip Step 8 entirely. Jump to Step 9 to emit a Stage-1-only verdict block. Stage 2 doesn't run — no point burning a deeper review on a diff that doesn't match intent. |
+| `quality` | Continue to Step 8 (Stage 2). Carry the per-item evidence forward into the final report. Stage 1 concerns alone don't decide the merge. |
+| `report` | **Short-circuit** (Stage 1 FAIL). Skip Step 8 and jump to Step 9 to emit a Stage-1-only verdict block. No point burning a deeper review on a diff that doesn't match intent. |
 
 When `--stage spec` is set, always jump to Step 9 after Stage 1 (no Stage 2 regardless of verdict).
 
 ## Step 8 — Stage 2: Dispatch Code-Quality Reviewer
 
-Skip this step entirely when `--stage spec` is set, OR when Stage 1 returned `SPEC-FAIL` (short-circuit applied in Step 7).
+Skip this step entirely when `--stage spec` is set, OR when Stage 1 routed to `report` (FAIL short-circuit in Step 7).
 
 Dispatch a single code-quality reviewer using the **orchestrator** model. Stage 2 owns code quality, conventions, stale scaffolding, and silent-failure detection. Intent / spec compliance lives in Stage 1 and is NOT re-evaluated here — the brief tells the reviewer to skip it.
 
-**Use Variant A when Stage 1 ran (SPEC-PASS or SPEC-CONCERNS). Use Variant B when Stage 1 was skipped (no-plan fallback or `--stage quality`).**
+**Use Variant A when Stage 1 ran (PASS or CONCERNS). Use Variant B when Stage 1 was skipped (no-plan fallback or `--stage quality`).**
 
-### Variant A — Stage 2 with Stage 1 (Stage 1 ran with SPEC-PASS or SPEC-CONCERNS)
+### Variant A — Stage 2 with Stage 1 (Stage 1 ran with PASS or CONCERNS)
 
 ```
 Stage 2 / 2 — code-quality review of `<branch>` against base `<base>`.
@@ -208,7 +214,7 @@ conventions, edge cases, security smells, performance cliffs, stale
 scaffolding, silent failures.
 
 **Stage 1 verdict (context — do not re-evaluate):**
-<SPEC-PASS or SPEC-CONCERNS — paste the Stage 1 evidence block verbatim>
+<PASS or CONCERNS — paste the Stage 1 evidence block verbatim>
 
 **Commits:**
 <hash> <subject>
@@ -250,10 +256,11 @@ scaffolding, silent failures.
 
 Return verdict as labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
 
-**Final verdict** (on the last line, all caps): QUALITY-PASS | QUALITY-CONCERNS | QUALITY-FAIL
-- QUALITY-PASS — no concerns worth surfacing
-- QUALITY-CONCERNS — works, but surfaces should be flagged before merge
-- QUALITY-FAIL — merge would regress behavior, violate a hard boundary, or break a convention
+**Verdict block.** End the report with one fenced `json` block and nothing after it. Stage verdict is `PASS`, `CONCERNS` or `FAIL`:
+{"verdict": "PASS", "summary": "<one line>", "findings": [{"severity": "blocker|major|minor|info", "title": "<what>", "file": "<path>", "line": 42, "detail": "<evidence>"}]}
+- PASS — no concerns worth surfacing
+- CONCERNS — works, but surfaces should be flagged before merge
+- FAIL — merge would regress behavior, violate a hard boundary, or break a convention
 ```
 
 ### Variant B — Stage 2 standalone (Stage 1 was skipped via no-plan fallback or `--stage quality`)
@@ -307,36 +314,31 @@ failures.
 
 Return verdict as labeled sections. Be specific: file:line for every concern. Rank concerns by severity.
 
-**Final verdict** (on the last line, all caps): QUALITY-PASS | QUALITY-CONCERNS | QUALITY-FAIL
-- QUALITY-PASS — no concerns worth surfacing
-- QUALITY-CONCERNS — works, but surfaces should be flagged before merge
-- QUALITY-FAIL — merge would regress behavior, violate a hard boundary, or break a convention
+**Verdict block.** End the report with one fenced `json` block and nothing after it. Stage verdict is `PASS`, `CONCERNS` or `FAIL`:
+{"verdict": "PASS", "summary": "<one line>", "findings": [{"severity": "blocker|major|minor|info", "title": "<what>", "file": "<path>", "line": 42, "detail": "<evidence>"}]}
+- PASS — no concerns worth surfacing
+- CONCERNS — works, but surfaces should be flagged before merge
+- FAIL — merge would regress behavior, violate a hard boundary, or break a convention
 ```
 
 ## Step 9 — Combine Verdicts and Relay
 
-Compute the combined verdict from Stage 1's `SPEC-*` and Stage 2's `QUALITY-*` outputs. Worst-of mapping — FAIL beats CONCERNS beats PASS:
+When Stage 2 ran, record its block the same way as Step 7:
 
-| Stage 1 | Stage 2 | Combined |
-|---------|---------|----------|
-| SPEC-FAIL | (skipped — short-circuit) | **FAIL** |
-| SPEC-PASS | QUALITY-PASS | **PASS** |
-| SPEC-PASS | QUALITY-CONCERNS | **CONCERNS** |
-| SPEC-PASS | QUALITY-FAIL | **FAIL** |
-| SPEC-CONCERNS | QUALITY-PASS | **CONCERNS** |
-| SPEC-CONCERNS | QUALITY-CONCERNS | **CONCERNS** |
-| SPEC-CONCERNS | QUALITY-FAIL | **FAIL** |
+```bash
+hv verdict add <branch> --kind review-quality --verdict <PASS|CONCERNS|FAIL> --body-file "$VERDICT" --json
+```
 
-When a single stage ran (`--stage spec` / `--stage quality` / no-plan fallback), strip the prefix from that stage's verdict: `SPEC-PASS` → `PASS`, `QUALITY-CONCERNS` → `CONCERNS`, etc.
+The combined verdict is `data.combined`: the verb takes the worst of the two stages (FAIL beats CONCERNS beats PASS) when Stage 1 ran at the same commit, else Stage 2's own. When only Stage 1 ran (FAIL short-circuit or `--stage spec`), the Step 7 verdict is the combined one. Never work the combination out by hand.
 
-Present both stages' outputs **verbatim** (or nearly so — trim only restatements). Stage 1 first, then Stage 2, then the combined verdict. Don't summarize away the evidence; specifics are the point. When Stage 2 was short-circuited, mark it `Skipped (Stage 1 returned SPEC-FAIL)` in the output block.
+Present both stages' outputs **verbatim** (or nearly so — trim only restatements). Stage 1 first, then Stage 2, then the combined verdict. Don't summarize away the evidence; specifics are the point. When Stage 2 was short-circuited, mark it `Skipped (Stage 1 returned FAIL)` in the output block.
 
 Structure:
 
 ```
 Review: `hv/foo` → main (3 commits, 5 files)
 
-## Stage 1 — Spec Compliance — SPEC-PASS
+## Stage 1 — Spec Compliance — PASS
 
 ### [F03] Quick-switch projects — PASS
 <evidence: each plan outcome ↔ diff line(s)>
@@ -344,7 +346,7 @@ Review: `hv/foo` → main (3 commits, 5 files)
 ### [B07] Timer badge — PASS
 <evidence>
 
-## Stage 2 — Code Quality — QUALITY-CONCERNS
+## Stage 2 — Code Quality — CONCERNS
 
 ### 1. Convention compliance — CONCERN
 - src/Foo.swift:42 — uses raw URLSession; KNOWLEDGE says all network calls go through NetworkClient
@@ -362,18 +364,18 @@ Review: `hv/foo` → main (3 commits, 5 files)
 Verdict: CONCERNS
 ```
 
-Short-circuit variant (Stage 1 returned SPEC-FAIL):
+Short-circuit variant (Stage 1 returned FAIL):
 
 ```
 Review: `hv/foo` → main (3 commits, 5 files)
 
-## Stage 1 — Spec Compliance — SPEC-FAIL
+## Stage 1 — Spec Compliance — FAIL
 
 ### [F03] Quick-switch projects — FAIL
 - .hv/plans/M01-F03.md outcome "Cmd+Tab overlay on the project picker" was not fulfilled — diff adds the overlay but doesn't wire the Cmd+Tab keybinding.
 - diff went off-target into src/Settings.swift (not implied by the plan).
 
-## Stage 2 — Code Quality — Skipped (Stage 1 returned SPEC-FAIL)
+## Stage 2 — Code Quality — Skipped (Stage 1 returned FAIL)
 
 Verdict: FAIL
 ```
@@ -385,7 +387,7 @@ Review: `hv/foo` → main (3 commits, 5 files)
 
 ## Stage 1 — Spec Compliance — Skipped (no plans found for referenced items)
 
-## Stage 2 — Code Quality — QUALITY-PASS
+## Stage 2 — Code Quality — PASS
 
 ### 0. Intent match — PASS
 <evidence (legacy fallback when Stage 1 didn't run)>
@@ -400,7 +402,7 @@ Verdict: PASS
 
 The verdict is the entire product — return it and stop. Never ask a follow-up; the caller (the user, or `/hv-ship` when invoked) owns what happens next.
 
-When invoked from `/hv-ship`, return the verdict; the parent runs consumer routing per `references/review-verdict-routing.md`. When invoked standalone, relay the verdict to the user using the *Producer-side relay* table in the reference — short summary:
+When invoked from `/hv-ship`, return the verdict; the parent routes on the recorded verdict with `hv verdict route --for ship-review` (`references/review-verdict-routing.md`). When invoked standalone, relay the verdict to the user using the *Producer-side relay* table in the reference — short summary:
 
 - **PASS** — *"Ready to ship. Run `/hv-ship`."*
 - **CONCERNS** — print the concerns inline (already done in Step 6), then suggest *"Address via `/hv-work` and rerun `/hv-review`, or accept and ship via `/hv-ship`."*
@@ -419,21 +421,21 @@ hv review queue --json
 1. **PRs.** None: report *"<ID> is `needs-review` but has no PR with a closing keyword"* and skip. Several: review each.
 2. **Checkout.** `git status --short` must be clean, else stop. Check the PR out through the adapter: `hv tracker call -- pr checkout <n>` (GitHub) or `-- mr checkout <n>` (GitLab).
 3. **Review.** Run Steps 2-9 on the checked-out branch, scoped to `<base>...HEAD` (`<base>` from `hv git base`). The reviewer is read-only; so is the loop, apart from the verbs below.
-4. **Route.**
-   - **PASS** — interactive: `AskUserQuestion` (Header `"Merge"`, *"Merge PR <n> for <ID>?"*, options *Merge (Recommended)* / *Skip* / *Stop*); `autonomy.level: "loop"` merges without asking. Merge with `hv ship pr-merge <n>` (in an umbrella `--repo <name>` is required; queue entries carry `repo` and qualified IDs): it merges and closes the linked items the host left open; `data.sha` and `data.closed` report the result. Exit 4 means nothing was merged because an item has no proof: it is now `changes-requested`; report `data.unproven` and move on. Then post the verdict on each linked item (`hv item comment add <ID> --kind feedback --body-file -`) and on the PR (`hv tracker call -- pr comment <n> --body-file -` on GitHub, `-- mr note <n> --message "<verdict>"` on GitLab).
-   - **CONCERNS / FAIL** — post the findings as a `feedback` comment on each linked item and on the PR (same commands), then `hv item state <ID> --to changes-requested`. The author's next `/hv-work` claim reads the feedback. No merge, under any autonomy level.
+4. **Route** on `hv verdict route <branch> --for queue --json`, field `data.next`:
+   - **`ask` / `merge`** (PASS) — `ask`: `AskUserQuestion` (Header `"Merge"`, *"Merge PR <n> for <ID>?"*, options *Merge (Recommended)* / *Skip* / *Stop*); `merge` (loop mode): merge without asking. Merge with `hv ship pr-merge <n>` (in an umbrella `--repo <name>` is required; queue entries carry `repo` and qualified IDs): it merges and closes the linked items the host left open; `data.sha` and `data.closed` report the result. Exit 4 means nothing was merged because an item has no proof: it is now `changes-requested`; report `data.unproven` and move on. Then post the verdict on each linked item (`hv item comment add <ID> --kind feedback --body-file -`) and on the PR (`hv tracker call -- pr comment <n> --body-file -` on GitHub, `-- mr note <n> --message "<verdict>"` on GitLab).
+   - **`request-changes`** (CONCERNS / FAIL) — post the findings as a `feedback` comment on each linked item and on the PR (same commands), then `hv item state <ID> --to changes-requested`. The author's next `/hv-work` claim reads the feedback. No merge, under any autonomy level.
 5. **Return.** `git checkout <base>` before the next entry.
 
 Exit 5 or 6 (tracker unavailable or rate-limited) from any verb stops the queue with a report of what was done and what is left. Never retry in a loop. Routing table: `references/review-verdict-routing.md` (Queue routing).
 
 ## Rules
 
-- **Read-only.** Never edit, commit, or stage. The verdict is the entire product.
+- **Read-only.** Never edit, commit, or stage. The verdict is the entire product; recording it with `hv verdict add` (the gitignored `.hv/verdicts.json`) is the one write.
 - **Evidence over opinion.** Every concern must cite file:line or commit hash.
 - **Scope is bounded.** Only the diff against the base is reviewed — don't wander into unchanged code.
 - **Call it honestly.** If conventions were violated but the user has a good reason, the reviewer still reports CONCERN — the user decides what to do.
-- **Don't re-run on a passed branch.** If the same scope was just reviewed in the session and came back PASS, skip Steps 7 and 8 and report the cached verdict.
-- **Stage gating: see Step 9 worst-of table.** SPEC-FAIL short-circuits Stage 2; otherwise both stages run and Step 9 combines worst-of.
+- **Don't re-run on a passed branch.** If `hv verdict show <branch> --json` has a review record with `verdict` PASS and `stale: false`, skip Steps 7 and 8 and report that verdict.
+- **Stage gating lives in the verb.** A Stage 1 FAIL routes to `report` and skips Stage 2; otherwise both stages run and `data.combined` is the worst of the two.
 
 ## References
 
