@@ -258,7 +258,7 @@ Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open 
 printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge <branch> --body-file -
 ```
 
-Verb behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
+Verb behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user. Exit 4 with `data.blockedBy: "manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human for this merge; `data.paths` names the files that put it there): nothing changed. Ask the user in an `AskUserQuestion` that loop mode never auto-picks, then re-run with `--confirm --confirm-note "<their answer>"`.
 
 ## Step 6c — Close Upstream Issues (Direct-Push Path)
 
@@ -784,7 +784,7 @@ Resolves: [B07], [F03]
 | [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
 | [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold). |
 | [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
-| [`manual-gates.md`](../references/manual-gates.md) | Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch). |
+| [`manual-gates.md`](../references/manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (8.5, 8.6, D-A1). |
 | [`review-verdict-routing.md`](../references/review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. |

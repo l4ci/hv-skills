@@ -207,6 +207,18 @@ Controls whether `/hv-ship` invokes [`/hv-qa run`](qa.md) between `/hv-review` (
 
 The gate is opt-in because product QA needs strategy files (`/hv-qa first-run` bootstraps them) and often binds to infra (dev server, sandbox creds, runners installed). Most cycles don't need it. Enable for repos that have a QA strategy wired up and where regressions cost more than the runner time.
 
+## ship.mergeApproval and ship.mergeApprovalPaths
+
+Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-merge`, `hv worker gate`) read it, so it binds `/hv-ship`, `/hv-review --queue` and the `/hv-work` gate step at every `autonomy.level`.
+
+| `ship.mergeApproval` | Behavior |
+|-------|----------|
+| `"none"` (default) | Merges run after their own gates (review, proof, verify) with no extra approval. |
+| `"all"` | Every merge needs a human. The verb refuses with exit 4 until the skill asks and re-runs it with `--confirm --confirm-note "<answer>"`. |
+| `"paths"` | Only merges that change a file matching `ship.mergeApprovalPaths` need a human. The refusal lists the matching files. |
+
+`ship.mergeApprovalPaths` is a list of repo-relative entries. A changed file matches an entry when it equals it, lies under it (`"hv-release"` matches `hv-release/SKILL.md`), or matches it as a glob against the whole path (`"*.md"` matches top-level Markdown only). Set them with `hv config set ship.mergeApproval paths` and `hv config set ship.mergeApprovalPaths '["migrations", "*.lock"]'`. Every approval lands in `.hv/gate-audit.jsonl`; see [`references/manual-gates.md`](../../references/manual-gates.md).
+
 ## qa.gate
 
 Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Independent of the `/hv-review` verdict routing.

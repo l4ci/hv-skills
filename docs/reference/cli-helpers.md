@@ -295,7 +295,7 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv worker reset <slot> [--task <id>] [--check-only]` | refuse a slot that holds work, else cut a fresh task branch |
 | `hv worker dispatch <slot> --body-file <path\|-> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>]` | send a brief into a slot's session |
 | `hv worker poll [<slot>] [--settle <seconds>] [--lines <n>]` | classify slot states from their panes |
-| `hv worker gate <slot> --base <branch> [--check-only] [--no-verify]` | merge gate for one slot's branch or PR |
+| `hv worker gate <slot> --base <branch> [--check-only] [--no-verify] [--confirm --confirm-note <answer>]` | merge gate for one slot's branch or PR; exit 4 when `ship.mergeApproval` needs a human |
 | `hv worker session check [--session <name>]` | inside a managed host session? (exit 1 when outside) |
 | `hv worker session ensure [--session <name>] [--body-file <path\|->] [--boot-timeout <s>]` | hand the orchestrator off into a host session |
 | `hv worker account list` | list accounts with their usage verdict |
@@ -307,7 +307,7 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | Usage | What it does |
 |---|---|
 | `hv tracker call [--provider auto\|github\|gitlab] -- <cli-arg>...` | run gh or glab with list limits and rate-limit handling |
-| `hv tracker suggest-upstream --title <text> --body-file <path\|-> [--upstream-repo <owner/repo>]` | file a hv-skills issue from a learning |
+| `hv tracker suggest-upstream --title <text> --body-file <path\|-> [--upstream-repo <owner/repo>] --confirm --confirm-note <answer>` | file a hv-skills issue from a learning (manual gate) |
 
 ## `hv git`
 
@@ -334,8 +334,8 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 |---|---|
 | `hv ship body [<branch>]` | build a PR body from a branch's commits |
 | `hv ship pr <branch> --title <text> --body-file <path\|-> [--items <ID>[,<ID>…]]` | push a branch and open a PR or MR |
-| `hv ship merge <branch> --body-file <path\|->` | merge a branch into the base branch with --no-ff |
-| `hv ship pr-merge <pr> [--items <ID>[,<ID>…]]` | merge a PR in issue mode |
+| `hv ship merge <branch> --body-file <path\|-> [--confirm --confirm-note <answer>]` | merge a branch into the base branch with --no-ff; exit 4 when `ship.mergeApproval` needs a human |
+| `hv ship pr-merge <pr> [--items <ID>[,<ID>…]] [--confirm --confirm-note <answer>]` | merge a PR in issue mode; exit 4 when `ship.mergeApproval` needs a human |
 | `hv ship undo [--cycle <hash>] [--allow-post-merge] [--apply]` | roll back the last cycle merge on the base branch |
 
 ## `hv release`
@@ -350,6 +350,16 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv release pending` | how much has landed since the last release tag |
 | `hv release milestone-check <MNN>` | list the open issues that block a milestone release |
 | `hv release close-milestone <MNN> --release <X.Y.Z>` | close out a released milestone |
+| `hv release push <X.Y.Z> [--branch <name>] --confirm --confirm-note <answer>` | push the release tag and branch to origin (manual gate) |
+| `hv release publish <X.Y.Z> --title <text> --body-file <path\|-> [--draft] --confirm --confirm-note <answer>` | create the GitHub or GitLab release (manual gate) |
+
+## `hv gate`
+
+| Usage | What it does |
+|---|---|
+| `hv gate list` | list every manual gate and the verbs that enforce it |
+
+A gated verb refuses with exit 4 (`blockedBy: "manual gate"`) at every autonomy level unless `--confirm` and `--confirm-note` carry the human's answer, and appends each approval to `.hv/gate-audit.jsonl`. See [`references/manual-gates.md`](../../references/manual-gates.md).
 
 ## `hv init`
 

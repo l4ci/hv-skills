@@ -520,7 +520,7 @@ Loop until no slot is `busy`, routing each state as it appears. Each poll also w
   hv worker gate <wN> --base <cycle-branch> --json
   ```
 
-  Exit 0 (`data.verdict: pass`) means merged and the merged tree verified (or skipped, `data.verifySkipped: true`): continue. Every other verdict exits 1; route on `data.verdict`. Exit 3 means the pool, slot, base or worker branch is missing, or the base branch is not checked out.
+  Exit 0 (`data.verdict: pass`) means merged and the merged tree verified (or skipped, `data.verifySkipped: true`): continue. Exit 4 (`data.verdict: approval-required`) is the `merge-approval` manual gate: nothing merged; ask the user (never auto-picked; name `data.paths`), then re-gate with `--confirm --confirm-note "<their answer>"`. Every other verdict exits 1; route on `data.verdict`. Exit 3 means the pool, slot, base or worker branch is missing, or the base branch is not checked out.
 
   | `data.verdict` | Meaning | Action |
   |---|---|---|

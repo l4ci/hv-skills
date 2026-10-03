@@ -42,8 +42,8 @@ The queue loop is the consumer (`hv verdict route --for queue`). It routes per P
 
 | `data.next` | Verdict | Action |
 |---------|---------|--------|
-| `ask` | `PASS`, interactive | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr>` (exit 4 = not merged, an item unproven and set to `changes-requested`) |
-| `merge` | `PASS`, loop | merge, no question |
+| `ask` | `PASS`, interactive | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr> --confirm --confirm-note "<answer>"` (exit 4 = not merged: an item unproven and set to `changes-requested`, or the `merge-approval` gate) |
+| `merge` | `PASS`, loop | merge, no question, unless the verb refuses with `blockedBy: "manual gate"`; then ask and re-run with `--confirm` |
 | `request-changes` | `CONCERNS` or `FAIL` | findings as feedback, `hv item state <ID> --to changes-requested`; no merge. A `FAIL` still stops the surrounding loop as a guard failure |
 
 Exit 3 / 4 from any helper stops the queue. Label lifecycle: `references/issue-mode.md`.

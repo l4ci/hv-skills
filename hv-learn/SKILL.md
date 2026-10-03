@@ -264,7 +264,7 @@ If verification ran and passed, add a middle line: `Opus verification: PASS — 
 
 ## Step 8.5 — Suggest hv-skills issue (when applicable)
 
-This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing a public issue is high-stakes; the user presses the button. See `references/manual-gates.md`.
+`hv tracker suggest-upstream` enforces the `public-filing` manual gate (`hv gate list`): it exits 4 without `--confirm`, at every autonomy level. The question below is that confirmation, so never auto-pick it.
 
 **Trigger heuristic.** Scan the just-captured bullets for any of:
 
@@ -302,7 +302,8 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    ```
 3. Run the verb:
    ```bash
-   printf '%s' "$BODY" | hv tracker suggest-upstream --json --title "$TITLE" --body-file -
+   printf '%s' "$BODY" | hv tracker suggest-upstream --json --title "$TITLE" --body-file - \
+     --confirm --confirm-note "<the user's answer, verbatim>"
    ```
    - On exit 0 (gh available, issue filed): read `url` and `number` from `data`.
    - On exit 5 (`gh` missing or not authenticated): show the error hint (the manual issue URL) to the user, then prompt once: *"Paste the issue number when you've filed it manually (or 'skip' to skip):"* Read the user's reply; if a number, use it; if "skip" or empty, abandon the tracking step.
@@ -402,5 +403,5 @@ Cleared N contradictions: <demoted-count> demoted, <skipped-count> skipped
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
+- [`references/manual-gates.md`](../references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
 - [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.
