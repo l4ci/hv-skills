@@ -1,6 +1,6 @@
 echo "sidecar lock — sidecar read-modify-write survives concurrent writers"
-# locked() (bin/hvlib_io.py) serializes sidecar read-modify-write cycles via
-# fcntl.flock on a sibling <path>.lock file. These assertions pin the contract:
+# hv serializes sidecar read-modify-write cycles via
+# flock on a sibling <path>.lock file. These assertions pin the contract:
 # (a) N concurrent knowledge hit calls lose no increments;
 # (b) N concurrent knowledge contradiction add calls lose no entries;
 # (c) a leftover .lock file (left in place by design — unlink-after-release

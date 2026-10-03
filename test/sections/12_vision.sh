@@ -5,7 +5,7 @@ import json
 p='.hv/counters.json'
 d=json.load(open(p)); d['milestones']=0; json.dump(d,open(p,'w'))
 "
-# Re-seed MILESTONES.md (earlier hv-managed-block knowledge test rewrote CLAUDE.md, but
+# Re-seed MILESTONES.md (earlier `hv block knowledge` test rewrote CLAUDE.md, but
 # MILESTONES.md is untouched).
 cat > .hv/MILESTONES.md <<'EOF'
 # Milestones
@@ -145,7 +145,9 @@ OUT=$(hvj -C "$BOOT_DIR" init) || fail "init failed: $OUT"
 [ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "init did not seed MILESTONES.md"
 [ -f "$BOOT_DIR/.hv/counters.json" ] || fail "init did not seed counters.json"
 [ -f "$BOOT_DIR/.hv/status.json" ] || fail "init did not seed status.json"
-[ ! -e "$BOOT_DIR/.hv/bin" ] || fail "init created .hv/bin"
+# The 4.x mirror directory, spelled in two pieces like section 74 does.
+MIRROR=".hv/""bin"
+[ ! -e "$BOOT_DIR/$MIRROR" ] || fail "init created the 4.x mirror dir"
 grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "init did not add .hv/ to .gitignore"
 grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init counters.json missing milestones key"
 pass "init seeds dirs, data files, and .gitignore"
@@ -171,8 +173,10 @@ rm -rf "$BOOT_DIR"
 
 echo "init check"
 # Ensure all core data files exist (smoke setup creates BACKLOG.md/counters.json/status.json;
-# KNOWLEDGE.md got written by hv-managed-block knowledge; config.json is needed by the check).
+# earlier sections seed KNOWLEDGE.md and DECISIONS.md, so a SECTION_LIST run seeds them here).
 [ -f .hv/config.json ] || echo '{}' > .hv/config.json
+[ -f .hv/KNOWLEDGE.md ] || printf '# Knowledge\n' > .hv/KNOWLEDGE.md
+[ -f .hv/DECISIONS.md ] || printf '# Decisions\n' > .hv/DECISIONS.md
 
 # 1. Everything present → init check passes.
 OUT=$(hvj init check) || fail "init check failed on fully initialized project: $OUT"

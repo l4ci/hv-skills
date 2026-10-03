@@ -39,12 +39,6 @@ trap 'rm -rf "$DSN_TMP"' EXIT
   rc=0; hvj design show F99 >/dev/null 2>&1 || rc=$?
   [ "$rc" = "3" ] || { echo "FAIL: design show F99 (missing) should exit 3, got $rc"; exit 1; }
 
-  # 6b. F26: design show sources the shared lib
-  # S7 deletes: wrapper-sourcing check; no Go code to test, the verb is Go-native
-  # white-box-begin: A9 #53 keep
-  grep -q "hv-artifact-show.sh" "$BIN/hv-design-show" || { echo "FAIL: hv-design-show should source hv-artifact-show.sh after F26"; exit 1; }
-  # white-box-end
-
   # 7. design list non-empty — one F00 entry
   OUT=$(hvj design list) || { echo "FAIL: design list exited non-zero"; exit 1; }
   python3 -c "
@@ -113,16 +107,10 @@ trap 'rm -rf "$AMD_TMP"' EXIT
   # e. bad ID shape — exit 2
   rc=0; hvj design amend S01 --section Goal --mode replace --body-file body-replace.md >/dev/null 2>&1 || rc=$?
   [ "$rc" = "2" ] || { echo "FAIL: bad ID shape S01 should exit 2, got $rc"; exit 1; }
-
-  # f. wrapper sources the shared lib (mirrors F26 design show assertion)
-  # S7 deletes: wrapper-sourcing check; no Go code to test, the verb is Go-native
-  # white-box-begin: A9 #53 keep
-  grep -q "hv-artifact-amend.sh" "$BIN/hv-design-amend" || { echo "FAIL: hv-design-amend should source hv-artifact-amend.sh"; exit 1; }
-  # white-box-end
 ) || fail "design amend assertions"
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$AMD_TMP"
-pass "design amend: replace/append section contracts hold; rejects bad section, missing design, bad ID; sources shared lib"
+pass "design amend: replace/append section contracts hold; rejects bad section, missing design, bad ID"
 
 echo "## /hv-plan integration with --design pointer"
 

@@ -353,13 +353,6 @@ PY
     eq "plan uncertain F2 view failure rc" 5 "$(FAKE_TRACKER_FAIL=view rcof hvj plan uncertain F2)"
     eq "field get view failure" 5 "$(FAKE_TRACKER_FAIL=view rcof hvj item field get F2 --name title)"
     pass "$prov: tracker failures surface as exit 5"
-
-    # hv-append stays refused (capture is item create)
-    # S7 deletes: Go has no append on the issues backend; hv-append goes with bin/
-    # white-box-begin: A9 #53 keep
-    rc=0; "$BIN/hv-append" "## Bugs" '- **[B10] x.**' >/dev/null 2>&1 || rc=$?; eq "append refused" 2 "$rc"
-    pass "$prov: hv-append still refused in issue mode"
-    # white-box-end
   )
 done
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT

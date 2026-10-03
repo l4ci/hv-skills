@@ -7,7 +7,6 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$REPO/bin"
 TESTDIR="$REPO/test"
 
 # Which sections run. SECTION_LIST (newline-separated paths, so paths may hold
@@ -50,15 +49,13 @@ else
   fi
 fi
 
-# Pin hv-resolve-plugin-root to the canonical repo bin/ during smoke. Without
-# this, hv-preflight walks ~/.claude/plugins/* and may pick up a stale
-# marketplace install with helpers that have since been removed (false-positive
-# "stale: missing helpers"). The smoke is about *this* checkout, not whatever
-# Claude Code happens to have installed locally.
+# Pin the install root `hv update` reports to this checkout. Without it, hv
+# walks ~/.claude/plugins/* and may pick up whatever marketplace install
+# Claude Code happens to have locally. The smoke is about *this* checkout.
 export HV_INSTALL_ROOT="$REPO"
 # macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
-# from helpers like hv-resolve-umbrella (which would otherwise mismatch on Darwin).
+# from verbs like `hv repo umbrella` (which would otherwise mismatch on Darwin).
 # Root every temp dir of this run under one base (#110). Sections and
 # the helpers all call mktemp, and sections replace the EXIT trap (F38), so
 # per-site cleanup cannot be relied on: TMPDIR rooting lets the runner remove

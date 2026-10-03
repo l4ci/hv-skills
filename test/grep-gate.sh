@@ -21,26 +21,39 @@ bad() { printf '\033[31mFAIL\033[0m %s\n' "$1" >&2; fails=$((fails + 1)); }
 BIN_LS="$(git ls-files bin | sort | tr '\n' ' ')"
 [ "$BIN_LS" = "bin/hv " ] || bad "bin/ must hold only the hv launcher; tracked: $BIN_LS"
 
-# 2. Legacy names. History keeps them: the changelog, announcements, the 5.0
-# design docs and tracked .hv/ content cite helpers as what they replaced. The
-# validator owns the name list, and the white-box scanner and its guard section
-# spell the patterns they look for.
+# 2. Legacy names. The scope is what users and contributors read or run:
+# skills, references, docs, the root Markdown, test/ and Go tests. Non-test Go
+# source under internal/ is out of scope (A9 ruling, option a): it cites the
+# helper each verb was ported from, and some of it has to know the old names
+# (init deleting the 4.x mirror, the migrate v4 codemod). History keeps them
+# too: announcements and the 5.0 design docs cite helpers as what they
+# replaced. The validator owns the name list, and the white-box scanner, its
+# guard section, the doclint section and this gate spell the patterns.
 NAMES="$(python3 test/validate-skills.py --list-legacy | paste -sd'|')"
 [ -n "$NAMES" ] || bad "validate-skills.py --list-legacy printed no names"
 PATTERN="(?<![\\w/.-])(?:${NAMES})(?![\\w-])|\\.hv/bin|hvlib|(?<![\\w.-])bin/hv-"
-EXCLUDE=(
+SCOPE=(
+  'hv-*/' 'references/' 'docs/' 'test/' '*.md'
+  ':(glob)**/*_test.go' ':(glob)**/testdata/**'
   ':(exclude)CHANGELOG.md'
   ':(exclude)docs/announcements'
   ':(exclude)docs/design/5.0-*'
   ':(exclude).hv'
-  ':(exclude)bin'
+  ':(exclude)test/grep-gate.sh'
   ':(exclude)test/validate-skills.py'
   ':(exclude)test/whitebox-scan.awk'
+  ':(exclude)test/sections/29_doclint.sh'
   ':(exclude)test/sections/72_whitebox_guard.sh'
-  # TEMPORARY: waits on the E1/codex decision (#68). Delete this line with it.
-  ':(exclude)test/sections/50_codex_verify.sh'
+  # Tests of the code that has to know the old names: the migrate v4 codemod
+  # and init removing the 4.x mirror. Their fixtures are legacy text on purpose.
+  ':(exclude)test/sections/39_migrate.sh'
+  ':(exclude)internal/migrate'
+  ':(exclude)internal/cli/migrate_test.go'
+  ':(exclude)internal/cli/testdata/golden/TestMigrateV4*'
+  ':(exclude)internal/cli/init_test.go'
+  ':(exclude)internal/initproj'
 )
-HITS="$(git grep -nP "$PATTERN" -- . "${EXCLUDE[@]}" || true)"
+HITS="$(git grep -nP "$PATTERN" -- "${SCOPE[@]}" || true)"
 if [ -n "$HITS" ]; then
   bad "legacy helper names, .hv/bin or hvlib still referenced ($(wc -l <<<"$HITS" | tr -d ' ') lines):"
   printf '%s\n' "$HITS" >&2

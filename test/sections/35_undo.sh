@@ -112,7 +112,7 @@ done = f"- ~~**[B01] [P1] Sample bug.** Body.~~ Done 2026-01-15 [`{short}`]\n"
 text = text.replace("## Completed\n", "## Completed\n" + done)
 p.write_text(text)
 PYEOF
-  # Bump since_refactor.bugs to 1 (what hv-complete would have done).
+  # Bump since_refactor.bugs to 1 (what completing an item does).
   python3 - <<'PYEOF'
 import json, pathlib
 p = pathlib.Path(".hv/counters.json")

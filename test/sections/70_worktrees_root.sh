@@ -26,7 +26,7 @@ mkdir -p "$TMP_WR/boot2"
   cd "$TMP_WR/boot2"
   git init -q -b main .
   "$HV_BIN" init >/dev/null 2>&1 || exit 1
-  grep -vxF '.worktrees/' .gitignore | grep -vxF '# Worker worktrees (hv-worker-pool, parallel rounds)' > .gitignore.new && mv .gitignore.new .gitignore
+  grep -vxF '.worktrees/' .gitignore | grep -vxF '# Worker worktrees (hv worker pool, parallel rounds)' > .gitignore.new && mv .gitignore.new .gitignore
   "$HV_BIN" init >/dev/null 2>&1 || exit 1
 ) || fail "hv init re-run failed"
 [ "$(grep -cxF '.worktrees/' "$TMP_WR/boot2/.gitignore")" = "1" ] || fail "an upgraded project must gain .worktrees/ once"

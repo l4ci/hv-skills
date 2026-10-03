@@ -281,7 +281,7 @@ pass "review scope picks origin bullet, ignores Related-link references"
 git branch -D hv/scope-regression >/dev/null 2>&1 || true
 rm -f r.txt
 
-# Regression: hv-ship-body must attribute an ID to its OWN bullet, not to
+# Regression: `hv ship body` must attribute an ID to its OWN bullet, not to
 # another item that mentions the ID in a `Related:` suffix.
 git checkout -q main
 cat > .hv/BACKLOG.md <<'EOF'

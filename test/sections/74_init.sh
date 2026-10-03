@@ -1,7 +1,4 @@
 echo "A9: hv init seeds .hv/, runs the blocks, and hv init check reports"
-# The shim's init still runs the 4.x bootstrap (mirror, no blocks), so this
-# section needs init served by Go.
-require_go_verb init || return 0
 
 TMP_IN="$(mktemp -d)"
 trap 'rm -rf "$TMP_IN"' EXIT
@@ -53,7 +50,7 @@ rc=0; OUT="$(hvj -C "$TMP_IN/nb" init check)" || rc=$?
 hvj -C "$TMP_IN/fresh" init check >/dev/null || fail "A9[d]: initialized init check did not exit 0"
 pass "A9[d]: init check lists every missing path, exit 1; 0 when initialized"
 
-# (e) legacy TODO.md, stale .hv/bin mirror, blanket .hv/ ignore
+# (e) legacy TODO.md, stale 4.x mirror, blanket .hv/ ignore
 mkdir -p "$TMP_IN/legacy/$MIRROR"
 printf '# Backlog\n\n## Bugs\n- [B01] old\n' > "$TMP_IN/legacy/.hv/TODO.md"
 : > "$TMP_IN/legacy/$MIRROR/hv-status-add"
