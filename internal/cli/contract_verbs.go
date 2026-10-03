@@ -27,6 +27,7 @@ var contractVerbs = []string{
 	"debug counter record-attempt",
 	"debug counter show",
 	"debug counter summary",
+	"debug reset",
 	"debug verdict",
 	"decisions auto-log",
 	"decisions auto-since",
