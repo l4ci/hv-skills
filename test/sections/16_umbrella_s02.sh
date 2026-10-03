@@ -306,17 +306,3 @@ OUT=$(hvj repo umbrella) || fail "repo umbrella expected yes from repos.json reg
 pass "repo umbrella is true from repos.json regardless of config flag"
 cd ..
 
-# white-box-begin: go-unit A3 #47
-echo "hv-resolve-umbrella detects deep stray .hv/"
-mkdir ru-deep && cd ru-deep
-# umbrella + sub-repo registered + DEEP stray .hv/ inside sub-repo's source tree
-mkdir -p .hv web/src/.hv
-cat > .hv/repos.json <<'EOF'
-{"repos": [{"name": "web", "path": "./web"}]}
-EOF
-cd web/src
-RC=0; "$BIN/hv-resolve-umbrella" 2>/dev/null || RC=$?
-[ "$RC" = "2" ] || fail "hv-resolve-umbrella deep stray expected exit 2, got $RC"
-pass "hv-resolve-umbrella exits 2 on deep stray .hv/ inside registered sub-repo"
-# white-box-end
-cd ../../..

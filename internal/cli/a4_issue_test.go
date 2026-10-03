@@ -110,6 +110,11 @@ func TestIssueModeFileOnly(t *testing.T) {
 			t.Fatalf("%v: exit %d, want %d (%v)", argv, code, ExitRefused, env)
 		}
 	}
+	// the milestones counter is refused too, and the refusal names the backend
+	code, env, _ := hvRun(t, "--json", "-C", root, "id", "next", "--kind", "milestones")
+	if d := ddata(t, env); code != ExitRefused || d["blockedBy"] != "backend" {
+		t.Fatalf("id next --kind milestones: exit %d data %v", code, d)
+	}
 }
 
 // Without an injected tracker the real one is built; a project with no

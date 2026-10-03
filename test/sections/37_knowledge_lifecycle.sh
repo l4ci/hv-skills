@@ -50,13 +50,15 @@ pass "knowledge tier set rejects invalid tier"
 
 # --- hv-knowledge-migrate idempotency ---
 rm -f .hv/knowledge-tier.json
-# white-box-begin: go-unit A5 #49
+# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
+# white-box-begin: A9 #53 keep
 OUT=$("$BIN/hv-knowledge-migrate")
 grep -q "migrated 3 entries" <<<"$OUT" || fail "first migration didn't claim 3 entries: $OUT"
 pass "hv-knowledge-migrate stamps all titled bullets on first run"
 # white-box-end
 
-# white-box-begin: go-unit A5 #49
+# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
+# white-box-begin: A9 #53 keep
 OUT2=$("$BIN/hv-knowledge-migrate")
 grep -qi "nothing to migrate" <<<"$OUT2" || fail "second migration not idempotent: $OUT2"
 pass "hv-knowledge-migrate is idempotent on re-run"

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -330,5 +331,81 @@ func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
 	b := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
 	if !strings.Contains(b.stdout, `"noop": true`) || !strings.Contains(b.stdout, `"changed": false`) {
 		t.Errorf("second apply: %s", b.stdout)
+	}
+}
+
+// --apply stamps hvSkills.version with the installed plugin version, drops the
+// legacy top-level version, and reports the stamp as data.versionStamp.
+func TestMigrateV4StampsInstalledVersion(t *testing.T) {
+	migPlugin(t)
+	dir := migProject(t, false)
+	knWrite(t, filepath.Join(dir, ".hv", "config.json"), `{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}`)
+	migGit(t, dir, "add", "-A", "-f")
+	migGit(t, dir, "commit", "-q", "-m", "cfg")
+	n := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
+	if n.rc != 0 {
+		t.Fatalf("rc=%d %s %s", n.rc, n.stdout, n.stderr)
+	}
+	var env struct {
+		Data struct {
+			VersionStamp string `json:"versionStamp"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(n.stdout), &env); err != nil {
+		t.Fatalf("json: %v\n%s", err, n.stdout)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, ".hv", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		HvSkills struct {
+			Version string `json:"version"`
+		} `json:"hvSkills"`
+		Version *string `json:"version"`
+	}
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("config: %v\n%s", err, raw)
+	}
+	if cfg.HvSkills.Version != "4.9.9" {
+		t.Errorf("hvSkills.version = %q, want 4.9.9", cfg.HvSkills.Version)
+	}
+	if env.Data.VersionStamp != cfg.HvSkills.Version {
+		t.Errorf("data.versionStamp = %q, stamped %q", env.Data.VersionStamp, cfg.HvSkills.Version)
+	}
+	if cfg.Version != nil {
+		t.Errorf("legacy top-level version kept: %s", raw)
+	}
+}
+
+// A deprecated context block is stripped while a live knowledge block and the
+// surrounding prose survive, and the report names the stripped block.
+func TestMigrateV4StripKeepsLiveBlockAndProse(t *testing.T) {
+	migPlugin(t)
+	dir := migProject(t, false)
+	knNew(t, dir, "", "migrate", "v4", "--apply")
+	// The strip works on AGENTS.md when present, else CLAUDE.md.
+	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	knWrite(t, filepath.Join(dir, "CLAUDE.md"), "# Project\n\n<!-- hv-knowledge-start -->\n## Project Knowledge\nLive block - must survive.\n<!-- hv-knowledge-end -->\n\n<!-- hv-context-start -->\n## Project Context\nOrphan block - must be stripped.\n<!-- hv-context-end -->\n\nRegular prose stays.\n")
+	migGit(t, dir, "add", "-A", "-f")
+	migGit(t, dir, "commit", "-q", "-m", "claude md")
+	a := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
+	if a.rc != 0 || !strings.Contains(a.stdout, `"strippedBlocks": ["context"]`) {
+		t.Fatalf("apply: %d %s", a.rc, a.stdout)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if strings.Contains(got, "hv-context-start") || strings.Contains(got, "Orphan block") {
+		t.Errorf("orphan block not stripped:\n%s", got)
+	}
+	for _, want := range []string{"hv-knowledge-start", "Live block - must survive.", "Regular prose stays."} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q lost:\n%s", want, got)
+		}
 	}
 }

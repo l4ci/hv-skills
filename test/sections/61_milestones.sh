@@ -67,25 +67,6 @@ assert body.endswith("<!-- hv:fields\nDepends: M01\n-->"), body
 assert issues[1]["body"].count("hv:fields") == 0
 PY
 
-    # gaps and closed milestones count toward the next ID
-    # white-box-begin: go-unit A8 #52
-    PYTHONPATH="$BIN" python3 - <<'PY'
-from hvlib import adapter_for, load_config
-a = adapter_for(load_config())
-a.create_milestone("M05 — gap", "")
-n = a.create_milestone("M09 — closed holder", "")
-a.edit_milestone(n, state="closed")
-assert {m["title"]: m["state"] for m in a.milestones("all")}["M09 — closed holder"] == "closed"
-assert [m["title"] for m in a.milestones("all")][-1] == "M09 — closed holder"
-a.edit_milestone(n, description="renamed")
-assert [m for m in a.milestones("all") if m["number"] == n][0]["description"] == "renamed"
-PY
-    eq "id after gap and closed max" "M10" "$(hvj milestone add --title "Tenth" --summary "Skips ahead" | jget data.id)"
-    RC hvj id next --kind milestones
-    eq "id next still refuses" "4" "$RCV"
-    eq "id next refusal names the backend" "backend" "$(jget data.blockedBy <<<"$OUT")"
-    # white-box-end
-
     # --- status transitions
     eq "status changed" "true" "$(hvj milestone status M01 --to active | jget data.changed)"
     eq "active labels" "open|None|milestone-tracker,status:active|M01 — Alpha" "$(ISSUE 1)"
@@ -99,7 +80,7 @@ PY
     OUT="$(hvj milestone show M01)" || fail "$prov milestone show M01 failed"
     OUT="$(jget data.body <<<"$OUT")"
     eq "shipped frontmatter" "status: shipped" "$(grep -m1 "^status:" <<<"$OUT")"
-    case "$(SUMMARY)" in "M01:shipped:true: M02:planned:true:M01 "*) ;; *) fail "$prov ready after ship: $(SUMMARY)" ;; esac
+    case "$(SUMMARY)" in "M01:shipped:true: M02:planned:true:M01") ;; *) fail "$prov ready after ship: $(SUMMARY)" ;; esac
     hvj milestone status M02 --to archived >/dev/null || fail "$prov status archived failed"
     eq "archived closes not planned" "closed|not_planned" "$(ISSUE 2 | cut -d'|' -f1,2)"
     eq "archived closes native milestone" "closed" "$(NATIVE M02)"
@@ -153,32 +134,6 @@ PY
     eq "show unknown milestone" "3" "$RCV"
     RC hvj milestone put M02
     eq "put usage" "2" "$RCV"
-
-    # --- plan:SNN notes on the tracking issue (backend level)
-    # white-box-begin: go-unit A6 #50
-    PYTHONPATH="$BIN" python3 - <<'PY' || fail "$prov slice notes"
-from hvlib import get_backend, adapter_for, load_config
-b = get_backend()
-n = str(b.tracker_issue("M02")["number"])
-assert b.note_get(n, "plan:S01") is None and b.slice_units("M02") == []
-b.note_put(n, "plan:S01", "slice one\nline two")
-b.note_put(n, "plan:S02", "slice two")
-b.note_put(n, "plan", "plain plan note")
-assert b.note_get(n, "plan:S01") == "slice one\nline two"
-assert b.note_get(n, "plan") == "plain plan note"
-assert b.slice_units("M02") == ["S01", "S02"]
-marks = [c["body"].split("\n")[0] for c in adapter_for(load_config()).comments(int(n))]
-assert marks == ["<!-- hv:plan:S01 -->", "<!-- hv:plan:S02 -->", "<!-- hv:plan -->"], marks
-assert b.note_put(n, "plan:S01", "slice one\nline two") is False
-assert b.note_rm(n, "plan:S01") and b.note_rm(n, "plan:S01") is False
-assert b.slice_units("M02") == ["S02"] and b.note_get(n, "plan") == "plain plan note"
-b.note_rm(n, "plan:S02"); b.note_rm(n, "plan")
-try:
-    b.note_put(n, "plan:x1", "bad"); raise SystemExit("bad slice kind accepted")
-except ValueError:
-    pass
-PY
-    # white-box-end
 
     # --- duplicate tracking issues: lowest open wins
     SEED_TRACKER "M02 — duplicate" $'---\nid: M02\n---\n' || fail "$prov seeding the duplicate tracking issue failed"

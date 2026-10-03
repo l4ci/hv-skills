@@ -159,23 +159,6 @@ case "$(jget error.message <<<"$OUT")" in *"$SLEEPER"*) ;; *) fail "tmux: refusa
 kill "$SLEEPER" 2>/dev/null || true; wait "$SLEEPER" 2>/dev/null || true
 pass "dispatch exits 5 and spawns nothing when the old tab/window (or its pids) is not confirmed gone"
 
-# A zombie has exited; it must read as gone, and a live process as alive. The
-# zombie's parent (an exec'd sleep) never reaps it.
-ZF="$TMP_RG/zombie.pid"
-sh -c 'sh -c "echo \$\$ > '"$ZF"'" & exec sleep 300' & ZPARENT=$!
-for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$ZF" ] && break; sleep 0.2; done
-sleep 0.3
-ZPID="$(cat "$ZF")"
-# white-box-begin: go-unit A7 #51
-( . "$BIN/hv-host-select.sh"
-  hv_pid_alive "$ZPID" && exit 1
-  hv_pid_alive "$ZPARENT" || exit 2
-  case "$(hv_pid_tree "$ZPARENT")" in *"$ZPARENT"*"$ZPID"*) ;; *) exit 3 ;; esac
-) || fail "hv_pid_alive/hv_pid_tree: zombie must be gone, parent alive, tree must list descendants (rc $?)"
-kill "$ZPARENT" 2>/dev/null || true; wait "$ZPARENT" 2>/dev/null || true
-pass "a zombie reads as exited, so a slow reaper cannot cause a false refusal"
-# white-box-end
-
 # ── (d) resume flags and unparseable commands ───────────────────────────────
 cfgj() { python3 -c 'import json,sys; print(json.dumps({"work":{"dispatch":"herdr","workerCommand":sys.argv[1]}}))' "$1" > "$TMP_RG/repo/.hv/config.json"; }
 dispatch_rc() { RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T5 2>/dev/null)" || RC=$?; }

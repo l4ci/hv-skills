@@ -116,6 +116,43 @@ func TestAppend(t *testing.T) {
 	})
 }
 
+func TestAppendGolden(t *testing.T) {
+	f, _ := proj(t, hvFiles(nil))
+	head, ok := f.git("rev-parse", "--short", "HEAD")
+	if !ok || head == "" {
+		t.Fatal("no HEAD in the fixture repo")
+	}
+	if err := f.Append("## Bugs", "- **[B09] [P2] New.** d."); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Append("Tasks", "- **[T09] t.** d. Since: zzz9999"); err != nil {
+		t.Fatal(err)
+	}
+	got := read(t, f, ".hv/BACKLOG.md")
+	for _, want := range []string{
+		"- **[B09] [P2] New.** d. Since: " + head + "\n",
+		"- **[T09] t.** d. Since: zzz9999\n", // an existing Since is kept, not restamped
+		// the new bug lands right after the last bug, before the blank line and "## Features"
+		"- **[B02] [P2] Second.** y Related: [B01], [F01], [T01]\n- **[B09] [P2] New.** d. Since: " + head + "\n\n## Features",
+		"- **[T01] Task.** w\n- **[T09] t.** d. Since: zzz9999\n\n## Completed",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("BACKLOG.md lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Since: zzz9999 Since:") || strings.Count(got, "[T09]") != 1 {
+		t.Errorf("existing Since restamped:\n%s", got)
+	}
+	before := read(t, f, ".hv/BACKLOG.md")
+	err := f.Append("## Nope", "- **[B10] x**")
+	if !errors.Is(err, ErrNotFound) || err.Error() != "section '## Nope' not found" {
+		t.Fatalf("err = %v", err)
+	}
+	if read(t, f, ".hv/BACKLOG.md") != before {
+		t.Error("a refused append changed BACKLOG.md")
+	}
+}
+
 func TestCreate(t *testing.T) {
 	t.Run("bullet, counter and detail", func(t *testing.T) {
 		f, _ := proj(t, hvFiles(nil))
