@@ -64,10 +64,14 @@ func LoadSettings(cfg any) (Settings, error) {
 	if s.HandoffMaxBlks, err = get("orchestrator.handoffMaxBlocks", 0, 1000); err != nil {
 		return s, err
 	}
-	if s.UsageThreshold, err = get("orchestrator.usageThreshold", 1, 100); err != nil {
+	if s.SwitchOnUsage, err = BoolKey(cfg, "orchestrator.switchOnUsage"); err != nil {
 		return s, err
 	}
-	s.SwitchOnUsage, err = BoolKey(cfg, "orchestrator.switchOnUsage")
+	if s.SwitchOnUsage {
+		// Read only when on: a bad threshold must not disable the context
+		// handoff of a project that never opted in.
+		s.UsageThreshold, err = get("orchestrator.usageThreshold", 1, 100)
+	}
 	return s, err
 }
 

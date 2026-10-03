@@ -386,8 +386,18 @@ func TestInstallRefusesNonArrayHooks(t *testing.T) {
 func TestLoadSettings(t *testing.T) {
 	cfg := func(s string) any { v, _ := jsonx.Decode([]byte(s)); return v }
 	s, err := LoadSettings(cfg(`{}`))
-	if err != nil || s != (Settings{75, 120, 900, 2, false, 90}) {
+	if err != nil || s != (Settings{75, 120, 900, 2, false, 0}) {
 		t.Fatalf("%+v %v", s, err)
+	}
+	// A bad usageThreshold matters only once switchOnUsage is on.
+	if s, err := LoadSettings(cfg(`{"orchestrator":{"usageThreshold":0}}`)); err != nil || s.Threshold != 75 {
+		t.Errorf("usageThreshold 0 with switching off: %+v %v", s, err)
+	}
+	if s, err := LoadSettings(cfg(`{"orchestrator":{"switchOnUsage":true}}`)); err != nil || !s.SwitchOnUsage || s.UsageThreshold != 90 {
+		t.Errorf("switching on: %+v %v", s, err)
+	}
+	if _, err := LoadSettings(cfg(`{"orchestrator":{"switchOnUsage":true,"usageThreshold":0}}`)); err == nil {
+		t.Error("usageThreshold 0 with switching on must be an error")
 	}
 	for _, bad := range []string{`{"orchestrator":{"handoffThreshold":0}}`, `{"orchestrator":{"handoffThreshold":101}}`, `{"orchestrator":{"handoffThreshold":"x"}}`, `{"orchestrator":{"handoffMaxBlocks":-1}}`, `{"orchestrator":{"stateMaxAgeSeconds":0}}`} {
 		if _, err := LoadSettings(cfg(bad)); err == nil {

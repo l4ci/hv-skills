@@ -192,7 +192,7 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 			Escalate: escalateFunc(ctx, root),
 			Notify:   func(title, body string) { keepaliveNotify(context.WithoutCancel(ctx), cfg, title, body) },
 		}
-		gap := new(atomic.Bool)
+		gap := keepaliveGap(set.SwitchOnUsage)
 		env.Gap = gap
 		opts := keepalive.Options{
 			Command: args, Root: root, CommonDir: cd, HandoffPath: handoffFile(root, cfg),
@@ -251,6 +251,15 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 		}
 		return Result{Data: d, Text: text}, nil
 	}
+}
+
+// keepaliveGap is the flag the supervisor sets between children, nil unless
+// the switch is on: with it off, D3's loop must not see a gap at all.
+func keepaliveGap(switchOnUsage bool) *atomic.Bool {
+	if !switchOnUsage {
+		return nil
+	}
+	return new(atomic.Bool)
 }
 
 // usageMarker finds the newest usage handoff written at or after since in the
