@@ -5,7 +5,7 @@ With `backlog.backend: "issues"` the tracker (GitHub or GitLab) is the backlog. 
 ## Setup
 
 1. Install and authenticate the CLI for your host: `gh auth status` (GitHub) or `glab auth status` (GitLab). With no CLI or no auth, `hv` exits 3 and does not fall back to files.
-2. Set the backend: `/hv-config backlog.backend=issues`.
+2. Set the backend: `hv config set backlog.backend issues`.
 3. Optional keys (all in `.hv/config.json`, full list in [Configuration](configuration.md#issues-backend-keys)):
 
 | Key | Default | Use |
@@ -53,13 +53,13 @@ Exit 3 means the tracker is unavailable; exit 4 means rate-limited. Both stop th
 ## Migrating a file backlog
 
 ```
-/hv-migrate issues            # dry run: planned operations and would-be map
-/hv-migrate issues --apply    # create everything
-/hv-config backlog.backend=issues
+hv migrate issues            # dry run: planned operations and would-be map
+hv migrate issues --apply    # create everything
+hv config set backlog.backend issues
 ```
 
 Open items, their detail files, proof rows, design and plan artifacts, and planned/active milestones with their slice plans move to the tracker. Completed items, `ARCHIVE.md` and shipped/archived milestones stay in the files as history, so after the flip `hv milestone list` shows only the planned and active milestones. `Related:` fields and old IDs in migrated text are rewritten to the new IDs after every item exists; `Related:` IDs that are not migrated (completed items) are dropped from the field and listed in the issue body as `Related before migration (not migrated): F79, F80`. A bullet's `Since:` anchor is kept in the issue's fields block.
 
 The run is resumable: `.hv/issue-map.json` records each old ID, its new ID and URL. Commit it. A rate limit (exit 4) stops the run with the map saved; wait and re-run. `--limit N` creates at most N items per run. Writes are paced by `issues.bulkPaceMs`.
 
-`--apply` never changes `backlog.backend`. When everything is migrated it adds a "Frozen" banner to `.hv/BACKLOG.md` and prints `Next: /hv-config backlog.backend=issues`. Old IDs are not resolved through the map after the flip; an old `F82` and a new issue `F82` can both exist. Umbrella projects migrate each sub-repo separately.
+`--apply` never changes `backlog.backend`. When everything is migrated it adds a "Frozen" banner to `.hv/BACKLOG.md` and prints `Next: hv config set backlog.backend issues`. Old IDs are not resolved through the map after the flip; an old `F82` and a new issue `F82` can both exist. Umbrella projects migrate each sub-repo separately.

@@ -8,13 +8,13 @@ The example project is **Pinpoint**, an internal incident dashboard. Node and Re
 
 ```mermaid
 flowchart LR
-  REPO[(existing repo<br/>+ open GH issues)] --> INIT["/hv-init"]
+  REPO[(existing repo<br/>+ open GH issues)] --> INIT["hv init"]
   INIT --> SUBS[(.hv/map/<br/>6 subsystem files,<br/>hand-authored)]
   INIT --> ISSUES["/hv-capture --from-github"]
   INIT --> CAP["/hv-capture"]
   ISSUES --> BACKLOG[(BACKLOG.md)]
   CAP --> BACKLOG
-  BACKLOG --> NEXT["/hv-next"]
+  BACKLOG --> NEXT["/hv-work"]
   NEXT --> WORK["/hv-work B05<br/>P0 secrets-in-URL"]
   NEXT --> DEBUGCYCLE["/hv-debug B01<br/>severity casing"]
   WORK --> SHIP["/hv-ship<br/>Closes #41"]
@@ -27,19 +27,19 @@ flowchart LR
 
 Ten steps follow, in execution order.
 
-## Step 1: /hv-init
+## Step 1: hv init
 
 ```bash
-$ /hv-init
+$ hv init
 ```
 
-Same five questions as a greenfield setup. For an existing repo I usually flip two from the defaults: `worktree` isolation so `main` stays untouched while agents run (useful when you also need to deploy from `main` mid-cycle), and `pr` merge strategy if your team requires GitHub review. For a solo maintenance pass, the defaults are fine.
+Same defaults as a greenfield setup. For an existing repo I usually flip two with `hv config set`: `worktree` isolation so `main` stays untouched while agents run (useful when you also need to deploy from `main` mid-cycle), and `pr` merge strategy if your team requires GitHub review. For a solo maintenance pass, the defaults are fine.
 
-`/hv-init` writes `.hv/` and the managed blocks in `CLAUDE.md`. It doesn't read your code. That happens next.
+`hv init` writes `.hv/` and the managed blocks in `CLAUDE.md`. It doesn't read your code. That happens next.
 
 ## Step 2: Scaffold the project map by hand
 
-`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. The project map lives in `.hv/map/<name>.md`: one Markdown file per coherent area of the codebase, hand-authored. `/hv-init` already created the empty `.hv/map/` directory in Step 1; you fill it in now.
+`/hv-work` and `/hv-debug` need to know what subsystems your project has so they don't burn context re-exploring the same directories on every cycle. The project map lives in `.hv/map/<name>.md`: one Markdown file per coherent area of the codebase, hand-authored. `hv init` already created the empty `.hv/map/` directory in Step 1; you fill it in now.
 
 For Pinpoint you spend ten minutes sketching out:
 
@@ -112,7 +112,7 @@ You pick the five you care about. The rest stay open upstream, untouched. Each p
 [B05] integration config UI accepts secrets in URL    Bug, P0, Major, GH: #41
 ```
 
-`/hv-capture` flagged B05 as P0 because it tagged "secrets in URL" as a security category. P0 always jumps the queue in `/hv-next`.
+`/hv-capture` flagged B05 as P0 because it tagged "secrets in URL" as a security category. P0 always jumps the queue in `/hv-work` (no argument).
 
 Round-trip closing is automatic when `/hv-ship` runs: the PR body gets `Closes #N` lines (GitHub auto-closes on merge), or the direct-push path offers a manual-gated `hv issues close` prompt for each resolved upstream issue.
 
@@ -143,10 +143,10 @@ F02 is size-Major. `/hv-capture` nudges you:
 
 You take the nudge. `/hv-brainstorm F02` runs a focused design session: Socratic discovery, two competing approaches with tradeoffs, sectioned design with per-section approval. The output lands at `.hv/designs/F02.md`. When `/hv-plan F02` runs later, it reads that file as soft input rather than re-deriving the design.
 
-## Step 5: /hv-next surveys everything
+## Step 5: /hv-work surveys everything
 
 ```bash
-$ /hv-next
+$ /hv-work
 ```
 
 It reconciles `status.json` against git (nothing active yet, clean state), archives completions older than five days (none yet), and shows you the full sorted picture:
@@ -173,15 +173,16 @@ Run /hv-work B05? [y/N]
 
 P0 always wins. You confirm.
 
-## Step 6: a hot-path fix that skips the queue (/hv-go)
+## Step 6: a hot-path fix that skips the queue (capture hand-off)
 
 Before you commit to B05, you spot a typo in the contributing guide while scanning another file. Too small to queue.
 
 ```bash
-$ /hv-go "fix typo in CONTRIBUTING.md line 23, 'depencency' → 'dependency'"
+$ /hv-capture "fix typo in CONTRIBUTING.md line 23, 'depencency' → 'dependency'"
+... Work it now? yes
 ```
 
-`/hv-go` mints `[T01]`, dispatches a worker, lands one commit on a feature branch, merges back. About thirty seconds. Same machinery as `/hv-work`; it collapses capture and execute into one pass for things too small to queue.
+`/hv-capture` mints `[T01]`; accepting the hand-off runs `/hv-work`, which dispatches a worker, lands one commit on a feature branch, merges back. About thirty seconds. Capture and execute in one pass for things too small to queue.
 
 ## Step 7: the P0 cycle
 

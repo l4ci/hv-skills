@@ -20,7 +20,7 @@ The workers' standing brief is [references/worker-contract.md](../references/wor
 
 ## When NOT to use
 
-- One item, no parallelism → `/hv-go` or `/hv-work`.
+- One item, no parallelism → `/hv-work`.
 - You are a worker, not the orchestrator → read the contract above and stop.
 - No terminal host (herdr or tmux) is not a reason to skip a round: it runs in solo mode (below). For one or two small items, `/hv-work` with subagents is still lighter.
 

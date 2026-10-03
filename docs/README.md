@@ -13,17 +13,17 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 ### Walkthroughs
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md). Empty repo plus a one-page brief, taken end-to-end through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md). Established codebase with open issues and a mental bug list, walked through `/hv-init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle.
+- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md). Established codebase with open issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle.
 
 ### Capture and backlog
 
 - [Capturing work](usage/capturing-work.md): `/hv-capture`, mixed input, related links, detail files
-- [Picking work](usage/picking-work.md): `/hv-next`, `/hv-work --preview`
+- [Picking work](usage/picking-work.md): `/hv-work` (no argument), `/hv-work --preview`
 - [Removing work](usage/removing-work.md): `/hv-capture --remove`, dry-run preview, batch removal, safety semantics
 
 ### Execution
 
-- [Running work](usage/running-work.md): `/hv-work` parallel cycles, branch vs worktree isolation, `/hv-go` speed-path
+- [Running work](usage/running-work.md): `/hv-work` parallel cycles, branch vs worktree isolation, the `/hv-capture` hand-off
 - [Debugging](usage/debugging.md): `/hv-debug` systematic cycle
 - [Pausing and resuming](usage/pausing-and-resuming.md): `/hv-pause`, recovering after `/clear`
 - [Parallel work](usage/parallel-work.md): worktree mode, concurrent `/hv-work` sessions
@@ -46,15 +46,15 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 
 - [Configuration](usage/configuration.md): every key in `.hv/config.json` and what it does
 - [Autonomy levels](usage/autonomy.md): how `off` / `auto` / `loop` change skill chaining
-- [Issue backend](usage/issue-backend.md): backlog on GitHub/GitLab issues, setup, labels, milestones, `/hv-migrate issues`
+- [Issue backend](usage/issue-backend.md): backlog on GitHub/GitLab issues, setup, labels, milestones, `hv migrate issues`
 - [Umbrella mode](usage/umbrella-mode.md): coordinator at umbrella, work in sub-repos (M02 V1)
 
 ### Reference
 
 - [Slash commands](reference/slash-commands.md): every `/hv-*` command, alphabetical
-- [The `.hv/` folder](reference/hv-folder.md): files and directories created by `/hv-init`
+- [The `.hv/` folder](reference/hv-folder.md): files and directories created by `hv init`
 - [`hv` verb reference](reference/cli-helpers.md): every `hv` verb, with conventions and exit codes
-- [Configuration options](reference/config-options.md): the questions `/hv-init` and `/hv-config` ask, with their option labels
+- [Configuration options](reference/config-options.md): every config key and option label, set via `hv config set`
 - [`/hv-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md): pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
 - [Project check](reference/preflight.md): what `hv init check` verifies, plus exit-code meanings
 

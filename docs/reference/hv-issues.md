@@ -35,7 +35,7 @@ Don't use it to describe work you're inventing from scratch; that's plain
 - **GitLab remotes:** `glab` installed and authenticated (`glab auth status`).
 
 Missing CLI for a detected provider → that repo is skipped with a one-line note;
-the rest proceed. Both CLIs are needed only in mixed-host umbrellas. `/hv-init`
+the rest proceed. Both CLIs are needed only in mixed-host umbrellas. `hv init`
 soft-warns when a remote is detected but its CLI is missing.
 
 ## Config keys
@@ -48,7 +48,7 @@ soft-warns when a remote is detected but its CLI is missing.
 | `issues.providers.github` | `true` | Enable `--from-github` |
 | `issues.providers.gitlab` | `true` | Enable `--from-gitlab` |
 
-Edit via `/hv-config` or directly:
+Edit via `hv config set` or directly:
 
 ```bash
 hv config set issues.label accepted

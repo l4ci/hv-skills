@@ -44,7 +44,7 @@ The user's input may be:
 For an item target, read its `BACKLOG.md` entry and overflow file (`.hv/<bugs|features|tasks>/<id>.md` if it exists) and look for a `Milestone:` field. That's the parent. If the item lacks a milestone tag, ask the user to either:
 
 - Tag the item under an active milestone — write the tag via `hv item field set <ID> --name milestone --value <MID>` (never hand-edit `.hv/BACKLOG.md`; the verb mutates the open bullet in place and is idempotent), then proceed
-- Skip planning and use `/hv-go` for one-shot execution
+- Skip planning and capture with `/hv-capture` and accept the hand-off to `/hv-work`
 
 When the item carries a `Repos:` field, capture that value as the plan's target sub-repo(s) so `/hv-work` can resolve dispatch from the plan alone. The plan key shape (`<milestone>-<itemId>`) does not change — repo is frontmatter, not key. Multi-repo items pass the full comma-list through (`--repos web,api`); the frontmatter key stays singular `repo:` and just carries the joined string. Slice and milestone targets do not carry a repo (umbrella-flat per M02 acceptance).
 
@@ -178,7 +178,7 @@ If `/hv-work` is the natural next step and the user is ready, offer it as a one-
 
 ## Auto-loop mode
 
-Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in loop mode when no plan exists for a Major + Milestone-tagged item — see `/hv-work`'s Step 4 dispatch directive for the trigger conditions and the inline `Skill`-tool dispatch language. This section describes the run shape once the flag is set; the dispatch decision lives at `/hv-work`'s call site (per the hv-init "Imperative rules in autonomy-aware steps must live inline at every dispatch point" convention).
+Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in loop mode when no plan exists for a Major + Milestone-tagged item — see `/hv-work`'s Step 4 dispatch directive for the trigger conditions and the inline `Skill`-tool dispatch language. This section describes the run shape once the flag is set; the dispatch decision lives at `/hv-work`'s call site (per the authoring-conventions rule "Imperative rules in autonomy-aware steps must live inline at every dispatch point" convention).
 
 **Orchestrator-model contract.** `--auto-loop` makes design picks autonomously (no `AskUserQuestion`), so it depends on orchestrator-grade design judgment. The contract: this skill is invoked via the `Skill` tool from `/hv-work` Step 4, which loads it inline in `/hv-work`'s session. Since `/hv-work` runs under `models.orchestrator` (per `.hv/config.json`, default `opus`), `--auto-loop` inherits that model. If a future change moves the dispatch to the `Agent` tool, the call site MUST explicitly pass `model: orchestrator` (resolved from `.hv/config.json`) — running `--auto-loop` under the worker model would push design picks onto an execution-tuned model and degrade plan quality. The interactive (default) mode has no such constraint; it can run under any model since the user redlines via `AskUserQuestion`.
 
@@ -204,7 +204,7 @@ After all questions are resolved, write the plan to `.hv/plans/<key>.md` using t
 
 ### Surfacing
 
-`/hv-plan --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-next` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `hv decisions auto-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer (signaling the entry is now a normal decision).
+`/hv-plan --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-work` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `hv decisions auto-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer (signaling the entry is now a normal decision).
 
 ## Key Principles
 

@@ -1,6 +1,6 @@
 # Implementing
 
-Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-go` collapses capture and implementation into one pass.
+Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-capture` ends with an optional hand-off to `/hv-work`.
 
 ## /hv-work
 
@@ -8,14 +8,14 @@ Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" throu
 
 **Trigger phrases:**
 
-- `/hv-work` after `/hv-next` routes you here automatically
+- `/hv-work` with no argument reconciles the backlog, suggests an item, then works it
 - `/hv-work [B03]` to implement a specific item by ID
 - `/hv-work [B03] [F07]` to implement a batch of items together
 - `/hv-work "add retry logic to the upload pipeline"` describes the work; it captures and executes
 
 **Precondition:** refuses to start on a dirty working tree. Commit or stash first.
 
-**Status tracking:** registers in `.hv/status.json` at start so [`/hv-next`](picking-work.md) in another session knows those items are in progress.
+**Status tracking:** registers in `.hv/status.json` at start so [`/hv-work` (no argument)](picking-work.md) in another session knows those items are in progress.
 
 ```mermaid
 sequenceDiagram
@@ -67,44 +67,40 @@ With `"branch"`, your main worktree switches to the feature branch for the durat
 
 To run multiple `/hv-work` sessions at the same time on different item batches, pick `"worktree"`. See [parallel-work](parallel-work.md) for the multi-session pattern.
 
-## /hv-go: capture and run in one pass
+## Capture, then work it now
 
-Use `/hv-go` when you have a specific fix in mind and want it done now, not queued.
+For a single ad-hoc fix, run `/hv-capture` and accept the hand-off at the end: it offers to work the new item now and routes to `/hv-work`.
 
 ```
-/hv-go "fix the off-by-one in RingBuffer"
-/hv-go "add a Cmd+K shortcut to the project picker"
+/hv-capture "fix the off-by-one in RingBuffer"
+/hv-capture "add a Cmd+K shortcut to the project picker"
 ```
 
-The item still gets a real ID in `BACKLOG.md` (counters increment, history is preserved), but the `/hv-next` review round-trip is skipped. `/hv-go` hands off to `/hv-work` after capture completes.
+The item gets a real ID in `BACKLOG.md` (counters increment, history is preserved). Decline the hand-off and it stays queued. If you're still exploring or the scope is fuzzy, decline and refine the entry first.
 
-`/hv-go` caps clarifying questions on purpose. It assumes the requirement is clear enough to act on. If you're still exploring or the scope is fuzzy, [`/hv-capture`](capturing-work.md) first is safer.
+**Flow:** `/hv-capture` files the item, then (on accept) `/hv-work` implements it. All `/hv-capture` rules (classification, detail-file overflow, ID assignment) and all `/hv-work` rules (clean-tree guard, branch/worktree isolation, parallel workers, per-task commits) apply.
 
-**Flow:** clean-tree guard, capture via `/hv-capture`, work via `/hv-work`.
+## Capture vs. Work: picking the right entry
 
-`/hv-go` inherits all `/hv-capture` rules (classification, detail-file overflow, ID assignment) and all `/hv-work` rules (branch/worktree isolation, parallel workers, per-task commits).
-
-## Capture vs. Go vs. Work: picking the right entry
-
-Three skills trigger on action-shaped phrases. Pick by **intent**, not by the verb typed:
+Pick by **intent**, not by the verb typed:
 
 | The user wants to… | Use | Why |
 |---------------------|-----|-----|
-| Brain-dump items into the backlog without acting now | `/hv-capture` | Records only; no execution, no clean-tree guard |
-| Get one specific thing done right now (not yet captured) | `/hv-go` | Captures → immediately runs `/hv-work`, with a low question cap |
-| Implement an item that's already in `BACKLOG.md` | `/hv-work` | Plans, dispatches workers, verifies, commits per task |
-| Pick the next thing from the backlog and execute | `/hv-next` | Reconciles → suggests → routes to `/hv-work` |
+| Brain-dump items into the backlog without acting now | `/hv-capture` (decline the hand-off) | Records only; no execution, no clean-tree guard |
+| Get one specific thing done right now (not yet captured) | `/hv-capture`, accept the hand-off | Captures, then runs `/hv-work` on the new item |
+| Implement an item that's already in `BACKLOG.md` | `/hv-work <ID>` | Plans, dispatches workers, verifies, commits per task |
+| Pick the next thing from the backlog and execute | `/hv-work` (no argument) | Reconciles, suggests, then works the pick |
 
 **Rules of thumb:**
 
-- *"fix X"* / *"add Y"* / *"do Z"*: clear single thing, not yet captured → `/hv-go`.
-- A list of things, no immediate action, *"capture this"* / *"add to backlog"* → `/hv-capture`.
-- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"* → `/hv-work`.
-- *"what's next?"* / *"pick something"* / *"what should I work on?"* → `/hv-next`.
+- *"fix X"* / *"add Y"* / *"do Z"*: clear single thing, not yet captured: `/hv-capture`, then accept the hand-off.
+- A list of things, no immediate action, *"capture this"* / *"add to backlog"*: `/hv-capture`, decline the hand-off.
+- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"*: `/hv-work <ID>`.
+- *"what's next?"* / *"pick something"* / *"what should I work on?"*: `/hv-work` with no argument.
 
-When intent is ambiguous, the cheapest path is `/hv-capture`. Items can be picked up later by `/hv-next` or `/hv-work`, but a hot-path `/hv-go` cycle is hard to reverse if you actually wanted a backlog entry.
+When intent is ambiguous, `/hv-capture` is the cheapest path: the hand-off is optional, so you can still decline.
 
-See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how `/hv-next` selects and prioritizes.
+See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how the no-argument `/hv-work` selects and prioritizes.
 
 ## Merge or PR
 

@@ -24,9 +24,9 @@ Each milestone carries one of four statuses:
 | `shipped` | Complete; unblocks any milestone that lists it as a dependency |
 | `archived` | Abandoned or superseded; does **not** unblock dependents |
 
-Multiple milestones can be `active` simultaneously when their dependencies allow. [`/hv-next`](picking-work.md) prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag still surface.
+Multiple milestones can be `active` simultaneously when their dependencies allow. [`/hv-work` (no argument)](picking-work.md) prefers items tagged to active milestones within each priority and size band, so the active set scopes work without being a hard wall. P0 bugs always jump the queue regardless of milestone, and general-backlog items without a tag still surface.
 
-When an active milestone has no open items remaining, `/hv-next` surfaces an empty-active notice so you know the milestone is ready to close. Run `hv milestone status <MID> shipped` to flip its status, which immediately unblocks any milestone that listed it as a dependency.
+When an active milestone has no open items remaining, `/hv-work` (no argument) surfaces an empty-active notice so you know the milestone is ready to close. Run `hv milestone status <MID> shipped` to flip its status, which immediately unblocks any milestone that listed it as a dependency.
 
 Marking a milestone `shipped` immediately unblocks anything that depended on it. Marking it `archived` does not. Use `archived` for milestones you are intentionally dropping, not for ones that finished.
 
@@ -41,7 +41,7 @@ Each plan contains: goal in one sentence, approach in 3–6 sentences, tasks wit
 
 Before the plan is signed off, `/hv-plan` checks doc-by-path deliverables: any task file path containing a `docs/` segment must resolve to an existing doc home in the target repo. Mismatches surface as Open questions instead of biting mid-`/hv-work`. In umbrella mode a sibling `<repo>-docs` sub-repo registered in `.hv/repos.json` is surfaced as the suggested alternative home.
 
-When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-next` suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
+When `/hv-work` starts its planning step, it checks for a matching plan file and uses it as the dispatch source instead of decomposing ad-hoc. `/hv-work` (no argument) suggests running `/hv-plan` for size-Major items that do not have a plan yet. `/hv-vision` offers it alongside [`/hv-capture`](capturing-work.md) when you finish seeding a freshly activated milestone.
 
 After `/hv-work` ships an item that had its own plan (e.g. `M01-B07.md`), the plan file is removed automatically. Once the cycle commits, the plan's task decomposition and assumptions are stale, and leaving the file would confuse a future cycle on the same key. Slice plans (`M01-S01.md`) stay through their multi-item lifetime; remove the slice plan with `hv plan rm M01-S01` once the slice is fully shipped.
 
@@ -61,6 +61,6 @@ When a milestone hinges on a question you cannot answer from the chair (*"can SS
 
 `/hv-capture` tags captured items with the active milestone automatically when there is exactly one active. When multiple milestones are active simultaneously, it surfaces them as picks. Items can carry a `Milestone: M01` field or a comma-separated list (`Milestone: M01, M03`) when work spans milestones.
 
-`/hv-next` prefers milestone-tagged items within each priority and size band but general-backlog items still surface. The active milestone set acts as a soft scope rather than a hard filter, so you stay focused without losing sight of the rest of the backlog.
+`/hv-work` (no argument) prefers milestone-tagged items within each priority and size band but general-backlog items still surface. The active milestone set acts as a soft scope rather than a hard filter, so you stay focused without losing sight of the rest of the backlog.
 
-See [capturing work](capturing-work.md) for how items are filed and [running work](running-work.md) for how `/hv-next` and `/hv-work` use the milestone tag when dispatching.
+See [capturing work](capturing-work.md) for how items are filed and [running work](running-work.md) for how `/hv-work` (no argument) and `/hv-work` use the milestone tag when dispatching.

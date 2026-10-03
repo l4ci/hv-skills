@@ -7,7 +7,7 @@
 - Right after capturing a `[Major]` feature or a `[P0]` bug, when its design is unclear.
 - When two reasonable approaches need negotiation before you commit to one.
 - When the item's TODO entry is one sentence but the implementation isn't obvious.
-- When `/hv-capture` or `/hv-next` nudges you toward it (the nudge fires on `[Major]` and `[P0]` items that don't yet have a design artifact).
+- When `/hv-capture` or `/hv-work` (no argument) nudges you toward it (the nudge fires on `[Major]` and `[P0]` items that don't yet have a design artifact).
 
 Skip it when the item is `[Minor]`, `[Cosmetic]`, or a plain task with an obvious shape. Skip it when you already know what you want to build; go straight to [`/hv-plan`](vision-and-plans.md) or [`/hv-work`](running-work.md).
 
@@ -108,8 +108,8 @@ If `.hv/designs/<ID>.md` already exists, `/hv-brainstorm` asks how to proceed:
 - Project-level design stays with [`/hv-vision`](vision-and-plans.md): milestones, multi-feature arcs, vision rewrites.
 - Code-touching feasibility experiments stay with [`/hv-spike`](spikes.md): a throwaway branch that proves a thing works before the design hardens.
 - Implementation plan with task decomposition stays with [`/hv-plan`](vision-and-plans.md).
-- [`/hv-go`](running-work.md) always skips the brainstorm step; it's a single-pass capture-and-implement path for items with an obvious shape.
+- The `/hv-capture` hand-off to [`/hv-work`](running-work.md) skips the brainstorm step; use it for items with an obvious shape.
 
 ## Autonomy interaction
 
-Under `autonomy.level: "off"` (default), `/hv-capture` and `/hv-next` print a one-line nudge for `[Major]` features and `[P0]` bugs without a design artifact. Under `"auto"`, the nudge auto-invokes `/hv-brainstorm` before routing to `/hv-plan`. Under `"loop"`, `/hv-work` Step 4 dispatches `/hv-brainstorm --auto-loop <ID>` for Major + Milestone-tagged items without a design. Auto-loop resolves design picks via local-first (DECISIONS / KNOWLEDGE / CONTEXT / MILESTONES), then bounded web (when `loop.webResearch=true`), then placeholder; it logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<ID>.md` with `auto: true` frontmatter. The user articulates Forbids/Permits on the logged decisions later via terminal-path surfacing. See [Autonomy levels](autonomy.md) for the full chaining rules.
+Under `autonomy.level: "off"` (default), `/hv-capture` and `/hv-work` (no argument) print a one-line nudge for `[Major]` features and `[P0]` bugs without a design artifact. Under `"auto"`, the nudge auto-invokes `/hv-brainstorm` before routing to `/hv-plan`. Under `"loop"`, `/hv-work` Step 4 dispatches `/hv-brainstorm --auto-loop <ID>` for Major + Milestone-tagged items without a design. Auto-loop resolves design picks via local-first (DECISIONS / KNOWLEDGE / CONTEXT / MILESTONES), then bounded web (when `loop.webResearch=true`), then placeholder; it logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<ID>.md` with `auto: true` frontmatter. The user articulates Forbids/Permits on the logged decisions later via terminal-path surfacing. See [Autonomy levels](autonomy.md) for the full chaining rules.

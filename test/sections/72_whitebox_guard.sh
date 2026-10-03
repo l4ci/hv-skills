@@ -26,7 +26,7 @@ SAMPLES=(
   'ls "$''REPO/bin"'
   'ls bin/''*'
   'install_''helpers'
-  'grep -q x hv-go/SKILL''.md'
+  'grep -q x hv-plan/SKILL''.md'
   'PYTHON''PATH=x python3 -c pass'
   'git ls-''files -s bin/x'
   'cat "$''REPO/references/x.md"'

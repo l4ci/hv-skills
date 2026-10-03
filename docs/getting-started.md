@@ -12,8 +12,8 @@ For other install methods (Claude Code plugin marketplace, GNU Stow, local clone
 
 ## Initialize the project
 
-Run `/hv-init` once at the project root. It asks five questions (models, isolation, merge
-strategy, quality gates, autonomy level) with Recommended defaults highlighted. Accept the
+Run `hv init` once at the project root. It scaffolds `.hv/` and writes the Recommended
+config defaults (models, isolation, merge strategy, quality gates, autonomy level). Keep the
 defaults unless you have a reason not to.
 
 Two settings worth a second of thought:
@@ -22,14 +22,14 @@ Two settings worth a second of thought:
   untouched while agents run, or if you plan to run parallel `/hv-work` sessions.
 - **Merge strategy.** `direct` for fast iteration. `pr` if your team requires GitHub review.
 
-To change any setting later, run `/hv-config`. Don't hand-edit the JSON files.
+To change a setting later, run `hv config set <key> <value>` (`hv config show` lists the keys). See [config options](reference/config-options.md). Don't hand-edit the JSON files.
 
 ## Worked examples
 
 Two end-to-end walkthroughs carry one concrete project from brief to shipped milestone:
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md): empty repo plus a one-page brief, walked through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `/hv-init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
+- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
 
 Pick whichever matches where your project is today and follow it skill-by-skill.
 

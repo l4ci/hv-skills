@@ -1,8 +1,8 @@
 # Picking work
 
-Two flows help you orient and pick what to do next. `/hv-next` reconciles git state, surfaces any [`/hv-pause`](pausing-and-resuming.md) handoff note for active streams, presents the backlog, and suggests work. `/hv-work --preview <ID>` lets you peek at the orchestrator's plan before code lands.
+Two flows help you orient and pick what to do next. `/hv-work` (no argument) reconciles git state, surfaces any [`/hv-pause`](pausing-and-resuming.md) handoff note for active streams, presents the backlog, and suggests work. `/hv-work --preview <ID>` lets you peek at the orchestrator's plan before code lands.
 
-## /hv-next
+## /hv-work (no argument)
 
 Reconciles the backlog against actual git state, then suggests what to pick up.
 
@@ -16,7 +16,7 @@ Before presenting results it:
 
 ```mermaid
 flowchart TD
-    A[/hv-next] --> B[Reconcile status.json vs git]
+    A[/hv-work no argument] --> B[Reconcile status.json vs git]
     B --> C{Active streams?}
     C -->|Yes| D[Read handoff notes per stream]
     D --> E[Ask: resume / ship / abandon]
@@ -31,17 +31,17 @@ flowchart TD
     I -->|Stop| L[End]
 ```
 
-After you confirm the pick, `/hv-next` routes you to [running work](running-work.md) via `/hv-work`.
+After you confirm the pick, `/hv-work` (no argument) routes you to [running work](running-work.md) via `/hv-work`.
 
 **Example:**
 
 ```
-/hv-next
+/hv-work
 ```
 
 Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P0 bug): fix auth token expiry`. Answer `y` (or pick a different item) and work begins.
 
-If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-next` offers `/hv-work --preview` as a question option before routing to `/hv-work`.
+If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-work` (no argument) offers `/hv-work --preview` as a question option before routing to `/hv-work`.
 
 Items with a `Related:` field that share a cluster surface together so you can tackle them as a unit.
 
@@ -68,4 +68,4 @@ If a plan already exists at [`.hv/plans/<key>.md`](../reference/hv-folder.md), t
 
 ## How reconciliation keeps state honest
 
-The status cache is a speed optimisation; git is the source of truth. Each `/hv-next` run checks which branches and worktrees actually exist: deleted branches become stale entries and get cleaned up, removed worktrees get updated in kind. If state drifts (crashed session, manual git operations), the next `/hv-next` run repairs it without manual intervention.
+The status cache is a speed optimisation; git is the source of truth. Each `/hv-work` (no argument) run checks which branches and worktrees actually exist: deleted branches become stale entries and get cleaned up, removed worktrees get updated in kind. If state drifts (crashed session, manual git operations), the next `/hv-work` (no argument) run repairs it without manual intervention.

@@ -32,9 +32,9 @@ Single-repo behavior is unchanged. Umbrella-aware verbs gate on `umbrella.enable
 ## Enabling it
 
 1. `cd` to the umbrella folder, the parent that contains your sub-repos as immediate children.
-2. Run `/hv-init`.
-3. When [`/hv-init`](../reference/slash-commands.md#hv-init) detects two or more immediate git children, it offers umbrella mode via `AskUserQuestion`, listing the children it found (`hv init umbrella --list`).
-4. Accept. `/hv-init` calls `hv init umbrella`, which writes `.hv/repos.json` with the repos you chose and sets `umbrella.enabled: true` in `.hv/config.json`. If the umbrella is itself a git repo, `.gitignore` gains a `# ── hv umbrella ──` block listing `.claude/`, `.hv/`, and each registered sub-repo.
+2. Run `hv init`.
+3. When `hv init` detects two or more immediate git children, it offers umbrella mode via `AskUserQuestion`, listing the children it found (`hv init umbrella --list`).
+4. Accept. `hv init` calls `hv init umbrella`, which writes `.hv/repos.json` with the repos you chose and sets `umbrella.enabled: true` in `.hv/config.json`. If the umbrella is itself a git repo, `.gitignore` gains a `# ── hv umbrella ──` block listing `.claude/`, `.hv/`, and each registered sub-repo.
 
 The result looks like:
 
@@ -51,7 +51,7 @@ myorg/                 # umbrella root
 └── shared/            # registered sub-repo (independent git)
 ```
 
-To opt back out, run [`/hv-config`](configuration.md), pick the umbrella row, and toggle off. The registry file stays intact: entries in `.hv/repos.json` remain on disk, and `hv` stops consulting them until you toggle umbrella mode back on.
+To opt back out, run `hv config set umbrella.enabled false` (see [configuration](configuration.md)). The registry file stays intact: entries in `.hv/repos.json` remain on disk, and `hv` stops consulting them until you toggle umbrella mode back on.
 
 ## The registry: `.hv/repos.json`
 
@@ -71,14 +71,14 @@ The registry is one JSON file at the umbrella's `.hv/repos.json`:
 - Entries are sorted alphabetically for stable diffs.
 - No SHAs, no version pins. Sub-repos are independent git repositories. See `.hv/DECISIONS.md` (Architecture, "Umbrella mode does not use git submodules") for the rationale.
 
-To edit the registry today, re-run `/hv-init` from the umbrella. `hv init umbrella` is idempotent: a second run with the same selection is a no-op; a run with new names adds them; names you omit but were previously registered are kept (with a warning). A registry editor in `/hv-config` is planned.
+To edit the registry today, re-run `hv init` from the umbrella. `hv init umbrella` is idempotent: a second run with the same selection is a no-op; a run with new names adds them; names you omit but were previously registered are kept (with a warning).
 
 ### KNOWLEDGE.md and Glossary in umbrella mode
 
 KNOWLEDGE.md is **hybrid** in umbrella projects (shipped in F21):
 
 - `.hv/KNOWLEDGE.md`: umbrella file. Cross-repo learnings and umbrella Glossary terms.
-- `.hv/knowledge/<name>/KNOWLEDGE.md`: per-sub-repo file. Repo-local learnings and per-sub-repo Glossary terms. Created on first write (and pre-seeded by `/hv-init` umbrella setup).
+- `.hv/knowledge/<name>/KNOWLEDGE.md`: per-sub-repo file. Repo-local learnings and per-sub-repo Glossary terms. Created on first write (and pre-seeded by `hv init` umbrella setup).
 
 The Glossary topic follows the same hybrid scoping. Scope resolves in this order: an explicit `--repo umbrella|<name>` flag wins; otherwise the cwd auto-resolves (inside a registered sub-repo → that repo; at the umbrella root → umbrella). Single-repo projects always resolve to `umbrella` and behave byte-identically to before. The knowledge verbs (`hv knowledge add`, `query`, `tier`, `amend`) and the glossary verbs (`hv glossary write`, `read`, `import`) all take `--repo`; readers (`hv knowledge query`, `hv glossary read`) merge umbrella + sub-repo content with a `> from: <path>` provenance line per source when scope is a sub-repo. Tier sidecars split per file (`.hv/knowledge-tier.json` umbrella, `.hv/knowledge/<name>/knowledge-tier.json` per sub-repo).
 
@@ -120,8 +120,7 @@ Most skills delegate umbrella resolution to the underlying verbs and stay umbrel
 
 - **`/hv-capture`** asks for `Repos:` when umbrella mode is on, accepting one or more registered names. Items can also be untagged (umbrella-flat, appropriate for cross-cutting tasks).
 - **`/hv-work`** reads `Repos:` from the item and runs the orchestrator plus workers against the resolved sub-repo's `.git/`. The atomic commits land in that sub-repo's history; `status.json` records the entry as `(branch, repo)`.
-- **`/hv-go`** is a pass-through; `/hv-capture` and `/hv-work` handle umbrella resolution under it.
-- **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-next` reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for older streams.
+- **`/hv-pause`** writes its handoff to `.hv/handoff/<branch>@<repo>.md` (instead of `<branch>.md`) so two sub-repos sharing a branch name don't clobber each other's notes. The body gains a `Repo: <name>` line. `/hv-work` (no argument) reads the umbrella-keyed path first and falls back to the legacy `<branch>.md` form for older streams.
 - **`/hv-plan`** records the target sub-repo in plan frontmatter (`repo: <name>`) when invoked with `--repo` or when the item carries `Repos:`. Slice and milestone plans stay umbrella-flat.
 - **`/hv-spike`** runs the spike branch in the resolved sub-repo (`spike/<name>` lives in that repo's `.git/`); the spike file stays at `<umbrella>/.hv/spikes/<name>.md` with a `repo: <name>` frontmatter line.
 - **`/hv-work --preview`** displays the resolved sub-repo for items with `Repos:` in its peek output.
@@ -130,14 +129,14 @@ Most skills delegate umbrella resolution to the underlying verbs and stay umbrel
 - **`/hv-ship`** threads `--repo` through `hv ship merge` / `hv ship pr` so the merge or PR runs in the correct sub-repo.
 - **`/hv-refactor`** asks which scope to refactor (all sub-repos, all sub-repos plus the umbrella, the umbrella only, or a subset), then dispatches parallel sub-agents, each running a focused single-repo cycle in its target's `.git/`. The umbrella orchestrator aggregates per-repo summaries and resets the refactor counter once at the end.
 - **`/hv-learn`** routes the learning (and `--term` Glossary entries) to the scope resolved from cwd or `--repo`: repo-local learnings land in `.hv/knowledge/<name>/KNOWLEDGE.md`, cross-repo ones in the umbrella file. At the umbrella root it asks once whether a learning is umbrella-shared or sub-repo-scoped. The per-sub-repo CLAUDE.md knowledge block lists umbrella ∪ that sub-repo's topics. DECISIONS via `/hv-decide` stays umbrella-only.
-- **`/hv-migrate v4`** now supports umbrella projects (the prior refusal was lifted in F21). Each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary; the umbrella-root `.hv/CONTEXT.md` migrates into the umbrella KNOWLEDGE.md. Everything is backed up under `.hv/migrate-backup/` first; `--dry-run` is still the default.
+- **`hv migrate v4`** now supports umbrella projects (the prior refusal was lifted in F21). Each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` migrates into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` Glossary; the umbrella-root `.hv/CONTEXT.md` migrates into the umbrella KNOWLEDGE.md. Everything is backed up under `.hv/migrate-backup/` first; `--dry-run` is still the default.
 
 The `--repo <name>` flag is also exposed on the underlying verbs when you call them directly: `hv status add`, `hv status rm`, `hv review scope`, `hv ship merge`, `hv ship pr`, `hv plan add`, `hv spike add`, `hv git worktree-path`, plus the knowledge/glossary surface (`hv knowledge add`, `hv knowledge query`, `hv knowledge tier`, `hv knowledge amend`, `hv glossary write`, `hv glossary read`, `hv glossary import`) where scope auto-resolves from cwd when the flag is omitted. Without the flag, verbs operate on the cwd's git tree / umbrella scope as in single-repo mode.
 
 ## What's not yet in umbrella mode
 
 - **Multi-repo items.** One TODO item that fans out to commits in N sub-repos at once (with linked PRs) is on the M03 roadmap. Today, `Repos:` resolves to a single sub-repo per item.
-- **Registry editor in `/hv-config`.** Add/remove repos without re-running `/hv-init`. Planned.
+- **Registry editor.** Add/remove repos without re-running `hv init umbrella`. Planned.
 
 ## Footguns
 
@@ -148,5 +147,5 @@ The `--repo <name>` flag is also exposed on the underlying verbs when you call t
 ## See also
 
 - `.hv/DECISIONS.md` (Architecture, "Umbrella mode does not use git submodules")
-- [The `.hv/` folder](../reference/hv-folder.md): what `/hv-init` writes
+- [The `.hv/` folder](../reference/hv-folder.md): what `hv init` writes
 - [Vision and plans](vision-and-plans.md): how M02 fits the milestone roadmap

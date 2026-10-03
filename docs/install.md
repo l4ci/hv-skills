@@ -38,4 +38,4 @@ Use this when you want to edit skills locally and have changes reflected immedia
 
 ## After install
 
-Whichever path you pick, the next step is `/hv-init` at the project root. See [Getting started](getting-started.md) for the rest of the first cycle.
+Whichever path you pick, the next step is `hv init` at the project root. See [Getting started](getting-started.md) for the rest of the first cycle.

@@ -1,6 +1,6 @@
 ---
 name: hv-debug
-description: Systematic root-cause investigation for a bug — reads the TODO entry + detail file, consults KNOWLEDGE.md, reproduces, hypothesizes, verifies, fixes with one atomic commit, and nudges /hv-learn. Use on "debug [B07]", "why is X broken", "investigate the crash", when a bug needs a proper cycle rather than a /hv-go shot.
+description: Systematic root-cause investigation for a bug — reads the TODO entry + detail file, consults KNOWLEDGE.md, reproduces, hypothesizes, verifies, fixes with one atomic commit, and nudges /hv-learn. Use on "debug [B07]", "why is X broken", "investigate the crash", when a bug needs a proper cycle rather than a one-shot fix.
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
@@ -35,7 +35,7 @@ Read `.hv/config.json`:
 
 ## When NOT to Use
 
-- Trivial fix with an obvious one-liner → `/hv-go`
+- Trivial fix with an obvious one-liner → `/hv-capture`, then accept the hand-off to `/hv-work`
 - Multiple items in one pass → `/hv-work`
 - You don't have a reproducer and the bug isn't captured → `/hv-capture` first
 
@@ -263,7 +263,7 @@ This is a terminal path. Surface any `[Auto:Loop]` decisions before halting:
 
 Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty).
 
-Loop mode (`autonomy.level == "loop"`): the Iron Law breaks the loop. Do not auto-dispatch `/hv-next` or any continuation skill. The loop stops here; the user re-engages by hand.
+Loop mode (`autonomy.level == "loop"`): the Iron Law breaks the loop. Do not auto-dispatch `/hv-work` (no argument) or any continuation skill. The loop stops here; the user re-engages by hand.
 
 ## Step 10 — Mark Complete
 
@@ -303,7 +303,7 @@ hv status rm <branch>
 hv status rm --repo <repo> <branch>
 ```
 
-Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
+Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-work` (no argument) run.
 
 ## Step 11 — Report
 

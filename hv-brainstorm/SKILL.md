@@ -26,7 +26,7 @@ LEVEL=$(jq -r '.autonomy.level // "off"' .hv/config.json)
 
 Also parse `AUTO_LOOP`: scan `$ARGUMENTS` (the skill `args` value) for the literal string `--auto-loop`; set `AUTO_LOOP=true` if present, `AUTO_LOOP=false` otherwise. Then branch:
 
-- **`LEVEL == "loop"` AND `AUTO_LOOP=false`** — print *"Note: /hv-brainstorm is skipped under loop autonomy (throughput mode). Re-run with `/hv-config` set to off or auto if you want to brainstorm."* and exit 0. Per the 2026-05-09 KNOWLEDGE inline-autonomy-directives convention, the check lives at every dispatch point including this one.
+- **`LEVEL == "loop"` AND `AUTO_LOOP=false`** — print *"Note: /hv-brainstorm is skipped under loop autonomy (throughput mode). Re-run after `hv config set` to off or auto if you want to brainstorm."* and exit 0. Per the 2026-05-09 KNOWLEDGE inline-autonomy-directives convention, the check lives at every dispatch point including this one.
 - **`LEVEL == "loop"` AND `AUTO_LOOP=true`** — enter auto-loop mode: proceed to Step 2 without exiting. All `AskUserQuestion` calls are suppressed for the rest of the run; the auto-resolution pipeline (see `## Auto-loop mode`) drives every pick.
 - **`LEVEL != "loop"` (off/auto) AND `AUTO_LOOP=true`** — stop: `--auto-loop` is loop-mode only (`hv design add --auto-loop` refuses it with exit 2 anyway; this check just stops before the run).
 - **`LEVEL != "loop"` AND `AUTO_LOOP=false`** — normal interactive flow (today's path); proceed to Step 2.
@@ -154,7 +154,7 @@ Scan per the shared shape — see `references/design-exploration.md` (placeholde
 
 ## Step 9 — User Review Gate
 
-**Skipped under `--auto-loop`** — the design is final on write; users review via terminal-path surfacing (`/hv-next` empty-backlog, `/hv-work` guard-fail, `/hv-pause`) where `hv decisions auto-since` prints the logged decisions.
+**Skipped under `--auto-loop`** — the design is final on write; users review via terminal-path surfacing (`/hv-work` empty-backlog, `/hv-work` guard-fail, `/hv-pause`) where `hv decisions auto-since` prints the logged decisions.
 
 Print the final artifact (or invoke `hv design show <ID>`) and ask via `AskUserQuestion` per the shared review-gate shape (see `references/design-exploration.md`). Item-specific routes:
 
@@ -183,7 +183,7 @@ If the user picked *Stop here* → exit without a `/hv-plan` nudge.
 
 ## Auto-loop mode
 
-Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in loop mode when no design exists for a Major + Milestone-tagged item — see `/hv-work`'s Step 4 dispatch directive for the trigger conditions and the inline `Skill`-tool dispatch language. This section describes the run shape once the flag is set; the dispatch decision lives at `/hv-work`'s call site (per the hv-init "Imperative rules in autonomy-aware steps must live inline at every dispatch point" convention).
+Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in loop mode when no design exists for a Major + Milestone-tagged item — see `/hv-work`'s Step 4 dispatch directive for the trigger conditions and the inline `Skill`-tool dispatch language. This section describes the run shape once the flag is set; the dispatch decision lives at `/hv-work`'s call site (per the authoring-conventions rule "Imperative rules in autonomy-aware steps must live inline at every dispatch point" convention).
 
 **Orchestrator-model contract.** `--auto-loop` makes design picks autonomously (no `AskUserQuestion`), so it depends on orchestrator-grade design judgment. The contract: this skill is invoked via the `Skill` tool from `/hv-work` Step 4, which loads it inline in `/hv-work`'s session. Since `/hv-work` runs under `models.orchestrator` (per `.hv/config.json`, default `opus`), `--auto-loop` inherits that model. If a future change moves the dispatch to the `Agent` tool, the call site MUST explicitly pass `model: orchestrator` (resolved from `.hv/config.json`) — running `--auto-loop` under the worker model would push design picks onto an execution-tuned model and degrade design quality. The interactive (default) mode has no such constraint; it can run under any model since the user redlines via `AskUserQuestion`.
 
@@ -209,7 +209,7 @@ After all questions and the approach pick are resolved, write the design via `hv
 
 ### Surfacing
 
-`/hv-brainstorm --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-next` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `hv decisions auto-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer.
+`/hv-brainstorm --auto-loop` itself does not surface auto-decisions to the user — surfacing fires only on terminal paths (`/hv-work` empty-backlog branch, `/hv-work` guard-fail branch, `/hv-pause`) via `hv decisions auto-since`. The user sees the running summary at session end, articulates `Forbids/Permits` in `DECISIONS.md`, and removes the `<!-- [Auto:Loop] -->` footer.
 
 ## Anti-pattern guard
 

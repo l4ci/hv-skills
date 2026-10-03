@@ -1,6 +1,6 @@
 # The `.hv/` folder
 
-[`/hv-init`](slash-commands.md#hv-init) creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only a handful of machine-specific or transient paths are gitignored. Use the skills or `hv` verbs to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
+`hv init` creates this folder once per project. Everything inside is Markdown or JSON, and most of it is tracked by default. Only a handful of machine-specific or transient paths are gitignored. Use the skills or `hv` verbs to update tracked content; reach for hand-editing only when investigating or fixing something that drifted.
 
 ## Overview
 
@@ -10,7 +10,7 @@
 | `KNOWLEDGE.md` | Durable learnings grouped by topic: gotchas, conventions, constraints |
 | `DECISIONS.md` | Hard-boundary decisions with explicit forbids/permits. Active commitments future work must respect |
 | `MILESTONES.md` | Milestone overview: one short section per milestone, with a vision intro paragraph and an active list |
-| `MAP.md` + `map/<subsystem>.md` | Project map: AI-facing narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Hand-authored; `touched:` auto-bumped by cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`). |
+| `MAP.md` + `map/<subsystem>.md` | Project map: AI-facing narratives describing one coherent area each. Source-of-truth for the `## Project Map` block in `CLAUDE.md`. Hand-authored; `touched:` auto-bumped by cycle skills (`/hv-work`, `/hv-debug`). |
 | `counters.json` | Auto-incrementing IDs for each item type |
 | `config.json` | Model selection, isolation mode, merge strategy, ship/learn/refactor gates, autonomy level (team-shared defaults) |
 | `config.local.json` | _(gitignored)_ Per-developer config overrides, deep-merged on top of `config.json` by `load_config()`. Use for `autonomy.level`, model preferences, or any setting that varies per machine. |
@@ -22,7 +22,7 @@
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) with full plan: goal, acceptance, rationale, risks, research findings, notes |
 | `plans/` | Implementation plans keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
 | `spikes/` | Spike findings: one Markdown file per spike. The experimental code lives on the `spike/<name>` git branch and is never merged |
-| `handoff/` | _(gitignored)_ `/hv-pause` notes. One file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next`. Per-developer scratch. |
+| `handoff/` | _(gitignored)_ `/hv-pause` notes. One file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-work` (no argument). Per-developer scratch. |
 | `qa-runs/` | _(gitignored)_ Timestamped `/hv-qa` run artifacts. Bulky, regeneratable from the strategy in `qa/<target>.md` |
 | `verdicts.json` | _(gitignored)_ Typed review, second-opinion, QA and debug verdicts (`hv verdict add`, `hv debug verdict`). Per-developer: `/hv-ship` routes on it. |
 | `gate-audit.jsonl` | _(gitignored)_ One JSON line per manual gate a human cleared: gate, verb, target, time, the quoted answer and the autonomy level. Written by the gated `hv` verbs (`hv gate list`). |
@@ -32,7 +32,7 @@
 
 ## BACKLOG.md: active backlog
 
-`BACKLOG.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items, and [`/hv-next`](../usage/picking-work.md) reads it to suggest what to work on next.
+`BACKLOG.md` is the single source of truth for everything in flight. It holds open bugs, features, and tasks organised by type, plus a "recently completed" section at the bottom. [`/hv-capture`](../usage/capturing-work.md) appends new items, and [`/hv-work` (no argument)](../usage/picking-work.md) reads it to suggest what to work on next.
 
 A typical entry looks like:
 
@@ -46,11 +46,11 @@ Edit this file by hand whenever you want: reorder items, bump priorities, or del
 
 `KNOWLEDGE.md` stores durable project knowledge: gotchas, team conventions, architectural constraints, and anything else you don't want to rediscover later. Entries sit under free-form topic headings. [`/hv-learn`](../usage/learning.md) appends new learnings at the end of a session.
 
-One topic is special-cased: `## Glossary` holds domain-terminology entries as nested bullets (`- **<term>** — <definition>` with indented `**Aliases:**` / optional `**Not:**` / date stamp). The Glossary topic is pinned at `/hv-init` time; entries are written via `/hv-learn --term <name>` (`hv glossary write`) and read via `hv glossary read <term>`. The F03 tier lifecycle skips Glossary, since terms are canonical, not probationary.
+One topic is special-cased: `## Glossary` holds domain-terminology entries as nested bullets (`- **<term>** — <definition>` with indented `**Aliases:**` / optional `**Not:**` / date stamp). The Glossary topic is pinned at `hv init` time; entries are written via `/hv-learn --term <name>` (`hv glossary write`) and read via `hv glossary read <term>`. The F03 tier lifecycle skips Glossary, since terms are canonical, not probationary.
 
 See [../usage/learning.md](../usage/learning.md) for how to capture and review knowledge.
 
-`/hv-init` inserts a managed block in `CLAUDE.md` (or `AGENTS.md` when present) that lists the current topics (`Glossary` surfaces here like any other topic). That block keeps knowledge visible to the model across context clears without re-reading the full file.
+`hv init` inserts a managed block in `CLAUDE.md` (or `AGENTS.md` when present) that lists the current topics (`Glossary` surfaces here like any other topic). That block keeps knowledge visible to the model across context clears without re-reading the full file.
 
 ## DECISIONS.md: hard-boundary decisions
 
@@ -66,11 +66,11 @@ See [../usage/decisions.md](../usage/decisions.md) for the full capture flow and
 
 See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for how milestones work with planning and implementation skills.
 
-A companion managed block in `CLAUDE.md` lists active milestones so `/hv-next` and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is in progress.
+A companion managed block in `CLAUDE.md` lists active milestones so `/hv-work` (no argument) and [`/hv-pause`](../usage/pausing-and-resuming.md) can scope their suggestions to what is in progress.
 
 ## MAP.md: project map
 
-`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv map query <name>`. Write `.hv/map/<name>.md` files by hand as you discover subsystems: one file per coherent area, with `subsystem:`/`summary:`/`touched:` frontmatter and free-form body sections (Purpose, Entry points, Key files / dirs, Conventions, Notes / gotchas). Cycle skills (`/hv-work`, `/hv-debug`, `/hv-go`) bump `touched:` post-cycle when their changes overlap a subsystem's key files or entry points, and regenerate the always-on `## Project Map` block in `CLAUDE.md` via `hv map index`. When subsystems drift or duplicate, edit or retire `.hv/map/<name>.md` entries directly; the index verb picks up the change on the next run.
+`MAP.md` is an AI-facing index of project subsystems. It holds a brief summary for each named area; full narratives live in `map/<subsystem>.md` and are loaded on demand via `hv map query <name>`. Write `.hv/map/<name>.md` files by hand as you discover subsystems: one file per coherent area, with `subsystem:`/`summary:`/`touched:` frontmatter and free-form body sections (Purpose, Entry points, Key files / dirs, Conventions, Notes / gotchas). Cycle skills (`/hv-work`, `/hv-debug`) bump `touched:` post-cycle when their changes overlap a subsystem's key files or entry points, and regenerate the always-on `## Project Map` block in `CLAUDE.md` via `hv map index`. When subsystems drift or duplicate, edit or retire `.hv/map/<name>.md` entries directly; the index verb picks up the change on the next run.
 
 A managed `## Project Map` block in `CLAUDE.md` surfaces the thin summary so the model can orient without loading detail files.
 
@@ -88,13 +88,13 @@ You should not need to edit this by hand. If you ever manually delete items from
 
 `config.json` stores project-level preferences: which model to use, whether branch isolation is on, how merges are handled, the ship/learn/refactor gate thresholds, and the autonomy level for orchestration.
 
-See [../usage/configuration.md](../usage/configuration.md) for the full list of options and how to change them with `/hv-config`.
+See [../usage/configuration.md](../usage/configuration.md) for the full list of options and how to change them with `hv config set`.
 
 ## status.json: active work streams
 
 `status.json` records which items are currently being worked on and which git branch or worktree each one lives in. It is written when work starts and cleared when work completes or is paused.
 
-See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-next` uses this file to orient the model after a context clear.
+See [../usage/picking-work.md](../usage/picking-work.md) for how `/hv-work` (no argument) uses this file to orient the model after a context clear.
 
 ## bugs/, features/, tasks/: overflow detail files
 
@@ -118,7 +118,7 @@ See [../usage/vision-and-plans.md](../usage/vision-and-plans.md) for the full pl
 
 ## handoff/: pause notes
 
-When you run `/hv-pause`, the current state of the session (active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy) is written to `handoff/<branch>.md`. `/hv-next` reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
+When you run `/hv-pause`, the current state of the session (active hypothesis, next planned step, files mid-edit, gotchas just discovered, uncommitted-work strategy) is written to `handoff/<branch>.md`. `/hv-work` (no argument) reads any matching note for an active branch and uses it to restore intent that pure git state can't carry across `/clear` or a fresh session.
 
 Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned, so delete them by hand once the branch is shipped.
 
@@ -144,7 +144,7 @@ The backlog is shared by default: state travels with the repo so collaborators s
 | `.hv/workers.json` | Per-developer worker slot registry (tab handles, account config dirs, claims); machine-specific |
 | `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write |
 
-`/hv-init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
+`hv init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
 
 ### `config.local.json`: per-developer overrides
 

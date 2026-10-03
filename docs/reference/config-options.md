@@ -1,25 +1,25 @@
 # Configuration options
 
-This page documents the questions `/hv-init` and `/hv-config` ask, with their exact option labels and descriptions. For a concept-first walk through each config key, see [`usage/configuration.md`](../usage/configuration.md).
+This page lists every config key with its allowed values. The options below are the five core settings (Q1-Q5) with their labels. For a concept-first walk through each key, see [`usage/configuration.md`](../usage/configuration.md).
 
-Two sources feed this vocabulary:
+There is no interactive config UI. Two verbs cover it:
 
-- **`/hv-init`** runs FRESH on first setup. It asks all five questions below (Q1–Q5) in one `AskUserQuestion` call, and writes the answers to `.hv/config.json`. On a STALE upgrade, it asks only the questions whose keys are missing.
-- **`/hv-config`** lets you edit individual keys later. Its Step 4 reuses the Q1–Q5 option vocabulary verbatim, plus five additional keys (docs path, docs auto-create, docs after-work, git base branch, umbrella mode) that `/hv-init` does not prompt for.
+- **`hv init`** writes `.hv/config.json` on first setup, fills any missing keys with the Recommended defaults on later runs, and stamps `hvSkills.version`. It never overwrites a value you set.
+- **`hv config show`** and **`hv config set`** read and change keys later.
 
-The "(Recommended)" tag on each option marks the install-time default. `/hv-config` retags the user's *current* value as `(current)` instead, so users always see what they're replacing.
+The "(Recommended)" tag on each option marks the default `hv init` writes.
 
-## /hv-config invocation shapes
+## hv config invocation shapes
 
-`/hv-config` supports three positional invocation shapes, parsed in Step 1.5 of its skill flow (see `hv-config/SKILL.md`).
+`hv config` takes positional arguments:
 
 | Shape | Behavior |
 |-------|----------|
-| `/hv-config` (no args) | Prints `hv config show` output (every key, value and source layer: `local`, `project` or `default`), then the full guided flow: category checklist, then key checklist, then value pickers. |
-| `/hv-config <key>` | Jumps straight to the value picker for that key, skipping the category and key checklists. |
-| `/hv-config <key>=<value>` | Applies the value directly without any interactive prompts, then prints the one-line diff. |
+| `hv config show` | Prints every key, value and source layer: `local`, `project` or `default`. |
+| `hv config show <key>` | Prints one key. |
+| `hv config set <key> <value>` | Validates the value, writes `.hv/config.json` (never `.hv/config.local.json`), prints the one-line diff. |
 
-Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text) are enumerated in `hv-config/SKILL.md` Step 1.5. An unknown key or invalid value stops the skill with an explicit error; it does not fall through to the guided flow.
+Values for list and object keys are JSON (`hv config set work.accounts '[...]'`). An unknown key or an invalid value exits non-zero with the allowed values; nothing is written.
 
 ## Q1: Models
 
@@ -79,11 +79,11 @@ Valid keys, allowed values, and validation rules (enum vs. boolean vs. free-text
 |-------|-------------|
 | Off (Recommended) | Skills nudge with a one-line suggestion at decision points. You stay in the driver's seat. |
 | Auto chain | One-hop chaining: `/hv-work` → `/hv-learn`, `/hv-debug` → `/hv-ship`, `/hv-ship` → `/hv-learn`, refactor threshold → `/hv-refactor`. Stops after the chained step. |
-| Full loop | Auto chain + after each cycle, invoke `/hv-next` and start the next item. Runs until the backlog drains, a guard fails, or a brief is genuinely ambiguous. |
+| Full loop | Auto chain + after each cycle, run `/hv-work` with no argument and start the next item. Runs until the backlog drains, a guard fails, or a brief is genuinely ambiguous. |
 
-## Mapping table: answers to config values
+## Mapping table: options to config values
 
-Each Q1–Q5 answer maps to a single `key.path: value` write in `.hv/config.json`:
+Each Q1–Q5 option maps to a single `key.path: value` in `.hv/config.json`:
 
 | Answer | Config |
 |--------|--------|
@@ -103,62 +103,50 @@ Each Q1–Q5 answer maps to a single `key.path: value` write in `.hv/config.json
 | Q5 Auto chain | `autonomy.level: "auto"` |
 | Q5 Full loop | `autonomy.level: "loop"` |
 
-## Additional /hv-config keys
+## Additional keys
 
-`/hv-config` Step 4 also exposes five keys that `/hv-init` does not prompt for. Each reuses the Q1–Q5 option wording where it overlaps; the rest are toggles or free text.
+Five more keys are not part of Q1-Q5. `hv init` writes their defaults; change them with `hv config set`.
 
 ### Docs path
 
-> *"Which directory contains your project documentation?"*
-
-Free text. Default: `docs`. Writes `docs.path`.
+Free text. Default: `docs`. Key `docs.path`.
 
 ### Docs auto-create
 
-> *"Should `/hv-ship --docs` auto-write doc updates after work cycles?"*
-
-`On` / `Off`. Writes `docs.autoCreate`.
+`On` / `Off`. Key `docs.autoCreate`.
 
 ### Docs after-work
 
-> *"Should `/hv-ship --docs` run automatically after `/hv-work` and `/hv-ship` finish?"*
-
-`On` / `Off` (Recommended `Off`). Writes `docs.afterWork`.
+`On` / `Off` (Recommended `Off`). Key `docs.afterWork`.
 
 ### Git base branch
 
-> *"Enter the base branch for this project, or leave blank to auto-detect (main / master / trunk / origin HEAD)."*
-
-Free text. Default: `""` (auto-detect). Writes `git.baseBranch`.
+Free text. Default: `""` (auto-detect). Key `git.baseBranch`.
 
 ### Umbrella mode
 
-> *"Enable umbrella mode? (.hv/ stays at the umbrella; helpers operate per sub-repo. Toggling off does not delete `.hv/repos.json`; registered repos remain.)"*
-
-`On` / `Off`. Toggling off does **not** delete `.hv/repos.json`; registered repos remain and are simply ignored until umbrella mode is re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
+`On` / `Off`. Key `umbrella.enabled`. `.hv/` stays at the umbrella; verbs operate per sub-repo. Toggling off does **not** delete `.hv/repos.json`; registered repos remain and are simply ignored until umbrella mode is re-enabled. To add or remove repos from the registry, run `hv init umbrella` from the umbrella root (idempotent).
 
 ## Validation rules
 
-Two rules govern how answers are coerced into config writes:
+- **Enums.** `models.*` take `opus`, `sonnet` or `haiku`; `work.isolation` takes `branch` or `worktree`; `work.mergeStrategy` takes `direct` or `pr`; `autonomy.level` takes `off`, `auto` or `loop`. Anything else is rejected by `hv config set`.
+- **Booleans and integers.** Booleans take `true` or `false`; integer keys state their minimum below. Out-of-range values exit 70 where a verb reads them.
 
-- **"Other" with custom text.** If the user picks `Other` and types a custom value, honor it only if it's a valid value for that key: `"opus"`/`"sonnet"`/`"haiku"` for models, `"branch"`/`"worktree"` for isolation, `"direct"`/`"pr"` for merge strategy, `"off"`/`"auto"`/`"loop"` for autonomy. Anything else silently falls back to the Recommended value.
-- **Plain-text fallback.** When `AskUserQuestion` isn't available (older harness, scripted run), the skill writes Recommended defaults for any pending keys rather than stalling. `/hv-config` Step 4 falls back to one-shot prompts per selected key, validates the reply against the allowed values, and falls back to the current value on invalid input.
+## Silent-default keys
 
-## Not asked, just set
+`hv init` fills these with the silent default; set them only when you want something else:
 
-A few keys are written without ever being asked:
-
-- `hvSkills.version`: stamp of the hv-skills release that wrote the config. Auto-managed by `/hv-init` and `/hv-update`; not exposed in `/hv-config`.
+- `hvSkills.version`: stamp of the hv-skills release that wrote the config. Auto-managed by `hv init` and `hv update`; do not set it by hand.
 - `refactor.verifyCommands`: array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv config set refactor.verifyCommands '[...]'`.
-- `ship.secondOpinion`: opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv config set ship.secondOpinion true` or via `/hv-config` (Quality gates category, call 1).
+- `ship.secondOpinion`: opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv config set ship.secondOpinion true`.
 - `ship.secondOpinionRunner`: who runs the /hv-ship Step 3.5 gate when `ship.secondOpinion` is `true`. Enum `subagent` (silent default). The `codex` value was removed in 5.0: /hv-ship prints a one-line note and runs the subagent in advisory mode (FAIL is surfaced, never blocks), as the Codex runner did. See [`usage/configuration.md`](../usage/configuration.md#shipsecondopinionrunner).
-- `ship.qa`: opt-in product-QA gate in /hv-ship Step 3.75. Silent default `false` (Rule 9). When `true`, /hv-ship invokes [`/hv-qa run`](../usage/qa.md) after /hv-review (and second-opinion if on) and before merge / PR. Set via `hv config set ship.qa true` or via `/hv-config` (Quality gates category). See [`usage/configuration.md`](../usage/configuration.md#shipqa).
+- `ship.qa`: opt-in product-QA gate in /hv-ship Step 3.75. Silent default `false` (Rule 9). When `true`, /hv-ship invokes [`/hv-qa run`](../usage/qa.md) after /hv-review (and second-opinion if on) and before merge / PR. Set via `hv config set ship.qa true`. See [`usage/configuration.md`](../usage/configuration.md#shipqa).
 - `ship.mergeApproval` / `ship.mergeApprovalPaths`: which merges need a human. Enum `none` (silent default), `all` or `paths`, plus a list of repo-relative paths or globs for `paths`. The merge verbs enforce it at every autonomy level. Set via `hv config set ship.mergeApproval all`. See [`usage/configuration.md`](../usage/configuration.md#shipmergeapproval-and-shipmergeapprovalpaths).
 - `round.scope` / `round.roster` / `round.brief` / `round.sharedPaths` / `round.stallMinutes`: how `hv round` runs a round. `round.scope` is which issues a round may take: `slate` (only the issues named at `hv round start --items`), `milestone` (silent default: the active milestones) or `next` (also the next ready milestone). `round.roster` is the agent names slots are provisioned under, silent default `["ben","dana","nia","kit"]`. `round.brief` is the path the worker pointer names, `round.sharedPaths` the globs the file-overlap check ignores; both silent default empty. `round.stallMinutes` is how long a slot with a live agent may show no commit, edit or state change before `hv round reconcile` reports it `stalled`, silent default `30`, `0` turns it off. Not the same axis as `autonomy.level`. Set via `hv config set round.scope slate`. See [`usage/configuration.md`](../usage/configuration.md#round-keys).
 - `round.tier` / `round.tiers.<kind>.<tier>`: worker model tiers for `hv round assign`. `round.tier` is the default tier (`light`, `standard` or `heavy`; silent default `standard`). `round.tiers.claude.light|standard|heavy` map a tier to a model (silent defaults `haiku`, the value of `models.worker`, `opus`); `round.tiers.codex.*` default empty, and a configured kind must name all three. An explicit `round.tiers.claude.standard` wins over `models.worker`. Set via `hv config set round.tiers.claude.heavy opus`. See [`usage/configuration.md`](../usage/configuration.md#round-keys).
-- `orchestrator.handoffThreshold` / `orchestrator.stateMaxAgeSeconds` / `orchestrator.handoffMaxAgeSeconds` / `orchestrator.handoffMaxBlocks`: how the orchestrator hands off before its context runs out (`hv hook stop`, `hv hook session-start`). `handoffThreshold` is the context percentage, an integer from 1 to 100, at which the Stop hook blocks until a handoff is written (silent default `75`). `stateMaxAgeSeconds` is how old the statusline reading may be before the hook ignores it (`120`). `handoffMaxAgeSeconds` is how long a handoff counts as fresh (`900`). `handoffMaxBlocks` is how many times the hook re-blocks a session that still has no handoff before giving up (`2`). None is written by `/hv-init`; an out-of-range value exits 70 where a verb reads it, and the hooks treat it as a pass. Set via `hv config set orchestrator.handoffThreshold 80`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#orchestrator-handoff).
-- `orchestrator.keepaliveMaxRestarts` / `orchestrator.keepaliveBreaker` / `orchestrator.keepaliveBackoffSeconds` / `orchestrator.restartPrompt` / `orchestrator.escalateIssue`: how `hv keepalive run` restarts the orchestrator. `keepaliveMaxRestarts` is the restarts before it gives up, an integer of 0 or more (silent default `10`; `0` stops at the first handoff exit). `keepaliveBreaker` is how many restarts in a row may leave no new handoff before the breaker trips, 1 or more (`3`). `keepaliveBackoffSeconds` is the wait before a restart, 0 or more (`5`). `restartPrompt` is the text appended as the last argument of a restart, a non-empty string (default `Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.`). `escalateIssue` is the issue number the breaker's escalation comment goes on, 0 or more (`0`: unset, so a host notification and a warning only). None is written by `/hv-init`; an out-of-range value exits 70. Each of the first four has a `hv keepalive run` flag that overrides it for one run. Set via `hv config set orchestrator.escalateIssue 12`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#keepalive).
-- `limits.mode` / `limits.resumeMarginSeconds` / `limits.fallbackSleepSeconds` / `limits.maxResumes` / `limits.resumePrompt`: how the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`) reacts to a 5-hour or weekly limit. `mode` is `switch` (silent default: a worker's issue moves to an idle slot on another account that has headroom, else it sleeps) or `sleep` (always wait for the reset); the orchestrator only ever sleeps. `resumeMarginSeconds` is the wait after the reset before the resume prompt is typed, 0 or more (`60`). `fallbackSleepSeconds` is how long a limit with no known reset time sleeps, 1 or more (`1800`). `maxResumes` is how many resume prompts one limit gets before the entry is `failed` and escalated, 1 or more (`3`). `resumePrompt` is the text typed into the limited pane, a non-empty string (default `The usage limit has reset. Continue where you left off.`). None is written by `/hv-init`; an out-of-range value exits 70. Set via `hv config set limits.mode sleep`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#usage-limits).
+- `orchestrator.handoffThreshold` / `orchestrator.stateMaxAgeSeconds` / `orchestrator.handoffMaxAgeSeconds` / `orchestrator.handoffMaxBlocks`: how the orchestrator hands off before its context runs out (`hv hook stop`, `hv hook session-start`). `handoffThreshold` is the context percentage, an integer from 1 to 100, at which the Stop hook blocks until a handoff is written (silent default `75`). `stateMaxAgeSeconds` is how old the statusline reading may be before the hook ignores it (`120`). `handoffMaxAgeSeconds` is how long a handoff counts as fresh (`900`). `handoffMaxBlocks` is how many times the hook re-blocks a session that still has no handoff before giving up (`2`). `hv init` does not write them; an out-of-range value exits 70 where a verb reads it, and the hooks treat it as a pass. Set via `hv config set orchestrator.handoffThreshold 80`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#orchestrator-handoff).
+- `orchestrator.keepaliveMaxRestarts` / `orchestrator.keepaliveBreaker` / `orchestrator.keepaliveBackoffSeconds` / `orchestrator.restartPrompt` / `orchestrator.escalateIssue`: how `hv keepalive run` restarts the orchestrator. `keepaliveMaxRestarts` is the restarts before it gives up, an integer of 0 or more (silent default `10`; `0` stops at the first handoff exit). `keepaliveBreaker` is how many restarts in a row may leave no new handoff before the breaker trips, 1 or more (`3`). `keepaliveBackoffSeconds` is the wait before a restart, 0 or more (`5`). `restartPrompt` is the text appended as the last argument of a restart, a non-empty string (default `Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.`). `escalateIssue` is the issue number the breaker's escalation comment goes on, 0 or more (`0`: unset, so a host notification and a warning only). `hv init` does not write them; an out-of-range value exits 70. Each of the first four has a `hv keepalive run` flag that overrides it for one run. Set via `hv config set orchestrator.escalateIssue 12`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#keepalive).
+- `limits.mode` / `limits.resumeMarginSeconds` / `limits.fallbackSleepSeconds` / `limits.maxResumes` / `limits.resumePrompt`: how the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`) reacts to a 5-hour or weekly limit. `mode` is `switch` (silent default: a worker's issue moves to an idle slot on another account that has headroom, else it sleeps) or `sleep` (always wait for the reset); the orchestrator only ever sleeps. `resumeMarginSeconds` is the wait after the reset before the resume prompt is typed, 0 or more (`60`). `fallbackSleepSeconds` is how long a limit with no known reset time sleeps, 1 or more (`1800`). `maxResumes` is how many resume prompts one limit gets before the entry is `failed` and escalated, 1 or more (`3`). `resumePrompt` is the text typed into the limited pane, a non-empty string (default `The usage limit has reset. Continue where you left off.`). `hv init` does not write them; an out-of-range value exits 70. Set via `hv config set limits.mode sleep`. See [`usage/pausing-and-resuming.md`](../usage/pausing-and-resuming.md#usage-limits).
 - `qa.gate`: verdict routing for /hv-qa invocations from /hv-ship. Silent default `"advisory"` (surface findings, never block). Alternative `"blocking"` halts the ship on `FAIL`. Set via `hv config set qa.gate blocking`. See [`usage/configuration.md`](../usage/configuration.md#qagate).
 - `qa.afterWork`: post-cycle /hv-qa invocation from /hv-work when touched files match a target's `Watch globs`. Silent default `false`. Set via `hv config set qa.afterWork true`. See [`usage/configuration.md`](../usage/configuration.md#qaafterwork).
 - `learn.promoteThreshold`: F03 knowledge-lifecycle auto-promotion threshold. Integer ≥ 0; silent default `3`. Set via `hv config set learn.promoteThreshold <N>` when a project wants stricter or looser confidence gating. See [`usage/configuration.md`](../usage/configuration.md#learnpromotethreshold).

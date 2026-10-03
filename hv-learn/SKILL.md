@@ -242,12 +242,12 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 - `"off"` (default) — append a single nudge line per offender to the confirm output:
 
   ```
-  Note: `<topic>` is large (<bullets> bullets, <bytes-as-KB-rounded-1dp> KB). Consider splitting it (e.g. `<topic>: <facet-A>` + `<topic>: <facet-B>`) to reduce per-query cost in /hv-work, /hv-debug, /hv-go, /hv-plan.
+  Note: `<topic>` is large (<bullets> bullets, <bytes-as-KB-rounded-1dp> KB). Consider splitting it (e.g. `<topic>: <facet-A>` + `<topic>: <facet-B>`) to reduce per-query cost in /hv-work, /hv-debug, /hv-plan.
   ```
 
   Format KB as `{bytes/1024:.1f}` (e.g. `9.8 KB` for 9876 bytes). Splitting is editorial; the user accepts or declines.
 
-- `"auto"` or `"loop"` — **perform the split immediately — no prompt, no confirmation, no "want me to" question.** Per the `hv-init` authoring convention for loop-mode routine auto-picks. For each offender topic:
+- `"auto"` or `"loop"` — **perform the split immediately — no prompt, no confirmation, no "want me to" question.** Per the `references/authoring-conventions.md` convention for loop-mode routine auto-picks. For each offender topic:
 
   1. Read the topic's bullets via `hv knowledge query "<topic>"`.
   2. Group bullets into 2 or 3 cohesive facets by semantic theme (e.g. `Helpers` / `Workers & Parallelism`, `Conventions` / `References`). Each facet must hold ≥3 bullets; `Misc` / `Other` / `Etc.` facets are forbidden — every bullet gets a substantive home. If no plausible split axis exists (bullets are byte-equivalent in theme), fall back to the `"off"` nudge for that topic and skip steps 3–7.
@@ -267,7 +267,7 @@ If verification ran and passed, add a middle line: `Opus verification: PASS — 
 
 **Trigger heuristic.** Scan the just-captured bullets for any of:
 
-- A skill slash-command name: `/hv-init`, `/hv-config`, `/hv-capture`, `/hv-go`, `/hv-vision`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-refactor`, `/hv-update`, `/hv-release`.
+- A skill slash-command name: `/hv-capture`, `/hv-vision`, `/hv-pause`, `/hv-plan`, `/hv-spike`, `/hv-work`, `/hv-debug`, `/hv-decide`, `/hv-review`, `/hv-ship`, `/hv-learn`, `/hv-refactor`, `/hv-release`.
 - An `hv` verb invocation (regex `\bhv [a-z]+( [a-z-]+)?`), e.g. `hv knowledge add`.
 - An `.hv/` artifact path: `.hv/BACKLOG.md`, `.hv/KNOWLEDGE.md`, `.hv/DECISIONS.md`, `.hv/MILESTONES.md`, `.hv/status.json`, `.hv/config.json`, `.hv/handoff/`, `.hv/plans/`, `.hv/spikes/`, `.hv/bugs/`, `.hv/features/`, `.hv/tasks/`, `.hv/milestones/`.
 

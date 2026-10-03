@@ -65,7 +65,7 @@ Any item can carry a `Related:` suffix linking it to other items:
 - **[B05] [P1] Timer badge stale after pause.** Description... Related: [F03]
 ```
 
-Links are optional. [`/hv-next`](picking-work.md) infers the reverse link automatically, so you don't need to add it to both sides. When linked items form clusters, `/hv-next` suggests tackling them together (see [picking work](picking-work.md)).
+Links are optional. [`/hv-work` (no argument)](picking-work.md) infers the reverse link automatically, so you don't need to add it to both sides. When linked items form clusters, `/hv-work` (no argument) suggests tackling them together (see [picking work](picking-work.md)).
 
 `/hv-capture` scans both [`BACKLOG.md`](../reference/hv-folder.md) and `ARCHIVE.md` for connections, so a new bug can link back to a completed feature.
 
@@ -83,4 +83,4 @@ Under `autonomy.level: loop`, flagged titles auto-skip with one line per skipped
 
 ## What /hv-capture is not
 
-`/hv-capture` is a pure recording tool. It classifies and files. It does not act, validate the item, or deduplicate against existing entries. To implement something immediately after capturing it, use [/hv-go](running-work.md). To pick up an already-filed item and implement it, use [/hv-work](running-work.md). To remove a captured item that turned out to be a duplicate or wrong-premise, use [`/hv-capture --remove`](removing-work.md).
+`/hv-capture` is a pure recording tool. It classifies and files. It does not act, validate the item, or deduplicate against existing entries. To implement something immediately after capturing it, accept the hand-off at the end of the capture (it routes to [/hv-work](running-work.md)). To pick up an already-filed item and implement it, use [/hv-work](running-work.md). To remove a captured item that turned out to be a duplicate or wrong-premise, use [`/hv-capture --remove`](removing-work.md).

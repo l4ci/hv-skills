@@ -8,7 +8,7 @@ description: Brainstorm a project's vision and break it into milestones — Socr
 ```
 ════════════════════════════════════════════════════════════════════════
   🔭  hv-vision  ·  brainstorm milestones with research
-  triggers: "vision", "brainstorm milestones"  ·  pairs: hv-next
+  triggers: "vision", "brainstorm milestones"  ·  pairs: hv-work
 ════════════════════════════════════════════════════════════════════════
 ```
 
@@ -209,7 +209,7 @@ Vision updated.
 - M03 — Public API               [active · ready]
 - M04 — Admin dashboard          [planned · blocked by M01, M02]
 
-Active: M01, M03. Run /hv-capture to start filling items, or /hv-next to pick from the existing backlog.
+Active: M01, M03. Run /hv-capture to start filling items, or /hv-work (no argument) to pick from the existing backlog.
 ```
 
 If a freshly active milestone has no captured items yet, append a two-route offer instead of just printing the run hint:

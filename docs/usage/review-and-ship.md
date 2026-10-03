@@ -20,7 +20,7 @@ Stage 1 verdicts:
 
 Stage 1 also runs a **refocus check**: each change is traced from plan task to backlog item to milestone intent (when the item has a milestone tag). Locally sensible steps that drift from the parent intent surface as `CONCERNS` naming the drift path; drift alone never fails the review.
 
-**No-plan fallback.** If no referenced item has a plan file (common when `/hv-go` was used), Stage 1 can't run as a meaningful spec check. The skill prints one informational line and proceeds directly to Stage 2, which then absorbs intent-match as its first rubric item.
+**No-plan fallback.** If no referenced item has a plan file (common when a one-shot capture hand-off was used), Stage 1 can't run as a meaningful spec check. The skill prints one informational line and proceeds directly to Stage 2, which then absorbs intent-match as its first rubric item.
 
 ### Stage 2: code quality
 
@@ -122,7 +122,7 @@ See [configuration](configuration.md) for the full `ship` block.
 
 ## Release nudges
 
-Once you've accumulated commits since the last release tag, [`/hv-next`](picking-work.md) (on terminal paths, when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
+Once you've accumulated commits since the last release tag, [`/hv-work` (no argument)](picking-work.md) (on terminal paths, when you stop without entering `/hv-work`) and `/hv-ship` (in its post-ship report) surface a one-line reminder:
 
 ```
 5 commits since v1.16.0; consider /hv-release.

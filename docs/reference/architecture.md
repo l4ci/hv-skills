@@ -1,6 +1,6 @@
 # Architecture
 
-Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth; `status.json` is just a cache, and `/hv-next` reconciles drift between the two whenever it runs.
+Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth; `status.json` is just a cache, and `/hv-work` (no argument) reconciles drift between the two whenever it runs.
 
 ## `.hv/` layout
 
@@ -26,7 +26,7 @@ Everything Claude reads or mutates lives under `.hv/` in your project. Git is th
 
 ## Drift detection
 
-`hv version --drift` compares the project's recorded `hvSkills.version` against the installed binary. On drift, rerun `/hv-init` to re-stamp the project.
+`hv version --drift` compares the project's recorded `hvSkills.version` against the installed binary. On drift, rerun `hv init` to re-stamp the project.
 
 ## Related
 

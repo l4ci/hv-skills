@@ -47,7 +47,7 @@ The skill then asks for confirmation through the standard *Apply* / *Cancel* pic
 [F42] cycle rolled back: base reset to 7c91a2e, 1 TODO entry restored, counters decremented
 ```
 
-Re-run [`/hv-next`](picking-work.md) and `[F42]` shows up under Features again, ready to be re-planned or replaced. The detail file at `.hv/features/F42.md` is untouched; only the active backlog state and the merge commit moved. If you want to amend the item's description before re-running, edit the detail file directly and `/hv-next` will pick up the new wording on its next pass.
+Re-run [`/hv-work` (no argument)](picking-work.md) and `[F42]` shows up under Features again, ready to be re-planned or replaced. The detail file at `.hv/features/F42.md` is untouched; only the active backlog state and the merge commit moved. If you want to amend the item's description before re-running, edit the detail file directly and `/hv-work` (no argument) will pick up the new wording on its next pass.
 
 ## What gets rolled back vs. preserved
 
@@ -89,7 +89,7 @@ The confirmation step is asked every time, including when [`autonomy.level`](aut
 
 ## What `/hv-ship --undo` is NOT for
 
-- Editing what landed. If the work is fine but needs a tweak, capture a new fix via [`/hv-go`](running-work.md) or [`/hv-capture`](capturing-work.md) + [`/hv-work`](running-work.md). Don't roll back just to redo.
+- Editing what landed. If the work is fine but needs a tweak, capture a new fix via [`/hv-capture`](capturing-work.md) + [`/hv-work`](running-work.md). Don't roll back just to redo.
 - Partial rollback. `/hv-ship --undo` rolls the entire cycle back as a unit. To revert one task from a multi-task cycle, `git revert <task-commit>` is the right tool.
 - Rolling back more than one cycle at once. Invoke `/hv-ship --undo` twice, confirming each step independently.
 - PR-mode cycles. See *Safety semantics* above; use `gh pr close` or `git revert` instead.

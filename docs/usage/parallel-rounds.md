@@ -64,9 +64,8 @@ worker gate and the orchestrator's merge gate are the same commands.
   conventions & invariants*, *Architecture: Module extraction & migration safety*, *Build &
   Tooling: Smoke testing*.
 - A new verb needs a contract entry in `docs/design/5.0-verb-contract.md` and a smoke section.
-- Config keys are documented in five places at once: `docs/reference/config-options.md`,
-  `docs/usage/configuration.md`, `hv-config/SKILL.md`, `hv-init/SKILL.md`,
-  `internal/config/schema.go`. Touch only the lines about your key; a sibling may be adding
+- Config keys are documented in three places at once: `docs/reference/config-options.md`,
+  `docs/usage/configuration.md` and `internal/config/schema.go`. Touch only the lines about your key; a sibling may be adding
   another key in the same files.
 - Stage explicit paths. Commit messages: imperative subject under 72 chars, body says why,
   no `Co-Authored-By` trailer.
@@ -223,7 +222,7 @@ Claude workers only: a Codex subagent cannot be given a working directory.
 
 Slots are provisioned once and reused. `hv round start` creates any missing slot at
 `.worktrees/<agent>` on `park/<agent>` and leaves healthy ones alone. Every worktree lives in
-the project root under `.worktrees/<agent>` (gitignored by `/hv-init`), and `hv worker pool`
+the project root under `.worktrees/<agent>` (gitignored by `hv init`), and `hv worker pool`
 shares the same root. `round.roster` sets the names; the default is `ben`, `dana`, `nia`, `kit`.
 
 ### Grouping a slot under the project in herdr

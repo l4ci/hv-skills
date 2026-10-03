@@ -1,6 +1,6 @@
 # Debugging
 
-`/hv-debug` is for real bugs that need a proper cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for [`/hv-go`](capturing-work.md) or [`/hv-work`](running-work.md) instead.
+`/hv-debug` is for real bugs that need a proper cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for [`/hv-capture`](capturing-work.md) (accept the hand-off) or [`/hv-work`](running-work.md) instead.
 
 ## /hv-debug
 
@@ -53,17 +53,17 @@ If the root cause surprised you, the skill ends with a nudge:
 Root cause was non-obvious. Consider running /hv-learn to capture this.
 ```
 
-## When to use /hv-debug vs /hv-go vs /hv-work
+## When to use /hv-debug vs /hv-work
 
 Use `/hv-debug` when you don't yet know the root cause and need the reproduce, hypothesize, verify loop. The cycle is the point.
 
-Use `/hv-go` or `/hv-work` when:
+Use `/hv-work` (or `/hv-capture` with its hand-off) when:
 
 - The root cause is already clear and the fix is a small, mechanical change.
 - The item is a feature or task, not a bug.
 - You want lighter-weight dispatch without the hypothesis machinery.
 
-See [running work](running-work.md) for a full comparison of `/hv-go` and `/hv-work`.
+See [running work](running-work.md) for a full comparison of the entry points.
 
 ## When the cycle won't converge
 
