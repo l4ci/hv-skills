@@ -46,9 +46,11 @@ func TestHybridRoutesByTheBinarysVerbList(t *testing.T) {
 		t.Fatalf("go call: %d %q", code, out)
 	}
 	hybrid(t, goBin, log, nil, "knowledge", "nosuchverb")
+	// PARTIAL is empty since `version --drift` was ported: the flag no longer
+	// sends the call to the shim.
 	hybrid(t, goBin, log, nil, "version", "--drift")
 	got, _ := os.ReadFile(log)
-	want := "go knowledge tier get\nshim knowledge nosuchverb\nshim version\n"
+	want := "go knowledge tier get\nshim knowledge nosuchverb\ngo version\n"
 	if string(got) != want {
 		t.Errorf("log =\n%s\nwant\n%s", got, want)
 	}

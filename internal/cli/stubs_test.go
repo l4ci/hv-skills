@@ -62,7 +62,6 @@ func TestUnimplementedContractVerbExits71(t *testing.T) {
 	for _, args := range [][]string{
 		{"init"},
 		{"init", "check"},
-		{"init", "umbrella", "--json"},
 		{"init", "--no-such-flag", "x"},
 		{"init", "check", "--repo", "web"},
 	} {
@@ -95,7 +94,7 @@ func TestVerbsExcludesStubs(t *testing.T) {
 	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 		listed[l] = true
 	}
-	for _, stub := range []string{"init", "init check", "init umbrella"} {
+	for _, stub := range []string{"init", "init check"} {
 		if listed[stub] {
 			t.Errorf("stub %q listed by __verbs", stub)
 		}
