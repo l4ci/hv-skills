@@ -92,27 +92,23 @@ trap 'rm -rf "$XX_TMP"' EXIT
   [ "$(echo "$OUT" | jget data.drift)" = "false" ] || fail "no config: expected drift false: $OUT"
   pass "version --drift reports unknown when .hv/config.json is missing"
 
-  # Test 2: drift between stamped 1.0.0 and installed 2.0.0.
-  mkdir -p "fake-home/.claude/plugins/cache/hv-skills/hv-skills/2.0.0/.claude-plugin"
-  cat > "fake-home/.claude/plugins/cache/hv-skills/hv-skills/2.0.0/.claude-plugin/plugin.json" <<'EOF2'
-{"name":"hv-skills","version":"2.0.0"}
-EOF2
+  # Test 2: drift between stamped 1.0.0 and the running binary ($EXPECTED, the
+  # version the section above read back; `installed` is the binary's, not a
+  # plugin cache's, in 5.0).
   cat > .hv/config.json <<'EOF2'
 {"hvSkills":{"version":"1.0.0"}}
 EOF2
-  OUT=$(env -u HV_INSTALL_ROOT HOME="$XX_TMP/fake-home" "$HV_BIN" --json version --drift)
+  OUT=$("$HV_BIN" --json version --drift)
   [ "$(echo "$OUT" | jget data.stamped)" = "1.0.0" ] || fail "drift: wrong stamped: $OUT"
-  [ "$(echo "$OUT" | jget data.installed)" = "2.0.0" ] || fail "drift: wrong installed: $OUT"
-  [ "$(echo "$OUT" | jget data.version)" = "2.0.0" ] || fail "drift: version != installed: $OUT"
+  [ "$(echo "$OUT" | jget data.installed)" = "$EXPECTED" ] || fail "drift: wrong installed: $OUT"
+  [ "$(echo "$OUT" | jget data.version)" = "$EXPECTED" ] || fail "drift: version != installed: $OUT"
   [ "$(echo "$OUT" | jget data.status)" = "drift" ] || fail "drift: expected status drift: $OUT"
   [ "$(echo "$OUT" | jget data.drift)" = "true" ] || fail "drift: expected drift true: $OUT"
   pass "version --drift reports drift when stamped != installed"
 
-  # Test 3: match between stamped 2.0.0 and installed 2.0.0.
-  cat > .hv/config.json <<'EOF2'
-{"hvSkills":{"version":"2.0.0"}}
-EOF2
-  OUT=$(env -u HV_INSTALL_ROOT HOME="$XX_TMP/fake-home" "$HV_BIN" --json version --drift)
+  # Test 3: match when the stamp is the binary's own version.
+  printf '{"hvSkills":{"version":"%s"}}\n' "$EXPECTED" > .hv/config.json
+  OUT=$("$HV_BIN" --json version --drift)
   [ "$(echo "$OUT" | jget data.status)" = "match" ] || fail "match: expected status match: $OUT"
   [ "$(echo "$OUT" | jget data.drift)" = "false" ] || fail "match: expected drift false: $OUT"
   pass "version --drift reports match when stamped == installed"

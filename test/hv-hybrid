@@ -30,7 +30,7 @@ VALUE_FLAGS = {"-C", "--cwd", "--repo", "-cwd", "-repo"}
 # Verbs the binary lists but only partly implements: a call that carries one of
 # these flags goes to the shim. Each entry is a known gap in the port, not a
 # feature of the hybrid; delete it when the port catches up.
-PARTIAL = {("version", "--drift"): "A3: hv version --drift is not ported"}
+PARTIAL = {}
 
 
 def die(msg):

@@ -3,7 +3,9 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 
+	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/version"
 )
@@ -15,7 +17,7 @@ func Tree() *Command {
 		Name:    "hv",
 		Summary: "hv-skills command line",
 		Subs: []*Command{
-			{Name: "version", Summary: "print the hv version", Verb: noFlags(runVersion)},
+			{Name: "version", Summary: "print the hv version", Verb: versionVerb},
 			knowledgeCommands(),
 			glossaryCommands(),
 			blockCommand(),
@@ -24,6 +26,7 @@ func Tree() *Command {
 			mapCommands(),
 			qaCommands(),
 			migrateCommands(),
+			initCommand(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
@@ -40,10 +43,57 @@ func noFlags(run RunFunc) func(*flag.FlagSet) RunFunc {
 	return func(*flag.FlagSet) RunFunc { return run }
 }
 
-func runVersion(c *Ctx, args []string) (Result, error) {
-	if len(args) > 0 {
-		return Result{}, Usage("version takes no arguments")
+func versionVerb(fs *flag.FlagSet) RunFunc {
+	drift := fs.Bool("drift", false, "compare the version stamped in .hv/config.json with this binary")
+	return func(c *Ctx, args []string) (Result, error) {
+		if len(args) > 0 {
+			return Result{}, Usage("version takes no arguments")
+		}
+		if *drift {
+			return runVersionDrift(c)
+		}
+		return runVersion(c)
 	}
+}
+
+// runVersionDrift is hv-version-check --json: hvSkills.version of the merged
+// config against the running binary. stamped or installed empty is "unknown".
+// The old helper exited 0 without .hv/; 5.0 exits 3 (the root walk-up).
+func runVersionDrift(c *Ctx) (Result, error) {
+	root, err := c.Root()
+	if err != nil {
+		return Result{}, err
+	}
+	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	stamped := ""
+	if v, ok := config.Lookup(cfg, "hvSkills.version"); ok {
+		if s, ok := v.(string); ok {
+			stamped = s
+		}
+	}
+	installed := installedVersionFn()
+	status := "unknown"
+	switch {
+	case stamped == "" || installed == "":
+	case stamped == installed:
+		status = "match"
+	default:
+		status = "drift"
+	}
+	data := jsonx.NewObject()
+	data.Set("version", installed)
+	data.Set("stamped", stamped)
+	data.Set("installed", installed)
+	data.Set("status", status)
+	data.Set("drift", status == "drift")
+	text := ""
+	if status == "drift" {
+		text = fmt.Sprintf("hv-skills drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+	}
+	return Result{Data: data, Text: text}, nil
+}
+
+func runVersion(*Ctx) (Result, error) {
 	info := version.Get()
 	data := jsonx.NewObject()
 	data.Set("version", info.Version)
