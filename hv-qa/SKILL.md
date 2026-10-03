@@ -74,7 +74,6 @@ Run when `.hv/qa/` is empty for the active scope (umbrella: per-repo; single-rep
    - **Surface** — what kind of thing this is (web, API, CLI, mobile, lib)
    - **Watch globs** — paths whose changes should trigger after-work QA
    - **Executable checks** — runners with concrete commands, grouped by pillar (performance / security / functional). Each entry: `name` · `command` · `pass criterion`. Examples: `lighthouse --budget-path=.budget.json` · `pa11y http://localhost:3000` · `npm audit --audit-level=high` · `bash test/smoke.sh` · `playwright test --grep @smoke`.
-     - **Codex runner** (propose only when `codex` is on `PATH` and `.hv/bin/hv-codex-verify --doctor` exits 0; otherwise omit): `codex-verify` · `.hv/bin/hv-codex-verify --worktree . --brief .hv/qa/<target>.codex.md` · last line `PASS`. The brief file is plain markdown describing what Codex should verify by running commands; the helper maps `ERROR` (sandbox, timeout, dirty tree) to INFRA-FAIL, not a failed check.
    - **Audit checks** — usability dimensions to inspect by hand or LLM (empty states, error recovery, copy clarity, first-run flow). Rubric, no commands.
    - **Infra requirements** — what must be running for `run` mode (e.g. `npm run dev` on `:3000`, deployed staging URL, sandbox creds). Skill refuses to run if these aren't met.
    - **Out of scope** — explicit non-goals (e.g. "no load testing", "no real-payment flows").
@@ -217,7 +216,7 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 - **No strategy file** — halt; tell user to run `/hv-qa first-run`. Don't auto-scaffold.
 - **Infra unavailable** — `INFRA-FAIL` verdict; halt. User starts services, re-runs.
 - **Runner subagent timeout** — re-run that check alone per Step 5 before recording it. If it passes solo, the original red was contention: record `met: true` with both `uptime` figures in `evidence`. If it times out solo too, record `met: false` with `evidence: "timeout after Ns at load <figure>, reproduced alone at load <figure>"`. QA continues either way; verdict reflects the confirmed result, never the contended one.
-- **Strategy references retired tool** — that check is `met: false` with `evidence: "command not found"`. Surface in `restructure` mode.
+- **Strategy references retired tool** — that check is `met: false` with `evidence: "command not found"`. Surface in `restructure` mode. This includes a `codex-verify` runner from a pre-5.0 strategy: the Codex runner was removed in 5.0, so `restructure` drops the entry.
 
 ## References
 

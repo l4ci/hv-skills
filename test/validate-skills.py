@@ -188,11 +188,7 @@ LEGACY_RE = re.compile(
 # the PR that converts the files; the groups are kept apart so two slices'
 # deletions never touch adjacent lines. An entry whose file is already clean
 # (or gone) fails the check, so the list can only shrink. It is empty after S5.
-UNCONVERTED = {
-    # S2 leftovers: hv-codex-verify lines wait on the E1 decision (#68)
-    "hv-qa/SKILL.md",
-    "hv-ship/SKILL.md",
-}
+UNCONVERTED = set()
 
 
 def doclint_files():
