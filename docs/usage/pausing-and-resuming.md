@@ -130,10 +130,33 @@ hv limit status           # the log, and whether anything is watching
 
 - `sleep` waits for the reset.
 - `switch` applies to a worker slot only. It uses the rule `hv round assign` uses: keep the slot's account unless it is cooling, otherwise take the account with the most headroom (`hv worker account pick --exclude <account>`). With such an account and an idle slot on it, the slot's issue moves there with `hv round transfer`, so the work continues from its pushed branch and a handoff comment. With no usable account, or no idle slot on it, the limit sleeps instead, and the entry says why.
-- **The orchestrator only sleeps.** A limited session cannot write a handoff, and a restarted one with no handoff has nothing to continue from. Handing off before the limit and switching the orchestrator's account are follow-up work: #206.
+- **The orchestrator only sleeps.** A limited session cannot write a handoff, and a restarted one with no handoff has nothing to continue from. Moving it to another account is opt-in and happens before the limit, not at it: see [switching the orchestrator's account](#switching-the-orchestrators-account).
 
 **Resuming.** At the reset plus `limits.resumeMarginSeconds` (60) the loop types `limits.resumePrompt` into the pane and keeps watching it. A pane still limited after the prompt starts another cycle, up to `limits.maxResumes` (3) for one limit. Past that the entry is `failed` and the loop posts an escalation on issue `orchestrator.escalateIssue`, or raises a host notification when that is unset. Stop the watcher with Ctrl-C or SIGTERM and the waiting entries stay waiting: the next watcher resumes any whose reset has already passed.
 
 **Where the log is.** The `limits` list in `.hv/workers.json`, beside `slots` and `escalations`. Each entry (`l1`, `l2`, ...) records the session (`orchestrator` or a slot), the window, whether the reset came from data or text, when it resets, the action, its status (`waiting`, `resumed`, `switched` or `failed`) and a note. `hv limit status` reads it back, and `hv round status` and `hv round reconcile` list the ones still waiting. Nothing prunes resolved entries.
 
 **Config.** Five keys under `limits`, all silent defaults: `mode` (`switch`), `resumeMarginSeconds` (60), `fallbackSleepSeconds` (1800), `maxResumes` (3) and `resumePrompt` (`The usage limit has reset. Continue where you left off.`). See [configuration](configuration.md#limits-keys).
+
+## Switching the orchestrator's account
+
+Off by default. With `orchestrator.switchOnUsage` set to `true`, an orchestrator that is close to its usage limit hands off and restarts under another account, instead of running into the limit and sleeping. D3's sleep stays the behavior when the key is off, and for anything the switch does not cover.
+
+```
+hv config set orchestrator.switchOnUsage true
+hv config set orchestrator.usageThreshold 90      # percent, the default
+```
+
+**What it needs.** The Stop hook installed (`hv hook install`), the orchestrator started under `hv keepalive run` (without a supervisor nothing would restart it, so the hook does not ask), and at least two accounts with a `configDir` in `work.accounts`. `hv doctor` has a `switch` check for the last two.
+
+**At the threshold.** When the larger of the 5-hour and weekly `used_percentage` reaches `orchestrator.usageThreshold`, the Stop hook blocks the way it does for context and asks for the handoff and `/exit`, and records which window tripped. A session with no rate-limit reading (API billing) is never asked.
+
+**The restart.** When the orchestrator exits with that handoff, the supervisor picks the account. It never keeps the current one: the target is the account with the most headroom whose meter is `free`, that has a `configDir`, and whose headroom is above `100 - usageThreshold`. An account whose meter is `unknown` is not taken. The restarted `claude` runs with `CLAUDE_CONFIG_DIR` set to that account, and every later restart of the same run keeps it. It reads its handoff through the SessionStart hook as after any restart. The switch counts as a restart against `orchestrator.keepaliveMaxRestarts`.
+
+**With no usable account** the supervisor restarts at once on the same account and holds the switch until the window's reset (`switchHold` in `keepalive.json`; `limits.fallbackSleepSeconds` when there is no reset time). While the hold lasts the hook passes on usage, so the session works on and D3's in-session sleep handles the real limit at 100 percent. A context handoff is not held.
+
+**The figure is not a limit.** The threshold reads the session file's `used_percentage`, which carries no `extra_usage` information, so a weekly window at the threshold counts even when extra usage is enabled and would keep the account going. For an opt-in this is the simple choice; set `usageThreshold` to 100 to wait for the window to fill.
+
+**The log.** Each decision is an entry in the `limits` list: `action` `switch` (`status` `switched`) with the account left in `account` and the account switched to in `note`, or `action` `restart` (`status` `resumed`) when no account was usable, with why and the hold's end in `note`. `hv limit status` shows them. `keepalive.json` gains `account`, `switches` and `switchHold`.
+
+The herdr agent integration is per account (`herdr integration install claude` with that `CLAUDE_CONFIG_DIR`); `hv doctor`'s `hook` check covers it. The project-local hooks apply to every account.
