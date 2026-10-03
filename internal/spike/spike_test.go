@@ -72,7 +72,7 @@ _(viable / not viable / depends-on-X)_
 _(if viable, the shape of the real implementation — write only at /hv-spike done)_
 `
 
-// Spike files are shared with hv-spike-add and -finish; pin them byte for byte.
+// Spike files are shared with older plugin versions; pin them byte for byte.
 func TestSpikeFileBytes(t *testing.T) {
 	root := repo(t)
 	if _, err := Add(root, root, "sse", "Can SSE work?", ""); err != nil {

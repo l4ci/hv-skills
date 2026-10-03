@@ -190,13 +190,10 @@ func TestMapQueryAndQAQueryMatchGolden(t *testing.T) {
 	}
 }
 
-// The generated index blocks name the hv verb where the old ones named the
-// .hv/bin helper (verb contract); everything else must be identical.
+// The goldens carry the old helpers' blocks with the A9 G4 text: the pointer
+// names the hv verb. Everything else is the frozen output, byte for byte.
 func TestMapAndQAIndexMatchGolden(t *testing.T) {
-	for _, c := range []struct{ group, oldPath, newPath string }{
-		{"map", ".hv/bin/hv-map-query <name>", "hv map query <name>"},
-		{"qa", ".hv/bin/hv-qa-query <target>", "hv qa query <target>"},
-	} {
+	for _, c := range []struct{ group string }{{"map"}, {"qa"}} {
 		for _, withEntries := range []bool{true, false} {
 			dir := mapProject(t)
 			if !withEntries {
@@ -209,9 +206,8 @@ func TestMapAndQAIndexMatchGolden(t *testing.T) {
 			if want.RC != 0 || got.RC != 0 {
 				t.Fatalf("%s rc frozen=%d new=%d %s %s", c.group, want.RC, got.RC, want.Stderr, got.Stderr)
 			}
-			oldAgents := strings.ReplaceAll(want.Changed["../AGENTS.md"], c.oldPath, c.newPath)
-			if oldAgents != got.Changed["../AGENTS.md"] {
-				t.Errorf("%s (entries=%v) AGENTS.md differs\n--- frozen ---\n%s\n--- new ---\n%s", c.group, withEntries, oldAgents, got.Changed["../AGENTS.md"])
+			if want.Changed["../AGENTS.md"] != got.Changed["../AGENTS.md"] {
+				t.Errorf("%s (entries=%v) AGENTS.md differs\n--- frozen ---\n%s\n--- new ---\n%s", c.group, withEntries, want.Changed["../AGENTS.md"], got.Changed["../AGENTS.md"])
 			}
 			again := knNew(t, dir, "", c.group, "index", "--json")
 			if !strings.Contains(again.stdout, `"status": "unchanged", "changed": false`) {

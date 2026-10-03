@@ -467,7 +467,7 @@ func TestIssuesMergePR(t *testing.T) {
 		t.Fatal("PR 21 was merged")
 	}
 	is = rrIssue(f, 11)
-	want := "<!-- hv:comment feedback -->\nPR 21 not merged: no proof recorded for T11. Add proof with hv-proof-add, then run the review again."
+	want := "<!-- hv:comment feedback -->\nPR 21 not merged: no proof recorded for T11. Add proof with hv proof add, then run the review again."
 	if !slices.Contains(is.Labels, "changes-requested") || slices.Contains(is.Labels, "needs-review") ||
 		is.Comments[len(is.Comments)-1].Body != want {
 		t.Fatalf("T11 %+v", is)

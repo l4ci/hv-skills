@@ -183,7 +183,7 @@ func suiteA4B(t *testing.T) {
 	)
 	_ = bl
 
-	// ---- backlog ids (hv-todo-by-milestone)
+	// ---- backlog ids
 	idsOf := func(name string, f fx, mid string, extra ...string) scn {
 		return scn{name: "ids/" + name, fx: f, argv: j(append([]string{"backlog", "ids", "--milestone", mid}, extra...)...),
 			want: 0, check: eqCheck("data.milestone", mid)}
@@ -208,7 +208,7 @@ func suiteA4B(t *testing.T) {
 		scn{name: "ids/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, want: 5, argv: j("backlog", "ids", "--milestone", "M01")},
 	)
 
-	// ---- backlog milestones (hv-find-milestone-for-items)
+	// ---- backlog milestones
 	mil := func(name string, f fx, items ...string) scn {
 		return scn{name: "milestones/" + name, fx: f, argv: j(append([]string{"backlog", "milestones"}, items...)...),
 			want: 0}
@@ -353,7 +353,7 @@ func suiteA4B(t *testing.T) {
 		scn{name: "archive/repo-unregistered", fx: umbFx, argv: j("backlog", "archive", "--repo", "x"), want: 3},
 	)
 
-	// ---- backlog stale (hv-staleness)
+	// ---- backlog stale
 	today := "2026-10-02"
 	stale := func(name string, f fx, kind, todayV string, days int, want int) scn {
 		argv := []string{"backlog", "stale", "--kind", kind}
@@ -414,7 +414,7 @@ func suiteA4B(t *testing.T) {
 			}},
 	)
 
-	// ---- backlog drift (hv-todo-drift)
+	// ---- backlog drift
 	dr := func(name string, f fx, want int, args ...string) scn {
 		return scn{name: "drift/" + name, fx: f, argv: j(append([]string{"backlog", "drift"}, args...)...), want: want}
 	}
@@ -504,7 +504,7 @@ func suiteA4B(t *testing.T) {
 		scn{name: "drift/positional", goOnly: true, argv: j("backlog", "drift", "x"), want: 2},
 	)
 
-	// ---- backlog backfill (hv-backfill-since)
+	// ---- backlog backfill
 	bf := func(name string, f fx, want int, args ...string) scn {
 		return scn{name: "backfill/" + name, fx: f, argv: j(append([]string{"backlog", "backfill"}, args...)...), want: want}
 	}
@@ -624,7 +624,7 @@ func suiteA4B(t *testing.T) {
 			}},
 	)
 
-	// ---- status show (hv-status-repo-for)
+	// ---- status show
 	show := func(name string, f fx, branch string, active bool, items []string, repo, worktree any, extra ...string) scn {
 		return scn{name: "status-show/" + name, fx: f, argv: j(append([]string{"status", "show", branch}, extra...)...), want: 0,
 			check: func(t *testing.T, e envl) {
@@ -662,7 +662,7 @@ func suiteA4B(t *testing.T) {
 		scn{name: "status-show/no-branch", goOnly: true, want: 2, argv: j("status", "show")},
 	)
 
-	// ---- status handoff (hv-resolve-handoff)
+	// ---- status handoff
 	ho := func(name string, f fx, branch string, repo string, canonical bool, wantPath any, wantExists bool) scn {
 		argv := []string{"status", "handoff", branch}
 		if repo != "" {
@@ -702,7 +702,7 @@ func suiteA4B(t *testing.T) {
 		scn{name: "status-handoff/unknown-flag", goOnly: true, want: 2, argv: j("status", "handoff", "b", "--write")},
 	)
 
-	// ---- status loop (hv-loop-stamp)
+	// ---- status loop
 	stampRe := regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`)
 	loop := func(sub, name string, f fx, wantChanged any, wantStamp string) scn {
 		return scn{name: "status-loop/" + name, fx: f, argv: j("status", "loop", sub), want: 0,

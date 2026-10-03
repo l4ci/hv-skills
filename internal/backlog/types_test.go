@@ -7,7 +7,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-// registry is the HV_TYPE_REGISTRY line of the retired bin/hv-types.sh, frozen
+// registry is the HV_TYPE_REGISTRY line of the retired shell type registry, frozen
 // as it stood when the shell and Python helpers were deleted. Change it only
 // together with Types.
 const registry = "B:Bugs:bugs:CP F:Features:features:CP T:Tasks:tasks:P S:::P"

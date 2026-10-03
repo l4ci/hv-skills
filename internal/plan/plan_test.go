@@ -46,7 +46,7 @@ func project(t *testing.T) string {
 	return root
 }
 
-// The plan files must stay byte-identical to what the retired bin/hv-plan-add
+// The plan files must stay byte-identical to what the retired plan-add helper
 // wrote (testdata/golden, frozen, changed only by reviewed edit), dates masked.
 func TestAddMatchesOldHelper(t *testing.T) {
 	root := project(t)
@@ -327,7 +327,7 @@ func TestExplicitAndMintedSliceRace(t *testing.T) {
 }
 
 // Uncertain runs on the proof fixture (../proof/testdata/fixture) and must
-// agree with hv-uncertain: the .rc and .txt goldens are its exit code and stdout.
+// agree with the retired uncertain helper: the .rc and .txt goldens are its exit code and stdout.
 func TestUncertainMatchesOldHelper(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join("..", "proof", "testdata", "fixture")

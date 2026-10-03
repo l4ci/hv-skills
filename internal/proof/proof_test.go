@@ -59,7 +59,7 @@ func project(t *testing.T) string {
 }
 
 // The detail files and the shown rows must stay byte-identical to what the
-// retired hv-proof-add and hv-proof-show produced (testdata/golden, frozen,
+// retired proof add and show helpers produced (testdata/golden, frozen,
 // changed only by reviewed edit).
 func TestAddAndShowMatchOldHelpers(t *testing.T) {
 	root := project(t)

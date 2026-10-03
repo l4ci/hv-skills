@@ -37,7 +37,7 @@ func exitOf(err error) int {
 
 var ts = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{6})?\+00:00`)
 
-// The state file is shared with hv-debug-counter, so its bytes are pinned:
+// The state file is shared with older plugin versions, so its bytes are pinned:
 // key order, two-space indent, \u escapes, trailing newline, ISO timestamps.
 func TestStateFileBytes(t *testing.T) {
 	c, err := Open(repo(t))

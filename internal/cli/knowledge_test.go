@@ -440,9 +440,9 @@ func TestKnowledgeCRLFMatchGolden(t *testing.T) {
 		newArgs []string
 		stdin   string
 	}{
-		{"hv-knowledge-merge", []string{"knowledge", "add", "--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body-file", "-"}, "b"},
-		{"hv-knowledge-amend", []string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"}, "more"},
-		{"hv-knowledge-rename-topic", []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, ""},
+		{"add", []string{"knowledge", "add", "--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body-file", "-"}, "b"},
+		{"amend", []string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"}, "more"},
+		{"rename-topic", []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, ""},
 	}
 	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {

@@ -28,7 +28,7 @@ func project(t *testing.T) string {
 	return root
 }
 
-// testdata/golden holds what the retired bin/hv-design-add wrote (date
+// testdata/golden holds what the retired design-add helper wrote (date
 // masked). It is frozen: the files must stay byte-identical, and change only by
 // reviewed edit.
 func TestAddMatchesOldHelper(t *testing.T) {

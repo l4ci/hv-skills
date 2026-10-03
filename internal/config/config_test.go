@@ -10,7 +10,7 @@ import (
 )
 
 // Each testdata/<case>/ directory is a fixture: Go's Load must produce the
-// JSON that Python's hvlib_io.load_config recorded for it in testdata/golden.
+// JSON that the retired Python load_config recorded for it in testdata/golden.
 func TestLoadMatchesPython(t *testing.T) {
 	cases, err := os.ReadDir("testdata")
 	if err != nil {

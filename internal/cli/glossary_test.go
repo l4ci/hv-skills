@@ -3,11 +3,8 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
 )
 
 const glFixture = `# Knowledge
@@ -203,14 +200,8 @@ func TestBlockSkillsMatchGolden(t *testing.T) {
 	if want.RC != 0 || got.RC != 0 {
 		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
-	// The body names hv verbs, a deliberate break from the old helper's text
-	// (contract, A9 G4): everything around the body must still match.
-	block := regexp.MustCompile(`(?s)<!-- hv-skills-start -->\n.*?\n<!-- hv-skills-end -->`)
-	agents := want.Changed["../AGENTS.md"]
-	if !block.MatchString(agents) {
-		t.Fatalf("frozen helper wrote no skills block:\n%s", agents)
-	}
-	want.Changed["../AGENTS.md"] = block.ReplaceAllLiteralString(agents, "<!-- hv-skills-start -->\n"+knowledge.SkillsBlockBody()+"\n<!-- hv-skills-end -->")
+	// The golden carries the old helper's output with the A9 G4 body, which
+	// names hv verbs; everything around the body is the frozen output.
 	knSameDelta(t, want, got)
 	if got := knNew(t, dir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
 		t.Errorf("skills with a body: rc=%d", got.rc)
