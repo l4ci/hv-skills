@@ -1,4 +1,4 @@
-# T03 — hv-knowledge-rename-topic: atomic heading move + tier sidecar re-key
+# T03 — knowledge rename-topic: atomic heading move + tier sidecar re-key
 echo "T03: knowledge rename-topic — atomic re-key on heading move"
 
 TMP_KR="$(mktemp -d)"
@@ -140,11 +140,10 @@ cat > "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
 - **Timeout rule** — body. <!-- 2026-05-15 -->
 - **TLS rule** — body. <!-- 2026-05-15 -->
 EOF
-
-# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
-# white-box-begin: A9 #53 keep
-( cd "$TMP_KR" && "$BIN/hv-knowledge-migrate" >/dev/null )
-# white-box-end
+for T in "Retry rule" "Timeout rule" "TLS rule"; do
+  hvj -C "$TMP_KR" knowledge tier set --topic "Networking" --title "$T" --tier provisional >/dev/null \
+    || fail "could not register $T in the tier sidecar"
+done
 
 # Step 3: append facet headings before old topic.
 cat >> "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'

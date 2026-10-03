@@ -19,22 +19,6 @@
 pass() { printf '  \033[32mOK\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 
-# require_go_verb <verb words...>: a section for a verb that only Go serves
-# (the old helpers never had it, or the shim's version lacks the flags) starts
-#   require_go_verb init umbrella || return 0
-# It succeeds when HV_BIN lists the verb in `hv __verbs` (the Go binary, or the
-# hybrid when it routes the verb there). The plain shim has no __verbs, so the
-# section prints a SKIP line and the caller returns. S7 (#53) deletes the shim
-# and this helper with it.
-require_go_verb() {
-  local want="$*"
-  if grep -qxF -- "$want" <<<"$("$HV_BIN" __verbs 2>/dev/null || true)"; then
-    return 0
-  fi
-  printf '  \033[33mSKIP\033[0m hv %s is not served by %s (needs the Go binary)\n' "$want" "$HV_BIN"
-  return 1
-}
-
 # Black-box helpers (#46). Callers check the exit code themselves:
 #   rc=0; out=$(hvj item show B01) || rc=$?
 # hvj runs `"$HV_BIN" --json "$@"`, prints the envelope and returns the verb's
@@ -55,15 +39,6 @@ except (KeyError, IndexError, TypeError):
     sys.exit(1)
 print(v if isinstance(v, str) else json.dumps(v, separators=(",", ":")))
 ' "$1"
-}
-
-# F22 canonical mirror — strips stale helpers before copying fresh from $BIN.
-# Mirrors hv-init/SKILL.md Step 2. Callers must have $BIN set (runner provides it)
-# and .hv/bin/ already mkdir'd. Two-step delete-then-copy is intentional; matches
-# production semantics so smoke catches rename-regressions.
-install_helpers() {
-  find .hv/bin/ -maxdepth 1 \( -name 'hv-*' -o -name 'hvlib*.py' \) -type f -delete
-  cp "$BIN"/hv-* "$BIN"/hvlib*.py .hv/bin/ && chmod +x .hv/bin/hv-*
 }
 
 # F62 — preamble convention scan. Reads every test/sections/*.sh and fails

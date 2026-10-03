@@ -294,7 +294,7 @@ func TestDriftUmbrellaTargets(t *testing.T) {
 	}
 }
 
-// The expected values come from extract_symbols in bin/hv-todo-drift.
+// The expected values come from extract_symbols in the retired drift helper.
 func TestExtractSymbols(t *testing.T) {
 	for _, c := range []struct {
 		bullet, id string

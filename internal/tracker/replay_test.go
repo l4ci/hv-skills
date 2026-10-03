@@ -100,11 +100,11 @@ func replay(t *testing.T, path string) {
 			if !errors.As(err, &e) {
 				t.Fatalf("%s: want error %d %q, got %v (result %v)", step, s.Error.Code, s.Error.Message, err, got)
 			}
-			want := strings.TrimPrefix(s.Error.Message, "error: hv-tracker-call: ")
+			want := strings.TrimPrefix(s.Error.Message, "error: hv tracker call: ")
 			if e.Code != s.Error.Code || e.Message != want {
 				t.Fatalf("%s: error [%d] %q, want [%d] %q", step, e.Code, e.Message, s.Error.Code, want)
 			}
-			// What hvlib_backend sniffed with _NOT_FOUND_RE is a kind now. A
+			// What the Python backend sniffed with _NOT_FOUND_RE is a kind now. A
 			// label missing under autoCreateLabel off is also not found (the
 			// #106 contract), though Python's message doesn't say so.
 			notFound := pyNotFound.MatchString(s.Error.Message) || reMissingLabel.MatchString(s.Error.Message)
@@ -167,7 +167,7 @@ func dispatch(ctx context.Context, a Adapter, op string, args map[string]json.Ra
 		r, err := c.Run(ctx, list("args"), strings.NewReader(s("stdin")))
 		if err != nil {
 			e := err.(*Error)
-			return map[string]any{"stdout": "", "stderr": "error: hv-tracker-call: " + e.Message + "\n", "code": e.Code}, nil
+			return map[string]any{"stdout": "", "stderr": "error: hv tracker call: " + e.Message + "\n", "code": e.Code}, nil
 		}
 		return map[string]any{"stdout": string(r.Stdout), "stderr": string(r.Stderr), "code": r.ExitCode}, nil
 	case "closed_numbers":
@@ -244,7 +244,7 @@ func (b *base) cliOf() *CLI { return b.cli }
 // reMissingLabel is the ensure_labels refusal when autoCreateLabel is off.
 var reMissingLabel = regexp.MustCompile(`^label '.*' does not exist \(issues\.autoCreateLabel is off\)$`)
 
-// pyNotFound is hvlib_backend._NOT_FOUND_RE.
+// pyNotFound is the Python backend's _NOT_FOUND_RE.
 var pyNotFound = regexp.MustCompile(`(?i)not found|could not resolve|404`)
 
 // divergeArgv is the argv the Go port sends where it fixes the Python one:

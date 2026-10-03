@@ -26,7 +26,7 @@ mkdir -p "$TMP_WR/boot2"
   cd "$TMP_WR/boot2"
   git init -q -b main .
   "$HV_BIN" init >/dev/null 2>&1 || exit 1
-  grep -vxF '.worktrees/' .gitignore | grep -vxF '# Worker worktrees (hv-worker-pool, parallel rounds)' > .gitignore.new && mv .gitignore.new .gitignore
+  grep -vxF '.worktrees/' .gitignore | grep -vxF '# Worker worktrees (hv worker pool, parallel rounds)' > .gitignore.new && mv .gitignore.new .gitignore
   "$HV_BIN" init >/dev/null 2>&1 || exit 1
 ) || fail "hv init re-run failed"
 [ "$(grep -cxF '.worktrees/' "$TMP_WR/boot2/.gitignore")" = "1" ] || fail "an upgraded project must gain .worktrees/ once"
@@ -143,7 +143,7 @@ pass "a decoy SKILL.md/CLAUDE.md under .worktrees/ is invisible to validate-skil
 # validate-skills globs `hv-*/SKILL.md` (one level) and the helpers read fixed
 # .hv/ paths or one-level globs. A recursive walk of the project root would
 # find nested checkouts; fail on one. No exemptions.
-# white-box-begin: A9 #53 keep
+# white-box-begin: A9 #53 doclint
 WALK='rglob\(|os\.walk\(|os\.scandir\(|recursive ?= ?True|glob\([^)]*\*\*|find +(\.|\./|"\$PWD"|\$PWD|"\$\(pwd\)"|\$\(pwd\))( |$)'
 # The pattern must bite: each of these walks has to trip it.
 for SAMPLE in 'Path(".").rglob("SKILL.md")' 'os.walk(".")' 'os.scandir(root)' 'glob.glob("**/SKILL.md", recursive=True)' \
@@ -153,9 +153,9 @@ done
 for SAMPLE in 'find "$root/cmd" -newer "$bin"' 'sorted(Path(".").glob("hv-*/SKILL.md"))'; do
   if grep -qE "$WALK" <<<"$SAMPLE"; then fail "census pattern flags an anchored lookup: $SAMPLE"; fi
 done
-HITS="$(cd "$REPO" && grep -nE "$WALK" bin/* test/validate-skills.py 2>/dev/null || true)"
+HITS="$(cd "$REPO" && grep -nE "$WALK" test/validate-skills.py 2>/dev/null || true)"
 [ -z "$HITS" ] || fail "recursive tree walk found — it would pick up .worktrees/ checkouts; prune them or anchor the walk: $HITS"
-pass "no bin/ helper or validator walks the project tree recursively"
+pass "the validator does not walk the project tree recursively"
 # white-box-end
 
 trap 'rm -rf "$TMP"' EXIT

@@ -12,7 +12,7 @@
     "stderr": "",
     "rc": 0,
     "changed": {
-      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-qa-start --\u003e\n## Project QA\n\nQA strategies live in `.hv/QA.md` (detail in `.hv/qa/\u003ctarget\u003e.md`). Pull with `.hv/bin/hv-qa-query \u003ctarget\u003e`. `/hv-qa run` consumes these; the skill never hardcodes runners.\n\n- **bare** (?) — (no summary)\n- **web** (web) — browser\n\u003c!-- hv-qa-end --\u003e\n"
+      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-qa-start --\u003e\n## Project QA\n\nQA strategies live in `.hv/QA.md` (detail in `.hv/qa/\u003ctarget\u003e.md`). Pull with `hv qa query \u003ctarget\u003e`. `/hv-qa run` consumes these; the skill never hardcodes runners.\n\n- **bare** (?) — (no summary)\n- **web** (web) — browser\n\u003c!-- hv-qa-end --\u003e\n"
     },
     "removed": []
   }

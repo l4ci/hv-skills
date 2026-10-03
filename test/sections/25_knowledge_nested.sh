@@ -21,7 +21,7 @@ Durable learnings captured from sessions.
 EOF
 
 # Insert a new bullet under ## Architecture. The knowledge add parser
-# uses column-0 `## ` regex via hvlib.find_section — nested bullets (which
+# finds topics with a column-0 `## ` match — nested bullets (which
 # start with whitespace) MUST NOT be treated as topic boundaries.
 RC=0
 OUT=$(hvj -C "$TMP_NEST" knowledge add \

@@ -35,14 +35,14 @@ _(no active milestones — all shipped or archived; run `/hv-vision` to plan mor
 
 ## Working in this repo
 
-**Don't edit `.hv/` by hand — use the skill helpers.** Most of `.hv/` is tracked (knowledge, decisions, backlog, milestones, designs, plans, spikes, per-item detail, release checklist, config). These paths stay gitignored: `.hv/bin/` (regenerated mirror of canonical `bin/`, overwritten on every `/hv-init`); `.hv/status.json` and `.hv/repos.json` (per-developer runtime state); `.hv/config.local.json` (per-developer config overrides deep-merged on top of `.hv/config.json` by `load_config()`); `.hv/handoff/` (per-developer `/hv-pause` scratch); `.hv/qa-runs/` (bulky `/hv-qa` artifacts); and `.hv/**/*.lock` (transient sidecar lockfiles from `hvlib_io.locked`). Tracked `.hv/` content is skill-owned — capture via `/hv-capture`, learn via `/hv-learn`, decide via `/hv-decide`, etc. Real code/skill changes still go in canonical sources: skill folders (`hv-*/SKILL.md`), `bin/`, `docs/`, `test/`.
+**Don't edit `.hv/` by hand — use the skills and `hv` verbs.** Most of `.hv/` is tracked (knowledge, decisions, backlog, milestones, designs, plans, spikes, per-item detail, release checklist, config). These paths stay gitignored: `.hv/status.json` and `.hv/repos.json` (per-developer runtime state); `.hv/config.local.json` (per-developer config overrides deep-merged on top of `.hv/config.json`); `.hv/handoff/` (per-developer `/hv-pause` scratch); `.hv/qa-runs/` (bulky `/hv-qa` artifacts); and `.hv/**/*.lock` (transient sidecar lockfiles `hv` takes around read-modify-write). Tracked `.hv/` content is skill-owned — capture via `/hv-capture`, learn via `/hv-learn`, decide via `/hv-decide`, etc. Real code/skill changes still go in canonical sources: skill folders (`hv-*/SKILL.md`), `cmd/` and `internal/` (the `hv` binary), `docs/`, `test/`.
 
 **Run `bash test/smoke.sh` only at integration boundaries — not per task.** The full smoke suite is slow (sequential by design, state accumulates across sections). Per-task verification inside `/hv-work` and `/hv-debug` stays structural: `git status` / `git diff` / targeted greps / re-running the specific reproducer. Run the full smoke in `/hv-ship` and `/hv-review` (pre-merge / pre-PR), or when explicitly asked. If a single section is clearly relevant to the change in flight, sourcing just that section file in a sandbox is fine; defer the full run to ship time.
 
 <!-- hv-skills-start -->
 ## hv-skills
 
-This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/bin/` (regenerated mirror of canonical `bin/`, overwritten on every `/hv-init`), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored. Use the skill helpers to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
+This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored. Use the skills and `hv` verbs to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
 
 **Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
@@ -53,10 +53,10 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 
 Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
 
-- `.hv/bin/hv-knowledge-query <topic>…`
-- `.hv/bin/hv-decisions-query <topic>…`
-- `.hv/bin/hv-glossary-read <term>…` (terms live as nested-bullet entries under `## Glossary` in `.hv/KNOWLEDGE.md`)
-- `.hv/bin/hv-vision-active` (then `.hv/bin/hv-todo-by-milestone <id>` per active milestone)
+- `hv knowledge query <topic>…`
+- `hv decisions query <topic>…`
+- `hv glossary read <term>…` (terms live as nested-bullet entries under `## Glossary` in `.hv/KNOWLEDGE.md`)
+- `hv milestone active` (then `hv backlog ids --milestone <id>` per active milestone)
 <!-- hv-skills-end -->
 
 <!-- hv-decisions-start -->
@@ -71,7 +71,7 @@ Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work t
 <!-- hv-map-start -->
 ## Project Map
 
-Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/bin/hv-map-query <name>`.
+Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `hv map query <name>`.
 
 - _(no subsystems yet — write `.hv/map/<name>.md` as you discover subsystems)_
 <!-- hv-map-end -->
@@ -79,7 +79,7 @@ Subsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `.hv/
 <!-- hv-qa-start -->
 ## Project QA
 
-QA strategies live in `.hv/QA.md` (detail in `.hv/qa/<target>.md`). Pull with `.hv/bin/hv-qa-query <target>`. `/hv-qa run` consumes these; the skill never hardcodes runners.
+QA strategies live in `.hv/QA.md` (detail in `.hv/qa/<target>.md`). Pull with `hv qa query <target>`. `/hv-qa run` consumes these; the skill never hardcodes runners.
 
 - _(no QA strategy yet — run `/hv-qa first-run` to scaffold)_
 <!-- hv-qa-end -->

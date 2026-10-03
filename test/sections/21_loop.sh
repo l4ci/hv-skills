@@ -32,7 +32,7 @@ SURFACING_SITES=$(grep -l 'hv decisions auto-since' "$REPO"/hv-*/SKILL.md 2>/dev
   || fail "F32: hv decisions auto-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
 # white-box-end
 
-# (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
+# (d) hv status loop wired into /hv-next (start) and /hv-pause + /hv-work (clear).
 # white-box-begin: A9 #53 doclint
 grep -q 'hv status loop start' "$REPO/hv-next/SKILL.md" \
   || fail "F32: hv-next/SKILL.md must call hv status loop start"
@@ -179,7 +179,7 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$F32_TMP"
 pass "F32(h): decisions auto-since filter + lookup-empty"
 
-# --- hvlib: parse_frontmatter & iter_map_entries -------------------
+# --- map frontmatter & map entries -------------------
 mkdir -p .hv/map
 cat > .hv/map/capture.md <<'EOF'
 ---
@@ -284,7 +284,7 @@ if grep -q '"name":"work"' <<<"$out"; then echo "FAIL: work should NOT be stale"
 # days=0 lists all
 HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 0 | jget 'data.entries[1].name' >/dev/null \
   || { echo "FAIL: days=0 should list all"; exit 1; }
-# Nothing is stale when the window is huge (what hv-stale-summary reported as silence)
+# Nothing is stale when the window is huge (silence, not an empty report)
 out="$(HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 999999 | jget data.entries)"
 [ "$out" = "[]" ] || { echo "FAIL: backlog stale should be empty when nothing is stale (got: $out)"; exit 1; }
 # Knowledge: KNOWLEDGE.md exists from bootstrap-style fixture; should not error
@@ -311,9 +311,7 @@ grep -q "post-cycle map\|hv map index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: h
 echo "ok skill touchpoints (work/debug/go)"
 # white-box-end
 
-# --- status/next/resume reference hv-stale-summary ---------------
-# Note: hv-status and hv-resume were merged into hv-next (F26).
-# hv-next now uses bin/hv-stale-summary as a single wrapper (F48).
+# --- /hv-next reports staleness through hv backlog stale ---------------
 # white-box-begin: A9 #53 doclint
 grep -q "hv backlog stale" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
 grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }

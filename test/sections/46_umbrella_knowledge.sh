@@ -102,7 +102,7 @@ GLOSS_READ="$( cd "$TMP_UK/web" && hvj glossary read webterm | jget data.text )"
 grep -q "a web term" <<<"$GLOSS_READ" \
   || fail "F21[5]: glossary read must print the term definition"
 grep -q "> from: .hv/knowledge/web/KNOWLEDGE.md (## Glossary)" <<<"$GLOSS_READ" \
-  || fail "F21[5]: hv-glossary-read must include provenance line for web scope; got: $GLOSS_READ"
+  || fail "F21[5]: glossary read must include provenance line for web scope; got: $GLOSS_READ"
 pass "F21[5]: glossary write scoped to sub-repo; read shows provenance"
 
 # ── 6. Per-sub-repo CLAUDE.md block ─────────────────────────────────────────

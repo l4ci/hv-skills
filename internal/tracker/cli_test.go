@@ -289,7 +289,7 @@ func TestResolveProvider(t *testing.T) {
 }
 
 // TestProviderFromURL pins the classification table, which the retired
-// bin/hv-issues-provider agreed with on every row.
+// issues-provider helper agreed with on every row.
 func TestProviderFromURL(t *testing.T) {
 	cases := map[string]string{
 		"git@github.com:o/r.git":                 "github",

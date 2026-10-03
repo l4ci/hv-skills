@@ -199,7 +199,7 @@ func (b *Issues) MergePR(pr int, items []string) (MergeResult, error) {
 				return MergeResult{}, err
 			}
 			msg := "PR " + strconv.Itoa(pr) + " not merged: no proof recorded for " + id + ". " +
-				"Add proof with hv-proof-add, then run the review again."
+				"Add proof with hv proof add, then run the review again."
 			if _, err := b.AddComment(id, "feedback", msg); err != nil {
 				return MergeResult{}, err
 			}

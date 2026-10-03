@@ -5,7 +5,7 @@ import json
 p='.hv/counters.json'
 d=json.load(open(p)); d['milestones']=0; json.dump(d,open(p,'w'))
 "
-# Re-seed MILESTONES.md (earlier hv-managed-block knowledge test rewrote CLAUDE.md, but
+# Re-seed MILESTONES.md (earlier `hv block knowledge` test rewrote CLAUDE.md, but
 # MILESTONES.md is untouched).
 cat > .hv/MILESTONES.md <<'EOF'
 # Milestones
@@ -145,12 +145,12 @@ OUT=$(hvj -C "$BOOT_DIR" init) || fail "init failed: $OUT"
 [ -f "$BOOT_DIR/.hv/MILESTONES.md" ] || fail "init did not seed MILESTONES.md"
 [ -f "$BOOT_DIR/.hv/counters.json" ] || fail "init did not seed counters.json"
 [ -f "$BOOT_DIR/.hv/status.json" ] || fail "init did not seed status.json"
-# white-box-begin: A9 #53 keep
-# S7 (#53): re-add `[ ! -e "$BOOT_DIR/.hv/bin" ]` once the shim is gone; its bootstrap still creates .hv/bin.
+# The 4.x mirror directory, spelled in two pieces like section 74 does.
+MIRROR=".hv/""bin"
+[ ! -e "$BOOT_DIR/$MIRROR" ] || fail "init created the 4.x mirror dir"
 grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "init did not add .hv/ to .gitignore"
 grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init counters.json missing milestones key"
 pass "init seeds dirs, data files, and .gitignore"
-# white-box-end
 
 HEADING=$(head -1 "$BOOT_DIR/.hv/MILESTONES.md")
 [ "$HEADING" = "# Milestones" ] || fail "init seeded MILESTONES.md with wrong H1: '$HEADING' (want '# Milestones')"
@@ -173,28 +173,18 @@ rm -rf "$BOOT_DIR"
 
 echo "init check"
 # Ensure all core data files exist (smoke setup creates BACKLOG.md/counters.json/status.json;
-# KNOWLEDGE.md got written by hv-managed-block knowledge; config.json is needed by the check).
+# earlier sections seed KNOWLEDGE.md and DECISIONS.md, so a SECTION_LIST run seeds them here).
 [ -f .hv/config.json ] || echo '{}' > .hv/config.json
+[ -f .hv/KNOWLEDGE.md ] || printf '# Knowledge\n' > .hv/KNOWLEDGE.md
+[ -f .hv/DECISIONS.md ] || printf '# Decisions\n' > .hv/DECISIONS.md
 
-# 1. Helpers not yet installed in .hv/bin → exit 3 (partial install).
-rc=0
-# white-box-begin: A9 #53 keep
-"$BIN/hv-preflight" 2>/dev/null || rc=$?
-[ "$rc" = "3" ] || fail "expected exit 3 (partial install), got $rc"
-pass "preflight exits 3 when helpers missing from .hv/bin"
-# white-box-end
-
-# 2. Everything present → init check passes.
-# white-box-begin: A9 #53 keep
-mkdir -p .hv/bin
-install_helpers
+# 1. Everything present → init check passes.
 OUT=$(hvj init check) || fail "init check failed on fully initialized project: $OUT"
 [ "$(jget data.initialized <<<"$OUT")" = "true" ] || fail "init check should report initialized: $OUT"
 [ "$(jget data.missing <<<"$OUT")" = "[]" ] || fail "init check should report nothing missing: $OUT"
 pass "init check passes when fully initialized"
-# white-box-end
 
-# 3. Missing core data file → exit 1 (uninitialized), named in data.missing.
+# 2. Missing core data file → exit 1 (uninitialized), named in data.missing.
 mv .hv/BACKLOG.md .hv/BACKLOG.md.bak
 rc=0
 OUT=$(hvj init check 2>/dev/null) || rc=$?
@@ -204,15 +194,6 @@ MISSING=$(jget data.missing <<<"$OUT") || fail "init check data.missing absent: 
 grep -q '".hv/BACKLOG.md"' <<<"$MISSING" || fail "init check should name .hv/BACKLOG.md as missing: $OUT"
 pass "init check exits 1 when a data file is missing"
 mv .hv/BACKLOG.md.bak .hv/BACKLOG.md
-
-# 4. Missing helper → exit 3 (stale install after plugin upgrade).
-# white-box-begin: A9 #53 keep
-rm -f "$PWD/.hv/bin/hv-summary"
-rc=0
-"$BIN/hv-preflight" 2>/dev/null || rc=$?
-[ "$rc" = "3" ] || fail "expected exit 3 (missing helper), got $rc"
-pass "preflight exits 3 when a helper is missing"
-# white-box-end
 
 echo "plan add / list / show / rm"
 KEY1=$(hvj plan add --milestone M01 --slice --title "Auth foundation" | jget data.key) || fail "plan add --slice failed"

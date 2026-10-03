@@ -12,7 +12,7 @@
     "stderr": "",
     "rc": 0,
     "changed": {
-      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-map-start --\u003e\n## Project Map\n\nSubsystems live in `.hv/MAP.md` (detail in `.hv/map/\u003cname\u003e.md`). Pull with `.hv/bin/hv-map-query \u003cname\u003e`.\n\n- _(no subsystems yet — write `.hv/map/\u003cname\u003e.md` as you discover subsystems)_\n\u003c!-- hv-map-end --\u003e\n"
+      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-map-start --\u003e\n## Project Map\n\nSubsystems live in `.hv/MAP.md` (detail in `.hv/map/\u003cname\u003e.md`). Pull with `hv map query \u003cname\u003e`.\n\n- _(no subsystems yet — write `.hv/map/\u003cname\u003e.md` as you discover subsystems)_\n\u003c!-- hv-map-end --\u003e\n"
     },
     "removed": []
   }

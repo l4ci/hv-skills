@@ -20,7 +20,7 @@ var ignoreLines = []string{
 	".hv/**/*.lock",
 }
 
-const worktreesBlock = "\n# Worker worktrees (hv-worker-pool, parallel rounds)\n.worktrees/\n"
+const worktreesBlock = "\n# Worker worktrees (hv worker pool, parallel rounds)\n.worktrees/\n"
 
 var worktreesRe = regexp.MustCompile(`(?m)^/?\.worktrees/?$`)
 

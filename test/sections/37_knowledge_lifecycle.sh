@@ -48,25 +48,8 @@ RC=0; hvj knowledge tier set --topic "Architecture" --title "Foo rule" --tier ga
 [ "$RC" = "2" ] || fail "knowledge tier set should reject invalid tier with exit 2; got $RC"
 pass "knowledge tier set rejects invalid tier"
 
-# --- hv-knowledge-migrate idempotency ---
+# Start the hit checks from an empty sidecar: a first hit registers the bullet.
 rm -f .hv/knowledge-tier.json
-# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
-# white-box-begin: A9 #53 keep
-OUT=$("$BIN/hv-knowledge-migrate")
-grep -q "migrated 3 entries" <<<"$OUT" || fail "first migration didn't claim 3 entries: $OUT"
-pass "hv-knowledge-migrate stamps all titled bullets on first run"
-# white-box-end
-
-# S7 deletes: no Go port of hv-knowledge-migrate; goes with bin/
-# white-box-begin: A9 #53 keep
-OUT2=$("$BIN/hv-knowledge-migrate")
-grep -qi "nothing to migrate" <<<"$OUT2" || fail "second migration not idempotent: $OUT2"
-pass "hv-knowledge-migrate is idempotent on re-run"
-# white-box-end
-
-COUNT=$(hvj knowledge tier list | jget data.entries | python3 -c 'import json,sys;print(len(json.load(sys.stdin)))')
-[ "$COUNT" = "3" ] || fail "expected 3 sidecar entries after migrate, got $COUNT"
-pass "migrate populates sidecar with 3 entries"
 
 # --- knowledge hit + auto-promote ---
 echo '{"learn":{"verify":true,"promoteThreshold":3}}' > .hv/config.json

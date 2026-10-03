@@ -220,7 +220,7 @@ func (c *CLI) Run(ctx context.Context, args []string, stdin io.Reader) (Result, 
 	if limit > 0 {
 		var rows []json.RawMessage
 		if json.Unmarshal(r.Stdout, &rows) == nil && len(rows) == limit {
-			r.Stderr = append(r.Stderr, []byte("warning: hv-tracker-call: result hit the list limit ("+strconv.Itoa(limit)+"); results may be truncated\n")...)
+			r.Stderr = append(r.Stderr, []byte("warning: hv tracker call: result hit the list limit ("+strconv.Itoa(limit)+"); results may be truncated\n")...)
 		}
 	}
 	return r, nil

@@ -47,7 +47,7 @@ worker gate and the orchestrator's merge gate are the same commands.
 - A new verb needs a contract entry in `docs/design/5.0-verb-contract.md` and a smoke section.
 - Config keys are documented in five places at once: `docs/reference/config-options.md`,
   `docs/usage/configuration.md`, `hv-config/SKILL.md`, `hv-init/SKILL.md`,
-  `bin/hv-config-schema-check`. Touch only the lines about your key; a sibling may be adding
+  `internal/config/schema.go`. Touch only the lines about your key; a sibling may be adding
   another key in the same files.
 - Stage explicit paths. Commit messages: imperative subject under 72 chars, body says why,
   no `Co-Authored-By` trailer.

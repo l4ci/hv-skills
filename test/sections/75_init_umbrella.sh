@@ -1,8 +1,5 @@
 echo "init umbrella (--list, register, idempotence) and version --drift"
 
-# The shim's init has no umbrella mode (and no --list), so this needs Go.
-require_go_verb init umbrella || return 0
-
 # the scan: immediate children with a .git entry, hidden and plain dirs ignored
 TMP_U="$(mktemp -d)"
 trap 'rm -rf "$TMP_U"' EXIT

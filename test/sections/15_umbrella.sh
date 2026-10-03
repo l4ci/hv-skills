@@ -283,7 +283,7 @@ pass "M03-T6: hv-work/SKILL.md Preview Mode peek renders one line per repo"
 # white-box-end
 
 # M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
-# white-box-begin: A9 #53 keep
+# white-box-begin: A9 #53 doclint
 grep -q "hv git branch" "$REPO/hv-work/SKILL.md" \
   || fail "hv-work/SKILL.md must reference hv git branch for multi-repo branch creation"
 grep -q "hv status add .*--repos" "$REPO/hv-work/SKILL.md" \

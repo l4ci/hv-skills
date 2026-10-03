@@ -1,4 +1,4 @@
-echo "## git base + hv-worktree-clear + block (refactor)"
+echo "## git base + git worktree-clear + block (refactor)"
 
 # 1. git base
 BB_TMP="$(mktemp -d)"

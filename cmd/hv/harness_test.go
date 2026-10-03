@@ -108,7 +108,7 @@ type info struct {
 
 // fx describes a fixture project; the zero value is the standard one.
 type fx struct {
-	archive   string            // "" none, "plain" (no headings, as hv-archive-old writes it), "sectioned"
+	archive   string            // "" none, "plain" (no headings, as the 4.x archiver wrote it), "sectioned"
 	noBacklog bool              // no .hv/BACKLOG.md
 	noCommit  bool              // git repo without a commit
 	noHV      bool              // no .hv/ at all

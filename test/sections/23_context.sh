@@ -65,12 +65,8 @@ grep -q "^- \*\*backlog\*\* — " "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "missing b
 grep -q "^  - \*\*Aliases:\*\* task list, todo list$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "aliases line wrong"
 grep -q "^  <!-- $(date +%Y-%m-%d) -->$" "$TMP_ADD/.hv/KNOWLEDGE.md" || fail "date stamp missing"
 grep -q "no terms yet" "$TMP_ADD/.hv/KNOWLEDGE.md" && fail "placeholder should be stripped after first term added"
-# The knowledge block lands in AGENTS.md. The temporary shim still writes it
-# to CLAUDE.md, so that file is accepted too; drop CLAUDE.md with the shim (S7).
-KB_FILES=("$TMP_ADD/AGENTS.md")
-[ -f "$TMP_ADD/CLAUDE.md" ] && KB_FILES+=("$TMP_ADD/CLAUDE.md")
-grep -q "<!-- hv-knowledge-start -->" "${KB_FILES[@]}" || fail "knowledge block missing"
-grep -q "^- Glossary$" "${KB_FILES[@]}" || fail "Glossary topic not surfaced in AGENTS.md"
+grep -q "<!-- hv-knowledge-start -->" "$TMP_ADD/AGENTS.md" || fail "knowledge block missing"
+grep -q "^- Glossary$" "$TMP_ADD/AGENTS.md" || fail "Glossary topic not surfaced in AGENTS.md"
 pass "glossary write — new term inserts + indexes"
 
 echo "glossary write — no aliases writes _none_"
