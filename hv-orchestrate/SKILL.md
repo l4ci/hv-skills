@@ -38,7 +38,7 @@ One orchestrator per repo. If `start` exits 4 on the lease, someone else holds i
 - **How many.** Fewer than the roster is fine. Two issues touching one subsystem serialize better than they merge. Start with what you can review, not what the roster can hold.
 - **Overlap.** The `overlap` check compares files. It cannot see two issues that change the same behavior through different files. Read both bodies when they share a milestone or a verb. Pass `--accept-overlap` only after you have decided the order of the merges, and say which goes first in the second worker's brief.
 - **Premise.** An issue planned weeks ago may be wrong now. If the repo has moved, ask before assigning. Workers are told to dispute a ticket, but a bounced assignment costs a slot and a round trip.
-- **Tier.** *(pending C9, #75)* Pick the model tier per issue: `light` for reading and search, `standard` for code and tests, `heavy` for design and hard debugging. Default to `standard`. Spend `heavy` on the issue where a wrong call costs a round.
+- **Tier.** Pick the worker's tier per issue with `hv round assign --tier`: `light` for reading and search, `standard` for code and tests, `heavy` for design and hard debugging. Config sets the default and maps tiers to models; hv never chooses from the issue, you do. Stay at the default unless the issue needs more. A tier above the default needs `--tier-reason`, one line the PR body repeats, so spend `heavy` where a wrong call costs a round. The worker sizes its own subagents by the same tiers and writes `Worker tier: <tier> (<model>)` in its PR body; check it when you review.
 - **Answered decisions.** If the maintainer has settled something that touches the issue, pass it verbatim in `--body-file`. A worker cannot read your conversation.
 
 Assign with `hv round assign <ID>`. The verb marks the item in progress, cuts the branch and starts the worker. Don't do those steps by hand.
@@ -63,7 +63,15 @@ Between waits, use free slots: re-read `hv round candidates` and assign the next
 
 ## 4. Reading failures
 
-**Dead vs stalled.** A `dead` slot has no live agent: the tab is gone or the process exited. *(pending C10, #76, PR #193)* Its issue can go back to the pool: `hv round return` is the worker's own verb, `hv round transfer` hands it to another slot or the human and continues the pushed branch, and `hv round reclaim` frees a dead or stalled slot. An `assign` after a return starts fresh. A `stalled` slot has a live agent with no commits and no status change, usually a long test run, not a failure. Reclaiming it is your call after reading its pane; a healthy slot needs `--force`. `hv reap` reclaims `dead` slots only and never touches a live agent.
+**Dead vs stalled.** A `dead` slot has no live agent: the tab is gone or the process exited. A `stalled` slot has a live agent and nothing has moved for `round.stallMinutes` (no commit, no edit, no state change). Stalled is usually a long test run, not a failure, and a worker waiting on your escalation is never stalled. Read the pane before acting on either.
+
+To move an assigned issue, the C10 verbs (contract signed off, PR #193 unmerged):
+
+- **`hv round return`** is the worker's own verb for giving an issue back (blocked, wrong premise). You don't use it. The branch is pushed and kept, the claim is released, and the issue is a candidate again. A fresh `assign` starts clean: it does not continue the pushed branch.
+- **`hv round transfer <issue> --to <slot>`** continues the pushed branch in another slot, with the handoff comment named in the brief. Use it when the work is good and the worker is the problem (dead, wrong account, out of quota). `--to human` labels the issue `needs-human` and dispatches nothing: use it when the next step is a person's call.
+- **`hv round reclaim <slot>`** frees a `dead` or `stalled` slot and does not reassign; `assign` or `transfer` is your next call. Reclaiming a stalled slot kills its pane, so do it only after you have read the pane and decided it is hung. A healthy slot needs `--force`, which you almost never want.
+
+All three push the branch before moving the slot off it, so no work is lost. `hv reap` never reclaims a stalled slot and never kills a live agent.
 
 **`unknown`.** The host reports a state `hv` can't classify. Never treat it as finished. Policy: wait through one more `wait`; if the slot is still `unknown`, read its pane; if the pane shows a prompt or a stopped agent, run `herdr agent explain` on it, then treat the slot as `dead` or `blocked` accordingly. A round must not stall on a state nobody read.
 

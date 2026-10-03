@@ -170,7 +170,7 @@ in `<!-- hv:handoff <slot>@<round> -->`.
 - **reclaim** works on a slot that is `dead` or `stalled` (no commit, edit or state change for
   `round.stallMinutes`, default 30, `0` is off). A healthy slot needs `--force`; a live pane is
   killed first, and with no host to ask it is refused as `live agent`. It does not reassign.
-  `hv reap` reclaims `dead` slots only, never `stalled` ones: a worker in a long test run
+  `hv reap` may reclaim `dead` slots only, never `stalled` ones: a worker in a long test run
   makes no commits and looks stalled, and an unattended `reap --apply` would kill it.
 - `hv round reconcile` reports `stalled` (never repaired) and `claim-mismatch` (`--apply`
   clears a registry `claimId` whose claim is gone; the tracker is never edited).
