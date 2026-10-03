@@ -209,22 +209,7 @@ func registerSlot(root, name, branch, worktree, base, session, handle string) er
 			hv = handle
 		}
 		if existing := reg.Slot(name); existing == nil {
-			s := jsonx.NewObject()
-			s.Set("name", name)
-			s.Set("branch", branch)
-			s.Set("worktree", worktree)
-			s.Set("base", base)
-			s.Set("handle", hv)
-			// Slots are seeded as already-reported idle so a parked slot never
-			// fires a spurious "it finished" on the first poll. Only a slot that
-			// has gone BUSY re-arms that report.
-			s.Set("state", "idle")
-			s.Set("task", nil)
-			s.Set("pr", nil)
-			// Orchestrator relays sent to this slot, for the gate's
-			// approval-provenance check; dispatch --relay appends.
-			s.Set("relays", []any{})
-			s.Set("configDir", nil)
+			s := NewSlot(name, branch, worktree, base, hv)
 			list, _ := doc.Get("slots")
 			l, _ := list.([]any)
 			doc.Set("slots", append(l, s))
@@ -321,4 +306,24 @@ func (e Env) Reap(root string, names []string, all bool) (reaped []string, err e
 		doc.Set("slots", keep)
 	})
 	return reaped, err
+}
+
+// NewSlot is a fresh registry entry. Slots are seeded as already-reported idle
+// so a parked slot never fires a spurious "it finished" on the first poll.
+// Only a slot that has gone BUSY re-arms that report.
+func NewSlot(name, branch, worktree, base string, handle any) *jsonx.Object {
+	s := jsonx.NewObject()
+	s.Set("name", name)
+	s.Set("branch", branch)
+	s.Set("worktree", worktree)
+	s.Set("base", base)
+	s.Set("handle", handle)
+	s.Set("state", "idle")
+	s.Set("task", nil)
+	s.Set("pr", nil)
+	// Orchestrator relays sent to this slot, for the gate's
+	// approval-provenance check; dispatch --relay appends.
+	s.Set("relays", []any{})
+	s.Set("configDir", nil)
+	return s
 }
