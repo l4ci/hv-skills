@@ -131,6 +131,8 @@ var contractVerbs = []string{
 	"review queue",
 	"review scaffolding",
 	"review scope",
+	"round reconcile",
+	"round status",
 	"round wait",
 	"ship body",
 	"ship merge",
