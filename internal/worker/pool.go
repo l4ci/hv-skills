@@ -23,6 +23,21 @@ type InitOpts struct {
 	Slots   int
 	Base    string // "" means the current branch
 	Session string // "" means "hv"
+	// Names provisions these slots instead of w1..wSlots, each on the branch
+	// BranchPrefix+name (a round roster parks on "park/<agent>", #79).
+	Names        []string
+	BranchPrefix string
+}
+
+// slotNames are the slots PoolInit provisions and the branch each starts on.
+func (o InitOpts) slotNames() (names []string, branchOf func(string) string) {
+	if len(o.Names) > 0 {
+		return o.Names, func(n string) string { return o.BranchPrefix + n }
+	}
+	for i := 1; i <= o.Slots; i++ {
+		names = append(names, fmt.Sprintf("w%d", i))
+	}
+	return names, func(n string) string { return "hv-worker/" + n }
 }
 
 // InitResult is what `pool init` did.
@@ -73,9 +88,9 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 	dispatchV, _ := config.Lookup(cfg, "work.dispatch")
 	dispatch, _ := dispatchV.(string)
 
-	for i := 1; i <= o.Slots; i++ {
-		name := fmt.Sprintf("w%d", i)
-		branch := "hv-worker/" + name
+	names, branchOf := o.slotNames()
+	for _, name := range names {
+		branch := branchOf(name)
 		rel := filepath.Join(root, WorktreeRoot, name)
 
 		// A slot registered at another path (the pre-.worktrees root) keeps it
@@ -130,7 +145,9 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 			branch = Str(s, "branch")
 		}
 		handle := session + ":" + name
-		if dispatch == "herdr" {
+		// A round slot has no session until its first dispatch, whatever the
+		// host: a nominal handle would read as a dead tab to reconcile.
+		if dispatch == "herdr" || len(o.Names) > 0 {
 			handle = ""
 		}
 		if err := registerSlot(root, name, branch, abs, base, session, handle); err != nil {
@@ -144,8 +161,7 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 	// default inherits the ambient CLAUDE_CONFIG_DIR.
 	if acc != nil && len(Configured(root)) > 0 {
 		var used []string
-		for i := 1; i <= o.Slots; i++ {
-			name := fmt.Sprintf("w%d", i)
+		for _, name := range names {
 			// Exclude accounts already handed out this pass so slots spread
 			// rather than all landing on the single healthiest account. When
 			// accounts run out, the exclusion list resets and they share.

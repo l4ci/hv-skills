@@ -23,6 +23,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/escalation"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -37,6 +38,7 @@ const (
 	PRStale              = "pr-stale"
 	LabelMissing         = "label-missing"
 	LabelOrphan          = "label-orphan"
+	// LeaseStale is declared in lease.go.
 )
 
 // Source names, as `unavailable` lists them.
@@ -72,6 +74,9 @@ type Env struct {
 	HostErr, ForgeErr string
 	// Now dates timed-out escalations; nil means time.Now.
 	Now func() time.Time
+	// Lease reads the orchestrator lease; the zero value is the real process
+	// table and host name.
+	Lease roundlease.Env
 }
 
 // Row is one line of `hv round status`.
@@ -297,6 +302,8 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 			rep.add(Finding{Kind: LabelOrphan, Issue: strconv.Itoa(n), Detail: fmt.Sprintf("#%d has %s and no slot holds it", n, e.Label)})
 		}
 	}
+
+	e.leaseFinding(ctx, root, rep)
 
 	for _, r := range rows {
 		rep.Rows = append(rep.Rows, *r)
