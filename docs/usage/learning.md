@@ -57,7 +57,7 @@ unaffected. Full model: [`references/persistence-umbrella-scoping.md`](../../ref
 
 ### Hit tracking
 
-Every time [`/hv-work`](running-work.md) or `/hv-review` consults a bullet and the consuming step actually uses it (not just reads past it), the bullet's hit counter increments via `bin/hv-knowledge-hit`. Hits accumulate across sessions; the counter is durable.
+Every time [`/hv-work`](running-work.md) or `/hv-review` consults a bullet and the consuming step actually uses it (not just reads past it), the bullet's hit counter increments via `hv knowledge hit`. Hits accumulate across sessions; the counter is durable.
 
 At the `learn.promoteThreshold` mark, a `provisional` bullet auto-promotes to `confirmed`. Two skip conditions: the bullet already has a pending contradiction (auto-promotion stays blocked until you resolve it), or the threshold is `0` (in which case `provisional` is bypassed entirely on insert: a config choice, not a normal mode).
 

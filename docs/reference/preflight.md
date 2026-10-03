@@ -1,45 +1,22 @@
-# Preflight reference
+# Project check reference
 
-Every skill calls `.hv/bin/hv-preflight` first. Its exit codes and how skills should react are below.
+Skills no longer run a preflight step. Every `hv` verb that needs `.hv/` exits `3` when it cannot find one, so a skill that touches a project learns about a missing init from the verb itself. `hv init check` is the explicit check, for the few places that want one up front and for scripts.
 
-## Exit codes
-
-| Code | Meaning | User state | Skill should |
-|------|---------|------------|--------------|
-| `0`  | Clean: `.hv/` exists, all required data files and helpers are present. | Fully initialized. | Proceed silently. |
-| `2`  | Uninitialized: `.hv/` is missing, or one of the required data files (see below) is absent. | Project has not opted into hv-skills yet. | Tell the user they need to run `/hv-init` first, then **stop**. Do not auto-init; installation requires user consent. |
-| `3`  | Stale install: `.hv/` exists, but one or more helper binaries under `.hv/bin/` are missing (e.g. plugin upgraded, helpers haven't been re-copied). | Project is initialized but its helpers are outdated. | Invoke `hv-init` via the `Skill` tool to refresh, then continue from where preflight ran. |
-
-## Standard handling
-
-Every default skill follows this pattern:
+## `hv init check`
 
 ```bash
-.hv/bin/hv-preflight
+hv init check
+hv init check --json
 ```
 
-- exit `0` → continue silently
-- exit `2` → surface the missing-init message and stop (the user has not opted in)
-- exit `3` → invoke `hv-init` via the `Skill` tool, then resume the calling skill
+| Exit | Meaning | What to do |
+|------|---------|------------|
+| `0` | `.hv/` and its core files are present. | Proceed. |
+| `1` | Not initialized: `.hv/` or one of the core files is missing. `--json` lists every missing path in `data.missing`. | Tell the user to run `/hv-init`, then **stop**. Never auto-init: initialization needs the user's consent. |
 
-## Variants
+`hv init check` acts on the working directory (after `-C`) with no walk-up, so it also runs where there is no `.hv/` yet.
 
-Three skills have skill-specific exit-2 behavior. Their preflight step omits exit-code prose because the variant is captured here.
-
-| Skill | On exit `2` | On exit `3` |
-|-------|------------|------------|
-| `/hv-next` | Surface *"Nothing tracked yet. Run `/hv-init` then `/hv-capture`."* and stop. | Refresh via `hv-init` (helpers may be needed for the read). |
-| `/hv-pause` | Surface *"Nothing to pause. `/hv-init` the project first."* and stop. | Refresh via `hv-init`. |
-| `/hv-config` | Invoke `hv-init` via the `Skill` tool, then stop. Init writes the initial config interactively, so this skill has nothing to do afterward. | Refresh via `hv-init` and continue. |
-
-Two more skills are structural variants:
-
-- **`/hv-update`** checks `gh` is on `PATH` *before* preflight. The GitHub-release check is the primary purpose, so a missing `gh` fails fast before touching `.hv/`.
-- **`/hv-init`** is the bootstrapper itself; it doesn't run preflight.
-
-## What hv-preflight checks
-
-Required data files under `.hv/`:
+Core files it checks under `.hv/`:
 
 - `DECISIONS.md`
 - `BACKLOG.md`
@@ -49,8 +26,18 @@ Required data files under `.hv/`:
 - `config.json`
 - `status.json`
 
-Required helpers under `.hv/bin/`: every `hv-*` script alongside `hv-preflight` in the source `bin/` (auto-discovered, minus `hv-preflight` itself), plus `hvlib.py`.
+Advisory findings come back as `warnings`, never as a failure: an umbrella flag that disagrees with the registry, and version drift between the project's stamped `hvSkills.version` and the installed binary (`hv version --drift` reports the same thing on its own).
 
-Source of truth: [`bin/hv-preflight`](../../bin/hv-preflight).
+## Missing `.hv/` from any other verb
 
-Skill authors: check the Variants table above before writing inline exit-2 prose in a SKILL.md. If the skill is a variant, the cite is enough.
+Exit `3` (`resolution`), with a message naming the missing root. Skills surface it the same way as above: point the user at `/hv-init` and stop.
+
+| Skill | When `.hv/` is missing |
+|-------|------------------------|
+| `/hv-next` | Surface *"Nothing tracked yet. Run `/hv-init` then `/hv-capture`."* and stop. |
+| `/hv-pause` | Surface *"Nothing to pause. `/hv-init` the project first."* and stop. |
+| `/hv-config` | Hand off to `/hv-init`, which writes the initial config interactively. |
+| `/hv-update` | Not affected: it checks `gh` on `PATH`, then calls `hv update`, which runs without a project. |
+| `/hv-init` | Is the bootstrapper itself; it runs `hv init`. |
+
+All exit codes: [`hv` verb reference](cli-helpers.md#conventions).

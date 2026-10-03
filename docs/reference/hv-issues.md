@@ -44,27 +44,27 @@ soft-warns when a remote is detected but its CLI is missing.
 |-----|---------|---------|
 | `issues.label` | `"in-progress"` | Label applied upstream when an issue is captured |
 | `issues.autoCreateLabel` | `true` | Auto-create the label upstream if it doesn't exist |
-| `issues.filterMineOnly` | `false` | Restrict the picker to issues assigned to me (`hv-issues-list --mine` → `--assignee @me`) |
+| `issues.filterMineOnly` | `false` | Restrict the picker to issues assigned to me (`hv issues list --mine` → `--assignee @me`) |
 | `issues.providers.github` | `true` | Enable `--from-github` |
 | `issues.providers.gitlab` | `true` | Enable `--from-gitlab` |
 
 Edit via `/hv-config` or directly:
 
 ```bash
-.hv/bin/hv-config-set issues.label accepted
-.hv/bin/hv-config-set issues.filterMineOnly true
+hv config set issues.label accepted
+hv config set issues.filterMineOnly true
 ```
 
 ## Flow
 
-1. **Preflight**: `.hv/bin/hv-preflight` (see `docs/reference/preflight.md`).
+1. **Project check**: a verb exits 3 when `.hv/` is missing (see `docs/reference/preflight.md`).
 2. **Mode dispatch**: `/hv-capture` Step 1.5 routes `--from-github` /
    `--from-gitlab` to Import Mode (Steps I1+).
 3. **Resolve target repo set (I1)**: single-repo or umbrella multiSelect.
    Repos whose provider doesn't match the dispatching flag are silently
    dropped. Loop mode auto-picks all matching repos.
-4. **Discover candidates (I2)**: parallel `hv-issues-provider` +
-   `hv-issues-list` + `hv-issues-imported` per repo.
+4. **Discover candidates (I2)**: parallel `hv issues provider` +
+   `hv issues list` + `hv issues imported` per repo.
 5. **Subtract already-imported (I3)**: dedupes by
    `(provider, repo, issue_number)`. Prints `"N candidates, K already imported
    — showing M"` per repo.
@@ -92,10 +92,10 @@ Silence is not consent: the default when a plain-text fallback is used is
 
 Captured items carry `GH: #N` / `GL: #N` in their BACKLOG.md body. On ship:
 
-- **PR path:** `hv-ship-body` emits `Closes #N` lines into the PR/MR
+- **PR path:** `hv ship body` emits `Closes #N` lines into the PR/MR
   description; the host auto-closes the issues on merge. No extra action needed.
 - **Direct-push path:** `/hv-ship` Step 6c presents a manual-gated prompt
-  listing candidate issues and routes through `hv-issues-close`, which posts a
+  listing candidate issues and routes through `hv issues close`, which posts a
   tracking comment naming the merge commit and then closes the issue.
 
 ## Cleanup on remove
@@ -143,5 +143,5 @@ upstream issue isn't left permanently marked as claimed.
 - `/hv-ship`: emits `Closes #N` in PR bodies and handles direct-push closing.
 - `/hv-capture --remove`: optionally removes the upstream label when an
   imported item is deleted without shipping (Step R3 manual gate).
-- `bin/hv-issues-*`: helpers underlying this flow (`hv-issues-provider`,
-  `hv-issues-list`, `hv-issues-imported`, `hv-issues-label`, `hv-issues-close`).
+- `hv issues *`: the verbs underlying this flow (`hv issues provider`,
+  `hv issues list`, `hv issues imported`, `hv issues label`, `hv issues close`).

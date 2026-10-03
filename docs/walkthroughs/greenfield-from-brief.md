@@ -50,10 +50,9 @@ The command writes:
 
 - `.hv/BACKLOG.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `CONTEXT.md`
 - `.hv/counters.json`, `config.json`, `status.json`
-- `.hv/bin/` (every CLI helper)
 - Managed blocks in `CLAUDE.md` so the orchestrator picks up project knowledge, decisions, context, and the active milestone
 
-Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/bin/` (regenerated mirror), `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored.
+Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored.
 
 ## Step 2: /hv-vision
 
@@ -120,7 +119,7 @@ This creates a `spike/sqlite-schema` branch (which never merges into `main`) and
 **Decision.** Ship single-currency in M01. Add `currency` column in M03 or later, no need to engineer it in advance.
 ```
 
-Then run `.hv/bin/hv-spike-finish sqlite-schema` to stamp it done. The branch stays in git as reference; only the findings come back to `main`.
+Then run `hv spike finish sqlite-schema` to stamp it done. The branch stays in git as reference; only the findings come back to `main`.
 
 For a brand-new project you might do zero spikes. Use them when the answer materially changes the design.
 
@@ -220,7 +219,7 @@ You confirm. The orchestrator reads `.hv/plans/M01-S01.md`, picks the F01 task, 
 [worker]  ↳ commit: feat(cli): scaffold tally root command [F01]
 ```
 
-`hv-complete` marks F01 done in `BACKLOG.md`. `/hv-work` merges the branch into `main` with `--no-ff` (direct merge), deletes the branch, and prompts for the next item.
+`hv item complete` marks F01 done in `BACKLOG.md`. `/hv-work` merges the branch into `main` with `--no-ff` (direct merge), deletes the branch, and prompts for the next item.
 
 You repeat for F02 and F03. F03 introduces something subtle. The transactions schema stores amounts as int64 minor units, but the worker writes a helper that converts `decimal.Decimal` to int64 by multiplying by 100 and casting. Looks right. Isn't.
 
@@ -283,7 +282,7 @@ The verifier judges every bullet for durability before it lands. It rejects "fix
 - **Never multiply a `decimal.Decimal` by a float to convert to minor units.** `Float64() * 100` produces `9.999…` for inputs like `0.10`; truncation gives `9`. Use `decimal.NewFromString(...).Shift(2).IntPart()` end-to-end. The float path is silently wrong, not noisy.
 ```
 
-The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time `/hv-work` touches money handling, the orchestrator pulls this section via `hv-knowledge-query "Money & Decimals"` before planning, so the same trap doesn't bite a worker again.
+The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time `/hv-work` touches money handling, the orchestrator pulls this section via `hv knowledge query "Money & Decimals"` before planning, so the same trap doesn't bite a worker again.
 
 ## Step 10: repeat, then close M01
 
@@ -293,7 +292,7 @@ After the importer ships, `/hv-next` says:
 
 ```
 M01 has no open items.
-Run `.hv/bin/hv-vision-status M01 shipped` to close the milestone?
+Run `hv milestone status M01 shipped` to close the milestone?
 ```
 
 You run it. M02 and M03 (which both depend on M01) flip from blocked to ready in `MILESTONES.md`. The next `/hv-vision` invocation enters edit mode and refines M02's plan with what you learned in M01. The float gotcha now informs the dashboard's number rendering, and the XDG-paths-Linux-only assumption gets revisited for cross-platform packaging.

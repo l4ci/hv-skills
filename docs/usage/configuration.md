@@ -89,7 +89,7 @@ Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs
 `tmux` mode requires a `tmux` binary and a working `claude` on `PATH`; `herdr` mode requires running `/hv-work` from a herdr pane. Neither turns on by itself — set it explicitly:
 
 ```bash
-.hv/bin/hv-config-set work.dispatch tmux
+hv config set work.dispatch tmux
 ```
 
 Two things behave differently under `tmux` and `herdr`:
@@ -99,7 +99,7 @@ Two things behave differently under `tmux` and `herdr`:
 
 Related keys: `work.workerSlots` (pool size, default `3`), `work.workerCommand` (default builds `claude --model <models.worker> --dangerously-skip-permissions`), `work.operatorCommand` (default builds `claude --continue --model <models.orchestrator> --permission-mode auto`), and `work.accounts`.
 
-**Workers run with permissions skipped; the operator does not.** A worker is briefed to commit, open a PR and run tests with nobody in its pane to answer a prompt, so a narrower mode just stalls it. What bounds a worker is scope rather than gating — a throwaway branch in its own worktree, with `hv-worker-gate` re-verifying the merged tree before anything reaches the cycle branch. The operator keeps `auto` because it performs the merges and it is the window a human is actually watching. Narrow either via its config key; a worker that then stops on a prompt reports `NEEDS-PERMISSION` rather than hanging.
+**Workers run with permissions skipped; the operator does not.** A worker is briefed to commit, open a PR and run tests with nobody in its pane to answer a prompt, so a narrower mode just stalls it. What bounds a worker is scope rather than gating — a throwaway branch in its own worktree, with `hv worker gate` re-verifying the merged tree before anything reaches the cycle branch. The operator keeps `auto` because it performs the merges and it is the window a human is actually watching. Narrow either via its config key; a worker that then stops on a prompt reports `NEEDS-PERMISSION` rather than hanging.
 
 ## refactor.confirmBeforeExecute
 
@@ -124,10 +124,10 @@ Example for a Python project using ruff + pytest:
 }
 ```
 
-Commands run from the repo root (or, in umbrella mode, the sub-repo's root). Set via `hv-config-set` (which parses argv[2] as JSON):
+Commands run from the repo root (or, in umbrella mode, the sub-repo's root). Set via `hv config set` (which parses argv[2] as JSON):
 
 ```bash
-.hv/bin/hv-config-set refactor.verifyCommands '["uv run ruff check .","uv run ruff format --check ."]'
+hv config set refactor.verifyCommands '["uv run ruff check .","uv run ruff format --check ."]'
 ```
 
 ## learn.verify
@@ -145,16 +145,16 @@ See [learning](learning.md) for the full `/hv-learn` workflow.
 
 ## learn.promoteThreshold
 
-Controls the F03 knowledge promotion lifecycle: how many `hv-knowledge-hit` events a `provisional` bullet must accumulate before auto-promotion to `confirmed`. Integer ≥ 0; default `3`.
+Controls the F03 knowledge promotion lifecycle: how many `hv knowledge hit` events a `provisional` bullet must accumulate before auto-promotion to `confirmed`. Integer ≥ 0; default `3`.
 
-A "hit" registers when `/hv-work` or `/hv-review` consumes the bullet during a cycle's K+D consult (the bullet shows up in a worker brief's `Known gotchas:` section) AND the user doesn't push back with a correction that overlaps the bullet's body. The threshold is the cycle count after which the project decides the bullet has earned `confirmed` status. At that point `hv-knowledge-query` drops the `(provisional)` suffix and the bullet flows into consumers indistinguishable from established knowledge.
+A "hit" registers when `/hv-work` or `/hv-review` consumes the bullet during a cycle's K+D consult (the bullet shows up in a worker brief's `Known gotchas:` section) AND the user doesn't push back with a correction that overlaps the bullet's body. The threshold is the cycle count after which the project decides the bullet has earned `confirmed` status. At that point `hv knowledge query` drops the `(provisional)` suffix and the bullet flows into consumers indistinguishable from established knowledge.
 
 | Value | Behavior |
 |-------|----------|
 | `3` (default) | Auto-promote at the third clean hit. Catches durable bullets after a small handful of validated consults. |
 | `≥4` | Stricter. Bullets earn `confirmed` only after more validation. Use when you've seen weak bullets sneak through to `confirmed` too quickly. |
 | `1` or `2` | Looser. Almost every new bullet auto-promotes on first or second consult. Use when manual `/hv-learn --promote` flow feels heavy. |
-| `0` | Auto-promote on `hv-knowledge-merge` itself, effectively disabling the `provisional` tier. Defeats the lifecycle's purpose; included for completeness only. |
+| `0` | Auto-promote on `hv knowledge add` itself, effectively disabling the `provisional` tier. Defeats the lifecycle's purpose; included for completeness only. |
 
 Pending contradictions block auto-promotion regardless of hit count. The user must resolve them via `/hv-learn` Step 9 (Demote / Keep / Defer) before the bullet can flow forward.
 
@@ -330,13 +330,13 @@ Companion to `release.nudgeAfterCommits`. The release nudge fires when EITHER th
 - **Type:** string
 - **Default:** `""` (auto-detect)
 
-Override the base branch that `hv-base-branch` resolves to. When empty (the default), the helper auto-detects by probing `main`, `master`, `trunk`, then `origin/HEAD` in that order. Set this explicitly when your project uses a non-default base branch such as `develop` (gitflow), `release`, or any other name that won't be found by auto-detection.
+Override the base branch that `hv git base` resolves to. When empty (the default), `hv` auto-detects by probing `main`, `master`, `trunk`, then `origin/HEAD` in that order. Set this explicitly when your project uses a non-default base branch such as `develop` (gitflow), `release`, or any other name that won't be found by auto-detection.
 
 ```json
 { "git": { "baseBranch": "develop" } }
 ```
 
-Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-review`, and `/hv-merge`) all call `hv-base-branch` and will pick up this override automatically.
+Skills that use the base branch (including `/hv-ship`, `/hv-review` and `/hv-work`) all call `hv git base` and will pick up this override automatically.
 
 ## Issues backend keys
 
@@ -348,34 +348,30 @@ Skills that use the base branch (including `/hv-reconcile`, `/hv-ship`, `/hv-rev
 | `backlog.backend` | `"file"` | `"file"` or `"issues"`. `"issues"` puts the backlog on the tracker; see [issue backend](issue-backend.md). |
 | `issues.provider` | `"auto"` | `"auto"`, `"github"` or `"gitlab"`. |
 | `issues.retryWaitSeconds` | `60` | Seconds to wait before retrying a failed tracker call. |
-| `issues.bulkPaceMs` | `1000` | Milliseconds `hv-migrate-issues` waits between tracker writes. `0` disables the pause. |
+| `issues.bulkPaceMs` | `1000` | Milliseconds `hv migrate issues` waits between tracker writes. `0` disables the pause. |
 | `issues.homeRepo` | `""` | Umbrella mode only: sub-repo holding milestone tracking issues. Empty means the first registered sub-repo. |
 | `issues.labels.inProgress` | `"in-progress"` | Label name. |
 | `issues.labels.needsReview` | `"needs-review"` | Label name. |
 | `issues.labels.changesRequested` | `"changes-requested"` | Label name. |
 | `issues.labels.released` | `"released"` | Label name. |
 | `issues.labels.notPlanned` | `"not-planned"` | Label name. |
-| `issues.labels.blocked` | `"blocked"` | Label name set by `hv-complete --reason blocked`; the issue stays open. |
+| `issues.labels.blocked` | `"blocked"` | Label name set by `hv item complete --reason blocked`; the issue stays open. |
 | `issues.labels.milestoneTracker` | `"milestone-tracker"` | Label name. |
 | `issues.labels.types.bug` / `.feature` / `.task` | `"type:bug"` / `"type:feature"` / `"type:task"` | Label names per item type. |
 | `issues.labels.priorityPrefix` | `"p"` | Prefix for priority labels. |
 | `issues.labels.sizePrefix` | `"size:"` | Prefix for feature size labels (`size:Major`). |
 
-`issues.label` is the legacy alias of `issues.labels.inProgress`. It is used when the new key is unset. `hv-config-show` lists all of these keys with their effective value and source.
+`issues.label` is the legacy alias of `issues.labels.inProgress`. It is used when the new key is unset. `hv config show` lists all of these keys with their effective value and source.
 
 ## hvSkills.version (auto-managed)
 
 - **Type:** string
-- **Default:** `""` (unstamped on first init if the plugin couldn't be resolved)
+- **Default:** `""` (unstamped until `/hv-init` first runs)
 
 Records the hv-skills plugin version that was installed when `/hv-init` last ran. Auto-managed: `/hv-init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
 
-[`bin/hv-preflight`](../reference/preflight.md) calls `bin/hv-version-check` after every `/hv-preflight` invocation. If the stamped value differs from the currently-installed plugin's version, preflight prints one informational line to stderr:
+`hv version --drift` compares the stamped value with the installed `hv` binary, and [`hv init check`](../reference/preflight.md) surfaces the same drift as a warning. `--json` returns `stamped`, `installed` and `status` (`match`, `drift` or `unknown`).
 
-```
-hv-skills drift: project at 1.16.0, plugin at 1.17.0; run /hv-init to refresh helpers
-```
-
-Re-running `/hv-init` copies the new helpers into `.hv/bin/` and re-stamps `hvSkills.version`. Distinct from `/hv-update` (which compares installed vs latest GitHub release): this is *project drift*, surfaced when the plugin updated under you and the project hasn't been re-initialised yet.
+Re-running `/hv-init` re-stamps `hvSkills.version`; there are no project files to refresh. Distinct from `/hv-update` (which compares installed vs latest GitHub release): this is *project drift*, visible when the plugin updated under you and the project hasn't been re-stamped yet.
 
 When `autonomy.level` is `"auto"` or `"loop"`, [`/hv-update`](../reference/slash-commands.md#hv-update) Step 4 also offers (or auto-dispatches) `/hv-init` after a plugin upgrade so drift clears without an extra step. Under `"off"`, you still re-run `/hv-init` manually. See [autonomy](autonomy.md) for the full chain semantics.
