@@ -10,17 +10,9 @@ import (
 )
 
 // seedBase is the base seeding `hv init` does; `init umbrella` runs it first
-// (the old init skill always ran hv-bootstrap before hv-umbrella-init). The
-// `hv init` verb sets it, so both share one seed.
-var seedBase func(root string) error
-
-// initCommand is the `init` node with its real sub-verbs. It stays a stub
-// until the `hv init` verb itself lands; addStubs fills in the rest.
-func initCommand() *Command {
-	return &Command{Name: "init", Summary: "not ported yet (exit 71)", Stub: true, Verb: stubVerb, Subs: []*Command{
-		{Name: "umbrella", Summary: "register the git repos below this directory as an umbrella", Verb: initUmbrella},
-	}}
-}
+// (the old init skill always ran hv-bootstrap before hv-umbrella-init). A
+// variable so a test can swap the seed.
+var seedBase = func(root string) error { _, err := initproj.Init(root); return err }
 
 func initUmbrella(fs *flag.FlagSet) RunFunc {
 	repos := fs.String("repos", "", "comma-separated sub-repo names to register (empty: none)")

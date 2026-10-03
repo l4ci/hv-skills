@@ -246,7 +246,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	g.register(pre, true, false)
 	cmd := root
 	i := 0
-	for ; i < len(args) && (cmd.Verb == nil || stubDescends(cmd, args[i])); i++ {
+	for ; i < len(args) && (cmd.Verb == nil || descends(cmd, args[i])); i++ {
 		tok := args[i]
 		switch {
 		case tok == "--":
@@ -510,10 +510,12 @@ func VerbPaths(root *Command) []string {
 	return out
 }
 
-// stubDescends: a stub verb may still have stub sub-verbs (`init` and `init
-// check`), so a command word after it keeps the command-word scan going.
-func stubDescends(cmd *Command, tok string) bool {
-	return cmd.Stub && !isFlag(tok) && cmd.sub(tok) != nil
+// descends: a verb with sub-verbs (`init` and `init check`) keeps the
+// command-word scan going when the next word names one. A stub does the same
+// for its stub sub-verbs. Such a verb takes no positional argument that could
+// collide with a sub-verb name.
+func descends(cmd *Command, tok string) bool {
+	return !isFlag(tok) && cmd.sub(tok) != nil
 }
 
 func hasHelp(args []string) bool {

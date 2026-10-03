@@ -56,14 +56,26 @@ func stubRun(args ...string) (int, string, string) {
 	return code, so.String(), se.String()
 }
 
+// withFakeStub adds `zz` and `zz stub` to the contract verbs for one test. Every
+// real contract verb is ported, so the stub machinery would otherwise go
+// untested. `zz` is a stub with a stub sub-verb, the shape `init` and `init
+// check` had.
+func withFakeStub(t *testing.T) {
+	t.Helper()
+	saved := contractVerbs
+	contractVerbs = append(append([]string{}, saved...), "zz", "zz stub")
+	t.Cleanup(func() { contractVerbs = saved })
+}
+
 // A contract verb the Go binary lacks answers exit 71, whatever follows it,
 // not "unknown command" (exit 2).
 func TestUnimplementedContractVerbExits71(t *testing.T) {
+	withFakeStub(t)
 	for _, args := range [][]string{
-		{"init"},
-		{"init", "check"},
-		{"init", "--no-such-flag", "x"},
-		{"init", "check", "--repo", "web"},
+		{"zz"},
+		{"zz", "stub"},
+		{"zz", "--no-such-flag", "x"},
+		{"zz", "stub", "--repo", "web"},
 	} {
 		code, out, errOut := stubRun(args...)
 		if code != 71 || !strings.Contains(errOut, "is not ported yet") {
@@ -73,12 +85,12 @@ func TestUnimplementedContractVerbExits71(t *testing.T) {
 			t.Errorf("%v: envelope %q", args, out)
 		}
 	}
-	_, _, errOut := stubRun("init", "check")
-	if !strings.Contains(errOut, "hv init check is not ported yet") {
+	_, _, errOut := stubRun("zz", "stub")
+	if !strings.Contains(errOut, "hv zz stub is not ported yet") {
 		t.Errorf("the message names the full verb path: %q", errOut)
 	}
 	// -h still reaches help
-	if code, out, _ := stubRun("init", "check", "--help"); code != 0 || !strings.Contains(out, "hv init check") {
+	if code, out, _ := stubRun("zz", "stub", "--help"); code != 0 || !strings.Contains(out, "hv zz stub") {
 		t.Errorf("help: %d %q", code, out)
 	}
 	// a typo under an implemented group stays an unknown command
@@ -89,12 +101,13 @@ func TestUnimplementedContractVerbExits71(t *testing.T) {
 
 // `hv __verbs` is what test/hv-hybrid routes by: stubs must stay out of it.
 func TestVerbsExcludesStubs(t *testing.T) {
+	withFakeStub(t)
 	_, out, _ := stubRun("__verbs")
 	listed := map[string]bool{}
 	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 		listed[l] = true
 	}
-	for _, stub := range []string{"init", "init check"} {
+	for _, stub := range []string{"zz", "zz stub"} {
 		if listed[stub] {
 			t.Errorf("stub %q listed by __verbs", stub)
 		}

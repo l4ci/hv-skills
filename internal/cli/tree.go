@@ -26,7 +26,7 @@ func Tree() *Command {
 			mapCommands(),
 			qaCommands(),
 			migrateCommands(),
-			initCommand(),
+			initCommands(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)
@@ -64,15 +64,27 @@ func runVersionDrift(c *Ctx) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	stamped, installed, status := versionDrift(root)
+	data := jsonx.NewObject()
+	data.Set("version", installed)
+	data.Set("stamped", stamped)
+	data.Set("installed", installed)
+	data.Set("status", status)
+	data.Set("drift", status == "drift")
+	return Result{Data: data, Text: driftLine(stamped, installed, status)}, nil
+}
+
+// versionDrift compares hvSkills.version of root's merged config with the
+// running binary. Either side empty is "unknown".
+func versionDrift(root string) (stamped, installed, status string) {
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
-	stamped := ""
 	if v, ok := config.Lookup(cfg, "hvSkills.version"); ok {
 		if s, ok := v.(string); ok {
 			stamped = s
 		}
 	}
-	installed := installedVersionFn()
-	status := "unknown"
+	installed = installedVersionFn()
+	status = "unknown"
 	switch {
 	case stamped == "" || installed == "":
 	case stamped == installed:
@@ -80,17 +92,19 @@ func runVersionDrift(c *Ctx) (Result, error) {
 	default:
 		status = "drift"
 	}
-	data := jsonx.NewObject()
-	data.Set("version", installed)
-	data.Set("stamped", stamped)
-	data.Set("installed", installed)
-	data.Set("status", status)
-	data.Set("drift", status == "drift")
-	text := ""
-	if status == "drift" {
-		text = fmt.Sprintf("hv-skills drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+	return
+}
+
+func driftLine(stamped, installed, status string) string {
+	if status != "drift" {
+		return ""
 	}
-	return Result{Data: data, Text: text}, nil
+	return fmt.Sprintf("hv-skills drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+}
+
+// versionDriftLine is the drift nudge for root, or "".
+func versionDriftLine(root string) string {
+	return driftLine(versionDrift(root))
 }
 
 func runVersion(*Ctx) (Result, error) {
