@@ -304,7 +304,7 @@ func (d *runner) hv() Check {
 		if !ok {
 			continue
 		}
-		if ver == "" || ver == "(devel)" {
+		if ver == "" || ver == "(devel)" || ver == "dev" {
 			return skip("hv", "running a development build")
 		}
 		if plugin != ver {

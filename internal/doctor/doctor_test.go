@@ -222,6 +222,7 @@ func TestHvVersionCheck(t *testing.T) {
 		{"match", "5.0.0", []string{sub}, Pass},
 		{"v prefix", "v5.0.0", []string{sub}, Pass},
 		{"drift", "4.5.0", []string{sub}, Fail},
+		{"dev label", "dev", []string{sub}, Skip},
 		{"dev build", "", []string{sub}, Skip},
 		{"outside a checkout", "5.0.0", []string{empty}, Skip},
 		{"second root", "5.0.0", []string{empty, plug}, Pass},
