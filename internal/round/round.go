@@ -23,6 +23,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/escalation"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/limits"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -131,6 +132,9 @@ type Report struct {
 	// Escalations are the open ones (pending or timed-out), read from the
 	// registry without a forge call; `hv round escalate check` looks for answers.
 	Escalations []escalation.Report
+	// Limits are the usage-limit entries still waiting (D3), read from the
+	// registry like escalations.
+	Limits []limits.Entry
 
 	views map[string]*view
 }
@@ -388,6 +392,7 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 			}
 		}
 	}
+	rep.Limits = limits.Waiting(limits.Load(root))
 	return rep, nil
 }
 

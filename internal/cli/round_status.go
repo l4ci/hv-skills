@@ -114,6 +114,8 @@ func roundStatus(*flag.FlagSet) RunFunc {
 		}
 		esc, escLines := escalationRows(rep.Escalations)
 		d.Set("escalations", esc)
+		lim, limLines := limitStatusRows(rep.Limits)
+		d.Set("limits", lim)
 		var lines []string
 		for _, r := range rep.Rows {
 			lines = append(lines, strings.Join([]string{
@@ -121,6 +123,9 @@ func roundStatus(*flag.FlagSet) RunFunc {
 		}
 		for _, l := range escLines {
 			lines = append(lines, "escalation\t"+l)
+		}
+		for _, l := range limLines {
+			lines = append(lines, "limit\t"+l)
 		}
 		return Result{Data: d, Text: strings.Join(lines, "\n")}, nil
 	}
@@ -152,6 +157,8 @@ func roundReconcile(fs *flag.FlagSet) RunFunc {
 		d.Set("changed", len(out.Repaired) > 0)
 		esc, escLines := escalationRows(out.Report.Escalations)
 		d.Set("escalations", esc)
+		lim, limLines := limitStatusRows(out.Report.Limits)
+		d.Set("limits", lim)
 		var lines []string
 		for _, f := range out.Drift {
 			lines = append(lines, fmt.Sprintf("drift\t%s\t%s\t%s", f.Kind, dash(firstOf(f.Slot, "#"+f.Issue)), f.Detail))
@@ -161,6 +168,9 @@ func roundReconcile(fs *flag.FlagSet) RunFunc {
 		}
 		for _, l := range escLines {
 			lines = append(lines, "escalation\t"+l)
+		}
+		for _, l := range limLines {
+			lines = append(lines, "limit\t"+l)
 		}
 		return Result{Data: d, Text: strings.Join(lines, "\n")}, nil
 	}
