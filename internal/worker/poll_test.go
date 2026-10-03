@@ -248,3 +248,30 @@ func TestActiveAtStampedByDispatchAndRestampedByPollOnAStateChange(t *testing.T)
 		t.Errorf("a state change restamps: %q", got)
 	}
 }
+
+// TestClassifySentinelAfterReplyBullet pins #210: Claude Code v2.1.288 starts
+// a reply with "● ", so a worker whose whole reply is the sentinel shows it
+// after the bullet. The fixture is a real pane end (the input box and status
+// line, whose usage glyphs must not read as a sentinel).
+func TestClassifySentinelAfterReplyBullet(t *testing.T) {
+	b, err := os.ReadFile("testdata/panes/done-after-reply-bullet-2.1.288.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := string(b)
+	if state, ev := Classify(done, false, 60, "idle"); state != "DONE" || !strings.Contains(ev, "lr1/f01-add-a-hello-line-to") {
+		t.Errorf("done after the bullet: %s %q", state, ev)
+	}
+	blocked := strings.Replace(done, "● HV-DONE lr1 lr1/f01-add-a-hello-line-to", "● HV-BLOCKED lr1: which file gets the line?", 1)
+	if state, ev := Classify(blocked, false, 60, "idle"); state != "BLOCKED" || !strings.Contains(ev, "which file gets the line?") {
+		t.Errorf("blocked after the bullet: %s %q", state, ev)
+	}
+	older := strings.Replace(done, "● ", "⏺ ", 1)
+	if state, _ := Classify(older, false, 60, "idle"); state != "DONE" {
+		t.Errorf("done after the older ⏺ marker: %s", state)
+	}
+	plain := strings.Replace(done, "● HV-DONE lr1 lr1/f01-add-a-hello-line-to", "● All done.", 1)
+	if state, _ := Classify(plain, false, 60, "idle"); state == "DONE" {
+		t.Errorf("a bullet without a sentinel is not done")
+	}
+}
