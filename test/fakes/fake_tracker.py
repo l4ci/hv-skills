@@ -499,6 +499,15 @@ def gh_api(db, args):
         c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
         save(db)
         emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]}})
+    elif re.match(r"^issues/comments/\d+$", rest) and method == "GET":
+        cid = int(rest.split("/")[2])
+        for i in db["issues"]:
+            for c in i["comments"]:
+                if c["id"] == cid:
+                    emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]},
+                          "html_url": "https://github.com/fake/repo/issues/%d#issuecomment-%d" % (i["number"], cid)})
+                    return
+        raise Fail("404 Not Found")
     elif re.match(r"^issues/comments/\d+$", rest) and method == "DELETE":
         cid = int(rest.split("/")[2])
         for i in db["issues"]:
