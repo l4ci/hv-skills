@@ -282,6 +282,25 @@ func (g *GitHub) AddComment(ctx context.Context, number int, body string) (strin
 	return g.createdID(ctx, []string{"api", "-X", "POST", fmt.Sprintf("repos/{owner}/{repo}/issues/%d/comments", number), "-f", "body=" + body})
 }
 
+// MRNotes: a PR's conversation comments are the issue comments of its number.
+func (g *GitHub) MRNotes(ctx context.Context, number int) ([]Comment, error) {
+	return g.Comments(ctx, number)
+}
+
+func (g *GitHub) AddMRNote(ctx context.Context, number int, body string) (string, error) {
+	return g.AddComment(ctx, number, body)
+}
+
+func (g *GitHub) CommentURL(ctx context.Context, _ bool, _ int, commentID string) (string, error) {
+	var d struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := g.json(ctx, []string{"api", "repos/{owner}/{repo}/issues/comments/" + commentID}, &d); err != nil {
+		return "", err
+	}
+	return d.HTMLURL, nil
+}
+
 func (g *GitHub) EditComment(ctx context.Context, number int, commentID, body string) error {
 	_, err := g.run(ctx, []string{"api", "-X", "PATCH", "repos/{owner}/{repo}/issues/comments/" + commentID, "-f", "body=" + body}, "")
 	return err

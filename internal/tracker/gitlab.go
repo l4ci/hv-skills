@@ -260,6 +260,44 @@ func (g *GitLab) AddComment(ctx context.Context, number int, body string) (strin
 	return g.createdID(ctx, []string{"api", "-X", "POST", fmt.Sprintf("projects/:id/issues/%d/notes", number), "-f", "body=" + body})
 }
 
+// MRNotes returns the merge request's notes oldest first, system notes excluded.
+func (g *GitLab) MRNotes(ctx context.Context, number int) ([]Comment, error) {
+	var raw []glNote
+	if err := g.pages(ctx, fmt.Sprintf("projects/:id/merge_requests/%d/notes?sort=asc&order_by=created_at", number), &raw); err != nil {
+		return nil, err
+	}
+	out := []Comment{}
+	for _, n := range raw {
+		if !n.System {
+			out = append(out, n.comment())
+		}
+	}
+	return out, nil
+}
+
+func (g *GitLab) AddMRNote(ctx context.Context, number int, body string) (string, error) {
+	return g.createdID(ctx, []string{"api", "-X", "POST", fmt.Sprintf("projects/:id/merge_requests/%d/notes", number), "-f", "body=" + body})
+}
+
+// CommentURL: a note has no URL of its own in the API, so it is the thread's
+// web_url plus the #note_<id> anchor GitLab renders.
+func (g *GitLab) CommentURL(ctx context.Context, pr bool, number int, commentID string) (string, error) {
+	kind := "issue"
+	if pr {
+		kind = "mr"
+	}
+	var d struct {
+		WebURL string `json:"web_url"`
+	}
+	if err := g.json(ctx, []string{kind, "view", strconv.Itoa(number), "--output", "json"}, &d); err != nil {
+		return "", err
+	}
+	if d.WebURL == "" {
+		return "", nil
+	}
+	return d.WebURL + "#note_" + commentID, nil
+}
+
 func (g *GitLab) EditComment(ctx context.Context, number int, commentID, body string) error {
 	_, err := g.run(ctx, []string{"api", "-X", "PUT", fmt.Sprintf("projects/:id/issues/%d/notes/%s", number, commentID), "-f", "body=" + body}, "")
 	return err

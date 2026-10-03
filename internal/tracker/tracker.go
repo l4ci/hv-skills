@@ -187,6 +187,15 @@ type Adapter interface {
 	AddComment(ctx context.Context, number int, body string) (string, error)
 	EditComment(ctx context.Context, number int, commentID, body string) error
 	DeleteComment(ctx context.Context, number int, commentID string) error
+	// MRNotes lists the comments of PR/MR number oldest first (GitLab: the
+	// merge request notes, system notes excluded; GitHub: the issue comments
+	// of the same number, which is where PR conversation comments live).
+	MRNotes(ctx context.Context, number int) ([]Comment, error)
+	// AddMRNote posts a comment on PR/MR number and returns its id.
+	AddMRNote(ctx context.Context, number int, body string) (string, error)
+	// CommentURL is the web URL of comment id on the issue (pr false) or PR/MR
+	// number; it costs one forge call.
+	CommentURL(ctx context.Context, pr bool, number int, commentID string) (string, error)
 
 	// FindMilestone returns the title of the milestone whose leading token is
 	// hvID, preferring open ones; ok is false when none matches.
