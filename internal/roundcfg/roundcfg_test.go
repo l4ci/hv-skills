@@ -47,6 +47,8 @@ func TestInvalid(t *testing.T) {
 		`{"round":{"roster":[]}}`:        "empty",
 		`{"round":{"roster":"ben"}}`:     "list",
 		`{"round":{"sharedPaths":[1]}}`:  "list of strings",
+		`{"round":{"stallMinutes":-1}}`:  "stallMinutes",
+		`{"round":{"stallMinutes":"x"}}`: "stallMinutes",
 	} {
 		_, err := Load(project(t, cfg))
 		if err == nil || !strings.Contains(err.Error(), want) {
@@ -109,5 +111,17 @@ func TestInvalidTierConfig(t *testing.T) {
 func TestTierRank(t *testing.T) {
 	if !(TierRank(TierLight) < TierRank(TierStandard) && TierRank(TierStandard) < TierRank(TierHeavy)) || TierRank("x") != -1 {
 		t.Fatal("tiers order light < standard < heavy")
+	}
+}
+
+func TestStallMinutes(t *testing.T) {
+	if s, err := Load(project(t, "")); err != nil || s.StallMinutes != 30 {
+		t.Fatalf("default is 30: %v %+v", err, s)
+	}
+	if s, err := Load(project(t, `{"round":{"stallMinutes":0}}`)); err != nil || s.StallMinutes != 0 {
+		t.Fatalf("0 turns it off: %v %+v", err, s)
+	}
+	if s, err := Load(project(t, `{"round":{"stallMinutes":5}}`)); err != nil || s.StallMinutes != 5 {
+		t.Fatalf("%v %+v", err, s)
 	}
 }

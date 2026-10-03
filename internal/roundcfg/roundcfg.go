@@ -46,6 +46,9 @@ type Settings struct {
 	// every configured kind (a kind with no tier set is absent).
 	Tier   string
 	Models map[string]map[string]string
+	// StallMinutes is round.stallMinutes: how long a slot may make no progress
+	// before `round reconcile` calls it stalled; 0 turns the check off.
+	StallMinutes int
 }
 
 // ValidTier reports whether s is a tier; ValidKind whether s is a harness kind.
@@ -117,6 +120,19 @@ func Load(root string) (Settings, error) {
 	if s.SharedPaths, err = list(cfg, "round.sharedPaths"); err != nil {
 		return s, err
 	}
+	v, err = config.Value(cfg, "round.stallMinutes")
+	if err != nil {
+		return s, err
+	}
+	n, ok := v.(interface{ Int64() (int64, error) })
+	if !ok {
+		return s, fmt.Errorf("round.stallMinutes must be a non-negative integer (got %v)", v)
+	}
+	i, err := n.Int64()
+	if err != nil || i < 0 {
+		return s, fmt.Errorf("round.stallMinutes must be a non-negative integer (got %v)", v)
+	}
+	s.StallMinutes = int(i)
 	return s, loadTiers(cfg, &s)
 }
 

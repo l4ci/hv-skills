@@ -427,7 +427,11 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		b, _ := os.ReadFile(o.BodyFile)
 		decisions = string(b)
 	}
-	tmp.WriteString(pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions, tierBrief{Kind: kind, Tier: tier, Model: res.Model, Default: set.Tier, Reason: reason, Table: set.Models[kind]}))
+	text := pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions, tierBrief{Kind: kind, Tier: tier, Model: res.Model, Default: set.Tier, Reason: reason, Table: set.Models[kind]})
+	if hb := latestHandoffBranch(be, id); hb != "" {
+		text += fmt.Sprintf("\nAn earlier worker handed this issue back: read the latest `hv:handoff` comment on it. Its work is pushed on branch %s (origin/%s); fetch it before you start over.\n", hb, hb)
+	}
+	tmp.WriteString(text)
 	tmp.Close()
 	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch, Model: res.Model}); err != nil {
 		return res, err

@@ -13,6 +13,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -43,6 +44,10 @@ func defaultRoundEnv(ctx context.Context, root string) round.Env {
 	} else if s, ok := h.(host.Snapshotter); ok {
 		e.Snapshot, e.HostName = s.Snapshot, h.Name()
 	}
+	e.NeedsHuman = config.Label(cfg, "needsHuman")
+	if set, err := roundcfg.Load(root); err == nil {
+		e.StallMinutes = set.StallMinutes
+	}
 	f, err := tracker.New(ctx, tracker.SettingsFromConfig(cfg), "", root, trackerOptions...)
 	if err != nil {
 		e.ForgeErr = err.Error()
@@ -50,6 +55,27 @@ func defaultRoundEnv(ctx context.Context, root string) round.Env {
 		e.Forge = f
 	}
 	return e
+}
+
+// withBoard gives the env the backlog's claim side, which claim-mismatch drift
+// reads. File mode has no claims, and a backlog that cannot be opened is a
+// warning: the other drift kinds still report.
+func withBoard(c *Ctx, root string, env round.Env) round.Env {
+	if env.Board != nil {
+		return env
+	}
+	if name, err := config.Backend(config.Load(filepath.Join(root, ".hv", "config.json"))); err != nil || name != "issues" {
+		return env
+	}
+	be, err := a4Open(c, root, false, "")
+	if err != nil {
+		c.Warn("claim check skipped: %v", err)
+		return env
+	}
+	if b, ok := be.(round.Board); ok {
+		env.Board = b
+	}
+	return env
 }
 
 func roundStatus(*flag.FlagSet) RunFunc {
@@ -62,7 +88,7 @@ func roundStatus(*flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		ctx := c.Context()
-		rep, err := roundEnv(ctx, root).Status(ctx, root)
+		rep, err := withBoard(c, root, roundEnv(ctx, root)).Status(ctx, root)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}
@@ -101,7 +127,7 @@ func roundReconcile(fs *flag.FlagSet) RunFunc {
 			return Result{}, err
 		}
 		ctx := c.Context()
-		out, err := roundEnv(ctx, root).Reconcile(ctx, root, *apply)
+		out, err := withBoard(c, root, roundEnv(ctx, root)).Reconcile(ctx, root, *apply)
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}
