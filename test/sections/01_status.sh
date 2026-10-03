@@ -280,3 +280,33 @@ grep -q "B99" .hv/BACKLOG.md && fail "B99 still in BACKLOG.md"
 grep -q "F99" .hv/BACKLOG.md || fail "F99 should still be in BACKLOG.md"
 pass "old item archived, recent item kept"
 
+
+echo "status show"
+"$HV_BIN" status add hv/sh-a --items B01,B02 --worktree /tmp/sh-a-wt >/dev/null
+rc=0; OUT=$(hvj status show hv/sh-a) || rc=$?
+[ "$rc" = "0" ] || fail "status show of an active branch: expected exit 0, got $rc: $OUT"
+[ "$(jget data.branch <<<"$OUT")" = "hv/sh-a" ] || fail "status show: wrong branch: $OUT"
+[ "$(jget data.active <<<"$OUT")" = "true" ] || fail "status show: expected active true: $OUT"
+[ "$(jget data.repo <<<"$OUT")" = "null" ] || fail "status show: single-repo entry should have repo null: $OUT"
+[ "$(jget data.items <<<"$OUT")" = '["B01","B02"]' ] || fail "status show: wrong items: $OUT"
+[ "$(jget data.worktree <<<"$OUT")" = "/tmp/sh-a-wt" ] || fail "status show: wrong worktree: $OUT"
+TS_SHOW=$(jget data.startedAt <<<"$OUT")
+TS_FILE=$(python3 -c "import json; d=json.load(open('.hv/status.json')); print(next(e['startedAt'] for e in d['active'] if e['branch']=='hv/sh-a'))")
+[ "$TS_SHOW" = "$TS_FILE" ] || fail "status show startedAt '$TS_SHOW' != status.json '$TS_FILE'"
+pass "status show reports branch, repo, items, worktree and startedAt of an active branch"
+
+"$HV_BIN" status rm hv/sh-a >/dev/null
+rc=0; OUT=$(hvj status show hv/sh-a) || rc=$?
+[ "$rc" = "0" ] || fail "status show of an unknown branch: expected exit 0, got $rc: $OUT"
+[ "$(jget data.active <<<"$OUT")" = "false" ] || fail "status show after rm: expected active false: $OUT"
+[ "$(jget data.items <<<"$OUT")" = "[]" ] || fail "status show after rm: expected empty items: $OUT"
+[ "$(jget data.repo <<<"$OUT")" = "null" ] && [ "$(jget data.worktree <<<"$OUT")" = "null" ] || fail "status show after rm: repo/worktree should be null: $OUT"
+pass "status show of a branch with no entry is exit 0 with active false"
+
+rc=0; OUT=$(hvj status show 2>/dev/null) || rc=$?
+[ "$rc" = "2" ] && [ "$(jget error.code <<<"$OUT")" = "usage" ] || fail "status show without a branch: expected usage exit 2, got $rc: $OUT"
+rc=0; OUT=$(hvj status show hv/a hv/b 2>/dev/null) || rc=$?
+[ "$rc" = "2" ] && [ "$(jget error.code <<<"$OUT")" = "usage" ] || fail "status show with two branches: expected usage exit 2, got $rc: $OUT"
+rc=0; OUT=$(hvj status show hv/a --repo web 2>/dev/null) || rc=$?
+[ "$rc" = "3" ] && [ "$(jget error.code <<<"$OUT")" = "resolution" ] || fail "status show --repo outside umbrella mode: expected resolution exit 3, got $rc: $OUT"
+pass "status show exits 2 on bad arguments and 3 on --repo outside umbrella mode"

@@ -93,6 +93,38 @@ mkdir -p "$UMB/.claude/worktrees/web"
 pass "T4: ship merge --repo web removes the Layout B worktree"
 (cd "$UMB/web" && git branch -D hv/wt-x >/dev/null 2>&1) || true
 
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+(cd "$UMB" && hvj status add hv/sh-x --items B01,B02 --repo web --worktree "$UMB/.claude/worktrees/web/hv/sh-x" >/dev/null) || fail "status add --repo web for show failed"
+OUT=$(cd "$UMB" && hvj status show hv/sh-x --repo web) || fail "status show --repo web failed: $OUT"
+[ "$(jget data.active <<<"$OUT")" = "true" ] && [ "$(jget data.repo <<<"$OUT")" = "web" ] || fail "status show --repo web: wrong entry: $OUT"
+[ "$(jget data.items <<<"$OUT")" = '["B01","B02"]' ] || fail "status show --repo web: wrong items: $OUT"
+[ "$(jget data.worktree <<<"$OUT")" = "$UMB/.claude/worktrees/web/hv/sh-x" ] || fail "status show --repo web: wrong worktree: $OUT"
+rc=0; OUT=$(cd "$UMB" && hvj status show hv/sh-x --repo api) || rc=$?
+[ "$rc" = "0" ] && [ "$(jget data.active <<<"$OUT")" = "false" ] || fail "status show --repo api of a web-only branch: expected exit 0, active false, got $rc: $OUT"
+rc=0; OUT=$(cd "$UMB" && hvj status show hv/sh-x --repo nope 2>/dev/null) || rc=$?
+[ "$rc" = "3" ] && [ "$(jget error.code <<<"$OUT")" = "resolution" ] || fail "status show --repo nope: expected resolution exit 3, got $rc: $OUT"
+echo '{"active":[]}' > "$UMB/.hv/status.json"
+pass "status show --repo scopes to one sub-repo; an unregistered repo is exit 3"
+
+UMB_REAL=$(cd "$UMB" && pwd -P)
+rc=0; OUT=$(cd "$UMB" && hvj git worktree-path --repo web hv/wp-x) || rc=$?
+[ "$rc" = "0" ] || fail "git worktree-path: expected exit 0, got $rc: $OUT"
+[ "$(jget data.path <<<"$OUT")" = "$UMB_REAL/.claude/worktrees/web/hv/wp-x" ] || fail "git worktree-path: wrong path: $OUT"
+OUT=$(cd "$UMB/web" && hvj git worktree-path --repo api hv/wp-x) || fail "git worktree-path from inside a sub-repo failed: $OUT"
+[ "$(jget data.path <<<"$OUT")" = "$UMB_REAL/.claude/worktrees/api/hv/wp-x" ] || fail "git worktree-path from a sub-repo: wrong path: $OUT"
+[ ! -e "$UMB/.claude/worktrees/web/hv/wp-x" ] || fail "git worktree-path must only print, not create the worktree"
+pass "git worktree-path prints <umbrella>/.claude/worktrees/<repo>/<branch> from the root and from a sub-repo"
+
+rc=0; OUT=$(cd "$UMB" && hvj git worktree-path hv/wp-x 2>/dev/null) || rc=$?
+[ "$rc" = "2" ] && [ "$(jget error.code <<<"$OUT")" = "usage" ] || fail "git worktree-path without --repo: expected usage exit 2, got $rc: $OUT"
+rc=0; OUT=$(cd "$UMB" && hvj git worktree-path --repo web 2>/dev/null) || rc=$?
+[ "$rc" = "2" ] && [ "$(jget error.code <<<"$OUT")" = "usage" ] || fail "git worktree-path without a branch: expected usage exit 2, got $rc: $OUT"
+rc=0; OUT=$(cd "$UMB" && hvj git worktree-path --repo nope hv/wp-x 2>/dev/null) || rc=$?
+[ "$rc" = "3" ] && [ "$(jget error.code <<<"$OUT")" = "resolution" ] || fail "git worktree-path --repo nope: expected resolution exit 3, got $rc: $OUT"
+rc=0; OUT=$(cd "$TMP" && hvj git worktree-path --repo web hv/wp-x 2>/dev/null) || rc=$?
+[ "$rc" = "3" ] && [ "$(jget error.code <<<"$OUT")" = "resolution" ] || fail "git worktree-path outside umbrella mode: expected resolution exit 3, got $rc: $OUT"
+pass "git worktree-path exits 2 without --repo or branch and 3 for an unregistered repo or a non-umbrella project"
+
 # white-box-begin: go-unit A8 #52
 (cd "$UMB/web" && git checkout -q main && git branch hv/wt-z 2>/dev/null || true)
 mkdir -p "$UMB/.claude/worktrees/web"
