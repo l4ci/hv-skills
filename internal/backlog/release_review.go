@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv-skills/v5/internal/marker"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
@@ -484,7 +485,10 @@ func (b *Issues) labelReleased(mid, tag string, optional bool) (issues int, err 
 		return 0, err
 	}
 	label := config.Label(b.Cfg, "released")
-	marker := "Released in " + tag
+	// The marker keeps the comment from reading as a human's answer to an
+	// escalation; a comment posted before markers existed still counts as seen.
+	text := "Released in " + tag
+	body := text + "\n\n" + marker.Line("released")
 	for _, is := range all {
 		if is.State != "closed" || is.StateReason != "completed" {
 			continue
@@ -501,10 +505,11 @@ func (b *Issues) labelReleased(mid, tag string, optional bool) (issues int, err 
 		}
 		seen := false
 		for _, c := range comments {
-			seen = seen || pystr.Strip(c.Body) == marker
+			got := pystr.Strip(c.Body)
+			seen = seen || got == text || got == pystr.Strip(body)
 		}
 		if !seen {
-			if _, err := b.Tracker.AddComment(b.ctx(), is.Number, marker); err != nil {
+			if _, err := b.Tracker.AddComment(b.ctx(), is.Number, body); err != nil {
 				return issues, err
 			}
 		}

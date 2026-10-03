@@ -18,9 +18,10 @@ for prov in github gitlab; do
 import json, sys
 db = json.load(open(sys.argv[1]))
 i = next(i for i in db["issues"] if i["number"] == int(sys.argv[2]))
+# comment bodies are folded to one line (the hv marker line sits under the text)
 # glab has no close reason: a closed issue is completed unless it carries the not-planned label
 reason = i["state_reason"] or (("not_planned" if "not-planned" in i["labels"] else "completed") if i["state"] == "closed" else None)
-print("|".join([i["state"], str(reason), ",".join(sorted(i["labels"])), ";".join(c["body"] for c in i["comments"])]))' "$P/db.json" "$1"; }
+print("|".join([i["state"], str(reason), ",".join(sorted(i["labels"])), ";".join(" ".join(c["body"].split()) for c in i["comments"])]))' "$P/db.json" "$1"; }
     NATIVE() { python3 -c '
 import json, sys
 db = json.load(open(sys.argv[1]))
@@ -101,7 +102,7 @@ print(",".join(m["state"] for m in db["milestones"] if m["title"].startswith(sys
     eq "close-out data" '{"milestone":"M01","release":"1.2.0","tag":"v1.2.0","issues":3,"changed":true}' "$(echo "$OUT" | jget data)"
     eq "feat closed completed" "closed|completed" "$(ISSUE 2 | cut -d"|" -f1,2)"
     for n in 2 3 4; do
-      case "$(ISSUE $n)" in *released*"Released in v1.2.0") ;; *) fail "$prov #$n not released: $(ISSUE $n)" ;; esac
+      case "$(ISSUE $n)" in *released*"Released in v1.2.0"*"<!-- hv:released -->"*) ;; *) fail "$prov #$n not released: $(ISSUE $n)" ;; esac
     done
     case "$(ISSUE 5)" in *released*|*"Released in"*) fail "$prov dropped issue released" ;; esac
     case "$(ISSUE 6)" in *released*|*"Released in"*) fail "$prov outside issue released" ;; esac

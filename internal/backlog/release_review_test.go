@@ -459,7 +459,7 @@ func TestIssuesMergePR(t *testing.T) {
 		t.Fatalf("F1 %+v", is)
 	}
 	last := is.Comments[len(is.Comments)-1].Body
-	if last != "Done in `0123456`" {
+	if last != "Done in `0123456`\n\n<!-- hv:done -->" {
 		t.Fatalf("close comment %q", last)
 	}
 	// Unproven T11: nothing is merged, the item flips and gets the feedback.
@@ -575,7 +575,7 @@ func TestIssuesReleaseClose(t *testing.T) {
 	if is := rrIssue(f, 4); !slices.Contains(is.Labels, "released") || len(is.Comments) != 1 {
 		t.Fatalf("#4 %+v", is)
 	}
-	if is := rrIssue(f, 10); len(is.Comments) != 2 || is.Comments[1].Body != "Released in v1.2.0" {
+	if is := rrIssue(f, 10); len(is.Comments) != 2 || is.Comments[1].Body != "Released in v1.2.0\n\n<!-- hv:released -->" {
 		t.Fatalf("#10 %+v", is)
 	}
 	if is := rrIssue(f, 5); slices.Contains(is.Labels, "released") {

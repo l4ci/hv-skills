@@ -866,7 +866,7 @@ func TestReleaseCloseMilestone(t *testing.T) {
 		if n == 4 && is.Number != 4 || n == 7 && is.Number != 7 {
 			t.Fatal("fixture order")
 		}
-		if !slices.Contains(is.Labels, "released") || is.Comments[len(is.Comments)-1].Body != "Released in v1.2.0" {
+		if !slices.Contains(is.Labels, "released") || is.Comments[len(is.Comments)-1].Body != "Released in v1.2.0\n\n<!-- hv:released -->" {
 			t.Errorf("issue %d %+v", n, is)
 		}
 	}

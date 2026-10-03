@@ -43,20 +43,20 @@
 {"name":"complete/ambiguous","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"[F1] is ambiguous across sub-repos — qualify it: api:1, web:1"},"ok":false},"db":"e412b2585d6695b6"}]}
 {"name":"complete/ambiguous-hash","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"[#1] is ambiguous across sub-repos — qualify it: api:1, web:1"},"ok":false},"db":"e412b2585d6695b6"}]}
 {"name":"complete/bad-reason","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"--reason must be done|handed-off|blocked|dropped"},"ok":false},"db":"e412b2585d6695b6"}]}
-{"name":"complete/blocked","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"blocked","type":"T"},"ok":true},"db":"9fb8ff160edb909a"}]}
+{"name":"complete/blocked","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"blocked","type":"T"},"ok":true},"db":"a3b28112d2984835"}]}
 {"name":"complete/closed-in-other-repo-only","steps":[{"exit":0,"env":{"data":{"changed":false,"commit":"abc1234","id":"api:2","reason":"done","type":"B"},"ok":true},"db":"e412b2585d6695b6"}]}
-{"name":"complete/cwd/cwd=api_src_deep","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"6f84e2148602c37b"}]}
-{"name":"complete/cwd/cwd=docs_deep","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"6f84e2148602c37b"}]}
-{"name":"complete/cwd/cwd=web","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"6f84e2148602c37b"}]}
-{"name":"complete/done-bare-unique","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:5","reason":"done","type":"T"},"ok":true},"db":"fa574e40cc57198d"}]}
-{"name":"complete/done-no-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:1","reason":"done","type":"F"},"ok":true},"db":"1f92b78db79bf13a"}]}
-{"name":"complete/done-note","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:2","reason":"done","type":"B"},"ok":true},"db":"6dd76d1ec4f9d83e"}]}
+{"name":"complete/cwd/cwd=api_src_deep","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"750aff77f4cbeaec"}]}
+{"name":"complete/cwd/cwd=docs_deep","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"750aff77f4cbeaec"}]}
+{"name":"complete/cwd/cwd=web","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:3","reason":"done","type":"T"},"ok":true},"db":"750aff77f4cbeaec"}]}
+{"name":"complete/done-bare-unique","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:5","reason":"done","type":"T"},"ok":true},"db":"bb0671dc2e7d7246"}]}
+{"name":"complete/done-no-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:1","reason":"done","type":"F"},"ok":true},"db":"50bbea5f9c59ab3d"}]}
+{"name":"complete/done-note","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:2","reason":"done","type":"B"},"ok":true},"db":"03d9577d1659726b"}]}
 {"name":"complete/done-proof-missing","steps":[{"exit":4,"env":{"data":{"blockedBy":"proof missing","changed":false},"error":{"code":"refused","exit":4,"hint":"record proof with `hv proof add`, or pass --no-proof","message":"[F1] no proof recorded, pass --no-proof to override"},"ok":false},"db":"e412b2585d6695b6"}]}
-{"name":"complete/done-with-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:4","reason":"done","type":"B"},"ok":true},"db":"c02ad5b1239ab2fd"}]}
-{"name":"complete/dropped","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:2","reason":"dropped","type":"B"},"ok":true},"db":"d8a1308a0777b85b"}]}
-{"name":"complete/handed-off","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:5","reason":"handed-off","type":"F"},"ok":true},"db":"4ec32b789dd2c2cb"}]}
-{"name":"complete/hash-form","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"8b5f00ad7328f26e"}]}
-{"name":"complete/other-repo-untouched","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"8b5f00ad7328f26e"}]}
+{"name":"complete/done-with-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:4","reason":"done","type":"B"},"ok":true},"db":"9735283d7355b8af"}]}
+{"name":"complete/dropped","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"web:2","reason":"dropped","type":"B"},"ok":true},"db":"0af7b780f1cb5895"}]}
+{"name":"complete/handed-off","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:5","reason":"handed-off","type":"F"},"ok":true},"db":"e7fefff58f50f030"}]}
+{"name":"complete/hash-form","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"0e8b5f05c994b798"}]}
+{"name":"complete/other-repo-untouched","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"0e8b5f05c994b798"}]}
 {"name":"complete/rate-limit","steps":[{"exit":6,"env":{"error":{"code":"retry","exit":6,"message":"github secondary rate limit — stopped; wait several minutes before retrying"},"ok":false},"db":"e412b2585d6695b6"}]}
 {"name":"complete/unknown","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"item not found: F99"},"ok":false},"db":"e412b2585d6695b6"}]}
 {"name":"complete/unknown-repo","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"[nope:F1] not found in the issue tracker"},"ok":false},"db":"e412b2585d6695b6"}]}
@@ -222,7 +222,7 @@
 {"name":"repoflag/bare-narrowed","steps":[{"exit":0,"env":{"data":{"field":"title","id":"web:1","type":"F","value":"Web feat"},"ok":true},"db":"e412b2585d6695b6"}]}
 {"name":"repoflag/bare-narrowed-api","steps":[{"exit":0,"env":{"data":{"field":"title","id":"api:1","type":"F","value":"Api feat"},"ok":true},"db":"e412b2585d6695b6"}]}
 {"name":"repoflag/bare-outside-scope","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"[B4] not found in the issue tracker"},"ok":false},"db":"e412b2585d6695b6"}]}
-{"name":"repoflag/complete-narrowed","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"8b5f00ad7328f26e"}]}
+{"name":"repoflag/complete-narrowed","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"api:1","reason":"done","type":"F"},"ok":true},"db":"0e8b5f05c994b798"}]}
 {"name":"repoflag/qualified-unaffected","steps":[{"exit":0,"env":{"data":{"field":"title","id":"api:1","type":"F","value":"Api feat"},"ok":true},"db":"e412b2585d6695b6"}]}
 {"name":"repoflag/unregistered","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"--repo nope is not registered in .hv/repos.json"},"ok":false},"db":"e412b2585d6695b6"}]}
 {"name":"repoflag/unregistered-complete","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"--repo nope is not registered in .hv/repos.json"},"ok":false},"db":"e412b2585d6695b6"}]}

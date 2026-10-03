@@ -253,7 +253,7 @@ func TestCloseGitHub(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("%v %v", changed, err)
 	}
-	if want := "gh issue close 12 --comment Closed by hv-skills: shipped in " + sha + " ([B07])"; !f.did(want) {
+	if want := "gh issue close 12 --comment Closed by hv-skills: shipped in " + sha + " ([B07])\n\n<!-- hv:shipped -->"; !f.did(want) {
 		t.Errorf("calls %q, want %q", f.calls, want)
 	}
 	// already closed: no write
@@ -283,7 +283,7 @@ func TestCloseGitLab(t *testing.T) {
 	}
 	note, closeCall := -1, -1
 	for i, c := range f.calls {
-		if c == "glab issue note 3 --message Closed by hv-skills: shipped in "+sha+" ([F2])" {
+		if c == "glab issue note 3 --message Closed by hv-skills: shipped in "+sha+" ([F2])\n\n<!-- hv:shipped -->" {
 			note = i
 		}
 		if c == "glab issue close 3" {
