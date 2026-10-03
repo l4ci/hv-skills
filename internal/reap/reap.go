@@ -29,6 +29,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
@@ -38,10 +39,11 @@ const (
 	KindBranch   = "branch"
 	KindTab      = "tab"
 	KindProcess  = "process"
+	KindLease    = "lease"
 )
 
 // Kinds lists every kind, in the order candidates are found and removed.
-var Kinds = []string{KindWorktree, KindBranch, KindTab, KindProcess}
+var Kinds = []string{KindWorktree, KindBranch, KindTab, KindProcess, KindLease}
 
 // Candidate is something to reap. Held, when set, says why it must not be.
 type Candidate struct {
@@ -75,6 +77,13 @@ type HostOps interface {
 	StopProcess(ctx context.Context, pid int) error
 }
 
+// LeaseOps is the round lease as internal/round exposes it: round.Env
+// satisfies it. A nil LeaseOps finds no lease.
+type LeaseOps interface {
+	ReadLease(ctx context.Context, root string) (round.Lease, round.LeaseState, error)
+	ClearStaleLease(ctx context.Context, root string) (round.Lease, bool, error)
+}
+
 // Input is everything Find and Apply need from the outside.
 type Input struct {
 	Root string // project root
@@ -87,6 +96,7 @@ type Input struct {
 	Report *round.Report
 	Agents []host.Agent
 	Host   HostOps
+	Lease  LeaseOps
 }
 
 // Result is what Find and Apply report. Warnings are for the caller to print.
@@ -119,16 +129,32 @@ type state struct {
 }
 
 // A finder returns the candidates of one source. Adding a source is adding a
-// function here; C3 adds `lease`.
+// function here.
 type finder func(ctx context.Context, s *state) ([]Candidate, error)
 
 var finders = []finder{findWorktrees, findBranches, findTabs, findProcesses, findLeases}
 
-// findLeases is the seam for the C3 round lease. C3 (finn) will call
-// round.ReadLease and round.ClearStaleLease here once they exist in
-// internal/round, and return the stale leases. Until then it finds nothing,
-// and no `lease` kind exists in the output.
-func findLeases(context.Context, *state) ([]Candidate, error) { return nil, nil }
+// findLeases lists the round lease when its holder is gone. A live, foreign
+// or absent lease is never a candidate, and a lease is never Held: stale means
+// nothing owns it.
+func findLeases(ctx context.Context, s *state) ([]Candidate, error) {
+	if s.in.Lease == nil {
+		return nil, nil
+	}
+	l, st, err := s.in.Lease.ReadLease(ctx, s.in.Root)
+	if err != nil {
+		s.warn("round lease unavailable: %v; lease candidate skipped", err)
+		return nil, nil
+	}
+	if st != roundlease.Stale {
+		return nil, nil
+	}
+	who := "an unreadable lease file"
+	if l.PID > 0 {
+		who = fmt.Sprintf("pid %d (round %d, started %s)", l.PID, l.Round, l.StartedAt)
+	}
+	return []Candidate{{ID: KindLease + ":round", Kind: KindLease, Name: "round", Reason: "the round lease is held by " + who + ", which is gone"}}, nil
+}
 
 // Find lists the candidates of the wanted kinds (all when kinds is empty).
 // It fails only when git does.
@@ -517,6 +543,16 @@ func (s *state) remove(ctx context.Context, c Candidate) error {
 			}
 		}
 		return fmt.Errorf("tab %s is gone", c.Name)
+	case KindLease:
+		if s.in.Lease == nil {
+			return fmt.Errorf("no lease access")
+		}
+		// ClearStaleLease re-proves staleness under the lease lock.
+		_, cleared, err := s.in.Lease.ClearStaleLease(ctx, s.in.Root)
+		if err == nil && !cleared {
+			return fmt.Errorf("the lease is no longer stale; left alone")
+		}
+		return err
 	case KindProcess:
 		if s.in.Host == nil {
 			return fmt.Errorf("no host")

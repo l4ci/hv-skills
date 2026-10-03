@@ -50,7 +50,7 @@ pass "C6[reap a]: preview lists candidates, skips live and parked, deletes nothi
 # (b) --kind filter and unknown kind
 OUT="$(rp_run --kind branch)"
 [ "$(printf '%s' "$OUT" | rp_ids)" = "branch:kit/9-gone" ] || fail "C6[reap b]: --kind branch gave $(printf '%s' "$OUT" | rp_ids)"
-rc=0; rp_run --kind lease >/dev/null || rc=$?
+rc=0; rp_run --kind bogus >/dev/null || rc=$?
 [ "$rc" -eq 2 ] || fail "C6[reap b]: unknown kind exited $rc, not 2"
 rc=0; rp_run --repo x >/dev/null || rc=$?
 [ "$rc" -eq 2 ] || fail "C6[reap b]: --repo exited $rc, not 2"
@@ -80,6 +80,43 @@ pass "C6[reap d]: --apply removes only unheld candidates and never a live agent'
 OUT="$(rp_run)"
 [ "$(printf '%s' "$OUT" | rp_ids)" = "worktree:dirty!,branch:kit/1-old,tab:w5:t1,process:4242" ]  # the fixture file is static, so the host entries remain || fail "C6[reap e]: second run gave $(printf '%s' "$OUT" | rp_ids)"
 pass "C6[reap e]: a second run finds the branch the first freed and still holds the dirty worktree"
+
+# (f) the round lease: only a stale one (holder gone, this host) is listed and cleared
+LEASE_RP="$(rp_git rev-parse --path-format=absolute --git-common-dir)/hv/round-lease.json"
+mkdir -p "$(dirname "$LEASE_RP")"
+true & DEAD_RP=$!; wait "$DEAD_RP" || true
+rp_lease() { python3 - "$LEASE_RP" "$1" "$2" <<'PY'
+import json, socket, sys
+p, pid, host = sys.argv[1], int(sys.argv[2]), sys.argv[3] or socket.gethostname()
+json.dump({"pid": pid, "start": 1, "host": host, "root": "x", "round": 4, "startedAt": "2026-01-02T03:04:05Z"}, open(p, "w"))
+PY
+}
+sleep 30 & LIVE_RP=$!
+python3 - "$LEASE_RP" "$LIVE_RP" <<'PY'
+import json, socket, sys
+p, pid = sys.argv[1], int(sys.argv[2])
+start = int(open("/proc/%d/stat" % pid).read().rsplit(")", 1)[1].split()[19])
+json.dump({"pid": pid, "start": start, "host": socket.gethostname(), "root": "x", "round": 4, "startedAt": "2026-01-02T03:04:05Z"}, open(p, "w"))
+PY
+OUT="$(rp_run --kind lease --apply)"
+kill "$LIVE_RP" 2>/dev/null || true
+[ "$(printf '%s' "$OUT" | rp_ids)" = "" ] || fail "C6[reap f]: a live lease was listed: $OUT"
+[ -f "$LEASE_RP" ] || fail "C6[reap f]: a live lease was deleted"
+rp_lease "$DEAD_RP" "elsewhere"
+OUT="$(rp_run --kind lease --apply)"
+[ "$(printf '%s' "$OUT" | rp_ids)" = "" ] || fail "C6[reap f]: a foreign lease was listed: $OUT"
+[ -f "$LEASE_RP" ] || fail "C6[reap f]: a foreign lease was deleted"
+rp_lease "$DEAD_RP" ""
+OUT="$(rp_run --kind lease)"
+[ "$(printf '%s' "$OUT" | rp_ids)" = "lease:round" ] || fail "C6[reap f]: stale lease candidates were $(printf '%s' "$OUT" | rp_ids)"
+case "$OUT" in *"pid $DEAD_RP"*) ;; *) fail "C6[reap f]: the reason does not name the holder: $OUT" ;; esac
+[ -f "$LEASE_RP" ] || fail "C6[reap f]: preview deleted the lease"
+OUT="$(rp_run --kind lease --apply)"
+[ "$(printf '%s' "$OUT" | rp_field reaped)" = '["lease:round"]' ] || fail "C6[reap f]: reaped was $(printf '%s' "$OUT" | rp_field reaped)"
+[ ! -e "$LEASE_RP" ] || fail "C6[reap f]: the stale lease is still there"
+OUT="$(rp_run --kind lease)"
+[ "$(printf '%s' "$OUT" | rp_ids)" = "" ] || fail "C6[reap f]: no lease should remain: $OUT"
+pass "C6[reap f]: a stale lease is listed and cleared; live, foreign and absent ones are left alone"
 
 rm -rf "${TMP_RP:?}"
 trap 'rm -rf "$TMP"' EXIT

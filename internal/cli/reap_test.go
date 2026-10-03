@@ -105,7 +105,7 @@ func TestReapKindFilterAndUnknownKind(t *testing.T) {
 	if got := candIDs(data(t, out)); !reflect.DeepEqual(got, []string{"branch:kit/9-gone"}) {
 		t.Errorf("--kind branch = %v", got)
 	}
-	if code, _, _ := hvIn(t, root, "--json", "reap", "--kind", "lease"); code != 2 {
+	if code, _, _ := hvIn(t, root, "--json", "reap", "--kind", "bogus"); code != 2 {
 		t.Errorf("unknown kind exit %d, want 2", code)
 	}
 	if code, _, _ := hvIn(t, root, "--json", "reap", "--kind", "branch,nope"); code != 2 {

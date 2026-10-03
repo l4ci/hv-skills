@@ -9,6 +9,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 )
 
 var bg = context.Background()
@@ -356,7 +357,7 @@ func TestApplyReprovesABranchBeforeDeleting(t *testing.T) {
 	}
 }
 
-func TestKindFilterAndNoLeaseKind(t *testing.T) {
+func TestKindFilter(t *testing.T) {
 	g := repo([]wt{{"done", "kit/1-a", ""}}, []string{"kit/9-old"}, "kit/9-old", "HEAD")
 	g.clean("done")
 	all := find(t, input(g, nil, []host.Agent{}, nil))
@@ -382,5 +383,111 @@ func TestGitFailureIsAnError(t *testing.T) {
 	g := &fakeGit{resp: map[string]gitResp{"worktree list --porcelain": {code: 128, err: "not a repo"}}}
 	if _, err := Find(bg, input(g, nil, nil, nil), nil); err == nil {
 		t.Error("git failing must be an error")
+	}
+}
+
+// fakeLease scripts the round lease.
+type fakeLease struct {
+	l        round.Lease
+	st       roundlease.State
+	readErr  error
+	clearErr error
+	stale    bool // ClearStaleLease finds it stale and clears it
+	cleared  int
+}
+
+func (f *fakeLease) ReadLease(context.Context, string) (round.Lease, round.LeaseState, error) {
+	return f.l, f.st, f.readErr
+}
+
+func (f *fakeLease) ClearStaleLease(context.Context, string) (round.Lease, bool, error) {
+	if f.clearErr != nil || !f.stale {
+		return round.Lease{}, false, f.clearErr
+	}
+	f.cleared++
+	return f.l, true, nil
+}
+
+func leaseInput(f *fakeLease) Input {
+	in := input(repo(nil, nil), nil, []host.Agent{}, nil)
+	in.Lease = f
+	return in
+}
+
+var deadHolder = round.Lease{PID: 4242, Host: "h", Round: 3, StartedAt: "2026-01-02T03:04:05Z"}
+
+func TestStaleLeaseIsListedAndClearedOnApply(t *testing.T) {
+	f := &fakeLease{l: deadHolder, st: roundlease.Stale, stale: true}
+	in := leaseInput(f)
+	res := find(t, in)
+	if got := ids(res.Candidates); !reflect.DeepEqual(got, []string{"lease:round"}) {
+		t.Fatalf("candidates = %v", got)
+	}
+	c := res.Candidates[0]
+	if c.Held != "" || !strings.Contains(c.Reason, "pid 4242") || !strings.Contains(c.Reason, "round 3") {
+		t.Errorf("candidate = %+v", c)
+	}
+	if f.cleared != 0 {
+		t.Error("find must not clear the lease")
+	}
+	out := Apply(bg, in, res.Candidates)
+	if !reflect.DeepEqual(out.Reaped, []string{"lease:round"}) || len(out.Failed) != 0 || f.cleared != 1 {
+		t.Errorf("apply = %+v, cleared %d", out, f.cleared)
+	}
+}
+
+func TestUnreadableStaleLeaseNamesNoHolder(t *testing.T) {
+	f := &fakeLease{st: roundlease.Stale}
+	res := find(t, leaseInput(f))
+	if len(res.Candidates) != 1 || !strings.Contains(res.Candidates[0].Reason, "unreadable") {
+		t.Errorf("candidates = %+v", res.Candidates)
+	}
+}
+
+func TestLiveForeignAndAbsentLeasesAreNotListed(t *testing.T) {
+	for _, st := range []roundlease.State{roundlease.Live, roundlease.Foreign, roundlease.None} {
+		f := &fakeLease{l: deadHolder, st: st, stale: true}
+		res := find(t, leaseInput(f))
+		if len(res.Candidates) != 0 {
+			t.Errorf("%s lease listed: %v", st, ids(res.Candidates))
+		}
+	}
+	if res := find(t, input(repo(nil, nil), nil, []host.Agent{}, nil)); len(res.Candidates) != 0 {
+		t.Errorf("nil lease access listed %v", ids(res.Candidates))
+	}
+}
+
+func TestLeaseReadErrorIsAWarning(t *testing.T) {
+	f := &fakeLease{st: roundlease.Stale, readErr: fmt.Errorf("boom")}
+	res := find(t, leaseInput(f))
+	if len(res.Candidates) != 0 || len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "boom") {
+		t.Errorf("res = %+v", res)
+	}
+}
+
+func TestApplyLeaseThatTurnedLiveIsLeftAlone(t *testing.T) {
+	f := &fakeLease{l: deadHolder, st: roundlease.Stale, stale: false}
+	in := leaseInput(f)
+	res := find(t, in)
+	out := Apply(bg, in, res.Candidates)
+	if len(out.Reaped) != 0 || len(out.Failed) != 1 || out.Failed[0].ID != "lease:round" {
+		t.Errorf("apply = %+v", out)
+	}
+	f.clearErr = fmt.Errorf("locked")
+	if out := Apply(bg, in, res.Candidates); len(out.Failed) != 1 || !strings.Contains(out.Failed[0].Error, "locked") {
+		t.Errorf("apply = %+v", out)
+	}
+}
+
+func TestLeaseKindFilter(t *testing.T) {
+	g := repo([]wt{{"done", "kit/1-a", ""}}, []string{"kit/9-old"}, "kit/9-old", "HEAD")
+	g.clean("done")
+	in := input(g, nil, []host.Agent{}, nil)
+	in.Lease = &fakeLease{l: deadHolder, st: roundlease.Stale}
+	if got := ids(find(t, in, KindLease).Candidates); !reflect.DeepEqual(got, []string{"lease:round"}) {
+		t.Errorf("lease only = %v", got)
+	}
+	if got := ids(find(t, in, KindBranch).Candidates); !reflect.DeepEqual(got, []string{"branch:kit/9-old"}) {
+		t.Errorf("branch only = %v", got)
 	}
 }

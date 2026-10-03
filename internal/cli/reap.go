@@ -132,7 +132,7 @@ func reapCommand() *Command {
 }
 
 func reapVerb(fs *flag.FlagSet) RunFunc {
-	kind := fs.String("kind", "", "only these kinds, comma-separated: worktree, branch, tab, process")
+	kind := fs.String("kind", "", "only these kinds, comma-separated: worktree, branch, tab, process, lease")
 	apply := fs.Bool("apply", false, "delete the candidates that hold no work (default: preview)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if err := noArgs(args); err != nil {
@@ -160,7 +160,7 @@ func reapVerb(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}
-		in := reap.Input{Root: root, Base: env.Base, Git: env.Git, Report: rep, Agents: agents, Host: ops}
+		in := reap.Input{Root: root, Base: env.Base, Git: env.Git, Report: rep, Agents: agents, Host: ops, Lease: env}
 		found, err := reap.Find(ctx, in, kinds)
 		if err != nil {
 			return Result{}, fromWorker(err)
