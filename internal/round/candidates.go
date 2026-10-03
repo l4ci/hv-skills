@@ -34,64 +34,9 @@ func (e Env) Candidates(ctx context.Context, root string, be backlog.Backend, o 
 	if err != nil {
 		return nil, err
 	}
-	held := map[string]bool{}
-	for _, s := range worker.LoadRegistry(root).Slots() {
-		if id := heldID(worker.Str(s, "task"), worker.Str(s, "branch"), worker.Str(s, "name")); id != "" {
-			held[id] = true
-		}
-	}
-	pick := func(in func(backlog.Item) bool) []backlog.Item {
-		var out []backlog.Item
-		for _, it := range items {
-			if !it.Closed && !held[it.ID] && in(it) {
-				out = append(out, it)
-			}
-		}
-		return out
-	}
-	inMilestones := func(ids []string) func(backlog.Item) bool {
-		want := map[string]bool{}
-		for _, id := range ids {
-			want[id] = true
-		}
-		return func(it backlog.Item) bool {
-			for _, m := range backlog.ParseMilestones(it.Fields.Get("milestone")) {
-				if want[m] {
-					return true
-				}
-			}
-			return false
-		}
-	}
-
-	var chosen []backlog.Item
-	switch o.Scope {
-	case roundcfg.ScopeSlate:
-		in := map[string]bool{}
-		for _, id := range o.Slate {
-			in[strings.ToUpper(strings.TrimPrefix(id, "#"))] = true
-		}
-		chosen = pick(func(it backlog.Item) bool { return in[strings.ToUpper(it.ID)] })
-	case roundcfg.ScopeMilestone, roundcfg.ScopeNext:
-		active, err := milestone.Active(root)
-		if err != nil {
-			return nil, err
-		}
-		chosen = pick(inMilestones(active))
-		if len(chosen) == 0 && o.Scope == roundcfg.ScopeNext {
-			all, err := milestone.List(root)
-			if err != nil {
-				return nil, err
-			}
-			for _, m := range all {
-				if m.Status == "planned" && m.Ready {
-					chosen = pick(inMilestones([]string{m.ID}))
-					break
-				}
-			}
-		}
-	default:
-		return nil, &worker.Error{Exit: worker.ExitUsage, Message: "scope must be slate, milestone or next"}
+	chosen, err := scopeSet(root, items, heldIDs(root), o.Scope, o.Slate)
+	if err != nil {
+		return nil, err
 	}
 
 	tracked := e.trackedFiles(ctx, root)
@@ -124,4 +69,93 @@ func (e Env) trackedFiles(ctx context.Context, root string) []string {
 		}
 	}
 	return files
+}
+
+// heldIDs are the items the registry's slots hold.
+func heldIDs(root string) map[string]bool {
+	held := map[string]bool{}
+	for _, s := range worker.LoadRegistry(root).Slots() {
+		if id := heldID(worker.Str(s, "task"), worker.Str(s, "branch"), worker.Str(s, "name")); id != "" {
+			held[id] = true
+		}
+	}
+	return held
+}
+
+// scopeSet is the open items of the scope that held does not name.
+func scopeSet(root string, items []backlog.Item, held map[string]bool, scope string, slate []string) ([]backlog.Item, error) {
+	pick := func(in func(backlog.Item) bool) []backlog.Item {
+		var out []backlog.Item
+		for _, it := range items {
+			if !it.Closed && !held[it.ID] && in(it) {
+				out = append(out, it)
+			}
+		}
+		return out
+	}
+	inMilestones := func(ids []string) func(backlog.Item) bool {
+		want := map[string]bool{}
+		for _, id := range ids {
+			want[id] = true
+		}
+		return func(it backlog.Item) bool {
+			for _, m := range backlog.ParseMilestones(it.Fields.Get("milestone")) {
+				if want[m] {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	var chosen []backlog.Item
+	switch scope {
+	case roundcfg.ScopeSlate:
+		in := map[string]bool{}
+		for _, id := range slate {
+			in[strings.ToUpper(strings.TrimPrefix(id, "#"))] = true
+		}
+		chosen = pick(func(it backlog.Item) bool { return in[strings.ToUpper(it.ID)] })
+	case roundcfg.ScopeMilestone, roundcfg.ScopeNext:
+		active, err := milestone.Active(root)
+		if err != nil {
+			return nil, err
+		}
+		chosen = pick(inMilestones(active))
+		if len(chosen) == 0 && scope == roundcfg.ScopeNext {
+			all, err := milestone.List(root)
+			if err != nil {
+				return nil, err
+			}
+			for _, m := range all {
+				if m.Status == "planned" && m.Ready {
+					chosen = pick(inMilestones([]string{m.ID}))
+					break
+				}
+			}
+		}
+	default:
+		return nil, &worker.Error{Exit: worker.ExitUsage, Message: "scope must be slate, milestone or next"}
+	}
+	return chosen, nil
+}
+
+// InScope reports whether the scope allows assigning id: it is a candidate
+// now, or belongs to the scope's current set whether or not a slot holds it.
+func InScope(root string, be backlog.Backend, scope string, slate []string, id string) (bool, error) {
+	items, err := be.List(false)
+	if err != nil {
+		return false, err
+	}
+	for _, held := range []map[string]bool{heldIDs(root), nil} {
+		set, err := scopeSet(root, items, held, scope, slate)
+		if err != nil {
+			return false, err
+		}
+		for _, it := range set {
+			if strings.EqualFold(it.ID, id) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

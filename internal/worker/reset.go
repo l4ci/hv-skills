@@ -58,6 +58,12 @@ func BranchFor(slot, task string) string {
 // A refusal returns an *Error (exit 4, or exit 1 with checkOnly) whose Data
 // is the ResetResult.
 func (e Env) Reset(root, slot, task string, checkOnly bool) (ResetResult, error) {
+	return e.ResetTo(root, slot, task, BranchFor(slot, task), checkOnly)
+}
+
+// ResetTo is Reset onto an explicit branch: a round slot works on
+// `<agent>/<issue>-<slug>` and parks on `park/<agent>`, not hv-worker/….
+func (e Env) ResetTo(root, slot, task, newBranch string, checkOnly bool) (ResetResult, error) {
 	e = e.withDefaults()
 	res := ResetResult{Slot: slot}
 	reg := LoadRegistry(root)
@@ -76,7 +82,6 @@ func (e Env) Reset(root, slot, task string, checkOnly bool) (ResetResult, error)
 		return res, fail(ExitResolution, fmt.Sprintf("slot '%s' base '%s' does not exist", slot, base))
 	}
 	res.Base = base
-	newBranch := BranchFor(slot, task)
 
 	retry := false
 	if task != "" && task == oldTask {

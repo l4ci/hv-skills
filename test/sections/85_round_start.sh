@@ -81,3 +81,24 @@ OUT=$(rn round candidates)
 OUT=$(rn round candidates --scope milestone)
 [ "$(echo "$OUT" | jget data.candidates[2].id)" = "T01" ] || fail "--scope should override for one call: $OUT"
 pass "scope slate limits candidates to the approved slate"
+
+# assign: readiness, scope and the lease are checked before anything is marked.
+# The worker contract is not in this fixture, so a ready item stops at the
+# brief; a not-ready one and an out-of-scope one stop earlier. No host is used.
+rn round start --holder-pid "$HOLDER" --scope milestone >/dev/null
+OUT=$(rn round assign F01 --check-only --holder-pid "$HOLDER")
+[ "$(echo "$OUT" | jget data.ready)" = "true" ] || fail "F01 should be ready: $OUT"
+[ "$(echo "$OUT" | jget data.agent)" = "ben" ] || fail "check-only should name the first idle slot: $OUT"
+[ "$(echo "$OUT" | jget data.branch)" = "ben/f01-first" ] || fail "branch is <agent>/<issue>-<slug>: $OUT"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign T01 --check-only --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+[ "$RC" = "1" ] || fail "check-only on an unready item should exit 1, got $RC: $OUT"
+[ "$(echo "$OUT" | jget data.ready)" = "false" ] || fail "T01 is not ready: $OUT"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign T01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "not ready" ] || fail "assign of an unready item should be refused: $RC $OUT"
+grep -q 'no acceptance criteria' <<<"$OUT" || fail "the refusal should say why: $OUT"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign F01 --holder-pid 1 2>/dev/null ) || RC=$?
+[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "no round" ] || fail "a process without the lease is refused: $RC $OUT"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign F01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "brief missing" ] || fail "a missing worker contract is refused before marking: $RC $OUT"
+[ "$(git -C "$RN/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "a refused assign must leave the slot parked"
+pass "assign refuses before marking: not ready, no lease, missing contract; check-only writes nothing"

@@ -1,0 +1,400 @@
+package round
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
+	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv-skills/v5/internal/worker"
+)
+
+// Board is the backlog an assignment reads and marks.
+type Board interface {
+	backlog.Backend
+	backlog.Workflow
+}
+
+// Blocked reasons of an assignment (exit 4, `blockedBy`).
+const (
+	BlockNoRound      = "no round"
+	BlockOutOfScope   = "out of scope"
+	BlockNotReady     = "not ready"
+	BlockOverlap      = "overlap"
+	BlockClaimed      = "claimed"
+	BlockSlotBusy     = "slot busy"
+	BlockNoFreeSlot   = "no free slot"
+	BlockBriefMissing = "brief missing"
+)
+
+// BlockedError is an assignment refused before anything was marked or sent.
+type BlockedError struct {
+	By        string
+	Msg       string
+	Readiness *Readiness
+}
+
+func (e *BlockedError) Error() string { return e.Msg }
+
+// AssignOpts are the flags of `hv round assign`, with the config read.
+type AssignOpts struct {
+	ID            string
+	Agent         string
+	BodyFile      string // answered decisions, verbatim; "" for none
+	Siblings      []string
+	CheckOnly     bool
+	AcceptOverlap bool
+	HolderPID     int
+	Settings      roundcfg.Settings
+	Getenv        func(string) string
+}
+
+// Assigned is what Assign did.
+type Assigned struct {
+	ID, Type, Agent, Branch string
+	Readiness
+	Account    string
+	Dispatched bool
+	Changed    bool
+}
+
+var (
+	slugNonWord = regexp.MustCompile(`[^a-z0-9]+`)
+)
+
+// BranchName is `<agent>/<issue>-<slug>`: the issue number (file mode: the
+// lowercased ID), then the title lowercased with non-alphanumerics collapsed
+// to `-`, cut to five words and 40 characters.
+func BranchName(agent, id, title string) string {
+	slug := strings.Trim(slugNonWord.ReplaceAllString(strings.ToLower(title), "-"), "-")
+	if words := strings.Split(slug, "-"); len(words) > 5 {
+		slug = strings.Join(words[:5], "-")
+	}
+	if len(slug) > 40 {
+		slug = strings.TrimRight(slug[:40], "-")
+	}
+	name := agent + "/" + strings.ToLower(id)
+	if slug != "" {
+		name += "-" + slug
+	}
+	return name
+}
+
+// briefPath is the standing worker contract the pointer names: round.brief,
+// else references/worker-contract.md under CLAUDE_PLUGIN_ROOT, else under the
+// project root.
+func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (string, bool) {
+	var cands []string
+	if set.Brief != "" {
+		p := set.Brief
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(root, p)
+		}
+		cands = append(cands, p)
+	} else {
+		if pr := getenv("CLAUDE_PLUGIN_ROOT"); pr != "" {
+			cands = append(cands, filepath.Join(pr, "references", "worker-contract.md"))
+		}
+		cands = append(cands, filepath.Join(root, "references", "worker-contract.md"))
+	}
+	for _, c := range cands {
+		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
+			return c, true
+		}
+	}
+	return "", false
+}
+
+// pointerBrief is the short brief a worker is dispatched with: where its
+// contract is, which issue to read and dispute, its branch, its siblings and
+// the decisions already settled. dispatch signs it.
+func pointerBrief(agent, id, branch, brief string, siblings []string, decisions string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "You are %s. Read %s in full before anything else: it is your standing contract.\n\n", agent, brief)
+	fmt.Fprintf(&b, "Then read issue %s and its whole thread yourself. Dispute the ticket before implementing if it is wrong, already decided or contradicts the code: say so instead of building it.\n\n", id)
+	fmt.Fprintf(&b, "Your branch is %s; your worktree is already on it.\n", branch)
+	if len(siblings) > 0 {
+		fmt.Fprintf(&b, "Sibling issues running now: %s.\n", strings.Join(siblings, ", "))
+	}
+	if d := strings.TrimSpace(decisions); d != "" {
+		fmt.Fprintf(&b, "\nDecisions already settled (verbatim):\n\n%s\n", d)
+	}
+	return b.String()
+}
+
+func blocked(by, format string, a ...any) *BlockedError {
+	return &BlockedError{By: by, Msg: fmt.Sprintf(format, a...)}
+}
+
+func usage(format string, a ...any) error {
+	return &worker.Error{Exit: worker.ExitUsage, Message: fmt.Sprintf(format, a...)}
+}
+
+func (e Env) workerEnv() worker.Env {
+	w := e.Worker
+	if w.Git == nil {
+		w.Git = e.Git
+	}
+	return w
+}
+
+// Assign checks an item's readiness and, unless CheckOnly, marks it taken and
+// hands it to a slot: claim, in-progress state and comment, reset onto
+// `<agent>/<issue>-<slug>`, account, dispatch. Each step is skipped when
+// already done, so repeating the call resumes it. A failure before dispatch
+// undoes the claim and state; a failure at or after dispatch keeps them,
+// because the pane may already hold the brief.
+func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (res Assigned, err error) {
+	set := o.Settings
+	it, err := be.Get(o.ID)
+	if err != nil {
+		return res, err
+	}
+	if it.Closed {
+		return res, fmt.Errorf("%w: %s is closed", backlog.ErrNotFound, o.ID)
+	}
+	id := it.ID
+	res.ID, res.Type = id, it.Type
+	if o.Agent != "" && !contains(set.Roster, o.Agent) {
+		return res, usage("--agent %s is not in round.roster (%s)", o.Agent, strings.Join(set.Roster, ", "))
+	}
+	if o.BodyFile != "" {
+		if _, err := os.Stat(o.BodyFile); err != nil {
+			return res, usage("--body-file %s: %v", o.BodyFile, err)
+		}
+	}
+
+	// 1. This process holds the round's lease.
+	cd, err := e.commonDir(ctx, root)
+	if err != nil {
+		return res, err
+	}
+	le := e.leaseEnv()
+	lease, st, err := le.Read(cd)
+	if err != nil {
+		return res, err
+	}
+	holder := le.Discover(o.HolderPID, o.Getenv)
+	if (st != roundlease.Live && st != roundlease.Foreign) || !holder.SameAs(lease, le.Host) {
+		return res, blocked(BlockNoRound, "this process holds no round lease: run hv round start first")
+	}
+
+	// 2. The slot: the named one, else the first idle roster slot.
+	reg := worker.LoadRegistry(root)
+	var slot *jsonx.Object
+	resuming := false
+	if o.Agent != "" {
+		slot = reg.Slot(o.Agent)
+		if slot == nil {
+			return res, &worker.Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("slot %s is not provisioned: run hv round start", o.Agent)}
+		}
+	} else {
+		for _, name := range set.Roster {
+			s := reg.Slot(name)
+			if s != nil && heldID(worker.Str(s, "task"), worker.Str(s, "branch"), name) == strings.ToUpper(id) {
+				slot, resuming = s, true
+				break
+			}
+		}
+		for _, name := range set.Roster {
+			if slot != nil {
+				break
+			}
+			if s := reg.Slot(name); s != nil && heldID(worker.Str(s, "task"), worker.Str(s, "branch"), name) == "" {
+				slot = s
+			}
+		}
+		if slot == nil {
+			return res, blocked(BlockNoFreeSlot, "every roster slot is busy")
+		}
+	}
+	agent := worker.Str(slot, "name")
+	res.Agent = agent
+	if h := heldID(worker.Str(slot, "task"), worker.Str(slot, "branch"), agent); h != "" {
+		if h != strings.ToUpper(id) {
+			return res, blocked(BlockSlotBusy, "slot %s holds %s", agent, h)
+		}
+		resuming = true
+	}
+	res.Branch = BranchName(agent, id, it.Title)
+
+	// 3. The scope allows it.
+	scope, slate := SlateOf(root)
+	if scope == "" {
+		scope = set.Scope
+	}
+	if !resuming {
+		ok, err := InScope(root, be, scope, slate, id)
+		if err != nil {
+			return res, err
+		}
+		if !ok {
+			return res, blocked(BlockOutOfScope, "%s is outside the round's scope (%s)", id, scope)
+		}
+	}
+
+	// 4. Readiness.
+	tracked := e.trackedFiles(ctx, root)
+	inFlight := e.InFlightItems(ctx, root, be, tracked, set.SharedPaths)
+	r, err := Assess(be, id, tracked, set.SharedPaths, inFlight, o.AcceptOverlap)
+	if err != nil {
+		return res, err
+	}
+	res.Readiness = r
+	if o.CheckOnly {
+		return res, nil
+	}
+	if !r.Ready() {
+		by := BlockNotReady
+		if len(r.Checks) == 3 && r.Checks[0].OK && r.Checks[1].OK && !r.Checks[2].OK {
+			by = BlockOverlap
+		}
+		blk := blocked(by, "%s is not ready: %s", id, failedChecks(r))
+		blk.Readiness = &r
+		return res, blk
+	}
+
+	// 5. The brief exists before anything is marked.
+	brief, ok := briefPath(root, set, o.Getenv)
+	if !ok {
+		return res, blocked(BlockBriefMissing, "the worker contract (references/worker-contract.md) was not found; set round.brief")
+	}
+
+	// 6. Claim, in-progress, comment.
+	rnd := 0
+	if v, ok := worker.LoadRegistry(root).Doc.Get("round"); ok {
+		rnd = intOf(v)
+	}
+	claimID := agent + "@" + strconv.Itoa(rnd)
+	won, holderID, err := be.Claim(id, claimID)
+	if err != nil {
+		return res, err
+	}
+	if !won {
+		return res, blocked(BlockClaimed, "%s is claimed by %s", id, holderID)
+	}
+	undo := func() {
+		res.Changed = false
+		be.SetState(id, "none")
+		be.Release(id, claimID)
+		mutateSlot(root, agent, func(s *jsonx.Object) { s.Set("task", nil); s.Set("claimId", nil) })
+	}
+	changed, err := be.SetState(id, "in-progress")
+	if err != nil {
+		undo()
+		return res, err
+	}
+	res.Changed = changed || !resuming
+	if !resuming {
+		if _, err := be.AddComment(id, "feedback", fmt.Sprintf("In progress: agent **%s** on branch `%s`.", agent, res.Branch)); err != nil {
+			undo()
+			return res, err
+		}
+	}
+
+	// 7. The slot onto its issue branch.
+	w := e.workerEnv()
+	if _, err := w.ResetTo(root, agent, id, res.Branch, false); err != nil {
+		undo()
+		var we *worker.Error
+		if errors.As(err, &we) && we.Exit == worker.ExitRefused {
+			return res, blocked(BlockSlotBusy, "%s", we.Message)
+		}
+		return res, err
+	}
+	if err := mutateSlot(root, agent, func(s *jsonx.Object) { s.Set("task", id); s.Set("claimId", claimID) }); err != nil {
+		undo()
+		return res, err
+	}
+
+	// 8. The account is the pane's CLAUDE_CONFIG_DIR: keep the slot's own while
+	// it has headroom, else pick; none usable is a refusal to start.
+	if e.Accounts != nil && len(worker.Configured(root)) > 0 {
+		name, err := e.pickAccount(ctx, root, agent)
+		if err != nil {
+			undo()
+			return res, err
+		}
+		res.Account = name
+	}
+
+	// 9. Dispatch the pointer brief.
+	tmp, err := os.CreateTemp("", "hv-round-brief-")
+	if err != nil {
+		undo()
+		return res, err
+	}
+	defer os.Remove(tmp.Name())
+	decisions := ""
+	if o.BodyFile != "" {
+		b, _ := os.ReadFile(o.BodyFile)
+		decisions = string(b)
+	}
+	tmp.WriteString(pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions))
+	tmp.Close()
+	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch}); err != nil {
+		return res, err
+	}
+	res.Dispatched, res.Changed = true, true
+	return res, nil
+}
+
+func (e Env) pickAccount(ctx context.Context, root, agent string) (string, error) {
+	cur := ""
+	if s := worker.LoadRegistry(root).Slot(agent); s != nil {
+		cur = worker.Str(s, "account")
+	}
+	if cur != "" {
+		for _, m := range e.Accounts.Meters(ctx, root) {
+			if m.Name == cur && m.Verdict != worker.VerdictCooling {
+				return cur, nil
+			}
+		}
+	}
+	name, ok := e.Accounts.Pick(ctx, root, nil)
+	if !ok {
+		return "", &worker.Error{Exit: worker.ExitUnavailable, Message: "no work.accounts account has headroom: every configured account is cooling down"}
+	}
+	if _, _, err := e.Accounts.Assign(ctx, root, agent, name); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+func failedChecks(r Readiness) string {
+	var out []string
+	for _, c := range r.Checks {
+		if !c.OK {
+			out = append(out, c.Name+" ("+strings.Join(c.Detail, "; ")+")")
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+func contains(l []string, s string) bool {
+	for _, v := range l {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func intOf(v any) int {
+	switch t := v.(type) {
+	case float64:
+		return int(t)
+	case interface{ Int64() (int64, error) }:
+		i, _ := t.Int64()
+		return int(i)
+	}
+	return 0
+}
