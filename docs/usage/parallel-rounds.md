@@ -109,6 +109,21 @@ issue to read and dispute, the siblings and the decisions from `--body-file`.
 `--accept-overlap` skips the file-overlap check only. A failure before dispatch undoes the
 claim and state; one at or after dispatch keeps them, and repeating the call resumes.
 
+## Winding down
+
+```sh
+hv round wind-down                # verify the base, park every slot, release the lease
+hv round wind-down --no-verify
+```
+
+Run it from the orchestrator that holds the lease, with the base checked out and clean in
+the project root. It re-verifies the base (`refactor.verifyCommands`), then parks every
+roster slot on `park/<agent>` and releases the claims, then releases the lease. A red base
+(`verify-failed`, exit 1) keeps the lease. A slot with uncommitted changes or commits not on
+the base is reported as `retained` and left alone (`holds-work`, exit 4); the other slots are
+parked anyway, so fix the slot and run it again. It deletes no branch and clears no label: the
+`drift` count says what `hv round reconcile` and `hv reap` still have to do.
+
 ## Waiting on workers
 
 `hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints

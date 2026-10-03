@@ -12,5 +12,6 @@ func roundCommands() *Command {
 		{Name: "start", Summary: "take the orchestrator lease, provision the roster, list candidates", Verb: roundStart},
 		{Name: "candidates", Summary: "list the items the round's scope allows, with readiness", Verb: roundCandidates},
 		{Name: "assign", Summary: "check an item's readiness and hand it to a slot", Verb: roundAssign},
+		{Name: "wind-down", Summary: "re-verify the base, park every slot, release the lease", Verb: roundWindDown},
 	}}
 }

@@ -102,3 +102,24 @@ RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign F01 --holder-pid "
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "brief missing" ] || fail "a missing worker contract is refused before marking: $RC $OUT"
 [ "$(git -C "$RN/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "a refused assign must leave the slot parked"
 pass "assign refuses before marking: not ready, no lease, missing contract; check-only writes nothing"
+
+# wind-down: verify, park, release. A slot holding work is reported and kept.
+echo "scratch" > "$RN/.worktrees/ben/wip.txt"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+[ "$RC" = "4" ] || fail "wind-down with a dirty slot should exit 4, got $RC: $OUT"
+[ "$(echo "$OUT" | jget data.blockedBy)" = "slot holds work" ] || fail "refusal should name the cause: $OUT"
+[ "$(echo "$OUT" | jget data.slots[0].outcome)" = "retained" ] || fail "ben should be retained: $OUT"
+[ "$(echo "$OUT" | jget data.slots[1].outcome)" = "unchanged" ] || fail "dana should be unchanged: $OUT"
+[ -f "$LEASE" ] || fail "a refused wind-down must keep the lease"
+rm "$RN/.worktrees/ben/wip.txt"
+OUT=$(rn round wind-down --holder-pid "$HOLDER")
+[ "$(echo "$OUT" | jget data.verdict)" = "clean" ] || fail "wind-down should be clean: $OUT"
+[ "$(echo "$OUT" | jget data.verifySkipped)" = "true" ] || fail "no verify commands means skipped: $OUT"
+[ "$(echo "$OUT" | jget data.slots[0].outcome)" = "unchanged" ] || fail "both slots end parked: $OUT"
+[ ! -f "$LEASE" ] || fail "a clean wind-down should release the lease"
+[ "$(git -C "$RN/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "ben should be on park/ben"
+RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+[ "$RC" = "3" ] || fail "wind-down without a lease should exit 3, got $RC: $OUT"
+OUT=$(rn round start --holder-pid "$HOLDER")
+[ "$(echo "$OUT" | jget data.round)" -ge 3 ] || fail "a new start after wind-down is a later round: $OUT"
+pass "wind-down parks every slot, keeps the lease while one holds work, then releases it"
