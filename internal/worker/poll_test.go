@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -273,5 +274,23 @@ func TestClassifySentinelAfterReplyBullet(t *testing.T) {
 	plain := strings.Replace(done, "● HV-DONE lr1 lr1/f01-add-a-hello-line-to", "● All done.", 1)
 	if state, _ := Classify(plain, false, 60, "idle"); state == "DONE" {
 		t.Errorf("a bullet without a sentinel is not done")
+	}
+}
+
+func TestLimitRegexIsTheAlternationOfTheClassifierPhrases(t *testing.T) {
+	re := regexp.MustCompile(LimitRegex())
+	if len(LimitPatterns()) != len(LimitPhrases) {
+		t.Fatalf("%d patterns for %d phrases", len(LimitPatterns()), len(LimitPhrases))
+	}
+	for _, msg := range []string{"You've reached your usage limit", "Claude USAGE LIMIT REACHED", "Youve hit your usage limit", "Your limit will reset at 3pm", "Approaching your usage limit"} {
+		if !re.MatchString(msg) {
+			t.Errorf("%q not matched", msg)
+		}
+		if _, ev := Classify(msg, false, 40, ""); ev == "" {
+			t.Errorf("%q not classified", msg)
+		}
+	}
+	if re.MatchString("the limit of the buffer") {
+		t.Error("matched a bare limit")
 	}
 }

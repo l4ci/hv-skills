@@ -104,6 +104,13 @@ var Keys = []Key{
 	{"orchestrator.keepaliveBackoffSeconds", json.Number("5"), false},
 	{"orchestrator.restartPrompt", "Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.", false},
 	{"orchestrator.escalateIssue", json.Number("0"), false},
+	// D3 usage-limit keys: silent defaults, read by `hv limit watch` and the
+	// watcher inside `hv keepalive run`.
+	{"limits.mode", "switch", false},
+	{"limits.resumeMarginSeconds", json.Number("60"), false},
+	{"limits.fallbackSleepSeconds", json.Number("1800"), false},
+	{"limits.maxResumes", json.Number("3"), false},
+	{"limits.resumePrompt", "The usage limit has reset. Continue where you left off.", false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.

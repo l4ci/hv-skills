@@ -37,7 +37,7 @@ func Tree() *Command {
 	root.Subs = append(root.Subs, reviewCommands(), shipCommands(), releaseCommands())
 	root.Subs = append(root.Subs, verdictCommands(), gateCommands())
 	root.Subs = append(root.Subs, doctorCommand(), reapCommand())
-	root.Subs = append(root.Subs, statuslineCommands(), hookCommands(), keepaliveCommands())
+	root.Subs = append(root.Subs, statuslineCommands(), hookCommands(), keepaliveCommands(), limitCommands())
 	addStubs(root)
 	return root
 }

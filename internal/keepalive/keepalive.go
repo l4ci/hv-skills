@@ -9,6 +9,7 @@
 package keepalive
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -66,6 +67,10 @@ type Env struct {
 	Escalate func(issue int, title, body string) (id string, warnings []string, err error)
 	// Notify raises the host notification alone.
 	Notify func(title, body string)
+	// Limits is the usage-limit watcher (D3), run as a goroutine for the
+	// life of the supervisor. It returns when ctx ends, with any warnings.
+	// Nil means none (`--no-limits`).
+	Limits func(ctx context.Context) []string
 }
 
 // Options are one run's inputs, flags already merged over config.
@@ -220,7 +225,29 @@ func Run(env Env, o Options) (Result, error) {
 		}()
 	}
 
+	// The limits loop runs beside the child and ends before the lease is
+	// released, so it never acts for a round that has no orchestrator.
+	stopLimits := func() {}
+	if env.Limits != nil {
+		lctx, cancel := context.WithCancel(context.Background())
+		ldone := make(chan struct{})
+		var lwarns []string
+		go func() {
+			defer close(ldone)
+			lwarns = env.Limits(lctx)
+		}()
+		var once sync.Once
+		stopLimits = func() {
+			once.Do(func() {
+				cancel()
+				<-ldone
+				res.Warnings = append(res.Warnings, lwarns...)
+			})
+		}
+	}
+
 	finish := func(reason string, cause error) (Result, error) {
+		stopLimits()
 		res.StopReason, res.Restarts, res.NoProgress = reason, st.Restarts, st.NoProgress
 		if reason == StopMaxRestarts || reason == StopBreaker {
 			res.Escalation = escalate(env, o, st, reason, statePath, &res)

@@ -258,6 +258,20 @@ Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; 
 
 An out-of-range value exits 70 in a verb that reads it (`hv keepalive run` included); the hooks treat it as a pass and never block.
 
+## limits keys
+
+Settings for the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`; see [usage limits](pausing-and-resuming.md#usage-limits)). All are silent defaults; none is written by `/hv-init`.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `limits.mode` | `switch` | `switch` moves a limited worker's issue to an idle slot on another account with headroom, and sleeps when there is none. `sleep` always waits for the reset. The orchestrator always sleeps. |
+| `limits.resumeMarginSeconds` | `60` | Seconds after the reset before the resume prompt is typed (integer, 0 or more). |
+| `limits.fallbackSleepSeconds` | `1800` | Sleep for a limit whose reset time is unknown (integer, 1 or more). |
+| `limits.maxResumes` | `3` | Resume prompts one limit gets before the entry is `failed` and escalated (integer, 1 or more). |
+| `limits.resumePrompt` | `The usage limit has reset. Continue where you left off.` | Typed into the limited pane at the reset (non-empty string). |
+
+An out-of-range value exits 70 in a verb that reads it.
+
 ## qa.gate
 
 Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Independent of the `/hv-review` verdict routing.

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/l4ci/hv-skills/v5/internal/limits"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -143,3 +144,40 @@ func TestKeepaliveRunRefusedWhileLeaseHeldAndCommandMissing(t *testing.T) {
 }
 
 func mustStart(e roundlease.Env, pid int) uint64 { s, _ := e.StartTime(pid); return s }
+
+func TestKeepaliveRunsTheLimitsLoopUnlessTold(t *testing.T) {
+	for _, noLimits := range []bool{false, true} {
+		dir := kaProject(t, "")
+		useLimFake(t)
+		cd, _ := roundlease.CommonDir(dir)
+		out := filepath.Join(t.TempDir(), "seen")
+		// the child waits for the loop's record to appear, or gives up
+		script := `i=0; while [ ! -e "$1" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done; if [ -e "$1" ]; then echo yes > "$2"; else echo no > "$2"; fi`
+		argv := []string{"keepalive", "run", "--json"}
+		if noLimits {
+			argv = append(argv, "--no-limits")
+		}
+		argv = append(argv, "--", "sh", "-c", script, "sh", limits.WatchPath(cd), out)
+		if code, o, e := hvIn(t, dir, argv...); code != 0 {
+			t.Fatalf("exit %d: %s %s", code, o, e)
+		}
+		b, _ := os.ReadFile(out)
+		want := "yes"
+		if noLimits {
+			want = "no"
+		}
+		if strings.TrimSpace(string(b)) != want {
+			t.Errorf("--no-limits=%v: the watcher record was %q, want %q", noLimits, b, want)
+		}
+		if _, found := limits.ReadWatching(cd); found {
+			t.Errorf("--no-limits=%v: the record must be gone after the run", noLimits)
+		}
+	}
+	dir := kaProject(t, `{"git":{"baseBranch":"feat/x"},"limits":{"maxResumes":0}}`)
+	if code, _, _ := hvIn(t, dir, "keepalive", "run", "--", "true"); code != 70 {
+		t.Errorf("a bad limits key must exit 70, got %d", code)
+	}
+	if code, _, _ := hvIn(t, dir, "keepalive", "run", "--no-limits", "--", "true"); code != 0 {
+		t.Errorf("--no-limits must not read the limits keys, got %d", code)
+	}
+}

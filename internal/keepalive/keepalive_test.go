@@ -1,6 +1,7 @@
 package keepalive
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -444,5 +445,41 @@ func TestLoadSettingsDefaultsAndRanges(t *testing.T) {
 		if _, err := load(bad); err == nil {
 			t.Errorf("%s must be rejected", bad)
 		}
+	}
+}
+
+func TestLimitsLoopRunsBesideTheChildAndEndsBeforeTheLeaseIsReleased(t *testing.T) {
+	r := newRig(t)
+	env := r.env(nil)
+	started := make(chan struct{})
+	var leaseAtStop roundlease.State
+	var heldWhileRunning roundlease.State
+	env.Limits = func(ctx context.Context) []string {
+		close(started)
+		_, heldWhileRunning, _ = env.Lease.Read(r.dir)
+		<-ctx.Done()
+		_, leaseAtStop, _ = env.Lease.Read(r.dir)
+		return []string{"limits warning"}
+	}
+	r.script = func(n int, r *rig) Exit {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Error("the limits loop never started")
+		}
+		return Exit{}
+	}
+	res, err := Run(env, r.opts())
+	if err != nil || res.StopReason != StopNoHandoff {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if heldWhileRunning != roundlease.Live || leaseAtStop != roundlease.Live {
+		t.Errorf("the lease must be held while the loop runs and when it is told to stop: %v %v", heldWhileRunning, leaseAtStop)
+	}
+	if r.lease(env) != roundlease.None {
+		t.Error("the lease must be released after the loop ended")
+	}
+	if len(res.Warnings) != 1 || res.Warnings[0] != "limits warning" {
+		t.Errorf("the loop's warnings: %v", res.Warnings)
 	}
 }

@@ -2,11 +2,14 @@ package cli
 
 import (
 	"context"
+	"github.com/l4ci/hv-skills/v5/internal/limits"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
@@ -113,6 +116,29 @@ func TestRoundVerbsRejectRepoAndArgs(t *testing.T) {
 	for _, args := range [][]string{{"round", "status", "x"}, {"round", "reconcile", "x"}, {"--repo", "a", "round", "status"}} {
 		if code, _, _ := hvIn(t, root, args...); code != 2 {
 			t.Errorf("%v exit %d, want 2", args, code)
+		}
+	}
+}
+
+func TestRoundStatusAndReconcileListWaitingLimits(t *testing.T) {
+	root := roundFixture(t, []host.Agent{})
+	addLimit(t, root, waitingEntry(time.Date(2026, 10, 3, 15, 0, 0, 0, time.UTC)))
+	resolved := waitingEntry(time.Date(2026, 10, 3, 10, 0, 0, 0, time.UTC))
+	resolved.Status = limits.StatusResumed
+	addLimit(t, root, resolved)
+	for _, verb := range []string{"status", "reconcile"} {
+		code, out, _ := hvIn(t, root, "--json", "round", verb)
+		d := data(t, out)
+		rows, _ := d["limits"].([]any)
+		if code != 0 || len(rows) != 1 || rows[0].(map[string]any)["id"] != "l1" {
+			t.Fatalf("%s: %d %v", verb, code, d)
+		}
+		if verb == "reconcile" && len(d["drift"].([]any)) != 2 {
+			t.Errorf("a waiting limit must add no drift: %v", d["drift"])
+		}
+		_, text, _ := hvIn(t, root, "round", verb)
+		if !strings.Contains(text, "limit\tl1\twaiting\torchestrator") {
+			t.Errorf("%s text: %q", verb, text)
 		}
 	}
 }

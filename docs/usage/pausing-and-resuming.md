@@ -111,4 +111,29 @@ hv keepalive run -- claude --model opus       # everything after -- is the comma
 
 **How it stops.** The supervisor stops when the orchestrator leaves no fresh handoff (`no-handoff`), on the breaker or the restart limit (exit 1), or when you interrupt it: SIGINT and SIGTERM go to the child, the supervisor waits for it and does not restart (`interrupted`). It then releases the lease and records `status: stopped` in `<git-common-dir>/hv/keepalive.json`. It never deletes the handoff; only the SessionStart hook consumes it.
 
-The flags `--max-restarts`, `--breaker`, `--backoff` and `--prompt` override the config for one run. `--json` prints one envelope when the loop ends, not before.
+The flags `--max-restarts`, `--breaker`, `--backoff` and `--prompt` override the config for one run. `--no-limits` leaves out the usage-limit watcher the supervisor otherwise runs beside the command (see [usage limits](#usage-limits)). `--json` prints one envelope when the loop ends, not before.
+
+## Usage limits
+
+A 5-hour or weekly usage limit stops a session until the window resets. `hv limit watch` keeps a round from stalling on that: it notices the limit, waits for the reset, and types a resume prompt into the pane. Under `hv keepalive run` the same loop runs inside the supervisor, so there is nothing more to start. For an orchestrator not started under `run`, start the verb in the background or in a pane of its own:
+
+```
+hv limit watch            # blocks for the life of the round
+hv limit status           # the log, and whether anything is watching
+```
+
+`watch` needs the round lease, because moving work between accounts is the orchestrator's act. It refuses to start (exit 4) without it, under a live `hv keepalive run` (which already watches) or beside another watcher.
+
+**How it notices.** For the orchestrator it reads the rate limits the statusline dump stores: a window at 100 percent with its reset still ahead is a limit, and the later reset wins if both are. For a worker slot it reads the account meter (`hv worker account list`), but only after the slot's pane shows a limit message, never on a timer. The message itself is the fallback: on herdr 0.9.x the loop subscribes to `pane.output_matched` with the phrases `hv worker poll` already uses for LIMITED, on tmux (or if herdr refuses the subscription) it captures the panes every `--settle` seconds. A message with no data behind it gets its reset time from the text (`resets at 3pm` reads as the next 3pm in your time zone, within 8 days), and otherwise sleeps `limits.fallbackSleepSeconds`. "Approaching your usage limit" is a warning and starts nothing.
+
+**Sleep or switch.** `limits.mode` is `switch` (default) or `sleep`.
+
+- `sleep` waits for the reset.
+- `switch` applies to a worker slot only. It uses the rule `hv round assign` uses: keep the slot's account unless it is cooling, otherwise take the account with the most headroom (`hv worker account pick --exclude <account>`). With such an account and an idle slot on it, the slot's issue moves there with `hv round transfer`, so the work continues from its pushed branch and a handoff comment. With no usable account, or no idle slot on it, the limit sleeps instead, and the entry says why.
+- **The orchestrator only sleeps.** A limited session cannot write a handoff, and a restarted one with no handoff has nothing to continue from. Handing off before the limit and switching the orchestrator's account are follow-up work: #206.
+
+**Resuming.** At the reset plus `limits.resumeMarginSeconds` (60) the loop types `limits.resumePrompt` into the pane and keeps watching it. A pane still limited after the prompt starts another cycle, up to `limits.maxResumes` (3) for one limit. Past that the entry is `failed` and the loop posts an escalation on issue `orchestrator.escalateIssue`, or raises a host notification when that is unset. Stop the watcher with Ctrl-C or SIGTERM and the waiting entries stay waiting: the next watcher resumes any whose reset has already passed.
+
+**Where the log is.** The `limits` list in `.hv/workers.json`, beside `slots` and `escalations`. Each entry (`l1`, `l2`, ...) records the session (`orchestrator` or a slot), the window, whether the reset came from data or text, when it resets, the action, its status (`waiting`, `resumed`, `switched` or `failed`) and a note. `hv limit status` reads it back, and `hv round status` and `hv round reconcile` list the ones still waiting. Nothing prunes resolved entries.
+
+**Config.** Five keys under `limits`, all silent defaults: `mode` (`switch`), `resumeMarginSeconds` (60), `fallbackSleepSeconds` (1800), `maxResumes` (3) and `resumePrompt` (`The usage limit has reset. Continue where you left off.`). See [configuration](configuration.md#limits-keys).

@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/escalation"
 	"github.com/l4ci/hv-skills/v5/internal/hook"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/keepalive"
+	"github.com/l4ci/hv-skills/v5/internal/limits"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 )
 
@@ -119,6 +119,7 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 	maxRestarts := fs.String("max-restarts", "", "restarts before giving up (default orchestrator.keepaliveMaxRestarts)")
 	breaker := fs.String("breaker", "", "restarts without a new handoff before the breaker trips (default orchestrator.keepaliveBreaker)")
 	backoff := fs.String("backoff", "", "seconds to wait before a restart (default orchestrator.keepaliveBackoffSeconds)")
+	noLimits := fs.Bool("no-limits", false, "do not run the usage-limit watcher (hv limit watch) beside the command")
 	prompt := fs.String("prompt", "", "restart prompt, appended as the last argument on restarts (default orchestrator.restartPrompt)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if c.dashAt != 0 {
@@ -181,23 +182,20 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 		defer signal.Stop(sigs)
 
 		env := keepalive.Env{
-			Spawn:   keepaliveSpawn(c),
-			Signals: sigs,
-			Lease:   le,
-			Holder:  le.Discover(os.Getpid(), os.Getenv),
-			Handoff: func() keepalive.HandoffRead { return readHandoff(handoffFile(root, cfg)) },
-			Escalate: func(issue int, title, body string) (string, []string, error) {
-				ee := escalationEnv()
-				if ee.Forge == nil {
-					ee.Forge = escalationForge()
-				}
-				res, err := escalation.Send(context.WithoutCancel(ctx), ee, root, escalation.SendOpts{Number: issue, Title: title, Body: body})
-				if err != nil {
-					return "", res.Warnings, err
-				}
-				return res.Entry.ID, res.Warnings, nil
-			},
-			Notify: func(title, body string) { keepaliveNotify(context.WithoutCancel(ctx), cfg, title, body) },
+			Spawn:    keepaliveSpawn(c),
+			Signals:  sigs,
+			Lease:    le,
+			Holder:   le.Discover(os.Getpid(), os.Getenv),
+			Handoff:  func() keepalive.HandoffRead { return readHandoff(handoffFile(root, cfg)) },
+			Escalate: escalateFunc(ctx, root),
+			Notify:   func(title, body string) { keepaliveNotify(context.WithoutCancel(ctx), cfg, title, body) },
+		}
+		if !*noLimits {
+			lset, err := limits.LoadSettings(cfg)
+			if err != nil {
+				return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: hv config set"}
+			}
+			env.Limits = limitsLoop(c, root, cfg, lset, os.Getpid())
 		}
 		res, err := keepalive.Run(env, keepalive.Options{
 			Command: args, Root: root, CommonDir: cd, HandoffPath: handoffFile(root, cfg),
