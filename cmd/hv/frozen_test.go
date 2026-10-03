@@ -13,7 +13,9 @@ package main
 // shim; the forge suites still need python3 for test/fakes, which stay.
 //
 // Recording: HV_PARITY_FREEZE=1 go test ./cmd/hv -run '^TestParity' rewrites
-// the files of the suites that ran (only while the oracle exists). A suite's
+// the files of the suites that ran (only while the oracle exists). To accept a
+// deliberate change without the oracle, go test ./cmd/hv -run '^TestFrozenX$'
+// -update-frozen rewrites the records from the current Go output. A suite's
 // file holds one recording day: the fixtures commit at noon of that day and
 // {dN} dates count back from it, so its git hashes and dates repeat. A
 // TestFrozen run on another day re-runs its suite in a child process with the
@@ -59,6 +61,10 @@ func pinDay() {
 }
 
 var recording = os.Getenv("HV_PARITY_FREEZE") != ""
+
+// updateFrozen accepts the Go side as it is now: TestFrozen rewrites the
+// records instead of comparing. Review the jsonl diff before committing.
+var updateFrozen = flag.Bool("update-frozen", false, "TestFrozen: rewrite testdata/frozen from the current Go output")
 
 // frozenStep is one Go run of a scenario.
 type frozenStep struct {
@@ -158,6 +164,11 @@ func record(t *testing.T, side func(t *testing.T) frozenRec) {
 	if !recording || t.Failed() {
 		return
 	}
+	keep(t, side)
+}
+
+func keep(t *testing.T, side func(t *testing.T) frozenRec) {
+	t.Helper()
 	r := side(t)
 	if t.Failed() {
 		return
@@ -173,7 +184,8 @@ func record(t *testing.T, side func(t *testing.T) frozenRec) {
 }
 
 // writeRecords merges what this run recorded into the suite files. A file from
-// another day is replaced, never merged: one file, one fixture day.
+// another day is replaced, never merged: one file, one fixture day. A whole
+// suite run with -update-frozen replaces its file too, dropping stale records.
 func writeRecords() error {
 	recorded.Lock()
 	defer recorded.Unlock()
@@ -183,7 +195,8 @@ func writeRecords() error {
 			return err
 		}
 		hdr := frozenHeader{startDay, localDay}
-		if f.frozenHeader != hdr {
+		whole := *updateFrozen && !strings.Contains(flag.Lookup("test.run").Value.String(), "/")
+		if f.frozenHeader != hdr || whole {
 			f.recs = map[string]frozenRec{}
 		}
 		f.frozenHeader = hdr
@@ -221,7 +234,7 @@ func runFrozen(t *testing.T, parity func(*testing.T)) {
 	frozenOn = f
 	t.Cleanup(func() {
 		frozenOn = nil
-		if t.Failed() || strings.Contains(flag.Lookup("test.run").Value.String(), "/") {
+		if t.Failed() || *updateFrozen || strings.Contains(flag.Lookup("test.run").Value.String(), "/") {
 			return
 		}
 		var stale []string
@@ -243,6 +256,9 @@ func runFrozen(t *testing.T, parity func(*testing.T)) {
 func reexec(t *testing.T, day frozenHeader) {
 	t.Helper()
 	args := []string{"-test.run=^" + t.Name() + "$", "-test.count=1", "-test.timeout=30m"}
+	if *updateFrozen {
+		args = append(args, "-update-frozen")
+	}
 	if testing.Verbose() {
 		args = append(args, "-test.v")
 	}
@@ -266,7 +282,13 @@ func frozenCheck(t *testing.T, side func(t *testing.T) frozenRec) {
 	f.used[name] = true
 	f.mu.Unlock()
 	if !ok {
-		t.Fatalf("scenario %q is not frozen (re-record with HV_PARITY_FREEZE=1)", name)
+		if !*updateFrozen {
+			t.Fatalf("scenario %q is not frozen (re-record with HV_PARITY_FREEZE=1)", name)
+		}
+	}
+	if *updateFrozen {
+		keep(t, side)
+		return
 	}
 	got := side(t)
 	if len(got.Steps) != len(want.Steps) {

@@ -97,7 +97,7 @@ func runMain(m *testing.M) int {
 		"LC_ALL=C.UTF-8",
 	}
 	code := m.Run()
-	if recording {
+	if recording || *updateFrozen {
 		if err := writeRecords(); err != nil {
 			fmt.Fprintln(os.Stderr, "frozen:", err)
 			return 1
