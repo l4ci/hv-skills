@@ -51,6 +51,7 @@ type Outcome string
 const (
 	Taken     Outcome = "taken"
 	Renewed   Outcome = "renewed"   // same holder, round number kept
+	Numbered  Outcome = "numbered"  // same holder, a lease taken unnumbered (round 0) got its number
 	Reclaimed Outcome = "reclaimed" // a stale lease was replaced
 )
 
@@ -182,6 +183,9 @@ func (e Env) Acquire(commonDir, root string, h Holder, round int) (l Lease, out 
 				return &HeldError{Lease: cur, State: st}
 			}
 			l, out = cur, Renewed
+			if l.Round == 0 && round > 0 {
+				l.Round, out = round, Numbered
+			}
 			l.Pane, l.PaneHost = h.Pane, h.PaneHost
 			return write(path, l)
 		case Stale:
@@ -278,8 +282,14 @@ var transient = map[string]bool{
 	"env": true, "timeout": true, "hv": true, "sudo": true, "nohup": true, "script": true,
 }
 
-// Discover is the orchestrator holder: pid, when non-zero, is --holder-pid;
-// otherwise the nearest ancestor of this process that is not a shell, env,
+// HolderPIDEnv names the environment variable the keepalive supervisor sets in
+// its child: the supervisor holds the lease, so its pid is the holder of
+// every `hv` the orchestrator runs.
+const HolderPIDEnv = "HV_ROUND_HOLDER_PID"
+
+// Discover is the orchestrator holder: pid, when non-zero, is --holder-pid
+// and wins; otherwise HV_ROUND_HOLDER_PID when it holds a pid; otherwise the
+// nearest ancestor of this process that is not a shell, env,
 // timeout or hv, else the parent. The pane comes from the environment.
 func (e Env) Discover(pid int, getenv func(string) string) Holder {
 	h := Holder{}
@@ -288,6 +298,11 @@ func (e Env) Discover(pid int, getenv func(string) string) Holder {
 		h.Pane, h.PaneHost = getenv("HERDR_PANE_ID"), "herdr"
 	case getenv("TMUX_PANE") != "":
 		h.Pane, h.PaneHost = getenv("TMUX_PANE"), "tmux"
+	}
+	if pid <= 0 {
+		if n, err := strconv.Atoi(strings.TrimSpace(getenv(HolderPIDEnv))); err == nil && n > 0 {
+			pid = n
+		}
 	}
 	if pid <= 0 {
 		pid = os.Getppid()

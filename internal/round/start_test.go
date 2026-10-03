@@ -408,3 +408,46 @@ func TestStartRecordsSlateAndValidatesFlags(t *testing.T) {
 		t.Errorf("a milestone round drops the slate: %q %v", scope, slate)
 	}
 }
+
+func TestStartNumbersALeaseTakenUnnumberedByTheSameHolder(t *testing.T) {
+	root := newRepo(t, nil)
+	le := fakeLease("h", 100, 200)
+	// The keepalive supervisor (pid 100) took the lease without a number.
+	cd, err := (Env{Git: worker.ExecGit}).commonDir(bg, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := le.Acquire(cd, root, le.Discover(100, func(string) string { return "" }), 0); err != nil {
+		t.Fatal(err)
+	}
+	e := Env{Git: worker.ExecGit, Base: "main", Lease: le}
+	// Its child runs `round start` with HV_ROUND_HOLDER_PID, no --holder-pid.
+	o := startOpts(roundcfg.ScopeMilestone, 0)
+	o.Getenv = func(k string) string {
+		if k == roundlease.HolderPIDEnv {
+			return "100"
+		}
+		return ""
+	}
+	st, err := e.Start(bg, root, o)
+	if err != nil || st.Outcome != roundlease.Numbered || st.Round != 1 || !st.Changed {
+		t.Fatalf("first start under the supervisor must number the lease: %v %+v", err, st)
+	}
+	if l, _, _ := e.ReadLease(bg, root); l.Round != 1 {
+		t.Fatalf("lease must carry the number: %+v", l)
+	}
+	if r, _ := worker.LoadRegistry(root).Doc.Get("round"); fmt.Sprint(r) != "1" {
+		t.Fatalf("registry round: %v", r)
+	}
+	// A restart of the orchestrator renews: the number survives.
+	again, err := e.Start(bg, root, o)
+	if err != nil || again.Outcome != roundlease.Renewed || again.Round != 1 || again.Changed {
+		t.Fatalf("renewal under the supervisor must keep the round: %v %+v", err, again)
+	}
+	// A hand-run start from another process is refused.
+	_, err = e.Start(bg, root, startOpts(roundcfg.ScopeMilestone, 200))
+	var we *worker.Error
+	if !errors.As(err, &we) || we.Exit != worker.ExitRefused {
+		t.Fatalf("a non-descendant must be refused: %v", err)
+	}
+}
