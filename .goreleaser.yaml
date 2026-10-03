@@ -32,5 +32,16 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# One GitHub release per version. The release workflow (on a v* tag) makes it
+# as a draft carrying the binaries; `hv release publish` then fills in the
+# approved notes and publishes it. A draft's assets do not resolve at
+# /releases/download/, so bin/hv sees nothing until that gated step. Notes come
+# from /hv-release, not from commit messages.
+release:
+  draft: true
+  replace_existing_draft: true
+changelog:
+  disable: true
+
 # Homebrew needs a tap repository (e.g. l4ci/homebrew-tap) and a token with
 # write access to it; neither exists yet, so the brew section stays out.
