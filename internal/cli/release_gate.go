@@ -50,6 +50,17 @@ func releasePush(fs *flag.FlagSet) RunFunc {
 		if *tagOnly && *branchOnly {
 			return Result{}, Usage("--tag-only and --branch-only are mutually exclusive")
 		}
+		dir0, err := releaseDir(c)
+		if err != nil {
+			return Result{}, err
+		}
+		if cfg := releaseGoreleaser(dir0); cfg != "" && !*tagOnly && !*branchOnly {
+			// One push would put the new plugin version on the branch before
+			// the workflow has built the binaries it names.
+			return Result{Data: gitObj("blockedBy", "release order", "changed", false)},
+				Refused("%s builds releases here, so the branch must not be pushed with the tag", cfg).
+					WithHint("push the tag with --tag-only, wait for the release workflow and publish, then push with --branch-only")
+		}
 		conf, err := confirm()
 		if err != nil {
 			return Result{}, err
@@ -97,6 +108,26 @@ func releasePush(fs *flag.FlagSet) RunFunc {
 			}
 			if remote == "" {
 				return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push the tag first: hv release push " + strings.TrimPrefix(tag, "v") + " --tag-only")
+			}
+			// On GitHub the tag alone is not enough: the release must be
+			// published, so the binaries resolve for the version the branch names.
+			url, _, err := releaseGitOK(c, dir, "remote", "get-url", "origin")
+			if err != nil {
+				return Result{}, err
+			}
+			if h := release.Host(url); h == "github" || h == "github-enterprise" {
+				cl, err := tracker.NewCLI(c.Context(), tracker.SettingsFromConfig(releaseConfig(dir)), "github", dir, trackerOptions...)
+				if err != nil {
+					return Result{}, trackerErr(err)
+				}
+				rel, err := releaseView(c.Context(), cl, tag)
+				if err != nil {
+					return Result{}, err
+				}
+				if !rel.Found || rel.IsDraft {
+					return Result{}, Resolution("the release for %s is not published", tag).
+						WithHint("finish it first: hv release publish " + strings.TrimPrefix(tag, "v"))
+				}
 			}
 		}
 		if res, err := clearGate(c, gate.TagPush, tag, conf, nil, nil); err != nil {
@@ -177,6 +208,23 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 		if remote == "" {
 			return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push it first: hv release push " + strings.TrimPrefix(tag, "v"))
 		}
+		// Look before the gate, so a wait for the workflow (exit 3) does not
+		// spend the maintainer's approval.
+		ctx := c.Context()
+		cl, err := tracker.NewCLI(ctx, tracker.SettingsFromConfig(releaseConfig(dir)), provider, dir, trackerOptions...)
+		if err != nil {
+			return Result{}, trackerErr(err)
+		}
+		existing := false
+		if provider == "github" {
+			rel, err := releaseView(ctx, cl, tag)
+			if err != nil {
+				return Result{}, err
+			}
+			if existing, err = releaseUsable(rel, dir, tag); err != nil {
+				return Result{}, err
+			}
+		}
 		if res, err := clearGate(c, gate.ReleasePublish, tag, conf, nil, nil); err != nil {
 			return res, err
 		}
@@ -199,22 +247,10 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 		} else if *draft {
 			cliArgs = append(cliArgs, "--draft")
 		}
-		ctx := c.Context()
-		cl, err := tracker.NewCLI(ctx, tracker.SettingsFromConfig(releaseConfig(dir)), provider, dir, trackerOptions...)
-		if err != nil {
-			return Result{}, trackerErr(err)
-		}
-		if provider == "github" {
-			// The release workflow (goreleaser) may already have made a
-			// draft with the binaries: finish that one, never make a second.
-			existing, err := releaseExisting(ctx, cl, dir, tag)
-			if err != nil {
-				return Result{}, err
-			}
-			if existing {
-				verb = "edit"
-				cliArgs = []string{"release", "edit", tag, "--title", *title, "--notes-file", notes.Name(), "--draft=" + strconv.FormatBool(*draft)}
-			}
+		if existing {
+			// The workflow already made the draft: finish it, never make a second.
+			verb = "edit"
+			cliArgs = []string{"release", "edit", tag, "--title", *title, "--notes-file", notes.Name(), "--draft=" + strconv.FormatBool(*draft)}
 		}
 		r, err := cl.Run(ctx, cliArgs, nil)
 		if err != nil {
@@ -229,46 +265,86 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 	}
 }
 
-// releaseExisting reports whether GitHub already has a release for tag. A
-// draft must carry the binaries (checksums.txt and an hv_* asset) before it
-// is finished; and where the repo builds releases with goreleaser, a missing
-// release means the workflow has not run, so creating one here would put the
-// plugin version ahead of its binaries.
-func releaseExisting(ctx context.Context, cl *tracker.CLI, dir, tag string) (bool, error) {
+// releaseAssets is what the release workflow must attach before a draft is
+// finished: one bare binary per platform (the names bin/hv downloads) and the
+// checksums. The tarballs are not part of that contract.
+var releaseAssets = []string{
+	"hv_linux_amd64", "hv_linux_arm64", "hv_darwin_amd64", "hv_darwin_arm64", "checksums.txt",
+}
+
+// releaseGoreleaser is the goreleaser config in dir, or "".
+func releaseGoreleaser(dir string) string {
+	for _, f := range []string{".goreleaser.yaml", ".goreleaser.yml"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			return f
+		}
+	}
+	return ""
+}
+
+// releaseInfo is what `gh release view` says about a tag.
+type releaseInfo struct {
+	Found   bool
+	IsDraft bool
+	Assets  []string
+}
+
+// releaseView asks GitHub about the release for tag. gh 2.45 finds drafts
+// too (a GraphQL lookup by pending tag), so "release not found" means none.
+func releaseView(ctx context.Context, cl *tracker.CLI, tag string) (releaseInfo, error) {
 	r, err := cl.Run(ctx, []string{"release", "view", tag, "--json", "isDraft,assets"}, nil)
 	if err != nil {
-		return false, trackerErr(err)
+		return releaseInfo{}, trackerErr(err)
 	}
 	if r.ExitCode != 0 {
-		if !strings.Contains(strings.ToLower(string(r.Stderr)), "release not found") {
-			return false, Unavailable("gh release view failed: %s", strings.TrimSpace(string(r.Stderr)))
+		if strings.Contains(strings.ToLower(string(r.Stderr)), "release not found") {
+			return releaseInfo{}, nil
 		}
-		for _, f := range []string{".goreleaser.yaml", ".goreleaser.yml"} {
-			if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
-				return false, Resolution("no release for %s yet, and %s builds releases", tag, f).
-					WithHint("wait for the release workflow to create the draft with the binaries")
-			}
-		}
-		return false, nil
+		return releaseInfo{}, Unavailable("gh release view failed: %s", strings.TrimSpace(string(r.Stderr)))
 	}
-	var rel struct {
+	var out struct {
 		IsDraft bool `json:"isDraft"`
 		Assets  []struct {
 			Name string `json:"name"`
 		} `json:"assets"`
 	}
-	if err := json.Unmarshal(r.Stdout, &rel); err != nil {
-		return false, Unavailable("gh release view: unreadable output: %v", err)
+	if err := json.Unmarshal(r.Stdout, &out); err != nil {
+		return releaseInfo{}, Unavailable("gh release view: unreadable output: %v", err)
+	}
+	info := releaseInfo{Found: true, IsDraft: out.IsDraft}
+	for _, a := range out.Assets {
+		info.Assets = append(info.Assets, a.Name)
+	}
+	return info, nil
+}
+
+// releaseUsable reports whether publish should edit an existing release. A
+// draft must carry every binary and the checksums before it is finished; and
+// where goreleaser builds the repo, no release at all means the workflow has
+// not run, so creating one here would put the plugin version ahead of its
+// binaries.
+func releaseUsable(rel releaseInfo, dir, tag string) (bool, error) {
+	if !rel.Found {
+		if cfg := releaseGoreleaser(dir); cfg != "" {
+			return false, Resolution("no release for %s yet, and %s builds releases", tag, cfg).
+				WithHint("wait for the release workflow to create the draft with the binaries")
+		}
+		return false, nil
 	}
 	if rel.IsDraft {
-		sums, bins := false, false
+		have := map[string]bool{}
 		for _, a := range rel.Assets {
-			sums = sums || a.Name == "checksums.txt"
-			bins = bins || strings.HasPrefix(a.Name, "hv_")
+			have[a] = true
 		}
-		if !sums || !bins {
-			return false, Resolution("the draft release for %s has no binaries yet", tag).
-				WithHint("wait for the release workflow to attach hv_* and checksums.txt")
+		var missing []string
+		for _, want := range releaseAssets {
+			if !have[want] {
+				missing = append(missing, want)
+			}
+		}
+		if len(missing) > 0 {
+			return false, Resolution("the draft release for %s lacks %s", tag, strings.Join(missing, ", ")).
+				WithHint("wait for the release workflow to attach them")
 		}
 	}
 	return true, nil

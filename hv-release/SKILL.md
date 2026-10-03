@@ -141,7 +141,7 @@ If `data.to` differs from `new_version`, stop: the file may be partly modified, 
 hv release push <new_version> --tag-only --json --confirm --confirm-note "$APPROVAL"
 ```
 
-Only the tag goes now. The plugin version on the branch points at the release binaries, so the branch waits for Step 11b. Where the repo has a `.goreleaser.yaml`, the tag starts the release workflow, which builds the binaries into a draft release. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
+Only the tag goes now (an unflagged push is refused where goreleaser builds the release). The plugin version on the branch points at the release binaries, so the branch waits for Step 11b. Where the repo has a `.goreleaser.yaml`, the tag starts the release workflow, which builds the binaries into a draft release. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
 
 ## Step 11 — Publish Remote Release
 
@@ -152,7 +152,7 @@ hv release publish <new_version> --json --title "v<new_version> — <one-line su
   --body-file "$NOTES_FILE" [--draft] --confirm --confirm-note "$APPROVAL"
 ```
 
-Add `--draft` when `release.draft` is true and the host is GitHub (GitLab refuses it). There is one release per version: where the workflow already made a draft, the verb finishes it (notes, title, un-draft) and never creates a second. It exits 3 while that draft lacks `hv_*` and `checksums.txt`, or while no release exists and the repo builds with goreleaser, so wait for the workflow (`gh run watch`) and re-run. Origin on neither host: the verb publishes nothing (`changed: false`) and the summary says `skipped`. `data.url` goes in the summary. Exit 5 (`gh`/`glab` missing): print the error and continue; the tag is already public. Skipped in `--dry-run`; print the command.
+Add `--draft` when `release.draft` is true and the host is GitHub (GitLab refuses it). There is one release per version: where the workflow already made a draft, the verb finishes it (notes, title, un-draft) and never creates a second. It exits 3 while that draft lacks any of the four `hv_<os>_<arch>` binaries or `checksums.txt`, or while no release exists and the repo builds with goreleaser, so wait for the workflow (`gh run watch`) and re-run. Origin on neither host: the verb publishes nothing (`changed: false`) and the summary says `skipped`. `data.url` goes in the summary. Exit 5 (`gh`/`glab` missing): print the error and continue; the tag is already public. Skipped in `--dry-run`; print the command.
 
 ## Step 11b — Push the Branch
 
@@ -162,7 +162,7 @@ Once the release is published and the binaries resolve, the same `tag-push` gate
 hv release push <new_version> --branch-only --json --confirm --confirm-note "$APPROVAL"
 ```
 
-It exits 3 while the tag is not on origin, so the branch never leads the tag. Skipped in `--dry-run`.
+It exits 3 while the tag is not on origin or its release is missing or still a draft, so the branch never leads the binaries. Skipped in `--dry-run`.
 
 ## Step 12 — Close Out the Milestone (issue mode)
 
