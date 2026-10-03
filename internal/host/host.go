@@ -119,7 +119,9 @@ var (
 // SpawnOpts describes a slot session to create.
 type SpawnOpts struct {
 	Slot, Session, Cwd, ConfigDir, Launch string
-	BootTimeout                           int // seconds
+	// CodexHome is a codex launch's CODEX_HOME (herdr passes it to the tab).
+	CodexHome   string
+	BootTimeout int // seconds
 }
 
 // Host is one terminal backend.

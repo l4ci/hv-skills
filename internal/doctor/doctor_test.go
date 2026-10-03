@@ -195,7 +195,7 @@ func TestOrderAndOK(t *testing.T) {
 	for _, c := range r.Checks {
 		names = append(names, c.Name)
 	}
-	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,hv" {
+	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,hv,codex" {
 		t.Errorf("order %s", got)
 	}
 	if r.OK() {
@@ -231,5 +231,122 @@ func TestHvVersionCheck(t *testing.T) {
 		if c.Status != tc.status {
 			t.Errorf("%s: %+v, want %s", tc.name, c, tc.status)
 		}
+	}
+}
+
+func TestParseCodexVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name, out string
+		want      string // "" means unparseable
+		inRange   bool
+	}{
+		{"plain", "codex-cli 0.159.2\n", "0.159.2", true},
+		{"lower bound", "codex-cli 0.159.0", "0.159.0", true},
+		{"below", "codex-cli 0.158.99\n", "0.158.99", false},
+		{"upper bound is exclusive", "codex-cli 0.160.0\n", "0.160.0", false},
+		{"next major", "codex-cli 1.0.0\n", "1.0.0", false},
+		{"warning lines around it", "WARNING: proceeding\ncodex-cli 0.159.5\nWARNING: x\n", "0.159.5", true},
+		{"stderr joined", "\nWARNING: Failed to load config\ncodex-cli 0.159.1", "0.159.1", true},
+		{"prerelease is not a version", "codex-cli 0.159.2-alpha.1\n", "", false},
+		{"other tool", "claude 2.1.0\n", "", false},
+		{"bare number", "0.159.2\n", "", false},
+		{"empty", "", "", false},
+	} {
+		v, ok := ParseCodexVersion(tc.out)
+		if tc.want == "" {
+			if ok {
+				t.Errorf("%s: parsed %v from %q", tc.name, v, tc.out)
+			}
+			continue
+		}
+		if !ok || v.String() != tc.want || v.InRange() != tc.inRange {
+			t.Errorf("%s: got %v %v inRange %v, want %s %v", tc.name, v, ok, v.InRange(), tc.want, tc.inRange)
+		}
+	}
+}
+
+func TestCodexCheck(t *testing.T) {
+	// the claude fixtures carry a codex line of their own, so build these here
+	codexCur := "claude: current (v10)\ncodex: current (v8) (/x)\n"
+	codexMiss := "claude: current (v10)\ncodex: not installed (/x)\n"
+	homes := []CodexHome{{"ben", "/cd/hv/codex/ben"}, {"dana", "/cd/hv/codex/dana"}}
+	ver := Result{Stdout: "codex-cli 0.159.2\n"}
+	for _, tc := range []struct {
+		name     string
+		have     []string
+		dispatch string
+		homes    []CodexHome
+		reply    map[string]Result
+		status   string
+		detail   string // substring
+		hint     string
+	}{
+		{"skip: no codex, no homes", nil, "herdr", nil, nil, Skip, "no slot has a codex home", ""},
+		{"pass: codex alone", []string{"codex"}, "", nil, map[string]Result{"codex --version": ver}, Pass, "codex 0.159.2, no slot homes yet", ""},
+		{"fail: homes but no codex", nil, "herdr", homes, nil, Fail, "codex not found on PATH", CodexInstallHint},
+		{"fail: version unreadable", []string{"codex"}, "", nil, map[string]Result{"codex --version": {Stdout: "hello"}}, Fail, "unreadable", CodexInstallHint},
+		{"fail: version command fails", []string{"codex"}, "", nil, map[string]Result{"codex --version": {ExitCode: 3, Stdout: "codex-cli 0.159.2"}}, Fail, "unreadable", CodexInstallHint},
+		{"fail: out of range", []string{"codex"}, "", nil, map[string]Result{"codex --version": {Stdout: "codex-cli 0.160.1"}}, Fail, "codex 0.160.1, need >=0.159.0 <0.160.0", CodexInstallHint},
+		{"pass: logged in, herdr integration current", []string{"codex", "herdr"}, "herdr", homes,
+			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexCur}},
+			Pass, "homes checked: ben, dana", ""},
+		{"pass: tmux skips the integration", []string{"codex", "herdr"}, "tmux", homes,
+			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexMiss}},
+			Pass, "ben, dana", ""},
+		{"fail: not logged in", []string{"codex", "herdr"}, "herdr", homes,
+			map[string]Result{"codex --version": ver, "codex login status": {ExitCode: 1}, "herdr integration status": {Stdout: codexCur}},
+			Fail, "ben: not logged in", "CODEX_HOME=/cd/hv/codex/ben codex login"},
+		{"fail: integration missing", []string{"codex", "herdr"}, "herdr", homes[:1],
+			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexMiss}},
+			Fail, "ben: herdr integration not current", "CODEX_HOME=/cd/hv/codex/ben herdr integration install codex"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			have := map[string]bool{}
+			for _, n := range tc.have {
+				have[n] = true
+			}
+			f := &codexFake{fake: fake{have: have, reply: tc.reply}}
+			c := statusOf(Run(context.Background(), Input{Dispatch: tc.dispatch, CodexHomes: tc.homes, Exec: f.exec, Look: f.look}), "codex")
+			if c.Status != tc.status || !strings.Contains(c.Detail, tc.detail) || c.Hint != tc.hint {
+				t.Errorf("%+v, want %s %q hint %q", c, tc.status, tc.detail, tc.hint)
+			}
+			if tc.status == Fail && c.Hint == "" {
+				t.Error("every fail has a hint")
+			}
+		})
+	}
+}
+
+// codexFake records the CODEX_HOME each call ran with.
+type codexFake struct {
+	fake
+	homes []string
+}
+
+func (f *codexFake) exec(ctx context.Context, bin string, args []string, env []string, dir string) (Result, error) {
+	h := "-"
+	for _, e := range env {
+		if v, ok := strings.CutPrefix(e, "CODEX_HOME="); ok {
+			h = v
+		}
+	}
+	f.homes = append(f.homes, filepath.Base(bin)+" "+strings.Join(args, " ")+" @ "+h)
+	return f.fake.exec(ctx, bin, args, env, dir)
+}
+
+// The version runs under the first slot home so ~/.codex is never read, and
+// every home gets its own login call.
+func TestCodexCheckUsesSlotHomes(t *testing.T) {
+	f := &codexFake{fake: fake{
+		have:  map[string]bool{"codex": true},
+		reply: map[string]Result{"codex --version": {Stdout: "codex-cli 0.159.2"}, "codex login status": {}},
+	}}
+	homes := []CodexHome{{"ben", "/h/ben"}, {"dana", "/h/dana"}}
+	if c := statusOf(Run(context.Background(), Input{CodexHomes: homes, Exec: f.exec, Look: f.look}), "codex"); c.Status != Pass {
+		t.Fatalf("%+v", c)
+	}
+	want := "codex --version @ /h/ben|codex login status @ /h/ben|codex login status @ /h/dana"
+	if got := strings.Join(f.homes, "|"); got != want {
+		t.Errorf("calls %s, want %s", got, want)
 	}
 }

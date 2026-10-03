@@ -68,6 +68,8 @@ type Input struct {
 	Dispatch       string // work.dispatch
 	IssuesProvider string // issues.provider
 	Accounts       []Account
+	// CodexHomes are the existing slot homes under <git-common-dir>/hv/codex/.
+	CodexHomes []CodexHome
 
 	Version string // the running binary's version, "" when unknown
 
@@ -84,7 +86,7 @@ type Input struct {
 func Run(ctx context.Context, in Input) Report {
 	d := &runner{in: in, ctx: ctx}
 	return Report{Checks: []Check{
-		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.hv(),
+		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.hv(), d.codex(),
 	}}
 }
 

@@ -106,7 +106,7 @@ claims the item (`<agent>@<round>`), sets it in progress with a comment, cuts th
 branch `<agent>/<issue>-<slug>`, picks the account and dispatches a short signed brief: a
 pointer to the standing contract (`round.brief`, else `references/worker-contract.md`), the
 issue to read and dispute, the siblings and the decisions from `--body-file`.
-`--tier light|standard|heavy` picks the worker's model tier (default `round.tier`); a tier above the default needs `--tier-reason`. The tier and its model are recorded on the slot, shown by `hv round status`, and named in the brief with the tier table for the worker's own subagents. `--kind codex` resolves the model but exits 71 until Codex workers land (E1).
+`--tier light|standard|heavy` picks the worker's model tier (default `round.tier`); a tier above the default needs `--tier-reason`. The tier and its model are recorded on the slot, shown by `hv round status`, and named in the brief with the tier table for the worker's own subagents. `--kind codex` starts a Codex worker (herdr only): each slot gets its own `CODEX_HOME` at `<git-common-dir>/hv/codex/<slot>`, and you log in once per slot with `CODEX_HOME=<home> codex login`.
 `--accept-overlap` skips the file-overlap check only. A failure before dispatch undoes the
 claim and state; one at or after dispatch keeps them, and repeating the call resumes.
 

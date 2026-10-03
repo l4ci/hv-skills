@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	hit := filepath.Join(dir, "hit")
-	for _, name := range []string{"gh", "glab"} {
+	for _, name := range []string{"gh", "glab", "codex"} {
 		script := fmt.Sprintf("#!/bin/sh\necho \"$0 $*\" >> '%s'\nexit 99\n", hit)
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o755); err != nil {
 			fmt.Fprintln(os.Stderr, err)

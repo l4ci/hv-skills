@@ -15,6 +15,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
@@ -379,6 +380,8 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 	relay := fs.Bool("relay", false, "inject into the running session as an orchestrator relay")
 	round := fs.String("round", "", "orchestrator round for the signature")
 	boot := fs.Int("boot-timeout", 60, "seconds to wait for the session to boot")
+	kind := fs.String("kind", "", "harness kind: claude or codex (default the slot's, else claude)")
+	acceptCodex := fs.Bool("accept-codex-version", false, "let this call through a Codex CLI outside the supported range")
 	return func(c *Ctx, args []string) (Result, error) {
 		slot, err := oneArg(args, "slot")
 		if err != nil {
@@ -387,7 +390,11 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 		if *body == "" {
 			return Result{}, Usage("--body-file is required")
 		}
-		opts := worker.DispatchOpts{Slot: slot, Task: *task, Relay: *relay, BootTimeout: *boot}
+		if *kind != "" && !roundcfg.ValidKind(*kind) {
+			return Result{}, Usage("--kind must be one of %s", strings.Join(roundcfg.Kinds, ", "))
+		}
+		opts := worker.DispatchOpts{Slot: slot, Task: *task, Relay: *relay, BootTimeout: *boot,
+			Kind: *kind, AcceptCodexVersion: *acceptCodex}
 		if *round != "" {
 			n, err := strconv.Atoi(*round)
 			if err != nil || n < 0 || strings.TrimLeft(*round, "0123456789") != "" {
@@ -408,6 +415,9 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 		ctx, stop := workerContext()
 		defer stop()
 		res, err := workerEnvCtx(ctx).Dispatch(ctx, root, opts)
+		for _, w := range res.Warnings {
+			c.Warn("%s", w)
+		}
 		if err != nil {
 			var we *worker.Error
 			if errors.As(err, &we) {
@@ -427,6 +437,7 @@ func workerDispatch(fs *flag.FlagSet) RunFunc {
 			d.Set("round", *res.Round)
 		}
 		d.Set("relay", res.Relay)
+		setIf(d, "kind", res.Kind)
 		d.Set("changed", true)
 		return Result{Data: d, Text: fmt.Sprintf("dispatched: %s (%s)", res.Slot, res.Handle)}, nil
 	}

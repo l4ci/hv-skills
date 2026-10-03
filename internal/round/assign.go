@@ -34,6 +34,9 @@ const (
 	BlockNoFreeSlot   = "no free slot"
 	BlockBriefMissing = "brief missing"
 	BlockNoTierMap    = "no tier map"
+	// BlockCodexVersion: the installed Codex CLI is outside the supported
+	// range and --accept-codex-version is not given (E1, #68).
+	BlockCodexVersion = worker.BlockCodexVersion
 )
 
 // BlockedError is an assignment refused before anything was marked or sent.
@@ -59,6 +62,9 @@ type AssignOpts struct {
 	// Tier, TierReason and Kind are C9: "" means round.tier, no reason, and
 	// the slot's recorded kind, else claude.
 	Tier, TierReason, Kind string
+	// AcceptCodexVersion lets one codex assignment through a Codex CLI outside
+	// the supported range, with a warning.
+	AcceptCodexVersion bool
 }
 
 // Assigned is what Assign did.
@@ -168,6 +174,13 @@ func (t tierBrief) text() string {
 	fmt.Fprintf(&b, "Model tiers for your own subagents (%s): %s. Follow the tier rule in the contract.\n", t.Kind, strings.Join(rows, ", "))
 	fmt.Fprintf(&b, "Put `Worker tier: %s` in your PR body.\n", own)
 	return b.String()
+}
+
+func workerCommandKey(kind string) string {
+	if kind == roundcfg.KindCodex {
+		return "work.codexCommand"
+	}
+	return "work.workerCommand"
 }
 
 func blocked(by, format string, a ...any) *BlockedError {
@@ -294,9 +307,9 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 	res.Kind, res.Tier, res.TierReason = kind, tier, reason
 	res.Model = model
-	if !worker.ModelApplies(root) {
+	if !worker.ModelAppliesTo(root, kind) {
 		res.Model = ""
-		res.Warnings = append(res.Warnings, "tier model not applied: work.workerCommand has no {model} placeholder")
+		res.Warnings = append(res.Warnings, "tier model not applied: "+workerCommandKey(kind)+" has no {model} placeholder")
 	}
 
 	// 3. The scope allows it.
@@ -335,9 +348,20 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		return res, blk
 	}
 
-	// A codex worker is E1's: refuse before anything is marked.
+	// A codex worker that cannot start (version, host, login) is refused
+	// before anything is marked. dispatch runs the same preflight again.
 	if kind == roundcfg.KindCodex {
-		return res, &worker.Error{Exit: 71, Message: "starting a codex worker is not built yet (E1, #68); --check-only reports the model it would use"}
+		setup, err := e.workerEnv().CodexPreflight(ctx, root, agent, o.AcceptCodexVersion)
+		if err != nil {
+			var we *worker.Error
+			if errors.As(err, &we) && we.Exit == worker.ExitRefused {
+				if bd, ok := we.Data.(worker.BlockData); ok {
+					return res, blocked(bd.BlockedBy, "%s", we.Message)
+				}
+			}
+			return res, err
+		}
+		res.Warnings = append(res.Warnings, setup.Warnings...)
 	}
 
 	// 5. The brief exists before anything is marked.
@@ -406,7 +430,8 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 
 	// 8. The account is the pane's CLAUDE_CONFIG_DIR: keep the slot's own while
 	// it has headroom, else pick; none usable is a refusal to start.
-	if e.Accounts != nil && len(worker.Configured(root)) > 0 {
+	// work.accounts is Anthropic's: a codex slot's CODEX_HOME is its account.
+	if kind != roundcfg.KindCodex && e.Accounts != nil && len(worker.Configured(root)) > 0 {
 		name, err := e.pickAccount(ctx, root, agent)
 		if err != nil {
 			undo()
@@ -433,7 +458,8 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 	tmp.WriteString(text)
 	tmp.Close()
-	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch, Model: res.Model}); err != nil {
+	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch, Model: res.Model,
+		Kind: kind, AcceptCodexVersion: o.AcceptCodexVersion}); err != nil {
 		return res, err
 	}
 	res.Dispatched, res.Changed = true, true
