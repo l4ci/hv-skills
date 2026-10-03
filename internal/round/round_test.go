@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
@@ -326,5 +327,58 @@ func TestIssueOfAndPRNumber(t *testing.T) {
 		if n, _ := prNumber(in); n != want {
 			t.Errorf("prNumber(%q) = %d, want %d", in, n, want)
 		}
+	}
+}
+
+func TestOpenEscalationsAreReported(t *testing.T) {
+	root, e, _ := fixture(t)
+	esc := func(id, slot, status, deadline string) *jsonx.Object {
+		o := jsonx.NewObject()
+		o.Set("id", id)
+		o.Set("kind", "issue")
+		o.Set("number", 56)
+		o.Set("slot", slot)
+		o.Set("title", "q "+id)
+		o.Set("commentId", "1")
+		o.Set("sentAt", "2026-10-03T10:00:00Z")
+		if deadline != "" {
+			o.Set("deadline", deadline)
+		}
+		o.Set("notified", true)
+		o.Set("status", status)
+		return o
+	}
+	if err := worker.Update(root, jsonx.NewObject(), func(doc *jsonx.Object) {
+		doc.Set("escalations", []any{
+			esc("e1", "kit", "answered", ""),
+			esc("e2", "kit", "pending", "2026-10-03T11:00:00Z"),
+			esc("e3", "", "pending", ""),
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.Now = func() time.Time { return time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC) }
+	out, err := e.Reconcile(bg, root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, r := range out.Report.Escalations {
+		got = append(got, r.Entry.ID+":"+r.Status)
+	}
+	if want := []string{"e2:timed-out", "e3:pending"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("escalations = %v, want %v", got, want)
+	}
+	for _, r := range out.Report.Rows {
+		want := []string(nil)
+		if r.Name == "kit" {
+			want = []string{"e2"}
+		}
+		if !reflect.DeepEqual(r.Escalations, want) {
+			t.Errorf("row %s escalations = %v, want %v", r.Name, r.Escalations, want)
+		}
+	}
+	if kinds(out.Drift)["kit"] == nil || len(kinds(out.Drift)) != 6 {
+		t.Errorf("escalations must not add drift: %v", kinds(out.Drift))
 	}
 }

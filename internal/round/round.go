@@ -18,7 +18,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/l4ci/hv-skills/v5/internal/escalation"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
@@ -68,6 +70,8 @@ type Env struct {
 	Label string
 	// HostErr and ForgeErr say why Snapshot or Forge is nil.
 	HostErr, ForgeErr string
+	// Now dates timed-out escalations; nil means time.Now.
+	Now func() time.Time
 }
 
 // Row is one line of `hv round status`.
@@ -82,6 +86,8 @@ type Row struct {
 	Tab        string
 	Registered bool
 	Drift      []string
+	// Escalations are the ids of the slot's open escalations.
+	Escalations []string
 }
 
 // Finding is one drift. Repair names what Reconcile(apply) would do and is
@@ -97,6 +103,9 @@ type Report struct {
 	Unavailable []string
 	Warnings    []string
 	Host        string
+	// Escalations are the open ones (pending or timed-out), read from the
+	// registry without a forge call; `hv round escalate check` looks for answers.
+	Escalations []escalation.Report
 
 	views map[string]*view
 }
@@ -296,6 +305,21 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 		for i := range rep.Rows {
 			if f.Slot != "" && rep.Rows[i].Name == f.Slot {
 				rep.Rows[i].Drift = append(rep.Rows[i].Drift, f.Kind)
+			}
+		}
+	}
+	now := time.Now
+	if e.Now != nil {
+		now = e.Now
+	}
+	for _, x := range escalation.Load(root) {
+		if x.Status != escalation.StatusPending {
+			continue
+		}
+		rep.Escalations = append(rep.Escalations, escalation.Report{Entry: x, Status: x.Derived(now())})
+		for i := range rep.Rows {
+			if x.Slot != "" && rep.Rows[i].Name == x.Slot {
+				rep.Rows[i].Escalations = append(rep.Rows[i].Escalations, x.ID)
 			}
 		}
 	}

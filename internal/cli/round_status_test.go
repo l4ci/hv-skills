@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/host"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/round"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -77,6 +78,33 @@ func TestRoundStatusAndReconcile(t *testing.T) {
 	}
 	if s := worker.LoadRegistry(root).Slot("dana"); s == nil || worker.Str(s, "task") != "58" {
 		t.Errorf("registry = %v", s)
+	}
+
+	// An open escalation shows in both verbs and on its slot's row.
+	if err := worker.Update(root, jsonx.NewObject(), func(doc *jsonx.Object) {
+		e := jsonx.NewObject()
+		for _, kv := range [][2]any{{"id", "e1"}, {"kind", "pr"}, {"number", 3}, {"slot", "dana"}, {"title", "Which option?"},
+			{"commentId", "1"}, {"sentAt", "2026-10-03T10:00:00Z"}, {"notified", false}, {"status", "pending"}} {
+			e.Set(kv[0].(string), kv[1])
+		}
+		doc.Set("escalations", []any{e})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, out, _ = hvIn(t, root, "--json", "round", "status")
+	d = data(t, out)
+	esc := d["escalations"].([]any)
+	if len(esc) != 1 || esc[0].(map[string]any)["id"] != "e1" || esc[0].(map[string]any)["status"] != "pending" {
+		t.Errorf("status escalations = %v", d["escalations"])
+	}
+	for _, r := range d["slots"].([]any) {
+		if r := r.(map[string]any); r["name"] == "dana" && !reflect.DeepEqual(r["escalations"], []any{"e1"}) {
+			t.Errorf("dana row escalations = %v", r["escalations"])
+		}
+	}
+	_, out, _ = hvIn(t, root, "--json", "round", "reconcile")
+	if d = data(t, out); len(d["escalations"].([]any)) != 1 || d["clean"] != true {
+		t.Errorf("reconcile escalations = %v", d)
 	}
 }
 

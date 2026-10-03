@@ -128,28 +128,9 @@ func roundEscalateCheck(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return fromEscalation(err)
 		}
-		rows := make([]any, 0, len(res.Reports))
+		rows, lines := escalationRows(res.Reports)
 		var pending, answered, timedOut int
-		var lines []string
 		for _, r := range res.Reports {
-			e := r.Entry
-			o := jsonx.NewObject()
-			o.Set("id", e.ID)
-			o.Set("kind", e.Kind)
-			o.Set("number", e.Number)
-			if e.Slot != "" {
-				o.Set("slot", e.Slot)
-			}
-			o.Set("title", e.Title)
-			o.Set("status", r.Status)
-			o.Set("sentAt", e.SentAt)
-			if e.Deadline != "" {
-				o.Set("deadline", e.Deadline)
-			}
-			if e.Answer != nil {
-				o.Set("answer", e.Answer.Object())
-			}
-			rows = append(rows, o)
 			switch r.Status {
 			case escalation.StatusPending:
 				pending++
@@ -158,7 +139,6 @@ func roundEscalateCheck(fs *flag.FlagSet) RunFunc {
 			case escalation.StatusTimedOut:
 				timedOut++
 			}
-			lines = append(lines, fmt.Sprintf("%s\t%s\t%s #%d\t%s", e.ID, r.Status, e.Kind, e.Number, e.Title))
 		}
 		d := jsonx.NewObject()
 		d.Set("escalations", rows)
@@ -168,4 +148,34 @@ func roundEscalateCheck(fs *flag.FlagSet) RunFunc {
 		d.Set("changed", res.Changed)
 		return Result{Data: d, Text: strings.Join(lines, "\n")}, nil
 	}
+}
+
+// escalationRows renders reports as `check` shows them, which is also the
+// `escalations` list of `round status` and `round reconcile`, plus one text
+// line each.
+func escalationRows(reports []escalation.Report) ([]any, []string) {
+	rows := make([]any, 0, len(reports))
+	var lines []string
+	for _, r := range reports {
+		e := r.Entry
+		o := jsonx.NewObject()
+		o.Set("id", e.ID)
+		o.Set("kind", e.Kind)
+		o.Set("number", e.Number)
+		if e.Slot != "" {
+			o.Set("slot", e.Slot)
+		}
+		o.Set("title", e.Title)
+		o.Set("status", r.Status)
+		o.Set("sentAt", e.SentAt)
+		if e.Deadline != "" {
+			o.Set("deadline", e.Deadline)
+		}
+		if e.Answer != nil {
+			o.Set("answer", e.Answer.Object())
+		}
+		rows = append(rows, o)
+		lines = append(lines, fmt.Sprintf("%s\t%s\t%s #%d\t%s", e.ID, r.Status, e.Kind, e.Number, e.Title))
+	}
+	return rows, lines
 }
