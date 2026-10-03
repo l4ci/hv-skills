@@ -2,6 +2,8 @@ package host
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -16,7 +18,8 @@ import (
 // handle is the tab id (`w1:t7`). Tab ids are never reused, so the handle
 // changes on every dispatch and the caller must persist it. The agent's name
 // derives from slot + handle (`hv-w1-w1-t7`): herdr agent names are unique per
-// SERVER, and a bare `w1` would collide with another repo's pool.
+// SERVER, and a bare `w1` would collide with another repo's pool. See AgentName
+// for the names herdr accepts.
 //
 // Every herdr command prints JSON on stdout and, on failure, a JSON error on
 // stderr with exit 1. herdr reports agent state natively, so none of tmux's
@@ -47,9 +50,34 @@ func (h *herdr) Where() string {
 	return "herdr workspace " + ws
 }
 
-// AgentName is the herdr agent name for a slot and handle.
+// agentNameRe is what herdr 0.9.3 accepts as an agent name.
+var agentNameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+
+// AgentName is the herdr agent name for a slot and handle: `hv-<slot>-<tab id>`
+// (`hv-w1-w1-t7`) when herdr accepts that, which keeps the name of every agent
+// started before this rule. Workspace ids are mixed case (`w1W`) and herdr
+// takes only [a-z][a-z0-9_-]{0,31}, so otherwise it is `hv-<slot>-<hash>`: the
+// slot lowercased with anything else turned into `-` and cut to 20, and the
+// first 8 hex of the handle's SHA-1, which stays unique when two workspace ids
+// differ only in case.
 func AgentName(slot, handle string) string {
-	return "hv-" + slot + "-" + strings.ReplaceAll(handle, ":", "-")
+	if n := "hv-" + slot + "-" + strings.ReplaceAll(handle, ":", "-"); agentNameRe.MatchString(n) {
+		return n
+	}
+	var b strings.Builder
+	for _, r := range strings.ToLower(slot) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('-')
+		}
+	}
+	s := b.String()
+	if len(s) > 20 {
+		s = s[:20]
+	}
+	sum := sha1.Sum([]byte(handle))
+	return "hv-" + s + "-" + hex.EncodeToString(sum[:])[:8]
 }
 
 func (h *herdr) herdr(ctx context.Context, args ...string) Result {
@@ -215,7 +243,10 @@ func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 		return tab, nil
 	}
 	if jget(r.Stderr, "error.code") != "agent_not_ready" {
-		return "", fmt.Errorf("herdr agent start failed for slot '%s' (%s): %s", o.Slot, tab, strings.TrimSpace(r.Stderr))
+		// No agent ever ran in the tab: close it, or it lingers as a shell no
+		// slot tracks and no drift check sees (#204).
+		h.herdr(ctx, "tab", "close", tab)
+		return "", fmt.Errorf("herdr agent start failed for slot '%s' (%s; tab closed): %s", o.Slot, tab, strings.TrimSpace(r.Stderr))
 	}
 	// Blocked at startup: answer up to two dialogs (trust, then bypass).
 	for i := 0; ; {

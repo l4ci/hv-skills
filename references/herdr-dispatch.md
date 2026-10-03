@@ -24,13 +24,13 @@ hv worker session check     # exit 0 inside herdr, exit 1 outside
 |---|---|---|
 | Session per slot | window `<session>:<slot>` | tab in the current workspace, labelled `<slot>` |
 | `slot.handle` | `hv:w1`, stable | tab id `w1:t7`, **new on every dispatch** |
-| Agent name | n/a | `hv-<slot>-<tab id>` (e.g. `hv-w1-w1-t7`) |
+| Agent name | n/a | `hv-<slot>-<tab id>` (e.g. `hv-w1-w1-t7`); `hv-<slot>-<hash>` when that is not a valid herdr name |
 | Worktree | `.worktrees/wN` | same: adopted with `tab create --cwd` |
 | Account | `CLAUDE_CONFIG_DIR=… claude` typed into the shell | `tab create --env CLAUDE_CONFIG_DIR=…` |
 
 Slots keep hv-managed worktrees from `hv worker pool`. herdr's own `worktree create` is not used for slots (rounds provision with `--path .worktrees/<agent>`, the same root), so the pool, the gate and the account verbs work the same on both hosts.
 
-Agent names are unique per herdr **server**, not per workspace, so a bare `w1` would collide with another repo's pool. Tab ids are never reused, which makes `hv-<slot>-<tab id>` unique.
+Agent names are unique per herdr **server**, not per workspace, so a bare `w1` would collide with another repo's pool. Tab ids are never reused, which makes `hv-<slot>-<tab id>` unique. herdr 0.9.3 accepts only `[a-z][a-z0-9_-]{0,31}`, and workspace ids are mixed case (`w1W`), so when `hv-<slot>-<tab id>` is not a valid name hv uses `hv-<slot>-<hash>`: the slot lowercased (other characters become `-`, cut to 20) and the first 8 hex of the tab id's SHA-1. `herdr agent list` shows the name of each slot's agent.
 
 ## Dispatch
 
@@ -87,7 +87,7 @@ Append to the [standing contract](worker-contract.md#the-standing-contract) unde
 
 ## Rules herdr adds
 
-- **`focused: true` means a human is looking at that agent.** The `hv` verbs do not check it. Before a relay or a re-dispatch, check `herdr agent get hv-<slot>-<handle>`; if the tab is focused, someone is typing in it, so tell them instead of typing over them.
+- **`focused: true` means a human is looking at that agent.** The `hv` verbs do not check it. Before a relay or a re-dispatch, check `herdr agent get <name>` (the slot's agent name, above); if the tab is focused, someone is typing in it, so tell them instead of typing over them.
 - **A timeout or stall does not prove the prompt was lost.** Read the tab (`herdr agent read <name>`) before sending the same brief again. A duplicate brief costs a worker its context.
 - **Install the herdr Claude integration once per config dir** (`herdr integration`) when provisioning an account for herdr slots.
 

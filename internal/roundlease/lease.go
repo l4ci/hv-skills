@@ -84,6 +84,10 @@ type Env struct {
 	Alive     func(pid int) bool
 	StartTime func(pid int) (uint64, bool)
 	Now       func() time.Time
+	// Proc reads a process's parent and command name; Parent is this
+	// process's parent. Nil means the real /proc and os.Getppid.
+	Proc   func(pid int) (ppid int, comm string, ok bool)
+	Parent func() int
 }
 
 // DefaultEnv reads the real host, process table and clock.
@@ -275,6 +279,20 @@ func procComm(pid int) string {
 	return strings.TrimSpace(string(b))
 }
 
+// realProc reads ppid and comm from /proc.
+func realProc(pid int) (int, string, bool) {
+	pp, _, ok := procStat(pid)
+	comm := procComm(pid)
+	return pp, comm, ok && comm != ""
+}
+
+// hostServer reports whether comm is a terminal host's server: herdr, or tmux
+// (whose server and client rename themselves "tmux: server" and "tmux: client").
+// Every pane on it shares that ancestor, so it can never be the holder (#205).
+func hostServer(comm string) bool {
+	return comm == "herdr" || comm == "tmux" || strings.HasPrefix(comm, "tmux:")
+}
+
 // transient are the processes between hv and the orchestrator that exit with
 // the command: shells and wrappers.
 var transient = map[string]bool{
@@ -289,8 +307,11 @@ const HolderPIDEnv = "HV_ROUND_HOLDER_PID"
 
 // Discover is the orchestrator holder: pid, when non-zero, is --holder-pid
 // and wins; otherwise HV_ROUND_HOLDER_PID when it holds a pid; otherwise the
-// nearest ancestor of this process that is not a shell, env,
-// timeout or hv, else the parent. The pane comes from the environment.
+// nearest ancestor of this process that is not a shell, env, timeout or hv,
+// else the parent. A terminal host's server is a boundary: reaching it means
+// hv ran from a plain shell in a pane, and the holder is that pane's shell,
+// the ancestor just below the server, so each pane holds apart. The pane comes
+// from the environment.
 func (e Env) Discover(pid int, getenv func(string) string) Holder {
 	h := Holder{}
 	switch {
@@ -305,18 +326,31 @@ func (e Env) Discover(pid int, getenv func(string) string) Holder {
 		}
 	}
 	if pid <= 0 {
-		pid = os.Getppid()
+		proc, parent := e.Proc, e.Parent
+		if proc == nil {
+			proc = realProc
+		}
+		if parent == nil {
+			parent = os.Getppid
+		}
+		pid = parent()
+		below := 0
 		for cur, n := pid, 0; n < 16 && cur > 1; n++ {
-			comm := procComm(cur)
-			pp, _, ok := procStat(cur)
-			if comm == "" || !ok {
+			pp, comm, ok := proc(cur)
+			if !ok {
+				break
+			}
+			if hostServer(comm) {
+				if below != 0 {
+					pid = below
+				}
 				break
 			}
 			if !transient[comm] {
 				pid = cur
 				break
 			}
-			cur = pp
+			below, cur = cur, pp
 		}
 	}
 	h.PID = pid
