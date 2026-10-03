@@ -65,6 +65,29 @@ GraphQL deprecation error. Read an issue with `gh issue view <N> --json title,bo
 gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -F body=@body.md
 ```
 
+## Waiting on workers
+
+`hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints
+the slot and its state as JSON, so the orchestrator never polls in its own context. It
+classifies with the same rules as `hv worker poll` (sentinels, `limited`, `dead`, then the
+host's status) and writes nothing. With no slot named it watches every slot that has a
+session and whose recorded state is not `idle`; `worker dispatch` arms a slot.
+
+- **herdr**: pinned to **0.9.x** (built against 0.9.3, socket protocol 22); another minor
+  exits 5. One `events.subscribe` over `HERDR_SOCKET_PATH` carries a
+  `pane.agent_status_changed` subscription per watched pane, so N slots cost one
+  connection. The CLI's `herdr agent wait` takes one target, so waiting on the first of N
+  slots would mean N child processes.
+- **tmux**: no event stream and no agent status, so the verb re-captures the panes every
+  `--settle` seconds (default 5) inside its own process.
+- **Timeout** exits 1 with `data.timedOut: true` and every slot's state; it is an answer,
+  not a fault. `--timeout` defaults to 0, which waits indefinitely.
+- **Long waits in Claude Code**: the Bash tool kills a command at its `timeout`, which
+  defaults to 2 minutes (`BASH_DEFAULT_TIMEOUT_MS`) and is capped at 10 minutes
+  (`BASH_MAX_TIMEOUT_MS`). Raise the cap in `settings.json` under `env` (for example
+  `"BASH_MAX_TIMEOUT_MS": "3600000"`) and pass a matching `timeout` on the Bash call, or
+  loop on a finite `--timeout` shorter than the cap.
+
 ## Roster
 
 Slots are provisioned once and reused. Every worktree lives in the project root under
