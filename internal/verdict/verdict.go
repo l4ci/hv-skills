@@ -99,8 +99,10 @@ type ItemVerdict struct {
 	Verdict string `json:"verdict"`
 }
 
-// Body is the optional --body-file payload.
+// Body is the optional --body-file payload. Verdict, when the body
+// carries one, must equal --verdict; the record always takes --verdict.
 type Body struct {
+	Verdict  string        `json:"-"`
 	Summary  string        `json:"summary,omitempty"`
 	Findings []Finding     `json:"findings"`
 	Items    []ItemVerdict `json:"items,omitempty"`
@@ -109,6 +111,7 @@ type Body struct {
 // rawBody mirrors Body with pointers, so validation can tell a missing
 // field from a zero one.
 type rawBody struct {
+	Verdict  *string `json:"verdict"`
 	Summary  *string `json:"summary"`
 	Findings []struct {
 		Severity *string `json:"severity"`
@@ -143,6 +146,12 @@ func ParseBody(text string) (Body, error) {
 	}
 	if _, err := dec.Token(); err != io.EOF {
 		return b, usage("invalid verdict body: text after the JSON object")
+	}
+	if raw.Verdict != nil {
+		if !contains([]string{Pass, Concerns, Fail, InfraFail}, *raw.Verdict) {
+			return b, usage("invalid verdict body: verdict must be PASS, CONCERNS, FAIL or INFRA-FAIL")
+		}
+		b.Verdict = *raw.Verdict
 	}
 	if raw.Summary != nil {
 		b.Summary = strings.TrimSpace(*raw.Summary)

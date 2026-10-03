@@ -49,6 +49,7 @@ func TestVerdictAddValidates(t *testing.T) {
 		{"lowercase", []string{"--kind", "qa", "--verdict", "pass"}, 2},
 		{"bad body", []string{"--kind", "qa", "--verdict", "FAIL", "--body-file", bad}, 2},
 		{"missing body file", []string{"--kind", "qa", "--verdict", "FAIL", "--body-file", filepath.Join(dir, "nope")}, 2},
+		{"body verdict differs", []string{"--kind", "qa", "--verdict", "FAIL", "--body-file", writeBody(t, t.TempDir(), `{"verdict": "PASS"}`)}, 2},
 		{"unknown branch", []string{"nope", "--kind", "qa", "--verdict", "FAIL"}, 3},
 	}
 	for _, c := range cases {

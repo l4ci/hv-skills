@@ -17,6 +17,9 @@ func TestParseBodyAccepts(t *testing.T) {
 	if b.Summary != "s" || len(b.Findings) != 1 || b.Findings[0] != (Finding{"major", "t", "a.go", 3, "d"}) || b.Items[0] != (ItemVerdict{"B07", Pass}) {
 		t.Errorf("got %+v", b)
 	}
+	if b, err := ParseBody(`{"verdict": "INFRA-FAIL"}`); err != nil || b.Verdict != InfraFail {
+		t.Errorf("verdict in body: %+v %v", b, err)
+	}
 	if b, err := ParseBody("{}"); err != nil || b.Findings == nil || len(b.Findings) != 0 {
 		t.Errorf("empty object: %+v %v", b, err)
 	}
@@ -29,7 +32,7 @@ func TestParseBodyRejects(t *testing.T) {
 		"null":                           "not a JSON object",
 		"{":                              "invalid verdict body",
 		`{} {}`:                          "text after the JSON object",
-		`{"verdict": "PASS"}`:            `unknown field "verdict"`,
+		`{"verdict": "pass"}`:            "verdict must be PASS",
 		`{"finding": []}`:                `unknown field "finding"`,
 		`{"summary": 3}`:                 "summary must be a string",
 		`{"findings": {}}`:               "findings must be a list",

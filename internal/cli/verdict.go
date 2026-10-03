@@ -74,6 +74,14 @@ func verdictBody(c *Ctx, file string) (verdict.Body, error) {
 	return b, fromArtifact(err)
 }
 
+// sameVerdict is exit 2 when the body names a verdict other than --verdict.
+func sameVerdict(b verdict.Body, v string) error {
+	if b.Verdict != "" && b.Verdict != v {
+		return Usage("the body's verdict %s does not match --verdict %s", b.Verdict, v)
+	}
+	return nil
+}
+
 // checkVerdict is exit 2 unless kind takes v.
 func checkVerdict(kind, v string) error {
 	if v == "" {
@@ -101,6 +109,9 @@ func verdictAdd(fs *flag.FlagSet) RunFunc {
 		}
 		b, err := verdictBody(c, *body)
 		if err != nil {
+			return Result{}, err
+		}
+		if err := sameVerdict(b, *v); err != nil {
 			return Result{}, err
 		}
 		t, err := resolveVerdictBranch(c, args)
@@ -214,6 +225,9 @@ func debugVerdict(fs *flag.FlagSet) RunFunc {
 		}
 		b, err := verdictBody(c, *body)
 		if err != nil {
+			return Result{}, err
+		}
+		if err := sameVerdict(b, *v); err != nil {
 			return Result{}, err
 		}
 		root, err := c.Root()
