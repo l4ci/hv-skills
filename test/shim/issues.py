@@ -1,5 +1,6 @@
 # Part of the temporary hv test shim (#46); removed in A9 (#53). See test/hv-shim.
 # `hv issues` adapters.
+import os
 import re
 
 from core import *  # noqa: F401,F403  (shared shim helpers and @verb)
@@ -13,9 +14,27 @@ def scope(ctx):
 def issues_error(rc, err):
     """Old issues helpers: rc 1 is a missing or failing CLI, 3 and 4 are hv-tracker-call's."""
     msg = first_error_line(err) or f"old helper failed (rc {rc})"
-    if rc == 1 and "not found in current repository" in err:
+    # A missing issue is not_found (#154), not a forge failure: the fakes say
+    # "issue #N not found", gh "Could not resolve to an Issue", glab "404".
+    if rc == 1 and re.search(r"not found in current repository|issue #\d+ not found|"
+                             r"Could not resolve to an [Ii]ssue|404 Not Found", err):
         return HvError(3, msg)
     return HvError({1: 5, 3: 5, 4: 6}.get(rc, 70), msg)
+
+
+def provider(ctx):
+    """origin's forge, else issues.provider (#154); None when neither names one."""
+    _, out, _ = ctx.helper("hv-issues-provider", *scope(ctx))
+    if out.strip() in ("github", "gitlab"):
+        return out.strip()
+    cfg = read_json_file(os.path.join(require_root(ctx), ".hv", "config.json"), {})
+    return ((cfg if isinstance(cfg, dict) else {}).get("issues") or {}).get("provider") or None
+
+
+def require_provider(ctx):
+    """The old helpers return [] or exit 5 with no provider; the contract says 3."""
+    if provider(ctx) is None:
+        raise HvError(3, "cannot determine the forge: origin names none and issues.provider is unset")
 
 
 def issue_number(ctx, text):
@@ -38,6 +57,7 @@ def issues_list(ctx):
         if not re.fullmatch(r"[1-9]\d*", f["limit"]):
             raise usage(f"{ctx.name}: --limit must be a positive number")
         args += ["--limit", f["limit"]]
+    require_provider(ctx)
     rc, out, err = ctx.helper("hv-issues-list", *args)
     if rc != 0:
         raise issues_error(rc, err)
@@ -53,6 +73,7 @@ def issues_label(ctx):
     if not label:
         raise usage(f"{ctx.name}: --{action} needs a label name")
     number = issue_number(ctx, ctx.pos[0])
+    require_provider(ctx)
     rc, _, err = ctx.helper("hv-issues-label", "apply" if action == "add" else "remove",
                             "--issue", str(number), "--label", label, *scope(ctx))
     if rc != 0:
@@ -81,6 +102,7 @@ def issues_close(ctx):
     args = ["--issue", str(number), "--commit", f["commit"], *scope(ctx)]
     if f.get("item"):
         args += ["--item", f["item"]]
+    require_provider(ctx)
     rc, out, err = ctx.helper("hv-issues-close", *args)
     if rc != 0:
         raise issues_error(rc, err)
@@ -89,5 +111,5 @@ def issues_close(ctx):
 
 @verb("issues", "provider")
 def issues_provider(ctx):
-    out = call(ctx, "hv-issues-provider", *scope(ctx))
-    return {"provider": out.strip()}, out
+    p = provider(ctx) or "unknown"
+    return {"provider": p}, p + "\n"
