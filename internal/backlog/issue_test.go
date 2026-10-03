@@ -17,7 +17,7 @@ import (
 // fakeTracker is the in-memory, call-recording Tracker.
 type fakeTracker = trackertest.Fake
 
-// issueJSON is the wire form shared with the Python stub.
+// issueJSON is the wire form the Python stub used, kept so the golden inputs still read.
 type issueJSON struct {
 	Number      int      `json:"number"`
 	Title       string   `json:"title"`
@@ -102,52 +102,6 @@ func genIssues(rng *rand.Rand, n int, customLabels bool) []issueJSON {
 const defaultCfg = `{}`
 const customCfg = `{"issues": {"labels": {"types": {"bug": "kind/bug", "feature": "kind/feature", "task": "kind/task"}, "priorityPrefix": "prio-", "sizePrefix": "effort:", "milestoneTracker": "tracker"}}}`
 
-const pyIssues = `import json, sys
-from hvlib_backend import IssueBackend, parse_fields_block, render_fields_block
-from hvlib_tracker import TrackerError
-
-class Stub:
-    def __init__(self, issues):
-        self.issues = {i["number"]: self.norm(i) for i in issues}
-    @staticmethod
-    def norm(i):
-        i = dict(i)
-        for k in ("milestone", "state_reason", "closed_at"):
-            i[k] = i[k] or None
-        i["assignees"] = []
-        return i
-    def list(self, state="open"):
-        return [i for i in self.issues.values() if i["state"] == state]
-    def get(self, n):
-        if n not in self.issues:
-            raise TrackerError(1, "issue not found")
-        return self.issues[n]
-
-out = []
-for s in json.load(open(sys.argv[1])):
-    cfg = json.loads(s["cfg"])
-    b = IssueBackend(cfg, repo=s["repo"] or None)
-    b._adapter = Stub(s["issues"])
-    r = {"markdown": {}, "items": [], "detail": []}
-    for lim in (None, 0, 1, 3, 20):
-        r["markdown"][str(lim)] = b.backlog_markdown(closed_limit=lim)
-    for ref in s["refs"]:
-        f = b.fields(ref)
-        if f is None:
-            r["items"].append(None)
-        else:
-            issue = b._lookup(ref)
-            letter = b._letter(issue)
-            f["tag"] = b._tag(issue, letter)
-            f["type"] = letter
-            f["id"] = f"{letter}{issue['number']}"
-            f["closed"] = issue["state"] == "closed"
-            f["line"] = ("" + b._done_line(issue)) if f["closed"] else "- " + b._bullet_inner(issue)
-            r["items"].append(f)
-        r["detail"].append(b.detail_text(ref))
-    out.append(r)
-print(json.dumps(out))`
-
 func TestIssuesMatchPython(t *testing.T) {
 	rng := rand.New(rand.NewSource(21))
 	var scen []issueScenario
@@ -168,7 +122,7 @@ func TestIssuesMatchPython(t *testing.T) {
 	}
 
 	var want []map[string]any
-	pytest.GoldenJSON(t, pyIssues, scen, &want)
+	pytest.GoldenJSON(t, scen, &want)
 
 	var inputs, got, w []any
 	items := 0
@@ -236,16 +190,6 @@ func TestIssuesMatchPython(t *testing.T) {
 	}
 }
 
-const pyBlock = `import json, sys
-from hvlib_backend import parse_fields_block, render_fields_block
-out = []
-for body in json.load(open(sys.argv[1])):
-    text, fields = parse_fields_block(body)
-    out.append({"text": text, "fields": fields, "order": list(fields.keys()),
-                "render": render_fields_block(text, fields),
-                "render2": render_fields_block(body, {"A": " x\n y ", "B": "", "C": "  ", "D": "v"})})
-print(json.dumps(out))`
-
 func TestFieldsBlockMatchesPython(t *testing.T) {
 	rng := rand.New(rand.NewSource(5))
 	bodies := []string{
@@ -260,7 +204,7 @@ func TestFieldsBlockMatchesPython(t *testing.T) {
 		bodies = append(bodies, is.Body)
 	}
 	var want []map[string]any
-	pytest.GoldenJSON(t, pyBlock, bodies, &want)
+	pytest.GoldenJSON(t, bodies, &want)
 	var got, w, inputs []any
 	for i, body := range bodies {
 		text, fields, order := ParseFieldsBlock(body)

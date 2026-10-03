@@ -80,33 +80,6 @@ func genProjects(t *testing.T, n int) []project {
 	return out
 }
 
-const pyFile = `import json, os, sys
-from hvlib_backend import FileBackend
-from hvlib_section import load_backlog_corpus
-from hvlib_bullet import find_origin_bullet, parse_open_bullet
-res = []
-for p in json.load(open(sys.argv[1])):
-    os.chdir(p["root"])
-    fb = FileBackend()
-    corpus = load_backlog_corpus(".")
-    r = {"corpus": corpus, "items": [], "detail": [], "markdown": fb.backlog_markdown()}
-    for iid in p["ids"]:
-        f = fb.fields(iid)
-        if f is None:
-            r["items"].append(None)
-            continue
-        line, title = find_origin_bullet(corpus, iid)
-        b = parse_open_bullet("- " + line)
-        f["tag"] = b["tag"] if b else ""
-        f["title"] = b["title"] if b else (title or "")
-        f["closed"] = f["reason"] != ""
-        f["line"] = line
-        r["items"].append(f)
-    for iid in p["ids"]:
-        r["detail"].append(fb.detail_text(iid))
-    res.append(r)
-print(json.dumps(res))`
-
 func TestFileMatchesPython(t *testing.T) {
 	projects := genProjects(t, 60)
 	for _, p := range projects {
@@ -119,7 +92,7 @@ func TestFileMatchesPython(t *testing.T) {
 	for i := range recorded {
 		recorded[i].Root = ""
 	}
-	pytest.Golden(t, map[string]any{"script": pyFile, "input": recorded}, &want, func() { pytest.JSON(t, pyFile, projects, &want) })
+	pytest.Golden(t, map[string]any{"input": recorded}, &want)
 
 	var got, inputs []any
 	items := 0
@@ -211,30 +184,6 @@ type counterScenario struct {
 	Kinds    []string `json:"kinds"`
 }
 
-const pyNextID = `import json, os, sys, tempfile
-from pathlib import Path
-from hvlib_backend import FileBackend
-res = []
-for i, s in enumerate(json.load(open(sys.argv[1]))):
-    root = Path(tempfile.mkdtemp())
-    (root / ".hv").mkdir()
-    (root / ".hv" / "BACKLOG.md").write_text(s["backlog"])
-    if s["archive"]:
-        (root / ".hv" / "ARCHIVE.md").write_text(s["archive"])
-    if s["counters"] is not None:
-        (root / ".hv" / "counters.json").write_text(s["counters"])
-    os.chdir(root)
-    fb = FileBackend()
-    ids = []
-    for k in s["kinds"]:
-        try:
-            ids.append(fb.next_id(k))
-        except Exception:
-            ids.append({"err": True})
-    cj = root / ".hv" / "counters.json"
-    res.append({"ids": ids, "counters": cj.read_text() if cj.exists() else None})
-print(json.dumps(res))`
-
 func TestNextIDMatchesPython(t *testing.T) {
 	str := func(s string) *string { return &s }
 	backlog := "## Bugs\n- **[B07] [P1] a.** x\n- **[B31] b.**\n## Features\n- **[F02] f.**\n"
@@ -257,7 +206,7 @@ func TestNextIDMatchesPython(t *testing.T) {
 		{"- **[B100] a.**", "", str(`{"bugs": 1}`), []string{"bugs"}},
 	}
 	var want []map[string]any
-	pytest.GoldenJSON(t, pyNextID, scen, &want)
+	pytest.GoldenJSON(t, scen, &want)
 
 	var inputs, got, w []any
 	ids := 0

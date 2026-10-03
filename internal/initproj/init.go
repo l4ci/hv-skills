@@ -1,7 +1,8 @@
 // Package initproj is `hv init`: it seeds .hv/ in a directory, migrates what
 // older versions left behind, and checks that a project is initialized. It is
-// the port of bin/hv-bootstrap and bin/hv-preflight; the old helpers are the
-// oracle the tests compare against (see TestInitMatchesBootstrapGolden).
+// the port of bin/hv-bootstrap and bin/hv-preflight; the trees the old
+// bootstrap left, frozen in testdata/golden, are what the tests compare
+// against (see TestInitMatchesBootstrapGolden).
 //
 // Init, Check and the block orchestration act on the directory they are given,
 // with no walk-up: they run before a project root exists.

@@ -236,113 +236,6 @@ func rrScenarios() []rrSeed {
 	return append(out, custom)
 }
 
-const pyReleaseReview = `
-import re
-CLOSING = re.compile(r"(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)")
-SHA = "0123456789abcdef0123456789abcdef01234567"
-
-class PStub(Stub):
-    def __init__(self, s):
-        Stub.__init__(self, s)
-        del self.milestones  # the base stores milestone titles here; the method below serves native ones
-        self.prs = [dict(p) for p in s["prs"]]
-        self.native = [dict(n) for n in s["native"]]
-        self.host = s["hostCloses"]
-        self.fail = s["fail"] or {}
-        self.calls = []
-    def rec(self, m, *a):
-        Stub.rec(self, m, *a)
-        if m in self.fail:
-            raise TrackerError(self.fail[m], m + " failed")
-    def _plain(self, i):
-        i = dict(i)
-        i["labels"] = list(i["labels"]); i["assignees"] = list(i["assignees"])
-        del i["comments"]
-        return i
-    def list(self, state="open", labels=(), milestone=None):
-        self.rec("list", state)
-        return [self._plain(i) for i in sorted(self.issues, key=lambda i: i["number"])
-                if (state == "all" or i["state"] == state) and all(l in i["labels"] for l in labels)]
-    def issues_in_milestone(self, title, state="all"):
-        self.rec("issues_in_milestone", title, state)
-        return [self._plain(i) for i in self.issues
-                if i["milestone"] == title and (state == "all" or i["state"] == state)]
-    def open_prs(self):
-        self.rec("open_prs")
-        return [dict(p) for p in self.prs]
-    def closed_numbers(self, body):
-        return list(dict.fromkeys(int(m) for m in CLOSING.findall(body or "")))
-    def pr_merge(self, pr):
-        self.rec("pr_merge", pr)
-        hit = [p for p in self.prs if p["number"] == pr]
-        if not hit:
-            raise TrackerError(1, "no pull requests found")
-        self.prs = [p for p in self.prs if p["number"] != pr]
-        if self.host:
-            for n in self.closed_numbers(hit[0]["body"]):
-                for i in self.issues:
-                    if i["number"] == n and i["state"] == "open":
-                        i["state"] = "closed"; i["state_reason"] = "completed"
-        return SHA
-    def milestones(self, state="all"):
-        self.rec("milestones", state)
-        return [dict(n) for n in self.native]
-    def edit_milestone(self, number, state=None, **kw):
-        self.rec("edit_milestone", number, state or "")
-        for n in self.native:
-            if n["number"] == number and state:
-                n["state"] = state
-
-def step(b, st):
-    op = st["op"]
-    if op == "queue":
-        return b.review_queue()
-    if op == "merge":
-        sha, closed, unproven = b.merge_pr(st["pr"], st["items"])
-        return [sha, closed, unproven]
-    if op == "gate":
-        blocked, warn = b.release_gate(st["mid"])
-        return [[[i["number"], l] for i, l in blocked], [i["number"] for i in warn]]
-    if op == "notes":
-        return {k: [[t, n] for t, n in v] for k, v in b.release_notes(st["mid"]).items()}
-    if op == "close":
-        return b.release_close(st["mid"], st["tag"])
-    raise SystemExit("bad op " + op)
-
-out = []
-for s in json.load(open(sys.argv[1])):
-    stub = PStub(s)
-    b = IssueBackend(json.loads(s["cfg"]))
-    b._adapter = stub
-    hb._proof_gate = make_gate(b)
-    res = []
-    for st in s["steps"]:
-        stub.calls = []
-        try:
-            r = {"k": "ok", "v": step(b, st)}
-        except ProofMissing:
-            r = {"k": "proofmissing"}
-        except TrackerError as e:
-            r = {"k": "tracker:%d" % e.code}
-        except LookupError:
-            r = {"k": "notfound"}
-        except ValueError:
-            r = {"k": "invalid"}
-        except Exception as e:
-            r = {"k": "crash:" + type(e).__name__}
-        res.append({"result": r, "calls": stub.calls})
-    final = []
-    for i in sorted(stub.issues, key=lambda i: i["number"]):
-        final.append([i["number"], i["title"], i["body"], i["labels"], i["milestone"] or "", i["state"],
-                      i["state_reason"] or "", i["assignees"], [[str(c["id"]), c["body"]] for c in i["comments"]]])
-    out.append({"steps": res, "final": final, "native": [[n["number"], n["state"]] for n in stub.native],
-                "prs": [p["number"] for p in stub.prs]})
-print(json.dumps(out))`
-
-func rrScript() string {
-	return pyWrites[:strings.Index(pyWrites, "def step(")] + pyReleaseReview
-}
-
 func rrBackend(t *testing.T, s rrSeed) (*Issues, *rrFake) {
 	t.Helper()
 	ms := &trackertest.MS{Fake: &trackertest.Fake{}}
@@ -474,13 +367,13 @@ func rrRun(t *testing.T, s rrSeed) map[string]any {
 	return map[string]any{"steps": steps, "final": final, "native": native, "prs": prs}
 }
 
-// The Go backend and the Python IssueBackend, run on the same scenarios, return
-// the same results, send the same tracker calls in the same order and leave
-// the same issues, milestones and PRs behind.
+// The Go backend, run on the recorded scenarios, must return what the Python IssueBackend did:
+// the same results, the same tracker calls in the same order and the same
+// issues, milestones and PRs left behind.
 func TestIssuesReleaseReviewMatchPython(t *testing.T) {
 	scen := rrScenarios()
 	var want []map[string]any
-	pytest.GoldenJSON(t, rrScript(), scen, &want)
+	pytest.GoldenJSON(t, scen, &want)
 	steps, bad := 0, 0
 	for i, s := range scen {
 		got := norm(t, rrRun(t, s)).(map[string]any)

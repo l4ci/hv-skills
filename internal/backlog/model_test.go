@@ -34,33 +34,12 @@ func TestParseRefForms(t *testing.T) {
 	}
 }
 
-const pyRefs = `import json, sys
-from hvlib_backend import resolve_item_ref, _QUAL_HASH_RE, _QUAL_COLON_RE
-out = []
-for ref in json.load(open(sys.argv[1])):
-    ref = str(ref).strip()
-    try:
-        m = _QUAL_HASH_RE.match(ref)
-        if m:
-            out.append({"repo": m.group("repo"), "letter": "", "number": int(m.group("n"))})
-            continue
-        m = _QUAL_COLON_RE.match(ref)
-        if m:
-            n, l = resolve_item_ref(m.group("ref"))
-            out.append({"repo": m.group("repo"), "letter": l or "", "number": n})
-            continue
-        n, l = resolve_item_ref(ref)
-        out.append({"repo": "", "letter": l or "", "number": n})
-    except ValueError:
-        out.append({"err": True})
-print(json.dumps(out))`
-
 func TestParseRefMatchesPython(t *testing.T) {
 	refs := []string{"B7", "b7", "#7", "7", "repo:B7", "repo:#7", "repo:7", "repo#7", "", "#", "B", "X7", "B-7", "repo:", ":7",
 		"a b#7", "repo:b07", "٢٣", "B٢", "repo#٢", "#B7", "7\n", " 7", "B7x", "repo:B7:x", "r#1#2", "r:#7", "r:#B7",
 		"t5", "T5", "f 5", "5 5", " B7 ", "web:F12", "web#012", "my-web.x:T3", "00", "0"}
 	var want []map[string]any
-	pytest.GoldenJSON(t, pyRefs, refs, &want)
+	pytest.GoldenJSON(t, refs, &want)
 	var got, w, inputs []any
 	for i, r := range refs {
 		ref, err := ParseRef(r)

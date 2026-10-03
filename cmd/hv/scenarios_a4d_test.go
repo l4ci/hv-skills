@@ -1,44 +1,34 @@
 package main
 
-// Black-box parity for `hv issues list|label|imported|close|provider` and
-// `hv migrate issues` (#48). Each scenario builds a git project whose origin
+// Scenarios for `hv issues list|label|imported|close|provider` and `hv
+// migrate issues` (#48). Each scenario builds a git project whose origin
 // resolves to github or gitlab, seeds the stateful fake forge
-// (test/fakes/fake_tracker.py) identically for both sides, runs the shim
-// (test/shim, which adapts the old helpers) on side A and the Go binary on
-// side B, and compares the exit code, the --json envelope, the final .hv/ tree
-// and the final fake-forge database. A scenario may run several commands in
-// a row on the same project (resume after a failure).
+// (test/fakes/fake_tracker.py), runs the Go binary and compares the exit
+// code, the --json envelope, the final .hv/ tree and the final fake-forge
+// database with the scenario's frozen record. A scenario may run several
+// commands in a row on the same project (resume after a failure).
 //
 // Safety: the shared TestMain refuses to run unless gh resolves to test/fakes,
 // TestDFakesFirst checks glab too, and every run has its own FAKE_TRACKER_DB
 // under t.TempDir.
 //
-// Documented divergences (a scenario with `div` names one):
-//  1. data.changed: the shim says true for every label and close that exits 0
-//     (old cannot tell a no-op); Go reports the real value. Scenarios assert
-//     Go's value (drun.changed) and drop the key from the comparison.
-//  2. A forge CLI that exits with a code other than 1, 3 or 4: the old helpers
-//     pass the CLI's rc through and the shim maps unknown rcs to 70; Go says 5
-//     (the CLI failed). The fake gh exits 2 for the flags it does not
-//     implement (--assignee on `issue list`), so github `issues list --mine`
-//     fails there; internal/issues covers it.
-//  3. issues.autoCreateLabel false: old reads it with jq's `// true`, so false
-//     still reads as true and the label is created anyway; the contract (and
-//     Go) says false means no creation.
-//  4. .hv/issue-map.json that is a JSON array: old dies with usage (shim 2),
-//     Go treats a corrupt state file as exit 70. (Any other non-tracker
-//     failure mid-run, which crashes the old helper with a traceback, is the
-//     same split: shim 2, Go 70, or 2 for a validation error.)
-//  5. (retired) The fake gh now answers `issue view --json state -q .state`,
-//     so the github idempotency check of close sees CLOSED like gitlab does.
+// Where Go departed from the old helpers on purpose:
+//  1. data.changed reports whether the forge changed; the old helpers said
+//     true for every label and close that exited 0 (drun.changed).
+//  2. A forge CLI that exits with a code other than 1, 3 or 4 is exit 5 (the
+//     CLI failed). The fake gh exits 2 for the flags it does not implement
+//     (--assignee on `issue list`), so github `issues list --mine` fails
+//     there; internal/issues covers it.
+//  3. issues.autoCreateLabel false means no label creation (the old helper
+//     read it with jq's `// true` and created the label anyway).
+//  4. A .hv/issue-map.json that is a JSON array is a corrupt state file, exit
+//     70 (the old helper died with usage).
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -47,12 +37,8 @@ type drun struct {
 	argv    []string
 	env     []string
 	want    int
-	div     string // the reference cannot agree on the exit
-	refWant int
-	changed *bool      // Go's data.changed; dropped from the comparison (divergence 1)
-	skipDB  bool       // the forge DBs differ by design; Go's must equal the seed (divergence 3)
-	msgHas  string     // the Go error message contains this
-	norm    func(envl) // applied to both envelopes
+	changed *bool  // Go's data.changed on success
+	msgHas  string // the error message contains this
 	check   func(t *testing.T, g envl, db map[string]any)
 }
 
@@ -94,160 +80,63 @@ func dseed78() map[string]any {
 	return db
 }
 
-// oracleStep is what the old side did for one run of a scenario.
-type oracleStep struct {
-	Code           int
-	Stdout, Stderr string
-	Tree           map[string]string // the .hv/ tree after the run
-	DB             map[string]any    // the forge database after the run
-}
-
-// oracle runs the scenario's old side (the shim) in a copy of base, or replays
-// it from the cache when none of its inputs changed (parity_cache_test.go).
-func (s dsc) oracle(t *testing.T, base string, in info, remote string, seed map[string]any) []oracleStep {
-	t.Helper()
-	type runIn struct {
-		Argv, Env []string
-	}
-	var runs []runIn
-	for _, r := range s.runs {
-		runs = append(runs, runIn{subst(r.argv, in), r.env})
-	}
-	key := oracleKey(t, map[string]any{"kind": "dsc", "project": projectDigest(base), "remote": remote, "seed": seed, "runs": runs})
-	var steps []oracleStep
-	if oracleLoad(key, &steps) && len(steps) == len(s.runs) {
-		return steps
-	}
-	steps = nil
-	refDir := copyTree(t, base)
-	refDB := filepath.Join(t.TempDir(), "ref.json")
-	if seed != nil {
-		raw, _ := json.Marshal(seed)
-		if err := os.WriteFile(refDB, raw, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, r := range runs {
-		run := envRun(t, refDir, "", append([]string{"FAKE_TRACKER_DB=" + refDB}, r.Env...), "python3", append([]string{shimPath}, r.Argv...)...)
-		steps = append(steps, oracleStep{run.code, run.stdout, run.stderr, snapshot(t, refDir), readDB(t, refDB)})
-	}
-	oracleStore(t, key, steps)
-	return steps
-}
-
 // fixture builds the scenario's project with its origin remote and the seed.
-func (s dsc) fixture(t *testing.T) (base string, in info, remote string, seed map[string]any) {
+func (s dsc) fixture(t *testing.T) (base string, in info, seed map[string]any) {
 	t.Helper()
 	f := s.fx
 	if f.config == "" {
 		f.config = dCfg
 	}
 	base, in = f.build(t)
-	remote = map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
+	remote := map[string]string{"": "https://github.com/example/repo.git", "gitlab": "https://gitlab.com/example/repo.git"}[s.remote]
 	if remote != "" {
 		git(t, base, "remote", "add", "origin", remote)
 	}
 	if s.db != nil {
 		seed = s.db()
 	}
-	return base, in, remote, seed
+	return base, in, seed
 }
 
 func (s dsc) exec(t *testing.T) {
 	t.Parallel()
-	if frozenOn != nil {
-		frozenCheck(t, s.goSide)
-		return
-	}
-	base, in, remote, seed := s.fixture(t)
-	ref := s.oracle(t, base, in, remote, seed)
-	goDir := copyTree(t, base)
-	goDB := filepath.Join(t.TempDir(), "go.json")
+	base, in, seed := s.fixture(t)
+	dir := copyTree(t, base)
+	dbPath := filepath.Join(t.TempDir(), "go.json")
 	if seed != nil {
 		raw, _ := json.Marshal(seed)
-		if err := os.WriteFile(goDB, raw, 0o644); err != nil {
+		if err := os.WriteFile(dbPath, raw, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for n, r := range s.runs {
-		argv := subst(r.argv, in)
+	var rec frozenRec
+	before := snapshot(t, base)
+	for n, rn := range s.runs {
+		argv := subst(rn.argv, in)
 		tag := fmt.Sprintf("run %d %v", n+1, argv)
-		goRun := envRun(t, goDir, "", append([]string{"FAKE_TRACKER_DB=" + goDB}, r.env...), hvBin, argv...)
-		refRun := run{code: ref[n].Code, stdout: ref[n].Stdout, stderr: ref[n].Stderr}
-		if goRun.code != r.want {
-			t.Errorf("%s: go exit = %d, want %d\nstdout: %s\nstderr: %s", tag, goRun.code, r.want, goRun.stdout, goRun.stderr)
+		r := envRun(t, dir, "", frozenEnv(append([]string{"FAKE_TRACKER_DB=" + dbPath}, rn.env...)), hvBin, argv...)
+		if r.code != rn.want {
+			t.Errorf("%s: exit = %d, want %d\nstdout: %s\nstderr: %s", tag, r.code, rn.want, r.stdout, r.stderr)
 		}
-		refWant := r.want
-		if r.div != "" {
-			refWant = r.refWant
-		}
-		if refRun.code != refWant {
-			t.Errorf("%s: reference exit = %d, want %d (%s)\nstdout: %s\nstderr: %s", tag, refRun.code, refWant, r.div, refRun.stdout, refRun.stderr)
-		}
-		goEnv := parseEnv(t, "go", goRun)
-		refEnv := parseEnv(t, "shim", refRun)
-		if r.msgHas != "" {
-			if msg, _ := at(goEnv, "error.message").(string); !strings.Contains(msg, r.msgHas) {
-				t.Errorf("%s: error message %q does not contain %q", tag, msg, r.msgHas)
+		db := readDB(t, dbPath)
+		rec.Steps = append(rec.Steps, newStep(t, r, before, dir, db))
+		e := parseEnv(t, "go", r)
+		if rn.msgHas != "" {
+			if msg, _ := at(e, "error.message").(string); !strings.Contains(msg, rn.msgHas) {
+				t.Errorf("%s: error message %q does not contain %q", tag, msg, rn.msgHas)
 			}
 		}
-		if d := diffTrees(ref[n].Tree, snapshot(t, goDir)); d != "" {
-			t.Errorf("%s: .hv/ trees differ:\n%s", tag, d)
+		if rn.changed != nil && r.code == 0 && at(e, "data.changed") != *rn.changed {
+			t.Errorf("%s: data.changed = %v, want %v", tag, at(e, "data.changed"), *rn.changed)
 		}
-		gDB, rDB := readDB(t, goDB), ref[n].DB
-		if r.skipDB {
-			if want := norm(s.db()); !reflect.DeepEqual(gDB, want) {
-				t.Errorf("%s: go changed the forge although it refused (%s)", tag, r.div)
-			}
-		} else if !reflect.DeepEqual(gDB, rDB) {
-			gj, _ := json.MarshalIndent(gDB, "", " ")
-			rj, _ := json.MarshalIndent(rDB, "", " ")
-			t.Errorf("%s: forge DBs differ\nref stderr: %s\n--- reference\n%s\n--- go\n%s", tag, refRun.stderr, rj, gj)
-		}
-		if r.div == "" || refRun.code == goRun.code {
-			g, rf := stripText(goEnv), stripText(refEnv)
-			if r.changed != nil {
-				if got := at(goEnv, "data.changed"); goRun.code == 0 && got != *r.changed {
-					t.Errorf("%s: go data.changed = %v, want %v", tag, got, *r.changed)
-				}
-				dropChanged(g)
-				dropChanged(rf)
-			}
-			if r.norm != nil {
-				r.norm(g)
-				r.norm(rf)
-			}
-			if r.div == "" && !reflect.DeepEqual(map[string]any(rf), map[string]any(g)) {
-				rj, _ := json.Marshal(rf)
-				gj, _ := json.Marshal(g)
-				t.Errorf("%s: envelopes differ\nshim: %s\ngo:   %s", tag, rj, gj)
-			}
-		}
-		if r.check != nil {
-			r.check(t, goEnv, gDB)
+		if rn.check != nil {
+			rn.check(t, e, db)
 		}
 	}
-	record(t, s.goSide)
+	frozenCheck(t, rec)
 }
 
 func TestDFakesFirst(t *testing.T) { TestIssueFakesFirst(t) }
-
-// sortEntries orders data.entries so the old helper's directory order does not matter.
-func sortEntries(e envl) {
-	d, ok := e["data"].(map[string]any)
-	if !ok {
-		return
-	}
-	rows, ok := d["entries"].([]any)
-	if !ok {
-		return
-	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		a, _ := json.Marshal(rows[i])
-		b, _ := json.Marshal(rows[j])
-		return string(a) < string(b)
-	})
-}
 
 func dr(want int, argv ...string) drun {
 	return drun{argv: append([]string{"--json"}, argv...), want: want}
@@ -255,11 +144,7 @@ func dr(want int, argv ...string) drun {
 
 func (r drun) env1(kv ...string) drun { r.env = append(r.env, kv...); return r }
 func (r drun) ch(b bool) drun         { r.changed = &b; return r }
-func (r drun) with(div string, refWant int) drun {
-	r.div, r.refWant = div, refWant
-	return r
-}
-func (r drun) msg(s string) drun { r.msgHas = s; return r }
+func (r drun) msg(s string) drun      { r.msgHas = s; return r }
 
 // one is a single-run scenario on the standard project and the standard forge.
 func one(name string, r drun) dsc { return dsc{name: name, db: dseed, runs: []drun{r}} }
@@ -291,7 +176,7 @@ func umbrella(f fx) fx {
 	return f
 }
 
-func TestParityA4D(t *testing.T) {
+func suiteA4D(t *testing.T) {
 	var all []dsc
 	add := func(s ...dsc) { all = append(all, s...) }
 	rate := []string{"FAKE_TRACKER_FAIL_MSG=secondary rate limit"}
@@ -372,11 +257,7 @@ func TestParityA4D(t *testing.T) {
 		one("label/rate-limited-remove/gitlab", dr(6, "issues", "label", "1", "--remove", "bug").env1(append([]string{"FAKE_TRACKER_FAIL=issue update"}, rate...)...)).on("gitlab"))
 	add(one("label/unknown-provider", dr(3, "issues", "label", "1", "--add", "bug").msg("issues.provider")).on("none"))
 	add(dsc{name: "label/autocreate-off/github", db: dseed, fx: fx{config: `{"issues": {"retryWaitSeconds": 0, "autoCreateLabel": false}}`},
-		runs: []drun{func() drun {
-			r := dr(3, "issues", "label", "1", "--add", "brand-new").with("old reads autoCreateLabel with jq's `// true`, so false still creates (divergence 3)", 0)
-			r.skipDB = true
-			return r
-		}()}},
+		runs: []drun{dr(3, "issues", "label", "1", "--add", "brand-new")}}, // divergence 3
 		dsc{name: "label/autocreate-off/gitlab", remote: "gitlab", db: dseed, fx: fx{config: `{"issues": {"retryWaitSeconds": 0, "autoCreateLabel": false}}`},
 			runs: []drun{dr(0, "issues", "label", "1", "--add", "brand-new").ch(true)}})
 	dboth(&all, dsc{name: "label/autocreate-off-existing", db: dseed, fx: fx{config: `{"issues": {"retryWaitSeconds": 0, "autoCreateLabel": false}}`},
@@ -434,9 +315,7 @@ func TestParityA4D(t *testing.T) {
 		},
 	}
 	imp := func(name string, argv ...string) {
-		r := dr(0, append([]string{"issues", "imported"}, argv...)...)
-		r.norm = sortEntries
-		add(dsc{name: "imported/" + name, remote: "none", fx: importedFx, db: dseed, runs: []drun{r}})
+		add(dsc{name: "imported/" + name, remote: "none", fx: importedFx, db: dseed, runs: []drun{dr(0, append([]string{"issues", "imported"}, argv...)...)}})
 	}
 	imp("all")
 	imp("for-repo-web", "--for-repo", "web")
@@ -446,23 +325,23 @@ func TestParityA4D(t *testing.T) {
 	imp("open-only-web", "--open-only", "--for-repo", "web")
 	imp("open-only-api", "--for-repo", "api", "--open-only")
 	add(dsc{name: "imported/open-only-umbrella", remote: "none", fx: umbrella(importedFx), db: importedDB, runs: []drun{
-		{argv: []string{"--json", "issues", "imported", "--open-only"}, want: 0, norm: sortEntries}}})
+		{argv: []string{"--json", "issues", "imported", "--open-only"}, want: 0}}})
 	add(dsc{name: "imported/open-only-umbrella-web", remote: "none", fx: umbrella(importedFx), db: importedDB, runs: []drun{
-		{argv: []string{"--json", "issues", "imported", "--open-only", "--for-repo", "web"}, want: 0, norm: sortEntries}}})
+		{argv: []string{"--json", "issues", "imported", "--open-only", "--for-repo", "web"}, want: 0}}})
 	add(dsc{name: "imported/open-only-forge-fails", remote: "none", fx: importedFx, db: importedDB, runs: []drun{
-		{argv: []string{"--json", "issues", "imported", "--open-only"}, want: 0, norm: sortEntries, env: []string{"FAKE_TRACKER_FAIL=issue view"}}}})
+		{argv: []string{"--json", "issues", "imported", "--open-only"}, want: 0, env: []string{"FAKE_TRACKER_FAIL=issue view"}}}})
 	add(dsc{name: "imported/empty-backlog", remote: "none", fx: fx{backlog: "# TODO\n\n## Bugs\n\n## Completed\n"}, runs: []drun{dr(0, "issues", "imported")}})
 	add(dsc{name: "imported/no-archive-no-details", remote: "none", fx: fx{backlog: importedBacklog, files: map[string]string{".hv/bugs/B01.md": "", ".hv/features/F01.md": "", ".hv/plans/M01-B02.md": "", ".hv/plans/M02-F01.md": ""}}, runs: []drun{
-		{argv: []string{"--json", "issues", "imported"}, want: 0, norm: sortEntries}}})
+		{argv: []string{"--json", "issues", "imported"}, want: 0}}})
 	add(dsc{name: "imported/no-hv", remote: "none", fx: fx{noHV: true}, runs: []drun{dr(3, "issues", "imported")}})
 	add(dsc{name: "imported/repo-flag-rejected", remote: "none", fx: umbrella(importedFx), runs: []drun{dr(2, "issues", "imported", "--repo", "web")}})
 	add(dsc{name: "imported/positional", remote: "none", fx: importedFx, runs: []drun{dr(2, "issues", "imported", "web")}})
 	add(dsc{name: "imported/text-vs-open", remote: "none", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] One.** GH:#5 GL:  #6 Repos: web , api Related: [F01]\n- **[B02] [P1] Two.** GL: #6\n\n## Completed\n- ~~**[B03] [P1] Done.** GH: #1~~ Done 2026-01-01 [`a`]\n"}, runs: []drun{
-		{argv: []string{"--json", "issues", "imported"}, want: 0, norm: sortEntries}}})
+		{argv: []string{"--json", "issues", "imported"}, want: 0}}})
 	add(dsc{name: "imported/archive-and-open-same-key", remote: "none", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] One.** GH: #5\n\n## Completed\n",
 		after: func(t *testing.T, dir string, in *info) {
 			write(t, dir, ".hv/ARCHIVE.md", "## Old\n- ~~**[B01] [P1] One.** GH: #5~~ Done 2026-01-01 [`a`]\n")
-		}}, runs: []drun{{argv: []string{"--json", "issues", "imported"}, want: 0, norm: sortEntries}}})
+		}}, runs: []drun{{argv: []string{"--json", "issues", "imported"}, want: 0}}})
 
 	// ---- migrate issues ----
 	addMigrate(&all)
@@ -475,12 +354,12 @@ func TestParityA4D(t *testing.T) {
 }
 
 // listBoth is a successful `issues list` on github and gitlab. The fake gh
-// rejects --assignee, so --mine fails on github: Go 5, the shim 70 (divergence 2).
+// rejects --assignee, so --mine fails on github with 5 (divergence 2).
 func listBoth(all *[]dsc, name string, db func() map[string]any, argv ...string) {
 	gh, gl := dr(0, argv...), dr(0, argv...)
 	for _, a := range argv {
 		if a == "--mine" {
-			gh = dr(5, argv...).with("the fake gh rejects --assignee: rc 2, shim 70 (divergence 2)", 70)
+			gh = dr(5, argv...)
 		}
 	}
 	*all = append(*all, dsc{name: name + "/github", db: db, runs: []drun{gh}}, dsc{name: name + "/gitlab", remote: "gitlab", db: db, runs: []drun{gl}})
@@ -637,7 +516,7 @@ func addMigrate(all *[]dsc) {
 	dboth(all, m("map/prepopulated-preview", mfx(map[string]string{".hv/issue-map.json": preMap}), dseed, mig(0)))
 	dboth(all, m("map/prepopulated-apply", mfx(map[string]string{".hv/issue-map.json": preMap}), dseed78, mig(0, "--apply")))
 	dboth(all, m("map/array-is-corrupt", mfx(map[string]string{".hv/issue-map.json": "[]\n"}), dseed,
-		mig(70, "--apply").with("old dies with usage (divergence 4)", 2)))
+		mig(70, "--apply"))) // divergence 4
 	dboth(all, m("map/unparseable-restarts", mfx(map[string]string{".hv/issue-map.json": "{not json"}), dseed, mig(0, "--apply")))
 	dboth(all, m("map/empty-object", mfx(map[string]string{".hv/issue-map.json": "{}\n"}), dseed, mig(0)))
 	dboth(all, m("map/foreign-keys-kept", mfx(map[string]string{".hv/issue-map.json": `{"X9": {"id": "X9", "number": 1, "url": "u", "done": []}}`}), dseed, mig(0, "--apply")))
