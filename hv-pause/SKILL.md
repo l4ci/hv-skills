@@ -1,7 +1,6 @@
 ---
 name: hv-pause
 description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv-next in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

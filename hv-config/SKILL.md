@@ -1,7 +1,6 @@
 ---
 name: hv-config
 description: Change hv-skills configuration interactively — pick which settings to edit from a checklist showing current values, then choose new values from the same options used at init. Also supports positional shortcuts: `/hv-config <key>` jumps to the value picker, `/hv-config <key>=<value>` applies directly. Use on "change config", "switch to worktree mode", "turn on autonomy", "edit settings".
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

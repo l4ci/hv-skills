@@ -1,7 +1,6 @@
 ---
 name: hv-work
 description: Orchestrator-driven parallel implementation — plans tasks, dispatches workers, verifies, commits atomically per task. Workers run as in-process subagents (default) or, under work.dispatch=tmux or herdr, as separate Claude Code sessions in their own worktrees that open PRs behind a merge gate. Supports branch or worktree isolation and direct merge or PR. Use when items already exist in BACKLOG.md and need implementation ("implement [B07]", "build these"); for an item not yet captured use /hv-go.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

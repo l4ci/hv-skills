@@ -1,7 +1,7 @@
 """
 validate-skills.py — static schema validator for hv-skills SKILL.md files,
-plus the legacy-name doclint over skills and references (A9, #53) and the
-prose-contract lint (PROSE_RULES, #173).
+plus the Agent Skills spec frontmatter lint (E2, #69), the legacy-name doclint
+over skills and references (A9, #53) and the prose-contract lint (PROSE_RULES, #173).
 Stdlib only. `--list-legacy` prints the frozen legacy helper names and exits. Exit 0 on all-pass, exit 1 on any failure, exit 2 on unexpected error.
 """
 
@@ -46,6 +46,91 @@ def check_frontmatter(path, text, issues):
     for key in ("name", "description"):
         if key not in fm or not fm[key]:
             issues.append(f"{path}: frontmatter missing required key '{key}'")
+
+
+# Agent Skills spec frontmatter (E2, #69; https://agentskills.io/specification).
+# Codex and Claude Code read the same SKILL.md, and a strict spec validator
+# rejects any key outside SPEC_KEYS. The two sets below excuse a violation a
+# slice has not fixed yet (empty since E2 fixed them all). An entry with nothing
+# left to excuse fails the check, so the sets can only shrink.
+SPEC_KEYS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+PENDING_KEYS = set()
+PENDING_LONG = set()
+
+
+def pending_spec():
+    # HV_SPEC_PENDING (whitespace-separated; a token ending .md is a path for
+    # PENDING_LONG, anything else a key for PENDING_KEYS) replaces both sets, so
+    # smoke sections can test the check on a fixture tree.
+    override = os.environ.get("HV_SPEC_PENDING")
+    if override is None:
+        return PENDING_KEYS, PENDING_LONG
+    toks = override.split()
+    return {t for t in toks if not t.endswith(".md")}, {t for t in toks if t.endswith(".md")}
+
+
+BLOCK_SCALARS = {">", "|", ">-", "|-", ">+", "|+"}
+
+
+def spec_fields(text):
+    """Top-level frontmatter as {key: value}, folding indented continuation
+    lines into the value; None without a frontmatter block."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    out, key = {}, None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return out
+        m = re.match(r"^([A-Za-z0-9_-]+):[ \t]*(.*)$", line)
+        if m:
+            key, val = m.group(1), m.group(2).strip()
+            if len(val) > 1 and val[0] == val[-1] and val[0] in "\"'":
+                val = val[1:-1]
+            out[key] = "" if val in BLOCK_SCALARS else val
+        elif key and line[:1] in (" ", "\t"):
+            out[key] = (out[key] + " " + line.strip()).strip()
+    return None
+
+
+def check_spec_frontmatter(path, text, issues):
+    pending_keys, pending_long = pending_spec()
+    path = Path(path)
+    fm = spec_fields(text)
+    if fm is None:
+        return
+    rel = path.as_posix()
+    name, desc = fm.get("name", ""), fm.get("description", "")
+    if name and name != path.parent.name:
+        issues.append(f"{rel}: frontmatter name '{name}' must equal the directory '{path.parent.name}'")
+    if name and (len(name) > 64 or not NAME_RE.match(name)):
+        issues.append(f"{rel}: name '{name}' must be 1-64 chars of lowercase letters, digits and single hyphens, not starting or ending with one")
+    if len(desc) > 1024:
+        if rel not in pending_long:
+            issues.append(f"{rel}: description is {len(desc)} chars; the spec allows 1024")
+    elif rel in pending_long:
+        issues.append(f"{rel}: description is within 1024 chars; remove it from PENDING_LONG")
+    if len(fm.get("compatibility", "")) > 500:
+        issues.append(f"{rel}: compatibility is over 500 chars")
+    extra = sorted(set(fm) - SPEC_KEYS)
+    bad = [k for k in extra if k not in pending_keys]
+    if bad:
+        issues.append(f"{rel}: frontmatter key(s) {', '.join(bad)} are not in the Agent Skills spec "
+                      f"(allowed: {', '.join(sorted(SPEC_KEYS))})")
+
+
+def check_pending_spec(skill_files, issues):
+    """A pending entry nothing uses any more must be deleted."""
+    pending_keys, pending_long = pending_spec()
+    used = set()
+    for p in skill_files:
+        used |= set(spec_fields(Path(p).read_text(encoding="utf-8")) or {}) & pending_keys
+    for k in sorted(pending_keys - used):
+        issues.append(f"PENDING_KEYS: no SKILL.md uses '{k}' any more; remove it")
+    present = {Path(p).as_posix() for p in skill_files}
+    for rel in sorted(pending_long - present):
+        issues.append(f"{rel}: listed in PENDING_LONG but missing; remove the entry")
 
 
 def check_banner(path, text, issues):
@@ -421,9 +506,11 @@ def main():
     for skill_path in skill_files:
         text = skill_path.read_text(encoding="utf-8")
         check_frontmatter(skill_path, text, issues)
+        check_spec_frontmatter(skill_path, text, issues)
         check_banner(skill_path, text, issues)
         check_references(skill_path, text, issues)
 
+    check_pending_spec(skill_files, issues)
     check_legacy_names(issues)
     check_prose(issues)
     check_version(issues)

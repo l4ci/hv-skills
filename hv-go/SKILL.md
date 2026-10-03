@@ -1,7 +1,6 @@
 ---
 name: hv-go
 description: Capture one item and immediately implement it — combines /hv-capture and /hv-work, skipping the /hv-next review. Use when the user wants one specific thing done right now ("fix X", "add Y", "do Z") and it's not yet captured. For brain-dumping use /hv-capture; for items already in BACKLOG.md use /hv-work.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

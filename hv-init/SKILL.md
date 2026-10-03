@@ -1,7 +1,6 @@
 ---
 name: hv-init
 description: Initialize the .hv/ folder structure with BACKLOG.md, KNOWLEDGE.md, counters.json, config.json and status.json via `hv init`. Also sets up AGENTS.md (with CLAUDE.md importing it) and seeds the managed knowledge-index blocks in it so future /hv-work runs can consult learnings. Called automatically by other hv: skills when the folder doesn't exist, or manually to set up a new project.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

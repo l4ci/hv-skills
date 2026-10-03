@@ -1,7 +1,6 @@
 ---
 name: hv-brainstorm
 description: Per-item design exploration before /hv-plan — Socratic discovery, 2-3 approaches with tradeoffs, sectioned design with per-section approval, writes .hv/designs/<ID>.md, hands off to /hv-plan. Use when a Major feature or P0 bug needs design negotiation before implementation planning.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
