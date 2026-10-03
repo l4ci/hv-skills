@@ -27,7 +27,7 @@ case "$1 $2" in
     printf '{"id":"cli","result":{"type":"agent_info","agent":{"agent_status":"%s","pane_id":"w9:p11","tab_id":"w9:t7"}}}\n' "$st" ;;
   "agent read")
     t="working"; [ -f "$F/fired" ] && t="HV-DONE w1 https://github.com/o/r/pull/7"
-    python3 -c 'import json,sys; print(json.dumps({"id":"cli","result":{"read":{"text":sys.argv[1]+"\n"}}}))' "$t" ;;
+    printf '%s\n' "$t" ;;  # herdr 0.9.3 prints pane text as is, no JSON envelope
   *) echo '{"error":{"code":"unknown_method","message":"fake"}}' >&2; exit 1 ;;
 esac
 SH

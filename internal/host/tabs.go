@@ -42,7 +42,6 @@ func (h *herdr) Tabs(ctx context.Context) ([]Tab, error) {
 				TabID  string `json:"tab_id"`
 				Cwd    string `json:"cwd"`
 				Agent  string `json:"agent"`
-				Name   string `json:"name"`
 				Status string `json:"agent_status"`
 			} `json:"panes"`
 		} `json:"result"`
@@ -63,7 +62,7 @@ func (h *herdr) Tabs(ctx context.Context) ([]Tab, error) {
 		if !t.Agentless {
 			continue
 		}
-		if p.Agent != "" || p.Name != "" || (p.Status != "unknown" && p.Status != "") || !h.onlyShells(ctx, p.PaneID) {
+		if p.Agent != "" || (p.Status != "unknown" && p.Status != "") || !h.onlyShells(ctx, p.PaneID) {
 			t.Agentless = false
 		}
 	}
