@@ -183,7 +183,7 @@ func TestIronLawRefusesInitAndRecordAttempt(t *testing.T) {
 
 func TestDebugReset(t *testing.T) {
 	dir := verdictRepo(t)
-	for _, c := range [][]string{{"B07"}, {"B07", "--reason", "  "}, {" ", "--reason", "r"}} {
+	for _, c := range [][]string{{"B07"}, {"B07", "--reason", "  "}, {" ", "--reason", "r"}, {"B07", "--reason", "r", "--confirm"}} {
 		if code, _, _ := hvIn(t, dir, append([]string{"debug", "reset"}, c...)...); code != 2 {
 			t.Errorf("%v: exit %d, want 2", c, code)
 		}
@@ -200,10 +200,21 @@ func TestDebugReset(t *testing.T) {
 	if code, _, _ := hvIn(t, dir, "debug", "counter", "init", "B07"); code != 4 {
 		t.Fatalf("init before reset: exit %d", code)
 	}
+	// Without --confirm the debug-reset gate refuses and nothing changes.
 	code, out, _ = hvIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--json")
+	if d := data(t, out); code != 4 || d["gate"] != "debug-reset" || d["changed"] != false {
+		t.Fatalf("unconfirmed reset: %d %v", code, d)
+	}
+	if len(verdict.Load(dir).Items["B07"]) != 3 {
+		t.Fatal("a refused reset wrote a record")
+	}
+	code, out, _ = hvIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--confirm", "--confirm-note", "yes, reset it", "--json")
 	d := data(t, out)
 	if code != 0 || d["bugId"] != "B07" || d["cleared"] != float64(3) || d["failedFixes"] != float64(0) || d["changed"] != true {
 		t.Fatalf("reset: %d %v", code, d)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, ".hv", "gate-audit.jsonl")); err != nil || !strings.Contains(string(b), `"gate": "debug-reset"`) || !strings.Contains(string(b), "yes, reset it") {
+		t.Errorf("audit line missing: %s %v", b, err)
 	}
 	list := verdict.Load(dir).Items["B07"]
 	if last := list[len(list)-1]; len(list) != 4 || last.Kind != verdict.DebugReset || last.Verdict != "RESET" || last.Summary != "new angle" || last.Sha == "" {

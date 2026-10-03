@@ -23,6 +23,7 @@ const (
 	ReleasePublish = "release-publish"
 	PublicFiling   = "public-filing"
 	MergeApproval  = "merge-approval"
+	DebugReset     = "debug-reset"
 )
 
 // Gate is one registry row. A gate with Verbs is enforced: those verbs refuse
@@ -44,6 +45,7 @@ var Registry = []Gate{
 	{ReleasePublish, []string{"release publish"}, []string{"hv-release"}, "a GitHub or GitLab release page"},
 	{PublicFiling, []string{"tracker suggest-upstream"}, []string{"hv-learn"}, "a public issue on the hv-skills repo"},
 	{MergeApproval, []string{"ship merge", "ship pr-merge", "worker gate"}, []string{"hv-ship", "hv-review", "hv-work"}, "a merge into the base branch"},
+	{DebugReset, []string{"debug reset"}, []string{"hv-debug"}, "a fresh failed-fix count for an item the Iron Law halted"},
 	{"pr-open", nil, []string{"hv-ship"}, "a public PR or MR"},
 	{"issue-close", nil, []string{"hv-ship", "hv-release"}, "closed upstream issues"},
 	{"issue-label", nil, []string{"hv-capture"}, "upstream label added or removed"},

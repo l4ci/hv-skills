@@ -11,6 +11,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/debugctr"
+	"github.com/l4ci/hv-skills/v5/internal/gate"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/repos"
@@ -311,8 +312,13 @@ func ignoreRefused(err error) error {
 
 func debugReset(fs *flag.FlagSet) RunFunc {
 	reason := fs.String("reason", "", "why the count starts again")
+	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		bug, err := oneArg(args, "bugId")
+		if err != nil {
+			return Result{}, err
+		}
+		conf, err := confirm()
 		if err != nil {
 			return Result{}, err
 		}
@@ -335,7 +341,9 @@ func debugReset(fs *flag.FlagSet) RunFunc {
 			d.Set("changed", false)
 			return Result{Data: d, Text: "nothing to reset"}, nil
 		}
-		// B1 gate: debug-reset
+		if res, err := clearGate(c, gate.DebugReset, bug, conf, nil, nil); err != nil {
+			return res, err
+		}
 		sha := ""
 		if out, err := reviewGit(c.Context(), root, "rev-parse", "--short", "HEAD"); err == nil {
 			sha = strings.TrimSpace(out)

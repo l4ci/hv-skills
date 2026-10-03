@@ -57,8 +57,9 @@ func TestRegistry(t *testing.T) {
 			enforced = append(enforced, g.Name)
 		}
 	}
-	// The maintainer's B1 ruling: exactly these gates are enforced in code.
-	if want := []string{TagPush, ReleasePublish, PublicFiling, MergeApproval}; !reflect.DeepEqual(enforced, want) {
+	// The maintainer's B1 ruling, plus B3's reset: exactly these gates are
+	// enforced in code.
+	if want := []string{TagPush, ReleasePublish, PublicFiling, MergeApproval, DebugReset}; !reflect.DeepEqual(enforced, want) {
 		t.Errorf("enforced %v, want %v", enforced, want)
 	}
 	for _, name := range []string{"issue-close", "issue-label"} {
