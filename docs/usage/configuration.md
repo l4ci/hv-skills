@@ -193,9 +193,8 @@ Picks who runs the [`ship.secondOpinion`](#shipsecondopinion) gate. Has no effec
 | Value | Behavior |
 |-------|----------|
 | `"subagent"` (default) | A fresh Sonnet subagent reviews the goal + diff brief. |
-| `"codex"` | `/hv-ship` writes the same brief to a file and runs `hv-codex-verify` (Codex headless, structured PASS/FAIL/ERROR). The helper adds no `-s` flag, so Codex's own configured sandbox applies; a before/after `git status --porcelain` guard runs regardless. |
 
-The `codex` runner is advisory: a FAIL is surfaced to the user and never blocks the ship (the `subagent` runner keeps its existing routing, where FAIL stops). An `ERROR` (Codex missing, sandbox failure such as `bwrap`, timeout, dirty tree after the run) is reported as an infra note and the ship continues. Run `.hv/bin/hv-codex-verify --doctor` to check the Codex install and sandbox.
+5.0 removed the `"codex"` runner, which ran Codex headlessly. 5.0 has no headless sessions. A config that still says `"codex"` keeps working: `/hv-ship` prints a one-line note and runs the subagent. The subagent runner routes its verdict like `/hv-review`, so a FAIL now stops the ship where the advisory Codex runner only reported it.
 
 ## ship.qa
 
