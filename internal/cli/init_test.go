@@ -146,3 +146,157 @@ func TestInitCheckWarnsOnVersionDrift(t *testing.T) {
 		t.Errorf("exit %d warnings %v stderr %q", code, w, errOut)
 	}
 }
+
+// initCode runs hv with -C and returns the exit code, restoring the cwd.
+func initCode(t *testing.T, args ...string) int {
+	t.Helper()
+	wd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(wd) })
+	code, _, _ := stubRun(args...)
+	return code
+}
+
+// codexRoot builds a fake skills root: two skills and a non-skill directory.
+func codexRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, n := range []string{"hv-alpha", "hv-beta"} {
+		os.MkdirAll(filepath.Join(root, n), 0o755)
+		os.WriteFile(filepath.Join(root, n, "SKILL.md"), []byte("# "+n+"\n"), 0o644)
+	}
+	os.MkdirAll(filepath.Join(root, "hv-nothing"), 0o755)
+	os.MkdirAll(filepath.Join(root, "references"), 0o755)
+	return root
+}
+
+func codexLinks(d *jsonx.Object) map[string]string {
+	c, _ := d.Get("codex")
+	l, _ := c.(*jsonx.Object).Get("links")
+	out := map[string]string{}
+	for _, e := range l.([]any) {
+		o := e.(*jsonx.Object)
+		n, _ := o.Get("name")
+		s, _ := o.Get("status")
+		out[n.(string)] = s.(string)
+	}
+	return out
+}
+
+func TestInitCodexLinksAndIsIdempotent(t *testing.T) {
+	skills, dir := codexRoot(t), t.TempDir()
+	code, env, _ := initRun(t, dir, "init", "--no-blocks", "--codex", "--skills-dir", skills)
+	d := initData(env)
+	if code != 0 {
+		t.Fatal(env)
+	}
+	if got := codexLinks(d); len(got) != 2 || got["hv-alpha"] != "created" || got["hv-beta"] != "created" {
+		t.Errorf("links %v", got)
+	}
+	for _, n := range []string{"hv-alpha", "hv-beta"} {
+		tgt, err := os.Readlink(filepath.Join(dir, ".agents", "skills", n))
+		if err != nil || tgt != filepath.Join(skills, n) {
+			t.Errorf("%s -> %q %v", n, tgt, err)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(dir, ".agents", "skills", "hv-nothing")); err == nil {
+		t.Error("linked a non-skill dir")
+	}
+	cr, _ := d.Get("created")
+	for _, p := range cr.([]any) {
+		if strings.HasPrefix(p.(string), ".agents") {
+			t.Errorf("created lists %v", p)
+		}
+	}
+	gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if strings.Count(string(gi), ".agents/skills/hv-*") != 1 {
+		t.Errorf("gitignore:\n%s", gi)
+	}
+	_, env, _ = initRun(t, dir, "init", "--no-blocks", "--codex", "--skills-dir", skills)
+	d = initData(env)
+	if ch, _ := d.Get("changed"); ch != false {
+		t.Errorf("second run changed: %v", env)
+	}
+	if got := codexLinks(d); got["hv-alpha"] != "unchanged" || got["hv-beta"] != "unchanged" {
+		t.Errorf("links %v", got)
+	}
+	gi2, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if string(gi2) != string(gi) {
+		t.Error("gitignore rewritten")
+	}
+}
+
+func TestInitCodexSkipsExistingPaths(t *testing.T) {
+	skills, dir := codexRoot(t), t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".agents", "skills", "hv-alpha"), 0o755)
+	os.Symlink("/elsewhere", filepath.Join(dir, ".agents", "skills", "hv-beta"))
+	code, env, _ := initRun(t, dir, "init", "--no-blocks", "--codex", "--skills-dir", skills)
+	d := initData(env)
+	if code != 0 {
+		t.Fatal(env)
+	}
+	if got := codexLinks(d); got["hv-alpha"] != "skipped" || got["hv-beta"] != "skipped" {
+		t.Errorf("links %v", got)
+	}
+	if tgt, _ := os.Readlink(filepath.Join(dir, ".agents", "skills", "hv-beta")); tgt != "/elsewhere" {
+		t.Errorf("overwrote link: %q", tgt)
+	}
+	if w, _ := d.Get("warnings"); w == nil {
+		t.Error("no warnings")
+	}
+}
+
+func TestInitCodexInvalidRootWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	code := initCode(t, "-C", dir, "init", "--codex", "--skills-dir", t.TempDir())
+	if code != 3 {
+		t.Errorf("exit %d", code)
+	}
+	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
+		t.Errorf("wrote %v", ents)
+	}
+}
+
+func TestInitCodexDerivesRootFromBinary(t *testing.T) {
+	skills, dir := codexRoot(t), t.TempDir()
+	os.MkdirAll(filepath.Join(skills, "bin"), 0o755)
+	old := executablePath
+	executablePath = func() (string, error) { return filepath.Join(skills, "bin", "hv"), nil }
+	t.Cleanup(func() { executablePath = old })
+	// EvalSymlinks needs the file to exist
+	os.WriteFile(filepath.Join(skills, "bin", "hv"), nil, 0o755)
+	code, env, _ := initRun(t, dir, "init", "--no-blocks", "--codex")
+	if code != 0 || codexLinks(initData(env))["hv-alpha"] != "created" {
+		t.Errorf("exit %d %v", code, env)
+	}
+	// a binary with no skills beside it: exit 3
+	executablePath = func() (string, error) { return filepath.Join(t.TempDir(), "bin", "hv"), nil }
+	if code := initCode(t, "-C", t.TempDir(), "init", "--codex"); code != 3 {
+		t.Errorf("exit %d", code)
+	}
+}
+
+func TestInitSkillsDirNeedsCodex(t *testing.T) {
+	dir := t.TempDir()
+	code := initCode(t, "-C", dir, "init", "--skills-dir", codexRoot(t))
+	if code != 2 {
+		t.Errorf("exit %d", code)
+	}
+	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
+		t.Errorf("wrote %v", ents)
+	}
+}
+
+func TestInitDefaultHasNoCodex(t *testing.T) {
+	dir := t.TempDir()
+	_, env, _ := initRun(t, dir, "init", "--no-blocks")
+	if _, ok := initData(env).Get("codex"); ok {
+		t.Error("codex in data")
+	}
+	if _, err := os.Lstat(filepath.Join(dir, ".agents")); err == nil {
+		t.Error(".agents created")
+	}
+	gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if strings.Contains(string(gi), ".agents") {
+		t.Error("gitignore mentions .agents")
+	}
+}
