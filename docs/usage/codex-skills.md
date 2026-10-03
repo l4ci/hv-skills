@@ -12,3 +12,7 @@ hv init --codex --skills-dir ~/src/hv-skills   # a go-installed hv, or any check
 In Codex, type `$hv-pause` where Claude Code uses `/hv-pause`. It is the same skill; Codex lists it as `hv-skills:hv-pause`.
 
 Not covered: skill bodies still name Claude Code tools (`AskUserQuestion`, `TaskCreate`, `Agent`), so a skill may not run end to end in Codex. `hv` also has to be on `PATH` (release binary or `go install`; the Claude Code plugin supplies it only inside Claude Code).
+
+## Checking discovery
+
+In a scratch repo with the links in place, `codex debug prompt-input hi` prints the model-visible input, skills included, without starting a model session. Each `hv-*` skill should appear as `hv-skills:hv-x: <description>`. It reads your own `~/.codex` and writes nothing to the project. `hv doctor` checks that your Codex version is in the supported range.

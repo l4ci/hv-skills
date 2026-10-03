@@ -1,6 +1,6 @@
-echo "E2: Agent Skills frontmatter lint, hv init --codex, Codex discovery (#69)"
+echo "E2: Agent Skills frontmatter lint and hv init --codex (#69)"
 # test/validate-skills.py checks every SKILL.md against the Agent Skills spec;
-# `hv init --codex` symlinks the skills into .agents/skills; Codex lists them.
+# `hv init --codex` symlinks the skills into .agents/skills.
 VALIDATE="$TESTDIR/validate-skills.py"
 SPEC_TMP="$(mktemp -d)"
 trap 'rm -rf "$SPEC_TMP"' EXIT
@@ -90,26 +90,9 @@ RC=0; hvj -C "$SPEC_TMP/nope" init --skills-dir "$SKILLS" >/dev/null 2>&1 || RC=
 [ "$RC" = 2 ] || fail "E2[e]: --skills-dir without --codex exited $RC, want 2"
 pass "E2[e]: existing paths are skipped; a bad root exits 3 and a stray flag exits 2, both before writing"
 
-# (f) Codex lists the linked skills. The probe renders the model-visible input
-# with `codex debug prompt-input`: no model session, no login used beyond what
-# Codex reads at start, nothing written to the project. It runs against the
-# caller's own ~/.codex (CODEX_HOME unset) and skips when codex is missing or
-# is not a version this probe was checked against (E1, #68, owns the real pin).
-CODEX_PROBED="0.159."
-if ! command -v codex >/dev/null 2>&1; then
-  echo "  SKIP E2[f]: codex is not installed"
-elif ! grep -q "^codex-cli ${CODEX_PROBED//./\\.}" <<<"$(codex --version 2>&1)"; then
-  echo "  SKIP E2[f]: codex $(codex --version 2>&1) is outside ${CODEX_PROBED}x"
-else
-  git -C "$SPEC_TMP/proj" init -q
-  # Codex (node) leaves a compile cache in TMPDIR; keep it inside this section's tree.
-  mkdir -p "$SPEC_TMP/codex-tmp"
-  OUT="$(cd "$SPEC_TMP/proj" && TMPDIR="$SPEC_TMP/codex-tmp" timeout 60 codex debug prompt-input hi 2>&1)" || fail "E2[f]: codex debug prompt-input failed: $OUT"
-  for s in hv-one hv-two; do
-    grep -qE "(^|[^a-z-])(hv-skills:)?$s: " <<<"$OUT" || fail "E2[f]: Codex did not list $s"
-  done
-  pass "E2[f]: Codex ${CODEX_PROBED}x lists both skills from .agents/skills"
-fi
+# Codex discovery itself is a manual check, not a smoke step: the runner puts a
+# poison codex on PATH so no section runs the real CLI (E1). The probe is in
+# docs/usage/codex-skills.md and its result is recorded in the PR.
 
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$SPEC_TMP"
