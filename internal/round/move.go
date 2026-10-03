@@ -14,6 +14,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
 	"github.com/l4ci/hv-skills/v5/internal/escalation"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
@@ -386,6 +387,7 @@ func (e Env) Reclaim(ctx context.Context, root string, be Board, o ReclaimOpts) 
 	// A live pane must be gone before its worktree moves under it.
 	if h.Health != HealthDead {
 		switch {
+		case e.HostName == host.Solo: // a subagent has no pane to close
 		case h.Known && !h.Alive: // provably gone
 		case !h.Known:
 			return res, blocked(BlockLiveAgent, "the host cannot be asked, so slot %s's agent cannot be proved gone; start the host or close its pane", o.Slot)
@@ -437,6 +439,8 @@ type Transferred struct {
 	Salvaged                      bool
 	ClaimID                       string
 	Dispatched, Changed           bool
+	// Host, Brief and Worktree are set under solo (C8) in place of a dispatch.
+	Host, Brief, Worktree string
 }
 
 // Transfer is the orchestrator's verb to move an issue from the slot holding it
@@ -609,16 +613,12 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 		res.ClaimID = worker.Str(receiver, "claimId")
 	}
 
-	if e.Accounts != nil && len(worker.Configured(root)) > 0 {
+	solo := isSolo(root)
+	if !solo && e.Accounts != nil && len(worker.Configured(root)) > 0 {
 		if _, err := e.pickAccount(ctx, root, o.To); err != nil {
 			return res, wrap(err)
 		}
 	}
-	tmp, err := os.CreateTemp("", "hv-round-brief-")
-	if err != nil {
-		return res, wrap(err)
-	}
-	defer os.Remove(tmp.Name())
 	decisions := ""
 	if o.BodyFile != "" {
 		b, _ := os.ReadFile(o.BodyFile)
@@ -630,6 +630,21 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 	text := pointerBrief(o.To, id, branch, brief, nil, decisions, tierBrief{Kind: kind, Tier: tier, Model: model, Default: tier, Table: o.Settings.Models[kind]})
 	text += fmt.Sprintf("\nThis issue was handed to you by %s. Read its latest hv:handoff comment first (it ends with a `<!-- hv:handoff %s@%d -->` marker), then continue from the pushed work on %s, already checked out in your worktree.\n",
 		res.From, res.From, rnd, branch)
+	if solo {
+		// No pane: mark the receiver busy and hand the brief back.
+		b, wt, err := e.soloHandOff(root, o.To, text, rnd)
+		if err != nil {
+			return res, wrap(err)
+		}
+		res.Host, res.Brief, res.Worktree = host.Solo, b, wt
+		res.Changed = true
+		return res, nil
+	}
+	tmp, err := os.CreateTemp("", "hv-round-brief-")
+	if err != nil {
+		return res, wrap(err)
+	}
+	defer os.Remove(tmp.Name())
 	tmp.WriteString(text)
 	tmp.Close()
 	if _, err := e.workerEnv().Dispatch(ctx, root, worker.DispatchOpts{Slot: o.To, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: branch, Model: model}); err != nil {

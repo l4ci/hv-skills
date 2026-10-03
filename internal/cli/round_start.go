@@ -128,9 +128,11 @@ func roundStart(fs *flag.FlagSet) RunFunc {
 			}
 		}
 		env := roundEnv(ctx, root)
+		dispatch, _ := config.Lookup(cfg, "work.dispatch")
+		dispatchStr, _ := dispatch.(string)
 		st, err := env.Start(ctx, root, round.StartOpts{
 			Scope: sc, Items: splitList(*items), Slots: *slots, Base: *base, HolderPID: *pid,
-			Settings: set, Getenv: os.Getenv, DefaultNum: def,
+			Settings: set, Getenv: os.Getenv, DefaultNum: def, Dispatch: dispatchStr,
 		})
 		for _, w := range st.Warnings {
 			c.Warn("%s", w)
@@ -148,6 +150,9 @@ func roundStart(fs *flag.FlagSet) RunFunc {
 			}
 			return Result{}, fromWorker(err)
 		}
+		// Start has just recorded the round's host (C8): rebuild the env so the
+		// drift count asks that host, not the guess made before it existed.
+		env = roundEnv(ctx, root)
 		be, err := a4Open(c, root, false, "")
 		if err != nil {
 			return a4Fail(err)

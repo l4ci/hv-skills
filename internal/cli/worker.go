@@ -318,6 +318,9 @@ func accountPick(fs *flag.FlagSet) RunFunc {
 				skip = append(skip, n)
 			}
 		}
+		if err := worker.SoloRefusal(root, "every solo subagent runs on the orchestrator's own account"); err != nil {
+			return Result{}, fromWorker(err)
+		}
 		ctx, stop := workerContext()
 		defer stop()
 		name, found := workerAccounts().Pick(ctx, root, skip)
@@ -341,6 +344,9 @@ func accountAssign(fs *flag.FlagSet) RunFunc {
 		root, err := c.Root()
 		if err != nil {
 			return Result{}, err
+		}
+		if err := worker.SoloRefusal(root, "every solo subagent runs on the orchestrator's own account"); err != nil {
+			return Result{}, fromWorker(err)
 		}
 		ctx, stop := workerContext()
 		defer stop()
@@ -508,6 +514,9 @@ func sessionCheck(fs *flag.FlagSet) RunFunc {
 		root, err := c.Root()
 		if err != nil {
 			return Result{}, err
+		}
+		if err := worker.SoloRefusal(root, "a solo round has no host session; there is nothing to check"); err != nil {
+			return Result{}, fromWorker(err)
 		}
 		ctx, stop := workerContext()
 		defer stop()

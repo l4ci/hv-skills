@@ -68,7 +68,8 @@ type Forge interface {
 // means that source is unavailable; tests fill every field with fakes.
 type Env struct {
 	Git worker.GitFunc
-	// Snapshot lists the host's live agents; HostName is "herdr" or "tmux".
+	// Snapshot lists the host's live agents; HostName is "herdr" or "tmux", or
+	// "solo" with no Snapshot when the round has no terminal host.
 	Snapshot func(ctx context.Context) ([]host.Agent, error)
 	HostName string
 	Forge    Forge
@@ -206,7 +207,11 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 	// Host.
 	var agents []host.Agent
 	hostOK := false
-	if e.Snapshot == nil {
+	if e.HostName == host.Solo {
+		// No panes to ask: solo is not an unavailable host, and the tab drift
+		// kinds (dead-tab, unclaimed-tab, stalled) have nothing to read.
+		rep.Host = host.Solo
+	} else if e.Snapshot == nil {
 		rep.unavailable(SourceHost, firstNonEmpty(e.HostErr, "no host available"))
 	} else if a, err := e.Snapshot(ctx); err != nil {
 		rep.unavailable(SourceHost, err.Error())
@@ -215,6 +220,7 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 		rep.Host = e.HostName
 	}
 	claimed := map[int]bool{}
+	alive := map[string]bool{} // slots the host shows an agent or window for
 	for _, r := range rows {
 		if !hostOK {
 			break
@@ -227,6 +233,7 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 		}
 		if i := matchAgent(agents, r.Tab, wt); i >= 0 {
 			claimed[i] = true
+			alive[r.Name] = true
 			r.Agent, r.HostState = agents[i].Name, agents[i].Status
 			if r.Tab == "" {
 				r.Tab = agents[i].Tab
@@ -341,7 +348,8 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 	if hostOK {
 		for _, r := range rows {
 			s := slotObj[r.Name]
-			if s == nil || r.Issue == "" || r.Agent == "" {
+			// Alive as Health counts it: a tmux window carries no agent name.
+			if s == nil || r.Issue == "" || !alive[r.Name] {
 				continue
 			}
 			v := rep.views[r.Name]

@@ -208,6 +208,11 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 		if _, err := le.Release(cd, holder); err != nil {
 			return res, err
 		}
+		// The round is over, so its host goes with the lease: the worker verbs
+		// read work.dispatch again.
+		if err := worker.Update(root, slotsDefault(), func(doc *jsonx.Object) { doc.Delete("host") }); err != nil {
+			return res, err
+		}
 		res.Changed = true
 		return res, nil
 	}

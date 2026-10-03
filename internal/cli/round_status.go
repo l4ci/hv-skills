@@ -23,8 +23,9 @@ import (
 var roundEnv = defaultRoundEnv
 
 // defaultRoundEnv wires the real git, host and forge. The host is herdr when
-// work.dispatch says so or the process runs inside herdr (rounds are started
-// by hand with `herdr worktree create`, whatever the config says), else tmux.
+// the round recorded (C8); with none it is herdr when work.dispatch says so or
+// the process runs inside herdr (rounds are started by hand with `herdr
+// worktree create`, whatever the config says), else tmux.
 // A host or forge that cannot be built or reached is left nil: the verbs
 // report it as unavailable instead of failing.
 func defaultRoundEnv(ctx context.Context, root string) round.Env {
@@ -33,16 +34,25 @@ func defaultRoundEnv(ctx context.Context, root string) round.Env {
 	if b, ok, err := (git.Repo{Dir: root}).Base(ctx, ""); err == nil && ok {
 		e.Base = b
 	}
-	dispatch, _ := config.Lookup(cfg, "work.dispatch")
-	hostKind := "tmux"
-	if dispatch == "herdr" || os.Getenv("HERDR_ENV") == "1" {
-		hostKind = "herdr"
+	// The round's recorded host wins (C8). With none, the guess below is what
+	// rounds started by hand have always had.
+	hostKind := worker.RegistryHost(root)
+	if hostKind == "" {
+		dispatch, _ := config.Lookup(cfg, "work.dispatch")
+		hostKind = "tmux"
+		if dispatch == "herdr" || os.Getenv("HERDR_ENV") == "1" {
+			hostKind = "herdr"
+		}
 	}
-	h := host.New(hostKind, host.Deps{})
-	if err := h.Require(); err != nil {
-		e.HostErr = err.Error()
-	} else if s, ok := h.(host.Snapshotter); ok {
-		e.Snapshot, e.HostName = s.Snapshot, h.Name()
+	if hostKind == host.Solo {
+		e.HostName = host.Solo // no panes to snapshot, and not an unavailable host
+	} else {
+		h := host.New(hostKind, host.Deps{})
+		if err := h.Require(); err != nil {
+			e.HostErr = err.Error()
+		} else if s, ok := h.(host.Snapshotter); ok {
+			e.Snapshot, e.HostName = s.Snapshot, h.Name()
+		}
 	}
 	e.NeedsHuman = config.Label(cfg, "needsHuman")
 	if set, err := roundcfg.Load(root); err == nil {
