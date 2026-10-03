@@ -112,7 +112,7 @@ hv config set hvSkills.version <version>     # always; data.version from `hv ver
 hv init check --json
 ```
 
-Exit 1 (`data.initialized: false`) means a core file is still missing: report every path in `data.missing` and stop. Surface any `data.warnings` (umbrella-flag mismatch) as one line each.
+Exit 1 (`data.initialized: false`) means a core file is still missing: report every path in `data.missing` and stop. Surface the envelope's top-level `warnings` (umbrella-flag mismatch, version drift) as one line each.
 
 Tell the user one compact block:
 
