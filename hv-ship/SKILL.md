@@ -787,6 +787,6 @@ Resolves: [B07], [F03]
 | [`manual-gates.md`](../references/manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. |
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (8.5, 8.6, D-A1). |
-| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. |
+| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | Verdict semantics, `AskUserQuestion` shapes and plain-text fallback for `/hv-review` consumers. |
 | [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (registration sites, audience split). Consumed by Docs Mode. |
 | [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. Docs Mode follows this skeleton. |

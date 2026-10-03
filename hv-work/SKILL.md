@@ -478,7 +478,7 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 
 ### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
-Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) (herdr's state mapping in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md)); the routing is:
+Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) (herdr's host differences in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md)); the routing is:
 
 ```bash
 hv worker poll --json            # data.slots: [{name, state, evidence}, ...]
@@ -741,6 +741,6 @@ Loop stops naturally when:
 | [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus `hv ship` invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
 | [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
-| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"` (shared by `"herdr"`). |
-| [`herdr-dispatch.md`](../references/herdr-dispatch.md) | herdr host for worker dispatch: tabs as slots, startup dialogs, native agent-state mapping, `work.dispatch: "herdr"`. |
+| [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Judgment `hv worker` verbs do not enforce for `work.dispatch: "tmux"` (shared by `"herdr"`): permissions, relay provenance, merge-gate lore, failure modes. |
+| [`herdr-dispatch.md`](../references/herdr-dispatch.md) | herdr host for worker dispatch: tabs as slots, startup dialogs, worker-contract additions, `work.dispatch: "herdr"`. |
 | [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode verbs, registry shape, and `Repos:` field semantics. |

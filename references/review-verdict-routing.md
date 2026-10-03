@@ -1,11 +1,6 @@
 # Review verdict routing
 
-`/hv-review` ends with one of three verdicts — `PASS`, `CONCERNS`, or `FAIL` — and records it with `hv verdict add`, as do the `/hv-ship` second opinion and `/hv-qa` (which adds `INFRA-FAIL`). Callers route on the recorded verdict with `hv verdict route`, never on a report's last line. The routing table lives in code (`internal/verdict`, contract section "B2: verdicts" in `docs/design/5.0-verb-contract.md`); this reference holds what the code does not: what each verdict means, the question text, and the labels. Any future skill that gates on a pre-merge review consumes the same contract.
-
-## Recording and routing
-
-- **Producers** end their report with a fenced `json` block, `{"verdict", "summary", "findings": [{"severity", "title", "file", "line", "detail"}]}`, and the skill records it: `hv verdict add <branch> --kind review-spec|review-quality|second-opinion|qa --verdict <V> --body-file <block>`. Exit 2 names the malformed field; ask for the block again, never guess. `/hv-debug` records fix outcomes with `hv debug verdict <ID>`.
-- **Consumers** run `hv verdict route <branch> --for ship-review|ship-second-opinion|ship-qa|queue --json` and act on `data.next`. Exit 3 means no verdict was recorded: rerun the producer.
+`/hv-review` ends with one of three verdicts — `PASS`, `CONCERNS`, or `FAIL` — and records it with `hv verdict add`, as do the `/hv-ship` second opinion and `/hv-qa` (which adds `INFRA-FAIL`). Callers route on the recorded verdict with `hv verdict route`, never on a report's last line (exit 3 means none was recorded: rerun the producer). Recording flags, the producer JSON block and the refusal rules live in code (`internal/verdict`, contract section "B2: verdicts" in `docs/design/5.0-verb-contract.md`); this reference holds what the code does not: what each verdict means, the question text, and the labels. Any future skill that gates on a pre-merge review consumes the same contract.
 
 ## Verdict semantics
 
@@ -13,7 +8,7 @@
 |---------|---------|---------------|
 | `PASS` | No concerns worth surfacing. The diff matches intent and respects conventions. | Continue silently. The reviewed work is integration-ready. |
 | `CONCERNS` | The diff works, but surfaces should be flagged before merge — convention drifts, suboptimal patterns, or stale scaffolding. Not a regression. | Surface each concern, then route per `autonomy.level` (see Consumer routing below). |
-| `FAIL` | Merging would regress behavior, break intent, or violate a hard-boundary `DECISIONS.md` entry. | Stop. Surface findings. `hv ship pr`, `ship merge` and `ship pr-merge` refuse the branch (exit 4, `data.blockedBy: "verdict"`) until a newer verdict replaces the FAIL. The user fixes via `/hv-work` or `/hv-debug` and reruns the review. |
+| `FAIL` | Merging would regress behavior, break intent, or violate a hard-boundary `DECISIONS.md` entry. | Stop. Surface findings. The ship verbs refuse the branch until a newer verdict replaces the FAIL. The user fixes via `/hv-work` or `/hv-debug` and reruns the review. |
 
 ## Consumer routing
 
@@ -42,11 +37,11 @@ The queue loop is the consumer (`hv verdict route --for queue`). It routes per P
 
 | `data.next` | Verdict | Action |
 |---------|---------|--------|
-| `ask` | `PASS`, interactive | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr> --confirm --confirm-note "<answer>"` (exit 4 = not merged: an item unproven and set to `changes-requested`, or the `merge-approval` gate) |
-| `merge` | `PASS`, loop | merge, no question, unless the verb refuses with `blockedBy: "manual gate"`; then ask and re-run with `--confirm` |
+| `ask` | `PASS`, interactive | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr> --confirm --confirm-note "<answer>"` (exit 4 = not merged) |
+| `merge` | `PASS`, loop | merge, no question; if the verb refuses on a manual gate, ask and re-run with `--confirm` |
 | `request-changes` | `CONCERNS` or `FAIL` | findings as feedback, `hv item state <ID> --to changes-requested`; no merge. A `FAIL` still stops the surrounding loop as a guard failure |
 
-Exit 3 / 4 from any helper stops the queue. Label lifecycle: `references/issue-mode.md`.
+Exit 3 / 4 from any verb stops the queue. Label lifecycle: `references/issue-mode.md`.
 
 ## Producer-side relay (standalone `/hv-review` runs)
 
@@ -58,12 +53,7 @@ When `/hv-review` is invoked directly (not from `/hv-ship`), it relays the verdi
 
 When `/hv-review` is invoked from `/hv-ship`, the parent owns the routing — return the verdict and stop; do not run this relay.
 
-## Per-skill carrier — what stays inline
-
-- **`hv-review/SKILL.md` Step 5 (reviewer brief)** — the exact rubric text the reviewer evaluates against (intent match, convention compliance, etc.) is the producer's prompt-engineering content, not the verdict-routing pattern. Stays inline.
-- **`hv-ship/SKILL.md` Step 3 (ship.review gate)** — the `ship.review` config check, the *"If `ship.review` is `false`, skip"* guard, and the cycle position (between commit-bundling and PR-body composition) are skill-local carriers. Stays inline.
-- **The verdict rubric** — what makes a diff PASS, CONCERNS or FAIL is the reviewer's judgment and stays in each brief. Only the verdict-to-next-step mapping moved into code.
-- **The `AskUserQuestion` call site itself** — the call lives at the consumer's step; only the option text and routing logic extract to this reference.
+The reviewer rubric (what makes a diff PASS, CONCERNS or FAIL) stays in each producer's brief; only the verdict-to-next-step mapping moved into code.
 
 ## Carrier-label override
 
@@ -75,4 +65,4 @@ Convention: prefix surfaced concern lines with the producer's name and a dash, e
 
 - `references/ask-user-question-fallback.md` — canonical plain-text fallback mechanic.
 - `references/authoring-conventions.md` rule #5 — *"routine routing/tagging auto-picks Recommended in loop mode"*.
-- A future `references/manual-gates.md` may eventually capture the *"Ship anyway is a user-volition gate"* pattern alongside other manual gates (T37 captures the extraction). When that lands, this reference cites it instead of restating the rationale.
+- `references/manual-gates.md`: *"Ship anyway"* as a user-volition gate alongside the other manual gates.

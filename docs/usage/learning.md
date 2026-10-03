@@ -43,7 +43,7 @@ the umbrella `.hv/KNOWLEDGE.md`, repo-local ones in
 entries) routes to the scope resolved from cwd or an explicit `--repo`; at
 the umbrella root it asks once whether a learning is umbrella-shared or
 sub-repo-scoped. DECISIONS stays umbrella-only. Single-repo projects are
-unaffected. Full model: [`references/persistence-umbrella-scoping.md`](../../references/persistence-umbrella-scoping.md).
+unaffected. Full model: [`references/persistence-skills.md`](../../references/persistence-skills.md#umbrella-scoping).
 
 ## Promotion lifecycle
 
