@@ -121,3 +121,37 @@ func TestParseTermEntry(t *testing.T) {
 		t.Errorf("none alias: %+v", e)
 	}
 }
+
+func TestTierReadBackfillsLegacyBullets(t *testing.T) {
+	root := t.TempDir()
+	hv := filepath.Join(root, ".hv")
+	os.MkdirAll(hv, 0o777)
+	os.WriteFile(filepath.Join(hv, "KNOWLEDGE.md"), []byte("# K\n\n## Arch\n\n- **Old** — legacy <!-- 2026-01-01 -->\n- **Kept** — tracked <!-- 2026-01-02 -->\n\n## Glossary\n\n- **Term** — never tiered\n"), 0o666)
+	s := Store{Root: root}
+	if _, _, err := s.TierSet(Umbrella, "Arch", "Kept", Confirmed); err != nil {
+		t.Fatal(err)
+	}
+
+	e, ok, err := s.TierGet(Umbrella, "Arch", "Old")
+	if err != nil || !ok || e.Tier != Provisional || e.Hits != 0 {
+		t.Fatalf("legacy bullet = %+v ok=%v err=%v", e, ok, err)
+	}
+	if e, _, _ := s.TierGet(Umbrella, "Arch", "Kept"); e.Tier != Confirmed {
+		t.Errorf("tracked entry overwritten: %+v", e)
+	}
+	list, _ := s.TierList(Umbrella, "")
+	if len(list) != 2 {
+		t.Errorf("list = %+v, want Old and Kept (no Glossary)", list)
+	}
+}
+
+func TestTierReadWithoutKnowledgeFileCreatesNothing(t *testing.T) {
+	root := t.TempDir()
+	s := Store{Root: root}
+	if list, err := s.TierList(Umbrella, ""); err != nil || len(list) != 0 {
+		t.Fatalf("list = %v err=%v", list, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".hv", "knowledge-tier.json")); !os.IsNotExist(err) {
+		t.Errorf("sidecar created: %v", err)
+	}
+}
