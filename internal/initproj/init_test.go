@@ -266,6 +266,10 @@ func TestInitRefusesACorruptCounters(t *testing.T) {
 		if got := readTree(t, dir)[".hv/counters.json"]; got != body {
 			t.Errorf("%q: counters rewritten to %q", body, got)
 		}
+		// nothing else was written: exit 70 leaves the tree as it was
+		if tree := readTree(t, dir); len(tree) != 2 {
+			t.Errorf("%q: refused init left %v", body, tree)
+		}
 	}
 }
 
@@ -317,6 +321,16 @@ func TestInitKeepsCustomFilesInTheMirror(t *testing.T) {
 	}
 }
 
+func TestMergeGitignoreKeepsTheUmbrellaBlanket(t *testing.T) {
+	in := strings.Join(ignoreLines, "\n") + "\n.hv/\n.worktrees/\n"
+	if got := MergeGitignore(in, true, true); got != in {
+		t.Errorf("umbrella root rewrote .gitignore:\n%q", got)
+	}
+	if got := MergeGitignore(in, true, false); strings.Contains(got, "\n.hv/\n") {
+		t.Errorf("single repo kept the blanket line:\n%q", got)
+	}
+}
+
 func TestMergeGitignore(t *testing.T) {
 	block := strings.Join(ignoreLines, "\n") + "\n"
 	cases := []struct {
@@ -334,9 +348,45 @@ func TestMergeGitignore(t *testing.T) {
 		{"no trailing newline", "a", true, "a\n" + block + worktreesBlock},
 	}
 	for _, c := range cases {
-		got := MergeGitignore(c.in, c.exists)
+		got := MergeGitignore(c.in, c.exists, false)
 		if got != c.want {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, c.want)
+		}
+	}
+}
+
+// Each migration step alone makes the run changed, though nothing is created.
+func TestInitChangedWhenOnlyAMigrationWrote(t *testing.T) {
+	seeded := func(t *testing.T) string {
+		dir := t.TempDir()
+		if _, err := Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	for name, mutate := range map[string]func(dir string){
+		"counters backfill": func(d string) {
+			os.WriteFile(filepath.Join(d, ".hv", "counters.json"), []byte(`{"bugs": 3}`), 0o644)
+		},
+		"gitignore block": func(d string) { os.WriteFile(filepath.Join(d, ".gitignore"), []byte("x\n"), 0o644) },
+		"milestones heading": func(d string) {
+			os.WriteFile(filepath.Join(d, ".hv", "MILESTONES.md"), []byte("# Vision\n"), 0o644)
+		},
+		"knowledge preamble": func(d string) {
+			os.WriteFile(filepath.Join(d, ".hv", "KNOWLEDGE.md"), []byte("Use `/hv:learn`.\n"), 0o644)
+		},
+	} {
+		dir := seeded(t)
+		mutate(dir)
+		res, err := Init(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Created) != 0 || !res.Changed() {
+			t.Errorf("%s: created %v changed %v", name, res.Created, res.Changed())
+		}
+		if again, _ := Init(dir); again.Changed() {
+			t.Errorf("%s: second run changed", name)
 		}
 	}
 }

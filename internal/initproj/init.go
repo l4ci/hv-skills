@@ -1,7 +1,7 @@
 // Package initproj is `hv init`: it seeds .hv/ in a directory, migrates what
 // older versions left behind, and checks that a project is initialized. It is
 // the port of bin/hv-bootstrap and bin/hv-preflight; the old helpers are the
-// oracle the tests compare against (see init_parity_test.go).
+// oracle the tests compare against (see TestInitMatchesBootstrapGolden).
 //
 // Init, Check and the block orchestration act on the directory they are given,
 // with no walk-up: they run before a project root exists.
@@ -20,6 +20,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 )
 
 // ErrSeed is wrapped by every failure of seeding: a file that is unreadable,
@@ -36,13 +37,19 @@ type Result struct {
 	Created []string
 	// Removed lists what the stale-mirror cleanup deleted, relative to the root.
 	Removed []string
+	// Migrated is whether a migration step rewrote an existing file: the
+	// MILESTONES.md heading, the counters backfill, the .gitignore block or the
+	// KNOWLEDGE.md preamble.
+	Migrated bool
 	// Warnings are things the caller should surface: a legacy TODO.md left in
 	// place, custom files left in .hv/bin.
 	Warnings []string
 }
 
 // Changed is whether Init touched anything.
-func (r Result) Changed() bool { return len(r.Created) > 0 || len(r.Removed) > 0 }
+func (r Result) Changed() bool {
+	return len(r.Created) > 0 || len(r.Removed) > 0 || r.Migrated
+}
 
 var seedDirs = []string{"bugs", "features", "tasks", "milestones", "plans", "spikes", "map"}
 
@@ -53,6 +60,15 @@ func Init(root string) (Result, error) {
 	var res Result
 	before := snapshot(root)
 	hv := filepath.Join(root, ".hv")
+	// A corrupt counters.json is refused before anything is written, so exit 70
+	// leaves the tree as it was.
+	if err := checkCounters(filepath.Join(hv, "counters.json")); err != nil {
+		return res, err
+	}
+	step := func(wrote bool, err error) error {
+		res.Migrated = res.Migrated || wrote
+		return err
+	}
 	for _, d := range seedDirs {
 		if err := os.MkdirAll(filepath.Join(hv, d), 0o777); err != nil {
 			return res, seedErr("%v", err)
@@ -82,14 +98,14 @@ func Init(root string) (Result, error) {
 			return res, err
 		}
 	}
-	if err := migrateMilestonesHeading(filepath.Join(hv, "MILESTONES.md")); err != nil {
+	if err := step(migrateMilestonesHeading(filepath.Join(hv, "MILESTONES.md"))); err != nil {
 		return res, err
 	}
 
 	if err := seedFile(filepath.Join(hv, "counters.json"), countersSeed); err != nil {
 		return res, err
 	}
-	if err := backfillCounters(filepath.Join(hv, "counters.json")); err != nil {
+	if err := step(backfillCounters(filepath.Join(hv, "counters.json"))); err != nil {
 		return res, err
 	}
 	for _, f := range []struct{ name, text string }{
@@ -102,10 +118,10 @@ func Init(root string) (Result, error) {
 		}
 	}
 
-	if err := updateGitignore(filepath.Join(root, ".gitignore")); err != nil {
+	if err := step(updateGitignore(filepath.Join(root, ".gitignore"), len(repos.Load(root)) > 0)); err != nil {
 		return res, err
 	}
-	if err := migrateKnowledgePreamble(filepath.Join(hv, "KNOWLEDGE.md")); err != nil {
+	if err := step(migrateKnowledgePreamble(filepath.Join(hv, "KNOWLEDGE.md"))); err != nil {
 		return res, err
 	}
 
@@ -141,39 +157,39 @@ func seedFile(path, text string) error {
 
 // migrateMilestonesHeading rewrites a first line of exactly "# Vision" to
 // "# Milestones" and leaves the rest alone.
-func migrateMilestonesHeading(path string) error {
+func migrateMilestonesHeading(path string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
 	if first, _, _ := strings.Cut(string(raw), "\n"); first != "# Vision" {
-		return nil
+		return false, nil
 	}
 	text, err := fsio.ReadText(path)
 	if err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
 	lines := strings.SplitAfter(text, "\n")
 	lines[0] = "# Milestones" + strings.TrimPrefix(lines[0], "# Vision")
 	if err := fsio.WriteFileAtomic(path, []byte(strings.Join(lines, ""))); err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
-	return nil
+	return true, nil
 }
 
 // backfillCounters adds the keys later versions introduced to an older
 // counters.json. A file that is not a JSON object is an error: the old helper
 // replaced a corrupt one with just the two backfilled keys, which restarted
 // every item counter at zero.
-func backfillCounters(path string) error {
+func backfillCounters(path string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
 	v, err := jsonx.Decode(raw)
 	d, ok := v.(*jsonx.Object)
 	if err != nil || !ok {
-		return seedErr("%s is not a JSON object; fix or remove it", filepath.ToSlash(filepath.Join(".hv", filepath.Base(path))))
+		return false, seedErr("%s is not a JSON object; fix or remove it", filepath.ToSlash(filepath.Join(".hv", filepath.Base(path))))
 	}
 	changed := false
 	if _, ok := d.Get("milestones"); !ok {
@@ -189,36 +205,53 @@ func backfillCounters(path string) error {
 	}
 	if changed {
 		if err := fsio.WriteJSONAtomic(path, d); err != nil {
-			return seedErr("%v", err)
+			return false, seedErr("%v", err)
 		}
+	}
+	return changed, nil
+}
+
+// checkCounters refuses a counters.json that exists but is not a JSON object.
+func checkCounters(path string) error {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return seedErr("%v", err)
+	}
+	if v, err := jsonx.Decode(raw); err != nil {
+		return seedErr(".hv/counters.json is not valid JSON; fix or remove it")
+	} else if _, ok := v.(*jsonx.Object); !ok {
+		return seedErr(".hv/counters.json is not a JSON object; fix or remove it")
 	}
 	return nil
 }
 
-func updateGitignore(path string) error {
+func updateGitignore(path string, umbrella bool) (bool, error) {
 	raw, err := os.ReadFile(path)
 	exists := err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
-	next := MergeGitignore(string(raw), exists)
+	next := MergeGitignore(string(raw), exists, umbrella)
 	if exists && next == string(raw) {
-		return nil
+		return false, nil
 	}
 	if err := fsio.WriteFileAtomic(path, []byte(next)); err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
-	return nil
+	return true, nil
 }
 
 var legacySlashRe = regexp.MustCompile(`/hv:([a-z][a-z0-9-]*)`)
 
 // migrateKnowledgePreamble rewrites the legacy `/hv:X` command spelling to
 // `/hv-X` above the first `## ` heading. Captured learnings are never touched.
-func migrateKnowledgePreamble(path string) error {
+func migrateKnowledgePreamble(path string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
 	legacy := false
 	for _, l := range strings.Split(string(raw), "\n") {
@@ -228,11 +261,11 @@ func migrateKnowledgePreamble(path string) error {
 		}
 	}
 	if !legacy {
-		return nil
+		return false, nil
 	}
 	text, err := fsio.ReadText(path)
 	if err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
 	lines := strings.SplitAfter(text, "\n")
 	changed := false
@@ -246,12 +279,12 @@ func migrateKnowledgePreamble(path string) error {
 		}
 	}
 	if !changed {
-		return nil
+		return false, nil
 	}
 	if err := fsio.WriteFileAtomic(path, []byte(strings.Join(lines, ""))); err != nil {
-		return seedErr("%v", err)
+		return false, seedErr("%v", err)
 	}
-	return nil
+	return true, nil
 }
 
 // removeMirror deletes the `.hv/bin` mirror that 4.x /hv-init wrote. 5.0 has no
