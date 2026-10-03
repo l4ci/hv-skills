@@ -17,13 +17,13 @@ func TestCodexCommand(t *testing.T) {
 		cfg, model, want string
 		exit             int
 	}{
-		{``, "gpt-x", "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --no-daemon --no-alt-screen", 0},
-		{``, "", "codex --dangerously-bypass-approvals-and-sandbox --no-daemon --no-alt-screen", 0},
+		{``, "gpt-x", "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen", 0},
+		{``, "", "codex --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen", 0},
 		{`{"work":{"codexCommand":"wrap codex -m {model}"}}`, "gpt-x", "wrap codex -m gpt-x", 0},
 		{`{"work":{"codexCommand":"wrap codex -m {model}"}}`, "", "", ExitUsage},
 		{`{"work":{"codexCommand":"codex --yolo"}}`, "gpt-x", "codex --yolo", 0},
 		{`{"work":{"codexCommand":"codex --yolo"}}`, "", "codex --yolo", 0},
-		{`{"work":{"workerCommand":"claude -x"}}`, "gpt-x", "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --no-daemon --no-alt-screen", 0},
+		{`{"work":{"workerCommand":"claude -x"}}`, "gpt-x", "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen", 0},
 	}
 	for _, c := range cases {
 		got, err := codexCommand(launchRoot(t, c.cfg), c.model)
@@ -283,7 +283,7 @@ func TestDispatchCodexSpawnsWithItsHome(t *testing.T) {
 		t.Fatalf("%+v %v", res, err)
 	}
 	if f.spawnOpts.CodexHome != home || f.spawnOpts.ConfigDir != "" ||
-		f.spawnOpts.Launch != "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --no-daemon --no-alt-screen" {
+		f.spawnOpts.Launch != "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen" {
 		t.Errorf("spawn opts = %+v", f.spawnOpts)
 	}
 }

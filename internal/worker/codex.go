@@ -26,7 +26,7 @@ const (
 // this constant. {model} takes the tier's model; with no model the pair is
 // dropped (codexCommand). --no-daemon keeps the session in the pane's own
 // process tree, so dispatch's kill is provable.
-const DefaultCodexCommand = "codex --model {model} --dangerously-bypass-approvals-and-sandbox --no-daemon --no-alt-screen"
+const DefaultCodexCommand = "codex --model {model} --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen"
 
 // Blocked reasons and hints of a codex worker that cannot start.
 const (

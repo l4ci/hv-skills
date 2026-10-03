@@ -94,7 +94,7 @@ cxrc round assign F01 --agent ben --kind codex --holder-pid "$HOLDER"
 grep -qx '# mine' "$CFG" || fail "an existing config.toml must stay as it was"
 grep -qF "tab create --workspace w9 --cwd $CX/.worktrees/ben --label ben --no-focus --env CODEX_HOME=$HOME_BEN" "$FH/log" || fail "tab create should pass CODEX_HOME: $(cat "$FH/log")"
 case "$(cat "$FH/log")" in *CLAUDE_CONFIG_DIR*) fail "a codex tab must not carry CLAUDE_CONFIG_DIR" ;; esac
-grep -qE 'agent start hv-ben-w9-t[0-9]+ --kind codex --pane [^ ]+ --timeout [0-9]+ -- --model c-std --dangerously-bypass-approvals-and-sandbox --no-daemon' "$FH/log" || fail "agent start should be --kind codex with the default command: $(cat "$FH/log")"
+grep -qE 'agent start hv-ben-w9-t[0-9]+ --kind codex --pane [^ ]+ --timeout [0-9]+ -- --model c-std --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen' "$FH/log" || fail "agent start should be --kind codex with the default command: $(cat "$FH/log")"
 pass "a logged-in slot starts a codex pane: --kind codex, CODEX_HOME on the tab, kind recorded"
 
 # A resume subcommand in work.codexCommand is refused by worker dispatch before anything is touched.
