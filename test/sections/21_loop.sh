@@ -1,55 +1,5 @@
 echo "F32: loop-mode auto-planning helpers"
 
-# (a) /hv-plan SKILL.md exposes --auto-loop with the inline dispatch language.
-# white-box-begin: A9 #53 doclint
-grep -q -- '--auto-loop' "$REPO/hv-plan/SKILL.md" \
-  || fail "F32: hv-plan/SKILL.md must document the --auto-loop flag"
-grep -q 'Auto-loop mode' "$REPO/hv-plan/SKILL.md" \
-  || fail "F32: hv-plan/SKILL.md must include the dedicated 'Auto-loop mode' section"
-# white-box-end
-
-# (b) /hv-work Step 4 carries the inline loop-mode auto-dispatch chain directive (renamed under B28).
-# white-box-begin: A9 #53 doclint
-grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
-  || fail "F32: hv-work/SKILL.md must contain the loop-mode auto-dispatch chain language"
-grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
-  || fail "F32: hv-work/SKILL.md must reference /hv-plan --auto-loop"
-# white-box-end
-
-# (c) Surfacing call sites — pre-execution skills reference hv decisions auto-since
-# to consult recent decisions before suggesting an approach. The original intent
-# was to invoke the helper explicitly from /hv-next, /hv-pause, /hv-work on terminal
-# paths; current SKILL.md prose in hv-brainstorm and hv-plan documents that pathway
-# but the explicit invocations have not landed. This assertion guards against the
-# helper becoming orphaned — if neither prose nor invocations reference it, the
-# helper exists with no consumer. Update the expected set when explicit invocations
-# land in the terminal-path skills.
-# white-box-begin: A9 #53 doclint
-SURFACING_SITES=$(grep -l 'hv decisions auto-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
-  | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
-  | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
-[ "$SURFACING_SITES" = "hv-brainstorm hv-plan" ] \
-  || fail "F32: hv decisions auto-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
-# white-box-end
-
-# (d) hv status loop wired into /hv-next (start) and /hv-pause + /hv-work (clear).
-# white-box-begin: A9 #53 doclint
-grep -q 'hv status loop start' "$REPO/hv-next/SKILL.md" \
-  || fail "F32: hv-next/SKILL.md must call hv status loop start"
-grep -q 'hv status loop clear' "$REPO/hv-pause/SKILL.md" \
-  || fail "F32: hv-pause/SKILL.md must call hv status loop clear"
-grep -q 'hv status loop clear' "$REPO/hv-work/SKILL.md" \
-  || fail "F32: hv-work/SKILL.md must call hv status loop clear"
-# white-box-end
-
-# (e) hv-init seeds loop.webResearch=false on fresh and upgraded configs: `hv config fill`
-# writes every missing schema default.
-# white-box-begin: A9 #53 doclint
-grep -q 'hv config fill' "$REPO/hv-init/SKILL.md" \
-  || fail "F32: hv-init must fill missing config defaults (loop.webResearch) with hv config fill"
-pass "F32: SKILL.md wiring + config defaults"
-# white-box-end
-
 # (f) status loop: start writes ISO timestamp; idempotent first-write; clear removes; show is null when unset.
 F32_TMP="$(mktemp -d)"
 trap 'rm -rf "$F32_TMP"' EXIT
@@ -303,21 +253,6 @@ trap 'rm -rf "$TMP" "$TMP2"' EXIT
 )
 echo "ok init seeds map"
 
-# --- skill touchpoints reference map ------------------------------
-# white-box-begin: A9 #53 doclint
-grep -q "hv map stats --cap\|hv map index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
-grep -q "hv map stats --cap\|hv map index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
-grep -q "post-cycle map\|hv map index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
-echo "ok skill touchpoints (work/debug/go)"
-# white-box-end
-
-# --- /hv-next reports staleness through hv backlog stale ---------------
-# white-box-begin: A9 #53 doclint
-grep -q "hv backlog stale" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
-grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
-echo "ok status/next/resume/capture touchpoints"
-# white-box-end
-
 # --- end-to-end: scaffold + after-work bump + consolidate prep ----
 TMP3=$(mktemp -d)
 trap 'rm -rf "$TMP3" "$TMP" "$TMP2"' EXIT
@@ -380,33 +315,3 @@ echo "ok end-to-end map flow"
 
 # --- parse_todo_fields handles Subsystem ---------------------------
 echo "B28: /hv-brainstorm --auto-loop dispatch chain"
-
-# (a) /hv-brainstorm SKILL.md exposes --auto-loop with the inline dispatch language.
-# white-box-begin: A9 #53 doclint
-grep -q -- '--auto-loop' "$REPO/hv-brainstorm/SKILL.md" \
-  || fail "B28: hv-brainstorm/SKILL.md must document the --auto-loop flag"
-grep -q '## Auto-loop mode' "$REPO/hv-brainstorm/SKILL.md" \
-  || fail "B28: hv-brainstorm/SKILL.md must include the dedicated 'Auto-loop mode' section"
-# white-box-end
-
-# (b) /hv-work Step 4 carries the inline loop-mode auto-brainstorm dispatch directive.
-# white-box-begin: A9 #53 doclint
-grep -q '/hv-brainstorm --auto-loop' "$REPO/hv-work/SKILL.md" \
-  || fail "B28: hv-work/SKILL.md must reference /hv-brainstorm --auto-loop dispatch"
-grep -q 'Loop-mode auto-dispatch chain' "$REPO/hv-work/SKILL.md" \
-  || fail "B28: hv-work/SKILL.md must title Step 4 chain as 'Loop-mode auto-dispatch chain'"
-# white-box-end
-
-# (c) /hv-work Step 2 carve-out for Major + Milestone-tagged items defers to Step 4 chain.
-# white-box-begin: A9 #53 doclint
-grep -q 'defer to Step 4' "$REPO/hv-work/SKILL.md" \
-  || fail "B28: hv-work/SKILL.md Step 2 must defer Major + Milestone-tagged ambiguity to Step 4 chain"
-# white-box-end
-
-# (d) references/loop-mode-plan-dispatch.md describes the design pre-flight.
-# white-box-begin: A9 #53 doclint
-grep -q 'Design pre-flight' "$REPO/references/loop-mode-plan-dispatch.md" \
-  || fail "B28: references/loop-mode-plan-dispatch.md must include the Design pre-flight section"
-
-pass "B28: /hv-brainstorm --auto-loop dispatch chain is wired across SKILL.md + reference"
-# white-box-end

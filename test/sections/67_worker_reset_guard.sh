@@ -199,12 +199,6 @@ rm -f "$FK/dirty_on_close" "$WT/raced.txt"
 [ "$(slot_field w1 state)" = "idle" ] || fail "the slot must not stay busy with no session, got $(slot_field w1 state)"
 pass "a failure after the kill clears the slot's stale handle"
 
-# ── drift: SKILL.md carries the contract the helper header names ────────────
-# white-box-begin: A9 #53 doclint
-grep -qF "reset guard" "$REPO/hv-work/SKILL.md" || fail "hv-work/SKILL.md does not describe the slot reset guard"
-pass "hv-work/SKILL.md describes the slot reset guard"
-# white-box-end
-
 # ── (g) a detached worktree is not registered as branch 'HEAD' ──────────────
 git -C "$WT" switch -q --detach
 BEFORE_BR="$(slot_field w1 branch)"

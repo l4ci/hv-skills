@@ -93,61 +93,6 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CFG_TMP"
 pass "config set nested / idempotent / typed values / preservation / errors / autocreate"
 
-echo "hv-ship (Docs Mode) / hv-config / hv-init reference hv config set"
-# white-box-begin: A9 #53 doclint
-grep -q "hv config set" "$REPO/hv-ship/SKILL.md"   || fail "hv-ship Docs Mode missing hv config set call"
-grep -q "hv config set" "$REPO/hv-config/SKILL.md" || fail "hv-config missing hv config set call"
-grep -q "hv config set" "$REPO/hv-init/SKILL.md"   || fail "hv-init missing hv config set call"
-pass "hv-ship Docs Mode, hv-config, hv-init all reference hv config set"
-# white-box-end
-
-echo "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
-# white-box-begin: A9 #53 doclint
-grep -E '\| Manual invoke.*after-work.*manual mode' "$REPO/hv-ship/SKILL.md" >/dev/null \
-  || fail "F09: hv-ship Docs Mode Modes row for manual invocation doesn't reflect after-work in manual mode"
-grep -q "Route to the After-work sub-flow" "$REPO/hv-ship/SKILL.md" \
-  || fail "F09: hv-ship Docs Mode Step D1 'Already true' branch doesn't route to after-work sub-flow"
-grep -q "Manual entry bypasses the gate" "$REPO/hv-ship/SKILL.md" \
-  || fail "F09: hv-ship Docs Mode Step D-A1 missing manual-entry bypass clause"
-# Old no-op text must not survive
-if grep -q "Re-running .*hv-docs.* manually has no further effect" "$REPO/hv-ship/SKILL.md"; then
-  fail "F09: stale 'no further effect' no-op text still present in hv-ship/SKILL.md Docs Mode"
-fi
-pass "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
-# white-box-end
-
-echo "hv-config positional-args invocation shapes"
-# white-box-begin: A9 #53 doclint
-grep -q '## Step 1.5 — Parse Positional Arguments' "$REPO/hv-config/SKILL.md" || fail "hv-config missing Step 1.5"
-grep -qE 'work\.isolation=worktree|<key>=<value>' "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing positional-args syntax doc"
-grep -q 'models.orchestrator' "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing canonical key list"
-# Each canonical key should appear in Step 1.5's enumeration (12 base + the models pair = 14 keys)
-for key in models.orchestrator models.worker work.isolation work.mergeStrategy ship.review learn.verify refactor.confirmBeforeExecute debug.competingHypotheses autonomy.level docs.path docs.autoCreate docs.afterWork git.baseBranch umbrella.enabled; do
-  grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" || fail "hv-config Step 1.5 missing key: $key"
-done
-pass "hv-config Step 1.5 documents all 14 canonical keys with positional-args syntax"
-# white-box-end
-
-echo "F78: work.dispatch / workerSlots / workerCommand are registered everywhere"
-# A config key that is only half-registered fails silently: hv-config rejects it
-# as unknown, or /hv-init never backfills it on an upgrade. Pin the skill and doc sites.
-# (The CONFIG_KEYS table row is also covered by `config show` / `config check` below.)
-# white-box-begin: A9 #53 doclint
-for key in work.dispatch work.workerSlots work.workerCommand; do
-  grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" \
-    || fail "F78: hv-config Step 1.5 valid-key list missing $key"
-  grep -q "$key" "$REPO/docs/reference/config-options.md" \
-    || fail "F78: config-options.md does not document $key"
-done
-grep -q 'hv config fill' "$REPO/hv-init/SKILL.md" \
-  || fail "F78: hv-init does not backfill missing keys with hv config fill"
-grep -q 'work.dispatch.*subagent.*tmux\|`work.dispatch` accepts' "$REPO/hv-config/SKILL.md" \
-  || fail "F78: hv-config validation rules do not constrain work.dispatch to its enum"
-grep -q 'work.dispatch' "$REPO/docs/usage/configuration.md" \
-  || fail "F78: usage/configuration.md does not explain work.dispatch"
-pass "F78: work.dispatch + workerSlots + workerCommand registered in the skill and doc sites"
-# white-box-end
-
 echo "F78: config check reports the new keys stale on an older config"
 CFG_F78="$(mktemp -d)"
 trap 'rm -rf "$CFG_F78"' EXIT
@@ -206,11 +151,3 @@ rc=0; VERDICT=$( cd "$CFG_F78" && hvj config check 2>/dev/null ) || rc=$?
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CFG_F78"
 pass "F78: pre-F78 configs report stale so /hv-init backfills the new keys"
-
-echo "hv-config positional-args mentioned in docs + README"
-# white-box-begin: A9 #53 doclint
-grep -q 'positional' "$REPO/docs/reference/config-options.md" || fail "config-options.md missing positional-args mention"
-grep -q 'positional\|<key>=<value>' "$REPO/docs/usage/configuration.md" || fail "configuration.md missing positional-args mention"
-grep -q '/hv-config <key>' "$REPO/README.md" || fail "README.md missing /hv-config <key> shortcut"
-pass "hv-config positional-args documented in docs + README"
-# white-box-end

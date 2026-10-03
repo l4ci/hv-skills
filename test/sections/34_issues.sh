@@ -4,7 +4,6 @@
 # the section's final pass line. (Helpers pass/fail and $REPO/$TMP from runner.sh/lib.sh.)
 set -euo pipefail
 
-
 # === Provider detection unit tests ===
 echo "Section 32: issues provider classification"
 TMP_PROV="$(mktemp -d)"
@@ -45,47 +44,6 @@ trap 'rm -rf "$TMP_PROV"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
 trap 'rm -rf "$TMP"' EXIT
 pass "issues provider classifies github/gitlab/unknown across 5 fixtures"
-
-# === SKILL.md manual-gate callouts (T7, T8, T9) ===
-# white-box-begin: A9 #53 doclint
-echo "Section 32: manual-gate callouts in SKILL.md files"
-
-# hv-capture/SKILL.md — Step I6 labeling gate (folded from /hv-issues in F16)
-grep -q "Step I6" "$REPO/hv-capture/SKILL.md" || \
-  fail "hv-capture/SKILL.md missing Step I6 (Import Mode label gate)"
-
-# hv-capture/SKILL.md — Step R3 de-tag gate (folded from /hv-rm in F14)
-grep -q "Step R3" "$REPO/hv-capture/SKILL.md" || \
-  fail "hv-capture/SKILL.md missing Step R3 (Remove Mode de-tag gate)"
-
-# Both gates share the canonical callout phrasing — verify it's present at least twice
-gate_count=$(grep -c '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
-  "$REPO/hv-capture/SKILL.md")
-[ "$gate_count" -ge 2 ] || \
-  fail "hv-capture/SKILL.md has $gate_count manual-gate callouts, expected ≥2 (Step R3 + Step I6)"
-
-# hv-ship/SKILL.md — Step 6c direct-push close gate
-grep -q "Step 6c" "$REPO/hv-ship/SKILL.md" || \
-  fail "hv-ship/SKILL.md missing Step 6c (direct-push close gate)"
-grep -q '\*\*always manual\*\* — never auto-invoked, regardless of `autonomy.level`' \
-  "$REPO/hv-ship/SKILL.md" || fail "hv-ship/SKILL.md missing manual-gate callout (Step 6c)"
-
-pass "3 manual-gate callouts present in hv-capture/SKILL.md (Step R3 + Step I6), hv-ship/SKILL.md (Step 6c)"
-
-# === references/manual-gates.md inventory rows (T11 must land before these pass) ===
-echo "Section 32: manual-gates.md inventory rows"
-
-grep -q 'Step I6\|hv-capture --from-.*label\|label.*hv-capture --from' "$REPO/references/manual-gates.md" || \
-  fail "manual-gates.md missing /hv-capture --from-* Step I6 row"
-
-grep -q 'Step R3\|hv-capture --remove.*de-tag\|de-tag.*hv-capture --remove' "$REPO/references/manual-gates.md" || \
-  fail "manual-gates.md missing /hv-capture --remove Step R3 row"
-
-grep -q 'Step 6c\|direct-push close' "$REPO/references/manual-gates.md" || \
-  fail "manual-gates.md missing hv-ship Step 6c row (T11 not yet landed?)"
-
-pass "manual-gates.md inventory has rows for the 3 manual gates"
-# white-box-end
 
 # === issues imported smoke ===
 echo "Section 32: issues imported smoke"
