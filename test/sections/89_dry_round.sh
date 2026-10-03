@@ -275,18 +275,11 @@ pass "reap preview: lists no tab, process or worktree, removes nothing (candidat
 # (later words are positional arguments). Extracted words are the run of
 # lowercase [a-z-] tokens after `hv` in an inline code span or a fenced line;
 # flags, placeholders, quotes and `hv-*` skill names end or never match.
-# The three C10 verbs are merged later by PR #193 (omar/76-return-reclaim): they
-# are gated on the verb existing in THIS tree, with an explicit SKIP line. Delete
-# C10_PENDING and the case below once #193 has merged.
-C10_PENDING="round return|round transfer|round reclaim"
-if ! git -C "$REPO" show origin/omar/76-return-reclaim:docs/design/5.0-verb-contract.md > "$TMP_DY/c10-contract.md" 2>/dev/null; then
-  : > "$TMP_DY/c10-contract.md"
-fi
 LINT="$TMP_DY/lint.py"
 cat > "$LINT" <<'PY'
 import re, subprocess, sys
-hv, pending, c10 = sys.argv[1], sys.argv[2].split("|"), open(sys.argv[3]).read()
-docs = sys.argv[4:]
+hv = sys.argv[1]
+docs = sys.argv[2:]
 
 def commands(path):
     out = subprocess.run([hv] + path + ["--help"], capture_output=True, text=True)
@@ -321,7 +314,7 @@ for doc in docs:
             if words:
                 found.setdefault(tuple(words), "%s:%d" % (doc, n))
 
-bad, skipped, ok = [], [], 0
+bad, ok = [], 0
 for words, where in sorted(found.items()):
     path = []
     verdict = "ok"
@@ -340,36 +333,29 @@ for words, where in sorted(found.items()):
         verdict = "names no verb"
     verb = " ".join(path) if verdict == "ok" else " ".join(words[:2])
     if verdict != "ok":
-        # the C10 trio: only these may be absent, and only while #193 holds them
-        key = " ".join(words[:2])
-        if key in pending and re.search(r"^### hv " + re.escape(key) + r"$", c10, re.M):
-            skipped.append(key)
-            continue
         bad.append("%s: hv %s: %s" % (where, " ".join(words), verdict))
     else:
         ok += 1
-for k in sorted(set(skipped)):
-    print("SKIP-until-#193 hv %s (in the C10 contract on origin/omar/76-return-reclaim, not in this tree)" % k)
 for b in bad:
     print("MISSING " + b)
 print("RESOLVED %d" % ok)
 sys.exit(1 if bad else 0)
 PY
 # white-box-begin: A9 #53 doclint
-rc=0; OUT="$(python3 "$LINT" "$HV_BIN" "$C10_PENDING" "$TMP_DY/c10-contract.md" "$REPO/hv-orchestrate/SKILL.md" "$REPO/docs/usage/parallel-rounds.md" 2>&1)" || rc=$?
+rc=0; OUT="$(python3 "$LINT" "$HV_BIN" "$REPO/hv-orchestrate/SKILL.md" "$REPO/docs/usage/parallel-rounds.md" 2>&1)" || rc=$?
 [ "$rc" = "0" ] || fail "dry round: verbs named in the skill or docs that do not exist: $OUT"
 case "$OUT" in *"RESOLVED "*) ;; *) fail "dry round: the verb lint resolved nothing: $OUT" ;; esac
 # The lint must be able to fail: a doc naming a verb that is not there is caught.
 printf 'Run `hv round waitt` and `hv worker gate <slot>`.\n' > "$TMP_DY/bad.md"
-rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$C10_PENDING" "$TMP_DY/c10-contract.md" "$TMP_DY/bad.md" 2>&1)" || rc=$?
+rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/bad.md" 2>&1)" || rc=$?
 [ "$rc" = "1" ] && grep -q 'MISSING .*hv round waitt' <<<"$BAD" || fail "dry round: the lint should reject a made-up verb: rc=$rc $BAD"
-# The C10 gate is limited to the three verbs: a fourth missing verb stays a hard failure.
-printf 'Run `hv round reclaim ben` and `hv round bounce`.\n' > "$TMP_DY/c10.md"
-rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$C10_PENDING" "$TMP_DY/c10-contract.md" "$TMP_DY/c10.md" 2>&1)" || rc=$?
-[ "$rc" = "1" ] && grep -q 'MISSING .*hv round bounce' <<<"$BAD" || fail "dry round: only the C10 trio may be skipped: rc=$rc $BAD"
-while IFS= read -r line; do
-  case "$line" in SKIP-until-*) pass "lint: $line" ;; esac
-done <<<"$OUT"
+# The C10 verbs resolve for real now, and a made-up neighbour is still caught.
+printf 'Run `hv round reclaim ben`, `hv round return ben` and `hv round transfer 5 --to dana`.\n' > "$TMP_DY/c10.md"
+rc=0; GOOD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/c10.md" 2>&1)" || rc=$?
+[ "$rc" = "0" ] && grep -q 'RESOLVED 3' <<<"$GOOD" || fail "dry round: the C10 verbs should resolve: rc=$rc $GOOD"
+printf 'Run `hv round reclaim ben` and `hv round bounce`.\n' > "$TMP_DY/c10b.md"
+rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/c10b.md" 2>&1)" || rc=$?
+[ "$rc" = "1" ] && grep -q 'MISSING .*hv round bounce' <<<"$BAD" || fail "dry round: a made-up round verb should fail: rc=$rc $BAD"
 pass "lint: every hv verb in hv-orchestrate/SKILL.md and docs/usage/parallel-rounds.md resolves ($(grep -o 'RESOLVED [0-9]*' <<<"$OUT"))"
 # white-box-end
 

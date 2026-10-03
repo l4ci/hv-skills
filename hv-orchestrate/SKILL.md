@@ -65,7 +65,7 @@ Between waits, use free slots: re-read `hv round candidates` and assign the next
 
 **Dead vs stalled.** A `dead` slot has no live agent: the tab is gone or the process exited. A `stalled` slot has a live agent and nothing has moved for `round.stallMinutes` (no commit, no edit, no state change). Stalled is usually a long test run, not a failure, and a worker waiting on your escalation is never stalled. Read the pane before acting on either.
 
-To move an assigned issue, the C10 verbs (contract signed off, PR #193 unmerged):
+To move an assigned issue, the C10 verbs:
 
 - **`hv round return`** is the worker's own verb for giving an issue back (blocked, wrong premise). You don't use it. The branch is pushed and kept, the claim is released, and the issue is a candidate again. A fresh `assign` starts clean: it does not continue the pushed branch.
 - **`hv round transfer <issue> --to <slot>`** continues the pushed branch in another slot, with the handoff comment named in the brief. Use it when the work is good and the worker is the problem (dead, wrong account, out of quota). `--to human` labels the issue `needs-human` and dispatches nothing: use it when the next step is a person's call.
@@ -115,7 +115,7 @@ When the slate is done or the maintainer calls the round: `hv round wind-down`. 
 
 ## Solo mode
 
-*(pending C8, #64)*
+C8, #64: pending.
 
 ## Rules that outlive any verb
 
