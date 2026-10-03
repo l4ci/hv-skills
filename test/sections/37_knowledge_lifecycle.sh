@@ -23,11 +23,17 @@ OUT=$(hvj knowledge tier get --topic "Architecture" --title "Nonexistent")
 [ "$(jget data.found <<<"$OUT")" = "false" ] || fail "knowledge tier get on missing should be found:false: $OUT"
 pass "knowledge tier get on missing entry reports found:false"
 
-# Tier entries are created lazily: setting an untracked entry makes it hits 0.
-OUT=$(hvj knowledge tier set --topic "Architecture" --title "Foo rule" --tier provisional)
+# A tier read registers every titled bullet as provisional/0 (lazy init, #174),
+# so the get above has already tracked "Foo rule".
+OUT=$(hvj knowledge tier get --topic "Architecture" --title "Foo rule")
+[ "$(jget data.tier <<<"$OUT")/$(jget data.hits <<<"$OUT")" = "provisional/0" ] || fail "tier get should backfill a bullet as provisional/0: $OUT"
+pass "knowledge tier get backfills untracked bullets as provisional/0"
+
+# Setting an entry with no bullet and no sidecar row creates it with hits 0.
+OUT=$(hvj knowledge tier set --topic "Architecture" --title "Ghost rule" --tier provisional)
 [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "tier set on untracked entry should change: $OUT"
 if jget data.previousTier <<<"$OUT" >/dev/null 2>&1; then fail "untracked entry should have no previousTier: $OUT"; fi
-OUT=$(hvj knowledge tier get --topic "Architecture" --title "Foo rule")
+OUT=$(hvj knowledge tier get --topic "Architecture" --title "Ghost rule")
 [ "$(jget data.tier <<<"$OUT")/$(jget data.hits <<<"$OUT")" = "provisional/0" ] || fail "tier set on untracked entry wrong shape: $OUT"
 pass "knowledge tier set creates an untracked entry as provisional/0"
 
