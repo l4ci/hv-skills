@@ -92,6 +92,8 @@ Controls which backend [`/hv-work`](../reference/slash-commands.md#hv-work) runs
 hv config set work.dispatch tmux
 ```
 
+**Parallel rounds (`hv round`) pick their host differently.** With `work.dispatch` unset or `subagent`, `hv round start` detects one: herdr when it runs inside a herdr pane, tmux when it runs inside tmux, and otherwise **solo mode**, where the orchestrator runs each worker as a Claude `Agent` subagent in the slot's own worktree. An explicit `tmux` or `herdr` is used as set, and fails if unavailable rather than falling back. The round records its host when it starts and keeps it until wind-down. Solo workers share the orchestrator's account, rate window and context, so one usage limit stops them all. Solo mode runs Claude workers only: a Codex subagent cannot be given a working directory. See [Parallel rounds](parallel-rounds.md).
+
 Two things behave differently under `tmux` and `herdr`:
 
 - **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
