@@ -17,13 +17,7 @@ user-invocable: true
 
 Review the project backlog, suggest what to tackle next, and execute it.
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task List
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -41,30 +35,38 @@ Phases:
 
 | Worker | Model | Inputs | Returns |
 |--------|-------|--------|---------|
-| **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{still-active, done, drift}` from `.hv/bin/hv-reconcile` output (the helper's JSON arrays: `cleaned` / `needsAction` / `todoDrift` / `todoSymbolDrift`, distilled). |
-| **Worker B — Archive scan** | haiku | `BACKLOG.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `.hv/bin/hv-archive-old 5`, returns count + IDs moved). |
-| **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv-vision-active` | `milestone → remaining map` (per active milestone: ID set from `hv-todo-by-milestone`, slice summary). In issue mode (`references/issue-mode.md`) the inputs are `hv-vision-active`, `hv-vision-list`, `hv-vision-show <MNN>` and `hv-todo-by-milestone <MNN>`; never read `.hv/milestones/*.md`. |
-| **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `BACKLOG.md` sorted by `hv-backlog`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
+| **Worker A — Reconcile** | sonnet | `status.json`, git refs | `{cleaned, needsAction, todoDrift, todoSymbolDrift}`, built per **Reconcile procedure** below. |
+| **Worker B — Archive scan** | haiku | `BACKLOG.md`, `archive.ttl` config | List of completion-dated entries past TTL (runs `hv backlog archive --days 5`, returns the moved count). |
+| **Worker C — Milestones** | sonnet | `MILESTONES.md`, `.hv/milestones/M*.md`, active IDs from `hv milestone active` | `milestone → remaining map` (per active milestone: ID set from `hv backlog ids --milestone <MNN>`, slice summary). In issue mode (`references/issue-mode.md`) the inputs are `hv milestone active`, `hv milestone list`, `hv milestone show <MNN>` and `hv backlog ids --milestone <MNN>`; never read `.hv/milestones/*.md`. |
+| **Worker D — Relevance** | sonnet | Top-N candidate IDs from current `BACKLOG.md` sorted by `hv backlog list`, plus topic strings from each candidate | Relevance map: `{candidate ID → matching knowledge bullets, decisions, context terms}` via the canonical K+D query pattern (`references/knowledge-consult.md`). |
 
 Each brief uses the small-brief template from the reference: Goal · Inputs (paths/IDs only) · Constraints (cite the worktree-isolation rule when commit-producing waves are involved, though this wave is read-only) · Return shape (the table above) · Word budget ≤200 words.
 
+**Reconcile procedure (Worker A).** Read `.hv/status.json`; for each `active` entry (`branch`, `repo`, `items`, `worktree`, `startedAt`), with `-C <path>` pointing git at the entry's sub-repo when `repo` is non-null (path from `hv repo resolve <repo> --json`):
+
+1. `repo` not registered (`hv repo resolve` exits 3) → add to `cleaned` with reason `repo_unregistered`; leave the entry in place.
+2. `git branch --list <branch>` empty → run `hv status rm <branch>` (add `--repo <repo>` when non-null) and add to `cleaned` with reason `branch_gone`.
+3. Otherwise add to `needsAction`: `hasCommits` is `git rev-list --count <base>..<branch>` > 0, where `<base>` comes from `hv git base`; `worktreeMissing` is a non-null `worktree` that is not a directory. In umbrella mode, an entry with `repo: null` whose umbrella has no base branch (`hv git base` fails) gets `noBase: true`; treat it as indeterminate, not zero commits.
+
+Then `hv backlog drift --json` gives `data.drift` (`todoDrift`) and `data.symbolDrift` (`todoSymbolDrift`); on any failure (it refuses in issue mode) both are `[]`.
+
 Aggregate the four returns into the working state used by Steps 3–6: drift IDs feed the `[ID] looks shipped on <hash>` lines below; archive output is silent (already moved); milestone map feeds the Step 5 header and the Step 6 milestone-bias check; relevance map feeds the Step 6 Suggested Next reasoning.
 
-When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in BACKLOG.md`. Then suggest *"If you've verified it, record the check with `.hv/bin/hv-proof-add <ID> --check <what you ran> --result PASS --evidence <output> --sha <hash>` and close it with `.hv/bin/hv-complete <ID> <hash>`. If nothing can be re-run, close it with `.hv/bin/hv-complete <ID> <hash> --no-proof`. If it isn't actually done, re-open the work."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
+When `todoDrift` is non-empty, print one informational line per drifted ID using the most recent commit (last in the `commits` list): `[ID] looks shipped on <hash> but still open in BACKLOG.md`. Then suggest *"If you've verified it, record the check with `hv proof add <ID> --check <what you ran> --result PASS --evidence <output> --sha <hash>` and close it with `hv item complete <ID> --commit <hash>`. If nothing can be re-run, close it with `hv item complete <ID> --commit <hash> --no-proof`. If it isn't actually done, re-open the work."* This is informational only — don't block, don't ask, continue to Step 3 after printing.
 
 When `todoSymbolDrift` is non-empty, print one advisory line per entry: `[ID] names symbol(s) <symbols> that appeared in the tree after capture (e.g. <file>) — verify it isn't already shipped before implementing.` (Use the entry's `symbols` joined and the first `files` entry as `<file>`.) This is a higher-precision "silently shipped without the `[ID]`" hint than `todoDrift`, but still advisory only — don't block, don't ask, and never auto-complete. The user/orchestrator should `git grep`/`git log` the named symbols to confirm the change really landed before implementing. Continue to Step 3 after printing.
 
 If `needsAction` is empty, produce no output and continue.
 
-**Read handoff notes per stream.** Before building the per-stream questions, resolve and read any `/hv-pause` handoff note for each `needsAction` entry. Reconcile output gives `.repo` per stream (may be `null`); the path resolves with an ordered fallback so umbrella streams pick up the `(branch, repo)`-keyed file while single-repo / pre-feature notes keep working:
+**Read handoff notes per stream.** Before building the per-stream questions, resolve and read any `/hv-pause` handoff note for each `needsAction` entry. Each `needsAction` entry carries `repo` (may be `null`); the path resolves with an ordered fallback so umbrella streams pick up the `(branch, repo)`-keyed file while single-repo / pre-feature notes keep working:
 
 ```bash
-# Per stream — reconcile output gives BRANCH and REPO (REPO may be empty)
-HANDOFF="$(.hv/bin/hv-resolve-handoff ${REPO:+--repo "$REPO"} "$BRANCH")"
+# Per stream — the needsAction entry gives BRANCH and REPO (REPO may be empty)
+HANDOFF="$(hv status handoff "$BRANCH" ${REPO:+--repo "$REPO"})"
 [ -n "$HANDOFF" ] && cat "$HANDOFF"
 ```
 
-Issue the resolve+read pairs in parallel — one per stream — in the same tool-call batch as any other independent reads in this step. `hv-resolve-handoff` is a lookup helper: it probes `.hv/handoff/<branch>@<repo>.md` first (umbrella-keyed, preferred when `repo` is non-null) and falls back to `.hv/handoff/<branch>.md` (single-repo / legacy); empty stdout means no handoff exists for the stream.
+Issue the resolve+read pairs in parallel — one per stream — in the same tool-call batch as any other independent reads in this step. `hv status handoff` is a lookup: it probes `.hv/handoff/<branch>@<repo>.md` first (umbrella-keyed, preferred when `repo` is non-null) and falls back to `.hv/handoff/<branch>.md` (single-repo / legacy); empty stdout (`data.path: null` under `--json`) means no handoff exists for the stream.
 
 For each stream that has a handoff, extract the **Stage**, **Next planned step**, and **Current hypothesis** sections — those drive the question text and routing below. Streams without a handoff note keep today's behavior unchanged.
 
@@ -108,7 +110,7 @@ Route each resolution:
 |--------|--------|
 | Ship via `/hv-ship` | Invoke `hv-ship` via the `Skill` tool with this branch |
 | Resume with `/hv-work` | Invoke `hv-work` on the existing branch |
-| Abandon | `git branch -D <branch>` then `.hv/bin/hv-status-remove [--repo <repo>] <branch>` (pass `--repo` when the active entry has a non-null `repo`) |
+| Abandon | `git branch -D <branch>` then `hv status rm <branch> [--repo <repo>]` (pass `--repo` when the active entry has a non-null `repo`) |
 | Leave as-is | Print *"Skipped `<branch>` — still in `status.json`."* and continue |
 | Resume with `/hv-work` (handoff arm) | Invoke `hv-work` via the `Skill` tool with the branch + the handoff content as the brief; then `rm -f` the handoff path. |
 | Leave handoff for later | Print *"Handoff for `<branch>` left in place — re-run `/hv-next` later."* and continue. |
@@ -118,7 +120,7 @@ Plain-text fallback: *"Merge or open a PR?"* and *"Resume or abandon?"* — hono
 ## Step 3 — Archive Completed Items
 
 ```bash
-.hv/bin/hv-archive-old 5
+hv backlog archive --days 5
 ```
 
 Moves `## Completed` items older than 5 days to `ARCHIVE.md`. Silent — don't report the count.
@@ -126,32 +128,32 @@ Moves `## Completed` items older than 5 days to `ARCHIVE.md`. Silent — don't r
 ## Step 4 — Read Active Milestones
 
 ```bash
-.hv/bin/hv-vision-active
+hv milestone active
 ```
 
-If the helper prints nothing, no milestones are active — Step 6 ranks the whole backlog without milestone bias. Otherwise capture the list (one or more IDs); it shapes both the backlog presentation in Step 5 and the suggestion in Step 6.
+If it prints nothing, no milestones are active — Step 6 ranks the whole backlog without milestone bias. Otherwise capture the list (one or more IDs); it shapes both the backlog presentation in Step 5 and the suggestion in Step 6.
 
-If at least one milestone is active, also gather items already tagged to each. **Issue one `hv-todo-by-milestone` call per active milestone in parallel** (one tool-call batch, not the sequential shell loop):
+If at least one milestone is active, also gather items already tagged to each. **Issue one `hv backlog ids` call per active milestone in parallel** (one tool-call batch, not the sequential shell loop):
 
 ```bash
-.hv/bin/hv-todo-by-milestone M01
-.hv/bin/hv-todo-by-milestone M03
+hv backlog ids --milestone M01
+hv backlog ids --milestone M03
 # …one per active milestone, all dispatched in the same response
 ```
 
-The per-milestone ID set arrives from Worker C of the Step 2 dispatch wave; Step 5's `hv-backlog` runs on the orchestrator after the wave returns, since its output is presented verbatim and doesn't benefit from worker synthesis.
+The per-milestone ID set arrives from Worker C of the Step 2 dispatch wave; Step 5's `hv backlog list` runs on the orchestrator after the wave returns, since its output is presented verbatim and doesn't benefit from worker synthesis.
 
 ## Step 5 — Present the Backlog
 
 ```bash
-.hv/bin/hv-backlog
+hv backlog list
 ```
 
-Prints pre-sorted markdown tables: "In Progress" (active items from `status.json`), "Bugs" (P0→P2), "Features" (Cosmetic→Major), "Tasks". Empty sections are omitted. If the backlog is empty, the helper prints a placeholder — pass it through and stop.
+Prints pre-sorted tables: "In Progress" (active items from `status.json`), "Bugs" (P0→P2), "Features" (Cosmetic→Major), "Tasks". Empty sections are omitted. If the backlog is empty, it prints a placeholder — pass it through and stop.
 
-**Always print the full helper output verbatim — every row, every section.** Do not summarize, truncate, omit rows, collapse sections, wrap in code fences, or replace with a count ("12 bugs pending"). The user invoked `/hv-next` specifically to *see* the backlog; a missing or shortened table defeats the command. This applies even if the table is long or a word-budget hint suggests otherwise — backlog tables are exempt from response-length limits.
+**Always print the full output verbatim — every row, every section.** Do not summarize, truncate, omit rows, collapse sections, wrap in code fences, or replace with a count ("12 bugs pending"). The user invoked `/hv-next` specifically to *see* the backlog; a missing or shortened table defeats the command. This applies even if the table is long or a word-budget hint suggests otherwise — backlog tables are exempt from response-length limits.
 
-`hv-backlog` emits a `### Clusters` section automatically when 2+ items are joined by `Related:` references — pairs render as `[A] ↔ [B]`, larger groups as comma-separated. The section is part of the verbatim output; don't reformat or restate it. You may add a single editorial line after a cluster if a tactical hint is genuinely useful (e.g. *"fix the bug before the feature"*) — otherwise leave the helper's output to stand on its own.
+`hv backlog list` emits a clusters section automatically when 2+ items are joined by `Related:` references — pairs render as `[A] ↔ [B]`, larger groups as comma-separated. The section is part of the verbatim output; don't reformat or restate it. You may add a single editorial line after a cluster if a tactical hint is genuinely useful (e.g. *"fix the bug before the feature"*) — otherwise leave the output to stand on its own.
 
 If Step 4 found active milestones, prefix the backlog with a one-line header so the user knows what's in focus:
 
@@ -159,10 +161,10 @@ If Step 4 found active milestones, prefix the backlog with a one-line header so 
 Active milestones: M01 — Auth foundation, M03 — Public API
 ```
 
-(The `Milestone` column in `hv-backlog`'s tables already shows per-item tags when any are present — don't restate that.)
+(The `Milestone` column in `hv backlog list`'s tables already shows per-item tags when any are present — don't restate that.)
 
-- **Stale candidates** — print one summary line via `.hv/bin/hv-stale-summary --days 90`. Helper outputs `stale: map=N, knowledge=M, todo=K` with zero-count kinds suppressed (and prints nothing if everything is fresh). Never blocks output.
-- **Empty active milestones** — print one line per ID emitted by `.hv/bin/hv-vision-empty-active`: `empty-active: <MID> — no open items; ship with .hv/bin/hv-vision-status <MID> shipped.` Helper outputs one milestone ID per line; empty stdout means every active milestone still has open items (skip silently). Never blocks output.
+- **Stale candidates** — run `hv backlog stale --kind <k> --days 90 --json` for `map`, `knowledge` and `todo` (in parallel) and print one line `stale: map=N, knowledge=M, todo=K` from the `data.entries` counts, dropping zero-count kinds (print nothing if all three are zero). Never blocks output.
+- **Empty active milestones** — for each active milestone whose Worker C ID set (`hv backlog ids --milestone <MID>`) is empty, print `empty-active: <MID> — no open items; ship with hv milestone status <MID> --to shipped.` Skip silently when every active milestone still has open items. Never blocks output.
 
 ## Step 6 — Suggest Next
 
@@ -180,7 +182,7 @@ Recommend using this priority order:
 
 If the active milestone has no captured items yet, surface that in the suggestion line — *"M01 has no items yet; consider running `/hv-capture` to seed it"* — and then suggest the best general-backlog item.
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): items labelled `changes-requested` rank first (after P0 bugs): a reviewer already asked for changes and the work is half done. The `hv-todo-drift` hint does not apply (the helper refuses in issue mode): skip any `todoDrift` / `todoSymbolDrift` nudge. When an item is picked, load its context per the reference's "Resuming an item" (`hv-item-show <ID>` for state, claim, assignee and comments, `hv-todo-field --dump <ID>`, `hv-item-note <ID> --kind design|plan --show`, the issue comments) and pass it to `/hv-work`.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): items labelled `changes-requested` rank first (after P0 bugs): a reviewer already asked for changes and the work is half done. The `hv backlog drift` hint does not apply (the verb refuses in issue mode): skip any `todoDrift` / `todoSymbolDrift` nudge. When an item is picked, load its context per the reference's "Resuming an item" (`hv item show <ID>` for state, claim, assignee and comments, `hv item field list <ID>`, `hv item note show <ID> --kind design|plan`, the issue comments) and pass it to `/hv-work`.
 
 Skip items already active. Present:
 
@@ -210,7 +212,7 @@ Read `autonomy.level` from `.hv/config.json` (default `"off"`).
 **Loop mode auto-pick.** When `autonomy.level == "loop"`, skip the question entirely and invoke `hv-work` via the `Skill` tool with the suggested item(s) and their TODO descriptions. This is what sustains the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` loop. Print one line first so the user sees the pick: *"Loop: starting [ID] [Title]."* Before dispatching, stamp the session start so terminal paths can later filter `[Auto:Loop]` decisions to this loop:
 
 ```bash
-.hv/bin/hv-loop-stamp start   # idempotent — first-write only; preserves any existing timestamp
+hv status loop start   # idempotent — first-write only; preserves any existing timestamp
 ```
 
 If Step 6 found nothing to suggest (empty backlog, no active milestone items), do **not** invoke `/hv-work`. Print *"Loop: backlog empty — stopping."* and exit. The user re-invokes `/hv-capture` or `/hv-vision` to seed more work.
@@ -248,10 +250,10 @@ Plain-text fallback: *"Work on this?"* — honor yes/no/"pick specific IDs" repl
 Fires only on the *terminal* paths of /hv-next — when the user picks "Stop here" in Step 7 or when the backlog was empty (loop or off/auto). When Step 7 dispatches into /hv-work (with or without `--preview`) or /hv-plan, skip this step entirely — those skills run their own tails and the nudge would either be drowned out or surface again at the wrong time.
 
 ```bash
-.hv/bin/hv-release-pending
+hv release pending --json
 ```
 
-Parse the JSON output. If `shouldNudge` is `false`, skip silently. If `true`, append the helper's `message` field as a single line of output (after any "OK — run `/hv-next` again..." message). The helper renders the appropriate phrasing based on `reason`; the skill just prints it.
+Read `data`. If `shouldNudge` is `false`, skip silently. If `true`, append its `message` field as a single line of output (after any "OK — run `/hv-next` again..." message). The verb renders the appropriate phrasing based on `reason`; the skill just prints it.
 
 Keep it to one line. Don't expand into a paragraph or a checklist — the nudge is informational and the user might just dismiss it.
 

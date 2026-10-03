@@ -29,13 +29,7 @@ user-invocable: true
 - You can finish in this session → just finish
 - No active branch / no `/hv-work` running → nothing to hand off
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task List
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -52,11 +46,11 @@ Determine the set of `(branch, repo)` entries to pause. The set has size 1 for s
 
 1. Read `.hv/status.json` and find active streams whose `branch` matches the current branch.
 2. **Exactly one match** — pause set is that single `(branch, repo)` entry (`repo` may be `null` for non-umbrella entries).
-3. **Multiple matches** (a multi-repo `/hv-work` wave). Run `.hv/bin/hv-resolve-repo` from the current cwd:
-   - **cwd resolves to a registered sub-repo** — pause set is the single matching `(branch, repo)` entry. The user explicitly scoped to one repo by `cd`-ing there; the other entries stay active.
-   - **cwd doesn't resolve** (umbrella root or outside any sub-repo) — pause set is **all** matching entries, treated as one logical wave. Do not raise an `AskUserQuestion` — entries from a single `/hv-work` wave are paused together.
+3. **Multiple matches** (a multi-repo `/hv-work` wave). Run `hv repo which` from the current cwd:
+   - **cwd resolves to a registered sub-repo** (exit 0) — pause set is the single matching `(branch, repo)` entry. The user explicitly scoped to one repo by `cd`-ing there; the other entries stay active.
+   - **cwd doesn't resolve** (exit 3: umbrella root or outside any sub-repo) — pause set is **all** matching entries, treated as one logical wave. Do not raise an `AskUserQuestion` — entries from a single `/hv-work` wave are paused together.
 4. **No match** — fall back to `git rev-parse --abbrev-ref HEAD` for the branch and pause set is `[(branch, null)]` (covers running `/hv-pause` before any `/hv-work` registered status).
-5. If the resolved branch is the project base (run `.hv/bin/hv-guard-feature-branch <branch>` and check exit 1), tell the user there's no feature work to pause and stop.
+5. If the resolved branch is the project base (run `hv git guard feature-branch <branch>` and check exit 1), tell the user there's no feature work to pause and stop.
 
 Steps 3–6 below operate on the pause set: single-entry sets keep today's behavior byte-for-byte; multi-entry wave sets loop the per-repo work and emit a single combined confirmation in Step 6.
 
@@ -65,7 +59,7 @@ Steps 3–6 below operate on the pause set: single-entry sets keep today's behav
 For each `(branch, repo)` in the pause set, resolve the working directory:
 
 - `repo == null` → run from current cwd.
-- `repo != null` → use the sub-repo's absolute path (`.hv/bin/hv-resolve-repos <repo>` returns it).
+- `repo != null` → use the sub-repo's absolute path (`hv repo resolve <repo> --json` returns it as `data.repos[0].path`).
 
 Run the status check in each working directory:
 
@@ -94,9 +88,9 @@ Apply the chosen disposition **only to the dirty entries** (use `git -C <path> .
 mkdir -p .hv/handoff
 ```
 
-Resolve milestone context first — pass the captured item IDs to `.hv/bin/hv-find-milestone-for-items <ID> [<ID>...]` to read their `Milestone:` tags. If the helper prints one or more milestones, include them in the **Working on** block below. If it prints nothing, fall back to `.hv/bin/hv-vision-active` — and if exactly one active milestone is listed, include that. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
+Resolve milestone context first — pass the captured item IDs to `hv backlog milestones <ID> [<ID>...]` to read their `Milestone:` tags. If it lists one or more milestones, include them in the **Working on** block below. If it lists none, fall back to `hv milestone active` — and if exactly one active milestone is listed, include that. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
 
-**Loop over the pause set — one handoff file per `(branch, repo)` entry.** Resolve each entry's write path via `.hv/bin/hv-resolve-handoff --write ${REPO:+--repo "$REPO"} "$BRANCH"`; the helper owns the canonical encoding (single-repo and `<branch>@<repo>` umbrella variants).
+**Loop over the pause set — one handoff file per `(branch, repo)` entry.** Resolve each entry's write path via `hv status handoff "$BRANCH" --canonical ${REPO:+--repo "$REPO"}`; the verb owns the canonical encoding (single-repo and `<branch>@<repo>` umbrella variants).
 
 For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Next planned step**, and **Current hypothesis** content — only `Repo:` and the per-repo `Uncommitted work` artifact differ. Don't merge them into one combined file: `/hv-next`'s lookup is keyed on `(branch, repo)`, so per-entry files keep that path symmetric and survive partial cleanup (one repo abandoned, others resumed).
 
@@ -110,7 +104,7 @@ Loop over the pause set:
 
 ```bash
 # Make sure status.json has each entry so /hv-next finds them
-.hv/bin/hv-status-add --if-absent [--repo <repo>] <branch> <item-ids> [worktree-path]
+hv status add <branch> --items <item-ids> [--worktree <path>] [--repo <repo>] --if-absent
 ```
 
 Pass `--repo <repo>` for entries with a non-null `repo`; omit it for legacy / single-repo entries. Uniqueness is `(branch, repo)`, so threading `--repo` matters when two sub-repos share a branch name.
@@ -126,7 +120,7 @@ Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (s
 After surfacing, clear the loop timestamp so the next loop session starts fresh:
 
 ```bash
-.hv/bin/hv-loop-stamp clear   # no-op when loopStartedAt is already unset
+hv status loop clear   # no-op when loopStartedAt is already unset
 ```
 
 ## Step 6 — Confirm
@@ -151,7 +145,7 @@ For wave pause sets (≥ 2 entries from one `/hv-work` wave):
 Paused `hv/api-refactor` across web, api — 2 handoffs saved.
 
 Stage: implementing wave 2 of 3
-Next: thread the new repo arg through hv-status-add-multi
+Next: thread the new repo arg through hv status add --repos
 Uncommitted:
   - web: wip commit a1b2c3d
   - api: clean tree

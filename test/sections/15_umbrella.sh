@@ -322,12 +322,12 @@ pass "M03-T6: hv-work/SKILL.md Preview Mode peek renders one line per repo"
 
 # M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
 # white-box-begin: A9 #53 keep
-grep -q "hv-multi-branch-create" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference bin/hv-multi-branch-create for multi-repo branch creation"
-grep -q "hv-status-add-multi" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference bin/hv-status-add-multi for multi-repo status entries"
-grep -q "hv-resolve-repos" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference bin/hv-resolve-repos for multi-repo validation"
+grep -q "hv git branch" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference hv git branch for multi-repo branch creation"
+grep -q "hv status add .*--repos" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference hv status add --repos for multi-repo status entries"
+grep -q "hv repo resolve" "$REPO/hv-work/SKILL.md" \
+  || fail "hv-work/SKILL.md must reference hv repo resolve for multi-repo validation"
 if grep -q "M03 (deferred)" "$REPO/hv-work/SKILL.md"; then
   fail "hv-work/SKILL.md must no longer say 'M03 (deferred)'"
 fi

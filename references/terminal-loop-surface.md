@@ -7,11 +7,11 @@ Canonical bash block referenced by every terminal-path skill that surfaces `[Aut
 Run after the terminal-path framing paragraph, before any final user message:
 
 ```bash
-.hv/bin/hv-auto-decisions-since   # empty stdout when nothing matches
-.hv/bin/hv-loop-stamp clear       # clear the session marker so the next /hv-next loop entry stamps a fresh start
+hv decisions auto-since   # empty stdout when nothing matches
+hv status loop clear      # clear the session marker so the next /hv-next loop entry stamps a fresh start
 ```
 
-If `hv-auto-decisions-since` produces no output, skip silently — there's nothing to surface.
+If `hv decisions auto-since` produces no output, skip silently — there's nothing to surface.
 
 ## How to cite from a SKILL.md
 

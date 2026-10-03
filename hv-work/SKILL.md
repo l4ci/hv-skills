@@ -46,15 +46,14 @@ Guard → Clarify (if needed) → Status → Plan → Isolate → Dispatch → V
 
 ## Preview Mode (`--preview`)
 
-When invoked as `/hv-work --preview <target>` (or with `--preview` anywhere in the args), the skill enters **read-only preview mode** — it produces the same approach peek the formerly-separate `/hv-assume` skill emitted, then stops. No writes, no commits, no helper calls beyond reads. Steps 1–15 are bypassed.
+When invoked as `/hv-work --preview <target>` (or with `--preview` anywhere in the args), the skill enters **read-only preview mode** — it produces the same approach peek the formerly-separate `/hv-assume` skill emitted, then stops. No writes, no commits, no `hv` calls beyond reads. Steps 1–15 are bypassed.
 
 The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `M01-B07`), or a milestone (`M01`). Ambiguous → ask once; do not auto-pick.
 
 **Procedure:**
 
-1. **Preflight only** — `.hv/bin/hv-preflight`. No guard, no status registration.
-2. **Load context silently** per [`references/context-load-protocol.md`](../references/context-load-protocol.md). Issue all reads in parallel. For backlog-item targets under umbrella mode: parse the entry's `Repos:` field (`hv-todo-field <ID> repos`); when umbrella mode is on (`.hv/bin/hv-umbrella-on` returns `yes`) and the item carries a `Repos:` value, resolve to absolute sub-repo path(s) via `.hv/bin/hv-resolve-repos`. Multi-repo items resolve to a list — keep all entries for the render. Skip repo resolution for slice / milestone targets (umbrella-flat per M02 acceptance). If `hv-decisions-query` returns matches, surface them in the peek's "Hard boundaries to respect" section (between "Files I'd create" and "Tests I'd add") — one line each: `- <decision title> — <one-line summary>`. The user's job during review is to spot conflicts before code lands.
-3. **Produce the peek.** Print this structure to chat. **Nothing else** — no preamble, no recap of what context you read:
+1. **Load context silently** per [`references/context-load-protocol.md`](../references/context-load-protocol.md). Issue all reads in parallel. For backlog-item targets under umbrella mode: parse the entry's `Repos:` field (`hv item field get <ID> --name repos`); when umbrella mode is on (`hv repo umbrella` exits 0) and the item carries a `Repos:` value, resolve to absolute sub-repo path(s) via `hv repo resolve <name>… --json`. Multi-repo items resolve to a list — keep all entries for the render. Skip repo resolution for slice / milestone targets (umbrella-flat per M02 acceptance). If `hv decisions query` returns matches, surface them in the peek's "Hard boundaries to respect" section (between "Files I'd create" and "Tests I'd add") — one line each: `- <decision title> — <one-line summary>`. The user's job during review is to spot conflicts before code lands. No guard, no status registration.
+2. **Produce the peek.** Print this structure to chat. **Nothing else** — no preamble, no recap of what context you read:
 
    ```
    Peek for <target>:
@@ -95,7 +94,7 @@ The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `
 
    Be specific. *"I'd touch the auth code"* is useless — cite paths. If you don't know the path well enough to cite it, say so under Known unknowns.
 
-4. **Stop.** Do **not** auto-invoke `/hv-work` (without `--preview`), write a plan, or take any action. The user reviews and either:
+3. **Stop.** Do **not** auto-invoke `/hv-work` (without `--preview`), write a plan, or take any action. The user reviews and either:
 
    - Says *"go"* — they invoke `/hv-work <target>` themselves (without `--preview`).
    - Pushes back — they redirect, you restate the peek with corrections.
@@ -103,7 +102,7 @@ The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `
 
 **Key principles for preview mode:**
 
-- **Pure read.** No writes, no commits, no helper calls beyond reads.
+- **Pure read.** No writes, no commits, no `hv` calls beyond reads.
 - **Be specific.** Generic peeks are useless. Cite paths, test names, function names.
 - **Name assumptions.** The whole mode's value is making implicit choices visible.
 - **Stop after the peek.** No auto-continuation; the user's pushback is the point.
@@ -111,19 +110,13 @@ The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `
 
 **Orchestrator-model contract (F35, loop mode).** When `/hv-work` Step 4's F34 uncertainty pre-flight needs a peek, it runs this Preview Mode procedure **inline** (not via recursive `Skill` dispatch) — the peek inherits the orchestrator model since the cycle is already running under it. The Step 4 chain reads the peek output from chat context and proceeds to `/hv-plan --auto-loop`. Manual invocations from `/hv-next` or the user's prompt (`/hv-work --preview <ID>`) are unconstrained — the user is in the loop and can correct any peek that under-performs.
 
-## Step 1 — Preflight & Guard
+## Step 1 — Guard
 
 ```bash
-.hv/bin/hv-preflight
+hv git guard clean --context "/hv-work"
 ```
 
-See `docs/reference/preflight.md` for exit-code handling.
-
-```bash
-.hv/bin/hv-guard-clean "/hv-work"
-```
-
-Exit 0 = clean, continue. Exit 2 = not a repo, surface and stop.
+Exit 0 = clean, continue. Exit 3 = not a repo, surface and stop.
 
 **Exit 1 (dirty tree) — auto-sweep known tool siblings first.** Some toolchains generate sibling files *after* a previous `/hv-work` wave finished (Godot `.gd.uid`, Xcode `.xcworkspace/contents.xcworkspacedata`, SwiftPM `Package.resolved`, Tuist-regenerated `.xcodeproj`, `.DS_Store`). If these are all that's dirty, they belong in a `chore:` commit, not a refusal.
 
@@ -145,26 +138,26 @@ git commit -m "chore: sweep tool-generated siblings before hv-work"
 
 If **any** path is a user change, stop with the original guard message — the user decides whether to stash, commit, or discard.
 
-**Greenfield variant.** On a fresh `git init`'d repo (no commits yet), `hv-guard-clean` emits a tailored message pointing at the `chore: import initial files` baseline commit. Run it and re-invoke — the guard then sees a clean tree.
+**Greenfield variant.** On a fresh `git init`'d repo (no commits yet), `hv git guard clean` emits a tailored message pointing at the `chore: import initial files` baseline commit. Run it and re-invoke — the guard then sees a clean tree.
 
 Don't narrate the sweep unless it happened; silent pass-through is the common case.
 
-**On any Step 1 guard failure that stops `/hv-work` (exit 2 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
+**On any Step 1 guard failure that stops `/hv-work` (exit 3 not-a-repo, or exit 1 user-change dirty tree)** — this is a terminal path; the user is about to step away from the loop to resolve. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-pause`), surface any `[Auto:Loop]` decisions logged during this loop session before printing the guard message:
 
 Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the guard message.
 
 After surfacing, clear the loop timestamp so the next loop session starts fresh:
 
 ```bash
-.hv/bin/hv-loop-stamp clear   # no-op when loopStartedAt is already unset
+hv status loop clear   # no-op when loopStartedAt is already unset
 ```
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
-1. *Preflight & guard* — clean tree + repo confirmed (Step 1)
-2. *Register status* — branch named, `hv-status-add` recorded (Steps 3, 5)
+1. *Guard* — clean tree + repo confirmed (Step 1)
+2. *Register status* — branch named, `hv status add` recorded (Steps 3, 5)
 3. *Plan tasks* — wave layout + briefs ready (Step 4)
 4. *Branch / worktree* — isolation set up per `work.isolation` (Step 5)
 5. *Dispatch & verify per wave* — workers run, orchestrator verifies each completion (Steps 6–8)
@@ -208,10 +201,10 @@ Plain-text fallback: ask once; on ambiguity, default to Recommended and state it
 V1 overlap heuristic — simple case-insensitive substring match: for each candidate bullet from the K+D query, extract its body text; if a meaningful fragment (≥4 contiguous lowercase words) from the bullet appears in the user's correction text, the bullet is a contradiction candidate. Log via:
 
 ```bash
-.hv/bin/hv-knowledge-contradiction --add --topic <T> --title <S> --text "<first 200 chars of correction>"
+hv knowledge contradiction add --topic <T> --title <S> --text "<first 200 chars of correction>"
 ```
 
-Process candidates in parallel — the helper serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose updates. `/hv-learn` Step 9 surfaces these candidates at session end and asks per-bullet whether to demote.
+Process candidates in parallel — the verb serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose updates. `/hv-learn` Step 9 surfaces these candidates at session end and asks per-bullet whether to demote.
 
 Edge case: this step only fires when Step 2 actually surfaced an AskUserQuestion AND the user provided a non-Recommended answer. The Step 4 query happens later — so this detection ALSO fires later, comparing the now-loaded bullets against the earlier correction. Practical sequencing: cache the correction text in the cycle's working memory at Step 2, then run the overlap check after Step 4's K+D returns matches.
 
@@ -224,7 +217,7 @@ After picking the branch name:
 **Single-repo:**
 
 ```bash
-.hv/bin/hv-status-add <branch> <ID1>,<ID2>[,...] [worktree-path]
+hv status add <branch> --items <ID1>,<ID2>[,...] [--worktree <path>]
 ```
 
 **Umbrella mode** (when `umbrella.enabled` is true and items carry `Repos:`): parse the `Repos:` field from each item's TODO entry. The value is a comma-separated CSV — single-repo items have one name (`Repos: web`), multi-repo items have two or more (`Repos: web, api`). All items in a wave must share the *same* set of repos.
@@ -232,22 +225,22 @@ After picking the branch name:
 Single-repo wave: pass the one name via `--repo`:
 
 ```bash
-.hv/bin/hv-status-add --repo <repo-name> <branch> <ID1>,<ID2>[,...] [worktree-path]
+hv status add <branch> --items <ID1>,<ID2>[,...] [--worktree <path>] --repo <repo-name>
 ```
 
-Multi-repo wave: register one entry per `(branch, repo)` pair via `hv-status-add-multi`:
+Multi-repo wave: register one entry per `(branch, repo)` pair with `--repos`:
 
 ```bash
-.hv/bin/hv-status-add-multi --branch <branch> --items <ID1>,<ID2>[,...] --repos "<repos-csv>"
+hv status add <branch> --items <ID1>,<ID2>[,...] --repos <repos-csv> [--worktrees <csv>]
 ```
 
-Parse the `Repos:` field for each item using `hv-todo-field`:
+Parse the `Repos:` field for each item:
 
 ```bash
-.hv/bin/hv-todo-field <ID> repos
+hv item field get <ID> --name repos
 ```
 
-This uses the canonical `parse_todo_fields` from hvlib, so multi-repo CSVs (`web, api`) are captured intact and the parser correctly handles `Detail:`/`Related:`/`Milestone:` boundaries that the old grep chain could over-eat. Hand the resulting CSV to `hv-resolve-repos` for validation; if it exits non-zero, surface the missing names and stop.
+The field parser keeps multi-repo CSVs (`web, api`) intact and handles the `Detail:`/`Related:`/`Milestone:` boundaries. Hand the names to `hv repo resolve <name>…` for validation; if it exits 3, surface the missing names (from its message) and stop.
 
 Idempotent on `(branch, repo)` — call again with the worktree path(s) once Step 5 creates them.
 
@@ -256,7 +249,7 @@ Idempotent on `(branch, repo)` — call again with the worktree path(s) once Ste
 **Plan-as-artifact check (first).** If the work has a milestone-and-unit key — an item tagged to a milestone (`Milestone: M01` on `B07` → key `M01-B07`) or a slice (`M01-S01`) — check for an existing plan:
 
 ```bash
-.hv/bin/hv-plan-show <milestone>-<unit> 2>/dev/null
+hv plan show <milestone>-<unit> 2>/dev/null
 ```
 
 If a plan exists, **use it as the orchestrator's plan** — its task decomposition, files, verify steps, and assumptions become the dispatch briefs in Step 6 instead of decomposing ad-hoc. Restate any user redlines from the conversation, but don't silently re-derive what the user already signed off on. If the conversation contradicts the plan, ask the user whether to update the plan first (`/hv-plan` again) or proceed and ignore it.
@@ -264,7 +257,7 @@ If a plan exists, **use it as the orchestrator's plan** — its task decompositi
 **Loop-mode auto-dispatch chain (B28 / F32 / F34 / F35).** In loop mode with a Major + Milestone-tagged item but no plan, `/hv-work` runs the full research → plan chain in three steps, all via the `Skill` tool so the dispatched skills inherit the orchestrator model:
 
 1. **Design pre-flight (B28).** If `.hv/designs/<itemId>.md` is absent, dispatch `/hv-brainstorm --auto-loop <itemId>`. The dispatched skill auto-resolves design questions (Local-first → Bounded web → Placeholder), logs `[Auto:Loop]` decisions for fresh picks, and writes `.hv/designs/<itemId>.md` with `auto: true` frontmatter. When a design already exists, this step is a no-op.
-2. **Uncertainty pre-flight (F34).** Run `.hv/bin/hv-uncertain <itemId>`. Exit 0 (uncertain, reasons on stdout) → run the **Preview Mode** procedure (above) inline with `<itemId>` as the target; the peek prints to chat and lands in the orchestrator's session context. Exit 1 (certain) → skip the peek.
+2. **Uncertainty pre-flight (F34).** Run `hv plan uncertain <itemId>`. Exit 0 (uncertain, reasons on stdout) → run the **Preview Mode** procedure (above) inline with `<itemId>` as the target; the peek prints to chat and lands in the orchestrator's session context. Exit 1 (certain) → skip the peek.
 3. **Plan dispatch (F32 / F35).** Dispatch `/hv-plan --auto-loop <milestone>-<itemId>`. `/hv-plan` Step 3 reads the design artifact as soft input (already wired), and the auto-resolution pipeline writes the plan with all picks honored.
 
 After the chain returns, re-run the plan-as-artifact check at the top of this step — the plan now exists; use it as the orchestrator's plan. Off and auto modes skip this chain entirely and fall through to manual decomposition. See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) for the full choreography.
@@ -273,37 +266,37 @@ If no plan exists and the loop-mode dispatch above did not fire (off/auto, or Mi
 
 From the conversation context:
 
-1. **Consult knowledge + decisions.** Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics inferred from the planned work areas. Also run `.hv/bin/hv-glossary-read "<terms appearing in the TODO entry or task plan>"` for any domain term used in the TODO entry (terms live in `.hv/KNOWLEDGE.md`'s `## Glossary` topic), and surface inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle. Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching.
+1. **Consult knowledge + decisions.** Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with topics inferred from the planned work areas. Also run `hv glossary read <terms appearing in the TODO entry or task plan>…` for any domain term used in the TODO entry (terms live in `.hv/KNOWLEDGE.md`'s `## Glossary` topic), and surface inline conflict-call-outs (synonym or drift) when the user's wording deviates from the canonical term during the cycle. Carry matches into Step 6 briefs as `**Known gotchas:**` (relevant knowledge bullets only) and `**Hard boundaries:**` (full decision entries — rule + *Why* + **Forbids** + **Permits**). Workers must treat boundaries as constraints, not hints. If a planned task would violate a decision, **stop and surface to the user** before dispatching.
 
-   - **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
+   - **Soft-cap check.** Run `hv map stats --cap` — prints a one-line nudge (a warning on stderr) when the subsystem count is at or above the configured soft cap, and nothing below it. Never blocks.
 
-   > **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After writing the Step 6 briefs, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in a brief's `**Known gotchas:**` section, call `.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch — the helper serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose hits. Bullets returned but pruned before the briefs don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
+   > **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After writing the Step 6 briefs, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in a brief's `**Known gotchas:**` section, call `hv knowledge hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch — the verb serializes its sidecar writes behind a per-file lock, so concurrent calls don't lose hits. Bullets returned but pruned before the briefs don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
 
 2. Identify discrete tasks — files to create/modify, what changes, acceptance criteria.
-3. **Absorb wave-internal file collisions.** Before grouping into waves, scan task pairs for **any two tasks whose modified-file sets intersect** — not just rename / link-sweep. Under `work.isolation: "branch"` two write-only workers editing the same file race on disk (the second worker's `Edit` reads sibling-mutated content), so a same-file pair would otherwise force serialization across waves. The orchestrator's standing recourse is **absorption**: fold one task's same-file portion into the other task's Step 6 brief at dispatch time, leaving the absorbed task touching only files no other task writes. Both then run as parallel write-only workers. This is a reproducible orchestrator-side technique, not per-orchestrator improvisation — resolve every intersecting pair by absorption (preferred), clean split-ownership, or serialize-across-waves before grouping. Rename + link-sweep is the canonical instance; use `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` as ground truth for it (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Absorb wave-internal file collisions* for the absorption choreography, the M02-S02 worked example, and the rename + link-sweep resolution table.
+3. **Absorb wave-internal file collisions.** Before grouping into waves, scan task pairs for **any two tasks whose modified-file sets intersect** — not just rename / link-sweep. Under `work.isolation: "branch"` two write-only workers editing the same file race on disk (the second worker's `Edit` reads sibling-mutated content), so a same-file pair would otherwise force serialization across waves. The orchestrator's standing recourse is **absorption**: fold one task's same-file portion into the other task's Step 6 brief at dispatch time, leaving the absorbed task touching only files no other task writes. Both then run as parallel write-only workers. This is a reproducible orchestrator-side technique, not per-orchestrator improvisation — resolve every intersecting pair by absorption (preferred), clean split-ownership, or serialize-across-waves before grouping. Rename + link-sweep is the canonical instance; use `hv plan rename-check <old-name> [-- <scope>...]` as ground truth for it (re-run at Step 7 to catch enumeration gaps). See [`references/loop-mode-plan-dispatch.md`](../references/loop-mode-plan-dispatch.md) *Absorb wave-internal file collisions* for the absorption choreography, the M02-S02 worked example, and the rename + link-sweep resolution table.
 
-   **Disjoint file sets are not proof of independence — scan for shared-symbol collisions too.** Two tasks can hold non-intersecting file sets and still break the merged tree, because the break exists in neither worker's diff. Two shapes: a task that **widens, narrows, or re-types a shared symbol's signature** while a sibling adds a fresh call to it, and a task that **stops emitting a constant, key, or output field** while a sibling starts depending on it. Each worker's own output is internally consistent and Step 7's per-task diff review passes both — the defect is only visible in the union, and only to something that resolves symbols across the whole tree. Rename is the one instance of this class the rules above already catch (`hv-plan-rename-check`); signature changes and dropped emissions are not renames and no grep for the old name finds them. When a task's brief changes a symbol's *shape* rather than its *name*, either serialize it ahead of every task that references the symbol, or absorb the call-site updates into it. When the project has a whole-tree resolution check available (typecheck, compile, `hv-qa` executable check), run it once after Step 7.5 commits the wave rather than per task — per-task verification structurally cannot catch this class.
+   **Disjoint file sets are not proof of independence — scan for shared-symbol collisions too.** Two tasks can hold non-intersecting file sets and still break the merged tree, because the break exists in neither worker's diff. Two shapes: a task that **widens, narrows, or re-types a shared symbol's signature** while a sibling adds a fresh call to it, and a task that **stops emitting a constant, key, or output field** while a sibling starts depending on it. Each worker's own output is internally consistent and Step 7's per-task diff review passes both — the defect is only visible in the union, and only to something that resolves symbols across the whole tree. Rename is the one instance of this class the rules above already catch (`hv plan rename-check`); signature changes and dropped emissions are not renames and no grep for the old name finds them. When a task's brief changes a symbol's *shape* rather than its *name*, either serialize it ahead of every task that references the symbol, or absorb the call-site updates into it. When the project has a whole-tree resolution check available (typecheck, compile, `hv-qa` executable check), run it once after Step 7.5 commits the wave rather than per task — per-task verification structurally cannot catch this class.
 4. Group into dependency waves:
    - **Wave 1:** independent files → parallel
    - **Wave 2+:** depend on wave 1 outputs → sequential or next parallel batch
 
 ## Step 4.5 — Umbrella Pre-Flight (when umbrella mode is on)
 
-Umbrella mode is in effect when `.hv/repos.json` registers ≥1 sub-repo (the data is truth; `umbrella.enabled` is informational). Detect with `.hv/bin/hv-umbrella-on` — see `references/umbrella-mode.md` for the registry shape, resolution helpers, and `Repos:` field semantics.
+Umbrella mode is in effect when `.hv/repos.json` registers ≥1 sub-repo (the data is truth; `umbrella.enabled` is informational). Detect with `hv repo umbrella` — see `references/umbrella-mode.md` for the registry shape, resolution verbs, and `Repos:` field semantics.
 
-If `hv-umbrella-on` returns `no`, skip this step entirely (single-repo path).
+If `hv repo umbrella` exits 1 (`umbrella: false`), skip this step entirely (single-repo path).
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`, *Umbrella*): items are single-repo and their IDs are qualified (`<repo>:<ID>`). Take the repo from the item's `Repos:` field (`hv-todo-field <ID> repos`); a bare ID that exists in several sub-repos exits 1, so use the qualified form. Pass `--repo <repo>` to `hv-pr` (Step 10).
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`, *Umbrella*): items are single-repo and their IDs are qualified (`<repo>:<ID>`). Take the repo from the item's `Repos:` field (`hv item field get <ID> --name repos`); a bare ID that exists in several sub-repos exits 2 as ambiguous, so use the qualified form. Pass `--repo <repo>` to `hv ship pr` (Step 10).
 
-If `yes`:
+If it exits 0:
 
-1. **Every item must carry `Repos:`.** Parse via `.hv/bin/hv-todo-field <ID> repos`. If any item lacks a tag, stop with: *"Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it. Cannot route to a sub-repo."*
+1. **Every item must carry `Repos:`.** Parse via `hv item field get <ID> --name repos`. If any item lacks a tag, stop with: *"Error: `[<ID>]` lacks a `Repos:` tag. Re-run `/hv-capture` to add it. Cannot route to a sub-repo."*
 
 2. **All items in a wave must resolve to the same repo set** (as a set, order-independent). Single-repo and multi-repo items can't mix in one wave; two multi-repo items must list the same names. On divergence, stop with: *"Error: items in this wave target different sub-repo sets: `<set-a>` vs `<set-b>`. Split into separate `/hv-work` runs."*
 
-3. **Validate every name in the resolved set** via `.hv/bin/hv-resolve-repos "<csv>"` (exits 1 with stderr on any missing name). On failure, stop with: *"Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `/hv-init` from the umbrella root to register sub-repos."*
+3. **Validate every name in the resolved set** via `hv repo resolve <name>…`, one positional per name with the CSV's spaces dropped (exits 3 and names every missing one). On failure, stop with: *"Error: `Repos: <name>` not registered in `.hv/repos.json`. Run `/hv-init` from the umbrella root to register sub-repos."*
 
-4. **Walk-up convenience (single-repo only).** If `/hv-work` was invoked from a cwd that `.hv/bin/hv-resolve-repo` resolves to a registered sub-repo, default that sub-repo as the wave's scope when items lack an explicit `Repos:` tag. Multi-repo items always come from the captured `Repos:` field — no cwd default.
+4. **Walk-up convenience (single-repo only).** If `/hv-work` was invoked from a cwd that `hv repo which` resolves to a registered sub-repo, default that sub-repo as the wave's scope when items lack an explicit `Repos:` tag. Multi-repo items always come from the captured `Repos:` field — no cwd default.
 
 When the gate passes, carry the resolved sub-repo set forward to Step 5 (branch / worktree creation) and Step 10 (merge / PR).
 
@@ -318,34 +311,34 @@ When `work.dispatch` is `"tmux"` or `"herdr"`, skip the isolation guard and the 
 **First, confirm this session is inside the host. It is a precondition, not a nicety.**
 
 ```bash
-.hv/bin/hv-worker-session check     # exit 0 = inside, exit 1 = outside
+hv worker session check     # exit 0 = inside, exit 1 = outside
 ```
 
-The helper reads `work.dispatch` itself: under tmux it keys on `$TMUX`, under herdr on `HERDR_ENV=1`.
+The verb reads `work.dispatch` itself: under tmux it keys on `$TMUX`, under herdr on `HERDR_ENV=1`.
 
 The backend is worth its cost for exactly one reason: a worker that needs a decision can idle and a human can answer *in that worker's pane*. Launched from a terminal that isn't already inside tmux, the worker windows land in a **detached session nobody is looking at** — every escalation goes unanswered and the backend silently degrades into a worse subagent mode. Don't proceed on the assumption someone will attach later.
 
-**herdr, exit 1 — stop.** There is no handoff under herdr: `ensure` exits 3 because there is no workspace to open an operator tab in from outside herdr. Tell the user to start Claude Code in a herdr pane at the repo root and re-run `/hv-work` there, then end the run. Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` first.
+**herdr, exit 1 — stop.** There is no handoff under herdr: `ensure` exits 4 because there is no workspace to open an operator tab in from outside herdr. Tell the user to start Claude Code in a herdr pane at the repo root and re-run `/hv-work` there, then end the run. Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` first.
 
 **tmux, exit 1 (outside tmux) — hand the cycle over and stop.** Write a short instruction file telling the operator what it is resuming (the cycle target, the wave layout so far, and that it should continue from Step 5), then:
 
 ```bash
-.hv/bin/hv-worker-session ensure --instruction-file <path>
+hv worker session ensure --body-file <path>
 ```
 
 That creates the session, spawns an `operator` window running `claude --continue` (which resumes *this* conversation, so the plan and briefs survive), pastes the instruction, and prints the attach command.
 
-**Then stop this cycle immediately.** Print the helper's attach block verbatim and end the run. Do **not** continue to the pool, do not dispatch, do not "keep going in case the handoff failed" — two orchestrators driving one pool dispatch the same task twice and race on the same slots. The handoff either worked (the operator is running it) or the helper exited non-zero (report that and let the user attach by hand). This is a terminal path, so surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` before printing the block.
+**Then stop this cycle immediately.** Print the verb's attach block verbatim and end the run. Do **not** continue to the pool, do not dispatch, do not "keep going in case the handoff failed" — two orchestrators driving one pool dispatch the same task twice and race on the same slots. The handoff either worked (the operator is running it) or the verb exited non-zero (report that and let the user attach by hand). This is a terminal path, so surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` before printing the block.
 
 **Exit 0 (inside the host) — continue.** After creating the cycle branch, stand up the worker pool:
 
 ```bash
 git checkout -b <cycle-branch>
-.hv/bin/hv-status-add <cycle-branch> <ID>[,<ID>...]
-.hv/bin/hv-worker-pool init --slots <work.workerSlots> --base <cycle-branch>
+hv status add <cycle-branch> --items <ID>[,<ID>...]
+hv worker pool init --slots <work.workerSlots> --base <cycle-branch>
 ```
 
-`hv-worker-pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots live in `<project>/.worktrees/<slot>` (gitignored by `/hv-init`; a slot registered at the older `.claude/worktrees/hv-worker/<slot>` keeps that path until it is moved). Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
+`hv worker pool init` is idempotent — it creates only the slots that are missing and rebuilds any whose worktree went away. Slots live in `<project>/.worktrees/<slot>` (gitignored by `/hv-init`; a slot registered at the older `.claude/worktrees/hv-worker/<slot>` keeps that path until it is moved). Slots persist across cycles by design; the tmux *windows* or herdr *tabs* are what get recreated per dispatch.
 
 `work.isolation` does not apply on this path: each slot has its own worktree and therefore its own `.git/index`, which is the precondition the isolation guard exists to enforce. Don't also evaluate the guard — it would be checking a condition that cannot occur.
 
@@ -359,18 +352,18 @@ Before any worker is dispatched, abort fatally if the planned wave has **≥2 co
 
 ### Branch / worktree creation
 
-Pick the pattern from `references/isolation-patterns.md` based on `work.isolation` (`"branch"` or `"worktree"` from `.hv/config.json`) and whether umbrella mode is on (Step 4.5 resolved the sub-repo set; carry it forward). The reference's decision table covers all five combinations: single-repo branch, single-repo worktree, umbrella sub-repo branch, umbrella sub-repo worktree (Layout B), umbrella multi-repo branch (via `.hv/bin/hv-multi-branch-create`, which runs an atomic precheck across every named repo before creating any branches).
+Pick the pattern from `references/isolation-patterns.md` based on `work.isolation` (`"branch"` or `"worktree"` from `.hv/config.json`) and whether umbrella mode is on (Step 4.5 resolved the sub-repo set; carry it forward). The reference's decision table covers all five combinations: single-repo branch, single-repo worktree, umbrella sub-repo branch, umbrella sub-repo worktree (Layout B), umbrella multi-repo branch (via `hv git branch <name> --repos <csv>`, which runs an atomic precheck across every named repo before creating any branches).
 
 The most common case — single-repo, branch isolation — is just:
 
 ```bash
 git checkout -b <branch>
-.hv/bin/hv-status-add <branch> <ID>[,<ID>...]
+hv status add <branch> --items <ID>[,<ID>...]
 ```
 
 For umbrella-mode branch creation (single sub-repo, multi-repo, Layout B worktree), see `references/umbrella-mode.md` *Branch creation* — that reference owns the canonical umbrella ceremony.
 
-**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`). Once the branch exists, per item: run `.hv/bin/hv-item-ready <ID>`. Exit 1 prints what is missing: warn the user interactively; under `autonomy.level: "loop"` refuse the item. Then claim it with `.hv/bin/hv-item-claim <ID> --as <branch>`. Exit 5 means another worker holds it: drop that item from the wave and continue with the rest (or stop when none remain). Exit 3 or 4: stop and report. Load each item's context as the reference's "Resuming an item" describes (start with `.hv/bin/hv-item-show <ID>`) before planning tasks.
+**Issue mode** (`backlog.backend: "issues"`; see `references/issue-mode.md`). Once the branch exists, per item: run `hv item ready <ID>`. Exit 1 prints what is missing: warn the user interactively; under `autonomy.level: "loop"` refuse the item. Then claim it with `hv item claim <ID> --as <branch>`. Exit 4 means another worker holds it: drop that item from the wave and continue with the rest (or stop when none remain). Exit 3 or 5: stop and report. Load each item's context as the reference's "Resuming an item" describes (start with `hv item show <ID>`) before planning tasks.
 
 Orchestrator stays at the repo root (or umbrella root in umbrella mode); workers `cd` into their assigned directory before any file operation, and use absolute paths in their briefs.
 
@@ -395,13 +388,13 @@ You are implementing Task N of [total].
 [Precise instructions — what to read, what to change, exact code where possible]
 
 **Known gotchas:**
-[Relevant bullets from hv-knowledge-query output]
+[Relevant bullets from hv knowledge query output]
 
 **Hard boundaries:**
-[Relevant entries from hv-decisions-query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
+[Relevant entries from hv decisions query — full rule + forbids/permits, not just the rule. Workers MUST respect these; the orchestrator's verification step (Step 7) checks the diff for violations.]
 
 **Canonical terms:**
-[Relevant terms from hv-glossary-read — definition + aliases. Workers MUST use these canonical names in code/comments/commit messages where they apply; aliases are listed so divergent user phrasing in the TODO entry maps back to the right term.]
+[Relevant terms from hv glossary read — definition + aliases. Workers MUST use these canonical names in code/comments/commit messages where they apply; aliases are listed so divergent user phrasing in the TODO entry maps back to the right term.]
 
 **Critical constraints:**
 [Behavior preservation, patterns to follow, things NOT to touch]
@@ -437,21 +430,21 @@ Launch all independent agents in one message (parallel tool calls) — write-onl
 Same brief, different transport. Write each task's brief to a file and dispatch it to a slot:
 
 ```bash
-.hv/bin/hv-worker-dispatch --slot <wN> --brief-file <path> --task <ID>
+hv worker dispatch <wN> --body-file <path> --task <ID>
 ```
 
 `--task` records the task in `.hv/workers.json` beside the slot's handle and `state: busy`.
 
-A task dispatch runs the slot **reset guard** first (`hv-worker-reset`): it refuses (exit 3) when the slot's worktree has uncommitted changes or commits that never reached the cycle branch, and otherwise cuts a fresh `hv-worker/<slot>-<task>` branch from the cycle branch tip and records it in `.hv/workers.json`, which `hv-worker-gate` reads. A refused slot needs its work gated and merged, or `hv-worker-pool reap --slot <wN>`; do not dispatch around it. Re-dispatching the task the slot already holds (same `--task`, still on that task's branch) is a retry: it keeps the branch's commits and edits instead of refusing. Dispatch also exits 3 when the previous tab or window (and its process tree) cannot be confirmed closed, and exits 2 when `work.workerCommand` carries `-c`, `-r`, `--continue` or `--resume`, which would reopen the old conversation in the fresh session (quoted arguments such as `sh -c "claude -c"` are checked too; an unparseable command exits 2).
+A task dispatch runs the slot **reset guard** first (`hv worker reset`): it refuses (exit 4) when the slot's worktree has uncommitted changes or commits that never reached the cycle branch, and otherwise cuts a fresh `hv-worker/<slot>-<task>` branch from the cycle branch tip and records it in `.hv/workers.json`, which `hv worker gate` reads. A refused slot needs its work gated and merged, or `hv worker pool reap <wN>`; do not dispatch around it. Re-dispatching the task the slot already holds (same `--task`, still on that task's branch) is a retry: it keeps the branch's commits and edits instead of refusing. Dispatch also exits 5 when the previous tab or window (and its process tree) cannot be confirmed closed, and exits 4 when `work.workerCommand` carries `-c`, `-r`, `--continue` or `--resume`, which would reopen the old conversation in the fresh session (quoted arguments such as `sh -c "claude -c"` are checked too; an unparseable command exits 2).
 
 Two differences from the subagent path, and only two:
 
-1. **Prepend the standing worker contract** from [`references/worker-contract.md`](../references/worker-contract.md) *The standing contract* (under herdr, plus the line in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md) *Worker contract additions*). A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through in an `## Approvals` PR section) must be in the brief text. `hv-worker-dispatch` signs the brief `--- ORCHESTRATOR (round N) ---`; pass `--round <N>` on the first dispatch of a round. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
+1. **Prepend the standing worker contract** from [`references/worker-contract.md`](../references/worker-contract.md) *The standing contract* (under herdr, plus the line in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md) *Worker contract additions*). A tmux worker boots with none of this session's context — no conversation, no loaded KNOWLEDGE, no plan — so the rules the subagent path gets implicitly (stay in your tree, stage explicit paths, escalate rather than guess, cite the channel an approval came through in an `## Approvals` PR section) must be in the brief text. `hv worker dispatch` signs the brief `--- ORCHESTRATOR (round N) ---`; pass `--round <N>` on the first dispatch of a round. The contract also defines the two sentinels the worker prints, `HV-BLOCKED` and `HV-DONE`, which Step 7 routes on.
 2. **The brief tells the worker to commit and open a PR** against the cycle branch, replacing the *"Do NOT run `git add` or `git commit`"* line. Keep the `**Suggested commit message:**` line — the worker uses it directly rather than the orchestrator.
 
 The brief **body** — Goal, Files, What to do, Known gotchas, Hard boundaries, Canonical terms, Critical constraints, Claims to verify — is byte-identical to the subagent path. Don't fork the template; a second copy drifts.
 
-Dispatch all slots for a wave in sequence (each call returns once pickup is confirmed), then move to Step 7's poll loop. `hv-worker-dispatch` exits 4 if a brief never submitted — treat that as a failed dispatch and retry that slot once before reassigning the task. Under herdr, read the tab first (`herdr agent read hv-<slot>-<handle>`): a stall does not prove the text was lost. Exit 5 (herdr only) means a dialog was already open and nothing was sent; inspect the tab and treat it like `NEEDS-PERMISSION`.
+Dispatch all slots for a wave in sequence (each call returns once pickup is confirmed), then move to Step 7's poll loop. `hv worker dispatch` exits 6 if a brief never submitted — treat that as a failed dispatch and retry that slot once before reassigning the task. Under herdr, read the tab first (`herdr agent read hv-<slot>-<handle>`): a stall does not prove the text was lost. Exit 5 (herdr only) means a dialog was already open and nothing was sent; inspect the tab and treat it like `needs-permission`.
 
 **Edit-tool race in parallel same-file workers.** When parallel workers edit the same file at different ranges, an `Edit` call may report *"File has been modified since read"* after a sibling worker's edit invalidates the cached state. Mitigation: re-`Read` the file, re-run the same `Edit` with byte-identical `old_string` — do NOT regenerate `old_string` from scratch (risks sibling-edited content).
 
@@ -481,66 +474,68 @@ Trust the diff, not the worker's narrative — when a worker re-enters files in 
 
 **PASS** → move on silently. **FAIL** → dispatch a fix agent, re-verify. Surface failures only if they persist.
 
-**Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `.hv/bin/hv-proof-add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv-complete` (Step 9) is the acceptance write and exits 3 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced. In issue mode `hv-proof-add` works unchanged: the rows go into the item's proof note on the issue.
+**Record proof (subagent path).** For each task that PASSes, append one row per item it resolves: `hv proof add <ID> --check "<verify command or grep>" --result PASS --evidence "<output line or path>" [--sha <task-commit>]`. A FAIL that persists is recorded with `--result FAIL`. Proof rows are facts about what ran, not acceptance: `hv item complete` (Step 9) is the acceptance write and exits 4 when an item has no proof. Loop mode never passes `--no-proof` on its own; an unproven item stays open and is surfaced. In issue mode `hv proof add` works unchanged: the rows go into the item's proof note on the issue.
 
 ### Backend branch — `work.dispatch` is `"tmux"` or `"herdr"`
 
 Workers run in their own sessions, so this step gains a poll loop before the review, and a merge gate after it. Full protocol in [`references/tmux-dispatch.md`](../references/tmux-dispatch.md) (herdr's state mapping in [`references/herdr-dispatch.md`](../references/herdr-dispatch.md)); the routing is:
 
 ```bash
-.hv/bin/hv-worker-poll            # JSON: [{name, state, evidence}, ...]
+hv worker poll --json            # data.slots: [{name, state, evidence}, ...]
 ```
 
-Loop until no slot is `BUSY`, routing each state as it appears. Each poll also writes the slot's state into `.hv/workers.json`, and the PR URL from `HV-DONE` into `slot.pr`, which is what lets the gate merge through the PR:
+Loop until no slot is `busy`, routing each state as it appears. Each poll also writes the slot's state into `.hv/workers.json`, and the PR URL from `HV-DONE` into `slot.pr`, which is what lets the gate merge through the PR:
 
-- **`BLOCKED`** — the worker asked a question and idled. Surface it with `AskUserQuestion`, **in the worker's own words** (it already phrased it for someone without the file open; don't re-encode it into implementation terms). Relay the answer back:
-
-  ```bash
-  .hv/bin/hv-worker-dispatch --slot <wN> --brief-file <answer-file> --relay
-  ```
-
-  **Always pass `--relay` when forwarding a user's answer.** It signs the text as the orchestrator's and logs it in the slot's `relays[]`, which `hv-worker-gate` checks the PR's `## Approvals` against (exit 4 `PROVENANCE-FAIL`). Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
-
-- **`DEAD`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
-
-- **`NEEDS-PERMISSION`** — the worker stopped at a permission prompt and is waiting on a human. It is **not** idle and it will never self-resolve. Surface it to the user with the slot name and tell them to approve in that pane (tmux: `tmux attach -t <session>`, switch to the slot's window; herdr: the slot's tab, labelled `<wN>`, which also raised a notification). If it recurs across slots, the permission mode is too narrow for what the briefs ask workers to do — the default `acceptEdits` auto-approves file edits but still prompts for `git`, `gh`, and test commands, so a worker briefed to commit and open a PR will stall on its first Bash call. Report that pattern rather than re-dispatching into it; widening it is the user's call via `work.workerCommand`.
-
-- **`LIMITED`** — the session hit its usage window. Re-dispatching onto the same account just hits the same wall, so move the slot instead:
+- **`blocked`** — the worker asked a question and idled. Surface it with `AskUserQuestion`, **in the worker's own words** (it already phrased it for someone without the file open; don't re-encode it into implementation terms). Relay the answer back:
 
   ```bash
-  .hv/bin/hv-worker-account pick --exclude <current-account>   # exit 3 = all cooling
-  .hv/bin/hv-worker-account assign --slot <wN> --account <picked>
-  .hv/bin/hv-worker-dispatch --slot <wN> --brief-file <same-brief>
+  hv worker dispatch <wN> --body-file <answer-file> --relay
   ```
 
-  Limits are **per-session rolling windows with staggered resets**, so read each account independently — one slot hard-stopping says nothing about its siblings, and declaring a blanket stall wastes accounts that still have headroom. When `pick` exits 3 every configured account is cooling: report the earliest `resetsAt` from `hv-worker-account list` and stop the wave rather than spinning.
+  **Always pass `--relay` when forwarding a user's answer.** It signs the text as the orchestrator's and logs it in the slot's `relays[]`, which `hv worker gate` checks the PR's `## Approvals` against (verdict `provenance-fail`, exit 1). Without it the worker cites your relay in its PR body as a maintainer sign-off it never received — the relay arrives through the same channel a human answer would, the worker genuinely cannot tell, and once merged it is permanent.
+
+- **`dead`** — the session died (a bare `API Error` on a static pane is a headstone, not a pulse). Re-dispatch the same brief once. If it dies a second time the fault is that session, not the API — hand the task to a different slot rather than trying a third time.
+
+- **`needs-permission`** — the worker stopped at a permission prompt and is waiting on a human. It is **not** idle and it will never self-resolve. Surface it to the user with the slot name and tell them to approve in that pane (tmux: `tmux attach -t <session>`, switch to the slot's window; herdr: the slot's tab, labelled `<wN>`, which also raised a notification). If it recurs across slots, the permission mode is too narrow for what the briefs ask workers to do — the default `acceptEdits` auto-approves file edits but still prompts for `git`, `gh`, and test commands, so a worker briefed to commit and open a PR will stall on its first Bash call. Report that pattern rather than re-dispatching into it; widening it is the user's call via `work.workerCommand`.
+
+- **`limited`** — the session hit its usage window. Re-dispatching onto the same account just hits the same wall, so move the slot instead:
+
+  ```bash
+  hv worker account pick --exclude <current-account>   # exit 1 = all cooling
+  hv worker account assign <wN> --account <picked>
+  hv worker dispatch <wN> --body-file <same-brief>
+  ```
+
+  Limits are **per-session rolling windows with staggered resets**, so read each account independently — one slot hard-stopping says nothing about its siblings, and declaring a blanket stall wastes accounts that still have headroom. When `pick` exits 1 every configured account is cooling: report the earliest `resetsAt` from `hv worker account list` and stop the wave rather than spinning.
 
   **If the evidence mentions `Add funds`, do not answer the prompt.** That option spends real money and is never the orchestrator's to pick — surface it to the user and wait. Local shell work (gating, merging, verification) does not consume the LLM window, so the orchestrator can keep integrating finished slots while one is limited.
 
   With `work.accounts` unset this state still fires but has nowhere to move the slot to; treat it as a hard stop and tell the user which window is spent.
 
-- **`UNKNOWN`** (herdr only) — herdr sees an agent but cannot classify its screen. It is **not** done. Look at the tab and route on what is actually there; never send it to the gate on this state alone.
+- **`unknown`** (herdr only) — herdr sees an agent but cannot classify its screen. It is **not** done. Look at the tab and route on what is actually there; never send it to the gate on this state alone.
 
-- **`DONE`** — the worker opened a PR. Review its diff against the brief using the same rubric as the subagent path above (items 1–6), then gate it:
+- **`done`** — the worker opened a PR. Review its diff against the brief using the same rubric as the subagent path above (items 1–6), then gate it:
 
   ```bash
-  .hv/bin/hv-worker-gate --slot <wN> --base <cycle-branch>
+  hv worker gate <wN> --base <cycle-branch> --json
   ```
 
-  | Exit | Meaning | Action |
+  Exit 0 (`data.verdict: pass`) means merged and the merged tree verified (or skipped, `data.verifySkipped: true`): continue. Every other verdict exits 1; route on `data.verdict`. Exit 3 means the pool, slot, base or worker branch is missing, or the base branch is not checked out.
+
+  | `data.verdict` | Meaning | Action |
   |---|---|---|
-  | 0 | merged and the merged tree verified (or `NO-VERIFY`) | continue |
-  | 3 | `STALE` — the slot branched before sibling work landed | bounce to the slot to `git merge <cycle-branch>` and re-verify, then re-gate. Bounce **once**; if it goes stale again while re-syncing, resolve it yourself in the worker's worktree and document that on the PR |
-  | 3 | merge conflicted | route the resolution to the slot that owns the branch context, with a summary of what landed. Never resolve a cross-worker semantic conflict blind |
-  | 3 | PR is not the verified branch (head SHA moved, wrong head or base, not open) | re-poll the slot; a stacked PR needs its base retargeted |
-  | 4 | `GATE-FAIL` — the merged tree is broken | fix forward on the cycle branch; the owning slot has usually moved on |
-  | 4 | `NOT-MERGED` / `NOT-ON-BASE` — the tracker reported a merge that is not on the base branch | treat as unmerged; check for a scheduled auto-merge or a stacked base, then re-gate |
-  | 5 | `CHECK-BROKE` — the gate could not decide (bad ref, failed fetch, unreadable PR, a recorded PR but no `origin` remote) | fix the environment and re-run; do not read it as STALE. A PR is never merged locally |
-  | 6 | `MERGED-REMOTELY` — the PR is on `origin/<base>` but the local base could not fast-forward | do **not** re-merge; reconcile the local base by hand, then re-verify |
+  | `stale` | the slot branched before sibling work landed | bounce to the slot to `git merge <cycle-branch>` and re-verify, then re-gate. Bounce **once**; if it goes stale again while re-syncing, resolve it yourself in the worker's worktree and document that on the PR |
+  | `merge-failed` | merge conflicted | route the resolution to the slot that owns the branch context, with a summary of what landed. Never resolve a cross-worker semantic conflict blind |
+  | `pr-mismatch` | PR is not the verified branch (head SHA moved, wrong head or base, not open) | re-poll the slot; a stacked PR needs its base retargeted |
+  | `provenance-fail` | the PR's `## Approvals` cites a relay the slot never received | treat the approval as unverified; ask the user before re-gating |
+  | `verify-failed` | the merged tree is broken (`data.changed: true`: the merge landed) | fix forward on the cycle branch; the owning slot has usually moved on |
+  | `not-merged` / `not-on-base` | the tracker reported a merge that is not on the base branch | treat as unmerged; check for a scheduled auto-merge or a stacked base, then re-gate |
+  | `check-broke` | the gate could not decide (bad ref, failed fetch, unreadable PR, a recorded PR but no `origin` remote) | fix the environment and re-run; do not read it as `stale`. A PR is never merged locally |
+  | `merged-remotely` | the PR is on `origin/<base>` but the local base could not fast-forward | do **not** re-merge; reconcile the local base by hand, then re-verify |
 
-  Exit 4 is the case this gate exists for: two workers with disjoint file sets, each honestly green, merging cleanly into a broken tree. Per-task verification cannot see it — the conflicting change was never in either worker's tree. Do not skip the gate because both diffs looked fine; that is exactly the condition under which it fires.
+  `verify-failed` is the case this gate exists for: two workers with disjoint file sets, each honestly green, merging cleanly into a broken tree. Per-task verification cannot see it — the conflicting change was never in either worker's tree. Do not skip the gate because both diffs looked fine; that is exactly the condition under which it fires.
 
-A `NO-VERIFY` line means `refactor.verifyCommands` is empty and the merged tree was **not** gated by any command. Report that honestly in Step 12 rather than describing the cycle as verified.
+`data.verifySkipped: true` means `refactor.verifyCommands` is empty and the merged tree was **not** gated by any command. Report that honestly in Step 12 rather than describing the cycle as verified.
 
 ## Step 7.5 — Commit per Task (orchestrator)
 
@@ -586,23 +581,23 @@ If a tool regenerates siblings only when the editor loads (e.g., Godot `class_na
 
 ## Step 9 — Update BACKLOG.md
 
-**Issue mode:** skip this step and Step 9.5. Do not call `hv-complete`: the issue closes when its PR merges (`Closes #<n>`, Step 10).
+**Issue mode:** skip this step and Step 9.5. Do not call `hv item complete`: the issue closes when its PR merges (`Closes #<n>`, Step 10).
 
 ```bash
-.hv/bin/hv-complete <ID> <commit-hash>
+hv item complete <ID> --commit <commit-hash>
 ```
 
 Run per resolved item. Match by keyword overlap between task description and TODO entry title. If unsure whether an item was addressed, leave it — don't move items you didn't work on.
 
 ## Step 9.5 — Tombstone Consumed Item Plans
 
-For each item ID that `hv-complete` just resolved, remove its corresponding item plan if one was written:
+For each item ID that `hv item complete` just resolved, remove its corresponding item plan if one was written:
 
 ```bash
 # For each <ID> the cycle resolved (B07/F03/T11/…):
-MILESTONE=$(.hv/bin/hv-todo-field <ID> milestone)
+MILESTONE=$(hv item field get <ID> --name milestone)
 if [ -n "$MILESTONE" ] && [ -f ".hv/plans/${MILESTONE}-<ID>.md" ]; then
-  .hv/bin/hv-plan-rm "${MILESTONE}-<ID>"
+  hv plan rm "${MILESTONE}-<ID>"
 fi
 ```
 
@@ -613,9 +608,9 @@ Skip silently when:
 - The item carries no `Milestone:` tag — no plan key exists for it.
 - No plan file is at the resolved key — the `[ -f … ]` guard handles this (untagged items, items that one-shot through `/hv-go` or `/hv-work` without a written plan).
 
-**Slice plans (`M01-S01.md`) stay.** A slice covers multiple items; completing one item does not consume the slice plan. Slice cleanup is currently manual via `.hv/bin/hv-plan-rm <key>` once the user is done with the slice.
+**Slice plans (`M01-S01.md`) stay.** A slice covers multiple items; completing one item does not consume the slice plan. Slice cleanup is currently manual via `hv plan rm <key>` once the user is done with the slice.
 
-**Commit the close-the-loop changes before merge/PR.** `.hv/BACKLOG.md` (updated by `hv-complete` in Step 9) and `.hv/plans/<key>.md` removals (above) are tracked under the partial-ignore model, so they leave a dirty tree. Step 10's merge/PR refuses on a dirty tree (or silently loses the diffs across the checkout), so stage and commit them here as one "close the loop" commit:
+**Commit the close-the-loop changes before merge/PR.** `.hv/BACKLOG.md` (updated by `hv item complete` in Step 9) and `.hv/plans/<key>.md` removals (above) are tracked under the partial-ignore model, so they leave a dirty tree. Step 10's merge/PR refuses on a dirty tree (or silently loses the diffs across the checkout), so stage and commit them here as one "close the loop" commit:
 
 ```bash
 if ! git diff --quiet -- .hv/ 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard .hv/)" ]; then
@@ -628,34 +623,34 @@ Single commit per cycle keeps the loop atomic: the implementation commits ship t
 
 ## Step 10 — Merge or PR
 
-Use `work.mergeStrategy` from `.hv/config.json` to pick `hv-merge` (direct) or `hv-pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), helper contracts, and the Manual-gate rule for opening a PR.
+Use `work.mergeStrategy` from `.hv/config.json` to pick `hv ship merge` (direct) or `hv ship pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), verb contracts, and the Manual-gate rule for opening a PR.
 
-When `work.mergeStrategy == "direct"` (or unset — the default), use `hv-merge`. When `work.mergeStrategy == "pr"`, use `hv-pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `/hv-config`; respect it silently.
+When `work.mergeStrategy == "direct"` (or unset — the default), use `hv ship merge`. When `work.mergeStrategy == "pr"`, use `hv ship pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `/hv-config`; respect it silently.
 
 **Issue mode forces the PR path**, whatever `work.mergeStrategy` says, and never merges:
 
 ```bash
-printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID1>,<ID2> <branch> "<short title>"
-.hv/bin/hv-item-state <ID> needs-review    # once per item
+printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file - --items <ID1>,<ID2>
+hv item state <ID> --to needs-review    # once per item
 ```
 
-Do not call `hv-item-release`: the claim persists until the PR merges. Merging is `/hv-review --queue`'s job. Details in `references/issue-mode.md`.
+Do not call `hv item release`: the claim persists until the PR merges. Merging is `/hv-review --queue`'s job. Details in `references/issue-mode.md`.
 
 ## Step 11 — Update Status
 
 **Single-repo:**
 
 ```bash
-.hv/bin/hv-status-remove <branch>
+hv status rm <branch>
 ```
 
 **Umbrella mode** (when the wave's resolved sub-repo from Step 4.5 is `<repo>`):
 
 ```bash
-.hv/bin/hv-status-remove --repo <repo> <branch>
+hv status rm <branch> --repo <repo>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
+Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 ## Step 12 — Report to User
 
@@ -701,15 +696,15 @@ If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work f
 
 ## Step 13.7 — Map After-Work
 
-- **Update project map.** For any `.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap files touched in this cycle, bump `touched:` to today in the frontmatter; refresh `summary:` if the cycle's intent changed it; add new entry points where helpful. Don't rewrite untouched sections. After editing, run `.hv/bin/hv-map-index` to regenerate the `## Project Map` block in `CLAUDE.md`. Stage the updates as part of the cycle's final commit — no separate commit. Skip silently when no map entry matches.
+- **Update project map.** For any `.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap files touched in this cycle, bump `touched:` to today in the frontmatter; refresh `summary:` if the cycle's intent changed it; add new entry points where helpful. Don't rewrite untouched sections. After editing, run `hv map index` to regenerate the `## Project Map` block in `CLAUDE.md`. Stage the updates as part of the cycle's final commit — no separate commit. Skip silently when no map entry matches.
 
 ## Step 14 — Refactor (Nudge or Auto-Invoke)
 
 ```bash
-.hv/bin/hv-refactor-age
+hv refactor age --json
 ```
 
-Returns JSON: `{"features": N, "bugs": M}` — counts since the last `refactor:` commit.
+`data` is `{"features": N, "bugs": M}` — counts since the last `refactor:` commit.
 
 Run the post-cycle choreography in `references/post-cycle-trigger-gate.md` with these parameters:
 
@@ -742,10 +737,10 @@ Loop stops naturally when:
 | [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
 | [`issue-mode.md`](../references/issue-mode.md) | Issue-mode helper map, state labels, PR flow, resuming an item, exit codes (`backlog.backend: "issues"`). |
 | [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
-| [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill. |
-| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. |
+| [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. |
+| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus `hv ship` invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
 | [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
 | [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"` (shared by `"herdr"`). |
 | [`herdr-dispatch.md`](../references/herdr-dispatch.md) | herdr host for worker dispatch: tabs as slots, startup dialogs, native agent-state mapping, `work.dispatch: "herdr"`. |
-| [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. |
+| [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode verbs, registry shape, and `Repos:` field semantics. |

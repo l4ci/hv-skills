@@ -41,15 +41,9 @@ Every friction point gets one category — it drives the fix strategy:
 3. **Ports & Adapters** — your services across a network boundary (microservices, internal APIs). Define a port at the module boundary; deep module owns logic, transport is injected. Tests use an in-memory adapter; production uses the real one.
 4. **True external** — third-party services (Stripe, Twilio) you don't control. Mock at the boundary; tests provide the mock, production uses the real implementation.
 
-## Step 1 — Preflight
+## Step 1 — Task List
 
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
-
-The `hv-guard-clean` call moved from this step into Step 1.5's branches — fanout sub-agents run their own guard-cleans against their target trees, so the umbrella-level guard isn't needed (and would falsely fail when the umbrella is not a git repo).
+The clean-tree guard (`hv git guard clean`) lives in Step 1.5's branches, not here — fanout sub-agents run their own guards against their target trees, so the umbrella-level guard isn't needed (and would falsely fail when the umbrella is not a git repo).
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -68,19 +62,19 @@ Skip this step entirely if EITHER:
 - `--here` was passed to this invocation
 - `umbrella.enabled` is false in `.hv/config.json`
 
-In that case, run `hv-guard-clean` and proceed to Step 2 (single-repo flow):
+In that case, run the clean-tree guard and proceed to Step 2 (single-repo flow):
 
 ```bash
-.hv/bin/hv-guard-clean "/hv-refactor"
+hv git guard clean --context "/hv-refactor"
 ```
 
 Otherwise, list refactor targets:
 
 ```bash
-.hv/bin/hv-refactor-targets
+hv refactor targets --json
 ```
 
-Output JSON:
+`data` holds:
 
 ```json
 {
@@ -118,7 +112,7 @@ If the user picks **"Pick a subset"**, follow up with a multiSelect:
 
 ### Branch — "Umbrella only"
 
-Run `hv-guard-clean` against the umbrella's tree if you skipped it earlier. Then proceed to Step 2 (single-repo flow). The umbrella's `.git/` (if it has one) receives the commit; if the umbrella isn't a git repo, hv-guard-clean exits 2 and this step stops.
+Run `hv git guard clean --context "/hv-refactor"` against the umbrella's tree if you skipped it earlier. Then proceed to Step 2 (single-repo flow). The umbrella's `.git/` (if it has one) receives the commit; if the umbrella isn't a git repo, the guard exits 3 and this step stops.
 
 ### Branch — fanout (any other scope: "All sub-repos", "All + umbrella", "Pick a subset")
 
@@ -247,7 +241,7 @@ If the project uses a build tool to regenerate project files (e.g. `xcodegen gen
 After the commit lands, zero the refactor-pressure counter so the next cycle starts fresh:
 
 ```bash
-.hv/bin/hv-refactor-reset
+hv refactor reset
 ```
 
 ## Step 10 — Report to User

@@ -22,7 +22,7 @@ A wave is "commit-producing" by default; "read-only" workers (research, lint-onl
 
 ## Why this guard exists
 
-Caught on M02-S01 Wave 1: four parallel workers running under branch isolation produced two failure modes against the shared `.git/index` — `index.lock` collisions (poll-and-retry survived these), and an undetectable index-sweep where Worker A's staged file landed in Worker B's commit. T1's `bin/hv-resolve-umbrella` was orphaned that way; T4's worker had to `git reset --soft` and re-stage, the orchestrator re-committed T1 standalone, and the implementation history is now obscured by recovery commits. The fix is structural: each worker on its own worktree → its own index → no race.
+Caught on M02-S01 Wave 1: four parallel workers running under branch isolation produced two failure modes against the shared `.git/index` — `index.lock` collisions (poll-and-retry survived these), and an undetectable index-sweep where Worker A's staged file landed in Worker B's commit. T1's new umbrella-resolver script was orphaned that way; T4's worker had to `git reset --soft` and re-stage, the orchestrator re-committed T1 standalone, and the implementation history is now obscured by recovery commits. The fix is structural: each worker on its own worktree → its own index → no race.
 
 ## Forbids
 

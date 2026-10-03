@@ -8,13 +8,13 @@ Used by `/hv-work` Step 5 (the single primary consumer today). The reference enu
 
 | Scope | Isolation | Pattern |
 |---|---|---|
-| Single-repo | branch | `git checkout -b <branch>` + `hv-status-add <branch> <items>` |
-| Single-repo | worktree | `git branch <branch>` + `git worktree add .claude/worktrees/<branch>` + `hv-status-add <branch> <items> <path>` |
-| Umbrella (sub-repo) | branch | `(cd <repo> && git checkout -b <branch>)` + `hv-status-add --repo <repo> <branch> <items>` |
-| Umbrella (sub-repo) | worktree (Layout B) | `(cd <repo> && git branch <branch>)`, `hv-worktree-path --repo <repo> <branch>`, `git -C <repo> worktree add "$WT" <branch>`, `hv-status-add --repo <repo> <branch> <items> "$WT"` |
-| Umbrella (multi-repo) | branch | `hv-multi-branch-create --branch <branch> --repos "<csv>"` + `hv-status-add-multi --branch <branch> --items <ids-csv> --repos "<csv>"` |
+| Single-repo | branch | `git checkout -b <branch>` + `hv status add <branch> --items <items>` |
+| Single-repo | worktree | `git branch <branch>` + `git worktree add .claude/worktrees/<branch>` + `hv status add <branch> --items <items> --worktree <path>` |
+| Umbrella (sub-repo) | branch | `(cd <repo> && git checkout -b <branch>)` + `hv status add <branch> --items <items> --repo <repo>` |
+| Umbrella (sub-repo) | worktree (Layout B) | `(cd <repo> && git branch <branch>)`, `hv git worktree-path <branch> --repo <repo>`, `git -C <repo> worktree add "$WT" <branch>`, `hv status add <branch> --items <items> --worktree "$WT" --repo <repo>` |
+| Umbrella (multi-repo) | branch | `hv git branch <branch> --repos <csv>` + `hv status add <branch> --items <ids-csv> --repos <csv>` |
 
-`hv-multi-branch-create` precheck collides ALL repos if the branch exists in ANY one — no partial creation. Multi-repo workers are safe under either isolation mode (see *Cross-repo parallelism* below).
+`hv git branch` precheck refuses ALL repos if the branch exists in ANY one — no partial creation. Multi-repo workers are safe under either isolation mode (see *Cross-repo parallelism* below).
 
 ## Per-pattern code
 
@@ -24,7 +24,7 @@ The table is the contract; these are the invocations spelled out for the worker 
 
 ```bash
 git checkout -b <branch>
-.hv/bin/hv-status-add <branch> <ID>[,<ID>...]
+hv status add <branch> --items <ID>[,<ID>...]
 ```
 
 **Single-repo, worktree:**
@@ -32,16 +32,16 @@ git checkout -b <branch>
 ```bash
 git branch <branch>
 git worktree add .claude/worktrees/<branch> <branch>
-.hv/bin/hv-status-add <branch> <ID>[,<ID>...] .claude/worktrees/<branch>
+hv status add <branch> --items <ID>[,<ID>...] --worktree .claude/worktrees/<branch>
 ```
 
 **Umbrella sub-repo, Layout B worktree:**
 
 ```bash
 (cd <repo> && git branch <branch>)
-WT=$(.hv/bin/hv-worktree-path --repo <repo> <branch>)
+WT=$(hv git worktree-path <branch> --repo <repo>)
 git -C <repo> worktree add "$WT" <branch>
-.hv/bin/hv-status-add --repo <repo> <branch> <ID>[,<ID>...] "$WT"
+hv status add <branch> --items <ID>[,<ID>...] --worktree "$WT" --repo <repo>
 ```
 
 Full umbrella branch-creation ceremony (single + multi) lives in `references/umbrella-mode.md`; do not duplicate it here.
@@ -64,11 +64,11 @@ This is why multi-repo waves dispatched by `/hv-work` (one branch, N sub-repos, 
 
 ## Umbrella mechanics
 
-This reference covers only the isolation-and-worktree-creation aspects of umbrella mode. The broader umbrella concept — the registry (`.hv/repos.json`), resolution helpers (`hv-resolve-repo`, `hv-resolve-repos`, `hv-resolve-umbrella`), the `Repos:` field on TODO items, walk-up convenience, merge/PR `--repo` plumbing — lives in `references/umbrella-mode.md`. Cite it from call sites that need both halves.
+This reference covers only the isolation-and-worktree-creation aspects of umbrella mode. The broader umbrella concept — the registry (`.hv/repos.json`), resolution verbs (`hv repo which`, `hv repo resolve`), the `Repos:` field on TODO items, walk-up convenience, merge/PR `--repo` plumbing — lives in `references/umbrella-mode.md`. Cite it from call sites that need both halves.
 
 ## What this reference does NOT cover
 
-- **The tmux worker backend** (`work.dispatch: "tmux"`) — see `references/tmux-dispatch.md`. That path does not use these patterns at all: `hv-worker-pool` owns one worktree per slot, and `work.isolation` stops applying because every slot has its own index by construction.
-- **The umbrella-mode concept, registry, and helpers** — see `references/umbrella-mode.md`.
+- **The tmux worker backend** (`work.dispatch: "tmux"`) — see `references/tmux-dispatch.md`. That path does not use these patterns at all: `hv worker pool` owns one worktree per slot, and `work.isolation` stops applying because every slot has its own index by construction.
+- **The umbrella-mode concept, registry, and resolution verbs** — see `references/umbrella-mode.md`.
 - **Worker dispatch under each isolation mode** (Skill-tool shape, parallel batching, worker-brief construction) — see `/hv-work` Step 6 inline.
 - **The full F11 write-only-workers default** (why workers don't commit, how the orchestrator collects diffs and commits) — see `KNOWLEDGE.md` 2026-05-07 entry.

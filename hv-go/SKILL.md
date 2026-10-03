@@ -18,36 +18,28 @@ user-invocable: true
 ## Flow
 
 ```
-Init guard → Capture → Clean-tree guard → Hand off to /hv-work
+Capture → Clean-tree guard → Hand off to /hv-work
 ```
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
-
-## Step 2 — Capture
+## Step 1 — Capture
 
 Invoke `hv-capture` via the `Skill` tool. Prefix the args passed to capture with `(hv-go — cap clarification at 1-2 questions)` so capture applies the speed-path question limit; then pass the user's input verbatim. `hv-capture` handles classification, ID assignment, detail files, and the `BACKLOG.md` write.
 
-Capture runs before the clean-tree guard on purpose: `BACKLOG.md` lives under `.hv/`, which the clean-tree guard treats as a separate concern from the code paths it inspects, so capture never blocks Step 3. If Step 3 then fails, the item is safely on the backlog and the user can run `/hv-work` after cleaning up instead of re-describing it.
+Capture runs before the clean-tree guard on purpose: `BACKLOG.md` lives under `.hv/`, which the clean-tree guard treats as a separate concern from the code paths it inspects, so capture never blocks Step 2. If Step 2 then fails, the item is safely on the backlog and the user can run `/hv-work` after cleaning up instead of re-describing it.
 
-Under `backlog.backend: "issues"` capture creates tracker issues through `hv-item-create`; the IDs are the type letter plus the issue number (`F42`). See `references/issue-mode.md`; `/hv-work` then claims the items and opens a PR.
+Under `backlog.backend: "issues"` capture creates tracker issues through `hv item create`; the IDs are the type letter plus the issue number (`F42`). See `references/issue-mode.md`; `/hv-work` then claims the items and opens a PR.
 
-Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 4.
+Record the captured IDs (e.g., `[F05]`, `[B07]`) — you need them for Step 3.
 
-## Step 3 — Guard: Clean Working Tree
+## Step 2 — Guard: Clean Working Tree
 
 ```bash
-.hv/bin/hv-guard-clean "/hv-go"
+hv git guard clean --context "/hv-go"
 ```
 
-Non-zero exit = stop and surface the script's message. Tell the user *"Captured `[ID] Title` — clean your working tree and run `/hv-work` to execute."* so they know the capture survived.
+Non-zero exit = stop and surface the verb's message. Tell the user *"Captured `[ID] Title` — clean your working tree and run `/hv-work` to execute."* so they know the capture survived.
 
-## Step 4 — Hand Off to /hv-work
+## Step 3 — Hand Off to /hv-work
 
 Invoke `hv-work` via the `Skill` tool with a brief containing:
 
@@ -59,8 +51,8 @@ Invoke `hv-work` via the `Skill` tool with a brief containing:
 
 ## Rules
 
-- **Delegate, don't duplicate.** Capture mechanics (ID minting, classification, detail files, `Repos:` tagging in umbrella mode) live in `/hv-capture`. Execution and post-cycle nudges (branch creation, worker dispatch, commits, post-cycle map bump via `hv-map-index`, soft-cap check, `/hv-learn`) live in `/hv-work`. `/hv-go` is a pass-through orchestrator — it does not own any of these rules independently.
-- **Capture survives clean-tree guard failure.** Step 2 writes to `.hv/BACKLOG.md` before Step 3's guard, which inspects code paths (not `.hv/`). If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
+- **Delegate, don't duplicate.** Capture mechanics (ID minting, classification, detail files, `Repos:` tagging in umbrella mode) live in `/hv-capture`. Execution and post-cycle nudges (branch creation, worker dispatch, commits, post-cycle map bump via `hv map index`, soft-cap check, `/hv-learn`) live in `/hv-work`. `/hv-go` is a pass-through orchestrator — it does not own any of these rules independently.
+- **Capture survives clean-tree guard failure.** Step 1 writes to `.hv/BACKLOG.md` before Step 2's guard, which inspects code paths (not `.hv/`). If the guard fails, the captured item is safely on the backlog; the user runs `/hv-work <ID>` after cleanup instead of re-describing the work.
 
 ## References
 

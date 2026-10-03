@@ -189,22 +189,6 @@ LEGACY_RE = re.compile(
 # deletions never touch adjacent lines. An entry whose file is already clean
 # (or gone) fails the check, so the list can only shrink. It is empty after S5.
 UNCONVERTED = {
-    # S1 work cycle
-    "hv-go/SKILL.md",
-    "hv-next/SKILL.md",
-    "hv-pause/SKILL.md",
-    "hv-refactor/SKILL.md",
-    "hv-work/SKILL.md",
-    "references/herdr-dispatch.md",
-    "references/isolation-guard.md",
-    "references/isolation-patterns.md",
-    "references/loop-mode-plan-dispatch.md",
-    "references/refactor-umbrella-fanout.md",
-    "references/terminal-loop-surface.md",
-    "references/tmux-dispatch.md",
-    "references/umbrella-mode.md",
-    "references/worker-contract.md",
-
     # S2 ship, review, release, qa, debug
     "hv-debug/SKILL.md",
     "hv-qa/SKILL.md",

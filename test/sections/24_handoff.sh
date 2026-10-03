@@ -65,7 +65,7 @@ rm -rf "$HANDOFF_TMP"
 pass "status handoff lookup + canonical modes, umbrella fallback, error cases"
 
 # white-box-begin: A9 #53 doclint
-echo "hv-next/SKILL.md references hv-resolve-handoff"
-grep -q "hv-resolve-handoff" "$REPO/hv-next/SKILL.md" || fail "hv-next/SKILL.md missing hv-resolve-handoff call"
-pass "hv-next/SKILL.md uses hv-resolve-handoff"
+echo "hv-next/SKILL.md references hv status handoff"
+grep -q "hv status handoff" "$REPO/hv-next/SKILL.md" || fail "hv-next/SKILL.md missing hv status handoff call"
+pass "hv-next/SKILL.md uses hv status handoff"
 # white-box-end

@@ -4,7 +4,7 @@ Used by `/hv-work` Steps 6 and 7 when `work.dispatch` is `"tmux"` or `"herdr"`. 
 
 ## The standing contract
 
-A worker boots with **none** of the orchestrator's context: no conversation, no loaded KNOWLEDGE, no plan. Everything it needs is in the brief. `hv-worker-dispatch` signs the brief (see *Provenance*); `/hv-work` Step 6 prepends this contract to the task brief on every dispatch. The brief body itself is identical to the subagent path, same `**Claims to verify**` section and all.
+A worker boots with **none** of the orchestrator's context: no conversation, no loaded KNOWLEDGE, no plan. Everything it needs is in the brief. `hv worker dispatch` signs the brief (see *Provenance*); `/hv-work` Step 6 prepends this contract to the task brief on every dispatch. The brief body itself is identical to the subagent path, same `**Claims to verify**` section and all.
 
 ```
 You are a worker on <task-id>, running in your own worktree as slot <slot>.
@@ -36,18 +36,18 @@ Work only this task, then stop.
 - When your PR is open, print `HV-DONE <slot> <pr-url>` and stop.
 ```
 
-The two sentinels are the contract's load-bearing half. We own the worker's instructions, so state is *declared* rather than inferred from prose — which is what makes `hv-worker-poll` reliable where pattern-matching a TUI is not.
+The two sentinels are the contract's load-bearing half. We own the worker's instructions, so state is *declared* rather than inferred from prose — which is what makes `hv worker poll` reliable where pattern-matching a TUI is not.
 
 ## Provenance
 
 The worker writes its own PR body, and an orchestrator relay, a maintainer typing in the pane and stray text all arrive through the same channel. Without a signature the worker genuinely cannot tell them apart, and what it cites is permanent once merged.
 
-- **Signing.** `hv-worker-dispatch` prepends `--- ORCHESTRATOR (round N) ---` as the first line of every brief and every `--relay`. The round comes from `--round <N>`, else the round last recorded in `.hv/workers.json`, else `1`. A relay also carries a bracketed note saying it is forwarded text, not the maintainer.
+- **Signing.** `hv worker dispatch` prepends `--- ORCHESTRATOR (round N) ---` as the first line of every brief and every `--relay`. The round comes from `--round <N>`, else the round last recorded in `.hv/workers.json`, else `1`. A relay also carries a bracketed note saying it is forwarded text, not the maintainer.
 - **Unsigned text** means ask, never act, never ignore.
 - **`m:` prefix** is optional, for a maintainer's typed answer. It is imitable, so a prefixed line that contradicts the last signed message still gets one confirmation.
 - **Phantom text.** Claude Code renders a dim generated suggestion on the prompt line. It was never typed by anyone.
-- **Relay log.** `hv-worker-dispatch --relay` appends `{round, ts, summary}` to the slot's `relays[]` in `.hv/workers.json`; the summary is the first line of the relayed text. A new task dispatch resets the list.
-- **Gate.** `hv-worker-gate` reads the `## Approvals` section of the slot's PR body (`gh pr view --json body`) and exits 4 with `PROVENANCE-FAIL` on:
+- **Relay log.** `hv worker dispatch --relay` appends `{round, ts, summary}` to the slot's `relays[]` in `.hv/workers.json`; the summary is the first line of the relayed text. A new task dispatch resets the list.
+- **Gate.** `hv worker gate` reads the `## Approvals` section of the slot's PR body (`gh pr view --json body`) and fails with verdict `provenance-fail` (exit 1) on:
   - *inflation*: a line citing the maintainer that quotes a logged relay;
   - *deflation*: a line citing `orchestrator relay round N` when no relay for round N is logged;
   - a missing `## Approvals` section while `relays[]` is non-empty.
