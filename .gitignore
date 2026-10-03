@@ -14,7 +14,7 @@
 # Advisory lockfiles guarding sidecar read-modify-write (written by hv)
 .hv/**/*.lock
 
-# Python bytecode (test oracle until the legacy scripts go)
+# Python bytecode (test tooling: validator, fakes)
 __pycache__/
 *.pyc
 
