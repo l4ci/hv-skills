@@ -143,6 +143,38 @@ the base is reported as `retained` and left alone (`holds-work`, exit 4); the ot
 parked anyway, so fix the slot and run it again. It deletes no branch and clears no label: the
 `drift` count says what `hv round reconcile` and `hv reap` still have to do.
 
+## Moving an issue that is assigned
+
+```sh
+hv round return ben --reason "wrong premise" --note-file next.md   # the worker's own verb
+hv round transfer 59 --to dana --note-file next.md                 # orchestrator: to a slot
+hv round transfer 59 --to human                                    # orchestrator: to the human
+hv round reclaim ben                                               # orchestrator: dead or stalled slot
+```
+
+All three free the slot the same way (`Park`): dirty paths are committed by name as
+`wip: parked from <slot> (hv round <verb>)`, the work branch is pushed to `origin` (no force)
+and only then is the worktree switched to `park/<agent>`. A failed push or a rejected commit
+leaves the slot as found (exit 5), so the branch is never the only copy of the work. Each
+posts a handoff comment on the issue (branch, head, state, reason, your `--note-file`) ending
+in `<!-- hv:handoff <slot>@<round> -->`.
+
+- **return** releases the claim and the in-progress label, so `candidates` lists the issue
+  again; the branch stays and an open PR stays open. Run it inside the slot's worktree, or as
+  the lease holder. An `assign` after a return starts fresh; `transfer` is the verb that
+  continues a pushed branch.
+- **transfer to a slot** checks the pushed branch out in the receiver's worktree and
+  dispatches it with a brief that names the handoff; the in-progress label stays on. **To
+  `human`** labels the issue `needs-human` (`issues.labels.needsHuman`), claims nothing and
+  dispatches nothing; `candidates` skips it until the human clears the label.
+- **reclaim** works on a slot that is `dead` or `stalled` (no commit, edit or state change for
+  `round.stallMinutes`, default 30, `0` is off). A healthy slot needs `--force`; a live pane is
+  killed first, and with no host to ask it is refused as `live agent`. It does not reassign.
+  `hv reap` reclaims `dead` slots only, never `stalled` ones: a worker in a long test run
+  makes no commits and looks stalled, and an unattended `reap --apply` would kill it.
+- `hv round reconcile` reports `stalled` (never repaired) and `claim-mismatch` (`--apply`
+  clears a registry `claimId` whose claim is gone; the tracker is never edited).
+
 ## Waiting on workers
 
 `hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints

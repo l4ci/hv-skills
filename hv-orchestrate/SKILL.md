@@ -63,7 +63,7 @@ Between waits, use free slots: re-read `hv round candidates` and assign the next
 
 ## 4. Reading failures
 
-**Dead vs stalled.** A `dead` slot has no live agent: the tab is gone or the process exited. Its issue can go back to the pool. *(pending C10, #76: `hv round reclaim` does this for `dead` slots only.)* A `stalled` slot has a live agent that shows no commits and no status change. That is usually a long test run, not a failure. Reclaiming a stalled slot is your call after reading its pane, never automatic. `hv reap` never touches either kind of live agent.
+**Dead vs stalled.** A `dead` slot has no live agent: the tab is gone or the process exited. *(pending C10, #76, PR #193)* Its issue can go back to the pool: `hv round return` is the worker's own verb, `hv round transfer` hands it to another slot or the human and continues the pushed branch, and `hv round reclaim` frees a dead or stalled slot. An `assign` after a return starts fresh. A `stalled` slot has a live agent with no commits and no status change, usually a long test run, not a failure. Reclaiming it is your call after reading its pane; a healthy slot needs `--force`. `hv reap` reclaims `dead` slots only and never touches a live agent.
 
 **`unknown`.** The host reports a state `hv` can't classify. Never treat it as finished. Policy: wait through one more `wait`; if the slot is still `unknown`, read its pane; if the pane shows a prompt or a stopped agent, run `herdr agent explain` on it, then treat the slot as `dead` or `blocked` accordingly. A round must not stall on a state nobody read.
 
