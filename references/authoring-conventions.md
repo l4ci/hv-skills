@@ -227,3 +227,7 @@ Claude Code's TUI HTML-escapes task titles for rendering but never decodes — s
 - `+` as the connector where it reads naturally (e.g. *"Commit + TODO + smoke"*) — already used elsewhere; renders correctly.
 
 Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `hv-init`, `hv-ship`, `hv-review`, `hv-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.
+
+## `/hv-x` and `$hv-x` are the same invocation
+
+Codex invokes a skill as `$hv-x`; Claude Code as `/hv-x`. Skill text keeps `/hv-x` everywhere and does not branch on the harness: read `$hv-x` as the same call. Codex lists a skill linked through `hv init --codex` as `hv-skills:hv-x`, and a bare `$hv-x` still resolves it (checked on Codex 0.159.2). Never write both spellings in one sentence, and never rewrite an existing `/hv-x` to `$hv-x`.
