@@ -138,18 +138,3 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$PLN_TMP"
 pass "plan add --design records design pointer in frontmatter; rejects a missing design"
 
-echo "B28: hv-brainstorm --auto-loop frontmatter convention"
-
-# Auto-loop mode marks the design artifact with auto: true frontmatter (per hv-plan F32 convention).
-# white-box-begin: A9 #53 doclint
-grep -q 'auto: true' "$REPO/hv-brainstorm/SKILL.md" \
-  || fail "B28: hv-brainstorm/SKILL.md must document 'auto: true' frontmatter under --auto-loop"
-# white-box-end
-
-# Auto-loop autonomy gate is wired in Step 1 (mode entered when flag is present under loop autonomy).
-# white-box-begin: A9 #53 doclint
-grep -q 'AUTO_LOOP' "$REPO/hv-brainstorm/SKILL.md" \
-  || fail "B28: hv-brainstorm/SKILL.md must parse the --auto-loop flag in Step 1"
-# white-box-end
-
-pass "B28: hv-brainstorm --auto-loop frontmatter + autonomy gate wired"

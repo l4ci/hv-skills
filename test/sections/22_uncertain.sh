@@ -99,24 +99,3 @@ EOF
 )
 echo "ok plan uncertain"
 
-# white-box-begin: A9 #53 doclint
-echo "F37: TaskCreate progress-checklist convention"
-TIER_SAB_F37=(hv-init hv-work hv-debug hv-ship hv-release \
-              hv-refactor hv-learn hv-decide hv-spike hv-vision \
-              hv-capture hv-next hv-pause hv-review hv-plan hv-config)
-TIER_C_F37=(hv-go hv-update)
-
-for skill in "${TIER_SAB_F37[@]}"; do
-  grep -q "TaskCreate(" "$REPO/$skill/SKILL.md" \
-    || fail "F37: Tier S/A/B skill $skill/SKILL.md missing TaskCreate( reference"
-done
-pass "Tier S/A/B SKILL.md files reference TaskCreate("
-
-for skill in "${TIER_C_F37[@]}"; do
-  if grep -q "TaskCreate(" "$REPO/$skill/SKILL.md"; then
-    fail "F37: Tier C skill $skill/SKILL.md unexpectedly has TaskCreate( (should be unchanged per F37 plan)"
-  fi
-done
-pass "Tier C SKILL.md files do not reference TaskCreate("
-# white-box-end
-echo "ok F37"

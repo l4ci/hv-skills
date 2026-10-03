@@ -230,18 +230,6 @@ rc=0; (cd "$UMB" && "$HV_BIN" status add hv/m3-bad --items M03-S01 --repos web,n
 [ "$rc" = 3 ] || fail "status add should exit 3 on unregistered repos, got $rc"
 pass "M03-T3: status add rejects unregistered repos"
 
-# M03-T5: hv-capture/SKILL.md Step 4.6 declares multi-select for Repos
-# white-box-begin: A9 #53 doclint
-grep -q "multiSelect:.*true" "$REPO/hv-capture/SKILL.md" \
-  || fail "hv-capture Step 4.6 must declare multiSelect: true for the Repos question"
-grep -q "comma-separated list of registered sub-repos" "$REPO/hv-capture/SKILL.md" \
-  || fail "hv-capture field-order line must say 'comma-separated list of registered sub-repos'"
-if grep -q "single name in V1" "$REPO/hv-capture/SKILL.md"; then
-  fail "hv-capture must no longer carry the 'single name in V1' qualifier"
-fi
-pass "M03-T5: hv-capture/SKILL.md Step 4.6 supports multi-repo Repos tagging"
-# white-box-end
-
 # M03-T6: plan add accepts comma-separated --repos and validates each name
 PLANS_TMP=$(mktemp -d)
 mkdir -p "$PLANS_TMP/.hv"
@@ -267,37 +255,6 @@ grep -q "nonexistent" <<<"$(jget error.message <<<"$OUT")" || fail "plan add err
 pass "M03-T6: plan add rejects unregistered name in --repos CSV"
 
 rm -rf "$PLANS_TMP"
-
-# M03-T6: hv-plan/SKILL.md prose mentions multi-repo flow
-# white-box-begin: A9 #53 doclint
-grep -q 'multi-repo items pass the full comma-list' "$REPO/hv-plan/SKILL.md" \
-  || fail "hv-plan/SKILL.md must explain multi-repo --repo flow"
-pass "M03-T6: hv-plan/SKILL.md documents multi-repo --repo"
-# white-box-end
-
-# M03-T6: hv-work/SKILL.md Preview Mode peek shape supports multiple sub-repo lines
-# white-box-begin: A9 #53 doclint
-grep -q "one line per repo for multi-repo items" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md Preview Mode peek must show one Repo line per sub-repo for multi-repo items"
-pass "M03-T6: hv-work/SKILL.md Preview Mode peek renders one line per repo"
-# white-box-end
-
-# M03-T4: hv-work/SKILL.md documents multi-repo dispatch via the helpers
-# white-box-begin: A9 #53 doclint
-grep -q "hv git branch" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference hv git branch for multi-repo branch creation"
-grep -q "hv status add .*--repos" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference hv status add --repos for multi-repo status entries"
-grep -q "hv repo resolve" "$REPO/hv-work/SKILL.md" \
-  || fail "hv-work/SKILL.md must reference hv repo resolve for multi-repo validation"
-if grep -q "M03 (deferred)" "$REPO/hv-work/SKILL.md"; then
-  fail "hv-work/SKILL.md must no longer say 'M03 (deferred)'"
-fi
-if grep -q "wait for M03 multi-repo support" "$REPO/hv-work/SKILL.md"; then
-  fail "hv-work/SKILL.md must no longer say 'wait for M03 multi-repo support'"
-fi
-pass "M03-T4: hv-work/SKILL.md documents multi-repo dispatch flow"
-# white-box-end
 
 # Cleanup status.json so it doesn't pollute later assertions
 rm -f "$UMB/.hv/status.json"

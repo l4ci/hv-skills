@@ -21,7 +21,8 @@ dl_fixture() {
   printf '# Changelog\n\n## v1.0.0\n' > "$d/CHANGELOG.md"
 }
 # dl_run <dir> <allowlist> prints the validator output and returns its exit code.
-dl_run() { ( cd "$1" && HV_DOCLINT_UNCONVERTED="$2" python3 "$VALIDATE" 2>&1 ); }
+# HV_DOCLINT_PROSE=off: the fixtures carry no real skills, so the prose lint is off.
+dl_run() { ( cd "$1" && HV_DOCLINT_PROSE=off HV_DOCLINT_UNCONVERTED="$2" python3 "$VALIDATE" 2>&1 ); }
 
 F="$DL_TMP/clean"; dl_fixture "$F"
 OUT="$(dl_run "$F" "")" || fail "doclint flagged a clean fixture (slash commands, hv-skills, hv verbs): $OUT"
@@ -56,5 +57,23 @@ pass "the UNCONVERTED allowlist exempts listed files and rejects stale entries"
 # The real tree, with the built-in allowlist.
 OUT="$(cd "$REPO" && python3 "$VALIDATE" 2>&1)" || fail "validate-skills fails on the repo: $OUT"
 pass "skills and references pass the doclint"
+
+# The prose lint (#173): drop a pinned phrase from a copy of the real skills and
+# the validator names the file; a deleted target file is reported, not skipped.
+# white-box-begin: A9 #53 doclint
+PL="$DL_TMP/prose"; mkdir -p "$PL/.claude-plugin"
+cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/CHANGELOG.md" "$PL/"
+cp "$REPO/.claude-plugin/plugin.json" "$PL/.claude-plugin/"
+OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || fail "prose lint fails on a copy of the repo: $OUT"
+sed -i 's/hv status loop start/hv status loop begin/' "$PL/hv-next/$SK"
+RC=0; OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || RC=$?
+[ "$RC" = 1 ] && grep -qF "hv-next/$SK: must call hv status loop start" <<<"$OUT" \
+  || fail "prose lint missed a dropped phrase (rc $RC): $OUT"
+rm -f "$PL/references/manual-gates.md"
+RC=0; OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || RC=$?
+[ "$RC" = 1 ] && grep -qF "references/manual-gates.md: prose rule target is missing" <<<"$OUT" \
+  || fail "prose lint skipped a missing target file (rc $RC): $OUT"
+# white-box-end
+pass "the prose lint names a skill that lost a pinned phrase and a missing target file"
 
 rm -rf "${DL_TMP:?}"

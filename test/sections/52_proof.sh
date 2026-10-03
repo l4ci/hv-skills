@@ -69,15 +69,5 @@ mkdir -p "$TMP_PF/proj"
   pass "non-done reasons skip the proof gate"
 )
 
-# T119: every skill that calls hv item complete must also give it a proof path.
-# white-box-begin: A9 #53 doclint
-callers=$(cd "$REPO" && grep -l 'hv item complete' hv-*/SKILL.md)
-[ -n "$callers" ] || fail "expected at least one SKILL.md calling hv item complete"
-for f in $callers; do
-  grep -q 'hv proof add' "$REPO/$f" || fail "$f calls hv item complete without an hv proof add path"
-done
-pass "hv item complete callers document a proof path"
-# white-box-end
-
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$TMP_PF"
