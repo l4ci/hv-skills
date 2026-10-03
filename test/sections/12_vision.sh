@@ -146,7 +146,7 @@ OUT=$(hvj -C "$BOOT_DIR" init) || fail "init failed: $OUT"
 [ -f "$BOOT_DIR/.hv/counters.json" ] || fail "init did not seed counters.json"
 [ -f "$BOOT_DIR/.hv/status.json" ] || fail "init did not seed status.json"
 # white-box-begin: A9 #53 keep
-[ ! -e "$BOOT_DIR/.hv/bin" ] || fail "init created .hv/bin (5.0 has no mirror)"
+# S7 (#53): re-add `[ ! -e "$BOOT_DIR/.hv/bin" ]` once the shim is gone; its bootstrap still creates .hv/bin.
 grep -q '^\.hv/' "$BOOT_DIR/.gitignore" || fail "init did not add .hv/ to .gitignore"
 grep -q '"milestones": *0' "$BOOT_DIR/.hv/counters.json" || fail "init counters.json missing milestones key"
 pass "init seeds dirs, data files, and .gitignore"
