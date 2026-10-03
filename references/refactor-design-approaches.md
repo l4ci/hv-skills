@@ -7,7 +7,7 @@ Loaded by `/hv-refactor` Step 5 when a friction point is classified **structural
 **Consult decisions before designing.** Pull relevant boundary entries:
 
 ```bash
-.hv/bin/hv-decisions-query <topics…>
+hv decisions query <topics…>
 ```
 
 Any approach that violates a decision is disqualified before the design phase. If every generated approach would violate, **stop and surface to the user** — refactors must not silently work around committed boundaries. Refactors are exactly when boundaries matter most.

@@ -22,13 +22,7 @@ Two modes:
 - **Start mode** — open a new spike with a question
 - **Finish mode** — extract findings from work done on a spike branch into the spike file
 
-## Step 1 — Preflight & Mode
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Mode
 
 Determine the mode silently:
 
@@ -36,7 +30,7 @@ Determine the mode silently:
 - *"spike done"*, *"finish the SSE spike"*, *"extract findings"* → **Finish mode**
 - Neither set of triggers matches, or both match → ask once
 
-In Finish mode, list existing open spikes via `.hv/bin/hv-spike-list` and ask which one if not specified.
+In Finish mode, list existing open spikes via `hv spike list` (`data.spikes`, `status` not `done`) and ask which one if not specified.
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -60,18 +54,18 @@ Name the spike with a short kebab-case identifier (`sse-feasibility`, `auth-rota
 
 ## Step 2.5 (Start mode) — Resolve Sub-Repo (umbrella mode only)
 
-Skip this step entirely when umbrella mode is off (`hv-umbrella-on` returns `no`). See `references/umbrella-mode.md` for what umbrella mode means and how the registry works.
+Skip this step entirely when umbrella mode is off (`hv repo umbrella` exits 1). See `references/umbrella-mode.md` for what umbrella mode means and how the registry works.
 
 In umbrella mode, the spike branch must land in a specific sub-repo (the umbrella root often is not a git repo at all). Resolve `<repo>` via the 3-step fallback codified in KNOWLEDGE 2026-05-02:
 
 1. If the user named a sub-repo in their input (e.g. *"spike SSE feasibility in web"*) — use it.
-2. Else, run `.hv/bin/hv-resolve-repo` from the current cwd; if it succeeds, default to the resolved name.
+2. Else, run `hv repo which --json` from the current cwd; if it succeeds (`data.name`), default to the resolved name.
 3. Else, ask via `AskUserQuestion`:
    - **Header:** `"Repo"`
    - **Question:** *"Which sub-repo should `spike/<name>` live in?"*
-   - **Options:** one per registered sub-repo (read names from `.hv/repos.json` via `load_repos()`), single-select.
+   - **Options:** one per registered sub-repo (read names from `.hv/repos.json`, or `hv repo resolve --json`), single-select.
 
-Carry `<repo>` into Step 4's helper invocation as `--repo <repo>`. The spike file still lands at the umbrella's `.hv/spikes/<name>.md` — only the git branch lives in the sub-repo, per the umbrella-vs-sub-repo `.git/` distinction in `references/umbrella-mode.md`.
+Carry `<repo>` into Step 4's verb invocation as `--repo <repo>`. The spike file still lands at the umbrella's `.hv/spikes/<name>.md` — only the git branch lives in the sub-repo, per the umbrella-vs-sub-repo `.git/` distinction in `references/umbrella-mode.md`.
 
 ## Step 3 (Start mode) — Confirm Before Branching
 
@@ -90,12 +84,12 @@ Plain-text fallback: if the working tree is clean, default to "create and switch
 
 ```bash
 # Single-repo:
-BRANCH=$(.hv/bin/hv-spike-add <name> "<question>")
+BRANCH=$(hv spike add --json <name> --question "<question>" | jq -r .data.branch)
 # Umbrella mode — spike lives in <repo>:
-BRANCH=$(.hv/bin/hv-spike-add --repo <repo> <name> "<question>")
+BRANCH=$(hv spike add --json --repo <repo> <name> --question "<question>" | jq -r .data.branch)
 ```
 
-The helper:
+The verb:
 
 - Creates branch `spike/<name>` off the current HEAD (in the sub-repo's git history when `--repo` is set)
 - Writes `.hv/spikes/<name>.md` with frontmatter + question + section stubs
@@ -118,7 +112,7 @@ No further work in this skill — the user drives the experiment.
 
 ## Step 5 (Finish mode) — Read the Spike Branch
 
-Read `repo:` from `.hv/spikes/<name>.md`'s frontmatter first (parallel-load with the spike-file content). When set, run the `git log` / `git diff` calls in the sub-repo (resolve via `.hv/repos.json` / `load_repos()`); when unset, run them in the cwd. Inspect git either by `cd`-ing into the sub-repo before the call or by passing `git -C <sub-repo path>`:
+Read `repo:` from `.hv/spikes/<name>.md`'s frontmatter first (parallel-load with the spike-file content). When set, run the `git log` / `git diff` calls in the sub-repo (resolve via `hv repo resolve <name>`, `data.repos[0].path`); when unset, run them in the cwd. Inspect git either by `cd`-ing into the sub-repo before the call or by passing `git -C <sub-repo path>`:
 
 ```bash
 # Single-repo (no `repo:` in frontmatter) — run in cwd:
@@ -154,10 +148,10 @@ Use the `Edit` tool on `.hv/spikes/<name>.md` to fill in:
 Then mark the spike done:
 
 ```bash
-.hv/bin/hv-spike-finish <name>
+hv spike finish <name>
 ```
 
-The helper sets `status: done` and `finished: <date>` in the spike file. The branch is left as-is — historical reference, never merged.
+The verb sets `status: done` and `finished: <date>` in the spike file (a repeat call is a no-op). The branch is left as-is — historical reference, never merged.
 
 ## Step 6.5 (Finish mode) — Promote Finding to Decision (nudge)
 
@@ -173,7 +167,7 @@ When the decision is `viable`, `not viable`, or `depends-on-X`, ask via `AskUser
 
 Plain-text fallback: *"Promote to a decision?"* — yes / no.
 
-On **Yes**, dispatch `hv-decide` via the `Skill` tool with `--from-spike <name>` as the argument, then continue to Step 7 once it returns.
+On **Yes**, dispatch `/hv-decide` via the `Skill` tool with `--from-spike <name>` as the argument, then continue to Step 7 once it returns.
 
 On **Skip**, print one line — *"Spike finding stays in `.hv/spikes/<name>.md`. Run `/hv-decide --from-spike <name>` later if you change your mind."* — then continue to Step 7.
 
@@ -199,4 +193,4 @@ If not viable or inconclusive, the spike is its own conclusion. Don't push to ca
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/umbrella-mode.md`](../references/umbrella-mode.md) — Umbrella-mode helpers, registry shape, and `Repos:` field semantics.
+- [`references/umbrella-mode.md`](../references/umbrella-mode.md) — Umbrella-mode verbs, registry shape, and `Repos:` field semantics.

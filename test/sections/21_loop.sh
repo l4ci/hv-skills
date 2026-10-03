@@ -25,11 +25,11 @@ grep -q '/hv-plan --auto-loop' "$REPO/hv-work/SKILL.md" \
 # helper exists with no consumer. Update the expected set when explicit invocations
 # land in the terminal-path skills.
 # white-box-begin: A9 #53 doclint
-SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
+SURFACING_SITES=$(grep -l 'hv decisions auto-since' "$REPO"/hv-*/SKILL.md 2>/dev/null \
   | sed -E 's@.*/(hv-[a-z-]+)/SKILL\.md@\1@' \
   | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
 [ "$SURFACING_SITES" = "hv-brainstorm hv-plan" ] \
-  || fail "F32: hv-auto-decisions-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
+  || fail "F32: hv decisions auto-since reference expected in exactly hv-brainstorm/hv-plan SKILL.md, got '$SURFACING_SITES'"
 # white-box-end
 
 # (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).

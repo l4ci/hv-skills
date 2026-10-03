@@ -19,15 +19,9 @@ Multiple milestones can be active at once when they don't depend on each other.
 
 `.hv/MILESTONES.md` opens with `# Milestones` as its H1, followed by a short vision paragraph as intro preamble, then `## Active milestones` and one short overview section per milestone. `.hv/milestones/MNN.md` holds the full plan for each milestone (goal, acceptance criteria, rationale, open risks, research findings, free-form notes).
 
-## Step 1 — Preflight & Mode
+## Step 1 — Mode
 
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
-
-Determine the mode silently via `.hv/bin/hv-vision-list`: empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
+Determine the mode silently via `hv milestone list --json`: `data.milestones` empty → **Create mode** (build vision from scratch); non-empty → **Edit mode** (extend, refine, retire, re-prioritize). Don't announce — it shapes your questions, not the user's view.
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -46,10 +40,10 @@ Apply the canonical pre-planning context-load protocol (`references/context-load
 - `.hv/MILESTONES.md` (current vision paragraph and overviews)
 - Every `.hv/milestones/M*.md` (full per-milestone plans — read whatever exists)
 - `.hv/BACKLOG.md` (what's already on the backlog hints at the user's mental model)
-- Glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` via `hv-glossary-read` — vision sessions are the highest-yield surface for canonical-term capture; consult so brainstorming uses existing terms, and treat user definitional signals (*"by X I mean…"*, *"let's call this X"*) as triggers for inline `hv-glossary-write` writes (also available as `/hv-learn --term <name>`)
+- Glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` via `hv glossary read <term>` — vision sessions are the highest-yield surface for canonical-term capture; consult so brainstorming uses existing terms, and treat user definitional signals (*"by X I mean…"*, *"let's call this X"*) as triggers for inline `hv glossary write` writes (also available as `/hv-learn --term <name>`)
 - `README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, or whatever stack file exists at the root
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): milestone plans are tracking-issue bodies, not files. Read them with `.hv/bin/hv-vision-list` and `.hv/bin/hv-vision-show <MNN>` (both modes); never read `.hv/milestones/*.md`. `.hv/MILESTONES.md` still holds the vision paragraph.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): milestone plans are tracking-issue bodies, not files. Read them with `hv milestone list` and `hv milestone show <MNN>` (both modes); never read `.hv/milestones/*.md`. `.hv/MILESTONES.md` still holds the vision paragraph.
 
 DECISIONS matches are committed boundaries that constrain what milestones can promise; surface any conflict before proposing milestones.
 
@@ -58,16 +52,16 @@ DECISIONS matches are committed boundaries that constrain what milestones can pr
 Brief (haiku tier — this is mechanical aggregation):
 
 - **Goal:** Return a compact snapshot of the project's vision state.
-- **Inputs:** `.hv/MILESTONES.md`, `.hv/milestones/M*.md`, `.hv/BACKLOG.md`, `README.md` (or whichever stack file exists), plus the output of `.hv/bin/hv-knowledge-query`, `.hv/bin/hv-decisions-query`, and `.hv/bin/hv-glossary-read` for vision-relevant topics and domain terms (the orchestrator selects topics from the user's framing).
+- **Inputs:** `.hv/MILESTONES.md`, `.hv/milestones/M*.md`, `.hv/BACKLOG.md`, `README.md` (or whichever stack file exists), plus the output of `hv knowledge query`, `hv decisions query`, and `hv glossary read` for vision-relevant topics and domain terms (the orchestrator selects topics from the user's framing).
 - **Constraints:** Surface any DECISIONS conflict explicitly in the snapshot — committed boundaries that constrain milestone proposals must be visible to the orchestrator before Step 3.
 - **Return shape:** `{vision-paragraph, existing-milestones[], gaps[], hard-boundaries[], context-terms[]}` — bullets, not paragraphs, ≤200 words total.
 - **Word budget:** ≤200 words.
 
-The orchestrator uses the snapshot to ground the Step 3 framing paragraph. Definitional signals from the user (*"by X I mean…"*) still trigger inline `hv-glossary-write` writes on the orchestrator (also reachable via `/hv-learn --term <name>`) — that's a write, which stays per the reference.
+The orchestrator uses the snapshot to ground the Step 3 framing paragraph. Definitional signals from the user (*"by X I mean…"*) still trigger inline `hv glossary write` writes on the orchestrator (also reachable via `/hv-learn --term <name>`) — that's a write, which stays per the reference.
 
 ## Step 3 — Frame & Discover
 
-`/hv-vision` is the project-scope half of the design-exploration family — see `references/design-exploration.md` for the shared spine (Socratic discovery, propose before disk write, iterate before commit, write via helper, user-review gate) and the per-axis divergences. Vision's discovery is batched (single `AskUserQuestion` call with 2–3 questions in Create mode); brainstorm's is one-per-round. Both honor the same plain-text fallback rule.
+`/hv-vision` is the project-scope half of the design-exploration family — see `references/design-exploration.md` for the shared spine (Socratic discovery, propose before disk write, iterate before commit, write via verb, user-review gate) and the per-axis divergences. Vision's discovery is batched (single `AskUserQuestion` call with 2–3 questions in Create mode); brainstorm's is one-per-round. Both honor the same plain-text fallback rule.
 
 Open with one short paragraph (3–4 sentences max) summarizing what you see — the project's apparent shape, the existing milestones if any, the obvious gaps. This grounds the conversation; it's not a status report.
 
@@ -182,25 +176,25 @@ Once confirmed, persist each milestone. Batch all writes, then refresh the index
 **New milestone:**
 
 ```bash
-.hv/bin/hv-vision-add "<title>" "<one-line summary>" "<depends-csv>"
+MID=$(hv milestone add --json --title "<title>" --summary "<one-line summary>" [--depends M01,M02] | jq -r .data.id)
 ```
 
-The helper mints `MNN`, creates `.hv/milestones/MNN.md` with a stub plan, and appends an overview block to `.hv/MILESTONES.md`. Status starts as `planned`.
+The verb mints `MNN`, creates `.hv/milestones/MNN.md` with a stub plan, and appends an overview block to `.hv/MILESTONES.md`. Status starts as `planned`.
 
-**Issue mode** (`backlog.backend: "issues"`): `hv-vision-add` prints `MNN` and creates the native milestone `MNN — <title>` plus a tracking issue labelled `milestone-tracker` and `status:planned`; no stub file or overview block is written. Draft the full plan in a scratch file (frontmatter `id: <MNN>` required; `depends` updates the tracking issue's Depends field) and publish it with `.hv/bin/hv-vision-put <MNN> --body-file <scratch-file>|-` instead of the `Edit` steps below. Status follows the label: `.hv/bin/hv-vision-status <MNN> <status>` (`shipped`/`archived` close the tracking issue and native milestone; `planned`/`active` reopen). The vision paragraph stays in `MILESTONES.md`; `hv-vision-index` regenerates only its Active list and the managed instructions block (`AGENTS.md`, else `CLAUDE.md`).
+**Issue mode** (`backlog.backend: "issues"`): `hv milestone add` returns `MNN` and creates the native milestone `MNN — <title>` plus a tracking issue labelled `milestone-tracker` and `status:planned`; no stub file or overview block is written. Draft the full plan in a scratch file (frontmatter `id: <MNN>` required; `depends` updates the tracking issue's Depends field) and publish it with `hv milestone put <MNN> --body-file <scratch-file>|-` instead of the `Edit` steps below. Status follows the label: `hv milestone status <MNN> --to <status>` (`shipped`/`archived` close the tracking issue and native milestone; `planned`/`active` reopen). The vision paragraph stays in `MILESTONES.md`; `hv milestone index` regenerates only its Active list and the managed instructions block (`AGENTS.md`, else `CLAUDE.md`).
 
-**Fill in the detail file.** After `hv-vision-add` creates the stub, edit `.hv/milestones/MNN.md` with the full content — replace the placeholder sections (`Goal`, `Acceptance criteria`, `Rationale`, `Open risks`, `Research findings`, `Notes`) with what the brainstorm produced. Use the `Edit` tool, not `Write`, so the frontmatter stays intact.
+**Fill in the detail file.** After `hv milestone add` creates the stub, edit `.hv/milestones/MNN.md` with the full content — replace the placeholder sections (`Goal`, `Acceptance criteria`, `Rationale`, `Open risks`, `Research findings`, `Notes`) with what the brainstorm produced. Use the `Edit` tool, not `Write`, so the frontmatter stays intact.
 
 **Existing milestone edits:** use `Edit` to update `.hv/milestones/MNN.md` directly. If you change the title or the dependencies, also update the `### MNN — Title` section in `.hv/MILESTONES.md` so the overview matches.
 
-**Activate / deactivate / retire:** call `.hv/bin/hv-vision-status MNN <planned|active|shipped|archived>` once per milestone whose status changed. Multi-active is supported — independent milestones (no shared dependencies) can run simultaneously. Use `archived` to retire a milestone that's no longer being pursued — its section stays in `MILESTONES.md` as a record but it drops out of the "Active milestones" header (same exclusion model as `shipped`). Note: `shipped` deps satisfy dependent milestones; `archived` deps do not, so a milestone blocked by an archived prerequisite stays blocked until the prerequisite is reframed.
+**Activate / deactivate / retire:** call `hv milestone status MNN --to <planned|active|shipped|archived>` once per milestone whose status changed. Multi-active is supported — independent milestones (no shared dependencies) can run simultaneously. Use `archived` to retire a milestone that's no longer being pursued — its section stays in `MILESTONES.md` as a record but it drops out of the "Active milestones" header (same exclusion model as `shipped`). Note: `shipped` deps satisfy dependent milestones; `archived` deps do not, so a milestone blocked by an archived prerequisite stays blocked until the prerequisite is reframed.
 
 **Vision paragraph (Create mode only).** Replace the placeholder under the `# Milestones` H1 in `MILESTONES.md` — *"(no vision yet — run `/hv-vision` to brainstorm milestones)"* — with 2–4 sentences that frame the project's why. This preamble sits above `## Active milestones` and provides context for the milestone list. In Edit mode, leave the paragraph alone unless the brainstorm meaningfully changed the framing.
 
 **Refresh the index — once, at the end:**
 
 ```bash
-.hv/bin/hv-vision-index
+hv milestone index
 ```
 
 This regenerates `## Active milestones` in `MILESTONES.md` and the managed `<!-- hv-vision-start -->` block in `CLAUDE.md`. It also heals any drift in the per-section `**Status:**` lines from frontmatter — frontmatter is the single source of truth.
@@ -267,7 +261,7 @@ Otherwise the run is done. Don't recap discovery, research, or the challenge rou
 - **Multi-active is fine.** Independent milestones can run in parallel. Don't force a single-track ordering when the dependency graph allows more.
 - **No hard milestone count.** Two is fine. Fifteen is fine. Take what the vision needs.
 - **`MILESTONES.md` is the overview; `milestones/MNN.md` is the plan.** Don't bloat the overview with full plans, and don't scatter the overview across detail files.
-- **Active list is generated, not edited.** `## Active milestones` is regenerated by `hv-vision-index` from frontmatter — never hand-edit it.
+- **Active list is generated, not edited.** `## Active milestones` is regenerated by `hv milestone index` from frontmatter — never hand-edit it.
 
 ## References
 
