@@ -25,7 +25,7 @@ Umbrella: <umbrella-abs-path>
 
 1. cd <abs-path>
 
-2. Run `.hv/bin/hv-guard-clean` from this repo's bin path (it lives at <umbrella-abs-path>/.hv/bin/hv-guard-clean — call it as `<umbrella-abs-path>/.hv/bin/hv-guard-clean`). If the repo isn't a git repo or has uncommitted changes, stop and report "no changes" back.
+2. Run `hv git guard clean --context "/hv-refactor" --repo <name>` (`hv` finds the umbrella's `.hv/` by walking up from here). If it exits non-zero (not a git repo, or uncommitted changes), stop and report "no changes" back.
 
 3. Run a focused refactor cycle equivalent to /hv-refactor's Steps 2-9 on THIS REPO:
    a. Dispatch an exploration agent (orchestrator model: <orchestrator from config>) to explore THIS REPO ONLY for friction. Do not walk into the umbrella or other sub-repos.
@@ -36,7 +36,7 @@ Umbrella: <umbrella-abs-path>
    f. Commit in this repo's `.git/`. One commit for the cycle. Stage modified files explicitly (no `git add -A`).
 
 4. Do NOT:
-   - Run `hv-refactor-reset` — the umbrella orchestrator does that once at the end.
+   - Run `hv refactor reset` — the umbrella orchestrator does that once at the end.
    - Modify the umbrella's `.hv/`, `.claude*/`, or any other sub-repo.
    - Push or create PRs.
 
@@ -69,7 +69,7 @@ The orchestrator and worker model names embedded in the prompt come from the umb
 ## After fanout returns
 
 1. Aggregate the per-repo summaries into a single umbrella-level report.
-2. Run `.hv/bin/hv-refactor-reset` ONCE.
+2. Run `hv refactor reset` ONCE.
 3. Print the aggregated report. Format:
 
 ```

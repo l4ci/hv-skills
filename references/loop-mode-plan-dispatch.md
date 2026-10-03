@@ -4,7 +4,7 @@ Shared reference for `/hv-work` Step 4 *Plan Tasks* details that are dense and s
 
 ## Design pre-flight (B28, loop mode only)
 
-Before the uncertainty pre-flight, `/hv-work` checks for a design artifact at `.hv/designs/<itemId>.md`. When absent for a Major + Milestone-tagged item, dispatch `/hv-brainstorm --auto-loop <itemId>` via the `Skill` tool — no prompt, no confirmation. The dispatched skill auto-resolves design questions via the same pipeline shape `/hv-plan --auto-loop` uses (Local-first against `DECISIONS.md` / `KNOWLEDGE.md` / `CONTEXT.md` / `MILESTONES.md` → Bounded web when `loop.webResearch == true` → Placeholder fallback for the unresolved), logs fresh picks via `hv-auto-decision-log`, and writes the design with `auto: true` frontmatter.
+Before the uncertainty pre-flight, `/hv-work` checks for a design artifact at `.hv/designs/<itemId>.md`. When absent for a Major + Milestone-tagged item, dispatch `/hv-brainstorm --auto-loop <itemId>` via the `Skill` tool — no prompt, no confirmation. The dispatched skill auto-resolves design questions via the same pipeline shape `/hv-plan --auto-loop` uses (Local-first against `DECISIONS.md` / `KNOWLEDGE.md` / `CONTEXT.md` / `MILESTONES.md` → Bounded web when `loop.webResearch == true` → Placeholder fallback for the unresolved), logs fresh picks via `hv decisions auto-log`, and writes the design with `auto: true` frontmatter.
 
 When the design already exists (auto-written or manually authored), this step is a no-op — loop calls are idempotent and never replace existing designs.
 
@@ -19,10 +19,10 @@ When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND
 Before the auto-plan dispatch, `/hv-work` runs:
 
 ```bash
-.hv/bin/hv-uncertain <itemId>
+hv plan uncertain <itemId>
 ```
 
-The helper applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout); exit 1 = certain; exit 2 = error.
+The verb applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout, `data.reasons` under `--json`); exit 1 = certain; exit 3 = the item or `BACKLOG.md` is missing.
 
 When uncertain, **run the `/hv-work` Preview Mode procedure inline** with `<itemId>` as the target — no prompt, no confirmation. The peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
 
@@ -54,7 +54,7 @@ The most common intersecting pair is *Task A renames a file (`git mv old new` or
 - **Split ownership cleanly**: rename task owns the file move plus edits to the renamed file's own content; link-sweep task owns link updates in all *other* files. No file appears in both tasks' modified-file sets.
 - **Serialize across waves**: rename in wave N, link-sweep in wave N+1, so the sweep operates on settled paths.
 
-For every rename, derive the incoming-link file set with `.hv/bin/hv-plan-rename-check <old-name> [<scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the helper is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
+For every rename, derive the incoming-link file set with `hv plan rename-check <old-name> [-- <scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the verb is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
 
 ## Cited by
 

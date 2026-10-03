@@ -4,7 +4,7 @@ Used by `/hv-work` Steps 5, 6, 7, and 7.5 when `work.dispatch: "tmux"`. Under th
 
 The tmux backend runs each worker as **its own Claude Code session**, in its own `git worktree`, on its own branch, opening a PR against the cycle branch. That buys a real per-worker context window and a channel a human can talk into. It costs the failure modes below, every one of which was paid for by a real round in the runbook this backend is modelled on.
 
-Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-gate`. The tmux primitives they call live in `bin/hv-host-tmux.sh`.
+Verbs: `hv worker pool`, `hv worker dispatch`, `hv worker poll`, `hv worker gate`. They drive tmux through the `hv` binary's tmux host.
 
 `work.dispatch: "herdr"` runs the same workers in herdr tabs instead; see [`herdr-dispatch.md`](herdr-dispatch.md). These sections apply to both hosts: *The worker contract*, *Escalating and relaying*, *The merge gate*, *Permissions*, *Accounts*.
 
@@ -16,7 +16,7 @@ Helpers: `hv-worker-pool`, `hv-worker-dispatch`, `hv-worker-poll`, `hv-worker-ga
 | Worker writes | files only, never stages | stages, commits, opens a PR |
 | Commits | orchestrator, one per task (Step 7.5) | the worker; Step 7.5 is skipped |
 | `work.isolation` | honored | **does not apply** — every slot has its own worktree, so its own index |
-| Integration | task commits land on the cycle branch directly | `hv-worker-gate` per slot: freshness → merge → re-verify |
+| Integration | task commits land on the cycle branch directly | `hv worker gate` per slot: freshness → merge → re-verify |
 | A worker can ask a question | no | yes — it idles, the orchestrator relays |
 
 ## Being inside tmux is a precondition
@@ -26,7 +26,7 @@ The backend earns its cost through one property: a worker can idle on a question
 So `/hv-work` Step 5 checks first:
 
 ```bash
-.hv/bin/hv-worker-session check     # exit 0 inside, exit 1 outside
+hv worker session check     # exit 0 inside, exit 1 outside
 ```
 
 Detection is `$TMUX`, which is set for any process started inside a pane. `tmux has-session` is the wrong test — it answers whether a session *exists*, not whether *we are in it*, and conflating the two produces exactly the detached-pane failure above.
@@ -34,7 +34,7 @@ Detection is `$TMUX`, which is set for any process started inside a pane. `tmux 
 **Outside → hand the cycle over, then stop.**
 
 ```bash
-.hv/bin/hv-worker-session ensure --instruction-file <path>
+hv worker session ensure --body-file <path>
 ```
 
 This creates the session, spawns an `operator` window, and runs `work.operatorCommand` there — `claude --continue --model <orchestrator>` by default. `--continue` resumes the most recent conversation for the directory, so the operator inherits the plan, the briefs, and the wave layout instead of restarting cold. The instruction file is pasted once the session is up, using the same confirm-pickup path as a worker dispatch.
@@ -49,17 +49,17 @@ Shared by both hosts and kept in [`worker-contract.md`](worker-contract.md): the
 
 ## Pane classification
 
-`hv-worker-poll` captures each pane twice, `--settle` seconds apart. **Movement decides liveness**; a pane that changed is BUSY. A static pane is then classified by content, most specific rule first:
+`hv worker poll` captures each pane twice, `--settle` seconds apart. **Movement decides liveness**; a pane that changed is `busy`. A static pane is then classified by content, most specific rule first (the `state` field of each `data.slots` entry under `--json`):
 
 | State | Rule | Orchestrator action |
 |---|---|---|
-| `BLOCKED` | `HV-BLOCKED <slot>: <question>` present | Surface the question via `AskUserQuestion`, relay the answer back with `--relay` |
-| `DONE` | `HV-DONE <slot> <pr>` present | Review the PR diff against the brief, then `hv-worker-gate` |
-| `BUSY` | `Retrying in` present, **or** the pane changed between captures | Wait |
-| `NEEDS-PERMISSION` | static pane showing a permission prompt | Surface to the user to approve in that pane; recurring means the permission mode is too narrow (see *Permissions*) |
-| `LIMITED` | the session says it hit its usage window | Reassign the slot to another account and re-dispatch (see *Accounts*) |
-| `DEAD` | static pane with `API Error …` or `Resume this session with` | Re-dispatch **once**, then hand the task to a different slot |
-| `IDLE` | static, no sentinel | Parked, or finished without printing a sentinel — inspect |
+| `blocked` | `HV-BLOCKED <slot>: <question>` present | Surface the question via `AskUserQuestion`, relay the answer back with `--relay` |
+| `done` | `HV-DONE <slot> <pr>` present | Review the PR diff against the brief, then `hv worker gate` |
+| `busy` | `Retrying in` present, **or** the pane changed between captures | Wait |
+| `needs-permission` | static pane showing a permission prompt | Surface to the user to approve in that pane; recurring means the permission mode is too narrow (see *Permissions*) |
+| `limited` | the session says it hit its usage window | Reassign the slot to another account and re-dispatch (see *Accounts*) |
+| `dead` | static pane with `API Error …` or `Resume this session with` | Re-dispatch **once**, then hand the task to a different slot |
+| `idle` | static, no sentinel | Parked, or finished without printing a sentinel — inspect |
 
 Sentinels outrank movement: a worker still rendering output after printing `HV-DONE` is finished, not busy.
 
@@ -69,13 +69,13 @@ Sentinels outrank movement: a worker still rendering output after printing `HV-D
 
 ## Escalating and relaying
 
-1. `hv-worker-poll` returns `BLOCKED` with the question in `evidence`.
+1. `hv worker poll` returns `blocked` with the question in `evidence`.
 2. The orchestrator asks the user with `AskUserQuestion`, **in the worker's words** — the worker already phrased it for someone without the file open; don't re-encode it into implementation terms.
-3. Relay the answer with `hv-worker-dispatch --slot <n> --brief-file <answer> --relay`.
+3. Relay the answer with `hv worker dispatch <n> --body-file <answer> --relay`.
 
 `--relay` signs the injected text `--- ORCHESTRATOR (round N) ---`, adds a note that it is forwarded text, and logs it in the slot's `relays[]`. This is not hygiene, it is the fix for a specific, permanent failure: the worker writes its own PR body, and a relay arrives through the *same channel* a human answer would. Without the signature, an orchestrator's own mid-task correction gets cited in a merged PR as *"the maintainer confirmed in my pane"* — while the maintainer was asleep. Not dishonesty on the worker's part; it genuinely cannot tell. Once merged, it is permanent.
 
-So: **read every PR body for the channel named, not merely for whether a citation exists.** `hv-worker-gate` cross-checks the `## Approvals` section against the relay log and exits 4 `PROVENANCE-FAIL` on a mismatch ([provenance](worker-contract.md#provenance)); that catches the obvious cases, not a paraphrase.
+So: **read every PR body for the channel named, not merely for whether a citation exists.** `hv worker gate` cross-checks the `## Approvals` section against the relay log and fails with verdict `provenance-fail` (exit 1) on a mismatch ([provenance](worker-contract.md#provenance)); that catches the obvious cases, not a paraphrase.
 
 ## The merge gate
 
@@ -86,13 +86,13 @@ Worker-owned branches make integration git-native and bring back the failure cla
 
 Neither author can see it — the conflicting change never existed in their tree. Git's mergeability answer is about text, not meaning.
 
-`hv-worker-gate --slot <n> --base <cycle-branch>` runs three steps in order:
+`hv worker gate <n> --base <cycle-branch>` runs three steps in order. Every verdict but `pass` (and `fresh` under `--check-only`) exits 1; read it from `data.verdict` under `--json`:
 
-1. **Freshness** — `git merge-base --is-ancestor <base> <worker-branch>`, on the pushed refs (`origin/<base>`, `origin/<branch>` after a fetch) when the slot recorded a PR, since the PR merges what was pushed. The PR must also be open, target `<base>` (a stacked PR merges into another branch) and have the verified SHA as its head. STALE (exit 3) means the worker never merged what landed since it branched, so its green is stale. Bounce it to the slot with a summary of what landed. Bounce **once**: with several slots in flight the owner often goes stale again while re-syncing, and a bounce loop is worse than resolving it yourself in the worker's worktree and documenting that on the PR.
-2. **Merge** — `gh pr merge` or `glab mr merge` (auto-merge off, pinned to the verified SHA) when the slot recorded a PR, else a local `git merge`. A PR merge is confirmed before step 3: its merge commit must be an ancestor of `origin/<base>` (exit 4 `NOT-MERGED` / `NOT-ON-BASE` otherwise). A check that itself breaks (bad ref, failed fetch, unreadable PR) exits 5 `CHECK-BROKE`, never STALE; a recorded PR with no `origin` remote is refused the same way rather than merged locally. A merged MR with no merge commit (GitLab fast-forward) is confirmed by the verified SHA being on the base. If the PR landed but the local base cannot fast-forward, exit 6 `MERGED-REMOTELY`: never retry the merge. A conflict here routes to the slot that owns the branch context; never resolve a cross-worker semantic conflict blind.
-3. **Re-verify on the MERGED tree** — `refactor.verifyCommands` from `.hv/config.json`. Exit 4 means the merged tree is broken; the failing command's output tail is printed and the full log path is named. Fix forward on the cycle branch; the owning slot has usually moved on, and small orphaned-reference fixes are the orchestrator's to make.
+1. **Freshness** — `git merge-base --is-ancestor <base> <worker-branch>`, on the pushed refs (`origin/<base>`, `origin/<branch>` after a fetch) when the slot recorded a PR, since the PR merges what was pushed. The PR must also be open, target `<base>` (a stacked PR merges into another branch) and have the verified SHA as its head. `stale` means the worker never merged what landed since it branched, so its green is stale. Bounce it to the slot with a summary of what landed. Bounce **once**: with several slots in flight the owner often goes stale again while re-syncing, and a bounce loop is worse than resolving it yourself in the worker's worktree and documenting that on the PR.
+2. **Merge** — `gh pr merge` or `glab mr merge` (auto-merge off, pinned to the verified SHA) when the slot recorded a PR, else a local `git merge`. A PR merge is confirmed before step 3: its merge commit must be an ancestor of `origin/<base>` (verdict `not-merged` / `not-on-base` otherwise). A check that itself breaks (bad ref, failed fetch, unreadable PR) is `check-broke`, never `stale`; a recorded PR with no `origin` remote is refused the same way rather than merged locally. A merged MR with no merge commit (GitLab fast-forward) is confirmed by the verified SHA being on the base. If the PR landed but the local base cannot fast-forward, the verdict is `merged-remotely`: never retry the merge. A conflict (`merge-failed`) here routes to the slot that owns the branch context; never resolve a cross-worker semantic conflict blind.
+3. **Re-verify on the MERGED tree** — `refactor.verifyCommands` from `.hv/config.json`. `verify-failed` means the merged tree is broken (`data.changed` is true: the merge already landed); the failing command's output tail is printed and the full log path is named. Fix forward on the cycle branch; the owning slot has usually moved on, and small orphaned-reference fixes are the orchestrator's to make.
 
-When `refactor.verifyCommands` is empty the gate prints `NO-VERIFY` and exits 0 — it reports that the merged tree was **not** gated by a command rather than implying a pass it cannot back. A project running the tmux backend should set `verifyCommands`; without one, step 3 is a structural diff review by the orchestrator and nothing more.
+When `refactor.verifyCommands` is empty the gate passes with `data.verifySkipped: true` — it reports that the merged tree was **not** gated by a command rather than implying a pass it cannot back. A project running the tmux backend should set `verifyCommands`; without one, step 3 is a structural diff review by the orchestrator and nothing more.
 
 Batching: re-verify per merge is the rule. A group of PRs with genuinely disjoint file sets can be merged and gated once. Gate **individually** when a PR touches a shared module, widens a shared type, or renames a shared symbol.
 
@@ -107,15 +107,15 @@ The two roles run at different trust levels, on purpose:
 
 **Why workers skip the gate.** A narrower mode does not make a worker safer, it makes it stop. `acceptEdits` auto-approves file edits only, so a worker briefed by the contract writes its files and then blocks on its first `git add` — forever, because the prompt is addressed to a human who may not be attached. An unattended session that halts halfway through a task with a dirty worktree is not a safer outcome than one that finishes.
 
-**What bounds a worker is scope, not gating.** Each runs on a throwaway branch in its own worktree; nothing it produces reaches the cycle branch until `hv-worker-gate` has checked freshness, merged, and re-verified the merged tree. The branch is disposable and `hv-worker-pool reap` deletes it. That containment is worth stating precisely, because it has a real hole: worktree confinement is a **contract, not a sandbox**. The worker contract says stay in your worktree and use worktree-rooted paths, and an absolute path under the repo root still reaches the main checkout. Skipped permissions mean nothing stops that but the instruction.
+**What bounds a worker is scope, not gating.** Each runs on a throwaway branch in its own worktree; nothing it produces reaches the cycle branch until `hv worker gate` has checked freshness, merged, and re-verified the merged tree. The branch is disposable and `hv worker pool reap` deletes it. That containment is worth stating precisely, because it has a real hole: worktree confinement is a **contract, not a sandbox**. The worker contract says stay in your worktree and use worktree-rooted paths, and an absolute path under the repo root still reaches the main checkout. Skipped permissions mean nothing stops that but the instruction.
 
 **The operator keeps `auto`** because its blast radius is different: it merges into the branch the cycle ships from, and a human is watching that window, so a prompt there gets answered rather than stranding the run.
 
-**`NEEDS-PERMISSION` stays in the classifier** even though the default should never trigger it. It covers the case where `work.workerCommand` has been narrowed — a stalled worker then reports the stall instead of looking idle. One slot stalling is a prompt to approve; every slot stalling means the mode is too narrow for the briefs.
+**`needs-permission` stays in the classifier** even though the default should never trigger it. It covers the case where `work.workerCommand` has been narrowed — a stalled worker then reports the stall instead of looking idle. One slot stalling is a prompt to approve; every slot stalling means the mode is too narrow for the briefs.
 
 **Narrowing it.** Point `work.workerCommand` at a settings file that allowlists just what the contract needs (`claude --settings <file>` with `permissions.allow` covering `git add`, `git commit`, `gh pr create`, and the project's test runner). Workers get autonomy for the operations they were briefed to perform and nothing else, at the cost of maintaining the list.
 
-**Multi-account caveat.** Entering skip-permissions mode can itself prompt for confirmation, and that acknowledgement is per config dir. A slot pointed at a **fresh** `CLAUDE_CONFIG_DIR` (see *Accounts*) may therefore stall at boot on a dir where the ambient one is fine. Set `skipDangerousModePermissionPrompt: true` in each account's `settings.json` when provisioning it, or the first dispatch to that slot reports `NEEDS-PERMISSION` before doing any work.
+**Multi-account caveat.** Entering skip-permissions mode can itself prompt for confirmation, and that acknowledgement is per config dir. A slot pointed at a **fresh** `CLAUDE_CONFIG_DIR` (see *Accounts*) may therefore stall at boot on a dir where the ambient one is fine. Set `skipDangerousModePermissionPrompt: true` in each account's `settings.json` when provisioning it, or the first dispatch to that slot reports `needs-permission` before doing any work.
 
 ## Accounts
 
@@ -130,17 +130,17 @@ The two roles run at different trust levels, on purpose:
 
 Empty (the default) means every slot inherits the ambient config dir — the single-account case, and nothing below applies.
 
-`hv-worker-pool init` assigns slots at pool creation, and `hv-worker-account` owns the reading:
+`hv worker pool init` assigns slots at pool creation, and `hv worker account` owns the reading:
 
 ```bash
-.hv/bin/hv-worker-account list                      # per-account headroom + verdict
-.hv/bin/hv-worker-account pick [--exclude <names>]  # most headroom; exit 3 if all cooling
-.hv/bin/hv-worker-account assign --slot w1 --account personal
+hv worker account list                      # per-account headroom + verdict
+hv worker account pick [--exclude <names>]  # most headroom; exit 1 if all cooling
+hv worker account assign w1 --account personal
 ```
 
 **Where the numbers come from.** The interactive status line renders usage, so a pane *can* be scraped — but the pane is the weakest source. Headroom comes from the OAuth usage endpoint authenticated with the account's own `$configDir/.credentials.json`, which is structured, per-account, and readable **with no session running**. That last property is what makes balancing possible at all: a slot can be pointed at an account with headroom *before* dispatch, rather than discovering the wall by hitting it. Pane scraping remains the fallback, and `unknown` the honest floor.
 
-**The helper never refreshes credentials.** An expired token reports `unknown` and falls through to rotation. Refreshing would mutate state a live Claude Code session owns, and racing it risks logging the user out — a worse outcome than a slot that rotates.
+**`hv` never refreshes credentials.** An expired token reports `unknown` and falls through to rotation. Refreshing would mutate state a live Claude Code session owns, and racing it risks logging the user out — a worse outcome than a slot that rotates.
 
 Three distinctions that must not collapse:
 
@@ -150,12 +150,12 @@ Three distinctions that must not collapse:
 
 A window is only `cooling` when it is spent **and** names a *future* reset. A spent window with no `resets_at` is not actionable — nothing says when it clears, so treating it as cooling would park the slot indefinitely.
 
-**Never answer an "Add funds" prompt.** A limited session may offer *Stop and wait* vs *Add funds*; the second spends real money and is never the orchestrator's to pick. `hv-worker-poll` flags it in the evidence string — escalate to the human and wait. Meanwhile the orchestrator can keep gating, merging, and verifying finished slots, because local shell work does not consume the LLM window.
+**Never answer an "Add funds" prompt.** A limited session may offer *Stop and wait* vs *Add funds*; the second spends real money and is never the orchestrator's to pick. `hv worker poll` flags it in the evidence string — escalate to the human and wait. Meanwhile the orchestrator can keep gating, merging, and verifying finished slots, because local shell work does not consume the LLM window.
 
 ## Other failure modes worth knowing
 
-- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv-worker-dispatch` kills and recreates the window for every task brief; a fresh session starts at 0 context. Do not try to reuse a window by clearing it. The kill is confirmed (window gone, its pane PID exited) before the replacement spawns, and the worktree is checked by `hv-worker-reset` first; see SKILL.md Step 6. A `--relay` is the exception: it goes into the running session, because the worker that asked the question is the one that needs the answer.
-- **A pasted brief may not submit.** A long prompt arrives as a collapsed paste chip whose trailing Enter is swallowed. `hv-worker-dispatch` sends Enter as a separate keypress and then **confirms pickup** by re-capturing the pane, retrying up to 4 times before failing with exit 4. Never assume the first Enter landed.
+- **`/clear` does not reliably reset a session.** It can land as a literal chat message with the context still loaded. `hv worker dispatch` kills and recreates the window for every task brief; a fresh session starts at 0 context. Do not try to reuse a window by clearing it. The kill is confirmed (window gone, its pane PID exited) before the replacement spawns, and the worktree is checked by `hv worker reset` first; see SKILL.md Step 6. A `--relay` is the exception: it goes into the running session, because the worker that asked the question is the one that needs the answer.
+- **A pasted brief may not submit.** A long prompt arrives as a collapsed paste chip whose trailing Enter is swallowed. `hv worker dispatch` sends Enter as a separate keypress and then **confirms pickup** by re-capturing the pane, retrying up to 4 times before failing with exit 6 (never submitted, safe to resend). Never assume the first Enter landed.
 - **Load is a first-class failure mode.** Slots contend for one box. Beyond roughly one slot per two cores, CPU-bound tests with fixed time budgets start failing on elapsed time rather than on truth, and each false red costs a re-measurement to disprove. That is why the worker contract says targeted tests only, and why `work.workerSlots` defaults to 3. Never "fix" a load-induced red by raising a timeout — a bigger fixed number just fails at a higher load and reports genuine regressions more slowly.
 - **A timeout is not a failure of the thing under test.** It says the assertion never ran. Read the output before forming a theory.
 - **Bracket every `pgrep`/`pkill` pattern** (`[v]itest`, not `vitest`). An unbracketed pattern matches the argv of the shell running it: as `pkill` that is a confusing exit 144, but inside a wait-loop it never terminates at all — the loop matches itself and spins forever while the pane reports work still running.
@@ -163,6 +163,6 @@ A window is only `cooling` when it is spent **and** names a *future* reset. A sp
 
 ## See also
 
-- [`references/isolation-patterns.md`](isolation-patterns.md) — worktree patterns for the `subagent` backend; the tmux pool is managed by `hv-worker-pool` instead.
+- [`references/isolation-patterns.md`](isolation-patterns.md) — worktree patterns for the `subagent` backend; the tmux pool is managed by `hv worker pool` instead.
 - [`references/subagent-dispatch.md`](subagent-dispatch.md) — when to dispatch at all, and the brief shape both backends share.
 - [`references/ask-user-question-fallback.md`](ask-user-question-fallback.md) — mechanics for the escalation prompt in the relay flow.
