@@ -219,6 +219,19 @@ Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-mer
 
 `ship.mergeApprovalPaths` is a list of repo-relative entries. A changed file matches an entry when it equals it, lies under it (`"hv-release"` matches `hv-release/SKILL.md`), or matches it as a glob against the whole path (`"*.md"` matches top-level Markdown only). Set them with `hv config set ship.mergeApproval paths` and `hv config set ship.mergeApprovalPaths '["migrations", "*.lock"]'`. Every approval lands in `.hv/gate-audit.jsonl`; see [`references/manual-gates.md`](../../references/manual-gates.md).
 
+## round keys
+
+Settings for `hv round` (parallel rounds). All are silent defaults; none is written by `/hv-init`.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `round.scope` | `"milestone"` | Which issues `hv round assign` accepts. `"slate"`: only the issues given to `hv round start --items`. `"milestone"`: the open items of the active milestones. `"next"`: the same, then the first planned milestone whose dependencies are shipped once none is left. Assign refuses anything outside the scope. |
+| `round.roster` | `["ben","dana","nia","kit"]` | Agent names, one slot each (`.worktrees/<agent>`, parked on `park/<agent>`, working on `<agent>/<issue>-<slug>`). Lowercase letters, digits and `-`; no duplicates. |
+| `round.brief` | `""` | Path of the standing worker contract the assignment pointer names. Empty means `references/worker-contract.md` from the plugin or project. |
+| `round.sharedPaths` | `[]` | Repo-relative globs the file-overlap readiness check ignores, for files every issue touches (a command registry, a contract doc). |
+
+`round.scope` is a different axis from `autonomy.level`: the level says how far skills chain on their own, the scope says which issues a round may take. Set with `hv config set round.scope slate`.
+
 ## qa.gate
 
 Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Independent of the `/hv-review` verdict routing.

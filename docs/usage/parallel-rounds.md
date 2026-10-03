@@ -65,6 +65,33 @@ GraphQL deprecation error. Read an issue with `gh issue view <N> --json title,bo
 gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -F body=@body.md
 ```
 
+## Starting a round
+
+`hv round start` takes the orchestrator lease, provisions the roster slots and lists the
+candidates; it starts no agent.
+
+```sh
+hv round start --slots 3                    # scope from round.scope (default milestone)
+hv round start --scope slate --items 12,13  # only these issues
+hv round candidates                         # re-read the board with readiness checks
+```
+
+- **One orchestrator per repo.** The lease is `<git-common-dir>/hv/round-lease.json`, so
+  every worktree of the repo shares it. A second `start` is refused (exit 4) and names the
+  holder. The holder is the nearest non-shell ancestor of `hv` (in Claude Code, the `claude`
+  process) plus its start time; pass `--holder-pid` where that cannot be read. A lease whose
+  holder is gone is stale: `hv round reconcile` reports it (`lease-stale`) and `hv round start`
+  reclaims it.
+- **Slots** are the first `--slots` names of `round.roster`, each `.worktrees/<agent>` on
+  `park/<agent>`. A healthy existing slot is left alone.
+- **Candidates** carry three checks: `criteria` (acceptance criteria or a design/plan note),
+  `dependencies` (every `## Depends on` reference is closed; one that cannot be looked up
+  fails the check, so fix the issue text) and `overlap` (no shared file with an in-flight
+  slot, from a `## Files` section or the paths the issue text names plus the slot's real
+  changes). The overlap check cannot see files an issue will create, paths nobody wrote down,
+  two issues editing the same function, generated files every issue touches (list those in
+  `round.sharedPaths`), renames, or another machine's round.
+
 ## Waiting on workers
 
 `hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints

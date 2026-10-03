@@ -79,6 +79,10 @@ var Keys = []Key{
 	// 5.0 keys: not in CONFIG_KEYS.
 	{"ship.mergeApproval", "none", false},
 	{"ship.mergeApprovalPaths", []any{}, false},
+	{"round.scope", "milestone", false},
+	{"round.roster", []any{"ben", "dana", "nia", "kit"}, false},
+	{"round.brief", "", false},
+	{"round.sharedPaths", []any{}, false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.
@@ -116,8 +120,8 @@ func Value(cfg any, dotted string) (any, error) {
 		if v, ok := walk(cfg, dotted); ok {
 			return v, nil
 		}
-		if _, isList := k.Default.([]any); isList {
-			return []any{}, nil // a fresh slice, so callers cannot edit the table
+		if list, isList := k.Default.([]any); isList {
+			return append([]any{}, list...), nil // a fresh slice, so callers cannot edit the table
 		}
 		return k.Default, nil
 	}
