@@ -68,6 +68,6 @@ pass "git guard feature-branch refuses base and detached HEAD / passes feature /
 echo "hv-ship and hv-pause reference hv-guard-feature-branch"
 # white-box-begin: A9 #53 doclint
 grep -q "hv-guard-feature-branch" "$REPO/hv-ship/SKILL.md" || fail "hv-ship missing hv-guard-feature-branch call"
-grep -q "hv-guard-feature-branch" "$REPO/hv-pause/SKILL.md" || fail "hv-pause missing hv-guard-feature-branch call"
+grep -q "hv git guard feature-branch" "$REPO/hv-pause/SKILL.md" || fail "hv-pause missing hv git guard feature-branch call"
 pass "hv-ship and hv-pause both reference the new helper"
 # white-box-end

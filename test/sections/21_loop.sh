@@ -34,12 +34,12 @@ SURFACING_SITES=$(grep -l 'hv-auto-decisions-since' "$REPO"/hv-*/SKILL.md 2>/dev
 
 # (d) hv-loop-stamp wired into /hv-next (start) and /hv-pause + /hv-work (clear).
 # white-box-begin: A9 #53 doclint
-grep -q 'hv-loop-stamp start' "$REPO/hv-next/SKILL.md" \
-  || fail "F32: hv-next/SKILL.md must call hv-loop-stamp start"
-grep -q 'hv-loop-stamp clear' "$REPO/hv-pause/SKILL.md" \
-  || fail "F32: hv-pause/SKILL.md must call hv-loop-stamp clear"
-grep -q 'hv-loop-stamp clear' "$REPO/hv-work/SKILL.md" \
-  || fail "F32: hv-work/SKILL.md must call hv-loop-stamp clear"
+grep -q 'hv status loop start' "$REPO/hv-next/SKILL.md" \
+  || fail "F32: hv-next/SKILL.md must call hv status loop start"
+grep -q 'hv status loop clear' "$REPO/hv-pause/SKILL.md" \
+  || fail "F32: hv-pause/SKILL.md must call hv status loop clear"
+grep -q 'hv status loop clear' "$REPO/hv-work/SKILL.md" \
+  || fail "F32: hv-work/SKILL.md must call hv status loop clear"
 # white-box-end
 
 # (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
@@ -327,9 +327,9 @@ echo "ok init seeds map"
 
 # --- skill touchpoints reference map ------------------------------
 # white-box-begin: A9 #53 doclint
-grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
+grep -q "hv map stats --cap\|hv map index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
 grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
-grep -q "post-cycle map\|hv-map-index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
+grep -q "post-cycle map\|hv map index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 # white-box-end
 
@@ -337,7 +337,7 @@ echo "ok skill touchpoints (work/debug/go)"
 # Note: hv-status and hv-resume were merged into hv-next (F26).
 # hv-next now uses bin/hv-stale-summary as a single wrapper (F48).
 # white-box-begin: A9 #53 doclint
-grep -q "hv-stale-summary" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
+grep -q "hv backlog stale" "$REPO/hv-next/SKILL.md"        || { echo "FAIL: hv-next missing stale-summary call"; exit 1; }
 grep -q "Subsystem:" "$REPO/hv-capture/SKILL.md"           || { echo "FAIL: hv-capture missing Subsystem field"; exit 1; }
 echo "ok status/next/resume/capture touchpoints"
 # white-box-end
