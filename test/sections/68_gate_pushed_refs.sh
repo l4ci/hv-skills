@@ -127,18 +127,6 @@ RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
 [ "$(jget data.changed <"$GT_DIR.out")" = false ] || fail "gate (a): a stale check must not report changed: $(cat "$GT_DIR.out")"
 pass "freshness is judged on origin/* after a fetch, not on local refs"
 
-# (b) a check that itself breaks is check-broke, never stale
-gt_case b "$GH_URL"
-# white-box-begin: go-unit A7 #51
-RC="$(gt_gate env PATH="$TMP_GT/brokengit:$GT_BIN:$PATH" "$HV_BIN" --json worker gate w1 --base main --check-only)"
-[ "$RC" = 1 ] && [ "$(gt_verdict)" = check-broke ] \
-  || fail "gate (b): merge-base rc>1 must be verdict check-broke, not stale (rc=$RC): $(cat "$GT_DIR.out")"
-git -C "$GT_DIR" remote set-url origin "$TMP_GT/does-not-exist.git"
-RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"
-[ "$RC" = 1 ] && [ "$(gt_verdict)" = check-broke ] || fail "gate (b): a failed fetch must be check-broke (rc=$RC): $(cat "$GT_DIR.out")"
-pass "a broken check (merge-base rc>1, failed fetch) is check-broke, not stale"
-# white-box-end
-
 # (c) the PR must be the verified branch: head SHA, head branch, target branch, state
 gt_case c "$GH_URL"
 RC="$(gt_gate "$HV_BIN" --json worker gate w1 --base main --check-only)"

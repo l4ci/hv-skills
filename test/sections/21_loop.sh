@@ -203,27 +203,6 @@ EOF
 # malformed: no frontmatter
 echo "no frontmatter here" > .hv/map/broken.md
 
-# white-box-begin: go-unit A3 #47
-PYTHONPATH="$BIN" python3 - <<'PY'
-from hvlib import parse_frontmatter, iter_map_entries
-fm, body = parse_frontmatter(open(".hv/map/capture.md").read())
-assert fm["subsystem"] == "capture", fm
-assert fm["summary"] == "Captures items into BACKLOG.md", fm
-assert "## Purpose" in body, body
-assert fm["related-topics"] == ["Skill Authoring"], fm
-
-# malformed body: empty frontmatter dict, full content as body
-fm2, body2 = parse_frontmatter(open(".hv/map/broken.md").read())
-assert fm2 == {}, fm2
-assert body2.strip() == "no frontmatter here", body2
-
-entries = list(iter_map_entries(".hv/map"))
-names = sorted(e[0] for e in entries)
-assert names == ["capture", "plan"], names  # malformed file is skipped
-PY
-echo "ok hvlib parse_frontmatter / iter_map_entries"
-# white-box-end
-
 # --- map query -----------------------------------------------------
 out="$(hvj map query capture | jget data.text)"
 [[ "$out" == *"## Purpose"* ]] || { echo "FAIL: map query body missing"; exit 1; }
@@ -402,22 +381,6 @@ rm -rf "$TMP2" "$TMP3"
 echo "ok end-to-end map flow"
 
 # --- parse_todo_fields handles Subsystem ---------------------------
-# white-box-begin: go-unit A4 #48
-PYTHONPATH="$BIN" python3 - <<'PY'
-from hvlib import parse_todo_fields
-line = "- [B07] [P1] Title. Repos: web Subsystem: capture Captured: 2026-05-09"
-fields = parse_todo_fields(line)
-assert fields.get("repos") == "web", f"repos={fields.get('repos')!r}"
-assert fields.get("subsystem") == "capture", f"subsystem={fields.get('subsystem')!r}"
-
-line2 = "- [B07] [P1] Title. Milestone: M01 Subsystem: capture Captured: 2026-05-09"
-fields2 = parse_todo_fields(line2)
-assert fields2.get("milestone") == "M01", f"milestone={fields2.get('milestone')!r}"
-assert fields2.get("subsystem") == "capture", f"subsystem={fields2.get('subsystem')!r}"
-PY
-echo "ok parse_todo_fields handles Subsystem"
-# white-box-end
-
 echo "B28: /hv-brainstorm --auto-loop dispatch chain"
 
 # (a) /hv-brainstorm SKILL.md exposes --auto-loop with the inline dispatch language.

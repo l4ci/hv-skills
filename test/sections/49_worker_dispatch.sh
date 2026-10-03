@@ -127,21 +127,7 @@ EVID=$( ( cd "$TMP_WD" && HV_TEST_POLL_FIXTURE="$FX/blocked_long.txt" "$HV_BIN" 
         | jget 'data.slots[0].evidence' )
 [ "$EVID" = "$LONGQ" ] \
   || fail "worker poll truncated a long BLOCKED question: got ${#EVID} chars, expected ${#LONGQ}"
-# Every pane capture in the tree must join wrapped lines. hv-worker-dispatch's
-# captures live in the shared library, so assert against whichever files
-# actually call capture-pane rather than a fixed list that rots on refactor.
-# white-box-begin: go-unit A7 #51
-CAPTURERS=$( grep -l 'capture-pane' "$BIN"/hv-worker-* "$BIN"/hv-host-tmux.sh 2>/dev/null || true )
-[ -n "$CAPTURERS" ] || fail "no helper calls capture-pane — the pane classifier has gone missing"
-for H in $CAPTURERS; do
-  if grep -q 'capture-pane -p ' "$H"; then
-    fail "$(basename "$H") captures panes without -J; long sentinels silently truncate at pane width"
-  fi
-  grep -q 'capture-pane -pJ' "$H" \
-    || fail "$(basename "$H") calls capture-pane but not with -J (join wrapped lines)"
-done
-pass "worker poll preserves questions longer than the pane is wide (capture-pane -J)"
-# white-box-end
+pass "worker poll preserves questions longer than the pane is wide"
 
 # ── (b1) tmux precondition ──────────────────────────────────────────────────
 # Being inside tmux is load-bearing: outside it, worker windows land in a
@@ -200,28 +186,6 @@ SRC=$(sed 's/#.*//' "$BIN/hv-host-tmux.sh") || fail "cannot read hv-host-tmux.sh
 grep -q 'paste-buffer' <<<"$SRC" \
   || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
 pass "worker helpers share one paste-and-confirm path through the host libs"
-# white-box-end
-
-# Workers and the operator run at deliberately different trust levels. Both
-# defaults are pinned because a silent drift either way is bad: narrowing the
-# worker stalls it mid-task on an unattended pane, and widening the operator
-# removes the gate on the process that merges into the cycle branch.
-# white-box-begin: go-unit A7 #51
-grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-dispatch" \
-  || fail "worker default must skip permissions — a narrower mode stalls an unattended worker mid-task"
-if grep -q 'dangerously-skip-permissions' "$BIN/hv-worker-session"; then
-  fail "the operator must NOT skip permissions; it merges into the cycle branch and a human watches it"
-fi
-grep -q 'permission-mode auto' "$BIN/hv-worker-session" \
-  || fail "operator default must set --permission-mode auto"
-grep -q 'continue' "$BIN/hv-worker-session" \
-  || fail "operator default must use --continue so the handoff keeps the cycle's context"
-# Both are overridable, or a project could never narrow the grant.
-grep -q 'workerCommand' "$BIN/hv-worker-dispatch" \
-  || fail "work.workerCommand override missing from worker dispatch"
-grep -q 'operatorCommand' "$BIN/hv-worker-session" \
-  || fail "work.operatorCommand override missing from worker session"
-pass "worker skips permissions, operator runs auto, both overridable via config"
 # white-box-end
 
 # ── (b2) accounts + LIMITED ─────────────────────────────────────────────────

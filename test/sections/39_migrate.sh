@@ -330,12 +330,6 @@ grep -q "hv-context-start" CLAUDE.md && fail "B09-d1: orphan hv-context block sh
 grep -q "Regular prose stays" CLAUDE.md || fail "B09-d1: surrounding prose must survive"
 grep -q "stripped: context" "$TMP_STRIP/strip.out" || fail "B09-d1: strip output should report 'stripped: context'"
 
-# Idempotency: second run is silent and a no-op.
-# white-box-begin: go-unit A5 #49
-"$BIN/hv-managed-block-strip-deprecated" > "$TMP_STRIP/strip2.out"
-[ ! -s "$TMP_STRIP/strip2.out" ] || fail "B09-d1: re-running hv-managed-block-strip-deprecated on clean CLAUDE.md should be silent"
-# white-box-end
-
 cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
