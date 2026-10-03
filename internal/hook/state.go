@@ -34,6 +34,9 @@ type State struct {
 	HandoffBlocks int    `json:"handoffBlocks,omitempty"`
 	BlockedAt     string `json:"blockedAt,omitempty"`
 	HandoffFailed bool   `json:"handoffFailed,omitempty"`
+
+	// UsageHandoff is set when the last Stop block was for usage (D4).
+	UsageHandoff *UsageHandoff `json:"usageHandoff,omitempty"`
 }
 
 var sessionIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)

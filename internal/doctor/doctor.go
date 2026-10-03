@@ -70,6 +70,7 @@ type Input struct {
 	Dispatch       string // work.dispatch
 	IssuesProvider string // issues.provider
 	Accounts       []Account
+	SwitchOnUsage  bool // orchestrator.switchOnUsage (D4)
 	// CodexHomes are the existing slot homes under <git-common-dir>/hv/codex/.
 	CodexHomes []CodexHome
 
@@ -95,7 +96,7 @@ type Input struct {
 func Run(ctx context.Context, in Input) Report {
 	d := &runner{in: in, ctx: ctx}
 	return Report{Checks: []Check{
-		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.hv(), d.codex(),
+		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.switchCheck(), d.hv(), d.codex(),
 	}}
 }
 
@@ -433,6 +434,33 @@ func (d *runner) statusline() Check {
 		return fail(name, strings.Join(bad, "; "), statuslineHint)
 	}
 	return pass(name, "hv statusline dump runs ("+strings.Join(parts, "; ")+")")
+}
+
+// switchCheck is D4's: with orchestrator.switchOnUsage on, the Stop hook must
+// be installed and a second account must exist to move to. It reads config and
+// settings files only.
+func (d *runner) switchCheck() Check {
+	const name = "switch"
+	if !d.in.SwitchOnUsage {
+		return skip(name, "orchestrator.switchOnUsage is off")
+	}
+	if d.in.ProjectRoot == "" {
+		return skip(name, "not inside an hv project")
+	}
+	var with []string
+	for _, a := range d.in.Accounts {
+		if a.ConfigDir != "" {
+			with = append(with, a.Name)
+		}
+	}
+	if len(with) < 2 {
+		return fail(name, fmt.Sprintf("%d account with a configDir in work.accounts, need 2 to move between", len(with)),
+			"add a second account to work.accounts")
+	}
+	if h := d.stopHook(); h.Status != Pass {
+		return fail(name, "the Stop hook is not installed: "+h.Detail, stopHookHint)
+	}
+	return pass(name, fmt.Sprintf("%d accounts, Stop hook installed", len(with)))
 }
 
 func (d *runner) stopHook() Check {

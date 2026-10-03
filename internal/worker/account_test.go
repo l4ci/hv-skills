@@ -263,3 +263,50 @@ func TestExpiredTokenReportsUnknownWithoutNetwork(t *testing.T) {
 		t.Errorf("token = %q, %q", tok, why)
 	}
 }
+
+func TestOrchestratorTarget(t *testing.T) {
+	dir, usage := newProject(t, acctConfig), usageDir(t)
+	acc := &Accounts{Getenv: func(k string) string {
+		if k == "HV_ACCOUNT_USAGE_DIR" {
+			return usage
+		}
+		return ""
+	}}
+	// From alpha: gamma has the most headroom (80). beta and delta cool, epsilon
+	// has none, zeta has no reading and so is not a candidate.
+	m, ok, others := acc.OrchestratorTarget(bg, dir, "/acct/alpha", 90)
+	if !ok || m.Name != "gamma" {
+		t.Fatalf("%v %v", m.Name, ok)
+	}
+	joined := strings.Join(others, "; ")
+	for _, want := range []string{"alpha: current account", "beta: cooling", "epsilon: 0% headroom", "zeta: unknown"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("others lack %q: %s", want, joined)
+		}
+	}
+	// The current account is never its own target, and gamma's 80 beats alpha's 69.5.
+	if m, _, _ := acc.OrchestratorTarget(bg, dir, "/acct/gamma", 90); m.Name != "alpha" {
+		t.Errorf("from gamma: %s", m.Name)
+	}
+	// The target must be below the threshold: alpha has 69.5 headroom, so a
+	// threshold of 20 (headroom above 80 needed) takes neither.
+	if _, ok, _ := acc.OrchestratorTarget(bg, dir, "/acct/zeta", 20); ok {
+		t.Error("an account above the threshold was taken")
+	}
+	// An account with no configDir is not a candidate.
+	d2 := newProject(t, `{"work":{"accounts":[{"name":"alpha","configDir":"/acct/alpha"},{"name":"gamma"}]}}`)
+	if _, ok, o := acc.OrchestratorTarget(bg, d2, "/acct/alpha", 90); ok || !strings.Contains(strings.Join(o, ";"), "gamma: no configDir") {
+		t.Errorf("no configDir: %v %v", ok, o)
+	}
+}
+
+func TestSameConfigDirAndAccountOf(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	if !SameConfigDir("", filepath.Join(home, ".claude")) || !SameConfigDir("~/.x/", filepath.Join(home, ".x")) || SameConfigDir("/a", "/b") {
+		t.Error("SameConfigDir")
+	}
+	dir := newProject(t, acctConfig)
+	if AccountOf(dir, "/acct/beta/") != "beta" || AccountOf(dir, "/elsewhere") != "" {
+		t.Error("AccountOf")
+	}
+}

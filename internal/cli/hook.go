@@ -19,6 +19,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/hook"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/keepalive"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/status"
 )
@@ -233,7 +234,11 @@ func hookStop(c *Ctx, args []string) (res Result, _ error) {
 		return Result{}, nil
 	}
 	now := hookNow()
-	d := hook.DecideStop(hook.StopIn{StopHookActive: active}, st, hc.set, hook.StatHandoff(hc.handoff), hc.handoff, now)
+	in := hook.StopIn{StopHookActive: active}
+	if hc.set.SwitchOnUsage {
+		in.Supervised, in.HoldUntil = supervisedHold(hc.commonDir, hookNow())
+	}
+	d := hook.DecideStop(in, st, hc.set, hook.StatHandoff(hc.handoff), hc.handoff, now)
 	if d.Persist {
 		// Only the counters: a statusline refresh may have landed meanwhile.
 		_ = hook.UpdateState(path, func(cur hook.State, found bool) hook.State {
@@ -241,6 +246,7 @@ func hookStop(c *Ctx, args []string) (res Result, _ error) {
 				cur = st
 			}
 			cur.HandoffBlocks, cur.BlockedAt, cur.HandoffFailed = d.State.HandoffBlocks, d.State.BlockedAt, d.State.HandoffFailed
+			cur.UsageHandoff = d.State.UsageHandoff
 			return cur
 		})
 	}
@@ -248,6 +254,22 @@ func hookStop(c *Ctx, args []string) (res Result, _ error) {
 		return Result{}, nil
 	}
 	return hookPrint(hook.StopOutput(d.Reason)), nil
+}
+
+// supervisedHold reads keepalive.json the way `hv keepalive status` does: a
+// supervisor is live when the file says running and its pid is alive. The
+// hold is its switchHold when that is still ahead (D4).
+func supervisedHold(commonDir string, now time.Time) (supervised bool, until time.Time) {
+	ks, found, err := keepalive.ReadState(keepalive.StatePath(commonDir))
+	if err != nil || !found || ks.Status != keepalive.StatusRunning || !roundlease.DefaultEnv().Alive(ks.PID) {
+		return false, time.Time{}
+	}
+	if ks.SwitchHold != nil {
+		if t, err := time.Parse(time.RFC3339, ks.SwitchHold.Until); err == nil && t.After(now) {
+			until = t
+		}
+	}
+	return true, until
 }
 
 func hookSessionStart(c *Ctx, args []string) (res Result, _ error) {

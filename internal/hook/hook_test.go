@@ -386,7 +386,7 @@ func TestInstallRefusesNonArrayHooks(t *testing.T) {
 func TestLoadSettings(t *testing.T) {
 	cfg := func(s string) any { v, _ := jsonx.Decode([]byte(s)); return v }
 	s, err := LoadSettings(cfg(`{}`))
-	if err != nil || s != (Settings{75, 120, 900, 2}) {
+	if err != nil || s != (Settings{75, 120, 900, 2, false, 90}) {
 		t.Fatalf("%+v %v", s, err)
 	}
 	for _, bad := range []string{`{"orchestrator":{"handoffThreshold":0}}`, `{"orchestrator":{"handoffThreshold":101}}`, `{"orchestrator":{"handoffThreshold":"x"}}`, `{"orchestrator":{"handoffMaxBlocks":-1}}`, `{"orchestrator":{"stateMaxAgeSeconds":0}}`} {

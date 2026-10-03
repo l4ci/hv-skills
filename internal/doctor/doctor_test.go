@@ -195,7 +195,7 @@ func TestOrderAndOK(t *testing.T) {
 	for _, c := range r.Checks {
 		names = append(names, c.Name)
 	}
-	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,statusline,stop-hook,hv,codex" {
+	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,statusline,stop-hook,switch,hv,codex" {
 		t.Errorf("order %s", got)
 	}
 	if r.OK() {
@@ -474,3 +474,31 @@ func TestOrchestratorChecksSkipUntilOptedIn(t *testing.T) {
 		t.Errorf("opted in: %+v", c)
 	}
 }
+
+func TestSwitchCheck(t *testing.T) {
+	o := newOrch(t)
+	run := func(on bool, accts []Account, have map[string]bool) Check {
+		f := &fake{have: have, reply: map[string]Result{}}
+		r := Run(context.Background(), Input{Exec: f.exec, Look: f.look, ProjectRoot: o.root, ConfigDirs: []string{o.a, o.b}, SwitchOnUsage: on, Accounts: accts})
+		return statusOf(r, "switch")
+	}
+	two := []Account{{"a", o.a}, {"b", o.b}}
+	if c := run(false, nil, nil); c.Status != Skip {
+		t.Fatalf("off: %+v", c)
+	}
+	if c := run(true, one(two), map[string]bool{"hv": true}); c.Status != Fail || c.Hint != "add a second account to work.accounts" {
+		t.Fatalf("one account: %+v", c)
+	}
+	if c := run(true, []Account{{"a", o.a}, {"b", ""}}, nil); c.Status != Fail {
+		t.Fatalf("no configDir does not count: %+v", c)
+	}
+	if c := run(true, two, map[string]bool{"hv": true}); c.Status != Fail || c.Hint != "hv hook install" {
+		t.Fatalf("no hooks: %+v", c)
+	}
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}],"SessionStart":[{"hooks":[{"type":"command","command":"hv hook session-start # hv-hook"}]}]}}`)
+	if c := run(true, two, map[string]bool{"hv": true}); c.Status != Pass {
+		t.Fatalf("ready: %+v", c)
+	}
+}
+
+func one(a []Account) []Account { return a[:1] }

@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/hook"
@@ -71,6 +72,16 @@ type Env struct {
 	// life of the supervisor. It returns when ctx ends, with any warnings.
 	// Nil means none (`--no-limits`).
 	Limits func(ctx context.Context) []string
+
+	// D4 (#206), used only when Options.SwitchOnUsage is set. UsageMarker
+	// returns the usage handoff written at or after since; Choose picks the
+	// account to move to; Record writes the decision to the limits log. Gap is
+	// true while no child runs, so the embedded loop leaves the orchestrator's
+	// pane and session alone.
+	UsageMarker func(since time.Time) (hook.UsageHandoff, bool)
+	Choose      func(currentDir string, threshold int) Choice
+	Record      func(Decision) error
+	Gap         *atomic.Bool
 }
 
 // Options are one run's inputs, flags already merged over config.
@@ -85,6 +96,16 @@ type Options struct {
 	Backoff       time.Duration
 	Prompt        string
 	EscalateIssue int
+
+	// D4: the switch and the account the child starts under. ConfigDir is the
+	// child's CLAUDE_CONFIG_DIR as inherited and Account its name in
+	// work.accounts, empty when it has none. HoldFallback is how long a hold
+	// lasts when the marker has no reset time.
+	SwitchOnUsage  bool
+	UsageThreshold int
+	HoldFallback   time.Duration
+	ConfigDir      string
+	Account        string
 }
 
 // Result is what Run did. On an error it holds whatever happened before it.
@@ -92,6 +113,7 @@ type Result struct {
 	StopReason string
 	Restarts   int
 	NoProgress int
+	Switches   int
 	LastExit   Exit
 	Escalation string
 	Warnings   []string
@@ -197,7 +219,7 @@ func Run(env Env, o Options) (Result, error) {
 	statePath := StatePath(o.CommonDir)
 	start := env.Now()
 	st := State{PID: env.Holder.PID, StartedAt: ts(start), Command: append([]string{}, o.Command...),
-		Status: StatusRunning, RunStartedAt: ts(start)}
+		Status: StatusRunning, RunStartedAt: ts(start), Account: o.Account}
 	if h := env.Handoff(); h.Exists {
 		st.LastHandoffSha = h.SHA // the handoff the first run begins with
 	}
@@ -248,7 +270,7 @@ func Run(env Env, o Options) (Result, error) {
 
 	finish := func(reason string, cause error) (Result, error) {
 		stopLimits()
-		res.StopReason, res.Restarts, res.NoProgress = reason, st.Restarts, st.NoProgress
+		res.StopReason, res.Restarts, res.NoProgress, res.Switches = reason, st.Restarts, st.NoProgress, st.Switches
 		if reason == StopMaxRestarts || reason == StopBreaker {
 			res.Escalation = escalate(env, o, st, reason, statePath, &res)
 			st.Escalation = res.Escalation
@@ -263,17 +285,29 @@ func Run(env Env, o Options) (Result, error) {
 
 	argv := append([]string{}, o.Command...)
 	pidEnv := []string{roundlease.HolderPIDEnv + "=" + strconv.Itoa(env.Holder.PID)}
+	setGap := func(on bool) {
+		if env.Gap != nil {
+			env.Gap.Store(on)
+		}
+	}
+	curDir := o.ConfigDir
 	for {
 		runStarted := env.Now()
 		st.RunStartedAt = ts(runStarted)
 		save()
-		child, err := env.Spawn(argv, pidEnv)
+		childEnv := pidEnv
+		if st.Switches > 0 {
+			childEnv = append(append([]string{}, pidEnv...), "CLAUDE_CONFIG_DIR="+curDir)
+		}
+		child, err := env.Spawn(argv, childEnv)
 		if err != nil {
 			return finish(StopSpawnFailed, &SpawnError{Err: err})
 		}
+		setGap(false)
 		res.Changed = true
 		s.setChild(child)
 		exit, werr := child.Wait()
+		setGap(true)
 		s.setChild(nil)
 		if werr != nil {
 			return finish(StopSpawnFailed, &SpawnError{Err: werr})
@@ -303,6 +337,11 @@ func Run(env Env, o Options) (Result, error) {
 		save()
 		if !env.Sleep(o.Backoff, s.intr) || s.wasInterrupted() {
 			return finish(StopInterrupted, nil)
+		}
+		if o.SwitchOnUsage && env.UsageMarker != nil && env.Choose != nil {
+			if m, ok := env.UsageMarker(runStarted); ok {
+				decideUsage(env, o, &st, &curDir, m, func(w string) { res.Warnings = append(res.Warnings, w) })
+			}
 		}
 		st.Restarts++
 		argv = append(append([]string{}, o.Command...), o.Prompt)

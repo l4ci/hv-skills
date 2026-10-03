@@ -32,6 +32,9 @@ const (
 const (
 	ActionSleep  = "sleep"
 	ActionSwitch = "switch"
+	// ActionRestart is a same-account restart of the orchestrator after a
+	// usage handoff that found no account to move to (D4).
+	ActionRestart = "restart"
 )
 
 // Sources of the reset time.

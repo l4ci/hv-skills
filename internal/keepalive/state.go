@@ -41,6 +41,13 @@ type State struct {
 	LastExit       *LastExit `json:"lastExit,omitempty"`
 	StopReason     string    `json:"stopReason,omitempty"`
 	Escalation     string    `json:"escalation,omitempty"`
+
+	// D4: the orchestrator's current account (empty when it has no name in
+	// work.accounts), how many usage handoffs moved it, and the hold that
+	// follows one that found no account to move to.
+	Account    string `json:"account,omitempty"`
+	Switches   int    `json:"switches"`
+	SwitchHold *Hold  `json:"switchHold,omitempty"`
 }
 
 // StatePath is the state file of a repo, by its git common dir.
