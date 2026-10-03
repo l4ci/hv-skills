@@ -23,7 +23,7 @@ A silent failure leaves no surface error. The build is green, the test reports `
 
 For each test, smoke section, or assertion the diff adds or relies on, answer the four questions below. If any answer is *no* or *unclear*, mark the claim `SILENT-FAIL` with file:line evidence and a one-sentence explanation.
 
-1. **What does this verify, concretely?** Name the specific behavior the change introduces, not the general feature. ("Asserts hv-merge prints the merge hash on stdout" beats "tests hv-merge.")
+1. **What does this verify, concretely?** Name the specific behavior the change introduces, not the general feature. ("Asserts `hv ship merge` prints the merge hash on stdout" beats "tests the merge verb.")
 2. **Is the asserted-on thing the same thing the real consumer reads?** Output shape, file path, exit code, env var, JSON key — all must match where the rest of the system actually looks for that signal.
 3. **Was the new code path exercised?** Trace: did the fixture set the flag, hit the route, or pass the input that triggers the new branch the diff added? If the new branch lives behind an `if config.featureX:` check, did the test enable `featureX`?
 4. **If you deleted the new code, would the assertion still pass?** If yes, the assertion is not actually testing the change. Flag.
@@ -36,7 +36,7 @@ For each `SILENT-FAIL` flag, surface one bullet under a `### Silent failure chec
 
 ```
 ### Silent failure check
-- test/sections/08_ship.sh:42 — asserts `grep "merged" output` but `hv-merge` prints "Merged" with a capital M; assertion would pass before the change too.
+- test/sections/08_ship.sh:42 — asserts `grep "merged" output` but `hv ship merge` prints "Merged" with a capital M; assertion would pass before the change too.
 - references/foo.md:17 — claims "loop mode exits cleanly on empty backlog" but no smoke section flips autonomy.level to "loop" with an empty backlog.
 ```
 

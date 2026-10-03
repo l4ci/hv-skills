@@ -37,8 +37,8 @@ The queue loop is the consumer. It routes per PR / MR and always posts the verdi
 
 | Verdict | Interactive | `autonomy.level: "loop"` |
 |---------|-------------|--------------------------|
-| `PASS` | `AskUserQuestion` merge / skip / stop; merge runs `hv-pr-merge <pr>` (exit 5 = merged, an item unproven and set to `changes-requested`) | merge, no question |
-| `CONCERNS` | findings as feedback, `hv-item-state <ID> changes-requested`; no merge | same |
+| `PASS` | `AskUserQuestion` merge / skip / stop; merge runs `hv ship pr-merge <pr>` (exit 4 = not merged, an item unproven and set to `changes-requested`) | merge, no question |
+| `CONCERNS` | findings as feedback, `hv item state <ID> --to changes-requested`; no merge | same |
 | `FAIL` | same as `CONCERNS`; no merge | same, and the guard-failure stop above still applies to the surrounding loop |
 
 Exit 3 / 4 from any helper stops the queue. Label lifecycle: `references/issue-mode.md`.

@@ -1,6 +1,6 @@
 ---
 name: hv-ship
-description: Bundle completed work on a feature branch into a PR (or direct merge) — extracts commits, resolved item IDs with titles, optionally runs /hv-review, and calls hv-pr or hv-merge. Use on "ship it", "open the PR", "finish this branch", when work is done and you want to integrate. Also supports --undo (guided rollback of the last cycle on the base branch, replaces /hv-undo) and --docs (public-docs maintenance, replaces /hv-docs). Use --undo on "roll back the last cycle", "revert that merge". Use --docs on "/hv-docs", "update docs"; auto-invoked post-cycle when docs/ exists.
+description: Bundle completed work on a feature branch into a PR (or direct merge) — extracts commits, resolved item IDs with titles, optionally runs /hv-review, and calls `hv ship pr` or `hv ship merge`. Use on "ship it", "open the PR", "finish this branch", when work is done and you want to integrate. Also supports --undo (guided rollback of the last cycle on the base branch) and --docs (public-docs maintenance, replaces /hv-docs). Use --undo on "roll back the last cycle", "revert that merge". Use --docs on "/hv-docs", "update docs"; auto-invoked post-cycle when docs/ exists.
 user-invocable: true
 ---
 
@@ -19,7 +19,7 @@ Read `$ARGUMENTS` (the slash-command's free-text args). Route on the first flag 
 
 | Args contain | Route to | Purpose |
 |---|---|---|
-| `--undo` | **Undo Mode** (Steps U1–U5) | Guided rollback of the last `/hv-work` cycle on the base branch. Replaces the standalone `/hv-undo`. |
+| `--undo` | **Undo Mode** (Steps U1–U5) | Guided rollback of the last `/hv-work` cycle on the base branch. |
 | `--docs` (or `--docs restructure`) | **Docs Mode** (Steps D1+) | Maintain public user-guide under `<docs.path>/`. Replaces the standalone `/hv-docs`. |
 | (no recognized flag) | **Normal Ship Mode** (Steps 1–10) | Bundle a feature branch into a PR or direct merge. |
 
@@ -55,33 +55,27 @@ Read `.hv/config.json`:
 - Nothing committed yet → clean up, then come back
 - You want to resume a paused branch → `/hv-next`
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Branch Check
 
 Confirm a feature branch is checked out:
 
 ```bash
-.hv/bin/hv-guard-feature-branch
+hv git guard feature-branch
 ```
 
-Exit 1 (with the helper's stderr message naming the base branch) means the user is on `main`/`master`/`trunk` (or the configured base) — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
+Exit 1 (`data.reason` is `base` or `detached`; the message names the base branch) means the user is on `main`/`master`/`trunk` (or the configured base), or HEAD is detached — pass the message through and stop. Exit 0 means a feature branch is checked out; continue.
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
-1. *Preflight & branch check* — feature branch confirmed, not on main (Step 1)
+1. *Branch check* — feature branch confirmed, not on main (Step 1)
 2. *Extract commits & items* — branch range read, item IDs resolved (Step 2)
 3. *Review* — `/hv-review` runs when `ship.review: true` (Step 3)
 4. *Second-opinion gate* — fresh-eyes adversarial review when `ship.secondOpinion: true` (Step 3.5)
 5. *QA gate* — product `/hv-qa run` when `ship.qa: true` (Step 3.75)
 6. *CONCERNS routing* — verdict-gated branch selection (Step 4)
-7. *Merge or PR* — integration via `hv-merge` or `hv-pr` (Steps 5–8)
+7. *Merge or PR* — integration via `hv ship merge` or `hv ship pr` (Steps 5–8)
 8. *Report & nudges* — summary + post-cycle nudges (Steps 9–10)
 
 ## Step 2 — Scope the Work
@@ -89,22 +83,24 @@ Phases:
 Resolve the active entry's repo (umbrella mode; empty in single-repo projects):
 
 ```bash
-REPO=$(.hv/bin/hv-status-repo-for <branch>)
+hv status show --json <branch>
 ```
+
+`data.repo` is the repo name (`null` in single-repo projects); call it `$REPO` below.
 
 **Single-repo:**
 
 ```bash
-.hv/bin/hv-review-scope <branch>
+hv review scope --json <branch>
 ```
 
 **Umbrella mode** (when `$REPO` is non-empty):
 
 ```bash
-.hv/bin/hv-review-scope --repo "$REPO" <branch>
+hv review scope --json --repo "$REPO" <branch>
 ```
 
-Emits JSON with commits, touched files, referenced IDs, and matched TODO entries. Keep the JSON in memory — Step 4 needs it.
+`data` carries commits, touched files, referenced IDs, and the matched item entries. Keep the JSON in memory — Step 4 needs it.
 
 If `commitCount` is 0, tell the user the branch has no commits beyond the base and stop.
 
@@ -139,12 +135,12 @@ Skip the gate when any of these apply (no work to second-opinion):
 Otherwise, run the gate:
 
 ```bash
-.hv/bin/hv-second-opinion-brief [--repo "$REPO"] <branch>
+hv review brief [--repo "$REPO"] <branch>
 ```
 
 (Pass `--repo "$REPO"` in umbrella mode using the value from Step 2.)
 
-The helper emits a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
+The verb prints a markdown brief that includes only the goal (resolved item titles + their TODO entry text), the commit list, and per-file diff content — no KNOWLEDGE, no DECISIONS, no plan, no conventions. That minimal context is the entire point.
 
 Read `ship.secondOpinionRunner` (default `"subagent"`). If it is `"codex"`, follow **Codex runner** below instead of dispatching a subagent.
 
@@ -166,7 +162,7 @@ Route the verdict per `references/review-verdict-routing.md` — same contract a
 **Codex runner** (`ship.secondOpinionRunner: "codex"`). Same brief, Codex as the reviewer:
 
 ```bash
-.hv/bin/hv-second-opinion-brief [--repo "$REPO"] <branch> > "$BRIEF"
+hv review brief [--repo "$REPO"] <branch> > "$BRIEF"
 .hv/bin/hv-codex-verify --worktree <cycle worktree or repo root> --brief "$BRIEF"
 ```
 
@@ -205,7 +201,7 @@ The gate runs after Step 3.5 because there's no point spinning up infra-bound QA
 ## Step 4 — Build the PR Body
 
 ```bash
-.hv/bin/hv-ship-body <branch>
+hv ship body <branch>
 ```
 
 Prints `## Summary` and `## Items resolved`. Capture the output, then append a `## Test plan` section — 2-5 checkboxes, one per meaningful area (not per file), built from the scope JSON's touched files. Example:
@@ -234,48 +230,48 @@ Plain-text fallback: *"Ship `<branch>` as a PR or direct merge?"* — see `refer
 
 ## Step 6a — Open a PR
 
-**Issue mode:** pass the resolved items so the PR closes them, then mark each for review. Do not call `hv-item-release`: the claim stays until the PR merges.
+**Issue mode:** pass the resolved items so the PR closes them, then mark each for review. Do not call `hv item release`: the claim stays until the PR merges.
 
 ```bash
-printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID1>,<ID2> <branch> "<short title>"
-.hv/bin/hv-item-state <ID> needs-review    # once per item
+printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file - --items <ID1>,<ID2>
+hv item state <ID> --to needs-review    # once per item
 ```
 
-In an umbrella add `--repo <name>` to `hv-pr` (it falls back to the cwd's sub-repo); IDs are qualified `<repo>:<ID>`.
+In an umbrella add `--repo <name>` to `hv ship pr` (it falls back to the cwd's sub-repo); IDs are qualified `<repo>:<ID>`.
 
 `/hv-review --queue` merges it later. Skip Steps 6b, 6c and 8.
 
 > **Manual gate — filing a public artifact.** Opening a PR creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The orchestrator may compose the title and body and run the `AskUserQuestion` prompt in Step 5 (Pick Strategy), but the user presses the button there before this step runs. See `references/manual-gates.md`.
 
 ```bash
-printf '%s' "$BODY" | .hv/bin/hv-pr <branch> "<short title>"
+printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file -
 ```
 
-Title rules and helper behavior — see `references/merge-strategy-gate.md` (Open a PR). Share the PR URL with the user.
+Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open a PR). Share the PR URL with the user.
 
 ## Step 6b — Direct Merge
 
 ```bash
-printf 'merge: <summary>\n\n- item 1\n- item 2\n' | .hv/bin/hv-merge <branch>
+printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge <branch> --body-file -
 ```
 
-Helper behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
+Verb behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user.
 
 ## Step 6c — Close Upstream Issues (Direct-Push Path)
 
 **Issue mode:** does not apply. The items are the tracker issues and close when `/hv-review --queue` merges the PR.
 
-This step runs only on the **direct-merge path** (after `hv-merge` returns a commit hash). Skip entirely on the PR path — `hv-ship-body` already emits `Closes #N` lines into the PR body, and GitHub/GitLab auto-close the issues on PR merge.
+This step runs only on the **direct-merge path** (after `hv ship merge` returns a commit hash). Skip entirely on the PR path — `hv ship body` already emits `Closes #N` lines into the PR body, and GitHub/GitLab auto-close the issues on PR merge.
 
 **1. Identify candidates.**
 
 From the scope JSON's `referencedIds` (already in memory from Step 2), call:
 
 ```bash
-.hv/bin/hv-issues-imported --open-only
+hv issues imported --json --open-only
 ```
 
-`--open-only` drops entries whose upstream issue is already closed so the gate doesn't surface no-ops. Parse the JSON array; filter to entries whose `item_id` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
+`--open-only` drops entries whose upstream issue is already closed so the gate doesn't surface no-ops. Read `data.entries`; filter to entries whose `itemId` is in the shipped item list (the resolved IDs from Step 2). If the filtered list is empty, skip the rest of this step silently.
 
 **2. Manual gate.**
 
@@ -291,10 +287,10 @@ Invoke `AskUserQuestion` (single-select, ≤4 options):
 
 This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
 
-**4. On "Yes, close all":** dispatch parallel `hv-issues-close` calls (one per candidate, all in a single batch of tool calls):
+**4. On "Yes, close all":** dispatch parallel `hv issues close` calls (one per candidate, all in a single batch of tool calls):
 
 ```bash
-.hv/bin/hv-issues-close --issue <N> --commit <merge-sha> --item <ID> [--repo <name>]
+hv issues close <N> --commit <merge-sha> --item <ID> [--repo <name>]
 ```
 
 Pass `--repo` only in umbrella mode (`$REPO` non-empty from Step 2).
@@ -305,7 +301,7 @@ Pass `--repo` only in umbrella mode (`$REPO` non-empty from Step 2).
 - Question: *"Which issue(s) should be closed?"*
 - Options: one entry per candidate formatted as `"#N (item <ID>)"`
 
-Then dispatch parallel `hv-issues-close` calls for each selected entry as in step 4.
+Then dispatch parallel `hv issues close` calls for each selected entry as in step 4.
 
 **6. On "No, leave open":** print:
 
@@ -318,37 +314,37 @@ Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>`
 **Single-repo:**
 
 ```bash
-.hv/bin/hv-status-remove <branch>
+hv status rm <branch>
 ```
 
 **Umbrella mode** (reuse `$REPO` from Step 2; re-derive if out of scope):
 
 ```bash
-.hv/bin/hv-status-remove --repo "$REPO" <branch>
+hv status rm --repo "$REPO" <branch>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
+Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella waves MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 Silently clears the entry if one existed. Harmless if not.
 
 ## Step 8 — Mark Unfinished Items Complete
 
-**Issue mode:** skip. Closing happens at the review merge (`hv-pr-merge`); `hv-complete` here would close an issue before its PR is reviewed. Use it only for `--reason handed-off|blocked|dropped`.
+**Issue mode:** skip. Closing happens at the review merge (`hv ship pr-merge`); `hv item complete` here would close an issue before its PR is reviewed. Use it only for `--reason handed-off|blocked|dropped`.
 
 Most IDs are already completed by `/hv-work`. This catches manual commits that referenced IDs without closing them.
 
 For each ID in the scope JSON's `referencedIds`:
 
 ```bash
-.hv/bin/hv-complete <ID> <merge-or-last-commit-hash>
+hv item complete <ID> --commit <merge-or-last-commit-hash>
 ```
 
-`hv-complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
+`hv item complete` is idempotent — already-completed IDs silent no-op, only typos (IDs absent from `BACKLOG.md` entirely) produce an error. No grep needed. Pass `--reason handed-off|blocked|dropped [--note <text>]` when an item closes without being done; the marker then reads `(<reason>: <note>)`.
 
-**Exit 3 = no proof recorded.** The ID is still open and has no `## Proof` row. Record one row per executed check that passed during this ship — the Step 3.75 QA run, or the project's test/smoke command run before merge — then re-run `hv-complete`:
+**Exit 4 (`blockedBy: proof missing`) = no proof recorded.** The ID is still open and has no `## Proof` row. Record one row per executed check that passed during this ship — the Step 3.75 QA run, or the project's test/smoke command run before merge — then re-run `hv item complete`:
 
 ```bash
-.hv/bin/hv-proof-add <ID> --check "<command that ran>" --result PASS --evidence "<summary line or log path>" --sha <merge-or-last-commit-hash>
+hv proof add <ID> --check "<command that ran>" --result PASS --evidence "<summary line or log path>" --sha <merge-or-last-commit-hash>
 ```
 
 A `/hv-review` or second-opinion PASS is acceptance, not proof — it reads the diff, it doesn't run anything — so it never becomes a row. If no executed check ran, ask via `AskUserQuestion`: run the project's test command now and record it (Recommended), close with `--no-proof` (the user's call, said in the Step 9 report), or leave the item open. Loop mode never passes `--no-proof`: the item stays open and Step 9 lists it as unproven.
@@ -399,12 +395,12 @@ If `REVIEW_CHOICE == ship-anyway`, append the concerns one-liner at the end of t
 After every successful ship, surface unreleased-commit accumulation so the user can decide whether to cut a release before moving on.
 
 ```bash
-.hv/bin/hv-release-pending
+hv release pending --json
 ```
 
-Parse the JSON. If `shouldNudge` is `false`, skip silently. If `lastTag` is empty (no release ever cut), skip silently — the first release is the user's call.
+Read `data`. If `shouldNudge` is `false`, skip silently. If `lastTag` is empty (no release ever cut), skip silently — the first release is the user's call.
 
-When the nudge fires, append the helper's `message` field as one line in the Step 9 report block (after `Resolved: [...]`). The helper renders the phrasing; the skill just prints it.
+When the nudge fires, append the `message` field as one line in the Step 9 report block (after `Resolved: [...]`). The verb renders the phrasing; the skill just prints it.
 
 This step runs after BOTH PR and direct-merge flows; the trigger is "ship completed", not the integration mechanism.
 
@@ -427,30 +423,31 @@ Phases:
 1. *Detect cycle* — most recent `merge: ` commit on base branch identified (Step U1 dry-run)
 2. *Surface preview* — dry-run output rendered verbatim to user (Step U2)
 3. *Confirm* — manual `AskUserQuestion` gate (Step U3)
-4. *Apply rollback* — engine runs with `--force`, base resets, items restored (Step U4)
+4. *Apply rollback* — `hv ship undo --apply` runs, base resets, items restored (Step U4)
 5. *Report* — summary line printed; no post-cycle nudges (Step U5)
 
 ### Step U1 — Detect Cycle (Dry-Run Preview)
 
-Run the engine with no `--force` flag; it defaults to dry-run and prints what would change:
+Run the verb without `--apply`; it previews what would change and writes nothing:
 
 ```bash
-.hv/bin/hv-undo
+hv ship undo
 ```
 
 Exit codes:
 
-- **0** — dry-run printed successfully. Surface stdout verbatim to the user, then continue to Step U2.
-- **1** — precondition error (no cycle on base, subject doesn't match `^merge: `, post-merge commits without `--allow-post-merge`, invalid arg, PR-mode cycle, not on base branch). Surface stderr verbatim and **stop** — do not proceed to Step U2.
-- **2** — dirty tree. Print *"Working tree is dirty — commit, stash, or discard before /hv-ship --undo can run."* and stop.
+- **0** — preview printed successfully (the `preview only; pass --apply` warning is expected). Surface stdout verbatim to the user, then continue to Step U2.
+- **3** — no cycle to undo. Surface the message and **stop**.
+- **4** — precondition refused (not on the base branch, subject doesn't match `^merge: `, post-merge commits without `--allow-post-merge`, PR-mode cycle, HEAD is not a merge). Surface the message verbatim and **stop** — do not proceed to Step U2.
+- **4** with a dirty tree — print *"Working tree is dirty — commit, stash, or discard before /hv-ship --undo can run."* and stop.
 
-If the user wants to target a specific cycle other than the most recent, they invoke `.hv/bin/hv-undo --cycle <hash>` directly; the slash-command default is always the most recent.
+If the user wants to target a specific cycle other than the most recent, they invoke `hv ship undo --cycle <hash>` directly; the slash-command default is always the most recent.
 
-If the base branch has commits past the cycle merge, `hv-undo` refuses by default. Resolve manually (`git reset` to before those commits) or re-run with `--allow-post-merge` to discard them. Surface the helper's stderr verbatim — no extra prompting.
+If the base branch has commits past the cycle merge, `hv ship undo` refuses by default. Resolve manually (`git reset` to before those commits) or re-run with `--allow-post-merge` to discard them. Surface the verb's message verbatim — no extra prompting.
 
 ### Step U2 — Surface the Plan
 
-Render the helper's stdout to the user verbatim. The preview shows the merge commit being reset, the items being restored to BACKLOG.md, and any caveats (e.g. post-merge commits flagged for discard when `--allow-post-merge` is in play).
+Render the verb's stdout to the user verbatim. The preview shows the merge commit being reset, the items being restored to BACKLOG.md, and any caveats (e.g. post-merge commits flagged for discard when `--allow-post-merge` is in play).
 
 ### Step U3 — Confirmation Gate
 
@@ -459,7 +456,7 @@ Use a single `AskUserQuestion` call. Show the dry-run output above the question 
 - **Header:** `"Apply"`
 - **Question:** `"Apply this rollback plan?"`
 - **Options** (single-select):
-  1. `"Apply (Recommended)"` — runs `.hv/bin/hv-undo --force`. Resets the base branch and restores the TODO entries.
+  1. `"Apply (Recommended)"` — runs `hv ship undo --apply`. Resets the base branch and restores the TODO entries.
   2. `"Cancel"` — print *"No changes."* and stop; nothing is written.
 
 Plain-text fallback (when `AskUserQuestion` is not available): ask once — *"Apply rollback? (yes/no)"* — `yes` → Apply; anything else → Cancel.
@@ -469,16 +466,16 @@ Plain-text fallback (when `AskUserQuestion` is not available): ask once — *"Ap
 ### Step U4 — Apply (when not Cancel)
 
 ```bash
-.hv/bin/hv-undo --force
+hv ship undo --apply
 ```
 
-(Or `.hv/bin/hv-undo --force --allow-post-merge` when the user opted into discarding post-merge commits in Step U1 — but Step U1 errored out and re-routed for that case; the simpler `--force` is the common path.)
+(Or `hv ship undo --apply --allow-post-merge` when the user opted into discarding post-merge commits in Step U1 — but Step U1 errored out and re-routed for that case; the simpler `--apply` is the common path.)
 
-Pass the helper's stdout to the user verbatim. Then continue to Step U5.
+Pass the verb's stdout to the user verbatim. Then continue to Step U5.
 
 ### Step U5 — Report
 
-Print the engine's final summary line as-is. Do **not** invoke `/hv-learn`, `/hv-ship --docs`, `/hv-refactor`, or `/hv-next` — Undo Mode is terminal. The user re-runs `/hv-next` themselves to see the restored backlog.
+Print the verb's final summary line as-is. Do **not** invoke `/hv-learn`, `/hv-ship --docs`, `/hv-refactor`, or `/hv-next` — Undo Mode is terminal. The user re-runs `/hv-next` themselves to see the restored backlog.
 
 ### When to Use Undo Mode
 
@@ -497,8 +494,8 @@ Use `/hv-ship --undo` when:
 
 ### Undo Mode Rules
 
-- Default is dry-run; `--force` is the only way to apply changes.
-- The base-branch + clean-tree preconditions are enforced by the helper; never bypass them.
+- Default is preview; `--apply` is the only way to apply changes.
+- The base-branch + clean-tree preconditions are enforced by the verb; never bypass them.
 - Post-merge commits on the base branch refuse by default; `--allow-post-merge` is opt-in.
 - Manual confirmation gate; loop mode does not auto-pick.
 - Terminal mode — no post-cycle nudges. The user re-orients with `/hv-next`.
@@ -524,13 +521,7 @@ Docs Mode and `/hv-qa` share the three-mode skeleton (scaffold / after-work / au
 >
 > **`docs/` is the public surface.** It's consumer-facing — contributor and contract content lives in the skill that owns it (`hv-*/SKILL.md`), not in a parallel reference file. Cross-refs from `docs/` and `README.md` point at `docs/` pages or specific SKILL.md files, never at a centralized internals doc.
 
-### Step D1 — Preflight & First-Run Detection
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+### Step D1 — First-Run Detection
 
 Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs.path>/` exists and is non-empty:
 
@@ -549,10 +540,10 @@ Read `docs.path` from `.hv/config.json` (default `"docs"`). Check whether `<docs
       2. *"Leave off"* — exit without changes.
     - Plain-text fallback: ask once. Default to "Leave off" if ambiguous (opt-in semantics — never silently flip a config flag the user didn't ask for).
 
-The config write uses the shared helper:
+The config write:
 
 ```bash
-.hv/bin/hv-config-set docs.afterWork true
+hv config set docs.afterWork true
 ```
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
@@ -640,7 +631,7 @@ Write `<docs.path>/README.md` as a real index — TOC linking every other propos
 
 Seed `.docsignore` at repo root if it doesn't already exist — use the template in `references/docs-conventions.md` (`.docsignore` seed section). Make all writes idempotent — never overwrite an existing file.
 
-After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use `.hv/bin/hv-config-set docs.afterWork true` (same pattern as Step D1's manual-toggle branch). Skip silently if `docs.afterWork` is already `true`.
+After scaffolding succeeds, set `docs.afterWork: true` in `.hv/config.json` automatically — the user just opted into the docs flow by approving the scaffold, so the after-work gate flips on with the same approval. No separate question needed. Use `hv config set docs.afterWork true` (same pattern as Step D1's manual-toggle branch). Skip silently if `docs.afterWork` is already `true`.
 
 ### Step D6 — Closing Summary
 
@@ -781,7 +772,7 @@ Resolves: [B07], [F03]
 - **Read-only until Step 6.** Review, scoping, and body generation never mutate anything.
 - **One integration pass.** Don't split into "review, then ship later" — if review passes, ship.
 - **Titles stay clean.** PR titles are for humans; strip `[ID]` tags. The body carries the linkage.
-- **`hv-complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 1); an open ID with no proof row exits 3 (Step 8 records proof or asks). No grep needed.
+- **`hv item complete` is idempotent on re-completion, strict on typos.** Already-completed IDs silent no-op (exit 0); IDs absent from `BACKLOG.md` entirely produce an error (exit 3); an open ID with no proof row exits 4 (Step 8 records proof or asks). No grep needed.
 
 ## References
 
