@@ -50,63 +50,51 @@ func glProject(t *testing.T, umbrella bool, knowledge string) string {
 	return dir
 }
 
-func TestGlossaryWriteMatchesOldHelper(t *testing.T) {
+func TestGlossaryWriteMatchGolden(t *testing.T) {
 	cases := []struct {
 		name     string
 		fixture  string
 		umbrella bool
-		oldArgs  []string
 		newArgs  []string
-		oldRC    int
+		oldRC    int // the helper's exit code, frozen in the golden
 		wantRC   int
 	}{
 		{"new term in empty glossary", glFixture, false,
-			[]string{"Worker", "--def", "an agent", "--alias", "agent, slot", "--not", "orchestrator"},
 			[]string{"glossary", "write", "Worker", "--def", "an agent", "--alias", "agent, slot", "--not", "orchestrator"}, 0, 0},
 		{"second term sorts alphabetically", glFixtureTerms, false,
-			[]string{"Batch", "--def", "a group"},
 			[]string{"glossary", "write", "Batch", "--def", "a group"}, 0, 0},
 		{"update keeps date and unions aliases", glFixtureTerms, false,
-			[]string{"worker", "--def", "a new def", "--alias", "Agent,runner"},
 			[]string{"glossary", "write", "worker", "--def", "a new def", "--alias", "Agent,runner"}, 0, 0},
 		{"touch restamps the date", glFixtureTerms, false,
-			[]string{"Round", "--def", "one cycle", "--touch"},
 			[]string{"glossary", "write", "Round", "--def", "one cycle", "--touch"}, 0, 0},
 		{"empty --not clears the list", glFixtureTerms, false,
-			[]string{"Worker", "--def", "d", "--not", ""},
 			[]string{"glossary", "write", "Worker", "--def", "d", "--not", ""}, 0, 0},
 		{"omitting --not keeps the list", glFixtureTerms, false,
-			[]string{"Worker", "--def", "d"},
 			[]string{"glossary", "write", "Worker", "--def", "d"}, 0, 0},
 		{"alias collision refuses", glFixtureTerms, false,
-			[]string{"Newbie", "--def", "d", "--alias", "agent"},
 			[]string{"glossary", "write", "Newbie", "--def", "d", "--alias", "agent"}, 3, 4},
 		{"sub-repo scope", glFixture, true,
-			[]string{"Page", "--def", "a view", "--repo", "web"},
 			[]string{"glossary", "write", "Page", "--def", "a view", "--repo", "web"}, 0, 0},
 		{"missing Glossary heading", "# K\n\n## Architecture\n\n- **a** — b <!-- 2026-01-01 -->\n", false,
-			[]string{"T", "--def", "d"},
 			[]string{"glossary", "write", "T", "--def", "d"}, 2, 3},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := glProject(t, c.umbrella, c.fixture), glProject(t, c.umbrella, c.fixture)
-			o := knOld(t, oldDir, "", "hv-glossary-write", c.oldArgs...)
-			n := knNew(t, newDir, "", c.newArgs...)
-			if o.rc != c.oldRC || n.rc != c.wantRC {
-				t.Fatalf("rc old=%d (want %d) new=%d (want %d)\nold: %s\nnew: %s", o.rc, c.oldRC, n.rc, c.wantRC, o.stderr, n.stderr)
+			want, got := knFrozen(t, glProject(t, c.umbrella, c.fixture), "", c.newArgs...)
+			if want.RC != c.oldRC || got.RC != c.wantRC {
+				t.Fatalf("rc frozen=%d (want %d) new=%d (want %d)\nfrozen: %s\nnew: %s", want.RC, c.oldRC, got.RC, c.wantRC, want.Stderr, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
+			knSameDelta(t, want, got)
 		})
 	}
 }
 
-func TestGlossaryImportMatchesOldHelper(t *testing.T) {
+func TestGlossaryImportMatchGolden(t *testing.T) {
 	good := "# comment\nWorker\tan agent\tagent,slot\torchestrator\n\nRound\tone cycle\t\t\nBatch\ta group\tbunch\t\n"
 	cases := []struct {
 		name, manifest string
 		args           []string
-		oldRC, wantRC  int
+		oldRC, wantRC  int // the helper's exit code (frozen) and hv's
 	}{
 		{"imports a batch", good, nil, 0, 0},
 		{"touch", good, []string{"--touch"}, 0, 0},
@@ -117,38 +105,31 @@ func TestGlossaryImportMatchesOldHelper(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := glProject(t, false, glFixtureTerms), glProject(t, false, glFixtureTerms)
-			mf := filepath.Join(t.TempDir(), "manifest.tsv")
-			os.WriteFile(mf, []byte(c.manifest), 0o666)
-			o := knOld(t, oldDir, "", "hv-glossary-import", append([]string{mf}, c.args...)...)
-			n := knNew(t, newDir, c.manifest, append([]string{"glossary", "import", "--body-file", "-"}, c.args...)...)
-			if o.rc != c.oldRC || n.rc != c.wantRC {
-				t.Fatalf("rc old=%d (want %d) new=%d (want %d)\nold: %s\nnew: %s", o.rc, c.oldRC, n.rc, c.wantRC, o.stderr, n.stderr)
+			want, got := knFrozen(t, glProject(t, false, glFixtureTerms), c.manifest, append([]string{"glossary", "import", "--body-file", "-"}, c.args...)...)
+			if want.RC != c.oldRC || got.RC != c.wantRC {
+				t.Fatalf("rc frozen=%d (want %d) new=%d (want %d)\nfrozen: %s\nnew: %s", want.RC, c.oldRC, got.RC, c.wantRC, want.Stderr, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
+			knSameDelta(t, want, got)
 		})
 	}
 }
 
-func TestGlossaryReadMatchesOldHelper(t *testing.T) {
+func TestGlossaryReadMatchGolden(t *testing.T) {
 	for _, umbrella := range []bool{false, true} {
 		dir := glProject(t, umbrella, glFixtureTerms)
 		if umbrella {
 			knWrite(t, filepath.Join(dir, ".hv", "knowledge", "web", "KNOWLEDGE.md"), "## Glossary\n\n- **Page** — a view\n  - **Aliases:** _none_\n  <!-- 2026-04-01 -->\n\n- **Round** — web round\n  - **Aliases:** _none_\n  <!-- 2026-04-02 -->\n")
 		}
-		oldArgs := []string{"worker", "ROUND", "ghost"}
-		newArgs := []string{"glossary", "read", "worker", "ROUND", "ghost"}
+		args := []string{"glossary", "read", "worker", "ROUND", "ghost"}
 		if umbrella {
-			oldArgs = append([]string{"--repo", "web", "Page"}, oldArgs...)
-			newArgs = append(newArgs, "--repo", "web", "Page")
+			args = append(args, "--repo", "web", "Page")
 		}
-		o := knOld(t, dir, "", "hv-glossary-read", oldArgs...)
-		n := knNew(t, dir, "", newArgs...)
-		if o.stdout != n.stdout || n.rc != 0 {
-			t.Errorf("umbrella=%v\n--- old ---\n%s\n--- new ---\n%s\nrc=%d %s", umbrella, o.stdout, n.stdout, n.rc, n.stderr)
+		want, got := knFrozen(t, dir, "", args...)
+		if want.Stdout != got.Stdout || got.RC != 0 {
+			t.Errorf("umbrella=%v\n--- frozen ---\n%s\n--- new ---\n%s\nrc=%d %s", umbrella, want.Stdout, got.Stdout, got.RC, got.Stderr)
 		}
-		if !strings.Contains(n.stdout, "> from: .hv/KNOWLEDGE.md (## Glossary)") {
-			t.Errorf("no provenance line: %s", n.stdout)
+		if !strings.Contains(got.Stdout, "> from: .hv/KNOWLEDGE.md (## Glossary)") {
+			t.Errorf("no provenance line: %s", got.Stdout)
 		}
 	}
 	dir := glProject(t, false, glFixtureTerms)
@@ -161,42 +142,38 @@ func TestGlossaryReadMatchesOldHelper(t *testing.T) {
 	}
 }
 
-func TestBlockMatchesOldHelper(t *testing.T) {
+func TestBlockMatchGolden(t *testing.T) {
 	legacy := "# Project\n\n<!-- hv:knowledge:start -->\nold list\n<!-- hv:knowledge:end -->\n\ntail\n"
 	cases := []struct {
 		name     string
 		agents   string
 		umbrella bool
-		oldArgs  []string
 		newArgs  []string
 		stdin    string
-		oldRC    int
+		oldRC    int // the helper's exit code, frozen in the golden
 		wantRC   int
 	}{
-		{"knowledge block appended", "# Agents\n", false, []string{"knowledge"}, []string{"block", "knowledge"}, "", 0, 0},
-		{"knowledge block updated in place", legacy, false, []string{"knowledge"}, []string{"block", "knowledge"}, "", 0, 0},
-		{"decisions block", "# Agents\n", false, []string{"decisions"}, []string{"block", "decisions"}, "", 0, 0},
-		{"sub-repo knowledge block", "# Agents\n", true, []string{"knowledge", "--repo", "web"}, []string{"block", "knowledge", "--repo", "web"}, "", 0, 0},
-		{"custom body", "# Agents\n", false, []string{"vision", "--body-stdin"}, []string{"block", "vision", "--body-file", "-"}, "## Vision\n\nbody\n", 0, 0},
-		{"decisions with --repo", "# Agents\n", true, []string{"decisions", "--repo", "web"}, []string{"block", "decisions", "--repo", "web"}, "", 1, 2},
-		{"unknown generated key", "# Agents\n", false, []string{"nope"}, []string{"block", "nope"}, "", 1, 2},
+		{"knowledge block appended", "# Agents\n", false, []string{"block", "knowledge"}, "", 0, 0},
+		{"knowledge block updated in place", legacy, false, []string{"block", "knowledge"}, "", 0, 0},
+		{"decisions block", "# Agents\n", false, []string{"block", "decisions"}, "", 0, 0},
+		{"sub-repo knowledge block", "# Agents\n", true, []string{"block", "knowledge", "--repo", "web"}, "", 0, 0},
+		{"custom body", "# Agents\n", false, []string{"block", "vision", "--body-file", "-"}, "## Vision\n\nbody\n", 0, 0},
+		{"decisions with --repo", "# Agents\n", true, []string{"block", "decisions", "--repo", "web"}, "", 1, 2},
+		{"unknown generated key", "# Agents\n", false, []string{"block", "nope"}, "", 1, 2},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := glProject(t, c.umbrella, glFixtureTerms), glProject(t, c.umbrella, glFixtureTerms)
-			for _, d := range []string{oldDir, newDir} {
-				knWrite(t, filepath.Join(d, "AGENTS.md"), c.agents)
-				knWrite(t, filepath.Join(d, ".hv", "DECISIONS.md"), "# Decisions\n\n## Architecture\n\n### Rule\n")
+			dir := glProject(t, c.umbrella, glFixtureTerms)
+			knWrite(t, filepath.Join(dir, "AGENTS.md"), c.agents)
+			knWrite(t, filepath.Join(dir, ".hv", "DECISIONS.md"), "# Decisions\n\n## Architecture\n\n### Rule\n")
+			want, got := knFrozen(t, dir, c.stdin, c.newArgs...)
+			if want.RC != c.oldRC || got.RC != c.wantRC {
+				t.Fatalf("rc frozen=%d (want %d) new=%d (want %d)\nfrozen: %s\nnew: %s", want.RC, c.oldRC, got.RC, c.wantRC, want.Stderr, got.Stderr)
 			}
-			o := knOld(t, oldDir, c.stdin, "hv-managed-block", c.oldArgs...)
-			n := knNew(t, newDir, c.stdin, c.newArgs...)
-			if o.rc != c.oldRC || n.rc != c.wantRC {
-				t.Fatalf("rc old=%d (want %d) new=%d (want %d)\nold: %s\nnew: %s", o.rc, c.oldRC, n.rc, c.wantRC, o.stderr, n.stderr)
+			if c.oldRC == 0 && strings.TrimSpace(want.Stdout) != strings.TrimSpace(got.Stdout) {
+				t.Errorf("status frozen=%q new=%q", want.Stdout, got.Stdout)
 			}
-			if c.oldRC == 0 && strings.TrimSpace(o.stdout) != strings.TrimSpace(n.stdout) {
-				t.Errorf("status old=%q new=%q", o.stdout, n.stdout)
-			}
-			knSameTree(t, oldDir, newDir)
+			knSameDelta(t, want, got)
 		})
 	}
 }
@@ -220,32 +197,27 @@ func TestBlockIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestBlockSkillsMatchesOldHelper(t *testing.T) {
-	oldDir, newDir := glProject(t, false, glFixtureTerms), glProject(t, false, glFixtureTerms)
-	o := knOld(t, oldDir, "", "hv-skills-index")
-	n := knNew(t, newDir, "", "block", "skills")
-	if o.rc != 0 || n.rc != 0 {
-		t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+func TestBlockSkillsMatchGolden(t *testing.T) {
+	dir := glProject(t, false, glFixtureTerms)
+	want, got := knFrozen(t, dir, "", "block", "skills")
+	if want.RC != 0 || got.RC != 0 {
+		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
 	// The body names hv verbs, a deliberate break from the old helper's text
 	// (contract, A9 G4): everything around the body must still match.
-	agents := filepath.Join(oldDir, "AGENTS.md")
-	b, err := os.ReadFile(agents)
-	if err != nil {
-		t.Fatal(err)
-	}
 	block := regexp.MustCompile(`(?s)<!-- hv-skills-start -->\n.*?\n<!-- hv-skills-end -->`)
-	if !block.Match(b) {
-		t.Fatalf("old helper wrote no skills block:\n%s", b)
+	agents := want.Changed["../AGENTS.md"]
+	if !block.MatchString(agents) {
+		t.Fatalf("frozen helper wrote no skills block:\n%s", agents)
 	}
-	knWrite(t, agents, string(block.ReplaceAllLiteral(b, []byte("<!-- hv-skills-start -->\n"+knowledge.SkillsBlockBody()+"\n<!-- hv-skills-end -->"))))
-	knSameTree(t, oldDir, newDir)
-	if got := knNew(t, newDir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
+	want.Changed["../AGENTS.md"] = block.ReplaceAllLiteralString(agents, "<!-- hv-skills-start -->\n"+knowledge.SkillsBlockBody()+"\n<!-- hv-skills-end -->")
+	knSameDelta(t, want, got)
+	if got := knNew(t, dir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
 		t.Errorf("skills with a body: rc=%d", got.rc)
 	}
 }
 
-func TestInstructionsInitMatchesOldHelper(t *testing.T) {
+func TestInstructionsInitMatchGolden(t *testing.T) {
 	blocks := "<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\n<!-- hv:decisions:start -->\nD\n<!-- hv:decisions:end -->\n"
 	cases := []struct {
 		name          string
@@ -261,26 +233,23 @@ func TestInstructionsInitMatchesOldHelper(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := knProject(t, false), knProject(t, false)
-			for _, d := range []string{oldDir, newDir} {
-				if c.claude != "" {
-					knWrite(t, filepath.Join(d, "CLAUDE.md"), c.claude)
-				}
-				if c.agent != "" {
-					knWrite(t, filepath.Join(d, "AGENTS.md"), c.agent)
-				}
+			dir := knProject(t, false)
+			if c.claude != "" {
+				knWrite(t, filepath.Join(dir, "CLAUDE.md"), c.claude)
 			}
-			o := knOld(t, oldDir, "", "hv-instructions-init")
-			n := knNew(t, newDir, "", "instructions", "init")
-			if o.rc != 0 || n.rc != 0 {
-				t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+			if c.agent != "" {
+				knWrite(t, filepath.Join(dir, "AGENTS.md"), c.agent)
 			}
-			if o.stdout != n.stdout {
-				t.Errorf("actions differ\nold: %q\nnew: %q", o.stdout, n.stdout)
+			want, got := knFrozen(t, dir, "", "instructions", "init")
+			if want.RC != 0 || got.RC != 0 {
+				t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
+			if want.Stdout != got.Stdout {
+				t.Errorf("actions differ\nfrozen: %q\nnew: %q", want.Stdout, got.Stdout)
+			}
+			knSameDelta(t, want, got)
 			// A second run has nothing left to do.
-			again := knNew(t, newDir, "", "instructions", "init", "--json")
+			again := knNew(t, dir, "", "instructions", "init", "--json")
 			if !strings.Contains(again.stdout, `"actions": [], "changed": false`) {
 				t.Errorf("second run not a no-op: %s", again.stdout)
 			}
@@ -304,40 +273,32 @@ func TestInstructionsInitSkipsSymlinks(t *testing.T) {
 }
 
 // CRLF files are read as LF and rewritten as pure LF, like the old helpers.
-func TestCRLFMatchesOldHelpersForGlossaryBlocksAndInstructions(t *testing.T) {
+func TestCRLFMatchGoldenForGlossaryBlocksAndInstructions(t *testing.T) {
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	t.Run("glossary write and block", func(t *testing.T) {
-		oldDir, newDir := glProject(t, false, crlf(glFixtureTerms)), glProject(t, false, crlf(glFixtureTerms))
-		for _, d := range []string{oldDir, newDir} {
-			knWrite(t, filepath.Join(d, "AGENTS.md"), crlf("# Agents\n\ntext\n"))
+		dir := glProject(t, false, crlf(glFixtureTerms))
+		knWrite(t, filepath.Join(dir, "AGENTS.md"), crlf("# Agents\n\ntext\n"))
+		want, got := knFrozen(t, dir, "", "glossary", "write", "Batch", "--def", "a group")
+		if want.RC != 0 || got.RC != 0 {
+			t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 		}
-		o := knOld(t, oldDir, "", "hv-glossary-write", "Batch", "--def", "a group")
-		n := knNew(t, newDir, "", "glossary", "write", "Batch", "--def", "a group")
-		if o.rc != 0 || n.rc != 0 {
-			t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
-		}
-		knSameTree(t, oldDir, newDir)
-		for k, v := range knTree(t, newDir) {
+		knSameDelta(t, want, got)
+		for k, v := range knTree(t, dir) {
 			if strings.Contains(v, "\r") && !strings.HasSuffix(k, ".lock") {
 				t.Errorf("%s kept CR", k)
 			}
 		}
 	})
 	t.Run("glossary read", func(t *testing.T) {
-		dir := glProject(t, false, crlf(glFixtureTerms))
-		o := knOld(t, dir, "", "hv-glossary-read", "worker")
-		n := knNew(t, dir, "", "glossary", "read", "worker")
-		if o.stdout != n.stdout {
-			t.Errorf("old %q new %q", o.stdout, n.stdout)
+		want, got := knFrozen(t, glProject(t, false, crlf(glFixtureTerms)), "", "glossary", "read", "worker")
+		if want.Stdout != got.Stdout {
+			t.Errorf("frozen %q new %q", want.Stdout, got.Stdout)
 		}
 	})
 	t.Run("instructions init", func(t *testing.T) {
-		oldDir, newDir := knProject(t, false), knProject(t, false)
-		for _, d := range []string{oldDir, newDir} {
-			knWrite(t, filepath.Join(d, "CLAUDE.md"), crlf("# Mine\n\n<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\nafter\n"))
-		}
-		knOld(t, oldDir, "", "hv-instructions-init")
-		knNew(t, newDir, "", "instructions", "init")
-		knSameTree(t, oldDir, newDir)
+		dir := knProject(t, false)
+		knWrite(t, filepath.Join(dir, "CLAUDE.md"), crlf("# Mine\n\n<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\nafter\n"))
+		want, got := knFrozen(t, dir, "", "instructions", "init")
+		knSameDelta(t, want, got)
 	})
 }

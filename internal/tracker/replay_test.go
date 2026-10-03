@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -16,9 +15,10 @@ import (
 	"time"
 )
 
-// The fixtures in testdata/ are the M07 Python adapters recorded against the
-// offline fake gh/glab by testdata/record.py: every CLI call each step made
-// and what the adapter returned. Replaying them proves the Go adapters make
+// The fixtures in testdata/ are the retired M07 Python adapters recorded
+// against the offline fake gh/glab: every CLI call each step made and what the
+// adapter returned. They are frozen; the recorder is gone, so a fixture changes
+// only by reviewed hand edit. Replaying them proves the Go adapters make
 // the same calls, in the same order, and return the same values, apart from
 // two deliberate fixes the review of #90 asked for (see divergeArgv and
 // divergeResult).
@@ -51,27 +51,6 @@ type recording struct {
 func TestReplayRecordedFixtures(t *testing.T) {
 	for _, p := range []string{"github", "gitlab"} {
 		t.Run(p, func(t *testing.T) { replay(t, filepath.Join("testdata", p+".json")) })
-	}
-}
-
-// TestFixturesAreCurrent re-records against the Python adapters, while they
-// still exist in bin/, and replays the fresh recording.
-func TestFixturesAreCurrent(t *testing.T) {
-	if testing.Short() {
-		t.Skip("re-recording runs the Python adapters")
-	}
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not on PATH")
-	}
-	if _, err := os.Stat(filepath.Join("..", "..", "bin", "hvlib_tracker.py")); err != nil {
-		t.Skip("bin/hvlib_tracker.py is gone")
-	}
-	dir := t.TempDir()
-	if out, err := exec.Command("python3", filepath.Join("testdata", "record.py"), dir).CombinedOutput(); err != nil {
-		t.Fatalf("record.py: %v\n%s", err, out)
-	}
-	for _, p := range []string{"github", "gitlab"} {
-		t.Run(p, func(t *testing.T) { replay(t, filepath.Join(dir, p+".json")) })
 	}
 }
 

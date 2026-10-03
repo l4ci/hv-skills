@@ -2,18 +2,23 @@ package cli
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-// The parity tests run an old bin/ helper and the matching hv verb on copies
-// of one fixture and diff the resulting .hv/ trees: the files must be
-// byte-identical (docs: round-3 porter rules, parity target).
+// The parity tests run an hv verb on a fixture and compare its output and the
+// resulting .hv/ tree delta with a golden: what the retired bin/ helper
+// produced for the same case (testdata/golden, via knFrozen).
 
 const knFixtureKnowledge = `# Knowledge
 
@@ -102,37 +107,6 @@ type knOut struct {
 	rc             int
 }
 
-func knRepoRoot(t *testing.T) string {
-	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return filepath.Join(wd, "..", "..")
-}
-
-// knOld runs an old helper from bin/ in dir.
-func knOld(t *testing.T, dir, stdin, helper string, args ...string) knOut {
-	t.Helper()
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not available")
-	}
-	cmd := exec.Command(filepath.Join(knRepoRoot(t), "bin", helper), args...)
-	cmd.Dir = dir
-	cmd.Stdin = strings.NewReader(stdin)
-	var so, se bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &so, &se
-	rc := 0
-	if err := cmd.Run(); err != nil {
-		ee, ok := err.(*exec.ExitError)
-		if !ok {
-			t.Fatalf("%s: %v", helper, err)
-		}
-		rc = ee.ExitCode()
-	}
-	return knOut{so.String(), se.String(), rc}
-}
-
 // knNew runs hv in dir.
 func knNew(t *testing.T, dir, stdin string, args ...string) knOut {
 	t.Helper()
@@ -180,212 +154,231 @@ func knTree(t *testing.T, dir string) map[string]string {
 	return out
 }
 
-func knSameTree(t *testing.T, a, b string) {
+// knFrozenOut is what a retired bin/ helper produced for one call, frozen in
+// testdata/golden: its streams, exit code and the .hv/ tree delta it left.
+type knFrozenOut struct {
+	Stdout  string            `json:"stdout"`
+	Stderr  string            `json:"stderr"`
+	RC      int               `json:"rc"`
+	Changed map[string]string `json:"changed"` // path -> content, files added or rewritten
+	Removed []string          `json:"removed"`
+}
+
+var knLoggedAt = regexp.MustCompile(`"loggedAt": "[^"]*"`)
+
+// knDelta is the change between two knTree snapshots. Backup directory
+// timestamps and loggedAt stamps are normalised, they differ per run.
+func knDelta(before, after map[string]string) (changed map[string]string, removed []string) {
+	changed, removed = map[string]string{}, []string{}
+	for k, v := range after {
+		if old, ok := before[k]; !ok || old != v {
+			changed[migTS.ReplaceAllString(k, "migrate-backup/TS")] = knLoggedAt.ReplaceAllString(v, `"loggedAt": "TS"`)
+		}
+	}
+	for k := range before {
+		if _, ok := after[k]; !ok {
+			removed = append(removed, migTS.ReplaceAllString(k, "migrate-backup/TS"))
+		}
+	}
+	sort.Strings(removed)
+	return changed, removed
+}
+
+// knFrozenInputs names one case: the hv argv, its stdin and a digest of the
+// fixture tree it starts from, so a changed case fails against the golden.
+func knFrozenInputs(before map[string]string, stdin string, args []string) map[string]any {
+	norm := map[string]string{}
+	for k, v := range before {
+		norm[k] = knLoggedAt.ReplaceAllString(v, `"loggedAt": "TS"`)
+	}
+	raw, _ := json.Marshal(norm)
+	sum := sha256.Sum256(raw)
+	return map[string]any{"argv": args, "stdin": stdin, "fixture": hex.EncodeToString(sum[:])}
+}
+
+// knFrozen runs hv in dir like knNew and returns what the retired helper
+// produced for the same case (want, read from the golden) next to what hv did
+// (got, with its tree delta). Call it once per recorded case, in order.
+func knFrozen(t *testing.T, dir, stdin string, args ...string) (want, got knFrozenOut) {
 	t.Helper()
-	ta, tb := knTree(t, a), knTree(t, b)
+	before := knTree(t, dir)
+	pytest.Golden(t, knFrozenInputs(before, stdin, args), &want)
+	n := knNew(t, dir, stdin, args...)
+	got = knFrozenOut{Stdout: n.stdout, Stderr: n.stderr, RC: n.rc}
+	got.Changed, got.Removed = knDelta(before, knTree(t, dir))
+	return want, got
+}
+
+// knSameDelta reports where hv's tree delta differs from the frozen one.
+func knSameDelta(t *testing.T, want, got knFrozenOut) {
+	t.Helper()
 	var names []string
 	seen := map[string]bool{}
-	for k := range ta {
-		seen[k] = true
-		names = append(names, k)
-	}
-	for k := range tb {
-		if !seen[k] {
-			names = append(names, k)
+	for _, m := range []map[string]string{want.Changed, got.Changed} {
+		for k := range m {
+			if !seen[k] {
+				seen[k] = true
+				names = append(names, k)
+			}
 		}
 	}
 	sort.Strings(names)
 	for _, k := range names {
-		va, oka := ta[k]
-		vb, okb := tb[k]
+		w, wok := want.Changed[k]
+		g, gok := got.Changed[k]
 		switch {
-		case oka != okb:
-			t.Errorf(".hv/%s: exists in old=%v new=%v", k, oka, okb)
-		case va != vb:
-			t.Errorf(".hv/%s differs\n--- old ---\n%s\n--- new ---\n%s", k, va, vb)
+		case wok != gok:
+			t.Errorf(".hv/%s written: frozen=%v hv=%v", k, wok, gok)
+		case w != g:
+			t.Errorf(".hv/%s differs\n--- frozen ---\n%s\n--- hv ---\n%s", k, w, g)
 		}
+	}
+	if strings.Join(want.Removed, "\n") != strings.Join(got.Removed, "\n") {
+		t.Errorf("removed files: frozen=%v hv=%v", want.Removed, got.Removed)
 	}
 }
 
-// knStep is one parity case: the old helper call and the hv call that
-// replaces it, run on separate copies of the same fixture.
+// knStep is one parity case: the hv call whose result is compared with the
+// frozen helper call on the same fixture.
 type knStep struct {
 	name     string
-	oldHelp  string
-	oldArgs  []string
 	newArgs  []string
 	stdin    string
 	umbrella bool
-	// noStdout skips the stdout comparison (old helpers print status on stderr
-	// or nothing, hv prints a human line).
-	noStdout bool
-	wantRC   int // hv exit code; the old helper's must map to it via rcMap
-	oldRC    int
+	wantRC   int // hv exit code
+	oldRC    int // the helper's exit code, frozen in the golden
 }
 
-func TestKnowledgeWritesMatchOldHelpers(t *testing.T) {
+func TestKnowledgeWritesMatchGolden(t *testing.T) {
 	steps := []knStep{
-		{name: "add new bullet", oldHelp: "hv-knowledge-merge",
-			oldArgs: []string{"--topic", "Build", "--title", "Delta tip", "--date", "2026-05-05", "--body", "Use the shim."},
+		{name: "add new bullet",
 			newArgs: []string{"knowledge", "add", "--topic", "Build", "--title", "Delta tip", "--date", "2026-05-05", "--body-file", "-"},
-			stdin:   "Use the shim.\n", noStdout: true},
-		{name: "add duplicate title is a no-op", oldHelp: "hv-knowledge-merge",
-			oldArgs: []string{"--topic", "Architecture", "--title", "alpha RULE", "--body", "x"},
+			stdin:   "Use the shim.\n"},
+		{name: "add duplicate title is a no-op",
 			newArgs: []string{"knowledge", "add", "--topic", "Architecture", "--title", "alpha RULE", "--body-file", "-"},
-			stdin:   "x", noStdout: true},
-		{name: "add to sub-repo scope", oldHelp: "hv-knowledge-merge", umbrella: true,
-			oldArgs: []string{"--repo", "web", "--topic", "Architecture", "--title", "Web two", "--date", "2026-05-06", "--body", "More UI."},
+			stdin:   "x"},
+		{name: "add to sub-repo scope", umbrella: true,
 			newArgs: []string{"knowledge", "add", "--repo", "web", "--topic", "Architecture", "--title", "Web two", "--date", "2026-05-06", "--body-file", "-"},
-			stdin:   "More UI.", noStdout: true},
-		{name: "add under missing topic", oldHelp: "hv-knowledge-merge",
-			oldArgs: []string{"--topic", "Nope", "--title", "t", "--body", "b"},
+			stdin:   "More UI."},
+		{name: "add under missing topic",
 			newArgs: []string{"knowledge", "add", "--topic", "Nope", "--title", "t", "--body-file", "-"},
-			stdin:   "b", noStdout: true, oldRC: 1, wantRC: 3},
-		{name: "amend", oldHelp: "hv-knowledge-amend",
-			oldArgs: []string{"--topic", "Architecture", "--fragment", "Beta", "--append", "(see #12)"},
+			stdin:   "b", oldRC: 1, wantRC: 3},
+		{name: "amend",
 			newArgs: []string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"},
-			stdin:   "(see #12)\n", noStdout: true},
-		{name: "amend in sub-repo", oldHelp: "hv-knowledge-amend", umbrella: true,
-			oldArgs: []string{"--repo", "web", "--topic", "Architecture", "--fragment", "Web rule", "--append", "extra"},
+			stdin:   "(see #12)\n"},
+		{name: "amend in sub-repo", umbrella: true,
 			newArgs: []string{"knowledge", "amend", "--repo", "web", "--topic", "Architecture", "--fragment", "Web rule", "--mode", "append", "--body-file", "-"},
-			stdin:   "extra", noStdout: true},
-		{name: "amend finds nothing", oldHelp: "hv-knowledge-amend",
-			oldArgs: []string{"--topic", "Architecture", "--fragment", "zzz", "--append", "q"},
+			stdin:   "extra"},
+		{name: "amend finds nothing",
 			newArgs: []string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "zzz", "--mode", "append", "--body-file", "-"},
-			stdin:   "q", noStdout: true, oldRC: 1, wantRC: 3},
-		{name: "rename whole topic", oldHelp: "hv-knowledge-rename-topic",
-			oldArgs: []string{"--from", "Architecture", "--to", "Design"},
-			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Design"}, noStdout: true},
-		{name: "rename onto existing topic", oldHelp: "hv-knowledge-rename-topic",
-			oldArgs: []string{"--from", "Architecture", "--to", "Build"},
-			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build"}, noStdout: true, oldRC: 1, wantRC: 4},
-		{name: "move one bullet", oldHelp: "hv-knowledge-rename-topic",
-			oldArgs: []string{"--from", "Architecture", "--to", "Build", "--title", "Beta rule"},
-			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, noStdout: true},
-		{name: "move one bullet backwards", oldHelp: "hv-knowledge-rename-topic",
-			oldArgs: []string{"--from", "Build", "--to", "Architecture", "--title", "Gamma tip"},
-			newArgs: []string{"knowledge", "rename-topic", "--from", "Build", "--to", "Architecture", "--title", "Gamma tip"}, noStdout: true},
-		{name: "tier set", oldHelp: "hv-knowledge-tier",
-			oldArgs: []string{"--set", "--topic", "Architecture", "--title", "Beta rule", "--tier", "confirmed"},
-			newArgs: []string{"knowledge", "tier", "set", "--topic", "Architecture", "--title", "Beta rule", "--tier", "confirmed"}, noStdout: true},
-		{name: "tier set untracked", oldHelp: "hv-knowledge-tier",
-			oldArgs: []string{"--set", "--topic", "Build", "--title", "Gamma tip", "--tier", "deprecated"},
-			newArgs: []string{"knowledge", "tier", "set", "--topic", "Build", "--title", "Gamma tip", "--tier", "deprecated"}, noStdout: true},
-		{name: "hit increments", oldHelp: "hv-knowledge-hit",
-			oldArgs: []string{"--topic", "Architecture", "--title", "Beta rule"},
-			newArgs: []string{"knowledge", "hit", "--topic", "Architecture", "--title", "Beta rule"}, noStdout: true},
-		{name: "hit creates untracked", oldHelp: "hv-knowledge-hit",
-			oldArgs: []string{"--topic", "Build", "--title", "Gamma tip"},
-			newArgs: []string{"knowledge", "hit", "--topic", "Build", "--title", "Gamma tip"}, noStdout: true},
-		{name: "contradiction add", oldHelp: "hv-knowledge-contradiction",
-			oldArgs: []string{"--add", "--topic", "Architecture", "--title", "Beta rule", "--text", "no, use dirs"},
-			newArgs: []string{"knowledge", "contradiction", "add", "--topic", "Architecture", "--title", "Beta rule", "--text", "no, use dirs"}, noStdout: true},
-		{name: "contradiction clear", oldHelp: "hv-knowledge-contradiction",
-			oldArgs: []string{"--clear"},
-			newArgs: []string{"knowledge", "contradiction", "clear"}, noStdout: true},
+			stdin:   "q", oldRC: 1, wantRC: 3},
+		{name: "rename whole topic",
+			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Design"}},
+		{name: "rename onto existing topic",
+			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build"}, oldRC: 1, wantRC: 4},
+		{name: "move one bullet",
+			newArgs: []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}},
+		{name: "move one bullet backwards",
+			newArgs: []string{"knowledge", "rename-topic", "--from", "Build", "--to", "Architecture", "--title", "Gamma tip"}},
+		{name: "tier set",
+			newArgs: []string{"knowledge", "tier", "set", "--topic", "Architecture", "--title", "Beta rule", "--tier", "confirmed"}},
+		{name: "tier set untracked",
+			newArgs: []string{"knowledge", "tier", "set", "--topic", "Build", "--title", "Gamma tip", "--tier", "deprecated"}},
+		{name: "hit increments",
+			newArgs: []string{"knowledge", "hit", "--topic", "Architecture", "--title", "Beta rule"}},
+		{name: "hit creates untracked",
+			newArgs: []string{"knowledge", "hit", "--topic", "Build", "--title", "Gamma tip"}},
+		{name: "contradiction add",
+			newArgs: []string{"knowledge", "contradiction", "add", "--topic", "Architecture", "--title", "Beta rule", "--text", "no, use dirs"}},
+		{name: "contradiction clear",
+			newArgs: []string{"knowledge", "contradiction", "clear"}},
 	}
 	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {
-			oldDir, newDir := knProject(t, s.umbrella), knProject(t, s.umbrella)
-			o := knOld(t, oldDir, s.stdin, s.oldHelp, s.oldArgs...)
-			n := knNew(t, newDir, s.stdin, s.newArgs...)
-			if o.rc != s.oldRC {
-				t.Fatalf("old helper rc = %d, want %d; stderr: %s", o.rc, s.oldRC, o.stderr)
+			want, got := knFrozen(t, knProject(t, s.umbrella), s.stdin, s.newArgs...)
+			if want.RC != s.oldRC {
+				t.Fatalf("frozen helper rc = %d, want %d; stderr: %s", want.RC, s.oldRC, want.Stderr)
 			}
-			if n.rc != s.wantRC {
-				t.Fatalf("hv rc = %d, want %d; stderr: %s", n.rc, s.wantRC, n.stderr)
+			if got.RC != s.wantRC {
+				t.Fatalf("hv rc = %d, want %d; stderr: %s", got.RC, s.wantRC, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
+			knSameDelta(t, want, got)
 		})
 	}
 }
 
-// TestKnowledgeSequenceMatchesOldHelpers chains calls so state accumulates,
+// TestKnowledgeSequenceMatchGolden chains calls so state accumulates,
 // including auto-promotion at the hit threshold.
-func TestKnowledgeSequenceMatchesOldHelpers(t *testing.T) {
-	oldDir, newDir := knProject(t, false), knProject(t, false)
+func TestKnowledgeSequenceMatchGolden(t *testing.T) {
+	dir := knProject(t, false)
 	for i := 0; i < 3; i++ {
-		knOld(t, oldDir, "", "hv-knowledge-hit", "--topic", "Architecture", "--title", "Beta rule")
-		knNew(t, newDir, "", "knowledge", "hit", "--topic", "Architecture", "--title", "Beta rule")
+		want, got := knFrozen(t, dir, "", "knowledge", "hit", "--topic", "Architecture", "--title", "Beta rule")
+		knSameDelta(t, want, got)
 	}
-	knSameTree(t, oldDir, newDir)
-	if tier := knTree(t, newDir)["knowledge-tier.json"]; !strings.Contains(tier, `"tier": "confirmed"`) {
+	if tier := knTree(t, dir)["knowledge-tier.json"]; !strings.Contains(tier, `"tier": "confirmed"`) {
 		t.Fatalf("Beta rule not promoted:\n%s", tier)
 	}
 
 	// A pending contradiction blocks promotion.
-	knOld(t, oldDir, "", "hv-knowledge-contradiction", "--add", "--topic", "Build", "--title", "Gamma tip", "--text", "c")
-	knNew(t, newDir, "", "knowledge", "contradiction", "add", "--topic", "Build", "--title", "Gamma tip", "--text", "c")
+	want, got := knFrozen(t, dir, "", "knowledge", "contradiction", "add", "--topic", "Build", "--title", "Gamma tip", "--text", "c")
+	knSameDelta(t, want, got)
 	for i := 0; i < 4; i++ {
-		knOld(t, oldDir, "", "hv-knowledge-hit", "--topic", "Build", "--title", "Gamma tip")
-		knNew(t, newDir, "", "knowledge", "hit", "--topic", "Build", "--title", "Gamma tip")
+		want, got := knFrozen(t, dir, "", "knowledge", "hit", "--topic", "Build", "--title", "Gamma tip")
+		knSameDelta(t, want, got)
 	}
-	// loggedAt differs by wall clock: compare everything else.
-	to, tn := knTree(t, oldDir), knTree(t, newDir)
-	if to["knowledge-tier.json"] != tn["knowledge-tier.json"] {
-		t.Errorf("tier sidecar differs\nold:\n%s\nnew:\n%s", to["knowledge-tier.json"], tn["knowledge-tier.json"])
-	}
-	if !strings.Contains(tn["knowledge-tier.json"], `"Build::Gamma tip": {
+	if tier := knTree(t, dir)["knowledge-tier.json"]; !strings.Contains(tier, `"Build::Gamma tip": {
       "tier": "provisional",
       "hits": 4`) {
-		t.Errorf("promotion was not blocked:\n%s", tn["knowledge-tier.json"])
+		t.Errorf("promotion was not blocked:\n%s", tier)
 	}
 }
 
-func TestKnowledgeQueryMatchesOldHelper(t *testing.T) {
+func TestKnowledgeQueryMatchGolden(t *testing.T) {
 	cases := []struct {
 		name     string
 		umbrella bool
-		oldArgs  []string
 		newArgs  []string
 	}{
-		{"topics in document order", false, []string{"Build", "Architecture"}, []string{"knowledge", "query", "Build", "Architecture"}},
-		{"case-insensitive", false, []string{"architecture"}, []string{"knowledge", "query", "architecture"}},
-		{"include deprecated", false, []string{"--include-deprecated", "Architecture"}, []string{"knowledge", "query", "--include-deprecated", "Architecture"}},
-		{"tier filter", false, []string{"--tier", "confirmed", "Architecture"}, []string{"knowledge", "query", "--tier", "confirmed", "Architecture"}},
-		{"unmatched topic", false, []string{"Architecture", "Nope"}, []string{"knowledge", "query", "Architecture", "Nope"}},
-		{"sub-repo hybrid", true, []string{"--repo", "web", "Architecture", "Build"}, []string{"knowledge", "query", "--repo", "web", "Architecture", "Build"}},
+		{"topics in document order", false, []string{"knowledge", "query", "Build", "Architecture"}},
+		{"case-insensitive", false, []string{"knowledge", "query", "architecture"}},
+		{"include deprecated", false, []string{"knowledge", "query", "--include-deprecated", "Architecture"}},
+		{"tier filter", false, []string{"knowledge", "query", "--tier", "confirmed", "Architecture"}},
+		{"unmatched topic", false, []string{"knowledge", "query", "Architecture", "Nope"}},
+		{"sub-repo hybrid", true, []string{"knowledge", "query", "--repo", "web", "Architecture", "Build"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			dir := knProject(t, c.umbrella)
-			o := knOld(t, dir, "", "hv-knowledge-query", c.oldArgs...)
-			n := knNew(t, dir, "", c.newArgs...)
-			if o.stdout != n.stdout {
-				t.Errorf("stdout differs\n--- old ---\n%s\n--- new ---\n%s", o.stdout, n.stdout)
+			want, got := knFrozen(t, knProject(t, c.umbrella), "", c.newArgs...)
+			if want.Stdout != got.Stdout {
+				t.Errorf("stdout differs\n--- frozen ---\n%s\n--- new ---\n%s", want.Stdout, got.Stdout)
 			}
-			if o.rc != 0 || n.rc != 0 {
-				t.Errorf("rc old=%d new=%d", o.rc, n.rc)
+			if want.RC != 0 || got.RC != 0 {
+				t.Errorf("rc frozen=%d new=%d", want.RC, got.RC)
 			}
-			warnOld := strings.Count(o.stderr, "no topic heading matches")
-			warnNew := strings.Count(n.stderr, "no topic heading matches")
+			warnOld := strings.Count(want.Stderr, "no topic heading matches")
+			warnNew := strings.Count(got.Stderr, "no topic heading matches")
 			if warnOld != warnNew {
-				t.Errorf("warnings old=%d new=%d\n%s", warnOld, warnNew, n.stderr)
+				t.Errorf("warnings frozen=%d new=%d\n%s", warnOld, warnNew, got.Stderr)
 			}
 		})
 	}
 }
 
-func TestKnowledgeStatsMatchesOldHelper(t *testing.T) {
+func TestKnowledgeStats(t *testing.T) {
 	dir := knProject(t, false)
-	o := knOld(t, dir, "", "hv-knowledge-stats")
 	n := knNew(t, dir, "", "knowledge", "stats", "--json")
 	for _, want := range []string{`"name": "Architecture", "bullets": 3`, `"name": "Glossary"`} {
 		if !strings.Contains(n.stdout, want) {
 			t.Errorf("stats missing %s: %s", want, n.stdout)
 		}
 	}
-	if !strings.Contains(o.stdout, `"bullets": 3`) {
-		t.Fatalf("old stats unexpected: %s", o.stdout)
-	}
 }
 
-func TestKnowledgeTierReadsMatchOldHelper(t *testing.T) {
+func TestKnowledgeTierReads(t *testing.T) {
 	dir := knProject(t, false)
-	o := knOld(t, dir, "", "hv-knowledge-tier", "--list", "--tier", "confirmed")
 	n := knNew(t, dir, "", "knowledge", "tier", "list", "--tier", "confirmed", "--json")
-	if !strings.Contains(o.stdout, `"title": "Alpha rule"`) || !strings.Contains(n.stdout, `"title": "Alpha rule"`) || strings.Contains(n.stdout, "Beta") {
-		t.Errorf("old=%s\nnew=%s", o.stdout, n.stdout)
+	if !strings.Contains(n.stdout, `"title": "Alpha rule"`) || strings.Contains(n.stdout, "Beta") {
+		t.Errorf("list: %s", n.stdout)
 	}
 	g := knNew(t, dir, "", "knowledge", "tier", "get", "--topic", "Architecture", "--title", "Nope", "--json")
 	if g.rc != 0 || !strings.Contains(g.stdout, `"found": false`) {
@@ -440,33 +433,27 @@ func TestKnowledgeHitJSON(t *testing.T) {
 
 // A CRLF KNOWLEDGE.md is read as LF and rewritten as pure LF, like the old
 // helpers (Python's read_text normalizes line endings).
-func TestKnowledgeCRLFMatchesOldHelpers(t *testing.T) {
+func TestKnowledgeCRLFMatchGolden(t *testing.T) {
 	crlf := strings.ReplaceAll(knFixtureKnowledge, "\n", "\r\n")
 	steps := []struct {
-		helper  string
-		oldArgs []string
+		name    string
 		newArgs []string
 		stdin   string
 	}{
-		{"hv-knowledge-merge", []string{"--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body", "b"},
-			[]string{"knowledge", "add", "--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body-file", "-"}, "b"},
-		{"hv-knowledge-amend", []string{"--topic", "Architecture", "--fragment", "Beta", "--append", "more"},
-			[]string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"}, "more"},
-		{"hv-knowledge-rename-topic", []string{"--from", "Architecture", "--to", "Build", "--title", "Beta rule"},
-			[]string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, ""},
+		{"hv-knowledge-merge", []string{"knowledge", "add", "--topic", "Build", "--title", "Delta", "--date", "2026-05-05", "--body-file", "-"}, "b"},
+		{"hv-knowledge-amend", []string{"knowledge", "amend", "--topic", "Architecture", "--fragment", "Beta", "--mode", "append", "--body-file", "-"}, "more"},
+		{"hv-knowledge-rename-topic", []string{"knowledge", "rename-topic", "--from", "Architecture", "--to", "Build", "--title", "Beta rule"}, ""},
 	}
 	for _, s := range steps {
-		t.Run(s.helper, func(t *testing.T) {
-			oldDir, newDir := knProject(t, false), knProject(t, false)
-			knWrite(t, filepath.Join(oldDir, ".hv", "KNOWLEDGE.md"), crlf)
-			knWrite(t, filepath.Join(newDir, ".hv", "KNOWLEDGE.md"), crlf)
-			o := knOld(t, oldDir, s.stdin, s.helper, s.oldArgs...)
-			n := knNew(t, newDir, s.stdin, s.newArgs...)
-			if o.rc != 0 || n.rc != 0 {
-				t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+		t.Run(s.name, func(t *testing.T) {
+			dir := knProject(t, false)
+			knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), crlf)
+			want, got := knFrozen(t, dir, s.stdin, s.newArgs...)
+			if want.RC != 0 || got.RC != 0 {
+				t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
-			if strings.Contains(knTree(t, newDir)["KNOWLEDGE.md"], "\r") {
+			knSameDelta(t, want, got)
+			if strings.Contains(knTree(t, dir)["KNOWLEDGE.md"], "\r") {
 				t.Error("CR survived the rewrite")
 			}
 		})

@@ -1,21 +1,17 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
@@ -72,6 +68,10 @@ func reviewFeature(t *testing.T, repo string) {
 // svc sub-repo has the same branches.
 func reviewProject(t *testing.T) (plain, umb string) {
 	t.Helper()
+	// Fixed dates make the commit hashes the same on every run, so the
+	// goldens can hold the hashes the retired helpers printed.
+	t.Setenv("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
+	t.Setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
 	plain = newRepo(t, t.TempDir(), "proj", "main")
 	write(t, filepath.Join(plain, ".hv", "BACKLOG.md"), reviewBacklog)
 	reviewFeature(t, plain)
@@ -81,53 +81,62 @@ func reviewProject(t *testing.T) (plain, umb string) {
 	return plain, umb
 }
 
-func reviewRoot() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..")
+// reviewCall is one verb run in the plain project or the umbrella; the goldens
+// hold what the retired helpers (through the old test shim) answered.
+type reviewCall struct {
+	Name string
+	Umb  bool
+	Args []string
 }
 
-// reviewShim runs the old helpers through the test shim.
-func reviewShim(t *testing.T, dir string, args ...string) (int, map[string]any) {
-	t.Helper()
-	root := reviewRoot()
-	cmd := exec.Command("python3", append([]string{filepath.Join(root, "test", "hv-shim"), "--json"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "HV_SHIM_HELPERS="+filepath.Join(root, "bin"))
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	_ = cmd.Run()
-	var env map[string]any
-	if err := json.Unmarshal(out.Bytes(), &env); err != nil {
-		t.Fatalf("shim %v: %v\n%s", args, err, out.String())
-	}
-	return cmd.ProcessState.ExitCode(), env
+// reviewWant is the retired helper's exit code and, on success, its data.
+type reviewWant struct {
+	RC   int `json:"rc"`
+	Data any `json:"data"`
 }
 
-// reviewBoth runs a verb through the shim and the Go binary; exit codes must
-// agree and, on success, the data too.
-func reviewBoth(t *testing.T, name, dir string, args ...string) map[string]any {
+// reviewCheck runs each call through the Go binary and compares the exit code
+// and, on success, the data with the golden. It returns the data per call.
+func reviewCheck(t *testing.T, plain, umb string, calls []reviewCall) []map[string]any {
 	t.Helper()
-	oc, oenv := reviewShim(t, dir, args...)
-	o := trRun(t, dir, "", append(append([]string{}, args...), "--json")...)
-	if o.code != oc {
-		t.Fatalf("%s: go exit %d, old exit %d\n%s%s", name, o.code, oc, o.stdout, o.stderr)
-	}
-	env := envelope(t, o.stdout)
-	if oc != 0 {
-		if env["data"] != nil {
-			t.Errorf("%s: failure carries data %v", name, env["data"])
+	var want []reviewWant
+	pytest.Golden(t, calls, &want)
+	out := make([]map[string]any, len(calls))
+	for i, c := range calls {
+		dir := plain
+		if c.Umb {
+			dir = umb
 		}
-		return nil
+		o := trRun(t, dir, "", append(append([]string{}, c.Args...), "--json")...)
+		if o.code != want[i].RC {
+			t.Fatalf("%s: go exit %d, golden exit %d\n%s%s", c.Name, o.code, want[i].RC, o.stdout, o.stderr)
+		}
+		env := envelope(t, o.stdout)
+		if want[i].RC != 0 {
+			if env["data"] != nil {
+				t.Errorf("%s: failure carries data %v", c.Name, env["data"])
+			}
+			continue
+		}
+		if !reflect.DeepEqual(env["data"], want[i].Data) {
+			t.Errorf("%s: data differs\ngo:     %v\ngolden: %v", c.Name, env["data"], want[i].Data)
+		}
+		out[i], _ = env["data"].(map[string]any)
 	}
-	if !reflect.DeepEqual(env["data"], oenv["data"]) {
-		t.Errorf("%s: data differs\ngo:  %v\nold: %v", name, env["data"], oenv["data"])
-	}
-	return env["data"].(map[string]any)
+	return out
 }
 
 func TestReviewScopeParity(t *testing.T) {
 	plain, umb := reviewProject(t)
-	data := reviewBoth(t, "plain", plain, "review", "scope", "feat/x")
+	got := reviewCheck(t, plain, umb, []reviewCall{
+		{"plain", false, []string{"review", "scope", "feat/x"}},
+		{"current branch", false, []string{"review", "scope"}},
+		{"umbrella --repo", true, []string{"review", "scope", "--repo", "svc", "feat/x"}},
+		{"umbrella no repo", true, []string{"review", "scope", "feat/x"}},
+		{"missing", false, []string{"review", "scope", "nope"}},
+		{"empty branch", false, []string{"review", "scope", "empty"}},
+	})
+	data := got[0]
 	if data["commitCount"] != 2.0 {
 		t.Errorf("commitCount %v", data["commitCount"])
 	}
@@ -138,11 +147,6 @@ func TestReviewScopeParity(t *testing.T) {
 	if b03 := intents[3].(map[string]any); b03["id"] != "B03" || b03["title"] != nil {
 		t.Errorf("a bullet without a title must give null: %v", b03)
 	}
-	reviewBoth(t, "current branch", plain, "review", "scope")
-	reviewBoth(t, "umbrella --repo", umb, "review", "scope", "--repo", "svc", "feat/x")
-	reviewBoth(t, "umbrella no repo", umb, "review", "scope", "feat/x")
-	reviewBoth(t, "missing", plain, "review", "scope", "nope")
-	reviewBoth(t, "empty branch", plain, "review", "scope", "empty")
 	for _, args := range [][]string{{"review", "scope", "main"}, {"review", "scope", "main", "--repo", "svc"}} {
 		dir := plain
 		if len(args) > 3 {
@@ -169,49 +173,42 @@ func TestReviewScopeParity(t *testing.T) {
 
 func TestReviewBriefParity(t *testing.T) {
 	plain, umb := reviewProject(t)
-	root := reviewRoot()
-	oldBrief := func(dir string, args ...string) (string, int) {
-		cmd := exec.Command("bash", append([]string{filepath.Join(root, "bin", "hv-second-opinion-brief")}, args...)...)
-		cmd.Dir = dir
-		var out, er bytes.Buffer
-		cmd.Stdout, cmd.Stderr = &out, &er
-		_ = cmd.Run()
-		if er.Len() > 0 {
-			t.Logf("old brief stderr: %s", er.String())
-		}
-		return out.String(), cmd.ProcessState.ExitCode()
-	}
-	// The old helper's --repo form calls hv-review-scope from inside the
-	// sub-repo, where repos.json is gone, so it fails; its in-repo run is the
-	// same scenario.
-	for _, c := range []struct {
-		dir, oldDir string
-		args        []string
+	// The retired helper's --repo form called hv-review-scope from inside the
+	// sub-repo, where repos.json is gone, so it failed; the golden holds its
+	// in-repo run, the same scenario.
+	runs := []struct {
+		Umb  bool
+		Args []string
 	}{
-		{plain, plain, []string{"review", "brief", "feat/x"}},
-		{umb, filepath.Join(umb, "svc"), []string{"review", "brief", "--repo", "svc", "feat/x"}},
-	} {
-		oldArgs := []string{"feat/x"}
-		want, rc := oldBrief(c.oldDir, oldArgs...)
-		if rc != 0 {
-			t.Fatalf("old brief rc %d", rc)
+		{false, []string{"review", "brief", "feat/x"}},
+		{true, []string{"review", "brief", "--repo", "svc", "feat/x"}},
+	}
+	var texts []string
+	pytest.Golden(t, runs, &texts)
+	for i, c := range runs {
+		dir := plain
+		if c.Umb {
+			dir = umb
 		}
-		o := trRun(t, c.dir, "", c.args...)
+		want := texts[i]
+		o := trRun(t, dir, "", c.Args...)
 		if o.code != 0 || o.stdout != want {
-			t.Errorf("%v: text differs (exit %d)\n--- go\n%q\n--- old\n%q", c.args, o.code, o.stdout, want)
+			t.Errorf("%v: text differs (exit %d)\n--- go\n%q\n--- golden\n%q", c.Args, o.code, o.stdout, want)
 		}
-		o = trRun(t, c.dir, "", append(append([]string{}, c.args...), "--json")...)
+		o = trRun(t, dir, "", append(append([]string{}, c.Args...), "--json")...)
 		data := envelope(t, o.stdout)["data"].(map[string]any)
 		if data["brief"] != want || data["commitCount"] != 2.0 || data["base"] != "main" || data["branch"] != "feat/x" {
-			t.Errorf("%v: data %v", c.args, data)
+			t.Errorf("%v: data %v", c.Args, data)
 		}
 		if len(data) != 4 {
 			t.Errorf("keys %v", data)
 		}
 	}
-	reviewBoth(t, "shim parity", plain, "review", "brief", "feat/x")
-	reviewBoth(t, "shim current", plain, "review", "brief")
-	reviewBoth(t, "missing", plain, "review", "brief", "nope")
+	reviewCheck(t, plain, umb, []reviewCall{
+		{"shim parity", false, []string{"review", "brief", "feat/x"}},
+		{"shim current", false, []string{"review", "brief"}},
+		{"missing", false, []string{"review", "brief", "nope"}},
+	})
 	if o := trRun(t, umb, "", "review", "brief", "feat/x"); o.code != 2 {
 		t.Errorf("umbrella without --repo: exit %d", o.code)
 	}
@@ -224,9 +221,6 @@ func TestReviewBriefParity(t *testing.T) {
 	if o.code != 1 || !strings.Contains(o.stderr, "branch 'empty' has no commits beyond 'main'") {
 		t.Errorf("empty: %d %s", o.code, o.stderr)
 	}
-	if _, rc := oldBrief(plain, "empty"); rc != 2 {
-		t.Errorf("old helper rc %d, want 2 (the shim maps it to 1)", rc)
-	}
 	// A bullet without a title printed Python's None.
 	if o := trRun(t, plain, "", "review", "brief", "feat/x"); !strings.Contains(o.stdout, "- [B03] None — ") {
 		t.Errorf("missing None title line")
@@ -235,8 +229,17 @@ func TestReviewBriefParity(t *testing.T) {
 
 func TestReviewScaffoldingParity(t *testing.T) {
 	plain, umb := reviewProject(t)
-	data := reviewBoth(t, "plain", plain, "review", "scaffolding", "feat/x")
-	findings := data["findings"].([]any)
+	got := reviewCheck(t, plain, umb, []reviewCall{
+		{"plain", false, []string{"review", "scaffolding", "feat/x"}},
+		{"explicit base", false, []string{"review", "scaffolding", "feat/x", "--base", "main"}},
+		{"current branch", false, []string{"review", "scaffolding"}},
+		{"umbrella --repo", true, []string{"review", "scaffolding", "--repo", "svc", "feat/x"}},
+		{"umbrella no repo", true, []string{"review", "scaffolding", "feat/x"}},
+		{"missing branch", false, []string{"review", "scaffolding", "nope"}},
+		{"missing base", false, []string{"review", "scaffolding", "feat/x", "--base", "nope"}},
+		{"empty", false, []string{"review", "scaffolding", "empty"}},
+	})
+	findings := got[0]["findings"].([]any)
 	if len(findings) < 6 {
 		t.Fatalf("expected matches in several hunks and files: %v", findings)
 	}
@@ -247,24 +250,16 @@ func TestReviewScaffoldingParity(t *testing.T) {
 	if !files["a.txt"] || !files["b.txt"] || !files["crlf.txt"] {
 		t.Errorf("files %v", files)
 	}
-	reviewBoth(t, "explicit base", plain, "review", "scaffolding", "feat/x", "--base", "main")
-	reviewBoth(t, "current branch", plain, "review", "scaffolding")
-	reviewBoth(t, "umbrella --repo", umb, "review", "scaffolding", "--repo", "svc", "feat/x")
-	reviewBoth(t, "umbrella no repo", umb, "review", "scaffolding", "feat/x")
-	reviewBoth(t, "missing branch", plain, "review", "scaffolding", "nope")
-	reviewBoth(t, "missing base", plain, "review", "scaffolding", "feat/x", "--base", "nope")
-	reviewBoth(t, "no findings", plain, "review", "scaffolding", "empty")
-	if d := reviewBoth(t, "empty", plain, "review", "scaffolding", "empty"); len(d["findings"].([]any)) != 0 {
+	if d := got[7]; len(d["findings"].([]any)) != 0 {
 		t.Errorf("empty branch: %v", d)
 	}
 
-	// Text mode is the old helper's stdout.
-	cmd := exec.Command("bash", filepath.Join(reviewRoot(), "bin", "hv-review-scaffolding"), "main", "feat/x")
-	cmd.Dir = plain
-	want, _ := cmd.Output()
+	// Text mode is the retired helper's stdout.
+	var want string
+	pytest.Golden(t, []string{"review", "scaffolding", "feat/x"}, &want)
 	o := trRun(t, plain, "", "review", "scaffolding", "feat/x")
-	if o.code != 0 || o.stdout != string(want) {
-		t.Errorf("text differs\n--- go\n%q\n--- old\n%q", o.stdout, want)
+	if o.code != 0 || o.stdout != want {
+		t.Errorf("text differs\n--- go\n%q\n--- golden\n%q", o.stdout, want)
 	}
 	if o := trRun(t, umb, "", "review", "scaffolding", "feat/x"); o.code != 2 {
 		t.Errorf("umbrella no repo: exit %d", o.code)
@@ -276,7 +271,7 @@ func TestReviewScaffoldingParity(t *testing.T) {
 
 // TestReviewScaffoldingUnicode pins the one place the port differs from
 // Python's regex by construction: Go's \b is ASCII-only, so the port spells
-// the boundary out; the old helper's answer must still come out.
+// the boundary out; the retired helper's answer must still come out.
 func TestReviewScaffoldingUnicode(t *testing.T) {
 	plain, _ := reviewProject(t)
 	var texts []string

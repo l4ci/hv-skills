@@ -61,13 +61,12 @@ func decProject(t *testing.T, decisions, status string) string {
 	return dir
 }
 
-func TestDecisionsQueryMatchesOldHelper(t *testing.T) {
+func TestDecisionsQueryMatchGolden(t *testing.T) {
 	dir := decProject(t, decFixture, "")
 	for _, topics := range [][]string{{"build"}, {"Build", "architecture"}, {"nothing"}} {
-		o := knOld(t, dir, "", "hv-decisions-query", topics...)
-		n := knNew(t, dir, "", append([]string{"decisions", "query"}, topics...)...)
-		if o.stdout != n.stdout || n.rc != 0 {
-			t.Errorf("%v\n--- old ---\n%s\n--- new ---\n%s", topics, o.stdout, n.stdout)
+		want, got := knFrozen(t, dir, "", append([]string{"decisions", "query"}, topics...)...)
+		if want.Stdout != got.Stdout || got.RC != 0 {
+			t.Errorf("%v\n--- frozen ---\n%s\n--- new ---\n%s", topics, want.Stdout, got.Stdout)
 		}
 	}
 	j := knNew(t, dir, "", "decisions", "query", "Build", "ghost", "--json")
@@ -82,38 +81,32 @@ func TestDecisionsQueryMatchesOldHelper(t *testing.T) {
 	}
 }
 
-func TestDecisionsAutoLogMatchesOldHelper(t *testing.T) {
+func TestDecisionsAutoLogMatchGolden(t *testing.T) {
 	cases := []struct {
 		name         string
 		decisions    string
-		oldArgs      []string
 		newArgs      []string
 		wantMarker   string
 		wantUnchange bool
 	}{
 		{"new entry in existing topic", decFixture,
-			[]string{"Build", "Fresh rule", "because", "plan-9", "2026-10-05"},
 			[]string{"decisions", "auto-log", "--topic", "Build", "--title", "Fresh rule", "--why", "because", "--plan-key", "plan-9", "--date", "2026-10-05"}, "### Fresh rule", false},
 		{"new topic", decFixture,
-			[]string{"Release", "Tag first", "why not", "", "2026-10-05"},
 			[]string{"decisions", "auto-log", "--topic", "Release", "--title", "Tag first", "--why", "why not", "--date", "2026-10-05"}, "## Release", false},
 		{"repeat is a no-op", decFixture,
-			[]string{"Build", "Gate first", "again", "", "2026-10-05"},
 			[]string{"decisions", "auto-log", "--topic", "Build", "--title", "Gate first", "--why", "again", "--date", "2026-10-05"}, "", true},
 		{"file does not exist yet", "",
-			[]string{"Build", "First", "w", "", "2026-10-05"},
 			[]string{"decisions", "auto-log", "--topic", "Build", "--title", "First", "--why", "w", "--date", "2026-10-05"}, "### First", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oldDir, newDir := decProject(t, c.decisions, ""), decProject(t, c.decisions, "")
-			o := knOld(t, oldDir, "", "hv-auto-decision-log", c.oldArgs...)
-			n := knNew(t, newDir, "", c.newArgs...)
-			if o.rc != 0 || n.rc != 0 {
-				t.Fatalf("rc old=%d new=%d %s %s", o.rc, n.rc, o.stderr, n.stderr)
+			dir := decProject(t, c.decisions, "")
+			want, got := knFrozen(t, dir, "", c.newArgs...)
+			if want.RC != 0 || got.RC != 0 {
+				t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 			}
-			knSameTree(t, oldDir, newDir)
-			j := knNew(t, newDir, "", append(c.newArgs, "--json")...)
+			knSameDelta(t, want, got)
+			j := knNew(t, dir, "", append(c.newArgs, "--json")...)
 			if !strings.Contains(j.stdout, `"changed": false`) {
 				t.Errorf("second call not idempotent: %s", j.stdout)
 			}
@@ -136,9 +129,9 @@ func TestDecisionsAutoSince(t *testing.T) {
 		t.Errorf("got %s\nwant to contain %s", n.stdout, want)
 	}
 	// Text output and the old helper agree on the entries it can see.
-	o := knOld(t, dir, "", "hv-auto-decisions-since")
-	if o.stdout != knNew(t, dir, "", "decisions", "auto-since").stdout {
-		t.Errorf("text differs\nold: %q\nnew: %q", o.stdout, knNew(t, dir, "", "decisions", "auto-since").stdout)
+	frozen, text := knFrozen(t, dir, "", "decisions", "auto-since")
+	if frozen.Stdout != text.Stdout {
+		t.Errorf("text differs\nfrozen: %q\nnew: %q", frozen.Stdout, text.Stdout)
 	}
 	// No loop, no file: empty.
 	for _, d := range []string{decProject(t, decFixture, ""), decProject(t, "", status)} {
@@ -159,9 +152,9 @@ func TestDecisionsAutoSinceIgnoresFootersWithoutPlanKey(t *testing.T) {
 	if !strings.Contains(n.stdout, "With key") || strings.Contains(n.stdout, "No key") {
 		t.Errorf("got %q", n.stdout)
 	}
-	o := knOld(t, dir, "", "hv-auto-decisions-since")
-	if o.stdout != n.stdout {
-		t.Errorf("old=%q new=%q", o.stdout, n.stdout)
+	// The frozen helper run on the same tree printed the same.
+	if want, _ := knFrozen(t, dir, "", "decisions", "auto-since"); want.Stdout != n.stdout {
+		t.Errorf("frozen=%q new=%q", want.Stdout, n.stdout)
 	}
 }
 
@@ -178,18 +171,17 @@ func mapProject(t *testing.T) string {
 	return dir
 }
 
-func TestMapQueryAndQAQueryMatchOldHelpers(t *testing.T) {
+func TestMapQueryAndQAQueryMatchGolden(t *testing.T) {
 	dir := mapProject(t)
 	knWrite(t, filepath.Join(dir, ".hv", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n\n# Web QA\n")
-	for _, c := range []struct{ old, group string }{{"hv-map-query", "map"}, {"hv-qa-query", "qa"}} {
+	for _, group := range []string{"map", "qa"} {
 		names := []string{"cli", "ghost", "alpha", "web"}
-		o := knOld(t, dir, "", c.old, names...)
-		n := knNew(t, dir, "", append([]string{c.group, "query"}, names...)...)
-		if o.stdout != n.stdout || n.rc != 0 {
-			t.Errorf("%s\n--- old ---\n%s\n--- new ---\n%s", c.group, o.stdout, n.stdout)
+		want, got := knFrozen(t, dir, "", append([]string{group, "query"}, names...)...)
+		if want.Stdout != got.Stdout || got.RC != 0 {
+			t.Errorf("%s\n--- frozen ---\n%s\n--- new ---\n%s", group, want.Stdout, got.Stdout)
 		}
-		if got := knNew(t, dir, "", c.group, "query"); got.rc != 2 {
-			t.Errorf("%s with no name: rc=%d", c.group, got.rc)
+		if got := knNew(t, dir, "", group, "query"); got.rc != 2 {
+			t.Errorf("%s with no name: rc=%d", group, got.rc)
 		}
 	}
 	j := knNew(t, dir, "", "map", "query", "ghost", "../x", "--json")
@@ -200,34 +192,28 @@ func TestMapQueryAndQAQueryMatchOldHelpers(t *testing.T) {
 
 // The generated index blocks name the hv verb where the old ones named the
 // .hv/bin helper (verb contract); everything else must be identical.
-func TestMapAndQAIndexMatchOldHelpers(t *testing.T) {
-	for _, c := range []struct{ old, group, oldPath, newPath string }{
-		{"hv-map-index", "map", ".hv/bin/hv-map-query <name>", "hv map query <name>"},
-		{"hv-qa-index", "qa", ".hv/bin/hv-qa-query <target>", "hv qa query <target>"},
+func TestMapAndQAIndexMatchGolden(t *testing.T) {
+	for _, c := range []struct{ group, oldPath, newPath string }{
+		{"map", ".hv/bin/hv-map-query <name>", "hv map query <name>"},
+		{"qa", ".hv/bin/hv-qa-query <target>", "hv qa query <target>"},
 	} {
 		for _, withEntries := range []bool{true, false} {
-			oldDir, newDir := mapProject(t), mapProject(t)
+			dir := mapProject(t)
 			if !withEntries {
-				for _, d := range []string{oldDir, newDir} {
-					os.RemoveAll(filepath.Join(d, ".hv", "map"))
-				}
+				os.RemoveAll(filepath.Join(dir, ".hv", "map"))
 			} else {
-				for _, d := range []string{oldDir, newDir} {
-					knWrite(t, filepath.Join(d, ".hv", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n")
-					knWrite(t, filepath.Join(d, ".hv", "qa", "bare.md"), "---\n---\n")
-				}
+				knWrite(t, filepath.Join(dir, ".hv", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n")
+				knWrite(t, filepath.Join(dir, ".hv", "qa", "bare.md"), "---\n---\n")
 			}
-			o := knOld(t, oldDir, "", c.old)
-			n := knNew(t, newDir, "", c.group, "index")
-			if o.rc != 0 || n.rc != 0 {
-				t.Fatalf("%s rc old=%d new=%d %s %s", c.group, o.rc, n.rc, o.stderr, n.stderr)
+			want, got := knFrozen(t, dir, "", c.group, "index")
+			if want.RC != 0 || got.RC != 0 {
+				t.Fatalf("%s rc frozen=%d new=%d %s %s", c.group, want.RC, got.RC, want.Stderr, got.Stderr)
 			}
-			ot, nt := knTree(t, oldDir), knTree(t, newDir)
-			oldAgents := strings.ReplaceAll(ot["../AGENTS.md"], c.oldPath, c.newPath)
-			if oldAgents != nt["../AGENTS.md"] {
-				t.Errorf("%s (entries=%v) AGENTS.md differs\n--- old ---\n%s\n--- new ---\n%s", c.group, withEntries, oldAgents, nt["../AGENTS.md"])
+			oldAgents := strings.ReplaceAll(want.Changed["../AGENTS.md"], c.oldPath, c.newPath)
+			if oldAgents != got.Changed["../AGENTS.md"] {
+				t.Errorf("%s (entries=%v) AGENTS.md differs\n--- frozen ---\n%s\n--- new ---\n%s", c.group, withEntries, oldAgents, got.Changed["../AGENTS.md"])
 			}
-			again := knNew(t, newDir, "", c.group, "index", "--json")
+			again := knNew(t, dir, "", c.group, "index", "--json")
 			if !strings.Contains(again.stdout, `"status": "unchanged", "changed": false`) {
 				t.Errorf("%s second run: %s", c.group, again.stdout)
 			}
@@ -235,14 +221,8 @@ func TestMapAndQAIndexMatchOldHelpers(t *testing.T) {
 	}
 }
 
-func TestMapStatsMatchesOldHelper(t *testing.T) {
+func TestMapStats(t *testing.T) {
 	dir := mapProject(t)
-	o := knOld(t, dir, "", "hv-map-stats")
-	for _, want := range []string{`"name": "alpha"`, `"name": "cli"`, `"entry_points": 3`, `"broken_refs": 2`, `"touched": "2026-09-01"`} {
-		if !strings.Contains(o.stdout, want) {
-			t.Fatalf("old helper unexpected, missing %s:\n%s", want, o.stdout)
-		}
-	}
 	n := knNew(t, dir, "", "map", "stats", "--json")
 	for _, want := range []string{`"name": "alpha"`, `"name": "cli"`, `"entryPoints": 3`, `"brokenRefs": 2`, `"touched": "2026-09-01"`, `"count": 2`} {
 		if !strings.Contains(n.stdout, want) {
@@ -270,50 +250,40 @@ func TestMapStatsCap(t *testing.T) {
 	if !strings.Contains(over.stdout, `"cap": 2, "overCap": true`) || !strings.Contains(over.stdout, `"warnings": ["project map has 2 subsystems (cap 2);`) {
 		t.Errorf("over cap: %s", over.stdout)
 	}
-	// The old nudge text matches.
-	o := knOld(t, dir, "", "hv-map-cap-check")
-	if !strings.Contains(o.stderr, "project map has 2 subsystems (cap 2); consider merging or retiring stale .hv/map/<name>.md entries") {
-		t.Errorf("old nudge: %q", o.stderr)
-	}
-	if text := knNew(t, dir, "", "map", "stats", "--cap"); !strings.HasPrefix(text.stdout, "note: project map has 2 subsystems") {
-		t.Errorf("text mode: %q", text.stdout)
+	// The old nudge text matches: the helper printed it on stderr, hv prints it on stdout.
+	want, got := knFrozen(t, dir, "", "map", "stats", "--cap")
+	if want.Stderr != got.Stdout || !strings.HasPrefix(got.Stdout, "note: project map has 2 subsystems") {
+		t.Errorf("text mode: frozen %q new %q", want.Stderr, got.Stdout)
 	}
 }
 
-func TestCRLFMatchesOldHelpersForDecisionsMapAndQA(t *testing.T) {
+func TestCRLFMatchGoldenForDecisionsMapAndQA(t *testing.T) {
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	t.Run("auto-log rewrites as LF", func(t *testing.T) {
-		oldDir, newDir := decProject(t, crlf(decFixture), ""), decProject(t, crlf(decFixture), "")
-		knOld(t, oldDir, "", "hv-auto-decision-log", "Build", "New rule", "why", "", "2026-10-05")
-		knNew(t, newDir, "", "decisions", "auto-log", "--topic", "Build", "--title", "New rule", "--why", "why", "--date", "2026-10-05")
-		knSameTree(t, oldDir, newDir)
-		if strings.Contains(knTree(t, newDir)["DECISIONS.md"], "\r") {
+		dir := decProject(t, crlf(decFixture), "")
+		want, got := knFrozen(t, dir, "", "decisions", "auto-log", "--topic", "Build", "--title", "New rule", "--why", "why", "--date", "2026-10-05")
+		knSameDelta(t, want, got)
+		if strings.Contains(knTree(t, dir)["DECISIONS.md"], "\r") {
 			t.Error("CR survived")
 		}
 	})
 	t.Run("decisions query and auto-since", func(t *testing.T) {
 		dir := decProject(t, crlf(decFixture), `{"loopStartedAt": "2026-10-01T09:00:00Z"}`)
-		if o, n := knOld(t, dir, "", "hv-decisions-query", "build"), knNew(t, dir, "", "decisions", "query", "build"); o.stdout != n.stdout {
-			t.Errorf("query old %q new %q", o.stdout, n.stdout)
+		if want, got := knFrozen(t, dir, "", "decisions", "query", "build"); want.Stdout != got.Stdout {
+			t.Errorf("query frozen %q new %q", want.Stdout, got.Stdout)
 		}
-		if o, n := knOld(t, dir, "", "hv-auto-decisions-since"), knNew(t, dir, "", "decisions", "auto-since"); o.stdout != n.stdout {
-			t.Errorf("since old %q new %q", o.stdout, n.stdout)
+		if want, got := knFrozen(t, dir, "", "decisions", "auto-since"); want.Stdout != got.Stdout {
+			t.Errorf("since frozen %q new %q", want.Stdout, got.Stdout)
 		}
 	})
 	t.Run("map query, stats and index", func(t *testing.T) {
 		dir := mapProject(t)
 		knWrite(t, filepath.Join(dir, ".hv", "map", "cli.md"), crlf(mapFileA))
 		knWrite(t, filepath.Join(dir, "cmd", "main.go"), crlf("package main\n\nfunc main() {}\n"))
-		if o, n := knOld(t, dir, "", "hv-map-query", "cli"), knNew(t, dir, "", "map", "query", "cli"); o.stdout != n.stdout || strings.Contains(n.stdout, "\r") {
-			t.Errorf("query old %q new %q", o.stdout, n.stdout)
+		if want, got := knFrozen(t, dir, "", "map", "query", "cli"); want.Stdout != got.Stdout || strings.Contains(got.Stdout, "\r") {
+			t.Errorf("query frozen %q new %q", want.Stdout, got.Stdout)
 		}
-		o := knOld(t, dir, "", "hv-map-stats")
 		n := knNew(t, dir, "", "map", "stats", "--json")
-		for _, want := range []string{`"entry_points": 3`, `"broken_refs": 2`} {
-			if !strings.Contains(o.stdout, want) {
-				t.Fatalf("old: %s", o.stdout)
-			}
-		}
 		if !strings.Contains(n.stdout, `"entryPoints": 3, "brokenRefs": 2`) {
 			t.Errorf("new: %s", n.stdout)
 		}

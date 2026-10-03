@@ -1,14 +1,15 @@
 package initproj
 
 import (
-	"bytes"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
 // tree builds an umbrella fixture: git children (dir or worktree-style .git
@@ -107,25 +108,27 @@ func TestIdempotent(t *testing.T) {
 	}
 }
 
-// TestParityWithOldHelper runs hv-umbrella-init and Umbrella on identical
-// trees and compares what they write and report.
-func TestParityWithOldHelper(t *testing.T) {
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not installed")
-	}
-	helper, _ := filepath.Abs("../../bin/hv-umbrella-init")
-	if _, err := os.Stat(helper); err != nil {
-		t.Skip("old helper gone (A9 S7): parity frozen")
-	}
+type umbrellaCase struct {
+	Name  string            `json:"name"`
+	Git   bool              `json:"git"`
+	Files map[string]string `json:"files"`
+	Kids  []string          `json:"kids"`
+	Stdin string            `json:"stdin"` // the retired helper's answer line
+	opts  UmbrellaOptions
+}
+
+// umbrellaOutcome is what one run left behind and reported.
+type umbrellaOutcome struct {
+	Repos     string   `json:"repos.json"`
+	Gitignore string   `json:".gitignore"`
+	Tree      []string `json:"tree"`
+	Summary   string   `json:"summary"`
+	Warnings  []string `json:"warnings"`
+}
+
+func umbrellaCases() []umbrellaCase {
 	prior := `{"repos": [{"name": "web", "path": "./web"}, {"name": "gone", "path": "./gone"}, {"name": "api", "path": "./api"}]}`
-	cases := []struct {
-		name  string
-		git   bool
-		files map[string]string
-		kids  []string
-		stdin string // the old helper's line
-		opts  UmbrellaOptions
-	}{
+	return []umbrellaCase{
 		{"all", true, nil, []string{"web", "api"}, "all", UmbrellaOptions{All: true}},
 		{"subset", true, nil, []string{"web", "api", "db"}, "web,db", UmbrellaOptions{Names: []string{"web", "db"}}},
 		{"none", false, nil, []string{"web"}, "none", UmbrellaOptions{}},
@@ -138,48 +141,45 @@ func TestParityWithOldHelper(t *testing.T) {
 		{"gitignore complete", true, map[string]string{".gitignore": ".claude/\n.hv/\n/web/\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
 		{"corrupt repos.json", false, map[string]string{".hv/repos.json": "{nope"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			oldRoot := tree(t, tc.git, tc.files, tc.kids...)
-			newRoot := tree(t, tc.git, tc.files, tc.kids...)
-			cmd := exec.Command("bash", helper)
-			cmd.Dir = oldRoot
-			cmd.Stdin = strings.NewReader(tc.stdin + "\n")
-			var stdout, stderr bytes.Buffer
-			cmd.Stdout, cmd.Stderr = &stdout, &stderr
-			if err := cmd.Run(); err != nil {
-				t.Fatalf("old helper: %v\n%s", err, stderr.String())
-			}
-			res, err := Umbrella(newRoot, tc.opts, nil)
+}
+
+// TestUmbrellaMatchesHelperGolden checks Umbrella against what the retired
+// hv-umbrella-init wrote and reported on each case, as recorded in
+// testdata/golden: repos.json, .gitignore, the paths under .hv, the summary
+// line and the warnings.
+func TestUmbrellaMatchesHelperGolden(t *testing.T) {
+	cases := umbrellaCases()
+	var want []umbrellaOutcome
+	pytest.Golden(t, cases, &want)
+	if len(want) != len(cases) {
+		t.Fatalf("golden has %d outcomes for %d cases", len(want), len(cases))
+	}
+	for i, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			root := tree(t, tc.Git, tc.Files, tc.Kids...)
+			res, err := Umbrella(root, tc.opts, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, f := range []string{".hv/repos.json", ".gitignore"} {
-				if o, n := read(t, oldRoot, f), read(t, newRoot, f); o != n {
-					t.Errorf("%s differs\nold: %q\nnew: %q", f, o, n)
-				}
-			}
 			for _, n := range res.Registered {
-				if _, err := os.Stat(filepath.Join(newRoot, ".hv", "knowledge", n)); err != nil {
+				if _, err := os.Stat(filepath.Join(root, ".hv", "knowledge", n)); err != nil {
 					t.Errorf("knowledge dir for %s missing", n)
 				}
 			}
-			oldSnap, newSnap := snapshot(oldRoot), snapshot(newRoot)
-			if !reflect.DeepEqual(oldSnap, newSnap) {
-				t.Errorf("tree differs\nold: %v\nnew: %v", oldSnap, newSnap)
+			var paths []string
+			for p := range snapshot(root) {
+				paths = append(paths, p)
 			}
-			wantOut := `{"registered":[` + quoteJoin(res.Registered) + `],"umbrellaIsGitRepo":` + map[bool]string{true: "true", false: "false"}[res.IsGitRepo] + "}\n"
-			if stdout.String() != wantOut {
-				t.Errorf("summary\nold: %q\nnew: %q", stdout.String(), wantOut)
+			sort.Strings(paths)
+			got := umbrellaOutcome{
+				Repos:     read(t, root, ".hv/repos.json"),
+				Gitignore: read(t, root, ".gitignore"),
+				Tree:      paths,
+				Summary:   `{"registered":[` + quoteJoin(res.Registered) + `],"umbrellaIsGitRepo":` + map[bool]string{true: "true", false: "false"}[res.IsGitRepo] + "}\n",
+				Warnings:  append([]string{}, res.Warnings...),
 			}
-			var oldWarn []string
-			for _, l := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
-				if strings.HasPrefix(l, "warning: ") {
-					oldWarn = append(oldWarn, strings.TrimPrefix(l, "warning: "))
-				}
-			}
-			if !reflect.DeepEqual(oldWarn, append([]string(nil), res.Warnings...)) && !(len(oldWarn) == 0 && len(res.Warnings) == 0) {
-				t.Errorf("warnings\nold: %q\nnew: %q", oldWarn, res.Warnings)
+			if !reflect.DeepEqual(got, want[i]) {
+				t.Errorf("outcome differs\ngo:     %+v\ngolden: %+v", got, want[i])
 			}
 		})
 	}

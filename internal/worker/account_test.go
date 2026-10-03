@@ -1,12 +1,12 @@
 package worker
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
 const acctConfig = `{"work":{"accounts":[
@@ -17,21 +17,31 @@ const acctConfig = `{"work":{"accounts":[
  {"name":"epsilon","configDir":"/acct/epsilon"},
  {"name":"zeta","configDir":"/acct/zeta"}]}}`
 
-var future = time.Now().UTC().Add(48 * time.Hour).Format("2006-01-02T15:04:05.000000+00:00")
+// future is a fixed reset far ahead, so the goldens recorded against it stay
+// deterministic and the cooling windows never lapse.
+const future = "2099-01-01T00:00:00.000000+00:00"
 
-// usageDir writes the per-account fixture payloads the helper reads from
-// HV_ACCOUNT_USAGE_DIR. alpha: 30% / 10%; beta: five-hour spent with a future
+// usageFixtures are the per-account payloads read from HV_ACCOUNT_USAGE_DIR.
+// alpha: 30% / 10%; beta: five-hour spent with a future
 // reset (cooling); gamma: weekly spent but extra usage live (free, discounted);
 // delta: weekly spent, no extra usage, future reset (cooling); epsilon:
 // spent window with no reset (free); zeta: no fixture (unknown).
+func usageFixtures() map[string]string {
+	return map[string]string{
+		"alpha":   `{"five_hour":{"utilization":30,"resets_at":null},"seven_day":{"utilization":10.5,"resets_at":null}}`,
+		"beta":    `{"five_hour":{"utilization":100,"resets_at":"` + future + `"},"seven_day":{"utilization":5,"resets_at":null}}`,
+		"gamma":   `{"five_hour":{"utilization":20,"resets_at":null},"seven_day":{"utilization":100,"resets_at":"` + future + `"},"extra_usage":{"is_enabled":true,"spend_limit_reached":false}}`,
+		"delta":   `{"five_hour":{"utilization":1,"resets_at":null},"seven_day":{"utilization":100,"resets_at":"` + future + `"},"extra_usage":{"is_enabled":true,"spend_limit_reached":true}}`,
+		"epsilon": `{"five_hour":{"utilization":100,"resets_at":null},"seven_day":{"utilization":57.45,"resets_at":null}}`,
+	}
+}
+
+// usageDir writes usageFixtures into a fresh directory.
 func usageDir(t *testing.T) string {
 	dir := t.TempDir()
-	put := func(name, body string) { os.WriteFile(filepath.Join(dir, name+".json"), []byte(body), 0o644) }
-	put("alpha", `{"five_hour":{"utilization":30,"resets_at":null},"seven_day":{"utilization":10.5,"resets_at":null}}`)
-	put("beta", `{"five_hour":{"utilization":100,"resets_at":"`+future+`"},"seven_day":{"utilization":5,"resets_at":null}}`)
-	put("gamma", `{"five_hour":{"utilization":20,"resets_at":null},"seven_day":{"utilization":100,"resets_at":"`+future+`"},"extra_usage":{"is_enabled":true,"spend_limit_reached":false}}`)
-	put("delta", `{"five_hour":{"utilization":1,"resets_at":null},"seven_day":{"utilization":100,"resets_at":"`+future+`"},"extra_usage":{"is_enabled":true,"spend_limit_reached":true}}`)
-	put("epsilon", `{"five_hour":{"utilization":100,"resets_at":null},"seven_day":{"utilization":57.45,"resets_at":null}}`)
+	for name, body := range usageFixtures() {
+		os.WriteFile(filepath.Join(dir, name+".json"), []byte(body), 0o644)
+	}
 	return dir
 }
 
@@ -46,16 +56,10 @@ func goMeters(t *testing.T, dir, usage string) []Meter {
 	return acc.Meters(bg, dir)
 }
 
-func TestAccountListParity(t *testing.T) {
+func TestAccountListMeters(t *testing.T) {
 	dir, usage := newProject(t, acctConfig), usageDir(t)
-	r := runOld(t, dir, []string{"HV_ACCOUNT_USAGE_DIR=" + usage}, "hv-worker-account", "list", "--json")
-	if r.Code != 0 {
-		t.Fatalf("old: %+v", r)
-	}
 	var old []map[string]any
-	if err := json.Unmarshal([]byte(r.Stdout), &old); err != nil {
-		t.Fatal(err)
-	}
+	pytest.Golden(t, map[string]any{"argv": []string{"list", "--json"}, "config": acctConfig, "usage": usageFixtures()}, &old)
 	got := goMeters(t, dir, usage)
 	if len(got) != len(old) {
 		t.Fatalf("%d rows, old %d", len(got), len(old))
@@ -106,7 +110,7 @@ func TestAccountListWithoutAccounts(t *testing.T) {
 	}
 }
 
-func TestAccountPickParity(t *testing.T) {
+func TestAccountPick(t *testing.T) {
 	dir, usage := newProject(t, acctConfig), usageDir(t)
 	acc := &Accounts{Getenv: func(k string) string {
 		if k == "HV_ACCOUNT_USAGE_DIR" {
@@ -114,24 +118,21 @@ func TestAccountPickParity(t *testing.T) {
 		}
 		return ""
 	}}
-	env := []string{"HV_ACCOUNT_USAGE_DIR=" + usage}
-	for _, excl := range []string{"", "gamma", "gamma,alpha", " gamma , alpha ", "gamma,alpha,epsilon,zeta", "alpha,beta,gamma,delta,epsilon,zeta"} {
-		args := []string{"pick"}
-		if excl != "" {
-			args = append(args, "--exclude", excl)
-		}
-		r := runOld(t, dir, env, "hv-worker-account", args...)
+	excludes := []string{"", "gamma", "gamma,alpha", " gamma , alpha ", "gamma,alpha,epsilon,zeta", "alpha,beta,gamma,delta,epsilon,zeta"}
+	var picks []string // "" where the helper exited non-zero: nothing eligible
+	pytest.Golden(t, map[string]any{"config": acctConfig, "usage": usageFixtures(), "excludes": excludes}, &picks)
+	for i, excl := range excludes {
 		var skip []string
 		if excl != "" {
 			skip = strings.Split(excl, ",")
 		}
 		name, ok := acc.Pick(bg, dir, skip)
-		if r.Code == 0 {
-			if !ok || name != strings.TrimSpace(r.Stdout) {
-				t.Errorf("exclude %q: go %q/%v, old %q", excl, name, ok, r.Stdout)
+		if picks[i] == "" {
+			if ok {
+				t.Errorf("exclude %q: nothing was eligible, go picked %q", excl, name)
 			}
-		} else if ok {
-			t.Errorf("exclude %q: old exit %d, go picked %q", excl, r.Code, name)
+		} else if !ok || name != picks[i] {
+			t.Errorf("exclude %q: go %q/%v, want %q", excl, name, ok, picks[i])
 		}
 	}
 }
@@ -141,16 +142,17 @@ func TestAccountPickRotatesWhenNoMeterIsReadable(t *testing.T) {
 	empty := t.TempDir()
 	acc := &Accounts{Getenv: func(string) string { return empty }}
 	name, ok := acc.Pick(bg, dir, nil)
-	r := runOld(t, dir, []string{"HV_ACCOUNT_USAGE_DIR=" + empty}, "hv-worker-account", "pick")
-	if !ok || name != strings.TrimSpace(r.Stdout) || name != "alpha" {
-		t.Errorf("unknown meters must stay eligible: go %q old %q", name, r.Stdout)
+	if !ok || name != "alpha" {
+		t.Errorf("unknown meters must stay eligible: go %q", name)
 	}
 }
 
-func TestAccountAssignParity(t *testing.T) {
-	a, b := newProject(t, acctConfig), newProject(t, acctConfig)
-	runOld(t, a, nil, "hv-worker-pool", "init", "--slots", "2", "--base", "main")
+func TestAccountAssign(t *testing.T) {
+	b := newProject(t, acctConfig)
 	goInit(t, b, InitOpts{Slots: 2, Base: "main"})
+	var want map[string]string // workers.json the helper left after each assign
+	pytest.Golden(t, map[string]any{"config": acctConfig, "usage": usageFixtures(), "pool": "init --slots 2 --base main",
+		"steps": []string{"assign --slot w1 --account beta", "assign --slot w2"}}, &want)
 	usage := usageDir(t)
 	acc := &Accounts{Getenv: func(k string) string {
 		if k == "HV_ACCOUNT_USAGE_DIR" {
@@ -158,26 +160,23 @@ func TestAccountAssignParity(t *testing.T) {
 		}
 		return ""
 	}}
-	env := []string{"HV_ACCOUNT_USAGE_DIR=" + usage}
 
-	r := runOld(t, a, env, "hv-worker-account", "assign", "--slot", "w1", "--account", "beta")
 	name, changed, err := acc.Assign(bg, b, "w1", "beta")
-	if r.Code != 0 || err != nil || name != "beta" || !changed || r.Stdout != "assigned: w1 -> beta\n" {
-		t.Fatalf("old %+v go %v %v %v", r, name, changed, err)
+	if err != nil || name != "beta" || !changed {
+		t.Fatalf("go %v %v %v", name, changed, err)
 	}
-	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+	mustEqual(t, "workers.json", want["after w1 beta"], registry(t, b))
 
 	if _, changed, _ := acc.Assign(bg, b, "w1", "beta"); changed {
 		t.Error("assigning the same account again must report changed=false")
 	}
 
 	// no --account: the best pick
-	r = runOld(t, a, env, "hv-worker-account", "assign", "--slot", "w2")
 	name, _, err = acc.Assign(bg, b, "w2", "")
-	if r.Code != 0 || err != nil || r.Stdout != "assigned: w2 -> "+name+"\n" {
-		t.Fatalf("old %+v go %v %v", r, name, err)
+	if err != nil || name == "" {
+		t.Fatalf("go %v %v", name, err)
 	}
-	mustEqual(t, "workers.json after pick", registry(t, a), registry(t, b))
+	mustEqual(t, "workers.json after pick", want["after w2 pick"], registry(t, b))
 
 	exitOf := func(err error) int {
 		if we, ok := err.(*Error); ok {
@@ -217,13 +216,11 @@ func TestAccountAssignWithEveryAccountCoolingIsRefused(t *testing.T) {
 
 // pool init spreads slots across accounts by headroom, resetting the
 // exclusion list when accounts run out.
-func TestPoolInitSpreadsAccountsLikeTheOldHelper(t *testing.T) {
-	a, b := newProject(t, acctConfig), newProject(t, acctConfig)
+func TestPoolInitSpreadsAccounts(t *testing.T) {
+	b := newProject(t, acctConfig)
 	usage := usageDir(t)
-	env := []string{"HV_ACCOUNT_USAGE_DIR=" + usage}
-	if r := runOld(t, a, env, "hv-worker-pool", "init", "--slots", "5", "--base", "main"); r.Code != 0 {
-		t.Fatalf("old: %+v", r)
-	}
+	var want map[string]string
+	pytest.Golden(t, map[string]any{"config": acctConfig, "usage": usageFixtures(), "argv": "init --slots 5 --base main"}, &want)
 	acc := &Accounts{Getenv: func(k string) string {
 		if k == "HV_ACCOUNT_USAGE_DIR" {
 			return usage
@@ -233,7 +230,7 @@ func TestPoolInitSpreadsAccountsLikeTheOldHelper(t *testing.T) {
 	if _, err := (Env{}).PoolInit(bg, b, InitOpts{Slots: 5, Base: "main"}, acc); err != nil {
 		t.Fatal(err)
 	}
-	mustEqual(t, "workers.json", registry(t, a), registry(t, b))
+	mustEqual(t, "workers.json", want["workers.json"], registry(t, b))
 	if !strings.Contains(registry(t, b), `"account": "alpha"`) {
 		t.Error("no slot was assigned an account")
 	}

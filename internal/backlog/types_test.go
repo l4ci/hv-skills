@@ -1,26 +1,20 @@
 package backlog
 
 import (
-	"os"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-// Types must stay the registry line of bin/hv-types.sh, which bash and
-// hvlib_types.py both derive from.
+// registry is the HV_TYPE_REGISTRY line of the retired bin/hv-types.sh, frozen
+// as it stood when the shell and Python helpers were deleted. Change it only
+// together with Types.
+const registry = "B:Bugs:bugs:CP F:Features:features:CP T:Tasks:tasks:P S:::P"
+
+// Types must stay the frozen registry row for row.
 func TestTypesMatchRegistry(t *testing.T) {
-	raw, err := os.ReadFile("../../bin/hv-types.sh")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := regexp.MustCompile(`(?m)^HV_TYPE_REGISTRY="([^"]*)"`).FindSubmatch(raw)
-	if m == nil {
-		t.Fatal("no HV_TYPE_REGISTRY line in bin/hv-types.sh")
-	}
-	rows := strings.Fields(string(m[1]))
+	rows := strings.Fields(registry)
 	if len(rows) != len(Types) {
 		t.Fatalf("registry has %d rows, Types has %d", len(rows), len(Types))
 	}
