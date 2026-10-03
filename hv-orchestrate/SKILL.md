@@ -22,7 +22,7 @@ The workers' standing brief is [references/worker-contract.md](../references/wor
 
 - One item, no parallelism → `/hv-go` or `/hv-work`.
 - You are a worker, not the orchestrator → read the contract above and stop.
-- No terminal host (herdr or tmux) → `hv doctor` says so; `/hv-work` with subagents is the route.
+- No terminal host (herdr or tmux) is not a reason to skip a round: it runs in solo mode (below). For one or two small items, `/hv-work` with subagents is still lighter.
 
 ## 1. Start
 
@@ -114,7 +114,13 @@ When the slate is done or the maintainer calls the round: `hv round wind-down`. 
 
 ## Solo mode
 
-C8, #64: pending.
+`hv round start` picks the host once per round. With `work.dispatch` unset or `subagent` it uses herdr inside a herdr pane, tmux inside tmux, and otherwise solo; `hv round status` shows which. Under solo each worker is a Claude `Agent` subagent you launch, working in its slot's worktree.
+
+- **Launch.** `hv round assign` starts nothing: it returns `data.brief` and `data.worktree`. Launch one `Agent` per assignment, in the background so the workers run at once, with the brief as the prompt and an opening line telling it to work only in that worktree. A worker that edits your checkout instead has broken the round; reset its work before assigning again.
+- **Collect.** When an `Agent` returns, record what it said: `hv round report <slot> --state done --pr <url>`, or `blocked`, `dead`, `limited`, with `--evidence` quoting its last line. `hv round wait` doesn't block under solo; the `Agent` completion is your wait. Then review and gate as usual.
+- **No panes.** `worker dispatch`, `--relay`, `poll` and `session` refuse. To answer a blocked worker, launch a fresh `Agent` on the same worktree with the brief and your signed answer. There is nothing to kill: report a runaway `dead` and reclaim the slot.
+- **Unchanged.** Gates, merge policy, escalations, `reconcile`, `reap` and wind-down work as in tab mode. An escalation reaches the maintainer only as the thread comment; there is no notification.
+- **Limits.** Every subagent shares your account, rate window and context. One `limited` stops them all and you with them, so keep to two or three slots and ask each `Agent` for a short result (PR URL, one line). Claude only: a Codex subagent cannot be given the worktree, so `--kind codex` refuses.
 
 ## Rules that outlive any verb
 
