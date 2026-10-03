@@ -46,8 +46,8 @@ rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
 [ "$rc" -eq 0 ] || fail "C6[a]: healthy project exited $rc: $OUT"
 [ "$(printf '%s' "$OUT" | dr_ok)" = "True" ] || fail "C6[a]: ok is not true: $OUT"
 NAMES="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)["data"]["checks"]))')"
-[ "$NAMES" = "git,host,tracker,accounts,hook,hv" ] || fail "C6[a]: checks were: $NAMES"
-for pair in git:pass host:pass tracker:skip accounts:pass hook:pass; do
+[ "$NAMES" = "git,host,tracker,accounts,hook,hv,codex" ] || fail "C6[a]: checks were: $NAMES"
+for pair in git:pass host:pass tracker:skip accounts:pass hook:pass codex:skip; do
   [ "$(printf '%s' "$OUT" | dr_field "${pair%%:*}" status)" = "${pair##*:}" ] || fail "C6[a]: ${pair%%:*} was not ${pair##*:}: $OUT"
 done
 case "$OUT" in *'"changed"'*) fail "C6[a]: doctor reports changed: $OUT" ;; esac

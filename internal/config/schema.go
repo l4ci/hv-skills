@@ -92,6 +92,7 @@ var Keys = []Key{
 	{"round.tiers.codex.heavy", "", false},
 	{"round.stallMinutes", json.Number("30"), false},
 	{"issues.labels.needsHuman", "needs-human", false},
+	{"work.codexCommand", "", false}, // empty: DefaultCodexCommand in internal/worker
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.

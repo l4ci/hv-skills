@@ -63,15 +63,24 @@ type hostFake struct {
 	spawned []string
 	launch  string
 	sent    string
+	// name is the host's name; "" is tmux.
+	name                 string
+	codexHome, configDir string
 }
 
-func (h *hostFake) Name() string    { return "tmux" }
+func (h *hostFake) Name() string {
+	if h.name != "" {
+		return h.name
+	}
+	return "tmux"
+}
 func (h *hostFake) Require() error  { return nil }
 func (h *hostFake) InSession() bool { return true }
 func (h *hostFake) Where() string   { return "main" }
 func (h *hostFake) Spawn(_ context.Context, o host.SpawnOpts) (string, error) {
 	h.spawned = append(h.spawned, o.Slot+" "+o.Cwd)
 	h.launch = o.Launch
+	h.codexHome, h.configDir = o.CodexHome, o.ConfigDir
 	return "w1:t1", nil
 }
 func (h *hostFake) Send(_ context.Context, slot, handle, file string) error {
@@ -436,30 +445,158 @@ func TestAssignRejectsUnknownTierAndKind(t *testing.T) {
 	}
 }
 
-func TestAssignCodexResolvesButDoesNotStart(t *testing.T) {
+// codexRig stands in for codex and herdr: every call is logged, the version
+// and login are scripted, and nothing real is reachable.
+type codexRig struct {
+	calls    []string
+	version  string // `codex --version` stdout
+	loggedIn bool
+	noCodex  bool
+}
+
+func (c *codexRig) install(f *assignFixture) {
+	f.env.Worker.LookPath = func(n string) (string, error) {
+		if n == "codex" && c.noCodex {
+			return "", errors.New("not found")
+		}
+		return "/fake/" + n, nil
+	}
+	f.env.Worker.Run = func(_ context.Context, name string, args, env []string) (host.Result, error) {
+		c.calls = append(c.calls, strings.TrimPrefix(name, "/fake/")+" "+strings.Join(args, " ")+" | "+strings.Join(env, " "))
+		switch strings.TrimPrefix(name, "/fake/") + " " + strings.Join(args, " ") {
+		case "codex --version":
+			return host.Result{Stdout: c.version}, nil
+		case "codex login status":
+			if c.loggedIn {
+				return host.Result{}, nil
+			}
+			return host.Result{Stderr: "Not logged in", ExitCode: 1}, nil
+		case "herdr integration status":
+			return host.Result{Stdout: "codex: not installed (/x)\n"}, nil
+		}
+		return host.Result{}, nil
+	}
+}
+
+const codexCfg = `{"work":{"dispatch":"herdr"},"round":{"tiers":{"codex":{"light":"c-l","standard":"c-s","heavy":"c-h"}}}}`
+
+func TestAssignCodexResolvesAndStarts(t *testing.T) {
 	f := newAssignFixture(t)
 	codex := func(o *AssignOpts) { o.Kind = "codex" }
 	if _, err := f.assign("12", "ben", codex); blockedBy(t, err) != BlockNoTierMap {
 		t.Fatalf("an unconfigured codex map is refused: %v", err)
 	}
-	f.config(t, `{"round":{"tiers":{"codex":{"light":"c-l","standard":"c-s","heavy":"c-h"}}}}`)
+	f.config(t, codexCfg)
+	rig := &codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}
+	rig.install(f)
+	f.host.name = "herdr"
 	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex"; o.CheckOnly = true })
-	if err != nil || res.Kind != "codex" || res.Model != "c-s" {
-		t.Fatalf("check-only resolves the codex model: %v %+v", err, res)
+	if err != nil || res.Kind != "codex" || res.Model != "c-s" || len(rig.calls) != 0 {
+		t.Fatalf("check-only resolves the codex model and runs nothing: %v %+v %v", err, res, rig.calls)
 	}
-	var we *worker.Error
-	if _, err := f.assign("12", "ben", codex); !errors.As(err, &we) || we.Exit != 71 {
-		t.Fatalf("codex start is E1's, exit 71: %v", err)
+	res, err = f.assign("12", "ben", codex)
+	if err != nil || !res.Dispatched || res.Kind != "codex" || res.Model != "c-s" {
+		t.Fatalf("%v %+v", err, res)
 	}
-	if len(f.be.claims) != 0 || len(f.be.states) != 0 || len(f.host.spawned) != 0 {
-		t.Fatalf("nothing is marked before the 71: %+v %+v", f.be.claims, f.host.spawned)
+	if !strings.HasPrefix(f.host.launch, "codex --model c-s ") || strings.Contains(f.host.launch, "{model}") {
+		t.Errorf("launch = %q", f.host.launch)
+	}
+	home := filepath.Join(f.root, ".git", "hv", "codex", "ben")
+	if f.host.codexHome != home || f.host.configDir != "" {
+		t.Errorf("home %q configDir %q", f.host.codexHome, f.host.configDir)
+	}
+	if s := worker.LoadRegistry(f.root).Slot("ben"); worker.Str(s, "kind") != "codex" {
+		t.Errorf("the kind is recorded: %v", s)
 	}
 	// A slot's recorded kind is the default.
-	worker.Update(f.root, slotsDefault(), func(doc *jsonx.Object) {
+	g := newAssignFixture(t)
+	g.config(t, codexCfg)
+	gr := &codexRig{version: "codex-cli 0.159.2\n"} // not logged in
+	gr.install(g)
+	worker.Update(g.root, slotsDefault(), func(doc *jsonx.Object) {
 		(worker.Registry{Doc: doc}).Slot("ben").Set("kind", "codex")
 	})
-	if _, err := f.assign("12", "ben", nil); !errors.As(err, &we) || we.Exit != 71 {
-		t.Fatalf("the recorded kind is the default: %v", err)
+	var we *worker.Error
+	if _, err := g.assign("12", "ben", nil); !errors.As(err, &we) || we.Exit != worker.ExitUnavailable || !strings.Contains(we.Hint, "codex login") {
+		t.Fatalf("the recorded kind is the default, and an unlogged slot is exit 5: %v", err)
+	}
+}
+
+// Every codex refusal happens before anything is marked, claimed or spawned.
+func TestAssignCodexPreflightRefusesBeforeMarking(t *testing.T) {
+	cases := map[string]struct {
+		rig    codexRig
+		cfg    string
+		accept bool
+		exit   int
+		by     string
+		hint   string
+	}{
+		"no codex":      {rig: codexRig{noCodex: true}, exit: worker.ExitUnavailable},
+		"old codex":     {rig: codexRig{version: "codex-cli 0.158.9\n", loggedIn: true}, by: BlockCodexVersion},
+		"new codex":     {rig: codexRig{version: "codex-cli 0.160.0\n", loggedIn: true}, by: BlockCodexVersion},
+		"unreadable":    {rig: codexRig{version: "something else\n", loggedIn: true}, by: BlockCodexVersion},
+		"not logged in": {rig: codexRig{version: "codex-cli 0.159.2\n"}, exit: worker.ExitUnavailable, hint: "codex login"},
+		"tmux":          {rig: codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}, cfg: `{"round":{"tiers":{"codex":{"light":"a","standard":"b","heavy":"c"}}}}`, exit: worker.ExitUnavailable},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newAssignFixture(t)
+			if c.cfg == "" {
+				c.cfg = codexCfg
+			}
+			f.config(t, c.cfg)
+			c.rig.install(f)
+			_, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex"; o.AcceptCodexVersion = c.accept })
+			var we *worker.Error
+			switch {
+			case c.by != "":
+				if blockedBy(t, err) != c.by {
+					t.Fatalf("%v", err)
+				}
+			case !errors.As(err, &we) || we.Exit != c.exit || !strings.Contains(we.Hint, c.hint):
+				t.Fatalf("want exit %d hint %q, got %v", c.exit, c.hint, err)
+			}
+			if len(f.be.claims) != 0 || len(f.be.states) != 0 || len(f.be.notes) != 0 || len(f.host.spawned) != 0 {
+				t.Fatalf("nothing is marked before the refusal: %+v %+v %v", f.be.claims, f.be.states, f.host.spawned)
+			}
+			if s := worker.LoadRegistry(f.root).Slot("ben"); worker.Str(s, "task") != "" || worker.Str(s, "kind") != "" {
+				t.Errorf("the slot stays untouched: %v", s)
+			}
+		})
+	}
+}
+
+func TestAssignCodexAcceptVersionWarns(t *testing.T) {
+	f := newAssignFixture(t)
+	f.config(t, codexCfg)
+	rig := &codexRig{version: "codex-cli 0.160.1\n", loggedIn: true}
+	rig.install(f)
+	f.host.name = "herdr"
+	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex"; o.AcceptCodexVersion = true })
+	if err != nil || !res.Dispatched {
+		t.Fatalf("%v %+v", err, res)
+	}
+	want := "codex 0.160.1 is outside the supported range >=0.159.0 <0.160.0"
+	if len(res.Warnings) != 1 || res.Warnings[0] != want {
+		t.Errorf("warnings = %q", res.Warnings)
+	}
+}
+
+// work.accounts and its meter are Anthropic's: a codex slot never picks one.
+func TestAssignCodexSkipsAccounts(t *testing.T) {
+	f := newAssignFixture(t)
+	f.config(t, `{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"/nowhere"}]},"round":{"tiers":{"codex":{"light":"a","standard":"b","heavy":"c"}}}}`)
+	(&codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}).install(f)
+	f.host.name = "herdr"
+	fetched := 0
+	f.env.Accounts = &worker.Accounts{Fetch: func(context.Context, string, string) (*jsonx.Object, string) {
+		fetched++
+		return nil, "fake: no network in tests"
+	}}
+	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex" })
+	if err != nil || !res.Dispatched || res.Account != "" || f.host.configDir != "" || fetched != 0 {
+		t.Fatalf("%v %+v configDir=%q meter calls=%d", err, res, f.host.configDir, fetched)
 	}
 }
 

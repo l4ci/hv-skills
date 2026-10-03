@@ -421,3 +421,71 @@ func TestWorkerSessionEnsureHerdrOutsideCarriesBlockedBy(t *testing.T) {
 		t.Errorf("%d %s", code, out)
 	}
 }
+
+// useCodex swaps in a host and scripted codex/herdr runners: no real binary is
+// reachable. version is codex's `--version` stdout.
+func useCodex(t *testing.T, h host.Host, version string, loggedIn bool) {
+	t.Helper()
+	old := workerEnv
+	workerEnv = func() worker.Env {
+		return worker.Env{
+			NewHost:  func(string) host.Host { return h },
+			Sleep:    func(time.Duration) {},
+			LookPath: func(n string) (string, error) { return "/fake/" + n, nil },
+			Run: func(_ context.Context, name string, args, _ []string) (host.Result, error) {
+				switch filepath.Base(name) + " " + strings.Join(args, " ") {
+				case "codex --version":
+					return host.Result{Stdout: version}, nil
+				case "codex login status":
+					if !loggedIn {
+						return host.Result{ExitCode: 1}, nil
+					}
+				case "herdr integration status":
+					return host.Result{Stdout: "codex: current (v8)\n"}, nil
+				}
+				return host.Result{}, nil
+			},
+		}
+	}
+	t.Cleanup(func() { workerEnv = old })
+}
+
+func TestWorkerDispatchKindFlag(t *testing.T) {
+	dir := workerProject(t, `{"work":{"dispatch":"herdr"}}`)
+	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	brief := filepath.Join(t.TempDir(), "b.md")
+	os.WriteFile(brief, []byte("hello\n"), 0o644)
+
+	useCodex(t, &cliHost{herdr: true, inSession: true}, "codex-cli 0.159.2\n", true)
+	if code, _, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T1", "--kind", "gemini"); code != 2 {
+		t.Errorf("a bad --kind: %d, want 2", code)
+	}
+	code, out, _ := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T1", "--kind", "codex", "--json")
+	if d := data(t, out); code != 0 || d["kind"] != "codex" {
+		t.Fatalf("codex dispatch: %d %s", code, out)
+	}
+	code, out, _ = hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--relay", "--kind", "codex", "--json")
+	if d := data(t, out); code != 0 {
+		t.Fatalf("relay: %d %s", code, out)
+	} else if _, has := d["kind"]; has {
+		t.Errorf("a relay ignores kind and reports none: %s", out)
+	}
+
+	// version refusal: exit 4 with blockedBy, and the flag lets one call through
+	useCodex(t, &cliHost{herdr: true, inSession: true}, "codex-cli 0.200.0\n", true)
+	code, out, _ = hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T2", "--kind", "codex", "--json")
+	if d := data(t, out); code != 4 || d["blockedBy"] != "codex version" || d["changed"] != false {
+		t.Errorf("version refusal: %d %s", code, out)
+	}
+	code, out, stderr := hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T2", "--kind", "codex", "--accept-codex-version", "--json")
+	if code != 0 || !strings.Contains(stderr, "codex 0.200.0 is outside the supported range >=0.159.0 <0.160.0") {
+		t.Errorf("accepted: %d %s %s", code, out, stderr)
+	}
+
+	// an unlogged slot is exit 5 with the login hint
+	useCodex(t, &cliHost{herdr: true, inSession: true}, "codex-cli 0.159.2\n", false)
+	code, _, stderr = hvIn(t, dir, "worker", "dispatch", "w1", "--body-file", brief, "--task", "T3", "--kind", "codex")
+	if code != 5 || !strings.Contains(stderr, "codex login") {
+		t.Errorf("login: %d %s", code, stderr)
+	}
+}

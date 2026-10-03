@@ -89,7 +89,7 @@ trap 'rm -rf "$RUN_TMP"' EXIT
 export HV_POISON_BIN="$HV_STAGE/poison"  # sections that reset PATH keep this first
 HV_POISON_LOG="$HV_STAGE/poison.log"
 mkdir -p "$HV_POISON_BIN" && : > "$HV_POISON_LOG"
-for cli in gh glab herdr tmux; do
+for cli in gh glab herdr tmux codex; do
   printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_BIN/$cli"
   chmod +x "$HV_POISON_BIN/$cli"
 done

@@ -3,8 +3,6 @@ package round
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -30,18 +28,7 @@ func (e Env) leaseEnv() roundlease.Env {
 
 // commonDir is the git common dir of root, through the Env's git.
 func (e Env) commonDir(ctx context.Context, root string) (string, error) {
-	out, errOut, code, err := e.Git(ctx, root, "rev-parse", "--git-common-dir")
-	if err != nil || code != 0 {
-		return "", &worker.Error{Exit: worker.ExitUnavailable, Message: "git rev-parse --git-common-dir failed: " + strings.TrimSpace(errOut)}
-	}
-	p := strings.TrimSpace(out)
-	if !filepath.IsAbs(p) {
-		p = filepath.Join(root, p)
-	}
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		p = r
-	}
-	return filepath.Clean(p), nil
+	return worker.CommonDir(ctx, e.Git, root)
 }
 
 // ReadLease is the repo's orchestrator lease and its state.

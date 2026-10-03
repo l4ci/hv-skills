@@ -36,7 +36,7 @@ func doctorData(t *testing.T, out string) (bool, map[string]map[string]any) {
 		byName[c["name"].(string)] = c
 		order += c["name"].(string) + ","
 	}
-	if order != "git,host,tracker,accounts,hook,hv," {
+	if order != "git,host,tracker,accounts,hook,hv,codex," {
 		t.Errorf("check order %s", order)
 	}
 	return env.Data.OK, byName

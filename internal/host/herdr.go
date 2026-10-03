@@ -91,24 +91,29 @@ func jget(doc, path string) string {
 }
 
 // LaunchArgs splits a worker launch command for `herdr agent start --kind
-// claude`, which runs the claude binary itself and takes only its arguments.
-// Leading KEY=VALUE tokens are returned as env (passed to the tab as --env),
-// everything after the binary as args. It fails when the command does not
-// launch claude, since agent start cannot run it.
-func LaunchArgs(launch string) (env, args []string, err error) {
+// <kind>`, which runs the agent binary itself and takes only its arguments.
+// The kind is the binary's basename after any leading KEY=VALUE tokens:
+// `claude` or `codex`. Those tokens are returned as env (passed to the tab as
+// --env), everything after the binary as args. It fails when the command
+// launches anything else, since agent start cannot run it.
+func LaunchArgs(launch string) (kind string, env, args []string, err error) {
 	toks, err := shlex.Split(launch)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, nil, err
 	}
 	i := 0
 	for i < len(toks) && envAssign.MatchString(toks[i]) {
 		env = append(env, toks[i])
 		i++
 	}
-	if i >= len(toks) || baseName(toks[i]) != "claude" {
-		return nil, nil, fmt.Errorf("not a claude launch")
+	if i >= len(toks) {
+		return "", nil, nil, fmt.Errorf("not a claude or codex launch")
 	}
-	return env, toks[i+1:], nil
+	switch k := baseName(toks[i]); k {
+	case "claude", "codex":
+		return k, env, toks[i+1:], nil
+	}
+	return "", nil, nil, fmt.Errorf("not a claude or codex launch")
 }
 
 var envAssign = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
@@ -167,14 +172,14 @@ func DialogKeys(pane string) (keys []string, ok bool) {
 	return append(keys, "enter"), true
 }
 
-// Spawn adopts the worktree as a new background tab, starts Claude Code in
+// Spawn adopts the worktree as a new background tab, starts the agent in
 // it, clears any startup dialog, and waits for it to idle. It returns the tab
 // id (the handle). Session is unused: herdr tabs live in the caller's own
 // workspace.
 func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
-	env, agentArgs, err := LaunchArgs(o.Launch)
+	kind, env, agentArgs, err := LaunchArgs(o.Launch)
 	if err != nil {
-		return "", fmt.Errorf("work.dispatch=herdr launches claude itself; workerCommand must run claude, got: %s", o.Launch)
+		return "", fmt.Errorf("work.dispatch=herdr launches claude or codex itself; the launch command must run one of them, got: %s", o.Launch)
 	}
 	args := []string{"tab", "create", "--workspace", h.d.Getenv("HERDR_WORKSPACE_ID"),
 		"--cwd", o.Cwd, "--label", o.Slot, "--no-focus"}
@@ -182,8 +187,14 @@ func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 		args = append(args, "--env", e)
 	}
 	// Account selection must happen at tab creation: agent start runs the
-	// binary directly and ignores shell aliases or wrappers.
-	if o.ConfigDir != "" {
+	// binary directly and ignores shell aliases or wrappers. A codex slot's
+	// account is its CODEX_HOME; the claude config dir is not its business.
+	switch {
+	case kind == "codex":
+		if o.CodexHome != "" {
+			args = append(args, "--env", "CODEX_HOME="+o.CodexHome)
+		}
+	case o.ConfigDir != "":
 		args = append(args, "--env", "CLAUDE_CONFIG_DIR="+o.ConfigDir)
 	}
 	r := h.herdr(ctx, args...)
@@ -198,7 +209,7 @@ func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 
 	name := AgentName(o.Slot, tab)
 	timeoutMs := strconv.Itoa(o.BootTimeout * 1000)
-	start := append([]string{"agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", timeoutMs, "--"}, agentArgs...)
+	start := append([]string{"agent", "start", name, "--kind", kind, "--pane", pane, "--timeout", timeoutMs, "--"}, agentArgs...)
 	r = h.herdr(ctx, start...)
 	if r.ExitCode == 0 {
 		return tab, nil

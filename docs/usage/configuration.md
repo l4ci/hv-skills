@@ -97,7 +97,7 @@ Two things behave differently under `tmux` and `herdr`:
 - **`work.isolation` stops applying.** Every slot has its own worktree, so its own git index, by construction.
 - **Workers commit.** The orchestrator's per-task commit step is skipped; integration happens through the merge gate instead, which re-verifies the *merged* tree. Two workers can each be honestly green and still break the cycle branch together — a signature one widens while another adds a caller, a constant one stops emitting while another starts reading it. Nothing about a clean merge rules that out, which is why the gate runs `refactor.verifyCommands` after every merge rather than trusting the branches.
 
-Related keys: `work.workerSlots` (pool size, default `3`), `work.workerCommand` (default builds `claude --model <models.worker> --dangerously-skip-permissions`), `work.operatorCommand` (default builds `claude --continue --model <models.orchestrator> --permission-mode auto`), and `work.accounts`.
+Related keys: `work.workerSlots` (pool size, default `3`), `work.workerCommand` (default builds `claude --model <models.worker> --dangerously-skip-permissions`), `work.codexCommand` (the same for Codex workers; default builds `codex --model <model> --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust --no-daemon --no-alt-screen`), `work.operatorCommand` (default builds `claude --continue --model <models.orchestrator> --permission-mode auto`), and `work.accounts`.
 
 **Workers run with permissions skipped; the operator does not.** A worker is briefed to commit, open a PR and run tests with nobody in its pane to answer a prompt, so a narrower mode just stalls it. What bounds a worker is scope rather than gating — a throwaway branch in its own worktree, with `hv worker gate` re-verifying the merged tree before anything reaches the cycle branch. The operator keeps `auto` because it performs the merges and it is the window a human is actually watching. Narrow either via its config key; a worker that then stops on a prompt reports `NEEDS-PERMISSION` rather than hanging.
 
@@ -232,9 +232,9 @@ Settings for `hv round` (parallel rounds). All are silent defaults; none is writ
 | `round.stallMinutes` | `30` | Minutes without a commit, an uncommitted edit or a state change before `hv round reconcile` reports a slot that holds an issue and has a live agent as `stalled`. `0` turns the check off. A slot waiting on an escalation is never stalled; a dead agent is `dead`, not stalled. |
 | `round.tier` | `"standard"` | Default worker tier: `light` (reading, searching), `standard` (code and tests) or `heavy` (hard reasoning). `hv round assign --tier heavy --tier-reason "…"` goes above it; a tier above the default needs the reason, which lands on the slot. |
 | `round.tiers.claude.light` / `.standard` / `.heavy` | `haiku` / `models.worker` / `opus` | The model each tier starts a Claude worker with. `standard` follows `models.worker` (so `/hv-work` and rounds agree) until set explicitly. |
-| `round.tiers.codex.light` / `.standard` / `.heavy` | empty | The same for Codex. A kind with any tier set must set all three. Starting a Codex worker is not built yet (#68); `assign --kind codex --check-only` shows the model it would use. |
+| `round.tiers.codex.light` / `.standard` / `.heavy` | empty | The same for Codex. A kind with any tier set must set all three. `assign --kind codex --check-only` shows the model it would use. |
 
-A custom `work.workerCommand` receives the tier's model only through a `{model}` placeholder in the command; without one, `hv round assign` warns and records the tier but not a model.
+A custom `work.workerCommand` receives the tier's model only through a `{model}` placeholder in the command; without one, `hv round assign` warns and records the tier but not a model. `work.codexCommand` works the same way for Codex workers.
 
 `round.scope` is a different axis from `autonomy.level`: the level says how far skills chain on their own, the scope says which issues a round may take. Set with `hv config set round.scope slate`.
 

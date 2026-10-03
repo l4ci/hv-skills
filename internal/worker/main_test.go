@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	tripwireHit = filepath.Join(dir, "hit")
-	for _, bin := range []string{"herdr", "tmux", "gh", "glab"} {
+	for _, bin := range []string{"herdr", "tmux", "gh", "glab", "codex"} {
 		script := fmt.Sprintf("#!/bin/sh\necho \"$0 $*\" >> '%s'\necho 'tripwire: real %s reached from a test' >&2\nexit 99\n", tripwireHit, bin)
 		if err := os.WriteFile(filepath.Join(dir, bin), []byte(script), 0o755); err != nil {
 			fmt.Fprintln(os.Stderr, err)

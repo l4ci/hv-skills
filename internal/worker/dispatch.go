@@ -31,6 +31,12 @@ type DispatchOpts struct {
 	// Branch is the per-task branch the reset guard cuts; "" means
 	// hv-worker/<slot>-<task>. A round slot works on <agent>/<issue>-<slug>.
 	Branch string
+	// Kind is the harness, "claude" or "codex" (E1); "" is the slot's
+	// recorded kind, else claude. A relay ignores it.
+	Kind string
+	// AcceptCodexVersion lets one codex dispatch through a Codex CLI outside
+	// the supported range, with a warning.
+	AcceptCodexVersion bool
 }
 
 // DispatchResult is what a successful dispatch did.
@@ -40,6 +46,9 @@ type DispatchResult struct {
 	Task   string
 	Round  *int
 	Relay  bool
+	// Kind is the harness the session runs; "" for a relay, which ignores it.
+	Kind     string
+	Warnings []string
 }
 
 // workerCommand is work.workerCommand, else the default launch line. Workers
@@ -238,15 +247,59 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	}
 
 	if !o.Relay {
-		launch := workerCommand(root, o.Model)
-		bad, perr := ResumeFlag(launch)
+		kind := o.Kind
+		if kind == "" {
+			kind = Str(s, "kind")
+		}
+		if kind == "" {
+			kind = KindClaude
+		}
+		if kind != KindClaude && kind != KindCodex {
+			return res, fail(ExitUsage, "kind must be claude or codex, got: "+kind)
+		}
+		res.Kind = kind
+		key, launch := "work.workerCommand", ""
+		bad, perr := "", error(nil)
+		what := ""
+		if kind == KindCodex {
+			key = "work.codexCommand"
+			if launch, perr = codexCommand(root, o.Model); perr == nil {
+				bad, perr = CodexResume(launch)
+				what = "the subcommand "
+			}
+		} else {
+			launch = workerCommand(root, o.Model)
+			bad, perr = ResumeFlag(launch)
+		}
 		if perr != nil {
-			return res, fail(ExitUsage, "work.workerCommand cannot be parsed (unbalanced quote?): "+launch)
+			var we *Error
+			if errors.As(perr, &we) {
+				return res, perr
+			}
+			return res, fail(ExitUsage, key+" cannot be parsed (unbalanced quote?): "+launch)
 		}
 		if bad != "" {
-			e := fail(ExitRefused, fmt.Sprintf("work.workerCommand contains '%s', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it.", bad))
+			e := fail(ExitRefused, fmt.Sprintf("%s contains %s'%s', which reopens the previous conversation; a task dispatch must start a fresh session. Remove it.", key, what, bad))
 			e.Data = BlockData{BlockedBy: "resume flag"}
 			return res, e
+		}
+		// Under herdr the launch binary decides `agent start --kind`, so it
+		// must be the kind's own: refuse before anything is killed.
+		if h.Name() == "herdr" {
+			if lk, _, _, lerr := host.LaunchArgs(launch); lerr != nil || lk != kind {
+				return res, fail(ExitUnavailable, fmt.Sprintf("work.dispatch=herdr starts a %s worker, but %s does not run %s: %s", kind, key, kind, launch))
+			}
+		}
+		// A codex worker's home, login and version are checked before the old
+		// session is killed or anything is marked.
+		codexHome := ""
+		if kind == KindCodex {
+			setup, err := e.CodexPreflight(ctx, root, o.Slot, o.AcceptCodexVersion)
+			if err != nil {
+				return res, err
+			}
+			codexHome, res.Warnings = setup.Home, setup.Warnings
+			configDir = ""
 		}
 		// Refuse a slot that still holds work, before its session is killed.
 		if _, err := e.ResetTo(root, o.Slot, o.Task, branchOr(o), true); err != nil {
@@ -266,7 +319,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 			return res, resetRefusal(err, true)
 		}
 		handle, err = h.Spawn(ctx, host.SpawnOpts{Slot: o.Slot, Session: session, Cwd: worktree,
-			ConfigDir: configDir, Launch: launch, BootTimeout: timeout})
+			ConfigDir: configDir, CodexHome: codexHome, Launch: launch, BootTimeout: timeout})
 		if err != nil {
 			clearHandle(root, o.Slot)
 			return res, fail(ExitUnavailable, err.Error())
@@ -404,9 +457,17 @@ const ModelPlaceholder = "{model}"
 // ModelApplies reports whether a chosen model reaches the launch command: the
 // default command always takes it, a custom work.workerCommand only through
 // the {model} placeholder.
-func ModelApplies(root string) bool {
+func ModelApplies(root string) bool { return ModelAppliesTo(root, KindClaude) }
+
+// ModelAppliesTo is ModelApplies for a harness kind: a codex worker's command
+// is work.codexCommand, whose default always takes the model.
+func ModelAppliesTo(root, kind string) bool {
+	key := "work.workerCommand"
+	if kind == KindCodex {
+		key = "work.codexCommand"
+	}
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
-	if v, ok := config.Lookup(cfg, "work.workerCommand"); ok {
+	if v, ok := config.Lookup(cfg, key); ok {
 		if s, _ := v.(string); s != "" {
 			return strings.Contains(s, ModelPlaceholder)
 		}

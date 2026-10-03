@@ -14,6 +14,8 @@ RT="$(mktemp -d "$TMP/round-tier.XXXXXX")"
 mkdir -p "$RT/downbin"
 printf '#!/bin/sh\necho "no server running" >&2\nexit 1\n' > "$RT/downbin/tmux"
 chmod +x "$RT/downbin/tmux"
+# A codex start runs codex --version first: the fake stands in, never the real one.
+cp "$TESTDIR/fakes/codex" "$RT/downbin/codex"
 RTENV="env -u HERDR_PANE_ID -u TMUX_PANE -u HERDR_ENV PATH=$RT/downbin:$PATH"
 rt() { ( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ); }
 rtrc() { RC=0; OUT=$( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ) || RC=$?; }
@@ -57,9 +59,9 @@ rt config set round.tiers.codex.heavy c-heavy >/dev/null
 OUT=$(rt round assign F01 --check-only --kind codex --holder-pid "$HOLDER")
 [ "$(echo "$OUT" | jget data.model)" = "c-std" ] || fail "codex standard should resolve: $OUT"
 rtrc round assign F01 --kind codex --holder-pid "$HOLDER"
-[ "$RC" = "71" ] || fail "starting a codex worker should exit 71 until E1, got $RC: $OUT"
-[ "$(git -C "$RT/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "the 71 must leave the slot parked"
-pass "codex resolves its model, exits 71 before marking anything, and needs a full map"
+[ "$RC" = "5" ] || fail "a codex worker under tmux should exit 5 (herdr only), got $RC: $OUT"
+[ "$(git -C "$RT/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "the refusal must leave the slot parked"
+pass "codex resolves its model, is refused before marking anything outside herdr, and needs a full map"
 
 # Status shows what a slot was assigned with.
 python3 - "$RT/.hv/workers.json" <<'PY' || fail "could not seed slot tier fields"

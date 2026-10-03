@@ -34,6 +34,7 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 	tier := fs.String("tier", "", "worker tier: light, standard or heavy (default round.tier)")
 	tierReason := fs.String("tier-reason", "", "one line on why; required above the default tier")
 	kind := fs.String("kind", "", "harness kind: claude or codex (default the slot's, else claude)")
+	acceptCodex := fs.Bool("accept-codex-version", false, "let this call through a Codex CLI outside the supported range")
 	accept := fs.Bool("accept-overlap", false, "skip the file-overlap check only")
 	pid := fs.Int("holder-pid", 0, "orchestrator pid, when its ancestry cannot be read")
 	return func(c *Ctx, args []string) (Result, error) {
@@ -81,7 +82,7 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 		res, err := env.Assign(ctx, root, be, round.AssignOpts{
 			ID: id, Agent: *agent, BodyFile: bf, Siblings: splitList(*siblings),
 			CheckOnly: *checkOnly, AcceptOverlap: *accept, HolderPID: *pid,
-			Tier: *tier, TierReason: *tierReason, Kind: *kind,
+			Tier: *tier, TierReason: *tierReason, Kind: *kind, AcceptCodexVersion: *acceptCodex,
 			Settings: set, Getenv: os.Getenv,
 		})
 		for _, w := range res.Warnings {

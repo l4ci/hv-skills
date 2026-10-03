@@ -12,12 +12,13 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/doctor"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/version"
+	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
 // doctorCommand is `hv doctor` (C6): a read-only preflight. It runs without
 // .hv/ and reads the project config only when one is found.
 func doctorCommand() *Command {
-	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, hv", Verb: noFlags(runDoctor)}
+	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, hv, codex", Verb: noFlags(runDoctor)}
 }
 
 // doctorCallTimeout bounds each tool call, so a hung herdr cannot hang the verb.
@@ -86,6 +87,7 @@ func doctorInput() doctor.Input {
 		return s
 	}
 	in.Dispatch, in.IssuesProvider = str("work.dispatch"), str("issues.provider")
+	in.CodexHomes = codexHomes(root)
 	if raw, _ := config.Lookup(cfg, "work.accounts"); raw != nil {
 		list, _ := raw.([]any)
 		for _, e := range list {
@@ -138,4 +140,25 @@ func doctorExec(ctx context.Context, bin string, args, extraEnv []string, dir st
 		return r, nil
 	}
 	return r, err
+}
+
+// codexHomes lists the slot homes that exist under <git-common-dir>/hv/codex/,
+// sorted by slot name. Any failure reads as none: the check then has no home
+// to look at, and git trouble is the git check's to report.
+func codexHomes(root string) []doctor.CodexHome {
+	cd, err := worker.CommonDir(context.Background(), worker.ExecGit, root)
+	if err != nil {
+		return nil
+	}
+	entries, err := os.ReadDir(worker.CodexHomesDir(cd))
+	if err != nil {
+		return nil
+	}
+	var homes []doctor.CodexHome
+	for _, e := range entries {
+		if e.IsDir() {
+			homes = append(homes, doctor.CodexHome{Slot: e.Name(), Dir: filepath.Join(worker.CodexHomesDir(cd), e.Name())})
+		}
+	}
+	return homes
 }

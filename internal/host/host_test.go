@@ -80,15 +80,23 @@ func TestAgentName(t *testing.T) {
 }
 
 func TestLaunchArgs(t *testing.T) {
-	env, args, err := LaunchArgs(`FOO=bar BAZ=1 /usr/bin/claude --model sonnet --dangerously-skip-permissions`)
-	if err != nil || !reflect.DeepEqual(env, []string{"FOO=bar", "BAZ=1"}) ||
+	kind, env, args, err := LaunchArgs(`FOO=bar BAZ=1 /usr/bin/claude --model sonnet --dangerously-skip-permissions`)
+	if err != nil || kind != "claude" || !reflect.DeepEqual(env, []string{"FOO=bar", "BAZ=1"}) ||
 		!reflect.DeepEqual(args, []string{"--model", "sonnet", "--dangerously-skip-permissions"}) {
-		t.Errorf("LaunchArgs = %q %q %v", env, args, err)
+		t.Errorf("LaunchArgs = %q %q %q %v", kind, env, args, err)
 	}
-	for _, bad := range []string{"codex --yolo", "", `claude "oops`, "FOO=1"} {
-		if _, _, err := LaunchArgs(bad); err == nil {
+	for _, bad := range []string{"gemini --yolo", "", `claude "oops`, "FOO=1", "FOO=1 /bin/sh -c claude"} {
+		if _, _, _, err := LaunchArgs(bad); err == nil {
 			t.Errorf("LaunchArgs(%q) should fail", bad)
 		}
+	}
+}
+
+func TestLaunchArgsKindFromBasename(t *testing.T) {
+	kind, env, args, err := LaunchArgs(`A=1 /opt/bin/codex --model gpt-x --no-daemon`)
+	if err != nil || kind != "codex" || !reflect.DeepEqual(env, []string{"A=1"}) ||
+		!reflect.DeepEqual(args, []string{"--model", "gpt-x", "--no-daemon"}) {
+		t.Errorf("LaunchArgs = %q %q %q %v", kind, env, args, err)
 	}
 }
 
@@ -388,11 +396,49 @@ func TestHerdrSpawn(t *testing.T) {
 	}
 }
 
-func TestHerdrSpawnRejectsNonClaudeLaunch(t *testing.T) {
+func TestHerdrSpawnRejectsUnknownLaunch(t *testing.T) {
 	f := &fake{handler: func(string, []string) Result { t.Error("ran a command"); return Result{} }}
-	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "codex --yolo", BootTimeout: 5})
-	if err == nil || !strings.Contains(err.Error(), "workerCommand must run claude, got: codex --yolo") {
+	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "gemini --yolo", BootTimeout: 5})
+	if err == nil || !strings.Contains(err.Error(), "must run one of them, got: gemini --yolo") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// A codex launch: the tab gets CODEX_HOME and no CLAUDE_CONFIG_DIR, and agent
+// start runs with --kind codex.
+func TestHerdrSpawnCodex(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "tab" {
+			return Result{Stdout: tabCreated}
+		}
+		return Result{Stdout: agentJSON("idle")}
+	}}
+	h := New("herdr", deps(f, herdrEnv, &clock{}))
+	got, err := h.Spawn(bg, SpawnOpts{Slot: "w1", Cwd: "/wt", ConfigDir: "/acct/one", CodexHome: "/cd/hv/codex/w1",
+		Launch: "codex --model gpt-x --dangerously-bypass-approvals-and-sandbox --no-daemon", BootTimeout: 60})
+	if err != nil || got != "w9:t7" {
+		t.Fatalf("Spawn = %q, %v", got, err)
+	}
+	want := []string{
+		"herdr tab create --workspace w9 --cwd /wt --label w1 --no-focus --env CODEX_HOME=/cd/hv/codex/w1",
+		"herdr agent start hv-w1-w9-t7 --kind codex --pane w9:p17 --timeout 60000 -- --model gpt-x --dangerously-bypass-approvals-and-sandbox --no-daemon",
+	}
+	if !reflect.DeepEqual(f.calls, want) {
+		t.Errorf("calls =\n%s\nwant\n%s", strings.Join(f.calls, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A claude launch ignores CodexHome, so the claude path is unchanged.
+func TestHerdrSpawnClaudeIgnoresCodexHome(t *testing.T) {
+	f := &fake{handler: func(_ string, a []string) Result {
+		if a[0] == "tab" {
+			return Result{Stdout: tabCreated}
+		}
+		return Result{Stdout: agentJSON("idle")}
+	}}
+	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Cwd: "/wt", ConfigDir: "/acct", CodexHome: "/h", Launch: "claude", BootTimeout: 5})
+	if err != nil || strings.Contains(f.log(), "CODEX_HOME") || !strings.Contains(f.calls[0], "--env CLAUDE_CONFIG_DIR=/acct") {
+		t.Errorf("%v\n%s", err, f.log())
 	}
 }
 

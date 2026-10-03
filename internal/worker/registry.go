@@ -196,6 +196,13 @@ type Env struct {
 	// Shell runs one verification command through `sh -c` in dir and returns
 	// its combined output and exit code.
 	Shell func(ctx context.Context, dir, command string) (output string, code int)
+	// Run runs one tool with extra environment (CODEX_HOME) and returns what
+	// it left behind; a command that ran and failed is a Result with ExitCode
+	// set, an error means it could not run at all. Every codex and herdr call
+	// of the codex preflight goes through it, so tests need no real binary.
+	Run func(ctx context.Context, name string, args, env []string) (host.Result, error)
+	// LookPath reports whether a binary is installed; nil means exec.LookPath.
+	LookPath func(string) (string, error)
 }
 
 func (e Env) context() context.Context {
@@ -229,7 +236,31 @@ func (e Env) withDefaults() Env {
 	if e.Shell == nil {
 		e.Shell = execShell
 	}
+	if e.Run == nil {
+		e.Run = execRun
+	}
+	if e.LookPath == nil {
+		e.LookPath = exec.LookPath
+	}
 	return e
+}
+
+// execRun is the production Env.Run. It bounds the call like the host runner.
+func execRun(ctx context.Context, name string, args, env []string) (host.Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, host.CallTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = append(os.Environ(), env...)
+	var out, errb strings.Builder
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	err := cmd.Run()
+	r := host.Result{Stdout: out.String(), Stderr: errb.String()}
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		r.ExitCode = ee.ExitCode()
+		return r, nil
+	}
+	return r, err
 }
 
 func execShell(ctx context.Context, dir, command string) (string, int) {
