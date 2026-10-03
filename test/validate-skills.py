@@ -201,15 +201,6 @@ UNCONVERTED = {
     "references/review-verdict-routing.md",
     "references/silent-failure-hunter.md",
 
-    # S3 backlog and vision
-    "hv-capture/SKILL.md",
-    "hv-spike/SKILL.md",
-    "hv-vision/SKILL.md",
-    "references/detail-files.md",
-    "references/issue-mode.md",
-    "references/milestone-tagging.md",
-    "references/refactor-design-approaches.md",
-
     # S5 lifecycle
     "hv-config/SKILL.md",
     "hv-init/SKILL.md",

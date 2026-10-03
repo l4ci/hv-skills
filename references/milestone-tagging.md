@@ -7,10 +7,10 @@ When `/hv-capture` produces new TODO items and there's at least one active miles
 ## Gate
 
 ```bash
-.hv/bin/hv-vision-active
+hv milestone active --json
 ```
 
-- If the helper prints nothing, no milestones are active — skip this step entirely.
+- If `data.ids` is empty, no milestones are active — skip this step entirely.
 - If exactly one milestone is active, ask the obvious-default question (below).
 - If multiple milestones are active, ask the multi-active question (no auto-default).
 
