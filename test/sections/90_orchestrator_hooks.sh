@@ -193,10 +193,16 @@ print(cs[sys.argv[1]].get(sys.argv[2],"ABSENT"))' "$1" "$2"; }
 rm -f "$SP"
 OUT="$(dd_run || true)"
 [ "$(echo "$OUT" | dd_field statusline status)" = "skip" ] || fail "D1: no settings file: statusline should skip: $OUT"
-[ "$(echo "$OUT" | dd_field stop-hook status)" = "fail" ] && [ "$(echo "$OUT" | dd_field stop-hook hint)" = "hv hook install" ] || fail "D1: missing hooks should fail with the hint: $OUT"
+[ "$(echo "$OUT" | dd_field stop-hook status)" = "skip" ] && echo "$OUT" | dd_field stop-hook detail | grep -q 'hv hook install' || fail "D1: hooks not installed are opt-in and should skip, naming the install command: $OUT"
 printf '{"statusLine":{"type":"command","command":"~/line.sh"}}\n' > "$SP"
 OUT="$(dd_run || true)"
-[ "$(echo "$OUT" | dd_field statusline status)" = "fail" ] && [ "$(echo "$OUT" | dd_field statusline hint)" = "hv hook install --wrap-statusline" ] || fail "D1: a statusline without the dump should fail: $OUT"
+[ "$(echo "$OUT" | dd_field statusline status)" = "skip" ] && [ "$(echo "$OUT" | dd_field stop-hook status)" = "skip" ] || fail "D1: a user's own statusline is not an hv install, both should skip: $OUT"
+# a partial install (one marked hook, no dump) is opted in and fails with the hint
+printf '{"statusLine":{"type":"command","command":"~/line.sh"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}\n' > "$SP"
+OUT="$(dd_run || true)"
+[ "$(echo "$OUT" | dd_field statusline status)" = "fail" ] && [ "$(echo "$OUT" | dd_field statusline hint)" = "hv hook install --wrap-statusline" ] || fail "D1: a partial install without the dump should fail: $OUT"
+[ "$(echo "$OUT" | dd_field stop-hook status)" = "fail" ] && [ "$(echo "$OUT" | dd_field stop-hook hint)" = "hv hook install" ] || fail "D1: a partial install without SessionStart should fail: $OUT"
+printf '{"statusLine":{"type":"command","command":"~/line.sh"}}\n' > "$SP"
 oh 0 -C "$P" hook install --wrap-statusline >/dev/null
 OUT="$(dd_run || true)"
 [ "$(echo "$OUT" | dd_field statusline status)" = "pass" ] && [ "$(echo "$OUT" | dd_field stop-hook status)" = "pass" ] || fail "D1: a wrapped install should pass both: $OUT"
@@ -204,7 +210,7 @@ rm "$DB/hv"
 OUT="$(dd_run || true)"
 [ "$(echo "$OUT" | dd_field stop-hook status)" = "fail" ] || fail "D1: hooks whose hv does not resolve should fail: $OUT"
 oh 0 -C "$P" hook uninstall >/dev/null
-pass "D1: doctor reports the statusline and stop-hook checks for missing, wrapped and current settings"
+pass "D1: doctor skips until opted in, fails a partial install and passes a wrapped one"
 
 kill "$ORCH" "$WORKER" 2>/dev/null || true
 wait "$ORCH" "$WORKER" 2>/dev/null || true

@@ -23,7 +23,6 @@ FAKE
   chmod +x "$DR_BIN/herdr"
 }
 dr_herdr 0.9.3
-ln -s "$HV_BIN" "$DR_BIN/hv" # the D1 stop-hook check needs the hooks' hv to resolve
 
 dr_field() { # dr_field <check> <field>: one field of one check from the envelope on stdin
   python3 -c '
@@ -42,16 +41,14 @@ echo '{}' >"$TMP_DR/acct/.credentials.json"
 : >"$TMP_DR/acct/installed"
 printf '.worktrees/\n' >"$TMP_DR/proj/.gitignore"
 printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]}}\n' "$TMP_DR/acct" >"$TMP_DR/proj/.hv/config.json"
-# D1 (#65): the orchestrator hooks are installed, so the project is healthy
-mkdir -p "$TMP_DR/proj/.claude"
-printf '{"statusLine":{"type":"command","command":"hv statusline dump"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}],"SessionStart":[{"matcher":"^(startup|clear)$","hooks":[{"type":"command","command":"hv hook session-start # hv-hook"}]}]}}\n' >"$TMP_DR/proj/.claude/settings.local.json"
+# D1 (#65): the orchestrator hooks are opt-in, so a project that has not installed them skips both checks
 git -C "$TMP_DR/proj" init -q
 rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
 [ "$rc" -eq 0 ] || fail "C6[a]: healthy project exited $rc: $OUT"
 [ "$(printf '%s' "$OUT" | dr_ok)" = "True" ] || fail "C6[a]: ok is not true: $OUT"
 NAMES="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)["data"]["checks"]))')"
 [ "$NAMES" = "git,host,tracker,accounts,hook,statusline,stop-hook,hv,codex" ] || fail "C6[a]: checks were: $NAMES"
-for pair in git:pass host:pass tracker:skip accounts:pass hook:pass statusline:pass stop-hook:pass codex:skip; do
+for pair in git:pass host:pass tracker:skip accounts:pass hook:pass statusline:skip stop-hook:skip codex:skip; do
   [ "$(printf '%s' "$OUT" | dr_field "${pair%%:*}" status)" = "${pair##*:}" ] || fail "C6[a]: ${pair%%:*} was not ${pair##*:}: $OUT"
 done
 case "$OUT" in *'"changed"'*) fail "C6[a]: doctor reports changed: $OUT" ;; esac

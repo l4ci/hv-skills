@@ -350,10 +350,42 @@ func (d *runner) userFile(dir string) hookFile {
 	return d.read(filepath.Join(d.expand(dir), "settings.json"))
 }
 
+// optIn reports whether anything `hv hook install` writes is present in any
+// settings file in scope: a `# hv-hook` entry for any event, or a statusLine
+// that runs `hv statusline dump`. The hooks are opt-in, so with none of that
+// the checks skip; they fail only on a broken or partial install. Unreadable
+// files are returned so a skip can say it could not look there.
+func (d *runner) optIn() (in bool, unreadable []string) {
+	files := d.projectFiles()
+	for _, dir := range d.in.ConfigDirs {
+		files = append(files, d.userFile(dir))
+	}
+	for _, f := range files {
+		if f.err != nil {
+			unreadable = append(unreadable, f.path)
+		}
+		if len(f.events) > 0 || (f.hasSL && strings.Contains(f.slCmd, hook.StatuslineCmd)) {
+			in = true
+		}
+	}
+	return in, unreadable
+}
+
+func notInstalled(name string, unreadable []string) Check {
+	detail := "hooks not installed (opt-in)"
+	if len(unreadable) > 0 {
+		detail += "; cannot read " + strings.Join(unreadable, ", ")
+	}
+	return skip(name, detail+": hv hook install")
+}
+
 func (d *runner) statusline() Check {
 	const name = "statusline"
 	if d.in.ProjectRoot == "" {
 		return skip(name, "not inside an hv project")
+	}
+	if in, bad := d.optIn(); !in {
+		return notInstalled(name, bad)
 	}
 	proj := d.projectFiles()
 	dirs := d.in.ConfigDirs
@@ -407,6 +439,9 @@ func (d *runner) stopHook() Check {
 	const name = "stop-hook"
 	if d.in.ProjectRoot == "" {
 		return skip(name, "not inside an hv project")
+	}
+	if in, bad := d.optIn(); !in {
+		return notInstalled(name, bad)
 	}
 	files := d.projectFiles()
 	for _, dir := range d.in.ConfigDirs {

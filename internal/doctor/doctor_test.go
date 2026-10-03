@@ -404,8 +404,9 @@ func TestStatuslineCheck(t *testing.T) {
 	if c := o.check(t, nil, "statusline"); c.Status != Pass {
 		t.Fatalf("wrapped: %+v", c)
 	}
-	// The project file is removed: account a has its own plain line, b has none.
-	os.Remove(filepath.Join(o.root, ".claude", "settings.local.json"))
+	// Hooks installed (so opted in) but no statusline dump: account a has its own
+	// plain line, b has none. A partial install fails.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
 	o.write(t, filepath.Join(o.a, "settings.json"), `{"statusLine":{"command":"~/bin/line.sh"}}`)
 	c := o.check(t, nil, "statusline")
 	if c.Status != Fail || c.Hint != "hv hook install --wrap-statusline" || !strings.Contains(c.Detail, o.a) || !strings.Contains(c.Detail, o.b+": no statusLine") {
@@ -425,9 +426,10 @@ func TestStatuslineCheck(t *testing.T) {
 
 func TestStopHookCheck(t *testing.T) {
 	o := newOrch(t)
+	// Nothing installed is not a fault: the hooks are opt-in.
 	c := o.check(t, map[string]bool{"hv": true}, "stop-hook")
-	if c.Status != Fail || c.Hint != "hv hook install" || !strings.Contains(c.Detail, "Stop and SessionStart") {
-		t.Fatalf("missing: %+v", c)
+	if c.Status != Skip || !strings.Contains(c.Detail, "opt-in") || !strings.Contains(c.Detail, "hv hook install") {
+		t.Fatalf("not installed: %+v", c)
 	}
 	// Only Stop installed.
 	o.write(t, filepath.Join(o.a, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
@@ -446,7 +448,29 @@ func TestStopHookCheck(t *testing.T) {
 	// A user's own unmarked Stop hook is not ours.
 	o2 := newOrch(t)
 	o2.write(t, filepath.Join(o2.root, ".claude", "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop"}]}]}}`)
-	if c := o2.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail {
+	if c := o2.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Skip {
 		t.Fatalf("unmarked: %+v", c)
+	}
+}
+
+// A user's own statusline, with no hv entry anywhere, is not an install to
+// check: both checks skip and say how to opt in. An unreadable settings file
+// is named in the skip, since nothing could be ruled in or out there.
+func TestOrchestratorChecksSkipUntilOptedIn(t *testing.T) {
+	o := newOrch(t)
+	o.write(t, filepath.Join(o.a, "settings.json"), `{"statusLine":{"command":"~/bin/line.sh"}}`)
+	for _, n := range []string{"statusline", "stop-hook"} {
+		if c := o.check(t, map[string]bool{"hv": true}, n); c.Status != Skip || !strings.Contains(c.Detail, "hv hook install") {
+			t.Errorf("%s: %+v", n, c)
+		}
+	}
+	o.write(t, filepath.Join(o.b, "settings.json"), `{nope`)
+	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
+		t.Errorf("unreadable: %+v", c)
+	}
+	// One marked entry anywhere opts in, and then the missing half fails.
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail {
+		t.Errorf("opted in: %+v", c)
 	}
 }
