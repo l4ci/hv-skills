@@ -5,10 +5,28 @@ its own git worktree and herdr workspace, each holding one GitHub issue at a tim
 implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
 decisions, merges PRs and re-verifies on `main` after every merge.
 
-The standing worker contract is the `orchestrate-herdr` skill's `references/worker.md`
-(on this machine:
-`/home/vo/.claude-work/plugins/synced/20a2b42b-2da4-4892-8aa3-286c686ead4d_db9298e1-7194-4cd2-a1b8-483e198e1e2b/stray/skills/orchestrate-herdr/references/worker.md`).
-Read it in full before the issue. This file adds only what is specific to hv-skills.
+The orchestrator runs the `hv-orchestrate` skill, which holds the judgment (which issues,
+how to read a stuck worker, what to escalate, when to merge). The mechanics are `hv round`
+verbs, so a round never polls in the orchestrator's context. A worker reads
+`references/worker-contract.md`; `hv round assign` points it there. This file adds only what
+is specific to hv-skills.
+
+## The round flow
+
+| Step | Verb | What it does |
+|---|---|---|
+| Check | `hv doctor` | git, host, tracker auth, accounts, herdr hooks, `hv` version; each failure carries its fix |
+| Start | `hv round start` | takes the repo's orchestrator lease, provisions slots, lists ready candidates |
+| Pick | `hv round candidates` | the open items that pass the criteria, dependency and overlap checks |
+| Assign | `hv round assign <ID>` | claims the item, marks it in progress, cuts `<agent>/<issue>-<slug>`, starts the worker with a signed pointer brief |
+| Wait | `hv round wait` | blocks until one slot needs the orchestrator, then returns it; never poll |
+| Look | `hv round status`, `hv round reconcile` | the round's rows and drift; `reconcile --apply` repairs what is safe |
+| Ask | `hv round escalate send`, `escalate check` | puts a question to the maintainer on the issue or PR thread and reads the answer |
+| Merge | `hv worker gate <slot> --base <branch>` | verifies on the merged tree, merges on a pass; a manual gate (B1) refuses without the maintainer's answer |
+| Clean | `hv reap` | lists, then with `--apply` removes, what no live slot owns; never kills a running agent |
+| End | `hv round wind-down` | re-verifies the base, parks every slot, releases the lease |
+
+Each verb's arguments, data and exit codes are in `docs/design/5.0-verb-contract.md`.
 
 ## The gate
 
@@ -150,15 +168,11 @@ session and whose recorded state is not `idle`; `worker dispatch` arms a slot.
 
 ## Roster
 
-Slots are provisioned once and reused. Every worktree lives in the project root under
-`.worktrees/<agent>` (gitignored by `/hv-init`), so herdr groups the workspaces under the
-project and `/hv-work`'s `hv worker pool` (`.worktrees/<slot>`) shares the same root.
-Provision a slot with:
-
-```sh
-herdr worktree create --path .worktrees/<agent> ...   # from the project root
-git worktree add .worktrees/<agent> park/<agent>      # or, without herdr
-```
+Slots are provisioned once and reused. `hv round start` creates any missing slot at
+`.worktrees/<agent>` on `park/<agent>` and leaves healthy ones alone. Every worktree lives in
+the project root under `.worktrees/<agent>` (gitignored by `/hv-init`), so herdr groups the
+workspaces under the project and `hv worker pool` shares the same root. `round.roster` sets
+the names; the default is `ben`, `dana`, `nia`, `kit`.
 
 Tools that walk the tree without reading `.gitignore` see a second copy of every file
 under `.worktrees/`; none of this repo's verbs or tests do (smoke section 70 pins it).
