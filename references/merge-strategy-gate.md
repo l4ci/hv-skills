@@ -13,6 +13,8 @@ The `work.mergeStrategy` config flag (`"direct"` | `"pr"` | unset) drives whethe
 
 With `backlog.backend: "issues"` the strategy is forced to `pr`: `work.mergeStrategy` is ignored, no picker fires, and `hv ship merge` is never used. `hv ship pr` takes `--items <ID[,ID...]>` to append `Closes #<n>` lines and opens a GitLab MR (`glab mr create`) when the provider is GitLab. Merging is `/hv-review --queue`'s job. See `references/issue-mode.md`.
 
+Both verbs refuse a branch whose latest review or second-opinion verdict is FAIL: exit 4, `data.blockedBy: "verdict"`, nothing pushed or merged. Surface the finding and stop; a newer verdict (fix, then review again) clears it. A leftover advisory `codex` second-opinion runner never refuses.
+
 ## Strategy picker
 
 Used by skills that have to decide (currently `hv-ship`). When to ask:

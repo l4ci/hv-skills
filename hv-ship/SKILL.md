@@ -250,7 +250,7 @@ In an umbrella add `--repo <name>` to `hv ship pr` (it falls back to the cwd's s
 printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file -
 ```
 
-Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open a PR). Share the PR URL with the user.
+Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open a PR), including the exit-4 refusal after a recorded FAIL. Share the PR URL with the user.
 
 ## Step 6b — Direct Merge
 
@@ -258,7 +258,7 @@ Title rules and verb behavior — see `references/merge-strategy-gate.md` (Open 
 printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge <branch> --body-file -
 ```
 
-Verb behavior — see `references/merge-strategy-gate.md` (Direct merge). Share the hash with the user. Exit 4 with `data.blockedBy: "manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human for this merge; `data.paths` names the files that put it there): nothing changed. Ask the user in an `AskUserQuestion` that loop mode never auto-picks, then re-run with `--confirm --confirm-note "<their answer>"`.
+Verb behavior — see `references/merge-strategy-gate.md` (Direct merge), including the exit-4 refusal after a recorded FAIL. Share the hash with the user. Exit 4 with `data.blockedBy: "manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human for this merge; `data.paths` names the files that put it there): nothing changed. Ask the user in an `AskUserQuestion` that loop mode never auto-picks, then re-run with `--confirm --confirm-note "<their answer>"`.
 
 ## Step 6c — Close Upstream Issues (Direct-Push Path)
 
