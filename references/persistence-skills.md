@@ -58,4 +58,30 @@ If a new persistence skill needs a different gate, choose deliberately from {non
 - **Manual gates inventory.** The list of always-manual sites across all skills (not just this duo) lives in `references/manual-gates.md`.
 - **TaskCreate phase boilerplate.** The cross-cutting authoring rule lives in `references/authoring-conventions.md` rule *"Surface multi-step skill progress with TaskCreate"*.
 - **Knowledge & decisions consult.** The read-side pattern (verbs, carrier semantics, parallelism) lives in `references/knowledge-consult.md`.
-- **Umbrella-mode per-sub-repo KNOWLEDGE + Glossary.** Shipped in **F21** — hybrid umbrella + per-sub-repo storage, scope auto-resolve, and DECISIONS.md staying umbrella-only. Full model in `references/persistence-umbrella-scoping.md`.
+- **Umbrella-mode scoping.** The model is in *Umbrella scoping* below.
+
+## Umbrella scoping
+
+How KNOWLEDGE.md, DECISIONS.md and the Glossary behave in an umbrella project (a root repo with registered sub-repos). Shipped in **F21**. The hard boundary is `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* (Architecture); this section describes the model and does not re-decide it. Changing the model means revisiting that decision first.
+
+**KNOWLEDGE.md is hybrid.** `.hv/KNOWLEDGE.md` (always present) holds cross-repo learnings and umbrella Glossary terms. `.hv/knowledge/<name>/KNOWLEDGE.md` (created on first write or by `/hv-init` umbrella setup) holds that sub-repo's learnings and Glossary terms. Learnings that apply across repos go in the umbrella file; one-repo learnings (*"`web`'s Postgres pool config differs from `api`'s"*) go in that repo's file.
+
+**DECISIONS.md is umbrella-only.** One `.hv/DECISIONS.md` at the umbrella root, never split per sub-repo: hard boundaries are cross-repo. A truly repo-local "decision" is a learning; use `/hv-learn`.
+
+**Glossary follows KNOWLEDGE's scoping.** The `## Glossary` topic in each file holds that scope's terms. Glossary skips the F03 tier lifecycle: terms are canonical when written, not probationary.
+
+**Scope resolution**, highest priority first:
+
+1. `--repo umbrella|<name>` always wins.
+2. cwd inside a registered sub-repo selects that sub-repo. At the umbrella root, skills ask once via `AskUserQuestion` (umbrella-shared vs a specific sub-repo).
+3. Single-repo projects always resolve to `umbrella`, byte-identical to pre-F21.
+
+The scoped `hv knowledge` and `hv glossary` verbs resolve the target file and tier sidecar from the global `--repo` flag or the cwd.
+
+**Readers are hybrid** when the scope is a sub-repo: `hv knowledge query` and `hv glossary read` read both the umbrella and the sub-repo file, with a `> from: <path>` provenance line before each block. At umbrella scope (root or `--repo umbrella`) only the umbrella file is read. `hv knowledge amend` refuses an ambiguous `(topic, fragment)` that matches entries in both files; pass `--repo` to disambiguate.
+
+**Tier sidecars** are per file: `.hv/knowledge-tier.json` (umbrella) and `.hv/knowledge/<name>/knowledge-tier.json`, each tracking only its own bullets. Glossary is exempt in both.
+
+**CLAUDE.md managed block.** A sub-repo's CLAUDE.md (or AGENTS.md when present) gets `hv block knowledge --repo <name>`, listing umbrella topics plus that sub-repo's own, so a reader in the sub-repo sees the full topic index. The umbrella-root file lists umbrella topics only. Single-repo projects are unchanged.
+
+**Migration.** `/hv-migrate v4` writes each `.hv/contexts/<name>/CONTEXT.md` into `.hv/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `hv glossary import --repo <name>`, and the umbrella-root `.hv/CONTEXT.md` into the umbrella Glossary. Originals are backed up under `.hv/migrate-backup/`. Existing umbrella KNOWLEDGE content is untouched.

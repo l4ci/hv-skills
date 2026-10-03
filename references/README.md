@@ -26,19 +26,20 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`manual-gates.md`](manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. | `/hv-capture` (`--remove`, `--from-*`), `/hv-learn`, `/hv-release`, `/hv-ship` |
 | [`merge-strategy-gate.md`](merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. | `/hv-ship`, `/hv-work` |
 | [`milestone-tagging.md`](milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. | `/hv-capture` |
-| [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — `/hv-learn` carries both topic-bullet learnings and `--term` Glossary entries. | `/hv-decide`, `/hv-learn` |
+| [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`), plus umbrella scoping (hybrid KNOWLEDGE, umbrella-only DECISIONS). | `/hv-decide`, `/hv-learn` |
 | [`post-cycle-trigger-gate.md`](post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle skills. | `/hv-qa`, `/hv-ship`, `/hv-work` |
 | [`refactor-explore.md`](refactor-explore.md) | Exploration-agent prompt + categories + stop condition for `/hv-refactor` single-repo mode. | `/hv-refactor` |
 | [`refactor-design-approaches.md`](refactor-design-approaches.md) | Competing-design choreography (decisions consult, agent constraints, output shape) for `/hv-refactor` Step 5. | `/hv-refactor` |
 | [`refactor-umbrella-fanout.md`](refactor-umbrella-fanout.md) | Per-repo fan-out logic for `/hv-refactor` in umbrella mode. | `/hv-refactor` |
-| [`review-verdict-routing.md`](review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. | `/hv-qa`, `/hv-review`, `/hv-ship` |
+| [`review-verdict-routing.md`](review-verdict-routing.md) | Verdict semantics, `AskUserQuestion` shapes and plain-text fallback for `/hv-review` consumers. | `/hv-qa`, `/hv-review`, `/hv-ship` |
 | [`silent-failure-hunter.md`](silent-failure-hunter.md) | Rubric for detecting work that reports complete but didn't move the system, used in review passes. | `/hv-review`, `/hv-ship` |
 | [`source-prefill.md`](source-prefill.md) | Source-prefill / promote-between-artifacts semantics for `/hv-decide`. | `/hv-decide` |
 | [`subagent-dispatch.md`](subagent-dispatch.md) | Cross-skill rulebook for when and how skills push work into subagents instead of the orchestrator thread. | `/hv-debug`, `/hv-next`, `/hv-qa`, `/hv-vision` |
 | [`task-list-init.md`](task-list-init.md) | Canonical task-list initialization block cited by every skill with three or more phases. | `/hv-brainstorm`, `/hv-capture`, `/hv-config`, `/hv-debug`, `/hv-decide`, `/hv-init`, `/hv-learn`, `/hv-next`, `/hv-pause`, `/hv-plan`, `/hv-qa`, `/hv-refactor`, `/hv-release`, `/hv-review`, `/hv-ship`, `/hv-spike`, `/hv-vision`, `/hv-work` |
 | [`terminal-loop-surface.md`](terminal-loop-surface.md) | Canonical bash block for surfacing `[Auto:Loop]` decisions from terminal-path skills before halting. | `/hv-debug`, `/hv-next`, `/hv-pause`, `/hv-work` |
 | [`worker-contract.md`](worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. | `/hv-work` |
-| [`tmux-dispatch.md`](tmux-dispatch.md) | Pane classification, escalation relay, and merge gate for `work.dispatch: "tmux"`. | `/hv-work` |
+| [`herdr-dispatch.md`](herdr-dispatch.md) | What herdr changes versus tmux: tabs as slots, startup dialogs, worker-contract additions. | `/hv-work` |
+| [`tmux-dispatch.md`](tmux-dispatch.md) | Judgment `hv worker` verbs do not enforce for `work.dispatch: "tmux"`: permissions, relay provenance, merge-gate lore, failure modes. | `/hv-work` |
 | [`three-mode-skill-shape.md`](three-mode-skill-shape.md) | Three-mode skill shape (first-run / after-work / restructure) used by `/hv-ship` (Docs Mode) and `/hv-qa`. | `/hv-qa`, `/hv-ship` |
 | [`umbrella-mode.md`](umbrella-mode.md) | Umbrella-mode helpers, registry shape, and `Repos:` field semantics. | `/hv-capture`, `/hv-qa`, `/hv-spike`, `/hv-work` |
 | [`update-verdicts.md`](update-verdicts.md) | Update-check verdicts and routing for `/hv-update`. | `/hv-update` |

@@ -82,7 +82,7 @@ KNOWLEDGE.md is **hybrid** in umbrella projects (shipped in F21):
 
 The Glossary topic follows the same hybrid scoping. Scope resolves in this order: an explicit `--repo umbrella|<name>` flag wins; otherwise the cwd auto-resolves (inside a registered sub-repo → that repo; at the umbrella root → umbrella). Single-repo projects always resolve to `umbrella` and behave byte-identically to before. The knowledge verbs (`hv knowledge add`, `query`, `tier`, `amend`) and the glossary verbs (`hv glossary write`, `read`, `import`) all take `--repo`; readers (`hv knowledge query`, `hv glossary read`) merge umbrella + sub-repo content with a `> from: <path>` provenance line per source when scope is a sub-repo. Tier sidecars split per file (`.hv/knowledge-tier.json` umbrella, `.hv/knowledge/<name>/knowledge-tier.json` per sub-repo).
 
-**DECISIONS.md stays umbrella-only.** Hard boundaries are inherently cross-repo. A repo-local "decision" is really a learning; capture it with `/hv-learn`. Full model and rationale: [`references/persistence-umbrella-scoping.md`](../../references/persistence-umbrella-scoping.md), governed by the `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* boundary.
+**DECISIONS.md stays umbrella-only.** Hard boundaries are inherently cross-repo. A repo-local "decision" is really a learning; capture it with `/hv-learn`. Full model and rationale: [`references/persistence-skills.md`](../../references/persistence-skills.md#umbrella-scoping), governed by the `.hv/DECISIONS.md` *"Persistence-trio scoping under umbrella mode"* boundary.
 
 ## Resolvers: `hv repo umbrella` and `hv repo which`
 

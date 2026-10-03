@@ -4,7 +4,7 @@ Used by `/hv-work` Steps 5, 6, 7, and 7.5 when `work.dispatch: "herdr"`. Under t
 
 The herdr backend is the tmux backend on a different host. Each worker is its own Claude Code session in its own `git worktree`, on its own branch, opening a PR against the cycle branch. The difference is where the session lives: a **herdr tab** in the orchestrator's own workspace instead of a tmux window. herdr recognises the agent running in each tab and reports its state natively, which removes most of the guesswork tmux needs.
 
-Everything that is about the *workers* rather than the *host* is shared with tmux and lives in [`worker-contract.md`](worker-contract.md) (the standing contract and [provenance](worker-contract.md#provenance)) and [`tmux-dispatch.md`](tmux-dispatch.md): [escalating and relaying](tmux-dispatch.md#escalating-and-relaying), [the merge gate](tmux-dispatch.md#the-merge-gate), [permissions](tmux-dispatch.md#permissions) and [accounts](tmux-dispatch.md#accounts). This file covers only what herdr changes.
+Everything that is about the *workers* rather than the *host* is shared with tmux and lives in [`worker-contract.md`](worker-contract.md) (the standing contract and [provenance](worker-contract.md#provenance)) and [`tmux-dispatch.md`](tmux-dispatch.md): [polling](tmux-dispatch.md#polling), [escalating and relaying](tmux-dispatch.md#escalating-and-relaying), [the merge gate](tmux-dispatch.md#the-merge-gate), [permissions](tmux-dispatch.md#permissions) and [accounts](tmux-dispatch.md#accounts). This file covers only what herdr changes.
 
 Verbs: the same four (`hv worker pool`, `hv worker dispatch`, `hv worker poll`, `hv worker gate`) plus `hv worker session`. `hv` picks the herdr host instead of the tmux one from `work.dispatch`.
 
@@ -53,27 +53,11 @@ Agent names are unique per herdr **server**, not per workspace, so a bare `w1` w
 | 5 | host failure, including outside herdr, a wrapper command and an unrecognised startup dialog; also `agent_blocked`: a dialog was already up, nothing was sent |
 | 6 | `agent_prompt_stalled` or timeout: no activity after the prompt. Inspect the tab before resending; a stall does not prove the text was lost |
 
-## Poll mapping
+## Polling
 
-`hv worker poll` reads herdr's native agent state after the settle interval, then runs the same text classifier as tmux on the captured pane (`agent read --source recent-unwrapped`).
+`hv worker poll` reads herdr's native agent state, then runs the same text classifier as tmux on the pane; the mapping and the registry writes (`slot.state`, `slot.pr`) are specified in the contract (`docs/design/5.0-verb-contract.md`, A7 and C1/C2). Read `data.slots[].state`. Sentinels, `Retrying in` and `limited` outrank the native state.
 
-| herdr state | hv state |
-|---|---|
-| `working` | `busy` |
-| `blocked` | `needs-permission` (a dialog is up), or `blocked` when the pane carries `HV-BLOCKED` |
-| `idle`, `done` | text rules: `HV-DONE` → `done`, `HV-BLOCKED` → `blocked`, usage-limit phrasing → `limited`, `API Error` / `Resume this session` → `dead`, else `idle` |
-| `unknown` | the same text rules, else **`unknown`** |
-| no agent in the tab | `dead`: the session exited back to a shell |
-
-Sentinels, `Retrying in` and `limited` outrank the native state, the same way they outrank movement under tmux.
-
-**`unknown` is not done.** herdr reports it when an agent is present but it cannot classify the screen. Look at the tab before doing anything, and never route it to the gate.
-
-A slot that newly turns `blocked` or `needs-permission` raises a herdr notification with sound (`notification show --sound request`), once per transition.
-
-## The registry now carries state and PR
-
-On both hosts, live polls write `slot.state` (the hv state) and, when `HV-DONE` carries a PR URL, `slot.pr`. `hv worker gate` then merges through `gh pr merge` (or `glab mr merge` on GitLab) instead of falling back to a local merge. A bare branch name after `HV-DONE` is not recorded, because handing a branch to `gh pr merge` fails where the local merge would have worked.
+**`unknown` is not done.** herdr reports it when an agent is present but it cannot classify the screen. Look at the tab before doing anything, and never route it to the gate. A slot that newly turns `blocked` or `needs-permission` raises a herdr notification with sound, once per transition.
 
 ## Worker contract additions
 
