@@ -96,6 +96,26 @@ def add_comment(db, issue, body):
     return c
 
 
+def thread(db, n):
+    """The issue-comments API's target: an issue, or (as on GitHub, where a PR is
+    an issue) a gh PR, whose thread comments live in their own list so the plain
+    `gh pr comment` strings stay apart."""
+    for i in db["issues"]:
+        if i["number"] == int(n):
+            return i
+    for p in db.get("prs", []):
+        if p["number"] == int(n):
+            return {"number": p["number"], "comments": p.setdefault("thread_comments", [])}
+    raise Fail("issue #%s not found" % n)
+
+
+def threads(db):
+    """Every comment list the issue-comments API reaches, with its number."""
+    out = [(i["number"], i["comments"]) for i in db["issues"]]
+    out += [(p["number"], p["thread_comments"]) for p in db.get("prs", []) if "thread_comments" in p]
+    return out
+
+
 def new_milestone(db, title, description, state):
     if find_milestone(db, title):
         raise Fail("milestone %r already exists" % title)
@@ -493,34 +513,34 @@ def gh_api(db, args):
         save(db)
         emit(gm(x))
     elif re.match(r"^issues/\d+/comments$", rest) and method == "GET":
-        i = find_issue(db, rest.split("/")[1])
+        i = thread(db, rest.split("/")[1])
         emit([{"id": c["id"], "body": c["body"], "user": {"login": c["author"]}} for c in i["comments"]])
     elif re.match(r"^issues/\d+/comments$", rest) and method == "POST":
-        c = add_comment(db, find_issue(db, rest.split("/")[1]), fields.get("body", ""))
+        c = add_comment(db, thread(db, rest.split("/")[1]), fields.get("body", ""))
         save(db)
         emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]}})
     elif re.match(r"^issues/comments/\d+$", rest) and method == "GET":
         cid = int(rest.split("/")[2])
-        for i in db["issues"]:
-            for c in i["comments"]:
+        for num, comments in threads(db):
+            for c in comments:
                 if c["id"] == cid:
                     emit({"id": c["id"], "body": c["body"], "user": {"login": c["author"]},
-                          "html_url": "https://github.com/fake/repo/issues/%d#issuecomment-%d" % (i["number"], cid)})
+                          "html_url": "https://github.com/fake/repo/issues/%d#issuecomment-%d" % (num, cid)})
                     return
         raise Fail("404 Not Found")
     elif re.match(r"^issues/comments/\d+$", rest) and method == "DELETE":
         cid = int(rest.split("/")[2])
-        for i in db["issues"]:
-            for c in i["comments"]:
+        for _, comments in threads(db):
+            for c in comments:
                 if c["id"] == cid:
-                    i["comments"].remove(c)
+                    comments.remove(c)
                     save(db)
                     return
         raise Fail("404 Not Found")
     elif re.match(r"^issues/comments/\d+$", rest) and method == "PATCH":
         cid = int(rest.split("/")[2])
-        for i in db["issues"]:
-            for c in i["comments"]:
+        for _, comments in threads(db):
+            for c in comments:
                 if c["id"] == cid:
                     c["body"] = fields.get("body", c["body"])
                     save(db)

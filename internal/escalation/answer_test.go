@@ -49,3 +49,18 @@ func TestFindAnswer(t *testing.T) {
 		}
 	}
 }
+
+func TestApproves(t *testing.T) {
+	yes := []string{"Approve.", "YES, go ahead", "lgtm!", "Ship it.", "ship it!", "\n\n  approved", "approve", "yes\nbut later", "\t Ship   it, please", "Approved;"}
+	no := []string{"no", "yes-ish", "please approve", "ok", "ship", "shipit", "", "  \n ", "not yes", "ship that", "approves", "ship\nit"}
+	for _, a := range yes {
+		if !Approves(a) {
+			t.Errorf("Approves(%q) = false", a)
+		}
+	}
+	for _, a := range no {
+		if Approves(a) {
+			t.Errorf("Approves(%q) = true", a)
+		}
+	}
+}

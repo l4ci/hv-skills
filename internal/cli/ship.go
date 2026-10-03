@@ -479,7 +479,7 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 			return Result{Data: d}, err
 		}
 		files := func() ([]string, error) { return shipChangedFiles(c, dir, base+"..."+branch) }
-		if res, err := clearMerge(c, policy, branch, conf, files, nil); err != nil {
+		if res, err := clearMerge(c, policy, branch, conf, approvalReq{}, files, nil); err != nil {
 			return res, err
 		}
 		if err := shipClearWorktree(c, dir, branch); err != nil {
@@ -538,12 +538,12 @@ func shipChangedFiles(c *Ctx, dir, rng string) ([]string, error) {
 // shipPRMerge merges a PR in issue mode (hv-pr-merge).
 func shipPRMerge(fs *flag.FlagSet) RunFunc {
 	itemsFlag := fs.String("items", "", "item IDs the PR closes, comma separated")
-	confirm := confirmFlags(fs)
+	confirm := approvalFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
 			return Result{}, Usage("usage: hv ship pr-merge <pr> [--items <ID>[,<ID>...]]")
 		}
-		conf, err := confirm()
+		conf, req, err := confirm()
 		if err != nil {
 			return Result{}, err
 		}
@@ -578,7 +578,10 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 			} else if gateRes, gateErr = shipPRVerdict(c, pr, branch); gateErr != nil {
 				return gateErr
 			}
-			gateRes, gateErr = clearMerge(c, policy, "PR "+args[0], conf, files, a4Obj("pr", pr))
+			req.Thread = func() (approvalThread, error) {
+				return approvalThread{Kind: "pr", Number: pr, Title: fmt.Sprintf("Merge approval: PR #%d", pr)}, nil
+			}
+			gateRes, gateErr = clearMerge(c, policy, "PR "+args[0], conf, req, files, a4Obj("pr", pr))
 			return gateErr
 		}
 		res, err := be.MergePRGated(pr, items, approve)

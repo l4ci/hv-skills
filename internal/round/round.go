@@ -388,6 +388,12 @@ func issueOf(task, branch, name string) string {
 	return ""
 }
 
+// SlotIssue is the issue number a slot holds (issueOf), "" when it holds none.
+func SlotIssue(task, branch, name string) string { return issueOf(task, branch, name) }
+
+// PRNumber reads the number from a recorded PR (a bare number, #n or a URL).
+func PRNumber(pr string) (int, bool) { return prNumber(pr) }
+
 func prNumber(pr string) (int, bool) {
 	m := rePRNumber.FindStringSubmatch(strings.TrimSpace(pr))
 	if m == nil {
