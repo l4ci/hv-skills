@@ -1,6 +1,6 @@
 # hv-update verdict templates
 
-Loaded by `/hv-update` Step 3 to emit a status-keyed message after `bin/hv-update-check` returns. Each block corresponds to one value of the helper's `status` field. Substitute the JSON fields (`currentVersion`, `latestVersion`, `installType`, `installRoot`, `updateCommand`) verbatim into the template — no editorial massaging.
+Loaded by `/hv-update` Step 3 to emit a status-keyed message after `hv update --json` returns. Each block corresponds to one value of its `data.status` field. Substitute the `data` fields (`currentVersion`, `latestVersion`, `installType`, `installRoot`, `updateCommand`) verbatim into the template — no editorial massaging.
 
 ## `current`
 
@@ -18,7 +18,7 @@ Installed as <installType> at <installRoot>.
 Update:
   <updateCommand>
 
-After updating, run /hv-init in your project to refresh .hv/bin/ helpers.
+After updating, run /hv-init in your project to re-stamp its version.
 ```
 
 ## `ahead`

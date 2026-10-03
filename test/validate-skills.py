@@ -192,13 +192,6 @@ UNCONVERTED = {
     # S2 leftovers: hv-codex-verify lines wait on the E1 decision (#68)
     "hv-qa/SKILL.md",
     "hv-ship/SKILL.md",
-
-    # S5 lifecycle
-    "hv-config/SKILL.md",
-    "hv-init/SKILL.md",
-    "hv-migrate/SKILL.md",
-    "hv-update/SKILL.md",
-    "references/update-verdicts.md",
 }
 
 
