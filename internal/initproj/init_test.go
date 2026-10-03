@@ -122,7 +122,8 @@ func readTree(t *testing.T, dir string) map[string]string {
 
 // TestInitMatchesBootstrapGolden checks that Init leaves the tree the old
 // hv-bootstrap left on every fixture, as recorded in testdata/golden. The
-// deliberate differences are the ones in the A9 rulings: no `.hv/bin` directory, the G4 MAP.md text and the G7 config.json key order.
+// deliberate differences are the ones in the A9 rulings: no `.hv/bin` directory, the G4 MAP.md text and the G7 config.json key order, plus B2's
+// `.hv/verdicts.json` line in the .gitignore block (#55), edited into the golden by hand.
 func TestInitMatchesBootstrapGolden(t *testing.T) {
 	var want map[string]map[string]string
 	pytest.Golden(t, fixtures, &want)

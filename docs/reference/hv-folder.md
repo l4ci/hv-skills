@@ -24,6 +24,7 @@
 | `spikes/` | Spike findings: one Markdown file per spike. The experimental code lives on the `spike/<name>` git branch and is never merged |
 | `handoff/` | _(gitignored)_ `/hv-pause` notes. One file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-next`. Per-developer scratch. |
 | `qa-runs/` | _(gitignored)_ Timestamped `/hv-qa` run artifacts. Bulky, regeneratable from the strategy in `qa/<target>.md` |
+| `verdicts.json` | _(gitignored)_ Typed review, second-opinion, QA and debug verdicts (`hv verdict add`, `hv debug verdict`). Per-developer: `/hv-ship` routes on it. |
 | `RELEASE.md` | Release checklist: `- [ ]` items `/hv-release` walks as gates before bumping version. Tracked, shared with the team. |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
@@ -136,6 +137,7 @@ The backlog is shared by default: state travels with the repo so collaborators s
 | `.hv/config.local.json` | Per-developer config overrides (see below) |
 | `.hv/handoff/` | Per-developer `/hv-pause` scratch notes |
 | `.hv/qa-runs/` | Bulky timestamped `/hv-qa` artifacts; regeneratable |
+| `.hv/verdicts.json` | Per-developer recorded verdicts that `/hv-ship` and `/hv-debug` route on |
 | `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write |
 
 `/hv-init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.

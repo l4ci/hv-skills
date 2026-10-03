@@ -175,7 +175,8 @@ func TestReviewBriefParity(t *testing.T) {
 	plain, umb := reviewProject(t)
 	// The retired helper's --repo form ran the scope step from inside the
 	// sub-repo, where repos.json is gone, so it failed; the golden holds its
-	// in-repo run, the same scenario.
+	// in-repo run, the same scenario. B2 (#55) edited the golden's closing
+	// lines by hand: the brief asks for a JSON verdict block, not a last line.
 	runs := []struct {
 		Umb  bool
 		Args []string

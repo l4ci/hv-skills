@@ -29,6 +29,7 @@ func a6Commands() []*Command {
 				{Name: "clear", Summary: "delete the counter", Verb: noFlags(runCounterClear)},
 				{Name: "inc-cycle", Summary: "count a hypothesis cycle", Verb: noFlags(runCounterIncCycle)},
 			}},
+			{Name: "verdict", Summary: "record whether a fix held and route on the item's failed-fix count", Verb: debugVerdict},
 		}},
 		{Name: "spike", Summary: "throwaway feasibility spikes", Subs: []*Command{
 			{Name: "add", Summary: "create spike/<name> and its file", Repo: true, Verb: spikeAdd},
