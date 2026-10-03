@@ -22,6 +22,10 @@ import (
 // ErrCommitNotFound: the commit is not in the repository (exit 3).
 var ErrCommitNotFound = errors.New("commit not found")
 
+// ErrNoProvider: neither the origin remote nor issues.provider names a forge
+// (exit 3).
+var ErrNoProvider = errors.New("no issue provider")
+
 // ErrBadOutput: the forge CLI printed something that is not the expected JSON.
 var ErrBadOutput = errors.New("unexpected forge output")
 
@@ -32,15 +36,22 @@ type Env struct {
 	Opts []tracker.Option
 }
 
-// Provider is "github", "gitlab" or "unknown" for the origin remote of dir
-// ("" is the process cwd). Only the origin host counts, as in
-// hv-issues-provider: issues.provider plays no part.
+// Provider is "github", "gitlab" or "unknown" for dir ("" is the process
+// cwd). The origin host decides, as in hv-issues-provider; issues.provider
+// is only the fallback when origin is missing or names no forge.
 func Provider(ctx context.Context, env Env, dir string) string {
 	p, err := tracker.ResolveProvider(ctx, "", "", dir, execOf(env))
-	if err != nil {
-		return "unknown"
+	if err == nil {
+		return p
 	}
-	return p
+	if c := env.Settings.Provider; c == "github" || c == "gitlab" {
+		return c
+	}
+	return "unknown"
+}
+
+func noProvider(verb string) error {
+	return fmt.Errorf("%w: cannot %s (no origin remote naming github or gitlab, and issues.provider is not set)", ErrNoProvider, verb)
 }
 
 // execOf is the executor the env's options install, or nil for the real one.
@@ -70,13 +81,14 @@ func call(ctx context.Context, cl *tracker.CLI, args ...string) (string, string,
 	return string(r.Stdout), string(r.Stderr), r.ExitCode, nil
 }
 
-// failed is a forge call that exited non-zero, as a tracker failure (exit 5).
+// failed is a forge call that exited non-zero, as a tracker failure: exit 3
+// when the forge says the object is not found, else exit 5.
 func failed(stderr string, code int) *tracker.Error {
-	msg := strings.TrimSpace(stderr)
-	if msg == "" {
-		msg = "forge CLI exited " + strconv.Itoa(code)
+	e := tracker.FailedCall(stderr, code)
+	if e.Message == "" {
+		e.Message = "forge CLI exited " + strconv.Itoa(code)
 	}
-	return &tracker.Error{Kind: tracker.KindFailed, Code: code, Message: msg}
+	return e
 }
 
 func cliName(provider string) string {
@@ -115,13 +127,13 @@ type Issue struct {
 	Author any
 }
 
-// List is the open issues of the provider at dir, normalised. An unknown
-// provider is an empty list; a missing or unauthenticated CLI is a
+// List is the open issues of the provider at dir, normalised. An unresolvable
+// provider is ErrNoProvider; a missing or unauthenticated CLI is a
 // *tracker.Error (exit 5).
 func List(ctx context.Context, env Env, dir string, o ListOpts) ([]Issue, error) {
 	provider := Provider(ctx, env, dir)
 	if provider == "unknown" {
-		return nil, nil
+		return nil, noProvider("list upstream issues")
 	}
 	cl, err := env.cli(ctx, provider, dir)
 	if err != nil {
@@ -204,7 +216,7 @@ var reLabelErr = regexp.MustCompile(`(?i)label|not found|could not`)
 func Label(ctx context.Context, env Env, dir string, number int, label string, add, autoCreate bool) (bool, error) {
 	provider := Provider(ctx, env, dir)
 	if provider == "unknown" {
-		return false, unavailable("provider unknown; cannot label upstream issue")
+		return false, noProvider("label upstream issue")
 	}
 	cl, err := env.cli(ctx, provider, dir)
 	if err != nil {
@@ -322,7 +334,7 @@ func Close(ctx context.Context, env Env, dir string, number int, commit, item st
 	}
 	provider := Provider(ctx, env, dir)
 	if provider == "unknown" {
-		return false, unavailable("provider unknown; cannot close upstream issue")
+		return false, noProvider("close upstream issue")
 	}
 	cl, err := env.cli(ctx, provider, dir)
 	if err != nil {

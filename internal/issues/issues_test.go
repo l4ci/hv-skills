@@ -100,9 +100,9 @@ func TestListGitLab(t *testing.T) {
 
 func TestListFailures(t *testing.T) {
 	ctx := context.Background()
-	// unknown provider: empty, and no forge call
+	// unknown provider: ErrNoProvider, and no forge call
 	f := &forge{}
-	if got, err := List(ctx, f.env(t), "", ListOpts{Limit: 3}); err != nil || got != nil || len(f.calls) != 0 {
+	if got, err := List(ctx, f.env(t), "", ListOpts{Limit: 3}); !errors.Is(err, ErrNoProvider) || got != nil || len(f.calls) != 0 {
 		t.Errorf("unknown provider: %v %v %q", got, err, f.calls)
 	}
 	// unauthenticated
@@ -187,8 +187,35 @@ func TestLabelGitLab(t *testing.T) {
 	}
 	// unknown provider
 	f = &forge{}
-	if _, err := Label(ctx, f.env(t), "", 3, "x", true, true); err == nil {
-		t.Error("unknown provider accepted")
+	if _, err := Label(ctx, f.env(t), "", 3, "x", true, true); !errors.Is(err, ErrNoProvider) {
+		t.Errorf("unknown provider: %v", err)
+	}
+	// a missing issue is not found, any other forge failure is not
+	f = &forge{origin: gh, reply: map[string]reply{"issue edit": {code: 1, err: "GraphQL: Could not resolve to an Issue with the number of 99."}}}
+	if _, err := Label(ctx, f.env(t), "", 99, "x", false, false); !tracker.IsKind(err, tracker.KindNotFound) {
+		t.Errorf("missing issue: %v", err)
+	}
+	f = &forge{origin: gh, reply: map[string]reply{"issue edit": {code: 1, err: "HTTP 500: server error"}}}
+	if _, err := Label(ctx, f.env(t), "", 99, "x", false, false); !tracker.IsKind(err, tracker.KindFailed) {
+		t.Errorf("forge error: %v", err)
+	}
+}
+
+func TestProviderFallsBackToConfig(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct{ origin, cfg, want string }{
+		{gh, "gitlab", "github"}, // origin wins
+		{"", "gitlab", "gitlab"}, // no origin: issues.provider
+		{"https://example.org/r.git", "github", "github"},
+		{"", "auto", "unknown"},
+		{"", "bogus", "unknown"},
+	} {
+		f := &forge{origin: c.origin}
+		env := f.env(t)
+		env.Settings.Provider = c.cfg
+		if got := Provider(ctx, env, ""); got != c.want {
+			t.Errorf("origin %q config %q: %s, want %s", c.origin, c.cfg, got, c.want)
+		}
 	}
 }
 
@@ -285,8 +312,12 @@ func TestCloseRefusals(t *testing.T) {
 		t.Errorf("a forge call before the commit check: %q", f.calls)
 	}
 	var te *tracker.Error
-	if _, err := Close(ctx, (&forge{}).env(t), dir, 1, sha, ""); !errors.As(err, &te) || te.Kind != tracker.KindUnavailable {
+	if _, err := Close(ctx, (&forge{}).env(t), dir, 1, sha, ""); !errors.Is(err, ErrNoProvider) {
 		t.Errorf("unknown provider: %v", err)
+	}
+	f = &forge{origin: gh, reply: map[string]reply{"issue close": {code: 1, err: "GraphQL: Could not resolve to an Issue with the number of 99."}}}
+	if _, err := Close(ctx, f.env(t), dir, 99, sha, ""); !tracker.IsKind(err, tracker.KindNotFound) {
+		t.Errorf("missing issue: %v", err)
 	}
 	f = &forge{origin: gh, reply: map[string]reply{"auth status": {code: 1}}}
 	if _, err := Close(ctx, f.env(t), dir, 1, sha, ""); !errors.As(err, &te) || te.Kind != tracker.KindUnavailable {
