@@ -29,7 +29,7 @@ Also parse `AUTO_LOOP`: scan `$ARGUMENTS` (the skill `args` value) for the liter
 
 - **`LEVEL == "loop"` AND `AUTO_LOOP=false`** — print *"Note: /hv-brainstorm is skipped under loop autonomy (throughput mode). Re-run with `/hv-config` set to off or auto if you want to brainstorm."* and exit 0. Per the 2026-05-09 KNOWLEDGE inline-autonomy-directives convention, the check lives at every dispatch point including this one.
 - **`LEVEL == "loop"` AND `AUTO_LOOP=true`** — enter auto-loop mode: proceed to Step 2 without exiting. All `AskUserQuestion` calls are suppressed for the rest of the run; the auto-resolution pipeline (see `## Auto-loop mode`) drives every pick.
-- **`LEVEL != "loop"` (off/auto) AND `AUTO_LOOP=true`** — reject with *"Error: `--auto-loop` is loop-mode only; remove the flag or set `autonomy.level=loop` via `/hv-config`."* and exit 1.
+- **`LEVEL != "loop"` (off/auto) AND `AUTO_LOOP=true`** — stop: `--auto-loop` is loop-mode only (`hv design add --auto-loop` refuses it with exit 2 anyway; this check just stops before the run).
 - **`LEVEL != "loop"` AND `AUTO_LOOP=false`** — normal interactive flow (today's path); proceed to Step 2.
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
@@ -147,7 +147,7 @@ The verb creates `.hv/designs/<ID>.md` with frontmatter (`id`, `title`, `status:
 
 **Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): the design is a note on the item's issue, not a file. `hv design add` still creates it; draft the approved sections in a scratch file (not under `.hv/designs/`) and publish with `hv design put <ID> --body-file <scratch-file>` instead of `Edit`. Read it back with `hv design show <ID>`. Post each answer that changed the design's direction with `hv item comment add <ID> --kind decision --body-file -`.
 
-Under `--auto-loop`, after `hv design add` runs, use `Edit` to insert `auto: true` into the frontmatter (between the `status:` and `created:` lines). The `auto: true` key marks the artifact as auto-written, matching the `/hv-plan --auto-loop` convention.
+Under `--auto-loop`, mint the stub with `hv design add <ID> --title "<title>" --auto-loop`: the verb writes `auto: true` into the frontmatter, marking the artifact as auto-written.
 
 ## Step 8 — Self-Review
 
@@ -206,7 +206,7 @@ hv decisions auto-log --topic "<topic>" --title "<rule-title>" --why "<why-text>
 
 Where `<design-key>` is `<milestone>-<itemId>` when the item has a `Milestone:` tag, else just `<itemId>`. The entry follows the standard `DECISIONS.md` template, but **only the rule and `*Why.*` are auto-filled**; `**Forbids.**` and `**Permits.**` stay as `_(Unresolved — user must articulate)_` placeholders. A footer comment encodes provenance: `<!-- [Auto:Loop] <design-key> <date> — review and articulate Forbids/Permits -->`. The verb is idempotent on `(topic, rule-title)`.
 
-After all questions and the approach pick are resolved, write the design via `hv design add` + `Edit` (per Step 7), then add `auto: true` to the frontmatter. The design's "Open questions" section lists every step-3 placeholder verbatim.
+After all questions and the approach pick are resolved, write the design via `hv design add --auto-loop` + `Edit` (per Step 7). The design's "Open questions" section lists every step-3 placeholder verbatim.
 
 ### Surfacing
 

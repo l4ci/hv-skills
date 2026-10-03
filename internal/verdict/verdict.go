@@ -26,6 +26,9 @@ const (
 	SecondOpinion = "second-opinion"
 	QA            = "qa"
 	DebugFix      = "debug-fix"
+	// DebugReset is the human reset of an item's failed-fix count (B3). It is
+	// written by `debug reset` only: no verb takes it as --kind.
+	DebugReset = "debug-reset"
 )
 
 // Verdicts, in worst-of order.
@@ -34,6 +37,8 @@ const (
 	Concerns  = "CONCERNS"
 	Fail      = "FAIL"
 	InfraFail = "INFRA-FAIL"
+	// Reset is the verdict of a debug-reset record.
+	Reset = "RESET"
 )
 
 // BranchKinds are the kinds recorded against a branch, in the order
@@ -343,15 +348,31 @@ func AddItem(root, id string, r Record) (failed int, err error) {
 	return
 }
 
-// FailedFixes counts an item's failed debug-fix records.
+// FailedFixes counts an item's failed debug-fix records after its latest
+// debug-reset record.
 func FailedFixes(list []Record) int {
 	n := 0
 	for _, r := range list {
-		if r.Kind == DebugFix && r.Verdict == Fail {
+		switch {
+		case r.Kind == DebugReset:
+			n = 0
+		case r.Kind == DebugFix && r.Verdict == Fail:
 			n++
 		}
 	}
 	return n
+}
+
+// ResetItem appends the reset record r to an item's list when the item has
+// failed fixes to clear, and returns that count. With none it appends
+// nothing and returns 0.
+func ResetItem(root, id string, r Record) (cleared int, err error) {
+	err = update(root, func(s *Store) {
+		if cleared = FailedFixes(s.Items[id]); cleared > 0 {
+			s.Items[id] = appendCapped(s.Items[id], r)
+		}
+	})
+	return
 }
 
 // Latest is the newest record of kind in list.
@@ -379,6 +400,21 @@ func EffectiveReview(list []Record) (Record, bool) {
 			}
 			return r, true
 		}
+	}
+	return Record{}, false
+}
+
+// Blocking is the record that blocks a ship (B3): the effective review
+// verdict when it is FAIL, else the latest second-opinion record when it is
+// FAIL and the runner is not the advisory codex fallback. A stale record
+// still blocks; only a newer record of the same kind clears it. CONCERNS and
+// QA never block.
+func Blocking(list []Record, s Settings) (Record, bool) {
+	if r, ok := EffectiveReview(list); ok && r.Verdict == Fail {
+		return r, true
+	}
+	if r, ok := Latest(list, SecondOpinion); ok && r.Verdict == Fail && s.Runner != "codex" {
+		return r, true
 	}
 	return Record{}, false
 }

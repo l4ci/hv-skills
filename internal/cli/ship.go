@@ -15,9 +15,12 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/fsio"
 	"github.com/l4ci/hv-skills/v5/internal/git"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv-skills/v5/internal/repos"
 	"github.com/l4ci/hv-skills/v5/internal/section"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv-skills/v5/internal/verdict"
 )
 
 // shipCommands is the `hv ship` group (A8, #52).
@@ -53,6 +56,52 @@ func shipFirstLine(s string) string {
 // shipBlocked is a refusal carrying {blockedBy, changed: false}.
 func shipBlocked(by, format string, a ...any) (Result, error) {
 	return Result{Data: gitObj("blockedBy", by, "changed", false)}, Refused(format, a...)
+}
+
+// shipVerdictBlock refuses (exit 4) when a recorded FAIL blocks branch from
+// shipping (B3): the data carries the blocking record, so a caller can add to
+// it. It returns nil, nil when nothing blocks. dir is the checkout the branch
+// lives in and root the project holding the verdict store.
+func shipVerdictBlock(c *Ctx, dir, root, branch string) (*jsonx.Object, error) {
+	repo := c.Repo
+	if repo == "" && len(repos.Load(root)) > 0 {
+		if r, err := repos.Which(dir); err == nil {
+			repo = r.Name
+		}
+	}
+	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	s := verdict.Settings{Runner: configString(cfg, "ship.secondOpinionRunner")}
+	r, ok := verdict.Blocking(verdict.Load(root).Branches[verdict.BranchKey(repo, branch)], s)
+	if !ok {
+		return nil, nil
+	}
+	// A branch whose tip cannot be read has moved on as far as we can tell.
+	stale := true
+	if out, err := reviewGit(c.Context(), dir, "rev-parse", "--short", branch); err == nil {
+		stale = r.Sha != strings.TrimSpace(out)
+	}
+	d := gitObj("blockedBy", "verdict", "kind", r.Kind, "verdict", r.Verdict, "sha", r.Sha, "stale", stale, "changed", false)
+	return d, Refused("%s %s recorded for %s; not shipped", r.Kind, r.Verdict, branch).
+		WithHint("see: hv verdict show " + branch)
+}
+
+// shipPRVerdict is shipVerdictBlock for the head branch of PR pr, with the
+// PR number added to the refusal data.
+func shipPRVerdict(c *Ctx, pr int, branch string) (Result, error) {
+	dir, err := gitDir(c)
+	if err != nil {
+		return Result{}, err
+	}
+	root, err := c.Root()
+	if err != nil {
+		return Result{}, err
+	}
+	d, err := shipVerdictBlock(c, dir, root, branch)
+	if err != nil {
+		d.Set("pr", pr)
+		return Result{Data: d}, err
+	}
+	return Result{}, nil
 }
 
 // shipBodyArg reads --body-file (- is stdin); a missing, unreadable or blank
@@ -267,6 +316,9 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 		} else if lines != "" {
 			body += "\n\n" + lines
 		}
+		if d, err := shipVerdictBlock(c, dir, root, branch); err != nil {
+			return Result{Data: d}, err
+		}
 
 		var base string
 		if cl.Provider == "gitlab" {
@@ -423,6 +475,9 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 		if base == branch {
 			return shipBlocked("base branch", "'%s' is the base branch", branch)
 		}
+		if d, err := shipVerdictBlock(c, dir, shipRoot(dir), branch); err != nil {
+			return Result{Data: d}, err
+		}
 		files := func() ([]string, error) { return shipChangedFiles(c, dir, base+"..."+branch) }
 		if res, err := clearMerge(c, policy, branch, conf, files, nil); err != nil {
 			return res, err
@@ -513,9 +568,16 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
+		// The verdict check (B3) runs before the merge-approval gate (B1), so
+		// a branch that would be refused never writes an audit line.
 		var gateRes Result
 		var gateErr error
-		approve := func(files func() ([]string, error)) error {
+		approve := func(branch string, files func() ([]string, error)) error {
+			if branch == "" {
+				c.Warn("could not resolve the head branch of PR %d; verdicts not checked", pr)
+			} else if gateRes, gateErr = shipPRVerdict(c, pr, branch); gateErr != nil {
+				return gateErr
+			}
 			gateRes, gateErr = clearMerge(c, policy, "PR "+args[0], conf, files, a4Obj("pr", pr))
 			return gateErr
 		}

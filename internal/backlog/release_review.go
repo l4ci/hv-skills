@@ -22,10 +22,12 @@ type PRTracker interface {
 	PRFiles(ctx context.Context, pr int) ([]string, error)
 }
 
-// MergeApprover is the merge-approval gate MergePRGated runs once the PR and
-// its items resolve, before the proof check: files lists the PR's changed
-// paths on demand. A non-nil error stops the merge with nothing changed.
-type MergeApprover func(files func() ([]string, error)) error
+// MergeApprover is the gate MergePRGated runs once the PR and its items
+// resolve, before the proof check: branch is the PR's head branch ("" when
+// the forge reported none), for the verdict check (B3), and files lists the
+// PR's changed paths on demand, for merge approval (B1). A non-nil error stops
+// the merge with nothing changed.
+type MergeApprover func(branch string, files func() ([]string, error)) error
 
 // ReleaseTracker is the part of tracker.Adapter the release calls need: the
 // native milestones and the issues in one.
@@ -137,7 +139,7 @@ func (b *Issues) MergePR(pr int, items []string) (MergeResult, error) {
 	return b.MergePRGated(pr, items, nil)
 }
 
-// MergePRGated is MergePR with the merge-approval gate (nil: none).
+// MergePRGated is MergePR with the B1 and B3 merge gates (nil: none).
 func (b *Issues) MergePRGated(pr int, items []string, approve MergeApprover) (MergeResult, error) {
 	pt, err := b.prTracker()
 	if err != nil {
@@ -188,7 +190,7 @@ func (b *Issues) MergePRGated(pr int, items []string, approve MergeApprover) (Me
 		return MergeResult{}, errf(ErrNotFound, "PR %d is not open", pr)
 	}
 	if approve != nil {
-		if err := approve(func() ([]string, error) { return pt.PRFiles(b.ctx(), pr) }); err != nil {
+		if err := approve(found.Branch, func() ([]string, error) { return pt.PRFiles(b.ctx(), pr) }); err != nil {
 			return MergeResult{}, err
 		}
 	}

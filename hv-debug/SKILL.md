@@ -26,7 +26,7 @@ Read `.hv/config.json`:
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly.
 - `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one.
-- The Iron Law counter persists at `.hv/debug/<session>.json` (session = current branch with `/` → `-`). Managed by `hv debug counter`; survives `/clear` and session resumption.
+- The Iron Law count is per item, in `.hv/verdicts.json` (`hv debug verdict` records each outcome); a new branch or session does not reset it. The attempt log for `hv debug counter summary` persists at `.hv/debug/<session>.json` (session = current branch with `/` → `-`); both survive `/clear` and session resumption.
 
 ## When to Use
 
@@ -119,7 +119,7 @@ Initialize the per-session counter for the Iron Law (Step 9.5):
 hv debug counter init <ID>
 ```
 
-Session ID is derived from the current branch (`/` → `-`); state lives in `.hv/debug/<session>.json`. Idempotent on re-entry.
+Session ID is derived from the current branch (`/` → `-`); state lives in `.hv/debug/<session>.json`. Idempotent on re-entry. Exit 4 (`data.blockedBy` `iron law`) means the bug already has 3 failed fixes: go to Step 9.5's surfacing without reproducing. `hv debug counter record-attempt` refuses the same way.
 
 ## Step 5 — Reproduce
 
@@ -255,7 +255,7 @@ hv debug counter summary
 
 Then surface — do NOT dispatch a fresh-context worker (Step 7.5's escalation belongs to the hypothesis-cycle counter; this is a stricter, terminal gate). Suggest the user:
 
-- Run `/hv-pause` to leave a handoff note and step away (a fresh session reads the persisted counter file and can decide whether to wipe it or continue).
+- Run `/hv-pause` to leave a handoff note and step away. Further attempts on this bug are refused until a human resets the count with `hv debug reset <ID> --reason "<why>"`, a manual gate (`references/manual-gates.md`): run it only after an `AskUserQuestion` yes, passing `--confirm --confirm-note "<their answer>"`, never on your own.
 - Or re-open the bug from a different angle — the symptom may be in a subsystem the past three hypotheses haven't touched.
 
 Do NOT call `hv status rm` here — the branch and status entry stay so the user can resume. Do NOT call `hv item complete` — the bug is not fixed.
