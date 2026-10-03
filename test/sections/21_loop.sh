@@ -42,12 +42,11 @@ grep -q 'hv status loop clear' "$REPO/hv-work/SKILL.md" \
   || fail "F32: hv-work/SKILL.md must call hv status loop clear"
 # white-box-end
 
-# (e) hv-init seeds loop.webResearch=False in both fresh + STALE config paths.
+# (e) hv-init seeds loop.webResearch=false on fresh and upgraded configs: `hv config fill`
+# writes every missing schema default.
 # white-box-begin: A9 #53 doclint
-grep -q '"loop":.*"webResearch": False' "$REPO/hv-init/SKILL.md" \
-  || fail "F32: hv-init must seed loop.webResearch in the fresh config block"
-grep -q 'hv-config-set loop.webResearch false' "$REPO/hv-init/SKILL.md" \
-  || fail "F32: hv-init must seed loop.webResearch in the STALE migration block"
+grep -q 'hv config fill' "$REPO/hv-init/SKILL.md" \
+  || fail "F32: hv-init must fill missing config defaults (loop.webResearch) with hv config fill"
 pass "F32: SKILL.md wiring + config defaults"
 # white-box-end
 
@@ -328,7 +327,7 @@ echo "ok init seeds map"
 # --- skill touchpoints reference map ------------------------------
 # white-box-begin: A9 #53 doclint
 grep -q "hv map stats --cap\|hv map index" "$REPO/hv-work/SKILL.md" || { echo "FAIL: hv-work has no map touchpoint"; exit 1; }
-grep -q "hv-map-cap-check\|hv-map-index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
+grep -q "hv map stats --cap\|hv map index" "$REPO/hv-debug/SKILL.md" || { echo "FAIL: hv-debug has no map touchpoint"; exit 1; }
 grep -q "post-cycle map\|hv map index" "$REPO/hv-go/SKILL.md" || { echo "FAIL: hv-go has no map touchpoint"; exit 1; }
 echo "ok skill touchpoints (work/debug/go)"
 # white-box-end

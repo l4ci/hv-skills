@@ -17,7 +17,7 @@ user-invocable: true
 
 Change one or more configuration values without hand-editing JSON. Same option vocabulary as `/hv-init`, but you pick exactly which keys to change and the rest stay untouched.
 
-> **Authoring note (when adding a new flag):** boolean opt-in feature flags default to `false`. Owning skills flip them to `true` only via explicit user approval — never silently on first detection. `/hv-config` edits them explicitly. See the *Authoring rule* section in `hv-init/SKILL.md` for the full rule + exemptions.
+> **Authoring note (when adding a new flag):** boolean opt-in feature flags default to `false`. Owning skills flip them to `true` only via explicit user approval — never silently on first detection. `/hv-config` edits them explicitly. See *Opt-in feature flags default to `false`* in `references/authoring-conventions.md` for the full rule + exemptions.
 
 ## When to Use
 
@@ -29,16 +29,10 @@ Change one or more configuration values without hand-editing JSON. Same option v
 ## When NOT to Use
 
 - First-time setup → `/hv-init` writes the whole file from scratch
-- Just inspecting current values → `.hv/bin/hv-config-show [<key>]` (value plus source layer)
-- Adding a brand-new key after a plugin upgrade → `/hv-init` runs the STALE migration and asks only for the missing key
+- Just inspecting current values → `hv config show [<key>]` (value plus source layer)
+- Adding a brand-new key after a plugin upgrade → `/hv-init` asks only for the missing keys and fills the rest with defaults
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task List
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -55,9 +49,9 @@ Inspect `$ARGUMENTS`. The skill supports three invocation shapes:
 
 | Shape | Behavior |
 |-------|----------|
-| Empty / whitespace only | Run `.hv/bin/hv-config-show` and print its output verbatim (every key, value and source layer), then continue to Step 2 — full guided flow. |
+| Empty / whitespace only | Run `hv config show` and print its output verbatim (every key, value and source layer), then continue to Step 2 — full guided flow. |
 | `<key>` (no `=`) | Skip Step 2 and Step 3. Treat `<key>` as the single picked key; jump straight to Step 4. |
-| `<key>=<value>` | Skip Steps 2–4. Validate, apply directly via `hv-config-set`, jump to Step 6. |
+| `<key>=<value>` | Skip Steps 2–4. Validate, apply directly via `hv config set`, jump to Step 6. |
 
 **Split on the FIRST `=` only.** Free-text keys (`docs.path`, `git.baseBranch`) may contain `=` in their values; later `=` characters belong to the value.
 
@@ -81,7 +75,7 @@ Unknown key → stop with: *"Error: `<key>` is not a configurable setting. Run `
 
 - Enum keys (`work.isolation`, `work.mergeStrategy`, `work.dispatch`, `ship.secondOpinionRunner`, `autonomy.level`, `models.orchestrator`, `models.worker`) — value must be one of the documented options. `work.dispatch` accepts `subagent`, `tmux` or `herdr`. `ship.secondOpinionRunner` accepts `subagent` or `codex`.
 - Boolean keys (`ship.review`, `ship.secondOpinion`, `learn.verify`, `refactor.confirmBeforeExecute`, `debug.competingHypotheses`, `docs.autoCreate`, `docs.afterWork`, `umbrella.enabled`, `issues.autoCreateLabel`, `issues.filterMineOnly`, `issues.providers.github`, `issues.providers.gitlab`) — accept `true`, `false`, `on`, `off` (case-insensitive). Normalize `on`/`off` to `true`/`false`. Anything else is invalid.
-- JSON-array keys (`refactor.verifyCommands`, `work.accounts`) — value must parse as a JSON array; `work.accounts` entries need a `name` and a `configDir`. Not offered in the guided flow; set via `hv-config-set work.accounts '[{"name":"personal","configDir":"~/.claude"}]'`.
+- JSON-array keys (`refactor.verifyCommands`, `work.accounts`) — value must parse as a JSON array; `work.accounts` entries need a `name` and a `configDir`. Not offered in the guided flow; set via `hv config set work.accounts '[{"name":"personal","configDir":"~/.claude"}]'`.
 - Free-text keys (`docs.path`, `git.baseBranch`, `issues.label`, `work.workerCommand`, `work.operatorCommand`) — accept any value including the empty string.
 - Integer keys (`learn.promoteThreshold`, `work.workerSlots`) — accept any non-negative integer (≥0) as a string of digits. Anything else (negative, non-numeric, decimal) is invalid. `work.workerSlots` additionally rejects `0` — a pool with no slots cannot dispatch.
 
@@ -92,7 +86,7 @@ On the `<key>` (no `=`) path, carry the single key forward as the only picked ke
 On the `<key>=<value>` path, write directly:
 
 ```bash
-.hv/bin/hv-config-set <key> <value>
+hv config set <key> <value>
 ```
 
 Then jump to Step 6 to print the one-line diff.
@@ -100,49 +94,38 @@ Then jump to Step 6 to print the one-line diff.
 ## Step 2 — Read & Display Current Config
 
 ```bash
-python3 - <<'PY'
-import json
-from pathlib import Path
-cfg = json.loads(Path(".hv/config.json").read_text())
-
-def profile(o, w):
-    pairs = {
-        ("opus","sonnet"): "Balanced",
-        ("opus","opus"): "Premium",
-        ("sonnet","sonnet"): "Fast",
-        ("sonnet","haiku"): "Minimal",
-    }
-    return pairs.get((o,w), f"Custom ({o} + {w})")
-
-m = cfg.get("models", {})
-o, w = m.get("orchestrator"), m.get("worker")
-print("Current configuration:")
-print(f"  Models                   {profile(o, w)} ({o} + {w})")
-print(f"  Isolation                {cfg.get('work',{}).get('isolation','branch')}")
-print(f"  Integration              {cfg.get('work',{}).get('mergeStrategy','direct')}")
-print(f"  Ship review              {'on' if cfg.get('ship',{}).get('review',True) else 'off'}")
-print(f"  Ship second-opinion      {'on' if cfg.get('ship',{}).get('secondOpinion',False) else 'off'}")
-print(f"  Verify learnings         {'on' if cfg.get('learn',{}).get('verify',True) else 'off'}")
-print(f"  Confirm before refactor  {'on' if cfg.get('refactor',{}).get('confirmBeforeExecute',True) else 'off'}")
-print(f"  Autonomy                 {cfg.get('autonomy',{}).get('level','off')}")
-print(f"  Competing hypotheses     {'on' if cfg.get('debug',{}).get('competingHypotheses',False) else 'off'}")
-print(f"  Docs path                {cfg.get('docs',{}).get('path','docs')}")
-print(f"  Docs auto-create         {'on' if cfg.get('docs',{}).get('autoCreate',False) else 'off'}")
-print(f"  Docs after-work          {'on' if cfg.get('docs',{}).get('afterWork',False) else 'off'}")
-print(f"  Git base branch          {cfg.get('git',{}).get('baseBranch','') or '(auto-detect)'}")
-print(f"  Umbrella mode            {'on' if cfg.get('umbrella',{}).get('enabled',False) else 'off'}")
-iss = cfg.get('issues', {})
-prov = iss.get('providers', {})
-print(f"  Issues label             {iss.get('label','in-progress')}")
-print(f"  Issues auto-create label {'on' if iss.get('autoCreateLabel',True) else 'off'}")
-print(f"  Issues filter mine only  {'on' if iss.get('filterMineOnly',False) else 'off'}")
-print(f"  Issues GitHub provider   {'on' if prov.get('github',True) else 'off'}")
-print(f"  Issues GitLab provider   {'on' if prov.get('gitlab',True) else 'off'}")
-print(f"  hv-skills version        {cfg.get('hvSkills',{}).get('version','') or '(unstamped)'}")
-PY
+hv config show --json
 ```
 
-Print the helper output verbatim — the user needs to see what they're editing. `hv-skills version` is auto-stamped by `/hv-init`; not in the edit list.
+`data.entries` holds every schema key with its `value` and `source`. Print this block, one row per line, from those values:
+
+```
+Current configuration:
+  Models                   <profile> (<models.orchestrator> + <models.worker>)
+  Isolation                <work.isolation>
+  Integration              <work.mergeStrategy>
+  Ship review              <ship.review: on|off>
+  Ship second-opinion      <ship.secondOpinion: on|off>
+  Verify learnings         <learn.verify: on|off>
+  Confirm before refactor  <refactor.confirmBeforeExecute: on|off>
+  Autonomy                 <autonomy.level>
+  Competing hypotheses     <debug.competingHypotheses: on|off>
+  Docs path                <docs.path>
+  Docs auto-create         <docs.autoCreate: on|off>
+  Docs after-work          <docs.afterWork: on|off>
+  Git base branch          <git.baseBranch, or "(auto-detect)" when empty>
+  Umbrella mode            <umbrella.enabled: on|off>
+  Issues label             <issues.label>
+  Issues auto-create label <issues.autoCreateLabel: on|off>
+  Issues filter mine only  <issues.filterMineOnly: on|off>
+  Issues GitHub provider   <issues.providers.github: on|off>
+  Issues GitLab provider   <issues.providers.gitlab: on|off>
+  hv-skills version        <hvSkills.version, or "(unstamped)" when empty>
+```
+
+`<profile>` from the model pair: opus+sonnet Balanced, opus+opus Premium, sonnet+sonnet Fast, sonnet+haiku Minimal, anything else `Custom (<orchestrator> + <worker>)`.
+
+The user needs to see what they're editing. `hv-skills version` is auto-stamped by `/hv-init`; not in the edit list.
 
 ## Step 3 — Pick Which Keys to Change
 
@@ -205,35 +188,35 @@ If the user's current value doesn't match any option (custom config), don't tag 
 
 If the user picks the `(current)` option on a question, treat that key as a no-op — no write, no diff line.
 
-**Umbrella toggling.** When toggling `umbrella.enabled` **Off**, registered repos in `.hv/repos.json` remain — helpers will simply ignore umbrella mode until re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
+**Umbrella toggling.** When toggling `umbrella.enabled` **Off**, registered repos in `.hv/repos.json` remain — `hv` verbs simply ignore umbrella mode until re-enabled. To add or remove repos from the registry, re-run `/hv-init` from the umbrella root (idempotent).
 
 Plain-text fallback: ask each selected key as a one-shot prompt, take the reply, validate it against the allowed values listed in the reference, fall back to the current value on invalid input.
 
 ## Step 5 — Merge & Write
 
-For each key the user changed in Step 4, call the shared helper once. Other keys are preserved automatically — the helper reads, mutates the one path, writes atomically:
+For each key the user changed in Step 4, call `hv config set` once. Other keys are preserved automatically — it reads, mutates the one path, writes atomically:
 
 ```bash
 # Examples (only run the lines that apply, one per key the user changed):
 #
-# .hv/bin/hv-config-set models.orchestrator opus
-# .hv/bin/hv-config-set models.worker sonnet
-# .hv/bin/hv-config-set work.isolation worktree
-# .hv/bin/hv-config-set work.mergeStrategy pr
-# .hv/bin/hv-config-set ship.review false
-# .hv/bin/hv-config-set learn.verify true
-# .hv/bin/hv-config-set refactor.confirmBeforeExecute false
-# .hv/bin/hv-config-set autonomy.level loop
-# .hv/bin/hv-config-set debug.competingHypotheses true
-# .hv/bin/hv-config-set umbrella.enabled true
-# .hv/bin/hv-config-set issues.label in-progress
-# .hv/bin/hv-config-set issues.autoCreateLabel true
-# .hv/bin/hv-config-set issues.filterMineOnly false
-# .hv/bin/hv-config-set issues.providers.github true
-# .hv/bin/hv-config-set issues.providers.gitlab true
+# hv config set models.orchestrator opus
+# hv config set models.worker sonnet
+# hv config set work.isolation worktree
+# hv config set work.mergeStrategy pr
+# hv config set ship.review false
+# hv config set learn.verify true
+# hv config set refactor.confirmBeforeExecute false
+# hv config set autonomy.level loop
+# hv config set debug.competingHypotheses true
+# hv config set umbrella.enabled true
+# hv config set issues.label in-progress
+# hv config set issues.autoCreateLabel true
+# hv config set issues.filterMineOnly false
+# hv config set issues.providers.github true
+# hv config set issues.providers.gitlab true
 ```
 
-The helper parses each value as JSON (so `true`/`false`/numbers decode correctly); bare identifiers like `opus` / `loop` / `worktree` fall back to string. Run one call per key — do not batch.
+`hv config set` parses each value as JSON (so `true`/`false`/numbers decode correctly); bare identifiers like `opus` / `loop` / `worktree` fall back to string. Run one call per key — do not batch.
 
 Rule: never write keys the user didn't pick. No full-file rewrite, no "while we're here let's also normalize". Targeted edits only.
 
@@ -265,7 +248,7 @@ Keep notes short and only for state changes that materially alter how subsequent
 
 ## Rules
 
-- **Never write keys the user didn't pick.** `setdefault` plus targeted assignment — no full-file rewrite.
+- **Never write keys the user didn't pick.** One `hv config set` per changed key — no full-file rewrite.
 - **Show current values everywhere.** Step 2 prints them; Step 3 shows them in checklist labels; Step 4 tags the matching option `(current)`. The user always sees what they're replacing.
 - **Same vocabulary as `/hv-init`.** Don't invent new option labels — reuse Q1–Q5's wording so the choices are familiar.
 - **Cancellation is silent.** Empty selection or all-`(current)` answers exit with *"No changes."* — no warnings, no nags.

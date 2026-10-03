@@ -30,19 +30,13 @@ command -v gh >/dev/null 2>&1 || echo "gh not installed"
 
 If missing, tell the user the check needs `gh` (or `brew install gh` / equivalent) and stop. Don't try to `curl` the GitHub API — users with `gh` get auth'd rate limits for free.
 
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
-
 ## Step 2 — Run the Check
 
 ```bash
-.hv/bin/hv-update-check
+hv update --json
 ```
 
-Parses JSON output:
+Read `data`:
 
 - `installType` — `plugin` | `stow` | `repo` | `override` | `unknown`
 - `installRoot` — absolute path to the detected install
@@ -62,7 +56,7 @@ Emit one compact block keyed by the `status` field from Step 2. Templates live i
 | `ahead`   | `## ahead`   |
 | `unknown` | `## unknown` |
 
-Add new status values to both the helper and the reference together.
+Add new status values to both `hv update` and the reference together.
 
 ## Step 4 — Offer to Re-Init
 
@@ -74,7 +68,7 @@ Read `.hv/config.json#autonomy.level` (default `"off"`) and branch:
 
 Print one nudge line after the verdict block:
 
-> After running the update command above, re-run `/hv-init` in this project to refresh `.hv/bin/` helpers and clear the drift nudge.
+> After running the update command above, re-run `/hv-init` in this project to refresh the managed blocks and re-stamp `hvSkills.version`, which clears the drift warning.
 
 Don't auto-invoke. The user may want to update multiple projects before re-initialising any of them.
 
@@ -83,12 +77,12 @@ Don't auto-invoke. The user may want to update multiple projects before re-initi
 Use `AskUserQuestion`:
 
 - **Header:** `"Re-init"`
-- **Question:** *"Plugin update is `<current> → <latest>`. Already ran `claude plugin update hv-skills`? Run `/hv-init` now to refresh `.hv/bin/` helpers in this project?"*
+- **Question:** *"Plugin update is `<current> → <latest>`. Already ran `claude plugin update hv-skills`? Run `/hv-init` now to refresh this project?"*
 - **Options** (single-select):
-  1. *"Yes, run `/hv-init` now (Recommended)"* — *"Refreshes `.hv/bin/` and re-stamps `hvSkills.version` so drift detection clears."*
+  1. *"Yes, run `/hv-init` now (Recommended)"* — *"Refreshes the managed blocks and re-stamps `hvSkills.version` so drift detection clears."*
   2. *"Not yet — I'll run the update first"* — *"Skip; re-invoke `/hv-update` after running the update command."*
-  3. *"Skip — I'll run `/hv-init` later"* — *"No-op; the drift nudge will keep firing on every preflight until then."*
-- Plain-text fallback: ask once textually — *"Already ran `claude plugin update hv-skills`? Run `/hv-init` now to refresh helpers? (yes/no)"* — honor yes/no, default off (don't dispatch on ambiguous reply).
+  3. *"Skip — I'll run `/hv-init` later"* — *"No-op; `hv init check` keeps warning about drift until then."*
+- Plain-text fallback: ask once textually — *"Already ran `claude plugin update hv-skills`? Run `/hv-init` now to refresh this project? (yes/no)"* — honor yes/no, default off (don't dispatch on ambiguous reply).
 
 On answer 1: **dispatch `hv-init` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass no args (the skill knows what to do from cwd).
 
@@ -96,11 +90,11 @@ On answer 1: **dispatch `hv-init` via `Skill` immediately — no prompt, no conf
 
 Skip the question entirely. Print one informational line first so the user sees the pick:
 
-> Loop: dispatching `/hv-init` to refresh helpers (assumes plugin update already ran).
+> Loop: dispatching `/hv-init` to refresh this project (assumes plugin update already ran).
 
 Then **dispatch `hv-init` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass no args.
 
-If the plugin actually wasn't updated, `/hv-init`'s STALE migration just re-stamps the same version and is a no-op for everything else — the loop contract trades that edge case for full chaining.
+If the plugin actually wasn't updated, `/hv-init` just re-stamps the same version and is a no-op for everything else — the loop contract trades that edge case for full chaining.
 
 ---
 
@@ -111,7 +105,7 @@ Across projects: each project tracks its own `hvSkills.version`. Updating the pl
 - **Read-only.** Never invoke the update command yourself. Surface it, let the user run it.
 - **Network-dependent.** If `gh` can't reach the API, report `unknown` and stop — don't retry on a loop.
 - **Honor dev builds.** An `ahead` status is not an error; contributors run that way.
-- **Helpers refresh is separate.** Upgrading the plugin does not rewrite `.hv/bin/` in existing projects. Step 4 nudges (off), asks (auto), or auto-dispatches `/hv-init` (loop) — but per project. Multi-project users still re-run `/hv-init` in each project explicitly.
+- **Project refresh is separate.** Upgrading the plugin does not re-stamp `hvSkills.version` or refresh managed blocks in existing projects. Step 4 nudges (off), asks (auto), or auto-dispatches `/hv-init` (loop) — but per project. Multi-project users still re-run `/hv-init` in each project explicitly.
 
 ## References
 

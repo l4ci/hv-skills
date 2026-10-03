@@ -93,12 +93,12 @@ trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CFG_TMP"
 pass "config set nested / idempotent / typed values / preservation / errors / autocreate"
 
-echo "hv-ship (Docs Mode) / hv-config / hv-init reference hv-config-set"
+echo "hv-ship (Docs Mode) / hv-config / hv-init reference hv config set"
 # white-box-begin: A9 #53 doclint
-grep -q "hv-config-set" "$REPO/hv-ship/SKILL.md"   || fail "hv-ship Docs Mode missing hv-config-set call"
-grep -q "hv-config-set" "$REPO/hv-config/SKILL.md" || fail "hv-config missing hv-config-set call"
-grep -q "hv-config-set" "$REPO/hv-init/SKILL.md"   || fail "hv-init missing hv-config-set call"
-pass "hv-ship Docs Mode, hv-config, hv-init all reference the new helper"
+grep -q "hv config set" "$REPO/hv-ship/SKILL.md"   || fail "hv-ship Docs Mode missing hv config set call"
+grep -q "hv config set" "$REPO/hv-config/SKILL.md" || fail "hv-config missing hv config set call"
+grep -q "hv config set" "$REPO/hv-init/SKILL.md"   || fail "hv-init missing hv config set call"
+pass "hv-ship Docs Mode, hv-config, hv-init all reference hv config set"
 # white-box-end
 
 echo "F09: hv-ship --docs manual entry routes to after-work flow with gate bypass"
@@ -136,11 +136,11 @@ echo "F78: work.dispatch / workerSlots / workerCommand are registered everywhere
 for key in work.dispatch work.workerSlots work.workerCommand; do
   grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" \
     || fail "F78: hv-config Step 1.5 valid-key list missing $key"
-  grep -q "$key" "$REPO/hv-init/SKILL.md" \
-    || fail "F78: hv-init does not seed $key"
   grep -q "$key" "$REPO/docs/reference/config-options.md" \
     || fail "F78: config-options.md does not document $key"
 done
+grep -q 'hv config fill' "$REPO/hv-init/SKILL.md" \
+  || fail "F78: hv-init does not backfill missing keys with hv config fill"
 grep -q '("work.dispatch", "subagent", True)' "$REPO/bin/hvlib_config.py" \
   || fail "F78: hvlib_config CONFIG_KEYS missing work.dispatch"
 grep -q 'work.dispatch.*subagent.*tmux\|`work.dispatch` accepts' "$REPO/hv-config/SKILL.md" \
