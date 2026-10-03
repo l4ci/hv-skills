@@ -302,6 +302,37 @@ OUT=$(acct pick 2>/dev/null) || RC=$?
 [ "$(jget data.found <<<"$OUT")" = "false" ] || fail "pick must answer found=false when every account is cooling, got '$OUT'"
 pass "worker account pick rotates on unknown meters and refuses (exit 1, found=false) when all are cooling"
 
+# ── (b2a) account assign ────────────────────────────────────────────────────
+# Every account is cooling here, so an assign with no --account has nothing to
+# pick and must decline (exit 4, rule 7), leaving the registry alone.
+slot_cfg() { python3 -c 'import json,sys; print(next(s.get("configDir") for s in json.load(open(sys.argv[1]))["slots"] if s["name"]==sys.argv[2]))' "$TMP_WD/.hv/workers.json" "$1"; }
+RC=0
+OUT=$(acct assign w1 2>/dev/null) || RC=$?
+[ "$RC" = "4" ] || fail "assign without --account must exit 4 when no account is usable, got $RC: $OUT"
+[ "$(slot_cfg w1)" != "/nonexistent/beta" ] || fail "a refused assign must not touch the slot"
+python3 - "$AFX" <<'PYEOF' || fail "could not rewrite the usage fixtures"
+import json, sys
+afx = sys.argv[1]
+for n, five in (("alpha", 100.0), ("beta", 100.0), ("gamma", 20.0), ("delta", 100.0)):
+    json.dump({"five_hour": {"utilization": five, "resets_at": "2090-01-01T00:00:00+00:00"},
+               "seven_day": {"utilization": 10.0, "resets_at": None},
+               "extra_usage": {"is_enabled": False}}, open(f"{afx}/{n}.json", "w"))
+PYEOF
+OUT=$(acct assign w1 --account beta) || fail "assign --account beta failed"
+[ "$(jget data.slot <<<"$OUT")" = "w1" ] && [ "$(jget data.account <<<"$OUT")" = "beta" ] \
+  || fail "assign data must name slot and account, got: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "a first assignment reports changed:true, got: $OUT"
+[ "$(slot_cfg w1)" = "/nonexistent/beta" ] || fail "the registry must record beta's configDir on w1, got $(slot_cfg w1)"
+OUT=$(acct assign w1 --account beta) || fail "repeat assign failed"
+[ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "re-assigning the same account reports changed:false, got: $OUT"
+OUT=$(acct assign w2) || fail "assign without --account failed with a usable account"
+[ "$(jget data.account <<<"$OUT")" = "gamma" ] || fail "assign without --account must pick the only usable account (gamma), got: $OUT"
+[ "$(slot_cfg w2)" = "/nonexistent/gamma" ] || fail "the picked account must land on w2, got $(slot_cfg w2)"
+RC=0
+acct assign w1 --account nosuch >/dev/null 2>&1 || RC=$?
+[ "$RC" = "3" ] || fail "assign of an unknown account must exit 3, got $RC"
+pass "worker account assign records the account on the slot, is idempotent, picks when --account is omitted, exits 4 when none is usable"
+
 # LIMITED must outrank movement — a limited session can still animate a prompt,
 # and reading that as BUSY strands the wave on work that cannot resume.
 printf 'You have reached your usage limit. Your limit will reset at 3:00pm.\n' > "$FX/limited.txt"
@@ -475,6 +506,61 @@ set_relays '[]'
 [ "$(prov $'## Summary\nno approvals needed\n')" = "0:fresh" ] \
   || fail "no relays and no section must pass: $(cat "$TMP_WD/prov.out")"
 pass "worker gate --check-only exits 1 with verdict provenance-fail on inflation, deflation and a missing section"
+
+# ── (d) tmux host: dispatch and session ensure ──────────────────────────────
+# test/fakes/tmux keeps a log and a few state files under $FAKE_TMUX; it goes in
+# front of the poison tmux, which fails the run if anything reaches it.
+TX="$(mktemp -d)" || fail "mktemp failed"
+mkdir -p "$TX/repo/.hv" "$TX/state"
+( cd "$TX/repo" && git init -q -b main . && git config user.email t@t && git config user.name t \
+  && echo seed > seed.txt && git add seed.txt && git commit -q -m seed ) || fail "tmux fixture repo setup failed"
+printf '{"work":{"dispatch":"tmux"}}\n' > "$TX/repo/.hv/config.json"
+echo brief > "$TX/brief.md"
+# TXTMUX=<value> puts the caller inside tmux; by default it is outside.
+tx() { ( cd "$TX/repo" && unset TMUX && { [ -z "${TXTMUX:-}" ] || export TMUX="$TXTMUX"; } \
+         && PATH="$TESTDIR/fakes:$HV_POISON_BIN:$PATH" FAKE_TMUX="$TX/state" HV_HOST_KILL_WAIT=1 "$@" ); }
+printf 'Welcome to Claude Code\n' > "$TX/state/pane"
+: > "$TX/state/log"
+tx hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "tmux pool init failed"
+
+OUT=$(tx hvj worker dispatch w1 --body-file "$TX/brief.md" --task T1 --boot-timeout 4) || fail "tmux dispatch failed: $OUT"
+[ "$(jget data.handle <<<"$OUT")" = "hv:w1" ] || fail "tmux dispatch must return the session:slot handle, got: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "a dispatch reports changed:true, got: $OUT"
+TLOG=$(cat "$TX/state/log")
+for SUB in '^new-window ' '^load-buffer ' '^paste-buffer ' '^send-keys .*C-m'; do
+  grep -q "$SUB" <<<"$TLOG" || fail "tmux dispatch never ran '$SUB'; log: $TLOG"
+done
+PAYLOAD=$(cat "$TX/state/payload" 2>/dev/null) || fail "nothing was loaded into a tmux buffer"
+grep -q brief <<<"$PAYLOAD" || fail "the pasted payload must carry the brief, got: $PAYLOAD"
+pass "worker dispatch on the tmux host opens a window, pastes the brief and returns its handle"
+
+# A brief that never submits leaves the pane unchanged: exit 6, safe to resend.
+touch "$TX/state/frozen"
+RC=0; OUT=$(tx hvj worker dispatch w1 --body-file "$TX/brief.md" --task T1 --boot-timeout 4 2>/dev/null) || RC=$?
+[ "$RC" = "6" ] || fail "a brief that never submits must exit 6, got $RC: $OUT"
+rm -f "$TX/state/frozen"
+pass "worker dispatch on the tmux host exits 6 when the brief never submits"
+
+# session ensure: outside tmux it hands the cycle to a tmux session.
+: > "$TX/state/log"; rm -f "$TX/state/session"
+OUT=$(tx hvj worker session ensure --session hvsmoke) || fail "session ensure outside tmux failed: $OUT"
+[ "$(jget data.handedOff <<<"$OUT")" = "true" ] && [ "$(jget data.inside <<<"$OUT")" = "false" ] \
+  || fail "ensure outside tmux must hand off with inside:false, got: $OUT"
+[ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "a handoff reports changed:true, got: $OUT"
+[ "$(jget data.session <<<"$OUT")" = "hvsmoke" ] || fail "handoff data must name the session, got: $OUT"
+TLOG=$(cat "$TX/state/log")
+for SUB in '^new-session .*hvsmoke' '^new-window .*operator' '^send-keys .*hvsmoke:operator'; do
+  grep -q "$SUB" <<<"$TLOG" || fail "session ensure never ran '$SUB'; log: $TLOG"
+done
+
+# Already inside: no handoff, and nothing is created.
+: > "$TX/state/log"
+OUT=$(TXTMUX=/tmp/fake,1,0 tx hvj worker session ensure --session hvsmoke) || fail "session ensure inside tmux failed: $OUT"
+[ "$(jget data.inside <<<"$OUT")" = "true" ] && [ "$(jget data.handedOff <<<"$OUT")" = "false" ] \
+  || fail "ensure inside tmux must report inside:true, handedOff:false, got: $OUT"
+if grep -q '^new-session\|^new-window' "$TX/state/log"; then fail "ensure inside tmux must not create anything; log: $(cat "$TX/state/log")"; fi
+rm -rf "$TX"
+pass "worker session ensure hands off to a tmux session from outside, and does nothing inside"
 
 # ── usage contract ──────────────────────────────────────────────────────────
 # Bare invocation is a usage error for pool/gate/dispatch. It is NOT one for

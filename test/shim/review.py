@@ -39,10 +39,10 @@ def git_error(err):
     return HvError(5, msg)
 
 
-def run_branch_helper(ctx, helper, args, repo_flag=True):
+def run_branch_helper(ctx, helper, args, repo_flag=True, cwd=None):
     """Run a helper with the global --repo as its old first argument."""
     full = (["--repo", ctx.repo] if ctx.repo and repo_flag else []) + args
-    rc, out, err = ctx.helper(helper, *full)
+    rc, out, err = ctx.helper(helper, *full, cwd=cwd)
     if rc == 0:
         return out
     if rc == 1 or rc == 2:
@@ -64,7 +64,14 @@ def review_scope(ctx):
 @verb("review", "brief", pos=(0, 1))
 def review_brief(ctx):
     branch = ctx.pos[0] if ctx.pos else current_branch(ctx, repo_dir(ctx))
-    brief = run_branch_helper(ctx, "hv-second-opinion-brief", [branch])
+    # The old helper cd's into the sub-repo and then re-passes --repo to
+    # hv-review-scope, which cannot find repos.json from there (exit 2). Run it
+    # from inside the sub-repo without --repo instead; it resolves the same repo.
+    if ctx.repo:
+        brief = run_branch_helper(ctx, "hv-second-opinion-brief", [branch],
+                                  repo_flag=False, cwd=repo_dir(ctx))
+    else:
+        brief = run_branch_helper(ctx, "hv-second-opinion-brief", [branch])
     scope = json_body(run_branch_helper(ctx, "hv-review-scope", [branch]))
     return {"branch": branch, "base": scope["base"], "commitCount": scope["commitCount"],
             "brief": brief}, brief

@@ -38,6 +38,49 @@ EOS
 )
 rm -rf "$HI2_TMP"
 
+echo "tracker suggest-upstream creates the issue upstream"
+HI3_TMP="$(mktemp -d)"
+trap 'rm -rf "$HI3_TMP"' EXIT
+(
+  cd "$HI3_TMP"
+  mkdir -p .hv
+  echo '{"issues":{"provider":"github","retryWaitSeconds":0}}' > .hv/config.json
+  export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$HI3_TMP/db.json" FAKE_TRACKER_LOG="$HI3_TMP/log"
+  [ "$(command -v gh)" = "$TESTDIR/fakes/gh" ] || fail "fake gh not first on PATH"
+  # The fake store is the forge's own state: no verb reads back the repo an issue landed in.
+  DBQ() { python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(len(d["issues"]), d["issues"][-1]["title"], d["issues"][-1].get("repo", "-"), d["issues"][-1]["body"].strip())' "$HI3_TMP/db.json"; }
+
+  # Default target: l4ci/hv-skills (HV_UPSTREAM_REPO unset)
+  OUT=$(env -u HV_UPSTREAM_REPO "$HV_BIN" --json tracker suggest-upstream --title "learned a thing" --body-file - <<<"the body") || fail "suggest-upstream failed: $OUT"
+  [ "$(echo "$OUT" | jget data.number)" = "1" ] || fail "suggest-upstream number: $OUT"
+  [ "$(echo "$OUT" | jget data.upstreamRepo)" = "l4ci/hv-skills" ] || fail "suggest-upstream default repo: $OUT"
+  [ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "suggest-upstream changed: $OUT"
+  [ "$(echo "$OUT" | jget data.url)" = "https://github.com/l4ci/hv-skills/issues/1" ] || fail "suggest-upstream url: $OUT"
+  [ "$(DBQ)" = "1 learned a thing l4ci/hv-skills the body" ] || fail "issue not filed upstream as asked: $(DBQ)"
+
+  # --upstream-repo wins over HV_UPSTREAM_REPO; the issue lands in that repo
+  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "second" --upstream-repo fork/repo --body-file - <<<"b2") || fail "suggest-upstream --upstream-repo failed: $OUT"
+  [ "$(echo "$OUT" | jget data.number)" = "2" ] || fail "second issue number: $OUT"
+  [ "$(echo "$OUT" | jget data.upstreamRepo)" = "fork/repo" ] || fail "--upstream-repo not reported: $OUT"
+  [ "$(echo "$OUT" | jget data.url)" = "https://github.com/fork/repo/issues/2" ] || fail "--upstream-repo url: $OUT"
+  [ "$(DBQ)" = "2 second fork/repo b2" ] || fail "--upstream-repo issue landed elsewhere: $(DBQ)"
+
+  # HV_UPSTREAM_REPO alone is the target when the flag is absent
+  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "third" --body-file - <<<"b3") || fail "suggest-upstream env repo failed: $OUT"
+  [ "$(echo "$OUT" | jget data.upstreamRepo)" = "env/repo" ] || fail "HV_UPSTREAM_REPO ignored: $OUT"
+  [ "$(DBQ)" = "3 third env/repo b3" ] || fail "env-repo issue landed elsewhere: $(DBQ)"
+
+  # missing --title is a usage error (2), nothing filed
+  rc=0; "$HV_BIN" --json tracker suggest-upstream --body-file - <<<"x" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] || fail "suggest-upstream without --title should exit 2, got $rc"
+  [ "$(DBQ | cut -d' ' -f1)" = "3" ] || fail "usage error still filed an issue"
+)
+rm -rf "$HI3_TMP"
+pass "tracker suggest-upstream files the issue in the default, env and --upstream-repo targets"
+
 echo "release pending"
 RP_TMP="$(mktemp -d)"
 trap 'rm -rf "$RP_TMP"' EXIT

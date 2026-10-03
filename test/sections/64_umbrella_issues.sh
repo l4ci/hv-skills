@@ -202,6 +202,78 @@ done
   eq "ship pr --repo exit" "0" "$RCV"
   has "ship pr --repo body" "Closes #$GHQ" "$(DB ghrepo 'd["prs"][-1]["body"]')"
   git -C "$U/ghrepo" checkout -q master 2>/dev/null || git -C "$U/ghrepo" checkout -q main 2>/dev/null || true
+
+  # --- review/ship checkout verbs under --repo: run in the named sub-repo, not the umbrella root
+  mkbranch() { # <repo> <branch> <file> <subject>
+    local base; base="$(git -C "$U/$1" branch --show-current)"
+    git -C "$U/$1" checkout -q -b "$2" && echo "$3" > "$U/$1/$3" \
+      && git -C "$U/$1" add "$3" && git -C "$U/$1" commit -q -m "$4" && git -C "$U/$1" checkout -q "$base"
+  }
+  mkbranch glrepo feat/rv gl-only.txt "gl only change"
+  mkbranch ghrepo feat/rv gh-only.txt "gh only change"
+  git -C "$U/glrepo" checkout -q -b feat/pr3 && echo x > "$U/glrepo/gl3.txt" && git -C "$U/glrepo" add gl3.txt \
+    && git -C "$U/glrepo" commit -q -m "gl pr3 change" && git -C "$U/glrepo" checkout -q -
+  for v in "review scope" "review brief" "review scaffolding" "ship body"; do
+    RC hvj $v feat/rv
+    eq "$v at umbrella root exit" "2" "$RCV"
+    RC hvj $v feat/rv --repo nope
+    eq "$v unregistered repo exit" "3" "$RCV"
+  done
+  RC hvj review scope feat/rv --repo glrepo
+  eq "scope glrepo exit" "0" "$RCV"
+  eq "scope glrepo reads sub-repo commits" "1|gl only change|gl-only.txt" "$(echo "$OUT" | jget data.commitCount)|$(echo "$OUT" | jget 'data.commits[0].subject')|$(echo "$OUT" | jget 'data.touchedFiles[0]')"
+  RC hvj review scope feat/rv --repo ghrepo
+  eq "scope ghrepo touched file" "gh-only.txt" "$(echo "$OUT" | jget 'data.touchedFiles[0]')"
+  RC hvj review scope feat/gone --repo glrepo
+  eq "scope unknown branch exit" "3" "$RCV"
+  RC hvj review brief feat/rv --repo glrepo
+  eq "brief glrepo exit" "0" "$RCV"
+  has "brief names sub-repo commit" "gl only change" "$(echo "$OUT" | jget data.brief)"
+  case "$(echo "$OUT" | jget data.brief)" in *"gh only change"*) fail "umbrella issues: glrepo brief leaked ghrepo commit";; esac
+  git -C "$U/glrepo" checkout -q feat/rv && printf '// Task 7 placeholder\n' >> "$U/glrepo/gl-only.txt" \
+    && git -C "$U/glrepo" commit -q -am "gl scaffolding" && git -C "$U/glrepo" checkout -q -
+  RC hvj review scaffolding feat/rv --repo glrepo
+  eq "scaffolding glrepo finding" "0|gl-only.txt" "$RCV|$(echo "$OUT" | jget 'data.findings[0].file')"
+  RC hvj review scaffolding feat/rv --repo ghrepo
+  eq "scaffolding ghrepo clean" "0|0" "$RCV|$(echo "$OUT" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["findings"]))')"
+  RC hvj ship body feat/rv --repo glrepo
+  eq "ship body glrepo exit" "0" "$RCV"
+  has "body from sub-repo commits" "gl only change" "$(echo "$OUT" | jget data.body)"
+  case "$(echo "$OUT" | jget data.body)" in *"gh only change"*) fail "umbrella issues: glrepo body leaked ghrepo commit";; esac
+  RC hvj ship body master --repo glrepo
+  eq "ship body base branch exit" "1" "$RCV"
+
+  # review queue --repo narrows to one sub-repo
+  RC hvj review queue --repo ghrepo
+  eq "queue --repo ghrepo" "0|ghrepo" "$RCV|$(echo "$OUT" | python3 -c 'import json,sys; print(",".join(sorted({x["repo"] for x in json.load(sys.stdin)["data"]["items"]})))')"
+  RC hvj review queue --repo glrepo
+  eq "queue --repo glrepo excludes ghrepo" "0|0" "$RCV|$(echo "$OUT" | python3 -c 'import json,sys; print(sum(x["repo"] != "glrepo" for x in json.load(sys.stdin)["data"]["items"]))')"
+  RC hvj review queue --repo nope
+  eq "queue unregistered repo exit" "3" "$RCV"
+
+  # ship pr/merge/pr-merge: exit 2 at root, exit 3 unregistered, effect lands in the named sub-repo
+  RC bash -c "printf 'B' | '$HV_BIN' --json ship pr feat/rv --title T --body-file -"
+  eq "ship pr at umbrella root exit" "2" "$RCV"
+  RC bash -c "printf 'B' | '$HV_BIN' --json ship pr feat/rv --title T --body-file - --repo nope"
+  eq "ship pr unregistered repo exit" "3" "$RCV"
+  RC bash -c "printf 'merge: x\n' | '$HV_BIN' --json ship merge feat/rv --body-file -"
+  eq "ship merge at umbrella root exit" "2" "$RCV"
+  RC bash -c "printf 'merge: x\n' | '$HV_BIN' --json ship merge feat/rv --body-file - --repo nope"
+  eq "ship merge unregistered repo exit" "3" "$RCV"
+  RC hvj ship pr-merge 1 --repo nope
+  eq "pr-merge unregistered repo exit" "3" "$RCV"
+  GL_PRS="$(DB glrepo 'len(d["prs"])')"; GH_PRS="$(DB ghrepo 'len(d["prs"])')"
+  git -C "$U/glrepo" config "url.$TMP_UI/gl-origin.git.pushInsteadOf" "https://gitlab.com/o/glrepo.git"
+  git init -q --bare "$TMP_UI/gl-origin.git"
+  RC bash -c "printf 'Body' | '$HV_BIN' --json ship pr feat/pr3 --repo glrepo --title 'Gl via ship pr' --body-file -"
+  eq "ship pr glrepo exit" "0" "$RCV"
+  eq "ship pr glrepo provider" "gitlab" "$(echo "$OUT" | jget data.provider)"
+  eq "ship pr opened on glrepo forge only" "$((GL_PRS + 1))|$GH_PRS" "$(DB glrepo 'len(d["prs"])')|$(DB ghrepo 'len(d["prs"])')"
+  eq "ship pr pushed to glrepo origin" "feat/pr3" "$(git -C "$TMP_UI/gl-origin.git" branch --format='%(refname:short)' | grep feat/pr3)"
+  RC bash -c "printf 'merge: rv\n\n- gl\n' | '$HV_BIN' --json ship merge feat/rv --repo glrepo --body-file -"
+  eq "ship merge glrepo exit" "0" "$RCV"
+  eq "ship merge landed in glrepo only" "1|0" "$(git -C "$U/glrepo" log --oneline --grep='^merge: rv' | wc -l | tr -d ' ')|$(git -C "$U/ghrepo" log --oneline --grep='^merge: rv' | wc -l | tr -d ' ')"
+  [ -f "$U/glrepo/gl-only.txt" ] || fail "umbrella issues: ship merge --repo glrepo did not land the file in glrepo"
 ) 2>"$TMP_UI/subshell.err" || { cat "$TMP_UI/subshell.err" >&2; fail "umbrella issue mode section failed"; }
 rm -rf "$TMP_UI"
 trap 'rm -rf "$TMP"' EXIT
