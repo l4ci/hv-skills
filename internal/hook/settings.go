@@ -25,25 +25,29 @@ type Settings struct {
 	HandoffMaxBlks int // handoffMaxBlocks
 }
 
+// IntKey reads an integer config key and checks it is within min..max. The
+// message is what a verb prints for exit 70.
+func IntKey(cfg any, key string, min, max int) (int, error) {
+	v, err := config.Value(cfg, key)
+	if err != nil {
+		return 0, err
+	}
+	n, ok := v.(interface{ Int64() (int64, error) })
+	if !ok {
+		return 0, fmt.Errorf("%s must be an integer (got %v)", key, v)
+	}
+	i, err := n.Int64()
+	if err != nil || i < int64(min) || i > int64(max) {
+		return 0, fmt.Errorf("%s must be an integer from %d to %d (got %v)", key, min, max, v)
+	}
+	return int(i), nil
+}
+
 // LoadSettings reads and validates the orchestrator.* keys from a merged
 // config. The hooks treat an error as a pass; doctor and verbs report it.
 func LoadSettings(cfg any) (Settings, error) {
 	var s Settings
-	get := func(key string, min, max int) (int, error) {
-		v, err := config.Value(cfg, key)
-		if err != nil {
-			return 0, err
-		}
-		n, ok := v.(interface{ Int64() (int64, error) })
-		if !ok {
-			return 0, fmt.Errorf("%s must be an integer (got %v)", key, v)
-		}
-		i, err := n.Int64()
-		if err != nil || i < int64(min) || i > int64(max) {
-			return 0, fmt.Errorf("%s must be an integer from %d to %d (got %v)", key, min, max, v)
-		}
-		return int(i), nil
-	}
+	get := func(key string, min, max int) (int, error) { return IntKey(cfg, key, min, max) }
 	var err error
 	if s.Threshold, err = get("orchestrator.handoffThreshold", 1, 100); err != nil {
 		return s, err

@@ -200,3 +200,49 @@ func TestDiscoverWalksPastShells(t *testing.T) {
 		t.Fatalf("bad holder %+v", h)
 	}
 }
+
+func TestDiscoverHonoursHolderPIDEnvButExplicitPIDWins(t *testing.T) {
+	e := fakeEnv("h1", procs{55: 7, 77: 5})
+	env := map[string]string{HolderPIDEnv: "55", "TMUX_PANE": "%3"}
+	get := func(k string) string { return env[k] }
+	if h := e.Discover(0, get); h.PID != 55 || h.Start != 7 || h.Pane != "%3" {
+		t.Fatalf("env must name the holder when no pid is given: %+v", h)
+	}
+	if h := e.Discover(77, get); h.PID != 77 {
+		t.Fatalf("an explicit --holder-pid must win over the env: %+v", h)
+	}
+	for _, bad := range []string{"", "x", "0", "-4"} {
+		env[HolderPIDEnv] = bad
+		if h := e.Discover(0, get); h.PID == 55 || h.PID <= 0 {
+			t.Fatalf("env %q must fall through to the ancestor walk: %+v", bad, h)
+		}
+	}
+}
+
+func TestAcquireNumbersAnUnnumberedLeaseOfTheSameHolder(t *testing.T) {
+	dir := t.TempDir()
+	e := fakeEnv("h1", procs{10: 100, 20: 200})
+	h := Holder{PID: 10, Start: 100}
+	if l, out, _, err := e.Acquire(dir, "/r", h, 0); err != nil || out != Taken || l.Round != 0 {
+		t.Fatalf("unnumbered take: %v %v %+v", err, out, l)
+	}
+	// Another holder is still refused.
+	if _, _, _, err := e.Acquire(dir, "/r", Holder{PID: 20, Start: 200}, 5); err == nil {
+		t.Fatal("a second holder must be refused")
+	}
+	// An unnumbered renewal stays unnumbered.
+	if l, out, _, _ := e.Acquire(dir, "/r", h, 0); out != Renewed || l.Round != 0 {
+		t.Fatalf("round 0 renewal: %v %+v", out, l)
+	}
+	l, out, _, err := e.Acquire(dir, "/r", h, 3)
+	if err != nil || out != Numbered || l.Round != 3 {
+		t.Fatalf("numbering: %v %v %+v", err, out, l)
+	}
+	if cur, _, _ := e.Read(dir); cur.Round != 3 || cur.StartedAt == "" {
+		t.Fatalf("the number must be on disk: %+v", cur)
+	}
+	// Later renewals keep the number.
+	if l, out, _, _ := e.Acquire(dir, "/r", h, 9); out != Renewed || l.Round != 3 {
+		t.Fatalf("renewal must keep the number: %v %+v", out, l)
+	}
+}

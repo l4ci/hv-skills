@@ -91,4 +91,24 @@ hv hook install --wrap-statusline    # when you already have a statusLine
 
 **The next session.** The SessionStart hook fires on `startup` and `clear`. When the new session holds the lease and the handoff exists, it injects the file as context and moves it to `<base>.md.consumed`. A restarted orchestrator has not run `hv round start` yet, so it holds no lease: a fresh handoff written by the Stop hook (first line `<!-- hv-handoff: orchestrator -->`) is injected anyway. Its first act is `hv round start`, then it reads the handoff. `resume` and `compact` keep the file.
 
-`hv doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`, `stop-hook`). The hooks are opt-in: until `hv hook install` has written something, both checks skip. After that they fail on a partial or broken install (one hook missing, a statusline without the dump, a hook command that no longer resolves). Restarting the pane after the exit is not part of this: that is D2 (#66), and usage limits are D3 (#67). Without the hooks, `/hv-pause` and `/hv-next` are the manual route.
+`hv doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`, `stop-hook`). The hooks are opt-in: until `hv hook install` has written something, both checks skip. After that they fail on a partial or broken install (one hook missing, a statusline without the dump, a hook command that no longer resolves). Restarting the orchestrator after the exit is the next section; usage limits are D3 (#67). Without the hooks, `/hv-pause` and `/hv-next` are the manual route.
+
+## Keepalive
+
+The hooks end an orchestrator session cleanly. `hv keepalive run` starts the next one. Start the orchestrator under it, in the pane it will own:
+
+```
+hv keepalive run -- claude --model opus       # everything after -- is the command
+```
+
+`hv keepalive run` is the pane's foreground process and `claude` is its child, so it learns the exit from the child's own status and needs neither herdr nor tmux to notice it. This is a supervisor, not a watcher: the issue (#66) asks for a watcher on herdr's process PID or `agent_status_changed`, and D2 runs the orchestrator as a child instead. The cost is that an orchestrator not started under `run` is not restarted.
+
+**When it restarts.** On every exit it looks for a fresh handoff, `.hv/handoff/<base>.md` no older than `orchestrator.handoffMaxAgeSeconds`. With one, it waits `orchestrator.keepaliveBackoffSeconds` (5) and starts the command again with the restart prompt, `orchestrator.restartPrompt`, appended as the last argument. The first start never gets the prompt. Without one, it stops: that is how `/exit` from you ends the loop.
+
+**The lease.** `run` takes the [round lease](parallel-rounds.md) and holds it across restarts, and tells its child through `HV_ROUND_HOLDER_PID`. So `hv round start` and the hooks inside the orchestrator see the supervisor as the holder: the round number survives a restart, and the SessionStart hook injects the handoff at once, without `hv round start` first. A second `run`, or an orchestrator started by hand, is refused while it lives (`hv round start` exits 4). `hv keepalive status` shows the supervisor and the lease; a supervisor killed with SIGKILL leaves a stale lease, which the next `run` reclaims.
+
+**The breaker.** A restarted orchestrator that dies before it reads the handoff (bad auth, a hook error) leaves the same file behind. `run` counts a restart as progress only when the handoff changed, a new write with different content. After `orchestrator.keepaliveBreaker` (3) restarts in a row without progress it stops, and after `orchestrator.keepaliveMaxRestarts` (10) restarts in total it stops regardless. Both stops post an escalation comment on issue `orchestrator.escalateIssue` through `hv round escalate send`, and raise the herdr notification. With `escalateIssue` unset, which is the default, you get the notification and a warning only. The handoff is kept; fix the cause and run it again.
+
+**How it stops.** The supervisor stops when the orchestrator leaves no fresh handoff (`no-handoff`), on the breaker or the restart limit (exit 1), or when you interrupt it: SIGINT and SIGTERM go to the child, the supervisor waits for it and does not restart (`interrupted`). It then releases the lease and records `status: stopped` in `<git-common-dir>/hv/keepalive.json`. It never deletes the handoff; only the SessionStart hook consumes it.
+
+The flags `--max-restarts`, `--breaker`, `--backoff` and `--prompt` override the config for one run. `--json` prints one envelope when the loop ends, not before.

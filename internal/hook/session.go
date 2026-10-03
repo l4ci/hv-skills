@@ -22,7 +22,7 @@ func ShouldInject(source string, orchestrator, leaseFree bool, ho Handoff, head 
 	if orchestrator {
 		return true
 	}
-	return leaseFree && now.Sub(ho.ModTime) <= maxAge && strings.TrimSpace(head) == HandoffMarker
+	return leaseFree && ho.Fresh(maxAge, now) && strings.TrimSpace(head) == HandoffMarker
 }
 
 // FirstLine is the first line of a file, "" when unreadable.

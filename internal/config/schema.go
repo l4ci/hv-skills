@@ -98,6 +98,12 @@ var Keys = []Key{
 	{"orchestrator.stateMaxAgeSeconds", json.Number("120"), false},
 	{"orchestrator.handoffMaxAgeSeconds", json.Number("900"), false},
 	{"orchestrator.handoffMaxBlocks", json.Number("2"), false},
+	// D2 keepalive keys: silent defaults, read by `hv keepalive run`.
+	{"orchestrator.keepaliveMaxRestarts", json.Number("10"), false},
+	{"orchestrator.keepaliveBreaker", json.Number("3"), false},
+	{"orchestrator.keepaliveBackoffSeconds", json.Number("5"), false},
+	{"orchestrator.restartPrompt", "Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.", false},
+	{"orchestrator.escalateIssue", json.Number("0"), false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.

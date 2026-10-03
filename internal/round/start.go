@@ -108,7 +108,7 @@ func (e Env) Start(ctx context.Context, root string, o StartOpts) (Started, erro
 
 	slate := normaliseSlate(o.Items)
 	if err := worker.Update(root, slotsDefault(), func(doc *jsonx.Object) {
-		if out != roundlease.Renewed {
+		if out != roundlease.Renewed { // taken, reclaimed or numbered
 			doc.Set("round", l.Round)
 		}
 		doc.Set("scope", o.Scope)
