@@ -536,8 +536,11 @@ func TestHerdrSpawnOtherStartFailure(t *testing.T) {
 		return Result{ExitCode: 1, Stderr: herdrErr("server_down")}
 	}}
 	_, err := New("herdr", deps(f, herdrEnv, &clock{})).Spawn(bg, SpawnOpts{Slot: "w1", Launch: "claude", BootTimeout: 5})
-	if err == nil || !strings.Contains(err.Error(), "herdr agent start failed for slot 'w1' (w9:t7)") {
+	if err == nil || !strings.Contains(err.Error(), "herdr agent start failed for slot 'w1' (w9:t7; tab closed)") {
 		t.Errorf("err = %v", err)
+	}
+	if f.count("herdr tab close w9:t7") != 1 {
+		t.Errorf("a failed start must close the tab it created:\n%s", f.log())
 	}
 	if f.count("herdr agent read") != 0 {
 		t.Error("only agent_not_ready may enter the dialog loop")
@@ -804,5 +807,34 @@ func TestHerdrPaneTextIsPlain(t *testing.T) {
 		if got := paneText(tc.r); got != tc.want {
 			t.Errorf("paneText(%+v) = %q, want %q", tc.r, got, tc.want)
 		}
+	}
+}
+
+// TestAgentNameIsWhatHerdrAccepts pins herdr 0.9.3's rule, [a-z][a-z0-9_-]{0,31}:
+// a name that already passes keeps its old form, anything else is hashed (#204).
+func TestAgentNameIsWhatHerdrAccepts(t *testing.T) {
+	if got := AgentName("ben", "w1:t4"); got != "hv-ben-w1-t4" {
+		t.Errorf("a valid name keeps its old form, got %q", got)
+	}
+	seen := map[string]string{}
+	for _, tc := range []struct{ slot, handle string }{
+		{"lr1", "w1W:t4"},
+		{"lr1", "w1w:t4x"},
+		{"Ben", "w1:t4"},
+		{"a-very-long-slot-name-indeed", "w12:t345"},
+		{"dots.and spaces", "wA:tB"},
+		{"lr1", "w1X:t4"},
+	} {
+		got := AgentName(tc.slot, tc.handle)
+		if !agentNameRe.MatchString(got) {
+			t.Errorf("AgentName(%q, %q) = %q, which herdr rejects", tc.slot, tc.handle, got)
+		}
+		if prev, dup := seen[got]; dup {
+			t.Errorf("AgentName(%q, %q) = %q collides with %s", tc.slot, tc.handle, got, prev)
+		}
+		seen[got] = tc.slot + " " + tc.handle
+	}
+	if AgentName("lr1", "w1W:t4") == AgentName("lr1", "w1w:t4") {
+		t.Error("workspace ids that differ only in case must not share an agent name")
 	}
 }

@@ -27,10 +27,16 @@ err() { printf '{"error":{"code":"%s","message":"fake"},"id":"cli"}\n' "$1" >&2;
 agent_json() {
   printf '{"id":"cli","result":{"type":"%s","agent":{"agent":"claude","agent_status":"%s","pane_id":"w9:p11","tab_id":"w9:t7","focused":false}}}\n' "$1" "$2"
 }
+# herdr 0.9.3 accepts only these agent names; tab ids come from --workspace.
+case "$1 $2" in
+  "agent start"|"agent get"|"agent read"|"agent send-keys"|"agent wait"|"agent prompt")
+    [[ "$3" =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || err invalid_agent_name ;;
+esac
 case "$1 $2" in
   "tab create")
+    ws=w9; prev=""; for a in "$@"; do [ "$prev" = "--workspace" ] && ws="$a"; prev="$a"; done
     n=$(( $(cat "$F/tabs" 2>/dev/null || echo 6) + 1 )); echo "$n" >"$F/tabs"
-    printf '{"id":"cli","result":{"type":"tab_created","tab":{"tab_id":"w9:t%s","workspace_id":"w9","label":"x","number":%s,"focused":false,"pane_count":1,"agent_status":"unknown"},"root_pane":{"pane_id":"w9:p1%s","tab_id":"w9:t%s","workspace_id":"w9"}}}\n' "$n" "$n" "$n" "$n" ;;
+    printf '{"id":"cli","result":{"type":"tab_created","tab":{"tab_id":"%s:t%s","workspace_id":"%s","label":"x","number":%s,"focused":false,"pane_count":1,"agent_status":"unknown"},"root_pane":{"pane_id":"%s:p1%s","tab_id":"%s:t%s","workspace_id":"%s"}}}\n' "$ws" "$n" "$ws" "$n" "$ws" "$n" "$ws" "$n" "$ws" ;;
   "tab close") echo '{"id":"cli","result":{"type":"ok"}}' ;;
   "agent start")
     [ -f "$F/start_not_ready" ] && err agent_not_ready
@@ -295,6 +301,18 @@ RC=0
 [ "$RC" = "4" ] || fail "ensure outside herdr should refuse with exit 4, got $RC"
 hd "$HV_BIN" worker session ensure >/dev/null || fail "ensure inside herdr should be a no-op exit 0"
 pass "worker session keys on HERDR_ENV; ensure refuses outside herdr"
+
+# ── (g) a workspace id with an uppercase letter (#204) ─────────────────────
+# Real ids are mixed case (w1W); herdr takes only [a-z][a-z0-9_-]{0,31}, and so
+# does the fake, so a name built from the raw id fails at agent start.
+: > "$FAKE/log"
+( cd "$TMP_HD/repo" && PATH="$FAKE/bin:$PATH" FAKE_HERDR="$FAKE" HERDR_ENV=1 HERDR_WORKSPACE_ID=w1W \
+    "$HV_BIN" worker dispatch w2 --body-file "$TMP_HD/brief.md" --task T9 >/dev/null 2>&1 ) \
+  || fail "dispatch in an uppercase workspace should start the agent: $(cat "$FAKE/log")"
+case "$(slot_field w2 handle)" in w1W:t*) ;; *) fail "the handle keeps the real tab id, got $(slot_field w2 handle)" ;; esac
+NAME="$(awk '$1=="agent" && $2=="start" {print $3}' "$FAKE/log")"
+[[ "$NAME" =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || fail "the agent name herdr gets must be valid, got '$NAME'"
+pass "worker dispatch in an uppercase workspace starts an agent with a valid name"
 
 trap 'rm -rf "$TMP"' EXIT
 pass "worker verbs herdr dispatch contract"
