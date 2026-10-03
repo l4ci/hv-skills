@@ -1,12 +1,14 @@
 package round
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -69,6 +71,34 @@ func TestWindDownParksReleasesAndSummarises(t *testing.T) {
 	}
 	if _, st, _ := f.env.ReadLease(bg, f.root); st != roundlease.None {
 		t.Errorf("a clean wind-down releases the lease: %v", st)
+	}
+}
+
+func TestWindDownClearsHandleSoReconcileSeesNoDeadTab(t *testing.T) {
+	f := newAssignFixture(t)
+	if _, err := f.assign("12", "ben", nil); err != nil {
+		t.Fatal(err)
+	}
+	if worker.Str(worker.LoadRegistry(f.root).Slot("ben"), "handle") == "" {
+		t.Fatal("the fixture must dispatch ben into a tab")
+	}
+	f.verifyWith(t, `["true"]`)
+	if _, err := f.windDown(nil); err != nil {
+		t.Fatal(err)
+	}
+	if h := worker.Str(worker.LoadRegistry(f.root).Slot("ben"), "handle"); h != "" {
+		t.Errorf("a parked slot keeps no handle, got %q", h)
+	}
+	// The worker's tab closes after the round.
+	f.env.Snapshot = func(context.Context) ([]host.Agent, error) { return nil, nil }
+	rep, err := f.env.Status(bg, f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fd := range rep.Findings {
+		if fd.Kind == DeadTab {
+			t.Errorf("reconcile after wind-down reports a dead-tab: %+v", fd)
+		}
 	}
 }
 
