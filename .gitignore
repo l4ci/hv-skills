@@ -3,7 +3,7 @@
 # plans, spikes, per-item detail). Only ignore the parts that are
 # machine-specific, regenerated, or per-developer local overrides.
 
-# Regenerated mirror of canonical bin/ on every /hv-init
+# Stale mirror from hv-skills 4.x; `hv init` deletes it. Kept for one release (removable)
 .hv/bin/
 # Active-work tracking (per-developer, branch-aware)
 .hv/status.json
@@ -11,10 +11,10 @@
 .hv/repos.json
 # Per-developer config overrides — deep-merged on top of config.json by load_config()
 .hv/config.local.json
-# Advisory lockfiles guarding sidecar read-modify-write (hvlib_io.locked)
+# Advisory lockfiles guarding sidecar read-modify-write (written by hv)
 .hv/**/*.lock
 
-# Python bytecode (hvlib.py)
+# Python bytecode (test oracle until the legacy scripts go)
 __pycache__/
 *.pyc
 
@@ -31,7 +31,7 @@ __pycache__/
 .hv/qa-runs/
 .hv/migrate-backup/
 
-# Worker worktrees (hv-worker-pool, parallel rounds): nested checkouts
+# Worker worktrees (hv worker pool, parallel rounds): nested checkouts
 .worktrees/
 
 # hv release builds (goreleaser)

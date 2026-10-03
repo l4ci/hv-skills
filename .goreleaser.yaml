@@ -10,7 +10,7 @@ builds:
     binary: hv
     env:
       - CGO_ENABLED=0
-    # No windows: the sidecar lock uses flock (as hvlib_io does).
+    # No windows: the sidecar lock uses flock (as the Go lock code does).
     goos: [linux, darwin]
     goarch: [amd64, arm64]
     ldflags:
