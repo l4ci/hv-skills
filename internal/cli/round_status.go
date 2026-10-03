@@ -76,10 +76,15 @@ func roundStatus(*flag.FlagSet) RunFunc {
 		if rep.Host != "" {
 			d.Set("host", rep.Host)
 		}
+		esc, escLines := escalationRows(rep.Escalations)
+		d.Set("escalations", esc)
 		var lines []string
 		for _, r := range rep.Rows {
 			lines = append(lines, strings.Join([]string{
 				r.Name, dash(r.Issue), dash(r.Branch), dash(r.PR), dash(r.HostState), dash(strings.Join(r.Drift, ","))}, "\t"))
+		}
+		for _, l := range escLines {
+			lines = append(lines, "escalation\t"+l)
 		}
 		return Result{Data: d, Text: strings.Join(lines, "\n")}, nil
 	}
@@ -109,12 +114,17 @@ func roundReconcile(fs *flag.FlagSet) RunFunc {
 		d.Set("clean", out.Clean())
 		d.Set("unavailable", strs(out.Report.Unavailable))
 		d.Set("changed", len(out.Repaired) > 0)
+		esc, escLines := escalationRows(out.Report.Escalations)
+		d.Set("escalations", esc)
 		var lines []string
 		for _, f := range out.Drift {
 			lines = append(lines, fmt.Sprintf("drift\t%s\t%s\t%s", f.Kind, dash(firstOf(f.Slot, "#"+f.Issue)), f.Detail))
 		}
 		for _, f := range out.Repaired {
 			lines = append(lines, fmt.Sprintf("repaired\t%s\t%s\t%s", f.Kind, dash(firstOf(f.Slot, "#"+f.Issue)), f.Repair))
+		}
+		for _, l := range escLines {
+			lines = append(lines, "escalation\t"+l)
 		}
 		return Result{Data: d, Text: strings.Join(lines, "\n")}, nil
 	}
@@ -134,6 +144,7 @@ func rowList(rows []round.Row) []any {
 		setIf(o, "tab", r.Tab)
 		o.Set("registered", r.Registered)
 		o.Set("drift", strs(r.Drift))
+		o.Set("escalations", strs(r.Escalations))
 		out = append(out, o)
 	}
 	return out

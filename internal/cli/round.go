@@ -8,5 +8,6 @@ func roundCommands() *Command {
 		{Name: "wait", Summary: "block until a worker needs attention", Verb: roundWait},
 		{Name: "status", Summary: "list the round's slots with host, PR and drift", Verb: roundStatus},
 		{Name: "reconcile", Summary: "report drift between registry, host, git and forge; --apply repairs the safe kinds", Verb: roundReconcile},
+		roundEscalate(),
 	}}
 }

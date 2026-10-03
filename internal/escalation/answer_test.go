@@ -1,0 +1,51 @@
+package escalation
+
+import (
+	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
+)
+
+func TestIsAnswer(t *testing.T) {
+	for _, c := range []struct {
+		name, body string
+		want       bool
+	}{
+		{"plain reply", "use the second option", true},
+		{"m: reply still counts", "m: go ahead", true},
+		{"html comment that is not hv's", "ok <!-- note -->", true},
+		{"hv escalation marker", "**hv escalation e1**: q\n<!-- hv:escalation e1 -->", false},
+		{"other hv marker", "Claimed by dana\n<!-- hv:claim dana -->", false},
+		{"marker mid-body", "hello\n<!-- hv:comment feedback -->\nmore", false},
+	} {
+		if got := IsAnswer(c.body); got != c.want {
+			t.Errorf("%s: IsAnswer(%q) = %v, want %v", c.name, c.body, got, c.want)
+		}
+	}
+}
+
+func TestFindAnswer(t *testing.T) {
+	cm := func(id, body string) tracker.Comment { return tracker.Comment{ID: id, Body: body, Author: "u"} }
+	esc := cm("10", "**hv escalation e1**: q\n<!-- hv:escalation e1 -->")
+	for _, c := range []struct {
+		name     string
+		comments []tracker.Comment
+		wantID   string
+		found    bool
+		escFound bool
+	}{
+		{"answer after", []tracker.Comment{cm("9", "m: early"), esc, cm("11", "m: yes")}, "11", true, true},
+		{"first of several wins", []tracker.Comment{esc, cm("11", "m: one"), cm("12", "m: two")}, "11", true, true},
+		{"skips hv comments", []tracker.Comment{esc, cm("11", "<!-- hv:claim x -->\nClaimed"), cm("12", "two")}, "12", true, true},
+		{"before escalation ignored", []tracker.Comment{cm("9", "m: early"), esc}, "", false, true},
+		{"hv marker never answers", []tracker.Comment{esc, cm("11", "m: x\n<!-- hv:escalation e2 -->"), cm("12", "m: real")}, "12", true, true},
+		{"no answer", []tracker.Comment{esc, cm("11", "<!-- hv:comment feedback -->\nnote")}, "", false, true},
+		{"escalation comment deleted", []tracker.Comment{cm("9", "m: early"), cm("11", "m: yes")}, "", false, false},
+		{"empty thread", nil, "", false, false},
+	} {
+		got, found, escFound := FindAnswer(c.comments, "10")
+		if found != c.found || escFound != c.escFound || got.ID != c.wantID {
+			t.Errorf("%s: got (%q, %v, %v), want (%q, %v, %v)", c.name, got.ID, found, escFound, c.wantID, c.found, c.escFound)
+		}
+	}
+}
