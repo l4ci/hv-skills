@@ -239,7 +239,7 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 	}
 	before, _ := os.ReadFile(RegistryPath(root))
 
-	rows := e.classify(ctx, h, targets, o.Settle, o.Lines)
+	rows, _ := e.classify(ctx, h, targets, o.Settle, o.Lines)
 	for i, r := range rows {
 		// Notify on the transition only: a poll loop re-reading a stuck slot
 		// must not ring every few seconds.
@@ -292,20 +292,29 @@ func slotTarget(s *jsonx.Object) pollTarget {
 // It touches no file: Poll records the result, `round wait` only reads it.
 // First capture for every slot, then settle once, then the second capture, so
 // N slots cost one settle interval, not N.
-func (e Env) classify(ctx context.Context, h host.Host, targets []pollTarget, settle time.Duration, lines int) []PollRow {
+//
+// settling reports a slot that is BUSY only because its pane moved while the
+// host's own status was not `working` (herdr idle or done, or no native
+// status). The host sends no event when such a pane comes to rest, so a
+// caller woken by events must re-classify it on its own (#211: herdr's
+// scrollback reads differ for a moment after a turn ends).
+func (e Env) classify(ctx context.Context, h host.Host, targets []pollTarget, settle time.Duration, lines int) (rows []PollRow, settling bool) {
 	first := map[string]string{}
 	for _, t := range targets {
 		first[t.name] = h.Capture(ctx, t.name, t.handle, lines)
 	}
 	e.Sleep(settle)
-	var rows []PollRow
 	for _, t := range targets {
 		second := h.Capture(ctx, t.name, t.handle, lines)
 		native := h.Status(ctx, t.name, t.handle)
-		st, ev := Classify(second, first[t.name] != second, lines, native)
+		moved := first[t.name] != second
+		st, ev := Classify(second, moved, lines, native)
+		if st == StateBusy && moved && native != "working" {
+			settling = true
+		}
 		rows = append(rows, PollRow{t.name, st, ev})
 	}
-	return rows
+	return rows, settling
 }
 
 // updateSlotsAll edits every slot under the registry lock.
