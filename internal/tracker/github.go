@@ -7,10 +7,15 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // GitHub is the gh adapter.
-type GitHub struct{ base }
+type GitHub struct {
+	base
+	// noStateReason is set once gh has rejected the stateReason field.
+	noStateReason atomic.Bool
+}
 
 // ghLimit is the first --limit a list asks gh for; a full result asks again
 // with twice as many.
@@ -21,6 +26,29 @@ func ghPaging(size, _ int) ([]string, bool) { return []string{"--limit", strconv
 var reCommentURL = regexp.MustCompile(`#issuecomment-([0-9]+)$`)
 
 const ghFields = "number,title,body,labels,milestone,state,stateReason,closedAt,url,assignees"
+
+// reNoStateReason is gh older than 2.4x refusing the stateReason field.
+var reNoStateReason = regexp.MustCompile(`Unknown JSON field: "stateReason"`)
+
+// issueFields is ghFields, minus stateReason once gh has rejected it; the
+// reason of a closed issue is then unknown.
+func (g *GitHub) issueFields() string {
+	if g.noStateReason.Load() {
+		return strings.Replace(ghFields, "stateReason,", "", 1)
+	}
+	return ghFields
+}
+
+// withIssueFields runs call with the --json field list, once more without
+// stateReason when gh does not know that field.
+func (g *GitHub) withIssueFields(call func(fields string) error) error {
+	err := call(g.issueFields())
+	if err != nil && !g.noStateReason.Load() && reNoStateReason.MatchString(err.Error()) {
+		g.noStateReason.Store(true)
+		return call(g.issueFields())
+	}
+	return err
+}
 
 type ghIssue struct {
 	Number      int                      `json:"number"`
@@ -180,12 +208,14 @@ func (g *GitHub) IssuesInMilestone(ctx context.Context, title, state string) ([]
 }
 
 func (g *GitHub) Get(ctx context.Context, number int, withComments bool) (Issue, error) {
-	fields := ghFields
-	if withComments {
-		fields += ",comments"
-	}
 	var d ghIssue
-	if err := g.json(ctx, []string{"issue", "view", strconv.Itoa(number), "--json", fields}, &d); err != nil {
+	err := g.withIssueFields(func(fields string) error {
+		if withComments {
+			fields += ",comments"
+		}
+		return g.json(ctx, []string{"issue", "view", strconv.Itoa(number), "--json", fields}, &d)
+	})
+	if err != nil {
 		return Issue{}, err
 	}
 	is := d.norm()
@@ -213,15 +243,18 @@ func (g *GitHub) List(ctx context.Context, f ListFilter) ([]Issue, error) {
 	if state == "" {
 		state = "open"
 	}
-	args := []string{"issue", "list", "--state", state, "--json", ghFields}
-	for _, l := range f.Labels {
-		args = append(args, "--label", l)
-	}
-	if f.Milestone != "" {
-		args = append(args, "--milestone", f.Milestone)
-	}
 	var raw []ghIssue
-	if err := g.list(ctx, args, ghLimit, ghPaging, &raw); err != nil {
+	err := g.withIssueFields(func(fields string) error {
+		args := []string{"issue", "list", "--state", state, "--json", fields}
+		for _, l := range f.Labels {
+			args = append(args, "--label", l)
+		}
+		if f.Milestone != "" {
+			args = append(args, "--milestone", f.Milestone)
+		}
+		return g.list(ctx, args, ghLimit, ghPaging, &raw)
+	})
+	if err != nil {
 		return nil, err
 	}
 	out := []Issue{}

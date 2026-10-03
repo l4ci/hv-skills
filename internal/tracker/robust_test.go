@@ -419,3 +419,35 @@ func TestMissingLabelIsNotFound(t *testing.T) {
 		t.Fatalf("gitlab: %v", err)
 	}
 }
+
+// TestGitHubOldGhNoStateReason: gh 2.45 rejects the stateReason field. List
+// and Get retry without it, the reason reads as unknown, and later calls skip
+// the doomed first try.
+func TestGitHubOldGhNoStateReason(t *testing.T) {
+	const row = `{"number":3,"title":"t","body":"","labels":[],"milestone":null,"state":"CLOSED","closedAt":"2026-01-01T00:00:00Z","url":"u","assignees":[]}`
+	s := &scripted{answer: func(_ string, args []string) (string, string, int) {
+		if strings.Contains(strings.Join(args, " "), "stateReason") {
+			return "", "Unknown JSON field: \"stateReason\"\nAvailable fields:\n  assignees\n", 1
+		}
+		if args[1] == "list" {
+			return "[" + row + "]", "", 0
+		}
+		return row, "", 0
+	}}
+	a := newAdapter(t, "github", s)
+	ctx := context.Background()
+	got, err := a.List(ctx, ListFilter{State: "closed"})
+	if err != nil || len(got) != 1 || got[0].State != "closed" || got[0].StateReason != "" {
+		t.Fatalf("list: %+v, %v", got, err)
+	}
+	if len(s.calls) != 2 {
+		t.Fatalf("list calls %q, want a rejected try and a retry", s.calls)
+	}
+	is, err := a.Get(ctx, 3, false)
+	if err != nil || is.Number != 3 || is.State != "closed" {
+		t.Fatalf("get: %+v, %v", is, err)
+	}
+	if len(s.calls) != 3 || strings.Contains(s.calls[2], "stateReason") {
+		t.Fatalf("get should skip the rejected field, calls %q", s.calls)
+	}
+}
