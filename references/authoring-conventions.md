@@ -1,8 +1,6 @@
 # Authoring conventions
 
-These conventions constrain how new hv-skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `hv-*/SKILL.md` file. `hv-init/SKILL.md` cites this page; no other skill currently does, but new authoring rules land here, not inline.
-
-Cited by `hv-init/SKILL.md` (the canonical entry point for the convention set).
+These conventions constrain how new hv-skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `hv-*/SKILL.md` file. New authoring rules land here, not inline. The index in `references/README.md` is the entry point.
 
 ## Skills are self-contained — no shared contract file
 
@@ -46,7 +44,7 @@ Per-site shape (adapt phase list per skill):
 Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the situation is clear"* — don't qualify. When a phase genuinely produces a subjective state (a UX flow approval, a design pick), name the user action or recorded decision that captures the approval rather than the inner state. Skill authors picking a phase outcome should ask: *"what would I `grep` or `[ ]` test for, from the next session, to know this phase finished?"* If the answer is "nothing concrete", the phase is too vague to track.
 
 **Forbids.**
-- Adding the block to single-phase or trivial skills (Tier C: `hv-go`, `hv-update`) — the checklist UX is overhead when there's nothing to tick off.
+- Adding the block to single-phase or trivial skills (Tier C) — the checklist UX is overhead when there's nothing to tick off.
 - Placing it as a new `Step 1.5` — the decimal-step rule reserves those slots; this is content within Step 1.
 - Cross-skill alignment of phase names — each skill's phase list reflects its own structure; phrasing is local to the SKILL.md.
 - Calling `TaskCreate` from inside subagent dispatches — the orchestrator owns the task list; workers focus on their assigned tasks and report back.
@@ -57,7 +55,7 @@ Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the s
 - Phases that absorb decimal sub-steps (e.g. `/hv-work` 13.5/13.7 fold into one "post-cycle nudges" phase) — phase boundaries are coarser than step boundaries by design.
 - Tracking spawned waves as nested tasks via `addBlocks`/`addBlockedBy` when a skill orchestrates parallel work — `/hv-work` may use this for its dispatched waves.
 
-Codified from F37 (2026-05-10): rolled out across Tier S/A/B SKILL.md files (hv-init + 17 others). Tier C skills stay untouched. Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08): both make the host's UI primitives load-bearing for skill UX.
+Codified from F37 (2026-05-10): rolled out across Tier S/A/B SKILL.md files (17 skills). Tier C skills stay untouched. Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08): both make the host's UI primitives load-bearing for skill UX.
 
 ## Routine routing/tagging auto-picks Recommended in loop mode
 
@@ -65,23 +63,23 @@ When `autonomy.level == "loop"`, AskUserQuestion calls that present a single cle
 
 This is what makes loop mode actually loop — a single "Tag with M01?" or "Resume vs ship?" prompt mid-queue stalls every subsequent item until the user types an answer. Loop mode's contract is "drain the queue until empty / guard / interrupt"; intermediate routine prompts violate it.
 
-Routine = the kind of question where the Recommended option is the obvious right answer, not a design pick. Examples: milestone tagging (`/hv-capture` Step 4.5), sub-repo tagging (`/hv-capture` Step 4.6), reconcile resolution (`/hv-next` Step 2 — resume / ship / leave), CONCERNS routing (`/hv-ship` Step 3 — "Address via /hv-work"), refactor scope and candidate gates.
+Routine = the kind of question where the Recommended option is the obvious right answer, not a design pick. Examples: milestone tagging (`/hv-capture` Step 4.5), sub-repo tagging (`/hv-capture` Step 4.6), reconcile resolution (`/hv-work` no-argument mode, step 1 — resume / ship / leave), CONCERNS routing (`/hv-ship` Step 3 — "Address via /hv-work"), refactor scope and candidate gates.
 
 **Forbids.** Auto-picking on:
 - **Design decisions with open questions** — competing approaches, version-bump escalation, novel pattern choice. These belong to F32 (loop-mode auto-planning, with `[Auto:Loop]` decision logging). A `(Recommended)` flag on a design pick is a *suggestion*, not a routine answer; the loop must surface them.
 - **Manual gates that are never auto-invoked regardless of autonomy** — `/hv-decide` approvals, `/hv-learn` Step 8.5 issue filing, `/hv-learn` Step 9 runlog filing, `/hv-ship` Step 5 PR strategy, `/hv-release` push/publish gates. These have explicit `**Manual gate — ...**` callouts in their SKILL.md. Loop mode honors the gate — it does not auto-pick.
-- **Config-flip questions** — `/hv-init` initial setup, `/hv-config` edits, `/hv-ship --docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
+- **Config-flip questions** — `/hv-ship --docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
 
 **Permits.**
 - Routine routing/tagging with one clear Recommended option (the use cases listed above and any future analogue).
-- Sites that already implement the pattern explicitly (`/hv-next` Step 7 work-on-suggested-item, `/hv-update` Step 4 re-init) — same shape, already inline; new sites follow their lead.
+- Sites that already implement the pattern explicitly (`/hv-work` no-argument mode, step 4 confirm-the-suggested-item; `/hv-capture` Step 8 work-it-now hand-off) — same shape, already inline; new sites follow their lead.
 - Per-site phrasing variations — each site's loop branch states the auto-pick locally because the autonomy-rule-must-live-inline convention (above) forbids cross-refs to a single source of truth.
 
 The dispatch site should add a short loop branch alongside the existing `"off"` AskUserQuestion arm. Pattern (adapt phrasing per site):
 
 > **Loop mode:** when `autonomy.level == "loop"`, silently auto-pick the Recommended option without invoking AskUserQuestion — `<one-line summary of what gets dispatched>`.
 
-Codified after F33 caught loop-mode discontinuity from `/hv-capture` milestone tagging and `/hv-next` reconcile gates breaking the `/hv-work` → `/hv-learn` → `/hv-next` → `/hv-work` chain.
+Codified after F33 caught loop-mode discontinuity from `/hv-capture` milestone tagging and `/hv-work` no-argument reconcile gates breaking the `/hv-work` → `/hv-learn` → `/hv-work` chain.
 
 ## User-volition gates enforced at exactly one point
 
@@ -99,13 +97,13 @@ When scaling a feature surface from "single X" to "list of X" (e.g. one repo →
 
 When adding a new boolean config flag whose purpose is to enable additional skill behavior or auto-invocation:
 
-- **Default `false`** in both the FRESH write block and the STALE migration's setdefault.
+- **Default `false`** in the config defaults `hv init` writes (fresh and re-stamped projects alike).
 - **Never silently flip to `true`** anywhere — not on first detection, not on first invocation, not via cwd-inferred heuristics.
 - The owning skill flips the flag to `true` only via explicit user approval: first-run scaffold approval (the user opted in by approving), or `AskUserQuestion` on existing state with default "Leave off".
-- `/hv-config` edits the flag explicitly (the flag is never read-only).
+- `hv config set` edits the flag explicitly (the flag is never read-only).
 - **Exempt:** standard-on settings with opt-out semantics (e.g. `learn.verify: true`, `ship.review: true`) — these are not opt-in flags. Mode switches inside an already-enabled feature (e.g. `docs.autoCreate: false→true`) are also exempt.
 
-Codified after F15 introduced `docs.afterWork`. Without this rule, opt-in flags drift toward auto-flip-on-first-detect, which makes them on-by-default in practice — defeating the opt-in semantics. Mirror reminder lives in `hv-config/SKILL.md`.
+Codified after F15 introduced `docs.afterWork`. Without this rule, opt-in flags drift toward auto-flip-on-first-detect, which makes them on-by-default in practice — defeating the opt-in semantics.
 
 ## Dispatch heavy work to subagents
 
@@ -113,13 +111,12 @@ Skills MUST consult `references/subagent-dispatch.md` for any step involving ≥
 
 The reference defines the cost/benefit threshold, the small-brief template, the return-shape contract, the model-tier mapping (haiku / sonnet / opus), the parallel fan-out pattern (single-turn dispatch, worktree-isolation cross-cite), and the orchestrator's remaining responsibilities.
 
-Three retrofitted skills illustrate compliance:
+Two retrofitted skills illustrate compliance:
 
-- `hv-next` — Steps 2/3/4/6 dispatch as a single parallel wave (reconcile + archive + per-milestone summary + relevance queries) so the backlog rendering in Step 5 receives synthesis instead of raw helper output.
 - `hv-vision` — Step 2 bundles all context reads into one haiku worker that returns a compact snapshot; Step 4 fans out N parallel research workers (one per angle) instead of serial `WebSearch` calls on the orchestrator.
 - `hv-debug` — Step 5 dispatches reproduction to a sonnet worker when the repro is heavy (multi-MB output, multi-step manual setup, writing a failing test from scratch); Step 7 dispatches verification to a worker (model tier depends on whether the verdict requires judgment or pattern-matching). Cheap repros and single-line verifications stay inline.
 
-A skill author asking "what does compliance look like?" can read any one of the three retrofits and find a concrete answer for every rule in the reference. New skills follow the same pattern.
+A skill author asking "what does compliance look like?" can read either retrofit and find a concrete answer for every rule in the reference. New skills follow the same pattern.
 
 **Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the hv-skills dispatch discipline is self-contained.
 
@@ -152,7 +149,7 @@ Codified during the T52 sweep across `hv-debug`, `hv-release`, `hv-review`, `hv-
 - Chunking into multiple sequential `AskUserQuestion` calls with ≤4 options each, `multiSelect: true` so the user picks across batches.
 - Two-stage flow: pick categories first (single multiSelect, ≤4), then drill into the keys within each chosen category in a second call.
 
-Codified during the `/hv-config` Step 3 fix (B11) where a 13-key picklist silently fell back to free text; resolved with category-then-keys staging.
+Codified during the B11 fix where a 13-key config picklist silently fell back to free text; resolved with category-then-keys staging.
 
 ## Ask in the user's terms, and name the default
 
@@ -173,17 +170,17 @@ Codified from a read of klufft's `swarm.md` (hv-skills#20, 2026-07-31), whose or
 
 ## Nudges on terminal/idle paths only
 
-When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/hv-next` → `/hv-work` → `/hv-ship` → `/hv-next` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.
+When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/hv-work` → `/hv-ship` → `/hv-work` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.
 
 **Forbids.**
 - Firing the same nudge from a skill's tail when that skill auto-dispatches the next skill (the user never sees the message — it's overwritten by the dispatched skill's banner).
 - Firing the nudge from a dispatch path on the assumption *"users will see it eventually"* — they see the loudest, latest banner; intermediate nudges are noise.
 
 **Permits.**
-- Firing the nudge from the terminal branch of a routing skill (e.g. `/hv-next` Step 8 "Stop here" / empty-backlog) where the user is about to step away.
+- Firing the nudge from the terminal branch of a routing skill (e.g. `/hv-work` no-argument mode "Stop here" / empty-backlog) where the user is about to step away.
 - Firing the nudge from the post-ship report (`/hv-ship` Step 9.5) where the cycle ended and no auto-dispatch follows.
 
-Codified after F19's release-pending nudge: fires from `/hv-next` only on the "Stop here" / empty-backlog branch and from `/hv-ship`'s post-ship report, never from inside `/hv-work`'s tail (the most-frequent path, but always followed by a dispatch).
+Codified after F19's release-pending nudge: fires from `/hv-work` no-argument mode only on the "Stop here" / empty-backlog branch and from `/hv-ship`'s post-ship report, never from inside `/hv-work`'s tail (the most-frequent path, but always followed by a dispatch).
 
 ## The verb contract is the contract — SKILL.md prose paraphrasing drifts
 
@@ -211,7 +208,7 @@ When a SKILL.md extracts N≥4 sibling rules to a `references/` file, leave a on
 - For ≤3 extracted rules, citing the reference inline without an inventory (the rule names fit in the citing sentence).
 - Inventory tables with extra columns (audience, complexity, etc.) when those columns help readers triage.
 
-Codified on T39: `hv-init/SKILL.md` "Authoring conventions" H2 grew a 9-row inventory table beside its `references/authoring-conventions.md` citation; the inventory itself is what triggered this rule's codification.
+Codified on T39: a SKILL.md grew a 9-row inventory table beside its `references/authoring-conventions.md` citation; the inventory itself is what triggered this rule's codification.
 
 ## Avoid `&` in `TaskCreate`/`TodoWrite` payloads
 
@@ -226,7 +223,7 @@ Claude Code's TUI HTML-escapes task titles for rendering but never decodes — s
 - Topic headings like `## Build & Tooling` in `KNOWLEDGE.md` — those aren't TaskCreate payloads.
 - `+` as the connector where it reads naturally (e.g. *"Commit + TODO + smoke"*) — already used elsewhere; renders correctly.
 
-Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `hv-init`, `hv-ship`, `hv-review`, `hv-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.
+Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `hv-ship`, `hv-review`, `hv-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.
 
 ## `/hv-x` and `$hv-x` are the same invocation
 

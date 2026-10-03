@@ -1,6 +1,6 @@
 # Milestone tagging
 
-Used by `/hv-capture` Step 4.5. Single-consumer extraction — the reference exists for hv-capture's readability, not for cross-skill sharing. Future skills that capture-then-tag items would cite the same pattern.
+Used by `/hv-capture` Step 4.5. Single-consumer extraction, kept for hv-capture's readability.
 
 When `/hv-capture` produces new TODO items and there's at least one active milestone, the items get tagged into the active milestone via an `AskUserQuestion` flow.
 
@@ -32,13 +32,6 @@ hv milestone active --json
   2. *"None / unrelated — leave untagged"*
   3. *"Different milestone"* (free text — accepts any existing `M\d+`)
 
-## Caller cap (hv-go speed path)
-
-When the invoking args carry the `(hv-go — cap clarification at 1-2 questions)` prefix:
-
-- With one active milestone: auto-tag without asking — the speed path uses the obvious answer.
-- With multiple active milestones: the cap is **exempt for this single question** — silently skipping would orphan items from every milestone view, which is worse than spending one question. Ask the multi-active question above; it counts toward the cap budget, so spend remaining clarification budget carefully (often zero further questions).
-
 ## Loop mode
 
 When `autonomy.level == "loop"`:
@@ -46,7 +39,7 @@ When `autonomy.level == "loop"`:
 - With one active milestone: auto-pick *"Yes — tag all (Recommended)"* without invoking AskUserQuestion.
 - With multiple active milestones: auto-pick the first-listed milestone (the option marked `(Recommended)`).
 
-Honors the `hv-init` authoring convention "routine routing/tagging auto-picks Recommended in loop mode" — see `references/authoring-conventions.md` rule #5.
+Honors the authoring convention "routine routing/tagging auto-picks Recommended in loop mode" (`references/authoring-conventions.md` rule #5).
 
 ## Plain-text fallback
 

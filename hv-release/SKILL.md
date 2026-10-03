@@ -30,61 +30,35 @@ Read from `.hv/config.json` (all keys optional — defaults apply if absent):
 
 ## Step 1 — Guard
 
-Verify:
+Run each check; stop with a one-liner on failure.
 
-1. **Clean tree** — run `git status --porcelain`. If output is non-empty and `release.requireCleanTree` is `true` (default), stop: *"Working tree is dirty. Commit or stash changes first, or set `release.requireCleanTree: false`."* Show `git status -s` in the error.
-2. **On main/trunk** — `git rev-parse --abbrev-ref HEAD`. If not `main`, `master`, or `trunk`, stop with a one-liner.
-3. **HEAD pushed** — `git rev-parse HEAD` vs `git rev-parse @{u}`. If they differ, branch on `autonomy.level` from `.hv/config.json`:
+1. **Clean tree** — `git status --porcelain`. Non-empty and `release.requireCleanTree` true: stop, show `git status -s`, suggest commit/stash or `release.requireCleanTree: false`.
+2. **On trunk** — branch must be `main`, `master` or `trunk`.
+3. **HEAD pushed** — `git rev-parse HEAD` vs `@{u}`. A release ships the local commits, so unpushed commits are part of it, not an error. Branch on `autonomy.level`:
+   - `"auto"` or `"loop"` — count `git rev-list @{u}..HEAD --count`. Below `release.confirmLargePushCommits`: run `git push origin <current-branch>` silently and continue. At or above it, ask once whatever the autonomy: header `"Large push"`, *"<N> unpushed commits about to be pushed as part of this release. Continue?"*, options `Push and continue (Recommended)` / `Abort`.
+   - `"off"` — header `"Unpushed"`, *"HEAD has unpushed commits. Push them as part of this release?"*, options `Push and continue (Recommended)` / `Abort`.
+   - Plain-text fallback: *"Push and continue, or abort?"*
 
-   - `"auto"` or `"loop"` — count unpushed commits via `git rev-list @{u}..HEAD --count`.
-     - If the count is < `release.confirmLargePushCommits` (default 10), silently run `git push origin <current-branch>` and continue. A release intends to ship the local commits; an unpushed HEAD is part of the release, not a pre-flight error.
-     - If the count is ≥ `release.confirmLargePushCommits`, interject ONE `AskUserQuestion` regardless of autonomy:
-       - **Header:** `"Large push"`
-       - **Question:** *"<N> unpushed commits about to be pushed as part of this release. Continue?"*
-       - **Options:**
-         1. `"Push and continue (Recommended)"` — runs `git push origin <current-branch>`, then proceed
-         2. `"Abort"` — stop without writing anything
-       - Plain-text fallback: *"Push <N> commits and continue, or abort?"*
-   - `"off"` (default) — use `AskUserQuestion`:
-     - **Header:** `"Unpushed"`
-     - **Question:** *"HEAD has unpushed commits. Push them as part of this release?"*
-     - **Options:**
-       1. `"Push and continue (Recommended)"` — runs `git push origin <current-branch>`, then proceed
-       2. `"Abort"` — stop without writing anything
-     - Plain-text fallback: *"Push and continue, or abort?"*
+**Initialize task list.** Follow `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase:
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+1. *Guard* — clean tree, on trunk, HEAD pushed (Step 1)
+2. *Project checklist* — walk `.hv/RELEASE.md` items as gates (Step 2)
+3. *Bump version* — level chosen, version file and CHANGELOG written (Steps 4-5, 7-8)
+4. *Generate notes* — categorized notes drafted and approved (Steps 5-6)
+5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 9-10)
+6. *Publish* — remote release published if origin matches (Step 11)
+7. *Close upstream issues / milestone* — manual gate (Steps 12-13)
+8. *Post-release nudges* — summary + docs (Steps 14-15)
 
-Phases:
+`--dry-run` (any step): run the read-only verbs and the judgment questions, skip every write, commit, tag and push, and print what would happen instead.
 
-1. *Guard* — clean tree, on main, HEAD pushed (Step 1)
-2. *Project checklist* — walk `.hv/RELEASE.md` items as gates (Step 1.5)
-3. *Bump version* — version source detected and incremented (Steps 2–4)
-4. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
-5. *Tag & push* — annotated tag created, branch + tag pushed (Steps 8–12)
-6. *Publish* — `gh`/`glab` release published if origin matches (Step 13)
-7. *Close upstream issues / milestone* — manual gate to close any GH/GL issues still open for shipped items (Step 13.4)
-8. *Post-release nudges* — summary + autonomy-aware chaining (Step 14+)
+## Step 2 — Project Checklist
 
-## Step 1.5 — Project Checklist
+Per-project release steps (sibling version files, lockfiles, docs version refs, infra rollouts) live in `release.checklistPath`, tracked and shared with the team. The skill hardcodes none of them. Skip in `--dry-run`: print the parsed items and `DRY RUN — checklist walk skipped.`
 
-Per-project release steps that aren't (and shouldn't be) hardcoded into the skill — sibling version files, lockfiles, docs version refs, infra rollouts, anything project-specific. Lives in `release.checklistPath` (default `.hv/RELEASE.md`). Tracked by default — shared with the team like any other source file.
+**File absent.** `autonomy.level` `"auto"`/`"loop"`: skip silently; never interrupt an unattended run to scaffold. `"off"`: header `"Checklist"`, *"No `<release.checklistPath>` found. Scaffold a starter checklist now, or continue without?"*, options `Scaffold starter (Recommended)` (write the template, let the user edit, re-read, walk it) / `Continue without` (summary says *"no project checklist"*) / `Abort`. Plain-text fallback: *"Scaffold checklist, continue without, or abort?"*
 
-Skip the whole step in `--dry-run` mode (print the parsed items and `DRY RUN — checklist walk skipped.` instead).
-
-**File absent.** Branch on `autonomy.level` from `.hv/config.json`:
-
-- `"off"` (default) — `AskUserQuestion`:
-  - **Header:** `"Checklist"`
-  - **Question:** *"No `<release.checklistPath>` found. Scaffold a starter checklist now, or continue without?"*
-  - **Options** (single-select):
-    1. `Scaffold starter (Recommended)` — write the template below, open it for the user to edit, then re-read and walk it
-    2. `Continue without` — note it in the Step 14 summary as *"no project checklist"*; continue to Step 2
-    3. `Abort`
-  - Plain-text fallback: *"Scaffold checklist, continue without, or abort?"*
-- `"auto"` or `"loop"` — skip silently. No checklist means no gate; do not interrupt unattended runs to scaffold one.
-
-**Starter template** (write verbatim on Scaffold):
+Starter template:
 
 ```markdown
 # Release Checklist
@@ -98,319 +72,111 @@ Each `- [ ]` line is a gate `/hv-release` walks before bumping the version. Edit
 (Add project-specific items below.)
 ```
 
-**File present.** Parse every line matching `^\s*-\s+\[\s*\]\s+(.+)$` as a gate (in file order). Lines matching `- [x]` are skipped. If zero gates, print *"Checklist has no open items — continuing."* and proceed.
+**File present.** Every line matching `^\s*-\s+\[\s*\]\s+(.+)$` is a gate, in file order; `- [x]` lines are skipped. Zero gates: say *"Checklist has no open items — continuing."* For each gate:
 
-For each gate, branch on `autonomy.level`:
+- `"off"` — ask: header `"Checklist"`, *"Checklist item: \<text\>. Done?"*, options `Yes, continue (Recommended)` / `Fix it now and continue` (pause, re-ask the same item) / `Skip this item` (record `skipped: <text>`) / `Abort release` (*"Release aborted at checklist item: \<text\>. Nothing written."*). Plain-text fallback: *"Done, fix now, skip, or abort?"*
+- `"auto"`/`"loop"` — auto-acknowledge items not ending in `(manual)`; ask the `"off"` question for items that do, so sensitive items stay confirmed in unattended runs.
 
-- `"off"` — always interject:
-  - **Header:** `"Checklist"`
-  - **Question:** *"Checklist item: \<text\>. Done?"*
-  - **Options** (single-select):
-    1. `Yes, continue (Recommended)` — proceed to next item
-    2. `Fix it now and continue` — pause for the user; re-ask the same item afterward
-    3. `Skip this item` — note in the Step 14 summary as `skipped: <text>`
-    4. `Abort release` — stop with *"Release aborted at checklist item: \<text\>. Nothing written."*
-  - Plain-text fallback: *"Done, fix now, skip, or abort?"*
-- `"auto"` or `"loop"` — auto-acknowledge items whose text does **not** end with `(manual)`; interject (using the off-mode prompt above) for items that do. This lets users mark sensitive items (`Push staging migration (manual)`) as always-confirmed even in unattended runs.
+## Step 3 — Milestone Gate (issue mode)
 
-After all gates pass, continue to Step 2.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): pick the milestone. `--milestone MNN` wins; else the single one from `hv milestone active`. Several active: `AskUserQuestion` (plain-text fallback: list the IDs); under `autonomy.level: "loop"`, stop unless exactly one is active. Then `hv release milestone-check <MNN> --json`.
 
-## Step 1.6 — Milestone Gate (issue mode)
+Exit 1 means blocked: show each `data.blocked` entry (open issues labelled `in-progress`, `needs-review` or `changes-requested`) and stop. `data.stillOpen` entries do not block; show them and continue. Other exits (2, 3, 4, 5, 6): stop and report the verb's message.
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): pick the milestone to release. `--milestone MNN` wins; otherwise the single milestone from `hv milestone active`. With several active, `AskUserQuestion` (plain-text fallback: list the IDs). Under `autonomy.level: "loop"`, stop unless exactly one is active. Then:
+**Umbrella** (`hv repo umbrella` exits 0): releases run per sub-repo. Pass `--repo <name>` to `release milestone-check`, `release notes --from issues` and `release close-milestone`; without it they exit 2. The milestone reads `shipped` only once every sub-repo's milestone MNN is closed.
 
-```bash
-hv release milestone-check <MNN> --json
-```
+## Step 4 — Version and Bump Level
 
-Exit 0: clear. Exit 1: blocked; each `data.blocked` entry (`number`, `title`, `label`) is an open issue labelled `in-progress`, `needs-review` or `changes-requested`. Show them and stop. `data.stillOpen` entries (other open issues) do not block; show them and continue. Exit 2: umbrella root without `--repo`; 3: unknown milestone; 4: file mode (the gate is issue-only); 5: tracker unavailable; 6: rate-limited: stop and report.
+`hv release version --json` gives `data` `{file, version, kind}`. Exit 3 (no version file or unparsable): surface the message and tell the user to set `release.versionFile` in `.hv/config.json`.
 
-**Umbrella** (`hv repo umbrella` exits 0): releases run per sub-repo. Pass `--repo <name>` to `hv release milestone-check`, `hv release notes --from issues` (Step 6) and `hv release close-milestone` (Step 13.3); without it they exit 2. The milestone reads `shipped` only once every sub-repo's native milestone MNN is closed.
+Accept a bump arg if given: `major`, `minor`, `patch` or an explicit `X.Y.Z`.
 
-## Step 2 — Detect Version Source
+With no arg, get the previous tag (`git describe --tags --abbrev=0 2>/dev/null || true`; empty means full history, note it in the summary), run `hv release notes --from commits [--since <prev-tag>]` and read the bucket headings: `Breaking` recommends `major`, `New` recommends `minor`, otherwise `patch`. Ask: header `"Bump type"`, *"Current version: `<current>`. What bump type?"*, options `patch — <current> → <X.Y.Z+1>` / `minor — … → <X.Y+1.0>` / `major — … → <X+1.0.0>` (mark the recommended one) / `Explicit version` (exact string via Other) / `Abort`. Plain-text fallback: *"Bump type? (major / minor / patch / X.Y.Z / abort)"*
 
-```bash
-hv release version --json
-```
+Compute the new version read-only: `hv release version --json --level <patch|minor|major>` (or `--to <X.Y.Z>`); `data.next` is `new_version`. An invalid or not-greater `--to` exits 1: surface it and stop.
 
-Read `data` `{file, version, kind}`:
+If `Breaking` commits were found but the user chose `patch` or `minor`, ask before continuing: header `"Escalate"`, *"Commits contain `BREAKING CHANGE:` footers but bump type is `<chosen>`. Escalate to major?"*, options `Escalate to major (Recommended)` / `Keep <chosen>` / `Abort`. Plain-text fallback names the Recommended default on ambiguity (`references/ask-user-question-fallback.md`).
 
-- `file` — absolute path to the version-bearing file
-- `version` — current semver string (e.g., `1.10.0`)
-- `kind` — `plugin-json` | `package-json` | `pyproject` | `cargo` | `plain`
+## Step 5 — Generate Release Notes
 
-If exit 3 (no version file found, or it cannot be parsed), surface the message verbatim and stop. To disambiguate, tell the user to set `release.versionFile` in `.hv/config.json`.
+`hv release notes --from commits [--since <prev_tag>]` returns categorized Markdown (merges filtered). In issue mode use `hv release notes --from issues <MNN> [--since <prev_tag>]` instead. Exit 3/4/5/6: stop and report. The verb categorizes; editorial work is yours:
 
-## Step 3 — Determine Bump Type
+- **Compact dense buckets.** A bucket with 3+ entries on one feature or concern (7 `feat:` commits on one new skill) becomes one summary line for the theme, plus at most 1-2 bullets for the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets under 3 stay as-is.
+- **Stats.** Replace the verb's `## Stats` with `## Stats\n<N commits, M files changed, +X −Y lines>` from `git diff --shortstat <prev_tag>..HEAD` (drop `<prev_tag>..` with no previous tag).
+- **Compare link.** With a previous tag, `hv release host --json` `data.host` picks the URL: `github`/`github-enterprise` → `https://<host>/<owner>/<repo>/compare/<prev_tag>...v<new_version>`; `gitlab`/`gitlab-self-hosted` → `https://<host>/<owner>/<repo>/-/compare/<prev_tag>...v<new_version>`. Append `**Full changelog:** <url>`. Host `none` or no previous tag: omit.
+- **One-line summary.** Prepend one line on the top 2-3 themes. It becomes the release title suffix in Step 11.
 
-Accept an arg if the user supplied one: `major`, `minor`, `patch`, or an explicit `X.Y.Z` string. Also accept `--dry-run` flag — run all steps but skip all writes, commits, tags, and pushes; print what would happen.
+Notes ship to GitHub/GitLab and live in CHANGELOG.md. Before showing the draft, silently apply the rules in `references/humanizing-prose.md` to all model-written prose; the user sees the post-audit draft.
 
-If no arg, first generate the commit-range preview for a recommendation:
+## Step 6 — Review Notes
+
+Show the full draft, then ask: header `"Notes"`, *"Release `v<new_version>` — notes look good? Yes pushes the tag and publishes the release."*, options `Looks good (Recommended)` / `Edit` (replacement text via Other replaces the draft verbatim; re-display it, one edit pass, no second prompt) / `Abort release` (*"Release aborted. Nothing written."*). Plain-text fallback: *"Proceed, edit, or abort?"*
+
+This answer is the human approval for Steps 10 and 11. Keep it verbatim as `$APPROVAL` (the option label, or the replacement text's first line after Edit) for `--confirm-note`. Never auto-pick this question in any autonomy mode.
+
+Write the approved notes to `NOTES_FILE=$(mktemp /tmp/hv-release-notes.XXXXXX.md)`.
+
+## Step 7 — Write Version File and CHANGELOG
 
 ```bash
-hv release notes --from commits --since <prev-tag>
-```
-
-Scan output for bucket headings:
-- `Breaking` heading present → recommend `major`
-- `New` heading present (no Breaking) → recommend `minor`
-- else → recommend `patch`
-
-Then use `AskUserQuestion`:
-- **Header:** `"Bump type"`
-- **Question:** *"Current version: `<current>`. What bump type?"*
-- **Options** (single-select, mark recommended):
-  1. `patch — <current> → <X.Y.Z+1>` (mark Recommended if applicable)
-  2. `minor — <current> → <X.Y+1.0>`
-  3. `major — <current> → <X+1.0.0>`
-  4. `Explicit version` — prompt for the exact string via Other
-  5. `Abort`
-
-Plain-text fallback: *"Bump type? (major / minor / patch / X.Y.Z / abort)"*
-
-If the user picks explicit, validate: must be valid semver and strictly greater than current. If invalid, stop with an error.
-
-## Step 4 — Compute New Version
-
-Compute the next version read-only so it has one source of truth — Step 8 writes the file with the same arguments.
-
-```bash
-hv release version --json --level <patch|minor|major>   # or: --to <X.Y.Z>
-```
-
-`data.next` is the new version. `--to` must be bare `X.Y.Z` and strictly greater than the current version; if it is not, the verb exits 1 with a message — surface it and stop.
-
-Store `new_version` for use in Steps 6, 7, 8, 9, 10, 11, 12, 13, 14.
-
-If BREAKING CHANGE commits were detected (Step 3 scan) but the user chose `patch` or `minor`, interject with `AskUserQuestion` before continuing:
-- **Header:** `"Escalate"`
-- **Question:** *"Commits contain `BREAKING CHANGE:` footers but bump type is `<chosen>`. Escalate to major?"*
-- **Options:** `Escalate to major (Recommended)` / `Keep <chosen>` / `Abort`
-- Plain-text fallback: *"Escalate to major, keep <chosen>, or abort?"* — default to Recommended (Escalate to major) on ambiguity, naming it explicitly. See `references/ask-user-question-fallback.md`.
-
-## Step 5 — Detect Previous Tag
-
-```bash
-git describe --tags --abbrev=0 2>/dev/null || true
-```
-
-If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this in the Step 14 summary. If a tag exists, set `prev_tag = <value>` and `range = <prev_tag>..HEAD`.
-
-## Step 6 — Generate Release Notes
-
-```bash
-hv release notes --from commits [--since <prev_tag>]
-```
-
-Captures categorized Markdown (buckets in verb order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the verb. No `--since` means all history.
-
-**Issue mode:** build the notes from the milestone's issues instead:
-
-```bash
-hv release notes --from issues <MNN> [--since <prev_tag>]
-```
-
-It emits `### New` (features), `### Fixed` (bugs) and `### Changed` (tasks) with lines `- <Title> (#<n>)` (closed-as-completed issues only) and `### Other` (commit subjects with no item reference). Exit 4 is file mode, 5 and 6 are tracker failures, 3 is an unknown milestone or `--since` ref. Compaction, stats and compare URL below apply unchanged.
-
-**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1–2 bullets naming the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The verb's job is the raw categorization; *editorial collapse is yours*.
-
-Append stats line — run:
-
-```bash
-git diff --shortstat <prev_tag>..HEAD   # omit <prev_tag>.. when no previous tag
-```
-
-Format as `## Stats\n<N commits, M files changed, +X −Y lines>`.
-
-Build compare URL (only when `prev_tag` is non-empty):
-
-```bash
-hv release host --json
-```
-
-`data.host` is one of:
-
-- `github` or `github-enterprise` → `https://<host>/<owner>/<repo>/compare/<prev_tag>...v<new_version>`
-- `gitlab` or `gitlab-self-hosted` → `https://<host>/<owner>/<repo>/-/compare/<prev_tag>...v<new_version>`
-- `none` → omit compare URL
-
-Append `**Full changelog:** <compare-url>` to the notes (or omit if no prev tag or no host).
-
-Prepend a model-written one-line summary scoped to the top 2-3 themes from the buckets. This summary also becomes the release title suffix in Step 13.
-
-**Run the self-audit before Step 7 displays the draft.** Compact bucket summaries, the prepended one-line summary, and any other model-written prose in the notes are user-facing artifacts that ship to GitHub/GitLab and live in CHANGELOG.md indefinitely. Apply the rule sheet and self-audit pass in `references/humanizing-prose.md` to the assembled notes silently — the user sees the post-audit draft, not the pre-audit one.
-
-## Step 7 — Review Notes
-
-Display the full notes draft to the user, then use `AskUserQuestion`:
-
-- **Header:** `"Notes"`
-- **Question:** *"Release `v<new_version>` — notes look good? Yes pushes the tag and publishes the release."*
-- **Options** (single-select):
-  1. `Looks good (Recommended)`
-  2. `Edit` — accept replacement text via Other (free-text replaces the draft verbatim)
-  3. `Abort release`
-
-Plain-text fallback: *"Proceed, edit, or abort?"*
-
-If the user picks **Edit**, accept the replacement text and store it. Re-display the edited notes before continuing (no second prompt — one edit pass only).
-
-If the user picks **Abort**, stop with one line: *"Release aborted. Nothing written."*
-
-This answer is the human approval for Steps 12 and 13. Keep it verbatim as `$APPROVAL` (the option label, or the replacement text's first line after **Edit**) for their `--confirm-note`. Never auto-pick this question in any autonomy mode.
-
-Write the (possibly edited) notes to a temp file:
-
-```bash
-NOTES_FILE=$(mktemp /tmp/hv-release-notes.XXXXXX.md)
-```
-
-## Step 8 — Update Version File
-
-```bash
-hv release bump --json --level <patch|minor|major>   # or: --to <X.Y.Z>
-```
-
-Same level or version as Step 4; this writes the file. Pass `--file <path> --kind <kind>` only to override Step 2's detection. Assert `data.to == new_version`; if they diverge, stop with an error (the file may be partially modified — surface the discrepancy and let the user investigate).
-
-Skip in the skill's `--dry-run` mode; print what would be written instead.
-
-## Step 9 — Update CHANGELOG.md
-
-```bash
+hv release bump --json --level <patch|minor|major>   # or --to <X.Y.Z>; same arguments as Step 4
 hv release changelog <new_version> --body-file "$NOTES_FILE" [--path <release.changelogPath>]
 ```
 
-If exit 4 (version section already exists), surface the error and stop — do not proceed to commit.
+If `data.to` differs from `new_version`, stop: the file may be partly modified, so surface the discrepancy for the user. Changelog exit 4 (section already exists): stop before committing. Skipped in `--dry-run`.
 
-Skip in `--dry-run` mode; print what would be prepended instead.
+## Step 8 — Commit
 
-## Step 10 — Commit
+`git add <version-file> <release.changelogPath>` then `git commit -m "chore: release v<new_version>"`. Skipped in `--dry-run`.
 
-```bash
-git add <version-file> <release.changelogPath>
-git commit -m "chore: release v<new_version>"
-```
+## Step 9 — Tag
 
-Skip in `--dry-run` mode.
+`git tag -s` if `git config --get user.signingkey` is set, else `-a`: `git tag [-a|-s] v<new_version> -F "$NOTES_FILE"`. Skipped in `--dry-run`; print the command.
 
-## Step 11 — Tag
+## Step 10 — Push
 
-Check whether `user.signingkey` is set:
-
-```bash
-git config --get user.signingkey 2>/dev/null
-```
-
-If set, use `git tag -s`; otherwise `git tag -a`:
-
-```bash
-git tag [-a|-s] v<new_version> -F "$NOTES_FILE"
-```
-
-Skip in `--dry-run` mode; print the tag command that would run.
-
-## Step 12 — Push
-
-`hv release push` enforces the `tag-push` manual gate (`hv gate list`): it exits 4 without `--confirm`, at every autonomy level. Pass Step 7's answer:
+> **Manual gate — pushing the release tag.** The remote tag is public and hard to retract. This step always asks, in every autonomy mode; loop mode does not accelerate it. `hv release push` enforces the `tag-push` gate (exit 4 without `--confirm`). Step 6's answer is the approval. See `references/manual-gates.md`.
 
 ```bash
 hv release push <new_version> --json --confirm --confirm-note "$APPROVAL"
 ```
 
-One push carries both the commit and the tag. On exit 3 (no origin) or 5 (push failed), stop; the error names the tag SHA for manual recovery.
+One push carries the commit and the tag. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
 
-Skip in `--dry-run` mode.
+## Step 11 — Publish Remote Release
 
-## Step 13 — Create Remote Release
-
-`hv release publish` enforces the `release-publish` manual gate the same way. It picks `gh` or `glab` from the origin host, and publishes nothing (exit 0, `changed: false`) when origin is neither:
+> **Manual gate — publishing the release.** Same rule: always asks, loop mode does not accelerate it. `hv release publish` enforces the `release-publish` gate and reuses Step 6's answer.
 
 ```bash
 hv release publish <new_version> --json --title "v<new_version> — <one-line summary>" \
   --body-file "$NOTES_FILE" [--draft] --confirm --confirm-note "$APPROVAL"
 ```
 
-Add `--draft` when `release.draft` is true and the host is GitHub; GitLab has no draft releases and refuses it (exit 2). `data.url` goes into the Step 14 summary. If `gh` or `glab` is missing (exit 5), print the error and continue: the tag is already public.
+Add `--draft` when `release.draft` is true and the host is GitHub (GitLab refuses it). Origin on neither host: the verb publishes nothing (`changed: false`) and the summary says `skipped`. `data.url` goes in the summary. Exit 5 (`gh`/`glab` missing): print the error and continue; the tag is already public. Skipped in `--dry-run`; print the command.
 
-Skip the whole step in `--dry-run` mode; print the `hv release publish` command that would run.
+## Step 12 — Close Out the Milestone (issue mode)
 
-## Step 13.3 — Close Out the Milestone (issue mode)
+After Steps 10 and 11, `hv release close-milestone <MNN> --release <new_version> [--repo <name>]` (bare `X.Y.Z`). It marks the milestone's completed issues `released`, closes the milestone and sets it `shipped`; tell the user `data.issues`. Exit 2-6: report the message. Skipped in `--dry-run`. Step 13 does not apply: the tracker is the backlog, nothing is imported.
 
-**Issue mode:** after the tag is pushed (Step 12) and the remote release is handled (Step 13), behind the same manual gates:
+## Step 13 — Close Upstream Issues
 
-```bash
-hv release close-milestone <MNN> --release <new_version>
-```
+Closes upstream issues that shipped in this release but stayed open: work pushed straight to main, or `/hv-ship` chose "leave open". Same shape as `/hv-ship` Step 6c, scoped to the release range. Skip in `--dry-run`.
 
-`--release` is the bare `X.Y.Z`; the verb derives the tag. Labels each completed issue `released` with the comment `Released in <tag>`, closes the native milestone and sets its status `shipped`. Idempotent; `data.issues` counts the issues touched. Exit 2: umbrella root without `--repo`; 3: unknown milestone; 4: file mode; 5 and 6: tracker failures. Skip in `--dry-run`. Step 13.4 below does not apply: the tracker is the backlog and `hv issues imported` has nothing to list.
+`hv issues imported --json --open-only` lists candidates (already-closed or unresolvable ones are dropped). Empty `data.entries`: skip silently.
 
-## Step 13.4 — Close Upstream Issues
+> **Manual gate — closing public upstream issues.** Closing posts a tracking comment and changes issue state on the remote, visible to others. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`; loop mode stops here and waits for the user. The release already published; this decides whether to close the issues too. See `references/manual-gates.md`.
 
-Mirrors `/hv-ship` Step 6c, scoped to the whole release range rather than a single ship cycle. Closes upstream issues that landed in this release but stayed open because the work was pushed directly to main (skipping `/hv-ship` entirely) or because `/hv-ship` chose "leave open" at the time.
+Ask (single-select): header `"Close"`, *"Close N upstream issue(s) released in `v<new_version>`? (`<#N list>`)"*, options `Yes, close all` / `Pick subset` / `No, leave open`.
 
-Skip the whole step in `--dry-run` mode (nothing was actually tagged or pushed).
+- **Close all:** run `hv issues close <N> --commit <release-commit-sha> --item <ID> [--repo <name>]` per candidate, in one parallel batch. `--repo` only for entries with a non-null `repo`.
+- **Pick subset:** multiSelect `AskUserQuestion` (header `"Pick issues"`, *"Which issue(s) should be closed?"*, options `"#N (item <ID>)"`, chunk at 4), then close the selection as above.
+- **Leave open:** print *"Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired."*
 
-**1. List candidates.**
+## Step 14 — Docs Nudge
 
-```bash
-hv issues imported --json --open-only
-```
+Read `docs.afterWork` (default `false`); if false, skip. When on, a release is a natural docs trigger: notes and CHANGELOG often imply README, guide or reference updates. Skip in `--dry-run`; once per session. `"off"`: append to the summary *"Release shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."* `"auto"`/`"loop"`: dispatch `hv-ship --docs` via `Skill` immediately, no prompt, with a brief naming the version, bump type and the one-line summary. `/hv-ship` self-skips if the docs path is missing or empty. Users opt in with `hv config set docs.afterWork true` or one manual `/hv-ship --docs`.
 
-The `--open-only` flag drops entries whose upstream issue is already closed (or whose state can't be resolved — missing CLI, deleted issue), so the gate only surfaces issues still actually open. If `data.entries` is empty, skip the rest of this step silently.
-
-**2. Manual gate.**
-
-> **Manual gate — closing public upstream issues.** Closing the issues posts a tracking comment and changes their state on the remote — externally-visible. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The release already published; this step decides whether to close the upstream issues too. See `references/manual-gates.md`.
-
-**3. Ask the user.**
-
-Invoke `AskUserQuestion` (single-select, ≤4 options):
-
-- Header: `"Close"`
-- Question: *"Close N upstream issue(s) released in `v<new_version>`? (`<comma-separated list of #N>`)"*
-- Options: `"Yes, close all"`, `"Pick subset"`, `"No, leave open"`
-
-This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
-
-**4. On "Yes, close all":** dispatch parallel `hv issues close` calls (one per candidate, all in a single batch of tool calls), passing the release commit SHA from Step 10:
-
-```bash
-hv issues close <N> --commit <release-commit-sha> --item <ID> [--repo <name>]
-```
-
-Pass `--repo` only for entries whose `repo` field is non-null (umbrella mode).
-
-**5. On "Pick subset":** invoke a second `AskUserQuestion` (multiSelect, ≤4 candidates per call; chunk if N>4):
-
-- Header: `"Pick issues"`
-- Question: *"Which issue(s) should be closed?"*
-- Options: one entry per candidate formatted as `"#N (item <ID>)"`
-
-Then dispatch parallel `hv issues close` calls for each selected entry as in step 4.
-
-**6. On "No, leave open":** print:
-
-```
-Skipping upstream issue close — N issue(s) left open. Run `gh issue close <N>` / `glab issue close <N>` manually if desired.
-```
-
-## Step 13.5 — Docs After-Work (Nudge or Auto-Invoke)
-
-Read `docs.afterWork` from `.hv/config.json` (default `false`). If it's `false`, skip this step entirely. Users opt in via `/hv-config` or by running `/hv-ship --docs` manually once.
-
-When the flag is on, a release is a natural docs trigger — release notes and CHANGELOG entries are user-facing artifacts that often imply other docs (READMEs, getting-started guides, reference pages) need a refresh. Skip in `--dry-run` mode. Don't repeat in the same session.
-
-When triggered, branch on `autonomy.level`:
-
-- `"off"` — append one line to the Step 14 summary — *"Release shipped. Run `/hv-ship --docs` to review and update public docs (after-work mode)."*
-- `"auto"` or `"loop"` — **dispatch `hv-ship --docs` via `Skill` immediately — no prompt, no confirmation, no "want me to" question.** Pass a brief naming the new version, the bump type, and a one-line summary of what shipped (from Step 6's release notes title).
-
-If `<docs.path>/` doesn't exist or is empty, `/hv-ship`'s Docs Mode after-work flow self-skips (printing a one-line "not yet initialized" notice) — no extra check needed here.
-
-## Step 14 — Summary
-
-Print one compact block:
+## Step 15 — Summary
 
 ```
 Released v<new_version>
@@ -422,35 +188,27 @@ Released v<new_version>
   [No previous tag — full history used as range.]   ← only when no prev tag
 ```
 
-If any checklist items were skipped, append a `Skipped checklist items:` block listing each on its own line.
-
-In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
+List skipped checklist items under `Skipped checklist items:` so the release record is honest. In `--dry-run`, prefix the block with `DRY RUN — no changes written.`
 
 ## Edge Cases
 
-- **No previous tag** — full history range; add the one-liner to the Step 14 summary. Omit compare URL from notes.
-- **Multiple version files** — currently first-match wins; set `release.versionFile` in `.hv/config.json` to pin the file explicitly.
-- **Working tree dirty** — fail at Step 1 unless `release.requireCleanTree: false`; show `git status -s` in the error message.
-- **BREAKING CHANGE with patch/minor bump** — escalate via `AskUserQuestion` in Step 4 before any writes.
-- **`gh`/`glab` not installed but origin matches** — fail at Step 13 *after* tag push; `hv release publish` exits 5; print recovery: re-run it once the CLI is installed (`hv release publish <X.Y.Z> --title … --body-file <path> --confirm --confirm-note "<answer>"`) and the push-delete command to revert the tag if needed: `git push --delete origin v<X.Y.Z>`.
-- **No origin** — Step 13 silently skipped; tag and CHANGELOG still committed locally.
-- **CHANGELOG section already exists for this version** — helper exits 1 at Step 9; surface the error and stop.
-- **Existing CHANGELOG.md without `# Changelog` header** — helper preserves existing content; inserts after H1 if present, else prepends.
-- **Compare URL when no previous tag** — omit the `Full changelog:` line from the notes.
-- **Checklist absent in `auto`/`loop`** — silently skip Step 1.5; do not interrupt unattended runs to scaffold. The Step 14 summary notes *"no project checklist"*.
-- **Checklist item user-skipped** — proceed, but list the skipped text under `Skipped checklist items:` in the Step 14 summary so the release record is honest.
+- **Multiple version files** — first match wins; pin with `release.versionFile`.
+- **`gh`/`glab` missing but origin matches** — Step 11 fails after the tag push. Recovery: install the CLI and re-run `hv release publish <X.Y.Z> --title … --body-file <path> --confirm --confirm-note "<answer>"`; to revert the tag, `git push --delete origin v<X.Y.Z>`.
+- **No origin** — push exits 3; publish is skipped. Tag and CHANGELOG stay committed locally.
+- **CHANGELOG without a `# Changelog` header** — the verb keeps existing content and inserts after the H1 if present, else prepends.
 
 ## Rules
 
-- Never bump without an explicit user-confirmed bump type.
-- Never push the tag without the user reviewing and approving release notes (Step 7).
-- Never duplicate a CHANGELOG section — the helper enforces this; stop if it exits 1.
-- Atomic writes only — all file mutations go through the helpers which use atomic write semantics.
-- Surface failures from any helper immediately; do not continue past a non-zero exit.
-- `--dry-run` skips all writes, commits, tags, and pushes — output shows what would happen.
-- Never hardcode project-specific release steps into the skill — they live in `release.checklistPath` per project. Step 1.5 walks the file; the skill itself stays generic.
+- Never bump without a user-confirmed bump type.
+- Never push the tag without the user approving the release notes (Step 6).
+- Stop on any non-zero verb exit you have no branch for; do not continue past it.
+- Never hardcode project-specific release steps here; they live in `release.checklistPath`.
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/manual-gates.md`](../references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
+- [`references/task-list-init.md`](../references/task-list-init.md) — Task-list init pattern.
+- [`references/issue-mode.md`](../references/issue-mode.md) — Issue-mode milestones and release.
+- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback rule.
+- [`references/humanizing-prose.md`](../references/humanizing-prose.md) — Self-audit for model-written notes.

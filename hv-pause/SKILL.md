@@ -1,6 +1,6 @@
 ---
 name: hv-pause
-description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so /hv-next in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
+description: Gracefully pause mid-session — writes a handoff note (current hypothesis, next planned step, mid-edit files, uncommitted work strategy) to .hv/handoff/<branch>.md so `/hv-work` with no argument in a fresh session can pick up with full context, not just git state. Use when the session is approaching a context limit, you need to hand off, or you want to stop a long /hv-work cycle cleanly.
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
@@ -8,13 +8,13 @@ description: Gracefully pause mid-session — writes a handoff note (current hyp
 ```
 ════════════════════════════════════════════════════════════════════════
   💤  hv-pause  ·  write handoff note for clean pause
-  triggers: "pause", "hand off"  ·  pairs: hv-next, hv-learn
+  triggers: "pause", "hand off"  ·  pairs: hv-work, hv-learn
 ════════════════════════════════════════════════════════════════════════
 ```
 
 # hv-pause — Graceful Session Pause
 
-`/hv-next` reads and deletes the handoff note on the next session.
+`/hv-work` with no argument reads the handoff note on the next session; the note goes away when that stream is resumed or abandoned (`hv status rm` deletes it).
 
 ## When to Use
 
@@ -30,101 +30,58 @@ description: Gracefully pause mid-session — writes a handoff note (current hyp
 
 ## Step 1 — Task List
 
-**Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
+**Initialize task list.** Follow `references/task-list-init.md` (load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed), one task per phase:
 
-Phases:
-
-1. *Snapshot context* — current hypothesis, next planned step, mid-edit files captured (Step 2)
-2. *Compose handoff* — narrative drafted for `/hv-next` to surface on resume (Step 3)
-3. *Write to .hv/handoff/* — file persisted under the active branch's name (Step 4)
-4. *Report* — compact handoff summary printed (Step 5)
+1. *Resolve pause set* — which `(branch, repo)` entries (Step 2)
+2. *Handle uncommitted work* — user picks a strategy (Step 3)
+3. *Write handoff* — one note per entry, status pinned (Steps 4-5)
+4. *Report* — surface `[Auto:Loop]` decisions, confirm (Steps 6-7)
 
 ## Step 2 — Resolve the Pause Set
 
-Determine the set of `(branch, repo)` entries to pause. The set has size 1 for single-repo cycles or scoped umbrella pauses; size ≥ 2 when one `/hv-work` wave fanned out across sub-repos and the user wants to pause it as one logical unit.
+The pause set is the `(branch, repo)` entries to pause: one for a single-repo cycle or a scoped umbrella pause, two or more when one `/hv-work` wave fanned out across sub-repos.
 
-1. Read `.hv/status.json` and find active streams whose `branch` matches the current branch.
-2. **Exactly one match** — pause set is that single `(branch, repo)` entry (`repo` may be `null` for non-umbrella entries).
-3. **Multiple matches** (a multi-repo `/hv-work` wave). Run `hv repo which` from the current cwd:
-   - **cwd resolves to a registered sub-repo** (exit 0) — pause set is the single matching `(branch, repo)` entry. The user explicitly scoped to one repo by `cd`-ing there; the other entries stay active.
-   - **cwd doesn't resolve** (exit 3: umbrella root or outside any sub-repo) — pause set is **all** matching entries, treated as one logical wave. Do not raise an `AskUserQuestion` — entries from a single `/hv-work` wave are paused together.
-4. **No match** — fall back to `git rev-parse --abbrev-ref HEAD` for the branch and pause set is `[(branch, null)]` (covers running `/hv-pause` before any `/hv-work` registered status).
-5. If the resolved branch is the project base (run `hv git guard feature-branch <branch>` and check exit 1), tell the user there's no feature work to pause and stop.
-
-Steps 3–6 below operate on the pause set: single-entry sets keep today's behavior byte-for-byte; multi-entry wave sets loop the per-repo work and emit a single combined confirmation in Step 6.
+1. `hv status show`: take the active streams whose `branch` matches the current branch. One match is the pause set (`repo` may be null).
+2. Several matches: run `hv repo which`. Exit 0 means the user `cd`-ed into one sub-repo, so pause only that entry. Exit 3 (umbrella root) means pause all matches as one wave. Do not ask which repo.
+3. No match: use `git rev-parse --abbrev-ref HEAD` and pause `[(branch, null)]`, covering `/hv-pause` before `/hv-work` registered status.
+4. `hv git guard feature-branch <branch>` exiting 1 means the base branch: tell the user there is no feature work to pause and stop.
 
 ## Step 3 — Handle Uncommitted Work
 
-For each `(branch, repo)` in the pause set, resolve the working directory:
+Check each entry's tree with `git -C <path> status --porcelain` (path from `hv repo resolve <repo> --json`, `data.repos[0].path`; cwd when `repo` is null).
 
-- `repo == null` → run from current cwd.
-- `repo != null` → use the sub-repo's absolute path (`hv repo resolve <repo> --json` returns it as `data.repos[0].path`).
+All clean: record `clean tree` and continue. Any dirty: ask once via `AskUserQuestion`, following `references/ask-user-question-fallback.md`:
 
-Run the status check in each working directory:
+- **Header:** `"Uncommitted"`
+- **Question:** *"N uncommitted files on `<branch>`. How should I handle them?"* For a wave, name the dirty repos instead of N.
+- **Options** (single-select):
+  1. "WIP commit (Recommended)" — *"`git add -A && git commit -m 'wip: pause before context cutoff'` — keeps changes on the branch."*
+  2. "Stash" — *"`git stash push -u -m 'hv-pause <branch>'` — keeps changes out of history."*
+  3. "Leave in place" — *"No action; the handoff will note that the tree is dirty."*
 
-```bash
-git -C <path> status --porcelain
-```
-
-For a single-entry set this is identical to today's `git status --porcelain` from cwd.
-
-- **All entries clean** → continue to Step 4 with `clean tree` artifact for every entry.
-- **Any entry dirty** → ask once via `AskUserQuestion`:
-  - **Header:** `"Uncommitted"`
-  - **Question (single-entry set):** *"N uncommitted files on `<branch>`. How should I handle them?"*
-  - **Question (wave set):** *"Uncommitted files on `<branch>` in `<repo-a>`, `<repo-c>`. How should I handle them?"*
-  - **Options** (single-select):
-    1. "WIP commit (Recommended)" — *"`git add -A && git commit -m 'wip: pause before context cutoff'` — keeps changes on the branch."*
-    2. "Stash" — *"`git stash push -u -m 'hv-pause <branch>'` — keeps changes out of history."*
-    3. "Leave in place" — *"No action; the handoff will note that the tree is dirty."*
-  - Plain-text fallback: *"Wrap them in a `wip:` commit, stash them, or leave them in place?"*
-
-Apply the chosen disposition **only to the dirty entries** (use `git -C <path> ...` per repo). Record the per-entry artifact (commit hash, stash ref, `dirty tree`, or `clean tree`) for Step 4.
+Apply the choice only to dirty entries, with `git -C <path>`. Record each entry's artifact (commit hash, stash ref, `dirty tree`, `clean tree`).
 
 ## Step 4 — Write the Handoff Note
 
-```bash
-mkdir -p .hv/handoff
-```
+Find the milestone first: `hv backlog milestones <ID>...` for the captured items. If none is listed, `hv milestone active`; include it only if exactly one is active. With several, use the one matching the paused items.
 
-Resolve milestone context first — pass the captured item IDs to `hv backlog milestones <ID> [<ID>...]` to read their `Milestone:` tags. If it lists one or more milestones, include them in the **Working on** block below. If it lists none, fall back to `hv milestone active` — and if exactly one active milestone is listed, include that. Multi-active milestones with mixed-tagged items: list whichever milestone matches the items being paused.
+Write one note per `(branch, repo)` entry. Get the path from `hv status handoff "$BRANCH" --canonical ${REPO:+--repo "$REPO"}`. Fill the template in `references/handoff-template.md` from the session: omit sections that do not apply, do not invent content. Always overwrite.
 
-**Loop over the pause set — one handoff file per `(branch, repo)` entry.** Resolve each entry's write path via `hv status handoff "$BRANCH" --canonical ${REPO:+--repo "$REPO"}`; the verb owns the canonical encoding (single-repo and `<branch>@<repo>` umbrella variants).
+In a wave, entries share Items, Milestone, Stage, Next planned step and Current hypothesis; only `Repo:` and the Uncommitted artifact differ. Keep separate files so one repo can be abandoned while the others resume.
 
-For wave sets, every entry shares the **Items**, **Milestone**, **Stage**, **Next planned step**, and **Current hypothesis** content — only `Repo:` and the per-repo `Uncommitted work` artifact differ. Don't merge them into one combined file: `/hv-next`'s lookup is keyed on `(branch, repo)`, so per-entry files keep that path symmetric and survive partial cleanup (one repo abandoned, others resumed).
-
-Compose the note from the template at `references/handoff-template.md` — fill each section from the current session, omit sections that don't apply, but don't manufacture content. The four sections in the template are exactly what `/hv-next` consumes.
-
-Use `Write` for each note (always overwrite — one handoff per `(branch, repo)` pair). Durable learnings (gotchas, dead ends) belong in `/hv-learn` via the Step 6 nudge, not the handoff.
+Gotchas and dead ends belong in `/hv-learn` (Step 7), not the note.
 
 ## Step 5 — Pin Status
 
-Loop over the pause set:
+For each entry run `hv status add <branch> --items <ids> [--worktree <path>] [--repo <repo>] --if-absent` so the resume flow finds it. `--if-absent` keeps the original `startedAt`, so time in flight stays accurate; the note carries the pause time.
 
-```bash
-# Make sure status.json has each entry so /hv-next finds them
-hv status add <branch> --items <item-ids> [--worktree <path>] [--repo <repo>] --if-absent
-```
+## Step 6 — Surface Auto:Loop Decisions
 
-Pass `--repo <repo>` for entries with a non-null `repo`; omit it for legacy / single-repo entries. Uniqueness is `(branch, repo)`, so threading `--repo` matters when two sub-repos share a branch name.
+`/hv-pause` is a terminal path: the user is about to leave. Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty), printed verbatim above the confirm block. Then run `hv status loop clear` (a no-op when unset) so the next loop session starts fresh.
 
-Idempotent — `--if-absent` skips the write if the entry already exists, preserving the original `startedAt` so "time in flight" stays accurate. The handoff note carries the pause timestamp separately.
+## Step 7 — Confirm
 
-## Step 5.5 — Surface Auto:Loop Decisions
-
-`/hv-pause` is a terminal path — the user is about to leave the session. Per the F19 terminal-path-only convention (mirrored in `/hv-next` empty-backlog and `/hv-work` guard-fail), surface any `[Auto:Loop]` decisions logged during this loop session so the user can articulate `Forbids/Permits` and remove the `<!-- [Auto:Loop] -->` footers in `DECISIONS.md` before the session ends:
-
-Surface any `[Auto:Loop]` decisions per `references/terminal-loop-surface.md` (silent when empty). Print the surface verbatim above the Step 6 confirm block.
-
-After surfacing, clear the loop timestamp so the next loop session starts fresh:
-
-```bash
-hv status loop clear   # no-op when loopStartedAt is already unset
-```
-
-## Step 6 — Confirm
-
-One compact block. For single-entry pause sets:
+One compact block. Single entry:
 
 ```
 Paused `hv/fix-B07-timer-badge` (web) — handoff saved.
@@ -133,12 +90,10 @@ Stage: mid-hypothesis verification for [B07]
 Next: run the verification probe in MenuBarManager.swift:54
 Uncommitted: wip commit a1b2c3d
 
-Resume with `/hv-next` in a fresh session.
+Resume with `/hv-work` in a fresh session.
 ```
 
-The `(web)` suffix is shown only in umbrella mode (when `<repo>` is non-null); single-repo cycles drop it and just print the branch.
-
-For wave pause sets (≥ 2 entries from one `/hv-work` wave):
+Show the `(web)` suffix only when `repo` is non-null. For a wave:
 
 ```
 Paused `hv/api-refactor` across web, api — 2 handoffs saved.
@@ -149,28 +104,26 @@ Uncommitted:
   - web: wip commit a1b2c3d
   - api: clean tree
 
-Resume with `/hv-next` in a fresh session.
+Resume with `/hv-work` in a fresh session.
 ```
 
-Stage / Next / Hypothesis are shared across the wave; Uncommitted is per-repo because each sub-repo's working tree is independent.
+Stage, Next and Hypothesis are shared across the wave; Uncommitted is per repo.
 
-**Learn nudge (conditional).** Pausing = context loss. If the session uncovered a durable gotcha (typical signals: a hypothesis that contradicted initial assumptions, a non-obvious root cause, a tool quirk you'll hit again), suggest one line:
-
-*"Run `/hv-learn` now to preserve session insights durably — handoff captures intent, not learnings."*
-
-Skip if nothing non-obvious surfaced or `/hv-learn` already ran this session. Don't block the pause — the nudge is advisory.
+**Learn nudge (conditional).** Pausing loses context. If the session hit a durable gotcha (a hypothesis that contradicted assumptions, a non-obvious root cause, a tool quirk), add one line: *"Run `/hv-learn` now to preserve session insights durably — handoff captures intent, not learnings."* Skip if nothing non-obvious surfaced or `/hv-learn` already ran. Advisory only.
 
 ## Rules
 
-- **Write what you know, not what you wish you knew.** The handoff is a snapshot of orchestrator state, not a task spec.
-- **One note per `(branch, repo)`.** Overwrite on re-pause; don't accumulate stale notes.
-- **Multi-repo waves are one logical pause.** When `status.json` holds multiple `(branch, repo)` entries from one `/hv-work` wave, `/hv-pause` treats them as a single unit by default — no `AskUserQuestion` to pick one repo. Scope the pause to a single sub-repo by `cd`-ing into it before invoking `/hv-pause`; cwd resolves to that repo and the other entries stay active.
-- **Umbrella handoff filenames key on `(branch, repo)`.** Two sub-repos sharing a branch name get separate handoff files at `.hv/handoff/<branch>@<repo>.md`; single-repo cycles keep `.hv/handoff/<branch>.md` unchanged.
-- **Never commit `.hv/handoff/`.** Handoff notes are per-developer scratch — `/hv-init` adds `.hv/handoff/` to `.gitignore` for this reason. Don't add a tracking exception; let `/hv-next` consume the note locally.
-- **`/hv-next` owns cleanup.** Once `/hv-next` has read and routed, it deletes the note. Don't self-delete here.
-- **No mutation beyond the handoff + optional wip/stash.** This skill's job is capture, not integration.
+- **Write what you know, not what you wish you knew.** The note is a snapshot of orchestrator state, not a task spec.
+- **One note per `(branch, repo)`.** Overwrite on re-pause.
+- **A multi-repo wave is one logical pause.** Scope to one sub-repo by `cd`-ing into it first.
+- **Never commit `.hv/handoff/`.** It is per-developer scratch and gitignored by `hv init`.
+- **Do not delete the note here.** Resuming or abandoning the stream removes it.
+- **No mutation beyond the note, status pin and the chosen wip commit or stash.** Capture, not integration.
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/handoff-template.md`](../references/handoff-template.md) — Handoff-note template written by `/hv-pause` and read by `/hv-next`.
+- [`references/task-list-init.md`](../references/task-list-init.md) — Task-list init pattern.
+- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback for the strategy question.
+- [`references/handoff-template.md`](../references/handoff-template.md) — Handoff-note template written by `/hv-pause`, read by `/hv-work`.
+- [`references/terminal-loop-surface.md`](../references/terminal-loop-surface.md) — `[Auto:Loop]` surface and loop-marker clear.

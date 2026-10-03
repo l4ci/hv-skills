@@ -14,7 +14,7 @@ Before any worker is dispatched, if the planned wave has **≥2 commit-producing
 >
 > Resolve by either:
 > - Re-plan the wave to a single worker (sequential commits within one task).
-> - Run `/hv-config` and flip `work.isolation` to `"worktree"`.
+> - Run `hv config set work.isolation worktree`.
 
 This guard is **fatal**, not warn-and-proceed. It fires regardless of umbrella mode.
 

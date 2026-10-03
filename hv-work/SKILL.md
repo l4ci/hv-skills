@@ -644,7 +644,7 @@ Single commit per cycle keeps the loop atomic: the implementation commits ship t
 
 ## Step 10 — Merge or PR
 
-Use `work.mergeStrategy` from `.hv/config.json` to pick `hv ship merge` (direct) or `hv ship pr`. See `references/merge-strategy-gate.md` for the canonical invocation (both single-repo and umbrella variants), verb contracts, and the Manual-gate rule for opening a PR.
+Use `work.mergeStrategy` from `.hv/config.json` to pick `hv ship merge` (direct) or `hv ship pr`. Invocations (umbrella `--repo`, exit-4 verdict and merge-approval handling) are in `hv-ship` Steps 6a/6b. Opening a PR is a manual gate.
 
 When `work.mergeStrategy == "direct"` (or unset — the default), use `hv ship merge`. When `work.mergeStrategy == "pr"`, use `hv ship pr`. The orchestrator never asks at this point in the cycle — the user set the policy via `hv config set`; respect it silently.
 
@@ -759,7 +759,6 @@ Loop stops naturally when:
 | [`issue-mode.md`](../references/issue-mode.md) | Issue-mode helper map, state labels, PR flow, resuming an item, exit codes (`backlog.backend: "issues"`). |
 | [`isolation-patterns.md`](../references/isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. |
 | [`knowledge-consult.md`](../references/knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. |
-| [`merge-strategy-gate.md`](../references/merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus `hv ship` invocations. |
 | [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition + nudge-or-dispatch choreography for post-cycle steps (13, 13.6, 14). |
 | [`worker-contract.md`](../references/worker-contract.md) | Standing worker contract and approval provenance for `work.dispatch: "tmux"` / `"herdr"`. |
 | [`tmux-dispatch.md`](../references/tmux-dispatch.md) | Judgment `hv worker` verbs do not enforce for `work.dispatch: "tmux"` (shared by `"herdr"`): permissions, relay provenance, merge-gate lore, failure modes. |

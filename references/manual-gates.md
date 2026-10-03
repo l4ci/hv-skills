@@ -8,8 +8,8 @@ The registry lives in code. `hv gate list` prints every gate, whether a verb enf
 
 | Gate | Verb | Skill site |
 |------|------|------------|
-| `tag-push` | `hv release push` | `/hv-release` Step 12 |
-| `release-publish` | `hv release publish` | `/hv-release` Step 13 |
+| `tag-push` | `hv release push` | `/hv-release` Step 10 |
+| `release-publish` | `hv release publish` | `/hv-release` Step 11 |
 | `public-filing` | `hv tracker suggest-upstream` | `/hv-learn` Step 8.5 |
 | `merge-approval` | `hv ship merge`, `hv ship pr-merge`, `hv worker gate`, when `ship.mergeApproval` covers the merge (`all`, or `paths` matching `ship.mergeApprovalPaths`) | `/hv-ship` Step 6b, `/hv-review --queue`, `/hv-work` gate step |
 | `debug-reset` | `hv debug reset <ID> --reason <why>` (starts an item's failed-fix count again after the Iron Law halted it) | `/hv-debug` Step 9.5 |
@@ -18,7 +18,7 @@ The verb exits 4 with `data.blockedBy: "manual gate"` and `data.gate` unless it 
 
 The skill's side:
 
-- **Ask first, in an `AskUserQuestion` loop mode never auto-picks.** An earlier question counts when it names the action: `/hv-release` Step 7 asks about the notes *and* says yes pushes and publishes, so Steps 12 and 13 reuse its answer.
+- **Ask first, in an `AskUserQuestion` loop mode never auto-picks.** An earlier question counts when it names the action: `/hv-release` Step 6 asks about the notes *and* says yes pushes and publishes, so Steps 10 and 11 reuse its answer.
 - **Pass the answer verbatim** in `--confirm-note`. Never invent one, and never pass `--confirm` without a human answer behind it.
 - **On exit 4 with `blockedBy: "manual gate"`, ask and re-run.** Nothing changed on the refusal, so the re-run is safe.
 
@@ -48,7 +48,7 @@ Sites with multi-paragraph prose may use the *inline* form, a `**always manual**
 | `issue-label` | `/hv-capture --from-github` / `--from-gitlab` | Step I6 (Apply label upstream) | Applies the `in-progress` label to upstream issues; collaborators see them claimed. |
 | `issue-label` | `/hv-capture --remove` | Step R3 (De-tag upstream) | Removes the `in-progress` label upstream when a captured item is removed. |
 | `issue-close` | `/hv-ship` | Step 6c (Direct-push close) | Posts a tracking comment and closes upstream issues after a direct merge. |
-| `issue-close` | `/hv-release` | Step 13.4 | Closes upstream issues still open for shipped items. |
+| `issue-close` | `/hv-release` | Step 13 | Closes upstream issues still open for shipped items. |
 
 `/hv-ship` Step 3's *"Ship anyway"* option (in the CONCERNS-routing AskUserQuestion) is manual-shaped too; see `references/review-verdict-routing.md` for why loop mode auto-picks *"Address via /hv-work"* but never *"Ship anyway"*. Acceptance of risk is the user's choice; routing toward safe is not.
 

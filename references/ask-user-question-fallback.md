@@ -28,7 +28,7 @@ The three rules in the wild today — read these as illustration, not as authori
 
 - **Honor yes/no** — `/hv-learn` issue-file gate (*"File a hv-skills issue?"*), `/hv-spike` promote-to-decision gate (*"Promote to a decision?"*), `/hv-pause` uncommitted-work stance (*"Wrap them in a `wip:` commit, stash them, or leave them in place?"*).
 - **Default to Recommended** — `/hv-work` plan-shape ambiguity (one Recommended interpretation among several equally-valid plans), `/hv-ship --docs` route picks (first-run / after-work / restructure), `/hv-vision` brainstorm-vs-edit picks.
-- **Default to opt-in-off / cancel** — `/hv-init` umbrella opt-in (default **No** because `umbrella.enabled` is an opt-in flag), `/hv-capture --remove` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/hv-decide` write gate (only `yes` / `write` commits the decision), `/hv-ship --docs` after-work mode opt-in (default **Leave off**), `/hv-update` dispatch gate (default off on ambiguous reply).
+- **Default to opt-in-off / cancel** — `/hv-capture --remove` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/hv-decide` write gate (only `yes` / `write` commits the decision), `/hv-ship --docs` after-work mode opt-in (default **Leave off**).
 
 ## Why three rules and not one
 
@@ -40,7 +40,7 @@ The three rules carve up by *consequence*, not by question shape: binary gates h
 
 - **The exact prose question text.** Each skill's UX wording, examples, and option summary belong to that SKILL.md — *"Apply changes? (yes/no/scrub-archive)"* is not the same shape as *"Author a runlog entry?"*.
 - **The mapping from specific free-text replies to specific outcomes.** Each skill's option set differs; `yes` / `write` / `scrub-archive` / `ship` / `leave off` all live in their owning sites.
-- **Which of the three default rules applies.** Declared at each site — the mechanic doesn't decide for you. A binary `/hv-learn` issue-file gate honors yes/no; `/hv-work`'s plan-shape ambiguity defaults to Recommended; `/hv-init`'s umbrella opt-in defaults to off.
+- **Which of the three default rules applies.** Declared at each site — the mechanic doesn't decide for you. A binary `/hv-learn` issue-file gate honors yes/no; `/hv-work`'s plan-shape ambiguity defaults to Recommended.
 
 ## See also
 
