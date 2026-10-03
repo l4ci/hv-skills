@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -256,5 +257,93 @@ func TestWaitCancelIsNotATimeout(t *testing.T) {
 	res, err := envWith(watcherHost{h}).Wait(ctx, dir, WaitOpts{})
 	if exitOf(err) != ExitFailed || res.TimedOut {
 		t.Errorf("%+v %v", res, err)
+	}
+}
+
+// #211: herdr sends one event per status change and none after `done`. Just
+// after a turn ends, herdr's `agent read --source recent-unwrapped` rebuilds
+// scrollback, and two reads a moment apart can return different windows (one
+// recorded read carried 34 more history lines and a different prompt line).
+// The classification that follows the last event then sees "movement" and
+// reads busy, and no further event ever re-classifies it. Events and panes are
+// herdr 0.9.3's own, recorded in the live re-check of the slot's tab.
+//
+// The recorded panes end on the worker's `● HV-DONE` reply, which the
+// classifier sees at once (#210), so the event itself settles that case. A
+// worker that finishes without a sentinel is the case only the re-check can
+// settle: the same panes with the reply line removed.
+func TestWaitAfterTheLastEventRechecksAPaneThatMovedOnce(t *testing.T) {
+	read := func(name string) string {
+		b, err := os.ReadFile("testdata/wait-211/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	var statuses []string
+	for _, line := range strings.Split(strings.TrimSpace(read("frames.jsonl")), "\n") {
+		var f struct {
+			Event string `json:"event"`
+			Data  struct {
+				Status string `json:"agent_status"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(line), &f); err != nil || f.Event != "pane.agent_status_changed" {
+			t.Fatalf("bad frame %q", line)
+		}
+		statuses = append(statuses, f.Data.Status)
+	}
+	if strings.Join(statuses, ",") != "working,done" {
+		t.Fatalf("frames = %v", statuses)
+	}
+	const reply = "● HV-DONE lr2 lr2/f01-add-a-hello-line-to\n"
+	scrollback, settled := read("pane-scrollback-read.txt"), read("pane-settled.txt")
+	if !strings.Contains(scrollback, reply) || !strings.Contains(settled, reply) {
+		t.Fatal("the recorded panes should end on the worker's HV-DONE reply")
+	}
+	noReply := func(s string) string { return strings.Replace(s, reply, "", 1) }
+
+	for _, c := range []struct {
+		name                string
+		scrollback, settled string
+		state, source       string
+	}{
+		{"recorded, sentinel seen at the event", scrollback, settled, StateDone, SourceEvent},
+		{"no sentinel, settled by the re-check", noReply(scrollback), noReply(settled), StateIdle, SourcePoll},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := waitProject(t, 1, map[string]string{"w1": "w9:t1"})
+			h := newWaitHost("herdr")
+			h.set("w1", "✻ Working…\n", statuses[0])
+			captures, armed := 0, false
+			h.onCapture = func(string) {
+				h.mu.Lock()
+				defer h.mu.Unlock()
+				if armed {
+					captures++
+					if captures == 1 {
+						h.text["w1"] = c.scrollback // first capture after the done event
+					} else {
+						h.text["w1"] = c.settled // later reads agree; no event says so
+					}
+				} else {
+					h.text["w1"] += "." // a working pane moves between captures
+				}
+			}
+			go func() {
+				time.Sleep(20 * time.Millisecond)
+				h.mu.Lock()
+				h.status["w1"], armed = statuses[1], true
+				h.mu.Unlock()
+				h.events <- "w1"
+			}()
+			res, err := envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{Timeout: 2 * time.Second})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.TimedOut || res.Slot != "w1" || res.State != c.state || res.Source != c.source {
+				t.Fatalf("want %s via %s, got %+v", c.state, c.source, res)
+			}
+		})
 	}
 }

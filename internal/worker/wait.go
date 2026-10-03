@@ -43,6 +43,14 @@ type WaitResult struct {
 // FIRST means a change during the classification is already queued, so no
 // event is lost. tmux has no event stream: it re-classifies in a loop, and
 // each classification's settle gap is the poll interval.
+//
+// One exception on herdr (#211): a slot that is BUSY only because its pane
+// moved while herdr did not say `working` is re-classified at once, without
+// waiting. herdr sends one event per status change and none when the pane of
+// an idle or done agent comes to rest, so blocking on the next event there
+// would wait for an event that never comes. Right after a turn, two of
+// herdr's scrollback reads can differ for a moment, which is how a finished
+// worker reads as moving. The re-check is a poll and is reported as one.
 func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, error) {
 	e = e.withDefaults()
 	if o.Lines <= 0 {
@@ -117,7 +125,7 @@ func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, err
 
 	source := SourceSnapshot
 	for {
-		rows := e.classify(ctx, h, targets, o.Settle, o.Lines)
+		rows, settling := e.classify(ctx, h, targets, o.Settle, o.Lines)
 		if ctx.Err() != nil {
 			return stop()
 		}
@@ -128,7 +136,7 @@ func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, err
 					Source: source, Waited: e.Now().Sub(start)}, nil
 			}
 		}
-		if w == nil {
+		if w == nil || settling {
 			source = SourcePoll
 			if o.Settle <= 0 {
 				e.Sleep(time.Second)
