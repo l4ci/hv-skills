@@ -172,6 +172,11 @@ func detect(e Env) (kind, root string) {
 		return k, r
 	}
 	for _, link := range []string{
+		filepath.Join(e.Home, ".claude/skills/hv-work"),
+		filepath.Join(e.Home, ".agents/skills/hv-work"),
+		filepath.Join(e.Home, ".claude/skills/hv-capture"),
+		filepath.Join(e.Home, ".agents/skills/hv-capture"),
+		// installs from before the 5.0 skill removals
 		filepath.Join(e.Home, ".claude/skills/hv-update"),
 		filepath.Join(e.Home, ".agents/skills/hv-update"),
 		filepath.Join(e.Home, ".claude/skills/hv-init"),

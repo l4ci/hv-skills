@@ -112,14 +112,14 @@ func TestDetectStow(t *testing.T) {
 	if r.InstallType != Stow || r.InstallRoot != want || r.UpdateCommand != "cd "+want+" && git pull" {
 		t.Errorf("agents skills: %+v", r)
 	}
-	// the skill-symlink walk: ~/.claude/skills/hv-update -> <clone>/hv-update
+	// the skill-symlink walk: ~/.claude/skills/hv-work -> <clone>/hv-work
 	home = t.TempDir()
 	clone := t.TempDir()
 	clone, _ = filepath.EvalSymlinks(clone)
 	plugin(t, clone, "1.0.0")
-	os.MkdirAll(filepath.Join(clone, "hv-update"), 0o755)
+	os.MkdirAll(filepath.Join(clone, "hv-work"), 0o755)
 	os.MkdirAll(filepath.Join(home, ".claude/skills"), 0o755)
-	if err := os.Symlink(filepath.Join(clone, "hv-update"), filepath.Join(home, ".claude/skills/hv-update")); err != nil {
+	if err := os.Symlink(filepath.Join(clone, "hv-work"), filepath.Join(home, ".claude/skills/hv-work")); err != nil {
 		t.Fatal(err)
 	}
 	r = Check(env(home, nil, "2.0.0"))

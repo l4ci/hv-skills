@@ -41,7 +41,7 @@ func (b BlocksResult) Changed() bool {
 	return false
 }
 
-// Blocks is Step 4 of the old /hv-init skill: make AGENTS.md the instructions
+// Blocks is Step 4 of the old init skill: make AGENTS.md the instructions
 // file, strip the managed blocks earlier versions left behind, then write the
 // six blocks (skills, knowledge, milestones, decisions, map, qa). Every step is
 // idempotent. A step that fails is recorded as "failed" and the rest still run;

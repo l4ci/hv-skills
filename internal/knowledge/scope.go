@@ -35,7 +35,7 @@ func (s Store) check(scope string) error {
 		return nil
 	}
 	if len(s.Repos) == 0 {
-		return fmt.Errorf("%w: sub-repo scope '%s' requested but umbrella mode is off (no sub-repos registered); run /hv-init from the umbrella root", ErrScope, scope)
+		return fmt.Errorf("%w: sub-repo scope '%s' requested but umbrella mode is off (no sub-repos registered); run hv init from the umbrella root", ErrScope, scope)
 	}
 	if _, ok := s.Repos[scope]; !ok {
 		names := make([]string, 0, len(s.Repos))

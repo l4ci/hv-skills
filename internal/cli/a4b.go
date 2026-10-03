@@ -96,7 +96,7 @@ func a4BacklogList(fs *flag.FlagSet) RunFunc {
 		}
 		data := a4Obj("inProgress", []any{}, "bugs", []any{}, "features", []any{}, "tasks", []any{}, "clusters", []any{})
 		if !ok {
-			return Result{Data: data, Text: "No .hv/BACKLOG.md yet. Run /hv-init then /hv-capture."}, nil
+			return Result{Data: data, Text: "No .hv/BACKLOG.md yet. Run hv init then /hv-capture."}, nil
 		}
 		var active []backlog.Active
 		for _, e := range status.Entries(root) {
