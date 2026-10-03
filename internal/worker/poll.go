@@ -57,6 +57,26 @@ const (
 	StateUnknown         = "UNKNOWN"
 )
 
+// LimitPhrases are the usage-limit messages a session prints about itself, as
+// case-insensitive regex sources (no flag prefix). `worker poll` classifies
+// LIMITED with them, and the usage-limit watcher (D3) matches the same list,
+// so there is one source.
+var LimitPhrases = []string{
+	`reached your usage limit`,
+	`usage limit reached`,
+	`You'?ve hit your (?:usage )?limit`,
+	`limit (?:will )?reset[s]? at`,
+	`Approaching (?:your )?usage limit`,
+}
+
+// LimitRegex is the alternation of LimitPhrases with the case-insensitive
+// flag written in the regex itself, for engines that take one pattern string
+// (herdr's pane.output_matched).
+func LimitRegex() string { return "(?i)(?:" + strings.Join(LimitPhrases, "|") + ")" }
+
+// LimitPatterns are the compiled LimitPhrases.
+func LimitPatterns() []*regexp.Regexp { return limitPatterns }
+
 var (
 	// A sentinel may follow Claude Code's reply marker: v2.1.288 starts the
 	// first line of every reply with "● " (older versions "⏺ ").
@@ -69,13 +89,7 @@ var (
 	// Heuristic, like DEAD: a limited session cannot print a sentinel. The
 	// patterns are anchored to phrasing a session emits about ITSELF, not bare
 	// words like "limit" that a worker reading source code would echo.
-	limitPatterns = compileAll(`(?i)`, []string{
-		`reached your usage limit`,
-		`usage limit reached`,
-		`You'?ve hit your (?:usage )?limit`,
-		`limit (?:will )?reset[s]? at`,
-		`Approaching (?:your )?usage limit`,
-	})
+	limitPatterns = compileAll(`(?i)`, LimitPhrases)
 	// A worker stopped at a permission prompt is STALLED, but looks exactly
 	// like an idle one. Distinct from BLOCKED: the worker is not asking a
 	// design question, it needs an approval.
