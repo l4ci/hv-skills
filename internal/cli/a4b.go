@@ -308,12 +308,30 @@ func a4Archive(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
-		moved, err := be.(*backlog.File).Archive(*days, time.Now())
+		today, err := a4AgeToday()
+		if err != nil {
+			return Result{}, err
+		}
+		moved, err := be.(*backlog.File).Archive(*days, today)
 		if err != nil {
 			return a4Fail(err)
 		}
 		return Result{Data: a4Obj("days", *days, "moved", moved, "changed", moved > 0), Text: fmt.Sprintf("archived %d", moved)}, nil
 	}
+}
+
+// a4AgeToday is the day archive and stale measure age against: today, or the
+// HV_TEST_TODAY override the tests pin it with.
+func a4AgeToday() (time.Time, error) {
+	v := os.Getenv("HV_TEST_TODAY")
+	if v == "" {
+		return time.Now(), nil
+	}
+	t, ok := stale.ParseDate(v)
+	if !ok {
+		return time.Time{}, Usage("HV_TEST_TODAY must be YYYY-MM-DD, got %q", v)
+	}
+	return t, nil
 }
 
 // ---- backlog stale ---------------------------------------------------------------
@@ -332,13 +350,9 @@ func a4Stale(fs *flag.FlagSet) RunFunc {
 		if !a4In(stale.Kinds, *kind) {
 			return Result{}, Usage("--kind must be map|knowledge|todo")
 		}
-		today := time.Now()
-		if v := os.Getenv("HV_TEST_TODAY"); v != "" {
-			t, ok := stale.ParseDate(v)
-			if !ok {
-				return Result{}, Usage("HV_TEST_TODAY must be YYYY-MM-DD, got %q", v)
-			}
-			today = t
+		today, err := a4AgeToday()
+		if err != nil {
+			return Result{}, err
 		}
 		today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
 		entries, err := stale.Find(root, *kind, *days, today)
