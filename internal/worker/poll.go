@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
@@ -224,41 +225,24 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 	if o.Slot != "" && reg.Slot(o.Slot) == nil {
 		return PollResult{}, fail(ExitResolution, fmt.Sprintf("slot '%s' is not in the pool", o.Slot))
 	}
-	type target struct{ name, handle, prev string }
-	var targets []target
+	var targets []pollTarget
 	for _, s := range reg.Slots() {
 		if o.Slot != "" && Str(s, "name") != o.Slot {
 			continue
 		}
-		handle := Str(s, "handle")
-		if handle == "" {
-			handle = Str(s, "window") // pre-handle field name
-		}
-		targets = append(targets, target{Str(s, "name"), handle, Str(s, "state")})
+		targets = append(targets, slotTarget(s))
 	}
 	if len(targets) == 0 {
 		return PollResult{}, nil
 	}
 	before, _ := os.ReadFile(RegistryPath(root))
 
-	// First capture for every slot, then settle once, then the second capture,
-	// so N slots cost one settle interval, not N.
-	first := map[string]string{}
-	for _, t := range targets {
-		first[t.name] = h.Capture(ctx, t.name, t.handle, o.Lines)
-	}
-	e.Sleep(o.Settle)
-
-	var rows []PollRow
-	for _, t := range targets {
-		second := h.Capture(ctx, t.name, t.handle, o.Lines)
-		native := h.Status(ctx, t.name, t.handle)
-		st, ev := Classify(second, first[t.name] != second, o.Lines, native)
-		rows = append(rows, PollRow{t.name, st, ev})
+	rows := e.classify(ctx, h, targets, o.Settle, o.Lines)
+	for i, r := range rows {
 		// Notify on the transition only: a poll loop re-reading a stuck slot
 		// must not ring every few seconds.
-		if (st == StateBlocked || st == StateNeedsPermission) && t.prev != strings.ToLower(st) {
-			h.Notify(ctx, fmt.Sprintf("hv worker %s: %s", t.name, st), ev)
+		if (r.State == StateBlocked || r.State == StateNeedsPermission) && targets[i].prev != strings.ToLower(r.State) {
+			h.Notify(ctx, fmt.Sprintf("hv worker %s: %s", r.Name, r.State), r.Evidence)
 		}
 	}
 
@@ -283,6 +267,38 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 	}
 	after, _ := os.ReadFile(RegistryPath(root))
 	return PollResult{Slots: rows, Changed: string(before) != string(after)}, nil
+}
+
+// pollTarget is one slot to classify: its name, host handle and the state the
+// registry last recorded for it.
+type pollTarget struct{ name, handle, prev string }
+
+func slotTarget(s *jsonx.Object) pollTarget {
+	handle := Str(s, "handle")
+	if handle == "" {
+		handle = Str(s, "window") // pre-handle field name
+	}
+	return pollTarget{Str(s, "name"), handle, Str(s, "state")}
+}
+
+// classify reads each target's pane twice, settle apart, and classifies it.
+// It touches no file: Poll records the result, `round wait` only reads it.
+// First capture for every slot, then settle once, then the second capture, so
+// N slots cost one settle interval, not N.
+func (e Env) classify(ctx context.Context, h host.Host, targets []pollTarget, settle time.Duration, lines int) []PollRow {
+	first := map[string]string{}
+	for _, t := range targets {
+		first[t.name] = h.Capture(ctx, t.name, t.handle, lines)
+	}
+	e.Sleep(settle)
+	var rows []PollRow
+	for _, t := range targets {
+		second := h.Capture(ctx, t.name, t.handle, lines)
+		native := h.Status(ctx, t.name, t.handle)
+		st, ev := Classify(second, first[t.name] != second, lines, native)
+		rows = append(rows, PollRow{t.name, st, ev})
+	}
+	return rows
 }
 
 // updateSlotsAll edits every slot under the registry lock.
