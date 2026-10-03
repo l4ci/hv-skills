@@ -246,3 +246,48 @@ func TestAcquireNumbersAnUnnumberedLeaseOfTheSameHolder(t *testing.T) {
 		t.Fatalf("renewal must keep the number: %v %+v", out, l)
 	}
 }
+
+// tree is a recorded process table: pid -> (ppid, comm).
+type tree map[int]struct {
+	pp   int
+	comm string
+}
+
+func (t tree) env(self int) Env {
+	e := fakeEnv("h1", procs{})
+	e.Parent = func() int { return self }
+	e.Proc = func(pid int) (int, string, bool) {
+		p, ok := t[pid]
+		return p.pp, p.comm, ok
+	}
+	return e
+}
+
+// TestDiscoverStopsAtTheHostServer pins #205: from a plain shell in a herdr or
+// tmux pane the holder is that pane's shell, not the server every pane shares;
+// with an agent in the pane, the agent.
+func TestDiscoverStopsAtTheHostServer(t *testing.T) {
+	none := func(string) string { return "" }
+	for _, server := range []string{"herdr", "tmux: server"} {
+		// server(4089) -> zsh(5000) -> hv's parent shell(5001) -> hv
+		plain := tree{4089: {1, server}, 5000: {4089, "zsh"}, 5001: {5000, "bash"}}
+		if h := plain.env(5001).Discover(0, none); h.PID != 5000 {
+			t.Errorf("%s, plain shell: holder %d, want the pane's shell 5000", server, h.PID)
+		}
+		// A second pane on the same server is a different holder.
+		other := tree{4089: {1, server}, 6000: {4089, "zsh"}}
+		if h := other.env(6000).Discover(0, none); h.PID != 6000 {
+			t.Errorf("%s, second pane: holder %d, want 6000", server, h.PID)
+		}
+		// server -> zsh -> claude -> bash -> hv: the agent holds.
+		agent := tree{4089: {1, server}, 5000: {4089, "zsh"}, 5100: {5000, "claude"}, 5101: {5100, "bash"}}
+		if h := agent.env(5101).Discover(0, none); h.PID != 5100 {
+			t.Errorf("%s, agent in the pane: holder %d, want claude 5100", server, h.PID)
+		}
+	}
+	// hv run straight from the server's child: that child is the holder.
+	direct := tree{4089: {1, "herdr"}}
+	if h := direct.env(4089).Discover(0, none); h.PID != 4089 {
+		t.Errorf("nothing below the server: holder %d, want the parent 4089", h.PID)
+	}
+}
