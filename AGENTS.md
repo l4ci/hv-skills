@@ -44,13 +44,13 @@ _(no active milestones — all shipped or archived; run `/hv-vision` to plan mor
 
 This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, `.hv/verdicts.json`, `.hv/gate-audit.jsonl`, `.hv/workers.json`, and `.hv/**/*.lock` files are gitignored. Use the skills and `hv` verbs to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
 
-**Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
-**Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
+**Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items; offers to hand off to `/hv-work`), `/hv-pause`
+**Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (no argument reconciles active work and suggests the next item; `--preview` for read-only peek), `/hv-debug`
 **Rounds** — `/hv-orchestrate` (run a parallel round as the orchestrator)
 **Review & ship** — `/hv-review`, `/hv-qa` (opt-in gate via `ship.qa`), `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
 **Persist** — `/hv-learn` (durable knowledge; `--term <name>` for glossary), `/hv-decide` (hard boundaries — manual only)
 **Vision & maps** — `/hv-vision`, `/hv-refactor`
-**Maintenance** — `/hv-init`, `/hv-config`, `/hv-update`, `/hv-migrate` (v3→v4 codemod), `/hv-release`
+**Maintenance** — `/hv-release`. Setup and upkeep are `hv` verbs: `hv init`, `hv config`, `hv update`, `hv migrate`
 
 Before acting on work that touches a topic listed in `## Project Knowledge`, `## Project Decisions`, or `## Project Vision`, pull only the relevant sections:
 

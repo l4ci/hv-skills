@@ -17,13 +17,9 @@
     "knowledge-base"
   ],
   "skills": [
-    "./hv-init",
-    "./hv-config",
     "./hv-capture",
-    "./hv-go",
     "./hv-vision",
     "./hv-brainstorm",
-    "./hv-next",
     "./hv-pause",
     "./hv-plan",
     "./hv-spike",
@@ -36,8 +32,6 @@
     "./hv-ship",
     "./hv-learn",
     "./hv-refactor",
-    "./hv-update",
-    "./hv-migrate",
     "./hv-release"
   ]
 }
