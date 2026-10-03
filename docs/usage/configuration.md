@@ -238,6 +238,19 @@ A custom `work.workerCommand` receives the tier's model only through a `{model}`
 
 `round.scope` is a different axis from `autonomy.level`: the level says how far skills chain on their own, the scope says which issues a round may take. Set with `hv config set round.scope slate`.
 
+## orchestrator keys
+
+Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)). All are silent defaults; none is written by `/hv-init`.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `orchestrator.handoffThreshold` | `75` | Context percentage (integer, 1 to 100) at which the Stop hook blocks the orchestrator until it has written a handoff. |
+| `orchestrator.stateMaxAgeSeconds` | `120` | A statusline reading older than this is not acted on. |
+| `orchestrator.handoffMaxAgeSeconds` | `900` | A handoff younger than this counts as fresh: the Stop hook passes, and the SessionStart fallback injects it. |
+| `orchestrator.handoffMaxBlocks` | `2` | Times the hook re-blocks a session that still has no handoff, then passes and records `handoffFailed` in the session state. `0` blocks once. |
+
+An out-of-range value exits 70 in a verb that reads it; the hooks treat it as a pass and never block.
+
 ## qa.gate
 
 Controls how `/hv-ship` routes a `/hv-qa run` verdict when `ship.qa: true`. Independent of the `/hv-review` verdict routing.

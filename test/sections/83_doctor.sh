@@ -41,13 +41,14 @@ echo '{}' >"$TMP_DR/acct/.credentials.json"
 : >"$TMP_DR/acct/installed"
 printf '.worktrees/\n' >"$TMP_DR/proj/.gitignore"
 printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]}}\n' "$TMP_DR/acct" >"$TMP_DR/proj/.hv/config.json"
+# D1 (#65): the orchestrator hooks are opt-in, so a project that has not installed them skips both checks
 git -C "$TMP_DR/proj" init -q
 rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
 [ "$rc" -eq 0 ] || fail "C6[a]: healthy project exited $rc: $OUT"
 [ "$(printf '%s' "$OUT" | dr_ok)" = "True" ] || fail "C6[a]: ok is not true: $OUT"
 NAMES="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)["data"]["checks"]))')"
-[ "$NAMES" = "git,host,tracker,accounts,hook,hv,codex" ] || fail "C6[a]: checks were: $NAMES"
-for pair in git:pass host:pass tracker:skip accounts:pass hook:pass codex:skip; do
+[ "$NAMES" = "git,host,tracker,accounts,hook,statusline,stop-hook,hv,codex" ] || fail "C6[a]: checks were: $NAMES"
+for pair in git:pass host:pass tracker:skip accounts:pass hook:pass statusline:skip stop-hook:skip codex:skip; do
   [ "$(printf '%s' "$OUT" | dr_field "${pair%%:*}" status)" = "${pair##*:}" ] || fail "C6[a]: ${pair%%:*} was not ${pair##*:}: $OUT"
 done
 case "$OUT" in *'"changed"'*) fail "C6[a]: doctor reports changed: $OUT" ;; esac
@@ -93,7 +94,7 @@ printf '.worktrees/\n' >"$TMP_DR/bare/.gitignore"
 git -C "$TMP_DR/bare" init -q
 rc=0; OUT="$(dr_run "$TMP_DR/bare")" || rc=$?
 [ "$rc" -eq 0 ] || fail "C6[f]: doctor without .hv/ exited $rc: $OUT"
-for n in host accounts hook; do
+for n in host accounts hook statusline stop-hook; do
   [ "$(printf '%s' "$OUT" | dr_field "$n" status)" = "skip" ] || fail "C6[f]: $n did not skip without .hv/: $OUT"
 done
 pass "C6[f]: doctor runs without .hv/ on defaults"

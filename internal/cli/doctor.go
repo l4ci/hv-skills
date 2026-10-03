@@ -18,7 +18,7 @@ import (
 // doctorCommand is `hv doctor` (C6): a read-only preflight. It runs without
 // .hv/ and reads the project config only when one is found.
 func doctorCommand() *Command {
-	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, hv, codex", Verb: noFlags(runDoctor)}
+	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, orchestrator hooks, hv, codex", Verb: noFlags(runDoctor)}
 }
 
 // doctorCallTimeout bounds each tool call, so a hung herdr cannot hang the verb.
@@ -103,6 +103,19 @@ func doctorInput() doctor.Input {
 					in.Accounts = append(in.Accounts, a)
 				}
 			}
+		}
+	}
+	in.ProjectRoot = root
+	for _, a := range in.Accounts {
+		if a.ConfigDir != "" {
+			in.ConfigDirs = append(in.ConfigDirs, a.ConfigDir)
+		}
+	}
+	if len(in.ConfigDirs) == 0 {
+		if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+			in.ConfigDirs = []string{d}
+		} else if in.Home != "" {
+			in.ConfigDirs = []string{filepath.Join(in.Home, ".claude")}
 		}
 	}
 	return in
