@@ -17,6 +17,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/host"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/marker"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -196,7 +197,7 @@ func PendingOn(list []Entry, kind string, number int) (Entry, bool) {
 }
 
 // Marker is the line every escalation comment ends with.
-func Marker(id string) string { return "<!-- hv:escalation " + id + " -->" }
+func Marker(id string) string { return marker.Line("escalation", id) }
 
 // Compose is the comment hv posts: heading, the body, the ask, the marker.
 func Compose(id, title, body string) string {
@@ -272,6 +273,9 @@ func Send(ctx context.Context, env Env, root string, o SendOpts) (SendResult, er
 		return res, &Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("--slot %s is not a registered slot", o.Slot)}
 	}
 	kind := kindOf(o.PR)
+	// The pending check and NextID below read the registry outside its lock.
+	// That is safe only while one orchestrator sends escalations at a time
+	// (ratified by the orchestrator, round 4).
 	list := Load(root)
 	if p, ok := PendingOn(list, kind, o.Number); ok {
 		return res, &Error{Exit: worker.ExitRefused, Message: fmt.Sprintf("escalation %s is still pending on %s #%d", p.ID, kind, o.Number),

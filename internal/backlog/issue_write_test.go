@@ -144,7 +144,7 @@ func TestIssuesComplete(t *testing.T) {
 	if ok, err := b.Complete("1", CompleteInput{Commit: "abc", Reason: "done", NoProof: true, Note: "a\nb  c"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[1] remove_labels[1,["in-progress","blocked"]] close[1,"completed","Done in `+"`abc`"+` — a b c"]`)
+	wantCalls(t, tr, `get[1] remove_labels[1,["in-progress","blocked"]] close[1,"completed","Done in `+"`abc`"+` — a b c\n\n<!-- hv:done -->"]`)
 	if is := tr.Issues[0]; is.State != "closed" || is.StateReason != "completed" || strings.Join(is.Labels, ",") != "keep" {
 		t.Fatalf("%+v", is)
 	}
@@ -155,7 +155,7 @@ func TestIssuesComplete(t *testing.T) {
 	if ok, err := b.Complete("#2", CompleteInput{Commit: "def", Reason: "done"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[2] comments[2] close[2,"completed","Done in `+"`def`"+`"]`)
+	wantCalls(t, tr, `get[2] comments[2] close[2,"completed","Done in `+"`def`"+`\n\n<!-- hv:done -->"]`)
 
 	// dropped and handed-off close as not planned and skip the proof gate.
 	for _, reason := range []string{"dropped", "handed-off"} {
@@ -163,7 +163,7 @@ func TestIssuesComplete(t *testing.T) {
 		if ok, err := b.Complete("5", CompleteInput{Commit: "x", Reason: reason, Note: "n"}); !ok || err != nil {
 			t.Fatal(ok, err)
 		}
-		wantCalls(t, tr, `get[5] close[5,"not_planned","Closed: `+reason+` — n"]`)
+		wantCalls(t, tr, `get[5] close[5,"not_planned","Closed: `+reason+` — n\n\n<!-- hv:closed -->"]`)
 	}
 
 	// blocked: label plus comment, no proof gate; blocked again is a no-op.
@@ -171,7 +171,7 @@ func TestIssuesComplete(t *testing.T) {
 	if ok, err := b.Complete("6", CompleteInput{Reason: "blocked", Note: "waiting"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[6] add_labels[6,["blocked"],true] add_comment[6,"Blocked — waiting"]`)
+	wantCalls(t, tr, `get[6] add_labels[6,["blocked"],true] add_comment[6,"Blocked — waiting\n\n<!-- hv:blocked -->"]`)
 	tr.Calls = nil
 	if ok, _ := b.Complete("6", CompleteInput{Reason: "blocked"}); ok {
 		t.Fatal("already blocked must be a no-op")
@@ -197,7 +197,7 @@ func TestIssuesCompleteProofSeam(t *testing.T) {
 	if ok, err := b.Complete("1", CompleteInput{Commit: "c", Reason: "done"}); !ok || err != nil || asked != "T1" {
 		t.Fatal(ok, err, asked)
 	}
-	wantCalls(t, tr, `get[1] close[1,"completed","Done in `+"`c`"+`"]`)
+	wantCalls(t, tr, `get[1] close[1,"completed","Done in `+"`c`"+`\n\n<!-- hv:done -->"]`)
 }
 
 func TestIssuesReopen(t *testing.T) {

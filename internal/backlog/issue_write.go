@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv-skills/v5/internal/marker"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 	"github.com/l4ci/hv-skills/v5/internal/section"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
@@ -273,7 +274,8 @@ func (b *Issues) SetField(ref, field, value string) (bool, error) {
 // Complete closes the issue with the reason's tracker state
 // (IssueBackend.complete): done closes as completed with a "Done in `<hash>`"
 // comment; dropped and handed-off close as not planned with "Closed: <reason>";
-// blocked leaves it open with the blocked label and a "Blocked" comment.
+// blocked leaves it open with the blocked label and a "Blocked" comment. Each
+// comment ends with an hv marker line (blocked, done, closed).
 // Closing clears the in-progress, needs-review, changes-requested and blocked
 // labels. changed is false for an already closed (or already blocked) issue. A
 // `done` close without a proof row is a RefusedError wrapping ErrProofMissing.
@@ -304,7 +306,7 @@ func (b *Issues) Complete(ref string, in CompleteInput) (bool, error) {
 		if err := tr.AddLabels(b.ctx(), n, []string{label}, b.autoCreate()); err != nil {
 			return false, err
 		}
-		_, err := tr.AddComment(b.ctx(), n, "Blocked"+suffix)
+		_, err := tr.AddComment(b.ctx(), n, "Blocked"+suffix+"\n\n"+marker.Line("blocked"))
 		return err == nil, err
 	}
 	if in.Reason == "done" && !in.NoProof {
@@ -329,9 +331,9 @@ func (b *Issues) Complete(ref string, in CompleteInput) (bool, error) {
 		}
 	}
 	if in.Reason == "done" {
-		return true, tr.Close(b.ctx(), n, "completed", "Done in `"+in.Commit+"`"+suffix)
+		return true, tr.Close(b.ctx(), n, "completed", "Done in `"+in.Commit+"`"+suffix+"\n\n"+marker.Line("done"))
 	}
-	return true, tr.Close(b.ctx(), n, "not_planned", "Closed: "+in.Reason+suffix)
+	return true, tr.Close(b.ctx(), n, "not_planned", "Closed: "+in.Reason+suffix+"\n\n"+marker.Line("closed"))
 }
 
 func has(list []string, s string) bool {

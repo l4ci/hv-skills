@@ -542,11 +542,17 @@ for prov in github gitlab; do
     # IV <n>: "state|state_reason|sorted labels (comma)|comments (joined by ' // ')", read from the fake
     # tracker's store. glab has no close reason: a closed issue is completed unless it carries not-planned.
     IV() { python3 -c '
-import json, sys
+import json, re, sys
 i = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
 reason = (i["state_reason"] or (("not_planned" if "not-planned" in i["labels"] else "completed") if i["state"] == "closed" else "")).replace(" ", "_")
+# the trailing hv marker line (hv:blocked|done|closed) is hidden here; MARKERS asserts it
+strip = lambda b: re.sub(r"\n\n<!-- hv:(?:blocked|done|closed) -->$", "", b)
 print("%s|%s|%s|%s" % (i["state"], reason, ",".join(sorted(i["labels"])),
-                       " // ".join(c["body"].replace("\n", " ") for c in i["comments"] if not c["body"].startswith("<!-- hv:proof"))))' "$1" "$P/db.json"; }
+                       " // ".join(strip(c["body"]).replace("\n", " ") for c in i["comments"] if not c["body"].startswith("<!-- hv:proof"))))' "$1" "$P/db.json"; }
+    MARKERS() { python3 -c '
+import json, sys
+i = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
+print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["body"].startswith("<!-- hv:proof")))' "$1" "$P/db.json"; }
     WRITES() { grep -c "$1" "$P/log" || true; }
     PROOF() { hvj proof add "$1" --check smoke --result PASS --evidence ok --sha abc1234 >/dev/null; }
     DONE() { hvj item complete "$@"; }
@@ -568,6 +574,7 @@ print("%s|%s|%s|%s" % (i["state"], reason, ",".join(sorted(i["labels"])),
     OUT="$(DONE T1 --commit abc1234)"
     eq "done data" "1|T|done|abc1234|true" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.reason)|$(echo "$OUT" | jget data.commit)|$(echo "$OUT" | jget data.changed)"
     eq "done" "closed|completed|type:task|Done in \`abc1234\`" "$(IV 1)"
+    eq "done marker" "<!-- hv:done -->" "$(MARKERS 1)"
     : > "$P/log"
     eq "done idempotent changed" "false" "$(DONE T1 --commit abc1234 | jget data.changed)"
     eq "done idempotent writes nothing" "0" "$(WRITES 'issue \(edit\|update\|close\)\|api -X')"
@@ -585,6 +592,7 @@ print("%s|%s|%s|%s" % (i["state"], reason, ",".join(sorted(i["labels"])),
     # blocked: stays open, label + comment, other state labels kept; idempotent
     DONE T5 --commit abc1234 --reason blocked --note "waiting on X" >/dev/null
     eq "blocked" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
+    eq "blocked marker" "<!-- hv:blocked -->" "$(MARKERS 5)"
     DONE T5 --commit abc1234 --reason blocked --note "again" >/dev/null
     eq "blocked idempotent" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
     # blocked then done: closes and clears blocked + in-progress

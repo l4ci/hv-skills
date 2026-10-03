@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/marker"
 	"github.com/l4ci/hv-skills/v5/internal/pystr"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
@@ -332,6 +333,7 @@ func Close(ctx context.Context, env Env, dir string, number int, commit, item st
 	if item != "" {
 		body += " ([" + item + "])"
 	}
+	body += "\n\n" + marker.Line("shipped")
 	provider := Provider(ctx, env, dir)
 	if provider == "unknown" {
 		return false, noProvider("close upstream issue")

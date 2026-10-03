@@ -33,20 +33,20 @@
 {"name":"commentlist/wrong-letter","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"item not found: F2"},"ok":false},"db":"3964919894374191"}]}
 {"name":"complete/already-closed","steps":[{"exit":0,"env":{"data":{"changed":false,"commit":"abc1234","id":"4","reason":"done","type":"T"},"ok":true},"db":"3964919894374191"}]}
 {"name":"complete/bad-reason","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"--reason must be done|handed-off|blocked|dropped"},"ok":false},"db":"3964919894374191"}]}
-{"name":"complete/blocked","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"blocked","type":"B"},"ok":true},"db":"504895148e06efc7"}]}
+{"name":"complete/blocked","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"blocked","type":"B"},"ok":true},"db":"03a9933a73efb008"}]}
 {"name":"complete/blocked-already","steps":[{"exit":0,"env":{"data":{"changed":false,"commit":"abc1234","id":"8","reason":"blocked","type":"B"},"ok":true},"db":"3964919894374191"}]}
-{"name":"complete/done-clears-state-labels","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"7","reason":"done","type":"T"},"ok":true},"db":"a0e4b77d66060f5b"}]}
-{"name":"complete/done-no-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"done","type":"B"},"ok":true},"db":"7071d2196ebc3f22"}]}
-{"name":"complete/done-note","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"done","type":"B"},"ok":true},"db":"cc99823f35c1acb1"}]}
+{"name":"complete/done-clears-state-labels","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"7","reason":"done","type":"T"},"ok":true},"db":"960a6d3bed07defd"}]}
+{"name":"complete/done-no-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"done","type":"B"},"ok":true},"db":"45d5b0d1c5e44322"}]}
+{"name":"complete/done-note","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"done","type":"B"},"ok":true},"db":"82bc487a6443d857"}]}
 {"name":"complete/done-proof-missing","steps":[{"exit":4,"env":{"data":{"blockedBy":"proof missing","changed":false},"error":{"code":"refused","exit":4,"hint":"record proof with `hv proof add`, or pass --no-proof","message":"[B2] no proof recorded, pass --no-proof to override"},"ok":false},"db":"3964919894374191"}]}
-{"name":"complete/done-with-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"edb7804299ad457f"}]}
-{"name":"complete/dropped","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"dropped","type":"B"},"ok":true},"db":"e5616e1e912c2b8a"}]}
+{"name":"complete/done-with-proof","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"4f2fc0a3c37e2187"}]}
+{"name":"complete/dropped","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"2","reason":"dropped","type":"B"},"ok":true},"db":"673f80eb9da99dfc"}]}
 {"name":"complete/forge-unavailable","steps":[{"exit":5,"env":{"error":{"code":"unavailable","exit":5,"message":"cannot determine provider (set issues.provider)"},"ok":false},"db":"3964919894374191"}]}
-{"name":"complete/gitlab-done-proof/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"edb7804299ad457f"}]}
-{"name":"complete/gitlab-done-proof/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"6bbe7acc4d33a11a"}]}
-{"name":"complete/gitlab-dropped/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"dropped","type":"F"},"ok":true},"db":"4d35d04613c8093f"}]}
-{"name":"complete/gitlab-dropped/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"dropped","type":"F"},"ok":true},"db":"490a8afc10803746"}]}
-{"name":"complete/handed-off","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"handed-off","type":"F"},"ok":true},"db":"a1e46ff90ca8503e"}]}
+{"name":"complete/gitlab-done-proof/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"4f2fc0a3c37e2187"}]}
+{"name":"complete/gitlab-done-proof/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"5","reason":"done","type":"B"},"ok":true},"db":"323768b487a32ceb"}]}
+{"name":"complete/gitlab-dropped/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"dropped","type":"F"},"ok":true},"db":"fd90aa0443ddda37"}]}
+{"name":"complete/gitlab-dropped/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"dropped","type":"F"},"ok":true},"db":"2d0b3e91886a3b9d"}]}
+{"name":"complete/handed-off","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"abc1234","id":"6","reason":"handed-off","type":"F"},"ok":true},"db":"0c10c7254f571bc4"}]}
 {"name":"complete/rate-limit","steps":[{"exit":6,"env":{"error":{"code":"retry","exit":6,"message":"github secondary rate limit — stopped; wait several minutes before retrying"},"ok":false},"db":"3964919894374191"}]}
 {"name":"complete/tracker-issue","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"item not found: 3"},"ok":false},"db":"3964919894374191"}]}
 {"name":"complete/unknown","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"item not found: 99"},"ok":false},"db":"3964919894374191"}]}
