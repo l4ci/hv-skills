@@ -1,12 +1,7 @@
 echo "A9: hv init seeds .hv/, runs the blocks, and hv init check reports"
 # The shim's init still runs the 4.x bootstrap (mirror, no blocks), so this
-# section needs init served by Go: the Go binary, or the hybrid when it routes
-# init there. Probed the way the hybrid routes, through `hv __verbs`; the shim
-# has no __verbs. S7 (#53) deletes the shim and this skip with it.
-if ! grep -qx init <<<"$("$HV_BIN" __verbs 2>/dev/null || true)"; then
-  echo "  skip: HV_BIN does not serve hv init from Go (hv __verbs lists no init)"
-  return 0
-fi
+# section needs init served by Go.
+require_go_verb init || return 0
 
 TMP_IN="$(mktemp -d)"
 trap 'rm -rf "$TMP_IN"' EXIT
