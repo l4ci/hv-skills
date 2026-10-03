@@ -157,6 +157,9 @@ func roundStart(fs *flag.FlagSet) RunFunc {
 			return a4Fail(err)
 		}
 		drift := 0
+		if b, ok := be.(round.Board); ok && be.Name() == "issues" {
+			env.Board = b
+		}
 		if rep, err := env.Status(ctx, root); err == nil {
 			drift = len(rep.Findings)
 		}

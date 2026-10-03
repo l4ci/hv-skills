@@ -7,6 +7,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
 	"github.com/l4ci/hv-skills/v5/internal/milestone"
 	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
+	"github.com/l4ci/hv-skills/v5/internal/tracker"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
@@ -39,10 +40,17 @@ func (e Env) Candidates(ctx context.Context, root string, be backlog.Backend, o 
 		return nil, err
 	}
 
+	handed, err := e.handedToHuman(ctx, be)
+	if err != nil {
+		return nil, err
+	}
 	tracked := e.trackedFiles(ctx, root)
 	inFlight := e.InFlightItems(ctx, root, be, tracked, o.Shared)
 	var out []Candidate
 	for _, it := range chosen {
+		if it.Number != 0 && handed[it.Number] {
+			continue
+		}
 		r, err := Assess(be, it.ID, tracked, o.Shared, inFlight, false)
 		if err != nil {
 			return nil, err
@@ -158,4 +166,21 @@ func InScope(root string, be backlog.Backend, scope string, slate []string, id s
 		}
 	}
 	return false, nil
+}
+
+// handedToHuman is the open issues carrying the needs-human label (C10): the
+// human holds them, so a round does not offer them. File mode has no labels.
+func (e Env) handedToHuman(ctx context.Context, be backlog.Backend) (map[int]bool, error) {
+	if e.Forge == nil || be.Name() != "issues" {
+		return nil, nil
+	}
+	issues, err := e.Forge.List(ctx, tracker.ListFilter{State: "open", Labels: []string{firstNonEmpty(e.NeedsHuman, DefaultNeedsHuman)}})
+	if err != nil {
+		return nil, err
+	}
+	out := map[int]bool{}
+	for _, is := range issues {
+		out[is.Number] = true
+	}
+	return out, nil
 }

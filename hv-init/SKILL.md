@@ -104,7 +104,7 @@ hv config set umbrella.enabled true          # only when UMBRELLA=true
 hv config set hvSkills.version <version>     # always; data.version from `hv version --json`
 ```
 
-`fill` never touches a key already present, so upgrades keep every prior value. The stamp is rewritten on every run: re-running `/hv-init` is how version drift clears.
+`fill` never touches a key already present, so upgrades keep every prior value. It does not seed the silent keys either (`round.scope`, `round.roster`, `round.brief`, `round.sharedPaths`, `round.stallMinutes`, `issues.labels.needsHuman`): they take their default until someone sets them. The stamp is rewritten on every run: re-running `/hv-init` is how version drift clears.
 
 ## Step 4 — Confirm
 

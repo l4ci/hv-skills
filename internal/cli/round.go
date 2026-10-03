@@ -13,5 +13,8 @@ func roundCommands() *Command {
 		{Name: "candidates", Summary: "list the items the round's scope allows, with readiness", Verb: roundCandidates},
 		{Name: "assign", Summary: "check an item's readiness and hand it to a slot", Verb: roundAssign},
 		{Name: "wind-down", Summary: "re-verify the base, park every slot, release the lease", Verb: roundWindDown},
+		{Name: "return", Summary: "a worker hands its issue back: park, comment, release", Verb: roundReturn},
+		{Name: "transfer", Summary: "move an assigned issue to another slot or to the human", Verb: roundTransfer},
+		{Name: "reclaim", Summary: "free a dead or stalled slot and make its issue assignable", Verb: roundReclaim},
 	}}
 }

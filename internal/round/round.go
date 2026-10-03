@@ -38,6 +38,8 @@ const (
 	PRStale              = "pr-stale"
 	LabelMissing         = "label-missing"
 	LabelOrphan          = "label-orphan"
+	StalledSlot          = "stalled"
+	ClaimMismatch        = "claim-mismatch"
 	// LeaseStale is declared in lease.go.
 )
 
@@ -49,6 +51,9 @@ const (
 
 // DefaultLabel is the issue label that means an agent is on the issue.
 const DefaultLabel = "in-progress"
+
+// DefaultNeedsHuman is the label of an issue handed to the human (C10).
+const DefaultNeedsHuman = "needs-human"
 
 // Forge is the part of the tracker adapter a round reads and, for the
 // label repair, writes. tracker.Adapter satisfies it.
@@ -82,6 +87,13 @@ type Env struct {
 	// work.accounts at assignment.
 	Worker   worker.Env
 	Accounts *worker.Accounts
+	// Board is the backlog's claim side; claim-mismatch drift needs it, and
+	// without it (file mode) that kind is skipped.
+	Board Board
+	// StallMinutes is round.stallMinutes; 0 turns the stalled check off.
+	StallMinutes int
+	// NeedsHuman is issues.labels.needsHuman; "" means DefaultNeedsHuman.
+	NeedsHuman string
 }
 
 // Row is one line of `hv round status`.
@@ -311,6 +323,35 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 		}
 	}
 
+	now := time.Now
+	if e.Now != nil {
+		now = e.Now
+	}
+	waiting := map[string]bool{}
+	for _, x := range escalation.Load(root) {
+		if x.Status == escalation.StatusPending && x.Slot != "" {
+			waiting[x.Slot] = true
+		}
+	}
+	if hostOK {
+		for _, r := range rows {
+			s := slotObj[r.Name]
+			if s == nil || r.Issue == "" || r.Agent == "" {
+				continue
+			}
+			v := rep.views[r.Name]
+			st := e.Stalled(ctx, StallInput{
+				Worktree: v.worktree, Base: v.base, Holds: true, Alive: true,
+				Escalated: waiting[r.Name], ActiveAt: worker.Str(s, "activeAt"), Minutes: e.StallMinutes,
+			}, now())
+			if st.Stalled {
+				rep.add(Finding{Kind: StalledSlot, Slot: r.Name, Issue: r.Issue,
+					Detail: fmt.Sprintf("nothing moved for %d min (last: %s)", int(st.Idle.Minutes()), st.Signal)})
+			}
+		}
+	}
+	e.claimFindings(ctx, rep, rows, slotObj, labelled, labelsOK)
+
 	e.leaseFinding(ctx, root, rep)
 
 	for _, r := range rows {
@@ -322,10 +363,6 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 				rep.Rows[i].Drift = append(rep.Rows[i].Drift, f.Kind)
 			}
 		}
-	}
-	now := time.Now
-	if e.Now != nil {
-		now = e.Now
 	}
 	for _, x := range escalation.Load(root) {
 		if x.Status != escalation.StatusPending {

@@ -22,7 +22,8 @@ func (o Outcome) Clean() bool { return len(o.Drift) == 0 && len(o.Repaired) == 0
 
 // Reconcile assembles the round and, with apply, makes the safe repairs: it
 // clears the handle of a dead tab, registers an unregistered worktree,
-// records an unrecorded PR and adds a missing in-progress label. Every other
+// records an unrecorded PR, adds a missing in-progress label and clears a
+// claimId whose claim is gone from the tracker (never the tracker's side). Every other
 // kind is only reported (a tab may be a live worker; opening a PR is the
 // worker's act; resetting a slot and removing a label are the orchestrator's).
 // A repair that fails becomes a warning and leaves its finding in Drift.
@@ -68,6 +69,8 @@ func (e Env) repair(ctx context.Context, root string, rep *Report, f Finding) er
 			}
 		}
 		return registerSlot(root, row, v)
+	case ClaimMismatch:
+		return mutateSlot(root, f.Slot, func(s *jsonx.Object) { s.Delete("claimId") })
 	case LabelMissing:
 		n, err := strconv.Atoi(f.Issue)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
@@ -121,9 +122,10 @@ func clearHandle(root, slot string) {
 	})
 }
 
-// recordDispatch writes the handle, state=busy and, for a task, the task id
-// (clearing the previous task's PR and relay log).
-func recordDispatch(root, slot, handle, task string, round *int) error {
+// recordDispatch writes the handle, state=busy, activeAt (the stall signal of
+// `round reconcile`) and, for a task, the task id (clearing the previous
+// task's PR and relay log).
+func recordDispatch(root, slot, handle, task string, round *int, now string) error {
 	def := jsonx.NewObject()
 	def.Set("slots", []any{})
 	return Update(root, def, func(doc *jsonx.Object) {
@@ -141,6 +143,7 @@ func recordDispatch(root, slot, handle, task string, round *int) error {
 			}
 			s.Set("handle", h)
 			s.Set("state", "busy")
+			s.Set("activeAt", now)
 			if task != "" {
 				s.Set("task", task)
 				s.Set("pr", nil)
@@ -273,7 +276,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	}
 	res.Handle = handle
 
-	if err := recordDispatch(root, o.Slot, handle, o.Task, o.Round); err != nil {
+	if err := recordDispatch(root, o.Slot, handle, o.Task, o.Round, stamp(e.Now())); err != nil {
 		return res, err
 	}
 	round := roundOf(root)
@@ -409,4 +412,30 @@ func ModelApplies(root string) bool {
 		}
 	}
 	return true
+}
+
+// stamp is the registry's activeAt format: RFC 3339, UTC.
+func stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05Z") }
+
+// KillSlot closes the slot's session on the configured host and proves it
+// gone. It is what a reclaim does to a stalled worker before its worktree is
+// parked: the host failing to close it is exit 5.
+func (e Env) KillSlot(ctx context.Context, root, slot string) error {
+	e = e.withDefaults()
+	s := LoadRegistry(root).Slot(slot)
+	if s == nil {
+		return fail(ExitResolution, fmt.Sprintf("slot '%s' is not in the pool", slot))
+	}
+	handle := Str(s, "handle")
+	if handle == "" {
+		handle = Str(s, "window")
+	}
+	h := e.NewHost(dispatchKind(root))
+	if err := h.Require(); err != nil {
+		return fail(ExitUnavailable, err.Error())
+	}
+	if err := h.Kill(ctx, slot, handle); err != nil {
+		return fail(ExitUnavailable, err.Error())
+	}
+	return nil
 }

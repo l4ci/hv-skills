@@ -90,6 +90,8 @@ var Keys = []Key{
 	{"round.tiers.codex.light", "", false},
 	{"round.tiers.codex.standard", "", false},
 	{"round.tiers.codex.heavy", "", false},
+	{"round.stallMinutes", json.Number("30"), false},
+	{"issues.labels.needsHuman", "needs-human", false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.

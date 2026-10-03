@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
@@ -209,5 +210,41 @@ func TestPollHostFailureAndNoRegistry(t *testing.T) {
 	f.requireErr = fmt.Errorf("tmux is not installed")
 	if _, err = envWith(f).Poll(bg, dir, PollOpts{}); exitOf(err) != ExitUnavailable {
 		t.Errorf("host missing: %v", err)
+	}
+}
+
+// activeAt is the stall clock of `round reconcile`: dispatch stamps it, poll
+// re-stamps it only when the classified state differs from the recorded one.
+func TestActiveAtStampedByDispatchAndRestampedByPollOnAStateChange(t *testing.T) {
+	dir, f := pollRegistry(t, "tmux")
+	f.panes["w1"] = []string{"? for shortcuts\n"}
+	const dispatched = "2026-10-02T15:04:05Z"
+	if _, err := envWith(f).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "go\n"), Task: "T1"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := slotField(t, dir, "w1", "activeAt"); got != dispatched {
+		t.Fatalf("dispatch stamps activeAt: %q", got)
+	}
+	if got := slotField(t, dir, "w2", "activeAt"); got != "<null>" {
+		t.Errorf("a slot never dispatched has none: %q", got)
+	}
+
+	later := envWith(f)
+	later.Now = func() time.Time { return time.Date(2026, 10, 2, 16, 0, 0, 0, time.UTC) }
+	// busy -> busy: the pane moves, the state is the recorded one: no restamp.
+	f.panes["w1"] = []string{"a\n", "b\n"}
+	if _, err := later.Poll(bg, dir, PollOpts{Slot: "w1", Lines: 60}); err != nil {
+		t.Fatal(err)
+	}
+	if got := slotField(t, dir, "w1", "activeAt"); got != dispatched {
+		t.Errorf("an unchanged state must not restamp: %q", got)
+	}
+	// busy -> done: a change.
+	f.panes["w1"] = []string{"x\n", "x\nHV-DONE w1 https://github.com/o/r/pull/9\n"}
+	if _, err := later.Poll(bg, dir, PollOpts{Slot: "w1", Lines: 60}); err != nil {
+		t.Fatal(err)
+	}
+	if got := slotField(t, dir, "w1", "activeAt"); got != "2026-10-02T16:00:00Z" {
+		t.Errorf("a state change restamps: %q", got)
 	}
 }

@@ -255,6 +255,11 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 		if !ok {
 			return
 		}
+		// A state change is the registry's only record of activity that is not a
+		// commit or an edit: `round reconcile` reads it as the stall clock.
+		if next := strings.ToLower(r.State); Str(s, "state") != next {
+			s.Set("activeAt", stamp(e.Now()))
+		}
 		s.Set("state", strings.ToLower(r.State))
 		// Only a URL-shaped HV-DONE argument becomes slot.pr. The contract
 		// allows a bare branch name there, and handing a branch to `gh pr
