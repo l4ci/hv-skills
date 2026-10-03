@@ -358,7 +358,7 @@ grep -q "^\*\*Diff" <<<"$BRIEF" \
   || fail "review brief missing Diff section"
 grep -q "so1.txt" <<<"$BRIEF" \
   || fail "review brief missing per-file diff path"
-grep -q "PASS | CONCERNS | FAIL" <<<"$BRIEF" \
+grep -q '^`verdict` is one of:' <<<"$BRIEF" \
   || fail "review brief missing verdict-instruction"
 if grep -qi "KNOWLEDGE\.md\|DECISIONS\.md\|hard boundaries\|known gotchas" <<<"$BRIEF"; then
   fail "review brief leaked KNOWLEDGE/DECISIONS context (must be diff+goal only)"
