@@ -78,7 +78,8 @@ pass "C6[reap d]: --apply removes only unheld candidates and never a live agent'
 
 # (e) the next run: the freed branch is now a candidate and the held worktree is still held
 OUT="$(rp_run)"
-[ "$(printf '%s' "$OUT" | rp_ids)" = "worktree:dirty!,branch:kit/1-old,tab:w5:t1,process:4242" ]  # the fixture file is static, so the host entries remain || fail "C6[reap e]: second run gave $(printf '%s' "$OUT" | rp_ids)"
+# the fixture file is static, so the host entries remain
+[ "$(printf '%s' "$OUT" | rp_ids)" = "worktree:dirty!,branch:kit/1-old,tab:w5:t1,process:4242" ] || fail "C6[reap e]: second run gave $(printf '%s' "$OUT" | rp_ids)"
 pass "C6[reap e]: a second run finds the branch the first freed and still holds the dirty worktree"
 
 # (f) the round lease: only a stale one (holder gone, this host) is listed and cleared
