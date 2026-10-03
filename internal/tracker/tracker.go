@@ -309,13 +309,19 @@ func (b *base) run(ctx context.Context, args []string, body string) (string, err
 		return "", err
 	}
 	if res.ExitCode != 0 {
-		kind := KindFailed
-		if reNotFound.Match(res.Stderr) && !reRepoMissing.Match(res.Stderr) {
-			kind = KindNotFound
-		}
-		return "", &Error{Kind: kind, Code: res.ExitCode, Message: strings.TrimSpace(string(res.Stderr))}
+		return "", FailedCall(string(res.Stderr), res.ExitCode)
 	}
 	return string(res.Stdout), nil
+}
+
+// FailedCall is a forge call that exited non-zero, as a tracker failure:
+// KindNotFound when the CLI says the object does not exist, else KindFailed.
+func FailedCall(stderr string, code int) *Error {
+	kind := KindFailed
+	if reNotFound.MatchString(stderr) && !reRepoMissing.MatchString(stderr) {
+		kind = KindNotFound
+	}
+	return &Error{Kind: kind, Code: code, Message: strings.TrimSpace(stderr)}
 }
 
 // list runs a list command with an explicit page size and keeps fetching

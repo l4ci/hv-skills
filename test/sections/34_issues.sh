@@ -274,7 +274,7 @@ print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
     eq "label remove state" "" "$(DBQ labels 2)"
     eq "label needs one of add/remove" 2 "$(rcof "$HV_BIN" --json issues label 2)"
     eq "label rejects add+remove" 2 "$(rcof "$HV_BIN" --json issues label 2 --add a --remove b)"
-    eq "label missing issue" 5 "$(rcof "$HV_BIN" --json issues label 99 --add triage)"
+    eq "label missing issue" 3 "$(rcof "$HV_BIN" --json issues label 99 --add triage)"
 
     # close: closes once and comments with the short sha; a repeat posts no second comment
     OUT=$(hvj issues close 2 --commit "$SHA" --item B07) || fail "$prov issues close failed: $OUT"
@@ -287,7 +287,7 @@ print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
     OUT=$(hvj issues list) || fail "$prov issues list after close failed"
     eq "list drops closed" "1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
     eq "close unknown commit" 3 "$(rcof "$HV_BIN" --json issues close 1 --commit deadbeef0000)"
-    eq "close missing issue" 5 "$(rcof "$HV_BIN" --json issues close 99 --commit "$SHA")"
+    eq "close missing issue" 3 "$(rcof "$HV_BIN" --json issues close 99 --commit "$SHA")"
     eq "close without --commit" 2 "$(rcof "$HV_BIN" --json issues close 1)"
     eq "close non-numeric issue" 2 "$(rcof "$HV_BIN" --json issues close abc --commit "$SHA")"
   ) || fail "issues list/label/close on $prov failed (see subshell output above)"
@@ -296,3 +296,56 @@ done
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$TMP_IV"
 pass "issues list, label and close behave on github and gitlab (data, store state, exit codes)"
+
+# === issues label/close exits: missing issue, no provider (#48) ===
+echo "Section 32: issues label/close exit 3 for a missing issue and no provider"
+TMP_EX="$(mktemp -d)"
+trap 'rm -rf "$TMP_EX"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
+
+mkexit() { # <dir> <origin url or ""> <config json>
+  mkdir -p "$1/.hv"
+  echo "$3" > "$1/.hv/config.json"
+  git -C "$1" init -q
+  git -C "$1" config user.email t@t
+  git -C "$1" config user.name t
+  git -C "$1" commit -q --allow-empty -m init
+  if [ -n "$2" ]; then git -C "$1" remote add origin "$2"; fi
+}
+rcv() { local rc=0; (cd "$1" && shift && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" "$HV_BIN" --json "$@") >"$TMP_EX/out" 2>&1 || rc=$?; echo "$rc"; }
+
+# A missing issue is not_found (exit 3) on both forges, not a forge failure (5).
+for prov in github gitlab; do
+  P="$TMP_EX/$prov"
+  mkexit "$P" "https://$prov.com/o/r.git" '{"issues":{"retryWaitSeconds":0}}'
+  rc=$(rcv "$P" issues label 99 --remove bug)
+  [ "$rc" = "3" ] || fail "$prov issues label on a missing issue should exit 3, got $rc: $(cat "$TMP_EX/out")"
+  rc=$(rcv "$P" issues label 99 --add bug)
+  [ "$rc" = "3" ] || fail "$prov issues label --add on a missing issue should exit 3, got $rc: $(cat "$TMP_EX/out")"
+  rc=$(rcv "$P" issues close 99 --commit HEAD)
+  [ "$rc" = "3" ] || fail "$prov issues close on a missing issue should exit 3, got $rc: $(cat "$TMP_EX/out")"
+  # another forge failure stays exit 5
+  rc=$(cd "$P" && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" FAKE_TRACKER_FAIL="issue" FAKE_TRACKER_FAIL_MSG="HTTP 500: server error" "$HV_BIN" --json issues close 1 --commit HEAD >/dev/null 2>&1; echo $?)
+  [ "$rc" = "5" ] || fail "$prov issues close with a failing forge should exit 5, got $rc"
+done
+
+# No origin and no issues.provider: exit 3 with a message, never a silent [].
+P="$TMP_EX/none"
+mkexit "$P" "" '{"issues":{"retryWaitSeconds":0}}'
+for argv in "issues list" "issues label 1 --add bug" "issues close 1 --commit HEAD"; do
+  rc=$(rcv "$P" $argv)
+  [ "$rc" = "3" ] || fail "no provider: hv $argv should exit 3, got $rc: $(cat "$TMP_EX/out")"
+  grep -q "issues.provider" "$TMP_EX/out" || fail "no provider: hv $argv message should name issues.provider: $(cat "$TMP_EX/out")"
+done
+
+# issues.provider stands in when origin names no forge; an origin that does wins.
+P="$TMP_EX/fallback"
+mkexit "$P" "" '{"issues":{"provider":"github","retryWaitSeconds":0}}'
+rc=$(rcv "$P" issues list)
+[ "$rc" = "0" ] || fail "issues list with issues.provider and no origin should exit 0, got $rc: $(cat "$TMP_EX/out")"
+[ "$(jq -r .data.issues <"$TMP_EX/out")" = "[]" ] || fail "issues list fallback expected an empty list from the fake forge: $(cat "$TMP_EX/out")"
+[ "$(cd "$P" && "$HV_BIN" --json issues provider | jget data.provider)" = "github" ] || fail "issues provider should answer from issues.provider with no origin"
+git -C "$P" remote add origin "https://gitlab.com/o/r.git"
+[ "$(cd "$P" && "$HV_BIN" --json issues provider | jget data.provider)" = "gitlab" ] || fail "an origin naming a forge should beat issues.provider"
+
+trap 'rm -rf "$TMP"' EXIT
+pass "issues label/close exit 3 for a missing issue and for no provider; issues.provider is the fallback"

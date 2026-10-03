@@ -248,3 +248,45 @@ func TestA4dScopeFollowsWorkingDirectory(t *testing.T) {
 		}
 	}
 }
+
+func TestA4dNoProviderAndMissingIssue(t *testing.T) {
+	// no origin, no issues.provider: list and label exit 3 instead of an empty list
+	root := a4dRepo(t, "")
+	a4dForge(t, "", nil)
+	for _, argv := range [][]string{{"issues", "list"}, {"issues", "label", "3", "--add", "x"}} {
+		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		if msg, _ := get(env, "error", "message").(string); code != ExitResolution || !strings.Contains(msg, "issues.provider") {
+			t.Errorf("%v: %d %v", argv, code, env)
+		}
+	}
+	// issues.provider stands in for a missing origin
+	root = a4dRepo(t, "")
+	os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte(`{"issues": {"provider": "github"}}`), 0o644)
+	calls := a4dForge(t, "", map[string]string{"issue list": "[]"})
+	if code, env, _ := hvRun(t, "--json", "-C", root, "issues", "list"); code != 0 || !slices.Contains(*calls, "gh issue list --state open --json number,title,body,labels,url,author --limit 30") {
+		t.Errorf("config fallback: %d %v %q", code, env, *calls)
+	}
+	// a missing issue is exit 3; another forge failure stays exit 5
+	root = a4dRepo(t, "https://github.com/o/r.git")
+	for stderr, want := range map[string]int{
+		"GraphQL: Could not resolve to an Issue with the number of 99.": ExitResolution,
+		"HTTP 500: server error": ExitUnavailable,
+	} {
+		exe := func(_ context.Context, _ string, name string, args []string, _ []byte) ([]byte, []byte, int, error) {
+			if name == "git" {
+				return []byte("https://github.com/o/r.git\n"), nil, 0, nil
+			}
+			if len(args) > 1 && args[0] == "issue" && args[1] == "edit" {
+				return nil, []byte(stderr), 1, nil
+			}
+			return nil, nil, 0, nil
+		}
+		old := trackerOptions
+		trackerOptions = []tracker.Option{tracker.WithExec(exe, func(n string) (string, error) { return "/fake/" + n, nil })}
+		code, env, _ := hvRun(t, "--json", "-C", root, "issues", "label", "99", "--remove", "x")
+		trackerOptions = old
+		if code != want {
+			t.Errorf("%q: exit %d, want %d: %v", stderr, code, want, env)
+		}
+	}
+}

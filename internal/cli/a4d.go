@@ -70,8 +70,12 @@ func a4dErr(err error) error {
 		return nil
 	case errors.Is(err, issues.ErrCommitNotFound):
 		return Resolution("%s", strings.TrimPrefix(err.Error(), issues.ErrCommitNotFound.Error()+": "))
+	case errors.Is(err, issues.ErrNoProvider):
+		return Resolution("%s", strings.TrimPrefix(err.Error(), issues.ErrNoProvider.Error()+": "))
 	case errors.As(err, &te):
 		switch te.Kind {
+		case tracker.KindNotFound:
+			return Resolution("%s", te.Message)
 		case tracker.KindRateLimited:
 			return Retry("%s", te.Message)
 		case tracker.KindInternal:
