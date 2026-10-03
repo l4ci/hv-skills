@@ -37,6 +37,15 @@ RC=0; OUT=$( cd "$IL" && hvj debug counter init B07 2>/dev/null ) || RC=$?
 ( cd "$IL" && hvj debug counter init B08 >/dev/null ) || fail "another item should still start"
 pass "the Iron Law refuses a fourth attempt per item"
 
+# debug reset is a manual gate: refused without --confirm, audited with it.
+RC=0; OUT=$( cd "$IL" && hvj debug reset B07 --reason "new angle" 2>/dev/null ) || RC=$?
+[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.gate)" = "debug-reset" ] || fail "an unconfirmed reset should hit the debug-reset gate: rc=$RC $OUT"
+OUT=$( cd "$IL" && hvj debug reset B07 --reason "new angle" --confirm --confirm-note "yes, reset" ) || fail "a confirmed reset failed: $OUT"
+[ "$(echo "$OUT" | jget data.cleared)" = "3" ] || fail "the reset should clear three failed fixes: $OUT"
+grep -q '"gate": "debug-reset"' "$IL/.hv/gate-audit.jsonl" || fail "the reset wrote no audit line"
+( cd "$IL" && hvj debug counter init B07 >/dev/null ) || fail "init should work again after a reset"
+pass "debug reset is gated and audited, and starts the count again"
+
 # --auto-loop writes auto: true in loop mode and is a usage error outside it.
 RC=0; ( cd "$IL" && hvj design add F01 --title "Auto" --auto-loop >/dev/null 2>&1 ) || RC=$?
 [ "$RC" = "2" ] || fail "design add --auto-loop outside loop should exit 2, got $RC"
