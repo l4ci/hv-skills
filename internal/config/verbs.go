@@ -93,8 +93,8 @@ func Show(root string, key string, one bool) ([]Entry, error) {
 
 // Default is the default of k as a fresh value, so callers cannot edit the table.
 func Default(k Key) any {
-	if _, isList := k.Default.([]any); isList {
-		return []any{}
+	if list, isList := k.Default.([]any); isList {
+		return append([]any{}, list...)
 	}
 	return k.Default
 }
