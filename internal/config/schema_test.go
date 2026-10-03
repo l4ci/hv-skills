@@ -88,7 +88,8 @@ func TestSchemaMatchesPython(t *testing.T) {
 		raw, _ := json.Marshal(tree)
 		cases = append(cases, schemaCase{string(raw), key})
 	}
-	for _, k := range Keys {
+	py := Keys[:PythonKeys] // the goldens were recorded over CONFIG_KEYS
+	for _, k := range py {
 		add(map[string]any{}, k.Name)
 	}
 	add(map[string]any{}, "no.such.key")
@@ -111,7 +112,7 @@ func TestSchemaMatchesPython(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		tree := map[string]any{}
 		for j := rng.Intn(5); j >= 0; j-- {
-			setPath(tree, Keys[rng.Intn(len(Keys))].Name, randomValue(rng, 0))
+			setPath(tree, py[rng.Intn(len(py))].Name, randomValue(rng, 0))
 		}
 		if rng.Intn(4) == 0 {
 			setPath(tree, "backlog.backend", randomValue(rng, 0))
@@ -119,7 +120,7 @@ func TestSchemaMatchesPython(t *testing.T) {
 		if rng.Intn(4) == 0 {
 			setPath(tree, "issues.label", randomValue(rng, 0))
 		}
-		add(tree, Keys[rng.Intn(len(Keys))].Name)
+		add(tree, py[rng.Intn(len(py))].Name)
 	}
 	inputs := make([]any, len(cases))
 	got := make([]any, len(cases))
@@ -140,17 +141,18 @@ func TestKeysShape(t *testing.T) {
 		}
 		seen[k.Name] = true
 	}
-	if len(Keys) != 54 {
-		t.Fatalf("Keys has %d rows, want 54 (CONFIG_KEYS)", len(Keys))
+	if len(Keys) < PythonKeys {
+		t.Fatalf("Keys has %d rows, want at least %d (CONFIG_KEYS)", len(Keys), PythonKeys)
 	}
 }
 
-// Keys must stay the same table as CONFIG_KEYS: name, default and required flag.
+// The leading PythonKeys rows must stay the same table as CONFIG_KEYS: name,
+// default and required flag.
 func TestKeysMatchPython(t *testing.T) {
 	var want [][]any
 	pytest.GoldenJSON(t, nil, &want)
 	var got [][]any
-	for _, k := range Keys {
+	for _, k := range Keys[:PythonKeys] {
 		got = append(got, []any{k.Name, k.Default, k.Required})
 	}
 	gi, wi := make([]any, len(got)), make([]any, len(want))

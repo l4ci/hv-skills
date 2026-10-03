@@ -17,8 +17,10 @@ type Key struct {
 	Required bool   // written by /hv-init; the schema check treats it as present-or-stale
 }
 
-// Keys is the table of every known config key, in the order of CONFIG_KEYS in
-// bin/hvlib_config.py. Leaf keys only: object-valued parents are not rows.
+// Keys is the table of every known config key. Leaf keys only: object-valued
+// parents are not rows. The first PythonKeys rows are CONFIG_KEYS of the
+// retired bin/hvlib_config.py, in its order, which the parity goldens freeze;
+// keys added in 5.0 follow them.
 var Keys = []Key{
 	{"models.orchestrator", "opus", true},
 	{"models.worker", "sonnet", true},
@@ -74,7 +76,13 @@ var Keys = []Key{
 	{"release.confirmLargePushCommits", json.Number("10"), false},
 	{"release.nudgeAfterCommits", json.Number("10"), false},
 	{"release.nudgeAfterDays", json.Number("14"), false},
+	// 5.0 keys: not in CONFIG_KEYS.
+	{"ship.mergeApproval", "none", false},
+	{"ship.mergeApprovalPaths", []any{}, false},
 }
+
+// PythonKeys is how many leading rows of Keys are CONFIG_KEYS.
+const PythonKeys = 54
 
 // backlogBackends are the accepted values of backlog.backend.
 var backlogBackends = []string{"file", "issues"}

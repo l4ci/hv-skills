@@ -63,6 +63,9 @@ const (
 	GateMergedRemotely = "merged-remotely"
 	GateMergeFailed    = "merge-failed"
 	GateCheckBroke     = "check-broke"
+	// GateApprovalRequired: the merge-approval gate (B1) refused before the
+	// merge; the CLI exits 4 with it.
+	GateApprovalRequired = "approval-required"
 )
 
 // GateOpts are the flags of `hv worker gate`.
@@ -71,6 +74,11 @@ type GateOpts struct {
 	Base      string
 	CheckOnly bool
 	NoVerify  bool
+	// Approve is the merge-approval gate (B1), run after provenance and right
+	// before the merge, never under CheckOnly. files lists the paths the merge
+	// changes. A non-nil error stops the gate with verdict approval-required
+	// and is returned as is.
+	Approve func(files func() ([]string, error)) error
 }
 
 // GateResult is the gate's answer. Err is the message for a non-success
@@ -215,6 +223,25 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	cur, _ := e.git(root, "rev-parse", "--abbrev-ref", "HEAD")
 	if cur != o.Base {
 		return res, fail(ExitResolution, fmt.Sprintf("gate must run with %s checked out (currently on %s)", o.Base, cur))
+	}
+	if o.Approve != nil {
+		files := func() ([]string, error) {
+			out, code := e.git(root, "diff", "--name-only", g.baseRef+"..."+g.headRef)
+			if code != 0 {
+				return nil, fmt.Errorf("git diff --name-only %s...%s exited %d", g.baseRef, g.headRef, code)
+			}
+			var list []string
+			for _, l := range strings.Split(out, "\n") {
+				if l != "" {
+					list = append(list, l)
+				}
+			}
+			return list, nil
+		}
+		if err := o.Approve(files); err != nil {
+			res.Verdict = GateApprovalRequired
+			return res, err
+		}
 	}
 	if g.remote {
 		if r, done := g.mergeRemote(); done {

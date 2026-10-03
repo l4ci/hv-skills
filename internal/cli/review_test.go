@@ -293,6 +293,11 @@ type a8Forge struct {
 	prs      []tracker.PR
 	mergeErr error
 	merged   []int
+	files    map[int][]string // PRFiles answers, for the merge-approval gate
+}
+
+func (f *a8Forge) PRFiles(_ context.Context, pr int) ([]string, error) {
+	return f.files[pr], nil
 }
 
 func (f *a8Forge) OpenPRs(context.Context) ([]tracker.PR, error) {

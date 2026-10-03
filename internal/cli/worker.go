@@ -577,6 +577,7 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 	base := fs.String("base", "", "the cycle branch the slot merges into")
 	check := fs.Bool("check-only", false, "judge freshness, PR identity and provenance; merge nothing")
 	noVerify := fs.Bool("no-verify", false, "merge without running refactor.verifyCommands")
+	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		slot, err := oneArg(args, "slot")
 		if err != nil {
@@ -585,13 +586,41 @@ func workerGate(fs *flag.FlagSet) RunFunc {
 		if *base == "" {
 			return Result{}, Usage("--base is required")
 		}
+		conf, err := confirm()
+		if err != nil {
+			return Result{}, err
+		}
 		root, err := c.Root()
 		if err != nil {
 			return Result{}, err
 		}
+		policy, err := mergePolicy(c)
+		if err != nil {
+			return Result{}, err
+		}
+		var gateRes Result
+		var gateErr error
+		approve := func(files func() ([]string, error)) error {
+			gateRes, gateErr = clearMerge(c, policy, slot+" into "+*base, conf, files, nil)
+			return gateErr
+		}
 		ctx, stop := workerContext()
 		defer stop()
-		r, err := workerEnvCtx(ctx).Gate(ctx, root, worker.GateOpts{Slot: slot, Base: *base, CheckOnly: *check, NoVerify: *noVerify})
+		r, err := workerEnvCtx(ctx).Gate(ctx, root, worker.GateOpts{Slot: slot, Base: *base, CheckOnly: *check, NoVerify: *noVerify, Approve: approve})
+		if gateErr != nil {
+			var e *Error
+			if !errors.As(gateErr, &e) {
+				return Result{}, Unavailable("%v", gateErr) // listing the merge's files failed
+			}
+			d := gateData(r)
+			if g, ok := gateRes.Data.(*jsonx.Object); ok {
+				for _, k := range []string{"blockedBy", "gate", "paths", "changed"} {
+					v, _ := g.Get(k)
+					d.Set(k, v)
+				}
+			}
+			return Result{Data: d}, gateErr
+		}
 		if err != nil {
 			return Result{}, fromWorker(err)
 		}

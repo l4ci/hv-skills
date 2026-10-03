@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv-skills/v5/internal/gate"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
@@ -94,9 +95,14 @@ func trSuggest(fs *flag.FlagSet) RunFunc {
 	title := fs.String("title", "", "issue title")
 	bodyFile := fs.String("body-file", "", "issue body: a path, or - for stdin")
 	upstream := fs.String("upstream-repo", "", "owner/repo (default $HV_UPSTREAM_REPO, else l4ci/hv-skills)")
+	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) > 0 {
 			return Result{}, Usage("unexpected argument %q", args[0])
+		}
+		conf, err := confirm()
+		if err != nil {
+			return Result{}, err
 		}
 		if *title == "" {
 			return Result{}, Usage("--title is required")
@@ -105,7 +111,6 @@ func trSuggest(fs *flag.FlagSet) RunFunc {
 			return Result{}, Usage("--body-file is required")
 		}
 		var raw []byte
-		var err error
 		if *bodyFile == "-" {
 			raw, err = io.ReadAll(c.Stdin)
 		} else {
@@ -124,6 +129,9 @@ func trSuggest(fs *flag.FlagSet) RunFunc {
 			repo = "l4ci/hv-skills"
 		}
 		manual := "file it by hand at https://github.com/" + repo + "/issues/new"
+		if res, err := clearGate(c, gate.PublicFiling, repo+": "+*title, conf, nil, nil); err != nil {
+			return res, err
+		}
 
 		ctx := c.Context()
 		cl, err := tracker.NewCLI(ctx, trackerSettings(c), "github", "", trackerOptions...)

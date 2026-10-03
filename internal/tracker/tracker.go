@@ -206,6 +206,9 @@ type Adapter interface {
 	// PRMerge merges with a merge commit, deletes the source branch and
 	// returns the merge commit sha.
 	PRMerge(ctx context.Context, pr int) (string, error)
+	// PRFiles lists the repo-relative paths a PR changes, for the
+	// merge-approval gate (B1).
+	PRFiles(ctx context.Context, pr int) ([]string, error)
 	PRComment(ctx context.Context, pr int, body string) error
 	// PRState is "open", "merged" or "closed".
 	PRState(ctx context.Context, pr int) (string, error)

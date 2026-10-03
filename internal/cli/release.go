@@ -31,6 +31,8 @@ func releaseCommands() *Command {
 		{Name: "pending", Summary: "how much has landed since the last release tag", Repo: true, Verb: noFlags(releasePending)},
 		{Name: "milestone-check", Summary: "list the open issues that block a milestone release", Repo: true, Verb: noFlags(releaseMilestoneCheck)},
 		{Name: "close-milestone", Summary: "close out a released milestone", Repo: true, Verb: releaseCloseMilestone},
+		{Name: "push", Summary: "push the release tag and branch to origin (manual gate)", Repo: true, Verb: releasePush},
+		{Name: "publish", Summary: "create the GitHub or GitLab release (manual gate)", Repo: true, Verb: releasePublish},
 	}}
 }
 

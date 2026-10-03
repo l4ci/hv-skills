@@ -358,6 +358,22 @@ func (g *GitHub) PRMerge(ctx context.Context, pr int) (string, error) {
 	return d.MergeCommit.Oid, nil
 }
 
+// PRFiles reads `gh pr diff --name-only`, which lists every file; the
+// `files` field of `gh pr view` stops at 100.
+func (g *GitHub) PRFiles(ctx context.Context, pr int) ([]string, error) {
+	out, err := g.run(ctx, []string{"pr", "diff", strconv.Itoa(pr), "--name-only"}, "")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, l := range strings.Split(out, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			files = append(files, l)
+		}
+	}
+	return files, nil
+}
+
 func (g *GitHub) PRComment(ctx context.Context, pr int, body string) error {
 	_, err := g.run(ctx, []string{"pr", "comment", strconv.Itoa(pr), "--body-file", "-"}, body)
 	return err

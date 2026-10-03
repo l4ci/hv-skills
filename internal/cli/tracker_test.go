@@ -197,7 +197,12 @@ func TestTrackerCallProviderAndRepo(t *testing.T) {
 }
 
 func TestTrackerSuggestUpstream(t *testing.T) {
-	dir := t.TempDir() // no .hv/: the verb runs outside a project too
+	// A confirmed pass is audited under .hv/ (B1), so the project needs one.
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".hv"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ok := []string{"--confirm", "--confirm-note", "yes, file it"}
 	body := filepath.Join(dir, "body.md")
 	if err := os.WriteFile(body, []byte("learned this\r\nand that\n\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -212,7 +217,7 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 	f := &forge{answer: created}
 	useForge(t, f)
 	t.Setenv("HV_UPSTREAM_REPO", "")
-	o := trRun(t, dir, "", "tracker", "suggest-upstream", "--json", "--title", "A learning", "--body-file", body)
+	o := trRun(t, dir, "", append([]string{"tracker", "suggest-upstream", "--json", "--title", "A learning", "--body-file", body}, ok...)...)
 	env := envelope(t, o.stdout)
 	data := env["data"].(map[string]any)
 	if o.code != 0 || data["url"] != "https://github.com/l4ci/hv-skills/issues/123" || data["number"] != 123.0 ||
@@ -231,8 +236,8 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 	f = &forge{answer: created}
 	useForge(t, f)
 	t.Setenv("HV_UPSTREAM_REPO", "env/repo")
-	trRun(t, dir, "from stdin", "tracker", "suggest-upstream", "--title", "T", "--body-file", "-")
-	o = trRun(t, dir, "x", "tracker", "suggest-upstream", "--title", "T", "--body-file", "-", "--upstream-repo", "flag/repo")
+	trRun(t, dir, "from stdin", append([]string{"tracker", "suggest-upstream", "--title", "T", "--body-file", "-"}, ok...)...)
+	o = trRun(t, dir, "x", append([]string{"tracker", "suggest-upstream", "--title", "T", "--body-file", "-", "--upstream-repo", "flag/repo"}, ok...)...)
 	if !strings.Contains(f.calls[1], "-R env/repo") || !strings.Contains(f.calls[3], "-R flag/repo") || f.stdins[1] != "from stdin" {
 		t.Fatalf("calls %q stdins %q", f.calls, f.stdins)
 	}
@@ -252,6 +257,9 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		{"no title", created, true, []string{"--body-file", body}, 2, "--title is required"},
 		{"no body", created, true, []string{"--title", "T"}, 2, "--body-file is required"},
 		{"unreadable body", created, true, []string{"--title", "T", "--body-file", filepath.Join(dir, "nope")}, 2, "--body-file"},
+		{"no confirm", created, true, []string{"--title", "T", "--body-file", body}, 4, "manual gate 'public-filing' is not cleared"},
+		{"confirm without note", created, true, []string{"--title", "T", "--body-file", body, "--confirm"}, 2, "--confirm-note"},
+		{"note without confirm", created, true, []string{"--title", "T", "--body-file", body, "--confirm-note", "yes"}, 2, "--confirm-note"},
 		{"gh missing", created, false, []string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv-skills/issues/new"},
 		{"not authed", func(string, []string) (string, string, int) { return "", "not logged in", 1 }, true,
 			[]string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv-skills/issues/new"},
@@ -265,7 +273,14 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		f := &forge{answer: c.answer}
 		useForge(t, f)
 		f.found = c.found
-		o := trRun(t, dir, "", append([]string{"tracker", "suggest-upstream"}, c.args...)...)
+		args := c.args
+		if c.code == 5 {
+			args = append(append([]string{}, args...), ok...)
+		}
+		o := trRun(t, dir, "", append([]string{"tracker", "suggest-upstream"}, args...)...)
+		if c.code == 4 && len(f.calls) != 0 {
+			t.Errorf("%s: gh ran before the gate refused: %q", c.name, f.calls)
+		}
 		if o.code != c.code || !strings.Contains(o.stderr, c.has) {
 			t.Errorf("%s: exit %d, stderr %q; want %d with %q", c.name, o.code, o.stderr, c.code, c.has)
 		}

@@ -391,12 +391,21 @@ func shipBackendErr(err error) error {
 
 func shipMerge(fs *flag.FlagSet) RunFunc {
 	bodyFile := fs.String("body-file", "", "merge message: a path, or - for stdin")
+	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 || args[0] == "" {
 			return Result{}, Usage("usage: hv ship merge <branch> --body-file <path|->")
 		}
 		branch := args[0]
+		conf, err := confirm()
+		if err != nil {
+			return Result{}, err
+		}
 		msg, err := shipBodyArg(c, *bodyFile, "the merge message")
+		if err != nil {
+			return Result{}, err
+		}
+		policy, err := mergePolicy(c)
 		if err != nil {
 			return Result{}, err
 		}
@@ -413,6 +422,10 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 		}
 		if base == branch {
 			return shipBlocked("base branch", "'%s' is the base branch", branch)
+		}
+		files := func() ([]string, error) { return shipChangedFiles(c, dir, base+"..."+branch) }
+		if res, err := clearMerge(c, policy, branch, conf, files, nil); err != nil {
+			return res, err
 		}
 		if err := shipClearWorktree(c, dir, branch); err != nil {
 			return Result{}, err
@@ -452,14 +465,32 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 	}
 }
 
+// shipChangedFiles lists the files a merge range changes, for the
+// merge-approval gate.
+func shipChangedFiles(c *Ctx, dir, rng string) ([]string, error) {
+	res, err := shipGit(c, dir, "diff", "--name-only", rng)
+	if err != nil {
+		return nil, err
+	}
+	if res.Code != 0 {
+		return nil, Unavailable("git diff %s: %s", rng, shipFirstLine(res.Stderr))
+	}
+	return pystr.Splitlines(strings.TrimSpace(res.Stdout)), nil
+}
+
 // ---- ship pr-merge ---------------------------------------------------------
 
 // shipPRMerge merges a PR in issue mode (hv-pr-merge).
 func shipPRMerge(fs *flag.FlagSet) RunFunc {
 	itemsFlag := fs.String("items", "", "item IDs the PR closes, comma separated")
+	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
 			return Result{}, Usage("usage: hv ship pr-merge <pr> [--items <ID>[,<ID>...]]")
+		}
+		conf, err := confirm()
+		if err != nil {
+			return Result{}, err
 		}
 		pr, err := strconv.Atoi(args[0])
 		if err != nil || strings.Trim(args[0], "0123456789") != "" {
@@ -478,9 +509,25 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return a4Fail(err)
 		}
-		res, err := be.MergePR(pr, items)
+		policy, err := mergePolicy(c)
+		if err != nil {
+			return Result{}, err
+		}
+		var gateRes Result
+		var gateErr error
+		approve := func(files func() ([]string, error)) error {
+			gateRes, gateErr = clearMerge(c, policy, "PR "+args[0], conf, files, a4Obj("pr", pr))
+			return gateErr
+		}
+		res, err := be.MergePRGated(pr, items, approve)
 		var mf *backlog.MergeFailedError
 		switch {
+		case gateErr != nil:
+			var e *Error
+			if errors.As(gateErr, &e) {
+				return gateRes, gateErr
+			}
+			return a4Fail(gateErr) // listing the PR's files failed at the tracker
 		case errors.As(err, &mf):
 			return Result{Data: a4Obj("pr", pr, "merged", false, "unproven", []string{}, "changesRequested", []string{}, "changed", false)},
 				Refused("%s", err.Error())
