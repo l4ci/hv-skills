@@ -143,11 +143,7 @@ func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.S
 	if hs, err := hook.LoadSettings(cfg); err == nil {
 		maxAge = time.Duration(hs.StateMaxAge) * time.Second
 	}
-	accounts := func() *worker.Accounts {
-		a := workerAccounts()
-		a.Now = hookNow
-		return a
-	}
+	accounts := workerAccounts
 	orchPane := os.Getenv("TMUX_PANE")
 	if kind == "herdr" {
 		orchPane = os.Getenv("HERDR_PANE_ID")
@@ -236,7 +232,10 @@ func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.S
 			if err != nil {
 				return err
 			}
-			_, err = env.Transfer(ctx, root, be, round.TransferOpts{
+			// A move that has begun is finished, not cut by --timeout or a
+			// signal: it leaves a claim and a branch half-moved otherwise (the
+			// same call would resume it, but nobody is there to make it).
+			_, err = env.Transfer(context.WithoutCancel(ctx), root, be, round.TransferOpts{
 				Issue: issue, To: to, HolderPID: holderPID, Settings: rc, Getenv: os.Getenv,
 				Note: "The slot's account hit its usage limit; hv limit watch moved the issue to an idle slot on another account.",
 			})

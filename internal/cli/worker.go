@@ -23,7 +23,7 @@ import (
 // this file is their glue. Tests swap the package variables below for fakes.
 var (
 	workerEnv      = func() worker.Env { return worker.Env{} }
-	workerAccounts = func() *worker.Accounts { return &worker.Accounts{} }
+	workerAccounts = func() *worker.Accounts { return &worker.Accounts{Now: hookNow} } // HV_TEST_NOW fixes the meters' clock too
 )
 
 // workerContext is cancelled on SIGINT and SIGTERM, so a Ctrl-C reaches the
