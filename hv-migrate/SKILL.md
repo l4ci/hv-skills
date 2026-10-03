@@ -1,6 +1,6 @@
 ---
 name: hv-migrate
-description: One-shot migrations. `/hv-migrate v4` is the v3 → v4 codemod (versioned arg required); `/hv-migrate issues [--dry-run|--apply] [--limit N]` moves a file backlog onto the GitHub/GitLab issue tracker (resumable, never flips `backlog.backend`). The v4 codemod: Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv glossary import`, and removes retired `hv-context-*` binaries left behind. Umbrella projects are also supported: each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` is migrated into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` (## Glossary) via `hv glossary import --repo <name>`; the umbrella-root `.hv/CONTEXT.md` still migrates to the umbrella `.hv/KNOWLEDGE.md`; everything is backed up under `.hv/migrate-backup/` first. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0, "migrate backlog to issues", "/hv-migrate issues".
+description: One-shot migrations. `/hv-migrate v4` is the v3 → v4 codemod (versioned arg required); `/hv-migrate issues [--dry-run|--apply] [--limit N]` moves a file backlog onto the GitHub/GitLab issue tracker (resumable, never flips `backlog.backend`). The v4 codemod: Rewrites references to 8 commands cut by M01 (across BACKLOG, plans, designs, handoffs, qa, milestones, KNOWLEDGE, DECISIONS, project CLAUDE.md), migrates `.hv/CONTEXT.md` terms into `.hv/KNOWLEDGE.md` (## Glossary) via `hv glossary import`, and removes the legacy context scripts left behind. Umbrella projects are also supported: each registered sub-repo's legacy `.hv/contexts/<name>/CONTEXT.md` is migrated into that sub-repo's `.hv/knowledge/<name>/KNOWLEDGE.md` (## Glossary) via `hv glossary import --repo <name>`; the umbrella-root `.hv/CONTEXT.md` still migrates to the umbrella `.hv/KNOWLEDGE.md`; everything is backed up under `.hv/migrate-backup/` first. `--dry-run` is default; `--apply` writes; `--verbose` adds per-file diffs. Idempotent — a clean second `--apply` rewrites zero files. Refuses on uncommitted changes outside `.hv/`, pre-3.0 project version, or when run inside an existing backup directory. Use on "migrate to v4", "/hv-migrate v4", upgrading hv-skills from 3.x to 4.0, "migrate backlog to issues", "/hv-migrate issues".
 user-invocable: true
 ---
 
@@ -21,7 +21,7 @@ user-invocable: true
 
 - Upgrading a project from hv-skills 3.x to 4.0.
 - After a fresh `hv-skills` install on a project that was using a pre-4.0 plugin.
-- Whenever `cat .hv/config.json | jq .version` reports a pre-4.0 string and you've also bumped the plugin to 4.0+.
+- Whenever `hv config show version` (the legacy top-level stamp) reports a pre-4.0 string and you've also bumped the plugin to 4.0+.
 
 ## When NOT to Use
 
@@ -63,7 +63,7 @@ Run the preview (no `--apply`) regardless of which flags the user passed:
 hv migrate v4 [--verbose]
 ```
 
-The output names every file that would be rewritten, how many references in each, the CONTEXT.md migration plan, the retired `hv-context-*` binaries to remove, and any manual-review items (ambiguous `/hv-issues` and `/hv-map` occurrences).
+The output names every file that would be rewritten, how many references in each, the CONTEXT.md migration plan, the legacy context scripts to remove, and any manual-review items (ambiguous `/hv-issues` and `/hv-map` occurrences).
 
 If it refuses on a safety precondition (exit 4) — uncommitted non-`.hv/` changes, pre-3.0 version, or running inside a backup directory — surface its stderr verbatim and stop. Exit 3 (no readable `.hv/config.json` version) means run `/hv-init` first; exit 5 means `git` is missing or this is not a git repo. The user resolves the precondition (commit or run `/hv-init`) and re-invokes `/hv-migrate v4` themselves.
 
@@ -87,6 +87,8 @@ Otherwise, use the `AskUserQuestion` tool with the dry-run summary in front of t
   3. `"Cancel"` — print *"Cancelled — no changes written."* and exit.
 
 Plain-text fallback: *"Apply the rewrites above? (yes/no)"* — `yes` runs `--apply`; anything else cancels. See `references/ask-user-question-fallback.md`.
+
+Exit 4 during `--apply` can come after writing started: a CONTEXT glossary import failed (`data.blockedBy: glossary-import`, `data.changed: true`). Surface the message verbatim (it names the backup path the original was kept at), tell the user to resolve the conflict and re-run, and stop.
 
 ## Step 5 — Report
 

@@ -45,4 +45,4 @@ The three rules carve up by *consequence*, not by question shape: binary gates h
 ## See also
 
 - `references/authoring-conventions.md` — option-count cap (`AskUserQuestion`'s option list is capped at 4) and other authoring rules. The cap is a different concern (option-list ergonomics, mitigated by category-then-keys staging), not restated here.
-- `hv-init/SKILL.md` *"Opt-in feature flags default to `false`"* — the canonical home for the safety-default-on-flags rule; this reference extends the same disposition to destructive operations under the *opt-in-off / cancel* bucket.
+- `references/authoring-conventions.md` *"Opt-in feature flags default to `false`"* — the canonical home for the safety-default-on-flags rule; this reference extends the same disposition to destructive operations under the *opt-in-off / cancel* bucket.

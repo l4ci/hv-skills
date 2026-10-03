@@ -62,7 +62,7 @@ Add new status values to both `hv update` and the reference together.
 
 Apply only when Step 2's `status` is `behind`. Skip entirely on `current`, `ahead`, or `unknown` — there's nothing to refresh.
 
-Read `.hv/config.json#autonomy.level` (default `"off"`) and branch:
+Read `autonomy.level` with `hv config show autonomy.level --json` (`data.entries[0].value`; it merges `config.local.json` and the default `"off"`) and branch:
 
 **`"off"` (default):**
 

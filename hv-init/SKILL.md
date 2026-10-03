@@ -91,7 +91,7 @@ It writes `.hv/repos.json` (keeping prior registrations still on disk) and, in a
 hv config check --json
 ```
 
-`upToDate` → nothing to ask; skip to the version stamp. `corrupt` → tell the user to fix or delete `.hv/config.json`, then rerun `/hv-init`; stop. `stale` → `data.missing` lists the absent keys: all of them on a fresh project, only the newly added ones on an upgrade.
+Exit 1 is a verdict, not an error: branch on `data.status`. `upToDate` → nothing to ask; skip to the version stamp. `corrupt` → tell the user to fix or delete `.hv/config.json`, then rerun `/hv-init`; stop. `stale` → `data.missing` lists the absent keys: all of them on a fresh project, only the newly added ones on an upgrade. `fresh` (no `config.json`, rare after `hv init`) → treat as `stale` with every key missing: ask all five.
 
 Ask, in one `AskUserQuestion` call, only the questions whose keys appear in `missing`: Q1 `models.*`, Q2 `work.isolation`, Q3 `work.mergeStrategy`, Q4 `ship.review`/`learn.verify`/`refactor.confirmBeforeExecute`/`debug.competingHypotheses`, Q5 `autonomy.level`. Wording, options and the answer-to-value mapping are canonical in [`docs/reference/config-options.md`](../docs/reference/config-options.md). "(Recommended)" marks the default; a native skip or plain-text no-reply takes the Recommended answers.
 
