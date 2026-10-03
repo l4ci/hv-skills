@@ -249,7 +249,7 @@ func New(ctx context.Context, s Settings, provider, dir string, opts ...Option) 
 		return nil, err
 	}
 	if c.Provider == "github" {
-		return &GitHub{base{cli: c, closing: closingGH}}, nil
+		return &GitHub{base: base{cli: c, closing: closingGH}}, nil
 	}
 	return &GitLab{base: base{cli: c, closing: closingGL}, NotPlannedLabel: s.NotPlannedLabel}, nil
 }
