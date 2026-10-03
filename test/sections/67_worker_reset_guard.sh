@@ -200,10 +200,9 @@ rm -f "$FK/dirty_on_close" "$WT/raced.txt"
 pass "a failure after the kill clears the slot's stale handle"
 
 # ── drift: SKILL.md carries the contract the helper header names ────────────
-# white-box-begin: A9 #53 keep
-head -40 "$BIN/hv-worker-reset" | grep -F "reset guard" >/dev/null || fail "hv-worker-reset header lost the term 'reset guard'"
+# white-box-begin: A9 #53 doclint
 grep -qF "reset guard" "$REPO/hv-work/SKILL.md" || fail "hv-work/SKILL.md does not describe the slot reset guard"
-pass "hv-work/SKILL.md and the helper header share the 'reset guard' contract"
+pass "hv-work/SKILL.md describes the slot reset guard"
 # white-box-end
 
 # ── (g) a detached worktree is not registered as branch 'HEAD' ──────────────

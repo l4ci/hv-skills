@@ -160,35 +160,6 @@ RC=0
 [ "$RC" = "2" ] || fail "worker session unknown verb should exit 2, got $RC"
 pass "worker session detects tmux membership via \$TMUX, not session existence"
 
-# The paste path is shared by hv-worker-dispatch and hv-worker-session through
-# the host libs. It carries three separate traps (bracketed-paste eating Enter,
-# collapsed paste chips, unconfirmed pickup); two copies would drift.
-# white-box-begin: A9 #53 keep
-[ -f "$BIN/hv-host-tmux.sh" ] || fail "bin/hv-host-tmux.sh (tmux host library) is missing"
-if [ -e "$BIN/hv-tmux-send.sh" ]; then
-  fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
-fi
-# white-box-end
-# S7 deletes: asserts bash helper structure; the Go worker has no such layer
-# white-box-begin: A9 #53 keep
-for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
-  grep -q 'hv-host-select.sh' "$BIN/$H" \
-    || fail "$H does not pick its host through hv-host-select.sh"
-done
-# Strip comments before grepping: the callers legitimately MENTION the paste
-# path in prose, and matching that reports a defect where none exists.
-for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
-  SRC=$(sed 's/#.*//' "$BIN/$H") || fail "cannot read $H"
-  if grep -q 'paste-buffer\|capture-pane\|herdr \(tab\|agent\|notification\)' <<<"$SRC"; then
-    fail "$H talks to a host directly; it must go through the hv_host_* primitives"
-  fi
-done
-SRC=$(sed 's/#.*//' "$BIN/hv-host-tmux.sh") || fail "cannot read hv-host-tmux.sh"
-grep -q 'paste-buffer' <<<"$SRC" \
-  || fail "hv-host-tmux.sh does not actually paste — the shared library is hollow"
-pass "worker helpers share one paste-and-confirm path through the host libs"
-# white-box-end
-
 # ── (b2) accounts + LIMITED ─────────────────────────────────────────────────
 # Meters come from per-account fixture payloads via HV_ACCOUNT_USAGE_DIR, which
 # mirrors the real OAuth usage shape. The three cases that are easy to get wrong

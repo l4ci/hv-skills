@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test for .hv/bin/ helpers. Builds a throwaway .hv/ in a tmpdir, then
+# Smoke test for the hv binary. Builds a throwaway .hv/ in a tmpdir, then
 # sources every section under test/sections/ in alphabetical order. Each
 # section runs in the shared $TMP cwd and may rely on cumulative state from
 # earlier sections — order is load-bearing.
@@ -12,7 +12,7 @@ TESTDIR="$REPO/test"
 
 # Which sections run. SECTION_LIST (newline-separated paths, so paths may hold
 # spaces) narrows the run to those sections, in the order given: phase
-# acceptance with test/hv-hybrid runs only the sections a phase owns. Unset runs
+# acceptance runs only the sections a phase owns. Unset runs
 # them all. Checked before anything is set up, and loudly: a typo must never end
 # in "All smoke tests passed." for sections that did not run. A relative entry
 # is taken from the repo root; every entry must be an existing test/sections/*.sh
@@ -59,7 +59,7 @@ export HV_INSTALL_ROOT="$REPO"
 # macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
 # from helpers like hv-resolve-umbrella (which would otherwise mismatch on Darwin).
-# Root every temp dir of this run under one base (#110). Sections, the shim and
+# Root every temp dir of this run under one base (#110). Sections and
 # the helpers all call mktemp, and sections replace the EXIT trap (F38), so
 # per-site cleanup cannot be relied on: TMPDIR rooting lets the runner remove
 # everything in one rm -rf. Go and Python callers inherit it too.
@@ -68,14 +68,19 @@ export TMPDIR="$RUN_TMP"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 
 # Black-box target (#46): sections call "$HV_BIN <group> <verb>". It defaults
-# to the temporary shim, which maps verbs onto the old bin/ helpers; point it
-# at a real `hv` binary to run the same sections against the Go port. The
-# shim runs helpers from a copy of bin/ staged outside every project, so a
-# helper that walks up from its own directory can never reach this dev tree.
-export HV_BIN="${HV_BIN:-$TESTDIR/hv-shim}"
-HV_SHIM_STAGE="$(mktemp -d)"
-export HV_SHIM_HELPERS="$HV_SHIM_STAGE/bin"
-cp -R "$BIN" "$HV_SHIM_HELPERS"
+# to the Go binary built once from this checkout, stamped with the plugin
+# version so version-drift checks see a matching install. Point HV_BIN at any
+# other `hv` binary (absolute path: sections cd) to run the suite against it.
+# The binary and the scratch dir for the poison stand-ins below live under
+# $RUN_TMP, so the EXIT trap removes them with everything else.
+HV_STAGE="$(mktemp -d)"
+if [ -z "${HV_BIN:-}" ]; then
+  HV_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$REPO/.claude-plugin/plugin.json")"
+  (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$HV_VERSION" \
+    -o "$HV_STAGE/hv" ./cmd/hv) || { echo "runner: go build ./cmd/hv failed" >&2; exit 2; }
+  HV_BIN="$HV_STAGE/hv"
+fi
+export HV_BIN
 trap 'rm -rf "$RUN_TMP"' EXIT
 
 # Forge and host guard: no section may reach a real gh, glab, herdr or tmux.
@@ -84,8 +89,8 @@ trap 'rm -rf "$RUN_TMP"' EXIT
 # section that wants a fake puts it in front of them, as it already does. A poison call logs itself
 # and exits 99, and any logged call fails the run after the leak guard. A
 # section that resets PATH must start it with "$HV_POISON_BIN".
-export HV_POISON_BIN="$HV_SHIM_STAGE/poison"  # sections that reset PATH keep this first
-HV_POISON_LOG="$HV_SHIM_STAGE/poison.log"
+export HV_POISON_BIN="$HV_STAGE/poison"  # sections that reset PATH keep this first
+HV_POISON_LOG="$HV_STAGE/poison.log"
 mkdir -p "$HV_POISON_BIN" && : > "$HV_POISON_LOG"
 for cli in gh glab herdr tmux; do
   printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_BIN/$cli"
@@ -178,7 +183,7 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 # leak guard catch only true walk-up clobbers, not cwd-drift residue.
 #
 # The loop runs in a subshell: sections replace the EXIT trap (F38), and the
-# runner's own trap above must survive them to remove the shim stage.
+# runner's own trap above must survive them to remove the temp tree.
 # It is not written `( … ) || rc=$?`: bash ignores set -e inside a subshell
 # that is the left side of `||`, so a failing section would carry on.
 set +e
@@ -227,9 +232,9 @@ fi
 [ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
 [ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
 # Temp-dir guard (#110): everything the run made is under $RUN_TMP. Entries
-# other than the runner's own were left behind by sections, helpers or the
-# shim; report the count so growth shows up, then the EXIT trap removes it all.
-RUN_LEFT="$(find "$RUN_TMP" -mindepth 1 -maxdepth 1 ! -path "$TMP" ! -path "$HV_SHIM_STAGE" 2>/dev/null | wc -l | tr -d ' ')"
+# other than the runner's own were left behind by sections or helpers; report
+# the count so growth shows up, then the EXIT trap removes it all.
+RUN_LEFT="$(find "$RUN_TMP" -mindepth 1 -maxdepth 1 ! -path "$TMP" ! -path "$HV_STAGE" 2>/dev/null | wc -l | tr -d ' ')"
 [ "$RUN_LEFT" -eq 0 ] || printf 'note: %s temp entries left under %s by sections; removing them\n' "$RUN_LEFT" "$RUN_TMP" >&2
 if [ "$RUN_LEFT" -gt "${HV_SMOKE_TMP_MAX:-150}" ]; then
   printf '\n\033[31merror: %s temp entries left under %s (limit %s); a section or helper is leaking\033[0m\n' "$RUN_LEFT" "$RUN_TMP" "${HV_SMOKE_TMP_MAX:-150}" >&2
@@ -242,10 +247,4 @@ if [ -s "$HV_POISON_LOG" ]; then
   exit 1
 fi
 [ "$SECTIONS_RC" = 0 ] || exit "$SECTIONS_RC"
-# Phase acceptance (#49): with HV_HYBRID_EXPECT=<group,...> the run only counts
-# if every one of those verb groups was served by the Go binary, never the shim.
-if [ -n "${HV_HYBRID_EXPECT:-}" ]; then
-  "$TESTDIR/hv-hybrid" --check || exit 1
-fi
-
 printf '\n\033[32mAll smoke tests passed.\033[0m\n'

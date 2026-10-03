@@ -159,39 +159,4 @@ pass "release pending: custom nudgeAfterCommits=5 honored"
 rm -rf "$RP_TMP"
 trap 'rm -rf "$TMP"' EXIT
 
-# white-box-begin: A9 #53 keep
-echo "F29: --repo flag uses strict form"
-# Structural guard: every helper that parses a literal --repo / --repos flag
-# must extract the value with the loud form ${2:?usage:...} so a missing
-# argument errors out instead of silently defaulting and corrupting state
-# (e.g. status.json with repo:null when the caller meant a sub-repo).
-# See [F29] — Converge --repo flag parsing across helpers.
-for f in hv-merge hv-pr hv-review-scope hv-spike-add hv-status-add hv-status-remove hv-worktree-clear hv-worktree-path hv-plan-add; do
-  helper="$BIN/$f"
-  [ -f "$helper" ] || fail "F29: expected helper $f missing from bin/"
-  grep -q -- '--repo' "$helper" || fail "F29: $f no longer references --repo (canonical list stale?)"
-  grep -qE '\$\{2:\?usage:' "$helper" || fail "F29: $f --repo extraction must use \${2:?usage:...} strict form (no silent \${2:-})"
-done
-for f in hv-status-add-multi hv-multi-branch-create; do
-  helper="$BIN/$f"
-  [ -f "$helper" ] || fail "F29: expected helper $f missing from bin/"
-  grep -q -- '--repos' "$helper" || fail "F29: $f no longer references --repos (canonical list stale?)"
-  grep -qE '\$\{2:\?usage:' "$helper" || fail "F29: $f --repos extraction must use \${2:?usage:...} strict form (no silent \${2:-})"
-done
-pass "F29: all --repo / --repos helpers use the strict \${2:?usage:...} extraction"
-# white-box-end
 
-# white-box-begin: A9 #53 keep
-echo "F30: walk-up helpers delegate to bin/hv-walk-up"
-# Structural guard: helpers that need to walk upward from a caller directory
-# must delegate to the canonical bin/hv-walk-up rather than reimplementing the
-# loop inline. Reverting to an inline `while [ "$dir" != "/" ]` walk drifts
-# masking semantics across callers.
-# See [F30] — Consolidate walk-up logic behind bin/hv-walk-up.
-for f in hv-self-locate.sh hv-resolve-umbrella; do
-  helper="$BIN/$f"
-  [ -f "$helper" ] || fail "F30: expected helper $f missing from bin/"
-  grep -q 'hv-walk-up' "$helper" || fail "F30: $f must invoke hv-walk-up (no inline walk-up loops)"
-done
-pass "F30: hv-self-locate.sh and hv-resolve-umbrella delegate to bin/hv-walk-up"
-# white-box-end
