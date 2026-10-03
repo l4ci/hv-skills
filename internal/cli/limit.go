@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
@@ -107,6 +108,21 @@ func orchestratorData(commonDir, root string, maxAge time.Duration) func(now tim
 	}
 }
 
+// inGap is whether the supervisor has no orchestrator child right now (D4).
+func inGap(gap *atomic.Bool) bool { return gap != nil && gap.Load() }
+
+// gapped hides the orchestrator's session file while there is no child: a
+// limit read from the last session must not type a resume prompt at a
+// supervisor with nothing to receive it.
+func gapped(gap *atomic.Bool, f func(time.Time) limits.Data) func(time.Time) limits.Data {
+	return func(now time.Time) limits.Data {
+		if inGap(gap) {
+			return limits.Data{}
+		}
+		return f(now)
+	}
+}
+
 func sameDir(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -125,7 +141,7 @@ type limitRig struct {
 // unavailable, or herdr outside 0.9.x, is an *Error with exit 5. A refused or
 // failed herdr subscription is not: the watcher captures the panes instead,
 // and the rig says so in warn.
-func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.Settings, holderPID int, tick time.Duration, warn func(string, ...any)) (*limitRig, error) {
+func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.Settings, holderPID int, tick time.Duration, gap *atomic.Bool, warn func(string, ...any)) (*limitRig, error) {
 	kind := limitHostKind(cfg)
 	h := limitHost(kind)
 	if err := h.Require(); err != nil {
@@ -182,9 +198,14 @@ func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.S
 
 	d := limits.Deps{
 		Root: root, Settings: set, Now: hookNow, Tick: tick,
-		Targets:          targets,
-		Capture:          func(ctx context.Context, t limits.Target) string { return ph.CapturePane(ctx, t.Pane, 60) },
-		OrchestratorData: orchestratorData(cd, root, maxAge),
+		Targets: targets,
+		Capture: func(ctx context.Context, t limits.Target) string {
+			if t.Orchestrator && inGap(gap) {
+				return ""
+			}
+			return ph.CapturePane(ctx, t.Pane, 60)
+		},
+		OrchestratorData: gapped(gap, orchestratorData(cd, root, maxAge)),
 		Meter: func(ctx context.Context, account string) limits.Reading {
 			for _, m := range accounts().Meters(ctx, root) {
 				if m.Name != account {
@@ -410,11 +431,11 @@ func (f *outputFeed) start() {
 
 // limitsLoop is the loop the supervisor runs beside its child. Failures are
 // warnings: the supervisor's own job goes on without it.
-func limitsLoop(c *Ctx, root string, cfg any, set limits.Settings, holderPID int) func(ctx context.Context) []string {
+func limitsLoop(c *Ctx, root string, cfg any, set limits.Settings, holderPID int, gap *atomic.Bool) func(ctx context.Context) []string {
 	return func(ctx context.Context) []string {
 		var warns []string
 		warn := func(format string, a ...any) { warns = append(warns, fmt.Sprintf(format, a...)) }
-		rig, err := buildLimits(ctx, c, root, cfg, set, holderPID, 5*time.Second, warn)
+		rig, err := buildLimits(ctx, c, root, cfg, set, holderPID, 5*time.Second, gap, warn)
 		if err != nil {
 			warn("usage-limit watcher not started: %v", err)
 			return warns
@@ -470,7 +491,7 @@ func limitWatch(fs *flag.FlagSet) RunFunc {
 			defer cancel()
 		}
 		tick := time.Duration(*settle * float64(time.Second))
-		rig, err := buildLimits(ctx, c, root, cfg, set, hookHolderPID(), tick, func(f string, a ...any) { c.Warn(f, a...) })
+		rig, err := buildLimits(ctx, c, root, cfg, set, hookHolderPID(), tick, nil, func(f string, a ...any) { c.Warn(f, a...) })
 		if err != nil {
 			return Result{}, err
 		}

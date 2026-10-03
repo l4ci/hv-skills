@@ -35,6 +35,11 @@ func StatHandoff(path string) Handoff {
 // StopIn is the Stop payload's relevant fields.
 type StopIn struct {
 	StopHookActive bool
+	// Supervised is whether a live `hv keepalive run` would restart the
+	// orchestrator (D4); without one a usage block would strand it.
+	Supervised bool
+	// HoldUntil is the end of the supervisor's switch hold, zero for none.
+	HoldUntil time.Time
 }
 
 // StopDecision is what the Stop hook does. Block false means print nothing.
@@ -58,7 +63,14 @@ func DecideStop(in StopIn, st State, set Settings, ho Handoff, handoffPath strin
 	if err != nil || now.Sub(at) > time.Duration(set.StateMaxAge)*time.Second {
 		return d // a stale reading is not acted on
 	}
-	if st.ContextPct == nil || *st.ContextPct < float64(set.Threshold) {
+	ctxTrip := st.ContextPct != nil && *st.ContextPct >= float64(set.Threshold)
+	var usage *UsageHandoff
+	if set.SwitchOnUsage && in.Supervised && !now.Before(in.HoldUntil) {
+		if w, p, r, ok := UsageOf(st.RateLimits); ok && p >= float64(set.UsageThreshold) {
+			usage = &UsageHandoff{Window: w, UsedPct: p, ResetsAt: r, At: now.UTC().Format(time.RFC3339)}
+		}
+	}
+	if !ctxTrip && usage == nil {
 		return d
 	}
 	var blockedAt time.Time
@@ -83,7 +95,13 @@ func DecideStop(in StopIn, st State, set Settings, ho Handoff, handoffPath strin
 	d.State.BlockedAt = now.UTC().Format(time.RFC3339)
 	d.Persist = true
 	d.Block = true
-	d.Reason = blockReason(*st.ContextPct, set.Threshold, handoffPath)
+	if usage != nil {
+		d.State.UsageHandoff = usage
+		d.Reason = usageReason(*usage, set.UsageThreshold, handoffPath)
+	} else {
+		d.State.UsageHandoff = nil
+		d.Reason = blockReason(*st.ContextPct, set.Threshold, handoffPath)
+	}
 	return d
 }
 

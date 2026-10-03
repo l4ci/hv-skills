@@ -18,6 +18,10 @@ type Settings struct {
 	Prompt        string        // restartPrompt
 	EscalateIssue int           // escalateIssue, 0 means unset
 	HandoffMaxAge time.Duration // handoffMaxAgeSeconds (D1)
+
+	SwitchOnUsage  bool          // switchOnUsage (D4)
+	UsageThreshold int           // usageThreshold, percent 1..100
+	HoldFallback   time.Duration // limits.fallbackSleepSeconds, the hold with no reset time
 }
 
 // DefaultPrompt is the default of orchestrator.restartPrompt.
@@ -49,6 +53,19 @@ func LoadSettings(cfg any) (Settings, error) {
 		return s, err
 	}
 	s.HandoffMaxAge = time.Duration(age) * time.Second
+	if s.SwitchOnUsage, err = hook.BoolKey(cfg, "orchestrator.switchOnUsage"); err != nil {
+		return s, err
+	}
+	if s.SwitchOnUsage { // the keys below matter only when it is on
+		if s.UsageThreshold, err = hook.IntKey(cfg, "orchestrator.usageThreshold", 1, 100); err != nil {
+			return s, err
+		}
+		fb, err := hook.IntKey(cfg, "limits.fallbackSleepSeconds", 1, maxInt)
+		if err != nil {
+			return s, err
+		}
+		s.HoldFallback = time.Duration(fb) * time.Second
+	}
 	v, err := config.Value(cfg, "orchestrator.restartPrompt")
 	if err != nil {
 		return s, err

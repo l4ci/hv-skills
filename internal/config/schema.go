@@ -104,6 +104,9 @@ var Keys = []Key{
 	{"orchestrator.keepaliveBackoffSeconds", json.Number("5"), false},
 	{"orchestrator.restartPrompt", "Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.", false},
 	{"orchestrator.escalateIssue", json.Number("0"), false},
+	// D4 usage-switch keys: silent defaults, read by the Stop hook and `hv keepalive run`.
+	{"orchestrator.switchOnUsage", false, false},
+	{"orchestrator.usageThreshold", json.Number("90"), false},
 	// D3 usage-limit keys: silent defaults, read by `hv limit watch` and the
 	// watcher inside `hv keepalive run`.
 	{"limits.mode", "switch", false},

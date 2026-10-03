@@ -254,6 +254,8 @@ Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; 
 | `orchestrator.keepaliveBreaker` | `3` | Restarts in a row that leave no new handoff before the breaker stops the loop (integer, 1 or more). |
 | `orchestrator.keepaliveBackoffSeconds` | `5` | Seconds to wait before a restart (integer, 0 or more). |
 | `orchestrator.restartPrompt` | `Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.` | Appended as the last argument of a restart, never of the first start (non-empty string). |
+| `orchestrator.switchOnUsage` | `false` | Opt in to moving the orchestrator to another account before a usage limit: the Stop hook then also blocks for a handoff at `usageThreshold`, and `hv keepalive run` restarts under another account (boolean). See [switching the orchestrator's account](pausing-and-resuming.md#switching-the-orchestrators-account). |
+| `orchestrator.usageThreshold` | `90` | Percent (integer, 1 to 100) of the 5-hour or weekly window at which the Stop hook asks for that handoff. Read only when `switchOnUsage` is `true`. |
 | `orchestrator.escalateIssue` | `0` | Issue number the breaker's escalation comment goes on (integer, 0 or more). `0` is unset: the breaker raises a host notification and a warning only. |
 
 An out-of-range value exits 70 in a verb that reads it (`hv keepalive run` included); the hooks treat it as a pass and never block.

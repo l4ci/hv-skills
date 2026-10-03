@@ -23,6 +23,9 @@ type Settings struct {
 	StateMaxAge    int // stateMaxAgeSeconds
 	HandoffMaxAge  int // handoffMaxAgeSeconds
 	HandoffMaxBlks int // handoffMaxBlocks
+
+	SwitchOnUsage  bool // switchOnUsage (D4, #206)
+	UsageThreshold int  // usageThreshold, percent 1..100
 }
 
 // IntKey reads an integer config key and checks it is within min..max. The
@@ -58,8 +61,32 @@ func LoadSettings(cfg any) (Settings, error) {
 	if s.HandoffMaxAge, err = get("orchestrator.handoffMaxAgeSeconds", 1, 1<<30); err != nil {
 		return s, err
 	}
-	s.HandoffMaxBlks, err = get("orchestrator.handoffMaxBlocks", 0, 1000)
+	if s.HandoffMaxBlks, err = get("orchestrator.handoffMaxBlocks", 0, 1000); err != nil {
+		return s, err
+	}
+	if s.SwitchOnUsage, err = BoolKey(cfg, "orchestrator.switchOnUsage"); err != nil {
+		return s, err
+	}
+	if s.SwitchOnUsage {
+		// Read only when on: a bad threshold must not disable the context
+		// handoff of a project that never opted in.
+		s.UsageThreshold, err = get("orchestrator.usageThreshold", 1, 100)
+	}
 	return s, err
+}
+
+// BoolKey reads a boolean config key. The message is what a verb prints for
+// exit 70.
+func BoolKey(cfg any, key string) (bool, error) {
+	v, err := config.Value(cfg, key)
+	if err != nil {
+		return false, err
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("%s must be true or false (got %v)", key, v)
+	}
+	return b, nil
 }
 
 // Scope is where a settings file lives; the order below is Claude Code's

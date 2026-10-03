@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/keepalive"
 	"github.com/l4ci/hv-skills/v5/internal/limits"
 	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
 
 // D2 (#66): `hv keepalive run|status`. The loop is internal/keepalive; this
@@ -190,18 +192,29 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 			Escalate: escalateFunc(ctx, root),
 			Notify:   func(title, body string) { keepaliveNotify(context.WithoutCancel(ctx), cfg, title, body) },
 		}
+		gap := keepaliveGap(set.SwitchOnUsage)
+		env.Gap = gap
+		opts := keepalive.Options{
+			Command: args, Root: root, CommonDir: cd, HandoffPath: handoffFile(root, cfg),
+			HandoffMaxAge: set.HandoffMaxAge, MaxRestarts: set.MaxRestarts, Breaker: set.Breaker,
+			Backoff: set.Backoff, Prompt: set.Prompt, EscalateIssue: set.EscalateIssue,
+		}
+		if set.SwitchOnUsage {
+			opts.SwitchOnUsage, opts.UsageThreshold, opts.HoldFallback = true, set.UsageThreshold, set.HoldFallback
+			opts.ConfigDir = os.Getenv("CLAUDE_CONFIG_DIR")
+			opts.Account = worker.AccountOf(root, opts.ConfigDir)
+			env.UsageMarker = usageMarker(cd, root)
+			env.Choose = usageChoose(ctx, root)
+			env.Record = usageRecord(root, hookNow)
+		}
 		if !*noLimits {
 			lset, err := limits.LoadSettings(cfg)
 			if err != nil {
 				return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: hv config set"}
 			}
-			env.Limits = limitsLoop(c, root, cfg, lset, os.Getpid())
+			env.Limits = limitsLoop(c, root, cfg, lset, os.Getpid(), gap)
 		}
-		res, err := keepalive.Run(env, keepalive.Options{
-			Command: args, Root: root, CommonDir: cd, HandoffPath: handoffFile(root, cfg),
-			HandoffMaxAge: set.HandoffMaxAge, MaxRestarts: set.MaxRestarts, Breaker: set.Breaker,
-			Backoff: set.Backoff, Prompt: set.Prompt, EscalateIssue: set.EscalateIssue,
-		})
+		res, err := keepalive.Run(env, opts)
 		for _, w := range res.Warnings {
 			c.Warn("%s", w)
 		}
@@ -228,6 +241,7 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 		d.Set("stopReason", res.StopReason)
 		d.Set("restarts", res.Restarts)
 		d.Set("noProgress", res.NoProgress)
+		d.Set("switches", res.Switches)
 		d.Set("lastExit", le2)
 		setIf(d, "escalation", res.Escalation)
 		d.Set("changed", res.Changed)
@@ -236,6 +250,75 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 			return Result{Data: d, Text: text}, Failed("keepalive stopped: %s", res.StopReason)
 		}
 		return Result{Data: d, Text: text}, nil
+	}
+}
+
+// keepaliveGap is the flag the supervisor sets between children, nil unless
+// the switch is on: with it off, D3's loop must not see a gap at all.
+func keepaliveGap(switchOnUsage bool) *atomic.Bool {
+	if !switchOnUsage {
+		return nil
+	}
+	return new(atomic.Bool)
+}
+
+// usageMarker finds the newest usage handoff written at or after since in the
+// session files whose cwd is the project root (D4).
+func usageMarker(commonDir, root string) func(since time.Time) (hook.UsageHandoff, bool) {
+	return func(since time.Time) (hook.UsageHandoff, bool) {
+		dir := filepath.Join(commonDir, "hv", "session")
+		ents, _ := os.ReadDir(dir)
+		var best hook.UsageHandoff
+		var bestAt time.Time
+		for _, e := range ents {
+			if !strings.HasSuffix(e.Name(), ".json") {
+				continue
+			}
+			st, found, err := hook.ReadState(filepath.Join(dir, e.Name()))
+			if err != nil || !found || st.UsageHandoff == nil || !sameDir(st.Cwd, root) {
+				continue
+			}
+			at, err := time.Parse(time.RFC3339, st.UsageHandoff.At)
+			if err != nil || at.Before(since.Truncate(time.Second)) {
+				continue
+			}
+			if bestAt.IsZero() || at.After(bestAt) {
+				best, bestAt = *st.UsageHandoff, at
+			}
+		}
+		return best, !bestAt.IsZero()
+	}
+}
+
+// usageChoose asks the account meters where an orchestrator at its threshold
+// can go (D4).
+func usageChoose(ctx context.Context, root string) func(string, int) keepalive.Choice {
+	return func(currentDir string, threshold int) keepalive.Choice {
+		m, ok, others := workerAccounts().OrchestratorTarget(ctx, root, currentDir, threshold)
+		if !ok {
+			return keepalive.Choice{Others: others}
+		}
+		return keepalive.Choice{
+			To:     &keepalive.Target{Name: m.Name, ConfigDir: worker.ExpandConfigDir(m.ConfigDir), Headroom: *m.Headroom},
+			Others: others,
+		}
+	}
+}
+
+// usageRecord writes a usage decision to the limits log in .hv/workers.json.
+func usageRecord(root string, now func() time.Time) func(keepalive.Decision) error {
+	return func(d keepalive.Decision) error {
+		status := limits.StatusSwitched
+		if d.Action == keepalive.ActionRestart {
+			status = limits.StatusResumed
+		}
+		t := limits.Time(now())
+		_, err := limits.Append(root, limits.Entry{
+			Session: limits.Orchestrator, Window: d.Marker.Window, Source: limits.SourceData,
+			DetectedAt: d.Marker.At, ResetsAt: d.Marker.ResetsAt, Action: d.Action,
+			Account: d.From, Status: status, ResolvedAt: t, Note: d.Note,
+		})
+		return err
 	}
 }
 

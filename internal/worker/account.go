@@ -352,6 +352,72 @@ func (a *Accounts) Pick(ctx context.Context, root string, exclude []string) (nam
 	return usable[0].Name, true
 }
 
+// SameConfigDir reports whether two CLAUDE_CONFIG_DIR values name one
+// directory: compared after Clean, with a leading ~/ expanded and empty
+// meaning ~/.claude (what Claude Code uses when the variable is unset).
+func SameConfigDir(a, b string) bool { return ExpandConfigDir(a) == ExpandConfigDir(b) }
+
+// ExpandConfigDir is the cleaned absolute form of a configDir.
+func ExpandConfigDir(d string) string {
+	home, _ := os.UserHomeDir()
+	if d == "" {
+		d = "~/.claude"
+	}
+	if strings.HasPrefix(d, "~/") && home != "" {
+		d = filepath.Join(home, d[2:])
+	}
+	return filepath.Clean(d)
+}
+
+// AccountOf names the work.accounts entry whose configDir is dir, "" when
+// none is.
+func AccountOf(root, dir string) string {
+	for _, ac := range Configured(root) {
+		if ac.configDir != "" && SameConfigDir(ac.configDir, dir) {
+			return ac.name
+		}
+	}
+	return ""
+}
+
+// OrchestratorTarget is the account an orchestrator can move to when its own
+// has used `threshold` percent of a window (D4). Unlike Pick it never keeps
+// the current account, and it takes only an account that has a configDir, a
+// `free` meter and known headroom above 100-threshold: an `unknown` meter is
+// not a candidate, since a wrong guess costs a whole handoff cycle. The most
+// headroom wins, ties by config order. others describes every account that
+// was not taken, for the log.
+func (a *Accounts) OrchestratorTarget(ctx context.Context, root, currentDir string, threshold int) (m Meter, ok bool, others []string) {
+	for _, c := range a.Meters(ctx, root) {
+		why := ""
+		switch {
+		case c.ConfigDir == "":
+			why = "no configDir"
+		case SameConfigDir(c.ConfigDir, currentDir):
+			why = "current account"
+		case c.Verdict != VerdictFree:
+			why = c.Verdict
+		case c.Headroom == nil:
+			why = "no reading"
+		case *c.Headroom <= float64(100-threshold):
+			why = fmt.Sprintf("%g%% headroom", *c.Headroom)
+		}
+		if why != "" {
+			others = append(others, c.Name+": "+why)
+			continue
+		}
+		if !ok || *c.Headroom > *m.Headroom {
+			if ok {
+				others = append(others, m.Name+": less headroom")
+			}
+			m, ok = c, true
+		} else {
+			others = append(others, c.Name+": less headroom")
+		}
+	}
+	return m, ok, others
+}
+
 // Assign writes the account's configDir onto the slot so dispatch launches
 // that slot under it. An empty account means "pick one". ok is false when no
 // account was usable (exit 4 for the verb).

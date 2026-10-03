@@ -10,6 +10,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/doctor"
+	"github.com/l4ci/hv-skills/v5/internal/hook"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/version"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
@@ -106,6 +107,9 @@ func doctorInput() doctor.Input {
 		}
 	}
 	in.ProjectRoot = root
+	if on, err := hook.BoolKey(cfg, "orchestrator.switchOnUsage"); err == nil {
+		in.SwitchOnUsage = on
+	}
 	for _, a := range in.Accounts {
 		if a.ConfigDir != "" {
 			in.ConfigDirs = append(in.ConfigDirs, a.ConfigDir)
