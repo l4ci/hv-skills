@@ -14,6 +14,7 @@ What each `/hv-*` skill does, one line each. For details: [`reference/slash-comm
 - **`/hv-spike`**: throwaway experiment on a dedicated branch. Only findings come back.
 - **`/hv-work`**: execute the plan in parallel with per-task commits. `--preview` for a read-only peek.
 - **`/hv-debug`**: systematic bug cycle. Reproduce, hypothesize, fix.
+- **`/hv-orchestrate`**: run a parallel round: choose the slate, route workers, merge. The `hv round` verbs do the mechanics.
 
 ## Review & ship
 - **`/hv-review`**: two-stage review (spec match, then code quality).

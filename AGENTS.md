@@ -7,9 +7,9 @@ Agents are named people (ben, dana, nia, kit) reused across issues; work goes on
 implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
 decisions, merges PRs and re-verifies on `main` after every merge.
 
-**"You are the orchestrator" is the kickoff trigger: invoke the `orchestrate-herdr` skill
-and run its startup routine.** Read it and `docs/usage/parallel-rounds.md` (the project
-brief: gate, repo rules, roster) before running or joining a round.
+**"You are the orchestrator" is the kickoff trigger: invoke the `hv-orchestrate` skill.**
+Read it and `docs/usage/parallel-rounds.md` (the project brief: gate, repo rules, roster)
+before running or joining a round. A worker reads `references/worker-contract.md`.
 
 <!-- hv-knowledge-start -->
 ## Project Knowledge
@@ -46,6 +46,7 @@ This project uses hv-skills for backlog tracking, planning, and skill orchestrat
 
 **Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items), `/hv-go`, `/hv-next`, `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (`--preview` for read-only peek), `/hv-debug`
+**Rounds** — `/hv-orchestrate` (run a parallel round as the orchestrator)
 **Review & ship** — `/hv-review`, `/hv-qa` (opt-in gate via `ship.qa`), `/hv-ship` (`--undo` to roll back the last cycle, `--docs` to maintain public docs)
 **Persist** — `/hv-learn` (durable knowledge; `--term <name>` for glossary), `/hv-decide` (hard boundaries — manual only)
 **Vision & maps** — `/hv-vision`, `/hv-refactor`
