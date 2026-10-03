@@ -1,7 +1,5 @@
 echo "config fill: missing required keys get schema defaults (A9 G1, G7)"
 
-# config fill has no old helper, so the plain shim answers 71 (no adapter).
-# The section needs the Go binary: HV_BIN=test/hv-hybrid or the binary itself.
 CF="$(mktemp -d)"
 trap 'rm -rf "$CF"' EXIT
 mkdir -p "$CF/.hv"

@@ -177,12 +177,6 @@ pass "worker session detects tmux membership via \$TMUX, not session existence"
 # The paste path is shared by hv-worker-dispatch and hv-worker-session through
 # the host libs. It carries three separate traps (bracketed-paste eating Enter,
 # collapsed paste chips, unconfirmed pickup); two copies would drift.
-# white-box-begin: A9 #53 keep
-[ -f "$BIN/hv-host-tmux.sh" ] || fail "bin/hv-host-tmux.sh (tmux host library) is missing"
-if [ -e "$BIN/hv-tmux-send.sh" ]; then
-  fail "bin/hv-tmux-send.sh is back; hv-host-tmux.sh absorbed it"
-fi
-# white-box-end
 # white-box-begin: go-unit A7 #51
 for H in hv-worker-dispatch hv-worker-session hv-worker-poll; do
   grep -q 'hv-host-select.sh' "$BIN/$H" \

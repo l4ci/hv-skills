@@ -57,11 +57,4 @@ pass "the UNCONVERTED allowlist exempts listed files and rejects stale entries"
 OUT="$(cd "$REPO" && python3 "$VALIDATE" 2>&1)" || fail "validate-skills fails on the repo: $OUT"
 pass "skills and references pass the doclint"
 
-# white-box-begin: A9 #53 keep
-# The frozen name list must cover every helper bin/ still ships. Goes with bin/ in S7.
-MISSING="$(comm -23 <(cd "$REPO/bin" && ls -1 | grep '^hv-' | grep -vx 'hv-migrate' | sort) \
-  <(python3 "$VALIDATE" --list-legacy | sort))"
-[ -z "$MISSING" ] || fail "validate-skills LEGACY_HELPERS misses bin/ helpers: $MISSING"
-pass "LEGACY_HELPERS covers every bin/ helper"
-# white-box-end
 rm -rf "${DL_TMP:?}"

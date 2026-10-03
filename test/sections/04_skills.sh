@@ -5,11 +5,7 @@ rm -f CLAUDE.md
 grep -q "<!-- hv-skills-start -->" CLAUDE.md || fail "block skills didn't write start marker"
 grep -q "<!-- hv-skills-end -->" CLAUDE.md || fail "block skills didn't write end marker"
 grep -q "Capture & pick" CLAUDE.md || fail "hv-skills body missing canonical sections"
-# white-box-begin: A9 #53 keep
-# The Go body names `hv knowledge query` (A9 G4); the old helper behind the shim
-# still names hv-knowledge-query until S7 deletes the shim and this alternative.
-grep -qE "hv knowledge query|hv-knowledge-query" CLAUDE.md || fail "hv-skills body missing consult-points"
-# white-box-end
+grep -q "hv knowledge query" CLAUDE.md || fail "hv-skills body missing consult-points"
 pass "block skills creates managed block with canonical body"
 
 # Second run on existing CLAUDE.md with prior content — must update in place,

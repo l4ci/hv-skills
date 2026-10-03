@@ -4,16 +4,6 @@
 # the section's final pass line. (Helpers pass/fail and $REPO/$TMP from runner.sh/lib.sh.)
 set -euo pipefail
 
-# === Helper existence + executable mode (F66) ===
-# white-box-begin: A9 #53 keep
-echo "Section 32: hv-issues helper existence + mode"
-for h in hv-issues-provider hv-issues-list hv-issues-label hv-issues-close hv-issues-imported; do
-  [ -f "$REPO/bin/$h" ] || fail "bin/$h missing"
-  mode=$(git -C "$REPO" ls-files -s "bin/$h" | awk '{print $1}')
-  [ "$mode" = "100755" ] || fail "bin/$h tracked mode is $mode, expected 100755"
-done
-pass "5 hv-issues-* helpers exist and tracked as 100755"
-# white-box-end
 
 # === Provider detection unit tests ===
 echo "Section 32: issues provider classification"

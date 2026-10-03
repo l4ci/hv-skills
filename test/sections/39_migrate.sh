@@ -199,31 +199,6 @@ EOF
 trap 'rm -rf "$TMP"' EXIT
 pass "migrate v4 — empty CONTEXT.md deleted with no batch call"
 
-# white-box-begin: A9 #53 keep
-echo "migrate v4 — removes stale .hv/bin/hv-context-* files"
-TMP_BIN="$(mktemp -d)"
-trap 'rm -rf "$TMP_BIN"' EXIT
-( cd "$TMP_BIN" && git init -q && git config user.email t@t && git config user.name t )
-mkdir -p "$TMP_BIN/.hv/bin"
-echo '{"version":"3.4.0"}' > "$TMP_BIN/.hv/config.json"
-echo '#!/bin/sh' > "$TMP_BIN/.hv/bin/hv-context-add"
-echo '#!/bin/sh' > "$TMP_BIN/.hv/bin/hv-context-query"
-chmod +x "$TMP_BIN/.hv/bin/hv-context-add" "$TMP_BIN/.hv/bin/hv-context-query"
-( cd "$TMP_BIN" && git add -A && git commit -q -m init )
-
-OUT_BIN=$( cd "$TMP_BIN" && hvj migrate v4 )
-[ "$(jget data.removedBinaries <<<"$OUT_BIN")" = "2" ] || fail "should report 2 removed binaries in dry-run: $OUT_BIN"
-[ -e "$TMP_BIN/.hv/bin/hv-context-add" ] || fail "dry-run must not remove binaries"
-
-( cd "$TMP_BIN" && "$HV_BIN" migrate v4 --apply >/dev/null )
-[ ! -e "$TMP_BIN/.hv/bin/hv-context-add" ] || fail "hv-context-add should be removed"
-[ ! -e "$TMP_BIN/.hv/bin/hv-context-query" ] || fail "hv-context-query should be removed"
-# Backup tree
-BACKUP_BIN=$(ls -d "$TMP_BIN"/.hv/migrate-backup/*/bin/ 2>/dev/null | head -1)
-[ -f "$BACKUP_BIN/hv-context-add" ] || fail "hv-context-add backup missing"
-trap 'rm -rf "$TMP"' EXIT
-pass "migrate v4 — removes stale .hv/bin/hv-context-* with backup"
-# white-box-end
 
 echo "migrate v4 — word boundary: /hv-capture is NOT rewritten by /hv-c\\b rule"
 TMP_WB="$(mktemp -d)"
@@ -299,9 +274,6 @@ pass "migrate v4 — B08: --apply bumps hvSkills.version"
 echo "migrate v4 — B09: strips orphan v3 blocks"
 TMP_STRIP="$(mktemp -d)"
 trap 'rm -rf "$TMP_STRIP"' EXIT
-# white-box-begin: A9 #53 keep
-mkdir -p "$TMP_STRIP/.hv/bin"
-# white-box-end
 cd "$TMP_STRIP"
 # Seed a CLAUDE.md with an orphan hv-context block, a live hv-knowledge block,
 # and unrelated prose. After strip: orphan gone, live block kept, prose intact.
@@ -388,7 +360,6 @@ echo '{"version":"3.4.0"}' > "$TMP_B09D2/.hv/config.json"
 #   (b) `/hv-context` in a fenced block — must NOT be rewritten
 #   (c) `hv-map-query` substring inside a helper-path token — must NOT be rewritten
 #   (d) bare `/hv-context` in prose — must be rewritten (control case)
-# white-box-begin: A9 #53 keep
 cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
 # TODO
 ## Bugs
@@ -398,11 +369,10 @@ cat > "$TMP_B09D2/.hv/BACKLOG.md" <<'EOF'
   This fenced block names /hv-context literally.
   ```
 
-  Use `.hv/bin/hv-map-query` to query the map — substring `hv-map` is part of a helper path.
+  Use `scripts/hv-map-query` to query the map — substring `hv-map` is part of a helper path.
 
   Bare /hv-context in prose should still rewrite (control).
 EOF
-# white-box-end
 ( cd "$TMP_B09D2" && git add -A && git commit -q -m init )
 
 ( cd "$TMP_B09D2" && "$HV_BIN" migrate v4 --apply >/dev/null )

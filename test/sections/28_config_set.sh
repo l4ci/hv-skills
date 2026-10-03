@@ -132,7 +132,7 @@ echo "F78: work.dispatch / workerSlots / workerCommand are registered everywhere
 # A config key that is only half-registered fails silently: hv-config rejects it
 # as unknown, or /hv-init never backfills it on an upgrade. Pin the skill and doc sites.
 # (The CONFIG_KEYS table row is also covered by `config show` / `config check` below.)
-# white-box-begin: A9 #53 keep
+# white-box-begin: A9 #53 doclint
 for key in work.dispatch work.workerSlots work.workerCommand; do
   grep -q "\`$key\`" "$REPO/hv-config/SKILL.md" \
     || fail "F78: hv-config Step 1.5 valid-key list missing $key"
@@ -141,8 +141,6 @@ for key in work.dispatch work.workerSlots work.workerCommand; do
   grep -q "$key" "$REPO/docs/reference/config-options.md" \
     || fail "F78: config-options.md does not document $key"
 done
-grep -q '("work.dispatch", "subagent", True)' "$REPO/bin/hvlib_config.py" \
-  || fail "F78: hvlib_config CONFIG_KEYS missing work.dispatch"
 grep -q 'work.dispatch.*subagent.*tmux\|`work.dispatch` accepts' "$REPO/hv-config/SKILL.md" \
   || fail "F78: hv-config validation rules do not constrain work.dispatch to its enum"
 grep -q 'work.dispatch' "$REPO/docs/usage/configuration.md" \
