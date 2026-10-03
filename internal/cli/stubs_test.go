@@ -102,12 +102,15 @@ func TestVerbsExcludesStubs(t *testing.T) {
 	if !listed["version"] || !listed["knowledge query"] {
 		t.Errorf("implemented verbs missing: %v", listed)
 	}
-	// every listed verb really runs; every other contract verb is a stub
+	// every listed verb really runs; every other contract verb is a stub. The
+	// probe runs in an empty directory: from the package directory a verb such
+	// as `block skills` walks up to this repo's .hv/ and rewrites AGENTS.md.
+	empty := t.TempDir()
 	for _, p := range contractVerbs {
 		if listed[p] {
 			continue
 		}
-		if code, _, _ := stubRun(append(strings.Fields(p), "--json")...); code == 2 && !strings.HasPrefix(p, "block ") {
+		if code, _, _ := stubRun(append([]string{"-C", empty}, append(strings.Fields(p), "--json")...)...); code == 2 && !strings.HasPrefix(p, "block ") {
 			t.Errorf("contract verb %q is neither implemented nor a stub (exit 2)", p)
 		}
 	}

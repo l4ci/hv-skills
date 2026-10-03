@@ -372,7 +372,7 @@ func IndexFrom(root string, items []Entry, issue bool) (changed bool, err error)
 		body = strings.Join(lines, "\n")
 		where := "`.hv/milestones/MNN.md`"
 		if issue {
-			where = "the tracking issues (`hv-vision-show MNN`)"
+			where = "the tracking issues (`hv milestone show MNN`)"
 		}
 		intro = "Active milestones live in `.hv/MILESTONES.md` (detail in " + where + "). Tag captured items with their milestone via the `Milestone:` field where applicable."
 	case len(items) > 0:

@@ -14,8 +14,8 @@ import (
 //go:embed skills_block.md
 var skillsFS embed.FS
 
-// SkillsBlockBody is the static body of the hv-skills managed block. It still
-// names `.hv/bin/hv-*` helpers; F1 (#71) rewrites it to hv verbs.
+// SkillsBlockBody is the static body of the hv-skills managed block. It names
+// hv verbs, so it differs from the old hv-skills-index body (contract, A9 G4).
 func SkillsBlockBody() string {
 	b, _ := skillsFS.ReadFile("skills_block.md")
 	return strings.TrimRight(string(b), "\n")
