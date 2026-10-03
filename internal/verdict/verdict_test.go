@@ -198,3 +198,72 @@ func TestAddItemCountsFailedFixes(t *testing.T) {
 		t.Errorf("items share a count: %d", n)
 	}
 }
+
+func TestFailedFixesStartsAfterReset(t *testing.T) {
+	list := []Record{rec(DebugFix, Fail, "a"), rec(DebugFix, Fail, "a"), rec(DebugReset, Reset, "a"), rec(DebugFix, Pass, "b"), rec(DebugFix, Fail, "b")}
+	if n := FailedFixes(list); n != 1 {
+		t.Errorf("after reset: %d, want 1", n)
+	}
+	if n := FailedFixes(list[:3]); n != 0 {
+		t.Errorf("reset last: %d, want 0", n)
+	}
+	if n := FailedFixes(list[:2]); n != 2 {
+		t.Errorf("before reset: %d, want 2", n)
+	}
+	if KnownKind(DebugReset) {
+		t.Error("debug-reset must not be an accepted kind")
+	}
+}
+
+func TestResetItem(t *testing.T) {
+	root := t.TempDir()
+	if n, err := ResetItem(root, "B07", rec(DebugReset, Reset, "s")); err != nil || n != 0 {
+		t.Fatalf("empty item: %d %v", n, err)
+	}
+	if len(Load(root).Items["B07"]) != 0 {
+		t.Error("reset with nothing to clear wrote a record")
+	}
+	for i := 0; i < 3; i++ {
+		AddItem(root, "B07", rec(DebugFix, Fail, "s"))
+	}
+	if n, err := ResetItem(root, "B07", rec(DebugReset, Reset, "s")); err != nil || n != 3 {
+		t.Fatalf("cleared %d %v, want 3", n, err)
+	}
+	list := Load(root).Items["B07"]
+	if len(list) != 4 || FailedFixes(list) != 0 {
+		t.Errorf("after reset: %d records, %d failed", len(list), FailedFixes(list))
+	}
+	if n, _ := ResetItem(root, "B07", rec(DebugReset, Reset, "s")); n != 0 || len(Load(root).Items["B07"]) != 4 {
+		t.Error("second reset must not append")
+	}
+}
+
+func TestBlocking(t *testing.T) {
+	q := rec(ReviewQuality, Pass, "a")
+	cases := []struct {
+		name   string
+		list   []Record
+		runner string
+		kind   string
+	}{
+		{"none", nil, "", ""},
+		{"review fail", []Record{rec(ReviewQuality, Fail, "a")}, "", ReviewQuality},
+		{"spec fail newer than quality pass", []Record{q, rec(ReviewSpec, Fail, "a")}, "", ReviewSpec},
+		{"quality pass newer than spec fail, other sha", []Record{rec(ReviewSpec, Fail, "a"), q}, "", ""},
+		{"second opinion fail", []Record{rec(SecondOpinion, Fail, "a")}, "", SecondOpinion},
+		{"second opinion fail, codex advisory", []Record{rec(SecondOpinion, Fail, "a")}, "codex", ""},
+		{"review fail beats second opinion", []Record{rec(SecondOpinion, Fail, "a"), rec(ReviewSpec, Fail, "a")}, "", ReviewSpec},
+		{"review fail blocks under codex", []Record{rec(ReviewSpec, Fail, "a")}, "codex", ReviewSpec},
+		{"concerns", []Record{rec(ReviewQuality, Concerns, "a"), rec(SecondOpinion, Concerns, "a")}, "", ""},
+		{"qa never", []Record{rec(QA, Fail, "a"), rec(QA, InfraFail, "a")}, "", ""},
+		{"stale fail still blocks", []Record{rec(ReviewQuality, Fail, "old")}, "", ReviewQuality},
+		{"newer pass clears", []Record{rec(ReviewQuality, Fail, "a"), rec(ReviewQuality, Pass, "b")}, "", ""},
+		{"newer second opinion pass clears", []Record{rec(SecondOpinion, Fail, "a"), rec(SecondOpinion, Pass, "b")}, "", ""},
+	}
+	for _, c := range cases {
+		r, ok := Blocking(c.list, Settings{Runner: c.runner})
+		if ok != (c.kind != "") || r.Kind != c.kind {
+			t.Errorf("%s: got %q %v, want %q", c.name, r.Kind, ok, c.kind)
+		}
+	}
+}

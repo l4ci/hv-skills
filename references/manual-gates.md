@@ -12,6 +12,7 @@ The registry lives in code. `hv gate list` prints every gate, whether a verb enf
 | `release-publish` | `hv release publish` | `/hv-release` Step 13 |
 | `public-filing` | `hv tracker suggest-upstream` | `/hv-learn` Step 8.5 |
 | `merge-approval` | `hv ship merge`, `hv ship pr-merge`, `hv worker gate`, when `ship.mergeApproval` covers the merge (`all`, or `paths` matching `ship.mergeApprovalPaths`) | `/hv-ship` Step 6b, `/hv-review --queue`, `/hv-work` gate step |
+| `debug-reset` | `hv debug reset <ID> --reason <why>` (starts an item's failed-fix count again after the Iron Law halted it) | `/hv-debug` Step 9.5 |
 
 The verb exits 4 with `data.blockedBy: "manual gate"` and `data.gate` unless it gets `--confirm --confirm-note "<answer>"`, at every autonomy level. `merge-approval` adds `data.paths`, the changed files that matched (`worker gate` reports `data.verdict: "approval-required"`). A cleared gate appends one line to `.hv/gate-audit.jsonl` (gitignored): gate, verb, target, time, the quoted answer and the autonomy level.
 

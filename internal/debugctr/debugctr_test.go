@@ -108,7 +108,7 @@ func TestSummaryBytes(t *testing.T) {
 	want := "# Iron Law triggered for [B07]\n\n1 fix attempt failed to resolve the bug. Halting.\n\n## Attempts\n\n1. abc — " + trunc + "...\n\n## Next steps\n\n" +
 		"- Run `/hv-pause` to leave a handoff note and step away.\n" +
 		"- Or re-read the symptom — the root cause is likely in a different subsystem than the hypotheses so far have explored.\n" +
-		"- Counter persists in `.hv/debug/feat-x.json` — delete it manually if you want a fresh start on the same branch."
+		"- The failed-fix count is per item and survives a new branch; only `hv debug reset B07`, after a human approves it, starts it again."
 	if md != want || bug != "B07" || failed != 1 {
 		t.Fatalf("summary:\n%s", md)
 	}

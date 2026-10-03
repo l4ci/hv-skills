@@ -11,6 +11,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/artifact"
 	"github.com/l4ci/hv-skills/v5/internal/config"
 	"github.com/l4ci/hv-skills/v5/internal/debugctr"
+	"github.com/l4ci/hv-skills/v5/internal/gate"
 	"github.com/l4ci/hv-skills/v5/internal/git"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/repos"
@@ -305,4 +306,58 @@ func ignoreRefused(err error) error {
 		return nil
 	}
 	return fromArtifact(err)
+}
+
+// ---- debug reset
+
+func debugReset(fs *flag.FlagSet) RunFunc {
+	reason := fs.String("reason", "", "why the count starts again")
+	confirm := confirmFlags(fs)
+	return func(c *Ctx, args []string) (Result, error) {
+		bug, err := oneArg(args, "bugId")
+		if err != nil {
+			return Result{}, err
+		}
+		conf, err := confirm()
+		if err != nil {
+			return Result{}, err
+		}
+		if bug = strings.TrimSpace(bug); bug == "" {
+			return Result{}, Usage("bugId must not be empty")
+		}
+		if strings.TrimSpace(*reason) == "" {
+			return Result{}, Usage("--reason is required")
+		}
+		root, err := c.Root()
+		if err != nil {
+			return Result{}, err
+		}
+		failed := verdict.FailedFixes(verdict.Load(root).Items[bug])
+		if failed == 0 {
+			d := jsonx.NewObject()
+			d.Set("bugId", bug)
+			d.Set("failedFixes", 0)
+			d.Set("cleared", 0)
+			d.Set("changed", false)
+			return Result{Data: d, Text: "nothing to reset"}, nil
+		}
+		if res, err := clearGate(c, gate.DebugReset, bug, conf, nil, nil); err != nil {
+			return res, err
+		}
+		sha := ""
+		if out, err := reviewGit(c.Context(), root, "rev-parse", "--short", "HEAD"); err == nil {
+			sha = strings.TrimSpace(out)
+		}
+		r := verdict.NewRecord(verdict.DebugReset, verdict.Reset, sha, verdict.Body{Summary: strings.TrimSpace(*reason)})
+		cleared, err := verdict.ResetItem(root, bug, r)
+		if err != nil {
+			return Result{}, err
+		}
+		d := jsonx.NewObject()
+		d.Set("bugId", bug)
+		d.Set("failedFixes", 0)
+		d.Set("cleared", cleared)
+		d.Set("changed", cleared > 0)
+		return Result{Data: d, Text: "reset " + bug + " (" + strconv.Itoa(cleared) + " cleared)"}, nil
+	}
 }

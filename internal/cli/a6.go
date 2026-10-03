@@ -10,6 +10,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/debugctr"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/spike"
+	"github.com/l4ci/hv-skills/v5/internal/verdict"
 )
 
 // The A6 verbs (milestone, plan, design, spike, proof, debug) live in
@@ -30,6 +31,7 @@ func a6Commands() []*Command {
 				{Name: "inc-cycle", Summary: "count a hypothesis cycle", Verb: noFlags(runCounterIncCycle)},
 			}},
 			{Name: "verdict", Summary: "record whether a fix held and route on the item's failed-fix count", Verb: debugVerdict},
+			{Name: "reset", Summary: "start an item's failed-fix count again", Verb: debugReset},
 		}},
 		{Name: "spike", Summary: "throwaway feasibility spikes", Subs: []*Command{
 			{Name: "add", Summary: "create spike/<name> and its file", Repo: true, Verb: spikeAdd},
@@ -85,10 +87,34 @@ func openCounter(c *Ctx) (*debugctr.Counter, error) {
 	return ctr, fromArtifact(err)
 }
 
+// ironLaw refuses (exit 4) when bug has 3 or more failed fixes since its
+// last reset (B3). The count is the verdict store's, so a new branch or a
+// cleared session file does not start it again.
+func ironLaw(c *Ctx, bug string) (Result, error) {
+	root, err := c.Root()
+	if err != nil {
+		return Result{}, err
+	}
+	failed := verdict.FailedFixes(verdict.Load(root).Items[bug])
+	if failed < verdict.IronLaw {
+		return Result{}, nil
+	}
+	d := jsonx.NewObject()
+	d.Set("blockedBy", "iron law")
+	d.Set("bugId", bug)
+	d.Set("failedFixes", failed)
+	d.Set("changed", false)
+	return Result{Data: d}, Refused("%s has %d failed fixes; the Iron Law halts the session", bug, failed).
+		WithHint("hv debug reset " + bug)
+}
+
 func runCounterInit(c *Ctx, args []string) (Result, error) {
 	bug, err := oneArg(args, "bugId")
 	if err != nil {
 		return Result{}, err
+	}
+	if res, err := ironLaw(c, bug); err != nil {
+		return res, err
 	}
 	ctr, err := openCounter(c)
 	if err != nil {
@@ -118,6 +144,16 @@ func counterRecordAttempt(fs *flag.FlagSet) RunFunc {
 		ctr, err := openCounter(c)
 		if err != nil {
 			return Result{}, err
+		}
+		st, err := ctr.State() // exit 3 without a session file
+		if err != nil {
+			return Result{}, fromArtifact(err)
+		}
+		bug, _ := st.Get("bug_id")
+		if id, _ := bug.(string); id != "" {
+			if res, err := ironLaw(c, id); err != nil {
+				return res, err
+			}
 		}
 		n, err := ctr.RecordAttempt(*hyp, *commit)
 		if err != nil {

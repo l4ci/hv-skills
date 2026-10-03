@@ -156,9 +156,14 @@ func TestDebugVerdictIronLaw(t *testing.T) {
 	if d := data(t, out); d["failedFixes"] != float64(1) {
 		t.Errorf("counter not closed: %v", d)
 	}
+	// At 3 failed fixes the Iron Law refuses a 4th attempt until a reset (B3).
+	if code, _, _ := hvIn(t, dir, "debug", "counter", "record-attempt", "--hypothesis", "h2", "--commit", "def"); code != 4 {
+		t.Fatalf("4th attempt: exit %d, want 4", code)
+	}
+	hvIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--confirm", "--confirm-note", "yes")
 	hvIn(t, dir, "debug", "counter", "record-attempt", "--hypothesis", "h2", "--commit", "def")
 	code, out, _ := hvIn(t, dir, "debug", "verdict", "B07", "--verdict", "PASS", "--json")
-	if d := data(t, out); code != 0 || d["next"] != "complete" || d["attempt"] != float64(2) || d["failedFixes"] != float64(3) {
+	if d := data(t, out); code != 0 || d["next"] != "complete" || d["attempt"] != float64(2) || d["failedFixes"] != float64(0) {
 		t.Fatalf("pass: %d %v", code, d)
 	}
 }

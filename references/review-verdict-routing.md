@@ -13,7 +13,7 @@
 |---------|---------|---------------|
 | `PASS` | No concerns worth surfacing. The diff matches intent and respects conventions. | Continue silently. The reviewed work is integration-ready. |
 | `CONCERNS` | The diff works, but surfaces should be flagged before merge — convention drifts, suboptimal patterns, or stale scaffolding. Not a regression. | Surface each concern, then route per `autonomy.level` (see Consumer routing below). |
-| `FAIL` | Merging would regress behavior, break intent, or violate a hard-boundary `DECISIONS.md` entry. | Stop. Surface findings. Do **not** auto-route to ship/merge under any autonomy level. The user fixes via `/hv-work` or `/hv-debug` and reruns the review. |
+| `FAIL` | Merging would regress behavior, break intent, or violate a hard-boundary `DECISIONS.md` entry. | Stop. Surface findings. `hv ship pr`, `ship merge` and `ship pr-merge` refuse the branch (exit 4, `data.blockedBy: "verdict"`) until a newer verdict replaces the FAIL. The user fixes via `/hv-work` or `/hv-debug` and reruns the review. |
 
 ## Consumer routing
 

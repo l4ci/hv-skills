@@ -269,7 +269,7 @@ func (c *Counter) Summary(o *jsonx.Object) (md, bugID string, failed int) {
 		"",
 		"- Run `/hv-pause` to leave a handoff note and step away.",
 		"- Or re-read the symptom — the root cause is likely in a different subsystem than the hypotheses so far have explored.",
-		"- Counter persists in `.hv/debug/"+c.Session+".json` — delete it manually if you want a fresh start on the same branch.",
+		"- The failed-fix count is per item and survives a new branch; only `hv debug reset "+bugID+"`, after a human approves it, starts it again.",
 	)
 	return strings.Join(lines, "\n"), bugID, failed
 }

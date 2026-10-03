@@ -201,7 +201,7 @@ hv decisions auto-log --topic "<topic>" --title "<rule-title>" --why "<why-text>
 
 The entry follows the standard `DECISIONS.md` template, but **only the rule and `*Why.*` are auto-filled**; `**Forbids.**` and `**Permits.**` stay as `_(Unresolved — user must articulate)_` placeholders the user fills at session end (per the 2026-05-08 source-prefill rule that destination-specific fields stay as placeholders the skill blocks on). A footer comment encodes provenance: `<!-- [Auto:Loop] <plan-key> <date> — review and articulate Forbids/Permits -->`. The verb is idempotent on `(topic, rule-title)` — re-running the same plan key writes each entry exactly once.
 
-After all questions are resolved, write the plan to `.hv/plans/<key>.md` using the same `hv plan add` + `Edit` flow as Step 6. The plan's "Open questions" section lists every step-3 placeholder verbatim; "Resolved open questions" lists every step-1/2 outcome with a brief rationale. The `auto: true` frontmatter key marks the plan as auto-written.
+After all questions are resolved, write the plan to `.hv/plans/<key>.md` using the same `hv plan add` + `Edit` flow as Step 6, with `--auto-loop` on `hv plan add`: the verb writes the `auto: true` frontmatter key that marks the plan as auto-written, and refuses the flag (exit 2) outside loop mode. The plan's "Open questions" section lists every step-3 placeholder verbatim; "Resolved open questions" lists every step-1/2 outcome with a brief rationale.
 
 ### Surfacing
 
