@@ -27,7 +27,8 @@ type LastExit struct {
 }
 
 // State is <git-common-dir>/hv/keepalive.json, rewritten under its own lock on
-// every transition. D3 appends its usage-limit entries to the same file.
+// every transition. D3's usage-limit log is not here: it is `limits` in
+// .hv/workers.json.
 type State struct {
 	PID            int       `json:"pid"`
 	StartedAt      string    `json:"startedAt"`
