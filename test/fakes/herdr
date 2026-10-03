@@ -2,6 +2,8 @@
 # Fake herdr for tests. SAFE BY CONSTRUCTION: it only appends to a log and
 # prints canned JSON, so it can stand in for the real binary inside a round
 # that itself runs in herdr. Never put the real herdr on a test's PATH.
+# Shapes follow real herdr 0.9.3 (checked read-only against a live server, #196):
+# every command answers a JSON envelope except `agent read`, which prints text.
 #
 # State lives in the directory $FAKE_HERDR (required): `log` gets one argv line
 # per call; the optional files below steer the answers:
@@ -10,7 +12,7 @@
 #   gone               `agent get`/`agent read` fail with agent_not_found
 #   status             agent_status for `agent get` (default idle)
 #   wait_status        agent_status for `agent wait` (default idle)
-#   pane.txt           text returned by `agent read`
+#   pane.txt           text `agent read` prints (plain text, as herdr 0.9.3 does)
 #   prompt_error       error code `agent prompt` fails with (except /exit)
 #   tab_stays          `tab get` keeps succeeding after `tab close`
 [ -n "${FAKE_HERDR:-}" ] || { echo "fake herdr: FAKE_HERDR is not set" >&2; exit 98; }
@@ -27,7 +29,7 @@ case "$1 $2" in
   "tab close") : >"$F/closed"; echo '{"id":"cli","result":{"type":"ok"}}' ;;
   "tab get")
     if [ -f "$F/closed" ] && [ ! -f "$F/tab_stays" ]; then err tab_not_found; fi
-    echo '{"id":"cli","result":{"type":"tab_info"}}' ;;
+    echo '{"id":"cli","result":{"tab":{"agent_status":"unknown","focused":false,"label":"x","number":7,"pane_count":1,"tab_id":"w9:t7","workspace_id":"w9"},"type":"tab_info"}}' ;;
   "agent start")
     [ -f "$F/start_not_ready" ] && err agent_not_ready
     agent_json agent_started idle ;;
@@ -37,13 +39,13 @@ case "$1 $2" in
   "agent wait") agent_json agent_info "$(cat "$F/wait_status" 2>/dev/null || echo idle)" ;;
   "agent read")
     [ -f "$F/gone" ] && err agent_not_found
-    python3 -c 'import json,sys; print(json.dumps({"id":"cli","result":{"type":"pane_read","read":{"text":open(sys.argv[1]).read(),"pane_id":"w9:p11"}}}))' "$F/pane.txt" ;;
+    cat "$F/pane.txt" 2>/dev/null ;;  # herdr 0.9.3 prints pane text as is, no JSON envelope
   "agent send-keys") echo '{"id":"cli","result":{"type":"ok"}}' ;;
   "agent prompt")
     printf '%s' "$4" >"$F/last_prompt"
     [ -f "$F/prompt_error" ] && [ "$4" != "/exit" ] && err "$(cat "$F/prompt_error")"
     agent_json agent_prompted working ;;
-  "pane process-info") echo '{"id":"cli","result":{"process_info":{"foreground_processes":[],"shell_pid":0}}}' ;;
+  "pane process-info") echo '{"id":"cli","result":{"process_info":{"foreground_process_group_id":0,"foreground_processes":[],"pane_id":"w9:p11","shell_pid":0},"type":"process_info"}}' ;;
   "notification show") echo '{"id":"cli","result":{"type":"notification_show","shown":true,"reason":"shown"}}' ;;
   *) err unknown_method ;;
 esac

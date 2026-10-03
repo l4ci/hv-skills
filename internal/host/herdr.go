@@ -208,7 +208,7 @@ func (h *herdr) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 	}
 	// Blocked at startup: answer up to two dialogs (trust, then bypass).
 	for i := 0; ; {
-		text := jget(h.herdr(ctx, "agent", "read", name, "--source", "visible").Stdout, "result.read.text")
+		text := paneText(h.herdr(ctx, "agent", "read", name, "--source", "visible", "--format", "text"))
 		keys, ok := DialogKeys(text)
 		if !ok {
 			return "", fmt.Errorf("slot '%s' is stuck on an unrecognised startup dialog in tab %s", o.Slot, tab)
@@ -252,12 +252,18 @@ func (h *herdr) Capture(ctx context.Context, slot, handle string, lines int) str
 	if handle == "" {
 		return ""
 	}
-	r := h.herdr(ctx, "agent", "read", AgentName(slot, handle), "--source", "recent-unwrapped",
-		"--lines", strconv.Itoa(lines))
+	return paneText(h.herdr(ctx, "agent", "read", AgentName(slot, handle), "--source", "recent-unwrapped",
+		"--lines", strconv.Itoa(lines), "--format", "text"))
+}
+
+// paneText is the pane text of an `agent read` reply. herdr 0.9.x prints it as
+// plain text on stdout, not in the JSON envelope its other commands use; a
+// failure is a JSON error on stderr and a non-zero exit, read here as no text.
+func paneText(r Result) string {
 	if r.ExitCode != 0 {
 		return ""
 	}
-	return jget(r.Stdout, "result.read.text")
+	return r.Stdout
 }
 
 // Status is herdr's native agent state, or `gone` when the slot has a tab but

@@ -429,7 +429,7 @@ func TestHerdrSpawnAnswersStartupDialogs(t *testing.T) {
 		case "agent read":
 			txt := dialogs[read]
 			read++
-			return Result{Stdout: fmt.Sprintf(`{"result":{"read":{"text":%q}}}`, txt)}
+			return Result{Stdout: txt} // herdr 0.9.x prints pane text, not JSON
 		case "agent wait":
 			waits++
 			if waits == 1 {
@@ -460,7 +460,7 @@ func TestHerdrSpawnDialogFailures(t *testing.T) {
 			case "agent start":
 				return Result{ExitCode: 1, Stderr: herdrErr("agent_not_ready")}
 			case "agent read":
-				return Result{Stdout: fmt.Sprintf(`{"result":{"read":{"text":%q}}}`, pane)}
+				return Result{Stdout: pane}
 			case "agent wait":
 				return Result{Stdout: agentJSON(status)}
 			}
@@ -528,17 +528,17 @@ func TestHerdrCaptureAndStatus(t *testing.T) {
 	f := &fake{handler: func(_ string, a []string) Result {
 		switch a[1] {
 		case "read":
-			return Result{Stdout: `{"result":{"read":{"text":"line1\nline2"}}}`}
+			return Result{Stdout: "line1\nline2\n"} // herdr 0.9.3: plain text, no envelope
 		case "get":
 			return Result{Stdout: agentJSON("working")}
 		}
 		return Result{}
 	}}
 	h := New("herdr", deps(f, herdrEnv, &clock{}))
-	if got := h.Capture(bg, "w1", "w9:t7", 60); got != "line1\nline2" {
+	if got := h.Capture(bg, "w1", "w9:t7", 60); got != "line1\nline2\n" {
 		t.Errorf("Capture = %q", got)
 	}
-	if !strings.Contains(f.log(), "herdr agent read hv-w1-w9-t7 --source recent-unwrapped --lines 60") {
+	if !strings.Contains(f.log(), "herdr agent read hv-w1-w9-t7 --source recent-unwrapped --lines 60 --format text") {
 		t.Errorf("read call wrong: %s", f.log())
 	}
 	if got := h.Status(bg, "w1", "w9:t7"); got != "working" {
@@ -740,5 +740,23 @@ func TestTmuxEnsureOperatorFailures(t *testing.T) {
 	}
 	if _, ok := New("herdr", deps(f, nil, &clock{})).(Operator); ok {
 		t.Error("herdr has no operator window to open")
+	}
+}
+
+// TestHerdrPaneTextIsPlain pins herdr 0.9.3's `agent read`: the pane text on
+// stdout as is (even text that looks like JSON), and on failure a JSON error
+// on stderr with exit 1, which reads as no text.
+func TestHerdrPaneTextIsPlain(t *testing.T) {
+	for _, tc := range []struct {
+		r    Result
+		want string
+	}{
+		{Result{Stdout: "HV-DONE PR https://github.com/o/r/pull/7\n"}, "HV-DONE PR https://github.com/o/r/pull/7\n"},
+		{Result{Stdout: `{"result":{"read":{"text":"x"}}}`}, `{"result":{"read":{"text":"x"}}}`},
+		{Result{ExitCode: 1, Stderr: herdrErr("agent_not_found")}, ""},
+	} {
+		if got := paneText(tc.r); got != tc.want {
+			t.Errorf("paneText(%+v) = %q, want %q", tc.r, got, tc.want)
+		}
 	}
 }

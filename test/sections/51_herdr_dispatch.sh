@@ -41,7 +41,7 @@ case "$1 $2" in
   "agent wait") agent_json agent_info "$(cat "$F/wait_status" 2>/dev/null || echo idle)" ;;
   "agent read")
     [ -f "$F/gone" ] && err agent_not_found
-    python3 -c 'import json,sys; print(json.dumps({"id":"cli","result":{"type":"pane_read","read":{"text":open(sys.argv[1]).read(),"pane_id":"w9:p11"}}}))' "$F/pane.txt" ;;
+    cat "$F/pane.txt" 2>/dev/null ;;  # herdr 0.9.3 prints pane text as is, no JSON envelope
   "agent send-keys") echo '{"id":"cli","result":{"type":"ok"}}' ;;
   "agent prompt")
     printf '%s' "$4" >"$F/last_prompt"
