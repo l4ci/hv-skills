@@ -240,7 +240,7 @@ A custom `work.workerCommand` receives the tier's model only through a `{model}`
 
 ## orchestrator keys
 
-Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)). All are silent defaults; none is written by `/hv-init`.
+Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)) and its restart (`hv keepalive run`; see [keepalive](pausing-and-resuming.md#keepalive)). All are silent defaults; none is written by `/hv-init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -248,8 +248,13 @@ Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; 
 | `orchestrator.stateMaxAgeSeconds` | `120` | A statusline reading older than this is not acted on. |
 | `orchestrator.handoffMaxAgeSeconds` | `900` | A handoff younger than this counts as fresh: the Stop hook passes, and the SessionStart fallback injects it. |
 | `orchestrator.handoffMaxBlocks` | `2` | Times the hook re-blocks a session that still has no handoff, then passes and records `handoffFailed` in the session state. `0` blocks once. |
+| `orchestrator.keepaliveMaxRestarts` | `10` | Restarts `hv keepalive run` makes before it stops with `max-restarts` (integer, 0 or more; `0` stops at the first handoff exit). |
+| `orchestrator.keepaliveBreaker` | `3` | Restarts in a row that leave no new handoff before the breaker stops the loop (integer, 1 or more). |
+| `orchestrator.keepaliveBackoffSeconds` | `5` | Seconds to wait before a restart (integer, 0 or more). |
+| `orchestrator.restartPrompt` | `Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.` | Appended as the last argument of a restart, never of the first start (non-empty string). |
+| `orchestrator.escalateIssue` | `0` | Issue number the breaker's escalation comment goes on (integer, 0 or more). `0` is unset: the breaker raises a host notification and a warning only. |
 
-An out-of-range value exits 70 in a verb that reads it; the hooks treat it as a pass and never block.
+An out-of-range value exits 70 in a verb that reads it (`hv keepalive run` included); the hooks treat it as a pass and never block.
 
 ## qa.gate
 
