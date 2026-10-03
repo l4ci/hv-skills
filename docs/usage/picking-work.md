@@ -10,9 +10,8 @@ Before presenting results it:
 
 1. Validates active branches and worktrees against git; stale entries get cleaned automatically.
 2. Archives completions older than five days to `ARCHIVE.md`.
-3. Builds a relationship map from `Related:` links and finds clusters.
-4. Sorts the backlog by priority and size, with cluster notes.
-5. Suggests one item or a connected batch. P0 bugs jump the queue.
+3. Shows the backlog sorted by priority and size, with a clusters section built from `Related:` links.
+4. Suggests one item. P0 bugs jump the queue.
 
 ```mermaid
 flowchart TD
@@ -23,7 +22,7 @@ flowchart TD
     E --> F[Archive completions older than 5d]
     C -->|No| F
     F --> G[Present backlog tables + clusters]
-    G --> H[Suggest one item or batch]
+    G --> H[Suggest one item]
     H --> I{User picks…}
     I -->|Start| J[/hv-work]
     I -->|Peek first| K[/hv-work --preview]
@@ -43,7 +42,7 @@ Output: a backlog table with a highlighted suggestion, e.g. `→ Suggest: B03 (P
 
 If the suggestion is a size-Major feature or a P0/P1 bug, `/hv-work` (no argument) offers `/hv-work --preview` as a question option before routing to `/hv-work`.
 
-Items with a `Related:` field that share a cluster surface together so you can tackle them as a unit.
+Items with a `Related:` field that share a cluster are listed together in the clusters section. The suggestion is a single item; to take a cluster as a batch, answer "Pick different items" and choose the set.
 
 ## /hv-work --preview: peek before you commit
 
