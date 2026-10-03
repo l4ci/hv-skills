@@ -33,6 +33,7 @@ const (
 	BlockSlotBusy     = "slot busy"
 	BlockNoFreeSlot   = "no free slot"
 	BlockBriefMissing = "brief missing"
+	BlockNoTierMap    = "no tier map"
 )
 
 // BlockedError is an assignment refused before anything was marked or sent.
@@ -55,6 +56,9 @@ type AssignOpts struct {
 	HolderPID     int
 	Settings      roundcfg.Settings
 	Getenv        func(string) string
+	// Tier, TierReason and Kind are C9: "" means round.tier, no reason, and
+	// the slot's recorded kind, else claude.
+	Tier, TierReason, Kind string
 }
 
 // Assigned is what Assign did.
@@ -64,6 +68,10 @@ type Assigned struct {
 	Account    string
 	Dispatched bool
 	Changed    bool
+	// Kind, Tier and Model are what the worker starts with; Model is "" when a
+	// custom work.workerCommand has no {model} placeholder.
+	Kind, Tier, Model, TierReason string
+	Warnings                      []string
 }
 
 var (
@@ -116,7 +124,7 @@ func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (
 // pointerBrief is the short brief a worker is dispatched with: where its
 // contract is, which issue to read and dispute, its branch, its siblings and
 // the decisions already settled. dispatch signs it.
-func pointerBrief(agent, id, branch, brief string, siblings []string, decisions string) string {
+func pointerBrief(agent, id, branch, brief string, siblings []string, decisions string, t tierBrief) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "You are %s. Read %s in full before anything else: it is your standing contract.\n\n", agent, brief)
 	fmt.Fprintf(&b, "Then read issue %s and its whole thread yourself. Dispute the ticket before implementing if it is wrong, already decided or contradicts the code: say so instead of building it.\n\n", id)
@@ -124,9 +132,41 @@ func pointerBrief(agent, id, branch, brief string, siblings []string, decisions 
 	if len(siblings) > 0 {
 		fmt.Fprintf(&b, "Sibling issues running now: %s.\n", strings.Join(siblings, ", "))
 	}
+	b.WriteString(t.text())
 	if d := strings.TrimSpace(decisions); d != "" {
 		fmt.Fprintf(&b, "\nDecisions already settled (verbatim):\n\n%s\n", d)
 	}
+	return b.String()
+}
+
+// tierBrief is the resolved tier facts of one worker: its own tier and model,
+// the tier table of its harness kind, and why the tier is above the default.
+type tierBrief struct {
+	Kind, Tier, Model, Default, Reason string
+	Table                              map[string]string
+}
+
+func (t tierBrief) text() string {
+	var b strings.Builder
+	own := t.Tier
+	if t.Model != "" {
+		own += " (" + t.Model + ")"
+	}
+	fmt.Fprintf(&b, "\nYour tier is %s", own)
+	if t.Reason != "" {
+		if roundcfg.TierRank(t.Tier) > roundcfg.TierRank(t.Default) {
+			fmt.Fprintf(&b, ", above the default %s: %s", t.Default, t.Reason)
+		} else {
+			fmt.Fprintf(&b, ": %s", t.Reason)
+		}
+	}
+	b.WriteString(".\n")
+	var rows []string
+	for _, tier := range roundcfg.Tiers {
+		rows = append(rows, tier+" = "+t.Table[tier])
+	}
+	fmt.Fprintf(&b, "Model tiers for your own subagents (%s): %s. Follow the tier rule in the contract.\n", t.Kind, strings.Join(rows, ", "))
+	fmt.Fprintf(&b, "Put `Worker tier: %s` in your PR body.\n", own)
 	return b.String()
 }
 
@@ -165,6 +205,20 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	res.ID, res.Type = id, it.Type
 	if o.Agent != "" && !contains(set.Roster, o.Agent) {
 		return res, usage("--agent %s is not in round.roster (%s)", o.Agent, strings.Join(set.Roster, ", "))
+	}
+	if o.Tier != "" && !roundcfg.ValidTier(o.Tier) {
+		return res, usage("--tier must be one of %s", strings.Join(roundcfg.Tiers, ", "))
+	}
+	if o.Kind != "" && !roundcfg.ValidKind(o.Kind) {
+		return res, usage("--kind must be one of %s", strings.Join(roundcfg.Kinds, ", "))
+	}
+	tier := o.Tier
+	if tier == "" {
+		tier = set.Tier
+	}
+	reason := strings.TrimSpace(o.TierReason)
+	if roundcfg.TierRank(tier) > roundcfg.TierRank(set.Tier) && reason == "" {
+		return res, usage("--tier %s is above the default tier %s: say why with --tier-reason", tier, set.Tier)
 	}
 	if o.BodyFile != "" {
 		if _, err := os.Stat(o.BodyFile); err != nil {
@@ -226,6 +280,25 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 	res.Branch = BranchName(agent, id, it.Title)
 
+	// Kind, tier and model (C9): the model is the tier's entry for the kind.
+	kind := o.Kind
+	if kind == "" {
+		kind = worker.Str(slot, "kind")
+	}
+	if kind == "" {
+		kind = roundcfg.KindClaude
+	}
+	model := set.Model(kind, tier)
+	if model == "" {
+		return res, blocked(BlockNoTierMap, "round.tiers.%s has no model for the %s tier: set round.tiers.%s.*", kind, tier, kind)
+	}
+	res.Kind, res.Tier, res.TierReason = kind, tier, reason
+	res.Model = model
+	if !worker.ModelApplies(root) {
+		res.Model = ""
+		res.Warnings = append(res.Warnings, "tier model not applied: work.workerCommand has no {model} placeholder")
+	}
+
 	// 3. The scope allows it.
 	scope, slate := SlateOf(root)
 	if scope == "" {
@@ -262,6 +335,11 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		return res, blk
 	}
 
+	// A codex worker is E1's: refuse before anything is marked.
+	if kind == roundcfg.KindCodex {
+		return res, &worker.Error{Exit: 71, Message: "starting a codex worker is not built yet (E1, #68); --check-only reports the model it would use"}
+	}
+
 	// 5. The brief exists before anything is marked.
 	brief, ok := briefPath(root, set, o.Getenv)
 	if !ok {
@@ -285,7 +363,11 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		res.Changed = false
 		be.SetState(id, "none")
 		be.Release(id, claimID)
-		mutateSlot(root, agent, func(s *jsonx.Object) { s.Set("task", nil); s.Set("claimId", nil) })
+		mutateSlot(root, agent, func(s *jsonx.Object) {
+			for _, k := range []string{"task", "claimId", "kind", "tier", "model", "tierReason"} {
+				s.Set(k, nil)
+			}
+		})
 	}
 	changed, err := be.SetState(id, "in-progress")
 	if err != nil {
@@ -310,7 +392,14 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		}
 		return res, err
 	}
-	if err := mutateSlot(root, agent, func(s *jsonx.Object) { s.Set("task", id); s.Set("claimId", claimID) }); err != nil {
+	if err := mutateSlot(root, agent, func(s *jsonx.Object) {
+		s.Set("task", id)
+		s.Set("claimId", claimID)
+		s.Set("kind", kind)
+		s.Set("tier", tier)
+		s.Set("model", nilIfEmpty(res.Model))
+		s.Set("tierReason", nilIfEmpty(reason))
+	}); err != nil {
 		undo()
 		return res, err
 	}
@@ -338,9 +427,9 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		b, _ := os.ReadFile(o.BodyFile)
 		decisions = string(b)
 	}
-	tmp.WriteString(pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions))
+	tmp.WriteString(pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions, tierBrief{Kind: kind, Tier: tier, Model: res.Model, Default: set.Tier, Reason: reason, Table: set.Models[kind]}))
 	tmp.Close()
-	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch}); err != nil {
+	if _, err := w.Dispatch(ctx, root, worker.DispatchOpts{Slot: agent, BodyFile: tmp.Name(), Task: id, Round: &rnd, Branch: res.Branch, Model: res.Model}); err != nil {
 		return res, err
 	}
 	res.Dispatched, res.Changed = true, true

@@ -20,13 +20,52 @@ const (
 // Scopes lists the valid scope values.
 var Scopes = []string{ScopeSlate, ScopeMilestone, ScopeNext}
 
+// Tiers, light to heavy, and the harness kinds a tier maps a model for.
+const (
+	TierLight    = "light"
+	TierStandard = "standard"
+	TierHeavy    = "heavy"
+
+	KindClaude = "claude"
+	KindCodex  = "codex"
+)
+
+// Tiers lists the tiers in order; Kinds the harness kinds.
+var (
+	Tiers = []string{TierLight, TierStandard, TierHeavy}
+	Kinds = []string{KindClaude, KindCodex}
+)
+
 // Settings are the round.* keys.
 type Settings struct {
 	Scope       string
 	Roster      []string
 	Brief       string
 	SharedPaths []string
+	// Tier is the default tier; Models maps kind -> tier -> model name for
+	// every configured kind (a kind with no tier set is absent).
+	Tier   string
+	Models map[string]map[string]string
 }
+
+// ValidTier reports whether s is a tier; ValidKind whether s is a harness kind.
+func ValidTier(s string) bool { return indexOf(Tiers, s) >= 0 }
+func ValidKind(s string) bool { return indexOf(Kinds, s) >= 0 }
+
+// TierRank orders tiers: light 0, standard 1, heavy 2; -1 for a non-tier.
+func TierRank(s string) int { return indexOf(Tiers, s) }
+
+func indexOf(l []string, s string) int {
+	for i, v := range l {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
+// Model is the model name for a kind and tier, "" when the kind has no map.
+func (s Settings) Model(kind, tier string) string { return s.Models[kind][tier] }
 
 // agentRe is a name usable in a branch (`<agent>/<issue>-<slug>`,
 // `park/<agent>`) and a directory (`.worktrees/<agent>`).
@@ -75,8 +114,66 @@ func Load(root string) (Settings, error) {
 		return s, err
 	}
 	s.Brief, _ = v.(string)
-	s.SharedPaths, err = list(cfg, "round.sharedPaths")
-	return s, err
+	if s.SharedPaths, err = list(cfg, "round.sharedPaths"); err != nil {
+		return s, err
+	}
+	return s, loadTiers(cfg, &s)
+}
+
+// loadTiers reads round.tier and round.tiers.<kind>.<tier>. The claude standard
+// tier falls back to models.worker, so one knob governs the standard model.
+// claude must be configured; a configured kind must name all three tiers.
+func loadTiers(cfg any, s *Settings) error {
+	v, err := config.Value(cfg, "round.tier")
+	if err != nil {
+		return err
+	}
+	s.Tier, _ = v.(string)
+	if !ValidTier(s.Tier) {
+		return fmt.Errorf("round.tier must be %s (got %v)", strings.Join(Tiers, ", "), v)
+	}
+	s.Models = map[string]map[string]string{}
+	for _, kind := range Kinds {
+		m := map[string]string{}
+		for _, tier := range Tiers {
+			key := "round.tiers." + kind + "." + tier
+			v, err := config.Value(cfg, key)
+			if err != nil {
+				return err
+			}
+			name, _ := v.(string)
+			name = strings.TrimSpace(name)
+			if name == "" && kind == KindClaude && tier == TierStandard {
+				w, err := config.Value(cfg, "models.worker")
+				if err != nil {
+					return err
+				}
+				name, _ = w.(string)
+				name = strings.TrimSpace(name)
+			}
+			m[tier] = name
+		}
+		set := 0
+		for _, n := range m {
+			if n != "" {
+				set++
+			}
+		}
+		switch {
+		case set == 0 && kind == KindClaude:
+			return fmt.Errorf("round.tiers.claude is not configured: set light, standard and heavy")
+		case set == 0:
+			continue
+		case set < len(Tiers):
+			for _, tier := range Tiers {
+				if m[tier] == "" {
+					return fmt.Errorf("round.tiers.%s.%s is empty: a configured kind needs a model for every tier", kind, tier)
+				}
+			}
+		}
+		s.Models[kind] = m
+	}
+	return nil
 }
 
 func list(cfg any, key string) ([]string, error) {

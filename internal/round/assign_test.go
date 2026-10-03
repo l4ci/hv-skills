@@ -11,6 +11,7 @@ import (
 
 	"github.com/l4ci/hv-skills/v5/internal/backlog"
 	"github.com/l4ci/hv-skills/v5/internal/host"
+	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -60,6 +61,7 @@ func (b *boardFake) AddComment(ref, kind, text string) (string, error) {
 // hostFake is a tmux host that accepts everything.
 type hostFake struct {
 	spawned []string
+	launch  string
 	sent    string
 }
 
@@ -69,6 +71,7 @@ func (h *hostFake) InSession() bool { return true }
 func (h *hostFake) Where() string   { return "main" }
 func (h *hostFake) Spawn(_ context.Context, o host.SpawnOpts) (string, error) {
 	h.spawned = append(h.spawned, o.Slot+" "+o.Cwd)
+	h.launch = o.Launch
 	return "w1:t1", nil
 }
 func (h *hostFake) Send(_ context.Context, slot, handle, file string) error {
@@ -335,3 +338,165 @@ func (b *boardFake) Status(string) (*backlog.Status, error)       { return nil, 
 func (b *boardFake) NoteGet(string, string) (string, bool, error) { return "", false, nil }
 func (b *boardFake) NotePut(string, string, string) (bool, error) { return false, nil }
 func (b *boardFake) NoteRm(string, string) (bool, error)          { return false, nil }
+
+func (f *assignFixture) config(t *testing.T, cfg string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.root, ".hv", "config.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set, err := roundcfg.Load(f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.set = set
+}
+
+func TestAssignDefaultTierStartsTheWorkerOnItsModel(t *testing.T) {
+	f := newAssignFixture(t)
+	res, err := f.assign("12", "ben", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Kind != "claude" || res.Tier != "standard" || res.Model != "sonnet" || res.TierReason != "" {
+		t.Fatalf("%+v", res)
+	}
+	if !strings.Contains(f.host.launch, "--model sonnet") {
+		t.Errorf("the worker must launch on the standard model: %q", f.host.launch)
+	}
+	s := worker.LoadRegistry(f.root).Slot("ben")
+	if worker.Str(s, "tier") != "standard" || worker.Str(s, "model") != "sonnet" || worker.Str(s, "kind") != "claude" {
+		t.Errorf("slot fields: %v", s)
+	}
+	for _, want := range []string{"Your tier is standard (sonnet).", "claude): light = haiku, standard = sonnet, heavy = opus", "Worker tier: standard (sonnet)"} {
+		if !strings.Contains(f.host.sent, want) {
+			t.Errorf("brief lacks %q:\n%s", want, f.host.sent)
+		}
+	}
+	rep, _ := f.env.Status(bg, f.root)
+	for _, r := range rep.Rows {
+		if r.Name == "ben" && (r.Tier != "standard" || r.Model != "sonnet" || r.Kind != "claude") {
+			t.Errorf("round status must show the tier: %+v", r)
+		}
+	}
+}
+
+func TestAssignStandardTierFollowsModelsWorker(t *testing.T) {
+	f := newAssignFixture(t)
+	f.config(t, `{"models":{"worker":"haiku-ish"}}`)
+	res, err := f.assign("12", "ben", nil)
+	if err != nil || res.Model != "haiku-ish" || !strings.Contains(f.host.launch, "--model haiku-ish") {
+		t.Fatalf("one knob governs the standard model: %v %+v %q", err, res, f.host.launch)
+	}
+	g := newAssignFixture(t)
+	g.config(t, `{"models":{"worker":"haiku-ish"},"round":{"tiers":{"claude":{"standard":"explicit"}}}}`)
+	if res, err := g.assign("12", "ben", nil); err != nil || res.Model != "explicit" {
+		t.Fatalf("an explicit tier value wins: %v %+v", err, res)
+	}
+}
+
+func TestAssignAboveDefaultNeedsAReasonAndRecordsIt(t *testing.T) {
+	f := newAssignFixture(t)
+	var we *worker.Error
+	if _, err := f.assign("12", "ben", func(o *AssignOpts) { o.Tier = "heavy" }); !errors.As(err, &we) || we.Exit != worker.ExitUsage {
+		t.Fatalf("heavy above standard needs a reason: %v", err)
+	}
+	if len(f.be.claims) != 0 {
+		t.Fatal("a usage error must mark nothing")
+	}
+	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Tier = "heavy"; o.TierReason = "touches the lease protocol" })
+	if err != nil || res.Tier != "heavy" || res.Model != "opus" || res.TierReason != "touches the lease protocol" {
+		t.Fatalf("%v %+v", err, res)
+	}
+	s := worker.LoadRegistry(f.root).Slot("ben")
+	if worker.Str(s, "tierReason") != "touches the lease protocol" || !strings.Contains(f.host.launch, "--model opus") {
+		t.Errorf("reason recorded and model applied: %v %q", s, f.host.launch)
+	}
+	if !strings.Contains(f.host.sent, "above the default standard: touches the lease protocol") || !strings.Contains(f.host.sent, "Worker tier: heavy (opus)") {
+		t.Errorf("brief:\n%s", f.host.sent)
+	}
+}
+
+func TestAssignBelowDefaultNeedsNoReason(t *testing.T) {
+	f := newAssignFixture(t)
+	if res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Tier = "light" }); err != nil || res.Model != "haiku" {
+		t.Fatalf("%v %+v", err, res)
+	}
+}
+
+func TestAssignRejectsUnknownTierAndKind(t *testing.T) {
+	f := newAssignFixture(t)
+	var we *worker.Error
+	for name, mod := range map[string]func(*AssignOpts){
+		"tier": func(o *AssignOpts) { o.Tier = "ultra" },
+		"kind": func(o *AssignOpts) { o.Kind = "gemini" },
+	} {
+		if _, err := f.assign("12", "ben", mod); !errors.As(err, &we) || we.Exit != worker.ExitUsage {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestAssignCodexResolvesButDoesNotStart(t *testing.T) {
+	f := newAssignFixture(t)
+	codex := func(o *AssignOpts) { o.Kind = "codex" }
+	if _, err := f.assign("12", "ben", codex); blockedBy(t, err) != BlockNoTierMap {
+		t.Fatalf("an unconfigured codex map is refused: %v", err)
+	}
+	f.config(t, `{"round":{"tiers":{"codex":{"light":"c-l","standard":"c-s","heavy":"c-h"}}}}`)
+	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex"; o.CheckOnly = true })
+	if err != nil || res.Kind != "codex" || res.Model != "c-s" {
+		t.Fatalf("check-only resolves the codex model: %v %+v", err, res)
+	}
+	var we *worker.Error
+	if _, err := f.assign("12", "ben", codex); !errors.As(err, &we) || we.Exit != 71 {
+		t.Fatalf("codex start is E1's, exit 71: %v", err)
+	}
+	if len(f.be.claims) != 0 || len(f.be.states) != 0 || len(f.host.spawned) != 0 {
+		t.Fatalf("nothing is marked before the 71: %+v %+v", f.be.claims, f.host.spawned)
+	}
+	// A slot's recorded kind is the default.
+	worker.Update(f.root, slotsDefault(), func(doc *jsonx.Object) {
+		(worker.Registry{Doc: doc}).Slot("ben").Set("kind", "codex")
+	})
+	if _, err := f.assign("12", "ben", nil); !errors.As(err, &we) || we.Exit != 71 {
+		t.Fatalf("the recorded kind is the default: %v", err)
+	}
+}
+
+func TestAssignCustomWorkerCommandModelPlaceholder(t *testing.T) {
+	f := newAssignFixture(t)
+	f.config(t, `{"work":{"workerCommand":"mywrap --dangerously-skip-permissions"}}`)
+	res, err := f.assign("12", "ben", nil)
+	if err != nil || res.Model != "" || res.Tier != "standard" || len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "{model}") {
+		t.Fatalf("a command without the placeholder warns and records the tier: %v %+v", err, res)
+	}
+	if strings.Contains(f.host.launch, "sonnet") || f.host.launch != "mywrap --dangerously-skip-permissions" {
+		t.Errorf("the command runs as written: %q", f.host.launch)
+	}
+	if s := worker.LoadRegistry(f.root).Slot("ben"); worker.Str(s, "tier") != "standard" || worker.Str(s, "model") != "" {
+		t.Errorf("tier recorded, model left out: %v", s)
+	}
+
+	g := newAssignFixture(t)
+	g.config(t, `{"work":{"workerCommand":"mywrap --m {model} --dangerously-skip-permissions"}}`)
+	res, err = g.assign("12", "ben", func(o *AssignOpts) { o.Tier = "light" })
+	if err != nil || res.Model != "haiku" || len(res.Warnings) != 0 || g.host.launch != "mywrap --m haiku --dangerously-skip-permissions" {
+		t.Fatalf("placeholder filled: %v %+v %q", err, res, g.host.launch)
+	}
+}
+
+func TestWindDownClearsTheTierFields(t *testing.T) {
+	f := newAssignFixture(t)
+	if _, err := f.assign("12", "ben", func(o *AssignOpts) { o.Tier = "heavy"; o.TierReason = "x" }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.windDown(nil); err != nil {
+		t.Fatal(err)
+	}
+	s := worker.LoadRegistry(f.root).Slot("ben")
+	for _, k := range []string{"kind", "tier", "model", "tierReason"} {
+		if worker.Str(s, k) != "" {
+			t.Errorf("%s must be cleared on park: %v", k, s)
+		}
+	}
+}

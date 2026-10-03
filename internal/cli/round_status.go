@@ -145,6 +145,10 @@ func rowList(rows []round.Row) []any {
 		o.Set("registered", r.Registered)
 		o.Set("drift", strs(r.Drift))
 		o.Set("escalations", strs(r.Escalations))
+		setIf(o, "kind", r.Kind)
+		setIf(o, "tier", r.Tier)
+		setIf(o, "model", r.Model)
+		setIf(o, "tierReason", r.TierReason)
 		out = append(out, o)
 	}
 	return out

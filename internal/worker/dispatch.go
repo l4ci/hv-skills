@@ -24,6 +24,9 @@ type DispatchOpts struct {
 	Relay       bool
 	Round       *int
 	BootTimeout int // seconds; 0 means 60
+	// Model is the model this worker starts with ("" keeps models.worker); see
+	// workerCommand.
+	Model string
 	// Branch is the per-task branch the reset guard cuts; "" means
 	// hv-worker/<slot>-<task>. A round slot works on <agent>/<issue>-<slug>.
 	Branch string
@@ -46,17 +49,24 @@ type DispatchResult struct {
 // merged tree before anything reaches the cycle branch. Override via
 // work.workerCommand to narrow it; NEEDS-PERMISSION stays in the classifier
 // for exactly that case, so a narrowed mode stalls loudly.
-func workerCommand(root string) string {
+//
+// A model chosen for the dispatch (a round's tier, C9) replaces models.worker
+// in the default command and fills the {model} placeholder of a custom one; a
+// custom command without the placeholder runs as written (ModelApplies).
+func workerCommand(root, chosen string) string {
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
-	if v, ok := config.Lookup(cfg, "work.workerCommand"); ok {
-		if s, _ := v.(string); s != "" {
-			return s
-		}
-	}
 	model := "sonnet"
 	if v, ok := config.Lookup(cfg, "models.worker"); ok {
 		if s, _ := v.(string); s != "" {
 			model = s
+		}
+	}
+	if chosen != "" {
+		model = chosen
+	}
+	if v, ok := config.Lookup(cfg, "work.workerCommand"); ok {
+		if s, _ := v.(string); s != "" {
+			return strings.ReplaceAll(s, ModelPlaceholder, model)
 		}
 	}
 	return "claude --model " + model + " --dangerously-skip-permissions"
@@ -225,7 +235,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	}
 
 	if !o.Relay {
-		launch := workerCommand(root)
+		launch := workerCommand(root, o.Model)
 		bad, perr := ResumeFlag(launch)
 		if perr != nil {
 			return res, fail(ExitUsage, "work.workerCommand cannot be parsed (unbalanced quote?): "+launch)
@@ -383,4 +393,20 @@ func branchOr(o DispatchOpts) string {
 		return o.Branch
 	}
 	return BranchFor(o.Slot, o.Task)
+}
+
+// ModelPlaceholder marks where a custom work.workerCommand takes the model.
+const ModelPlaceholder = "{model}"
+
+// ModelApplies reports whether a chosen model reaches the launch command: the
+// default command always takes it, a custom work.workerCommand only through
+// the {model} placeholder.
+func ModelApplies(root string) bool {
+	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	if v, ok := config.Lookup(cfg, "work.workerCommand"); ok {
+		if s, _ := v.(string); s != "" {
+			return strings.Contains(s, ModelPlaceholder)
+		}
+	}
+	return true
 }

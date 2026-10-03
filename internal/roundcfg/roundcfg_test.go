@@ -54,3 +54,60 @@ func TestInvalid(t *testing.T) {
 		}
 	}
 }
+
+func TestTierDefaults(t *testing.T) {
+	s, err := Load(project(t, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Tier != TierStandard {
+		t.Errorf("default tier %q", s.Tier)
+	}
+	want := map[string]string{"light": "haiku", "standard": "sonnet", "heavy": "opus"}
+	if !reflect.DeepEqual(s.Models[KindClaude], want) {
+		t.Errorf("claude map %v", s.Models[KindClaude])
+	}
+	if _, ok := s.Models[KindCodex]; ok || s.Model(KindCodex, TierLight) != "" {
+		t.Errorf("codex is unconfigured by default: %v", s.Models)
+	}
+}
+
+func TestStandardTierFollowsModelsWorkerUnlessExplicit(t *testing.T) {
+	s, err := Load(project(t, `{"models":{"worker":"opus"}}`))
+	if err != nil || s.Model(KindClaude, TierStandard) != "opus" {
+		t.Fatalf("one knob: %v %v", err, s.Models)
+	}
+	s, err = Load(project(t, `{"models":{"worker":"opus"},"round":{"tiers":{"claude":{"standard":"sonnet"}}}}`))
+	if err != nil || s.Model(KindClaude, TierStandard) != "sonnet" {
+		t.Fatalf("explicit wins: %v %v", err, s.Models)
+	}
+}
+
+func TestCodexMapNeedsEveryTier(t *testing.T) {
+	s, err := Load(project(t, `{"round":{"tiers":{"codex":{"light":"a","standard":"b","heavy":"c"}}}}`))
+	if err != nil || s.Model(KindCodex, TierHeavy) != "c" {
+		t.Fatalf("a full codex map: %v %v", err, s.Models)
+	}
+	_, err = Load(project(t, `{"round":{"tiers":{"codex":{"light":"a","heavy":"c"}}}}`))
+	if err == nil || !strings.Contains(err.Error(), "round.tiers.codex.standard") {
+		t.Fatalf("a partial map names the missing tier: %v", err)
+	}
+}
+
+func TestInvalidTierConfig(t *testing.T) {
+	for cfg, want := range map[string]string{
+		`{"round":{"tier":"ultra"}}`:                   "round.tier",
+		`{"round":{"tiers":{"claude":{"heavy":""}}}}`:  "round.tiers.claude.heavy",
+		`{"round":{"tiers":{"claude":{"light":" "}}}}`: "round.tiers.claude.light",
+	} {
+		if _, err := Load(project(t, cfg)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: want %q, got %v", cfg, want, err)
+		}
+	}
+}
+
+func TestTierRank(t *testing.T) {
+	if !(TierRank(TierLight) < TierRank(TierStandard) && TierRank(TierStandard) < TierRank(TierHeavy)) || TierRank("x") != -1 {
+		t.Fatal("tiers order light < standard < heavy")
+	}
+}
