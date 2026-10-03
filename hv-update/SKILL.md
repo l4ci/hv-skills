@@ -1,7 +1,6 @@
 ---
 name: hv-update
 description: Check for a newer hv-skills release on GitHub and tell the user how to update — detects install type (plugin, stow, repo clone), compares plugin.json version against the latest release, and prints the exact update command. Read-only; does not run the update itself. Use on "check for updates", "is hv-skills up to date", before long /hv-work sessions.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

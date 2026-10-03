@@ -1,7 +1,6 @@
 ---
 name: hv-plan
 description: Write an implementation plan as a first-class artifact before execution — keyed by milestone and slice or item (M01-S01.md, M01-B07.md). Captures goal, approach, task decomposition with verifiable outcomes, open questions, and named assumptions. /hv-work consults the plan if present. Use when an item or slice is too big to one-shot, or when alignment matters before code lands.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

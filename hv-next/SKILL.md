@@ -1,7 +1,6 @@
 ---
 name: hv-next
 description: Review the backlog, reconcile active work against git state, archive old completions, show sorted tables with relationship clusters, suggest the next item, and route to /hv-work. Detects handoff notes from /hv-pause on active streams (post-/clear reorientation flow). Use on "what's next", "what should I work on", "where was I", "pick up the next task", "resume", or when the user wants to see their backlog.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

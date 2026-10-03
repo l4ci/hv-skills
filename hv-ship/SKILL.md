@@ -1,7 +1,6 @@
 ---
 name: hv-ship
 description: Bundle completed work on a feature branch into a PR (or direct merge) — extracts commits, resolved item IDs with titles, optionally runs /hv-review, and calls `hv ship pr` or `hv ship merge`. Use on "ship it", "open the PR", "finish this branch", when work is done and you want to integrate. Also supports --undo (guided rollback of the last cycle on the base branch) and --docs (public-docs maintenance, replaces /hv-docs). Use --undo on "roll back the last cycle", "revert that merge". Use --docs on "/hv-docs", "update docs"; auto-invoked post-cycle when docs/ exists.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

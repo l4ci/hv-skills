@@ -1,7 +1,6 @@
 ---
 name: hv-decide
 description: Capture a hard-boundary decision into .hv/DECISIONS.md — manually confirmed, never auto-invoked. Decisions differ from learnings in KNOWLEDGE.md by being active commitments with explicit forbids/permits. Use on "decide on X", "we're committing to X", "lock in the boundary that Y", or when a session has produced a constraint future work must respect. Accepts `--from-learning <topic>` to promote a hardened KNOWLEDGE.md learning into a decision, and `--from-spike <name>` to promote a `.hv/spikes/<name>.md` finding.
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

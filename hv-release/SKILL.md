@@ -1,7 +1,6 @@
 ---
 name: hv-release
 description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a pre-release gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, publish a release on GitHub or GitLab if origin is set, and offer to close any upstream issues still open for shipped items. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

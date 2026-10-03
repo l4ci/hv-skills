@@ -50,14 +50,13 @@ def check_frontmatter(path, text, issues):
 
 # Agent Skills spec frontmatter (E2, #69; https://agentskills.io/specification).
 # Codex and Claude Code read the same SKILL.md, and a strict spec validator
-# rejects any key outside SPEC_KEYS. The two sets below are transitional: the
-# SKILL.md pass that follows C7 removes `user-invocable` everywhere and trims
-# hv-migrate's description, and deletes these entries in the same PR. An entry
-# with nothing left to excuse fails the check, so the sets can only shrink.
+# rejects any key outside SPEC_KEYS. The two sets below excuse a violation a
+# slice has not fixed yet (empty since E2 fixed them all). An entry with nothing
+# left to excuse fails the check, so the sets can only shrink.
 SPEC_KEYS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-PENDING_KEYS = {"user-invocable"}
-PENDING_LONG = {"hv-migrate/SKILL.md"}
+PENDING_KEYS = set()
+PENDING_LONG = set()
 
 
 def pending_spec():

@@ -1,7 +1,6 @@
 ---
 name: hv-orchestrate
 description: Run a parallel round as the orchestrator: choose the slate, read what workers are doing, answer or escalate their questions, merge their PRs, wind the round down. Judgment only: the `hv round` verbs do the sequencing and enforce the rules. Use on "you are the orchestrator", "run a round", "orchestrate", "assign the next issues to the workers", "what are my workers doing".
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.

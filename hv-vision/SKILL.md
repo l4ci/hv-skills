@@ -1,7 +1,6 @@
 ---
 name: hv-vision
 description: Brainstorm a project's vision and break it into milestones — Socratic discovery, web research, deliberate challenge, then write MILESTONES.md and per-milestone detail files. Handles fresh vision and editing/extending an existing one. Use on "let's plan", "what's the bigger picture", "create a roadmap", "brainstorm milestones".
-user-invocable: true
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
