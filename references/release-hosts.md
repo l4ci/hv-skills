@@ -1,6 +1,6 @@
 # Release host commands
 
-Loaded by `/hv-release` Step 13 (Create Remote Release) to emit the right host-specific command after `bin/hv-release-detect-host` returns the host type. Each block corresponds to one value of the helper's `host` output. Skip the whole step in `--dry-run` mode (the SKILL.md print the would-run command instead).
+Loaded by `/hv-release` Step 13 (Create Remote Release) to emit the right host-specific command after `hv release host` returns the host type. Each block corresponds to one value of the verb's `host` field. Skip the whole step in `--dry-run` mode (the SKILL.md print the would-run command instead).
 
 ## `github` or `github-enterprise`
 

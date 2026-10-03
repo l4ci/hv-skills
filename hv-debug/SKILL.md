@@ -26,7 +26,7 @@ Read `.hv/config.json`:
 - `work.isolation` — `"branch"` (default) or `"worktree"`
 - `autonomy.level` — `"off"` (default), `"auto"`, or `"loop"`. Controls whether Step 11 (Next move) and Step 12 (Learn) ask vs. invoke directly.
 - `debug.competingHypotheses` — `false` (default) or `true`. When `true`, Step 6 fans out 3 parallel hypothesis agents from different angles instead of dispatching one.
-- The Iron Law counter persists at `.hv/debug/<session>.json` (session = current branch with `/` → `-`). Managed by `bin/hv-debug-counter`; survives `/clear` and session resumption.
+- The Iron Law counter persists at `.hv/debug/<session>.json` (session = current branch with `/` → `-`). Managed by `hv debug counter`; survives `/clear` and session resumption.
 
 ## When to Use
 
@@ -46,25 +46,19 @@ Read `.hv/config.json`:
 Resolve bug → Consult knowledge → Reproduce → Hypothesize → Verify → Fix → Commit → (Iron Law gate) → Learn nudge
 ```
 
-## Step 1 — Preflight & Guard
+## Step 1 — Guard
 
 ```bash
-.hv/bin/hv-preflight
+hv git guard clean --context "/hv-debug"
 ```
 
-See `docs/reference/preflight.md` for exit-code handling.
-
-```bash
-.hv/bin/hv-guard-clean "/hv-debug"
-```
-
-Non-zero = stop.
+Non-zero = stop (exit 1 dirty tree, exit 3 not a git repo).
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
 Phases:
 
-1. *Preflight & guard* — clean tree, bug ID resolved (Step 1)
+1. *Guard* — clean tree, bug ID resolved (Step 1)
 2. *Read item & knowledge* — TODO entry + KNOWLEDGE.md cross-ref loaded (Steps 2–3)
 3. *Reproduce* — failure triggers reliably from a known input (Step 4)
 4. *Hypothesize & verify* — claim is testable; evidence supports or refutes (Steps 5–6)
@@ -91,12 +85,12 @@ Carry KNOWLEDGE bullets into Step 5's hypothesis brief. Carry DECISIONS entries 
 ## Step 3.5 — Vocabulary & soft-cap checks
 
 ```bash
-.hv/bin/hv-glossary-read "<terms from the bug report or the failing component>"
+hv glossary read "<terms from the bug report or the failing component>"
 ```
 
 Carry any matched terms into Step 6's hypothesis brief — canonical definitions help align bug-report phrasing to existing components.
 
-- **Soft-cap check.** Run `.hv/bin/hv-map-cap-check` — emits a one-line nudge to stderr if the subsystem count is at or above the configured soft cap. Never blocks.
+- **Soft-cap check.** Run `hv map stats --cap` — warns (`overCap`) if the subsystem count is at or above the configured soft cap. Never blocks.
 
 ## Step 4 — Branch or Worktree
 
@@ -106,7 +100,7 @@ Pick a descriptive name (e.g., `hv/fix-B07-timer-badge`).
 
 ```bash
 git checkout -b <branch-name>
-.hv/bin/hv-status-add <branch> <ID>
+hv status add <branch> --items <ID>
 ```
 
 **Worktree:**
@@ -114,15 +108,15 @@ git checkout -b <branch-name>
 ```bash
 git branch <branch-name>
 git worktree add .claude/worktrees/<branch-name> <branch-name>
-.hv/bin/hv-status-add <branch> <ID> .claude/worktrees/<branch-name>
+hv status add <branch> --items <ID> --worktree .claude/worktrees/<branch-name>
 ```
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): claim the bug now with `.hv/bin/hv-item-claim <ID> --as <branch>` (exit 5: someone else holds it, stop; exit 3 or 4: stop and report) and read its comments per the reference's "Resuming an item" before reproducing.
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): claim the bug now with `hv item claim <ID> --as <branch>` (exit 4: someone else holds it, stop; exit 3, 5 or 6: stop and report) and read its comments per the reference's "Resuming an item" before reproducing.
 
 Initialize the per-session counter for the Iron Law (Step 9.5):
 
 ```bash
-.hv/bin/hv-debug-counter init <ID>
+hv debug counter init <ID>
 ```
 
 Session ID is derived from the current branch (`/` → `-`); state lives in `.hv/debug/<session>.json`. Idempotent on re-entry.
@@ -230,7 +224,7 @@ One commit for the bug. Don't `git add -A` — sweep risk if any sibling artifac
 Record the attempt in the Iron Law counter so Step 9 can detect repeat failures:
 
 ```bash
-.hv/bin/hv-debug-counter record-attempt --hypothesis "<one-line hypothesis from Step 6>" --commit "$(git rev-parse --short HEAD)"
+hv debug counter record-attempt --hypothesis "<one-line hypothesis from Step 6>" --commit "$(git rev-parse --short HEAD)"
 ```
 
 ## Step 9 — Verify the Fix
@@ -240,26 +234,26 @@ Re-run the reproducer from Step 5. It must now pass (or the symptom must be gone
 If the fix holds, record the win:
 
 ```bash
-.hv/bin/hv-debug-counter pass
+hv debug counter pass
 ```
 
 If the fix doesn't hold, mark this attempt failed and check the Iron Law threshold:
 
 ```bash
-FAILED_FIXES=$(.hv/bin/hv-debug-counter fail)
+hv debug counter fail --json     # data.failedFixes
 ```
 
-- `FAILED_FIXES < 3` — back to Step 6 (which re-runs the in-context hypothesis cycle counter). Don't commit a partial fix.
-- `FAILED_FIXES >= 3` — jump to **Step 9.5 (Iron Law hard stop)**. Do NOT loop back to Step 6.
+- `failedFixes < 3` — back to Step 6 (which re-runs the in-context hypothesis cycle counter). Don't commit a partial fix.
+- `failedFixes >= 3` — jump to **Step 9.5 (Iron Law hard stop)**. Do NOT loop back to Step 6.
 
 ## Step 9.5 — Iron Law Hard Stop
 
-Fires when `hv-debug-counter fail` returns `>= 3`. Three committed fix attempts have failed to resolve the bug — continuing to dispatch more workers in the same session burns context without converging. Iron Law: hard stop, no further attempts.
+Fires when `hv debug counter fail` reports `failedFixes >= 3`. Three committed fix attempts have failed to resolve the bug — continuing to dispatch more workers in the same session burns context without converging. Iron Law: hard stop, no further attempts.
 
 Print the fail-loud summary verbatim to the user:
 
 ```bash
-.hv/bin/hv-debug-counter summary
+hv debug counter summary
 ```
 
 Then surface — do NOT dispatch a fresh-context worker (Step 7.5's escalation belongs to the hypothesis-cycle counter; this is a stricter, terminal gate). Suggest the user:
@@ -267,7 +261,7 @@ Then surface — do NOT dispatch a fresh-context worker (Step 7.5's escalation b
 - Run `/hv-pause` to leave a handoff note and step away (a fresh session reads the persisted counter file and can decide whether to wipe it or continue).
 - Or re-open the bug from a different angle — the symptom may be in a subsystem the past three hypotheses haven't touched.
 
-Do NOT call `hv-status-remove` here — the branch and status entry stay so the user can resume. Do NOT call `hv-complete` — the bug is not fixed.
+Do NOT call `hv status rm` here — the branch and status entry stay so the user can resume. Do NOT call `hv item complete` — the bug is not fixed.
 
 This is a terminal path. Surface any `[Auto:Loop]` decisions before halting:
 
@@ -280,40 +274,40 @@ Loop mode (`autonomy.level == "loop"`): the Iron Law breaks the loop. Do not aut
 Clear the Iron Law counter for this session:
 
 ```bash
-.hv/bin/hv-debug-counter clear
+hv debug counter clear
 ```
 
 Record the Step 9 reproducer re-run as proof, then mark the item complete:
 
 ```bash
-.hv/bin/hv-proof-add <ID> --check "<reproducer command>" --result PASS --evidence "<output line showing the symptom is gone>" --sha <commit-hash>
-.hv/bin/hv-complete <ID> <commit-hash>
+hv proof add <ID> --check "<reproducer command>" --result PASS --evidence "<output line showing the symptom is gone>" --sha <commit-hash>
+hv item complete <ID> --commit <commit-hash>
 ```
 
-`hv-complete` exits 3 if the proof row is missing. Never pass `--no-proof` here: Step 9 always runs the reproducer, so a missing row means the step was skipped. Go back and run it.
+`hv item complete` exits 4 if the proof row is missing. Never pass `--no-proof` here: Step 9 always runs the reproducer, so a missing row means the step was skipped. Go back and run it.
 
-**Issue mode:** `hv-proof-add` above works unchanged (the row lands in the proof note), but do not call `hv-complete` and do not merge directly. Open a PR instead and hand it to review; the issue closes when the PR merges:
+**Issue mode:** `hv proof add` above works unchanged (the row lands in the proof note), but do not call `hv item complete` and do not merge directly. Open a PR instead and hand it to review; the issue closes when the PR merges:
 
 ```bash
-printf '%s' "$BODY" | .hv/bin/hv-pr --closes <ID> <branch> "<short title>"
-.hv/bin/hv-item-state <ID> needs-review
+printf '%s' "$BODY" | hv ship pr <branch> --title "<short title>" --body-file - --items <ID>
+hv item state <ID> --to needs-review
 ```
 
-The claim stays (no `hv-item-release`). Then continue with the status cleanup below.
+The claim stays (no `hv item release`). Then continue with the status cleanup below.
 
 **Single-repo:**
 
 ```bash
-.hv/bin/hv-status-remove <branch>
+hv status rm <branch>
 ```
 
 **Umbrella mode** (when `umbrella.enabled` is true and the active entry has a non-null `repo`, derive it from `.hv/status.json` as `/hv-ship` does in its Step 2):
 
 ```bash
-.hv/bin/hv-status-remove --repo <repo> <branch>
+hv status rm --repo <repo> <branch>
 ```
 
-Without `--repo`, the helper preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
+Without `--repo`, the verb preserves umbrella-tagged entries (only legacy `repo: null` rows are removed) — so umbrella sessions MUST pass `--repo` here or the active entry leaks into the next `/hv-next`.
 
 ## Step 11 — Report
 
@@ -348,9 +342,9 @@ Branch on `autonomy.level`:
 - `"off"` — nudge *"Capture this gotcha? Run `/hv-learn` to save the root cause before context fades."*
 - `"auto"` or `"loop"` — **dispatch `hv-learn` via `Skill` immediately — no prompt, no confirmation.** Pass a brief naming the bug ID, root cause, and subsystem so the captured entry lands in the right topic.
 
-If the bug was rooted in hv-skills behavior (touched `bin/hv-*`, `hv-*/SKILL.md`, or `.hv/`), `/hv-learn`'s Step 8.5 will offer to file an upstream issue against `l4ci/hv-skills`.
+If the bug was rooted in hv-skills behavior (touched the `hv` binary, `hv-*/SKILL.md`, or `.hv/`), `/hv-learn`'s Step 8.5 will offer to file an upstream issue against `l4ci/hv-skills`.
 
-- **Update project map.** If the fix touched files belonging to a known subsystem (`.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap the changes), bump `touched:` to today in that file's frontmatter and run `.hv/bin/hv-map-index`. Stage with the cycle's final commit. Skip silently when no map entry matches.
+- **Update project map.** If the fix touched files belonging to a known subsystem (`.hv/map/<name>.md` whose `Key files / dirs` or `Entry points` overlap the changes), bump `touched:` to today in that file's frontmatter and run `hv map index`. Stage with the cycle's final commit. Skip silently when no map entry matches.
 
 ## Step 12.5 — Decide (Nudge Only)
 
@@ -364,11 +358,11 @@ If the fix codified a constraint (e.g., "never use timer-X here", "this surface 
 - **Iron Law: no fix without a hypothesis; hard stop at 3 failed fixes.** The hypothesis is logged with each attempt; three committed fixes that don't hold trigger Step 9.5 — no more attempts, surface to the user.
 - **Hypothesis is a claim, not a description.** "X causes Y because Z" — testable.
 - **One fix, one commit.** Scope creep in debug commits masks the root cause later.
-- **The ID closes the loop.** The commit message carries `[B##]`; `hv-complete` moves the entry.
+- **The ID closes the loop.** The commit message carries `[B##]`; `hv item complete` moves the entry.
 - **Learn the non-obvious.** If this bug surprised you, it'll surprise the next person.
 
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
 - [`references/debug-hypothesize.md`](../references/debug-hypothesize.md) — Both-modes hypothesize choreography (brief template, single vs competing dispatch, per-axis divergence table) for `/hv-debug` Step 6.
-- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill.
+- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.

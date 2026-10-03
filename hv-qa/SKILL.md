@@ -79,7 +79,7 @@ Run when `.hv/qa/` is empty for the active scope (umbrella: per-repo; single-rep
    - **Infra requirements** — what must be running for `run` mode (e.g. `npm run dev` on `:3000`, deployed staging URL, sandbox creds). Skill refuses to run if these aren't met.
    - **Out of scope** — explicit non-goals (e.g. "no load testing", "no real-payment flows").
 5. **Approve & write.** Use `AskUserQuestion` with `Approve as drafted (Recommended)` / `Edit before writing` / `Cancel`. On approval, write `.hv/qa/<target>.md` with frontmatter (`target`, `surface`, `summary`, `created`, `touched`, `watch-globs`) and the five body sections.
-6. **Index.** Run `.hv/bin/hv-qa-index` to regenerate the `## Project QA` block in `CLAUDE.md`.
+6. **Index.** Run `hv qa index` to regenerate the `## Project QA` block in `CLAUDE.md`.
 7. **Commit.** `chore(qa): scaffold QA strategy for <target> (.hv/qa/, ## Project QA block)`.
 
 ### Mode: run
@@ -98,26 +98,22 @@ Phases:
 6. *Score & verdict* — aggregate (Step 7)
 7. *Report* — relay to user (Step 8)
 
-#### Step 1 — Preflight
+#### Step 1 — Project Check
 
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+No separate check: every `hv` verb exits 3 when there is no `.hv/` project. Surface that and stop.
 
 #### Step 2 — Resolve Scope
 
 If user named a target (`/hv-qa run web`), use it. Otherwise:
 
-- **Umbrella mode** (`.hv/repos.json` non-empty): default to the repo of the current branch (resolve via `.hv/bin/hv-resolve-repo`). User can pass `--repo <name>` or `--all`.
+- **Umbrella mode** (`.hv/repos.json` non-empty): default to the repo of the current branch (resolve via `hv repo which`, field `name`). User can pass `--repo <name>` or `--all`.
 - **Single-repo mode**: default to all `.hv/qa/*.md` entries.
 
 If no strategy file exists for the resolved scope, halt and tell the user to run `/hv-qa first-run`.
 
 #### Step 3 — Load Strategies
 
-For each target, read `.hv/qa/<target>.md` via `.hv/bin/hv-qa-query <target>`. Parse the five body sections. Reject any strategy missing `Executable checks` or `Infra requirements` — surface as a config error and route to `restructure`.
+For each target, read `.hv/qa/<target>.md` via `hv qa query <target>`. Parse the five body sections. Reject any strategy missing `Executable checks` or `Infra requirements` — surface as a config error and route to `restructure`.
 
 #### Step 4 — Infra Preflight
 
@@ -139,7 +135,7 @@ Dispatch one subagent per check group (per pillar per target) in parallel via th
 
 The orchestrator does not run the checks itself — parallel dispatch is the point. Aggregate the results.
 
-**Record proof.** For every item on the branch (`hv-review-scope` referencedIds), write each executable-check result as a proof row: `.hv/bin/hv-proof-add <ID> --check "<check name>" --result PASS|FAIL --evidence "<artifact path under .hv/qa-runs/ or one-line output>"`. Rows are facts; the QA verdict (Step 7) is still the judgement.
+**Record proof.** For every item on the branch (`hv review scope --json` `data.referencedIds`), write each executable-check result as a proof row: `hv proof add <ID> --check "<check name>" --result PASS|FAIL --evidence "<artifact path under .hv/qa-runs/ or one-line output>"`. Rows are facts; the QA verdict (Step 7) is still the judgement.
 
 **Re-run a failed check alone before recording it.** Parallel runners contend for one box, and every check with a fixed time budget starts failing on elapsed time rather than on truth once the machine is loaded. Before writing `met: false` for any check that timed out, blew a duration budget, or failed on a connection error, re-run that one check with nothing else in flight and record `uptime` alongside both runs. Three consequences worth stating separately:
 
@@ -205,7 +201,7 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 1. Re-run the `Detect surfaces` and `Detect existing test infra` probes from `first-run`.
 2. Diff against current `.hv/qa/*.md` — flag: targets with no matching surface (dead), surfaces with no target (uncovered), commands referencing tools not installed (broken), `Watch globs` matching no files (stale).
 3. Propose changes — archive dead, draft new, fix broken, update globs — show to user before writing.
-4. On approval, write the changes, run `.hv/bin/hv-qa-index`, commit `chore(qa): restructure QA strategy (<summary>)`.
+4. On approval, write the changes, run `hv qa index`, commit `chore(qa): restructure QA strategy (<summary>)`.
 
 ## Rules
 

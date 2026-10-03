@@ -35,13 +35,7 @@ Read `.hv/config.json`:
 - Nothing committed yet → there's nothing to review
 - You want product-level evidence (does it actually work? perf budgets met? a11y clean? smoke tests green?) → `/hv-qa run`. `/hv-review` reasons from commits and diff; it does not run the product.
 
-## Step 1 — Preflight
-
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
+## Step 1 — Task List
 
 **Initialize task list.** Follow the canonical pattern in `references/task-list-init.md` — load `TaskCreate(…)` via `ToolSearch select:TaskCreate,TaskUpdate` if needed, then create one task per phase below.
 
@@ -53,19 +47,19 @@ Phases:
 4. *Stage 1 — Spec compliance* — diff evaluated against `PLAN.md` outcomes; short-circuit on FAIL (Step 7)
 5. *Stage 2 — Code quality* — staff-engineer review, gated on Stage 1 PASS or CONCERNS (Step 8)
 6. *Verdict* — combined PASS / CONCERNS / FAIL with structured findings (Step 9)
-7. *Knowledge lifecycle* — register hits on consumed bullets via hv-knowledge-hit (Step 4)
+7. *Knowledge lifecycle* — register hits on consumed bullets via `hv knowledge hit` (Step 4)
 
 **Stage opt-out (power users).** When invoked with `--stage spec`, run only Stage 1 (Steps 2, 3, 5, 7) and skip Step 8. When invoked with `--stage quality`, skip Steps 3 and 7 and run only Stage 2 — the legacy single-pass behavior. No `--stage` arg = run both stages with short-circuit gating (the default).
 
 ## Step 2 — Scope the Review
 
 ```bash
-.hv/bin/hv-review-scope <branch>
+hv review scope --json <branch>
 ```
 
-**Umbrella mode.** When the branch lives in a sub-repo, pass `--repo <name>` so git ops resolve there: `.hv/bin/hv-review-scope --repo <name> <branch>`. Determine `<name>` from the active stream's `repo` field in `.hv/status.json` (single match), or from `hv-resolve-repo` if invoked from inside the sub-repo's worktree. `BACKLOG.md` / `ARCHIVE.md` lookups stay umbrella-flat — `hv-review-scope` reads them from the umbrella's `.hv/`, so no repo flag is needed for intent matching.
+**Umbrella mode.** When the branch lives in a sub-repo, pass `--repo <name>` so git ops resolve there: `hv review scope --json --repo <name> <branch>`. Determine `<name>` from `data.repo` of `hv status show <branch> --json` (the active stream's repo), or from `hv repo which` if invoked from inside the sub-repo's worktree. `BACKLOG.md` / `ARCHIVE.md` lookups stay umbrella-flat — `hv review scope` reads them from the umbrella's `.hv/`, so no repo flag is needed for intent matching.
 
-If the user didn't name a branch, default to the current one. `hv-review-scope` emits JSON with:
+If the user didn't name a branch, default to the current one. `hv review scope` returns, under `data`:
 
 - `branch`, `base`, `commitCount`
 - `commits` — array of `{hash, subject}`
@@ -81,11 +75,11 @@ For each `intent` in the scope JSON's `intents` array, resolve its milestone-key
 
 ```bash
 # For each <ID> in referencedIds:
-MILESTONE=$(.hv/bin/hv-todo-field <ID> milestone)
-[ -n "$MILESTONE" ] && .hv/bin/hv-plan-show "${MILESTONE}-<ID>" 2>/dev/null
+hv item field get <ID> --name milestone     # data.value; empty = untagged
+hv plan show "<MNN>-<ID>"                    # only when tagged; exit 3 = no plan file
 ```
 
-Issue the `hv-todo-field` and `hv-plan-show` calls in parallel — one pair per `referencedId` — and collect a `plans` map: `{ID -> plan-content-or-empty}`. Untagged items (no `Milestone:` field) and items with no plan file produce empty entries — those items don't contribute to Stage 1.
+Issue the `hv item field get` and `hv plan show` calls in parallel — one pair per `referencedId` — and collect a `plans` map: `{ID -> plan-content-or-empty}`. Untagged items (no `Milestone:` field) and items with no plan file produce empty entries — those items don't contribute to Stage 1.
 
 **No-plan fallback.** If every entry in `plans` is empty (no referenced item has a plan file), Stage 1 cannot run as a meaningful spec check. Print one informational line — *"No plans found for referenced items; skipping Stage 1 (spec compliance). Running Stage 2 only."* — and proceed directly to Step 4 (effectively `--stage quality` behavior). The user may have skipped `/hv-plan` for this branch (e.g. `/hv-go` shortcut); that's legitimate, not an error.
 
@@ -97,7 +91,7 @@ Apply the canonical K+D query pattern (`references/knowledge-consult.md`) with t
 
 Carry KNOWLEDGE bullets into the reviewer brief. Pass DECISIONS entries under a `**Hard boundaries:**` section — the reviewer must **FAIL** if the diff violates any boundary, even if the change looks otherwise good.
 
-> **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After building the reviewer brief, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in the brief's `**Relevant project conventions (from KNOWLEDGE.md):**` section, call `.hv/bin/hv-knowledge-hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch. Bullets returned but pruned before the brief don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
+> **REQUIRED — Register hits on consumed bullets (F03 lifecycle).** After building the reviewer brief, apply the hit-register pattern from `references/knowledge-consult.md` *Hit-register after consumption*: for each bullet that landed in the brief's `**Relevant project conventions (from KNOWLEDGE.md):**` section, call `hv knowledge hit --topic "<T>" --title "<first-line-of-bullet>"` once, issuing all calls as a single parallel batch. Bullets returned but pruned before the brief don't earn credit. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3).
 
 ## Step 5 — Capture the Diff
 
@@ -114,10 +108,10 @@ git diff <base>...<branch> -- <file>
 Multi-task feature branches sometimes ship comments that referenced earlier task numbers ("Umbrella behavior is added in Task 7 — for now --repo is parsed but ignored") even after the referenced task completed. Before dispatching the reviewer, run a deterministic diff scan:
 
 ```bash
-.hv/bin/hv-review-scaffolding [--repo <name>] <base> <branch>
+hv review scaffolding [--repo <name>] --base <base> <branch>
 ```
 
-Empty stdout → no candidates, skip ahead to Step 7. Non-empty stdout → carry the matches forward as `**Possible stale scaffolding:**` evidence in the Stage 2 reviewer brief (Step 8). Do not auto-FAIL — the reviewer judges each match as real scaffolding or legitimate prose. The helper surfaces; the reviewer decides.
+Empty stdout (no `data.findings`) → no candidates, skip ahead to Step 7. Otherwise carry the matches forward as `**Possible stale scaffolding:**` evidence in the Stage 2 reviewer brief (Step 8). Do not auto-FAIL — the reviewer judges each match as real scaffolding or legitimate prose. The verb surfaces; the reviewer decides.
 
 ## Step 7 — Stage 1: Dispatch Spec-Compliance Reviewer
 
@@ -157,7 +151,7 @@ that's Stage 2's job. Even if you notice issues there, do NOT flag them.
 (Omit a plan section for items without plans — note them as "no plan; skipped from spec check.")
 
 **Recorded proof:**
-<rows from `.hv/bin/hv-proof-show <ID>` per item, or "none recorded">
+<rows from `hv proof show <ID>` per item, or "none recorded">
 Rows are verification already run (check, result, sha, evidence). Do NOT re-run a check that has a PASS row at the current sha; spot-check one row. A FAIL row or a row at a stale sha is a gap to cite.
 
 **Diff by file:**
@@ -230,7 +224,7 @@ scaffolding, silent failures.
 - <bullet 2>
 
 **Hard boundaries (from DECISIONS.md):**
-<entries from hv-decisions-query, if any — full rule + forbids/permits>
+<entries from `hv decisions query`, if any — full rule + forbids/permits>
 
 **Possible stale scaffolding (deterministic pre-flight grep):**
 <file:line>: <matched line text>
@@ -286,7 +280,7 @@ failures.
 - <bullet 2>
 
 **Hard boundaries (from DECISIONS.md):**
-<entries from hv-decisions-query, if any — full rule + forbids/permits>
+<entries from `hv decisions query`, if any — full rule + forbids/permits>
 
 **Possible stale scaffolding (deterministic pre-flight grep):**
 <file:line>: <matched line text>
@@ -414,23 +408,23 @@ When invoked from `/hv-ship`, return the verdict; the parent runs consumer routi
 
 ## Queue mode (`--queue`, issue mode)
 
-Works through every `needs-review` item's open PR / MR. Issue mode only (`backlog.backend: "issues"`; see `references/issue-mode.md` for the label lifecycle). In file mode say *"`--queue` needs the issue backend; use `/hv-ship` and `hv-merge` here"* and stop.
+Works through every `needs-review` item's open PR / MR. Issue mode only (`backlog.backend: "issues"`; see `references/issue-mode.md` for the label lifecycle). In file mode say *"`--queue` needs the issue backend; use `/hv-ship` and `hv ship merge` here"* and stop.
 
 ```bash
-.hv/bin/hv-review-queue
+hv review queue --json
 ```
 
-Prints a JSON list `[{"id","number","title","prs":[{"number","title","branch","url","body"}]}]`. Empty: report *"Review queue is empty"* and stop. Per entry, in order:
+`data.items` is `[{"id","number","title","prs":[{"number","title","branch","url","body"}]}]`. Empty: report *"Review queue is empty"* and stop. Per entry, in order:
 
 1. **PRs.** None: report *"<ID> is `needs-review` but has no PR with a closing keyword"* and skip. Several: review each.
-2. **Checkout.** `git status --short` must be clean, else stop. Check the PR out through the adapter: `.hv/bin/hv-tracker-call -- pr checkout <n>` (GitHub) or `-- mr checkout <n>` (GitLab).
-3. **Review.** Run Steps 2-9 on the checked-out branch, scoped to `<base>...HEAD` (`<base>` from `.hv/bin/hv-base-branch`). The reviewer is read-only; so is the loop, apart from the helpers below.
+2. **Checkout.** `git status --short` must be clean, else stop. Check the PR out through the adapter: `hv tracker call -- pr checkout <n>` (GitHub) or `-- mr checkout <n>` (GitLab).
+3. **Review.** Run Steps 2-9 on the checked-out branch, scoped to `<base>...HEAD` (`<base>` from `hv git base`). The reviewer is read-only; so is the loop, apart from the verbs below.
 4. **Route.**
-   - **PASS** — interactive: `AskUserQuestion` (Header `"Merge"`, *"Merge PR <n> for <ID>?"*, options *Merge (Recommended)* / *Skip* / *Stop*); `autonomy.level: "loop"` merges without asking. Merge with `.hv/bin/hv-pr-merge <n>` (in an umbrella `--repo <name>` is required; queue entries carry `repo` and qualified IDs): it merges, closes the linked items the host left open, and prints `merged <n> as <sha7>` plus a `closed <ID>` line each. Exit 5 means nothing was merged because an item has no proof: it is now `changes-requested`; report the `unproven <ID>` lines and move on. Then post the verdict on each linked item (`.hv/bin/hv-item-comment <ID> --kind feedback --body-file -`) and on the PR (`.hv/bin/hv-tracker-call -- pr comment <n> --body-file -` on GitHub, `-- mr note <n> --message "<verdict>"` on GitLab).
-   - **CONCERNS / FAIL** — post the findings as a `feedback` comment on each linked item and on the PR (same commands), then `.hv/bin/hv-item-state <ID> changes-requested`. The author's next `/hv-work` claim reads the feedback. No merge, under any autonomy level.
+   - **PASS** — interactive: `AskUserQuestion` (Header `"Merge"`, *"Merge PR <n> for <ID>?"*, options *Merge (Recommended)* / *Skip* / *Stop*); `autonomy.level: "loop"` merges without asking. Merge with `hv ship pr-merge <n>` (in an umbrella `--repo <name>` is required; queue entries carry `repo` and qualified IDs): it merges and closes the linked items the host left open; `data.sha` and `data.closed` report the result. Exit 4 means nothing was merged because an item has no proof: it is now `changes-requested`; report `data.unproven` and move on. Then post the verdict on each linked item (`hv item comment add <ID> --kind feedback --body-file -`) and on the PR (`hv tracker call -- pr comment <n> --body-file -` on GitHub, `-- mr note <n> --message "<verdict>"` on GitLab).
+   - **CONCERNS / FAIL** — post the findings as a `feedback` comment on each linked item and on the PR (same commands), then `hv item state <ID> --to changes-requested`. The author's next `/hv-work` claim reads the feedback. No merge, under any autonomy level.
 5. **Return.** `git checkout <base>` before the next entry.
 
-Exit 3 or 4 from any helper stops the queue with a report of what was done and what is left. Never retry in a loop. Routing table: `references/review-verdict-routing.md` (Queue routing).
+Exit 5 or 6 (tracker unavailable or rate-limited) from any verb stops the queue with a report of what was done and what is left. Never retry in a loop. Routing table: `references/review-verdict-routing.md` (Queue routing).
 
 ## Rules
 
@@ -444,5 +438,5 @@ Exit 3 or 4 from any helper stops the queue with a report of what was done and w
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv-knowledge-query` + `hv-decisions-query`) used by every cycle-starting skill.
+- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.
 - [`references/review-verdict-routing.md`](../references/review-verdict-routing.md) — PASS / CONCERNS / FAIL routing for `/hv-review` consumers.

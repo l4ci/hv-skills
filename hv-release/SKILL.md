@@ -1,6 +1,6 @@
 ---
 name: hv-release
-description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a preflight gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, publish a release on GitHub or GitLab if origin is set, and offer to close any upstream issues still open for shipped items. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
+description: Cut a release — walk the project's per-project release checklist (`.hv/RELEASE.md`) as a pre-release gate, bump version (major/minor/patch), generate categorized release notes from commits since the last tag, prepend a section to CHANGELOG.md, create an annotated git tag, push, publish a release on GitHub or GitLab if origin is set, and offer to close any upstream issues still open for shipped items. Use on "release", "cut a release", "tag a release", "ship X.Y.Z".
 user-invocable: true
 ---
 
@@ -29,15 +29,9 @@ Read from `.hv/config.json` (all keys optional — defaults apply if absent):
 | `release.requireCleanTree` | `true` | Set `false` to allow dirty releases (testing only) |
 | `release.confirmLargePushCommits` | `10` | Threshold (commits) above which auto/loop autonomy still confirms before pushing unpushed HEAD |
 
-## Step 1 — Preflight & Guard
+## Step 1 — Guard
 
-```bash
-.hv/bin/hv-preflight
-```
-
-See `docs/reference/preflight.md` for exit-code handling.
-
-Then verify:
+Verify:
 
 1. **Clean tree** — run `git status --porcelain`. If output is non-empty and `release.requireCleanTree` is `true` (default), stop: *"Working tree is dirty. Commit or stash changes first, or set `release.requireCleanTree: false`."* Show `git status -s` in the error.
 2. **On main/trunk** — `git rev-parse --abbrev-ref HEAD`. If not `main`, `master`, or `trunk`, stop with a one-liner.
@@ -64,7 +58,7 @@ Then verify:
 
 Phases:
 
-1. *Preflight & guard* — clean tree, on main, HEAD pushed (Step 1)
+1. *Guard* — clean tree, on main, HEAD pushed (Step 1)
 2. *Project checklist* — walk `.hv/RELEASE.md` items as gates (Step 1.5)
 3. *Bump version* — version source detected and incremented (Steps 2–4)
 4. *Generate notes* — categorized release notes drafted from commits (Steps 5–7)
@@ -124,29 +118,29 @@ After all gates pass, continue to Step 2.
 
 ## Step 1.6 — Milestone Gate (issue mode)
 
-**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): pick the milestone to release. `--milestone MNN` wins; otherwise the single milestone from `.hv/bin/hv-vision-active`. With several active, `AskUserQuestion` (plain-text fallback: list the IDs). Under `autonomy.level: "loop"`, stop unless exactly one is active. Then:
+**Issue mode** (`backlog.backend: "issues"`; `references/issue-mode.md`): pick the milestone to release. `--milestone MNN` wins; otherwise the single milestone from `hv milestone active`. With several active, `AskUserQuestion` (plain-text fallback: list the IDs). Under `autonomy.level: "loop"`, stop unless exactly one is active. Then:
 
 ```bash
-.hv/bin/hv-release-milestone-check <MNN>
+hv release milestone-check <MNN> --json
 ```
 
-Exit 0: clear. Exit 6: blocked; each `blocked: #<n> <title> [<label>]` line is an open issue labelled `in-progress`, `needs-review` or `changes-requested`. Show them and stop. `warning: #<n> <title> (still open)` lines (other open issues) do not block; show them and continue. Exit 1: usage or unknown milestone; 2: backend unavailable or file mode; 3: tracker unavailable; 4: rate-limited: stop and report.
+Exit 0: clear. Exit 1: blocked; each `data.blocked` entry (`number`, `title`, `label`) is an open issue labelled `in-progress`, `needs-review` or `changes-requested`. Show them and stop. `data.stillOpen` entries (other open issues) do not block; show them and continue. Exit 2: umbrella root without `--repo`; 3: unknown milestone; 4: file mode (the gate is issue-only); 5: tracker unavailable; 6: rate-limited: stop and report.
 
-**Umbrella** (`hv-umbrella-on` is `yes`): releases run per sub-repo. Pass `--repo <name>` to `hv-release-milestone-check`, `hv-release-notes-from-issues` (Step 6) and `hv-release-close-milestone` (Step 13.3); without it they exit 1. The milestone reads `shipped` only once every sub-repo's native milestone MNN is closed.
+**Umbrella** (`hv repo umbrella` exits 0): releases run per sub-repo. Pass `--repo <name>` to `hv release milestone-check`, `hv release notes --from issues` (Step 6) and `hv release close-milestone` (Step 13.3); without it they exit 2. The milestone reads `shipped` only once every sub-repo's native milestone MNN is closed.
 
 ## Step 2 — Detect Version Source
 
 ```bash
-.hv/bin/hv-release-detect-version
+hv release version --json
 ```
 
-Parse JSON output `{file, version, kind}`:
+Read `data` `{file, version, kind}`:
 
 - `file` — absolute path to the version-bearing file
 - `version` — current semver string (e.g., `1.10.0`)
 - `kind` — `plugin-json` | `package-json` | `pyproject` | `cargo` | `plain`
 
-If exit 1, surface the stderr message verbatim and stop. If output indicates multiple candidates, use `release.versionFile` to disambiguate — document that the user should set it in `.hv/config.json`.
+If exit 3 (no version file found, or it cannot be parsed), surface the message verbatim and stop. To disambiguate, tell the user to set `release.versionFile` in `.hv/config.json`.
 
 ## Step 3 — Determine Bump Type
 
@@ -155,12 +149,12 @@ Accept an arg if the user supplied one: `major`, `minor`, `patch`, or an explici
 If no arg, first generate the commit-range preview for a recommendation:
 
 ```bash
-.hv/bin/hv-release-changelog-from-commits <prev-tag>..HEAD
+hv release notes --from commits --since <prev-tag>
 ```
 
 Scan output for bucket headings:
-- `## Breaking` present → recommend `major`
-- `## New` present (no Breaking) → recommend `minor`
+- `Breaking` heading present → recommend `major`
+- `New` heading present (no Breaking) → recommend `minor`
 - else → recommend `patch`
 
 Then use `AskUserQuestion`:
@@ -179,13 +173,13 @@ If the user picks explicit, validate: must be valid semver and strictly greater 
 
 ## Step 4 — Compute New Version
 
-Use the helper's `--dry-run` mode so version computation has one source of truth — Step 8 will repeat the call without `--dry-run` to actually write the file.
+Compute the next version read-only so it has one source of truth — Step 8 writes the file with the same arguments.
 
 ```bash
-new_version=$(.hv/bin/hv-release-bump-version --dry-run <file> <kind> <bump>)
+hv release version --json --level <patch|minor|major>   # or: --to <X.Y.Z>
 ```
 
-`<file>` and `<kind>` come from Step 2; `<bump>` is `patch`, `minor`, `major`, or the explicit semver from Step 3. The helper validates the bump (must be valid semver and strictly greater than `current` for the explicit path) and prints the new version. If validation fails, the helper exits 1 with a message — surface it and stop.
+`data.next` is the new version. `--to` must be bare `X.Y.Z` and strictly greater than the current version; if it is not, the verb exits 1 with a message — surface it and stop.
 
 Store `new_version` for use in Steps 6, 7, 8, 9, 10, 11, 12, 13, 14.
 
@@ -206,20 +200,20 @@ If empty (no tags exist), range = full history; set `prev_tag = ""`. Note this i
 ## Step 6 — Generate Release Notes
 
 ```bash
-.hv/bin/hv-release-changelog-from-commits <range>
+hv release notes --from commits [--since <prev_tag>]
 ```
 
-Captures categorized Markdown (buckets in helper-emit order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the helper.
+Captures categorized Markdown (buckets in verb order: Breaking, New, Fixed, Performance, Changed, Documentation, Other). Merge commits are filtered by the verb. No `--since` means all history.
 
 **Issue mode:** build the notes from the milestone's issues instead:
 
 ```bash
-.hv/bin/hv-release-notes-from-issues <MNN> [--since <prev_tag>]
+hv release notes --from issues <MNN> [--since <prev_tag>]
 ```
 
-It emits `### New` (features), `### Fixed` (bugs) and `### Changed` (tasks) with lines `- <Title> (#<n>)` (closed-as-completed issues only) and `### Other` (commit subjects with no item reference). Same exit codes as Step 1.6. Compaction, stats and compare URL below apply unchanged.
+It emits `### New` (features), `### Fixed` (bugs) and `### Changed` (tasks) with lines `- <Title> (#<n>)` (closed-as-completed issues only) and `### Other` (commit subjects with no item reference). Exit 4 is file mode, 5 and 6 are tracker failures, 3 is an unknown milestone or `--since` ref. Compaction, stats and compare URL below apply unchanged.
 
-**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1–2 bullets naming the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The helper's job is the raw categorization; *editorial collapse is yours*.
+**Compact dense buckets.** When a bucket has 3+ entries that clearly belong to the same feature or concern (e.g., 7 `feat:` commits all touching one new skill), replace the raw list with a single model-written summary line capturing the theme, optionally followed by 1–2 bullets naming the highest-impact pieces (a breaking change, a flag flip, a new public surface). Buckets with fewer than 3 entries stay as-is — the noise floor is low and the model adds little value. The verb's job is the raw categorization; *editorial collapse is yours*.
 
 Append stats line — run:
 
@@ -232,8 +226,10 @@ Format as `## Stats\n<N commits, M files changed, +X −Y lines>`.
 Build compare URL (only when `prev_tag` is non-empty):
 
 ```bash
-.hv/bin/hv-release-detect-host
+hv release host --json
 ```
+
+`data.host` is one of:
 
 - `github` or `github-enterprise` → `https://<host>/<owner>/<repo>/compare/<prev_tag>...v<new_version>`
 - `gitlab` or `gitlab-self-hosted` → `https://<host>/<owner>/<repo>/-/compare/<prev_tag>...v<new_version>`
@@ -271,20 +267,20 @@ NOTES_FILE=$(mktemp /tmp/hv-release-notes.XXXXXX.md)
 ## Step 8 — Update Version File
 
 ```bash
-written=$(.hv/bin/hv-release-bump-version <file> <kind> <bump>)
+hv release bump --json --level <patch|minor|major>   # or: --to <X.Y.Z>
 ```
 
-Same arguments as Step 4's `--dry-run` call; this writes the file and prints the new version. Assert `written == new_version`; if they diverge, stop with an error (the file may be partially modified — surface the discrepancy and let the user investigate).
+Same level or version as Step 4; this writes the file. Pass `--file <path> --kind <kind>` only to override Step 2's detection. Assert `data.to == new_version`; if they diverge, stop with an error (the file may be partially modified — surface the discrepancy and let the user investigate).
 
-Skip in the skill's `--dry-run` mode (different from the helper's flag); print what would be written instead.
+Skip in the skill's `--dry-run` mode; print what would be written instead.
 
 ## Step 9 — Update CHANGELOG.md
 
 ```bash
-.hv/bin/hv-release-update-changelog <new_version> "$NOTES_FILE" [--path <release.changelogPath>]
+hv release changelog <new_version> --body-file "$NOTES_FILE" [--path <release.changelogPath>]
 ```
 
-If exit 1 (version section already exists), surface the error and stop — do not proceed to commit.
+If exit 4 (version section already exists), surface the error and stop — do not proceed to commit.
 
 Skip in `--dry-run` mode; print what would be prepended instead.
 
@@ -330,10 +326,10 @@ Skip in `--dry-run` mode.
 > **Manual gate — filing a public artifact.** Publishing the release on GitHub/GitLab creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The user already approved the release notes in Step 7; this step is downstream of that approval. See `references/manual-gates.md`.
 
 ```bash
-.hv/bin/hv-release-detect-host
+hv release host --json
 ```
 
-Branch on the helper's `host` output. Host-specific command blocks live in `references/release-hosts.md` — substitute `<new_version>`, `$NOTES_FILE`, and the summary verbatim.
+Branch on `data.host`. Host-specific command blocks live in `references/release-hosts.md` — substitute `<new_version>`, `$NOTES_FILE`, and the summary verbatim.
 
 | `host` | Section in `references/release-hosts.md` |
 |--------|------------------------------------------|
@@ -341,7 +337,7 @@ Branch on the helper's `host` output. Host-specific command blocks live in `refe
 | `gitlab`, `gitlab-self-hosted` | `## gitlab or gitlab-self-hosted` |
 | `none`                        | `## none`                         |
 
-Add new host values to both the helper and the reference together.
+Add new host values to both the verb and the reference together.
 
 Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that would run.
 
@@ -350,10 +346,10 @@ Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that woul
 **Issue mode:** after the tag is pushed (Step 12) and the remote release is handled (Step 13), behind the same manual gates:
 
 ```bash
-.hv/bin/hv-release-close-milestone <MNN> v<new_version>
+hv release close-milestone <MNN> --release <new_version>
 ```
 
-Labels each completed issue `released` with the comment `Released in <tag>`, closes the native milestone and sets its status `shipped`. Idempotent; prints `closed-out <MNN> <tag>: <k> issues`. Same exit codes as Step 1.6. Skip in `--dry-run`. Step 13.4 below does not apply: the tracker is the backlog and `hv-issues-imported` has nothing to list.
+`--release` is the bare `X.Y.Z`; the verb derives the tag. Labels each completed issue `released` with the comment `Released in <tag>`, closes the native milestone and sets its status `shipped`. Idempotent; `data.issues` counts the issues touched. Exit 2: umbrella root without `--repo`; 3: unknown milestone; 4: file mode; 5 and 6: tracker failures. Skip in `--dry-run`. Step 13.4 below does not apply: the tracker is the backlog and `hv issues imported` has nothing to list.
 
 ## Step 13.4 — Close Upstream Issues
 
@@ -364,10 +360,10 @@ Skip the whole step in `--dry-run` mode (nothing was actually tagged or pushed).
 **1. List candidates.**
 
 ```bash
-.hv/bin/hv-issues-imported --open-only
+hv issues imported --json --open-only
 ```
 
-The `--open-only` flag drops entries whose upstream issue is already closed (or whose state can't be resolved — missing CLI, deleted issue), so the gate only surfaces issues still actually open. If the resulting JSON array is empty, skip the rest of this step silently.
+The `--open-only` flag drops entries whose upstream issue is already closed (or whose state can't be resolved — missing CLI, deleted issue), so the gate only surfaces issues still actually open. If `data.entries` is empty, skip the rest of this step silently.
 
 **2. Manual gate.**
 
@@ -383,10 +379,10 @@ Invoke `AskUserQuestion` (single-select, ≤4 options):
 
 This gate is **always manual** — never auto-picked in loop mode. Stop the loop here and wait for the user's answer.
 
-**4. On "Yes, close all":** dispatch parallel `hv-issues-close` calls (one per candidate, all in a single batch of tool calls), passing the release commit SHA from Step 10:
+**4. On "Yes, close all":** dispatch parallel `hv issues close` calls (one per candidate, all in a single batch of tool calls), passing the release commit SHA from Step 10:
 
 ```bash
-.hv/bin/hv-issues-close --issue <N> --commit <release-commit-sha> --item <ID> [--repo <name>]
+hv issues close <N> --commit <release-commit-sha> --item <ID> [--repo <name>]
 ```
 
 Pass `--repo` only for entries whose `repo` field is non-null (umbrella mode).
@@ -397,7 +393,7 @@ Pass `--repo` only for entries whose `repo` field is non-null (umbrella mode).
 - Question: *"Which issue(s) should be closed?"*
 - Options: one entry per candidate formatted as `"#N (item <ID>)"`
 
-Then dispatch parallel `hv-issues-close` calls for each selected entry as in step 4.
+Then dispatch parallel `hv issues close` calls for each selected entry as in step 4.
 
 **6. On "No, leave open":** print:
 
