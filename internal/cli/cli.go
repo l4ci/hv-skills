@@ -59,6 +59,10 @@ type Ctx struct {
 
 	ctx      context.Context // set by run: cancelled on SIGINT and SIGTERM
 	warnings []string
+
+	// dashAt is how many positional arguments came before a bare "--", -1
+	// when there was none. Verbs that run a command after "--" need to tell.
+	dashAt int
 }
 
 // Context is the verb's context. run cancels it on SIGINT and SIGTERM, so a
@@ -230,7 +234,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	// Until the arguments parse, an error answers in JSON if any token
 	// before "--" is exactly --json.
-	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args)}
+	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args), dashAt: -1}
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	c.ctx = sigCtx
@@ -289,6 +293,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 		for ; i < len(args); i++ {
 			tok := args[i]
 			if tok == "--" {
+				c.dashAt = len(positional)
 				positional = append(positional, args[i+1:]...)
 				break
 			}

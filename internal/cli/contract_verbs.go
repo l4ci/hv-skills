@@ -80,6 +80,8 @@ var contractVerbs = []string{
 	"item shipped",
 	"item show",
 	"item state",
+	"keepalive run",
+	"keepalive status",
 	"knowledge add",
 	"knowledge amend",
 	"knowledge contradiction add",
