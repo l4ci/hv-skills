@@ -89,7 +89,7 @@ Between waits, use free slots: re-read `hv round candidates` and assign the next
 
 Workers never merge. After `done`, read the PR: does it do what the issue says, and does it stay inside the files the issue named? Then `hv worker gate <slot> --base <branch>`, which runs the checks on the merged tree and merges on a pass. Read its verdict; don't re-derive the rules it enforces.
 
-*(pending C5, #190)* Merge policy comes from config. With the default, the gate merges a passing PR. When policy requires approval (all PRs, or PRs touching listed paths), unattended runs pass `--escalate` to `worker gate` (or `ship pr-merge` for a PR you merge by number): the verb refuses with exit 4 and posts the approval request on the PR thread. Keep working other slots. `hv round escalate check` says when the maintainer has answered; re-run the gate with `--approval <id>`. An `approval declined` refusal means the slot is held, never retried. In an interactive session, ask and pass `--confirm --confirm-note` quoting the answer; the audit line records it. Never write a note the human didn't say.
+Merge policy comes from config (`ship.mergeApproval`). With the default, the gate merges a passing PR. When policy requires approval (all PRs, or PRs touching listed paths), unattended runs pass `--escalate` to `worker gate`, or to `ship pr-merge` for a PR you merge by number. The verb refuses with exit 4 and posts the approval request on the PR thread, once however often you re-gate. Keep working other slots. `hv round escalate check` says when the maintainer has answered; re-run with `--approval <id>`, and the audit line quotes the answer. An answer that doesn't read as approval (`approve`, `approved`, `yes`, `lgtm`, `ship it`) holds the merge: `approval declined` means the slot is held, never retried, and you tell the maintainer. Interactive sessions ask with `AskUserQuestion` and pass `--confirm --confirm-note` with the answer verbatim. Never write a note the human didn't say.
 
 After each merge, re-verify the base before assigning from it. The next assignment branches from a base you have just proved.
 
@@ -104,6 +104,10 @@ Bounce when in doubt about who is right. The ticket may be the wrong one.
 ## 8. Wind down
 
 When the slate is done or the maintainer calls the round: `hv round wind-down`. It re-verifies the base, parks every slot and releases the lease. If a slot still holds work it exits 4 and parks the rest; read which slot and why before deciding. Then run `hv round reconcile` and `hv reap` for what is left, and give the maintainer a short summary: what merged, what bounced, what is open, what drift remains.
+
+## Solo mode
+
+*(pending C8, #64)*
 
 ## Rules that outlive any verb
 
