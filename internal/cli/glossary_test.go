@@ -201,7 +201,8 @@ func TestBlockSkillsMatchGolden(t *testing.T) {
 		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
 	// The golden carries the old helper's output with the A9 G4 body, which
-	// names hv verbs; everything around the body is the frozen output.
+	// names hv verbs, and B2's `.hv/verdicts.json` in the gitignored list
+	// (#55); everything around the body is the frozen output.
 	knSameDelta(t, want, got)
 	if got := knNew(t, dir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
 		t.Errorf("skills with a body: rc=%d", got.rc)

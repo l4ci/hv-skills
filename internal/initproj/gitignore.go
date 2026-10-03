@@ -17,6 +17,7 @@ var ignoreLines = []string{
 	".hv/config.local.json",
 	".hv/handoff/",
 	".hv/qa-runs/",
+	".hv/verdicts.json",
 	".hv/**/*.lock",
 }
 

@@ -29,6 +29,7 @@ __pycache__/
 .hv/config.local.json
 .hv/handoff/
 .hv/qa-runs/
+.hv/verdicts.json
 .hv/migrate-backup/
 
 # Worker worktrees (hv worker pool, parallel rounds): nested checkouts
