@@ -22,6 +22,10 @@ The skill's side:
 - **Pass the answer verbatim** in `--confirm-note`. Never invent one, and never pass `--confirm` without a human answer behind it.
 - **On exit 4 with `blockedBy: "manual gate"`, ask and re-run.** Nothing changed on the refusal, so the re-run is safe.
 
+### Merge approval in an unattended round
+
+When nobody is at the prompt (`autonomy.level` `loop`, or an orchestrator driving herdr workers), `merge-approval` goes through the escalation channel instead of `AskUserQuestion`. `hv worker gate` and `hv ship pr-merge` take `--escalate`: on the refusal they post the approval request on the PR thread (or the slot's issue) with `hv round escalate send`, and `data.escalation.id` names it; a pending request on that thread is reused, never posted twice. Note the id against the slot, keep working other slots, and poll with `hv round escalate check`. Once it reports `answered`, re-run with `--approval <id>`. The verb itself decides whether the reply approves (first word `approve`, `approved`, `yes`, `lgtm`, or `ship it`) and audits the reply verbatim. Exit 4 `approval declined` means the human held the merge: surface `data.answer` and hold the slot, never retry. Exit 4 `approval pending` means `check` has not seen an answer yet. `hv ship merge` has no thread and keeps the `--confirm` path.
+
 Call sites show the flags and the exit-4 handling; they don't restate the rule, which the verb now enforces.
 
 ## Skill-only gates: the callout holds the line
