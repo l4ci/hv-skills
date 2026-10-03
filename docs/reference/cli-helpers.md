@@ -129,7 +129,7 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv issues label <issue> (--add <name> \| --remove <name>)` | add or remove a label on an upstream issue |
 | `hv issues imported [--for-repo <name>] [--open-only]` | backlog items that point at upstream issues |
 | `hv issues close <issue> --commit <sha> [--item <ID>]` | close an upstream issue naming the shipping commit |
-| `hv issues provider` | github, gitlab or unknown for the origin remote |
+| `hv issues provider` | github, gitlab or unknown, from the origin remote, falling back to `issues.provider` |
 
 ## `hv status`
 
@@ -355,7 +355,7 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 
 | Usage | What it does |
 |---|---|
-| `hv init` | create or refresh `.hv/`, the managed blocks and `.gitignore` |
+| `hv init [--no-blocks]` | create or refresh `.hv/`, the managed blocks and `.gitignore` (`--no-blocks` seeds only) |
 | `hv init check` | is `.hv/` initialized (exit 1 when not) |
 | `hv init umbrella (--repos <csv> \| --all \| --list)` | register sub-repos and make this directory an umbrella |
 
