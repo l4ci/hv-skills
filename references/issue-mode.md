@@ -74,4 +74,4 @@ Shared by the `hv item`, `hv ship pr` and `hv tracker call` verbs:
 
 - `5` tracker unavailable (CLI missing, not authenticated, provider unknown): stop and report; do not fall back to files.
 - `6` rate-limited: stop and report; never retry in a loop.
-- `4` refused. `hv item claim`: another worker holds the item (claim lost): drop that item and pick another. `hv ship pr-merge`: a linked item has no proof and moves to `changes-requested`: report it.
+- `4` refused. `hv item claim`: another worker holds the item (claim lost): drop that item and pick another. `hv ship pr-merge`: a linked item has no proof and moves to `changes-requested`: report it; or, with `data.blockedBy: "manual gate"`, `ship.mergeApproval` requires a human: ask, then re-run with `--confirm --confirm-note "<answer>"`.

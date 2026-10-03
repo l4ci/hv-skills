@@ -47,6 +47,8 @@ printf 'merge: <summary>\n\n- item 1\n- item 2\n' | hv ship merge --repo <repo> 
 
 The verb removes any worktree for the branch, checks out main, merges `--no-ff` with the piped message, deletes the branch, and reports the merge commit (`data.sha`; the short hash in text mode).
 
+Exit 4 with `data.blockedBy: "manual gate"` is the `merge-approval` gate (`ship.mergeApproval` requires a human for this merge; `data.paths` names the files that put it there): nothing changed. Ask the user in an `AskUserQuestion` that loop mode never auto-picks, then re-run with `--confirm --confirm-note "<their answer>"`.
+
 ## Open a PR — `hv ship pr`
 
 ```bash

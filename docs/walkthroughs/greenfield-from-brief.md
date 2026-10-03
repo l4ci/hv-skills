@@ -52,7 +52,7 @@ The command writes:
 - `.hv/counters.json`, `config.json`, `status.json`
 - Managed blocks in `CLAUDE.md` so the orchestrator picks up project knowledge, decisions, context, and the active milestone
 
-Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, and `.hv/**/*.lock` files are gitignored.
+Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, `.hv/gate-audit.jsonl`, and `.hv/**/*.lock` files are gitignored.
 
 ## Step 2: /hv-vision
 

@@ -361,7 +361,7 @@ func reviewScaffolding(fs *flag.FlagSet) RunFunc {
 // single-repo *backlog.Issues and the *backlog.Umbrella both have it.
 type a8Backend interface {
 	ReviewQueue() ([]backlog.QueueEntry, error)
-	MergePR(pr int, items []string) (backlog.MergeResult, error)
+	MergePRGated(pr int, items []string, approve backlog.MergeApprover) (backlog.MergeResult, error)
 	ReleaseGate(mid string) ([]backlog.Blocker, []backlog.Issue, error)
 	ReleaseNotes(mid string) ([]backlog.NoteSection, error)
 	ReleaseClose(mid, tag string) (int, bool, error)

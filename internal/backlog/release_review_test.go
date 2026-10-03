@@ -55,6 +55,10 @@ func (f *rrFake) ClosedNumbers(body string) []int {
 	return out
 }
 
+// PRFiles is the merge-approval gate's file list; the parity scenarios never
+// gate, so it records nothing.
+func (f *rrFake) PRFiles(context.Context, int) ([]string, error) { return nil, nil }
+
 func (f *rrFake) PRMerge(_ context.Context, pr int) (string, error) {
 	if err := f.rec("pr_merge", pr); err != nil {
 		return "", err

@@ -12,7 +12,7 @@ exit 7
 EOS
   chmod +x stub-bin/gh
   rc=0
-  OUT=$(PATH="$HI_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "test title" --body-file - <<<"test body" 2>/dev/null) || rc=$?
+  OUT=$(PATH="$HI_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "test title" --body-file - --confirm --confirm-note "yes, file it" <<<"test body" 2>/dev/null) || rc=$?
   [ "$rc" = "5" ] || fail "expected exit 5 when gh fails: rc=$rc"
   [ "$(echo "$OUT" | jget ok)" = "false" ] || fail "expected ok:false envelope: $OUT"
   echo "$OUT" | jget error.hint | grep "github.com/l4ci/hv-skills/issues/new" >/dev/null || fail "unavailable hint missing repo URL: $OUT"
@@ -31,7 +31,7 @@ trap 'rm -rf "$HI2_TMP"' EXIT
 exit 7
 EOS
   chmod +x stub-bin/gh
-  rc=0; OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - <<<"y" 2>/dev/null) || rc=$?
+  rc=0; OUT=$(PATH="$HI2_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "x" --upstream-repo "fork/repo" --body-file - --confirm --confirm-note "yes, file it" <<<"y" 2>/dev/null) || rc=$?
   [ "$rc" = 5 ] || fail "suggest-upstream with a failing gh should exit 5 (got $rc): $OUT"
   echo "$OUT" | jget error.hint | grep "github.com/fork/repo" >/dev/null || fail "--upstream-repo override ignored: $OUT"
   pass "tracker suggest-upstream --upstream-repo override flows through to the hint URL"
@@ -54,7 +54,7 @@ d = json.load(open(sys.argv[1]))
 print(len(d["issues"]), d["issues"][-1]["title"], d["issues"][-1].get("repo", "-"), d["issues"][-1]["body"].strip())' "$HI3_TMP/db.json"; }
 
   # Default target: l4ci/hv-skills (HV_UPSTREAM_REPO unset)
-  OUT=$(env -u HV_UPSTREAM_REPO "$HV_BIN" --json tracker suggest-upstream --title "learned a thing" --body-file - <<<"the body") || fail "suggest-upstream failed: $OUT"
+  OUT=$(env -u HV_UPSTREAM_REPO "$HV_BIN" --json tracker suggest-upstream --title "learned a thing" --body-file - --confirm --confirm-note "yes, file it" <<<"the body") || fail "suggest-upstream failed: $OUT"
   [ "$(echo "$OUT" | jget data.number)" = "1" ] || fail "suggest-upstream number: $OUT"
   [ "$(echo "$OUT" | jget data.upstreamRepo)" = "l4ci/hv-skills" ] || fail "suggest-upstream default repo: $OUT"
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "suggest-upstream changed: $OUT"
@@ -62,14 +62,14 @@ print(len(d["issues"]), d["issues"][-1]["title"], d["issues"][-1].get("repo", "-
   [ "$(DBQ)" = "1 learned a thing l4ci/hv-skills the body" ] || fail "issue not filed upstream as asked: $(DBQ)"
 
   # --upstream-repo wins over HV_UPSTREAM_REPO; the issue lands in that repo
-  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "second" --upstream-repo fork/repo --body-file - <<<"b2") || fail "suggest-upstream --upstream-repo failed: $OUT"
+  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "second" --upstream-repo fork/repo --body-file - --confirm --confirm-note "yes, file it" <<<"b2") || fail "suggest-upstream --upstream-repo failed: $OUT"
   [ "$(echo "$OUT" | jget data.number)" = "2" ] || fail "second issue number: $OUT"
   [ "$(echo "$OUT" | jget data.upstreamRepo)" = "fork/repo" ] || fail "--upstream-repo not reported: $OUT"
   [ "$(echo "$OUT" | jget data.url)" = "https://github.com/fork/repo/issues/2" ] || fail "--upstream-repo url: $OUT"
   [ "$(DBQ)" = "2 second fork/repo b2" ] || fail "--upstream-repo issue landed elsewhere: $(DBQ)"
 
   # HV_UPSTREAM_REPO alone is the target when the flag is absent
-  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "third" --body-file - <<<"b3") || fail "suggest-upstream env repo failed: $OUT"
+  OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "third" --body-file - --confirm --confirm-note "yes, file it" <<<"b3") || fail "suggest-upstream env repo failed: $OUT"
   [ "$(echo "$OUT" | jget data.upstreamRepo)" = "env/repo" ] || fail "HV_UPSTREAM_REPO ignored: $OUT"
   [ "$(DBQ)" = "3 third env/repo b3" ] || fail "env-repo issue landed elsewhere: $(DBQ)"
 
@@ -77,6 +77,11 @@ print(len(d["issues"]), d["issues"][-1]["title"], d["issues"][-1].get("repo", "-
   rc=0; "$HV_BIN" --json tracker suggest-upstream --body-file - <<<"x" >/dev/null 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "suggest-upstream without --title should exit 2, got $rc"
   [ "$(DBQ | cut -d' ' -f1)" = "3" ] || fail "usage error still filed an issue"
+
+  # without --confirm the public-filing gate refuses (4), nothing filed (B1)
+  rc=0; "$HV_BIN" --json tracker suggest-upstream --title "nope" --body-file - <<<"x" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 4 ] || fail "suggest-upstream without --confirm should exit 4, got $rc"
+  [ "$(DBQ | cut -d' ' -f1)" = "3" ] || fail "a refused filing still filed an issue"
 )
 rm -rf "$HI3_TMP"
 pass "tracker suggest-upstream files the issue in the default, env and --upstream-repo targets"

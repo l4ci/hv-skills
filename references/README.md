@@ -23,7 +23,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`isolation-patterns.md`](isolation-patterns.md) | Branch / worktree creation patterns per work.isolation + umbrella mode. | `/hv-work` |
 | [`knowledge-consult.md`](knowledge-consult.md) | Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill. | `/hv-debug`, `/hv-next`, `/hv-review`, `/hv-work` |
 | [`loop-mode-plan-dispatch.md`](loop-mode-plan-dispatch.md) | Loop-mode auto-plan dispatch (uncertainty pre-flight, orchestrator-model contract) plus rename + link-sweep collision detection for `/hv-work` Step 4. | `/hv-work` |
-| [`manual-gates.md`](manual-gates.md) | Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch). | `/hv-capture` (`--remove`, `--from-*`), `/hv-learn`, `/hv-release`, `/hv-ship` |
+| [`manual-gates.md`](manual-gates.md) | The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts. | `/hv-capture` (`--remove`, `--from-*`), `/hv-learn`, `/hv-release`, `/hv-ship` |
 | [`merge-strategy-gate.md`](merge-strategy-gate.md) | Merge-strategy decision UX (Direct vs PR) plus helper invocations. | `/hv-ship`, `/hv-work` |
 | [`milestone-tagging.md`](milestone-tagging.md) | Milestone-tagging UX pattern used by capture/go skills. | `/hv-capture` |
 | [`persistence-skills.md`](persistence-skills.md) | Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — `/hv-learn` carries both topic-bullet learnings and `--term` Glossary entries. | `/hv-decide`, `/hv-learn` |
@@ -31,7 +31,6 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 | [`refactor-explore.md`](refactor-explore.md) | Exploration-agent prompt + categories + stop condition for `/hv-refactor` single-repo mode. | `/hv-refactor` |
 | [`refactor-design-approaches.md`](refactor-design-approaches.md) | Competing-design choreography (decisions consult, agent constraints, output shape) for `/hv-refactor` Step 5. | `/hv-refactor` |
 | [`refactor-umbrella-fanout.md`](refactor-umbrella-fanout.md) | Per-repo fan-out logic for `/hv-refactor` in umbrella mode. | `/hv-refactor` |
-| [`release-hosts.md`](release-hosts.md) | Release-host detection and routing (GitHub / GitLab / origin-less). | `/hv-release` |
 | [`review-verdict-routing.md`](review-verdict-routing.md) | PASS / CONCERNS / FAIL routing for `/hv-review` consumers. | `/hv-qa`, `/hv-review`, `/hv-ship` |
 | [`silent-failure-hunter.md`](silent-failure-hunter.md) | Rubric for detecting work that reports complete but didn't move the system, used in review passes. | `/hv-review`, `/hv-ship` |
 | [`source-prefill.md`](source-prefill.md) | Source-prefill / promote-between-artifacts semantics for `/hv-decide`. | `/hv-decide` |

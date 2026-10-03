@@ -246,7 +246,7 @@ Prepend a model-written one-line summary scoped to the top 2-3 themes from the b
 Display the full notes draft to the user, then use `AskUserQuestion`:
 
 - **Header:** `"Notes"`
-- **Question:** *"Release `v<new_version>` — notes look good?"*
+- **Question:** *"Release `v<new_version>` — notes look good? Yes pushes the tag and publishes the release."*
 - **Options** (single-select):
   1. `Looks good (Recommended)`
   2. `Edit` — accept replacement text via Other (free-text replaces the draft verbatim)
@@ -257,6 +257,8 @@ Plain-text fallback: *"Proceed, edit, or abort?"*
 If the user picks **Edit**, accept the replacement text and store it. Re-display the edited notes before continuing (no second prompt — one edit pass only).
 
 If the user picks **Abort**, stop with one line: *"Release aborted. Nothing written."*
+
+This answer is the human approval for Steps 12 and 13. Keep it verbatim as `$APPROVAL` (the option label, or the replacement text's first line after **Edit**) for their `--confirm-note`. Never auto-pick this question in any autonomy mode.
 
 Write the (possibly edited) notes to a temp file:
 
@@ -311,35 +313,28 @@ Skip in `--dry-run` mode; print the tag command that would run.
 
 ## Step 12 — Push
 
-> **Manual gate — filing a public artifact.** Pushing the tag creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Step 7 (Review Notes) already gathered explicit user approval of the release notes; the push only fires after that approval. See `references/manual-gates.md`.
+`hv release push` enforces the `tag-push` manual gate (`hv gate list`): it exits 4 without `--confirm`, at every autonomy level. Pass Step 7's answer:
 
 ```bash
-git push origin <current-branch> v<new_version>
+hv release push <new_version> --json --confirm --confirm-note "$APPROVAL"
 ```
 
-Single call — pushes both the commit and the tag atomically. If this fails (e.g., origin not set), stop and print the tag SHA for manual recovery.
+One push carries both the commit and the tag. On exit 3 (no origin) or 5 (push failed), stop; the error names the tag SHA for manual recovery.
 
 Skip in `--dry-run` mode.
 
 ## Step 13 — Create Remote Release
 
-> **Manual gate — filing a public artifact.** Publishing the release on GitHub/GitLab creates externally-visible state. This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. The user already approved the release notes in Step 7; this step is downstream of that approval. See `references/manual-gates.md`.
+`hv release publish` enforces the `release-publish` manual gate the same way. It picks `gh` or `glab` from the origin host, and publishes nothing (exit 0, `changed: false`) when origin is neither:
 
 ```bash
-hv release host --json
+hv release publish <new_version> --json --title "v<new_version> — <one-line summary>" \
+  --body-file "$NOTES_FILE" [--draft] --confirm --confirm-note "$APPROVAL"
 ```
 
-Branch on `data.host`. Host-specific command blocks live in `references/release-hosts.md` — substitute `<new_version>`, `$NOTES_FILE`, and the summary verbatim.
+Add `--draft` when `release.draft` is true and the host is GitHub; GitLab has no draft releases and refuses it (exit 2). `data.url` goes into the Step 14 summary. If `gh` or `glab` is missing (exit 5), print the error and continue: the tag is already public.
 
-| `host` | Section in `references/release-hosts.md` |
-|--------|------------------------------------------|
-| `github`, `github-enterprise` | `## github or github-enterprise` |
-| `gitlab`, `gitlab-self-hosted` | `## gitlab or gitlab-self-hosted` |
-| `none`                        | `## none`                         |
-
-Add new host values to both the verb and the reference together.
-
-Skip the whole step in `--dry-run` mode; print the `gh`/`glab` command that would run.
+Skip the whole step in `--dry-run` mode; print the `hv release publish` command that would run.
 
 ## Step 13.3 — Close Out the Milestone (issue mode)
 
@@ -438,7 +433,7 @@ In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 - **Multiple version files** — currently first-match wins; set `release.versionFile` in `.hv/config.json` to pin the file explicitly.
 - **Working tree dirty** — fail at Step 1 unless `release.requireCleanTree: false`; show `git status -s` in the error message.
 - **BREAKING CHANGE with patch/minor bump** — escalate via `AskUserQuestion` in Step 4 before any writes.
-- **`gh`/`glab` not installed but origin matches** — fail at Step 13 *after* tag push; print recovery: `gh release create v<X.Y.Z> --notes-file <path>` and the push-delete command to revert the tag if needed: `git push --delete origin v<X.Y.Z>`.
+- **`gh`/`glab` not installed but origin matches** — fail at Step 13 *after* tag push; `hv release publish` exits 5; print recovery: re-run it once the CLI is installed (`hv release publish <X.Y.Z> --title … --body-file <path> --confirm --confirm-note "<answer>"`) and the push-delete command to revert the tag if needed: `git push --delete origin v<X.Y.Z>`.
 - **No origin** — Step 13 silently skipped; tag and CHANGELOG still committed locally.
 - **CHANGELOG section already exists for this version** — helper exits 1 at Step 9; surface the error and stop.
 - **Existing CHANGELOG.md without `# Changelog` header** — helper preserves existing content; inserts after H1 if present, else prepends.
@@ -459,5 +454,4 @@ In `--dry-run` mode, prefix the block with `DRY RUN — no changes written.`
 ## References
 
 - [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/manual-gates.md`](../references/manual-gates.md) — Steps that must always be manual regardless of autonomy.level (PR opening, upstream issues, runlog dispatch).
-- [`references/release-hosts.md`](../references/release-hosts.md) — Release-host detection and routing (GitHub / GitLab / origin-less).
+- [`references/manual-gates.md`](../references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.

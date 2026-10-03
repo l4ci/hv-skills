@@ -18,6 +18,7 @@ var ignoreLines = []string{
 	".hv/handoff/",
 	".hv/qa-runs/",
 	".hv/verdicts.json",
+	".hv/gate-audit.jsonl",
 	".hv/**/*.lock",
 }
 

@@ -19,7 +19,13 @@ type PRTracker interface {
 	OpenPRs(ctx context.Context) ([]tracker.PR, error)
 	ClosedNumbers(body string) []int
 	PRMerge(ctx context.Context, pr int) (string, error)
+	PRFiles(ctx context.Context, pr int) ([]string, error)
 }
+
+// MergeApprover is the merge-approval gate MergePRGated runs once the PR and
+// its items resolve, before the proof check: files lists the PR's changed
+// paths on demand. A non-nil error stops the merge with nothing changed.
+type MergeApprover func(files func() ([]string, error)) error
 
 // ReleaseTracker is the part of tracker.Adapter the release calls need: the
 // native milestones and the issues in one.
@@ -128,6 +134,11 @@ func (r ItemRef) Ref() string { return r.Type + r.ID }
 // sha. An unknown PR (items nil only) or item wraps ErrNotFound; a refused
 // merge is a *MergeFailedError.
 func (b *Issues) MergePR(pr int, items []string) (MergeResult, error) {
+	return b.MergePRGated(pr, items, nil)
+}
+
+// MergePRGated is MergePR with the merge-approval gate (nil: none).
+func (b *Issues) MergePRGated(pr int, items []string, approve MergeApprover) (MergeResult, error) {
 	pt, err := b.prTracker()
 	if err != nil {
 		return MergeResult{}, err
@@ -175,6 +186,11 @@ func (b *Issues) MergePR(pr int, items []string) (MergeResult, error) {
 	// checking here, after the items resolve, keeps its call order.
 	if found == nil {
 		return MergeResult{}, errf(ErrNotFound, "PR %d is not open", pr)
+	}
+	if approve != nil {
+		if err := approve(func() ([]string, error) { return pt.PRFiles(b.ctx(), pr) }); err != nil {
+			return MergeResult{}, err
+		}
 	}
 	var unproven []string
 	for _, ref := range linked {
@@ -532,6 +548,11 @@ func (u *Umbrella) ReviewQueue() ([]QueueEntry, error) {
 // MergePR merges PR pr of the --repo sub-repo. An --items reference qualified
 // with another sub-repo is an error; the IDs it reports are qualified.
 func (u *Umbrella) MergePR(pr int, items []string) (MergeResult, error) {
+	return u.MergePRGated(pr, items, nil)
+}
+
+// MergePRGated is MergePR with the merge-approval gate (nil: none).
+func (u *Umbrella) MergePRGated(pr int, items []string, approve MergeApprover) (MergeResult, error) {
 	name, s, err := u.perRepo()
 	if err != nil {
 		return MergeResult{}, err
@@ -550,7 +571,7 @@ func (u *Umbrella) MergePR(pr int, items []string) (MergeResult, error) {
 	if items == nil {
 		plain = nil
 	}
-	res, err := s.MergePR(pr, plain)
+	res, err := s.MergePRGated(pr, plain, approve)
 	for i := range res.Closed {
 		res.Closed[i].ID = name + ":" + res.Closed[i].ID
 	}

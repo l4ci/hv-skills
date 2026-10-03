@@ -33,7 +33,7 @@ In loop mode, AskUserQuestion calls fall into three buckets:
 
 - **Auto-picked silently**: routine routing/tagging questions where the `(Recommended)` option is the obvious right answer. Examples: which milestone to tag captured items with, whether to ship/resume a paused branch, where to send review concerns, which sub-repos to refactor. The loop proceeds as if you'd picked the Recommended option.
 - **Surfaced for design decisions**: when an `AskUserQuestion` covers a design pick with multiple plausible interpretations (a competing approach, a version-bump escalation), loop mode stops and asks. F32 (loop-mode auto-planning) extends this further with `[Auto:Loop]` decision logging when /hv-plan needs to resolve open questions, but until then design questions break the loop until you answer them.
-- **Always manual regardless of autonomy**: public-artifact gates and committed-boundary gates. `/hv-decide` approvals, `/hv-learn` issue/runlog filing, `/hv-ship` PR strategy, `/hv-release` push/publish gates. These honor their `**Manual gate: ...**` callout no matter what `autonomy.level` says.
+- **Always manual regardless of autonomy**: public-artifact gates and committed-boundary gates (`hv gate list`). The tag push, release publish, `/hv-learn` upstream issue and, when `ship.mergeApproval` asks for it, merges are enforced by the verbs themselves: they exit 4 until a human answer is passed with `--confirm`. `/hv-decide` approvals, runlog filing, PR opening and upstream issue close/label honor their `**Manual gate: ...**` callout no matter what `autonomy.level` says.
 
 If a routine routing prompt does fire under loop mode, that's a sign the auto-pick branch is missing at that call site. File it as a bug.
 
