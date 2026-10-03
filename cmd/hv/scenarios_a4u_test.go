@@ -1,50 +1,32 @@
 package main
 
-// Black-box parity for the A4 verbs in an umbrella (#48, last slice). The
+// Go-only scenarios for the A4 verbs in an umbrella (#48, last slice). The
 // issue-backend scenarios build an umbrella project whose sub-repos have github
 // or gitlab origins, seed one stateful fake forge store per sub-repo
 // (FAKE_TRACKER_DB_DIR, keyed by the sub-repo's git toplevel basename), run the
-// old implementation on side A and the Go binary on side B, and compare exit
-// code, envelope, the .hv/ tree and every sub-repo's final forge store. The
-// file-backend scenarios reuse the A4 harness (scn).
+// Go binary and check its exit code, envelope, .hv/ tree and every sub-repo's
+// final forge store against the frozen record. The file-backend scenarios reuse
+// the A4 harness (scn).
 //
 // Safety: the shared TestMain refuses to run unless gh resolves to test/fakes
-// (TestUbFakesFirst checks glab too); every side has its own store directory
+// (TestUbFakesFirst checks glab too); every run has its own store directory
 // under t.TempDir, and FAKE_TRACKER_DB_DIR wins over the harness-wide
 // FAKE_TRACKER_DB, so no scenario can touch another's store.
 //
-// Reference side: test/hv-shim for the verbs it adapts (item create, complete,
-// field get|list|set, state, reopen, backlog list|ids|milestones, summary) and
-// the old helper directly for the rest, as in the single-repo issue harness.
-//
-// Documented divergences (each scenario that exercises one carries a div text,
-// a norm or a changed expectation, so none passes silently):
-//  1. --repo: the shim and the old helpers ignore it on item verbs after
-//     validating the name. Go follows the contract's scope S (accepted by the
-//     orchestrator on #119): it narrows reads and bare references to the
-//     sub-repo and names the capture target, so a bare F1 under --repo web
-//     resolves where the old helper says ambiguous. Not an open question; the
-//     marker stays because the shim cannot agree.
-//  2. cwd inside a sub-repo: scope S narrows reads and bare refs to that
-//     sub-repo, like --repo (contract; orchestrator ruling on #119). The old
-//     helpers read the whole umbrella from anywhere (scopeDiv).
-//  3. field set --name repos: Go 2 (read-only field, contract), the shim 3.
-//  4. backlog ids and milestones: the old helper prints bare "F12" (the
-//     shim "12"), Go prints the qualified ID of rule 11 ("web:12"). norm maps
-//     Go's back before comparing.
-//  5. summary Recent ids are qualified by Go, bare in the shim (same norm).
-//  6. item show, bare ref: the old helper prints the bare canonical ID, Go
-//     always the qualified one (the contract's rule 11).
-//  7. create with --repo X --repos Y (X != Y): Go 2, the shim ignores --repo.
-//  11. a stream's item hides only its own sub-repo's row (backlog list).
-//  8. data.changed: the shim says true for every issue write; Go reports
-//     whether the tracker changed (dropped, then asserted on Go's side).
+// Behaviour worth knowing (contract rulings):
+//  1. --repo narrows reads and bare references to the sub-repo and names the
+//     capture target (scope S, orchestrator ruling on #119).
+//  2. cwd inside a sub-repo narrows reads and bare refs the same way.
+//  3. field set --name repos is a usage error (read-only field).
+//  4. ids, summary recents and item show print the qualified ID of rule 11
+//     ("web:12").
+//  5. a stream's item hides only its own sub-repo's row (backlog list).
+//  6. data.changed reports whether the tracker changed.
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -145,28 +127,20 @@ func ubThree() []ubRepo {
 // registry is sorted by name, so the default home would be api.
 const ubCfg = `{"backlog": {"backend": "issues"}, "issues": {"retryWaitSeconds": 0, "homeRepo": "web"}}`
 
-// ubcase is one differential scenario against an issue-backend umbrella.
+// ubcase is one scenario against an issue-backend umbrella.
 type ubcase struct {
-	name   string
-	repos  []ubRepo // default ubDefault
-	cfg    string   // config.json, default ubCfg
-	status string   // .hv/status.json
-	cwd    string   // working directory relative to the umbrella ("" root, "web", "web/src/deep")
-	argv   []string // new-shape argv, --json included
-	in     string
-	old    []string // old helper and argv; empty means the shim runs argv
-	oldMap func(rc int, stderr string) int
-	env    []string
-	want   int
-	div    string // the reference cannot agree on the exit
-	// refWant is the reference's mapped exit when div is set.
-	refWant  int
-	skipDB   bool // compare nothing about the stores except that Go's equal the seed
-	changed  *bool
-	textSame bool
-	shimDrop []string
-	norm     func(envl) envl
-	check    func(t *testing.T, e envl, ref run, dbs map[string]map[string]any)
+	name     string
+	repos    []ubRepo // default ubDefault
+	cfg      string   // config.json, default ubCfg
+	status   string   // .hv/status.json
+	cwd      string   // working directory relative to the umbrella ("" root, "web", "web/src/deep")
+	argv     []string // argv, --json included
+	in       string
+	env      []string
+	want     int
+	changed  *bool // Go's data.changed on success
+	textSame bool  // also record the text-mode stdout (read-only verbs)
+	check    func(t *testing.T, e envl, dbs map[string]map[string]any)
 }
 
 func ubInit(t *testing.T, c ubcase) (dir string, repos []ubRepo) {
@@ -225,102 +199,29 @@ func ubReadAll(t *testing.T, dbDir string, repos []ubRepo) map[string]map[string
 
 func (c ubcase) exec(t *testing.T) {
 	t.Parallel()
-	if frozenOn != nil {
-		frozenCheck(t, c.goSide)
-		return
-	}
 	base, repos := ubInit(t, c)
-	goDir, refDir := copyTree(t, base), copyTree(t, base)
-	goDBDir, refDBDir := ubSeed(t, repos), ubSeed(t, repos)
-	argv := c.argv
-	goRun := envRun(t, filepath.Join(goDir, c.cwd), c.in, append([]string{"FAKE_TRACKER_DB_DIR=" + goDBDir}, c.env...), hvBin, argv...)
-	if goRun.code != c.want {
-		t.Errorf("go exit = %d, want %d\nargv: %v\nstdout: %s\nstderr: %s", goRun.code, c.want, argv, goRun.stdout, goRun.stderr)
+	dir := copyTree(t, base)
+	dbDir := ubSeed(t, repos)
+	cwd := filepath.Join(dir, c.cwd)
+	env := frozenEnv(append([]string{"FAKE_TRACKER_DB_DIR=" + dbDir}, c.env...))
+	r := envRun(t, cwd, c.in, env, hvBin, c.argv...)
+	if r.code != c.want {
+		t.Errorf("exit = %d, want %d\nargv: %v\nstdout: %s\nstderr: %s", r.code, c.want, c.argv, r.stdout, r.stderr)
 	}
-	goEnv := parseEnv(t, "go", goRun)
-	refEnvVars := append([]string{"FAKE_TRACKER_DB_DIR=" + refDBDir}, c.env...)
-	var ref run
-	var refCode int
-	if len(c.old) > 0 {
-		ref = envRun(t, filepath.Join(refDir, c.cwd), c.in, refEnvVars, filepath.Join(stagedBin, c.old[0]), c.old[1:]...)
-		m := c.oldMap
-		if m == nil {
-			m = ubOldMap
-		}
-		refCode = m(ref.code, ref.stderr)
-	} else {
-		ref = envRun(t, filepath.Join(refDir, c.cwd), c.in, refEnvVars, "python3", append([]string{shimPath}, argv...)...)
-		refCode = ref.code
+	dbs := ubReadAll(t, dbDir, repos)
+	st := newStep(t, r, snapshot(t, base), dir, dbs)
+	if c.textSame {
+		st.text(envRun(t, cwd, c.in, env, hvBin, withoutJSON(c.argv)...).stdout)
 	}
-	if c.div != "" {
-		if refCode != c.refWant {
-			t.Errorf("reference exit = %d, want %d (divergence: %s)\nstdout: %s\nstderr: %s", refCode, c.refWant, c.div, ref.stdout, ref.stderr)
-		}
-	} else if refCode != goRun.code {
-		t.Errorf("exit differs: reference %d, go %d\nargv: %v\nref stdout: %s\nref stderr: %s\ngo stdout: %s\ngo stderr: %s",
-			refCode, goRun.code, argv, ref.stdout, ref.stderr, goRun.stdout, goRun.stderr)
-	}
-	if d := diffTrees(snapshot(t, refDir), snapshot(t, goDir)); d != "" {
-		t.Errorf(".hv/ trees differ:\n%s", d)
-	}
-	gDB, rDB := ubReadAll(t, goDBDir, repos), ubReadAll(t, refDBDir, repos)
-	seed := map[string]map[string]any{}
-	for _, r := range repos {
-		seed[r.name] = norm(r.db())
-	}
-	switch {
-	case c.skipDB:
-		if !reflect.DeepEqual(gDB, seed) {
-			t.Errorf("go changed a forge although it refused (%s)", c.div)
-		}
-	case c.div != "":
-		// the reference differs by design; the scenario's check asserts Go's stores
-	case !reflect.DeepEqual(gDB, rDB):
-		gj, _ := json.MarshalIndent(gDB, "", " ")
-		rj, _ := json.MarshalIndent(rDB, "", " ")
-		t.Errorf("forge stores differ\nargv: %v\nref stderr: %s\n--- reference\n%s\n--- go\n%s", argv, ref.stderr, rj, gj)
-	}
-	if len(c.old) == 0 && c.div == "" {
-		r, g := stripText(parseEnv(t, "shim", ref)), stripText(goEnv)
-		if c.changed != nil {
-			dropChanged(r)
-			ge := parseEnv(t, "go", goRun)
-			if c.want == 0 && at(ge, "data.changed") != *c.changed {
-				t.Errorf("go data.changed = %v, want %v", at(ge, "data.changed"), *c.changed)
-			}
-			dropChanged(g)
-		}
-		for _, k := range c.shimDrop {
-			if d, ok := r["data"].(map[string]any); ok {
-				delete(d, k)
-			}
-		}
-		if c.norm != nil {
-			r, g = c.norm(copyEnv(t, r)), c.norm(copyEnv(t, g))
-		}
-		if !reflect.DeepEqual(map[string]any(r), map[string]any(g)) {
-			rj, _ := json.Marshal(r)
-			gj, _ := json.Marshal(g)
-			t.Errorf("envelopes differ\nargv: %v\nshim: %s\ngo:   %s", argv, rj, gj)
-		}
-	}
-	if c.textSame && c.want == 0 && refCode == 0 {
-		var txt []string
-		for _, a := range argv {
-			if a != "--json" {
-				txt = append(txt, a)
-			}
-		}
-		gt := envRun(t, filepath.Join(goDir, c.cwd), c.in, append([]string{"FAKE_TRACKER_DB_DIR=" + goDBDir}, c.env...), hvBin, txt...)
-		if strings.TrimRight(gt.stdout, "\n") != strings.TrimRight(ref.stdout, "\n") {
-			t.Errorf("text mode differs from old stdout\nold: %q\ngo:  %q", ref.stdout, gt.stdout)
-		}
+	e := parseEnv(t, "go", r)
+	if c.changed != nil && c.want == 0 && at(e, "data.changed") != *c.changed {
+		t.Errorf("data.changed = %v, want %v", at(e, "data.changed"), *c.changed)
 	}
 	if c.check != nil {
-		goEnv["__info"] = info{}
-		c.check(t, goEnv, ref, rDB)
+		e["__info"] = info{}
+		c.check(t, e, dbs)
 	}
-	record(t, c.goSide)
+	frozenCheck(t, frozenRec{Steps: []frozenStep{st}})
 }
 
 // ubIssue is issue n of a repo's final store, nil when absent.
@@ -356,56 +257,7 @@ func ubHas(labels any, want string) bool {
 
 var ubQualRe = regexp.MustCompile(`^[a-z]+:`)
 
-// ubBare strips the "repo:" prefix of an id spelling (divergences 4 and 5).
-func ubBare(s string) string { return ubQualRe.ReplaceAllString(s, "") }
-
-// ubNormIDs maps the qualified IDs of ids lists, summary recents and backlog
-// rows to bare numbers on both sides, for the verbs where the old helper's
-// spelling is bare.
-func ubNormIDs(e envl) envl {
-	d, ok := e["data"].(map[string]any)
-	if !ok {
-		return e
-	}
-	if ids, ok := d["ids"].([]any); ok {
-		for i, v := range ids {
-			ids[i] = ubBare(v.(string))
-		}
-	}
-	if rec, ok := d["recent"].([]any); ok {
-		for _, r := range rec {
-			m := r.(map[string]any)
-			m["id"] = ubBare(m["id"].(string))
-		}
-	}
-	return e
-}
-
-// ubNormList drops what the shim cannot spell in rule 11: related entries keep
-// their type letter there (a single-repo issue-mode difference as well) and
-// clusters carry bare IDs. Go's clusters are checked directly.
-func ubNormList(e envl) envl {
-	d, ok := e["data"].(map[string]any)
-	if !ok {
-		return e
-	}
-	for _, k := range []string{"bugs", "features", "tasks"} {
-		rows, _ := d[k].([]any)
-		for _, r := range rows {
-			m := r.(map[string]any)
-			rel, _ := m["related"].([]any)
-			for i, v := range rel {
-				if s := v.(string); s != "" && strings.Contains("BFT", s[:1]) {
-					rel[i] = s[1:]
-				}
-			}
-		}
-	}
-	delete(d, "clusters")
-	return e
-}
-
-func TestParityA4Umbrella(t *testing.T) {
+func suiteA4Umbrella(t *testing.T) {
 	var all []ubcase
 	add := func(s ...ubcase) { all = append(all, s...) }
 	cwds := []string{"", "web", "web/src/deep", "api", "docs/deep"}
@@ -419,7 +271,7 @@ func TestParityA4Umbrella(t *testing.T) {
 	}
 	rate := []string{"FAKE_TRACKER_FAIL=issue view", "FAKE_TRACKER_FAIL_MSG=secondary rate limit"}
 
-	// ---- field get / list: every ref spelling and cwd (shim)
+	// ---- field get / list: every ref spelling and cwd
 	fget := func(name, ref, field string, want int) ubcase {
 		return ubcase{name: "fieldget/" + name, argv: j("item", "field", "get", ref, "--name", field), want: want}
 	}
@@ -447,7 +299,7 @@ func TestParityA4Umbrella(t *testing.T) {
 		c := c
 		s := fget(c.n, c.ref, c.field, c.want)
 		if c.want == 0 && c.field == "title" {
-			s.check = func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			s.check = func(t *testing.T, e envl, _ map[string]map[string]any) {
 				eq(t, e, "data.value", c.title)
 				if id, _ := at(e, "data.id").(string); !ubQualRe.MatchString(id) {
 					t.Errorf("data.id %q is not qualified", id)
@@ -468,9 +320,9 @@ func TestParityA4Umbrella(t *testing.T) {
 		if in == "web" {
 			uniq = 3
 		}
-		withCwds(cwdDiv(fget("cwd-ambiguous", "F1", "title", amb), cw), cw)
-		withCwds(cwdDiv(fget("cwd-qualified", "api:F1", "title", 0), cw), cw)
-		withCwds(cwdDiv(fget("cwd-bare-unique", "B4", "title", uniq), cw), cw)
+		withCwds(fget("cwd-ambiguous", "F1", "title", amb), cw)
+		withCwds(fget("cwd-qualified", "api:F1", "title", 0), cw)
+		withCwds(fget("cwd-bare-unique", "B4", "title", uniq), cw)
 	}
 	add(
 		ubcase{name: "fieldlist/qualified", argv: j("item", "field", "list", "web:F1"), want: 0},
@@ -493,7 +345,7 @@ func TestParityA4Umbrella(t *testing.T) {
 	// ---- three sub-repos: the candidates are all listed
 	add(
 		ubcase{name: "three/ambiguous-lists-all", repos: ubThree(), argv: j("item", "field", "get", "F1", "--name", "title"), want: 2,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				msg, _ := at(e, "error.message").(string)
 				for _, c := range []string{"web:1", "api:1", "lib:1"} {
 					if !strings.Contains(msg, c) {
@@ -506,7 +358,7 @@ func TestParityA4Umbrella(t *testing.T) {
 		ubcase{name: "three/qualified-third", repos: ubThree(), argv: j("item", "field", "get", "lib:F1", "--name", "title"), want: 0},
 	)
 
-	// ---- --repo: validated like the shim, then narrows (divergence 1)
+	// ---- --repo: validated, then narrows (scope S)
 	for _, c := range []struct {
 		n    string
 		argv []string
@@ -524,24 +376,20 @@ func TestParityA4Umbrella(t *testing.T) {
 	add(
 		ubcase{name: "repoflag/qualified-unaffected", argv: j("item", "field", "get", "api:F1", "--name", "title", "--repo", "web"), want: 0},
 		ubcase{name: "repoflag/bare-narrowed", argv: j("item", "field", "get", "F1", "--name", "title", "--repo", "web"), want: 0,
-			div: "1: the shim ignores --repo, so the bare F1 is ambiguous", refWant: 2,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				eq(t, e, "data.id", "web:1")
 				eq(t, e, "data.value", "Web feat")
 			}},
 		ubcase{name: "repoflag/bare-narrowed-api", argv: j("item", "field", "get", "F1", "--name", "title", "--repo", "api"), want: 0,
-			div: "1: the shim ignores --repo, so the bare F1 is ambiguous", refWant: 2,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.id", "api:1") }},
-		ubcase{name: "repoflag/bare-outside-scope", argv: j("item", "field", "get", "B4", "--name", "title", "--repo", "web"), want: 3,
-			div: "1: the shim ignores --repo and finds api's B4", refWant: 0},
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.id", "api:1") }},
+		ubcase{name: "repoflag/bare-outside-scope", argv: j("item", "field", "get", "B4", "--name", "title", "--repo", "web"), want: 3},
 		ubcase{name: "repoflag/complete-narrowed", argv: j("item", "complete", "F1", "--commit", "abc1234", "--no-proof", "--repo", "api"), want: 0,
-			div: "1: the shim ignores --repo, so the bare F1 is ambiguous", refWant: 2,
-			check: func(t *testing.T, e envl, _ run, dbs map[string]map[string]any) {
+			check: func(t *testing.T, e envl, dbs map[string]map[string]any) {
 				eq(t, e, "data.id", "api:1")
 			}},
 	)
 
-	// ---- field set (shim)
+	// ---- field set
 	fset := func(name, ref, field, value string, want int, ch *bool) ubcase {
 		return ubcase{name: "fieldset/" + name, argv: j("item", "field", "set", ref, "--name", field, "--value", value), want: want, changed: ch}
 	}
@@ -565,20 +413,18 @@ func TestParityA4Umbrella(t *testing.T) {
 		fset("bad-name", "api:F1", "title", "x", 2, nil),
 		fset("detail-refused", "api:F1", "detail", "x", 4, nil),
 		fset("bare-unique", "T5", "related", "B2", 0, yes()),
-		ubcase{name: "fieldset/repos-readonly", argv: j("item", "field", "set", "web:F1", "--name", "repos", "--value", "api"), want: 2,
-			div: "3: the shim exits 3 on the old ValueError, Go 2 (read-only field)", refWant: 3},
+		ubcase{name: "fieldset/repos-readonly", argv: j("item", "field", "set", "web:F1", "--name", "repos", "--value", "api"), want: 2},
 		ubcase{name: "fieldset/repos-readonly-unknown-item", argv: j("item", "field", "set", "nope:F1", "--name", "repos", "--value", "api"), want: 3},
-		ubcase{name: "fieldset/milestone-bad-format", argv: j("item", "field", "set", "api:F1", "--name", "milestone", "--value", "later"), want: 2,
-			div: "4: Go usage 2, the shim maps the old ValueError to 5", refWant: 5},
+		ubcase{name: "fieldset/milestone-bad-format", argv: j("item", "field", "set", "api:F1", "--name", "milestone", "--value", "later"), want: 2},
 		ubcase{name: "fieldset/rate-limit", argv: j("item", "field", "set", "web:F1", "--name", "related", "--value", "B1"), want: 6,
 			env: []string{"FAKE_TRACKER_FAIL=issue edit", "FAKE_TRACKER_FAIL_MSG=secondary rate limit"}},
 	)
 	for _, cw := range []string{"web", "api", "docs/deep"} {
-		withCwds(cwdDiv(fset("milestone-created", "api:F1", "milestone", "M07", 0, yes()), cw), cw)
+		withCwds(fset("milestone-created", "api:F1", "milestone", "M07", 0, yes()), cw)
 	}
 	// milestone assignment checks the native milestone lands on the owner only
 	add(ubcase{name: "fieldset/milestone-created-native-only-on-owner", argv: j("item", "field", "set", "api:F1", "--name", "milestone", "--value", "M07"), want: 0, changed: yes(),
-		check: func(t *testing.T, e envl, _ run, dbs map[string]map[string]any) {
+		check: func(t *testing.T, e envl, dbs map[string]map[string]any) {
 			if got := ubMilestoneTitles(dbs, "api"); got != "M07 — Title:open" {
 				t.Errorf("api milestones %q", got)
 			}
@@ -591,7 +437,7 @@ func TestParityA4Umbrella(t *testing.T) {
 	add(ubcase{name: "fieldset/home-repo-unregistered", cfg: `{"backlog": {"backend": "issues"}, "issues": {"retryWaitSeconds": 0, "homeRepo": "ghost"}}`,
 		argv: j("item", "field", "set", "api:F1", "--name", "milestone", "--value", "M07"), want: 3})
 
-	// ---- create (shim)
+	// ---- create
 	cr := func(name string, want int, args ...string) ubcase {
 		return ubcase{name: "create/" + name, argv: j(append([]string{"item", "create"}, args...)...), want: want, changed: yes()}
 	}
@@ -609,7 +455,7 @@ func TestParityA4Umbrella(t *testing.T) {
 		cr("bad-tag", 2, "--kind", "bugs", "--title", "x", "--tag", "Major", "--repos", "web"),
 		cr("no-title", 2, "--kind", "tasks", "--repos", "web"),
 		cr("empty-repos", 2, "--kind", "tasks", "--title", "x", "--repos", ""),
-		withShimDrop(cr("body-id-placeholder", 0, "--kind", "tasks", "--title", "Doc", "--repos", "web", "--body-file", "body.md"), "detail"),
+		cr("body-id-placeholder", 0, "--kind", "tasks", "--title", "Doc", "--repos", "web", "--body-file", "body.md"),
 		ubcase{name: "create/rate-limit", argv: j("item", "create", "--kind", "tasks", "--title", "x", "--repos", "web"), want: 6,
 			env: []string{"FAKE_TRACKER_FAIL=issue create", "FAKE_TRACKER_FAIL_MSG=secondary rate limit"}},
 		ubcase{name: "create/forge-unavailable", repos: []ubRepo{{"web", "none", ubWebDB}, {"api", "gitlab", ubAPIDB}},
@@ -627,7 +473,7 @@ func TestParityA4Umbrella(t *testing.T) {
 		s.cwd = c.cw
 		s.name = "create/cwd=" + map[bool]string{true: "root", false: strings.ReplaceAll(c.cw, "/", "_")}[c.cw == ""]
 		if c.want == 0 {
-			s.check = func(t *testing.T, e envl, _ run, dbs map[string]map[string]any) {
+			s.check = func(t *testing.T, e envl, dbs map[string]map[string]any) {
 				if id, _ := at(e, "data.id").(string); !strings.HasPrefix(id, c.repo+":") {
 					t.Errorf("data.id %q, want %s:N", id, c.repo)
 				}
@@ -639,23 +485,20 @@ func TestParityA4Umbrella(t *testing.T) {
 		withCwdCase(cr("cwd-field-wins", 0, "--kind", "tasks", "--title", "Field", "--repos", "api"), "web"),
 		withCwdCase(cr("cwd-gitlab-field", 0, "--kind", "features", "--title", "Gl", "--repos", "api", "--milestone", "M07"), "web/src/deep"),
 	)
-	// --repo names the capture target (divergence 1): the shim ignores it and cannot route
+	// --repo names the capture target (scope S)
 	add(
 		ubcase{name: "create/repoflag-target", argv: j("item", "create", "--kind", "tasks", "--title", "Via flag", "--repo", "api"), want: 0,
-			div: "1: the shim ignores --repo, so it cannot route and exits 3", refWant: 3,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				eq(t, e, "data.id", "api:6")
 				eq(t, e, "data.type", "T")
 			}},
 		ubcase{name: "create/repoflag-from-cwd-wins", cwd: "web", argv: j("item", "create", "--kind", "tasks", "--title", "Via flag", "--repo", "api"), want: 0,
-			div: "1: the shim routes by cwd to web", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.id", "api:6") }},
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.id", "api:6") }},
 		cr("repoflag-and-repos-same", 0, "--kind", "tasks", "--title", "Same", "--repos", "web", "--repo", "web"),
-		ubcase{name: "create/repoflag-and-repos-differ", argv: j("item", "create", "--kind", "tasks", "--title", "Differ", "--repos", "web", "--repo", "api"), want: 2,
-			div: "7: the shim ignores --repo", refWant: 0, skipDB: true},
+		ubcase{name: "create/repoflag-and-repos-differ", argv: j("item", "create", "--kind", "tasks", "--title", "Differ", "--repos", "web", "--repo", "api"), want: 2},
 	)
 
-	// ---- complete (shim)
+	// ---- complete
 	co := func(name, ref string, want int, ch *bool, args ...string) ubcase {
 		return ubcase{name: "complete/" + name, argv: j(append([]string{"item", "complete", ref, "--commit", "abc1234"}, args...)...), want: want, changed: ch}
 	}
@@ -682,13 +525,13 @@ func TestParityA4Umbrella(t *testing.T) {
 	withCwds(co("cwd", "api:T3", 0, yes(), "--no-proof"), "web", "api/src/deep", "docs/deep")
 	// the other repo stays untouched
 	add(ubcase{name: "complete/other-repo-untouched", argv: j("item", "complete", "api:F1", "--commit", "abc1234", "--no-proof"), want: 0, changed: yes(),
-		check: func(t *testing.T, e envl, _ run, dbs map[string]map[string]any) {
+		check: func(t *testing.T, e envl, dbs map[string]map[string]any) {
 			if ubIssue(dbs, "api", 1)["state"] != "closed" || ubIssue(dbs, "web", 1)["state"] != "open" {
 				t.Errorf("api #1 %v, web #1 %v", ubIssue(dbs, "api", 1)["state"], ubIssue(dbs, "web", 1)["state"])
 			}
 		}})
 
-	// ---- reopen / state (shim)
+	// ---- reopen / state
 	for _, c := range []struct {
 		n, ref string
 		ch     *bool
@@ -718,12 +561,12 @@ func TestParityA4Umbrella(t *testing.T) {
 		st("bad-to", "web:B2", "bogus", 2, nil),
 	)
 
-	// ---- claim / release / show / ready / comment / note (old helpers)
-	cl := func(name, ref, as string, want int, check func(*testing.T, envl, run, map[string]map[string]any)) ubcase {
-		return ubcase{name: "claim/" + name, argv: j("item", "claim", ref, "--as", as), old: []string{"hv-item-claim", ref, "--as", as}, want: want, check: check}
+	// ---- claim / release / show / ready / comment / note
+	cl := func(name, ref, as string, want int, check func(*testing.T, envl, map[string]map[string]any)) ubcase {
+		return ubcase{name: "claim/" + name, argv: j("item", "claim", ref, "--as", as), want: want, check: check}
 	}
-	won := func(id, typ string) func(*testing.T, envl, run, map[string]map[string]any) {
-		return func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+	won := func(id, typ string) func(*testing.T, envl, map[string]map[string]any) {
+		return func(t *testing.T, e envl, _ map[string]map[string]any) {
 			eq(t, e, "data.id", id)
 			eq(t, e, "data.type", typ)
 			eq(t, e, "data.changed", true)
@@ -734,7 +577,7 @@ func TestParityA4Umbrella(t *testing.T) {
 		cl("qualified-gl", "api:T3", "w1", 0, won("api:3", "T")),
 		cl("bare-unique", "B4", "w2", 0, won("api:4", "B")),
 		cl("hash-form", "web#5", "w2", 0, won("web:5", "T")),
-		cl("held-by-other", "api:F5", "me", 4, func(t *testing.T, e envl, ref run, _ map[string]map[string]any) {
+		cl("held-by-other", "api:F5", "me", 4, func(t *testing.T, e envl, _ map[string]map[string]any) {
 			eq(t, e, "data.blockedBy", "claimed")
 			eq(t, e, "data.changed", true)
 		}),
@@ -744,15 +587,15 @@ func TestParityA4Umbrella(t *testing.T) {
 		cl("unknown-repo", "nope:F1", "me", 3, nil),
 		cl("closed", "web:T3", "me", 3, nil),
 		cl("bad-as", "web:B2", "a b", 2, nil),
-		cl("only-owner-repo", "api:T3", "w1", 0, func(t *testing.T, e envl, _ run, dbs map[string]map[string]any) {
+		cl("only-owner-repo", "api:T3", "w1", 0, func(t *testing.T, e envl, dbs map[string]map[string]any) {
 			if !ubHas(ubIssue(dbs, "api", 3)["labels"], "in-progress") || ubHas(ubIssue(dbs, "web", 3)["labels"], "in-progress") {
 				t.Errorf("claim label landed on the wrong tracker")
 			}
 		}),
 	)
 	rl := func(name, ref, as string, want int, ch bool) ubcase {
-		return ubcase{name: "release/" + name, argv: j("item", "release", ref, "--as", as), old: []string{"hv-item-release", ref, "--as", as}, want: want,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		return ubcase{name: "release/" + name, argv: j("item", "release", ref, "--as", as), want: want,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if want == 0 {
 					eq(t, e, "data.changed", ch)
 				}
@@ -762,28 +605,25 @@ func TestParityA4Umbrella(t *testing.T) {
 		rl("match", "api:F5", "other", 0, true), rl("no-match", "api:F5", "zzz", 0, false), rl("never-claimed", "web:B2", "me", 0, false),
 		rl("ambiguous", "F1", "me", 2, false), rl("unknown", "web:99", "me", 3, false), rl("closed", "web:T3", "me", 0, false),
 	)
-	show := func(name, ref string, want int, _ bool, check func(*testing.T, envl, run, map[string]map[string]any)) ubcase {
-		return ubcase{name: "show/" + name, argv: j("item", "show", ref), old: []string{"hv-item-show", ref}, want: want, check: check}
+	show := func(name, ref string, want int, _ bool, check func(*testing.T, envl, map[string]map[string]any)) ubcase {
+		return ubcase{name: "show/" + name, argv: j("item", "show", ref), want: want, check: check}
 	}
 	add(
-		show("qualified-gh", "web:F1", 0, true, func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		show("qualified-gh", "web:F1", 0, true, func(t *testing.T, e envl, _ map[string]map[string]any) {
 			eq(t, e, "data.id", "web:1")
 			eq(t, e, "data.type", "F")
 			eq(t, e, "data.milestone", "M07")
 		}),
-		show("qualified-gl-noted", "api:B4", 0, true, func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		show("qualified-gl-noted", "api:B4", 0, true, func(t *testing.T, e envl, _ map[string]map[string]any) {
 			eq(t, e, "data.id", "api:4")
 			eq(t, e, "data.type", "B")
 		}),
-		show("claimed", "api:F5", 0, true, func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.claimedBy", "other") }),
-		show("closed", "api:B2", 0, true, func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.status", "closed") }),
-		show("hash-form", "web#5", 0, true, func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.id", "web:5") }),
-		show("bare-unique", "B4", 0, false, func(t *testing.T, e envl, ref run, _ map[string]map[string]any) {
-			// divergence 6: the old helper prints the bare canonical ID
+		show("claimed", "api:F5", 0, true, func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.claimedBy", "other") }),
+		show("closed", "api:B2", 0, true, func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.status", "closed") }),
+		show("hash-form", "web#5", 0, true, func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.id", "web:5") }),
+		show("bare-unique", "B4", 0, false, func(t *testing.T, e envl, _ map[string]map[string]any) {
+			// item show always prints the qualified ID (rule 11)
 			eq(t, e, "data.id", "api:4")
-			if !strings.HasPrefix(ref.stdout, "[B4]") {
-				t.Errorf("old head %q", strings.SplitN(ref.stdout, "\n", 2)[0])
-			}
 		}),
 		show("ambiguous", "F1", 2, false, nil),
 		show("unknown", "web:F99", 3, false, nil),
@@ -795,24 +635,12 @@ func TestParityA4Umbrella(t *testing.T) {
 		withCwds(show("cwd", "api:F1", 0, true, nil), cw)
 	}
 	rdy := func(name, ref string, want int, ready bool) ubcase {
-		return ubcase{name: "ready/" + name, argv: j("item", "ready", ref), old: []string{"hv-item-ready", ref}, oldMap: ubReadyMap, want: want,
-			check: func(t *testing.T, e envl, ref run, _ map[string]map[string]any) {
+		return ubcase{name: "ready/" + name, argv: j("item", "ready", ref), want: want,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if want == 3 || want == 2 {
 					return
 				}
 				eq(t, e, "data.ready", ready)
-				var got, old []string
-				for _, r := range at(e, "data.reasons").([]any) {
-					got = append(got, r.(string))
-				}
-				for _, l := range strings.Split(strings.TrimSpace(ref.stdout), "\n") {
-					if l != "" {
-						old = append(old, l)
-					}
-				}
-				if !reflect.DeepEqual(got, old) {
-					t.Errorf("reasons %q, old %q", got, old)
-				}
 			}}
 	}
 	add(
@@ -820,29 +648,21 @@ func TestParityA4Umbrella(t *testing.T) {
 		rdy("not-ready", "api:T3", 1, false), rdy("not-ready-bare", "F5", 1, false), rdy("ambiguous", "F1", 2, false), rdy("unknown", "web:99", 3, false),
 	)
 	ca := func(name, ref, kind, body string, want int) ubcase {
-		return ubcase{name: "comment-add/" + name, argv: j("item", "comment", "add", ref, "--kind", kind, "--body-file", "-"),
-			old: []string{"hv-item-comment", ref, "--kind", kind, "--body-file", "-"}, in: body, want: want,
-			check: func(t *testing.T, e envl, ref run, dbs map[string]map[string]any) {
-				if want == 0 {
-					eq(t, e, "data.commentId", strings.TrimSpace(ref.stdout))
-				}
-			}}
+		return ubcase{name: "comment-add/" + name, argv: j("item", "comment", "add", ref, "--kind", kind, "--body-file", "-"), in: body, want: want}
 	}
 	add(
 		ca("gh", "web:B2", "question", "Why?", 0), ca("gl", "api:T3", "decision", "Café ✓", 0), ca("bare-unique", "B4", "answer", "Because", 0),
 		ca("ambiguous", "F1", "question", "x", 2), ca("unknown", "web:99", "question", "x", 3), ca("bad-kind", "web:B2", "bogus", "x", 2),
 		ca("empty", "web:B2", "question", " \n", 2),
 	)
-	cll := func(name, ref string, args []string, want int, oldArgs ...string) ubcase {
-		return ubcase{name: "comment-list/" + name, argv: j(append([]string{"item", "comment", "list", ref}, args...)...),
-			old: append([]string{"hv-item-comment", ref, "--list"}, oldArgs...), want: want, textSame: true}
+	cll := func(name, ref string, args []string, want int) ubcase {
+		return ubcase{name: "comment-list/" + name, argv: j(append([]string{"item", "comment", "list", ref}, args...)...), want: want, textSame: true}
 	}
-	add(cll("gl", "api:B4", nil, 0), cll("kind", "api:B4", []string{"--kind", "question"}, 0, "--kind", "question"),
+	add(cll("gl", "api:B4", nil, 0), cll("kind", "api:B4", []string{"--kind", "question"}, 0),
 		cll("none", "web:B2", nil, 0), cll("ambiguous", "B2", nil, 2), cll("unknown", "api:99", nil, 3), cll("bare-unique", "B4", nil, 0))
 	nadd := func(name, ref, kind, text string, want int, ch bool) ubcase {
-		return ubcase{name: "note-add/" + name, argv: j("item", "note", "add", ref, "--kind", kind, "--body-file", "-"),
-			old: []string{"hv-item-note", ref, "--kind", kind, "--body-file", "-"}, in: text, want: want,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		return ubcase{name: "note-add/" + name, argv: j("item", "note", "add", ref, "--kind", kind, "--body-file", "-"), in: text, want: want,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if want == 0 {
 					eq(t, e, "data.changed", ch)
 				}
@@ -855,20 +675,18 @@ func TestParityA4Umbrella(t *testing.T) {
 		nadd("unknown", "web:99", "proof", "x", 3, false), nadd("bad-kind", "web:B2", "bogus", "x", 2, false),
 	)
 	nshow := func(name, ref, kind string, want int, exists bool) ubcase {
-		return ubcase{name: "note-show/" + name, argv: j("item", "note", "show", ref, "--kind", kind),
-			old: []string{"hv-item-note", ref, "--kind", kind, "--show"}, want: want, textSame: true,
-			check: func(t *testing.T, e envl, ref run, _ map[string]map[string]any) {
+		return ubcase{name: "note-show/" + name, argv: j("item", "note", "show", ref, "--kind", kind), want: want, textSame: true,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if want == 0 {
 					eq(t, e, "data.exists", exists)
-					eq(t, e, "data.body", strings.TrimRight(ref.stdout, "\n"))
 				}
 			}}
 	}
 	add(nshow("design-gh", "web:T5", "design", 0, true), nshow("proof-gl", "api:B4", "proof", 0, true), nshow("absent", "web:B2", "plan", 0, false),
 		nshow("bare-unique", "B4", "proof", 0, true), nshow("ambiguous", "F1", "plan", 2, false), nshow("unknown", "api:99", "plan", 3, false))
 	nrm := func(name, ref, kind string, want int, ch bool) ubcase {
-		return ubcase{name: "note-rm/" + name, argv: j("item", "note", "rm", ref, "--kind", kind), old: []string{"hv-item-note", ref, "--kind", kind, "--rm"}, want: want,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		return ubcase{name: "note-rm/" + name, argv: j("item", "note", "rm", ref, "--kind", kind), want: want,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if want == 0 {
 					eq(t, e, "data.changed", ch)
 				}
@@ -879,8 +697,8 @@ func TestParityA4Umbrella(t *testing.T) {
 
 	// ---- backlog list / ids / milestones / summary
 	add(
-		ubcase{name: "backlog-list/merged", argv: j("backlog", "list"), want: 0, norm: ubNormList,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		ubcase{name: "backlog-list/merged", argv: j("backlog", "list"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				var got []string
 				for _, k := range []string{"bugs", "features", "tasks"} {
 					for _, r := range at(e, "data."+k).([]any) {
@@ -892,15 +710,14 @@ func TestParityA4Umbrella(t *testing.T) {
 					t.Errorf("ids %v, want %v", got, want)
 				}
 			}},
-		ubcase{name: "backlog-list/grep", argv: j("backlog", "list", "--grep", "api"), want: 0, norm: ubNormList,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		ubcase{name: "backlog-list/grep", argv: j("backlog", "list", "--grep", "api"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if n := len(at(e, "data.features").([]any)); n != 2 {
 					t.Errorf("features %d", n)
 				}
 			}},
 		ubcase{name: "backlog-list/repo-narrowed", argv: j("backlog", "list", "--repo", "web"), want: 0,
-			div: "1: the shim ignores --repo and lists both sub-repos", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				for _, k := range []string{"bugs", "features", "tasks"} {
 					for _, r := range at(e, "data."+k).([]any) {
 						if id := r.(map[string]any)["id"].(string); !strings.HasPrefix(id, "web:") {
@@ -911,8 +728,7 @@ func TestParityA4Umbrella(t *testing.T) {
 			}},
 		ubcase{name: "backlog-list/active-stream-hides-its-repos-item", argv: j("backlog", "list"), want: 0,
 			status: `{"active": [{"branch": "feat/x", "repo": "api", "items": ["F1"], "startedAt": "2026-10-01T10:00:00Z"}]}`,
-			div:    "11: the old helper hides every sub-repo's F1; Go hides only the stream's own (api)", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				var got []string
 				for _, r := range at(e, "data.features").([]any) {
 					got = append(got, r.(map[string]any)["id"].(string))
@@ -925,8 +741,7 @@ func TestParityA4Umbrella(t *testing.T) {
 			}},
 		ubcase{name: "backlog-list/active-stream-qualified-item", argv: j("backlog", "list"), want: 0,
 			status: `{"active": [{"branch": "feat/x", "repo": null, "items": ["web:F1"], "startedAt": "2026-10-01T10:00:00Z"}]}`,
-			div:    "11: the old helper compares bare bullet IDs and never hides a qualified one", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				var got []string
 				for _, r := range at(e, "data.features").([]any) {
 					got = append(got, r.(map[string]any)["id"].(string))
@@ -935,8 +750,8 @@ func TestParityA4Umbrella(t *testing.T) {
 					t.Errorf("features %v", got)
 				}
 			}},
-		ubcase{name: "backlog-list/clusters", argv: j("backlog", "list"), want: 0, norm: ubNormList,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		ubcase{name: "backlog-list/clusters", argv: j("backlog", "list"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				cl, _ := at(e, "data.clusters").([]any)
 				if len(cl) != 1 {
 					t.Fatalf("clusters %v", cl)
@@ -948,32 +763,30 @@ func TestParityA4Umbrella(t *testing.T) {
 	)
 	for _, cw := range []string{"web", "api/src/deep", "docs/deep"} {
 		want := map[string]int{"web": 1, "api": 2, "": 3}[ubSubRepoOf(cw)]
-		withCwds(scopeDiv(ubcase{name: "backlog-list/cwd", argv: j("backlog", "list"), want: 0, norm: ubNormList,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		withCwds(ubcase{name: "backlog-list/cwd", argv: j("backlog", "list"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if n := len(at(e, "data.features").([]any)); n != want {
 					t.Errorf("features %d, want %d for cwd %q (scope S)", n, want, cw)
 				}
-			}}, cw), cw)
+			}}, cw)
 	}
 	add(
-		ubcase{name: "backlog-ids/native-milestone", argv: j("backlog", "ids", "--milestone", "M07"), want: 0, norm: ubNormIDs,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.ids.0", "web:1") }},
-		ubcase{name: "backlog-ids/none", argv: j("backlog", "ids", "--milestone", "M99"), want: 0, norm: ubNormIDs},
+		ubcase{name: "backlog-ids/native-milestone", argv: j("backlog", "ids", "--milestone", "M07"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.ids.0", "web:1") }},
+		ubcase{name: "backlog-ids/none", argv: j("backlog", "ids", "--milestone", "M99"), want: 0},
 		ubcase{name: "backlog-ids/no-flag", argv: j("backlog", "ids"), want: 2},
 		ubcase{name: "backlog-milestones/qualified", argv: j("backlog", "milestones", "web:F1"), want: 0,
-			div: "9: the old helper matches the bare bullet ID only, so a qualified ref finds nothing", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.milestones.0", "M07") }},
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.milestones.0", "M07") }},
 		ubcase{name: "backlog-milestones/bare", argv: j("backlog", "milestones", "F1"), want: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) { eq(t, e, "data.milestones.0", "M07") }},
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) { eq(t, e, "data.milestones.0", "M07") }},
 		ubcase{name: "backlog-milestones/untagged", argv: j("backlog", "milestones", "api:F1", "api:T3"), want: 0,
-			div: "9: the old helper matches the bare bullet ID only", refWant: 0,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				if n := len(at(e, "data.milestones").([]any)); n != 0 {
 					t.Errorf("milestones %v", at(e, "data.milestones"))
 				}
 			}},
-		ubcase{name: "summary/merged", argv: j("summary"), want: 0, norm: ubNormIDs, changed: nil,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		ubcase{name: "summary/merged", argv: j("summary"), want: 0, changed: nil,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				eq(t, e, "data.backlog.bugs", float64(2))
 				eq(t, e, "data.backlog.features", float64(3))
 				eq(t, e, "data.backlog.tasks", float64(2))
@@ -985,10 +798,10 @@ func TestParityA4Umbrella(t *testing.T) {
 	)
 	for _, cw := range []string{"web", "docs/deep"} {
 		want := map[string]float64{"web": 1, "": 3}[ubSubRepoOf(cw)]
-		withCwds(scopeDiv(ubcase{name: "summary/cwd", argv: j("summary"), want: 0, norm: ubNormIDs,
-			check: func(t *testing.T, e envl, _ run, _ map[string]map[string]any) {
+		withCwds(ubcase{name: "summary/cwd", argv: j("summary"), want: 0,
+			check: func(t *testing.T, e envl, _ map[string]map[string]any) {
 				eq(t, e, "data.backlog.features", want)
-			}}, cw), cw)
+			}}, cw)
 	}
 
 	// ---- file-only verbs under an issue umbrella are refused
@@ -1021,10 +834,6 @@ func TestParityA4Umbrella(t *testing.T) {
 	}
 }
 
-// cwdDiv marks a scenario whose reference side cannot run from a subdirectory:
-// hv-todo-field and hv-todo-set-field read .hv/config.json from the cwd without
-// self-locating, so they see a file-mode project with no BACKLOG.md (rc 1,
-// exit 3). Go finds the project by walking up, as the conventions say.
 // ubSubRepoOf is the registered sub-repo a fixture cwd is in, "" for the
 // umbrella root and the unregistered docs/ tree.
 func ubSubRepoOf(cw string) string {
@@ -1036,63 +845,17 @@ func ubSubRepoOf(cw string) string {
 	return ""
 }
 
-// scopeDiv marks a read run from inside a sub-repo: Go narrows it to that
-// sub-repo (contract scope S, orchestrator ruling on #119); the shim stays
-// umbrella-wide, so only Go's result is checked.
-func scopeDiv(c ubcase, cw string) ubcase {
-	if ubSubRepoOf(cw) != "" {
-		c.div = "scope S: a sub-repo cwd narrows reads in Go (contract); the shim reads the whole umbrella"
-		c.refWant = 0
-	}
-	return c
-}
-
-func cwdDiv(c ubcase, cw string) ubcase {
-	if cw != "" {
-		c.div = "10: the old helper does not self-locate from a subdirectory"
-		c.refWant = 3
-	}
-	return c
-}
-
-// withShimDrop drops data keys the shim sends and the contract's Go does not
-// (the detail file path of an issue-mode capture).
-func withShimDrop(c ubcase, keys ...string) ubcase {
-	c.shimDrop = keys
-	return c
-}
-
-// ubOldMap is mapIssueOld, plus the contract's exit 2 for an ambiguous bare ID
-// (the old helper's rc 1 with "ambiguous across sub-repos").
-func ubOldMap(rc int, stderr string) int {
-	if rc == 1 && strings.Contains(stderr, "ambiguous across sub-repos") {
-		return 2
-	}
-	return mapIssueOld(rc, stderr)
-}
-
-func ubReadyMap(rc int, stderr string) int {
-	if rc == 1 && strings.Contains(stderr, "ambiguous across sub-repos") {
-		return 2
-	}
-	return readyMapIssue(rc, stderr)
-}
-
 func withCwdCase(c ubcase, cw string) ubcase {
 	c.cwd = cw
 	c.name += "/in-" + strings.ReplaceAll(cw, "/", "_")
 	return c
 }
 
-var _ = exec.Command
-
-// TestParityA4UmbrellaFile runs the item verbs in a file-backend umbrella: one
+// suiteA4UmbrellaFile runs the item verbs in a file-backend umbrella: one
 // BACKLOG.md at the umbrella root, sub-repos registered in .hv/repos.json, the
 // verbs run from the root, a sub-repo or a deep directory, with --repo valid
-// and unregistered. The old helpers self-locate to the umbrella .hv/; the
-// exceptions (hv-todo-field and hv-todo-set-field, which read .hv/ from the
-// cwd) are marked with a divergence where the scenario runs below the root.
-func TestParityA4UmbrellaFile(t *testing.T) {
+// and unregistered. Field verbs run below the root are marked goOnly.
+func suiteA4UmbrellaFile(t *testing.T) {
 	var all []scn
 	add := func(s ...scn) { all = append(all, s...) }
 	umb := umbFx
@@ -1121,32 +884,28 @@ func TestParityA4UmbrellaFile(t *testing.T) {
 			mk("create-no-repos", scn{argv: j("item", "create", "--kind", "features", "--title", "None", "--tag", "Minor"), want: 0}),
 			mk("raw-file", scn{argv: j("item", "create", "--kind", "bugs", "--raw-file", "raw.md"), want: 0}),
 			mk("idnext", scn{argv: j("id", "next", "--kind", "bugs"), want: 0}),
-			mk("ready", scn{argv: j("item", "ready", "B01"), old: []string{"hv-item-ready", "B01"}, want: 0}),
-			mk("comment-add", scn{argv: j("item", "comment", "add", "B01", "--kind", "question", "--body-file", "-"), in: "Why?", want: 0,
-				old: []string{"hv-item-comment", "B01", "--kind", "question", "--body-file", "-"}}),
+			mk("ready", scn{argv: j("item", "ready", "B01"), want: 0}),
+			mk("comment-add", scn{argv: j("item", "comment", "add", "B01", "--kind", "question", "--body-file", "-"), in: "Why?", want: 0}),
 			mk("rm-preview", scn{argv: j("item", "rm", "B03"), want: 0}),
 			mk("rm-apply", scn{argv: j("item", "rm", "B03", "--apply"), want: 0}),
-			mk("shipped", scn{argv: j("item", "shipped", "parser-core lexer-v2"), want: map[bool]int{true: 0, false: 1}[cw == ""], old: []string{"hv-capture-audit", "parser-core lexer-v2"},
-				oldMap: func(rc int, _ string) int { return map[int]int{2: 0, 0: 1, 1: 2}[rc] }}),
+			mk("shipped", scn{argv: j("item", "shipped", "parser-core lexer-v2"), want: map[bool]int{true: 0, false: 1}[cw == ""]}),
 		)
-		// the field verbs read .hv/ from the cwd in the old helpers
+		// the field verbs run below the root are goOnly
 		fget := mk("fieldget-repos", scn{argv: j("item", "field", "get", "B03", "--name", "repos"), want: 0,
-			check: func(t *testing.T, e envl, _ run) { eq(t, e, "data.value", "web") }})
+			check: func(t *testing.T, e envl) { eq(t, e, "data.value", "web") }})
 		fset := mk("fieldset-repos", scn{argv: j("item", "field", "set", "B03", "--name", "repos", "--value", "web, api"), want: 0})
 		flst := mk("fieldlist", scn{argv: j("item", "field", "list", "B03"), want: 0})
 		if cw != "" {
-			// divergence 10: the old hv-todo-field and hv-todo-set-field do not
-			// self-locate, so the reference exits 3 below the root; Go's own
-			// result is asserted instead
+			// Go finds the project by walking up, so these work below the root
 			for _, f := range []*scn{&fget, &fset, &flst} {
 				f.goOnly = true
 				f.name += "/go-only"
 			}
-			fset.check = func(t *testing.T, e envl, _ run) {
+			fset.check = func(t *testing.T, e envl) {
 				eq(t, e, "data.changed", true)
 				eq(t, e, "data.value", "web, api")
 			}
-			flst.check = func(t *testing.T, e envl, _ run) { eq(t, e, "data.fields.repos", "web") }
+			flst.check = func(t *testing.T, e envl) { eq(t, e, "data.fields.repos", "web") }
 		}
 		add(fget, fset, flst)
 	}
@@ -1167,8 +926,7 @@ func TestParityA4UmbrellaFile(t *testing.T) {
 	} {
 		c := c
 		reg := append(append([]string{}, c.argv...), "--repo", "web")
-		add(scn{name: "repoflag-registered/" + c.n, fx: umb, argv: reg, want: c.want,
-			div: "1: the shim only validates --repo on item verbs; file mode keeps one backlog, so the result is the unscoped one", refWant: c.want})
+		add(scn{name: "repoflag-registered/" + c.n, fx: umb, argv: reg, want: c.want})
 		bad := append(append([]string{}, c.argv...), "--repo", "nope")
 		add(scn{name: "repoflag-unregistered/" + c.n, fx: umb, argv: bad, want: 3})
 	}

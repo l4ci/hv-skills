@@ -1,1 +1,1 @@
-{"inputs":{"files":{"config.json":"[1, 2]\n","config.local.json":"{\"a\": 1}\n"},"script":"import json, sys\nfrom hvlib_io import load_config\nprint(json.dumps(load_config(sys.argv[1]), indent=2), end=\"\")"},"outputs":"{\n  \"a\": 1\n}"}
+{"inputs":{"files":{"config.json":"[1, 2]\n","config.local.json":"{\"a\": 1}\n"}},"outputs":"{\n  \"a\": 1\n}"}

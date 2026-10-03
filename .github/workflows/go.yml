@@ -16,5 +16,5 @@ jobs:
           go-version-file: go.mod
       - run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
-      # python3 is on the runner, so the oracle-backed parity tests run too (they go with the legacy scripts).
+      # python3 is on the runner: the fake gh/glab in test/fakes are Python, and internal/worker still runs the legacy bin/ helpers.
       - run: go test ./...

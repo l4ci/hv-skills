@@ -16,7 +16,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/tracker"
 )
 
-// wStep is one backend call; the same JSON drives the Python IssueBackend.
+// wStep is one backend call; recorded as golden input; the Python IssueBackend ran it.
 type wStep struct {
 	Op      string      `json:"op"`
 	Ref     string      `json:"ref"`
@@ -61,197 +61,7 @@ type wScenario struct {
 	Steps      []wStep        `json:"steps"`
 }
 
-const pyWrites = `import json, os, sys
-import hvlib_backend as hb
-from hvlib_backend import IssueBackend, ProofMissing
-from hvlib_tracker import TrackerError
-
-class Stub:
-    def __init__(self, s):
-        self.calls = []
-        self.next_comment = 0
-        self.milestones = s["milestones"]
-        self.issues = []
-        for i in s["issues"]:
-            self.issues.append(dict(number=i["number"], title=i["title"], body=i["body"], labels=list(i["labels"] or []),
-                milestone=i["milestone"] or None, state=i["state"], state_reason=i["state_reason"] or None,
-                closed_at=None, url="https://example.test/issues/%d" % i["number"],
-                assignees=list(i["assignees"] or []), comments=[]))
-        for c in s["comments"]:
-            self._add(self._find(c["issue"]), c["body"])
-        self.calls = []
-    def rec(self, m, *a):
-        self.calls.append({"method": m, "args": list(a)})
-    def _find(self, n):
-        for i in self.issues:
-            if i["number"] == n:
-                return i
-        raise TrackerError(1, "issue #%d not found" % n)
-    def _add(self, issue, body):
-        self.next_comment += 1
-        issue["comments"].append({"id": self.next_comment, "body": body, "author": "fake-user"})
-        return self.next_comment
-    def get(self, number, comments=False):
-        self.rec("get", number)
-        i = dict(self._find(number))
-        i["labels"] = list(i["labels"]); i["assignees"] = list(i["assignees"])
-        del i["comments"]
-        return i
-    def create(self, title, body, labels=(), milestone=None):
-        self.rec("create", title, body, list(labels), milestone or "")
-        n = max([i["number"] for i in self.issues] + [0]) + 1
-        self.issues.append(dict(number=n, title=title, body=body, labels=list(labels), milestone=milestone or None,
-            state="open", state_reason=None, closed_at=None, url="https://example.test/issues/%d" % n,
-            assignees=[], comments=[]))
-        return n
-    def edit(self, number, title=None, body=None, add_labels=(), remove_labels=(), milestone=None, remove_milestone=False):
-        m = {}
-        if title is not None: m["title"] = title
-        if body is not None: m["body"] = body
-        if add_labels: m["add_labels"] = list(add_labels)
-        if remove_labels: m["remove_labels"] = list(remove_labels)
-        if milestone: m["milestone"] = milestone
-        if remove_milestone: m["remove_milestone"] = True
-        self.rec("edit", number, m)
-        i = self._find(number)
-        if title is not None: i["title"] = title
-        if body is not None: i["body"] = body
-        for l in add_labels:
-            if l not in i["labels"]: i["labels"].append(l)
-        i["labels"] = [l for l in i["labels"] if l not in remove_labels]
-        if milestone: i["milestone"] = milestone
-        if remove_milestone: i["milestone"] = None
-    def ensure_labels(self, names, auto_create=True):
-        self.rec("ensure_labels", list(names), bool(auto_create))
-    def add_labels(self, number, labels, auto_create=True):
-        self.rec("add_labels", number, list(labels), bool(auto_create))
-        i = self._find(number)
-        for l in labels:
-            if l not in i["labels"]: i["labels"].append(l)
-    def remove_labels(self, number, labels):
-        self.rec("remove_labels", number, list(labels))
-        i = self._find(number)
-        i["labels"] = [l for l in i["labels"] if l not in labels]
-    def close(self, number, reason="completed", comment=None):
-        reason = reason or "completed"
-        self.rec("close", number, reason, comment or "")
-        i = self._find(number)
-        i["state"] = "closed"; i["state_reason"] = reason
-        if comment: self._add(i, comment)
-    def reopen(self, number):
-        self.rec("reopen", number)
-        i = self._find(number)
-        i["state"] = "open"; i["state_reason"] = None
-    def assign_self(self, number):
-        self.rec("assign_self", number)
-        i = self._find(number)
-        if "fake-user" not in i["assignees"]: i["assignees"].append("fake-user")
-    def comments(self, number):
-        self.rec("comments", number)
-        return [dict(c) for c in self._find(number)["comments"]]
-    def add_comment(self, number, body):
-        self.rec("add_comment", number, body)
-        return self._add(self._find(number), body)
-    def edit_comment(self, number, comment_id, body):
-        self.rec("edit_comment", number, str(comment_id), body)
-        for c in self._find(number)["comments"]:
-            if c["id"] == comment_id:
-                c["body"] = body
-                return
-        raise TrackerError(1, "comment %s not found" % comment_id)
-    def delete_comment(self, number, comment_id):
-        self.rec("delete_comment", number, str(comment_id))
-        i = self._find(number)
-        i["comments"] = [c for c in i["comments"] if c["id"] != comment_id]
-    def find_milestone(self, hv_id):
-        self.rec("find_milestone", hv_id)
-        for t in self.milestones:
-            if t == hv_id or (len(t) > len(hv_id) and t.startswith(hv_id) and t[len(hv_id)] in " \t"):
-                return t
-        return None
-
-def make_gate(b):
-    def gate(item_id, reason, proof_show):
-        if reason == "done" and proof_show:
-            content = b.note_get(item_id, "proof")
-            rows = []
-            if content:
-                span = hb.find_section(content, "Proof")
-                if span:
-                    rows = [l for l in content[span[0]:span[1]].splitlines() if l.startswith("- ")]
-            if not rows:
-                raise ProofMissing("proof missing")
-    return gate
-
-def step(b, st):
-    op = st["op"]
-    ref = st["ref"]
-    if op == "create":
-        fields = {}
-        for n, v in (st["fields"] or []):
-            fields[n] = v
-        body = st["body"].encode() if st["body"] is not None else None
-        return b.create(st["kind"], st["title"], st["tag"], st["desc"], fields, body)
-    if op == "set_field":
-        return b.set_field(ref, st["field"], st["value"])
-    if op == "complete":
-        return b.complete(ref, "abc1234", "2026-01-02", st["reason"], st["note"], None if st["noproof"] else "x")
-    if op == "reopen":
-        return b.uncomplete(ref) == "restored"
-    if op == "ready":
-        return b.ready_reasons(ref)
-    if op == "comments":
-        return b.comments_list(ref, st["kind"] or None)
-    if op == "comment_add":
-        return str(b.comment_add(ref, st["kind"], st["text"]))
-    if op == "note_get":
-        return b.note_get(ref, st["kind"])
-    if op == "note_put":
-        return b.note_put(ref, st["kind"], st["text"])
-    if op == "note_rm":
-        return b.note_rm(ref, st["kind"])
-    if op == "claim":
-        won, holder = b.claim(ref, st["id"])
-        return [won, holder]
-    if op == "release":
-        return b.release(ref, st["id"])
-    if op == "set_state":
-        return b.set_state(ref, st["state"])
-    if op == "status":
-        return b.status(ref)
-    raise SystemExit("bad op " + op)
-
-out = []
-for s in json.load(open(sys.argv[1])):
-    os.environ["HV_NOTE_LIMIT"] = s["limit"]
-    stub = Stub(s)
-    b = IssueBackend(json.loads(s["cfg"]))
-    b._adapter = stub
-    hb._proof_gate = make_gate(b)
-    res = []
-    for st in s["steps"]:
-        stub.calls = []
-        try:
-            r = {"k": "ok", "v": step(b, st)}
-        except ProofMissing:
-            r = {"k": "proofmissing"}
-        except TrackerError as e:
-            r = {"k": "tracker:%d" % e.code}
-        except LookupError:
-            r = {"k": "notfound"}
-        except ValueError:
-            r = {"k": "invalid"}
-        except Exception as e:
-            r = {"k": "crash:" + type(e).__name__}
-        res.append({"result": r, "calls": stub.calls})
-    final = []
-    for i in sorted(stub.issues, key=lambda i: i["number"]):
-        final.append([i["number"], i["title"], i["body"], i["labels"], i["milestone"] or "", i["state"],
-                      i["state_reason"] or "", i["assignees"], [[str(c["id"]), c["body"]] for c in i["comments"]]])
-    out.append({"steps": res, "final": final})
-print(json.dumps(out))`
-
-// writeErrKind is the normalized error class shared with the Python harness.
+// writeErrKind is the normalized error class recorded with the Python harness.
 func writeErrKind(err error) string {
 	var te *tracker.Error
 	switch {
@@ -630,7 +440,7 @@ func TestIssueWritesMatchPython(t *testing.T) {
 		scen = append(scen, s)
 	}
 	var want []map[string]any
-	pytest.GoldenJSON(t, pyWrites, scen, &want)
+	pytest.GoldenJSON(t, scen, &want)
 
 	steps, bad := 0, 0
 	for i, s := range scen {

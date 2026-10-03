@@ -1,14 +1,11 @@
 package main
 
-// Scenarios for the A4 backlog views, summary, status and refactor verbs (#48),
-// on the differential harness of parity_a4_test.go. Shim-backed verbs (backlog
-// list, summary, backlog archive, status add, status rm) are compared with
-// test/hv-shim: exit code, envelope and the whole .hv/ tree. The rest run the
-// old helper directly, as the contract's `old:` line says, and check the Go
-// envelope against what the old output implies.
+// Go-only scenarios for the A4 backlog views, summary, status and refactor verbs
+// (#48), on the harness of harness_test.go. Each scenario runs the Go binary and
+// checks the exit code and its own assertions; frozen_test.go then compares the
+// run with the frozen record, which pins the envelope and the .hv/ changes.
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,68 +17,6 @@ import (
 )
 
 // ---- shared pieces -----------------------------------------------------------
-
-// dropIn removes key from every object of the list at path ("data.inProgress").
-func dropIn(path, key string) func(envl) envl {
-	return func(e envl) envl {
-		if l, ok := at(e, path).([]any); ok {
-			for _, it := range l {
-				if m, ok := it.(map[string]any); ok {
-					delete(m, key)
-				}
-			}
-		}
-		return e
-	}
-}
-
-// trunc10 cuts the startedAt of the In Progress rows to the date: the shim
-// reads them back from the Markdown table when it cannot match an entry's
-// items (a CSV string), which only has the date.
-func trunc10(e envl) envl {
-	if l, ok := at(e, "data.inProgress").([]any); ok {
-		for _, it := range l {
-			if m, ok := it.(map[string]any); ok {
-				if s, ok := m["startedAt"].(string); ok && len(s) > 10 {
-					m["startedAt"] = s[:10]
-				}
-			}
-		}
-	}
-	return e
-}
-
-func withNorm(s scn, n func(envl) envl) scn { s.norm = n; return s }
-
-// csvEntries turns a CSV-string `items` of the entries into a list: the shim
-// passes the stored string through, the contract wants []string.
-func csvEntries(e envl) envl {
-	if l, ok := at(e, "data.entries").([]any); ok {
-		for _, it := range l {
-			if m, ok := it.(map[string]any); ok {
-				if str, ok := m["items"].(string); ok {
-					var out []any
-					for _, p := range strings.Split(str, ",") {
-						if p = strings.TrimSpace(p); p != "" {
-							out = append(out, p)
-						}
-					}
-					m["items"] = out
-				}
-			}
-		}
-	}
-	return e
-}
-
-func chain(fns ...func(envl) envl) func(envl) envl {
-	return func(e envl) envl {
-		for _, f := range fns {
-			e = f(e)
-		}
-		return e
-	}
-}
 
 func strs(v any) []string {
 	out := []string{}
@@ -102,31 +37,20 @@ func lines(s string) []string {
 	return out
 }
 
-// checkLines compares the string list at path with the lines the old helper printed.
-func checkLines(path string) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
-		t.Helper()
-		got, want := strs(at(e, path)), lines(ref.stdout)
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("%s = %q, old printed %q", path, got, want)
-		}
-	}
-}
-
-func both(fs ...func(t *testing.T, e envl, ref run)) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
+func both(fs ...func(t *testing.T, e envl)) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) {
 		t.Helper()
 		for _, f := range fs {
-			f(t, e, ref)
+			f(t, e)
 		}
 	}
 }
 
-func eqCheck(path string, want any) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, _ run) { t.Helper(); eq(t, e, path, want) }
+func eqCheck(path string, want any) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) { t.Helper(); eq(t, e, path, want) }
 }
 
-func blocked(t *testing.T, e envl, _ run) {
+func blocked(t *testing.T, e envl) {
 	t.Helper()
 	eq(t, e, "data.blockedBy", "backend")
 	eq(t, e, "data.changed", false)
@@ -174,82 +98,81 @@ const stUmb = `{
 
 // ---- the scenarios ---------------------------------------------------------------
 
-func TestParityA4B(t *testing.T) {
+func suiteA4B(t *testing.T) {
 	var all []scn
 	add := func(s ...scn) { all = append(all, s...) }
-	listNorm := dropIn("data.inProgress", "type") // the shim rows have no `type`; the contract has one
 
-	// ---- backlog list (shim)
+	// ---- backlog list
 	const bl = "# TODO\n\n## Bugs\n"
 	add(
-		scn{name: "list/std", argv: j("backlog", "list"), want: 0, text: true, norm: listNorm,
-			check: func(t *testing.T, e envl, _ run) {
+		scn{name: "list/std", argv: j("backlog", "list"), want: 0, text: true,
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "data.bugs.0.id", "B01")
 				eq(t, e, "data.bugs.0.priority", "P1")
 				eq(t, e, "data.features.0.size", "Minor")
 				eq(t, e, "data.clusters.0.0", "B01")
 			}},
-		scn{name: "list/no-backlog", fx: fx{noBacklog: true}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+		scn{name: "list/no-backlog", fx: fx{noBacklog: true}, argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/empty-sections", fx: fx{backlog: "# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/no-sections", fx: fx{backlog: "# TODO\n"}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-title", argv: j("backlog", "list", "--grep", "first"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-upper", argv: j("backlog", "list", "--grep", "SECOND"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-related", argv: j("backlog", "list", "--grep", "[F01]"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-field-text", argv: j("backlog", "list", "--grep", "capture"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-none", argv: j("backlog", "list", "--grep", "zzzz"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-empty", argv: j("backlog", "list", "--grep", ""), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-equals-form", argv: j("backlog", "list", "--grep=task"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-keeps-cluster", argv: j("backlog", "list", "--grep", "Second bug"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/grep-spaces-and-dot", argv: j("backlog", "list", "--grep", "parser. dotted"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/active-one", fx: fx{status: stFile}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm,
-			check: func(t *testing.T, e envl, _ run) {
+			argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/no-sections", fx: fx{backlog: "# TODO\n"}, argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/grep-title", argv: j("backlog", "list", "--grep", "first"), want: 0, text: true},
+		scn{name: "list/grep-upper", argv: j("backlog", "list", "--grep", "SECOND"), want: 0, text: true},
+		scn{name: "list/grep-related", argv: j("backlog", "list", "--grep", "[F01]"), want: 0, text: true},
+		scn{name: "list/grep-field-text", argv: j("backlog", "list", "--grep", "capture"), want: 0, text: true},
+		scn{name: "list/grep-none", argv: j("backlog", "list", "--grep", "zzzz"), want: 0, text: true},
+		scn{name: "list/grep-empty", argv: j("backlog", "list", "--grep", ""), want: 0, text: true},
+		scn{name: "list/grep-equals-form", argv: j("backlog", "list", "--grep=task"), want: 0, text: true},
+		scn{name: "list/grep-keeps-cluster", argv: j("backlog", "list", "--grep", "Second bug"), want: 0, text: true},
+		scn{name: "list/grep-spaces-and-dot", argv: j("backlog", "list", "--grep", "parser. dotted"), want: 0, text: true},
+		scn{name: "list/active-one", fx: fx{status: stFile}, argv: j("backlog", "list"), want: 0, text: true,
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "data.inProgress.0.id", "B02")
 				eq(t, e, "data.inProgress.0.type", "B")
 				eq(t, e, "data.inProgress.0.title", "[P2] Second bug")
 				eq(t, e, "data.inProgress.0.startedAt", "2026-09-01T10:00:00Z")
 			}},
-		scn{name: "list/active-two-branches", fx: fx{status: stTwo}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/active-not-filtered-by-grep", fx: fx{status: stFile}, argv: j("backlog", "list", "--grep", "task"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/active-no-match-message", fx: fx{status: stFile}, argv: j("backlog", "list", "--grep", "zzz"), want: 0, text: true, norm: listNorm},
+		scn{name: "list/active-two-branches", fx: fx{status: stTwo}, argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/active-not-filtered-by-grep", fx: fx{status: stFile}, argv: j("backlog", "list", "--grep", "task"), want: 0, text: true},
+		scn{name: "list/active-no-match-message", fx: fx{status: stFile}, argv: j("backlog", "list", "--grep", "zzz"), want: 0, text: true},
 		scn{name: "list/active-csv-items", fx: fx{status: `{"active": [{"branch": "b", "repo": null, "items": "B01, F01", "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`},
-			argv: j("backlog", "list"), want: 0, text: true, norm: chain(listNorm, trunc10)},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/active-no-items", fx: fx{status: `{"active": [{"branch": "b", "repo": null, "items": [], "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/active-unknown-id", fx: fx{status: `{"active": [{"branch": "b", "repo": null, "items": ["B99", "T01"], "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/active-no-started", fx: fx{status: `{"active": [{"branch": "b", "repo": null, "items": ["T01"]}]}`},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/active-corrupt-status", fx: fx{status: "{not json"}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/active-repo-column", fx: withFx(umbFx, func(f *fx) { f.status = stUmb }), argv: j("backlog", "list"), want: 0, text: true, norm: listNorm,
-			check: func(t *testing.T, e envl, _ run) { eq(t, e, "data.inProgress.0.repo", "web") }},
+			argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/active-corrupt-status", fx: fx{status: "{not json"}, argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/active-repo-column", fx: withFx(umbFx, func(f *fx) { f.status = stUmb }), argv: j("backlog", "list"), want: 0, text: true,
+			check: func(t *testing.T, e envl) { eq(t, e, "data.inProgress.0.repo", "web") }},
 		scn{name: "list/sort-bug-prio", fx: fx{backlog: bl + "- **[B01] [P2] two.** a\n- **[B02] [P0] zero.** b\n- **[B03] none.** c\n- **[B04] [P1] one.** d\n- **[B05] [P9] odd.** e\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/sort-feature-size", fx: fx{backlog: "# TODO\n\n## Features\n- **[F01] [Major] big.** a\n- **[F02] [Cosmetic] tiny.** b\n- **[F03] none.** c\n- **[F04] [Minor] mid.** d\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/milestone-column", fx: fx{backlog: bl + "- **[B01] [P1] a.** x Milestone: M01\n- **[B02] [P1] b.** y\n- **[B03] [P1] c.** z Milestone: M01, M03\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/milestone-only-features", fx: fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] a.** x\n\n## Features\n- **[F01] [Major] f.** y Milestone: M02\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/clusters-chain-and-pair", fx: fx{backlog: bl + "- **[B01] [P1] a.** x Related: [B02]\n- **[B02] [P1] b.** y\n- **[B03] [P1] c.** z Related: [B04], [F01]\n- **[B04] [P1] d.** w\n- **[B05] [P1] lonely.** v Related: [B77]\n\n## Features\n- **[F01] [Major] f.** u\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/clusters-grep-one-member", fx: fx{backlog: bl + "- **[B01] [P1] alpha.** x Related: [B02]\n- **[B02] [P1] beta.** y\n- **[B03] [P1] gamma.** z Related: [B04]\n- **[B04] [P1] delta.** w\n"},
-			argv: j("backlog", "list", "--grep", "gamma"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/clusters-with-active-member", fx: fx{status: stFile}, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list", "--grep", "gamma"), want: 0, text: true},
+		scn{name: "list/clusters-with-active-member", fx: fx{status: stFile}, argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/related-trailing-dot", fx: fx{backlog: bl + "- **[B01] [P1] a.** x Related: [B02]. Milestone: M01\n- **[B02] [P1] b.** y\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/indented-bullet", fx: fx{backlog: bl + "- **[B01] [P1] a.** x\n  - **[B02] [P1] nested.** y\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/duplicate-ids", fx: fx{backlog: bl + "- **[B01] [P1] a.** x\n- **[B01] [P2] again.** y\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/no-period-title", fx: fx{backlog: "# TODO\n\n## Tasks\n- **[T01] No period**\n- **[T02] With. period** rest\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
 		scn{name: "list/unicode-title", fx: fx{backlog: bl + "- **[B01] [P1] Größe — naïve.** Zeile Related: [B02]\n- **[B02] [P1] 日本語.** y\n"},
-			argv: j("backlog", "list", "--grep", "GRÖSSE"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list", "--grep", "GRÖSSE"), want: 0, text: true},
 		scn{name: "list/completed-only", fx: fx{backlog: "# TODO\n\n## Completed\n- ~~**[B01] [P1] Done.** x~~ Done 2026-09-30 [`abc1234`]\n"},
-			argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/umbrella-no-repo", fx: umbFx, argv: j("backlog", "list"), want: 0, text: true, norm: listNorm},
-		scn{name: "list/umbrella-repo-registered", fx: umbFx, argv: j("backlog", "list", "--repo", "web"), want: 0, text: true, norm: listNorm},
+			argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/umbrella-no-repo", fx: umbFx, argv: j("backlog", "list"), want: 0, text: true},
+		scn{name: "list/umbrella-repo-registered", fx: umbFx, argv: j("backlog", "list", "--repo", "web"), want: 0, text: true},
 		scn{name: "list/umbrella-repo-unregistered", fx: umbFx, argv: j("backlog", "list", "--repo", "nope"), want: 3},
 		scn{name: "list/repo-outside-umbrella", argv: j("backlog", "list", "--repo", "web"), want: 3},
 		scn{name: "list/positional", argv: j("backlog", "list", "extra"), want: 2},
@@ -263,8 +186,7 @@ func TestParityA4B(t *testing.T) {
 	// ---- backlog ids (hv-todo-by-milestone)
 	idsOf := func(name string, f fx, mid string, extra ...string) scn {
 		return scn{name: "ids/" + name, fx: f, argv: j(append([]string{"backlog", "ids", "--milestone", mid}, extra...)...),
-			old: []string{"hv-todo-by-milestone", mid}, want: 0,
-			check: both(checkLines("data.ids"), eqCheck("data.milestone", mid))}
+			want: 0, check: eqCheck("data.milestone", mid)}
 	}
 	msFx := fx{backlog: bl + "- **[B01] [P1] a.** x Milestone: M01\n- **[B02] [P1] b.** y Milestone: M01, M03\n- **[B03] [P1] c.** z Milestone: M03\n  - **[B04] [P1] indented.** w Milestone: M01\n\n## Features\n- **[F01] [Major] f.** u Milestone: M03\n\n## Tasks\n- **[T01] t.** v Milestone: M01\n\n## Completed\n- ~~**[B09] [P1] done.** q Milestone: M01~~ Done 2026-09-30 [`abc`]\n"}
 	add(
@@ -289,7 +211,7 @@ func TestParityA4B(t *testing.T) {
 	// ---- backlog milestones (hv-find-milestone-for-items)
 	mil := func(name string, f fx, items ...string) scn {
 		return scn{name: "milestones/" + name, fx: f, argv: j(append([]string{"backlog", "milestones"}, items...)...),
-			old: append([]string{"hv-find-milestone-for-items"}, items...), want: 0, check: checkLines("data.milestones")}
+			want: 0}
 	}
 	numFx := fx{backlog: bl + "- **[B01] [P1] a.** x Milestone: M10, M2\n- **[B02] [P1] b.** y Milestone: M2, M03\n- **[B03] [P1] c.** z\n\n## Completed\n- ~~**[B09] [P1] done.** q Milestone: M07~~ Done 2026-09-30 [`abc`]\n"}
 	add(
@@ -308,20 +230,7 @@ func TestParityA4B(t *testing.T) {
 		scn{name: "milestones/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, want: 5, argv: j("backlog", "milestones", "12")},
 	)
 
-	// ---- summary (shim)
-	sumNorm := chain(dropIn("data.recent", "type"), func(e envl) envl {
-		// an entry without items: the shim reads "?" back as an item; the contract says none.
-		if l, ok := at(e, "data.active").([]any); ok {
-			for _, it := range l {
-				if m, ok := it.(map[string]any); ok {
-					if its, _ := m["items"].([]any); len(its) == 1 && its[0] == "?" {
-						m["items"] = []any{}
-					}
-				}
-			}
-		}
-		return e
-	})
+	// ---- summary
 	know := func(n int) string {
 		var b strings.Builder
 		b.WriteString("# Knowledge\n\npreamble\n")
@@ -344,7 +253,7 @@ func TestParityA4B(t *testing.T) {
 		return s + "---\n\nbody\n"
 	}
 	sum := func(name string, f fx) scn {
-		return scn{name: "summary/" + name, fx: f, argv: j("summary"), want: 0, text: true, norm: sumNorm}
+		return scn{name: "summary/" + name, fx: f, argv: j("summary"), want: 0, text: true}
 	}
 	add(variants(sum("std", fx{}))...)
 	add(
@@ -385,11 +294,11 @@ func TestParityA4B(t *testing.T) {
 		scn{name: "summary/no-hv", fx: fx{noHV: true}, argv: j("summary"), want: 3},
 		scn{name: "summary/positional", argv: j("summary", "x"), want: 2, goOnly: true},
 		scn{name: "summary/repo-unregistered", fx: umbFx, argv: j("summary", "--repo", "nope"), want: 3},
-		scn{name: "summary/repo-registered", fx: umbFx, argv: j("summary", "--repo", "web"), want: 0, text: true, norm: sumNorm},
+		scn{name: "summary/repo-registered", fx: umbFx, argv: j("summary", "--repo", "web"), want: 0, text: true},
 		scn{name: "summary/issues-backend", fx: fx{config: issuesConfig}, goOnly: true, want: 5, argv: j("summary")},
 		scn{name: "summary/topic-names-with-commas-kept-whole", goOnly: true, want: 0,
 			fx:   fx{files: map[string]string{".hv/KNOWLEDGE.md": "# K\n\n## One, two\nx\n\n## Three\ny\n"}},
-			argv: j("summary"), check: func(t *testing.T, e envl, _ run) {
+			argv: j("summary"), check: func(t *testing.T, e envl) {
 				eq(t, e, "data.knowledge.count", float64(2))
 				if got := strs(at(e, "data.knowledge.topics")); !reflect.DeepEqual(got, []string{"One, two", "Three"}) {
 					t.Errorf("topics = %q", got)
@@ -397,7 +306,7 @@ func TestParityA4B(t *testing.T) {
 			}},
 	)
 
-	// ---- backlog archive (shim)
+	// ---- backlog archive
 	arch := "# TODO\n\n## Bugs\n- **[B01] [P1] a.** x\n\n## Completed\n" +
 		"- ~~**[B02] [P1] old.** x~~ Done {d30} [`abc1234`]\n" +
 		"- ~~**[B03] [P1] mid.** x~~ Done {d6} [`abc1234`]\n" +
@@ -439,7 +348,7 @@ func TestParityA4B(t *testing.T) {
 		ar("no-hv", fx{noHV: true}, 3),
 		scn{name: "archive/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "archive"), want: 4, check: blocked},
 		scn{name: "archive/invalid-date-line", fx: fx{backlog: "# TODO\n\n## Completed\n- ~~**[B02] [P1] a.** x~~ Done 2026-13-45 [`abc`]\n"},
-			argv: j("backlog", "archive"), want: 70, div: "the helper crashes on a calendar-invalid date (rc 1, shim maps it to 3), writing nothing; hv exits 70 and writes nothing", refWant: 3},
+			argv: j("backlog", "archive"), want: 70}, // a calendar-invalid date: hv exits 70 and writes nothing
 		scn{name: "archive/repo-registered", fx: withFx(umbFx, func(f *fx) { f.backlog = arch }), argv: j("backlog", "archive", "--repo", "web"), want: 0},
 		scn{name: "archive/repo-unregistered", fx: umbFx, argv: j("backlog", "archive", "--repo", "x"), want: 3},
 	)
@@ -447,26 +356,12 @@ func TestParityA4B(t *testing.T) {
 	// ---- backlog stale (hv-staleness)
 	today := "2026-10-02"
 	stale := func(name string, f fx, kind, todayV string, days int, want int) scn {
-		old := []string{"hv-staleness", kind, "--today", todayV}
 		argv := []string{"backlog", "stale", "--kind", kind}
 		if days >= 0 {
-			old = append(old, "--days", strconv.Itoa(days))
 			argv = append(argv, "--days", strconv.Itoa(days))
 		}
-		return scn{name: "stale/" + name, fx: f, argv: j(argv...), old: old, want: want, env: []string{"HV_TEST_TODAY=" + todayV},
-			check: func(t *testing.T, e envl, ref run) {
-				t.Helper()
-				var got []string
-				l, _ := at(e, "data.entries").([]any)
-				for _, it := range l {
-					m := it.(map[string]any)
-					got = append(got, fmt.Sprintf("%v %v", m["name"], m["date"]))
-				}
-				if want := lines(ref.stdout); !reflect.DeepEqual(append([]string{}, got...), append([]string{}, want...)) && !(len(got) == 0 && len(want) == 0) {
-					t.Errorf("entries = %q, old printed %q", got, want)
-				}
-				eq(t, e, "data.kind", kind)
-			}}
+		return scn{name: "stale/" + name, fx: f, argv: j(argv...), want: want, env: []string{"HV_TEST_TODAY=" + todayV},
+			check: eqCheck("data.kind", kind)}
 	}
 	todoFx := fx{backlog: "# TODO\n\n## Bugs\n- **[B01] [P1] old.** x Captured: 2026-01-01\n- **[B02] [P1] fresh.** y Captured: 2026-09-15\n- **[B03] [P1] undated.** z\n- **[B04] [P1] junk.** w Captured: not-a-date\n\n## Features\n- **[F01] [Major] compact.** v Captured: 20260101\n- **[F02] [Minor] padded.** u Captured:  2026-02-02 \n\n## Tasks\n- **[T01] t.** s Captured: 2026-07-04\n\n## Completed\n- ~~**[B09] [P1] done.** q Captured: 2020-01-01~~ Done 2026-09-30 [`abc`]\n"}
 	knowFx := fx{files: map[string]string{".hv/KNOWLEDGE.md": "# K\n\n## Alpha\nx\n\n## Beta, gamma\ny\n\n## Delta  \nz\n"}}
@@ -502,13 +397,7 @@ func TestParityA4B(t *testing.T) {
 		stale("map-none-stale", mapFx, "map", "2025-01-01", 90, 0),
 		stale("map-missing-dir", fx{}, "map", today, 90, 0),
 		stale("map-umbrella", withFx(umbFx, func(f *fx) { f.files = mapFx.files }), "map", today, 90, 0),
-		scn{name: "stale/bad-kind", argv: j("backlog", "stale", "--kind", "plans"), old: []string{"hv-staleness", "plans"}, want: 2,
-			oldMap: func(rc int, _ string) int {
-				if rc == 1 {
-					return 2
-				}
-				return rc
-			}},
+		scn{name: "stale/bad-kind", argv: j("backlog", "stale", "--kind", "plans"), want: 2},
 		scn{name: "stale/missing-kind", goOnly: true, argv: j("backlog", "stale"), want: 2},
 		scn{name: "stale/positional", goOnly: true, argv: j("backlog", "stale", "--kind", "todo", "x"), want: 2},
 		scn{name: "stale/days-not-a-number", goOnly: true, argv: j("backlog", "stale", "--kind", "todo", "--days", "soon"), want: 2},
@@ -516,9 +405,9 @@ func TestParityA4B(t *testing.T) {
 		scn{name: "stale/no-hv", goOnly: true, fx: fx{noHV: true}, argv: j("backlog", "stale", "--kind", "todo"), want: 3},
 		scn{name: "stale/repo-unregistered", goOnly: true, fx: umbFx, argv: j("backlog", "stale", "--kind", "todo", "--repo", "x"), want: 3},
 		scn{name: "stale/todo-reads-file-under-issues-config", fx: withFx(todoFx, func(f *fx) { f.config = issuesConfig }), argv: j("backlog", "stale", "--kind", "todo", "--days", "90"),
-			old: []string{"hv-staleness", "todo", "--today", today, "--days", "90"}, env: []string{"HV_TEST_TODAY=" + today}, want: 0, check: checkStaleLines},
+			env: []string{"HV_TEST_TODAY=" + today}, want: 0},
 		scn{name: "stale/default-today-is-real-today", goOnly: true, argv: j("backlog", "stale", "--kind", "todo", "--days", "0"), want: 0, fx: todoFx,
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				if n := len(strs(at(e, "data.entries"))); n == 0 {
 					t.Errorf("no entries with --days 0 and the real date")
 				}
@@ -526,16 +415,13 @@ func TestParityA4B(t *testing.T) {
 	)
 
 	// ---- backlog drift (hv-todo-drift)
-	driftOld := []string{"hv-todo-drift"}
 	dr := func(name string, f fx, want int, args ...string) scn {
-		return scn{name: "drift/" + name, fx: f, argv: j(append([]string{"backlog", "drift"}, args...)...), old: driftOld, want: want, check: checkDrift}
+		return scn{name: "drift/" + name, fx: f, argv: j(append([]string{"backlog", "drift"}, args...)...), want: want}
 	}
-	// ids pins what the scenario must find, so an empty answer on both sides cannot pass.
+	// ids pins what the scenario must find, so an empty answer cannot pass.
 	ids := func(s scn, drift, sym []string) scn {
-		prev := s.check
-		s.check = func(t *testing.T, e envl, ref run) {
+		s.check = func(t *testing.T, e envl) {
 			t.Helper()
-			prev(t, e, ref)
 			var gd, gs []string
 			for _, it := range at(e, "data.drift").([]any) {
 				gd = append(gd, it.(map[string]any)["id"].(string))
@@ -608,7 +494,7 @@ func TestParityA4B(t *testing.T) {
 		dr("umbrella-repo-web", withFx(umbFx, func(f *fx) { f.backlog = "# TODO\n\n## Bugs\n- **[B01] [P1] web side.** x\n" }), 0, "--repo", "web"),
 		scn{name: "drift/umbrella-repo-api-filters-out-web", goOnly: true, want: 0, argv: j("backlog", "drift", "--repo", "api"),
 			fx: withFx(umbFx, func(f *fx) { f.backlog = "# TODO\n\n## Bugs\n- **[B01] [P1] web side.** x\n" }),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "data.drift", []any{})
 				eq(t, e, "data.symbolDrift", []any{})
 			}},
@@ -620,22 +506,7 @@ func TestParityA4B(t *testing.T) {
 
 	// ---- backlog backfill (hv-backfill-since)
 	bf := func(name string, f fx, want int, args ...string) scn {
-		return scn{name: "backfill/" + name, fx: f, argv: j(append([]string{"backlog", "backfill"}, args...)...), old: []string{"hv-backfill-since"}, want: want,
-			check: func(t *testing.T, e envl, ref run) {
-				t.Helper()
-				if want != 0 {
-					return
-				}
-				n, _ := strconv.Atoi(strings.TrimSpace(ref.stdout))
-				eq(t, e, "data.stamped", float64(n))
-				eq(t, e, "data.changed", n > 0)
-			}}
-	}
-	noHead := func(rc int, _ string) int {
-		if rc == 1 {
-			return 5
-		}
-		return rc
+		return scn{name: "backfill/" + name, fx: f, argv: j(append([]string{"backlog", "backfill"}, args...)...), want: want}
 	}
 	add(variants(bf("std", fx{}, 0))...)
 	add(
@@ -650,17 +521,17 @@ func TestParityA4B(t *testing.T) {
 		bf("empty-sections", fx{backlog: "# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n"}, 0),
 		bf("no-backlog", fx{noBacklog: true}, 0),
 		bf("umbrella-root-head", umbFx, 0),
-		scn{name: "backfill/no-head", fx: fx{noCommit: true}, argv: j("backlog", "backfill"), old: []string{"hv-backfill-since"}, oldMap: noHead, want: 5},
-		scn{name: "backfill/no-head-no-backlog", fx: fx{noCommit: true, noBacklog: true}, argv: j("backlog", "backfill"), old: []string{"hv-backfill-since"}, oldMap: noHead, want: 5},
-		scn{name: "backfill/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "backfill"), old: []string{"hv-backfill-since"}, want: 4, check: blocked},
+		scn{name: "backfill/no-head", fx: fx{noCommit: true}, argv: j("backlog", "backfill"), want: 5},
+		scn{name: "backfill/no-head-no-backlog", fx: fx{noCommit: true, noBacklog: true}, argv: j("backlog", "backfill"), want: 5},
+		scn{name: "backfill/issues-backend", fx: fx{config: issuesConfig}, argv: j("backlog", "backfill"), want: 4, check: blocked},
 		scn{name: "backfill/no-hv", goOnly: true, fx: fx{noHV: true}, argv: j("backlog", "backfill"), want: 3},
 		scn{name: "backfill/positional", goOnly: true, argv: j("backlog", "backfill", "x"), want: 2},
 		scn{name: "backfill/repo-unregistered", goOnly: true, fx: umbFx, argv: j("backlog", "backfill", "--repo", "x"), want: 3},
 	)
 
-	// ---- status add (shim)
+	// ---- status add
 	sa := func(name string, f fx, want int, args ...string) scn {
-		return scn{name: "status-add/" + name, fx: f, argv: j(append([]string{"status", "add"}, args...)...), want: want, normTS: true}
+		return scn{name: "status-add/" + name, fx: f, argv: j(append([]string{"status", "add"}, args...)...), want: want}
 	}
 	st := func(s string) fx { return fx{status: s} }
 	stWeb := `{"active": [{"branch": "feat/x", "repo": "web", "items": ["B01"], "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`
@@ -679,7 +550,7 @@ func TestParityA4B(t *testing.T) {
 		sa("no-status-file", fx{}, 0, "feat/new", "--items", "B01"),
 		sa("corrupt-status-file", st("{bad json"), 0, "feat/new", "--items", "B01"),
 		sa("status-without-active-key", st(`{"loopStartedAt": "2026-09-03T08:00:00Z"}`), 0, "feat/new", "--items", "B01"),
-		withNorm(sa("existing-csv-items-entry-if-absent", st(`{"active": [{"branch": "feat/x", "repo": null, "items": "B01, T01", "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`), 0, "feat/x", "--items", "B01", "--if-absent"), csvEntries),
+		sa("existing-csv-items-entry-if-absent", st(`{"active": [{"branch": "feat/x", "repo": null, "items": "B01, T01", "worktree": null, "startedAt": "2026-09-01T10:00:00Z"}]}`), 0, "feat/x", "--items", "B01", "--if-absent"),
 		sa("existing-extra-keys-entry-kept", st(`{"active": [{"branch": "other", "repo": null, "items": ["B01"], "worktree": null, "startedAt": "2026-09-01T10:00:00Z", "note": "k\u00fc"}]}`), 0, "feat/new", "--items", "B02"),
 		sa("umbrella-repo", umbFx, 0, "feat/x", "--items", "B01", "--repo", "web"),
 		sa("umbrella-repo-worktree", umbFx, 0, "feat/x", "--items", "B01", "--repo", "web", "--worktree", "web-wt"),
@@ -709,13 +580,12 @@ func TestParityA4B(t *testing.T) {
 		sa("repo-unregistered", umbFx, 3, "feat/x", "--items", "B01", "--repo", "nope"),
 		sa("repo-outside-umbrella", fx{}, 3, "feat/x", "--items", "B01", "--repo", "web"),
 		sa("no-hv", fx{noHV: true}, 3, "feat/x", "--items", "B01"),
-		scn{name: "status-add/repos-only-commas", fx: umbFx, argv: j("status", "add", "feat/m", "--items", "B01", "--repos", ","), want: 2, normTS: true,
-			div: "--repos \",\" names nothing: the helper succeeds without writing, hv rejects it as a usage error", refWant: 0},
+		scn{name: "status-add/repos-only-commas", fx: umbFx, argv: j("status", "add", "feat/m", "--items", "B01", "--repos", ","), want: 2}, // --repos "," names nothing: a usage error,
 	)
 
-	// ---- status rm (shim)
+	// ---- status rm
 	sr := func(name string, f fx, want int, args ...string) scn {
-		return scn{name: "status-rm/" + name, fx: f, argv: j(append([]string{"status", "rm"}, args...)...), want: want, normTS: true}
+		return scn{name: "status-rm/" + name, fx: f, argv: j(append([]string{"status", "rm"}, args...)...), want: want}
 	}
 	hand := func(f fx, files map[string]string) fx {
 		f.files = files
@@ -747,7 +617,7 @@ func TestParityA4B(t *testing.T) {
 		sr("no-branch", fx{}, 2),
 		sr("two-branches", fx{}, 2, "a", "b"),
 		scn{name: "status-rm/branch-escaping-handoff-dir", goOnly: true, want: 2, argv: j("status", "rm", "../x"), fx: fx{files: map[string]string{".hv/x.md": "keep\n"}},
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				if _, err := os.Stat(filepath.Join(e["__godir"].(string), ".hv", "x.md")); err != nil {
 					t.Errorf("a file outside .hv/handoff was removed: %v", err)
 				}
@@ -756,8 +626,8 @@ func TestParityA4B(t *testing.T) {
 
 	// ---- status show (hv-status-repo-for)
 	show := func(name string, f fx, branch string, active bool, items []string, repo, worktree any, extra ...string) scn {
-		return scn{name: "status-show/" + name, fx: f, argv: j(append([]string{"status", "show", branch}, extra...)...), old: []string{"hv-status-repo-for", branch}, want: 0,
-			check: func(t *testing.T, e envl, ref run) {
+		return scn{name: "status-show/" + name, fx: f, argv: j(append([]string{"status", "show", branch}, extra...)...), want: 0,
+			check: func(t *testing.T, e envl) {
 				t.Helper()
 				eq(t, e, "data.branch", branch)
 				eq(t, e, "data.active", active)
@@ -766,9 +636,6 @@ func TestParityA4B(t *testing.T) {
 				}
 				eq(t, e, "data.repo", repo)
 				eq(t, e, "data.worktree", worktree)
-				if r, _ := at(e, "data.repo").(string); r != strings.TrimSpace(ref.stdout) {
-					t.Errorf("repo = %q, old printed %q", r, ref.stdout)
-				}
 				if active && at(e, "data.startedAt") == nil {
 					t.Errorf("no startedAt on an active entry")
 				}
@@ -798,24 +665,18 @@ func TestParityA4B(t *testing.T) {
 	// ---- status handoff (hv-resolve-handoff)
 	ho := func(name string, f fx, branch string, repo string, canonical bool, wantPath any, wantExists bool) scn {
 		argv := []string{"status", "handoff", branch}
-		var old []string
 		if repo != "" {
 			argv = append(argv, "--repo", repo)
-			old = append(old, "--repo", repo)
 		}
 		if canonical {
 			argv = append(argv, "--canonical")
-			old = append(old, "--write")
 		}
-		return scn{name: "status-handoff/" + name, fx: f, argv: j(argv...), old: append([]string{"hv-resolve-handoff"}, append(old, branch)...), want: 0,
-			check: func(t *testing.T, e envl, ref run) {
+		return scn{name: "status-handoff/" + name, fx: f, argv: j(argv...), want: 0,
+			check: func(t *testing.T, e envl) {
 				t.Helper()
 				eq(t, e, "data.path", wantPath)
 				eq(t, e, "data.exists", wantExists)
 				eq(t, e, "data.branch", branch)
-				if p, _ := at(e, "data.path").(string); p != strings.TrimSpace(ref.stdout) {
-					t.Errorf("path = %q, old printed %q", p, ref.stdout)
-				}
 			}}
 	}
 	hf := map[string]string{".hv/handoff/feat/x.md": "h\n", ".hv/handoff/solo.md": "h\n", ".hv/handoff/feat/x@web.md": "w\n", ".hv/handoff/only-flat@web.md": "x\n"}
@@ -843,9 +704,9 @@ func TestParityA4B(t *testing.T) {
 
 	// ---- status loop (hv-loop-stamp)
 	stampRe := regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`)
-	loop := func(sub, oldSub, name string, f fx, wantChanged any, wantStamp string) scn {
-		return scn{name: "status-loop/" + name, fx: f, argv: j("status", "loop", sub), old: []string{"hv-loop-stamp", oldSub}, want: 0, normTS: true,
-			check: func(t *testing.T, e envl, ref run) {
+	loop := func(sub, name string, f fx, wantChanged any, wantStamp string) scn {
+		return scn{name: "status-loop/" + name, fx: f, argv: j("status", "loop", sub), want: 0,
+			check: func(t *testing.T, e envl) {
 				t.Helper()
 				if wantChanged != nil {
 					eq(t, e, "data.changed", wantChanged)
@@ -860,34 +721,26 @@ func TestParityA4B(t *testing.T) {
 			}}
 	}
 	add(
-		loop("start", "start", "start-new", fx{}, true, ""),
-		loop("start", "start", "start-existing-first-write-wins", st(stTwo), false, "2026-09-03T08:00:00Z"),
-		loop("start", "start", "start-keeps-active-entries", st(stFile), true, ""),
-		loop("start", "start", "start-adds-missing-active-key", st(`{"x": 1}`), true, ""),
-		loop("start", "start", "start-overwrites-empty-stamp", st(`{"active": [], "loopStartedAt": ""}`), true, ""),
-		loop("start", "start", "start-overwrites-null-stamp", st(`{"active": [], "loopStartedAt": null}`), true, ""),
-		loop("start", "start", "start-corrupt-file", st("{broken"), true, ""),
-		loop("start", "start", "start-preserves-unknown-keys-order", st(`{"b": [1, 2], "active": [], "a": {"k": "\u00e9"}}`), true, ""),
-		loop("clear", "clear", "clear-existing", st(stTwo), true, ""),
-		loop("clear", "clear", "clear-absent", st(stFile), false, ""),
-		loop("clear", "clear", "clear-no-status-file", fx{}, false, ""),
-		loop("clear", "clear", "clear-empty-stamp", st(`{"active": [], "loopStartedAt": ""}`), false, ""),
-		scn{name: "status-loop/show-set", fx: st(stTwo), argv: j("status", "loop", "show"), old: []string{"hv-loop-stamp", "read"}, want: 0,
-			check: both(eqCheck("data.loopStartedAt", "2026-09-03T08:00:00Z"), func(t *testing.T, e envl, ref run) {
-				if strings.TrimSpace(ref.stdout) != "2026-09-03T08:00:00Z" {
-					t.Errorf("old read printed %q", ref.stdout)
-				}
-			})},
-		scn{name: "status-loop/show-unset", fx: st(stFile), argv: j("status", "loop", "show"), old: []string{"hv-loop-stamp", "read"}, want: 0,
-			check: both(eqCheck("data.loopStartedAt", nil), func(t *testing.T, e envl, ref run) {
-				if ref.stdout != "" {
-					t.Errorf("old read printed %q", ref.stdout)
-				}
-			})},
-		scn{name: "status-loop/show-no-file", argv: j("status", "loop", "show"), old: []string{"hv-loop-stamp", "read"}, want: 0, check: eqCheck("data.loopStartedAt", nil)},
-		scn{name: "status-loop/show-empty-stamp-is-null", fx: st(`{"active": [], "loopStartedAt": ""}`), argv: j("status", "loop", "show"), old: []string{"hv-loop-stamp", "read"}, want: 0,
+		loop("start", "start-new", fx{}, true, ""),
+		loop("start", "start-existing-first-write-wins", st(stTwo), false, "2026-09-03T08:00:00Z"),
+		loop("start", "start-keeps-active-entries", st(stFile), true, ""),
+		loop("start", "start-adds-missing-active-key", st(`{"x": 1}`), true, ""),
+		loop("start", "start-overwrites-empty-stamp", st(`{"active": [], "loopStartedAt": ""}`), true, ""),
+		loop("start", "start-overwrites-null-stamp", st(`{"active": [], "loopStartedAt": null}`), true, ""),
+		loop("start", "start-corrupt-file", st("{broken"), true, ""),
+		loop("start", "start-preserves-unknown-keys-order", st(`{"b": [1, 2], "active": [], "a": {"k": "\u00e9"}}`), true, ""),
+		loop("clear", "clear-existing", st(stTwo), true, ""),
+		loop("clear", "clear-absent", st(stFile), false, ""),
+		loop("clear", "clear-no-status-file", fx{}, false, ""),
+		loop("clear", "clear-empty-stamp", st(`{"active": [], "loopStartedAt": ""}`), false, ""),
+		scn{name: "status-loop/show-set", fx: st(stTwo), argv: j("status", "loop", "show"), want: 0,
+			check: eqCheck("data.loopStartedAt", "2026-09-03T08:00:00Z")},
+		scn{name: "status-loop/show-unset", fx: st(stFile), argv: j("status", "loop", "show"), want: 0,
 			check: eqCheck("data.loopStartedAt", nil)},
-		scn{name: "status-loop/show-leaves-the-file-alone", fx: st("{\"active\":[],\"loopStartedAt\":\"2026-09-03T08:00:00Z\"}"), argv: j("status", "loop", "show"), old: []string{"hv-loop-stamp", "read"}, want: 0},
+		scn{name: "status-loop/show-no-file", argv: j("status", "loop", "show"), want: 0, check: eqCheck("data.loopStartedAt", nil)},
+		scn{name: "status-loop/show-empty-stamp-is-null", fx: st(`{"active": [], "loopStartedAt": ""}`), argv: j("status", "loop", "show"), want: 0,
+			check: eqCheck("data.loopStartedAt", nil)},
+		scn{name: "status-loop/show-leaves-the-file-alone", fx: st("{\"active\":[],\"loopStartedAt\":\"2026-09-03T08:00:00Z\"}"), argv: j("status", "loop", "show"), want: 0},
 		scn{name: "status-loop/start-then-show-roundtrip", goOnly: true, want: 0, argv: j("status", "loop", "start"), check: eqCheck("data.changed", true)},
 		scn{name: "status-loop/repo-is-not-a-flag", goOnly: true, want: 2, fx: umbFx, argv: j("status", "loop", "start", "--repo", "web")},
 		scn{name: "status-loop/show-repo-is-not-a-flag", goOnly: true, want: 2, fx: umbFx, argv: j("status", "loop", "show", "--repo", "web")},
@@ -899,15 +752,11 @@ func TestParityA4B(t *testing.T) {
 	// ---- refactor age / reset / targets
 	ageFx := func(counters string) fx { return fx{counters: counters} }
 	age := func(name string, f fx, feats, bugs float64, args ...string) scn {
-		return scn{name: "refactor-age/" + name, fx: f, argv: j(append([]string{"refactor", "age"}, args...)...), old: []string{"hv-refactor-age"}, want: 0,
-			check: func(t *testing.T, e envl, ref run) {
+		return scn{name: "refactor-age/" + name, fx: f, argv: j(append([]string{"refactor", "age"}, args...)...), want: 0,
+			check: func(t *testing.T, e envl) {
 				t.Helper()
 				eq(t, e, "data.features", feats)
 				eq(t, e, "data.bugs", bugs)
-				var old map[string]float64
-				if err := json.Unmarshal([]byte(ref.stdout), &old); err != nil || old["features"] != feats || old["bugs"] != bugs {
-					t.Errorf("old printed %q", ref.stdout)
-				}
 			}}
 	}
 	add(
@@ -921,10 +770,10 @@ func TestParityA4B(t *testing.T) {
 		scn{name: "refactor-age/repo-unregistered", goOnly: true, want: 3, fx: umbFx, argv: j("refactor", "age", "--repo", "x")},
 		scn{name: "refactor-age/no-hv", goOnly: true, want: 3, fx: fx{noHV: true}, argv: j("refactor", "age")},
 		scn{name: "refactor-age/positional", goOnly: true, want: 2, argv: j("refactor", "age", "x")},
-		scn{name: "refactor-age/works-under-issues-config", fx: fx{config: issuesConfig}, argv: j("refactor", "age"), old: []string{"hv-refactor-age"}, want: 0, check: eqCheck("data.bugs", float64(2))},
+		scn{name: "refactor-age/works-under-issues-config", fx: fx{config: issuesConfig}, argv: j("refactor", "age"), want: 0, check: eqCheck("data.bugs", float64(2))},
 	)
 	rst := func(name string, f fx, changed bool, args ...string) scn {
-		return scn{name: "refactor-reset/" + name, fx: f, argv: j(append([]string{"refactor", "reset"}, args...)...), old: []string{"hv-refactor-reset"}, want: 0, check: eqCheck("data.changed", changed)}
+		return scn{name: "refactor-reset/" + name, fx: f, argv: j(append([]string{"refactor", "reset"}, args...)...), want: 0, check: eqCheck("data.changed", changed)}
 	}
 	add(
 		rst("std", fx{}, true),
@@ -952,7 +801,7 @@ func TestParityA4B(t *testing.T) {
 		}
 	}
 	tgt := func(name string, f fx) scn {
-		return scn{name: "refactor-targets/" + name, fx: f, argv: j("refactor", "targets"), old: []string{"hv-refactor-targets"}, want: 0, check: checkTargets}
+		return scn{name: "refactor-targets/" + name, fx: f, argv: j("refactor", "targets"), want: 0}
 	}
 	add(
 		tgt("single-repo", fx{}),
@@ -1016,73 +865,6 @@ func TestParityA4B(t *testing.T) {
 	finish(t, all)
 }
 
-func checkStaleLines(t *testing.T, e envl, ref run) {
-	t.Helper()
-	var got []string
-	l, _ := at(e, "data.entries").([]any)
-	for _, it := range l {
-		m := it.(map[string]any)
-		got = append(got, fmt.Sprintf("%v %v", m["name"], m["date"]))
-	}
-	if want := lines(ref.stdout); len(got)+len(want) > 0 && !reflect.DeepEqual(got, want) {
-		t.Errorf("entries = %q, old printed %q", got, want)
-	}
-}
-
-// checkDrift compares the Go data with the JSON hv-todo-drift printed: the same
-// lists with symbol_drift renamed symbolDrift, a type on every item, and both
-// keys always present.
-func checkDrift(t *testing.T, e envl, ref run) {
-	t.Helper()
-	want := map[string]any{"drift": []any{}, "symbolDrift": []any{}}
-	var old map[string]any
-	if err := json.Unmarshal([]byte(ref.stdout), &old); err != nil {
-		t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
-	}
-	for _, k := range [][2]string{{"drift", "drift"}, {"symbol_drift", "symbolDrift"}} {
-		if l, ok := old[k[0]].([]any); ok && len(l) > 0 {
-			for _, it := range l {
-				m := it.(map[string]any)
-				m["type"] = m["id"].(string)[:1]
-			}
-			want[k[1]] = l
-		}
-	}
-	got, _ := at(e, "data").(map[string]any)
-	if !reflect.DeepEqual(got, want) {
-		gj, _ := json.Marshal(got)
-		wj, _ := json.Marshal(want)
-		t.Errorf("drift data differs from the old output\ngo:  %s\nold: %s", gj, wj)
-	}
-}
-
-// checkTargets compares the Go data with the JSON hv-refactor-targets printed,
-// after replacing each side's project directory with <root>.
-func checkTargets(t *testing.T, e envl, ref run) {
-	t.Helper()
-	goDir, _ := e["__godir"].(string)
-	norm := func(s, dir string) string {
-		real, err := filepath.EvalSymlinks(dir)
-		if err != nil {
-			real = dir
-		}
-		return strings.ReplaceAll(strings.ReplaceAll(s, real, "<root>"), dir, "<root>")
-	}
-	var old any
-	if err := json.Unmarshal([]byte(norm(ref.stdout, ref.dir)), &old); err != nil {
-		t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
-	}
-	gj, _ := json.Marshal(at(e, "data"))
-	var got any
-	if err := json.Unmarshal([]byte(norm(string(gj), goDir)), &got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, old) {
-		oj, _ := json.Marshal(old)
-		t.Errorf("targets differ\ngo:  %s\nold: %s", norm(string(gj), goDir), oj)
-	}
-}
-
 // finish checks the scenario table and runs it.
 func finish(t *testing.T, all []scn) {
 	t.Helper()
@@ -1099,9 +881,3 @@ func finish(t *testing.T, all []scn) {
 		t.Run(s.name, s.exec)
 	}
 }
-
-var (
-	_ = json.Marshal
-	_ = regexp.MustCompile
-	_ = strconv.Itoa
-)

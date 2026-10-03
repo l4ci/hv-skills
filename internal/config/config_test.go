@@ -3,26 +3,21 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-const pyLoad = `import json, sys
-from hvlib_io import load_config
-print(json.dumps(load_config(sys.argv[1]), indent=2), end="")`
-
-// Each testdata/<case>/ directory is a shared fixture: Go's Load and
-// Python's hvlib_io.load_config must produce byte-identical JSON.
+// Each testdata/<case>/ directory is a fixture: Go's Load must produce the
+// JSON that Python's hvlib_io.load_config recorded for it in testdata/golden.
 func TestLoadMatchesPython(t *testing.T) {
 	cases, err := os.ReadDir("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cases {
-		if c.Name() == "golden" { // the recorded Python outputs, not a fixture
+		if c.Name() == "golden" { // the recorded outputs, not a fixture
 			continue
 		}
 		t.Run(c.Name(), func(t *testing.T) {
@@ -38,16 +33,16 @@ func TestLoadMatchesPython(t *testing.T) {
 				}
 			}
 			var want string
-			pytest.Golden(t, map[string]any{"script": pyLoad, "files": files}, &want, func() { want = pytest.Run(t, ".", pyLoad, path) })
+			pytest.Golden(t, map[string]any{"files": files}, &want)
 			if string(got) != want {
-				t.Fatalf("\n--- go\n%s\n--- python\n%s", got, want)
+				t.Fatalf("\n--- go\n%s\n--- golden\n%s", got, want)
 			}
 		})
 	}
 }
 
 // Divergences from Python, kept on purpose and listed in the conventions doc
-// (Config). The test also runs Python, so the doc stays true if Python changes.
+// (Config). Python's side of each is noted in a comment.
 func TestDivergentInputs(t *testing.T) {
 	t.Run("NaN and Infinity", func(t *testing.T) {
 		path, _ := filepath.Abs("divergent/nan/config.json")
@@ -56,9 +51,6 @@ func TestDivergentInputs(t *testing.T) {
 			t.Fatalf("Go Load = %s, want {}", got)
 		}
 		// Python: json.loads accepts NaN and Infinity.
-		if py := pytest.Run(t, ".", pyLoad, path); !strings.Contains(py, "NaN") {
-			t.Fatalf("Python no longer loads NaN; update the doc. Got %s", py)
-		}
 	})
 	t.Run("invalid UTF-8", func(t *testing.T) {
 		path, _ := filepath.Abs("divergent/badutf8/config.json")
@@ -67,11 +59,7 @@ func TestDivergentInputs(t *testing.T) {
 		if !ok || v != "tm\uFFFDux" {
 			t.Fatalf("Go Load work.dispatch = %q", v)
 		}
-		pytest.Require(t)
 		// Python: read_text raises UnicodeDecodeError, which load_json does not catch.
-		if _, err := pytest.Try(".", pyLoad, path); err == nil {
-			t.Fatal("Python no longer fails on invalid UTF-8; update the doc")
-		}
 	})
 }
 

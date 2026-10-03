@@ -31,26 +31,7 @@ func TestClassesMatchPython(t *testing.T) {
 		Space, Word, Digit [][2]int
 		DigitValue         map[string]int
 	}
-	pytest.GoldenJSON(t, `import json, re
-def ranges(cs):
-    out = []
-    for c in cs:
-        if out and out[-1][1] == c - 1:
-            out[-1][1] = c
-        else:
-            out.append([c, c])
-    return out
-space, word, digit, dv = [], [], [], {}
-for c in range(0x30000):
-    if 0xd800 <= c <= 0xdfff:
-        continue
-    ch = chr(c)
-    if re.match(r"\s", ch): space.append(c)
-    if re.match(r"\w", ch): word.append(c)
-    if re.match(r"\d", ch):
-        digit.append(c)
-        dv[str(c)] = int(ch)
-print(json.dumps({"space": ranges(space), "word": ranges(word), "digit": ranges(digit), "digitValue": dv}))`, nil, &want)
+	pytest.GoldenJSON(t, nil, &want)
 
 	class := regexp.MustCompile(`\A[` + SpaceClass + `]\z`)
 	var space, word, digit []int
@@ -87,11 +68,7 @@ func itoa(n int) string { return strconv.Itoa(n) }
 func TestStringHelpersMatchPython(t *testing.T) {
 	cases := []string{"", "a", "a\nb", "a\n", "\n", "a\r\nb\rc\n\nd", "x\vy\fz", "a\x1cb\x1dc\x1ed\x1fe", "a\u0085b c d", " \t x  　", "\r", "\r\n", "\n\r", "café ", "a\x0b\x0c"}
 	var want []map[string]any
-	pytest.GoldenJSON(t, `import json, sys
-out = []
-for s in json.load(open(sys.argv[1])):
-    out.append({"strip": s.strip(), "rstrip": s.rstrip(), "lines": s.splitlines()})
-print(json.dumps(out))`, cases, &want)
+	pytest.GoldenJSON(t, cases, &want)
 	var got, w, in []any
 	for i, s := range cases {
 		lines := Splitlines(s)

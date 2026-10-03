@@ -2,18 +2,14 @@ package jsonx
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/l4ci/hv-skills/v5/internal/pytest"
 )
 
-const pyDump = `import json, sys
-print(json.dumps(json.loads(open(sys.argv[1]).read()), indent=2), end="")`
-
+// The golden is json.dumps(json.loads(file), indent=2).
 func TestRoundTripMatchesPython(t *testing.T) {
-	path, _ := filepath.Abs("testdata/mixed.json")
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile("testdata/mixed.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,24 +22,22 @@ func TestRoundTripMatchesPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	var want string
-	pytest.Golden(t, map[string]any{"script": pyDump, "file": string(raw)}, &want, func() { want = pytest.Run(t, ".", pyDump, path) })
+	pytest.Golden(t, map[string]any{"file": string(raw)}, &want)
 	if string(got) != want {
 		t.Fatalf("Go and Python disagree.\n--- go\n%s\n--- python\n%s", got, want)
 	}
 }
 
+// The golden is json.dumps(json.loads(file)) with Python's default separators.
 func TestCompactMatchesPython(t *testing.T) {
-	path, _ := filepath.Abs("testdata/mixed.json")
-	raw, _ := os.ReadFile(path)
+	raw, _ := os.ReadFile("testdata/mixed.json")
 	v, err := Decode(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got, _ := MarshalCompact(v)
-	const script = `import json, sys
-print(json.dumps(json.loads(open(sys.argv[1]).read())), end="")`
 	var want string
-	pytest.Golden(t, map[string]any{"script": script, "file": string(raw)}, &want, func() { want = pytest.Run(t, ".", script, path) })
+	pytest.Golden(t, map[string]any{"file": string(raw)}, &want)
 	if string(got) != want {
 		t.Fatalf("\n--- go\n%s\n--- python\n%s", got, want)
 	}

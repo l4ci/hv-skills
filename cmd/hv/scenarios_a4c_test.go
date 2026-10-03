@@ -1,16 +1,19 @@
 package main
 
-// Scenarios for hv update, hv config show|set|check and hv repo
-// which|resolve|umbrella (#48), on the differential harness of
-// parity_a4_test.go. The shim has no adapter for these verbs, so the
-// reference is the old helper run directly with the contract's `old:` argv
-// (hv-config-show, hv-config-set, hv-config-schema-check, hv-resolve-repo with
-// hv-resolve-repo-path, hv-resolve-repos, hv-umbrella-on, hv-update-check).
+// Go-only scenarios for hv update, hv config show|set|check and hv repo
+// which|resolve|umbrella (#48), on the harness of harness_test.go. Each runs
+// the Go binary and is checked against its frozen record in
+// testdata/frozen/a4c.jsonl (regenerate with -update-frozen).
+//
+// Behaviour worth knowing: config show reads keys outside the schema; config
+// check exits 1 unless up to date; repo umbrella and repo resolve walk up to
+// the nearest .hv/; hv update falls back to the stamped version only when no
+// install root resolves.
 //
 // Safety: hv update must never reach the network. Every update scenario sets
-// HV_TEST_LATEST_VERSION (Go) and HV_LATEST_VERSION (old helper); the one
-// scenario that leaves them unset runs with test/fakes first on PATH and
-// proves, through the fake's call log, that gh resolved there.
+// HV_TEST_LATEST_VERSION; the one scenario that leaves it unset runs with
+// test/fakes first on PATH and proves, through the fake's call log, that gh
+// resolved there.
 
 import (
 	"encoding/json"
@@ -19,7 +22,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -72,90 +74,21 @@ func noConfigFile(t *testing.T, dir string, in *info) {
 
 // ---- config checks -----------------------------------------------------------------
 
-var showLine = regexp.MustCompile(`^(\S+) = (.*)  \(source: (local|project|default)\)$`)
-
-// checkShow compares data.entries with the lines the old helper printed, the
-// way the contract's shim parses them.
-func checkShow(wantRows int) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
+// checkShow asserts the number of data.entries rows.
+func checkShow(wantRows int) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) {
 		t.Helper()
 		rows, _ := at(e, "data.entries").([]any)
-		old := lines(ref.stdout)
-		if len(rows) != len(old) || (wantRows >= 0 && len(rows) != wantRows) {
-			t.Fatalf("%d entries, old printed %d lines (want %d)", len(rows), len(old), wantRows)
-		}
-		for i, l := range old {
-			m := showLine.FindStringSubmatch(l)
-			if m == nil {
-				t.Fatalf("old line %q does not parse", l)
-			}
-			var val any
-			if err := json.Unmarshal([]byte(m[2]), &val); err != nil {
-				t.Fatalf("old value %q: %v", m[2], err)
-			}
-			row := rows[i].(map[string]any)
-			if row["key"] != m[1] || row["source"] != m[3] || !reflect.DeepEqual(row["value"], val) {
-				t.Errorf("entry %d = %v, old %q", i, row, l)
-			}
+		if wantRows >= 0 && len(rows) != wantRows {
+			t.Fatalf("%d entries, want %d", len(rows), wantRows)
 		}
 	}
 }
 
-func showMap(rc int, stderr string) int {
-	switch {
-	case rc == 0:
-		return 0
-	case strings.Contains(stderr, "usage:"):
-		return 2
-	case strings.Contains(stderr, "unknown key"), strings.Contains(stderr, "no .hv/ found"):
-		return 3
-	}
-	return 70
-}
-
-func setMap(rc int, stderr string) int {
-	switch {
-	case rc == 0:
-		return 0
-	case strings.Contains(stderr, "malformed key path"), strings.Contains(stderr, "usage:"):
-		return 2
-	case strings.Contains(stderr, "no .hv/ found"):
-		return 3
-	}
-	return 70
-}
-
-func resolveMap(rc int, stderr string) int {
-	switch rc {
-	case 0:
-		return 0
-	case 1:
-		return 3
-	case 2:
-		return 2
-	}
-	return 70
-}
-
-func whichMap(rc int, _ string) int {
-	if rc == 0 {
-		return 0
-	}
-	return 3
-}
-
-// checkVerdict compares data with the token hv-config-schema-check printed.
-func checkVerdict(status string, missing ...string) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
+// checkVerdict asserts the config check verdict in data.
+func checkVerdict(status string, missing ...string) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) {
 		t.Helper()
-		tok := strings.TrimSpace(ref.stdout)
-		want := map[string]string{"upToDate": "UP_TO_DATE", "fresh": "FRESH", "corrupt": "CORRUPT"}[status]
-		if status == "stale" {
-			want = "STALE:" + strings.Join(missing, ",")
-		}
-		if tok != want {
-			t.Errorf("old printed %q, want %q", tok, want)
-		}
 		eq(t, e, "data.status", status)
 		eq(t, e, "data.upToDate", status == "upToDate")
 		got := strs(at(e, "data.missing"))
@@ -179,53 +112,15 @@ func dirNorm(s, dir string) string {
 
 func goDirOf(e envl) string { d, _ := e["__godir"].(string); return d }
 
-// checkWhich: the old helper printed the name; hv-resolve-repo-path, run from
-// the umbrella root as the contract's shim does, gives the path.
-func checkWhich(name, rel string) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
+// checkWhich asserts the repo name and its path relative to the umbrella root.
+func checkWhich(name, rel string) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) {
 		t.Helper()
-		if got := strings.TrimSpace(ref.stdout); got != name {
-			t.Errorf("old printed %q, want %q", got, name)
-		}
 		eq(t, e, "data.name", name)
-		p := exec1(t, ref.dir, "", filepath.Join(stagedBin, "hv-resolve-repo-path"), name)
-		if p.code != 0 {
-			t.Fatalf("hv-resolve-repo-path %s: %d %s", name, p.code, p.stderr)
-		}
 		got, _ := at(e, "data.path").(string)
-		if a, b := dirNorm(got, goDirOf(e)), dirNorm(strings.TrimSpace(p.stdout), ref.dir); a != b {
-			t.Errorf("path = %s, old %s", a, b)
-		}
 		if want := "<root>/" + rel; dirNorm(got, goDirOf(e)) != want {
 			t.Errorf("path = %s, want %s", dirNorm(got, goDirOf(e)), want)
 		}
-	}
-}
-
-func checkResolved(t *testing.T, e envl, ref run) {
-	t.Helper()
-	var old any
-	if err := json.Unmarshal([]byte(dirNorm(ref.stdout, ref.dir)), &old); err != nil {
-		t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
-	}
-	gj, _ := json.Marshal(at(e, "data.repos"))
-	var got any
-	json.Unmarshal([]byte(dirNorm(string(gj), goDirOf(e))), &got)
-	if !reflect.DeepEqual(got, old) {
-		oj, _ := json.Marshal(old)
-		t.Errorf("repos differ\ngo:  %s\nold: %s", dirNorm(string(gj), goDirOf(e)), oj)
-	}
-}
-
-func checkYesNo(want bool) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
-		t.Helper()
-		old := strings.TrimSpace(ref.stdout)
-		if (old == "yes") != want && !(old == "no" && !want) {
-			// the old helper looks at the directory only; Go walks up (disagreement, see div)
-			return
-		}
-		eq(t, e, "data.umbrella", want)
 	}
 }
 
@@ -251,7 +146,7 @@ var (
 	updOnce sync.Once
 	upd     struct {
 		bin                                                   string // Go binary stamped with instVersion
-		cloneBin, cloneOld                                    string // the binary and bin/ copy inside a repo clone
+		cloneBin                                              string // the binary inside a repo clone
 		clone, plain, empty, foreign                          string
 		homeNone, homePlugin, homeCache, homeAgents, homeStow string
 		stowRepo                                              string
@@ -308,33 +203,23 @@ func updFixtures(t *testing.T) {
 		}
 		upd.clone = mk("clone")
 		manifest(t, upd.clone, "hv-skills", instVersion)
-		upd.cloneOld = filepath.Join(upd.clone, "bin")
-		if out, err := exec.Command("cp", "-a", stagedBin, upd.cloneOld).CombinedOutput(); err != nil {
-			t.Fatalf("cp: %v\n%s", err, out)
+		if err := os.MkdirAll(filepath.Join(upd.clone, "bin"), 0o755); err != nil {
+			t.Fatal(err)
 		}
-		upd.cloneBin = filepath.Join(upd.cloneOld, "hv")
+		upd.cloneBin = filepath.Join(upd.clone, "bin", "hv")
 		if out, err := exec.Command("cp", upd.bin, upd.cloneBin).CombinedOutput(); err != nil {
 			t.Fatalf("cp: %v\n%s", err, out)
 		}
 	})
 }
 
-// checkUpdate compares the Go data with the JSON hv-update-check printed.
-// currentVersion is compared too: the stamped binary and the fixture
+// checkUpdate asserts the install type, status and the shape of data.
+// currentVersion is a string too: the stamped binary and the fixture
 // manifests both say instVersion.
-func checkUpdate(installType, status string) func(t *testing.T, e envl, ref run) {
-	return func(t *testing.T, e envl, ref run) {
+func checkUpdate(installType, status string) func(t *testing.T, e envl) {
+	return func(t *testing.T, e envl) {
 		t.Helper()
-		var old map[string]any
-		if err := json.Unmarshal([]byte(ref.stdout), &old); err != nil {
-			t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
-		}
 		got, _ := at(e, "data").(map[string]any)
-		if !reflect.DeepEqual(got, old) {
-			gj, _ := json.Marshal(got)
-			oj, _ := json.Marshal(old)
-			t.Errorf("update data differs\ngo:  %s\nold: %s", gj, oj)
-		}
 		eq(t, e, "data.installType", installType)
 		eq(t, e, "data.status", status)
 		for _, k := range []string{"installType", "installRoot", "currentVersion", "latestVersion", "status", "updateCommand"} {
@@ -346,44 +231,26 @@ func checkUpdate(installType, status string) func(t *testing.T, e envl, ref run)
 }
 
 // updNoRoot is updScn where no install root resolves: currentVersion falls
-// back to the binary's stamped version (orchestrator ruling, A4 acceptance)
-// where the old helper gave "", so the status compares instead of unknown.
+// back to the binary's stamped version (orchestrator ruling, A4 acceptance).
 func updNoRoot(name, home, latest string, extra []string, status string) scn {
 	s := updScn(name, home, latest, extra, "unknown", status)
-	s.div, s.refWant = "no install root: Go falls back to the stamped version (ruling); old gave an empty currentVersion", 0
-	s.check = func(t *testing.T, e envl, ref run) {
+	s.check = func(t *testing.T, e envl) {
 		t.Helper()
-		var old map[string]any
-		if err := json.Unmarshal([]byte(ref.stdout), &old); err != nil {
-			t.Fatalf("old output is not JSON: %v\n%s", err, ref.stdout)
-		}
-		if old["currentVersion"] != "" || old["status"] != "unknown" {
-			t.Errorf("old = %v, expected the empty version and unknown", old)
-		}
-		got, _ := at(e, "data").(map[string]any)
-		g := map[string]any{}
-		for k, v := range got {
-			g[k] = v
-		}
 		eq(t, e, "data.currentVersion", instVersion)
 		eq(t, e, "data.status", status)
-		g["currentVersion"], g["status"] = "", "unknown"
-		if !reflect.DeepEqual(g, old) {
-			t.Errorf("update data differs beyond the fallback\ngo:  %v\nold: %v", got, old)
-		}
 	}
 	return s
 }
 
 func updScn(name, home, latest string, extra []string, installType, status string) scn {
-	env := []string{"HOME=" + home, "HV_TEST_LATEST_VERSION=" + latest, "HV_LATEST_VERSION=" + latest}
-	return scn{name: "update/" + name, fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
+	env := []string{"HOME=" + home, "HV_TEST_LATEST_VERSION=" + latest}
+	return scn{name: "update/" + name, fx: fx{noHV: true}, argv: j("update"), want: 0,
 		env: append(env, extra...), bin: upd.bin, check: checkUpdate(installType, status)}
 }
 
 // ---- the scenarios -----------------------------------------------------------------
 
-func TestParityA4C(t *testing.T) {
+func suiteA4C(t *testing.T) {
 	updFixtures(t)
 	var all []scn
 	add := func(s ...scn) { all = append(all, s...) }
@@ -392,11 +259,11 @@ func TestParityA4C(t *testing.T) {
 	// ---- config show: every schema key, in each of the three sources
 	show := func(name string, f fx, rows int, args ...string) scn {
 		return scn{name: "config-show/" + name, fx: f, argv: j(append([]string{"config", "show"}, args...)...),
-			old: append([]string{"hv-config-show"}, args...), oldMap: showMap, want: 0, text: true, check: checkShow(rows)}
+			want: 0, text: true, check: checkShow(rows)}
 	}
 	showE := func(name string, f fx, want int, args ...string) scn {
 		return scn{name: "config-show/" + name, fx: f, argv: j(append([]string{"config", "show"}, args...)...),
-			old: append([]string{"hv-config-show"}, args...), oldMap: showMap, want: want}
+			want: want}
 	}
 	for _, k := range config.Keys {
 		add(
@@ -440,23 +307,24 @@ func TestParityA4C(t *testing.T) {
 		show("one/under-issues-backend", fx{config: issuesConfig}, 1, "backlog.backend"),
 		showE("no-hv", fx{noHV: true}, 3),
 		scn{name: "config-show/repo-flag-outside-umbrella", goOnly: true, want: 3, argv: j("config", "show", "--repo", "web")},
-		scn{name: "config-show/repo-flag-registered", fx: umbFx, argv: j("config", "show", "--repo", "web", "docs.path"), old: []string{"hv-config-show", "docs.path"}, want: 0, text: true, check: checkShow(1)},
+		scn{name: "config-show/repo-flag-registered", fx: umbFx, argv: j("config", "show", "--repo", "web", "docs.path"), want: 0, text: true, check: checkShow(1)},
 		scn{name: "config-show/repo-flag-unregistered", goOnly: true, want: 3, fx: umbFx, argv: j("config", "show", "--repo", "nope")},
-		scn{name: "config-show/hand-edited-key-is-readable", div: "old rejects any key outside the schema", refWant: 3, want: 0,
-			fx: fx{config: `{"custom": {"x": 7}}`}, argv: j("config", "show", "custom.x"), old: []string{"hv-config-show", "custom.x"}, oldMap: showMap,
+		// config show reads keys outside the schema
+		scn{name: "config-show/hand-edited-key-is-readable", want: 0,
+			fx: fx{config: `{"custom": {"x": 7}}`}, argv: j("config", "show", "custom.x"),
 			check: both(eqCheck("data.entries.0.value", float64(7)), eqCheck("data.entries.0.source", "project"), eqCheck("data.entries.0.key", "custom.x"))},
-		scn{name: "config-show/hand-edited-key-local-source", div: "old rejects any key outside the schema", refWant: 3, want: 0,
-			fx: fx{config: `{"custom": 1}`, files: map[string]string{".hv/config.local.json": `{"custom": 2}`}}, argv: j("config", "show", "custom"), old: []string{"hv-config-show", "custom"}, oldMap: showMap,
+		scn{name: "config-show/hand-edited-key-local-source", want: 0,
+			fx: fx{config: `{"custom": 1}`, files: map[string]string{".hv/config.local.json": `{"custom": 2}`}}, argv: j("config", "show", "custom"),
 			check: both(eqCheck("data.entries.0.value", float64(2)), eqCheck("data.entries.0.source", "local"))},
-		scn{name: "config-show/hand-edited-parent-object", div: "old rejects any key outside the schema", refWant: 3, want: 0,
-			fx: fx{config: `{"models": {"worker": "w"}}`}, argv: j("config", "show", "models"), old: []string{"hv-config-show", "models"}, oldMap: showMap,
+		scn{name: "config-show/hand-edited-parent-object", want: 0,
+			fx: fx{config: `{"models": {"worker": "w"}}`}, argv: j("config", "show", "models"),
 			check: eqCheck("data.entries.0.value", map[string]any{"worker": "w"})},
 	)
 
 	// ---- config set
-	set := func(name string, f fx, key, val string, check func(t *testing.T, e envl, ref run)) scn {
-		return scn{name: "config-set/" + name, fx: f, argv: j("config", "set", key, val), old: []string{"hv-config-set", key, val},
-			oldMap: setMap, want: 0, check: check}
+	set := func(name string, f fx, key, val string, check func(t *testing.T, e envl)) scn {
+		return scn{name: "config-set/" + name, fx: f, argv: j("config", "set", key, val),
+			want: 0, check: check}
 	}
 	for _, c := range []struct {
 		name, raw string
@@ -473,7 +341,7 @@ func TestParityA4C(t *testing.T) {
 		{"escaped-newline", `"a\nb"`, "a\nb"}, {"empty-object", "{}", map[string]any{}}, {"empty-array", "[]", []any{}},
 		{"surrogate-pair-escape", `"😀"`, "\U0001F600"}, {"null", "null", nil},
 	} {
-		s := set("coerce/"+c.name, stdFx, "models.worker", c.raw, func(t *testing.T, e envl, ref run) {
+		s := set("coerce/"+c.name, stdFx, "models.worker", c.raw, func(t *testing.T, e envl) {
 			t.Helper()
 			eq(t, e, "data.value", c.want)
 			eq(t, e, "data.changed", true)
@@ -518,24 +386,24 @@ func TestParityA4C(t *testing.T) {
 	for _, body := range []string{"[1]", "null", `"s"`, "7", "true"} {
 		body := body
 		add(scn{name: "config-set/not-an-object/" + body, fx: fx{config: body}, argv: j("config", "set", "models.worker", "x"),
-			old: []string{"hv-config-set", "models.worker", "x"}, oldMap: setMap, want: 70})
+			want: 70})
 	}
 	for _, key := range []string{"", ".a", "a.", "a..b", "."} {
 		key := key
 		add(scn{name: "config-set/malformed-key/" + fmt.Sprintf("%q", key), argv: j("config", "set", key, "1"),
-			old: []string{"hv-config-set", key, "1"}, oldMap: setMap, want: 2})
+			want: 2})
 	}
 	add(
-		scn{name: "config-set/missing-value", argv: j("config", "set", "models.worker"), old: []string{"hv-config-set", "models.worker"}, oldMap: setMap, want: 2},
-		scn{name: "config-set/missing-both", argv: j("config", "set"), old: []string{"hv-config-set"}, oldMap: setMap, want: 2},
-		scn{name: "config-set/no-hv", fx: fx{noHV: true}, argv: j("config", "set", "models.worker", "x"), old: []string{"hv-config-set", "models.worker", "x"}, oldMap: setMap, want: 3},
+		scn{name: "config-set/missing-value", argv: j("config", "set", "models.worker"), want: 2},
+		scn{name: "config-set/missing-both", argv: j("config", "set"), want: 2},
+		scn{name: "config-set/no-hv", fx: fx{noHV: true}, argv: j("config", "set", "models.worker", "x"), want: 3},
 		scn{name: "config-set/umbrella-repo-flag-writes-the-root-config", fx: umbFx, argv: j("config", "set", "--repo", "web", "docs.path", "d"),
-			old: []string{"hv-config-set", "docs.path", "d"}, oldMap: setMap, want: 0, check: eqCheck("data.changed", true)},
+			want: 0, check: eqCheck("data.changed", true)},
 		scn{name: "config-set/repo-flag-unregistered", goOnly: true, want: 3, fx: umbFx, argv: j("config", "set", "--repo", "nope", "docs.path", "d")},
 		scn{name: "config-set/repo-flag-outside-umbrella", goOnly: true, want: 3, argv: j("config", "set", "--repo", "web", "docs.path", "d")},
 		scn{name: "config-set/value-with-leading-dash-without-double-dash-is-a-flag", goOnly: true, want: 2, argv: j("config", "set", "models.worker", "-5")},
 		scn{name: "config-set/key-outside-schema-is-refused", goOnly: true, want: 2, argv: j("config", "set", "nope.key", "1"),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				b, _ := os.ReadFile(filepath.Join(goDirOf(e), ".hv", "config.json"))
 				if string(b) != stdConfig {
 					t.Errorf("config.json changed: %s", b)
@@ -549,9 +417,10 @@ func TestParityA4C(t *testing.T) {
 	)
 
 	// ---- config check
+	// the contract exits 1 unless the config is up to date
 	chk := func(name string, f fx, want int, status string, missing ...string) scn {
-		return scn{name: "config-check/" + name, fx: f, argv: j("config", "check"), old: []string{"hv-config-schema-check"}, want: want,
-			div: "old always exits 0; the contract exits 1 unless upToDate", refWant: 0, text: true, check: checkVerdict(status, missing...)}
+		return scn{name: "config-check/" + name, fx: f, argv: j("config", "check"), want: want,
+			text: true, check: checkVerdict(status, missing...)}
 	}
 	allReq := []string{}
 	for _, k := range config.Keys {
@@ -581,13 +450,13 @@ func TestParityA4C(t *testing.T) {
 		chk("corrupt-empty-file", fx{config: " "}, 1, "corrupt"),
 		chk("corrupt-truncated", fx{config: fullConfig()[:40]}, 1, "corrupt"),
 		chk("from-subdir", withFile("sub/x.txt", "x\n"), 1, "stale", allReq...),
-		scn{name: "config-check/no-hv", fx: fx{noHV: true}, argv: j("config", "check"), old: []string{"hv-config-schema-check"}, want: 3, div: "old fails in the preamble with rc 1", refWant: 3},
+		scn{name: "config-check/no-hv", fx: fx{noHV: true}, argv: j("config", "check"), want: 3},
 		scn{name: "config-check/repo-flag-registered", fx: withFx(umbFx, func(f *fx) { f.config = fullConfig() }), argv: j("config", "check", "--repo", "api"),
-			old: []string{"hv-config-schema-check"}, want: 0, div: "old always exits 0", refWant: 0, check: checkVerdict("upToDate")},
+			want: 0, check: checkVerdict("upToDate")},
 		scn{name: "config-check/repo-flag-unregistered", goOnly: true, want: 3, fx: umbFx, argv: j("config", "check", "--repo", "nope")},
 		scn{name: "config-check/positional", goOnly: true, want: 2, argv: j("config", "check", "x")},
 		scn{name: "config-check/failure-data-keeps-the-verdict", goOnly: true, want: 1, fx: fx{config: "{}"}, argv: j("config", "check"),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "ok", false)
 				eq(t, e, "error.code", "failed")
 				eq(t, e, "data.status", "stale")
@@ -603,8 +472,8 @@ func TestParityA4C(t *testing.T) {
 		if want {
 			w = 0
 		}
-		return scn{name: "repo-umbrella/" + name, fx: f, argv: j("repo", "umbrella"), old: []string{"hv-umbrella-on"}, want: w,
-			div: "old always exits 0 and prints yes or no", refWant: 0, text: true, check: both(eqCheck("data.umbrella", want), checkYesNo(want))}
+		return scn{name: "repo-umbrella/" + name, fx: f, argv: j("repo", "umbrella"), want: w,
+			text: true, check: eqCheck("data.umbrella", want)}
 	}
 	add(
 		umb("two-sub-repos", umbFx, true),
@@ -612,8 +481,8 @@ func TestParityA4C(t *testing.T) {
 		umb("empty-registry", registry(`{"repos": []}`+"\n"), false),
 		umb("no-repos-key", registry(`{}`), false),
 		umb("corrupt-registry", registry(`{oops`), false),
-		scn{name: "repo-umbrella/registry-is-a-list", fx: registry(`[1]`), argv: j("repo", "umbrella"), old: []string{"hv-umbrella-on"}, want: 1,
-			div: "old crashes with a Python traceback on a registry that is not an object", refWant: 3, check: eqCheck("data.umbrella", false)},
+		scn{name: "repo-umbrella/registry-is-a-list", fx: registry(`[1]`), argv: j("repo", "umbrella"), want: 1,
+			check: eqCheck("data.umbrella", false)},
 		umb("entries-without-name-or-path", registry(`{"repos": [{"name": "a"}, {"path": "b"}, {"name": "", "path": "c"}]}`), false),
 		umb("one-valid-entry-among-junk", registry(`{"repos": [{"name": "a"}, {"name": "ok", "path": "api"}]}`), true),
 		umb("missing-path-still-counts", registry(`{"repos": [{"name": "ghost", "path": "not/there"}]}`), true),
@@ -623,34 +492,24 @@ func TestParityA4C(t *testing.T) {
 			f.after = func(t *testing.T, d string, in *info) { os.Remove(filepath.Join(d, ".hv/repos.json")) }
 		}), false),
 		umb("no-hv-at-all", fx{noHV: true}, false),
-		scn{name: "repo-umbrella/from-a-sub-repo-walks-up", fx: umbFx, cwd: "web", argv: j("repo", "umbrella"), old: []string{"hv-umbrella-on"}, want: 0,
-			div: "old reads only the working directory's .hv/; the contract walks up to the nearest .hv/", refWant: 0,
-			check: func(t *testing.T, e envl, ref run) {
-				eq(t, e, "data.umbrella", true)
-				if got := strings.TrimSpace(ref.stdout); got != "no" {
-					t.Errorf("old printed %q, expected the documented no", got)
-				}
-			}},
+		// the contract walks up to the nearest .hv/
+		scn{name: "repo-umbrella/from-a-sub-repo-walks-up", fx: umbFx, cwd: "web", argv: j("repo", "umbrella"), want: 0,
+			check: eqCheck("data.umbrella", true)},
 		scn{name: "repo-umbrella/stray-hv-in-a-sub-repo-is-the-nearest", cwd: "web", want: 1, fx: withFx(umbFx, func(f *fx) {
 			f.after = func(t *testing.T, d string, in *info) { os.MkdirAll(filepath.Join(d, "web", ".hv"), 0o755) }
-		}), argv: j("repo", "umbrella"), old: []string{"hv-umbrella-on"}, div: "old exits 0", refWant: 0, check: eqCheck("data.umbrella", false)},
+		}), argv: j("repo", "umbrella"), check: eqCheck("data.umbrella", false)},
 		scn{name: "repo-umbrella/with-C-on-the-root", fx: umbFx, cwd: "web", goOnly: true, want: 0, argv: j("-C", "..", "repo", "umbrella"), check: eqCheck("data.umbrella", true)},
 		scn{name: "repo-umbrella/repo-flag-rejected", goOnly: true, want: 2, fx: umbFx, argv: j("repo", "umbrella", "--repo", "web")},
 		scn{name: "repo-umbrella/positional-rejected", goOnly: true, want: 2, argv: j("repo", "umbrella", "x")},
 		scn{name: "repo-umbrella/failure-carries-data", goOnly: true, want: 1, argv: j("repo", "umbrella"),
-			check: func(t *testing.T, e envl, _ run) { eq(t, e, "error.code", "failed"); eq(t, e, "data.umbrella", false) }},
+			check: func(t *testing.T, e envl) { eq(t, e, "error.code", "failed"); eq(t, e, "data.umbrella", false) }},
 		scn{name: "repo-umbrella/no-root-is-no-not-3", goOnly: true, want: 1, fx: fx{noHV: true}, argv: j("repo", "umbrella")},
 	)
 
 	// ---- repo resolve
 	res := func(name string, f fx, want int, args ...string) scn {
-		old := "hv-resolve-repos"
 		return scn{name: "repo-resolve/" + name, fx: f, argv: j(append([]string{"repo", "resolve"}, args...)...),
-			old: []string{old, strings.Join(args, ",")}, oldMap: resolveMap, want: want, text: want == 0 && len(args) > 0 && false, check: func(t *testing.T, e envl, ref run) {
-				if want == 0 {
-					checkResolved(t, e, ref)
-				}
-			}}
+			want: want}
 	}
 	linkFx := withFx(umbFx, func(f *fx) {
 		f.after = func(t *testing.T, dir string, in *info) {
@@ -694,16 +553,17 @@ func TestParityA4C(t *testing.T) {
 				write(t, dir, ".hv/repos.json", fmt.Sprintf(`{"repos": [{"name": "abs", "path": %q}]}`, filepath.Join(dir, "api")))
 			}
 		}), 0, "abs"),
-		scn{name: "repo-resolve/from-a-sub-repo-walks-up", fx: umbFx, cwd: "web", argv: j("repo", "resolve", "api"), old: []string{"hv-resolve-repos", "api"}, oldMap: resolveMap,
-			want: 0, div: "old reads only the working directory's .hv/; the contract walks up to the nearest .hv/", refWant: 3,
-			check: func(t *testing.T, e envl, _ run) {
+		// the contract walks up to the nearest .hv/
+		scn{name: "repo-resolve/from-a-sub-repo-walks-up", fx: umbFx, cwd: "web", argv: j("repo", "resolve", "api"),
+			want: 0,
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "data.repos.0.name", "api")
 				if p, _ := at(e, "data.repos.0.path").(string); dirNorm(p, goDirOf(e)) != "<root>/api" {
 					t.Errorf("path = %s", p)
 				}
 			}},
 		scn{name: "repo-resolve/error-names-every-unregistered-name", goOnly: true, want: 3, fx: umbFx, argv: j("repo", "resolve", "x", "web", "y"),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				m, _ := at(e, "error.message").(string)
 				if !strings.Contains(m, "x, y") || strings.Contains(m, "web") {
 					t.Errorf("message = %q", m)
@@ -711,7 +571,7 @@ func TestParityA4C(t *testing.T) {
 			}},
 		scn{name: "repo-resolve/repo-flag-rejected", goOnly: true, want: 2, fx: umbFx, argv: j("repo", "resolve", "--repo", "web", "web")},
 		scn{name: "repo-resolve/zero-names-envelope", goOnly: true, want: 0, fx: umbFx, argv: j("repo", "resolve"),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				if l, ok := at(e, "data.repos").([]any); !ok || len(l) != 0 {
 					t.Errorf("data.repos = %#v", at(e, "data.repos"))
 				}
@@ -732,7 +592,7 @@ func TestParityA4C(t *testing.T) {
 	}
 	whichFx := withFx(umbFx, func(f *fx) { f.after = subdirs })
 	which := func(name string, f fx, cwd string, want int, wn, wr string) scn {
-		s := scn{name: "repo-which/" + name, fx: f, cwd: cwd, argv: j("repo", "which"), old: []string{"hv-resolve-repo"}, oldMap: whichMap, want: want}
+		s := scn{name: "repo-which/" + name, fx: f, cwd: cwd, argv: j("repo", "which"), want: want}
 		if want == 0 {
 			s.check = checkWhich(wn, wr)
 		}
@@ -787,27 +647,27 @@ func TestParityA4C(t *testing.T) {
 			prev := f.after
 			f.after = afterAll(prev, func(t *testing.T, dir string, in *info) { os.MkdirAll(filepath.Join(dir, "docs", ".hv"), 0o755) })
 		}), "docs", 3, "", ""),
-		scn{name: "repo-which/layout-b-worktree-maps-to-the-main-repo", fx: whichFx, prep: worktree, cwd: "web-wt", argv: j("repo", "which"), old: []string{"hv-resolve-repo"},
-			oldMap: whichMap, want: 0, check: checkWhich("web", "web")},
+		scn{name: "repo-which/layout-b-worktree-maps-to-the-main-repo", fx: whichFx, prep: worktree, cwd: "web-wt", argv: j("repo", "which"),
+			want: 0, check: checkWhich("web", "web")},
 		scn{name: "repo-which/layout-b-worktree-subdir", fx: whichFx, prep: func(t *testing.T, dir string) {
 			worktree(t, dir)
 			write(t, dir, "web-wt/pkg/x.txt", "x\n")
-		}, cwd: "web-wt/pkg", argv: j("repo", "which"), old: []string{"hv-resolve-repo"}, oldMap: whichMap, want: 0, check: checkWhich("web", "web")},
+		}, cwd: "web-wt/pkg", argv: j("repo", "which"), want: 0, check: checkWhich("web", "web")},
 		scn{name: "repo-which/worktree-of-an-unregistered-repo", fx: whichFx, prep: func(t *testing.T, dir string) {
 			git(t, filepath.Join(dir, "api"), "worktree", "add", "-q", "-b", "feat/y", filepath.Join(dir, "api-wt"))
 			write(t, dir, ".hv/repos.json", `{"repos": [{"name": "web", "path": "web"}]}`+"\n")
-		}, cwd: "api-wt", argv: j("repo", "which"), old: []string{"hv-resolve-repo"}, oldMap: whichMap, want: 3},
+		}, cwd: "api-wt", argv: j("repo", "which"), want: 3},
 		scn{name: "repo-which/worktree-inside-the-sub-repo-with-stray-hv-masks", fx: whichFx, prep: func(t *testing.T, dir string) {
 			git(t, filepath.Join(dir, "web"), "worktree", "add", "-q", "-b", "feat/z", filepath.Join(dir, "web", "wt"))
 			os.MkdirAll(filepath.Join(dir, "web", ".hv"), 0o755)
-		}, cwd: "web/wt", argv: j("repo", "which"), old: []string{"hv-resolve-repo"}, oldMap: whichMap, want: 3},
+		}, cwd: "web/wt", argv: j("repo", "which"), want: 3},
 		scn{name: "repo-which/git-missing-is-5", goOnly: true, fx: whichFx, cwd: "web", argv: j("repo", "which"), want: 5,
 			env:   []string{"PATH=/nonexistent"},
-			check: func(t *testing.T, e envl, _ run) { eq(t, e, "error.code", "unavailable") }},
+			check: func(t *testing.T, e envl) { eq(t, e, "error.code", "unavailable") }},
 		scn{name: "repo-which/repo-flag-rejected", goOnly: true, want: 2, fx: whichFx, cwd: "web", argv: j("repo", "which", "--repo", "web")},
 		scn{name: "repo-which/positional-rejected", goOnly: true, want: 2, argv: j("repo", "which", "x")},
 		scn{name: "repo-which/masked-error-hint-names-the-stray-dir", goOnly: true, want: 3, fx: maskedFx, cwd: "web", argv: j("repo", "which"),
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				eq(t, e, "error.code", "resolution")
 				if m, _ := at(e, "error.message").(string); !strings.Contains(m, "stray .hv/") || !strings.Contains(m, "web") {
 					t.Errorf("message = %q", m)
@@ -819,7 +679,7 @@ func TestParityA4C(t *testing.T) {
 		scn{name: "repo-which/with-C", goOnly: true, want: 0, fx: whichFx, argv: j("-C", "web/src", "repo", "which"),
 			check: eqCheck("data.name", "web")},
 		scn{name: "repo-which/not-in-a-git-repo-message", goOnly: true, want: 3, fx: fx{noHV: false, noCommit: false}, argv: j("-C", "/", "repo", "which"),
-			check: func(t *testing.T, e envl, _ run) { eq(t, e, "error.code", "resolution") }},
+			check: func(t *testing.T, e envl) { eq(t, e, "error.code", "resolution") }},
 	)
 
 	// ---- update: every install type, status and the safety net
@@ -848,34 +708,34 @@ func TestParityA4C(t *testing.T) {
 		updScn("stow/skill-symlink-walk-current", upd.homeStow, "1.2.3", nil, "stow", "current"),
 		updNoRoot("unknown/no-install-anywhere", upd.homeNone, "1.2.4", nil, "behind"),
 		updNoRoot("unknown/latest-still-reported", upd.homeNone, "9.9.9", nil, "behind"),
-		scn{name: "update/repo-clone-found-by-walking-up-from-the-binary", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
-			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4"}, bin: upd.cloneBin, oldBin: upd.cloneOld,
+		scn{name: "update/repo-clone-found-by-walking-up-from-the-binary", fx: fx{noHV: true}, argv: j("update"), want: 0,
+			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"}, bin: upd.cloneBin,
 			check: checkUpdate("repo", "behind")},
-		scn{name: "update/repo-clone-current", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
-			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.3", "HV_LATEST_VERSION=1.2.3"}, bin: upd.cloneBin, oldBin: upd.cloneOld,
+		scn{name: "update/repo-clone-current", fx: fx{noHV: true}, argv: j("update"), want: 0,
+			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.3"}, bin: upd.cloneBin,
 			check: checkUpdate("repo", "current")},
-		scn{name: "update/plugin-beats-repo-clone", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0,
-			env: []string{"HOME=" + upd.homePlugin, "HV_TEST_LATEST_VERSION=1.2.3", "HV_LATEST_VERSION=1.2.3"}, bin: upd.cloneBin, oldBin: upd.cloneOld,
+		scn{name: "update/plugin-beats-repo-clone", fx: fx{noHV: true}, argv: j("update"), want: 0,
+			env: []string{"HOME=" + upd.homePlugin, "HV_TEST_LATEST_VERSION=1.2.3"}, bin: upd.cloneBin,
 			check: checkUpdate("plugin", "current")},
-		scn{name: "update/runs-inside-a-project", argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
+		scn{name: "update/runs-inside-a-project", argv: j("update"), want: 0, bin: upd.bin,
+			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
 			check: checkUpdate("override", "behind")},
-		scn{name: "update/runs-from-a-subdirectory", fx: withFile("sub/x.txt", "x\n"), cwd: "sub", argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
+		scn{name: "update/runs-from-a-subdirectory", fx: withFile("sub/x.txt", "x\n"), cwd: "sub", argv: j("update"), want: 0, bin: upd.bin,
+			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
 			check: checkUpdate("override", "behind")},
 		// A resolved root without plugin.json: currentVersion is "" and the
-		// status unknown, as old read_version gave (ruling: the stamped
-		// version is only the no-root fallback).
-		scn{name: "update/override-without-manifest-is-empty", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
-			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.empty},
+		// status unknown (ruling: the stamped version is only the
+		// no-root fallback).
+		scn{name: "update/override-without-manifest-is-empty", fx: fx{noHV: true}, argv: j("update"), want: 0, bin: upd.bin,
+			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.empty},
 			check: both(eqCheck("data.installType", "override"), eqCheck("data.currentVersion", ""), eqCheck("data.status", "unknown"))},
 		scn{name: "update/dev-build-compares-as-zero", fx: fx{noHV: true}, argv: j("update"), goOnly: true, want: 0,
 			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=0.0.0"},
 			check: both(eqCheck("data.currentVersion", "dev"), eqCheck("data.status", "current"))},
-		scn{name: "update/without-the-test-variable-only-the-fake-gh-runs", fx: fx{noHV: true}, argv: j("update"), old: []string{"hv-update-check"}, want: 0, bin: upd.bin,
+		scn{name: "update/without-the-test-variable-only-the-fake-gh-runs", fx: fx{noHV: true}, argv: j("update"), want: 0, bin: upd.bin,
 			env: []string{"HOME=" + upd.homeNone, "HV_INSTALL_ROOT=" + upd.plain, "FAKE_TRACKER_LOG=" + filepath.Join(harnessTmp, "update-gh.log")},
-			check: func(t *testing.T, e envl, ref run) {
-				checkUpdate("override", "unknown")(t, e, ref)
+			check: func(t *testing.T, e envl) {
+				checkUpdate("override", "unknown")(t, e)
 				b, err := os.ReadFile(filepath.Join(harnessTmp, "update-gh.log"))
 				if err != nil {
 					t.Fatalf("the fake gh was not called: %v", err)
@@ -890,7 +750,7 @@ func TestParityA4C(t *testing.T) {
 		scn{name: "update/repo-flag-rejected", goOnly: true, want: 2, argv: j("update", "--repo", "web"), env: []string{"HV_TEST_LATEST_VERSION=1.0.0"}},
 		scn{name: "update/data-shape", goOnly: true, want: 0, argv: j("update"), bin: upd.bin,
 			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4", "HV_INSTALL_ROOT=" + upd.plain},
-			check: func(t *testing.T, e envl, _ run) {
+			check: func(t *testing.T, e envl) {
 				d, _ := at(e, "data").(map[string]any)
 				var keys []string
 				for k := range d {
@@ -907,48 +767,15 @@ func TestParityA4C(t *testing.T) {
 	finish(t, all)
 }
 
-// TestUpdateOldHelperHonoursTheTestVariable: the reference must not reach
-// the network either. With the variable set the old helper never looks for gh,
-// so a PATH with no gh at all still answers.
-func TestUpdateOldHelperHonoursTheTestVariable(t *testing.T) {
-	r := exec1e(t, t.TempDir(), "", []string{"PATH=/usr/bin:/bin", "HV_LATEST_VERSION=3.2.1", "HOME=" + harnessTmp, "HV_INSTALL_ROOT=" + harnessTmp},
-		filepath.Join(stagedBin, "hv-update-check"))
-	if r.code != 0 || !strings.Contains(r.stdout, `"latestVersion": "3.2.1"`) {
-		t.Fatalf("old helper: %d %s %s", r.code, r.stdout, r.stderr)
-	}
-}
-
-// TestOldHelperDisagreements pins, against the real old helpers, each place
-// where the verb contract and the helper differ and the Go binary follows the
-// contract. A change in the helper makes this fail, so the list stays true.
-func TestOldHelperDisagreements(t *testing.T) {
+// TestConfigSetStoresNaNAsString: NaN is not JSON, so config set stores it as
+// the string "NaN" (the old helper wrote a bare NaN).
+func TestConfigSetStoresNaNAsString(t *testing.T) {
 	dir, _ := fx{}.build(t)
-	old := func(name string, args ...string) run {
-		return exec1e(t, dir, "", nil, filepath.Join(stagedBin, name), args...)
-	}
-	// 1. contract: "falls back to a raw string (opus, empty string)"; helper: ${2:?} refuses an empty value.
-	if r := old("hv-config-set", "git.baseBranch", ""); r.code == 0 {
-		t.Errorf("hv-config-set accepts an empty value now: the contract and the helper agree, drop the note")
-	}
-	// 2. the helper accepts NaN and writes it bare; Go treats it as not JSON and stores the string.
-	if r := old("hv-config-set", "git.baseBranch", "NaN"); r.code != 0 {
-		t.Fatalf("hv-config-set NaN: %d %s", r.code, r.stderr)
+	if r := exec1e(t, dir, "", nil, hvBin, "--json", "config", "set", "git.baseBranch", "NaN"); r.code != 0 || !strings.Contains(r.stdout, `"value": "NaN"`) {
+		t.Errorf("exit %d: %s", r.code, r.stdout)
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, ".hv", "config.json"))
-	if !strings.Contains(string(b), "NaN") || strings.Contains(string(b), `"NaN"`) {
-		t.Errorf("expected a bare NaN in %s", b)
-	}
-	goDir, _ := fx{}.build(t)
-	if r := exec1(t, goDir, "", hvBin, "--json", "config", "set", "git.baseBranch", "NaN"); r.code != 0 || !strings.Contains(r.stdout, `"value": "NaN"`) {
-		t.Errorf("go: %d %s", r.code, r.stdout)
-	}
-	// 3. the helper stores a non-schema key; Go refuses it with exit 2.
-	if r := old("hv-config-set", "nope.key", "1"); r.code != 0 {
-		t.Errorf("hv-config-set accepted a non-schema key: %d", r.code)
-	}
-	// 4. a corrupt config.json is replaced silently by both helper and Go; the contract only names "not a JSON object" for exit 70.
-	cdir, _ := fx{config: "{oops"}.build(t)
-	if r := exec1e(t, cdir, "", nil, filepath.Join(stagedBin, "hv-config-set"), "docs.path", "x"); r.code != 0 {
-		t.Errorf("old on corrupt: %d %s", r.code, r.stderr)
+	if !strings.Contains(string(b), `"NaN"`) {
+		t.Errorf("config.json does not hold the string \"NaN\":\n%s", b)
 	}
 }

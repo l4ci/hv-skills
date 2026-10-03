@@ -1,21 +1,24 @@
 package main
 
-// Frozen parity (#53, S7 prep). The parity suites compare the Go binary with
-// the old helpers, which S7 deletes. Before that happens, every scenario that
-// passes parity records what the Go side did into
-// testdata/frozen/<suite>.jsonl: the exit code, the --json envelope, the plain
-// text for text scenarios, a hash of every .hv/ file the run changed and a
-// hash of the fake forge's database. Go agreed with the oracle on each
-// recorded scenario, so the record stands in for the oracle.
+// Frozen records (#53). The scenario suites once compared the Go binary with
+// the old helpers. Before those were deleted, every scenario that passed
+// recorded what the Go side did into testdata/frozen/<suite>.jsonl: the exit
+// code, the --json envelope, the plain text for text scenarios, a hash of
+// every .hv/ file the run changed and a hash of the fake forge's database. Go
+// agreed with the oracle on each recorded scenario, so the record stands in
+// for it. TestFrozen<Suite> runs the suite's scenario table and compares each
+// run with its record. It needs neither bin/ nor python3, except that the
+// forge suites drive test/fakes, which are Python.
 //
-// TestFrozen<Suite> runs the suite's own scenario table with the Go side only
-// and compares each run against its record. It needs neither bin/ nor the
-// shim; the forge suites still need python3 for test/fakes, which stay.
+// Regenerating: go test ./cmd/hv -run '^TestFrozen<Suite>$' -update-frozen
+// accepts the current Go output, provided every scenario's own assertions
+// (want, check) still pass. A change to a record is a behaviour change: read
+// the jsonl diff and say why in the PR. A filtered run (-run 'TestFrozenA4/x')
+// updates only the scenarios it ran and needs a file from the same day; a
+// whole-suite run rewrites the file and drops records with no scenario.
 //
-// Recording: HV_PARITY_FREEZE=1 go test ./cmd/hv -run '^TestParity' rewrites
-// the files of the suites that ran (only while the oracle exists). A suite's
-// file holds one recording day: the fixtures commit at noon of that day and
-// {dN} dates count back from it, so its git hashes and dates repeat. A
+// A suite's file holds one recording day: the fixtures commit at noon of that
+// day and {dN} dates count back from it, so its git hashes and dates repeat. A
 // TestFrozen run on another day re-runs its suite in a child process with the
 // harness pinned to that day (HV_FROZEN_DAY), sets HV_TEST_TODAY so archive and
 // stale measure age from it, and maps today's date in the output back to it.
@@ -58,7 +61,7 @@ func pinDay() {
 	}
 }
 
-var recording = os.Getenv("HV_PARITY_FREEZE") != ""
+var updateFrozen = flag.Bool("update-frozen", false, "accept the current Go output as the frozen records (see frozen_test.go)")
 
 // frozenStep is one Go run of a scenario.
 type frozenStep struct {
@@ -137,83 +140,37 @@ func (f *frozenFile) write(suite string) error {
 }
 
 // suiteOf splits a subtest name into the suite file and the scenario name:
-// TestParityA4B/list/std and TestFrozenA4B/list/std are both a4b, list/std.
+// TestFrozenA4B/list/std is a4b, list/std.
 func suiteOf(t *testing.T) (suite, name string) {
 	top, rest, _ := strings.Cut(t.Name(), "/")
-	top = strings.TrimPrefix(strings.TrimPrefix(top, "TestParity"), "TestFrozen")
-	return strings.ToLower(top), rest
-}
-
-// ---- recording -----------------------------------------------------------------
-
-var recorded = struct {
-	sync.Mutex
-	m map[string]map[string]frozenRec
-}{m: map[string]map[string]frozenRec{}}
-
-// record keeps a passing scenario's Go side for writeRecords; a scenario that
-// failed parity records nothing.
-func record(t *testing.T, side func(t *testing.T) frozenRec) {
-	t.Helper()
-	if !recording || t.Failed() {
-		return
-	}
-	r := side(t)
-	if t.Failed() {
-		return
-	}
-	suite, name := suiteOf(t)
-	r.Name = name
-	recorded.Lock()
-	defer recorded.Unlock()
-	if recorded.m[suite] == nil {
-		recorded.m[suite] = map[string]frozenRec{}
-	}
-	recorded.m[suite][name] = r
-}
-
-// writeRecords merges what this run recorded into the suite files. A file from
-// another day is replaced, never merged: one file, one fixture day.
-func writeRecords() error {
-	recorded.Lock()
-	defer recorded.Unlock()
-	for suite, recs := range recorded.m {
-		f, err := loadFrozen(suite)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		hdr := frozenHeader{startDay, localDay}
-		if f.frozenHeader != hdr {
-			f.recs = map[string]frozenRec{}
-		}
-		f.frozenHeader = hdr
-		for n, r := range recs {
-			f.recs[n] = r
-		}
-		if err := f.write(suite); err != nil {
-			return err
-		}
-		fmt.Fprintf(os.Stderr, "frozen: %s: recorded %d, %d in file\n", suite, len(recs), len(f.recs))
-	}
-	return nil
+	return strings.ToLower(strings.TrimPrefix(top, "TestFrozen")), rest
 }
 
 // ---- the frozen run --------------------------------------------------------------
 
 var frozenOn *frozenFile
 
-// runFrozen runs a parity suite's table against its record. parity is the
-// suite's TestParity function; in frozen mode its scenarios run frozenCheck
-// instead of the oracle comparison.
-func runFrozen(t *testing.T, parity func(*testing.T)) {
-	suite, _ := suiteOf(t)
-	f, err := loadFrozen(suite)
+// filtered reports whether -run selects single scenarios rather than whole
+// suites.
+func filtered() bool {
+	return strings.Contains(flag.Lookup("test.run").Value.String(), "/")
+}
+
+// runFrozen runs a suite's scenario table against its record, or with
+// -update-frozen rewrites the record from it.
+func runFrozen(t *testing.T, suite func(*testing.T)) {
+	name, _ := suiteOf(t)
+	f, err := loadFrozen(name)
+	if *updateFrozen {
+		updateRecords(t, name, f, err, suite)
+		return
+	}
 	if err != nil {
-		t.Fatalf("no frozen record for %s: %v (record with HV_PARITY_FREEZE=1 while bin/ exists)", suite, err)
+		t.Fatalf("no frozen record for %s: %v (go test -run '^%s$' -update-frozen writes one)", name, err, t.Name())
 	}
 	if f.UTC != startDay || f.Local != localDay {
 		if os.Getenv("HV_FROZEN_DAY") != "" {
-			t.Fatalf("pinned day %s,%s but %s was recorded on %s,%s", startDay, localDay, suite, f.UTC, f.Local)
+			t.Fatalf("pinned day %s,%s but %s was recorded on %s,%s", startDay, localDay, name, f.UTC, f.Local)
 		}
 		reexec(t, f.frozenHeader)
 		return
@@ -221,7 +178,7 @@ func runFrozen(t *testing.T, parity func(*testing.T)) {
 	frozenOn = f
 	t.Cleanup(func() {
 		frozenOn = nil
-		if t.Failed() || strings.Contains(flag.Lookup("test.run").Value.String(), "/") {
+		if t.Failed() || filtered() {
 			return
 		}
 		var stale []string
@@ -232,10 +189,40 @@ func runFrozen(t *testing.T, parity func(*testing.T)) {
 		}
 		sort.Strings(stale)
 		if len(stale) > 0 {
-			t.Errorf("%d records have no scenario (renamed or removed? re-record): %v", len(stale), stale)
+			t.Errorf("%d records have no scenario (renamed or removed? run with -update-frozen): %v", len(stale), stale)
 		}
 	})
-	parity(t)
+	suite(t)
+}
+
+// updateRecords runs the suite today and writes what it did as the record. A
+// whole-suite run replaces the file; a filtered one merges into a file from
+// the same day, since one file holds one fixture day.
+func updateRecords(t *testing.T, name string, old *frozenFile, loadErr error, suite func(*testing.T)) {
+	if loadErr != nil && !os.IsNotExist(loadErr) {
+		t.Fatal(loadErr)
+	}
+	hdr := frozenHeader{startDay, localDay}
+	f := &frozenFile{frozenHeader: hdr, recs: map[string]frozenRec{}, used: map[string]bool{}}
+	if filtered() {
+		if old.frozenHeader != hdr {
+			t.Fatalf("%s was recorded on %s,%s: a filtered -update-frozen cannot mix days; update the whole suite", name, old.UTC, old.Local)
+		}
+		f.recs = old.recs
+	}
+	frozenOn = f
+	t.Cleanup(func() {
+		frozenOn = nil
+		if t.Failed() {
+			t.Logf("%s: not written, the run failed", frozenPath(name))
+			return
+		}
+		if err := f.write(name); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%s: %d records", frozenPath(name), len(f.recs))
+	})
+	suite(t)
 }
 
 // reexec runs the one TestFrozen function in a child process pinned to the
@@ -257,18 +244,29 @@ func reexec(t *testing.T, day frozenHeader) {
 	}
 }
 
-// frozenCheck compares a scenario's Go side with its record.
-func frozenCheck(t *testing.T, side func(t *testing.T) frozenRec) {
+// frozenCheck compares a scenario's Go runs with its record, or with
+// -update-frozen stores them as the record.
+func frozenCheck(t *testing.T, got frozenRec) {
+	t.Helper()
 	_, name := suiteOf(t)
 	f := frozenOn
+	if *updateFrozen {
+		if t.Failed() {
+			return
+		}
+		got.Name = name
+		f.mu.Lock()
+		f.recs[name] = got
+		f.mu.Unlock()
+		return
+	}
 	f.mu.Lock()
 	want, ok := f.recs[name]
 	f.used[name] = true
 	f.mu.Unlock()
 	if !ok {
-		t.Fatalf("scenario %q is not frozen (re-record with HV_PARITY_FREEZE=1)", name)
+		t.Fatalf("scenario %q is not frozen (run with -update-frozen to record it)", name)
 	}
-	got := side(t)
 	if len(got.Steps) != len(want.Steps) {
 		t.Fatalf("%d runs, record has %d", len(got.Steps), len(want.Steps))
 	}
@@ -416,74 +414,6 @@ func (st *frozenStep) text(stdout string) {
 	st.Text = &n
 }
 
-// ---- the Go side of each scenario kind ---------------------------------------
-
-func (s scn) goSide(t *testing.T) frozenRec {
-	t.Helper()
-	base, in := s.fx.build(t)
-	dir := copyTree(t, base)
-	if s.prep != nil {
-		s.prep(t, dir)
-	}
-	argv := subst(s.argv, in)
-	env := frozenEnv(s.env)
-	r := exec1e(t, filepath.Join(dir, s.cwd), s.in, env, s.goBin(), argv...)
-	st := newStep(t, r, snapshot(t, base), dir, nil)
-	if s.text {
-		st.text(exec1e(t, filepath.Join(dir, s.cwd), s.in, env, s.goBin(), withoutJSON(argv)...).stdout)
-	}
-	return frozenRec{Steps: []frozenStep{st}}
-}
-
-func (s isc) goSide(t *testing.T) frozenRec {
-	t.Helper()
-	base, in, _ := s.fixture(t)
-	dir := copyTree(t, base)
-	dbPath := writeDB(t, seedDB())
-	argv := subst(s.argv, in)
-	env := frozenEnv(append([]string{"FAKE_TRACKER_DB=" + dbPath}, s.env...))
-	r := envRun(t, dir, s.in, env, hvBin, argv...)
-	st := newStep(t, r, snapshot(t, base), dir, readDB(t, dbPath))
-	if s.textSame {
-		st.text(envRun(t, dir, s.in, env, hvBin, withoutJSON(argv)...).stdout)
-	}
-	return frozenRec{Steps: []frozenStep{st}}
-}
-
-func (s dsc) goSide(t *testing.T) frozenRec {
-	t.Helper()
-	base, in, _, seed := s.fixture(t)
-	dir := copyTree(t, base)
-	dbPath := filepath.Join(t.TempDir(), "go.json")
-	if seed != nil {
-		raw, _ := json.Marshal(seed)
-		if err := os.WriteFile(dbPath, raw, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var rec frozenRec
-	before := snapshot(t, base)
-	for _, rn := range s.runs {
-		r := envRun(t, dir, "", frozenEnv(append([]string{"FAKE_TRACKER_DB=" + dbPath}, rn.env...)), hvBin, subst(rn.argv, in)...)
-		rec.Steps = append(rec.Steps, newStep(t, r, before, dir, readDB(t, dbPath)))
-	}
-	return rec
-}
-
-func (c ubcase) goSide(t *testing.T) frozenRec {
-	t.Helper()
-	base, repos := ubInit(t, c)
-	dir := copyTree(t, base)
-	dbDir := ubSeed(t, repos)
-	env := frozenEnv(append([]string{"FAKE_TRACKER_DB_DIR=" + dbDir}, c.env...))
-	r := envRun(t, filepath.Join(dir, c.cwd), c.in, env, hvBin, c.argv...)
-	st := newStep(t, r, snapshot(t, base), dir, ubReadAll(t, dbDir, repos))
-	if c.textSame {
-		st.text(envRun(t, filepath.Join(dir, c.cwd), c.in, env, hvBin, withoutJSON(c.argv)...).stdout)
-	}
-	return frozenRec{Steps: []frozenStep{st}}
-}
-
 func withoutJSON(argv []string) []string {
 	var out []string
 	for _, a := range argv {
@@ -494,10 +424,10 @@ func withoutJSON(argv []string) []string {
 	return out
 }
 
-func TestFrozenA4(t *testing.T)             { runFrozen(t, TestParityA4) }
-func TestFrozenA4B(t *testing.T)            { runFrozen(t, TestParityA4B) }
-func TestFrozenA4C(t *testing.T)            { runFrozen(t, TestParityA4C) }
-func TestFrozenA4D(t *testing.T)            { runFrozen(t, TestParityA4D) }
-func TestFrozenA4Issue(t *testing.T)        { runFrozen(t, TestParityA4Issue) }
-func TestFrozenA4Umbrella(t *testing.T)     { runFrozen(t, TestParityA4Umbrella) }
-func TestFrozenA4UmbrellaFile(t *testing.T) { runFrozen(t, TestParityA4UmbrellaFile) }
+func TestFrozenA4(t *testing.T)             { runFrozen(t, suiteA4) }
+func TestFrozenA4B(t *testing.T)            { runFrozen(t, suiteA4B) }
+func TestFrozenA4C(t *testing.T)            { runFrozen(t, suiteA4C) }
+func TestFrozenA4D(t *testing.T)            { runFrozen(t, suiteA4D) }
+func TestFrozenA4Issue(t *testing.T)        { runFrozen(t, suiteA4Issue) }
+func TestFrozenA4Umbrella(t *testing.T)     { runFrozen(t, suiteA4Umbrella) }
+func TestFrozenA4UmbrellaFile(t *testing.T) { runFrozen(t, suiteA4UmbrellaFile) }

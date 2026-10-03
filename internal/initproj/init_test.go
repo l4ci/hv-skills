@@ -3,10 +3,8 @@ package initproj
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -122,30 +120,12 @@ func readTree(t *testing.T, dir string) map[string]string {
 	return out
 }
 
-func repoBin() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..", "bin")
-}
-
-// TestInitMatchesBootstrapGolden runs the old hv-bootstrap on every fixture
-// (live with -update-golden, else from testdata/golden) and checks Init leaves
-// the same tree. The deliberate differences are the ones in the A9 rulings:
-// no `.hv/bin` directory, the G4 MAP.md text and the G7 config.json key order.
+// TestInitMatchesBootstrapGolden checks that Init leaves the tree the old
+// hv-bootstrap left on every fixture, as recorded in testdata/golden. The
+// deliberate differences are the ones in the A9 rulings: no `.hv/bin` directory, the G4 MAP.md text and the G7 config.json key order.
 func TestInitMatchesBootstrapGolden(t *testing.T) {
 	var want map[string]map[string]string
-	pytest.Golden(t, fixtures, &want, func() {
-		want = map[string]map[string]string{}
-		for name, f := range fixtures {
-			dir := t.TempDir()
-			writeFixture(t, dir, f)
-			cmd := exec.Command("bash", filepath.Join(repoBin(), "hv-bootstrap"))
-			cmd.Dir = dir
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Fatalf("hv-bootstrap on %s: %v\n%s", name, err, out)
-			}
-			want[name] = readTree(t, dir)
-		}
-	})
+	pytest.Golden(t, fixtures, &want)
 	for _, name := range names() {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

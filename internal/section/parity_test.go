@@ -14,25 +14,6 @@ type kase struct {
 	Body    string `json:"body"`
 }
 
-const pySection = `import json, sys
-from hvlib_section import find_section, section, replace_section, append_to_section, iter_topics
-
-def boff(s, i):
-    return len(s[:i].encode("utf-8"))
-
-out = []
-for c in json.load(open(sys.argv[1])):
-    content, name, body = c["content"], c["name"], c["body"]
-    span = find_section(content, name)
-    out.append({
-        "find": None if span is None else [boff(content, span[0]), boff(content, span[1])],
-        "body": section(content, name),
-        "replace": replace_section(content, name, body),
-        "append": append_to_section(content, name, body),
-        "topics": [list(t) for t in iter_topics(content)],
-    })
-print(json.dumps(out))`
-
 func goResult(c kase) map[string]any {
 	r := map[string]any{
 		"body":    Body(c.Content, c.Name),
@@ -122,7 +103,7 @@ func TestMatchesPython(t *testing.T) {
 		got[i], inputs[i] = goResult(c), c
 	}
 	var want []any
-	pytest.GoldenJSON(t, pySection, cases, &want)
+	pytest.GoldenJSON(t, cases, &want)
 	n := pytest.Compare(t, "section", inputs, got, want)
 	t.Logf("compared %d cases (find, body, replace, append, topics)", n)
 }

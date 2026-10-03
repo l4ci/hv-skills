@@ -17,29 +17,6 @@ type bulletIn struct {
 	Docs    []string    `json:"docs"`
 }
 
-const pyBullet = `import json, sys
-from hvlib_bullet import (parse_todo_fields, set_todo_field, parse_open_bullet, parse_done_line,
-    format_done_line, find_item_ids, find_origin_bullet, iter_open_bullets)
-d = json.load(open(sys.argv[1]))
-out = {}
-out["fields"] = [parse_todo_fields(l) for l in d["lines"]]
-out["open"] = [parse_open_bullet(l) for l in d["lines"]]
-out["done"] = [parse_done_line(l) for l in d["lines"]]
-def one(f, *a):
-    try:
-        return f(*a)
-    except ValueError as e:
-        return {"err": str(e)}
-out["set"] = [one(set_todo_field, *s) for s in d["sets"]]
-out["format"] = [one(format_done_line, *s) for s in d["dones"]]
-def origin(corpus, iid):
-    r = find_origin_bullet(corpus, iid)
-    return None if r is None else [r[0], r[1] or ""]
-out["origin"] = [origin(*o) for o in d["origins"]]
-out["ids"] = [find_item_ids(t, l) if l else find_item_ids(t) for t, l in d["ids"]]
-out["docs"] = [[[i, l, f, s] for i, l, f, s in iter_open_bullets(c)] for c in d["docs"]]
-print(json.dumps(out))`
-
 func TestBulletParityWithPython(t *testing.T) {
 	lines := genLines(48, 300)
 	rng := rand.New(rand.NewSource(7))
@@ -99,7 +76,7 @@ func TestBulletParityWithPython(t *testing.T) {
 		Docs    []any `json:"docs"`
 		Skipped any   `json:"-"`
 	}
-	pytest.GoldenJSON(t, pyBullet, in, &want)
+	pytest.GoldenJSON(t, in, &want)
 
 	total := 0
 	check := func(name string, inputs []any, got []any, want []any) {

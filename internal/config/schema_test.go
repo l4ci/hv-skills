@@ -15,30 +15,6 @@ type schemaCase struct {
 	Key string `json:"key"`
 }
 
-const pySchema = `import json, sys
-from hvlib_config import config_value, backlog_backend, tracker_label
-out = []
-for c in json.load(open(sys.argv[1])):
-    cfg = json.loads(c["cfg"])
-    key = c["key"]
-    r = {}
-    try:
-        r["value"] = json.dumps(config_value(cfg, key))
-    except KeyError:
-        r["value"] = {"err": True}
-    try:
-        r["backend"] = backend = backlog_backend(cfg)
-    except ValueError as e:
-        r["backend"] = {"err": str(e)}
-    if key.startswith("issues.labels."):
-        role = key[len("issues.labels."):]
-        v = tracker_label(cfg, role)
-        r["label"] = v if isinstance(v, str) else ""
-    else:
-        r["label"] = None
-    out.append(r)
-print(json.dumps(out))`
-
 func goSchema(t *testing.T, c schemaCase) map[string]any {
 	cfg, err := jsonx.Decode([]byte(c.Cfg))
 	if err != nil {
@@ -151,7 +127,7 @@ func TestSchemaMatchesPython(t *testing.T) {
 		inputs[i], got[i] = c, goSchema(t, c)
 	}
 	var want []any
-	pytest.GoldenJSON(t, pySchema, cases, &want)
+	pytest.GoldenJSON(t, cases, &want)
 	n := pytest.Compare(t, "schema", inputs, got, want)
 	t.Logf("compared %d cases (config_value, backlog_backend, tracker_label)", n)
 }
@@ -172,9 +148,7 @@ func TestKeysShape(t *testing.T) {
 // Keys must stay the same table as CONFIG_KEYS: name, default and required flag.
 func TestKeysMatchPython(t *testing.T) {
 	var want [][]any
-	pytest.GoldenJSON(t, `import json
-from hvlib_config import CONFIG_KEYS
-print(json.dumps([[k, d, r] for k, d, r in CONFIG_KEYS]))`, nil, &want)
+	pytest.GoldenJSON(t, nil, &want)
 	var got [][]any
 	for _, k := range Keys {
 		got = append(got, []any{k.Name, k.Default, k.Required})
