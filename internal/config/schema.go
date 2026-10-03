@@ -93,6 +93,11 @@ var Keys = []Key{
 	{"round.stallMinutes", json.Number("30"), false},
 	{"issues.labels.needsHuman", "needs-human", false},
 	{"work.codexCommand", "", false}, // empty: DefaultCodexCommand in internal/worker
+
+	{"orchestrator.handoffThreshold", json.Number("75"), false},
+	{"orchestrator.stateMaxAgeSeconds", json.Number("120"), false},
+	{"orchestrator.handoffMaxAgeSeconds", json.Number("900"), false},
+	{"orchestrator.handoffMaxBlocks", json.Number("2"), false},
 }
 
 // PythonKeys is how many leading rows of Keys are CONFIG_KEYS.
