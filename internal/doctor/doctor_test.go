@@ -107,6 +107,17 @@ func TestRunTable(t *testing.T) {
 		return m
 	}
 	herdrIn := Input{Dispatch: "herdr", Accounts: []Account{{"a", good}}}
+	env := func(kv ...string) func(string) string {
+		return func(k string) string {
+			for i := 0; i+1 < len(kv); i += 2 {
+				if kv[i] == k {
+					return kv[i+1]
+				}
+			}
+			return ""
+		}
+	}
+	inHerdr := Input{Dispatch: "subagent", Getenv: env("HERDR_ENV", "1"), Accounts: []Account{{"a", good}}}
 
 	for _, tc := range []struct {
 		name   string
@@ -132,6 +143,14 @@ func TestRunTable(t *testing.T) {
 		{"host tmux ok", Input{Dispatch: "tmux"}, all, with(nil), "host", Pass, "tmux", ""},
 		{"host tmux missing", Input{Dispatch: "tmux"}, without("tmux"), with(nil), "host", Fail, "tmux not found", "install tmux"},
 
+		{"host detects herdr in a pane", inHerdr, all, with(nil), "host", Pass, "herdr 0.9.3", ""},
+		{"host detects herdr when dispatch is unset", Input{Getenv: env("HERDR_ENV", "1")}, all, with(nil), "host", Pass, "herdr 0.9.3", ""},
+		{"host detects tmux inside tmux", Input{Dispatch: "subagent", Getenv: env("TMUX", "/tmp/tmux-1/default,1,0")}, all, with(nil), "host", Pass, "tmux on PATH", ""},
+		{"host herdr pane without herdr falls to solo", Input{Dispatch: "subagent", Getenv: env("HERDR_ENV", "1")}, without("herdr"), with(nil), "host", Skip, "solo", ""},
+		{"host herdr pane prefers herdr over tmux", Input{Getenv: env("HERDR_ENV", "1", "TMUX", "x")}, all, with(nil), "host", Pass, "herdr", ""},
+		{"host explicit tmux ignores a herdr pane", Input{Dispatch: "tmux", Getenv: env("HERDR_ENV", "1")}, all, with(nil), "host", Pass, "tmux", ""},
+		{"host explicit herdr missing fails in tmux", Input{Dispatch: "herdr", Getenv: env("TMUX", "x")}, without("herdr"), with(nil), "host", Fail, "herdr not found", ""},
+
 		{"tracker github ok", Input{}, all, with(nil), "tracker", Pass, "gh authenticated", ""},
 		{"tracker gh unauthenticated", Input{}, all, with(map[string]Result{"gh auth status": {ExitCode: 1}}), "tracker", Fail, "not authenticated", "gh auth login"},
 		{"tracker gh missing", Input{}, without("gh"), with(nil), "tracker", Fail, "gh not found", ""},
@@ -149,6 +168,8 @@ func TestRunTable(t *testing.T) {
 		{"hook ok", herdrIn, all, with(nil), "hook", Pass, "a: current", ""},
 		{"hook not installed", herdrIn, all, with(map[string]Result{"herdr integration status": {Stdout: miss}}), "hook", Fail, "a: not installed", "herdr integration install claude"},
 		{"hook status errors", herdrIn, all, with(map[string]Result{"herdr integration status": {ExitCode: 1}}), "hook", Fail, "status failed", "herdr integration install claude"},
+		{"hook runs for a detected herdr pane", inHerdr, all, with(nil), "hook", Pass, "a: current", ""},
+		{"hook skips for detected tmux", Input{Dispatch: "subagent", Getenv: env("TMUX", "x"), Accounts: []Account{{"a", good}}}, all, with(nil), "hook", Skip, "not herdr", ""},
 		{"hook skips off herdr", Input{Dispatch: "tmux", Accounts: []Account{{"a", good}}}, all, with(nil), "hook", Skip, "not herdr", ""},
 		{"hook skips without accounts", Input{Dispatch: "herdr"}, all, with(nil), "hook", Skip, "no accounts", ""},
 		{"hook skips without herdr", herdrIn, without("herdr"), with(nil), "hook", Skip, "see host", ""},

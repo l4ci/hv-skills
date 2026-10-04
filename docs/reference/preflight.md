@@ -51,7 +51,7 @@ The checks, in the order they run:
 | Check | Passes when | Skipped when |
 |-------|-------------|--------------|
 | `git` | git is on `PATH` and `.worktrees/` is gitignored | never |
-| `host` | the host `work.dispatch` names is usable: herdr on `PATH` and 0.9.x, or tmux on `PATH` | `work.dispatch` is neither `herdr` nor `tmux` |
+| `host` | the host a round would run on is usable: `work.dispatch` as named, or with it unset or `subagent`, herdr inside a herdr pane, else tmux inside tmux. herdr on `PATH` and 0.9.x, or tmux on `PATH` | no host is detected (solo) |
 | `tracker` | `gh` or `glab` is on `PATH` and logged in for the project's provider | the project has no remote |
 | `accounts` | every account in `work.accounts` has a `configDir` with a credentials file | no accounts configured |
 | `hook` | herdr's agent integration is installed for each configured account (`herdr integration install claude`) | the host is not herdr, or no account is configured |

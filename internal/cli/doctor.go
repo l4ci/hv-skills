@@ -58,7 +58,7 @@ func runDoctor(c *Ctx, args []string) (Result, error) {
 // doctorInput gathers the real environment: ROTA_TEST_DOCTOR_PATH replaces PATH
 // for tool lookup (a test hook, not part of the CLI).
 func doctorInput() doctor.Input {
-	in := doctor.Input{Exec: doctorExec, Look: doctorLook(os.Getenv("ROTA_TEST_DOCTOR_PATH"))}
+	in := doctor.Input{Exec: doctorExec, Getenv: os.Getenv, Look: doctorLook(os.Getenv("ROTA_TEST_DOCTOR_PATH"))}
 	in.Dir, _ = os.Getwd()
 	in.Home, _ = os.UserHomeDir()
 	in.Skills = doctorSkills(in.Home)

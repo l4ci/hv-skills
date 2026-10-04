@@ -35,8 +35,10 @@ dr_ok() { python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["ok"])
 # CLAUDE_CONFIG_DIR at an empty sandbox so it never sees the real ones. (An
 # account's configDir still reaches the fake herdr; doctor sets it per call.)
 mkdir -p "$TMP_DR/home" "$TMP_DR/claude"
+# Host detection reads HERDR_ENV and TMUX, so clear them: running the suite inside a pane must not change the result.
+# DR_HERDR=1 or DR_TMUX=<value> in front of dr_run fakes a pane.
 dr_run() { # dr_run <dir>: doctor in <dir> against the fakes; prints the envelope, returns the exit code
-  HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" ROTA_TEST_DOCTOR_PATH="$DR_BIN" "$ROTA_BIN" --json -C "$1" doctor 2>/dev/null
+  env -u HERDR_ENV -u TMUX ${DR_HERDR:+HERDR_ENV=1} ${DR_TMUX:+TMUX=$DR_TMUX} HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" ROTA_TEST_DOCTOR_PATH="$DR_BIN" "$ROTA_BIN" --json -C "$1" doctor 2>/dev/null
 }
 
 # (a) a herdr project with one account and the hook installed: all pass or skip
@@ -107,5 +109,26 @@ pass "C6[f]: doctor runs without .rota/ on defaults"
 rc=0; HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" ROTA_TEST_DOCTOR_PATH="$DR_BIN" "$ROTA_BIN" --json -C "$TMP_DR/bare" doctor --repo x >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "C6[g]: --repo exited $rc, not 2"
 pass "C6[g]: doctor rejects --repo"
+
+# (h) host detection (#236): init's default work.dispatch=subagent still gets the herdr checks inside a herdr pane
+printf '{"work":{"dispatch":"subagent","accounts":[{"name":"a","configDir":"%s"}]}}\n' "$TMP_DR/acct" >"$TMP_DR/proj/.rota/config.json"
+echo '{}' >"$TMP_DR/acct/.credentials.json"
+rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
+[ "$(printf '%s' "$OUT" | dr_field host status)" = "skip" ] || fail "C6[h]: subagent outside a pane did not skip host: $OUT"
+[ "$(printf '%s' "$OUT" | dr_field hook status)" = "skip" ] || fail "C6[h]: subagent outside a pane did not skip hook: $OUT"
+rc=0; OUT="$(DR_HERDR=1 dr_run "$TMP_DR/proj")" || rc=$?
+[ "$(printf '%s' "$OUT" | dr_field host status)" = "pass" ] || fail "C6[h]: herdr pane did not pass host: $OUT"
+[ "$(printf '%s' "$OUT" | dr_field host detail)" = "herdr 0.9.3" ] || fail "C6[h]: wrong host detail in a herdr pane: $OUT"
+[ "$(printf '%s' "$OUT" | dr_field hook status)" = "pass" ] || fail "C6[h]: herdr pane did not run hook: $OUT"
+rm "$TMP_DR/acct/installed"
+rc=0; OUT="$(DR_HERDR=1 dr_run "$TMP_DR/proj")" || rc=$?
+[ "$rc" -eq 1 ] || fail "C6[h]: uninstalled hook in a herdr pane exited $rc, not 1"
+[ "$(printf '%s' "$OUT" | dr_field hook status)" = "fail" ] || fail "C6[h]: uninstalled hook in a herdr pane did not fail: $OUT"
+: >"$TMP_DR/acct/installed"
+printf '#!/bin/sh\nexit 0\n' >"$DR_BIN/tmux"; chmod +x "$DR_BIN/tmux"
+rc=0; OUT="$(DR_TMUX=/tmp/tmux-1/default,1,0 dr_run "$TMP_DR/proj")" || rc=$?
+[ "$(printf '%s' "$OUT" | dr_field host detail)" = "tmux on PATH" ] || fail "C6[h]: tmux session not detected: $OUT"
+rm "$DR_BIN/tmux"
+pass "C6[h]: doctor detects the host like the round verbs when work.dispatch is subagent"
 
 trap 'rm -rf "$TMP"' EXIT

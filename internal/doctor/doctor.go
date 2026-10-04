@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/host"
 	"github.com/l4ci/rota/internal/skills"
 )
 
@@ -92,6 +93,9 @@ type Input struct {
 	ConfigDirs []string
 
 	Exec Exec
+	// Getenv reads the environment for host detection (HERDR_ENV, TMUX); nil
+	// reads as empty.
+	Getenv func(string) string
 	// Look resolves a tool name to a path, or false when it is not found.
 	Look func(name string) (string, bool)
 }
@@ -146,8 +150,23 @@ func (d *runner) git() Check {
 
 var versionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 
+// roundHost is the host a round would run on: the same detection the round
+// verbs use, so doctor checks what `round start` will drive.
+func (d *runner) roundHost() string {
+	getenv := d.in.Getenv
+	if getenv == nil {
+		getenv = func(string) string { return "" }
+	}
+	return host.ResolveRound(d.in.Dispatch, getenv, func(name string) (string, error) {
+		if p, ok := d.in.Look(name); ok {
+			return p, nil
+		}
+		return "", os.ErrNotExist
+	})
+}
+
 func (d *runner) host() Check {
-	switch d.in.Dispatch {
+	switch d.roundHost() {
 	case "herdr":
 		bin, ok := d.in.Look("herdr")
 		if !ok {
@@ -174,7 +193,7 @@ func (d *runner) host() Check {
 		if name == "" {
 			name = "subagent"
 		}
-		return skip("host", "work.dispatch is "+name+", no terminal host needed")
+		return skip("host", "work.dispatch is "+name+", not in herdr or tmux: solo, no terminal host needed")
 	}
 }
 
@@ -258,7 +277,7 @@ func (d *runner) accounts() Check {
 const hookHint = "herdr integration install claude"
 
 func (d *runner) hook() Check {
-	if d.in.Dispatch != "herdr" {
+	if d.roundHost() != "herdr" {
 		return skip("hook", "host is not herdr")
 	}
 	if len(d.in.Accounts) == 0 {
