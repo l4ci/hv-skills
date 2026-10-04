@@ -1,6 +1,6 @@
-# Release build for the hv CLI. Asset names are a contract with bin/hv, the
-# plugin launcher: it downloads hv_<os>_<arch> and checks it against
-# checksums.txt. Run `goreleaser release --snapshot --clean` to build locally.
+# Release build for the hv CLI. Asset names are a contract with install.sh: it
+# downloads hv_<os>_<arch> and checks it against checksums.txt. Run
+# `goreleaser release --snapshot --clean` to build locally.
 version: 2
 project_name: hv
 
@@ -20,8 +20,8 @@ builds:
       - -X github.com/l4ci/hv-skills/v5/internal/version.Date={{ .Date }}
 
 archives:
-  # Bare binaries for bin/hv.
-  - id: launcher
+  # Bare binaries for install.sh.
+  - id: installer
     formats: [binary]
     name_template: "hv_{{ .Os }}_{{ .Arch }}"
   # Tarballs for people and package managers.
@@ -35,7 +35,7 @@ checksum:
 # One GitHub release per version. The release workflow (on a v* tag) makes it
 # as a draft carrying the binaries; `hv release publish` then fills in the
 # approved notes and publishes it. A draft's assets do not resolve at
-# /releases/download/, so bin/hv sees nothing until that gated step. Notes come
+# /releases/download/, so install.sh sees nothing until that gated step. Notes come
 # from /hv-release, not from commit messages.
 release:
   draft: true
@@ -43,5 +43,25 @@ release:
 changelog:
   disable: true
 
-# Homebrew needs a tap repository (e.g. l4ci/homebrew-tap) and a token with
-# write access to it; neither exists yet, so the brew section stays out.
+# Homebrew formula, pushed to the tap on release. The tap repo and the token
+# are the maintainer's one-time setup (HOMEBREW_TAP_TOKEN, see .hv/RELEASE.md).
+# skip_upload: auto keeps a prerelease tag out of the tap. The formula installs
+# from the tarballs above; goreleaser fills in their URLs and sha256 sums.
+# Note: the formula is built when the draft is made, so it points at assets
+# that only resolve once `hv release publish` publishes the draft; run that
+# promptly after the workflow finishes.
+brews:
+  - name: hv
+    ids: [tarball]
+    repository:
+      owner: l4ci
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/l4ci/hv-skills
+    description: Plan, ship and run parallel rounds with AI coding agents
+    license: MIT
+    skip_upload: auto
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/hv version")
+    caveats: |
+      Next: hv skills install

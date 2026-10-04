@@ -137,7 +137,7 @@ The nudge fires when EITHER `release.nudgeAfterCommits` (default 10) OR `release
 ```markdown
 # Release Checklist
 
-- [ ] `.claude-plugin/marketplace.json` versions match the new `plugin.json` version
+- [ ] `VERSION` matches the CHANGELOG heading for the release
 - [ ] CI is green on the release branch
 - [ ] Migration notes for users on the prior version are written
 - [ ] Push staging migration (manual)
