@@ -42,10 +42,10 @@ var NoteKinds = []string{"proof", "design", "plan"}
 const noteLimitDefault = 60000
 
 var (
-	markerRe     = regexp.MustCompile(`\A<!-- rota:(proof|design|plan(?::S\p{Nd}+)?)(?: (\p{Nd}+)/(\p{Nd}+))? -->(?:\n|\z)`)
+	markerRe     = regexp.MustCompile(`\A<!-- (?:rota|hv):(proof|design|plan(?::S\p{Nd}+)?)(?: (\p{Nd}+)/(\p{Nd}+))? -->(?:\n|\z)`)
 	sliceKindRe  = regexp.MustCompile(`\Aplan:S\p{Nd}+\z`)
-	commentRe    = regexp.MustCompile(`\A<!-- rota:comment (` + wordClass + `+) -->(?:\n|\z)`)
-	claimRe      = regexp.MustCompile(`\A<!-- rota:(claim|release) ([^` + pystr.SpaceClass + `]+) -->`)
+	commentRe    = regexp.MustCompile(`\A<!-- (?:rota|hv):comment (` + wordClass + `+) -->(?:\n|\z)`)
+	claimRe      = regexp.MustCompile(`\A<!-- (?:rota|hv):(claim|release) ([^` + pystr.SpaceClass + `]+) -->`)
 	milestoneIDs = regexp.MustCompile(`\AM\p{Nd}+\z`)
 )
 

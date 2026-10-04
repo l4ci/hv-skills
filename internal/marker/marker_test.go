@@ -26,3 +26,9 @@ func TestHas(t *testing.T) {
 		t.Error("plain comment detected as marker")
 	}
 }
+
+func TestHasReadsLegacyHvMarker(t *testing.T) {
+	if !Has("Done in `abc`\n\n<!-- hv:done -->") {
+		t.Error("a marker hv wrote before the rename is not detected")
+	}
+}

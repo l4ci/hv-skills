@@ -956,3 +956,13 @@ func TestReclaimReleasesEveryClaimOfTheSlotEvenWhenTheRegistryLostIt(t *testing.
 	}
 }
 
+// A handoff comment hv posted before the rename (#236) still names the branch
+// the next worker continues from.
+func TestLatestHandoffBranchReadsLegacyMarker(t *testing.T) {
+	b := &moveBoard{comments: map[string][]string{
+		"#5": {"**hv handoff** (return, from ben)\nBranch: `ben/5-x`\n\n<!-- hv:handoff ben@1 -->"},
+	}}
+	if got := latestHandoffBranch(b, "#5"); got != "ben/5-x" {
+		t.Errorf("branch %q", got)
+	}
+}

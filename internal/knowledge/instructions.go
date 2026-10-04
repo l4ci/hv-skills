@@ -31,7 +31,7 @@ type Action struct {
 const claudeStub = "# CLAUDE.md\n\nProject instructions live in AGENTS.md.\n\n@AGENTS.md\n"
 
 var (
-	blockKeyRe = regexp.MustCompile(`<!-- (?:rota-([\w-]+)-start|hv:([\w-]+):start) -->`)
+	blockKeyRe = regexp.MustCompile(`<!-- (?:(?:rota|hv)-([\w-]+)-start|hv:([\w-]+):start) -->`)
 	blankRuns  = regexp.MustCompile(`\n{3,}`)
 )
 

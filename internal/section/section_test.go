@@ -109,6 +109,21 @@ func TestUpsertBlockAppendsAndMigratesLegacy(t *testing.T) {
 	}
 }
 
+// A block hv wrote before the rename (#236) is replaced in place, not
+// duplicated by an appended rota block.
+func TestUpsertBlockReplacesHvBlockInPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "AGENTS.md")
+	os.WriteFile(path, []byte("top\n<!-- hv-skills-start -->\nold\n<!-- hv-skills-end -->\nbottom\n"), 0o666)
+	got, err := UpsertBlock(path, "skills", "<!-- rota-skills-start -->\nA\n<!-- rota-skills-end -->", "")
+	if err != nil || got != Updated {
+		t.Fatalf("upsert: %q %v", got, err)
+	}
+	raw, _ := os.ReadFile(path)
+	if string(raw) != "top\n<!-- rota-skills-start -->\nA\n<!-- rota-skills-end -->\nbottom\n" {
+		t.Errorf("file = %q", raw)
+	}
+}
+
 func TestLinesMatchesPythonSplitlines(t *testing.T) {
 	in := "a\nb\r\nc\rd\v e\f\u0085f g h\n"
 	got := strings.Join(Lines(in), "|")

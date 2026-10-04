@@ -166,16 +166,17 @@ func InstructionsFile(root string) string {
 }
 
 // BlockRegex matches a managed block: the canonical
-// "<!-- rota-<key>-start -->…<!-- rota-<key>-end -->" and, when legacy is not
-// empty, the old "<!-- hv:<legacy>:start -->…<!-- hv:<legacy>:end -->" form.
-// consumeNewline also eats one newline after the end marker.
+// "<!-- rota-<key>-start -->…<!-- rota-<key>-end -->", the same block hv wrote
+// before the rename (#236) as "<!-- hv-<key>-start -->…", and, when legacy is
+// not empty, the old "<!-- hv:<legacy>:start -->…<!-- hv:<legacy>:end -->"
+// form. consumeNewline also eats one newline after the end marker.
 func BlockRegex(key, legacy string, consumeNewline bool) *regexp.Regexp {
 	tail := ""
 	if consumeNewline {
 		tail = `\n?`
 	}
 	k := regexp.QuoteMeta(key)
-	start, end := `rota-`+k+`-start`, `rota-`+k+`-end`
+	start, end := `(?:rota|hv)-`+k+`-start`, `(?:rota|hv)-`+k+`-end`
 	if legacy != "" {
 		l := regexp.QuoteMeta(legacy)
 		start, end = `(?:`+start+`|hv:`+l+`:start)`, `(?:`+end+`|hv:`+l+`:end)`
@@ -191,8 +192,9 @@ const (
 	Unchanged = "unchanged"
 )
 
-// UpsertBlock writes block into path: it replaces an existing block for key,
-// appends one when none exists, or creates the file holding just the block.
+// UpsertBlock writes block into path: it replaces an existing block for key
+// (a legacy hv-<key> block too, in place), appends one when none exists, or
+// creates the file holding just the block.
 // A second identical call is Unchanged and does not touch the file.
 func UpsertBlock(path, key, block, legacy string) (string, error) {
 	content, err := fsio.ReadText(path)

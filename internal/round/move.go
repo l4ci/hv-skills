@@ -156,15 +156,15 @@ func (h handoff) post(be Board, id string) (commentID string, posted bool, err e
 
 var reHandoffBranch = regexp.MustCompile("(?m)^Branch: `([^`]+)`$")
 
-// latestHandoffBranch is the branch named by the newest rota:handoff comment on
-// the issue, "" when there is none.
+// latestHandoffBranch is the branch named by the newest rota:handoff (or legacy
+// hv:handoff) comment on the issue, "" when there is none.
 func latestHandoffBranch(be Board, id string) string {
 	cs, err := be.Comments(id, "feedback")
 	if err != nil {
 		return ""
 	}
 	for i := len(cs) - 1; i >= 0; i-- {
-		if strings.Contains(cs[i].Text, "<!-- rota:handoff ") {
+		if t := cs[i].Text; strings.Contains(t, "<!-- rota:handoff ") || strings.Contains(t, "<!-- hv:handoff ") {
 			if m := reHandoffBranch.FindStringSubmatch(cs[i].Text); m != nil {
 				return m[1]
 			}

@@ -488,7 +488,7 @@ func (b *Issues) Detail(ref string) (string, bool, error) {
 }
 
 var (
-	fieldsBlockRe = regexp.MustCompile(`(?s)\n*<!-- rota:fields\n(.*?)\n?-->[ \t]*\n*\z`)
+	fieldsBlockRe = regexp.MustCompile(`(?s)\n*<!-- (?:rota|hv):fields\n(.*?)\n?-->[ \t]*\n*\z`)
 	fieldLineRe   = regexp.MustCompile(`\A([A-Za-z]+):[ \t]*(.*?)[ \t]*\z`)
 )
 
@@ -496,10 +496,11 @@ var (
 const fieldsOpen = "<!-- rota:fields"
 
 // ParseFieldsBlock splits an issue body into its text and the trailing
-// "<!-- rota:fields ... -->" comment, one "Name: value" per line
-// (parse_fields_block). order lists the field names in block order; a name
-// that repeats keeps its first position and its last value. Without a block
-// the text is the body (CRLF turned into LF) and fields is empty.
+// "<!-- rota:fields ... -->" comment (or the legacy hv:fields one), one
+// "Name: value" per line (parse_fields_block). order lists the field names in
+// block order; a name that repeats keeps its first position and its last
+// value. Without a block the text is the body (CRLF turned into LF) and fields
+// is empty.
 func ParseFieldsBlock(body string) (text string, fields map[string]string, order []string) {
 	body = strings.ReplaceAll(body, "\r\n", "\n")
 	fields = map[string]string{}
