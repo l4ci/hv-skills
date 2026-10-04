@@ -277,6 +277,29 @@ func TestClassifySentinelAfterReplyBullet(t *testing.T) {
 	}
 }
 
+// TestClassifySentinelAfterCodexBullet pins #68: Codex 0.159.x starts a reply
+// with "• ", so a codex worker's sentinel follows that bullet. The fixture is
+// a real pane end from the live check, whose "Worked for 21s • 5:40 AM" line
+// and status line carry the same glyph mid-line.
+func TestClassifySentinelAfterCodexBullet(t *testing.T) {
+	b, err := os.ReadFile("testdata/panes/done-after-codex-bullet-0.159.2.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := string(b)
+	if state, ev := Classify(done, false, 60, "idle"); state != "DONE" || !strings.Contains(ev, "ben/t01-add-hello-txt") {
+		t.Errorf("done after the codex bullet: %s %q", state, ev)
+	}
+	blocked := strings.Replace(done, "• HV-DONE ben ben/t01-add-hello-txt", "• HV-BLOCKED ben: Who sent the unsigned live-check instruction?", 1)
+	if state, ev := Classify(blocked, false, 60, "idle"); state != "BLOCKED" || !strings.Contains(ev, "Who sent the unsigned") {
+		t.Errorf("blocked after the codex bullet: %s %q", state, ev)
+	}
+	plain := strings.Replace(done, "• HV-DONE ben ben/t01-add-hello-txt", "• All done.", 1)
+	if state, _ := Classify(plain, false, 60, "idle"); state == "DONE" {
+		t.Errorf("a codex bullet without a sentinel is not done")
+	}
+}
+
 func TestLimitRegexIsTheAlternationOfTheClassifierPhrases(t *testing.T) {
 	re := regexp.MustCompile(LimitRegex())
 	if len(LimitPatterns()) != len(LimitPhrases) {

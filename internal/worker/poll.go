@@ -78,10 +78,11 @@ func LimitRegex() string { return "(?i)(?:" + strings.Join(LimitPhrases, "|") + 
 func LimitPatterns() []*regexp.Regexp { return limitPatterns }
 
 var (
-	// A sentinel may follow Claude Code's reply marker: v2.1.288 starts the
-	// first line of every reply with "● " (older versions "⏺ ").
-	reBlocked = regexp.MustCompile(`(?m)^\s*(?:[●⏺]\s*)?HV-BLOCKED\s+(\S+)\s*:\s*(.+)$`)
-	reDone    = regexp.MustCompile(`(?m)^\s*(?:[●⏺]\s*)?HV-DONE\s+(\S+)\s*(.*)$`)
+	// A sentinel may follow a reply marker: Claude Code v2.1.288 starts the
+	// first line of every reply with "● " (older versions "⏺ "), Codex
+	// 0.159.x with "• ".
+	reBlocked = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?HV-BLOCKED\s+(\S+)\s*:\s*(.+)$`)
+	reDone    = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?HV-DONE\s+(\S+)\s*(.*)$`)
 	reRetry   = regexp.MustCompile(`Retrying in`)
 	reFunds   = regexp.MustCompile(`Add funds`)
 	reAPIErr  = regexp.MustCompile(`(API Error[^\n]*)`)

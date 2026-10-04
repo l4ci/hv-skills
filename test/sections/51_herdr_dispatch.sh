@@ -293,6 +293,10 @@ hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
 printf '● HV-DONE w1 https://github.com/o/r/pull/10\n' > "$FAKE/pane.txt"
 hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
 [ "$(slot_field w1 pr)" = "https://github.com/o/r/pull/10" ] || fail "HV-DONE after the reply bullet should be seen, pr is $(slot_field w1 pr)"
+# Codex 0.159.x starts a reply with "• " (#68).
+printf '\342\200\242 HV-DONE w1 https://github.com/o/r/pull/11\n\n  Worked for 21s \342\200\242 5:40 AM\n' > "$FAKE/pane.txt"
+hd "$HV_BIN" --json worker poll w1 --settle 0 >/dev/null
+[ "$(slot_field w1 pr)" = "https://github.com/o/r/pull/11" ] || fail "HV-DONE after the codex bullet should be seen, pr is $(slot_field w1 pr)"
 touch "$FAKE/gone"
 STATE="$( hd "$HV_BIN" --json worker poll w1 --settle 0 | jget 'data.slots[0].state' )"
 [ "$STATE" = "dead" ] || fail "a slot whose agent is gone should poll dead, got $STATE"
