@@ -54,6 +54,7 @@ func TestDetect(t *testing.T) {
 	}{
 		{"brew arm", "/opt/homebrew/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
 		{"brew shim", "/opt/homebrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
+		{"intel cellar", "/usr/local/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
 		{"linuxbrew", "/home/linuxbrew/.linuxbrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
 		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh && hv skills update"},
 		{"dev suffix", "/home/u/.local/bin", "5.0.0-dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
@@ -67,8 +68,10 @@ func TestDetect(t *testing.T) {
 		}
 	}
 	// a home directory named like a brew path does not make a script install brew
-	if r := Check(env("/home/homebrewer/.local/bin", "5.0.0", "")); r.InstallType != Script {
-		t.Errorf("lookalike path: %+v", r)
+	for _, dir := range []string{"/home/homebrewer/.local/bin", "/home/linuxbrew-fan/.local/bin", "/home/u/homebrew/bin"} {
+		if r := Check(env(dir, "5.0.0", "")); r.InstallType != Script {
+			t.Errorf("lookalike path %s: %+v", dir, r)
+		}
 	}
 }
 

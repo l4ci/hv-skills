@@ -53,12 +53,56 @@ RC=0; sh "$INSTALL" --prefix "$IS/p5" --version 0.0.1 >/dev/null 2>&1 || RC=$?
 [ "$RC" != 0 ] && [ ! -e "$IS/p5/bin/hv" ] || fail "an unpublished version should fail without installing"
 
 # URL guard: userinfo and remote http are refused before any download.
-for bad in "https://x:y@github.com/l4ci/hv-skills/releases" "http://evil.example/releases" "http://localhost:1@evil.example/r"; do
+for bad in "https://x:y@github.com/l4ci/hv-skills/releases" "http://evil.example/releases" "http://localhost:1@evil.example/r" "http://127.0.0.1:8000/releases"; do
   RC=0; OUT=$(HV_RELEASE_BASE_URL="$bad" sh "$INSTALL" --prefix "$IS/p6" 2>&1) || RC=$?
   [ "$RC" != 0 ] || fail "install.sh accepted release URL $bad"
   case $OUT in *"refusing release URL"*) ;; *) fail "$bad should be refused by name: $OUT" ;; esac
 done
 [ ! -e "$IS/p6" ] || fail "a refused URL still created the prefix"
+
+# curl | sh: a script cut short runs nothing. Cut it at every line of main()'s
+# body and just before the closing call; each cut must leave no hv behind, and
+# HOME is a scratch dir, so a cut that did run would show up there.
+n=$(wc -l < "$INSTALL")
+for cut in 30 45 60 80 100 $((n - 2)) $((n - 1)); do
+  head -n "$cut" "$INSTALL" > "$IS/cut.sh"
+  rm -rf "$IS/home"; mkdir -p "$IS/home"
+  HOME="$IS/home" sh < "$IS/cut.sh" >/dev/null 2>&1 || true
+  [ -z "$(ls -A "$IS/home")" ] || fail "a script cut at line $cut touched HOME: $(ls -A "$IS/home")"
+done
+# The last line is the only call: drop it and nothing runs, even with env set that would install.
+head -n "$((n - 1))" "$INSTALL" > "$IS/cut.sh"
+OUT=$(HV_PREFIX="$IS/pcut" sh < "$IS/cut.sh" 2>&1) || fail "a copy without its last line should exit 0 quietly: $OUT"
+[ -z "$OUT" ] && [ ! -e "$IS/pcut" ] || fail "a copy without its last line did something: $OUT"
+# --help reads no file: it works with the script on stdin ($0 is just sh).
+OUT=$(sh -s -- --help < "$INSTALL" 2>&1) || fail "--help over stdin failed: $OUT"
+case $OUT in *"Usage: install.sh"*) ;; *) fail "--help should print usage: $OUT" ;; esac
+[ ! -e "$IS/phelp" ] || fail "--help touched the filesystem"
+
+# A signal mid-run leaves no temp dir behind.
+mkdir -p "$IS/sigrel/latest/download"
+printf '#!/bin/sh\n' > "$IS/sigrel/latest/download/$ASSET"
+sleepbin="$IS/fakebin"; mkdir -p "$sleepbin"
+printf '#!/bin/sh\nsleep 30\n' > "$sleepbin/curl"; chmod +x "$sleepbin/curl"
+PATH="$sleepbin:$PATH" HV_RELEASE_BASE_URL="file://$IS/sigrel" sh "$INSTALL" --prefix "$IS/psig" >/dev/null 2>&1 &
+SIGPID=$!
+i=0; while [ ! -d "$IS/psig/bin" ] || [ -z "$(ls -A "$IS/psig/bin" 2>/dev/null)" ]; do i=$((i + 1)); [ "$i" -lt 100 ] || break; sleep 0.1; done
+kill -TERM "$SIGPID" 2>/dev/null || true
+wait "$SIGPID" 2>/dev/null || true
+[ -z "$(ls -A "$IS/psig/bin" 2>/dev/null)" ] || fail "a terminated install left temp files: $(ls -A "$IS/psig/bin")"
+
+# Transport: an https base makes curl https-only with TLS 1.2+, redirects included.
+mkdir -p "$IS/tbin"
+printf '#!/bin/sh\necho "$*" >> "$IS_CURL_LOG"\nexit 22\n' > "$IS/tbin/curl"; chmod +x "$IS/tbin/curl"
+IS_CURL_LOG="$IS/curl.log" PATH="$IS/tbin:$PATH" HV_RELEASE_BASE_URL="https://example.invalid/releases" \
+  sh "$INSTALL" --prefix "$IS/ptr" >/dev/null 2>&1 || true
+CL=$(cat "$IS/curl.log")
+case $CL in *"--proto =https"*"--proto-redir =https"*"--tlsv1.2"*) ;; *) fail "curl should be pinned to https and TLS 1.2: $CL" ;; esac
+: > "$IS/curl.log"
+IS_CURL_LOG="$IS/curl.log" PATH="$IS/tbin:$PATH" HV_RELEASE_BASE_URL="file://$IS/rel" sh "$INSTALL" --prefix "$IS/ptr" >/dev/null 2>&1 || true
+CL=$(cat "$IS/curl.log")
+case $CL in *"--proto =file"*) ;; *) fail "a file:// base should limit curl to file: $CL" ;; esac
+case $CL in *https*) fail "a file:// base should not allow https: $CL" ;; esac
 
 # Bad flags and versions.
 RC=0; sh "$INSTALL" --bogus >/dev/null 2>&1 || RC=$?; [ "$RC" != 0 ] || fail "unknown flag should fail"

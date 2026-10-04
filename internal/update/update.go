@@ -125,7 +125,7 @@ func detect(e Env) string {
 	if e.ExeDir == "" {
 		return Unknown
 	}
-	for _, m := range []string{"/Cellar/", "/homebrew/", "/linuxbrew/"} {
+	for _, m := range []string{"/Cellar/", "/.linuxbrew/", "/opt/homebrew/"} {
 		if strings.Contains(e.ExeDir+"/", m) {
 			return Brew
 		}
