@@ -44,6 +44,7 @@ SCOPE=(
   # Tests of the code that has to know the old names: the migrate v4 codemod
   # and init removing the 4.x mirror. Their fixtures are legacy text on purpose.
   ':(exclude)test/sections/39_migrate.sh'
+  ':(exclude)test/sections/98_migrate_hv.sh'
   ':(exclude)internal/migrate'
   ':(exclude)internal/cli/migrate_test.go'
   ':(exclude)internal/cli/testdata/golden/TestMigrateV4*'
@@ -119,6 +120,9 @@ HV_SCOPE=(
   ':(exclude)internal/marker/'
   ':(exclude)internal/section/'
   ':(exclude)internal/round/move.go'
+  ':(exclude)internal/cli/migrate_hv.go'
+  ':(exclude)internal/cli/migrate_hv_test.go'
+  ':(exclude)test/sections/98_migrate_hv.sh'
   ':(exclude)internal/round/move_test.go'
   ':(exclude)internal/config/fill.go'
   ':(exclude)internal/config/fill_test.go'

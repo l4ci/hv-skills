@@ -15,6 +15,7 @@ import (
 func migrateCommands() *Command {
 	return &Command{Name: "migrate", Summary: "one-shot project migrations", Subs: []*Command{
 		{Name: "v4", Summary: "migrate a v3 project to v4 (preview unless --apply)", Verb: migrateV4},
+		hvMigrateCommand(),
 		{Name: "issues", Summary: "move the file backlog onto the issue tracker (preview unless --apply)", Verb: a4dMigrateIssues},
 	}}
 }

@@ -133,6 +133,13 @@ const (
 	statusLinePadKey = "padding"
 )
 
+// Exported spellings of the statusline wrap keys, for `rota migrate hv`, which
+// renames the hv-era keys to these.
+const (
+	WrappedKey     = keyWrapped
+	WrappedFromKey = keyWrappedScope
+)
+
 // ReadSettings parses a settings file. A missing file is (nil, nil). A file
 // that does not parse as a JSON object is an error.
 func ReadSettings(path string) (*jsonx.Object, error) {
