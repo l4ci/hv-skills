@@ -50,9 +50,14 @@ rtrc round assign F01 --check-only --tier ultra --holder-pid "$HOLDER"
 [ "$RC" = "2" ] || fail "an unknown tier should exit 2, got $RC"
 pass "a tier above the default needs --tier-reason; below it does not"
 
-# Codex: no map is a refusal, a full map resolves, a partial map is a config error.
+# Codex: no map is no model (Codex picks its own, #68), unless a custom command
+# holds {model}; a full map resolves, a partial map is a config error.
 rtrc round assign F01 --check-only --kind codex --holder-pid "$HOLDER"
-[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "no tier map" ] || fail "unconfigured codex should be refused: $RC $OUT"
+[ "$RC" = "0" ] && [ "$(echo "$OUT" | jget data.kind)" = "codex" ] && ! echo "$OUT" | jget data.model >/dev/null || fail "unconfigured codex should resolve to no model: $RC $OUT"
+rt config set work.codexCommand 'codex -m {model}' >/dev/null
+rtrc round assign F01 --check-only --kind codex --holder-pid "$HOLDER"
+[ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "no tier map" ] || fail "a {model} command with no map should be refused: $RC $OUT"
+rt config set work.codexCommand '' >/dev/null
 rt config set round.tiers.codex.light c-light >/dev/null
 rtrc round assign F01 --check-only --kind codex --holder-pid "$HOLDER"
 [ "$RC" = "70" ] || fail "a partial codex map is a config error (70), got $RC: $OUT"
@@ -63,7 +68,7 @@ OUT=$(rt round assign F01 --check-only --kind codex --holder-pid "$HOLDER")
 rtrc round assign F01 --kind codex --holder-pid "$HOLDER"
 [ "$RC" = "5" ] || fail "a codex worker under tmux should exit 5 (herdr only), got $RC: $OUT"
 [ "$(git -C "$RT/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "the refusal must leave the slot parked"
-pass "codex resolves its model, is refused before marking anything outside herdr, and needs a full map"
+pass "codex resolves its model (none when unset), is refused before marking anything outside herdr, and needs a full map"
 
 # Status shows what a slot was assigned with.
 python3 - "$RT/.hv/workers.json" <<'PY' || fail "could not seed slot tier fields"

@@ -171,11 +171,15 @@ func (t tierBrief) text() string {
 		}
 	}
 	b.WriteString(".\n")
-	var rows []string
-	for _, tier := range roundcfg.Tiers {
-		rows = append(rows, tier+" = "+t.Table[tier])
+	if len(t.Table) == 0 {
+		fmt.Fprintf(&b, "No model tiers are set for %s: your own subagents use its default model.\n", t.Kind)
+	} else {
+		var rows []string
+		for _, tier := range roundcfg.Tiers {
+			rows = append(rows, tier+" = "+t.Table[tier])
+		}
+		fmt.Fprintf(&b, "Model tiers for your own subagents (%s): %s. Follow the tier rule in the contract.\n", t.Kind, strings.Join(rows, ", "))
 	}
-	fmt.Fprintf(&b, "Model tiers for your own subagents (%s): %s. Follow the tier rule in the contract.\n", t.Kind, strings.Join(rows, ", "))
 	fmt.Fprintf(&b, "Put `Worker tier: %s` in your PR body.\n", own)
 	return b.String()
 }
@@ -305,8 +309,11 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	if kind == "" {
 		kind = roundcfg.KindClaude
 	}
+	// An unset codex tier map is allowed: the default codex command drops
+	// --model and Codex picks its own. A custom work.codexCommand holding
+	// {model} would fail at dispatch, after the claim, so it is refused here.
 	model := set.Model(kind, tier)
-	if model == "" {
+	if model == "" && (kind != roundcfg.KindCodex || worker.CodexNeedsModel(root)) {
 		return res, blocked(BlockNoTierMap, "round.tiers.%s has no model for the %s tier: set round.tiers.%s.*", kind, tier, kind)
 	}
 	res.Kind, res.Tier, res.TierReason = kind, tier, reason

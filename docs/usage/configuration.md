@@ -234,7 +234,7 @@ Settings for `hv round` (parallel rounds). All are silent defaults; none is writ
 | `round.stallMinutes` | `30` | Minutes without a commit, an uncommitted edit or a state change before `hv round reconcile` reports a slot that holds an issue and has a live agent as `stalled`. `0` turns the check off. A slot waiting on an escalation is never stalled; a dead agent is `dead`, not stalled. |
 | `round.tier` | `"standard"` | Default worker tier: `light` (reading, searching), `standard` (code and tests) or `heavy` (hard reasoning). `hv round assign --tier heavy --tier-reason "…"` goes above it; a tier above the default needs the reason, which lands on the slot. |
 | `round.tiers.claude.light` / `.standard` / `.heavy` | `haiku` / `models.worker` / `opus` | The model each tier starts a Claude worker with. `standard` follows `models.worker` (so `/hv-work` and rounds agree) until set explicitly. |
-| `round.tiers.codex.light` / `.standard` / `.heavy` | empty | The same for Codex. A kind with any tier set must set all three. `assign --kind codex --check-only` shows the model it would use. |
+| `round.tiers.codex.light` / `.standard` / `.heavy` | empty | The same for Codex, and optional: unset, a Codex worker runs on Codex's own default model (the default `work.codexCommand` drops `--model`). A kind with any tier set must set all three. `assign --kind codex --check-only` shows the model it would use. |
 
 A custom `work.workerCommand` receives the tier's model only through a `{model}` placeholder in the command; without one, `hv round assign` warns and records the tier but not a model. `work.codexCommand` works the same way for Codex workers.
 

@@ -282,14 +282,14 @@ func TestCodexCheck(t *testing.T) {
 		hint     string
 	}{
 		{"skip: no codex, no homes", nil, "herdr", nil, nil, Skip, "no slot has a codex home", ""},
-		{"pass: codex alone", []string{"codex"}, "", nil, map[string]Result{"codex --version": ver}, Pass, "codex 0.159.2, no slot homes yet", ""},
+		{"pass: codex alone", []string{"codex"}, "", nil, map[string]Result{"codex --version": ver}, Pass, "codex 0.159.2, no slot homes yet; round.tiers.codex unset (optional)", ""},
 		{"fail: homes but no codex", nil, "herdr", homes, nil, Fail, "codex not found on PATH", CodexInstallHint},
 		{"fail: version unreadable", []string{"codex"}, "", nil, map[string]Result{"codex --version": {Stdout: "hello"}}, Fail, "unreadable", CodexInstallHint},
 		{"fail: version command fails", []string{"codex"}, "", nil, map[string]Result{"codex --version": {ExitCode: 3, Stdout: "codex-cli 0.159.2"}}, Fail, "unreadable", CodexInstallHint},
 		{"fail: out of range", []string{"codex"}, "", nil, map[string]Result{"codex --version": {Stdout: "codex-cli 0.160.1"}}, Fail, "codex 0.160.1, need >=0.159.0 <0.160.0", CodexInstallHint},
 		{"pass: logged in, herdr integration current", []string{"codex", "herdr"}, "herdr", homes,
 			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexCur}},
-			Pass, "homes checked: ben, dana", ""},
+			Pass, "homes checked: ben, dana; round.tiers.codex unset (optional)", ""},
 		{"pass: tmux skips the integration", []string{"codex", "herdr"}, "tmux", homes,
 			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexMiss}},
 			Pass, "ben, dana", ""},
@@ -314,6 +314,15 @@ func TestCodexCheck(t *testing.T) {
 				t.Error("every fail has a hint")
 			}
 		})
+	}
+}
+
+// A set codex tier map drops the "optional" note (#68).
+func TestCodexCheckTiersSet(t *testing.T) {
+	f := &codexFake{fake: fake{have: map[string]bool{"codex": true}, reply: map[string]Result{"codex --version": {Stdout: "codex-cli 0.159.2\n"}}}}
+	c := statusOf(Run(context.Background(), Input{CodexTiers: true, Exec: f.exec, Look: f.look}), "codex")
+	if c.Status != Pass || strings.Contains(c.Detail, "round.tiers.codex") {
+		t.Errorf("%+v", c)
 	}
 }
 

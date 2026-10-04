@@ -61,6 +61,14 @@ func codexCommand(root, model string) (string, error) {
 	return strings.ReplaceAll(cmd, ModelPlaceholder, model), nil
 }
 
+// CodexNeedsModel reports whether a codex launch needs a tier model: only a
+// custom work.codexCommand that holds {model} does (codexCommand refuses it
+// with none).
+func CodexNeedsModel(root string) bool {
+	_, err := codexCommand(root, "")
+	return err != nil
+}
+
 // CodexResume returns the first token after the codex binary that is one of
 // its `resume` or `fork` subcommands, which reopen a previous session in the
 // "fresh" one and would undo the reset. Codex takes options with values

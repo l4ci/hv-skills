@@ -73,6 +73,8 @@ type Input struct {
 	SwitchOnUsage  bool // orchestrator.switchOnUsage (D4)
 	// CodexHomes are the existing slot homes under <git-common-dir>/hv/codex/.
 	CodexHomes []CodexHome
+	// CodexTiers is whether any round.tiers.codex.<tier> is set.
+	CodexTiers bool
 
 	Version string // the running binary's version, "" when unknown
 
