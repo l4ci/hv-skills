@@ -63,7 +63,7 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, initErr(err)
 		}
-		warnings := append([]string{}, res.Warnings...)
+		var warnings []string
 		changed := res.Changed()
 		data := knObj("root", dir, "created", strSlice(res.Created))
 		var lines []string

@@ -140,7 +140,6 @@ func TestGlossaryReadMatchGolden(t *testing.T) {
 }
 
 func TestBlockMatchGolden(t *testing.T) {
-	legacy := "# Project\n\n<!-- hv:knowledge:start -->\nold list\n<!-- hv:knowledge:end -->\n\ntail\n"
 	cases := []struct {
 		name     string
 		agents   string
@@ -151,7 +150,6 @@ func TestBlockMatchGolden(t *testing.T) {
 		wantRC   int
 	}{
 		{"knowledge block appended", "# Agents\n", false, []string{"block", "knowledge"}, "", 0, 0},
-		{"knowledge block updated in place", legacy, false, []string{"block", "knowledge"}, "", 0, 0},
 		{"decisions block", "# Agents\n", false, []string{"block", "decisions"}, "", 0, 0},
 		{"sub-repo knowledge block", "# Agents\n", true, []string{"block", "knowledge", "--repo", "web"}, "", 0, 0},
 		{"custom body", "# Agents\n", false, []string{"block", "vision", "--body-file", "-"}, "## Vision\n\nbody\n", 0, 0},
@@ -210,7 +208,7 @@ func TestBlockSkillsMatchGolden(t *testing.T) {
 }
 
 func TestInstructionsInitMatchGolden(t *testing.T) {
-	blocks := "<!-- rota-knowledge-start -->\nK\n<!-- rota-knowledge-end -->\n\n<!-- hv:decisions:start -->\nD\n<!-- hv:decisions:end -->\n"
+	blocks := "<!-- rota-knowledge-start -->\nK\n<!-- rota-knowledge-end -->\n\n<!-- rota-decisions-start -->\nD\n<!-- rota-decisions-end -->\n"
 	cases := []struct {
 		name          string
 		claude, agent string // "" means the file does not exist

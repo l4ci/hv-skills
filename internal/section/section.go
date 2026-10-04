@@ -166,22 +166,16 @@ func InstructionsFile(root string) string {
 }
 
 // BlockRegex matches a managed block: the canonical
-// "<!-- rota-<key>-start -->…<!-- rota-<key>-end -->", the same block hv wrote
-// before the rename (#236) as "<!-- hv-<key>-start -->…", and, when legacy is
-// not empty, the old "<!-- hv:<legacy>:start -->…<!-- hv:<legacy>:end -->"
-// form. consumeNewline also eats one newline after the end marker.
-func BlockRegex(key, legacy string, consumeNewline bool) *regexp.Regexp {
+// "<!-- rota-<key>-start -->…<!-- rota-<key>-end -->" and the same block hv
+// wrote before the rename (#236) as "<!-- hv-<key>-start -->…".
+// consumeNewline also eats one newline after the end marker.
+func BlockRegex(key string, consumeNewline bool) *regexp.Regexp {
 	tail := ""
 	if consumeNewline {
 		tail = `\n?`
 	}
 	k := regexp.QuoteMeta(key)
-	start, end := `(?:rota|hv)-`+k+`-start`, `(?:rota|hv)-`+k+`-end`
-	if legacy != "" {
-		l := regexp.QuoteMeta(legacy)
-		start, end = `(?:`+start+`|hv:`+l+`:start)`, `(?:`+end+`|hv:`+l+`:end)`
-	}
-	return regexp.MustCompile(`(?s)<!-- ` + start + ` -->.*?<!-- ` + end + ` -->` + tail)
+	return regexp.MustCompile(`(?s)<!-- (?:rota|hv)-` + k + `-start -->.*?<!-- (?:rota|hv)-` + k + `-end -->` + tail)
 }
 
 // Block statuses returned by UpsertBlock.
@@ -196,7 +190,7 @@ const (
 // (a legacy hv-<key> block too, in place), appends one when none exists, or
 // creates the file holding just the block.
 // A second identical call is Unchanged and does not touch the file.
-func UpsertBlock(path, key, block, legacy string) (string, error) {
+func UpsertBlock(path, key, block string) (string, error) {
 	content, err := fsio.ReadText(path)
 	if os.IsNotExist(err) {
 		return Created, fsio.WriteFileAtomic(path, []byte(block+"\n"))
@@ -204,7 +198,7 @@ func UpsertBlock(path, key, block, legacy string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	re := BlockRegex(key, legacy, false)
+	re := BlockRegex(key, false)
 	var next, status string
 	if re.MatchString(content) {
 		// ReplaceAllLiteralString: Python's re.sub would read backslash

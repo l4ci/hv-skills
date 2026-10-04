@@ -69,9 +69,9 @@ User rules here.
 
 More user text.
 
-<!-- hv:skills:start -->
+<!-- hv-skills-start -->
 legacy skills block
-<!-- hv:skills:end -->
+<!-- hv-skills-end -->
 MD
 OUT="$(init_ii "$TMP_II/mig")"
 grep -q '^created:AGENTS.md$' <<<"$OUT" || fail "F84[e]: AGENTS.md not reported created"
@@ -79,7 +79,7 @@ grep -q '^moved:AGENTS.md:knowledge,skills$' <<<"$OUT" || fail "F84[e]: moved li
 grep -q '^linked:CLAUDE.md$' <<<"$OUT" || fail "F84[e]: linked line missing: $OUT"
 grep -q "rota-knowledge-start" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: knowledge block not in AGENTS.md"
 grep -q "legacy skills block" "$TMP_II/mig/AGENTS.md" || fail "F84[e]: legacy block not in AGENTS.md"
-if grep -q "rota-knowledge\|hv:skills" "$TMP_II/mig/CLAUDE.md"; then fail "F84[e]: blocks remain in CLAUDE.md"; fi
+if grep -q "rota-knowledge\|hv-skills-start" "$TMP_II/mig/CLAUDE.md"; then fail "F84[e]: blocks remain in CLAUDE.md"; fi
 grep -q "User rules here." "$TMP_II/mig/CLAUDE.md" || fail "F84[e]: user text lost"
 grep -q "More user text." "$TMP_II/mig/CLAUDE.md" || fail "F84[e]: user text lost"
 [ "$(grep -cx '@AGENTS.md' "$TMP_II/mig/CLAUDE.md")" = "1" ] || fail "F84[e]: @AGENTS.md not added exactly once"

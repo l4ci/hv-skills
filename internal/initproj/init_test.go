@@ -18,27 +18,8 @@ type fixture map[string]string
 
 var fixtures = map[string]fixture{
 	"empty": {},
-	"legacy-todo": {
-		".rota/TODO.md": "# Backlog\n\n## Bugs\n- [B01] old\n",
-	},
-	"todo-and-backlog": {
-		".rota/TODO.md":    "# Old\n",
-		".rota/BACKLOG.md": "# Backlog\n\n## Bugs\n- [B09] mine\n",
-	},
 	"vision-heading": {
 		".rota/MILESTONES.md": "# Vision\n\nbody line\n# Vision\n",
-	},
-	"old-counters": {
-		".rota/counters.json": `{"bugs":3,"features":1,"tasks":2}` + "\n",
-	},
-	"old-counters-pretty": {
-		".rota/counters.json": "{\n  \"bugs\": 7,\n  \"milestones\": 2\n}\n",
-	},
-	"knowledge-preamble": {
-		".rota/KNOWLEDGE.md": "# Knowledge\n\nUse `/hv:learn` to save and `/hv:work` to read.\n\n## Topic\n\n- see `/hv:ship` here\n",
-	},
-	"gitignore-blanket": {
-		".gitignore": "node_modules/\n.rota/\ndist/\n",
 	},
 	"gitignore-no-newline": {
 		".gitignore": "node_modules/\n.rota/status.json",
@@ -51,9 +32,6 @@ var fixtures = map[string]fixture{
 	},
 	"gitignore-worktrees-crlf": {
 		".gitignore": "dist/\r\n.worktrees/\r\n",
-	},
-	"gitignore-only-blanket": {
-		".gitignore": ".rota/\n",
 	},
 	"initialized": {
 		".rota/BACKLOG.md":    "# Backlog\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n",
@@ -174,7 +152,7 @@ func TestInitIsIdempotent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res.Changed() || len(res.Warnings) > 1 {
+			if res.Changed() {
 				t.Errorf("second run: %+v", res)
 			}
 			if !reflect.DeepEqual(first, readTree(t, dir)) {
@@ -255,31 +233,8 @@ func TestInitRefusesACorruptCounters(t *testing.T) {
 	}
 }
 
-func TestInitWarnsOnLegacyTodoBesideBacklog(t *testing.T) {
-	dir := t.TempDir()
-	writeFixture(t, dir, fixtures["todo-and-backlog"])
-	res, err := Init(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "TODO.md") {
-		t.Errorf("warnings: %v", res.Warnings)
-	}
-}
-
-func TestMergeGitignoreKeepsTheUmbrellaBlanket(t *testing.T) {
-	in := strings.Join(ignoreLines, "\n") + "\n.rota/\n.worktrees/\n"
-	if got := MergeGitignore(in, true, true); got != in {
-		t.Errorf("umbrella root rewrote .gitignore:\n%q", got)
-	}
-	if got := MergeGitignore(in, true, false); strings.Contains(got, "\n.rota/\n") {
-		t.Errorf("single repo kept the blanket line:\n%q", got)
-	}
-}
-
 func TestMergeGitignore(t *testing.T) {
 	block := strings.Join(ignoreLines, "\n") + "\n"
-	oldHeaderBlock := strings.Join(append([]string{"# ── hv-skills ──"}, ignoreLines[1:]...), "\n") + "\n"
 	cases := []struct {
 		name, in string
 		exists   bool
@@ -290,15 +245,10 @@ func TestMergeGitignore(t *testing.T) {
 		{"complete", block + ".worktrees/\n", true, block + ".worktrees/\n"},
 		{"slash spelling", block + "/.worktrees\n", true, block + "/.worktrees\n"},
 		{"crlf worktrees", block + ".worktrees/\r\n", true, block + ".worktrees/\r\n"},
-		{"blanket stripped", "a\n.rota/\nb\n", true, "a\nb\n\n" + block + worktreesBlock},
-		{"only blanket kept", ".rota/\n", true, "\n" + block + worktreesBlock},
 		{"no trailing newline", "a", true, "a\n" + block + worktreesBlock},
-		// A block written before the rename (#231) keeps its old header: the
-		// header is cosmetic and never checked, so nothing is appended.
-		{"pre-rename header", oldHeaderBlock + ".worktrees/\n", true, oldHeaderBlock + ".worktrees/\n"},
 	}
 	for _, c := range cases {
-		got := MergeGitignore(c.in, c.exists, false)
+		got := MergeGitignore(c.in, c.exists)
 		if got != c.want {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, c.want)
 		}
@@ -315,15 +265,9 @@ func TestInitChangedWhenOnlyAMigrationWrote(t *testing.T) {
 		return dir
 	}
 	for name, mutate := range map[string]func(dir string){
-		"counters backfill": func(d string) {
-			os.WriteFile(filepath.Join(d, ".rota", "counters.json"), []byte(`{"bugs": 3}`), 0o644)
-		},
 		"gitignore block": func(d string) { os.WriteFile(filepath.Join(d, ".gitignore"), []byte("x\n"), 0o644) },
 		"milestones heading": func(d string) {
 			os.WriteFile(filepath.Join(d, ".rota", "MILESTONES.md"), []byte("# Vision\n"), 0o644)
-		},
-		"knowledge preamble": func(d string) {
-			os.WriteFile(filepath.Join(d, ".rota", "KNOWLEDGE.md"), []byte("Use `/hv:learn`.\n"), 0o644)
 		},
 	} {
 		dir := seeded(t)

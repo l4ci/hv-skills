@@ -164,7 +164,7 @@ The backlog is shared by default: state travels with the repo so collaborators s
 | `.rota/workers.json` | Per-developer worker slot registry (tab handles, account config dirs, claims); machine-specific |
 | `.rota/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write |
 
-`rota init` writes these under a `# ── rota ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/rota-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.rota/` line migrated automatically.
+`rota init` writes these under a `# ── rota ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/rota-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`.
 
 ### `config.local.json`: per-developer overrides
 

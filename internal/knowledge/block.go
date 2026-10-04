@@ -9,8 +9,8 @@ import (
 )
 
 type blockCfg struct {
-	heading, intro, empty, legacy string
-	umbrellaOnly                  bool
+	heading, intro, empty string
+	umbrellaOnly          bool
 }
 
 var blockKinds = map[string]blockCfg{
@@ -18,7 +18,6 @@ var blockKinds = map[string]blockCfg{
 		heading: "## Project Knowledge",
 		intro:   "Durable learnings live in `.rota/KNOWLEDGE.md`. Consult it when work touches these topics:",
 		empty:   "- _(no topics yet — run `/rota-learn` to capture learnings)_",
-		legacy:  "knowledge",
 	},
 	"decisions": {
 		heading:      "## Project Decisions",
@@ -103,7 +102,7 @@ func (s Store) RegenerateBlock(key, scope string) (string, error) {
 		body = strings.Join(lines, "\n")
 	}
 	block := fmt.Sprintf("<!-- rota-%s-start -->\n%s\n\n%s\n\n%s\n\n<!-- rota-%s-end -->", key, cfg.heading, cfg.intro, body, key)
-	return section.UpsertBlock(target, key, block, cfg.legacy)
+	return section.UpsertBlock(target, key, block)
 }
 
 // WriteCustomBlock wraps body in the key's markers and upserts it into the
@@ -111,5 +110,5 @@ func (s Store) RegenerateBlock(key, scope string) (string, error) {
 func (s Store) WriteCustomBlock(key, body string) (string, error) {
 	body = strings.TrimRight(body, "\n")
 	block := fmt.Sprintf("<!-- rota-%s-start -->\n%s\n<!-- rota-%s-end -->", key, body, key)
-	return section.UpsertBlock(section.InstructionsFile(s.Root), key, block, "")
+	return section.UpsertBlock(section.InstructionsFile(s.Root), key, block)
 }

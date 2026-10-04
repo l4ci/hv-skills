@@ -23,24 +23,7 @@ pass "init seeds BACKLOG.md on fresh init"
 OUT=$(cd "$BOOT_DIR" && hvj init check) || fail "init check failed on a fresh init: $OUT"
 [ "$(echo "$OUT" | jget data.initialized)" = "true" ] || fail "init check: expected initialized: $OUT"
 
-# ── (b) Legacy auto-rename ────────────────────────────────────────────────────
-rm -rf "$BOOT_DIR"
-mkdir -p "$BOOT_DIR/.rota"
-echo "# TODO" > "$BOOT_DIR/.rota/TODO.md"
-( cd "$BOOT_DIR" && hvj init >/dev/null ) || fail "init failed with a legacy TODO.md"
-[ -f "$BOOT_DIR/.rota/BACKLOG.md" ] || fail "init did not rename TODO.md → BACKLOG.md"
-! [ -f "$BOOT_DIR/.rota/TODO.md" ] || fail "init left legacy TODO.md after rename"
-grep -q "^# TODO$" "$BOOT_DIR/.rota/BACKLOG.md" || fail "content was not preserved after rename"
-
-# Idempotency: second run must succeed, create nothing and preserve the file.
-OUT=$(cd "$BOOT_DIR" && hvj init) || fail "second init failed: $OUT"
-[ -f "$BOOT_DIR/.rota/BACKLOG.md" ] || fail "BACKLOG.md missing after idempotent second run"
-grep -q "^# TODO$" "$BOOT_DIR/.rota/BACKLOG.md" || fail "second init rewrote BACKLOG.md"
-[ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "second init should report changed false: $OUT"
-[ "$(echo "$OUT" | jget data.created)" = "[]" ] || fail "second init should create nothing: $OUT"
-pass "init renames legacy TODO.md → BACKLOG.md, idempotent"
-
-# ── (c) Reader contract — the backlog reads BACKLOG.md only ──
+# ── (b) Reader contract — the backlog reads BACKLOG.md only ──
 # The legacy TODO.md fallback was removed in v4.1 (F71 self-flagged it for
 # removal once the rename shipped in v4.0). Reader test now verifies a listing
 # reflects what's at BACKLOG.md, not the legacy path.
