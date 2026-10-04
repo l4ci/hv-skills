@@ -149,3 +149,4 @@ The `--repo <name>` flag is also exposed on the underlying verbs when you call t
 - `.hv/DECISIONS.md` (Architecture, "Umbrella mode does not use git submodules")
 - [The `.hv/` folder](../reference/hv-folder.md): what `hv init` writes
 - [Vision and plans](vision-and-plans.md): how M02 fits the milestone roadmap
+- [Parallel rounds](parallel-rounds.md): the `hv round` verbs are not repo-scoped (no `--repo`)

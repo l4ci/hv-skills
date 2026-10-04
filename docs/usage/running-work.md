@@ -112,3 +112,7 @@ After `/hv-work` finishes, `work.mergeStrategy` in `config.json` controls what h
 | `"pr"` | Pushes the branch and creates a GitHub PR with a summary |
 
 The actual ship-time gates (review, preflight, PR body composition) live in [review and ship](review-and-ship.md).
+
+## Many items at once
+
+`/hv-work` takes items one session at a time, with subagents inside that session. To run several issues in parallel, each worker in its own worktree and terminal tab, use a round: run `hv doctor`, then ask for `/hv-orchestrate`. See [parallel rounds](parallel-rounds.md), the [`hv round` verbs](../reference/cli-helpers.md#hv-round) and [`/hv-orchestrate`](../reference/slash-commands.md#hv-orchestrate).
