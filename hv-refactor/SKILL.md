@@ -278,8 +278,8 @@ Don't recap the exploration findings, the design alternatives, or the verificati
 
 ## References
 
-- [`references/authoring-conventions.md`](../references/authoring-conventions.md) — Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold).
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/refactor-explore.md`](../references/refactor-explore.md) — Exploration-agent prompt + categories + stop condition used by `/hv-refactor` single-repo mode.
-- [`references/refactor-design-approaches.md`](../references/refactor-design-approaches.md) — Competing-design choreography (decisions consult, agent constraints, output shape, `confirmBeforeExecute` gate) used by `/hv-refactor` Step 5.
-- [`references/refactor-umbrella-fanout.md`](../references/refactor-umbrella-fanout.md) — Per-repo fan-out logic for `/hv-refactor` in umbrella mode.
+- [`references/authoring-conventions.md`](references/authoring-conventions.md) — Authoring rules shared across SKILL.md files (loop-mode auto-picks, mirror-step threshold).
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/refactor-explore.md`](references/refactor-explore.md) — Exploration-agent prompt + categories + stop condition used by `/hv-refactor` single-repo mode.
+- [`references/refactor-design-approaches.md`](references/refactor-design-approaches.md) — Competing-design choreography (decisions consult, agent constraints, output shape, `confirmBeforeExecute` gate) used by `/hv-refactor` Step 5.
+- [`references/refactor-umbrella-fanout.md`](references/refactor-umbrella-fanout.md) — Per-repo fan-out logic for `/hv-refactor` in umbrella mode.

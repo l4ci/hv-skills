@@ -27,6 +27,7 @@ func Tree() *Command {
 			qaCommands(),
 			migrateCommands(),
 			initCommands(),
+			skillsCommands(),
 		},
 	}
 	root.Subs = append(root.Subs, a6Commands()...)

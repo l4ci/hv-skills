@@ -28,11 +28,11 @@ never exits 5.
 | `statusline` | the effective statusline runs `hv statusline dump` | hooks not installed (opt-in) |
 | `stop-hook` | a `Stop` and a `SessionStart` entry marked `# hv-hook`, and the command resolves | hooks not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: the Stop hook and two accounts with a `configDir` | the key is off |
-| `hv` | the running binary's version matches `.claude-plugin/plugin.json` | a development build, or outside a source checkout |
+| `skills` | every installed skills root (user and project, Claude and Codex) matches the binary's skill set, has no missing or edited files, and no `hv-skills@` plugin is still installed | no root has a `.hv-manifest.json` (run `hv skills install`) |
 | `codex` | `codex` version in the supported range, each slot home logged in, herdr integration per home | `codex` is not on `PATH` and no slot has a home |
 
 The hooks are opt-in, so `statusline` and `stop-hook` skip until `hv hook install` has written
-something, and fail only on a partial or broken install. `switch` cannot tell whether the orchestrator
+something, and fail only on a partial or broken install. `skills` is opt-in the same way: it skips until `hv skills install` has written a manifest. `switch` cannot tell whether the orchestrator
 runs under `hv keepalive run`. See [unattended rounds](unattended-rounds.md). For `codex`, see
 [Codex workers](codex-workers.md).
 

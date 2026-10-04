@@ -349,15 +349,15 @@ Resolves: [B07], [F03]
 
 | Reference | Purpose |
 |-----------|---------|
-| [`ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
-| [`authoring-conventions.md`](../references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, manual gates, verb contract). |
-| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
-| [`docs-conventions.md`](../references/docs-conventions.md) | Conventions for content under `docs/` (page naming, `.docsignore` seed). Consumed by Docs Mode. |
-| [`humanizing-prose.md`](../references/humanizing-prose.md) | Self-audit for the PR body and doc edits. |
-| [`issue-mode.md`](../references/issue-mode.md) | Issue-mode PR and item lifecycle. |
-| [`manual-gates.md`](../references/manual-gates.md) | The manual-gate registry (`hv gate list`): verb-enforced gates and skill-only callouts. |
-| [`post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) | Trigger condition and nudge-or-dispatch choreography for Steps 8.5, 8.6 and D-A1. |
-| [`review-verdict-routing.md`](../references/review-verdict-routing.md) | Verdict meaning, the CONCERNS question text and carrier labels. |
-| [`silent-failure-hunter.md`](../references/silent-failure-hunter.md) | Silent-failure rubric carried in the review brief. |
-| [`task-list-init.md`](../references/task-list-init.md) | Task-list initialization pattern. |
-| [`three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. |
+| [`ask-user-question-fallback.md`](references/ask-user-question-fallback.md) | Plain-text fallback shape for AskUserQuestion-less hosts. |
+| [`authoring-conventions.md`](references/authoring-conventions.md) | Authoring rules shared across SKILL.md files (loop-mode auto-picks, manual gates, verb contract). |
+| [`banner-preamble.md`](references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`docs-conventions.md`](references/docs-conventions.md) | Conventions for content under `docs/` (page naming, `.docsignore` seed). Consumed by Docs Mode. |
+| [`humanizing-prose.md`](references/humanizing-prose.md) | Self-audit for the PR body and doc edits. |
+| [`issue-mode.md`](references/issue-mode.md) | Issue-mode PR and item lifecycle. |
+| [`manual-gates.md`](references/manual-gates.md) | The manual-gate registry (`hv gate list`): verb-enforced gates and skill-only callouts. |
+| [`post-cycle-trigger-gate.md`](references/post-cycle-trigger-gate.md) | Trigger condition and nudge-or-dispatch choreography for Steps 8.5, 8.6 and D-A1. |
+| [`review-verdict-routing.md`](references/review-verdict-routing.md) | Verdict meaning, the CONCERNS question text and carrier labels. |
+| [`silent-failure-hunter.md`](references/silent-failure-hunter.md) | Silent-failure rubric carried in the review brief. |
+| [`task-list-init.md`](references/task-list-init.md) | Task-list initialization pattern. |
+| [`three-mode-skill-shape.md`](references/three-mode-skill-shape.md) | Three-mode shape (first-run / after-work / restructure) shared with `/hv-qa`. |

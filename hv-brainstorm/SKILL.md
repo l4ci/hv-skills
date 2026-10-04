@@ -224,6 +224,6 @@ After all questions and the approach pick are resolved, write the design via `hv
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
-- [`references/design-exploration.md`](../references/design-exploration.md) — Shared spine (Socratic discovery, 2-3 approaches, sectioned design with per-section approval, self-review, user-review gate) used by `/hv-vision` and `/hv-brainstorm`.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/ask-user-question-fallback.md`](references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
+- [`references/design-exploration.md`](references/design-exploration.md) — Shared spine (Socratic discovery, 2-3 approaches, sectioned design with per-section approval, self-review, user-review gate) used by `/hv-vision` and `/hv-brainstorm`.

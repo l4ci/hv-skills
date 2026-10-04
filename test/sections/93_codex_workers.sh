@@ -127,7 +127,7 @@ dr
 [ "$(drf status)" = "pass" ] || fail "doctor codex should pass with both slots logged in: $OUT"
 case "$(drf detail)" in *"codex 0.159.2"*"ben, dana"*) ;; *) fail "doctor detail should name the version and homes: $(drf detail)" ;; esac
 case "$(echo "$OUT" | python3 -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)["data"]["checks"]))')" in
-  *",hv,codex") ;; *) fail "codex should come after hook: $OUT" ;; esac
+  *",skills,codex") ;; *) fail "codex should come after hook: $OUT" ;; esac
 rm "$HOME_BEN/.fake-logged-in"
 dr
 [ "$RC" = "1" ] && [ "$(drf status)" = "fail" ] || fail "doctor codex should fail for an unlogged slot: $RC $OUT"

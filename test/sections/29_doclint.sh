@@ -11,13 +11,12 @@ MIRROR='.hv/''bin'
 LIB='hv''lib'
 SK='SKILL''.md'
 
-# A fixture repo: one skill, one reference, the plugin version pair.
+# A fixture repo: one skill, one reference, a changelog.
 dl_fixture() {
   local d="$1"
-  mkdir -p "$d/hv-a" "$d/references" "$d/.claude-plugin"
+  mkdir -p "$d/hv-a" "$d/references"
   printf -- '---\nname: hv-a\ndescription: test\n---\n\nRun `hv status show`. See /hv-rm and /hv-release.\n' > "$d/hv-a/$SK"
   printf '# ref\n\nUse `hv config set`; hv-skills owns this.\n' > "$d/references/r.md"
-  printf '{"version": "1.0.0"}\n' > "$d/.claude-plugin/plugin.json"
   printf '# Changelog\n\n## v1.0.0\n' > "$d/CHANGELOG.md"
 }
 # dl_run <dir> <allowlist> prints the validator output and returns its exit code.
@@ -61,9 +60,8 @@ pass "skills and references pass the doclint"
 # The prose lint (#173): drop a pinned phrase from a copy of the real skills and
 # the validator names the file; a deleted target file is reported, not skipped.
 # white-box-begin: A9 #53 doclint
-PL="$DL_TMP/prose"; mkdir -p "$PL/.claude-plugin"
+PL="$DL_TMP/prose"; mkdir -p "$PL"
 cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/CHANGELOG.md" "$PL/"
-cp "$REPO/.claude-plugin/plugin.json" "$PL/.claude-plugin/"
 OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || fail "prose lint fails on a copy of the repo: $OUT"
 sed -i 's/hv status loop start/hv status loop begin/' "$PL/hv-work/$SK"
 RC=0; OUT="$(cd "$PL" && python3 "$VALIDATE" 2>&1)" || RC=$?

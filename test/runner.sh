@@ -72,7 +72,7 @@ TMP="$(cd "$(mktemp -d)" && pwd -P)"
 # $RUN_TMP, so the EXIT trap removes them with everything else.
 HV_STAGE="$(mktemp -d)"
 if [ -z "${HV_BIN:-}" ]; then
-  HV_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$REPO/.claude-plugin/plugin.json")"
+  HV_VERSION="$(sed -n 's/^## v\([0-9][^ ]*\).*/\1/p' "$REPO/CHANGELOG.md" | head -1)"
   (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$HV_VERSION" \
     -o "$HV_STAGE/hv" ./cmd/hv) || { echo "runner: go build ./cmd/hv failed" >&2; exit 2; }
   HV_BIN="$HV_STAGE/hv"

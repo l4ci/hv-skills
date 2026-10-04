@@ -295,7 +295,7 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    <one-sentence inversion of the gotcha — what should have happened>
 
    ## Context
-   - hv-skills version: <read from .claude-plugin/plugin.json or plugin.json — `"version": "X.Y.Z"`>
+   - hv-skills version: <output of `hv version`>
    - Captured topic: <KNOWLEDGE.md topic name>
    - Date: <today, YYYY-MM-DD>
    ```
@@ -401,6 +401,6 @@ Cleared N contradictions: <demoted-count> demoted, <skipped-count> skipped
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/manual-gates.md`](../references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
-- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/manual-gates.md`](references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
+- [`references/persistence-skills.md`](references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/l4ci/hv-skills/v5/internal/skills"
 )
 
 func fixture(t *testing.T, name string) string {
@@ -195,7 +197,7 @@ func TestOrderAndOK(t *testing.T) {
 	for _, c := range r.Checks {
 		names = append(names, c.Name)
 	}
-	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,statusline,stop-hook,switch,hv,codex" {
+	if got := strings.Join(names, ","); got != "git,host,tracker,accounts,hook,statusline,stop-hook,switch,skills,codex" {
 		t.Errorf("order %s", got)
 	}
 	if r.OK() {
@@ -206,30 +208,48 @@ func TestOrderAndOK(t *testing.T) {
 	}
 }
 
-func TestHvVersionCheck(t *testing.T) {
-	plug := t.TempDir()
-	os.MkdirAll(filepath.Join(plug, ".claude-plugin"), 0o755)
-	os.WriteFile(filepath.Join(plug, ".claude-plugin", "plugin.json"), []byte(`{"version":"5.0.0"}`), 0o644)
-	sub := filepath.Join(plug, "a", "b")
-	os.MkdirAll(sub, 0o755)
-	empty := t.TempDir()
+func TestSkillsCheck(t *testing.T) {
+	const bin = "aaaaaaaaaaaaaaaa"
+	root := func(mod func(*skills.RootStatus)) skills.RootStatus {
+		r := skills.RootStatus{Root: skills.Root{Path: "/h/.claude/skills", Agent: "claude", Scope: "user"},
+			Installed: true, Version: "5.0.0", Digest: bin, Current: true}
+		if mod != nil {
+			mod(&r)
+		}
+		return r
+	}
+	rep := func(plugin string, roots ...skills.RootStatus) *skills.Report {
+		return &skills.Report{Version: "5.0.0", Digest: bin, Roots: roots, Plugin: plugin}
+	}
 	f := &fake{have: map[string]bool{}}
 	for _, tc := range []struct {
-		name, ver string
-		roots     []string
-		status    string
+		name   string
+		in     *skills.Report
+		status string
+		detail string // substring
+		hint   string
 	}{
-		{"match", "5.0.0", []string{sub}, Pass},
-		{"v prefix", "v5.0.0", []string{sub}, Pass},
-		{"drift", "4.5.0", []string{sub}, Fail},
-		{"dev label", "dev", []string{sub}, Skip},
-		{"dev build", "", []string{sub}, Skip},
-		{"outside a checkout", "5.0.0", []string{empty}, Skip},
-		{"second root", "5.0.0", []string{empty, plug}, Pass},
+		{"nothing read", nil, Skip, "hv skills install", ""},
+		{"not installed", rep("", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "hv skills install", ""},
+		{"plugin alone is not an install", rep("hv-skills@hv-skills", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "not installed", ""},
+		{"current", rep("", root(nil)), Pass, "match hv 5.0.0", ""},
+		{"mismatch", rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "4.5.0", "bbbb", false })), Fail, "skills 4.5.0, hv 5.0.0", "run: hv skills update"},
+		{"dev build mismatch", func() *skills.Report {
+			r := rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "", "bbbbbbbbbbbbbbbbbbbb", false }))
+			r.Version = ""
+			return r
+		}(), Fail, "skills bbbbbbbbbbbb, hv aaaaaaaaaaaa", "run: hv skills update"},
+		{"edited", rep("", root(func(r *skills.RootStatus) { r.Edited = []string{"hv-work/SKILL.md"} })), Fail, "1 edited (hv-work/SKILL.md)", "run: hv skills update --overwrite"},
+		{"missing", rep("", root(func(r *skills.RootStatus) { r.Missing = []string{"hv-work/SKILL.md", "hv-ship/SKILL.md"} })), Fail, "2 missing", "run: hv skills update"},
+		{"plugin leftover", rep("hv-skills@hv-skills", root(nil)), Fail, "plugin hv-skills@hv-skills is still installed", "claude plugin uninstall hv-skills@hv-skills"},
+		{"second root only", rep("", root(func(r *skills.RootStatus) { r.Installed = false }), root(func(r *skills.RootStatus) { r.Path = "/h/.agents/skills" })), Pass, "1 roots", ""},
 	} {
-		c := statusOf(Run(context.Background(), Input{Version: tc.ver, PluginRoots: tc.roots, Exec: f.exec, Look: f.look}), "hv")
-		if c.Status != tc.status {
-			t.Errorf("%s: %+v, want %s", tc.name, c, tc.status)
+		c := statusOf(Run(context.Background(), Input{Skills: tc.in, Exec: f.exec, Look: f.look}), "skills")
+		if c.Status != tc.status || !strings.Contains(c.Detail, tc.detail) || (tc.hint != "" && c.Hint != tc.hint) {
+			t.Errorf("%s: %+v, want %s %q hint %q", tc.name, c, tc.status, tc.detail, tc.hint)
+		}
+		if tc.status == Fail && c.Hint == "" {
+			t.Errorf("%s: a fail needs a hint", tc.name)
 		}
 	}
 }

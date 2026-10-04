@@ -216,9 +216,9 @@ List skipped checklist items under `Skipped checklist items:` so the release rec
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/manual-gates.md`](../references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
-- [`references/task-list-init.md`](../references/task-list-init.md) — Task-list init pattern.
-- [`references/issue-mode.md`](../references/issue-mode.md) — Issue-mode milestones and release.
-- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback rule.
-- [`references/humanizing-prose.md`](../references/humanizing-prose.md) — Self-audit for model-written notes.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/manual-gates.md`](references/manual-gates.md) — The manual-gate registry (`hv gate list`): gates the verbs enforce with `--confirm`, and the skill-only callouts.
+- [`references/task-list-init.md`](references/task-list-init.md) — Task-list init pattern.
+- [`references/issue-mode.md`](references/issue-mode.md) — Issue-mode milestones and release.
+- [`references/ask-user-question-fallback.md`](references/ask-user-question-fallback.md) — Plain-text fallback rule.
+- [`references/humanizing-prose.md`](references/humanizing-prose.md) — Self-audit for model-written notes.

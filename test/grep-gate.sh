@@ -17,11 +17,7 @@ cd "$REPO"
 fails=0
 bad() { printf '\033[31mFAIL\033[0m %s\n' "$1" >&2; fails=$((fails + 1)); }
 
-# 1. bin/ is exactly the launcher.
-BIN_LS="$(git ls-files bin | sort | tr '\n' ' ')"
-[ "$BIN_LS" = "bin/hv " ] || bad "bin/ must hold only the hv launcher; tracked: $BIN_LS"
-
-# 2. Legacy names. The scope is what users and contributors read or run:
+# 1. Legacy names. The scope is what users and contributors read or run:
 # skills, references, docs, the root Markdown, test/ and Go tests. Non-test Go
 # source under internal/ is out of scope (A9 ruling, option a): it cites the
 # helper each verb was ported from, and some of it has to know the old names
@@ -58,11 +54,11 @@ if [ -n "$HITS" ]; then
   printf '%s\n' "$HITS" >&2
 fi
 
-# 3. A fresh project initializes and passes its own check.
+# 2. A fresh project initializes and passes its own check.
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "${SCRATCH:?}"' EXIT
 if [ -z "${HV_BIN:-}" ]; then
-  VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' .claude-plugin/plugin.json)"
+  VERSION="$(sed -n 's/^## v\([0-9][^ ]*\).*/\1/p' CHANGELOG.md | head -1)"
   go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$VERSION" -o "$SCRATCH/hv" ./cmd/hv
   HV_BIN="$SCRATCH/hv"
 fi

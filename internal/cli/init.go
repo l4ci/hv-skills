@@ -45,21 +45,15 @@ func initErr(err error) error {
 
 func initVerb(fs *flag.FlagSet) RunFunc {
 	noBlocks := fs.Bool("no-blocks", false, "seed .hv/ only; skip AGENTS.md and the managed blocks")
-	codex := fs.Bool("codex", false, "link the hv skills into .agents/skills so Codex discovers them")
-	skillsDir := fs.String("skills-dir", "", "hv-skills checkout to link from (with --codex; default: beside the hv binary)")
+	// Removed by F6a; kept as flags so they exit 2 with a hint, not "unknown flag".
+	codex := fs.Bool("codex", false, "removed: use hv skills install --scope project --agent codex")
+	skillsDir := fs.String("skills-dir", "", "removed: use hv skills install --scope project --agent codex")
 	return func(c *Ctx, args []string) (Result, error) {
 		if err := knNoArgs(args); err != nil {
 			return Result{}, err
 		}
-		if *skillsDir != "" && !*codex {
-			return Result{}, Usage("--skills-dir needs --codex")
-		}
-		skills := ""
-		if *codex {
-			var err error
-			if skills, err = codexSkillsRoot(*skillsDir); err != nil {
-				return Result{}, err
-			}
+		if *codex || *skillsDir != "" {
+			return Result{}, Usage("--codex and --skills-dir were removed").WithHint("run: hv skills install --scope project --agent codex")
 		}
 		dir, err := initDir()
 		if err != nil {
@@ -96,26 +90,6 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 			}
 			data.Set("blocks", entries)
 			data.Set("instructions", initInstructionsData(b))
-		}
-		if *codex {
-			cr, err := initproj.Codex(dir, skills)
-			if err != nil {
-				return Result{}, initErr(err)
-			}
-			changed = changed || cr.Changed()
-			warnings = append(warnings, cr.Warnings...)
-			links := []any{}
-			for _, l := range cr.Links {
-				links = append(links, knObj("name", l.Name, "target", l.Target, "status", l.Status))
-				line := "link: " + filepath.ToSlash(filepath.Join(".agents", "skills", l.Name))
-				if l.Status == "created" {
-					line += " -> " + l.Target
-				} else {
-					line += " (" + l.Status + ")"
-				}
-				lines = append(lines, line)
-			}
-			data.Set("codex", knObj("skillsDir", cr.SkillsDir, "links", links))
 		}
 		for _, w := range warnings {
 			c.Warn("%s", w)
@@ -176,33 +150,6 @@ func initConfig(root string) (initConfigResult, error) {
 		}
 	}
 	return r, nil
-}
-
-// executablePath is the running binary; a variable so a test can swap it.
-var executablePath = os.Executable
-
-// codexSkillsRoot is --skills-dir, else the plugin root beside the binary
-// (<root>/bin/hv). It must hold an hv-*/SKILL.md; checked before anything is
-// written, so exit 3 leaves nothing behind.
-func codexSkillsRoot(flagVal string) (string, error) {
-	root := flagVal
-	if root == "" {
-		exe, err := executablePath()
-		if err == nil {
-			exe, err = filepath.EvalSymlinks(exe)
-		}
-		if err != nil {
-			return "", Resolution("cannot locate the hv binary: %v", err).WithHint("pass --skills-dir <hv-skills checkout>")
-		}
-		root = filepath.Dir(filepath.Dir(exe))
-	}
-	if abs, err := filepath.Abs(root); err == nil {
-		root = abs
-	}
-	if !initproj.ValidSkillsRoot(root) {
-		return "", Resolution("no hv-*/SKILL.md skills found under %s", root).WithHint("pass --skills-dir <hv-skills checkout> (a go-installed hv has no skills beside it)")
-	}
-	return root, nil
 }
 
 // initMilestoneIndex runs `milestone index`, which handles issue mode, now

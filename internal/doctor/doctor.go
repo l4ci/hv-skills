@@ -1,6 +1,6 @@
 // Package doctor is the logic behind `hv doctor`: one read-only preflight
 // check per thing a parallel round depends on (git, the dispatch host, the
-// forge CLI, the worker accounts, herdr's agent integration, the hv binary).
+// forge CLI, the worker accounts, herdr's agent integration, the installed skills).
 //
 // Nothing here reaches os/exec or the real PATH directly: the caller injects
 // Exec and Look, so tests need no real herdr, gh or tmux. A missing tool is a
@@ -9,7 +9,6 @@ package doctor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/l4ci/hv-skills/v5/internal/hook"
+	"github.com/l4ci/hv-skills/v5/internal/skills"
 )
 
 // Check statuses.
@@ -76,7 +76,9 @@ type Input struct {
 	// CodexTiers is whether any round.tiers.codex.<tier> is set.
 	CodexTiers bool
 
-	Version string // the running binary's version, "" when unknown
+	// Skills is the state of the installed skill sets (skills.Set.Status);
+	// nil when nothing was read.
+	Skills *skills.Report
 
 	// ProjectRoot is the directory holding .hv/, "" outside an hv project:
 	// the orchestrator checks (statusline, stop-hook) skip without it.
@@ -84,10 +86,6 @@ type Input struct {
 	// ConfigDirs are the Claude config dirs whose settings.json counts for
 	// those checks: each account's configDir, else the default user dir.
 	ConfigDirs []string
-
-	// PluginRoots are directories to search upward for
-	// .claude-plugin/plugin.json, in order.
-	PluginRoots []string
 
 	Exec Exec
 	// Look resolves a tool name to a path, or false when it is not found.
@@ -98,7 +96,7 @@ type Input struct {
 func Run(ctx context.Context, in Input) Report {
 	d := &runner{in: in, ctx: ctx}
 	return Report{Checks: []Check{
-		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.switchCheck(), d.hv(), d.codex(),
+		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.switchCheck(), d.skills(), d.codex(),
 	}}
 }
 
@@ -521,42 +519,62 @@ func (d *runner) resolve(word string) (string, bool) {
 	return d.in.Look(word)
 }
 
-func (d *runner) hv() Check {
-	ver := strings.TrimPrefix(strings.TrimSpace(d.in.Version), "v")
-	for _, root := range d.in.PluginRoots {
-		plugin, ok := findPlugin(root)
-		if !ok {
-			continue
+// skills compares the installed skill sets with the binary's. It skips until
+// something is installed (the repo's opt-in rule) and fails only on a broken
+// install: another digest, missing or edited files, or a leftover plugin copy.
+func (d *runner) skills() Check {
+	const name = "skills"
+	const installHint = "run: hv skills install"
+	var have []skills.RootStatus
+	if rep := d.in.Skills; rep != nil {
+		for _, r := range rep.Roots {
+			if r.Installed {
+				have = append(have, r)
+			}
 		}
-		if ver == "" || ver == "(devel)" || ver == "dev" {
-			return skip("hv", "running a development build")
-		}
-		if plugin != ver {
-			return fail("hv", fmt.Sprintf("hv %s, plugin.json says %s", ver, plugin), "run: hv update")
-		}
-		return pass("hv", "hv "+ver+" matches plugin.json")
 	}
-	return skip("hv", "not inside a plugin or source checkout")
+	if len(have) == 0 {
+		return skip(name, "not installed (opt-in): "+installHint)
+	}
+	rep := d.in.Skills
+	if rep.Plugin != "" {
+		return fail(name, "the Claude plugin "+rep.Plugin+" is still installed, so both copies list", "claude plugin uninstall "+rep.Plugin)
+	}
+	var problems []string
+	hint := "run: hv skills update"
+	for _, r := range have {
+		if !r.Current {
+			problems = append(problems, fmt.Sprintf("%s: skills %s, hv %s", r.Path, versionOrDigest(r.Version, r.Digest), versionOrDigest(rep.Version, rep.Digest)))
+		}
+		if len(r.Missing) > 0 {
+			problems = append(problems, fmt.Sprintf("%s: %d missing (%s)", r.Path, len(r.Missing), first(r.Missing)))
+		}
+		if len(r.Edited) > 0 {
+			problems = append(problems, fmt.Sprintf("%s: %d edited (%s)", r.Path, len(r.Edited), first(r.Edited)))
+			hint = "run: hv skills update --overwrite"
+		}
+	}
+	if len(problems) > 0 {
+		return fail(name, strings.Join(problems, "; "), hint)
+	}
+	return pass(name, fmt.Sprintf("%d roots match hv %s", len(have), versionOrDigest(rep.Version, rep.Digest)))
 }
 
-// findPlugin walks up from dir to the nearest .claude-plugin/plugin.json and
-// returns its version.
-func findPlugin(dir string) (string, bool) {
-	for dir != "" {
-		b, err := os.ReadFile(filepath.Join(dir, ".claude-plugin", "plugin.json"))
-		if err == nil {
-			var p struct {
-				Version string `json:"version"`
-			}
-			if json.Unmarshal(b, &p) == nil && p.Version != "" {
-				return strings.TrimPrefix(p.Version, "v"), true
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
+// versionOrDigest names a skill set: its version when it has one, else the
+// start of its digest (a dev build has no version).
+func versionOrDigest(ver, digest string) string {
+	if ver = strings.TrimPrefix(strings.TrimSpace(ver), "v"); ver != "" && ver != "(devel)" && ver != "dev" {
+		return ver
 	}
-	return "", false
+	if len(digest) > 12 {
+		digest = digest[:12]
+	}
+	return digest
+}
+
+func first(l []string) string {
+	if len(l) > 1 {
+		return l[0] + ", ..."
+	}
+	return l[0]
 }

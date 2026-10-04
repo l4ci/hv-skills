@@ -249,9 +249,7 @@ trap 'rm -rf "$TMP_B08"' EXIT
 echo '{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}' > "$TMP_B08/.hv/config.json"
 ( cd "$TMP_B08" && git add -A && git commit -q -m init )
 
-# Force HV_INSTALL_ROOT to point at $REPO so the version stamp picks up
-# $REPO/.claude-plugin/plugin.json's version.
-OUT=$( cd "$TMP_B08" && HV_INSTALL_ROOT="$REPO" hvj migrate v4 --apply )
+OUT=$( cd "$TMP_B08" && hvj migrate v4 --apply )
 
 # Legacy top-level "version" should be cleaned up.
 HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")

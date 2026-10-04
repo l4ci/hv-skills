@@ -225,9 +225,9 @@ Run on demand when strategy files have drifted from the project (new surfaces, r
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule.
-- [`references/three-mode-skill-shape.md`](../references/three-mode-skill-shape.md) — Shared skeleton with `/hv-ship` Docs Mode.
-- [`references/subagent-dispatch.md`](../references/subagent-dispatch.md) — Parallel runner pattern.
-- [`references/review-verdict-routing.md`](../references/review-verdict-routing.md) — PASS / CONCERNS / FAIL contract; QA reuses it.
-- [`references/umbrella-mode.md`](../references/umbrella-mode.md) — Per-repo resolution for `--repo` / `--all`.
-- [`references/post-cycle-trigger-gate.md`](../references/post-cycle-trigger-gate.md) — When `qa.afterWork: true` should fire.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule.
+- [`references/three-mode-skill-shape.md`](references/three-mode-skill-shape.md) — Shared skeleton with `/hv-ship` Docs Mode.
+- [`references/subagent-dispatch.md`](references/subagent-dispatch.md) — Parallel runner pattern.
+- [`references/review-verdict-routing.md`](references/review-verdict-routing.md) — PASS / CONCERNS / FAIL contract; QA reuses it.
+- [`references/umbrella-mode.md`](references/umbrella-mode.md) — Per-repo resolution for `--repo` / `--all`.
+- [`references/post-cycle-trigger-gate.md`](references/post-cycle-trigger-gate.md) — When `qa.afterWork: true` should fire.
