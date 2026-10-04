@@ -88,8 +88,14 @@ func (d *runner) codex() Check {
 		return fail("codex", fmt.Sprintf("codex %s, need %s", v, CodexRange), CodexInstallHint)
 	}
 	head := "codex " + v.String()
+	// The tier map is optional for codex (#68): unset, a worker runs on
+	// Codex's own default model.
+	tiers := ""
+	if !d.in.CodexTiers {
+		tiers = "; round.tiers.codex unset (optional): workers use Codex's default model"
+	}
 	if len(homes) == 0 {
-		return pass("codex", head+", no slot homes yet")
+		return pass("codex", head+", no slot homes yet"+tiers)
 	}
 	herdr, haveHerdr := d.in.Look("herdr")
 	var bad []string
@@ -116,7 +122,7 @@ func (d *runner) codex() Check {
 	if len(bad) > 0 {
 		return fail("codex", head+"; "+strings.Join(bad, "; "), hint)
 	}
-	return pass("codex", fmt.Sprintf("%s; homes checked: %s", head, d.homeNames()))
+	return pass("codex", fmt.Sprintf("%s; homes checked: %s%s", head, d.homeNames(), tiers))
 }
 
 func (d *runner) homeNames() string {

@@ -483,9 +483,6 @@ const codexCfg = `{"work":{"dispatch":"herdr"},"round":{"tiers":{"codex":{"light
 func TestAssignCodexResolvesAndStarts(t *testing.T) {
 	f := newAssignFixture(t)
 	codex := func(o *AssignOpts) { o.Kind = "codex" }
-	if _, err := f.assign("12", "ben", codex); blockedBy(t, err) != BlockNoTierMap {
-		t.Fatalf("an unconfigured codex map is refused: %v", err)
-	}
 	f.config(t, codexCfg)
 	rig := &codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}
 	rig.install(f)
@@ -519,6 +516,36 @@ func TestAssignCodexResolvesAndStarts(t *testing.T) {
 	var we *worker.Error
 	if _, err := g.assign("12", "ben", nil); !errors.As(err, &we) || we.Exit != worker.ExitUnavailable || !strings.Contains(we.Hint, "codex login") {
 		t.Fatalf("the recorded kind is the default, and an unlogged slot is exit 5: %v", err)
+	}
+}
+
+// An unset codex tier map is no model, not a refusal (#68): the default
+// command drops --model and Codex picks its own. A custom work.codexCommand
+// holding {model} has nothing to fill in, so it is refused before the claim.
+func TestAssignCodexWithoutTierMap(t *testing.T) {
+	f := newAssignFixture(t)
+	f.config(t, `{"work":{"dispatch":"herdr"}}`)
+	rig := &codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}
+	rig.install(f)
+	f.host.name = "herdr"
+	res, err := f.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex" })
+	if err != nil || !res.Dispatched || res.Model != "" {
+		t.Fatalf("an unset codex map dispatches with no model: %v %+v", err, res)
+	}
+	if !strings.HasPrefix(f.host.launch, "codex --dangerously-bypass-approvals-and-sandbox ") || strings.Contains(f.host.launch, "--model") {
+		t.Errorf("launch = %q", f.host.launch)
+	}
+
+	g := newAssignFixture(t)
+	g.config(t, `{"work":{"dispatch":"herdr","codexCommand":"codex -m {model}"}}`)
+	gr := &codexRig{version: "codex-cli 0.159.2\n", loggedIn: true}
+	gr.install(g)
+	g.host.name = "herdr"
+	if _, err := g.assign("12", "ben", func(o *AssignOpts) { o.Kind = "codex" }); blockedBy(t, err) != BlockNoTierMap {
+		t.Fatalf("a custom {model} command with no map is refused: %v", err)
+	}
+	if len(gr.calls) != 0 || g.host.launch != "" {
+		t.Errorf("the refusal runs nothing: %v %q", gr.calls, g.host.launch)
 	}
 }
 

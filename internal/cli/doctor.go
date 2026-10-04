@@ -89,6 +89,11 @@ func doctorInput() doctor.Input {
 	}
 	in.Dispatch, in.IssuesProvider = str("work.dispatch"), str("issues.provider")
 	in.CodexHomes = codexHomes(root)
+	for _, t := range []string{"light", "standard", "heavy"} {
+		if strings.TrimSpace(str("round.tiers.codex."+t)) != "" {
+			in.CodexTiers = true
+		}
+	}
 	if raw, _ := config.Lookup(cfg, "work.accounts"); raw != nil {
 		list, _ := raw.([]any)
 		for _, e := range list {
