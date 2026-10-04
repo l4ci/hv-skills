@@ -370,6 +370,26 @@
       "tier": "provisional",
       "hits": 0,
       "lastSeen": "2026-10-01"
+    },
+    "Build & Tooling: Smoke testing::Fakes hide real-host bugs: run one live check before a release": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-04"
+    },
+    "Build & Tooling: Smoke testing::Shared-text changes need the full smoke run before merge": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-04"
+    },
+    "Architecture: Skill authoring::Codex drops skills whose unquoted description has ': ' or ' #'": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-04"
+    },
+    "Build & Tooling: Git & isolation::Repo-wide renames: one sweep PR owns shared code, slices stack on it": {
+      "tier": "provisional",
+      "hits": 0,
+      "lastSeen": "2026-10-04"
     }
   }
 }
