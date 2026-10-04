@@ -2,7 +2,7 @@ package cli
 
 import (
 	"context"
-	"github.com/l4ci/hv-skills/v5/internal/limits"
+	"github.com/l4ci/hv/v5/internal/limits"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/round"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // roundFixture is a project with one parked and one working worktree, and a

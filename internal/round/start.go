@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // StartOpts are the flags of `hv round start`, with the config already read.

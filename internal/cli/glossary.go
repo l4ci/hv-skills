@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
+	"github.com/l4ci/hv/v5/internal/knowledge"
 )
 
 // glossaryCommands is the `hv glossary` group (A5, #49).

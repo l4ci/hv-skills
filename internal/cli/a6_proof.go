@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/plan"
-	"github.com/l4ci/hv-skills/v5/internal/proof"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/plan"
+	"github.com/l4ci/hv/v5/internal/proof"
 )
 
 // Glue for the proof group and plan uncertain, which read items through

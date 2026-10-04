@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/pytest"
 )
 
 // These tests run the Go port against the fake herdr/tmux scripts

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // The gate tests rebuild smoke section 68's world: a bare origin, a gate

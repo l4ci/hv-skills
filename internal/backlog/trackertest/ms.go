@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // MS is Fake with the native milestone calls a milestone tracker needs, and a

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/artifact"
 )
 
 // Issue mode: the design is a `design` note on the item's issue, and the

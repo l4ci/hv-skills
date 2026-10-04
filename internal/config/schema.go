@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // Key is one known .hv/config.json key: its dotted name, the default used
@@ -15,6 +15,27 @@ type Key struct {
 	Name     string // dotted path, e.g. "work.mergeStrategy"
 	Default  any    // value when the key is missing or null
 	Required bool   // written by hv init; the schema check treats it as present-or-stale
+}
+
+// VersionKey is the stamp of the hv release that wrote a project's config.
+// LegacyVersionKey is where releases before the rename to hv kept it;
+// it is read as a fallback and moved by Fill.
+const (
+	VersionKey       = "hv.version"
+	LegacyVersionKey = "hvSkills.version"
+)
+
+// StampedVersion is the version stamped in cfg: the string at VersionKey,
+// else the one at LegacyVersionKey, else "".
+func StampedVersion(cfg any) string {
+	for _, k := range []string{VersionKey, LegacyVersionKey} {
+		if v, ok := walk(cfg, k); ok {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 // Keys is the table of every known config key. Leaf keys only: object-valued
@@ -50,7 +71,7 @@ var Keys = []Key{
 	{"umbrella.enabled", false, true},
 	{"issues.providers.github", true, true},
 	{"issues.providers.gitlab", true, true},
-	{"hvSkills.version", "", true},
+	{VersionKey, "", true},
 	{"loop.webResearch", false, false},
 	{"issues.label", "in-progress", false},
 	{"backlog.backend", "file", false},

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 func project(t *testing.T, cfg, local string) string {
@@ -256,10 +256,10 @@ func TestCheckVerdicts(t *testing.T) {
 	// null and a scalar parent both count as missing, in schema order
 	o, _ := getObject(cfg, "umbrella")
 	o.Set("enabled", nil)
-	cfg.Set("hvSkills", "scalar")
+	cfg.Set("hv", "scalar")
 	b, _ = jsonx.Marshal(cfg)
 	os.WriteFile(filepath.Join(root, ".hv", "config.json"), b, 0o644)
-	if st, m := Check(root); st != Stale || !reflect.DeepEqual(m, []string{"umbrella.enabled", "hvSkills.version"}) {
+	if st, m := Check(root); st != Stale || !reflect.DeepEqual(m, []string{"umbrella.enabled", "hv.version"}) {
 		t.Errorf("null/scalar: %s %v", st, m)
 	}
 }

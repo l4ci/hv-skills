@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 func initRun(t *testing.T, dir string, args ...string) (int, *jsonx.Object, string) {
@@ -140,7 +140,7 @@ func TestInitCheckWarnsOnVersionDrift(t *testing.T) {
 	old := installedVersionFn
 	installedVersionFn = func() string { return "5.0.0" }
 	t.Cleanup(func() { installedVersionFn = old })
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hvSkills":{"version":"4.9.0"}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hv":{"version":"4.9.0"}}`), 0o644)
 	code, env, errOut := initRun(t, dir, "init", "check")
 	w, _ := env.Get("warnings")
 	if l, _ := w.([]any); code != 0 || len(l) != 1 || !strings.Contains(l[0].(string), "project at 4.9.0, binary at 5.0.0") || !strings.Contains(errOut, "drift") {
@@ -204,10 +204,12 @@ func TestInitFillsConfigAndStampsVersion(t *testing.T) {
 		wantCfg map[string]any
 		stamped string
 	}{
-		{"fresh", "5.0.0", "", map[string]any{"hvSkills.version": "5.0.0"}, "5.0.0"},
-		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"hvSkills":{"version":"4.9.0"}}`,
-			map[string]any{"docs.path": "mydocs", "hvSkills.version": "5.0.0"}, "5.0.0"},
-		{"dev binary stamps nothing", "", "", map[string]any{"hvSkills.version": ""}, ""},
+		{"fresh", "5.0.0", "", map[string]any{"hv.version": "5.0.0"}, "5.0.0"},
+		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"hv":{"version":"4.9.0"}}`,
+			map[string]any{"docs.path": "mydocs", "hv.version": "5.0.0"}, "5.0.0"},
+		{"legacy key migrated", "5.0.0", `{"hvSkills":{"version":"4.9.0"}}`,
+			map[string]any{"hv.version": "5.0.0", "hvSkills.version": nil}, "5.0.0"},
+		{"dev binary stamps nothing", "", "", map[string]any{"hv.version": ""}, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -265,7 +267,7 @@ func TestInitClearsVersionDrift(t *testing.T) {
 	t.Cleanup(func() { installedVersionFn = old })
 	dir := t.TempDir()
 	initRun(t, dir, "init", "--no-blocks")
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hvSkills":{"version":"4.9.0"}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hv":{"version":"4.9.0"}}`), 0o644)
 	initRun(t, dir, "init", "--no-blocks")
 	_, env, _ := initRun(t, dir, "init", "check")
 	if w, _ := env.Get("warnings"); w != nil {

@@ -11,10 +11,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/shlex"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/shlex"
 )
 
 // DispatchOpts are the flags of `hv worker dispatch`.

@@ -1,7 +1,7 @@
 package hook
 
 import (
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/roundlease"
 )
 
 // Who says how a hook process relates to the round lease.

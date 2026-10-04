@@ -15,9 +15,9 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Version={{ .Version }}
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Date={{ .Date }}
+      - -X github.com/l4ci/hv/v5/internal/version.Version={{ .Version }}
+      - -X github.com/l4ci/hv/v5/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/l4ci/hv/v5/internal/version.Date={{ .Date }}
 
 archives:
   # Bare binaries for install.sh.
@@ -57,7 +57,7 @@ brews:
       owner: l4ci
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/l4ci/hv-skills
+    homepage: https://github.com/l4ci/hv
     description: Plan, ship and run parallel rounds with AI coding agents
     license: MIT
     skip_upload: auto

@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 // The write side of the file backend: FileBackend.append, create,

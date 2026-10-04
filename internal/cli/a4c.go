@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	hvrepos "github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/status"
-	"github.com/l4ci/hv-skills/v5/internal/update"
-	"github.com/l4ci/hv-skills/v5/internal/version"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	hvrepos "github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/status"
+	"github.com/l4ci/hv/v5/internal/update"
+	"github.com/l4ci/hv/v5/internal/version"
 )
 
 // The A4 `hv update`, `hv config show|set|check` and `hv repo which|resolve|
@@ -22,7 +22,7 @@ import (
 
 func a4cCommands() []*Command {
 	return []*Command{
-		{Name: "update", Summary: "check for a newer hv-skills release", Verb: a4Update},
+		{Name: "update", Summary: "check for a newer hv release", Verb: a4Update},
 		{Name: "config", Summary: "read and write .hv/config.json", Subs: []*Command{
 			{Name: "show", Summary: "effective value and source of config keys", Repo: true, Verb: a4ConfigShow},
 			{Name: "set", Summary: "set one key in .hv/config.json", Repo: true, Verb: a4ConfigSet},

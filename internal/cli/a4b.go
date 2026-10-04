@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/section"
-	"github.com/l4ci/hv-skills/v5/internal/stale"
-	"github.com/l4ci/hv-skills/v5/internal/status"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/frontmatter"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/stale"
+	"github.com/l4ci/hv/v5/internal/status"
 )
 
 // The A4 backlog views and maintenance verbs, `hv summary`, `hv status` and

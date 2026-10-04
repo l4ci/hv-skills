@@ -27,7 +27,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/config"
 )
 
 // ---- config fixtures ---------------------------------------------------------------
@@ -162,7 +162,7 @@ func updFixtures(t *testing.T) {
 			return d
 		}
 		upd.bin = filepath.Join(harnessTmp, "hv-stamped")
-		build := exec.Command("go", "build", "-ldflags", "-X github.com/l4ci/hv-skills/v5/internal/version.Version="+instVersion, "-o", upd.bin, ".")
+		build := exec.Command("go", "build", "-ldflags", "-X github.com/l4ci/hv/v5/internal/version.Version="+instVersion, "-o", upd.bin, ".")
 		build.Dir = filepath.Join(repoDir, "cmd", "hv")
 		if out, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("go build: %v\n%s", err, out)
@@ -305,7 +305,7 @@ func suiteA4C(t *testing.T) {
 		set("key/models.orchestrator", stdFx, "models.orchestrator", "haiku", eqCheck("data.key", "models.orchestrator")),
 		set("key/four-segments", stdFx, "issues.labels.types.bug", "defect", eqCheck("data.key", "issues.labels.types.bug")),
 		set("key/three-segments", stdFx, "issues.providers.github", "false", eqCheck("data.value", false)),
-		set("key/hvSkills.version", stdFx, "hvSkills.version", "5.0.0", eqCheck("data.value", "5.0.0")),
+		set("key/hv.version", stdFx, "hv.version", "5.0.0", eqCheck("data.value", "5.0.0")),
 		set("previous/scalar", fx{config: `{"models": {"worker": "sonnet"}}`}, "models.worker", "opus",
 			both(eqCheck("data.previous", "sonnet"), eqCheck("data.changed", true))),
 		set("previous/object", fx{config: `{"work": {"accounts": ["a"]}}`}, "work.accounts", `["b"]`, eqCheck("data.previous", []any{"a"})),
@@ -385,7 +385,7 @@ func suiteA4C(t *testing.T) {
 		chk("stale-std-config", stdFx, 1, "stale", allReq...),
 		chk("stale-empty-object", fx{config: "{}"}, 1, "stale", allReq...),
 		chk("stale-one-key", fx{config: fullConfig("umbrella.enabled")}, 1, "stale", "umbrella.enabled"),
-		chk("stale-schema-order", fx{config: fullConfig("hvSkills.version", "models.orchestrator", "docs.path")}, 1, "stale", "models.orchestrator", "docs.path", "hvSkills.version"),
+		chk("stale-schema-order", fx{config: fullConfig("hv.version", "models.orchestrator", "docs.path")}, 1, "stale", "models.orchestrator", "docs.path", "hv.version"),
 		chk("stale-null-value", fx{config: strings.Replace(fullConfig(), `"enabled": false`, `"enabled": null`, 1)}, 1, "stale", "umbrella.enabled"),
 		chk("stale-false-is-present", fx{config: fullConfig("ship.qa")}, 1, "stale", "ship.qa"),
 		chk("stale-parent-scalar", fx{config: strings.Replace(fullConfig(), "\"models\": {", "\"models\": 5, \"zzz\": {", 1)}, 1, "stale", "models.orchestrator", "models.worker"),
@@ -672,7 +672,7 @@ func suiteA4C(t *testing.T) {
 					t.Fatalf("the fake gh was not called: %v", err)
 				}
 				for _, l := range lines(string(b)) {
-					if !strings.HasPrefix(l, "api repos/l4ci/hv-skills/releases/latest") {
+					if !strings.HasPrefix(l, "api repos/l4ci/hv/releases/latest") {
 						t.Errorf("gh was called with %q", l)
 					}
 				}

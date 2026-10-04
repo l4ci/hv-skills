@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/gate"
-	"github.com/l4ci/hv-skills/v5/internal/release"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/gate"
+	"github.com/l4ci/hv/v5/internal/release"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // The B1 (#54) release verbs: the two release steps that create public state,

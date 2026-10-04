@@ -3,10 +3,10 @@ package initproj
 import (
 	"fmt"
 
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
-	"github.com/l4ci/hv-skills/v5/internal/mapqa"
-	ms "github.com/l4ci/hv-skills/v5/internal/milestone"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/knowledge"
+	"github.com/l4ci/hv/v5/internal/mapqa"
+	ms "github.com/l4ci/hv/v5/internal/milestone"
+	"github.com/l4ci/hv/v5/internal/repos"
 )
 
 // BlockEntry is the outcome of one managed block step. Status is what the

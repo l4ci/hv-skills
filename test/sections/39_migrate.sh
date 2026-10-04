@@ -221,12 +221,12 @@ grep -q "/hv-c is" "$TMP_WB/.hv/BACKLOG.md" && fail "stale /hv-c left after rewr
 trap 'rm -rf "$TMP"' EXIT
 pass "migrate v4 — word boundary: /hv-capture preserved, /hv-c rewritten"
 
-echo "migrate v4 — B07: reads hvSkills.version when top-level 'version' absent"
+echo "migrate v4 — B07: reads the legacy hvSkills.version when top-level 'version' absent"
 TMP_B07="$(mktemp -d)"
 trap 'rm -rf "$TMP_B07"' EXIT
 ( cd "$TMP_B07" && git init -q && git config user.email t@t && git config user.name t )
 mkdir -p "$TMP_B07/.hv"
-# Fresh v4 init shape: ONLY hvSkills.version, no top-level "version" field.
+# Pre-rename v4 init shape (legacy fallback): ONLY hvSkills.version, no top-level "version" field.
 echo '{"hvSkills":{"version":"4.0.0"}}' > "$TMP_B07/.hv/config.json"
 ( cd "$TMP_B07" && git add -A && git commit -q -m init )
 # Should pass the safety precondition: exit 3 (config has no version) is B07 still firing.
@@ -234,14 +234,18 @@ RC=0
 OUT=$( cd "$TMP_B07" && hvj migrate v4 2>/dev/null ) || RC=$?
 [ $RC -eq 0 ] || fail "B07: nested hvSkills.version should not trigger the missing-version refusal, got exit $RC"
 [ "$(jget data.noop <<<"$OUT")" = "true" ] || fail "B07: a v4 project with nothing to rewrite should be a noop: $OUT"
+# The renamed key is read too.
+echo '{"hv":{"version":"4.0.0"}}' > "$TMP_B07/.hv/config.json"
+RC=0; ( cd "$TMP_B07" && hvj migrate v4 >/dev/null 2>&1 ) || RC=$?
+[ $RC -eq 0 ] || fail "B07: hv.version should satisfy the version precondition, got exit $RC"
 # A config with no version at all is exit 3.
 echo '{}' > "$TMP_B07/.hv/config.json"
 RC=0; ( cd "$TMP_B07" && hvj migrate v4 >/dev/null 2>&1 ) || RC=$?
 [ $RC -eq 3 ] || fail "B07: a config with no version should exit 3, got $RC"
 trap 'rm -rf "$TMP"' EXIT
-pass "migrate v4 — B07: reads hvSkills.version when top-level 'version' absent"
+pass "migrate v4 — B07: reads the legacy hvSkills.version when top-level 'version' absent"
 
-echo "migrate v4 — B08: --apply bumps hvSkills.version to installed plugin"
+echo "migrate v4 — B08: --apply stamps hv.version and drops the legacy keys"
 TMP_B08="$(mktemp -d)"
 trap 'rm -rf "$TMP_B08"' EXIT
 ( cd "$TMP_B08" && git init -q && git config user.email t@t && git config user.name t )
@@ -254,8 +258,11 @@ OUT=$( cd "$TMP_B08" && hvj migrate v4 --apply )
 # Legacy top-level "version" should be cleaned up.
 HAS_LEGACY=$(python3 -c "import json; print('yes' if 'version' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")
 [ "$HAS_LEGACY" = "no" ] || fail "B08: legacy top-level 'version' should be removed after migration"
+HAS_OLD=$(python3 -c "import json; print('yes' if 'hvSkills' in json.load(open('$TMP_B08/.hv/config.json')) else 'no')")
+[ "$HAS_OLD" = "no" ] || fail "B08: legacy hvSkills should be removed after migration"
+[ "$(python3 -c "import json; print('hv' in json.load(open('$TMP_B08/.hv/config.json')))")" = "True" ] || fail "B08: hv.version should be stamped"
 trap 'rm -rf "$TMP"' EXIT
-pass "migrate v4 — B08: --apply bumps hvSkills.version"
+pass "migrate v4 — B08: --apply stamps hv.version"
 
 echo "migrate v4 — B09: strips orphan v3 blocks"
 cd "$TMP"

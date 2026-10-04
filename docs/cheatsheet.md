@@ -1,4 +1,4 @@
-# hv-skills cheat sheet
+# hv cheat sheet
 
 What each `/hv-*` skill does, one line each. For details: [`reference/slash-commands.md`](reference/slash-commands.md).
 

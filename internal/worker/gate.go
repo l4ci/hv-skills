@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // Merge gate for one worker slot's branch/PR into the cycle branch: the port

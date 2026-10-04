@@ -48,7 +48,7 @@ echo '{}' > "$TMP_V/.hv/config.json"
 OUT=$(cd "$TMP_V" && hvj version --drift) || fail "version --drift failed: $OUT"
 [ "$(echo "$OUT" | jget data.status)" = "unknown" ] || fail "no stamp should be unknown: $OUT"
 INSTALLED="$(echo "$OUT" | jget data.installed)"
-echo '{"hvSkills": {"version": "0.0.1-stale"}}' > "$TMP_V/.hv/config.json"
+echo '{"hv": {"version": "0.0.1-stale"}}' > "$TMP_V/.hv/config.json"
 OUT=$(cd "$TMP_V" && hvj version --drift) || fail "version --drift failed: $OUT"
 if [ -n "$INSTALLED" ]; then
   [ "$(echo "$OUT" | jget data.status)" = "drift" ] || fail "stale stamp should drift: $OUT"

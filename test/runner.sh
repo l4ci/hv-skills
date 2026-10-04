@@ -69,7 +69,7 @@ TMP="$(cd "$(mktemp -d)" && pwd -P)"
 HV_STAGE="$(mktemp -d)"
 if [ -z "${HV_BIN:-}" ]; then
   HV_VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-  (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$HV_VERSION" \
+  (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv/v5/internal/version.Version=$HV_VERSION" \
     -o "$HV_STAGE/hv" ./cmd/hv) || { echo "runner: go build ./cmd/hv failed" >&2; exit 2; }
   HV_BIN="$HV_STAGE/hv"
 fi

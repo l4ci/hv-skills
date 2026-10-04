@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // Workflow side of the fake board.

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/pytest"
 )
 
 // paneFixtures are static pane texts covering every rule of the classifier,

@@ -2,9 +2,9 @@ package backlog
 
 import (
 	"errors"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/repos"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/config"
 )
 
 // Backend is the read side of a backlog, whichever store holds it.

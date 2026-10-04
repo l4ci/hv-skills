@@ -55,11 +55,11 @@ The registry the round writes inside the project is `.hv/workers.json`: see [`.h
 
 ## Drift detection
 
-`hv version --drift` compares the project's recorded `hvSkills.version` against the installed binary. On drift, rerun `hv init` to re-stamp the project.
+`hv version --drift` compares the project's recorded `hv.version` against the installed binary. On drift, rerun `hv init` to re-stamp the project. The pre-rename `hvSkills.version` is read as a fallback and moved by `hv init` / `hv config fill`.
 
 ## Related
 
-- [How hv-skills works](../how-it-works.md): system diagram and lane overview
+- [How hv works](../how-it-works.md): system diagram and lane overview
 - [Slash commands](slash-commands.md): every `/hv-*` command
 - [`hv` verb reference](cli-helpers.md): every verb
 - [`.hv/` folder reference](hv-folder.md): per-file detail

@@ -14,10 +14,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/marker"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/marker"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // ErrCommitNotFound: the commit is not in the repository (exit 3).
@@ -329,7 +329,7 @@ func Close(ctx context.Context, env Env, dir string, number int, commit, item st
 	if err != nil {
 		return false, err
 	}
-	body := "Closed by hv-skills: shipped in " + short
+	body := "Closed by hv: shipped in " + short
 	if item != "" {
 		body += " ([" + item + "])"
 	}

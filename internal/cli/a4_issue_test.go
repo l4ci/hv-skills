@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // withTracker swaps newTracker for one serving tr, for the test's duration.

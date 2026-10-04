@@ -63,8 +63,10 @@ EOF2
   [ "$(echo "$OUT" | jget data.drift)" = "true" ] || fail "drift: expected drift true: $OUT"
   pass "version --drift reports drift when stamped != installed"
 
+  # (Test 2 stamps the pre-rename hvSkills.version key: the legacy fallback.)
+
   # Test 3: match when the stamp is the binary's own version.
-  printf '{"hvSkills":{"version":"%s"}}\n' "$EXPECTED" > .hv/config.json
+  printf '{"hv":{"version":"%s"}}\n' "$EXPECTED" > .hv/config.json
   OUT=$("$HV_BIN" --json version --drift)
   [ "$(echo "$OUT" | jget data.status)" = "match" ] || fail "match: expected status match: $OUT"
   [ "$(echo "$OUT" | jget data.drift)" = "false" ] || fail "match: expected drift false: $OUT"

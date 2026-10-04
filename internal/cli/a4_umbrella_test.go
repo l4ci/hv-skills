@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
 )
 
 // umbrellaProject is an issue-mode umbrella with git sub-repos web and api and

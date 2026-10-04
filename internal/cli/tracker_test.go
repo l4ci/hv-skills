@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // forge is a scripted gh/glab for the tracker verbs. Every test also puts a
@@ -211,7 +211,7 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		if args[0] == "auth" {
 			return "", "", 0
 		}
-		return "https://github.com/l4ci/hv-skills/issues/123\n", "", 0
+		return "https://github.com/l4ci/hv/issues/123\n", "", 0
 	}
 
 	f := &forge{answer: created}
@@ -220,11 +220,11 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 	o := trRun(t, dir, "", append([]string{"tracker", "suggest-upstream", "--json", "--title", "A learning", "--body-file", body}, ok...)...)
 	env := envelope(t, o.stdout)
 	data := env["data"].(map[string]any)
-	if o.code != 0 || data["url"] != "https://github.com/l4ci/hv-skills/issues/123" || data["number"] != 123.0 ||
-		data["upstreamRepo"] != "l4ci/hv-skills" || data["changed"] != true {
+	if o.code != 0 || data["url"] != "https://github.com/l4ci/hv/issues/123" || data["number"] != 123.0 ||
+		data["upstreamRepo"] != "l4ci/hv" || data["changed"] != true {
 		t.Fatalf("%+v", o)
 	}
-	if strings.Join(f.calls, "|") != "gh auth status|gh issue create -R l4ci/hv-skills -t A learning -F -" {
+	if strings.Join(f.calls, "|") != "gh auth status|gh issue create -R l4ci/hv -t A learning -F -" {
 		t.Fatalf("calls %q", f.calls)
 	}
 	// The old helper read the body with $(cat): trailing newlines go, CR stays.
@@ -241,7 +241,7 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 	if !strings.Contains(f.calls[1], "-R env/repo") || !strings.Contains(f.calls[3], "-R flag/repo") || f.stdins[1] != "from stdin" {
 		t.Fatalf("calls %q stdins %q", f.calls, f.stdins)
 	}
-	if o.stdout != "https://github.com/l4ci/hv-skills/issues/123\n" {
+	if o.stdout != "https://github.com/l4ci/hv/issues/123\n" {
 		t.Fatalf("text output %q", o.stdout)
 	}
 
@@ -260,9 +260,9 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		{"no confirm", created, true, []string{"--title", "T", "--body-file", body}, 4, "manual gate 'public-filing' is not cleared"},
 		{"confirm without note", created, true, []string{"--title", "T", "--body-file", body, "--confirm"}, 2, "--confirm-note"},
 		{"note without confirm", created, true, []string{"--title", "T", "--body-file", body, "--confirm-note", "yes"}, 2, "--confirm-note"},
-		{"gh missing", created, false, []string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv-skills/issues/new"},
+		{"gh missing", created, false, []string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv/issues/new"},
 		{"not authed", func(string, []string) (string, string, int) { return "", "not logged in", 1 }, true,
-			[]string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv-skills/issues/new"},
+			[]string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv/issues/new"},
 		{"create fails", func(_ string, args []string) (string, string, int) {
 			if args[0] == "auth" {
 				return "", "", 0

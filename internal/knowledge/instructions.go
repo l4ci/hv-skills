@@ -7,14 +7,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 //go:embed skills_block.md
 var skillsFS embed.FS
 
-// SkillsBlockBody is the static body of the hv-skills managed block. It names
+// SkillsBlockBody is the static body of the hv managed block. It names
 // hv verbs, so it differs from the old hv-skills-index body (contract, A9 G4).
 func SkillsBlockBody() string {
 	b, _ := skillsFS.ReadFile("skills_block.md")

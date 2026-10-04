@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/version"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/version"
 )
 
 // Tree is the hv command tree. Groups and verbs are added here as they are
@@ -15,7 +15,7 @@ import (
 func Tree() *Command {
 	root := &Command{
 		Name:    "hv",
-		Summary: "hv-skills command line",
+		Summary: "hv command line",
 		Subs: []*Command{
 			{Name: "version", Summary: "print the hv version", Verb: versionVerb},
 			knowledgeCommands(),
@@ -61,8 +61,9 @@ func versionVerb(fs *flag.FlagSet) RunFunc {
 	}
 }
 
-// runVersionDrift is hv-version-check --json: hvSkills.version of the merged
-// config against the running binary. stamped or installed empty is "unknown".
+// runVersionDrift is hv-version-check --json: hv.version of the merged config
+// (hvSkills.version on a project not yet migrated) against the running
+// binary. stamped or installed empty is "unknown".
 // The old helper exited 0 without .hv/; 5.0 exits 3 (the root walk-up).
 func runVersionDrift(c *Ctx) (Result, error) {
 	root, err := c.Root()
@@ -79,15 +80,12 @@ func runVersionDrift(c *Ctx) (Result, error) {
 	return Result{Data: data, Text: driftLine(stamped, installed, status)}, nil
 }
 
-// versionDrift compares hvSkills.version of root's merged config with the
-// running binary. Either side empty is "unknown".
+// versionDrift compares the stamped version (hv.version, else the legacy
+// hvSkills.version) of root's merged config with the running binary. Either
+// side empty is "unknown".
 func versionDrift(root string) (stamped, installed, status string) {
 	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
-	if v, ok := config.Lookup(cfg, "hvSkills.version"); ok {
-		if s, ok := v.(string); ok {
-			stamped = s
-		}
-	}
+	stamped = config.StampedVersion(cfg)
 	installed = installedVersionFn()
 	status = "unknown"
 	switch {
@@ -104,7 +102,7 @@ func driftLine(stamped, installed, status string) string {
 	if status != "drift" {
 		return ""
 	}
-	return fmt.Sprintf("hv-skills drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+	return fmt.Sprintf("hv drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
 }
 
 // versionDriftLine is the drift nudge for root, or "".

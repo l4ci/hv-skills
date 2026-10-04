@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // Parked is what Park did to a slot's worktree.

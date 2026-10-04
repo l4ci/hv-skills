@@ -13,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/round"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // The A7 verbs (worker pool, reset, account, ...) live in internal/worker;

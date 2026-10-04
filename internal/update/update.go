@@ -15,7 +15,7 @@ import (
 )
 
 // Repo is the GitHub repository whose latest release hv update asks about.
-const Repo = "l4ci/hv-skills"
+const Repo = "l4ci/hv"
 
 // Install types: how the running binary got where it is.
 const (

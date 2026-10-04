@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 func registryHost(root string) string { return worker.RegistryHost(root) }

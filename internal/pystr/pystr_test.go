@@ -7,7 +7,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/pytest"
 )
 
 // ranges compresses a sorted code point list to [lo, hi] runs, which keeps the

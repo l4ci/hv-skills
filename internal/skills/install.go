@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/fsio"
 )
 
 // Agents and scopes, as the verbs spell them.
@@ -527,7 +527,7 @@ func (s *Set) Status(roots []Root, version, claudeDir string) (Report, error) {
 	return rep, nil
 }
 
-// FindPlugin is the key of a Claude plugin install of hv-skills
+// FindPlugin is the key of a Claude plugin install of the skills
 // ("hv-skills@<marketplace>") in <claudeDir>/plugins/installed_plugins.json,
 // or "". Several matches give the first key in sorted order.
 func FindPlugin(claudeDir string) string {

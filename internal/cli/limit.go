@@ -12,17 +12,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/escalation"
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/keepalive"
-	"github.com/l4ci/hv-skills/v5/internal/limits"
-	"github.com/l4ci/hv-skills/v5/internal/round"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/escalation"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/keepalive"
+	"github.com/l4ci/hv/v5/internal/limits"
+	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // D3 (#67): `hv limit watch|status`. The loop is internal/limits; this file

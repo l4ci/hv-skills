@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // LockTimeout and lockPoll match hvlib_io.locked.

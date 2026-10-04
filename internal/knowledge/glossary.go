@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 // ErrAliasCollision: an alias already belongs to another term, or two terms of

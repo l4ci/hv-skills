@@ -1,6 +1,6 @@
 # Task list initialization
 
-Canonical block referenced by every hv-skills SKILL.md with three or more phases. Cited from each skill's Step 1; the phases list itself stays per-skill since it reflects the skill's natural structure.
+Canonical block referenced by every hv SKILL.md with three or more phases. Cited from each skill's Step 1; the phases list itself stays per-skill since it reflects the skill's natural structure.
 
 ## The block (cite this from SKILL.md)
 

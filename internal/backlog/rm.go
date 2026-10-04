@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 // Item removal with dependency cleanup: bin/hv-rm and bin/hvlib_crossref.py.

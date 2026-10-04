@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // fakeCLI scripts forge CLI answers and logs every call, like the fake gh in

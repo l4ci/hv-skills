@@ -4,8 +4,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/l4ci/hv-skills/v5/internal/marker"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/marker"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // IsAnswer is the answer rule for one comment body: any comment without an hv

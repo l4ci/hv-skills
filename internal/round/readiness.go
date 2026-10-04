@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/gate"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/gate"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // Readiness check names.

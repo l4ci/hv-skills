@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/knowledge"
 )
 
 // knowledgeCommands is the `hv knowledge` group (A5, #49).

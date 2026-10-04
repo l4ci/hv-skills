@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/update"
+	"github.com/l4ci/hv/v5/internal/update"
 )
 
 func TestA4cUpdateIsPinned(t *testing.T) {

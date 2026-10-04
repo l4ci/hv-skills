@@ -4,10 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	ms "github.com/l4ci/hv-skills/v5/internal/milestone"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	ms "github.com/l4ci/hv/v5/internal/milestone"
 )
 
 // The issue-mode halves of the milestone verbs: a milestone is a native

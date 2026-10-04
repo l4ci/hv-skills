@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // newUmbrella is an umbrella over fake trackers, one per name, with the

@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv-skills/v5/internal/git"
+	"github.com/l4ci/hv/v5/internal/git"
 )
 
 // branchTarget is what a branch-reading verb (review scope, review brief,

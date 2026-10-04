@@ -17,9 +17,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/knowledge"
 )
 
 // Sentinels the verb maps to exit codes.
@@ -45,7 +45,7 @@ func refuse(blocked, format string, a ...any) error {
 	return &Refusal{blocked, fmt.Sprintf(format, a...)}
 }
 
-// InstalledVersion is the version stamped into hvSkills.version; "" skips the
+// InstalledVersion is the version stamped into hv.version; "" skips the
 // stamp. It is the running binary's version, and tests replace it.
 var InstalledVersion = func() string { return "" }
 
@@ -319,8 +319,12 @@ func checkPreconditions(root, cwd string) error {
 		return err
 	}
 	version := ""
-	if hs, ok := getObj(cfg, "hvSkills"); ok {
-		version = getString(hs, "version")
+	for _, parent := range []string{"hv", "hvSkills"} {
+		if version == "" {
+			if o, ok := getObj(cfg, parent); ok {
+				version = getString(o, "version")
+			}
+		}
 	}
 	if version == "" {
 		version = getString(cfg, "version")
@@ -369,9 +373,10 @@ func getString(o *jsonx.Object, k string) string {
 	return s
 }
 
-// stampVersion writes hvSkills.version and drops the legacy top-level
-// "version". It returns the stamped version, or "" when nothing changed (no
-// installed version known, or the stamp is already canonical).
+// stampVersion writes hv.version and drops both legacy forms: hvSkills.version
+// (with its hvSkills object once empty) and the top-level "version". It
+// returns the stamped version, or "" when nothing changed (no installed
+// version known, or hv.version already holds it and no legacy form remains).
 func stampVersion(root string) (string, error) {
 	want := InstalledVersion()
 	if want == "" {
@@ -381,16 +386,27 @@ func stampVersion(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hs, _ := getObj(cfg, "hvSkills")
+	hv, _ := getObj(cfg, "hv")
+	old, _ := getObj(cfg, "hvSkills")
 	_, legacy := cfg.Get("version")
-	if hs != nil && getString(hs, "version") == want && !legacy {
+	if old != nil {
+		_, hasOld := old.Get("version")
+		legacy = legacy || hasOld
+	}
+	if hv != nil && getString(hv, "version") == want && !legacy {
 		return "", nil
 	}
-	if hs == nil {
-		hs = jsonx.NewObject()
-		cfg.Set("hvSkills", hs)
+	if hv == nil {
+		hv = jsonx.NewObject()
+		cfg.Set("hv", hv)
 	}
-	hs.Set("version", want)
+	hv.Set("version", want)
+	if old != nil {
+		old.Delete("version")
+		if len(old.Keys()) == 0 {
+			cfg.Delete("hvSkills")
+		}
+	}
 	cfg.Delete("version")
 	return want, fsio.WriteJSONAtomic(configPath(root), cfg)
 }

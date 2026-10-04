@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/escalation"
-	"github.com/l4ci/hv-skills/v5/internal/gate"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/escalation"
+	"github.com/l4ci/hv/v5/internal/gate"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // gateCommands is the `hv gate` group (B1, #54).

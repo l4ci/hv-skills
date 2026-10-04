@@ -7,33 +7,33 @@
 {"name":"close/bad-number/gitlab","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"hv issues close: issue must be a number, got \"x1\""},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/commit-unknown/github","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"commit 'deadbeef' not found in current repository"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/commit-unknown/gitlab","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"commit 'deadbeef' not found in current repository"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/empty-item/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"09410cdcf5a9ba91"}]}
-{"name":"close/empty-item/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"99fb21a60a7abfc6"}]}
-{"name":"close/forge-fails/github","steps":[{"exit":5,"env":{"error":{"code":"unavailable","exit":5,"message":"fake gh: simulated failure for: issue close 1 --comment Closed by hv-skills: shipped in 7340647\n\n<!-- hv:shipped -->"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/forge-fails/gitlab","steps":[{"exit":5,"env":{"error":{"code":"unavailable","exit":5,"message":"fake glab: simulated failure for: issue close 1"},"ok":false},"db":"37de9285fba8da1c"}]}
-{"name":"close/item-with-space/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"7f5dbd22c9812b25"}]}
-{"name":"close/item-with-space/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"34d7648044ca2b9d"}]}
+{"name":"close/empty-item/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"6066302951752afa"}]}
+{"name":"close/empty-item/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"24bd43e195d72606"}]}
+{"name":"close/forge-fails/github","steps":[{"exit":5,"env":{"error":{"code":"unavailable","exit":5,"message":"fake gh: simulated failure for: issue close 1 --comment Closed by hv: shipped in 7340647\n\n<!-- hv:shipped -->"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
+{"name":"close/forge-fails/gitlab","steps":[{"exit":5,"env":{"error":{"code":"unavailable","exit":5,"message":"fake glab: simulated failure for: issue close 1"},"ok":false},"db":"3a495a44419bef0f"}]}
+{"name":"close/item-with-space/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"b58d96ca654546ad"}]}
+{"name":"close/item-with-space/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"b9a22b0f8ed2874e"}]}
 {"name":"close/missing-commit/github","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"hv issues close: --commit is required"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/missing-commit/gitlab","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"hv issues close: --commit is required"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/missing-issue/github","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"issue #99 not found"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/missing-issue/gitlab","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"issue #99 not found"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/no-number/github","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"issues close takes one issue number"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"close/no-number/gitlab","steps":[{"exit":2,"env":{"error":{"code":"usage","exit":2,"message":"issues close takes one issue number"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/plain/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"09410cdcf5a9ba91"}]}
-{"name":"close/plain/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"99fb21a60a7abfc6"}]}
+{"name":"close/plain/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"6066302951752afa"}]}
+{"name":"close/plain/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"24bd43e195d72606"}]}
 {"name":"close/rate-limited/github","steps":[{"exit":6,"env":{"error":{"code":"retry","exit":6,"message":"github secondary rate limit — stopped; wait several minutes before retrying"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/rate-limited/gitlab","steps":[{"exit":6,"env":{"error":{"code":"retry","exit":6,"message":"gitlab secondary rate limit — stopped; wait several minutes before retrying"},"ok":false},"db":"37de9285fba8da1c"}]}
-{"name":"close/ref-name/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"HEAD","issue":1},"ok":true},"db":"09410cdcf5a9ba91"}]}
-{"name":"close/ref-name/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"HEAD","issue":1},"ok":true},"db":"99fb21a60a7abfc6"}]}
+{"name":"close/rate-limited/gitlab","steps":[{"exit":6,"env":{"error":{"code":"retry","exit":6,"message":"gitlab secondary rate limit — stopped; wait several minutes before retrying"},"ok":false},"db":"3a495a44419bef0f"}]}
+{"name":"close/ref-name/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"HEAD","issue":1},"ok":true},"db":"6066302951752afa"}]}
+{"name":"close/ref-name/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"HEAD","issue":1},"ok":true},"db":"24bd43e195d72606"}]}
 {"name":"close/repo-unknown","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"--repo nope is not registered in .hv/repos.json"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/short-sha/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"ffd4cc6","issue":6},"ok":true},"db":"34b9e53efa40621d"}]}
-{"name":"close/short-sha/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"ffd4cc6","issue":6},"ok":true},"db":"8d4e8195f8109f41"}]}
-{"name":"close/twice/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"99fb21a60a7abfc6"},{"exit":0,"env":{"data":{"changed":false,"commit":"7340647","issue":1},"ok":true},"db":"99fb21a60a7abfc6"}]}
-{"name":"close/umbrella-api","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"553db63","issue":2},"ok":true},"db":"1e00882fab898b3f"}]}
-{"name":"close/umbrella-web","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"f65d500","issue":1},"ok":true},"db":"a297d7273eed0017"}]}
+{"name":"close/short-sha/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"ffd4cc6","issue":6},"ok":true},"db":"f683a82900d719e0"}]}
+{"name":"close/short-sha/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"ffd4cc6","issue":6},"ok":true},"db":"4fcf9fa65efa8b92"}]}
+{"name":"close/twice/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":1},"ok":true},"db":"24bd43e195d72606"},{"exit":0,"env":{"data":{"changed":false,"commit":"7340647","issue":1},"ok":true},"db":"24bd43e195d72606"}]}
+{"name":"close/umbrella-api","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"553db63","issue":2},"ok":true},"db":"cc27149548823e3f"}]}
+{"name":"close/umbrella-web","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"f65d500","issue":1},"ok":true},"db":"f2830ee8900a1268"}]}
 {"name":"close/unknown-provider","steps":[{"exit":3,"env":{"error":{"code":"resolution","exit":3,"message":"cannot close upstream issue (no origin remote naming github or gitlab, and issues.provider is not set)"},"ok":false},"db":"c7ec7d64d1f5c1d8"}]}
-{"name":"close/with-item/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":2},"ok":true},"db":"ae959739c138362c"}]}
-{"name":"close/with-item/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":2},"ok":true},"db":"96514495aca891ae"}]}
+{"name":"close/with-item/github","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":2},"ok":true},"db":"41d1809a31c89532"}]}
+{"name":"close/with-item/gitlab","steps":[{"exit":0,"env":{"data":{"changed":true,"commit":"7340647","issue":2},"ok":true},"db":"d3392691aa18d0f3"}]}
 {"name":"imported/all","steps":[{"exit":0,"env":{"data":{"entries":[{"issue":12,"itemId":"B01","provider":"github","repo":null,"status":"open"},{"issue":7,"itemId":"B02","provider":"gitlab","repo":"web","status":"open"},{"issue":5,"itemId":"B03","provider":"github","repo":"web","status":"open"},{"issue":5,"itemId":"B03","provider":"github","repo":"api","status":"open"},{"issue":20,"itemId":"F01","provider":"github","repo":null,"status":"open"},{"issue":8,"itemId":"F01","provider":"gitlab","repo":null,"status":"open"},{"issue":4,"itemId":"T01","provider":"github","repo":"api","status":"open"},{"issue":3,"itemId":"T01","provider":"gitlab","repo":"api","status":"open"},{"issue":50,"itemId":"B05","provider":"github","repo":"web~~ Done 2026-05-15 [`e4abdbe`]","status":"archived"},{"issue":51,"itemId":"F05","provider":"gitlab","repo":null,"status":"archived"},{"issue":13,"itemId":"B01","provider":"github","repo":null,"status":"open"},{"issue":8,"itemId":"F01","provider":"gitlab","repo":"web","status":"open"},{"issue":70,"itemId":"T09","provider":"github","repo":null,"status":"open"}]},"ok":true},"db":"c7ec7d64d1f5c1d8"}]}
 {"name":"imported/archive-and-open-same-key","steps":[{"exit":0,"env":{"data":{"entries":[{"issue":5,"itemId":"B01","provider":"github","repo":null,"status":"open"}]},"ok":true}}]}
 {"name":"imported/empty-backlog","steps":[{"exit":0,"env":{"data":{"entries":[]},"ok":true}}]}

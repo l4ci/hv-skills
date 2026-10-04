@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"regexp"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 var intRe = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)

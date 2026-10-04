@@ -126,7 +126,7 @@ When a captured bullet is about an external dependency (a third-party API quirk,
 
 The nudge is always manual. `/hv-learn` never auto-files to runlog regardless of [autonomy](autonomy.md) level, since the contribution is a public artifact. Pick "Run /runlog-author" and the runlog skill drives its local Ed25519-signed verifier loop and submission; pick "Skip" and the bullet stays local. If the runlog plugin isn't installed, `/hv-learn` surfaces a one-line note and moves on without blocking.
 
-This is independent of the `hv-skills` upstream-issue suggestion (which fires for *internal* tool quirks). A bullet can match neither, one, or both. When it matches both, `/hv-learn` asks them in sequence, since they route to different upstreams.
+This is independent of the `hv` upstream-issue suggestion (which fires for *internal* tool quirks). A bullet can match neither, one, or both. When it matches both, `/hv-learn` asks them in sequence, since they route to different upstreams.
 
 ## Knowledge vs decisions
 

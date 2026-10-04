@@ -8,14 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/debugctr"
-	"github.com/l4ci/hv-skills/v5/internal/gate"
-	"github.com/l4ci/hv-skills/v5/internal/git"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/verdict"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/debugctr"
+	"github.com/l4ci/hv/v5/internal/gate"
+	"github.com/l4ci/hv/v5/internal/git"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/verdict"
 )
 
 // verdictCommands is the `hv verdict` group (B2, #55). `hv debug verdict`

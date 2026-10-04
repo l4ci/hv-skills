@@ -1,4 +1,4 @@
-# Running rounds on hv-skills
+# Running rounds on hv
 
 This is the brief for rounds on this repo: the gate, the repo rules and the roster. It is not the
 user guide. How a round works for any project is in [Parallel rounds](../usage/parallel-rounds.md).

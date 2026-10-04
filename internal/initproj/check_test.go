@@ -35,8 +35,8 @@ func TestCheckWarnings(t *testing.T) {
 	}
 	cfg := filepath.Join(dir, ".hv", "config.json")
 	os.WriteFile(cfg, []byte(`{"umbrella":{"enabled":true}}`), 0o644)
-	r := Check(dir, func() string { return "hv-skills drift: x" })
-	if !r.Initialized || len(r.Warnings) != 2 || !strings.Contains(r.Warnings[0], "no sub-repos") || r.Warnings[1] != "hv-skills drift: x" {
+	r := Check(dir, func() string { return "hv drift: x" })
+	if !r.Initialized || len(r.Warnings) != 2 || !strings.Contains(r.Warnings[0], "no sub-repos") || r.Warnings[1] != "hv drift: x" {
 		t.Errorf("%+v", r)
 	}
 	os.Remove(filepath.Join(dir, ".hv", "repos.json"))

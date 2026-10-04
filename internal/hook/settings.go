@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // Settings are the orchestrator.* config keys (the contract's Config section).

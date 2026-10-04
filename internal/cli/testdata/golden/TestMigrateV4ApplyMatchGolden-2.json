@@ -17,7 +17,7 @@
       "../web/CLAUDE.md": "\u003c!-- hv-knowledge-start --\u003e\n## Project Knowledge\n\nDurable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n- Glossary\n\n\u003c!-- hv-knowledge-end --\u003e\n",
       "BACKLOG.md": "# Backlog\n\n## Bugs\n\n- **[B01] Fix** — use /hv-capture to add, then /hv-capture --remove B01. See `/hv-c` and hv-map-query.\n\n```\n/hv-undo inside a fence\n```\n\nAsk /hv-issues or /hv-map later; /hv-ship --docs and /hv-work --preview work.\n",
       "KNOWLEDGE.md": "# Knowledge\n\n## Glossary\n\n- **Round** — one cycle\n  - **Aliases:** _none_\n  \u003c!-- 2026-10-03 --\u003e\n\n- **Worker** — an agent in a round spanning two lines\n  - **Aliases:** agent, slot\n  - **Not:** orchestrator\n  \u003c!-- 2026-10-03 --\u003e\n",
-      "config.json": "{\n  \"keep\": true,\n  \"hvSkills\": {\n    \"version\": \"4.9.9\"\n  }\n}\n",
+      "config.json": "{\n  \"keep\": true,\n  \"hv\": {\n    \"version\": \"4.9.9\"\n  }\n}\n",
       "knowledge/web/KNOWLEDGE.md": "# Knowledge\n\n## Glossary\n\n- **Page** — a view\n  - **Aliases:** _none_\n  \u003c!-- 2026-10-03 --\u003e\n",
       "migrate-backup/TS/.hv/BACKLOG.md": "# Backlog\n\n## Bugs\n\n- **[B01] Fix** — use /hv-c to add, then /hv-rm B01. See `/hv-c` and hv-map-query.\n\n```\n/hv-undo inside a fence\n```\n\nAsk /hv-issues or /hv-map later; /hv-docs and /hv-assume work.\n",
       "migrate-backup/TS/.hv/plans/P1.md": "plan: run /hv-undo then /hv-c\n",

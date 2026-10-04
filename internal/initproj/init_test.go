@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/pytest"
 )
 
 // fixture is a starting tree: path (relative to the root) to content.
@@ -314,6 +314,7 @@ func TestMergeGitignoreKeepsTheUmbrellaBlanket(t *testing.T) {
 
 func TestMergeGitignore(t *testing.T) {
 	block := strings.Join(ignoreLines, "\n") + "\n"
+	oldHeaderBlock := strings.Join(append([]string{"# ── hv-skills ──"}, ignoreLines[1:]...), "\n") + "\n"
 	cases := []struct {
 		name, in string
 		exists   bool
@@ -327,6 +328,9 @@ func TestMergeGitignore(t *testing.T) {
 		{"blanket stripped", "a\n.hv/\nb\n", true, "a\nb\n\n" + block + worktreesBlock},
 		{"only blanket kept", ".hv/\n", true, "\n" + block + worktreesBlock},
 		{"no trailing newline", "a", true, "a\n" + block + worktreesBlock},
+		// A block written before the rename (#231) keeps its old header: the
+		// header is cosmetic and never checked, so nothing is appended.
+		{"pre-rename header", oldHeaderBlock + ".worktrees/\n", true, oldHeaderBlock + ".worktrees/\n"},
 	}
 	for _, c := range cases {
 		got := MergeGitignore(c.in, c.exists, false)

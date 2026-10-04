@@ -164,7 +164,7 @@ The backlog is shared by default: state travels with the repo so collaborators s
 | `.hv/workers.json` | Per-developer worker slot registry (tab handles, account config dirs, claims); machine-specific |
 | `.hv/**/*.lock` | Transient advisory lockfiles guarding sidecar read-modify-write |
 
-`hv init` writes these under a `# ── hv-skills ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
+`hv init` writes these under a `# ── hv ──` header in your project's `.gitignore`. It also adds `.worktrees/` once: worker worktrees (`/hv-work` slots and parallel rounds) live in `<project>/.worktrees/<name>`, and a nested checkout must stay out of `git status`. Projects upgrading from blanket-ignore (v4.0.x and earlier) have the legacy `.hv/` line migrated automatically.
 
 ### `config.local.json`: per-developer overrides
 

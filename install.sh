@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install the hv binary from a GitHub release.
 #
-#   curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh
 #
 # Downloads hv_<os>_<arch> and checksums.txt from the release, refuses a binary
 # whose sha256 does not match (fail closed: nothing is installed), then copies
@@ -14,7 +14,7 @@
 #   --prefix DIR      HV_PREFIX    install to DIR/bin (default: $HOME/.local)
 #
 # Env:
-#   HV_RELEASE_BASE_URL  default https://github.com/l4ci/hv-skills/releases.
+#   HV_RELEASE_BASE_URL  default https://github.com/l4ci/hv/releases.
 #                        Layout: <base>/latest/download/<asset> and
 #                        <base>/download/v<version>/<asset>. https only; a
 #                        file:// base is accepted for tests and needs curl.
@@ -71,7 +71,7 @@ EOF
   case $(uname -s) in Linux) os=linux ;; Darwin) os=darwin ;; *) die "unsupported OS $(uname -s)" ;; esac
   case $(uname -m) in x86_64 | amd64) arch=amd64 ;; aarch64 | arm64) arch=arm64 ;; *) die "unsupported CPU $(uname -m)" ;; esac
 
-  root=${HV_RELEASE_BASE_URL:-https://github.com/l4ci/hv-skills/releases}
+  root=${HV_RELEASE_BASE_URL:-https://github.com/l4ci/hv/releases}
   root=${root%/}
   # https or file://, and no userinfo anywhere (https://github.com@evil.example
   # is evil.example).

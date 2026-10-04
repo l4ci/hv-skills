@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/keepalive"
-	"github.com/l4ci/hv-skills/v5/internal/limits"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/keepalive"
+	"github.com/l4ci/hv/v5/internal/limits"
+	"github.com/l4ci/hv/v5/internal/roundlease"
 )
 
 // limFake is a host that records what the watcher types and reads nothing:

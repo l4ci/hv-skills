@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/config"
 )
 
 // Scope values of round.scope: which issues a round may take.

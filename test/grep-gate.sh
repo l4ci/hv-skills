@@ -5,7 +5,8 @@
 #
 #   1. bin/ holds exactly the `hv` launcher.
 #   2. No tracked file names a legacy helper, the .hv/bin mirror or hvlib.
-#   3. `hv init` in an empty git repo works and `hv init check` exits 0.
+#   3. Nothing outside history and migration code uses the old name hv-skills.
+#   4. `hv init` in an empty git repo works and `hv init check` exits 0.
 #
 # The legacy names come from test/validate-skills.py (LEGACY_HELPERS, frozen
 # from bin/), the same list the doclint section uses, so there is one list.
@@ -54,12 +55,51 @@ if [ -n "$HITS" ]; then
   printf '%s\n' "$HITS" >&2
 fi
 
-# 2. A fresh project initializes and passes its own check.
+# 2. The old product name (#231). hv-skills became hv; what may still say
+# hv-skills is history (CHANGELOG, the 5.0 design docs, tracked .hv/ state),
+# code that has to know the old name (the migrate v4 codemod, plugin
+# detection, legacy-format fixtures) and text captured from real panes. The
+# managed block markers keep the key "skills" (hv-skills-start/-end), the 4.x
+# plugin is "hv-skills@<marketplace>" and hv-skills-index is a legacy helper,
+# so the pattern lets those through. README.md, docs/install.md and
+# docs/getting-started.md belong to F5 slice B, which rewrites them after the
+# rename; drop their exclusions once it merges.
+OLD_NAME='(?<!@)hv-skills(?!-(?:start|end|index)\b|@)'
+OLD_SCOPE=(
+  ':(exclude)CHANGELOG.md'
+  ':(exclude)docs/design/'
+  ':(exclude).hv/'
+  ':(exclude)test/grep-gate.sh'
+  ':(exclude)README.md'
+  ':(exclude)docs/install.md'
+  ':(exclude)docs/getting-started.md'
+  ':(exclude)internal/migrate/'
+  ':(exclude)internal/cli/migrate_test.go'
+  ':(exclude)internal/cli/testdata/golden/TestMigrateV4*'
+  ':(exclude)test/sections/39_migrate.sh'
+  # Legacy-format fixtures: a pre-rename block heading or .gitignore header,
+  # the 4.x plugin's cache directory, and doclint not flagging the old name.
+  ':(exclude)internal/knowledge/knowledge_test.go'
+  ':(exclude)internal/initproj/init_test.go'
+  ':(exclude)internal/skills/skills_test.go'
+  ':(exclude)test/sections/04_skills.sh'
+  ':(exclude)test/sections/29_doclint.sh'
+  # Scrollback captured from real panes, where the checkout path shows.
+  ':(exclude)internal/host/testdata/'
+  ':(exclude)internal/worker/testdata/'
+)
+HITS="$(git grep -inIP "$OLD_NAME" -- . "${OLD_SCOPE[@]}" || true)"
+if [ -n "$HITS" ]; then
+  bad "the old product name hv-skills is still used ($(wc -l <<<"$HITS" | tr -d ' ') lines):"
+  printf '%s\n' "$HITS" >&2
+fi
+
+# 3. A fresh project initializes and passes its own check.
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "${SCRATCH:?}"' EXIT
 if [ -z "${HV_BIN:-}" ]; then
   VERSION="$(tr -d '[:space:]' < VERSION)"
-  go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$VERSION" -o "$SCRATCH/hv" ./cmd/hv
+  go build -ldflags "-X github.com/l4ci/hv/v5/internal/version.Version=$VERSION" -o "$SCRATCH/hv" ./cmd/hv
   HV_BIN="$SCRATCH/hv"
 fi
 mkdir "$SCRATCH/proj"

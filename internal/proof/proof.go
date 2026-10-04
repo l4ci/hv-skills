@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 const sep = " · "

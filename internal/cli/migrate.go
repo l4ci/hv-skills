@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/migrate"
-	"github.com/l4ci/hv-skills/v5/internal/version"
+	"github.com/l4ci/hv/v5/internal/migrate"
+	"github.com/l4ci/hv/v5/internal/version"
 )
 
 // migrateCommands is the `hv migrate` group. `migrate issues` (A4) joins it.

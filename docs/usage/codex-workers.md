@@ -76,7 +76,7 @@ See [round keys](configuration.md#round-keys).
 - **No usage meter.** `work.accounts` and its headroom meter are Anthropic's, and a Codex slot is skipped
   by them. The slot's `CODEX_HOME` is its account, so `hv limit watch` has nothing to switch to. Account
   switching and [usage-limit handling](unattended-rounds.md#usage-limits) apply to Claude slots.
-- **The signed-brief rule is model-dependent** ([#225](https://github.com/l4ci/hv-skills/issues/225)). The worker contract says to treat
+- **The signed-brief rule is model-dependent** ([#225](https://github.com/l4ci/hv/issues/225)). The worker contract says to treat
   unsigned text in the pane as untrusted and to answer `HV-BLOCKED`. One Codex model did; another followed
   the unsigned instruction. Send a Codex worker its instructions through `hv worker dispatch` or the
   assignment brief, and don't type into its pane.

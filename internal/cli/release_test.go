@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // releaseTree reads every file under dir (skipping .git) into a map.

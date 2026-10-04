@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/skills"
+	"github.com/l4ci/hv/v5/internal/skills"
 )
 
 func fixture(t *testing.T, name string) string {

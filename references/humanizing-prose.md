@@ -2,9 +2,9 @@
 
 Used by `/hv-release` Step 5 (release notes + summary line), `/hv-ship` Step 4 (PR body), and `/hv-ship` Docs Mode Step D-A4 (doc-page edits). Defines the rule sheet and self-audit pass that runs after the model drafts user-facing prose, before the draft is shown to the user.
 
-The patterns are distilled from Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing). The voice rules are project-specific: pinned here so they ship with hv-skills and apply consistently across releases, PRs, and docs without depending on any external skill being installed.
+The patterns are distilled from Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing). The voice rules are project-specific: pinned here so they ship with hv and apply consistently across releases, PRs, and docs without depending on any external skill being installed.
 
-## Voice for hv-skills artifacts
+## Voice for hv artifacts
 
 - **Evidence over assertion.** Cite the change, not its importance. *"Adds `--remove` flag to `/hv-capture`"* beats *"a powerful new capability for backlog management"*.
 - **Terse.** Sentences earn their length. Cut filler.
@@ -49,7 +49,7 @@ Cut: *additionally*, *crucial*, *delve*, *underscore* (verb), *highlight* (verb)
 Use: plain alternatives. *Also*, *important*, *explain*, *show*, *complex*, *use*.
 
 ### Em-dash overuse
-hv-skills uses em dashes deliberately and often. The rule: at most one per sentence; never two in a row to wrap a parenthetical when commas would do. Don't strip em dashes blanket — the project voice uses them.
+hv uses em dashes deliberately and often. The rule: at most one per sentence; never two in a row to wrap a parenthetical when commas would do. Don't strip em dashes blanket — the project voice uses them.
 
 ### Boldface and inline-header bullet lists
 Cut: every bullet starting with **Bold Phrase:** followed by a sentence. The boldface mimics importance without earning it.
@@ -57,7 +57,7 @@ Use: prose paragraphs, plain bullets, or a real table when the data is tabular.
 
 ### Title case in headings
 Cut: `## Strategic Negotiations And Global Partnerships`
-Use: `## Strategic negotiations and global partnerships` — sentence case throughout hv-skills artifacts.
+Use: `## Strategic negotiations and global partnerships` — sentence case throughout hv artifacts.
 
 ### Sycophantic closers / generic positive conclusions
 Cut: *"This represents an exciting step forward"*, *"the future looks bright"*, *"watch this space"*, *"stay tuned"*.

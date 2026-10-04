@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/pystr"
 )
 
 // Item is one backlog item as every backend presents it.

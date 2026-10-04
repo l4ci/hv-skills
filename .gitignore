@@ -3,7 +3,7 @@
 # plans, spikes, per-item detail). Only ignore the parts that are
 # machine-specific, regenerated, or per-developer local overrides.
 
-# Stale mirror from hv-skills 4.x; `hv init` deletes it. Kept for one release (removable)
+# Stale mirror from hv 4.x; `hv init` deletes it. Kept for one release (removable)
 .hv/bin/
 # Active-work tracking (per-developer, branch-aware)
 .hv/status.json
@@ -21,7 +21,7 @@ __pycache__/
 # Claude Code harness state (scheduled tasks, etc.)
 .claude/
 
-# ── hv-skills ──
+# ── hv ──
 .hv/bin/
 .hv/status.json
 .hv/repos.json
