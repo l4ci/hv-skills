@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // forge is a scripted gh/glab for the tracker verbs. Every test also puts a
@@ -58,14 +58,14 @@ func useForge(t *testing.T, f *forge) {
 	t.Cleanup(func() { trackerOptions = nil })
 }
 
-// trProject is a project dir with .hv/config.json holding cfg.
+// trProject is a project dir with .rota/config.json holding cfg.
 func trProject(t *testing.T, cfg string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(cfg), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".rota", "config.json"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -169,7 +169,7 @@ func TestTrackerCallProviderAndRepo(t *testing.T) {
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".hv", "repos.json"), []byte(`{"repos":[{"name":"svc","path":"svc"}]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".rota", "repos.json"), []byte(`{"repos":[{"name":"svc","path":"svc"}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	trRun(t, dir, "", "tracker", "call", "--", "mr", "list")
@@ -197,9 +197,9 @@ func TestTrackerCallProviderAndRepo(t *testing.T) {
 }
 
 func TestTrackerSuggestUpstream(t *testing.T) {
-	// A confirmed pass is audited under .hv/ (B1), so the project needs one.
+	// A confirmed pass is audited under .rota/ (B1), so the project needs one.
 	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, ".hv"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	ok := []string{"--confirm", "--confirm-note", "yes, file it"}
@@ -211,20 +211,20 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		if args[0] == "auth" {
 			return "", "", 0
 		}
-		return "https://github.com/l4ci/hv/issues/123\n", "", 0
+		return "https://github.com/l4ci/rota/issues/123\n", "", 0
 	}
 
 	f := &forge{answer: created}
 	useForge(t, f)
-	t.Setenv("HV_UPSTREAM_REPO", "")
+	t.Setenv("ROTA_UPSTREAM_REPO", "")
 	o := trRun(t, dir, "", append([]string{"tracker", "suggest-upstream", "--json", "--title", "A learning", "--body-file", body}, ok...)...)
 	env := envelope(t, o.stdout)
 	data := env["data"].(map[string]any)
-	if o.code != 0 || data["url"] != "https://github.com/l4ci/hv/issues/123" || data["number"] != 123.0 ||
-		data["upstreamRepo"] != "l4ci/hv" || data["changed"] != true {
+	if o.code != 0 || data["url"] != "https://github.com/l4ci/rota/issues/123" || data["number"] != 123.0 ||
+		data["upstreamRepo"] != "l4ci/rota" || data["changed"] != true {
 		t.Fatalf("%+v", o)
 	}
-	if strings.Join(f.calls, "|") != "gh auth status|gh issue create -R l4ci/hv -t A learning -F -" {
+	if strings.Join(f.calls, "|") != "gh auth status|gh issue create -R l4ci/rota -t A learning -F -" {
 		t.Fatalf("calls %q", f.calls)
 	}
 	// The old helper read the body with $(cat): trailing newlines go, CR stays.
@@ -232,20 +232,20 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		t.Fatalf("body %q", f.stdins[1])
 	}
 
-	// $HV_UPSTREAM_REPO, then --upstream-repo, wins over the default; - reads stdin.
+	// $ROTA_UPSTREAM_REPO, then --upstream-repo, wins over the default; - reads stdin.
 	f = &forge{answer: created}
 	useForge(t, f)
-	t.Setenv("HV_UPSTREAM_REPO", "env/repo")
+	t.Setenv("ROTA_UPSTREAM_REPO", "env/repo")
 	trRun(t, dir, "from stdin", append([]string{"tracker", "suggest-upstream", "--title", "T", "--body-file", "-"}, ok...)...)
 	o = trRun(t, dir, "x", append([]string{"tracker", "suggest-upstream", "--title", "T", "--body-file", "-", "--upstream-repo", "flag/repo"}, ok...)...)
 	if !strings.Contains(f.calls[1], "-R env/repo") || !strings.Contains(f.calls[3], "-R flag/repo") || f.stdins[1] != "from stdin" {
 		t.Fatalf("calls %q stdins %q", f.calls, f.stdins)
 	}
-	if o.stdout != "https://github.com/l4ci/hv/issues/123\n" {
+	if o.stdout != "https://github.com/l4ci/rota/issues/123\n" {
 		t.Fatalf("text output %q", o.stdout)
 	}
 
-	t.Setenv("HV_UPSTREAM_REPO", "")
+	t.Setenv("ROTA_UPSTREAM_REPO", "")
 	for _, c := range []struct {
 		name   string
 		answer func(string, []string) (string, string, int)
@@ -260,9 +260,9 @@ func TestTrackerSuggestUpstream(t *testing.T) {
 		{"no confirm", created, true, []string{"--title", "T", "--body-file", body}, 4, "manual gate 'public-filing' is not cleared"},
 		{"confirm without note", created, true, []string{"--title", "T", "--body-file", body, "--confirm"}, 2, "--confirm-note"},
 		{"note without confirm", created, true, []string{"--title", "T", "--body-file", body, "--confirm-note", "yes"}, 2, "--confirm-note"},
-		{"gh missing", created, false, []string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv/issues/new"},
+		{"gh missing", created, false, []string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/rota/issues/new"},
 		{"not authed", func(string, []string) (string, string, int) { return "", "not logged in", 1 }, true,
-			[]string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/hv/issues/new"},
+			[]string{"--title", "T", "--body-file", body}, 5, "https://github.com/l4ci/rota/issues/new"},
 		{"create fails", func(_ string, args []string) (string, string, int) {
 			if args[0] == "auth" {
 				return "", "", 0

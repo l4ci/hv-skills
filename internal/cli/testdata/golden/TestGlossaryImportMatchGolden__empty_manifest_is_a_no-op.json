@@ -14,7 +14,7 @@
     "stderr": "noop: batch manifest contained no terms\n",
     "rc": 0,
     "changed": {
-      "../AGENTS.md": "# Agents\n\nintro\n\n\u003c!-- hv-knowledge-start --\u003e\n## Project Knowledge\n\nDurable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n- Architecture\n- Glossary\n\n\u003c!-- hv-knowledge-end --\u003e\n"
+      "../AGENTS.md": "# Agents\n\nintro\n\n\u003c!-- rota-knowledge-start --\u003e\n## Project Knowledge\n\nDurable learnings live in `.rota/KNOWLEDGE.md`. Consult it when work touches these topics:\n\n- Architecture\n- Glossary\n\n\u003c!-- rota-knowledge-end --\u003e\n"
     },
     "removed": []
   }

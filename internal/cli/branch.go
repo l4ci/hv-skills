@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/git"
+	"github.com/l4ci/rota/internal/git"
 )
 
 // branchTarget is what a branch-reading verb (review scope, review brief,
@@ -13,7 +13,7 @@ type branchTarget struct {
 	Dir    string // the checkout git runs in: the --repo sub-repo, else the cwd
 	Branch string // the named branch, else the current one
 	Base   string // the resolved base branch
-	// CorpusRoot holds the .hv/ whose BACKLOG.md and ARCHIVE.md item IDs are
+	// CorpusRoot holds the .rota/ whose BACKLOG.md and ARCHIVE.md item IDs are
 	// looked up in: the umbrella resolved from the cwd before any --repo
 	// (hv-resolve-umbrella), else the physical cwd, as the old helpers did.
 	CorpusRoot string

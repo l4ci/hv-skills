@@ -17,7 +17,7 @@ func doctorFakes(t *testing.T, tools map[string]string) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("HV_TEST_DOCTOR_PATH", dir)
+	t.Setenv("ROTA_TEST_DOCTOR_PATH", dir)
 	t.Setenv("HOME", t.TempDir()) // no skills, plugin or settings of the real user
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 }
@@ -46,10 +46,10 @@ func doctorData(t *testing.T, out string) (bool, map[string]map[string]any) {
 }
 
 func TestDoctorPassesWithoutHv(t *testing.T) {
-	// no .hv/: defaults, host skipped; git is a fake that says .worktrees/ is ignored
+	// no .rota/: defaults, host skipped; git is a fake that says .worktrees/ is ignored
 	doctorFakes(t, map[string]string{"git": `case "$1" in remote) exit 2;; esac; exit 0`})
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	code, out, _ := hvIn(t, dir, "doctor", "--json")
+	code, out, _ := rotaIn(t, dir, "doctor", "--json")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
@@ -71,9 +71,9 @@ func TestDoctorFailsWithSameData(t *testing.T) {
 	// herdr dispatch with an old herdr and no git on PATH
 	doctorFakes(t, map[string]string{"herdr": `echo "herdr 0.8.2"`})
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"work":{"dispatch":"herdr"}}`), 0o644)
-	code, out, _ := hvIn(t, dir, "doctor", "--json")
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".rota", "config.json"), []byte(`{"work":{"dispatch":"herdr"}}`), 0o644)
+	code, out, _ := rotaIn(t, dir, "doctor", "--json")
 	if code != 1 {
 		t.Fatalf("exit %d, want 1: %s", code, out)
 	}
@@ -88,36 +88,36 @@ func TestDoctorFailsWithSameData(t *testing.T) {
 
 func TestDoctorRejectsArgsAndRepo(t *testing.T) {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	if code, _, _ := hvIn(t, dir, "doctor", "extra"); code != 2 {
+	if code, _, _ := rotaIn(t, dir, "doctor", "extra"); code != 2 {
 		t.Errorf("positional: %d", code)
 	}
-	if code, _, _ := hvIn(t, dir, "doctor", "--repo", "x"); code != 2 {
+	if code, _, _ := rotaIn(t, dir, "doctor", "--repo", "x"); code != 2 {
 		t.Errorf("--repo: %d", code)
 	}
 }
 
-// The skills check skips until hv skills install ran, passes after it, and
+// The skills check skips until rota skills install ran, passes after it, and
 // fails when an installed file was edited.
 func TestDoctorSkillsCheck(t *testing.T) {
 	doctorFakes(t, map[string]string{"git": `case "$1" in remote) exit 2;; esac; exit 0`})
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	home := os.Getenv("HOME")
 	skills := func() map[string]any {
-		_, out, _ := hvIn(t, dir, "doctor", "--json")
+		_, out, _ := rotaIn(t, dir, "doctor", "--json")
 		_, c := doctorData(t, out)
 		return c["skills"]
 	}
-	if c := skills(); c["status"] != "skip" || !strings.Contains(c["detail"].(string), "hv skills install") {
+	if c := skills(); c["status"] != "skip" || !strings.Contains(c["detail"].(string), "rota skills install") {
 		t.Errorf("not installed: %v", c)
 	}
-	if code, out, _ := hvIn(t, dir, "skills", "install", "--agent", "claude"); code != 0 {
+	if code, out, _ := rotaIn(t, dir, "skills", "install", "--agent", "claude"); code != 0 {
 		t.Fatalf("install %d %s", code, out)
 	}
 	if c := skills(); c["status"] != "pass" {
 		t.Errorf("installed: %v", c)
 	}
-	os.WriteFile(filepath.Join(home, ".claude", "skills", "hv-work", "SKILL.md"), []byte("mine\n"), 0o644)
-	if c := skills(); c["status"] != "fail" || c["hint"] != "run: hv skills update --overwrite" {
+	os.WriteFile(filepath.Join(home, ".claude", "skills", "rota-work", "SKILL.md"), []byte("mine\n"), 0o644)
+	if c := skills(); c["status"] != "fail" || c["hint"] != "run: rota skills update --overwrite" {
 		t.Errorf("edited: %v", c)
 	}
 }

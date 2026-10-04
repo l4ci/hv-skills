@@ -4,8 +4,8 @@ TMP_TA="$(mktemp -d)"
 trap 'rm -rf "$TMP_TA"' EXIT
 
 for prov in github gitlab; do
-  P="$TMP_TA/$prov"; mkdir -p "$P/.hv"
-  echo "{\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_TA/$prov"; mkdir -p "$P/.rota"
+  echo "{\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
@@ -50,7 +50,7 @@ done
 
 # provider resolution failure: no issues.provider and no remote
 (
-  cd "$TMP_TA"; mkdir -p none/.hv; cd none; echo '{}' > .hv/config.json
+  cd "$TMP_TA"; mkdir -p none/.rota; cd none; echo '{}' > .rota/config.json
   git init -q . 2>/dev/null
   rc=0; hvj tracker call -- issue list </dev/null >/dev/null 2>&1 || rc=$?
   [ "$rc" = 5 ] || fail "tracker call without a resolvable provider should exit 5 (got $rc)"

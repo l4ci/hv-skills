@@ -1,4 +1,4 @@
-// Package host drives the terminal host that runs /hv-work worker sessions:
+// Package host drives the terminal host that runs /rota-work worker sessions:
 // tmux windows or herdr tabs. It is the Go port of bin/hv-host-select.sh,
 // bin/hv-host-tmux.sh and bin/hv-host-herdr.sh.
 //
@@ -67,7 +67,7 @@ type Deps struct {
 	// afterwards orphaned children are reparented and unfindable.
 	Tree func(pid int) []int
 	// KillWait is how many one-second polls Kill waits for a close to take
-	// (HV_HOST_KILL_WAIT in the shell helper). Zero means 10.
+	// (ROTA_HOST_KILL_WAIT in the shell helper). Zero means 10.
 	KillWait int
 	// LookPath reports whether a binary is installed.
 	LookPath func(string) (string, error)
@@ -101,7 +101,7 @@ func (d *Deps) fill() {
 	}
 	if d.KillWait <= 0 {
 		d.KillWait = 10
-		if n, err := strconv.Atoi(d.Getenv("HV_HOST_KILL_WAIT")); err == nil && n > 0 {
+		if n, err := strconv.Atoi(d.Getenv("ROTA_HOST_KILL_WAIT")); err == nil && n > 0 {
 			d.KillWait = n
 		}
 	}

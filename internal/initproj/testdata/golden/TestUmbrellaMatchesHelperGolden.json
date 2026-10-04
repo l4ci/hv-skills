@@ -52,7 +52,7 @@
    "name": "prior kept, stale dropped",
    "git": false,
    "files": {
-    ".hv/repos.json": "{\"repos\": [{\"name\": \"web\", \"path\": \"./web\"}, {\"name\": \"gone\", \"path\": \"./gone\"}, {\"name\": \"api\", \"path\": \"./api\"}]}"
+    ".rota/repos.json": "{\"repos\": [{\"name\": \"web\", \"path\": \"./web\"}, {\"name\": \"gone\", \"path\": \"./gone\"}, {\"name\": \"api\", \"path\": \"./api\"}]}"
    },
    "kids": [
     "web",
@@ -65,7 +65,7 @@
    "name": "gitignore appended",
    "git": true,
    "files": {
-    ".gitignore": "node_modules/\n.hv/\n"
+    ".gitignore": "node_modules/\n.rota/\n"
    },
    "kids": [
     "web"
@@ -98,7 +98,7 @@
    "name": "gitignore complete",
    "git": true,
    "files": {
-    ".gitignore": ".claude/\n.hv/\n/web/\n"
+    ".gitignore": ".claude/\n.rota/\n/web/\n"
    },
    "kids": [
     "web"
@@ -109,7 +109,7 @@
    "name": "corrupt repos.json",
    "git": false,
    "files": {
-    ".hv/repos.json": "{nope"
+    ".rota/repos.json": "{nope"
    },
    "kids": [
     "web"
@@ -120,28 +120,28 @@
  "outputs": [
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"api\",\n      \"path\": \"./api\"\n    },\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "# ── hv umbrella ──\n.claude/\n.hv/\n/api/\n/web/\n",
+   ".gitignore": "# ── rota umbrella ──\n.claude/\n.rota/\n/api/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/api",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/api",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"api\",\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"db\",\n      \"path\": \"./db\"\n    },\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "# ── hv umbrella ──\n.claude/\n.hv/\n/db/\n/web/\n",
+   ".gitignore": "# ── rota umbrella ──\n.claude/\n.rota/\n/db/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/db",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/db",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"db\",\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
@@ -150,8 +150,8 @@
    "repos.json": "{\n  \"repos\": []\n}\n",
    ".gitignore": "<missing>",
    "tree": [
-    ".hv",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[],\"umbrellaIsGitRepo\":false}\n",
    "warnings": []
@@ -160,21 +160,21 @@
    "repos.json": "{\n  \"repos\": []\n}\n",
    ".gitignore": "<missing>",
    "tree": [
-    ".hv",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[],\"umbrellaIsGitRepo\":false}\n",
    "warnings": []
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "# ── hv umbrella ──\n.claude/\n.hv/\n/web/\n",
+   ".gitignore": "# ── rota umbrella ──\n.claude/\n.rota/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": [
@@ -185,12 +185,12 @@
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"api\",\n      \"path\": \"./api\"\n    },\n    {\n      \"name\": \"db\",\n      \"path\": \"./db\"\n    },\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
    ".gitignore": "<missing>",
    "tree": [
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/api",
-    ".hv/knowledge/db",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/api",
+    ".rota/knowledge/db",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"api\",\"db\",\"web\"],\"umbrellaIsGitRepo\":false}\n",
    "warnings": [
@@ -199,52 +199,52 @@
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "node_modules/\n.hv/\n\n# ── hv umbrella ──\n.claude/\n/web/\n",
+   ".gitignore": "node_modules/\n.rota/\n\n# ── rota umbrella ──\n.claude/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "a\nb\n\n# ── hv umbrella ──\n.claude/\n.hv/\n/web/\n",
+   ".gitignore": "a\nb\n\n# ── rota umbrella ──\n.claude/\n.rota/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": "a\n.claude/\n\n# ── hv umbrella ──\n.hv/\n/web/\n",
+   ".gitignore": "a\n.claude/\n\n# ── rota umbrella ──\n.rota/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
   },
   {
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
-   ".gitignore": ".claude/\n.hv/\n/web/\n",
+   ".gitignore": ".claude/\n.rota/\n/web/\n",
    "tree": [
     ".gitignore",
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":true}\n",
    "warnings": []
@@ -253,10 +253,10 @@
    "repos.json": "{\n  \"repos\": [\n    {\n      \"name\": \"web\",\n      \"path\": \"./web\"\n    }\n  ]\n}\n",
    ".gitignore": "<missing>",
    "tree": [
-    ".hv",
-    ".hv/knowledge",
-    ".hv/knowledge/web",
-    ".hv/repos.json"
+    ".rota",
+    ".rota/knowledge",
+    ".rota/knowledge/web",
+    ".rota/repos.json"
    ],
    "summary": "{\"registered\":[\"web\"],\"umbrellaIsGitRepo\":false}\n",
    "warnings": []

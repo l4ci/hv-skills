@@ -3,12 +3,12 @@ echo "T03: knowledge rename-topic — atomic re-key on heading move"
 
 TMP_KR="$(mktemp -d)"
 trap 'rm -rf "$TMP_KR"' EXIT
-mkdir -p "$TMP_KR/.hv"
+mkdir -p "$TMP_KR/.rota"
 
 # Seed KNOWLEDGE.md with two topics, three titled bullets, and prime the
 # tier sidecar with confirmed/hits state — exactly what auto-split would
 # orphan today.
-cat > "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
+cat > "$TMP_KR/.rota/KNOWLEDGE.md" <<'EOF'
 # Knowledge
 
 ## Architecture
@@ -30,7 +30,7 @@ hvj -C "$TMP_KR" knowledge tier set --topic "Build & Tooling" --title "Baz rule"
 
 # ---------- Per-bullet move ----------
 # Append the target heading first (matches Step 8 auto-split step 3).
-cat >> "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
+cat >> "$TMP_KR/.rota/KNOWLEDGE.md" <<'EOF'
 
 ## Architecture: Foundations
 
@@ -44,11 +44,11 @@ OUT=$(hvj -C "$TMP_KR" knowledge rename-topic \
 [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "per-bullet rename should report changed: $OUT"
 
 # Foo rule moved out of Architecture, into Foundations.
-grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
+grep -A2 "^## Architecture$" "$TMP_KR/.rota/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
   && fail "Foo rule still under Architecture after per-bullet move"
-grep -A2 "^## Architecture: Foundations$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
+grep -A2 "^## Architecture: Foundations$" "$TMP_KR/.rota/KNOWLEDGE.md" | grep "Foo rule" >/dev/null \
   || fail "Foo rule not under Architecture: Foundations after per-bullet move"
-grep -A2 "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Bar rule" >/dev/null \
+grep -A2 "^## Architecture$" "$TMP_KR/.rota/KNOWLEDGE.md" | grep "Bar rule" >/dev/null \
   || fail "Bar rule lost from Architecture after Foo move"
 pass "per-bullet move: bullet relocated, siblings untouched"
 
@@ -80,11 +80,11 @@ OUT=$(hvj -C "$TMP_KR" knowledge rename-topic \
     --to "Tooling & Build") || fail "whole-topic rename returned non-zero: $OUT"
 [ "$(jget data.mode <<<"$OUT")" = "topic" ] || fail "whole-topic rename should report mode topic: $OUT"
 
-grep -q "^## Tooling & Build$" "$TMP_KR/.hv/KNOWLEDGE.md" \
+grep -q "^## Tooling & Build$" "$TMP_KR/.rota/KNOWLEDGE.md" \
   || fail "renamed heading '## Tooling & Build' not present"
-grep -q "^## Build & Tooling$" "$TMP_KR/.hv/KNOWLEDGE.md" \
+grep -q "^## Build & Tooling$" "$TMP_KR/.rota/KNOWLEDGE.md" \
   && fail "old heading '## Build & Tooling' still present after rename"
-grep -A2 "^## Tooling & Build$" "$TMP_KR/.hv/KNOWLEDGE.md" | grep "Baz rule" >/dev/null \
+grep -A2 "^## Tooling & Build$" "$TMP_KR/.rota/KNOWLEDGE.md" | grep "Baz rule" >/dev/null \
   || fail "Baz rule did not follow whole-topic rename"
 pass "whole-topic rename: heading renamed, bullets follow"
 
@@ -114,7 +114,7 @@ OUT=$(hvj -C "$TMP_KR" knowledge rename-topic \
     --from "Architecture" --to "Architecture") \
   || fail "same-name rename should be a no-op (exit 0)"
 [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "same-name rename should report changed:false: $OUT"
-grep -q "^## Architecture$" "$TMP_KR/.hv/KNOWLEDGE.md" \
+grep -q "^## Architecture$" "$TMP_KR/.rota/KNOWLEDGE.md" \
   || fail "Architecture heading disappeared after same-name no-op"
 pass "same-name rename is silent no-op"
 
@@ -128,10 +128,10 @@ RC=0; hvj -C "$TMP_KR" knowledge rename-topic --to "X" >/dev/null 2>&1 || RC=$?
 pass "missing --from flag rejected"
 
 # ---------- Auto-split end-to-end shape ----------
-# Mirror the /hv-learn Step 8 auto-split flow on a fresh fixture: large topic
+# Mirror the /rota-learn Step 8 auto-split flow on a fresh fixture: large topic
 # with 3 bullets split into 2 facets, each call atomic.
-rm -f "$TMP_KR/.hv/knowledge-tier.json"
-cat > "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
+rm -f "$TMP_KR/.rota/knowledge-tier.json"
+cat > "$TMP_KR/.rota/KNOWLEDGE.md" <<'EOF'
 # Knowledge
 
 ## Networking
@@ -146,7 +146,7 @@ for T in "Retry rule" "Timeout rule" "TLS rule"; do
 done
 
 # Step 3: append facet headings before old topic.
-cat >> "$TMP_KR/.hv/KNOWLEDGE.md" <<'EOF'
+cat >> "$TMP_KR/.rota/KNOWLEDGE.md" <<'EOF'
 
 ## Networking: Reliability
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// skillsRun runs hv in dir with HOME pointed at home and CLAUDE_CONFIG_DIR unset.
+// skillsRun runs rota in dir with HOME pointed at home and CLAUDE_CONFIG_DIR unset.
 func skillsRun(t *testing.T, home, dir string, args ...string) (int, map[string]any, string) {
 	t.Helper()
 	return skillsRunCfg(t, home, "", dir, args...)
@@ -55,7 +55,7 @@ func TestSkillsInstallStatusUpdateUninstall(t *testing.T) {
 	if r0["agent"] != "claude" || r0["scope"] != "user" || r0["root"] != filepath.Join(home, ".claude", "skills") {
 		t.Errorf("%v", r0)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "hv-pause", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "rota-pause", "SKILL.md")); err != nil {
 		t.Error(err)
 	}
 
@@ -78,7 +78,7 @@ func TestSkillsInstallStatusUpdateUninstall(t *testing.T) {
 	}
 
 	// An edit survives update (exit 4) and --overwrite replaces it.
-	edited := filepath.Join(home, ".claude", "skills", "hv-pause", "SKILL.md")
+	edited := filepath.Join(home, ".claude", "skills", "rota-pause", "SKILL.md")
 	os.WriteFile(edited, []byte("mine\n"), 0o644)
 	code, env, _ = skillsRun(t, home, work, "skills", "update")
 	if code != ExitRefused || skData(env)["blockedBy"] != "edited" {
@@ -101,12 +101,12 @@ func TestSkillsInstallStatusUpdateUninstall(t *testing.T) {
 	if code != 0 || skData(env)["changed"] != true {
 		t.Fatalf("uninstall %d %v", code, env)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".claude", "skills", "hv-pause")); err == nil {
+	if _, err := os.Stat(filepath.Join(home, ".claude", "skills", "rota-pause")); err == nil {
 		t.Error("skill left behind")
 	}
 	// Nothing installed any more: update fails with the install hint.
 	code, env, errOut = skillsRun(t, home, work, "skills", "update")
-	if code != ExitFailed || !strings.Contains(errOut, "hv skills install") {
+	if code != ExitFailed || !strings.Contains(errOut, "rota skills install") {
 		t.Errorf("update with nothing: %d %s", code, errOut)
 	}
 	if rs := skData(env)["roots"].([]any); len(rs) != 0 {
@@ -154,7 +154,7 @@ func TestSkillsProjectScope(t *testing.T) {
 	if real, _ := filepath.EvalSymlinks(repo); root != filepath.Join(real, ".claude", "skills") && root != filepath.Join(repo, ".claude", "skills") {
 		t.Errorf("root %s", root)
 	}
-	if _, err := os.Stat(filepath.Join(repo, ".claude", "skills", ".hv-manifest.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(repo, ".claude", "skills", ".rota-manifest.json")); err != nil {
 		t.Error(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".claude")); err == nil {
@@ -204,10 +204,10 @@ func TestSkillsClaudeConfigDir(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("%d %s", code, errOut)
 	}
-	if _, err := os.Stat(filepath.Join(cfg, "skills", "hv-pause", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(cfg, "skills", "rota-pause", "SKILL.md")); err != nil {
 		t.Error(err)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "hv-pause", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "rota-pause", "SKILL.md")); err != nil {
 		t.Error(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".claude")); err == nil {

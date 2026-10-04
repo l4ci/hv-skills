@@ -12,15 +12,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/release"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/release"
 )
 
-// releaseCommands is the `hv release` group (A8, #52).
+// releaseCommands is the `rota release` group (A8, #52).
 func releaseCommands() *Command {
 	return &Command{Name: "release", Summary: "version, notes, changelog and release nudge", Subs: []*Command{
 		{Name: "version", Summary: "print the version file, and the next version with --level or --to", Repo: true, Verb: releaseVersion},
@@ -48,7 +48,7 @@ func releaseDir(c *Ctx) (string, error) {
 }
 
 func releaseConfig(dir string) any {
-	return config.Load(filepath.Join(dir, ".hv", "config.json"))
+	return config.Load(filepath.Join(dir, ".rota", "config.json"))
 }
 
 // releaseFlagGiven reports whether the user passed --name, even with an empty value.
@@ -300,7 +300,7 @@ func releaseChangelog(fs *flag.FlagSet) RunFunc {
 	path := fs.String("path", "CHANGELOG.md", "changelog `file`")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
-			return Result{}, Usage("usage: hv release changelog <X.Y.Z> --body-file <path|->")
+			return Result{}, Usage("usage: rota release changelog <X.Y.Z> --body-file <path|->")
 		}
 		version := args[0]
 		if !release.IsSemver(version) {
@@ -410,7 +410,7 @@ func releaseGitCount(ctx context.Context, r git.Repo, args ...string) (int64, er
 
 func releaseMilestoneCheck(c *Ctx, args []string) (Result, error) {
 	if len(args) != 1 {
-		return Result{}, Usage("usage: hv release milestone-check <MNN>")
+		return Result{}, Usage("usage: rota release milestone-check <MNN>")
 	}
 	if err := releaseNotAtUmbrella(c); err != nil {
 		return Result{}, err
@@ -443,7 +443,7 @@ func releaseCloseMilestone(fs *flag.FlagSet) RunFunc {
 	rel := fs.String("release", "", "released version `X.Y.Z`")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
-			return Result{}, Usage("usage: hv release close-milestone <MNN> --release <X.Y.Z>")
+			return Result{}, Usage("usage: rota release close-milestone <MNN> --release <X.Y.Z>")
 		}
 		if !release.IsSemver(*rel) {
 			return Result{}, Usage("--release must be a bare X.Y.Z")

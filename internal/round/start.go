@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// StartOpts are the flags of `hv round start`, with the config already read.
+// StartOpts are the flags of `rota round start`, with the config already read.
 type StartOpts struct {
 	Scope      string
 	Items      []string // the slate, for scope slate
@@ -104,7 +104,7 @@ func (e Env) Start(ctx context.Context, root string, o StartOpts) (Started, erro
 	}
 
 	pool, err := worker.Env{Git: e.Git}.PoolInit(ctx, root, worker.InitOpts{
-		Base: base, Session: "hv", Names: set.Roster[:n], BranchPrefix: "park/",
+		Base: base, Session: "rota", Names: set.Roster[:n], BranchPrefix: "park/",
 	}, nil)
 	if err != nil {
 		return res, err

@@ -8,19 +8,19 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/skills"
-	"github.com/l4ci/hv/v5/internal/version"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/skills"
+	"github.com/l4ci/rota/internal/version"
 )
 
-// The `hv skills` group (F6a): install the skills embedded in the binary for
-// Claude Code and Codex. Every verb runs without .hv/.
+// The `rota skills` group (F6a): install the skills embedded in the binary for
+// Claude Code and Codex. Every verb runs without .rota/.
 
 func skillsCommands() *Command {
 	return &Command{Name: "skills", Summary: "install the embedded skills for Claude Code and Codex", Subs: []*Command{
 		{Name: "install", Summary: "write the skills into the agent skill directories", Verb: skillsVerb(skillsInstall, skills.User, true)},
 		{Name: "update", Summary: "refresh the skill directories that already have a manifest", Verb: skillsVerb(skillsUpdate, "", true)},
-		{Name: "uninstall", Summary: "remove what hv installed", Verb: skillsVerb(skillsUninstall, skills.User, true)},
+		{Name: "uninstall", Summary: "remove what rota installed", Verb: skillsVerb(skillsUninstall, skills.User, true)},
 		{Name: "status", Summary: "compare the installed skills with this binary", Verb: skillsVerb(skillsStatus, "", false)},
 	}}
 }
@@ -127,7 +127,7 @@ func skillsUpdate(c *Ctx, a skillsArgs) (Result, error) {
 	}
 	if len(res) == 0 {
 		return Result{Data: knObj("roots", []any{}, "changed", false)},
-			Failed("no skills install found in scope").WithHint("run: hv skills install")
+			Failed("no skills install found in scope").WithHint("run: rota skills install")
 	}
 	return skillsInstallResult(c, "update", res, cdir)
 }
@@ -188,7 +188,7 @@ func skillsInstallResult(c *Ctx, verb string, res []skills.RootResult, claudeDir
 	out := Result{Data: data, Text: strings.Join(text, "\n")}
 	if blockedBy != "" {
 		data.Set("blockedBy", blockedBy)
-		return out, Refused("%d path(s) kept (%s)", len(kept), blockedBy).WithHint("run: hv skills " + verb + " --overwrite")
+		return out, Refused("%d path(s) kept (%s)", len(kept), blockedBy).WithHint("run: rota skills " + verb + " --overwrite")
 	}
 	return out, nil
 }
@@ -226,7 +226,7 @@ func skillsUninstall(c *Ctx, a skillsArgs) (Result, error) {
 	out := Result{Data: data, Text: strings.Join(text, "\n")}
 	if keptAny {
 		data.Set("blockedBy", "edited")
-		return out, Refused("edited files were kept").WithHint("run: hv skills uninstall --overwrite")
+		return out, Refused("edited files were kept").WithHint("run: rota skills uninstall --overwrite")
 	}
 	return out, nil
 }
@@ -241,7 +241,7 @@ func skillsStatus(c *Ctx, a skillsArgs) (Result, error) {
 		return Result{}, skillsErr(err)
 	}
 	rootsData := []any{}
-	text := []string{fmt.Sprintf("hv %s, skills %s", rep.Version, short(rep.Digest))}
+	text := []string{fmt.Sprintf("rota %s, skills %s", rep.Version, short(rep.Digest))}
 	for _, r := range rep.Roots {
 		o := knObj("root", r.Path, "agent", r.Agent, "scope", r.Scope, "installed", r.Installed)
 		line := fmt.Sprintf("%s (%s, %s): ", r.Path, r.Agent, r.Scope)
@@ -252,7 +252,7 @@ func skillsStatus(c *Ctx, a skillsArgs) (Result, error) {
 			o.Set("digest", r.Digest)
 			line += "current"
 			if !r.Current {
-				line = fmt.Sprintf("%sstale (installed %s, hv %s)", strings.TrimSuffix(line, "current"), short(r.Digest), short(rep.Digest))
+				line = fmt.Sprintf("%sstale (installed %s, rota %s)", strings.TrimSuffix(line, "current"), short(r.Digest), short(rep.Digest))
 			}
 		}
 		o.Set("current", r.Current)

@@ -4,12 +4,12 @@ PVD_TMP="$(mktemp -d)"
 trap 'rm -rf "$PVD_TMP"' EXIT
 (
   cd "$PVD_TMP"
-  mkdir -p .hv/plans
-  echo '{"active":[]}' > .hv/status.json
-  echo '{"docs":{"path":"docs"}}' > .hv/config.json
+  mkdir -p .rota/plans
+  echo '{"active":[]}' > .rota/status.json
+  echo '{"docs":{"path":"docs"}}' > .rota/config.json
 
   # 1. Single-repo: doc home missing → warns, exit 0
-  cat > .hv/plans/M01-B07.md <<'PLAN'
+  cat > .rota/plans/M01-B07.md <<'PLAN'
 ---
 key: M01-B07
 milestone: M01
@@ -44,7 +44,7 @@ PLAN
 
   # 3. Indented Files: bullet form is parsed
   rm -rf "$PVD_TMP/docs"
-  cat > .hv/plans/M01-B08.md <<'PLAN'
+  cat > .rota/plans/M01-B08.md <<'PLAN'
 ---
 key: M01-B08
 milestone: M01
@@ -68,7 +68,7 @@ PLAN
   pass "T3: indented 'Files:' bullet form is parsed"
 
   # 4. Stub placeholder is ignored (no false positive)
-  cat > .hv/plans/M01-B09.md <<'PLAN'
+  cat > .rota/plans/M01-B09.md <<'PLAN'
 ---
 key: M01-B09
 milestone: M01
@@ -105,17 +105,17 @@ PVDU_TMP="$(mktemp -d)"
 trap 'rm -rf "$PVDU_TMP"' EXIT
 (
   cd "$PVDU_TMP"
-  mkdir -p .hv/plans runlog runlog-docs
-  echo '{"active":[]}' > .hv/status.json
-  echo '{"docs":{"path":"docs"}}' > .hv/config.json
-  cat > .hv/repos.json <<EOF
+  mkdir -p .rota/plans runlog runlog-docs
+  echo '{"active":[]}' > .rota/status.json
+  echo '{"docs":{"path":"docs"}}' > .rota/config.json
+  cat > .rota/repos.json <<EOF
 {"repos":[{"name":"runlog","path":"runlog"},{"name":"runlog-docs","path":"runlog-docs"}]}
 EOF
   (cd runlog && git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init)
   (cd runlog-docs && git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init)
 
   # Plan tagged with sub-repo that has no docs/, sibling -docs is registered
-  cat > .hv/plans/M01-B07.md <<'PLAN'
+  cat > .rota/plans/M01-B07.md <<'PLAN'
 ---
 key: M01-B07
 milestone: M01
@@ -142,7 +142,7 @@ PLAN
   pass "U1: umbrella sub-repo missing docs/ → suggests sibling <repo>-docs"
 
   # Umbrella-relative form (path begins with sub-repo name) is normalized.
-  cat > .hv/plans/M01-B08.md <<'PLAN'
+  cat > .rota/plans/M01-B08.md <<'PLAN'
 ---
 key: M01-B08
 milestone: M01
@@ -172,7 +172,7 @@ PLAN
 
   # Multi-repo plan: validates against each named repo
   mkdir -p runlog-docs/docs
-  cat > .hv/plans/M01-F09.md <<'PLAN'
+  cat > .rota/plans/M01-F09.md <<'PLAN'
 ---
 key: M01-F09
 milestone: M01
@@ -200,7 +200,7 @@ PLAN
   pass "U3: multi-repo plan validates each repo independently"
 
   # Unregistered repo tag → issue-level warning
-  cat > .hv/plans/M01-T01.md <<'PLAN'
+  cat > .rota/plans/M01-T01.md <<'PLAN'
 ---
 key: M01-T01
 milestone: M01

@@ -11,18 +11,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
-	"github.com/l4ci/hv/v5/internal/stale"
-	"github.com/l4ci/hv/v5/internal/status"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
+	"github.com/l4ci/rota/internal/stale"
+	"github.com/l4ci/rota/internal/status"
 )
 
-// The A4 backlog views and maintenance verbs, `hv summary`, `hv status` and
-// `hv refactor`. Shapes, flags and exits are the verb contract's
+// The A4 backlog views and maintenance verbs, `rota summary`, `rota status` and
+// `rota refactor`. Shapes, flags and exits are the verb contract's
 // (docs/design/5.0-verb-contract.md); the old helpers named on each verb are
 // the behaviour to match.
 
@@ -96,7 +96,7 @@ func a4BacklogList(fs *flag.FlagSet) RunFunc {
 		}
 		data := a4Obj("inProgress", []any{}, "bugs", []any{}, "features", []any{}, "tasks", []any{}, "clusters", []any{})
 		if !ok {
-			return Result{Data: data, Text: "No .hv/BACKLOG.md yet. Run hv init then /hv-capture."}, nil
+			return Result{Data: data, Text: "No .rota/BACKLOG.md yet. Run rota init then /rota-capture."}, nil
 		}
 		var active []backlog.Active
 		for _, e := range status.Entries(root) {
@@ -321,15 +321,15 @@ func a4Archive(fs *flag.FlagSet) RunFunc {
 }
 
 // a4AgeToday is the day archive and stale measure age against: today, or the
-// HV_TEST_TODAY override the tests pin it with.
+// ROTA_TEST_TODAY override the tests pin it with.
 func a4AgeToday() (time.Time, error) {
-	v := os.Getenv("HV_TEST_TODAY")
+	v := os.Getenv("ROTA_TEST_TODAY")
 	if v == "" {
 		return time.Now(), nil
 	}
 	t, ok := stale.ParseDate(v)
 	if !ok {
-		return time.Time{}, Usage("HV_TEST_TODAY must be YYYY-MM-DD, got %q", v)
+		return time.Time{}, Usage("ROTA_TEST_TODAY must be YYYY-MM-DD, got %q", v)
 	}
 	return t, nil
 }
@@ -406,12 +406,12 @@ func topicsText(count int, shown []string) string {
 
 type milestone struct{ id, title string }
 
-// activeMilestones is the active milestones of .hv/milestones/*.md, read the
+// activeMilestones is the active milestones of .rota/milestones/*.md, read the
 // way hv-vision-list reads them: frontmatter id (else the file name), title
 // and status (else "planned"), files without frontmatter skipped. This is the
-// minimal read hv summary needs; the milestone verbs (A6) own the rest.
+// minimal read rota summary needs; the milestone verbs (A6) own the rest.
 func activeMilestones(root string) []milestone {
-	dir := root + "/.hv/milestones"
+	dir := root + "/.rota/milestones"
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -463,7 +463,7 @@ func a4Summary(fs *flag.FlagSet) RunFunc {
 		}
 		md, err := be.Markdown(20)
 		if errors.Is(err, backlog.ErrNotFound) {
-			return Result{}, Resolution("no .hv/BACKLOG.md found").WithHint("run: hv init")
+			return Result{}, Resolution("no .rota/BACKLOG.md found").WithHint("run: rota init")
 		}
 		if err != nil {
 			return a4Fail(err)
@@ -553,12 +553,12 @@ func a4Summary(fs *flag.FlagSet) RunFunc {
 		data.Set("milestones", ms)
 
 		for _, k := range []struct{ label, file, key string }{{"Knowledge", "KNOWLEDGE.md", "knowledge"}, {"Decisions", "DECISIONS.md", "decisions"}} {
-			if n, shown, ok := topicsLine(root + "/.hv/" + k.file); ok {
+			if n, shown, ok := topicsLine(root + "/.rota/" + k.file); ok {
 				lines = append(lines, k.label+": "+topicsText(n, shown))
 				data.Set(k.key, a4Obj("count", n, "topics", shown))
 			}
 		}
-		if text, err := fsio.ReadText(root + "/.hv/ARCHIVE.md"); err == nil {
+		if text, err := fsio.ReadText(root + "/.rota/ARCHIVE.md"); err == nil {
 			n := 0
 			for _, l := range pystr.Splitlines(text) {
 				if strings.HasPrefix(l, "- ~~") {

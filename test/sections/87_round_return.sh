@@ -11,14 +11,14 @@ mkdir -p "$FK/tmux"
 ORIGIN="$TMP_RR/origin.git"
 PROJ="$TMP_RR/proj"
 git init -q --bare "$ORIGIN"
-mkdir -p "$PROJ/.hv"
+mkdir -p "$PROJ/.rota"
 (
   cd "$PROJ" && git init -q -b main . && git config user.email t@t && git config user.name t \
     && echo seed > seed.txt && git add seed.txt && git commit -q -m seed \
     && git remote add origin "$ORIGIN" && git push -q origin main
 ) || fail "round return fixture repo setup failed"
 printf 'stub worker contract\n' > "$TMP_RR/contract.md"
-printf '{"backlog":{"backend":"issues"},"issues":{"provider":"github","retryWaitSeconds":0},"work":{"dispatch":"tmux"},"round":{"brief":"%s"}}\n' "$TMP_RR/contract.md" > "$PROJ/.hv/config.json"
+printf '{"backlog":{"backend":"issues"},"issues":{"provider":"github","retryWaitSeconds":0},"work":{"dispatch":"tmux"},"round":{"brief":"%s"}}\n' "$TMP_RR/contract.md" > "$PROJ/.rota/config.json"
 printf 'Welcome to Claude Code\n' > "$FK/tmux/pane"
 : > "$FK/tmux/log"
 
@@ -26,12 +26,12 @@ printf 'Welcome to Claude Code\n' > "$FK/tmux/pane"
 : > "$FK/snapshot"
 
 HOLDER=$$
-FAKES="$TESTDIR/fakes:$HV_POISON_BIN:$PATH"
-# rrin <dir> <hv args...>: one hv call from <dir>, tmux and gh are the fakes.
-rrin() { local d="$1"; shift; ( cd "$d" && PATH="$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" HV_HOST_KILL_WAIT=1 "$HV_BIN" --json "$@" 2>/dev/null ); }
+FAKES="$TESTDIR/fakes:$ROTA_POISON_BIN:$PATH"
+# rrin <dir> <rota args...>: one rota call from <dir>, tmux and gh are the fakes.
+rrin() { local d="$1"; shift; ( cd "$d" && PATH="$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" ROTA_HOST_KILL_WAIT=1 "$ROTA_BIN" --json "$@" 2>/dev/null ); }
 rr() { rrin "$PROJ" "$@"; }
 # rrsnap: the same with the host snapshot on, so liveness and stalls are known.
-rrsnap() { ( cd "$PROJ" && PATH="$FAKES" FAKE_TMUX_SNAPSHOT="$FK/snapshot" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" HV_HOST_KILL_WAIT=1 "$HV_BIN" --json "$@" 2>/dev/null ); }
+rrsnap() { ( cd "$PROJ" && PATH="$FAKES" FAKE_TMUX_SNAPSHOT="$FK/snapshot" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" ROTA_HOST_KILL_WAIT=1 "$ROTA_BIN" --json "$@" 2>/dev/null ); }
 rc_of() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
 gh_() { ( cd "$PROJ" && PATH="$FAKES" FAKE_TRACKER_DB="$TMP_RR/db.json" gh "$@" ); }
 # The tracker's own state: labels and comment bodies of one issue.
@@ -43,7 +43,7 @@ if mode == "labels":
     print(",".join(sorted(issue["labels"])))
 else:
     print("\n=====\n".join(c["body"] for c in issue["comments"]))' "$1" "$2" "$TMP_RR/db.json"; }
-reg() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); s=[x for x in d["slots"] if x["name"]==sys.argv[2]][0]; v=s.get(sys.argv[3]); print("" if v is None else v)' "$PROJ/.hv/workers.json" "$1" "$2"; }
+reg() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); s=[x for x in d["slots"] if x["name"]==sys.argv[2]][0]; v=s.get(sys.argv[3]); print("" if v is None else v)' "$PROJ/.rota/workers.json" "$1" "$2"; }
 branch_of() { git -C "$PROJ/.worktrees/$1" symbolic-ref --short HEAD; }
 # drifts: "<kind>:<slot>,..|<repaired kind>,.." of a reconcile envelope on stdin.
 drifts() { python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(",".join(x["kind"]+":"+x.get("slot","") for x in d["drift"]) + "|" + ",".join(x["kind"] for x in d["repaired"]))'; }
@@ -83,16 +83,16 @@ OUT=$(rrin "$PROJ/.worktrees/ben" round return ben --reason "wrong premise: the 
 [ "$(echo "$OUT" | jget data.salvaged)" = "true" ] && [ "$(echo "$OUT" | jget data.released)" = "true" ] || fail "return should salvage and release: $OUT"
 [ -n "$(echo "$OUT" | jget data.commentId)" ] || fail "return should report the handoff comment: $OUT"
 [ -n "$(git -C "$ORIGIN" rev-parse --verify -q "refs/heads/$B1")" ] || fail "the work branch must be pushed to origin"
-[ "$(git -C "$ORIGIN" log -1 --format=%s "$B1")" = "wip: parked from ben (hv round return)" ] || fail "salvage commit subject: $(git -C "$ORIGIN" log -1 --format=%s "$B1")"
+[ "$(git -C "$ORIGIN" log -1 --format=%s "$B1")" = "wip: parked from ben (rota round return)" ] || fail "salvage commit subject: $(git -C "$ORIGIN" log -1 --format=%s "$B1")"
 [ "$(branch_of ben)" = "park/ben" ] || fail "ben must be parked, on $(branch_of ben)"
 [ -z "$(git -C "$PROJ/.worktrees/ben" status --porcelain)" ] || fail "a parked worktree is clean"
 [ "$(dbq labels 1)" = "type:task" ] || fail "in-progress must be gone: $(dbq labels 1)"
 HANDOFF="$(dbq comments 1)"
-for W in '**hv handoff** (return, from ben)' "Branch: \`$B1\`" 'State: committed, salvage commit' 'Reason: wrong premise: the ticket asks for the old format' 'table-driven one is next' '<!-- hv:handoff ben@1 -->'; do
+for W in '**rota handoff** (return, from ben)' "Branch: \`$B1\`" 'State: committed, salvage commit' 'Reason: wrong premise: the ticket asks for the old format' 'table-driven one is next' '<!-- rota:handoff ben@1 -->'; do
   case "$HANDOFF" in *"$W"*) ;; *) fail "handoff comment lacks '$W': $HANDOFF" ;; esac
 done
-case "$HANDOFF" in *"<!-- hv:release ben@1 -->"*) ;; *) fail "the claim must be released: $HANDOFF" ;; esac
-[ -z "$(reg ben task)" ] && [ -z "$(reg ben claimId)" ] && [ "$(reg ben state)" = "idle" ] || fail "ben's slot must be free: $(cat "$PROJ/.hv/workers.json")"
+case "$HANDOFF" in *"<!-- rota:release ben@1 -->"*) ;; *) fail "the claim must be released: $HANDOFF" ;; esac
+[ -z "$(reg ben task)" ] && [ -z "$(reg ben claimId)" ] && [ "$(reg ben state)" = "idle" ] || fail "ben's slot must be free: $(cat "$PROJ/.rota/workers.json")"
 pass "return pushes the branch, salvages dirty work, posts the handoff, releases the claim and parks the worker's worktree"
 
 # ── return then assign: the issue is a candidate again ──────────────────────
@@ -100,7 +100,7 @@ case ",$(cands)," in *,1,*) ;; *) fail "a returned issue must be a candidate aga
 OUT=$(rr round assign 1 --agent dana --holder-pid "$HOLDER") || fail "assign after return failed: $OUT"
 [ "$(echo "$OUT" | jget data.agent)" = "dana" ] || fail "assign after return: $OUT"
 PAYLOAD=$(cat "$FK/tmux/payload")
-case "$PAYLOAD" in *"hv:handoff"*"$B1"*) ;; *) fail "the brief must name the handoff and the pushed branch: $PAYLOAD" ;; esac
+case "$PAYLOAD" in *"rota:handoff"*"$B1"*) ;; *) fail "the brief must name the handoff and the pushed branch: $PAYLOAD" ;; esac
 pass "return then assign takes the item up again, and the brief names the handoff"
 
 # ── transfer to a slot: the existing branch is checked out in the receiver ──
@@ -121,9 +121,9 @@ OUT=$(rr round transfer 1 --to ben --holder-pid "$HOLDER" --note-file "$TMP_RR/n
 [ "$(branch_of ben)" = "$B2" ] || fail "ben must have the existing branch checked out, on $(branch_of ben)"
 [ -f "$PROJ/.worktrees/ben/step.txt" ] || fail "the receiver starts from the pushed work"
 [ "$(branch_of dana)" = "park/dana" ] || fail "the sender is parked, on $(branch_of dana)"
-[ "$(reg ben task)" = "1" ] && [ "$(reg ben claimId)" = "ben@1" ] && [ -z "$(reg dana task)" ] || fail "registry after the transfer: $(cat "$PROJ/.hv/workers.json")"
+[ "$(reg ben task)" = "1" ] && [ "$(reg ben claimId)" = "ben@1" ] && [ -z "$(reg dana task)" ] || fail "registry after the transfer: $(cat "$PROJ/.rota/workers.json")"
 [ "$(dbq labels 1)" = "in-progress,type:task" ] || fail "in-progress stays on across a transfer: $(dbq labels 1)"
-case "$(dbq comments 1)" in *"(transfer, from dana)"*"<!-- hv:release dana@1 -->"*"<!-- hv:claim ben@1 -->"*) ;; *) fail "transfer comment and claim order: $(dbq comments 1)" ;; esac
+case "$(dbq comments 1)" in *"(transfer, from dana)"*"<!-- rota:release dana@1 -->"*"<!-- rota:claim ben@1 -->"*) ;; *) fail "transfer comment and claim order: $(dbq comments 1)" ;; esac
 case "$(cat "$FK/tmux/payload")" in *"handed to you by dana"*) ;; *) fail "the receiver's brief names the handoff: $(cat "$FK/tmux/payload")" ;; esac
 pass "transfer to a slot parks the sender, moves the claim and checks the existing branch out in the receiver"
 
@@ -154,7 +154,7 @@ RC=0; OUT=$(rr round reclaim dana --holder-pid 1) || RC=$?
 # may not move the worktree under it.
 mkdir -p "$FK/down"
 printf '#!/bin/sh\necho "no server running" >&2\nexit 1\n' > "$FK/down/tmux"; chmod +x "$FK/down/tmux"
-RC=0; OUT=$( cd "$PROJ" && PATH="$FK/down:$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" "$HV_BIN" --json round reclaim dana --force --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$PROJ" && PATH="$FK/down:$FAKES" FAKE_TMUX="$FK/tmux" FAKE_TRACKER_DB="$TMP_RR/db.json" "$ROTA_BIN" --json round reclaim dana --force --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "live agent" ] || fail "no host: a live agent cannot be proved gone: $RC $OUT"
 [ "$(branch_of dana)" = "dana/2-second-thing" ] && [ "$(dbq labels 2)" = "in-progress,type:task" ] || fail "refusals change nothing"
 if grep -q 'kill-window' "$FK/tmux/log"; then fail "a refused reclaim must not kill anything"; fi
@@ -164,9 +164,9 @@ if grep -q 'kill-window' "$FK/tmux/log"; then fail "a refused reclaim must not k
 OUT=$(rr round reclaim dana --holder-pid "$HOLDER" --note-file "$TMP_RR/note.md") || fail "reclaim of a dead slot failed: $OUT"
 [ "$(echo "$OUT" | jget data.health)" = "dead" ] && [ "$(echo "$OUT" | jget data.salvaged)" = "true" ] && [ "$(echo "$OUT" | jget data.released)" = "true" ] && [ "$(echo "$OUT" | jget data.parked)" = "true" ] || fail "reclaim data: $OUT"
 [ -n "$(git -C "$ORIGIN" rev-parse --verify -q "refs/heads/dana/2-second-thing")" ] || fail "reclaim must push the branch"
-[ "$(branch_of dana)" = "park/dana" ] && [ -z "$(reg dana task)" ] && [ -z "$(reg dana handle)" ] && [ "$(reg dana state)" = "idle" ] || fail "dana's slot must be parked and free: $(cat "$PROJ/.hv/workers.json")"
+[ "$(branch_of dana)" = "park/dana" ] && [ -z "$(reg dana task)" ] && [ -z "$(reg dana handle)" ] && [ "$(reg dana state)" = "idle" ] || fail "dana's slot must be parked and free: $(cat "$PROJ/.rota/workers.json")"
 [ "$(dbq labels 2)" = "type:task" ] || fail "in-progress must be gone: $(dbq labels 2)"
-case "$(dbq comments 2)" in *"Reason: reclaimed, dead"*"hv:handoff dana@1"*) ;; *) fail "reclaim handoff: $(dbq comments 2)" ;; esac
+case "$(dbq comments 2)" in *"Reason: reclaimed, dead"*"rota:handoff dana@1"*) ;; *) fail "reclaim handoff: $(dbq comments 2)" ;; esac
 OUT=$(rr round reclaim dana --holder-pid "$HOLDER") || fail "reclaim of an idle slot failed: $OUT"
 [ "$(echo "$OUT" | jget data.health)" = "idle" ] && [ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "an idle slot is a no-op: $OUT"
 pass "reclaim of a dead slot parks it, posts the handoff, releases the claim and clears the handle; an idle slot is a no-op"
@@ -179,7 +179,7 @@ OUT=$(rrsnap round reconcile --apply)
 case "$(echo "$OUT" | drifts)" in *stalled*) fail "a worker that just started is not stalled: $OUT" ;; esac
 RC=0; OUT=$(rrsnap round reclaim ben --holder-pid "$HOLDER") || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "healthy" ] || fail "a live, recently active slot is healthy: $RC $OUT"
-python3 - "$PROJ/.hv/workers.json" <<'PY' || fail "could not age ben's activity"
+python3 - "$PROJ/.rota/workers.json" <<'PY' || fail "could not age ben's activity"
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))
@@ -188,20 +188,20 @@ for s in d["slots"]:
         s["activeAt"] = "2020-01-01T00:00:00Z"
 json.dump(d, open(p, "w"), indent=2)
 PY
-BEFORE=$(cat "$PROJ/.hv/workers.json")
+BEFORE=$(cat "$PROJ/.rota/workers.json")
 OUT=$(rrsnap round reconcile --apply)
 case "$(echo "$OUT" | drifts)" in *stalled:ben*) ;; *) fail "reconcile should report ben as stalled: $OUT" ;; esac
-[ "$(cat "$PROJ/.hv/workers.json")" = "$BEFORE" ] || fail "stalled is never repaired: --apply changed the registry"
+[ "$(cat "$PROJ/.rota/workers.json")" = "$BEFORE" ] || fail "stalled is never repaired: --apply changed the registry"
 
 # claim-mismatch: a human released the claim on the tracker. Only the registry
 # side is repaired.
-gh_ api -X POST repos/o/r/issues/3/comments -f body='<!-- hv:release ben@1 -->' >/dev/null || fail "could not release the claim by hand"
+gh_ api -X POST repos/o/r/issues/3/comments -f body='<!-- rota:release ben@1 -->' >/dev/null || fail "could not release the claim by hand"
 OUT=$(rrsnap round reconcile)
 case "$(echo "$OUT" | drifts)" in *claim-mismatch:ben*) ;; *) fail "reconcile should report the claim mismatch: $OUT" ;; esac
 OUT=$(rrsnap round reconcile --apply)
 case "$(echo "$OUT" | drifts)" in *"|claim-mismatch"*) ;; *) fail "apply should repair the registry side: $OUT" ;; esac
-[ -z "$(reg ben claimId)" ] && [ "$(reg ben task)" = "3" ] || fail "claimId cleared, task kept: $(cat "$PROJ/.hv/workers.json")"
-case "$(dbq comments 3)" in *"hv:claim ben@1"*"hv:release ben@1"*) ;; *) fail "the tracker is the source of truth and is not edited: $(dbq comments 3)" ;; esac
+[ -z "$(reg ben claimId)" ] && [ "$(reg ben task)" = "3" ] || fail "claimId cleared, task kept: $(cat "$PROJ/.rota/workers.json")"
+case "$(dbq comments 3)" in *"rota:claim ben@1"*"rota:release ben@1"*) ;; *) fail "the tracker is the source of truth and is not edited: $(dbq comments 3)" ;; esac
 
 : > "$FK/tmux/log"
 OUT=$(rrsnap round reclaim ben --holder-pid "$HOLDER") || fail "reclaim of a stalled slot failed: $OUT"

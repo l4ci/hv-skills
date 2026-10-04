@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/hook"
 )
 
 // Modes of limits.mode.

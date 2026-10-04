@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 const acctConfig = `{"work":{"accounts":[
@@ -21,7 +21,7 @@ const acctConfig = `{"work":{"accounts":[
 // deterministic and the cooling windows never lapse.
 const future = "2099-01-01T00:00:00.000000+00:00"
 
-// usageFixtures are the per-account payloads read from HV_ACCOUNT_USAGE_DIR.
+// usageFixtures are the per-account payloads read from ROTA_ACCOUNT_USAGE_DIR.
 // alpha: 30% / 10%; beta: five-hour spent with a future
 // reset (cooling); gamma: weekly spent but extra usage live (free, discounted);
 // delta: weekly spent, no extra usage, future reset (cooling); epsilon:
@@ -48,7 +48,7 @@ func usageDir(t *testing.T) string {
 func goMeters(t *testing.T, dir, usage string) []Meter {
 	t.Helper()
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usage
 		}
 		return ""
@@ -113,7 +113,7 @@ func TestAccountListWithoutAccounts(t *testing.T) {
 func TestAccountPick(t *testing.T) {
 	dir, usage := newProject(t, acctConfig), usageDir(t)
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usage
 		}
 		return ""
@@ -155,7 +155,7 @@ func TestAccountAssign(t *testing.T) {
 		"steps": []string{"assign --slot w1 --account beta", "assign --slot w2"}}, &want)
 	usage := usageDir(t)
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usage
 		}
 		return ""
@@ -203,7 +203,7 @@ func TestAccountAssignWithEveryAccountCoolingIsRefused(t *testing.T) {
 	dir := newProject(t, cfg)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usageDir(t)
 		}
 		return ""
@@ -222,7 +222,7 @@ func TestPoolInitSpreadsAccounts(t *testing.T) {
 	var want map[string]string
 	pytest.Golden(t, map[string]any{"config": acctConfig, "usage": usageFixtures(), "argv": "init --slots 5 --base main"}, &want)
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usage
 		}
 		return ""
@@ -267,7 +267,7 @@ func TestExpiredTokenReportsUnknownWithoutNetwork(t *testing.T) {
 func TestOrchestratorTarget(t *testing.T) {
 	dir, usage := newProject(t, acctConfig), usageDir(t)
 	acc := &Accounts{Getenv: func(k string) string {
-		if k == "HV_ACCOUNT_USAGE_DIR" {
+		if k == "ROTA_ACCOUNT_USAGE_DIR" {
 			return usage
 		}
 		return ""

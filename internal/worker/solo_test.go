@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // recordHost marks the project's registry as a round on the given host.

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // a4Project is a project with a backlog and no git: enough for the verbs
@@ -19,8 +19,8 @@ import (
 func a4Project(t *testing.T, config string) string {
 	t.Helper()
 	root := t.TempDir()
-	hv := filepath.Join(root, ".hv")
-	if err := os.MkdirAll(hv, 0o755); err != nil {
+	rota := filepath.Join(root, ".rota")
+	if err := os.MkdirAll(rota, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	files := map[string]string{
@@ -31,14 +31,14 @@ func a4Project(t *testing.T, config string) string {
 		files["config.json"] = config
 	}
 	for n, c := range files {
-		if err := os.WriteFile(filepath.Join(hv, n), []byte(c), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(rota, n), []byte(c), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	return root
 }
 
-func hvRun(t *testing.T, args ...string) (int, map[string]any, string) {
+func rotaRun(t *testing.T, args ...string) (int, map[string]any, string) {
 	t.Helper()
 	wd, _ := os.Getwd()
 	defer os.Chdir(wd)
@@ -63,7 +63,7 @@ func hvRun(t *testing.T, args ...string) (int, map[string]any, string) {
 
 func TestA4IssueModeNeedsTracker(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
-	code, env, stderr := hvRun(t, "--json", "-C", root, "item", "complete", "12", "--commit", "abc")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "complete", "12", "--commit", "abc")
 	if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "cannot determine provider") {
 		t.Fatalf("code=%d env=%v stderr=%s", code, env, stderr)
 	}
@@ -73,7 +73,7 @@ func TestA4IssueModeNeedsTracker(t *testing.T) {
 		{"id", "next", "--kind", "bugs"},
 		{"item", "field", "set", "12", "--name", "detail", "--value", "x"},
 	} {
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		data, _ := env["data"].(*jsonx.Object)
 		if code != ExitRefused || data == nil {
 			t.Fatalf("%v: code=%d env=%v", argv, code, env)
@@ -101,7 +101,7 @@ func TestA4IssueModeUnknownItem(t *testing.T) {
 		{"item", "note", "show", "12", "--kind", "plan"},
 		{"item", "field", "set", "12", "--name", "milestone", "--value", "M1"},
 	} {
-		code, _, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, _, stderr := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		if code != ExitResolution {
 			t.Errorf("%v: code=%d stderr=%s", argv, code, stderr)
 		}
@@ -115,20 +115,20 @@ func TestA4IssueModeUnknownItem(t *testing.T) {
 
 func TestA4Scope(t *testing.T) {
 	root := a4Project(t, "")
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != ExitResolution {
 		t.Errorf("--repo outside umbrella: exit %d, want 3", code)
 	}
 	reg := `{"repos": [{"name": "web", "path": "web"}]}`
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(reg), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(reg), 0o644)
 	// A file-mode umbrella keeps one backlog at its root: the verbs work there,
 	// with or without a registered --repo.
-	if code, _, stderr := hvRun(t, "--json", "-C", root, "item", "reopen", "B01"); code != 0 {
+	if code, _, stderr := rotaRun(t, "--json", "-C", root, "item", "reopen", "B01"); code != 0 {
 		t.Errorf("umbrella: exit %d, stderr %s", code, stderr)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != 0 {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "web"); code != 0 {
 		t.Errorf("registered --repo: exit %d, want 0", code)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "api"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "reopen", "B01", "--repo", "api"); code != ExitResolution {
 		t.Errorf("unregistered --repo: exit %d, want 3", code)
 	}
 }

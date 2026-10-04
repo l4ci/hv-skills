@@ -6,8 +6,8 @@ trap 'rm -rf "$TMP_RQ"' EXIT
 for prov in github gitlab; do
   P="$TMP_RQ/$prov"; mkdir -p "$P"
   git init -q --bare "$P/origin.git"
-  git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.hv"
-  printf '{"backlog":{"backend":"issues"},"issues":{"provider":"%s","retryWaitSeconds":0}}\n' "$prov" > "$P/work/.hv/config.json"
+  git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.rota"
+  printf '{"backlog":{"backend":"issues"},"issues":{"provider":"%s","retryWaitSeconds":0}}\n' "$prov" > "$P/work/.rota/config.json"
   (
     cd "$P/work"
     git config user.email t@t; git config user.name t
@@ -25,9 +25,9 @@ for prov in github gitlab; do
       else glab mr create --title "PR $1" --description "$2" --source-branch "$1" --target-branch "${3:-main}" --yes; fi
     }
 
-    for t in One Two Three Four Five; do "$HV_BIN" item create --kind features --title "$t" >/dev/null; done  # F1..F5
-    for id in F1 F2 F3 F4; do "$HV_BIN" item state $id --to needs-review >/dev/null; done
-    for id in F1 F2; do "$HV_BIN" proof add $id --check unit --result PASS --evidence ok --sha abc1234 >/dev/null; done
+    for t in One Two Three Four Five; do "$ROTA_BIN" item create --kind features --title "$t" >/dev/null; done  # F1..F5
+    for id in F1 F2 F3 F4; do "$ROTA_BIN" item state $id --to needs-review >/dev/null; done
+    for id in F1 F2; do "$ROTA_BIN" proof add $id --check unit --result PASS --evidence ok --sha abc1234 >/dev/null; done
 
     # PR A via ship pr --items (base main); B and C base dev (host does not auto-close); D "Closes #40" must not link F4
     git checkout -q -b feat/a; git commit -q --allow-empty -m a
@@ -80,7 +80,7 @@ for prov in github gitlab; do
     eq "C open" "open" "$(DBQ '[i for i in d["issues"] if i["number"]==3][0]["state"]')"
     eq "C labels" "['changes-requested']" "$(DBQ '[i for i in d["issues"] if i["number"]==3][0]["labels"][-1:]')"
     eq "C no needs-review" "False" "$(DBQ '"needs-review" in [i for i in d["issues"] if i["number"]==3][0]["labels"]')"
-    eq "C feedback" "True" "$(DBQ 'any("hv:comment feedback" in c["body"] and "no proof recorded" in c["body"] for c in [i for i in d["issues"] if i["number"]==3][0]["comments"])')"
+    eq "C feedback" "True" "$(DBQ 'any("rota:comment feedback" in c["body"] and "no proof recorded" in c["body"] for c in [i for i in d["issues"] if i["number"]==3][0]["comments"])')"
     pass "$prov: unproven item blocks the merge, stays open, changes-requested, exit 4"
 
     # --- queue after merges: only F4 (open PR D does not link it)
@@ -110,8 +110,8 @@ for prov in github gitlab; do
 done
 
 # --- file mode
-F="$TMP_RQ/file"; mkdir -p "$F/.hv"
-echo '{"backlog":{"backend":"file"}}' > "$F/.hv/config.json"
+F="$TMP_RQ/file"; mkdir -p "$F/.rota"
+echo '{"backlog":{"backend":"file"}}' > "$F/.rota/config.json"
 (
   cd "$F"; git init -q
   rc=0; out="$(hvj review queue 2>/dev/null)" || rc=$?

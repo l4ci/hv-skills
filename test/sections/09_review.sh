@@ -6,7 +6,7 @@ trap 'rm -rf "$SCAF_TMP"' EXIT
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
-  mkdir -p .hv
+  mkdir -p .rota
   # Seed main with a benign file
   echo "ok" > a.txt
   git add a.txt && git commit -q -m "init"

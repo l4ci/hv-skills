@@ -145,12 +145,12 @@ func (g *GitHub) RemoveLabels(ctx context.Context, number int, labels []string) 
 	return g.removeLabels(ctx, g, number, labels)
 }
 
-func (g *GitHub) FindMilestone(ctx context.Context, hvID string) (string, bool, error) {
+func (g *GitHub) FindMilestone(ctx context.Context, rotaID string) (string, bool, error) {
 	ms, err := g.milestones(ctx, "all")
 	if err != nil {
 		return "", false, err
 	}
-	t, ok := matchMilestone(ms, hvID)
+	t, ok := matchMilestone(ms, rotaID)
 	return t, ok, nil
 }
 

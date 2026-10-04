@@ -10,7 +10,7 @@ import (
 )
 
 // The read-only set is the contract's: an A3/A4 verb whose data line has no
-// "changed" (hv version is A3's and not in a4Commands).
+// "changed" (rota version is A3's and not in a4Commands).
 func TestA4ReadOnlySetMatchesContract(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "docs", "design", "5.0-verb-contract.md"))
 	if err != nil {
@@ -21,7 +21,7 @@ func TestA4ReadOnlySetMatchesContract(t *testing.T) {
 	if start < 0 || end < start {
 		t.Fatal("contract A3/A4 section not found")
 	}
-	entry := regexp.MustCompile(`(?m)^### hv ([a-z -]+)\n(?:.*\n)*?data: (.*)$`)
+	entry := regexp.MustCompile(`(?m)^### rota ([a-z -]+)\n(?:.*\n)*?data: (.*)$`)
 	want := map[string]bool{}
 	for _, m := range entry.FindAllStringSubmatch(doc[start:end], -1) {
 		verb := strings.TrimSpace(m[1])
@@ -92,7 +92,7 @@ func TestA4WrongBackendRefusals(t *testing.T) {
 					argv[i] = a
 				}
 			}
-			code, env, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+			code, env, stderr := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 			d := dataOf(env)
 			if code != c.exit || get(d, "blockedBy") != "backend" || get(d, "changed") != false {
 				t.Fatalf("exit %d (want %d), data %v, stderr %s", code, c.exit, env["data"], stderr)

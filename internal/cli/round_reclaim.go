@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
 )
 
 func roundReclaim(fs *flag.FlagSet) RunFunc {

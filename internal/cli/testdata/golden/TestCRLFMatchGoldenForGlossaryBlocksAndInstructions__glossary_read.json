@@ -9,7 +9,7 @@
     "stdin": ""
   },
   "outputs": {
-    "stdout": "\u003e from: .hv/KNOWLEDGE.md (## Glossary)\n- **Worker** — an agent in a round\n  - **Aliases:** agent, slot\n  - **Not:** orchestrator\n  \u003c!-- 2026-02-02 --\u003e\n",
+    "stdout": "\u003e from: .rota/KNOWLEDGE.md (## Glossary)\n- **Worker** — an agent in a round\n  - **Aliases:** agent, slot\n  - **Not:** orchestrator\n  \u003c!-- 2026-02-02 --\u003e\n",
     "stderr": "",
     "rc": 0,
     "changed": {},

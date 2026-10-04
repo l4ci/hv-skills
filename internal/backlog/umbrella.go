@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Umbrella is the issue backlog of an umbrella project: every registered

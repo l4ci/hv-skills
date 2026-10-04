@@ -1,6 +1,6 @@
-# `/hv-refactor` exploration agent
+# `/rota-refactor` exploration agent
 
-Loaded by `/hv-refactor` Step 2 when single-repo mode is in effect (umbrella fanout exits before reaching Step 2 — see `references/refactor-umbrella-fanout.md`).
+Loaded by `/rota-refactor` Step 2 when single-repo mode is in effect (umbrella fanout exits before reaching Step 2 — see `references/refactor-umbrella-fanout.md`).
 
 Dispatch an exploration agent using the configured **orchestrator** model. Pass it the full context of what was already fixed in prior rounds (if any — check recent commits). The agent walks the codebase with an explicit prioritization rule and stop condition, reads files in full, and reports every friction point with file name, line numbers, and why it matters.
 
@@ -35,7 +35,7 @@ local-substitutable, ports-and-adapters, or true external).
 
 STOP CONDITION — stop searching when either (a) 8–12 friction points
 have been surfaced across the categories above (the sweet spot for one
-/hv-refactor cycle), OR (b) 30+ files have been read with no new
+/rota-refactor cycle), OR (b) 30+ files have been read with no new
 category in the last 5 reads, whichever fires first. Quality of the
 smallest fix list beats raw count — do not pad past 12.
 ```

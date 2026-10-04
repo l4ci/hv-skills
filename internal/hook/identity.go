@@ -1,7 +1,7 @@
 package hook
 
 import (
-	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/rota/internal/roundlease"
 )
 
 // Who says how a hook process relates to the round lease.
@@ -14,7 +14,7 @@ type Who struct {
 
 // Identify decides whether the process behind a hook is the orchestrator: its
 // nearest non-shell ancestor (or holderPID when non-zero) must be the live
-// lease's holder, matched the way `hv round start` recorded it. A read error
+// lease's holder, matched the way `rota round start` recorded it. A read error
 // is "not the orchestrator".
 func Identify(env roundlease.Env, getenv func(string) string, holderPID int, commonDir string) Who {
 	l, st, err := env.Read(commonDir)

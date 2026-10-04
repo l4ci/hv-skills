@@ -1,22 +1,22 @@
 # Debugging
 
-`/hv-debug` is for real bugs that need a proper cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for [`/hv-capture`](capturing-work.md) (accept the hand-off) or [`/hv-work`](running-work.md) instead.
+`/rota-debug` is for real bugs that need a proper cycle: reproduce, hypothesize, verify, fix. If the root cause is already obvious and the fix is mechanical, reach for [`/rota-capture`](capturing-work.md) (accept the hand-off) or [`/rota-work`](running-work.md) instead.
 
-## /hv-debug
+## /rota-debug
 
-Invoke with a bug ID: `/hv-debug B07`.
+Invoke with a bug ID: `/rota-debug B07`.
 
-The skill reads the `[B07]` entry in [`BACKLOG.md`](../reference/hv-folder.md) and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
+The skill reads the `[B07]` entry in [`BACKLOG.md`](../reference/rota-folder.md) and any associated detail file, consults `KNOWLEDGE.md` for topics that match the bug's area, then works through a fixed cycle:
 
 1. **Reproduce**: runs the bug's existing test or writes a minimal failing reproducer.
 2. **Hypothesize**: the orchestrator model proposes a root cause based on the reproduction and project context.
 3. **Verify**: the hypothesis is tested (log inspection, targeted reads, narrow experiment) before any code changes.
 4. **Fix**: the worker model applies the fix. The reproducer must pass before the commit lands.
-5. **Commit**: a single atomic commit tagged `fix: … [B07]` so `/hv-ship` can close the loop.
+5. **Commit**: a single atomic commit tagged `fix: … [B07]` so `/rota-ship` can close the loop.
 
-If the root cause was non-obvious (required extra verification rounds, or contradicted the initial hypothesis, or touched a known-tricky subsystem), the skill nudges you to run [`/hv-learn`](learning.md) so the insight lands in `KNOWLEDGE.md`.
+If the root cause was non-obvious (required extra verification rounds, or contradicted the initial hypothesis, or touched a known-tricky subsystem), the skill nudges you to run [`/rota-learn`](learning.md) so the insight lands in `KNOWLEDGE.md`.
 
-`/hv-debug` uses the same isolation mode (`branch` or `worktree`) and model configuration as `/hv-work`. It refuses to start on a dirty working tree; stash or commit first.
+`/rota-debug` uses the same isolation mode (`branch` or `worktree`) and model configuration as `/rota-work`. It refuses to start on a dirty working tree; stash or commit first.
 
 ## The cycle
 
@@ -24,7 +24,7 @@ Here is what the session looks like:
 
 **Invoke**
 ```
-/hv-debug B07
+/rota-debug B07
 ```
 
 **Reproduce phase.** The skill runs the relevant test or writes a new failing one. You see something like:
@@ -50,14 +50,14 @@ fix: guard against empty-string input in parser [B07]
 
 If the root cause surprised you, the skill ends with a nudge:
 ```
-Root cause was non-obvious. Consider running /hv-learn to capture this.
+Root cause was non-obvious. Consider running /rota-learn to capture this.
 ```
 
-## When to use /hv-debug vs /hv-work
+## When to use /rota-debug vs /rota-work
 
-Use `/hv-debug` when you don't yet know the root cause and need the reproduce, hypothesize, verify loop. The cycle is the point.
+Use `/rota-debug` when you don't yet know the root cause and need the reproduce, hypothesize, verify loop. The cycle is the point.
 
-Use `/hv-work` (or `/hv-capture` with its hand-off) when:
+Use `/rota-work` (or `/rota-capture` with its hand-off) when:
 
 - The root cause is already clear and the fix is a small, mechanical change.
 - The item is a feature or task, not a bug.
@@ -67,32 +67,32 @@ See [running work](running-work.md) for a full comparison of the entry points.
 
 ## When the cycle won't converge
 
-`/hv-debug` has two distinct circuit breakers: one for hypotheses that won't verify, one for fixes that won't hold. They count different things and trigger at different points in the cycle.
+`/rota-debug` has two distinct circuit breakers: one for hypotheses that won't verify, one for fixes that won't hold. They count different things and trigger at different points in the cycle.
 
 ### Fresh-context escalation (hypothesize, verify won't converge)
 
-If the hypothesize, verify loop iterates 3 times without finding the root cause, `/hv-debug` automatically escalates: it synthesizes a brief listing the refuted hypotheses, files inspected, and suspected blockers, then dispatches a fresh subagent with no transcript of the failed attempts. The fresh context often surfaces angles the orchestrator's accumulated weight has blocked.
+If the hypothesize, verify loop iterates 3 times without finding the root cause, `/rota-debug` automatically escalates: it synthesizes a brief listing the refuted hypotheses, files inspected, and suspected blockers, then dispatches a fresh subagent with no transcript of the failed attempts. The fresh context often surfaces angles the orchestrator's accumulated weight has blocked.
 
-If the fresh subagent's hypothesis also fails verification, `/hv-debug` surfaces to you rather than looping a second fresh-context attempt; at that point the bug needs human triage.
+If the fresh subagent's hypothesis also fails verification, `/rota-debug` surfaces to you rather than looping a second fresh-context attempt; at that point the bug needs human triage.
 
 The 3-cycle threshold applies only in single-hypothesis mode. With `debug.competingHypotheses: true`, the three parallel framing lenses already cover the diverse-angles pattern.
 
 ### Iron Law: hard stop at 3 failed fixes
 
-A second, stricter gate catches the case where hypotheses *do* converge (fixes get committed) but the bug keeps coming back. Every committed fix that fails to resolve the reproducer increments a per-session counter persisted at `.hv/debug/<session>.json` (session keyed by current branch, with `/` → `-`). The counter survives `/clear` and resumption.
+A second, stricter gate catches the case where hypotheses *do* converge (fixes get committed) but the bug keeps coming back. Every committed fix that fails to resolve the reproducer increments a per-session counter persisted at `.rota/debug/<session>.json` (session keyed by current branch, with `/` → `-`). The counter survives `/clear` and resumption.
 
-At 3 failed fix attempts, the Iron Law fires: hard stop, no further attempts in this session. `/hv-debug` prints a fail-loud summary of every refuted hypothesis and committed fix, then surfaces. It does NOT dispatch a fresh-context worker (that's the hypothesis-cycle gate above, which targets a different failure mode). Three committed fixes that don't hold mean the framing of the bug needs human triage, not more agents.
+At 3 failed fix attempts, the Iron Law fires: hard stop, no further attempts in this session. `/rota-debug` prints a fail-loud summary of every refuted hypothesis and committed fix, then surfaces. It does NOT dispatch a fresh-context worker (that's the hypothesis-cycle gate above, which targets a different failure mode). Three committed fixes that don't hold mean the framing of the bug needs human triage, not more agents.
 
 Suggested next steps from the hard stop:
 
-- Run [`/hv-pause`](pausing-and-resuming.md) to leave a handoff note and step away. A fresh session reads the persisted counter and can decide whether to wipe it or continue.
+- Run [`/rota-pause`](pausing-and-resuming.md) to leave a handoff note and step away. A fresh session reads the persisted counter and can decide whether to wipe it or continue.
 - Or re-open the bug from a different angle. The symptom may be in a subsystem the past three hypotheses haven't touched.
 
 The branch and `status.json` entry stay intact so you can resume. The Iron Law breaks `autonomy.level: "loop"`: the loop stops at the hard stop and the user re-engages by hand. The counter clears on a successful fix so subsequent bugs start at zero.
 
 ## Competing hypotheses
 
-The `debug.competingHypotheses` config option (default `false`) controls whether `/hv-debug` generates one hypothesis or fans out three parallel agents that attack the bug from different angles (recent changes, data shape, concurrency/lifecycle).
+The `debug.competingHypotheses` config option (default `false`) controls whether `/rota-debug` generates one hypothesis or fans out three parallel agents that attack the bug from different angles (recent changes, data shape, concurrency/lifecycle).
 
 | Value | Behavior |
 |-------|----------|

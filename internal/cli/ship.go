@@ -11,19 +11,19 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/section"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/verdict"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/section"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/verdict"
 )
 
-// shipCommands is the `hv ship` group (A8, #52).
+// shipCommands is the `rota ship` group (A8, #52).
 func shipCommands() *Command {
 	return &Command{Name: "ship", Summary: "PR bodies, pull requests, merges and undo", Subs: []*Command{
 		{Name: "body", Summary: "build a PR body from a branch's commits", Repo: true, Verb: noFlags(shipBody)},
@@ -69,7 +69,7 @@ func shipVerdictBlock(c *Ctx, dir, root, branch string) (*jsonx.Object, error) {
 			repo = r.Name
 		}
 	}
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	s := verdict.Settings{Runner: configString(cfg, "ship.secondOpinionRunner")}
 	r, ok := verdict.Blocking(verdict.Load(root).Branches[verdict.BranchKey(repo, branch)], s)
 	if !ok {
@@ -82,7 +82,7 @@ func shipVerdictBlock(c *Ctx, dir, root, branch string) (*jsonx.Object, error) {
 	}
 	d := gitObj("blockedBy", "verdict", "kind", r.Kind, "verdict", r.Verdict, "sha", r.Sha, "stale", stale, "changed", false)
 	return d, Refused("%s %s recorded for %s; not shipped", r.Kind, r.Verdict, branch).
-		WithHint("see: hv verdict show " + branch)
+		WithHint("see: rota verdict show " + branch)
 }
 
 // shipPRVerdict is shipVerdictBlock for the head branch of PR pr, with the
@@ -126,7 +126,7 @@ func shipBodyArg(c *Ctx, path, what string) (string, error) {
 	return shipLine(string(raw)), nil
 }
 
-// shipRoot is the project whose .hv/ holds the config and backlog of the
+// shipRoot is the project whose .rota/ holds the config and backlog of the
 // checkout in dir.
 func shipRoot(dir string) string {
 	if root, err := git.FindRoot(dir, registeredRels); err == nil {
@@ -278,7 +278,7 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 	items := fs.String("items", "", "item IDs the PR closes, comma separated (issue mode)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 || args[0] == "" {
-			return Result{}, Usage("usage: hv ship pr <branch> --title <text> --body-file <path|->")
+			return Result{}, Usage("usage: rota ship pr <branch> --title <text> --body-file <path|->")
 		}
 		branch := args[0]
 		if *title == "" {
@@ -294,7 +294,7 @@ func shipPR(fs *flag.FlagSet) RunFunc {
 		}
 		ctx := c.Context()
 		root := shipRoot(dir)
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 
 		// The provider and the Closes lines come before the push, so a bad
 		// --items ID fails with nothing pushed.
@@ -446,7 +446,7 @@ func shipMerge(fs *flag.FlagSet) RunFunc {
 	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 || args[0] == "" {
-			return Result{}, Usage("usage: hv ship merge <branch> --body-file <path|->")
+			return Result{}, Usage("usage: rota ship merge <branch> --body-file <path|->")
 		}
 		branch := args[0]
 		conf, err := confirm()
@@ -541,7 +541,7 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 	confirm := approvalFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
-			return Result{}, Usage("usage: hv ship pr-merge <pr> [--items <ID>[,<ID>...]]")
+			return Result{}, Usage("usage: rota ship pr-merge <pr> [--items <ID>[,<ID>...]]")
 		}
 		conf, req, err := confirm()
 		if err != nil {
@@ -560,7 +560,7 @@ func shipPRMerge(fs *flag.FlagSet) RunFunc {
 				items = append(items, s)
 			}
 		}
-		be, err := a8Issues(c, "use: hv ship merge", true)
+		be, err := a8Issues(c, "use: rota ship merge", true)
 		if err != nil {
 			return a4Fail(err)
 		}
@@ -626,7 +626,7 @@ func shipCycleIDs(root string, hashes map[string]bool) []string {
 	var ids []string
 	seen := map[string]bool{}
 	for _, name := range []string{"BACKLOG.md", "ARCHIVE.md"} {
-		text, err := fsio.ReadText(filepath.Join(root, ".hv", name))
+		text, err := fsio.ReadText(filepath.Join(root, ".rota", name))
 		if err != nil {
 			continue
 		}
@@ -736,7 +736,7 @@ func shipUndo(fs *flag.FlagSet) RunFunc {
 			if *cycle != "" {
 				return shipBlocked("merge subject", "--cycle commit %s has subject not matching '^merge: ' (subject: %s)", *cycle, subject)
 			}
-			return shipBlocked("merge subject", "most recent merge on %s is not an hv cycle merge (subject: %s)", base, subject)
+			return shipBlocked("merge subject", "most recent merge on %s is not a rota cycle merge (subject: %s)", base, subject)
 		}
 
 		short, err := g("rev-parse", "--short", merge)
@@ -838,7 +838,7 @@ func shipPlan(short, subject, base string, postCount int, ids []string, apply bo
 		fmt.Fprintf(&b, "%s%s will be restored to BACKLOG.md (%s)\n", lead, id, sec)
 	}
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "Branch:   deleted by hv ship merge; rerun `git branch <name> %s^2` to keep the work\n", short)
+	fmt.Fprintf(&b, "Branch:   deleted by rota ship merge; rerun `git branch <name> %s^2` to keep the work\n", short)
 	b.WriteString("Status:   no active entry to clear (cycle already removed it)\n")
 	b.WriteString("Handoff:  gitignored — not restorable\n")
 	b.WriteString("Plans:    gitignored — not restorable\n")
@@ -855,7 +855,7 @@ func shipPlan(short, subject, base string, postCount int, ids []string, apply bo
 // unlocked keeps the no-op from leaving a .lock sidecar, which the old
 // helper never created and which dirties a tree that does not ignore it.
 func shipActive(root, id string) bool {
-	content, err := fsio.ReadText(filepath.Join(root, ".hv", "BACKLOG.md"))
+	content, err := fsio.ReadText(filepath.Join(root, ".rota", "BACKLOG.md"))
 	if err != nil {
 		return false
 	}

@@ -11,11 +11,11 @@ import (
 func TestScopePaths(t *testing.T) {
 	s := Store{Root: "/p", Repos: map[string]string{"web": "/p/web"}}
 	got, err := s.KnowledgePath(Umbrella)
-	if err != nil || got != "/p/.hv/KNOWLEDGE.md" {
+	if err != nil || got != "/p/.rota/KNOWLEDGE.md" {
 		t.Errorf("umbrella: %q %v", got, err)
 	}
 	got, err = s.TierPath("web")
-	if err != nil || got != "/p/.hv/knowledge/web/knowledge-tier.json" {
+	if err != nil || got != "/p/.rota/knowledge/web/knowledge-tier.json" {
 		t.Errorf("web tier: %q %v", got, err)
 	}
 	if _, err = s.KnowledgePath("ghost"); !errors.Is(err, ErrScope) {
@@ -100,9 +100,9 @@ func TestRekeyTopicMovesEveryEntry(t *testing.T) {
 func TestAmendAmbiguousAcrossFiles(t *testing.T) {
 	root := t.TempDir()
 	umb := "## T\n\n- **a** — shared text <!-- 2026-01-01 -->\n"
-	os.MkdirAll(filepath.Join(root, ".hv", "knowledge", "web"), 0o777)
-	os.WriteFile(filepath.Join(root, ".hv", "KNOWLEDGE.md"), []byte(umb), 0o666)
-	os.WriteFile(filepath.Join(root, ".hv", "knowledge", "web", "KNOWLEDGE.md"), []byte(umb), 0o666)
+	os.MkdirAll(filepath.Join(root, ".rota", "knowledge", "web"), 0o777)
+	os.WriteFile(filepath.Join(root, ".rota", "KNOWLEDGE.md"), []byte(umb), 0o666)
+	os.WriteFile(filepath.Join(root, ".rota", "knowledge", "web", "KNOWLEDGE.md"), []byte(umb), 0o666)
 	s := Store{Root: root, Repos: map[string]string{"web": filepath.Join(root, "web")}}
 	if _, _, err := s.Amend("web", false, "T", "shared", "x"); !errors.Is(err, ErrAmbiguous) {
 		t.Fatalf("err = %v", err)
@@ -124,9 +124,9 @@ func TestParseTermEntry(t *testing.T) {
 
 func TestTierReadBackfillsLegacyBullets(t *testing.T) {
 	root := t.TempDir()
-	hv := filepath.Join(root, ".hv")
-	os.MkdirAll(hv, 0o777)
-	os.WriteFile(filepath.Join(hv, "KNOWLEDGE.md"), []byte("# K\n\n## Arch\n\n- **Old** — legacy <!-- 2026-01-01 -->\n- **Kept** — tracked <!-- 2026-01-02 -->\n\n## Glossary\n\n- **Term** — never tiered\n"), 0o666)
+	rota := filepath.Join(root, ".rota")
+	os.MkdirAll(rota, 0o777)
+	os.WriteFile(filepath.Join(rota, "KNOWLEDGE.md"), []byte("# K\n\n## Arch\n\n- **Old** — legacy <!-- 2026-01-01 -->\n- **Kept** — tracked <!-- 2026-01-02 -->\n\n## Glossary\n\n- **Term** — never tiered\n"), 0o666)
 	s := Store{Root: root}
 	if _, _, err := s.TierSet(Umbrella, "Arch", "Kept", Confirmed); err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ func TestTierReadWithoutKnowledgeFileCreatesNothing(t *testing.T) {
 	if list, err := s.TierList(Umbrella, ""); err != nil || len(list) != 0 {
 		t.Fatalf("list = %v err=%v", list, err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv", "knowledge-tier.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".rota", "knowledge-tier.json")); !os.IsNotExist(err) {
 		t.Errorf("sidecar created: %v", err)
 	}
 }
@@ -161,7 +161,7 @@ func TestTierReadWithoutKnowledgeFileCreatesNothing(t *testing.T) {
 func TestWriteCustomBlockRewritesPreRenameSkillsBlock(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "AGENTS.md")
-	old := "# Agents\n\n<!-- hv-skills-start -->\n## hv-skills\n\nThis project uses hv-skills for backlog tracking.\n<!-- hv-skills-end -->\n\ntail\n"
+	old := "# Agents\n\n<!-- rota-skills-start -->\n## hv-skills\n\nThis project uses hv-skills for backlog tracking.\n<!-- rota-skills-end -->\n\ntail\n"
 	if err := os.WriteFile(p, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -172,8 +172,8 @@ func TestWriteCustomBlockRewritesPreRenameSkillsBlock(t *testing.T) {
 	b, _ := os.ReadFile(p)
 	got := string(b)
 	if strings.Contains(got, "hv-skills for") || strings.Contains(got, "## hv-skills\n") ||
-		!strings.Contains(got, "<!-- hv-skills-start -->\n## hv\n") ||
-		strings.Count(got, "<!-- hv-skills-start -->") != 1 || !strings.HasSuffix(got, "\n\ntail\n") {
+		!strings.Contains(got, "<!-- rota-skills-start -->\n## rota\n") ||
+		strings.Count(got, "<!-- rota-skills-start -->") != 1 || !strings.HasSuffix(got, "\n\ntail\n") {
 		t.Errorf("block not rewritten:\n%s", got)
 	}
 }

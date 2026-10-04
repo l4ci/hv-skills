@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Worker slot classification: the port of bin/hv-worker-poll.
@@ -25,8 +25,8 @@ import (
 // DONE and BLOCKED come from SENTINELS the worker contract requires it to
 // print, not from inference:
 //
-//	HV-DONE <slot> <pr-url-or-branch>
-//	HV-BLOCKED <slot>: <one question in plain language>
+//	ROTA-DONE <slot> <pr-url-or-branch>
+//	ROTA-BLOCKED <slot>: <one question in plain language>
 //
 // LIMITED means the session hit its usage window; it routes to reassigning
 // the slot to another account rather than re-dispatching onto the same one. If
@@ -40,7 +40,7 @@ import (
 //
 // herdr adds a native agent state, read before the pane text: working is
 // BUSY; blocked is NEEDS-PERMISSION (a dialog is up) unless the pane carries
-// an HV-BLOCKED sentinel; idle/done fall to the text rules; unknown falls to
+// a ROTA-BLOCKED sentinel; idle/done fall to the text rules; unknown falls to
 // the text rules and ends UNKNOWN, which is surfaced and never treated as
 // finished; gone (no agent) is DEAD. Sentinels, `Retrying in` and LIMITED
 // still outrank the native state, the same as they outrank movement.
@@ -81,8 +81,8 @@ var (
 	// A sentinel may follow a reply marker: Claude Code v2.1.288 starts the
 	// first line of every reply with "● " (older versions "⏺ "), Codex
 	// 0.159.x with "• ".
-	reBlocked = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?HV-BLOCKED\s+(\S+)\s*:\s*(.+)$`)
-	reDone    = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?HV-DONE\s+(\S+)\s*(.*)$`)
+	reBlocked = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?ROTA-BLOCKED\s+(\S+)\s*:\s*(.+)$`)
+	reDone    = regexp.MustCompile(`(?m)^\s*(?:[●⏺•]\s*)?ROTA-DONE\s+(\S+)\s*(.*)$`)
 	reRetry   = regexp.MustCompile(`Retrying in`)
 	reFunds   = regexp.MustCompile(`Add funds`)
 	reAPIErr  = regexp.MustCompile(`(API Error[^\n]*)`)
@@ -130,7 +130,7 @@ func Classify(text string, moved bool, lines int, native string) (state, evidenc
 	tail := strings.Join(all, "\n")
 
 	// Sentinels win over everything, including movement: a worker that printed
-	// HV-DONE and is still rendering its own output is finished, not busy.
+	// ROTA-DONE and is still rendering its own output is finished, not busy.
 	if m := reBlocked.FindStringSubmatch(tail); m != nil {
 		return StateBlocked, strings.TrimSpace(m[2])
 	}
@@ -190,7 +190,7 @@ type PollRow struct {
 	Name, State, Evidence string
 }
 
-// PollOpts are the flags of `hv worker poll`.
+// PollOpts are the flags of `rota worker poll`.
 type PollOpts struct {
 	Slot   string
 	Settle time.Duration // default 3s
@@ -222,7 +222,7 @@ func PollFixture(path, slot, status string, lines int) (PollResult, error) {
 }
 
 // Poll classifies the worker slots through the host and records each slot's
-// state in .hv/workers.json, plus the PR URL from `HV-DONE <slot> <pr-url>` in
+// state in .rota/workers.json, plus the PR URL from `ROTA-DONE <slot> <pr-url>` in
 // slot.pr, so the gate merges through the PR instead of falling back to a
 // local merge. A slot that newly turns BLOCKED or NEEDS-PERMISSION raises a
 // host notification (herdr only).
@@ -234,7 +234,7 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 	if o.Lines <= 0 {
 		o.Lines = 60
 	}
-	if err := SoloRefusal(root, "hv round report records a subagent's state"); err != nil {
+	if err := SoloRefusal(root, "rota round report records a subagent's state"); err != nil {
 		return PollResult{}, err
 	}
 	h := e.NewHost(hostKind(root))
@@ -262,7 +262,7 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 		// Notify on the transition only: a poll loop re-reading a stuck slot
 		// must not ring every few seconds.
 		if (r.State == StateBlocked || r.State == StateNeedsPermission) && targets[i].prev != strings.ToLower(r.State) {
-			h.Notify(ctx, fmt.Sprintf("hv worker %s: %s", r.Name, r.State), r.Evidence)
+			h.Notify(ctx, fmt.Sprintf("rota worker %s: %s", r.Name, r.State), r.Evidence)
 		}
 	}
 
@@ -281,7 +281,7 @@ func (e Env) Poll(ctx context.Context, root string, o PollOpts) (PollResult, err
 			s.Set("activeAt", stamp(e.Now()))
 		}
 		s.Set("state", strings.ToLower(r.State))
-		// Only a URL-shaped HV-DONE argument becomes slot.pr. The contract
+		// Only a URL-shaped ROTA-DONE argument becomes slot.pr. The contract
 		// allows a bare branch name there, and handing a branch to `gh pr
 		// merge` fails where the gate's local merge would have worked.
 		if r.State == StateDone && rePRURL.MatchString(r.Evidence) {

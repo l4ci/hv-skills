@@ -1,5 +1,5 @@
 // Package plan ports hv-plan-add, -list, -show, -put, -rm and
-// -rename-check for file mode: plan files under .hv/plans/<key>.md, where
+// -rename-check for file mode: plan files under .rota/plans/<key>.md, where
 // key is <milestone>-<unit> (M01-B07, M01-S03).
 package plan
 
@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 var (
@@ -42,10 +42,10 @@ func checkKey(key string) error {
 	return nil
 }
 
-func path(root, key string) string { return filepath.Join(root, ".hv", "plans", key+".md") }
+func path(root, key string) string { return filepath.Join(root, ".rota", "plans", key+".md") }
 
 func notFound(key string) *artifact.Error {
-	return artifact.Errf(artifact.ExitResolution, "plan %s not found (.hv/plans/%s.md)", key, key)
+	return artifact.Errf(artifact.ExitResolution, "plan %s not found (.rota/plans/%s.md)", key, key)
 }
 
 // AddOpts are the arguments of Add. Exactly one of Key or (Milestone with
@@ -106,7 +106,7 @@ func extras(root string, o AddOpts, issue bool) (design, repo string, err error)
 		if issue {
 			design = "note:design"
 		} else {
-			design = ".hv/designs/" + o.Design + ".md"
+			design = ".rota/designs/" + o.Design + ".md"
 			if _, serr := os.Stat(filepath.Join(root, design)); serr != nil {
 				return "", "", artifact.Errf(artifact.ExitResolution, "--design file not found: %s", design)
 			}
@@ -125,7 +125,7 @@ func extras(root string, o AddOpts, issue bool) (design, repo string, err error)
 			}
 		}
 		if len(missing) > 0 {
-			return "", "", artifact.Errf(artifact.ExitResolution, "--repos name(s) not in .hv/repos.json: %s", strings.Join(missing, ", "))
+			return "", "", artifact.Errf(artifact.ExitResolution, "--repos name(s) not in .rota/repos.json: %s", strings.Join(missing, ", "))
 		}
 		repo = strings.Join(names, ", ")
 	}
@@ -197,7 +197,7 @@ func Add(root string, o AddOpts) (key, unitKind string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	dir := filepath.Join(root, ".hv", "plans")
+	dir := filepath.Join(root, ".rota", "plans")
 	// One lock per milestone for every S-unit, minted or explicit, so the
 	// existence check and the minted number cannot race; an item plan locks
 	// its own key.
@@ -212,7 +212,7 @@ func Add(root string, o AddOpts) (key, unitKind string, err error) {
 		key, unitKind = milestone+"-"+unit, kindOfUnit(unit)
 		p := path(root, key)
 		if _, serr := os.Stat(p); serr == nil {
-			return artifact.Errf(artifact.ExitRefused, ".hv/plans/%s.md already exists", key)
+			return artifact.Errf(artifact.ExitRefused, ".rota/plans/%s.md already exists", key)
 		}
 		if err := os.MkdirAll(dir, 0o777); err != nil {
 			return err
@@ -246,9 +246,9 @@ type Entry struct {
 	Repos                                                  []string
 }
 
-// List reads .hv/plans/*.md in name order, optionally only one milestone's.
+// List reads .rota/plans/*.md in name order, optionally only one milestone's.
 func List(root, milestone string) ([]Entry, error) {
-	docs, err := artifact.ListDocs(filepath.Join(root, ".hv", "plans"))
+	docs, err := artifact.ListDocs(filepath.Join(root, ".rota", "plans"))
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +299,7 @@ func Put(root, key, text string) (changed bool, err error) {
 	}
 	p := path(root, key)
 	if _, serr := os.Stat(p); serr != nil {
-		return false, notFound(key).WithHint("hv plan add " + key + " --title <text>")
+		return false, notFound(key).WithHint("rota plan add " + key + " --title <text>")
 	}
 	err = fsio.Locked(p, fsio.LockTimeout, func() error {
 		old, rerr := os.ReadFile(p)

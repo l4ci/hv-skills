@@ -1,4 +1,4 @@
-// Package doctor is the logic behind `hv doctor`: one read-only preflight
+// Package doctor is the logic behind `rota doctor`: one read-only preflight
 // check per thing a parallel round depends on (git, the dispatch host, the
 // forge CLI, the worker accounts, herdr's agent integration, the installed skills).
 //
@@ -15,8 +15,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/skills"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/skills"
 )
 
 // Check statuses.
@@ -66,12 +66,12 @@ type Input struct {
 	Dir  string // working directory: where git runs
 	Home string // expands a leading "~/" in a configDir
 
-	// From the project config when .hv/ exists; zero values otherwise.
+	// From the project config when .rota/ exists; zero values otherwise.
 	Dispatch       string // work.dispatch
 	IssuesProvider string // issues.provider
 	Accounts       []Account
 	SwitchOnUsage  bool // orchestrator.switchOnUsage (D4)
-	// CodexHomes are the existing slot homes under <git-common-dir>/hv/codex/.
+	// CodexHomes are the existing slot homes under <git-common-dir>/rota/codex/.
 	CodexHomes []CodexHome
 	// CodexTiers is whether any round.tiers.codex.<tier> is set.
 	CodexTiers bool
@@ -80,7 +80,7 @@ type Input struct {
 	// nil when nothing was read.
 	Skills *skills.Report
 
-	// ProjectRoot is the directory holding .hv/, "" outside an hv project:
+	// ProjectRoot is the directory holding .rota/, "" outside a rota project:
 	// the orchestrator checks (statusline, stop-hook) skip without it.
 	ProjectRoot string
 	// ConfigDirs are the Claude config dirs whose settings.json counts for
@@ -129,7 +129,7 @@ func (d *runner) git() Check {
 	case r.ExitCode == 0:
 		return pass("git", ".worktrees/ is gitignored")
 	case r.ExitCode == 1:
-		return fail("git", ".worktrees/ is not gitignored", "add .worktrees/ to .gitignore (hv init does this)")
+		return fail("git", ".worktrees/ is not gitignored", "add .worktrees/ to .gitignore (rota init does this)")
 	default:
 		return fail("git", "not inside a git repository", "run: git init")
 	}
@@ -172,7 +172,7 @@ func (d *runner) host() Check {
 var forgeHost = regexp.MustCompile(`(?i)github|gitlab`)
 
 // provider is "github", "gitlab" or "": the origin host decides, and
-// issues.provider is only the fallback (as in `hv issues provider`).
+// issues.provider is only the fallback (as in `rota issues provider`).
 func (d *runner) provider() string {
 	if bin, ok := d.in.Look("git"); ok {
 		if r, ran := d.run(bin, []string{"remote", "get-url", "origin"}, nil); ran && r.ExitCode == 0 {
@@ -310,8 +310,8 @@ func ParseIntegration(out, agent string) string {
 }
 
 const (
-	statuslineHint = "hv hook install --wrap-statusline"
-	stopHookHint   = "hv hook install"
+	statuslineHint = "rota hook install --wrap-statusline"
+	stopHookHint   = "rota hook install"
 )
 
 // projectFiles reads the project's two settings files, in precedence order.
@@ -351,9 +351,9 @@ func (d *runner) userFile(dir string) hookFile {
 	return d.read(filepath.Join(d.expand(dir), "settings.json"))
 }
 
-// optIn reports whether anything `hv hook install` writes is present in any
-// settings file in scope: a `# hv-hook` entry for any event, or a statusLine
-// that runs `hv statusline dump`. The hooks are opt-in, so with none of that
+// optIn reports whether anything `rota hook install` writes is present in any
+// settings file in scope: a `# rota-hook` entry for any event, or a statusLine
+// that runs `rota statusline dump`. The hooks are opt-in, so with none of that
 // the checks skip; they fail only on a broken or partial install. Unreadable
 // files are returned so a skip can say it could not look there.
 func (d *runner) optIn() (in bool, unreadable []string) {
@@ -377,13 +377,13 @@ func notInstalled(name string, unreadable []string) Check {
 	if len(unreadable) > 0 {
 		detail += "; cannot read " + strings.Join(unreadable, ", ")
 	}
-	return skip(name, detail+": hv hook install")
+	return skip(name, detail+": rota hook install")
 }
 
 func (d *runner) statusline() Check {
 	const name = "statusline"
 	if d.in.ProjectRoot == "" {
-		return skip(name, "not inside an hv project")
+		return skip(name, "not inside a rota project")
 	}
 	if in, bad := d.optIn(); !in {
 		return notInstalled(name, bad)
@@ -422,7 +422,7 @@ func (d *runner) statusline() Check {
 		case eff == nil:
 			bad = append(bad, label+": no statusLine")
 		case !strings.Contains(eff.slCmd, hook.StatuslineCmd):
-			bad = append(bad, label+": statusLine does not run hv statusline dump ("+eff.path+")")
+			bad = append(bad, label+": statusLine does not run rota statusline dump ("+eff.path+")")
 		default:
 			parts = append(parts, label+": "+eff.path)
 		}
@@ -433,7 +433,7 @@ func (d *runner) statusline() Check {
 	if len(bad) > 0 {
 		return fail(name, strings.Join(bad, "; "), statuslineHint)
 	}
-	return pass(name, "hv statusline dump runs ("+strings.Join(parts, "; ")+")")
+	return pass(name, "rota statusline dump runs ("+strings.Join(parts, "; ")+")")
 }
 
 // switchCheck is D4's: with orchestrator.switchOnUsage on, the Stop hook must
@@ -445,7 +445,7 @@ func (d *runner) switchCheck() Check {
 		return skip(name, "orchestrator.switchOnUsage is off")
 	}
 	if d.in.ProjectRoot == "" {
-		return skip(name, "not inside an hv project")
+		return skip(name, "not inside a rota project")
 	}
 	var with []string
 	for _, a := range d.in.Accounts {
@@ -466,7 +466,7 @@ func (d *runner) switchCheck() Check {
 func (d *runner) stopHook() Check {
 	const name = "stop-hook"
 	if d.in.ProjectRoot == "" {
-		return skip(name, "not inside an hv project")
+		return skip(name, "not inside a rota project")
 	}
 	if in, bad := d.optIn(); !in {
 		return notInstalled(name, bad)
@@ -494,7 +494,7 @@ func (d *runner) stopHook() Check {
 		}
 	}
 	if len(missing) > 0 {
-		detail := "no # hv-hook entry for " + strings.Join(missing, " and ")
+		detail := "no # rota-hook entry for " + strings.Join(missing, " and ")
 		if len(unreadable) > 0 {
 			detail += " (cannot read " + strings.Join(unreadable, ", ") + ")"
 		}
@@ -506,7 +506,7 @@ func (d *runner) stopHook() Check {
 			return fail(name, ev+" hook runs "+first+", which is not found", stopHookHint)
 		}
 	}
-	return pass(name, "Stop and SessionStart hooks run hv")
+	return pass(name, "Stop and SessionStart hooks run rota")
 }
 
 // resolve finds the executable a hook command starts with.
@@ -524,7 +524,7 @@ func (d *runner) resolve(word string) (string, bool) {
 // install: another digest, missing or edited files, or a leftover plugin copy.
 func (d *runner) skills() Check {
 	const name = "skills"
-	const installHint = "run: hv skills install"
+	const installHint = "run: rota skills install"
 	var have []skills.RootStatus
 	if rep := d.in.Skills; rep != nil {
 		for _, r := range rep.Roots {
@@ -541,23 +541,23 @@ func (d *runner) skills() Check {
 		return fail(name, "the Claude plugin "+rep.Plugin+" is still installed, so both copies list", "claude plugin uninstall "+rep.Plugin)
 	}
 	var problems []string
-	hint := "run: hv skills update"
+	hint := "run: rota skills update"
 	for _, r := range have {
 		if !r.Current {
-			problems = append(problems, fmt.Sprintf("%s: skills %s, hv %s", r.Path, versionOrDigest(r.Version, r.Digest), versionOrDigest(rep.Version, rep.Digest)))
+			problems = append(problems, fmt.Sprintf("%s: skills %s, rota %s", r.Path, versionOrDigest(r.Version, r.Digest), versionOrDigest(rep.Version, rep.Digest)))
 		}
 		if len(r.Missing) > 0 {
 			problems = append(problems, fmt.Sprintf("%s: %d missing (%s)", r.Path, len(r.Missing), first(r.Missing)))
 		}
 		if len(r.Edited) > 0 {
 			problems = append(problems, fmt.Sprintf("%s: %d edited (%s)", r.Path, len(r.Edited), first(r.Edited)))
-			hint = "run: hv skills update --overwrite"
+			hint = "run: rota skills update --overwrite"
 		}
 	}
 	if len(problems) > 0 {
 		return fail(name, strings.Join(problems, "; "), hint)
 	}
-	return pass(name, fmt.Sprintf("%d roots match hv %s", len(have), versionOrDigest(rep.Version, rep.Digest)))
+	return pass(name, fmt.Sprintf("%d roots match rota %s", len(have), versionOrDigest(rep.Version, rep.Digest)))
 }
 
 // versionOrDigest names a skill set: its version when it has one, else the

@@ -7,11 +7,11 @@ Canonical bash block referenced by every terminal-path skill that surfaces `[Aut
 Run after the terminal-path framing paragraph, before any final user message:
 
 ```bash
-hv decisions auto-since   # empty stdout when nothing matches
-hv status loop clear      # clear the session marker so the next /hv-work loop entry stamps a fresh start
+rota decisions auto-since   # empty stdout when nothing matches
+rota status loop clear      # clear the session marker so the next /rota-work loop entry stamps a fresh start
 ```
 
-If `hv decisions auto-since` produces no output, skip silently — there's nothing to surface.
+If `rota decisions auto-since` produces no output, skip silently — there's nothing to surface.
 
 ## How to cite from a SKILL.md
 
@@ -29,4 +29,4 @@ Keep the surrounding terminal-path framing (which path, why it's terminal, what 
 ## See also
 
 - F19 terminal-path-only convention — surfacing fires only on terminal paths.
-- Cited from: `hv-work` Step 1 guard-fail, `hv-work` no-argument empty-backlog branch, `hv-pause` Step 6, `hv-debug` Iron Law halt.
+- Cited from: `rota-work` Step 1 guard-fail, `rota-work` no-argument empty-backlog branch, `rota-pause` Step 6, `rota-debug` Iron Law halt.

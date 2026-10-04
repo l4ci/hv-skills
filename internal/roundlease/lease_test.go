@@ -193,7 +193,7 @@ func TestDiscoverUsesOverrideAndPaneEnv(t *testing.T) {
 
 func TestDiscoverWalksPastShells(t *testing.T) {
 	// The test process's parent is `go test` or a shell; either way the
-	// result is a live pid with a start time, never hv's own pid.
+	// result is a live pid with a start time, never rota's own pid.
 	e := DefaultEnv()
 	h := e.Discover(0, func(string) string { return "" })
 	if h.PID <= 0 || h.PID == os.Getpid() || !e.Alive(h.PID) {
@@ -269,7 +269,7 @@ func (t tree) env(self int) Env {
 func TestDiscoverStopsAtTheHostServer(t *testing.T) {
 	none := func(string) string { return "" }
 	for _, server := range []string{"herdr", "tmux: server"} {
-		// server(4089) -> zsh(5000) -> hv's parent shell(5001) -> hv
+		// server(4089) -> zsh(5000) -> rota's parent shell(5001) -> rota
 		plain := tree{4089: {1, server}, 5000: {4089, "zsh"}, 5001: {5000, "bash"}}
 		if h := plain.env(5001).Discover(0, none); h.PID != 5000 {
 			t.Errorf("%s, plain shell: holder %d, want the pane's shell 5000", server, h.PID)
@@ -279,13 +279,13 @@ func TestDiscoverStopsAtTheHostServer(t *testing.T) {
 		if h := other.env(6000).Discover(0, none); h.PID != 6000 {
 			t.Errorf("%s, second pane: holder %d, want 6000", server, h.PID)
 		}
-		// server -> zsh -> claude -> bash -> hv: the agent holds.
+		// server -> zsh -> claude -> bash -> rota: the agent holds.
 		agent := tree{4089: {1, server}, 5000: {4089, "zsh"}, 5100: {5000, "claude"}, 5101: {5100, "bash"}}
 		if h := agent.env(5101).Discover(0, none); h.PID != 5100 {
 			t.Errorf("%s, agent in the pane: holder %d, want claude 5100", server, h.PID)
 		}
 	}
-	// hv run straight from the server's child: that child is the holder.
+	// rota run straight from the server's child: that child is the holder.
 	direct := tree{4089: {1, "herdr"}}
 	if h := direct.env(4089).Discover(0, none); h.PID != 4089 {
 		t.Errorf("nothing below the server: holder %d, want the parent 4089", h.PID)

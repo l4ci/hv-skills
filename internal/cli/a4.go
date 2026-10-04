@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
-// The A4 item verbs: `hv id next` and `hv item create|field|complete|reopen|
+// The A4 item verbs: `rota id next` and `rota item create|field|complete|reopen|
 // rm|shipped|ready|comment`. Shapes, flags and exits are the verb contract's
 // (docs/design/5.0-verb-contract.md); the file backend does the work.
 
@@ -150,7 +150,7 @@ func a4Scope(c *Ctx) (string, error) {
 // capture target, and a capture with none goes to the sub-repo the working
 // directory is in.
 func a4Open(c *Ctx, root string, fileOnly bool, hint string) (backlog.Backend, error) {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	name, err := config.Backend(cfg)
 	if err != nil {
 		// An invalid backlog.backend is a corrupt config (contract, shared definitions).
@@ -203,7 +203,7 @@ func a4Fail(err error) (Result, error) {
 			&Error{Exit: ExitRefused, Message: ref.Msg, Hint: ref.Hint}
 	case errors.As(err, &act):
 		return Result{Data: a4Obj("blockedBy", "active", "id", act.ID, "activeBranch", act.Branch, "changed", false)},
-			&Error{Exit: ExitRefused, Message: act.Error(), Hint: "end the stream first: hv status rm " + act.Branch}
+			&Error{Exit: ExitRefused, Message: act.Error(), Hint: "end the stream first: rota status rm " + act.Branch}
 	case errors.Is(err, backlog.ErrWrongBackend):
 		return Result{Data: a4Obj("blockedBy", "backend", "changed", false)}, Refused("%s", err.Error())
 	case errors.Is(err, backlog.ErrNotFound):
@@ -564,7 +564,7 @@ func a4Complete(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			res, e := a4Fail(err)
 			if errors.Is(err, backlog.ErrProofMissing) {
-				e.(*Error).Hint = "record proof with `hv proof add`, or pass --no-proof"
+				e.(*Error).Hint = "record proof with `rota proof add`, or pass --no-proof"
 			}
 			return res, e
 		}
@@ -625,7 +625,7 @@ func a4Rm(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		be, err := a4Open(c, root, true, "hv item complete <ID> --reason dropped")
+		be, err := a4Open(c, root, true, "rota item complete <ID> --reason dropped")
 		if err != nil {
 			return a4Fail(err)
 		}

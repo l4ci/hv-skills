@@ -1,5 +1,5 @@
 // Package design ports hv-design-add, -list, -show, -put and -rm for file
-// mode: the per-item design files under .hv/designs/<ID>.md.
+// mode: the per-item design files under .rota/designs/<ID>.md.
 package design
 
 import (
@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 var idRe = regexp.MustCompile(`^[BFT]\d{2,}$`)
@@ -30,10 +30,10 @@ func check(id string) error {
 	return nil
 }
 
-func path(root, id string) string { return filepath.Join(root, ".hv", "designs", id+".md") }
+func path(root, id string) string { return filepath.Join(root, ".rota", "designs", id+".md") }
 
 func notFound(root, id string) *artifact.Error {
-	return artifact.Errf(artifact.ExitResolution, "design %s not found (.hv/designs/%s.md)", id, id)
+	return artifact.Errf(artifact.ExitResolution, "design %s not found (.rota/designs/%s.md)", id, id)
 }
 
 // Add creates the design stub; an existing design is exit 4.
@@ -44,7 +44,7 @@ func Add(root, id, title string, opts ...Option) error {
 	p := path(root, id)
 	return fsio.Locked(p, fsio.LockTimeout, func() error {
 		if _, err := os.Stat(p); err == nil {
-			return artifact.Errf(artifact.ExitRefused, ".hv/designs/%s.md already exists", id)
+			return artifact.Errf(artifact.ExitRefused, ".rota/designs/%s.md already exists", id)
 		}
 		stub := stubText(id, title, time.Now().Format("2006-01-02"), collect(opts))
 		return fsio.WriteFileAtomic(p, []byte(stub))
@@ -54,10 +54,10 @@ func Add(root, id, title string, opts ...Option) error {
 // Entry is one row of List.
 type Entry struct{ ID, Title, Status, Created string }
 
-// List reads .hv/designs/*.md in name order; files without frontmatter are
+// List reads .rota/designs/*.md in name order; files without frontmatter are
 // skipped. status defaults to draft and id to the file stem.
 func List(root string) ([]Entry, error) {
-	docs, err := artifact.ListDocs(filepath.Join(root, ".hv", "designs"))
+	docs, err := artifact.ListDocs(filepath.Join(root, ".rota", "designs"))
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +96,12 @@ func Put(root, id, text string) (changed bool, err error) {
 	}
 	p := path(root, id)
 	if _, serr := os.Stat(p); serr != nil { // no lock file or directory for a missing design
-		return false, notFound(root, id).WithHint("hv design add " + id + " --title <text>")
+		return false, notFound(root, id).WithHint("rota design add " + id + " --title <text>")
 	}
 	err = fsio.Locked(p, fsio.LockTimeout, func() error {
 		old, rerr := os.ReadFile(p)
 		if rerr != nil {
-			return notFound(root, id).WithHint("hv design add " + id + " --title <text>")
+			return notFound(root, id).WithHint("rota design add " + id + " --title <text>")
 		}
 		if string(old) == text {
 			return nil
@@ -152,7 +152,7 @@ func Amend(root, id, heading, mode, text string) (changed bool, err error) {
 		}
 		_, _, ok := section.Find(content, heading)
 		if !ok {
-			return artifact.Errf(artifact.ExitResolution, "section '## %s' not found in .hv/designs/%s.md", heading, id)
+			return artifact.Errf(artifact.ExitResolution, "section '## %s' not found in .rota/designs/%s.md", heading, id)
 		}
 		var updated string
 		if mode == "replace" {

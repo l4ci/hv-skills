@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 func TestCodexCommand(t *testing.T) {
@@ -151,7 +151,7 @@ func codexProject(t *testing.T) (dir, home string) {
 	t.Helper()
 	dir = newProject(t, `{"work":{"dispatch":"herdr"}}`)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
-	return dir, filepath.Join(dir, ".git", "hv", "codex", "w1")
+	return dir, filepath.Join(dir, ".git", "rota", "codex", "w1")
 }
 
 func TestCodexPreflightHappyPathSeedsAndInstalls(t *testing.T) {
@@ -171,7 +171,7 @@ func TestCodexPreflightHappyPathSeedsAndInstalls(t *testing.T) {
 		t.Errorf("config.toml =\n%s\nwant\n%s", b, want)
 	}
 	if _, err := os.Stat(filepath.Join(home, "auth.json")); err == nil {
-		t.Error("hv must never write auth.json")
+		t.Error("rota must never write auth.json")
 	}
 	for _, c := range []string{"herdr integration status | CODEX_HOME=" + home, "herdr integration install codex | CODEX_HOME=" + home, "codex login status | CODEX_HOME=" + home} {
 		if rig.ran(c) != 1 {
@@ -261,7 +261,7 @@ func TestCodexPreflightNeedsHerdr(t *testing.T) {
 	if exitOf(err) != ExitUnavailable || !strings.Contains(err.Error(), "codex workers need work.dispatch=herdr") {
 		t.Fatalf("%v", err)
 	}
-	if _, serr := os.Stat(filepath.Join(dir, ".git", "hv", "codex")); serr == nil {
+	if _, serr := os.Stat(filepath.Join(dir, ".git", "rota", "codex")); serr == nil {
 		t.Error("no home is created for a host that cannot run codex workers")
 	}
 }

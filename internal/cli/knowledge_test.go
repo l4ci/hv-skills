@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
-// The parity tests run an hv verb on a fixture and compare its output and the
-// resulting .hv/ tree delta with a golden: what the retired bin/ helper
+// The parity tests run a rota verb on a fixture and compare its output and the
+// resulting .rota/ tree delta with a golden: what the retired bin/ helper
 // produced for the same case (testdata/golden, via knFrozen).
 
 const knFixtureKnowledge = `# Knowledge
@@ -76,15 +76,15 @@ func knProject(t *testing.T, umbrella bool) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), knFixtureKnowledge)
-	knWrite(t, filepath.Join(dir, ".hv", "knowledge-tier.json"), knFixtureTier)
+	knWrite(t, filepath.Join(dir, ".rota", "KNOWLEDGE.md"), knFixtureKnowledge)
+	knWrite(t, filepath.Join(dir, ".rota", "knowledge-tier.json"), knFixtureTier)
 	if umbrella {
 		for _, n := range []string{"web", "api"} {
 			if err := os.MkdirAll(filepath.Join(dir, n), 0o777); err != nil {
 				t.Fatal(err)
 			}
 		}
-		knWrite(t, filepath.Join(dir, ".hv", "repos.json"), `{
+		knWrite(t, filepath.Join(dir, ".rota", "repos.json"), `{
   "repos": [
     {
       "name": "web",
@@ -97,7 +97,7 @@ func knProject(t *testing.T, umbrella bool) string {
   ]
 }
 `)
-		knWrite(t, filepath.Join(dir, ".hv", "knowledge", "web", "KNOWLEDGE.md"), "# Web\n\n## Architecture\n\n- **Web rule** — Own the UI. <!-- 2026-04-01 -->\n\n## Glossary\n\n- **Page** — a view\n")
+		knWrite(t, filepath.Join(dir, ".rota", "knowledge", "web", "KNOWLEDGE.md"), "# Web\n\n## Architecture\n\n- **Web rule** — Own the UI. <!-- 2026-04-01 -->\n\n## Glossary\n\n- **Page** — a view\n")
 	}
 	return dir
 }
@@ -107,7 +107,7 @@ type knOut struct {
 	rc             int
 }
 
-// knNew runs hv in dir.
+// knNew runs rota in dir.
 func knNew(t *testing.T, dir, stdin string, args ...string) knOut {
 	t.Helper()
 	old, err := os.Getwd()
@@ -123,12 +123,12 @@ func knNew(t *testing.T, dir, stdin string, args ...string) knOut {
 	return knOut{so.String(), se.String(), rc}
 }
 
-// knTree reads every regular file under dir/.hv, plus the instructions files
+// knTree reads every regular file under dir/.rota, plus the instructions files
 // of the project root and of the fixture sub-repos, into a path → content map.
 func knTree(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	root := filepath.Join(dir, ".hv")
+	root := filepath.Join(dir, ".rota")
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -155,7 +155,7 @@ func knTree(t *testing.T, dir string) map[string]string {
 }
 
 // knFrozenOut is what a retired bin/ helper produced for one call, frozen in
-// testdata/golden: its streams, exit code and the .hv/ tree delta it left.
+// testdata/golden: its streams, exit code and the .rota/ tree delta it left.
 type knFrozenOut struct {
 	Stdout  string            `json:"stdout"`
 	Stderr  string            `json:"stderr"`
@@ -184,7 +184,7 @@ func knDelta(before, after map[string]string) (changed map[string]string, remove
 	return changed, removed
 }
 
-// knFrozenInputs names one case: the hv argv, its stdin and a digest of the
+// knFrozenInputs names one case: the rota argv, its stdin and a digest of the
 // fixture tree it starts from, so a changed case fails against the golden.
 func knFrozenInputs(before map[string]string, stdin string, args []string) map[string]any {
 	norm := map[string]string{}
@@ -196,8 +196,8 @@ func knFrozenInputs(before map[string]string, stdin string, args []string) map[s
 	return map[string]any{"argv": args, "stdin": stdin, "fixture": hex.EncodeToString(sum[:])}
 }
 
-// knFrozen runs hv in dir like knNew and returns what the retired helper
-// produced for the same case (want, read from the golden) next to what hv did
+// knFrozen runs rota in dir like knNew and returns what the retired helper
+// produced for the same case (want, read from the golden) next to what rota did
 // (got, with its tree delta). Call it once per recorded case, in order.
 func knFrozen(t *testing.T, dir, stdin string, args ...string) (want, got knFrozenOut) {
 	t.Helper()
@@ -209,7 +209,7 @@ func knFrozen(t *testing.T, dir, stdin string, args ...string) (want, got knFroz
 	return want, got
 }
 
-// knSameDelta reports where hv's tree delta differs from the frozen one.
+// knSameDelta reports where rota's tree delta differs from the frozen one.
 func knSameDelta(t *testing.T, want, got knFrozenOut) {
 	t.Helper()
 	var names []string
@@ -228,24 +228,24 @@ func knSameDelta(t *testing.T, want, got knFrozenOut) {
 		g, gok := got.Changed[k]
 		switch {
 		case wok != gok:
-			t.Errorf(".hv/%s written: frozen=%v hv=%v", k, wok, gok)
+			t.Errorf(".rota/%s written: frozen=%v rota=%v", k, wok, gok)
 		case w != g:
-			t.Errorf(".hv/%s differs\n--- frozen ---\n%s\n--- hv ---\n%s", k, w, g)
+			t.Errorf(".rota/%s differs\n--- frozen ---\n%s\n--- rota ---\n%s", k, w, g)
 		}
 	}
 	if strings.Join(want.Removed, "\n") != strings.Join(got.Removed, "\n") {
-		t.Errorf("removed files: frozen=%v hv=%v", want.Removed, got.Removed)
+		t.Errorf("removed files: frozen=%v rota=%v", want.Removed, got.Removed)
 	}
 }
 
-// knStep is one parity case: the hv call whose result is compared with the
+// knStep is one parity case: the rota call whose result is compared with the
 // frozen helper call on the same fixture.
 type knStep struct {
 	name     string
 	newArgs  []string
 	stdin    string
 	umbrella bool
-	wantRC   int // hv exit code
+	wantRC   int // rota exit code
 	oldRC    int // the helper's exit code, frozen in the golden
 }
 
@@ -300,7 +300,7 @@ func TestKnowledgeWritesMatchGolden(t *testing.T) {
 				t.Fatalf("frozen helper rc = %d, want %d; stderr: %s", want.RC, s.oldRC, want.Stderr)
 			}
 			if got.RC != s.wantRC {
-				t.Fatalf("hv rc = %d, want %d; stderr: %s", got.RC, s.wantRC, got.Stderr)
+				t.Fatalf("rota rc = %d, want %d; stderr: %s", got.RC, s.wantRC, got.Stderr)
 			}
 			knSameDelta(t, want, got)
 		})
@@ -447,7 +447,7 @@ func TestKnowledgeCRLFMatchGolden(t *testing.T) {
 	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {
 			dir := knProject(t, false)
-			knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), crlf)
+			knWrite(t, filepath.Join(dir, ".rota", "KNOWLEDGE.md"), crlf)
 			want, got := knFrozen(t, dir, s.stdin, s.newArgs...)
 			if want.RC != 0 || got.RC != 0 {
 				t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)

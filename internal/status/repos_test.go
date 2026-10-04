@@ -9,10 +9,10 @@ import (
 
 func TestLoadRepos(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o755)
 	os.MkdirAll(filepath.Join(root, "web"), 0o755)
 	os.Symlink("web", filepath.Join(root, "link"))
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [
 		{"name": "web", "path": "web"},
 		{"name": "alias", "path": "link"},
 		{"name": "ghost", "path": "not/there/yet"},
@@ -33,7 +33,7 @@ func TestLoadRepos(t *testing.T) {
 	if LoadRepos(t.TempDir()) != nil {
 		t.Error("a project without repos.json has repos")
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte("{bad"), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte("{bad"), 0o644)
 	if LoadRepos(root) != nil {
 		t.Error("a corrupt repos.json has repos")
 	}
@@ -41,9 +41,9 @@ func TestLoadRepos(t *testing.T) {
 
 func TestRealpathAbsoluteEntry(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o755)
 	abs := t.TempDir()
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "a", "path": "`+abs+`"}]}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "a", "path": "`+abs+`"}]}`), 0o644)
 	real, _ := filepath.EvalSymlinks(abs)
 	if got := LoadRepos(root); len(got) != 1 || got[0].Path != real {
 		t.Errorf("absolute path: %v, want %s", got, real)
@@ -66,7 +66,7 @@ func TestParseReposCSVAndMissing(t *testing.T) {
 func TestHasCode(t *testing.T) {
 	root := t.TempDir()
 	real, _ := filepath.EvalSymlinks(root)
-	for _, d := range []string{".git", ".hv", ".claude", "web"} {
+	for _, d := range []string{".git", ".rota", ".claude", "web"} {
 		os.MkdirAll(filepath.Join(root, d), 0o755)
 	}
 	os.WriteFile(filepath.Join(root, ".gitignore"), nil, 0o644)

@@ -1,7 +1,7 @@
-// Package roundlease is the per-repo orchestrator lease of `hv round start`
+// Package roundlease is the per-repo orchestrator lease of `rota round start`
 // (C3, #59). One orchestrator per repo: the lease is keyed on the git common
 // dir, so every worktree of the repo shares it. It cannot live in
-// .hv/workers.json, which is per worktree. internal/round re-exports Read and
+// .rota/workers.json, which is per worktree. internal/round re-exports Read and
 // ClearStale for reconcile and reap once it exists on main.
 package roundlease
 
@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
-// FileName is the lease under <git-common-dir>/hv/.
+// FileName is the lease under <git-common-dir>/rota/.
 const FileName = "round-lease.json"
 
 // Lease is the lease document.
@@ -123,7 +123,7 @@ func CommonDir(dir string) (string, error) {
 }
 
 // Path is the lease file under a common dir.
-func Path(commonDir string) string { return filepath.Join(commonDir, "hv", FileName) }
+func Path(commonDir string) string { return filepath.Join(commonDir, "rota", FileName) }
 
 // Classify says what a lease is, for this Env's host.
 func (e Env) Classify(l Lease) State {
@@ -227,7 +227,7 @@ func (e Env) Release(commonDir string, h Holder) (bool, error) {
 }
 
 // ClearStale removes the lease only when it is Stale and returns what it
-// removed. It is the seam `hv reap` calls.
+// removed. It is the seam `rota reap` calls.
 func (e Env) ClearStale(commonDir string) (Lease, bool, error) {
 	path := Path(commonDir)
 	var gone Lease
@@ -293,23 +293,23 @@ func hostServer(comm string) bool {
 	return comm == "herdr" || comm == "tmux" || strings.HasPrefix(comm, "tmux:")
 }
 
-// transient are the processes between hv and the orchestrator that exit with
+// transient are the processes between rota and the orchestrator that exit with
 // the command: shells and wrappers.
 var transient = map[string]bool{
 	"sh": true, "bash": true, "zsh": true, "fish": true, "dash": true, "ash": true,
-	"env": true, "timeout": true, "hv": true, "sudo": true, "nohup": true, "script": true,
+	"env": true, "timeout": true, "rota": true, "sudo": true, "nohup": true, "script": true,
 }
 
 // HolderPIDEnv names the environment variable the keepalive supervisor sets in
 // its child: the supervisor holds the lease, so its pid is the holder of
-// every `hv` the orchestrator runs.
-const HolderPIDEnv = "HV_ROUND_HOLDER_PID"
+// every `rota` the orchestrator runs.
+const HolderPIDEnv = "ROTA_ROUND_HOLDER_PID"
 
 // Discover is the orchestrator holder: pid, when non-zero, is --holder-pid
-// and wins; otherwise HV_ROUND_HOLDER_PID when it holds a pid; otherwise the
-// nearest ancestor of this process that is not a shell, env, timeout or hv,
+// and wins; otherwise ROTA_ROUND_HOLDER_PID when it holds a pid; otherwise the
+// nearest ancestor of this process that is not a shell, env, timeout or rota,
 // else the parent. A terminal host's server is a boundary: reaching it means
-// hv ran from a plain shell in a pane, and the holder is that pane's shell,
+// rota ran from a plain shell in a pane, and the holder is that pane's shell,
 // the ancestor just below the server, so each pane holds apart. The pane comes
 // from the environment.
 func (e Env) Discover(pid int, getenv func(string) string) Holder {

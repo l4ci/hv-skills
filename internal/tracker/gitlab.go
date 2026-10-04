@@ -104,12 +104,12 @@ func (g *GitLab) RemoveLabels(ctx context.Context, number int, labels []string) 
 	return g.removeLabels(ctx, g, number, labels)
 }
 
-func (g *GitLab) FindMilestone(ctx context.Context, hvID string) (string, bool, error) {
+func (g *GitLab) FindMilestone(ctx context.Context, rotaID string) (string, bool, error) {
 	ms, err := g.milestones(ctx, "projects/:id/milestones?per_page=100")
 	if err != nil {
 		return "", false, err
 	}
-	t, ok := matchMilestone(ms, hvID)
+	t, ok := matchMilestone(ms, rotaID)
 	return t, ok, nil
 }
 

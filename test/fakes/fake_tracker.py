@@ -6,9 +6,9 @@ Env: FAKE_TRACKER_DB   JSON store path (required unless FAKE_TRACKER_DB_DIR; cre
      FAKE_TRACKER_DB_DIR  per-repo stores: <dir>/<basename of the cwd's git toplevel>.json (wins over FAKE_TRACKER_DB)
      FAKE_TRACKER_LOG  if set, each call's argv (space-joined) is appended
      FAKE_TRACKER_FAIL if set, any call whose argv contains it fails (exit 1)
-     FAKE_TRACKER_FAIL_MSG extra stderr text on that failure (e.g. "secondary rate limit" makes hv exit 4)
-Only the subset hv uses is implemented; anything else exits 2.
-Ids are realistic where hv must not mix them up: gh `issue view --json comments` gives
+     FAKE_TRACKER_FAIL_MSG extra stderr text on that failure (e.g. "secondary rate limit" makes rota exit 4)
+Only the subset rota uses is implemented; anything else exits 2.
+Ids are realistic where rota must not mix them up: gh `issue view --json comments` gives
 GraphQL node ids (the REST id is in the comment url), and glab's global `id` differs from
 the project-scoped `iid` for milestones, which the API edits by `id` (offset by GL_MILESTONE_ID).
 """

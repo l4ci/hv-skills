@@ -8,17 +8,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/debugctr"
-	"github.com/l4ci/hv/v5/internal/gate"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/verdict"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/debugctr"
+	"github.com/l4ci/rota/internal/gate"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/verdict"
 )
 
-// verdictCommands is the `hv verdict` group (B2, #55). `hv debug verdict`
+// verdictCommands is the `rota verdict` group (B2, #55). `rota debug verdict`
 // lives in the debug group (a6.go) and shares this file's glue.
 func verdictCommands() *Command {
 	return &Command{Name: "verdict", Summary: "record typed review, second-opinion and QA verdicts and route on them", Subs: []*Command{
@@ -45,7 +45,7 @@ func resolveVerdictBranch(c *Ctx, args []string) (verdictBranch, error) {
 	}
 	root, err := git.FindRoot(cwd, registeredRels)
 	if err != nil {
-		return verdictBranch{}, Resolution("no .hv/ directory here or in any parent").WithHint("run: hv init")
+		return verdictBranch{}, Resolution("no .rota/ directory here or in any parent").WithHint("run: rota init")
 	}
 	v := verdictBranch{root: root, repo: c.Repo, branch: t.Branch}
 	if v.repo == "" && len(repos.Load(root)) > 0 {
@@ -181,9 +181,9 @@ func verdictRoute(fs *flag.FlagSet) RunFunc {
 		r, ok := verdict.ForConsumer(*consumer, verdict.Load(t.root).Branches[t.key])
 		if !ok {
 			return Result{}, Resolution("no verdict recorded for %s that %s reads", t.branch, *consumer).
-				WithHint("record one with: hv verdict add")
+				WithHint("record one with: rota verdict add")
 		}
-		cfg := config.Load(filepath.Join(t.root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(t.root, ".rota", "config.json"))
 		s := verdict.Settings{
 			Autonomy: configString(cfg, "autonomy.level"),
 			QAGate:   configString(cfg, "qa.gate"),

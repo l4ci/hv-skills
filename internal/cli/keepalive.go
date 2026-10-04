@@ -17,23 +17,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/keepalive"
-	"github.com/l4ci/hv/v5/internal/limits"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/keepalive"
+	"github.com/l4ci/rota/internal/limits"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// D2 (#66): `hv keepalive run|status`. The loop is internal/keepalive; this
+// D2 (#66): `rota keepalive run|status`. The loop is internal/keepalive; this
 // file is the process side: the child, signals, the lease environment, the
 // handoff file and the escalation entry.
 
 func keepaliveCommands() *Command {
 	return &Command{Name: "keepalive", Summary: "restart the orchestrator in its pane when it exits with a fresh handoff", Subs: []*Command{
-		{Name: "run", Summary: "run a command as a supervisor: hv keepalive run [flags] -- <command> [<arg>...]", Verb: keepaliveRun},
+		{Name: "run", Summary: "run a command as a supervisor: rota keepalive run [flags] -- <command> [<arg>...]", Verb: keepaliveRun},
 		{Name: "status", Summary: "show the supervisor state and the round lease", Verb: noFlags(keepaliveStatus)},
 	}}
 }
@@ -121,12 +121,12 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 	maxRestarts := fs.String("max-restarts", "", "restarts before giving up (default orchestrator.keepaliveMaxRestarts)")
 	breaker := fs.String("breaker", "", "restarts without a new handoff before the breaker trips (default orchestrator.keepaliveBreaker)")
 	backoff := fs.String("backoff", "", "seconds to wait before a restart (default orchestrator.keepaliveBackoffSeconds)")
-	noLimits := fs.Bool("no-limits", false, "do not run the usage-limit watcher (hv limit watch) beside the command")
+	noLimits := fs.Bool("no-limits", false, "do not run the usage-limit watcher (rota limit watch) beside the command")
 	prompt := fs.String("prompt", "", "restart prompt, appended as the last argument on restarts (default orchestrator.restartPrompt)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if c.dashAt != 0 {
-			return Result{}, Usage("usage: hv keepalive run [flags] -- <command> [<arg>...]").
-				WithHint("the command goes after --, e.g. hv keepalive run -- claude")
+			return Result{}, Usage("usage: rota keepalive run [flags] -- <command> [<arg>...]").
+				WithHint("the command goes after --, e.g. rota keepalive run -- claude")
 		}
 		if len(args) == 0 {
 			return Result{}, Usage("missing <command> after --")
@@ -152,10 +152,10 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 		set, err := keepalive.LoadSettings(cfg)
 		if err != nil {
-			return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the orchestrator.* key with: hv config set"}
+			return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the orchestrator.* key with: rota config set"}
 		}
 		if mrSet {
 			set.MaxRestarts = mr
@@ -210,7 +210,7 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 		if !*noLimits {
 			lset, err := limits.LoadSettings(cfg)
 			if err != nil {
-				return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: hv config set"}
+				return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: rota config set"}
 			}
 			env.Limits = limitsLoop(c, root, cfg, lset, os.Getpid(), gap)
 		}
@@ -228,7 +228,7 @@ func keepaliveRun(fs *flag.FlagSet) RunFunc {
 				d.Set("lease", leaseData(held.Lease, held.State))
 				d.Set("changed", false)
 				return Result{Data: d}, &Error{Exit: ExitRefused, Message: held.Error(),
-					Hint: "stop that orchestrator first, or run: hv keepalive status"}
+					Hint: "stop that orchestrator first, or run: rota keepalive status"}
 			case errors.As(err, &spawn):
 				return Result{}, &Error{Exit: ExitUnavailable, Message: fmt.Sprintf("cannot run %s: %v", args[0], spawn.Err)}
 			}
@@ -266,7 +266,7 @@ func keepaliveGap(switchOnUsage bool) *atomic.Bool {
 // session files whose cwd is the project root (D4).
 func usageMarker(commonDir, root string) func(since time.Time) (hook.UsageHandoff, bool) {
 	return func(since time.Time) (hook.UsageHandoff, bool) {
-		dir := filepath.Join(commonDir, "hv", "session")
+		dir := filepath.Join(commonDir, "rota", "session")
 		ents, _ := os.ReadDir(dir)
 		var best hook.UsageHandoff
 		var bestAt time.Time
@@ -305,7 +305,7 @@ func usageChoose(ctx context.Context, root string) func(string, int) keepalive.C
 	}
 }
 
-// usageRecord writes a usage decision to the limits log in .hv/workers.json.
+// usageRecord writes a usage decision to the limits log in .rota/workers.json.
 func usageRecord(root string, now func() time.Time) func(keepalive.Decision) error {
 	return func(d keepalive.Decision) error {
 		status := limits.StatusSwitched

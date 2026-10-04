@@ -30,11 +30,11 @@ const viewBacklog = `# TODO
 func fileBackend(t *testing.T, md string) *File {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if md != "" {
-		if err := os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte(md), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, ".rota", "BACKLOG.md"), []byte(md), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -216,7 +216,7 @@ func TestBuildListingActiveAndGrep(t *testing.T) {
 	if !strings.HasSuffix(l.Text(), "No matches for pattern 'ZZZ'.\n") {
 		t.Errorf("text = %q", l.Text())
 	}
-	if got := listing(t, "# TODO\n", nil, "").Text(); got != "Backlog empty. Run /hv-capture to add items.\n" {
+	if got := listing(t, "# TODO\n", nil, "").Text(); got != "Backlog empty. Run /rota-capture to add items.\n" {
 		t.Errorf("empty text = %q", got)
 	}
 	// grep keeps a cluster with a matching member, drops others.
@@ -232,8 +232,8 @@ func TestBuildListingActiveAndGrep(t *testing.T) {
 
 func TestBuildListingIssuesKeepSpellings(t *testing.T) {
 	tr := &fakeTracker{Issues: []Issue{
-		{Number: 12, Title: "Crash", State: "open", Labels: []string{"type:bug"}, Body: "<!-- hv:fields\nRelated: F3\n-->"},
-		{Number: 3, Title: "Idea", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},
+		{Number: 12, Title: "Crash", State: "open", Labels: []string{"type:bug"}, Body: "<!-- rota:fields\nRelated: F3\n-->"},
+		{Number: 3, Title: "Idea", State: "open", Labels: []string{"type:feature"}, Body: "<!-- rota:fields\nRelated: B12\n-->"},
 	}}
 	rows, md, _, err := OpenRows(&Issues{Cfg: mustDecode(t, `{}`), Tracker: tr})
 	if err != nil {

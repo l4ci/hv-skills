@@ -1,6 +1,6 @@
 # Authoring conventions
 
-These conventions constrain how new hv skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `hv-*/SKILL.md` file. New authoring rules land here, not inline. The index in `references/README.md` is the entry point.
+These conventions constrain how new rota skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `rota-*/SKILL.md` file. New authoring rules land here, not inline. The index in `references/README.md` is the entry point.
 
 ## Skills are self-contained — no shared contract file
 
@@ -12,7 +12,7 @@ Steps that branch on `autonomy.level` (off/auto/loop) and dispatch the next skil
 
 ## Don't ask what the code can answer
 
-Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.hv/` state — `grep`, `Read`, `git log`, `BACKLOG.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
+Before a skill calls `AskUserQuestion`, check whether the answer is derivable from the codebase, git history, or `.rota/` state — `grep`, `Read`, `git log`, `BACKLOG.md`, `KNOWLEDGE.md`, `status.json`, helper output. If it is, derive the answer (with a one-line note inline about what was found and where) and skip the question. `AskUserQuestion` is for genuine ambiguity — open requirements, opposing reasonable interpretations, the user's risk tolerance on a destructive op — not a forced-yes ritual confirming state the skill could discover.
 
 Codified from grill-with-docs (2026-05-10): *"If a question can be answered by exploring the codebase, explore the codebase instead."* Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08) — that one constrains the option list when asking is the right move; this one constrains whether to ask at all.
 
@@ -34,10 +34,10 @@ Per-site shape (adapt phase list per skill):
 
 **Observable outcome** is the detection predicate that says a phase is done. It must be mechanically verifiable, not subjective. Verifiable shapes:
 
-- A file exists at a named path — `[ -f .hv/plans/M01-S01.md ]`.
-- A command exits 0 — a verb returns success, a test passes, `hv knowledge add` writes successfully.
-- A managed-block marker is present in a tracked file — `grep -q '<!-- hv-knowledge-end -->' CLAUDE.md`.
-- A status entry was added or removed — `.hv/status.json` lists / no longer lists the branch.
+- A file exists at a named path — `[ -f .rota/plans/M01-S01.md ]`.
+- A command exits 0 — a verb returns success, a test passes, `rota knowledge add` writes successfully.
+- A managed-block marker is present in a tracked file — `grep -q '<!-- rota-knowledge-end -->' CLAUDE.md`.
+- A status entry was added or removed — `.rota/status.json` lists / no longer lists the branch.
 - A commit landed — `git log --oneline -1 | grep -q <ID>`.
 - A user picked a recorded answer in `AskUserQuestion` — the chosen label is the outcome marker (e.g. *"user picked 'Write it' on the confirmation gate"*).
 
@@ -52,8 +52,8 @@ Subjective phrases — *"looks good"*, *"feels done"*, *"is satisfied"*, *"the s
 **Permits.**
 - Per-site phase counts from 3 to 7+ — the rule fires at "multi-step", not a fixed number. Use phase boundaries that match the skill's natural structure, not the integer step count.
 - Per-site boilerplate prose variations — this is a cross-cutting autonomy-shaped rule; per the 2026-05-09 `KNOWLEDGE.md` entry on cross-cutting prose, byte-equivalent repetition of the shell across 18 sites is acceptable when phase lists dominate.
-- Phases that absorb decimal sub-steps (e.g. `/hv-work` 13.5/13.7 fold into one "post-cycle nudges" phase) — phase boundaries are coarser than step boundaries by design.
-- Tracking spawned waves as nested tasks via `addBlocks`/`addBlockedBy` when a skill orchestrates parallel work — `/hv-work` may use this for its dispatched waves.
+- Phases that absorb decimal sub-steps (e.g. `/rota-work` 13.5/13.7 fold into one "post-cycle nudges" phase) — phase boundaries are coarser than step boundaries by design.
+- Tracking spawned waves as nested tasks via `addBlocks`/`addBlockedBy` when a skill orchestrates parallel work — `/rota-work` may use this for its dispatched waves.
 
 Codified from F37 (2026-05-10): rolled out across Tier S/A/B SKILL.md files (17 skills). Tier C skills stay untouched. Companion to the *AskUserQuestion option list capped at 4* rule (`KNOWLEDGE.md`, 2026-05-08): both make the host's UI primitives load-bearing for skill UX.
 
@@ -63,27 +63,27 @@ When `autonomy.level == "loop"`, AskUserQuestion calls that present a single cle
 
 This is what makes loop mode actually loop — a single "Tag with M01?" or "Resume vs ship?" prompt mid-queue stalls every subsequent item until the user types an answer. Loop mode's contract is "drain the queue until empty / guard / interrupt"; intermediate routine prompts violate it.
 
-Routine = the kind of question where the Recommended option is the obvious right answer, not a design pick. Examples: milestone tagging (`/hv-capture` Step 4.5), sub-repo tagging (`/hv-capture` Step 4.6), reconcile resolution (`/hv-work` no-argument mode, step 1 — resume / ship / leave), CONCERNS routing (`/hv-ship` Step 3 — "Address via /hv-work"), refactor scope and candidate gates.
+Routine = the kind of question where the Recommended option is the obvious right answer, not a design pick. Examples: milestone tagging (`/rota-capture` Step 4.5), sub-repo tagging (`/rota-capture` Step 4.6), reconcile resolution (`/rota-work` no-argument mode, step 1 — resume / ship / leave), CONCERNS routing (`/rota-ship` Step 3 — "Address via /rota-work"), refactor scope and candidate gates.
 
 **Forbids.** Auto-picking on:
 - **Design decisions with open questions** — competing approaches, version-bump escalation, novel pattern choice. These belong to F32 (loop-mode auto-planning, with `[Auto:Loop]` decision logging). A `(Recommended)` flag on a design pick is a *suggestion*, not a routine answer; the loop must surface them.
-- **Manual gates that are never auto-invoked regardless of autonomy** — `/hv-decide` approvals, `/hv-learn` Step 8.5 issue filing, `/hv-learn` Step 9 runlog filing, `/hv-ship` Step 5 PR strategy, `/hv-release` push/publish gates. These have explicit `**Manual gate — ...**` callouts in their SKILL.md. Loop mode honors the gate — it does not auto-pick.
-- **Config-flip questions** — `/hv-ship --docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
+- **Manual gates that are never auto-invoked regardless of autonomy** — `/rota-decide` approvals, `/rota-learn` Step 8.5 issue filing, `/rota-learn` Step 9 runlog filing, `/rota-ship` Step 5 PR strategy, `/rota-release` push/publish gates. These have explicit `**Manual gate — ...**` callouts in their SKILL.md. Loop mode honors the gate — it does not auto-pick.
+- **Config-flip questions** — `/rota-ship --docs` after-work-mode opt-in. These flip user-preference flags; the opt-in-defaults-to-`false` rule (below) requires explicit user approval, not loop-mode synthesis.
 
 **Permits.**
 - Routine routing/tagging with one clear Recommended option (the use cases listed above and any future analogue).
-- Sites that already implement the pattern explicitly (`/hv-work` no-argument mode, step 4 confirm-the-suggested-item; `/hv-capture` Step 8 work-it-now hand-off) — same shape, already inline; new sites follow their lead.
+- Sites that already implement the pattern explicitly (`/rota-work` no-argument mode, step 4 confirm-the-suggested-item; `/rota-capture` Step 8 work-it-now hand-off) — same shape, already inline; new sites follow their lead.
 - Per-site phrasing variations — each site's loop branch states the auto-pick locally because the autonomy-rule-must-live-inline convention (above) forbids cross-refs to a single source of truth.
 
 The dispatch site should add a short loop branch alongside the existing `"off"` AskUserQuestion arm. Pattern (adapt phrasing per site):
 
 > **Loop mode:** when `autonomy.level == "loop"`, silently auto-pick the Recommended option without invoking AskUserQuestion — `<one-line summary of what gets dispatched>`.
 
-Codified after F33 caught loop-mode discontinuity from `/hv-capture` milestone tagging and `/hv-work` no-argument reconcile gates breaking the `/hv-work` → `/hv-learn` → `/hv-work` chain.
+Codified after F33 caught loop-mode discontinuity from `/rota-capture` milestone tagging and `/rota-work` no-argument reconcile gates breaking the `/rota-work` → `/rota-learn` → `/rota-work` chain.
 
 ## User-volition gates enforced at exactly one point
 
-Manual confirmation gates (`/hv-decide`'s manual-only contract, the public-artifact gate in `/hv-learn` Step 8.5, etc.) must be enforced at exactly ONE point in a skill, never propagated across orchestrator + called skill. The gate is architecture-enforced — only the owning skill can ask the question, and no other skill dispatches the gated skill via `Skill`. Putting a confirmation check in a skill that other skills can invoke breaks the contract under autonomy.
+Manual confirmation gates (`/rota-decide`'s manual-only contract, the public-artifact gate in `/rota-learn` Step 8.5, etc.) must be enforced at exactly ONE point in a skill, never propagated across orchestrator + called skill. The gate is architecture-enforced — only the owning skill can ask the question, and no other skill dispatches the gated skill via `Skill`. Putting a confirmation check in a skill that other skills can invoke breaks the contract under autonomy.
 
 ## Stage features across slices using pass-through stubs
 
@@ -97,10 +97,10 @@ When scaling a feature surface from "single X" to "list of X" (e.g. one repo →
 
 When adding a new boolean config flag whose purpose is to enable additional skill behavior or auto-invocation:
 
-- **Default `false`** in the config defaults `hv init` writes (fresh and re-stamped projects alike).
+- **Default `false`** in the config defaults `rota init` writes (fresh and re-stamped projects alike).
 - **Never silently flip to `true`** anywhere — not on first detection, not on first invocation, not via cwd-inferred heuristics.
 - The owning skill flips the flag to `true` only via explicit user approval: first-run scaffold approval (the user opted in by approving), or `AskUserQuestion` on existing state with default "Leave off".
-- `hv config set` edits the flag explicitly (the flag is never read-only).
+- `rota config set` edits the flag explicitly (the flag is never read-only).
 - **Exempt:** standard-on settings with opt-out semantics (e.g. `learn.verify: true`, `ship.review: true`) — these are not opt-in flags. Mode switches inside an already-enabled feature (e.g. `docs.autoCreate: false→true`) are also exempt.
 
 Codified after F15 introduced `docs.afterWork`. Without this rule, opt-in flags drift toward auto-flip-on-first-detect, which makes them on-by-default in practice — defeating the opt-in semantics.
@@ -113,12 +113,12 @@ The reference defines the cost/benefit threshold, the small-brief template, the 
 
 Two retrofitted skills illustrate compliance:
 
-- `hv-vision` — Step 2 bundles all context reads into one haiku worker that returns a compact snapshot; Step 4 fans out N parallel research workers (one per angle) instead of serial `WebSearch` calls on the orchestrator.
-- `hv-debug` — Step 5 dispatches reproduction to a sonnet worker when the repro is heavy (multi-MB output, multi-step manual setup, writing a failing test from scratch); Step 7 dispatches verification to a worker (model tier depends on whether the verdict requires judgment or pattern-matching). Cheap repros and single-line verifications stay inline.
+- `rota-vision` — Step 2 bundles all context reads into one haiku worker that returns a compact snapshot; Step 4 fans out N parallel research workers (one per angle) instead of serial `WebSearch` calls on the orchestrator.
+- `rota-debug` — Step 5 dispatches reproduction to a sonnet worker when the repro is heavy (multi-MB output, multi-step manual setup, writing a failing test from scratch); Step 7 dispatches verification to a worker (model tier depends on whether the verdict requires judgment or pattern-matching). Cheap repros and single-line verifications stay inline.
 
 A skill author asking "what does compliance look like?" can read either retrofit and find a concrete answer for every rule in the reference. New skills follow the same pattern.
 
-**Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the hv dispatch discipline is self-contained.
+**Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the rota dispatch discipline is self-contained.
 
 **Permits.** Mixed tiers in a single wave (one haiku worker alongside three sonnet workers in the same turn). Opportunistic haiku usage declared inline in the brief without a config flag. Per-skill judgment on which steps trip the threshold — the rule sets a floor, not a ceiling.
 
@@ -135,7 +135,7 @@ Prose like "a few", "many", "high X", "ambiguous", "might/may" forces the runtim
 - Adjectives in descriptive prose where no threshold is implied (*"a typical day"*, *"common workflow"*) — flavor doesn't trip the runtime if no rule fires off it.
 - Hedging in genuinely open situations that the rule explicitly flags as a known unknown.
 
-Codified during the T52 sweep across `hv-debug`, `hv-release`, `hv-review`, `hv-spike`, and `references/post-cycle-trigger-gate.md` (six phrases replaced with concrete thresholds).
+Codified during the T52 sweep across `rota-debug`, `rota-release`, `rota-review`, `rota-spike`, and `references/post-cycle-trigger-gate.md` (six phrases replaced with concrete thresholds).
 
 ## `AskUserQuestion` option list capped at 4
 
@@ -163,28 +163,28 @@ The skill is the side of the exchange holding the context, so translating is its
 - Leaving the no-preference path unstated, so that "either is fine" produces another round-trip instead of a decision.
 
 **Permits.**
-- Several questions in one `AskUserQuestion` call — the host renders each separately and returns an answer per question, so batching does not produce the partial answers that a free-text channel would. `/hv-work` Step 2's 1–3 question batch stays correct.
+- Several questions in one `AskUserQuestion` call — the host renders each separately and returns an answer per question, so batching does not produce the partial answers that a free-text channel would. `/rota-work` Step 2's 1–3 question batch stays correct.
 - Implementation vocabulary in the `description` field of an option, where it disambiguates for a user who *does* have the file open.
 
-Codified from a read of klufft's `swarm.md` (hv#20, 2026-07-31), whose orchestrator pays for this in tmux panes rather than pickers. Its companion rule — *ask one question at a time* — deliberately did **not** transfer: it is a property of a free-text channel where a batch gets a partial reply, and `AskUserQuestion` is not that channel.
+Codified from a read of klufft's `swarm.md` (rota#20, 2026-07-31), whose orchestrator pays for this in tmux panes rather than pickers. Its companion rule — *ask one question at a time* — deliberately did **not** transfer: it is a property of a free-text channel where a batch gets a partial reply, and `AskUserQuestion` is not that channel.
 
 ## Nudges on terminal/idle paths only
 
-When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/hv-work` → `/hv-ship` → `/hv-work` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.
+When a nudge or check could fire from multiple skills that converge on the same end-state (e.g., `/rota-work` → `/rota-ship` → `/rota-work` via loop continuation), place the nudge on the *terminal/idle paths* — where the user is about to leave the session — NOT on dispatch paths that hand off to another skill. Multiple skills firing the same nudge from convergent flows drowns the signal.
 
 **Forbids.**
 - Firing the same nudge from a skill's tail when that skill auto-dispatches the next skill (the user never sees the message — it's overwritten by the dispatched skill's banner).
 - Firing the nudge from a dispatch path on the assumption *"users will see it eventually"* — they see the loudest, latest banner; intermediate nudges are noise.
 
 **Permits.**
-- Firing the nudge from the terminal branch of a routing skill (e.g. `/hv-work` no-argument mode "Stop here" / empty-backlog) where the user is about to step away.
-- Firing the nudge from the post-ship report (`/hv-ship` Step 9.5) where the cycle ended and no auto-dispatch follows.
+- Firing the nudge from the terminal branch of a routing skill (e.g. `/rota-work` no-argument mode "Stop here" / empty-backlog) where the user is about to step away.
+- Firing the nudge from the post-ship report (`/rota-ship` Step 9.5) where the cycle ended and no auto-dispatch follows.
 
-Codified after F19's release-pending nudge: fires from `/hv-work` no-argument mode only on the "Stop here" / empty-backlog branch and from `/hv-ship`'s post-ship report, never from inside `/hv-work`'s tail (the most-frequent path, but always followed by a dispatch).
+Codified after F19's release-pending nudge: fires from `/rota-work` no-argument mode only on the "Stop here" / empty-backlog branch and from `/rota-ship`'s post-ship report, never from inside `/rota-work`'s tail (the most-frequent path, but always followed by a dispatch).
 
 ## The verb contract is the contract — SKILL.md prose paraphrasing drifts
 
-When a SKILL.md cites an `hv` verb, the verb's entry in `docs/design/5.0-verb-contract.md` (and `hv <verb> --help`) IS the contract; prose paraphrases drift. Before authoring prose ABOUT a verb, read its entry — if the SKILL.md disagrees with the contract, the SKILL.md is wrong.
+When a SKILL.md cites an `rota` verb, the verb's entry in `docs/design/5.0-verb-contract.md` (and `rota <verb> --help`) IS the contract; prose paraphrases drift. Before authoring prose ABOUT a verb, read its entry — if the SKILL.md disagrees with the contract, the SKILL.md is wrong.
 
 **Forbids.**
 - Paraphrasing a verb's behavior in SKILL.md prose without reading its contract entry first.
@@ -194,7 +194,7 @@ When a SKILL.md cites an `hv` verb, the verb's entry in `docs/design/5.0-verb-co
 - Quoting the verb's contract entry verbatim in the SKILL.md when the prose needs the exact contract.
 - Updating SKILL.md prose to match a verb after its contract changes (the prose follows the code, not the other way around).
 
-Codified on T28: `hv-work/SKILL.md` Step 4.5 gated umbrella mode on `umbrella.enabled`, but the umbrella-on helper's header pinned the contract to `.hv/repos.json` presence (today: `hv repo umbrella`). The header was authoritative; the SKILL.md was wrong.
+Codified on T28: `rota-work/SKILL.md` Step 4.5 gated umbrella mode on `umbrella.enabled`, but the umbrella-on helper's header pinned the contract to `.rota/repos.json` presence (today: `rota repo umbrella`). The header was authoritative; the SKILL.md was wrong.
 
 ## Inventory table beside a citation when ≥4 sibling rules extracted
 
@@ -223,8 +223,8 @@ Claude Code's TUI HTML-escapes task titles for rendering but never decodes — s
 - Topic headings like `## Build & Tooling` in `KNOWLEDGE.md` — those aren't TaskCreate payloads.
 - `+` as the connector where it reads naturally (e.g. *"Commit + TODO + smoke"*) — already used elsewhere; renders correctly.
 
-Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `hv-ship`, `hv-review`, `hv-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.
+Codified on T01: a `/rota-work` session surfaced `Dispatch &amp; verify wave` and `Merge &amp; report` rendered with literal `&amp;` in the TUI task list. Four example payloads were swept in `rota-ship`, `rota-review`, `rota-work` SKILL.md; the F06 SKILL-format validator can grow a rule for this once the upstream Claude Code fix lands and we want to track removal.
 
-## `/hv-x` and `$hv-x` are the same invocation
+## `/rota-x` and `$rota-x` are the same invocation
 
-Codex invokes a skill as `$hv-x`; Claude Code as `/hv-x`. Skill text keeps `/hv-x` everywhere and does not branch on the harness: read `$hv-x` as the same call. A skill installed with `hv skills install` lists in Codex as `hv-x`, and `$hv-x` invokes it. Never write both spellings in one sentence, and never rewrite an existing `/hv-x` to `$hv-x`.
+Codex invokes a skill as `$rota-x`; Claude Code as `/rota-x`. Skill text keeps `/rota-x` everywhere and does not branch on the harness: read `$rota-x` as the same call. A skill installed with `rota skills install` lists in Codex as `rota-x`, and `$rota-x` invokes it. Never write both spellings in one sentence, and never rewrite an existing `/rota-x` to `$rota-x`.

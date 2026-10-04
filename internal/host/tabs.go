@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Tab is one host tab with the proof `hv reap` needs before it may close it.
+// Tab is one host tab with the proof `rota reap` needs before it may close it.
 type Tab struct {
 	ID   string
 	Cwds []string // the working directory of each pane

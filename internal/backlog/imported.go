@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // Imported is one upstream issue a backlog item points at through a
@@ -37,14 +37,14 @@ type importedKey struct {
 
 // ScanImported indexes the GH/GL cross-references of BACKLOG.md (open
 // sections; ## Completed is skipped), ARCHIVE.md (every section, archived) and
-// the per-item detail files .hv/{bugs,features,tasks}/*.md (item = file stem,
+// the per-item detail files .rota/{bugs,features,tasks}/*.md (item = file stem,
 // every line). A multi-repo `Repos:` list gives one entry per repo; an
 // open entry replaces an archived one for the same key. The result keeps the
 // first-seen order, and detail files are read in name order (the old helper
 // used directory order). forRepo, when not empty, keeps the entries of that
 // Repos: name. Missing files are skipped.
 func ScanImported(root, forRepo string) []Imported {
-	hv := filepath.Join(root, ".hv")
+	rota := filepath.Join(root, ".rota")
 	seen := map[importedKey]int{}
 	var out []Imported
 	register := func(provider string, issue int, item string, repos []string, status string) {
@@ -77,7 +77,7 @@ func ScanImported(root, forRepo string) []Imported {
 		}
 	}
 	scanFile := func(name, status string, stopAtCompleted bool) {
-		text, err := fsio.ReadText(filepath.Join(hv, name))
+		text, err := fsio.ReadText(filepath.Join(rota, name))
 		if err != nil {
 			return
 		}
@@ -102,7 +102,7 @@ func ScanImported(root, forRepo string) []Imported {
 	scanFile("BACKLOG.md", "open", true)
 	scanFile("ARCHIVE.md", "archived", false)
 	for _, sub := range []string{"bugs", "features", "tasks"} {
-		entries, err := os.ReadDir(filepath.Join(hv, sub))
+		entries, err := os.ReadDir(filepath.Join(rota, sub))
 		if err != nil {
 			continue
 		}
@@ -114,7 +114,7 @@ func ScanImported(root, forRepo string) []Imported {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			text, err := fsio.ReadText(filepath.Join(hv, sub, name))
+			text, err := fsio.ReadText(filepath.Join(rota, sub, name))
 			if err != nil {
 				continue
 			}

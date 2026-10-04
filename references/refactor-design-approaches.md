@@ -1,13 +1,13 @@
-# `/hv-refactor` competing design approaches
+# `/rota-refactor` competing design approaches
 
-Loaded by `/hv-refactor` Step 5 when a friction point is classified **structural** in Step 3. Simple friction points skip Step 5 and go straight to Step 6 — that decision stays in the SKILL.md.
+Loaded by `/rota-refactor` Step 5 when a friction point is classified **structural** in Step 3. Simple friction points skip Step 5 and go straight to Step 6 — that decision stays in the SKILL.md.
 
 ## Consult decisions before designing
 
 **Consult decisions before designing.** Pull relevant boundary entries:
 
 ```bash
-hv decisions query <topics…>
+rota decisions query <topics…>
 ```
 
 Any approach that violates a decision is disqualified before the design phase. If every generated approach would violate, **stop and surface to the user** — refactors must not silently work around committed boundaries. Refactors are exactly when boundaries matter most.

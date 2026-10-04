@@ -2,10 +2,10 @@ echo "plan uncertain"
 (
   UTMP="$(mktemp -d)"
   trap 'rm -rf "$UTMP"' EXIT
-  mkdir -p "$UTMP/.hv/bugs" "$UTMP/.hv/features" "$UTMP/.hv/tasks"
+  mkdir -p "$UTMP/.rota/bugs" "$UTMP/.rota/features" "$UTMP/.rota/tasks"
   cd "$UTMP"
 
-  cat > .hv/BACKLOG.md <<'EOF'
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -23,28 +23,28 @@ echo "plan uncertain"
 EOF
 
   # F51: detail file present but contains zero backticks anywhere.
-  cat > .hv/features/F51.md <<'EOF'
+  cat > .rota/features/F51.md <<'EOF'
 # F51 detail
 
 Plain prose. No code spans. Just words.
 EOF
 
   # F52: detail file present with backticks; brief already has 2+ question marks.
-  cat > .hv/features/F52.md <<'EOF'
+  cat > .rota/features/F52.md <<'EOF'
 # F52 detail
 
 Use `widget` and explain. Why?
 EOF
 
   # F53: detail file present with backticks, no markers, 0 question marks.
-  cat > .hv/features/F53.md <<'EOF'
+  cat > .rota/features/F53.md <<'EOF'
 # F53 detail
 
 Use `helper` and `lib`. Concrete plan, no uncertainty.
 EOF
 
   # F54: detail file present with backticks; should still exit 1 (Minor).
-  cat > .hv/features/F54.md <<'EOF'
+  cat > .rota/features/F54.md <<'EOF'
 # F54 detail
 
 Use `something` to do Y.

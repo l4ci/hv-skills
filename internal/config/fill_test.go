@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 func requiredNames() []string {
@@ -35,7 +35,7 @@ func TestFillCreatesMissingFileInSchemaOrder(t *testing.T) {
 	}
 }
 
-// The seed hv init writes (issues-only keys in schema order) filled out is
+// The seed rota init writes (issues-only keys in schema order) filled out is
 // byte-identical to a full config written in schema order (G7).
 func TestFillCompletesTheSeedInSchemaOrder(t *testing.T) {
 	seed := `{"issues": {"providers": {"github": true, "gitlab": true}, "label": "in-progress", "autoCreateLabel": true, "filterMineOnly": false}}`
@@ -64,7 +64,7 @@ func TestFillKeepsPresentAndUnknownKeys(t *testing.T) {
 	doc, _ := jsonx.Decode([]byte(read(t, root)))
 	o := doc.(*jsonx.Object)
 	// present keys keep their order; added ones go before the first later sibling
-	want := []string{"zzz", "work", "models", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "hvSkills", "issues", "hv"}
+	want := []string{"zzz", "work", "models", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "hvSkills", "issues", "rota"}
 	if got := o.Keys(); !reflect.DeepEqual(got, want) {
 		t.Errorf("top keys %v", got)
 	}
@@ -89,8 +89,8 @@ func TestFillKeepsPresentAndUnknownKeys(t *testing.T) {
 	if v, _ := Value(o, "umbrella.enabled"); v != false {
 		t.Errorf("umbrella.enabled %v", v)
 	}
-	if v, _ := Value(o, "hv.version"); v != "" {
-		t.Errorf("hv.version %v", v)
+	if v, _ := Value(o, "rota.version"); v != "" {
+		t.Errorf("rota.version %v", v)
 	}
 	if st, m := Check(root); st != UpToDate {
 		t.Errorf("check: %s %v", st, m)
@@ -112,7 +112,7 @@ func TestFillNothingMissingDoesNotRewrite(t *testing.T) {
 func TestFillRefusesCorrupt(t *testing.T) {
 	for _, body := range []string{"{oops", "[1]", "null", "", "\xff{}"} {
 		root := project(t, "", "")
-		p := filepath.Join(root, ".hv", "config.json")
+		p := filepath.Join(root, ".rota", "config.json")
 		os.WriteFile(p, []byte(body), 0o644)
 		if _, err := Fill(root); !errors.Is(err, ErrCorrupt) {
 			t.Errorf("%q: %v", body, err)
@@ -148,7 +148,7 @@ func TestFillMigratesLegacyVersionKey(t *testing.T) {
 		t.Errorf("hvSkills left: %s", read(t, root))
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
-		t.Errorf("hv.version %v", v)
+		t.Errorf("rota.version %v", v)
 	}
 	if st, m := Check(root); st != UpToDate {
 		t.Errorf("check: %s %v", st, m)
@@ -156,12 +156,12 @@ func TestFillMigratesLegacyVersionKey(t *testing.T) {
 }
 
 // A file that is otherwise complete is still rewritten for the move alone,
-// and lists exactly hv.version.
+// and lists exactly rota.version.
 func TestFillLegacyKeyAloneRewrites(t *testing.T) {
 	cfg := fullConfig()
-	hv, _ := getObject(cfg, "hv")
-	hv.Delete("version")
-	cfg.Delete("hv")
+	rota, _ := getObject(cfg, "rota")
+	rota.Delete("version")
+	cfg.Delete("rota")
 	h, _ := jsonx.Decode([]byte(`{"version":"4.2.0"}`))
 	cfg.Set("hvSkills", h)
 	b, _ := jsonx.Marshal(cfg)
@@ -176,23 +176,23 @@ func TestFillLegacyKeyAloneRewrites(t *testing.T) {
 		t.Error("hvSkills left")
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
-		t.Errorf("hv.version %v", v)
+		t.Errorf("rota.version %v", v)
 	}
 }
 
 func TestFillLegacyKeepsExistingNewValue(t *testing.T) {
-	out, filled := fillLegacy(t, `{"hv":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`)
+	out, filled := fillLegacy(t, `{"rota":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`)
 	doc, _ := jsonx.Decode([]byte(out))
 	o := doc.(*jsonx.Object)
 	if v, _ := Value(o, VersionKey); v != "5.0.0" {
-		t.Errorf("hv.version %v", v)
+		t.Errorf("rota.version %v", v)
 	}
 	if _, ok := o.Get("hvSkills"); ok {
 		t.Error("hvSkills left")
 	}
-	// dropping the legacy key counts as filling hv.version either way
+	// dropping the legacy key counts as filling rota.version either way
 	if filled[len(filled)-1] != VersionKey {
-		t.Errorf("hv.version not listed: %v", filled)
+		t.Errorf("rota.version not listed: %v", filled)
 	}
 }
 
@@ -205,16 +205,16 @@ func TestFillLegacyKeepsOtherHvSkillsKeys(t *testing.T) {
 		t.Errorf("hvSkills %v: %s", ok, out)
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
-		t.Errorf("hv.version %v", v)
+		t.Errorf("rota.version %v", v)
 	}
 }
 
 func TestStampedVersion(t *testing.T) {
 	cases := []struct{ name, cfg, want string }{
-		{"new", `{"hv":{"version":"5.0.0"}}`, "5.0.0"},
+		{"new", `{"rota":{"version":"5.0.0"}}`, "5.0.0"},
 		{"legacy", `{"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
-		{"both prefers new", `{"hv":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`, "5.0.0"},
-		{"empty new falls back", `{"hv":{"version":""},"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
+		{"both prefers new", `{"rota":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`, "5.0.0"},
+		{"empty new falls back", `{"rota":{"version":""},"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
 		{"neither", `{}`, ""},
 	}
 	for _, tc := range cases {

@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// The C10 verbs `hv round return`, `transfer` and `reclaim` (#76); the steps
+// The C10 verbs `rota round return`, `transfer` and `reclaim` (#76); the steps
 // are internal/round (Park, Return, Transfer, Reclaim).
 
 // roundNote reads a --note-file ("-" is stdin); "" is no note. An unreadable
@@ -153,8 +153,8 @@ func inSlot(root, slot string) bool {
 }
 
 // returnRoot is the project root the slot is registered in. A worker runs this
-// verb from its own worktree, and a project that tracks .hv/ gives that
-// worktree a .hv/ of its own with no registry: when the nearest root does not
+// verb from its own worktree, and a project that tracks .rota/ gives that
+// worktree a .rota/ of its own with no registry: when the nearest root does not
 // know the slot, the main checkout (the parent of the git common dir) is tried.
 func returnRoot(c *Ctx, slot string) (string, error) {
 	root, err := c.Root()

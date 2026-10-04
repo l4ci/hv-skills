@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Item removal with dependency cleanup: bin/hv-rm and bin/hvlib_crossref.py.
@@ -32,7 +32,7 @@ type RmItem struct {
 	TodoEntry    bool   // the bullet is in BACKLOG.md
 	Archive      bool   // the bullet is in ARCHIVE.md
 	CrossRefs    int    // Related fields stripped, in BACKLOG.md and (with scrub) ARCHIVE.md
-	DetailFile   string // ".hv/<kind>/<ID>.md" when it exists
+	DetailFile   string // ".rota/<kind>/<ID>.md" when it exists
 	PlanFiles    []string
 	ActiveBranch string // set when status.json lists the item on a branch
 	Section      string // section that holds the bullet
@@ -190,7 +190,7 @@ var archiveHeadRe = regexp.MustCompile(`(?m)^## (.+)$`)
 // status.json that lists them.
 func (f *File) activeBranches() map[string]string {
 	out := map[string]string{}
-	st, ok := fsio.LoadJSON(f.hv("status.json"), nil).(*jsonx.Object)
+	st, ok := fsio.LoadJSON(f.rota("status.json"), nil).(*jsonx.Object)
 	if !ok {
 		return out
 	}
@@ -248,7 +248,7 @@ func activeItems(entry *jsonx.Object) []string {
 }
 
 func (f *File) planFiles(id string) []string {
-	entries, err := os.ReadDir(f.hv("plans"))
+	entries, err := os.ReadDir(f.rota("plans"))
 	if err != nil {
 		return []string{}
 	}
@@ -266,7 +266,7 @@ func (f *File) planFiles(id string) []string {
 	sort.Strings(names)
 	out := make([]string, len(names))
 	for i, n := range names {
-		out[i] = ".hv/plans/" + n
+		out[i] = ".rota/plans/" + n
 	}
 	return out
 }
@@ -280,8 +280,8 @@ func (f *File) planFiles(id string) []string {
 func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) {
 	var res RmResult
 	run := func() error {
-		todo, _ := fsio.ReadText(f.hv("BACKLOG.md"))
-		archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
+		todo, _ := fsio.ReadText(f.rota("BACKLOG.md"))
+		archive, _ := fsio.ReadText(f.rota("ARCHIVE.md"))
 		infos := map[string]RmItem{}
 		for _, id := range ids {
 			if sec, line, ok := findBulletIn(todo, id, allSections); ok {
@@ -294,7 +294,7 @@ func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) 
 					continue
 				}
 			}
-			return errf(ErrNotFound, "[%s] not found in .hv/BACKLOG.md or .hv/ARCHIVE.md", id)
+			return errf(ErrNotFound, "[%s] not found in .rota/BACKLOG.md or .rota/ARCHIVE.md", id)
 		}
 		active := f.activeBranches()
 		if apply {
@@ -334,8 +334,8 @@ func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) 
 				info.Type = strings.ToUpper(id[:1])
 			}
 			if dir := detailDir(id); dir != "" {
-				if _, err := os.Stat(f.hv(dir, id+".md")); err == nil {
-					info.DetailFile = ".hv/" + dir + "/" + id + ".md"
+				if _, err := os.Stat(f.rota(dir, id+".md")); err == nil {
+					info.DetailFile = ".rota/" + dir + "/" + id + ".md"
 					detail = append(detail, info.DetailFile)
 				}
 			}
@@ -349,12 +349,12 @@ func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) 
 			return nil
 		}
 		if newTodo != todo {
-			if err := fsio.WriteFileAtomic(f.hv("BACKLOG.md"), []byte(newTodo)); err != nil {
+			if err := fsio.WriteFileAtomic(f.rota("BACKLOG.md"), []byte(newTodo)); err != nil {
 				return err
 			}
 		}
 		if newArchive != archive && scrubArchive {
-			if err := fsio.WriteFileAtomic(f.hv("ARCHIVE.md"), []byte(newArchive)); err != nil {
+			if err := fsio.WriteFileAtomic(f.rota("ARCHIVE.md"), []byte(newArchive)); err != nil {
 				return err
 			}
 		}
@@ -369,6 +369,6 @@ func (f *File) Remove(ids []string, scrubArchive, apply bool) (RmResult, error) 
 	if !apply {
 		return res, run()
 	}
-	err := fsio.Locked(f.hv("BACKLOG.md"), fsio.LockTimeout, run)
+	err := fsio.Locked(f.rota("BACKLOG.md"), fsio.LockTimeout, run)
 	return res, err
 }

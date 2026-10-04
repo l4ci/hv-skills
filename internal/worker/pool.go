@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// WorktreeRoot is where slot worktrees live: one root for every mode (hv-work
-// slots and herdr rounds), inside the project and gitignored (hv init writes
+// WorktreeRoot is where slot worktrees live: one root for every mode (rota-work
+// slots and herdr rounds), inside the project and gitignored (rota init writes
 // `.worktrees/` to .gitignore), so herdr groups the workspaces under the
-// project. Slots created before this lived in .claude/worktrees/hv-worker/<slot>;
+// project. Slots created before this lived in .claude/worktrees/rota-worker/<slot>;
 // init leaves those where they are.
 const WorktreeRoot = ".worktrees"
 
-// InitOpts are the flags of `hv worker pool init`.
+// InitOpts are the flags of `rota worker pool init`.
 type InitOpts struct {
 	Slots   int
 	Base    string // "" means the current branch
-	Session string // "" means "hv"
+	Session string // "" means "rota"
 	// Names provisions these slots instead of w1..wSlots, each on the branch
 	// BranchPrefix+name (a round roster parks on "park/<agent>", #79).
 	Names        []string
@@ -37,7 +37,7 @@ func (o InitOpts) slotNames() (names []string, branchOf func(string) string) {
 	for i := 1; i <= o.Slots; i++ {
 		names = append(names, fmt.Sprintf("w%d", i))
 	}
-	return names, func(n string) string { return "hv-worker/" + n }
+	return names, func(n string) string { return "rota-worker/" + n }
 }
 
 // InitResult is what `pool init` did.
@@ -69,7 +69,7 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 	}
 	session := o.Session
 	if session == "" {
-		session = "hv"
+		session = "rota"
 	}
 	res.Base, res.Session = base, session
 	before, _ := os.ReadFile(RegistryPath(root))
@@ -78,13 +78,13 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 		return res, fail(ExitUnavailable, err.Error())
 	}
 	// A tracked-looking .worktrees/ makes every `git status` in the project
-	// noisy. Warn rather than edit .gitignore: hv init owns that line.
+	// noisy. Warn rather than edit .gitignore: rota init owns that line.
 	if _, code := e.git(root, "check-ignore", "-q", WorktreeRoot+"/"); code != 0 {
-		res.Warnings = append(res.Warnings, WorktreeRoot+"/ is not gitignored — re-run hv init to add it")
+		res.Warnings = append(res.Warnings, WorktreeRoot+"/ is not gitignored — re-run rota init to add it")
 	}
 
 	// tmux handles are known now; herdr tab ids exist only after a dispatch.
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	dispatchV, _ := config.Lookup(cfg, "work.dispatch")
 	dispatch, _ := dispatchV.(string)
 
@@ -135,7 +135,7 @@ func (e Env) PoolInit(ctx context.Context, root string, o InitOpts, acc *Account
 		}
 
 		abs := realPath(rel)
-		// A healthy slot may sit on a per-task branch (hv worker reset);
+		// A healthy slot may sit on a per-task branch (rota worker reset);
 		// register what is actually checked out, not the init-time name. A
 		// detached worktree has no branch to register: keep what the registry
 		// already holds for the slot, else the init-time name.
@@ -208,7 +208,7 @@ func realPath(p string) string {
 	return p
 }
 
-// registerSlot adds or updates one slot in .hv/workers.json, idempotent on
+// registerSlot adds or updates one slot in .rota/workers.json, idempotent on
 // the slot name.
 func registerSlot(root, name, branch, worktree, base, session, handle string) error {
 	def := jsonx.NewObject()
@@ -220,12 +220,12 @@ func registerSlot(root, name, branch, worktree, base, session, handle string) er
 			doc.Set("slots", []any{})
 		}
 		reg := Registry{Doc: doc}
-		var hv any
+		var rota any
 		if handle != "" {
-			hv = handle
+			rota = handle
 		}
 		if existing := reg.Slot(name); existing == nil {
-			s := NewSlot(name, branch, worktree, base, hv)
+			s := NewSlot(name, branch, worktree, base, rota)
 			list, _ := doc.Get("slots")
 			l, _ := list.([]any)
 			doc.Set("slots", append(l, s))
@@ -241,14 +241,14 @@ func registerSlot(root, name, branch, worktree, base, session, handle string) er
 			switch {
 			case handle != "":
 			case cur != nil && cur != "":
-				hv = cur
+				rota = cur
 			default:
-				hv = legacy
+				rota = legacy
 				if legacy == "" {
-					hv = nil
+					rota = nil
 				}
 			}
-			existing.Set("handle", hv)
+			existing.Set("handle", rota)
 		}
 		list, _ := doc.Get("slots")
 		l, _ := list.([]any)

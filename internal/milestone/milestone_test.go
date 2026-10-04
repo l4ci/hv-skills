@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func exitOf(err error) int {
@@ -65,7 +65,7 @@ func project(t *testing.T) string {
 
 func snap(t *testing.T, root, stage string) {
 	t.Helper()
-	for _, f := range []struct{ file, name string }{{"CLAUDE.md", "CLAUDE.md"}, {".hv/MILESTONES.md", "MILESTONES.md"}} {
+	for _, f := range []struct{ file, name string }{{"CLAUDE.md", "CLAUDE.md"}, {".rota/MILESTONES.md", "MILESTONES.md"}} {
 		if got := read(t, filepath.Join(root, f.file)); got != golden(t, stage+"."+f.name) {
 			t.Errorf("%s %s differs from golden:\n%s", stage, f.name, got)
 		}
@@ -100,7 +100,7 @@ func TestMatchesOldHelpers(t *testing.T) {
 	}
 	snap(t, root, "s2")
 	for _, id := range []string{"M01", "M02", "M03"} {
-		if got := created.ReplaceAllString(read(t, filepath.Join(root, ".hv/milestones", id+".md")), "created: DATE"); got != golden(t, id+".md") {
+		if got := created.ReplaceAllString(read(t, filepath.Join(root, ".rota/milestones", id+".md")), "created: DATE"); got != golden(t, id+".md") {
 			t.Errorf("%s differs from golden:\n%s", id, got)
 		}
 	}
@@ -133,7 +133,7 @@ func TestStatusAndIndexChanged(t *testing.T) {
 		t.Error("index of an up-to-date tree reported changed")
 	}
 	// Drift in MILESTONES.md heals.
-	p := filepath.Join(root, ".hv/MILESTONES.md")
+	p := filepath.Join(root, ".rota/MILESTONES.md")
 	os.WriteFile(p, []byte(strings.Replace(read(t, p), "**Status:** active", "**Status:** planned", 1)), 0o644)
 	if changed, _ := Index(root); !changed {
 		t.Error("index did not report healing drift")
@@ -178,7 +178,7 @@ func TestExits(t *testing.T) {
 		t.Error("identical put reported changed")
 	}
 	// Status on a file without a status field is a bug in the file: exit 70.
-	os.WriteFile(filepath.Join(root, ".hv/milestones/M01.md"), []byte("---\nid: M01\n---\n"), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota/milestones/M01.md"), []byte("---\nid: M01\n---\n"), 0o644)
 	if _, err := SetStatus(root, "M01", "active"); exitOf(err) != 70 {
 		t.Errorf("no status field: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestExits(t *testing.T) {
 
 func TestListStringDependsAndDefaults(t *testing.T) {
 	root := project(t)
-	dir := filepath.Join(root, ".hv/milestones")
+	dir := filepath.Join(root, ".rota/milestones")
 	os.MkdirAll(dir, 0o777)
 	os.WriteFile(filepath.Join(dir, "M05.md"), []byte("---\ntitle: T\ndepends: M01, M03\n---\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "M06.md"), []byte("# no frontmatter\n"), 0o644)
@@ -198,7 +198,7 @@ func TestListStringDependsAndDefaults(t *testing.T) {
 
 func TestAddWithoutOverviewAndConcurrent(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o777)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	ids := map[string]bool{}
@@ -220,7 +220,7 @@ func TestAddWithoutOverviewAndConcurrent(t *testing.T) {
 	if len(ids) != 6 {
 		t.Fatalf("ids = %v", ids)
 	}
-	if n := strings.Count(read(t, filepath.Join(root, ".hv/MILESTONES.md")), "### M0"); n != 6 {
+	if n := strings.Count(read(t, filepath.Join(root, ".rota/MILESTONES.md")), "### M0"); n != 6 {
 		t.Errorf("%d overview entries, want 6", n)
 	}
 }

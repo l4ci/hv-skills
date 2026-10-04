@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 func TestParseRefForms(t *testing.T) {
@@ -55,7 +55,7 @@ func TestParseRefMatchesPython(t *testing.T) {
 
 func TestOpenSelectsBackend(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	fileCfg, issuesCfg := mustDecode(t, `{}`), mustDecode(t, `{"backlog": {"backend": "issues"}}`)
@@ -74,7 +74,7 @@ func TestOpenSelectsBackend(t *testing.T) {
 		t.Fatalf("bad backend: %v", err)
 	}
 
-	repos := filepath.Join(root, ".hv", "repos.json")
+	repos := filepath.Join(root, ".rota", "repos.json")
 	for content, umbrella := range map[string]bool{
 		`{"repos": []}`: false, `{"repos": [{"name": "web"}]}`: false, `not json`: false, `[]`: false,
 		`{"repos": [{"name": "web", "path": "web"}]}`: true,

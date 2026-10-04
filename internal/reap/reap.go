@@ -1,4 +1,4 @@
-// Package reap is the logic behind `hv reap`: it finds what a round left
+// Package reap is the logic behind `rota reap`: it finds what a round left
 // behind that nothing live owns (worktrees, branches, tabs, processes) and,
 // on request, removes the part that is provably safe to remove.
 //
@@ -27,10 +27,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Candidate kinds.

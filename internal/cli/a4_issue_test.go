@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // withTracker swaps newTracker for one serving tr, for the test's duration.
@@ -23,7 +23,7 @@ const issuesConfig = `{"backlog": {"backend": "issues"}}`
 
 func issueFixture() *trackertest.Fake {
 	return &trackertest.Fake{Issues: []backlog.Issue{
-		{Number: 7, Title: "Add export", Body: "Export the backlog.\n\n<!-- hv:fields\nRelated: B9\n-->",
+		{Number: 7, Title: "Add export", Body: "Export the backlog.\n\n<!-- rota:fields\nRelated: B9\n-->",
 			Labels: []string{"type:feature", "size:Major"}, Milestone: "M02 — Sharing", State: "open",
 			URL: "https://example.test/issues/7"},
 		{Number: 9, Title: "Crash on start", Labels: []string{"type:bug", "p1"}, State: "closed",
@@ -49,7 +49,7 @@ func TestIssueFieldGetCanonicalID(t *testing.T) {
 	root := a4Project(t, issuesConfig)
 	withTracker(t, issueFixture())
 	for _, ref := range []string{"7", "#7", "F7", "f7"} {
-		code, env, stderr := hvRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title")
+		code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title")
 		if code != 0 {
 			t.Fatalf("%s: exit %d: %s", ref, code, stderr)
 		}
@@ -58,7 +58,7 @@ func TestIssueFieldGetCanonicalID(t *testing.T) {
 			t.Fatalf("%s: data %v", ref, d)
 		}
 	}
-	code, env, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "milestone")
+	code, env, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "milestone")
 	if d := issueData(t, env); code != 0 || issueGet(d, "value") != "M02" {
 		t.Fatalf("milestone: exit %d, %v", code, d)
 	}
@@ -67,7 +67,7 @@ func TestIssueFieldGetCanonicalID(t *testing.T) {
 func TestIssueFieldListClosedItem(t *testing.T) {
 	root := a4Project(t, issuesConfig)
 	withTracker(t, issueFixture())
-	code, env, stderr := hvRun(t, "--json", "-C", root, "item", "field", "list", "#9")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "field", "list", "#9")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -85,7 +85,7 @@ func TestIssueRefsThatDoNotResolve(t *testing.T) {
 	root := a4Project(t, issuesConfig)
 	withTracker(t, issueFixture())
 	for _, ref := range []string{"99", "B7", "#3", "x7"} {
-		if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title"); code != ExitResolution {
+		if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title"); code != ExitResolution {
 			t.Fatalf("%s: exit %d, want %d", ref, code, ExitResolution)
 		}
 	}
@@ -105,13 +105,13 @@ func TestIssueModeFileOnly(t *testing.T) {
 		{"item", "create", "--kind", "bugs", "--raw-file", raw},
 		{"item", "field", "set", "7", "--name", "detail", "--value", "x"},
 	} {
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		if code != ExitRefused {
 			t.Fatalf("%v: exit %d, want %d (%v)", argv, code, ExitRefused, env)
 		}
 	}
 	// the milestones counter is refused too, and the refusal names the backend
-	code, env, _ := hvRun(t, "--json", "-C", root, "id", "next", "--kind", "milestones")
+	code, env, _ := rotaRun(t, "--json", "-C", root, "id", "next", "--kind", "milestones")
 	if d := ddata(t, env); code != ExitRefused || d["blockedBy"] != "backend" {
 		t.Fatalf("id next --kind milestones: exit %d data %v", code, d)
 	}
@@ -121,7 +121,7 @@ func TestIssueModeFileOnly(t *testing.T) {
 // origin remote has no provider to pick, which is exit 5.
 func TestIssueModeWithoutTracker(t *testing.T) {
 	root := a4Project(t, issuesConfig)
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "title"); code != ExitUnavailable {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", "7", "--name", "title"); code != ExitUnavailable {
 		t.Fatalf("exit %d, want %d", code, ExitUnavailable)
 	}
 }

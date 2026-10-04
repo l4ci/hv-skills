@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 // Umbrella is the scope name of the project-level files.
@@ -22,7 +22,7 @@ const Umbrella = "umbrella"
 var ErrScope = errors.New("scope")
 
 // Store locates the knowledge files of one project. Root is the project root
-// (the directory holding .hv/); Repos maps registered sub-repo names to their
+// (the directory holding .rota/); Repos maps registered sub-repo names to their
 // absolute paths and is empty outside umbrella mode.
 type Store struct {
 	Root  string
@@ -35,7 +35,7 @@ func (s Store) check(scope string) error {
 		return nil
 	}
 	if len(s.Repos) == 0 {
-		return fmt.Errorf("%w: sub-repo scope '%s' requested but umbrella mode is off (no sub-repos registered); run hv init from the umbrella root", ErrScope, scope)
+		return fmt.Errorf("%w: sub-repo scope '%s' requested but umbrella mode is off (no sub-repos registered); run rota init from the umbrella root", ErrScope, scope)
 	}
 	if _, ok := s.Repos[scope]; !ok {
 		names := make([]string, 0, len(s.Repos))
@@ -43,7 +43,7 @@ func (s Store) check(scope string) error {
 			names = append(names, n)
 		}
 		sort.Strings(names)
-		return fmt.Errorf("%w: sub-repo '%s' not registered in .hv/repos.json; registered: %s", ErrScope, scope, strings.Join(names, ", "))
+		return fmt.Errorf("%w: sub-repo '%s' not registered in .rota/repos.json; registered: %s", ErrScope, scope, strings.Join(names, ", "))
 	}
 	return nil
 }
@@ -51,9 +51,9 @@ func (s Store) check(scope string) error {
 // dir is the directory holding the scope's knowledge files.
 func (s Store) dir(scope string) string {
 	if scope == "" || scope == Umbrella {
-		return filepath.Join(s.Root, ".hv")
+		return filepath.Join(s.Root, ".rota")
 	}
-	return filepath.Join(s.Root, ".hv", "knowledge", scope)
+	return filepath.Join(s.Root, ".rota", "knowledge", scope)
 }
 
 // KnowledgePath is the KNOWLEDGE.md of scope. The directory is not created:

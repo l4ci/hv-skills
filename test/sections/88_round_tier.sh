@@ -7,9 +7,9 @@ echo "round tiers: worker model per tier, above-default reason, codex map (C9, #
 RT="$(mktemp -d "$TMP/round-tier.XXXXXX")"
 (
   cd "$RT" && git init -q -b main . && git -c user.email=a@b -c user.name=n commit -q --allow-empty -m init \
-    && mkdir -p .hv/milestones \
-    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md \
-    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .hv/milestones/M01.md
+    && mkdir -p .rota/milestones \
+    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md \
+    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .rota/milestones/M01.md
 ) || fail "round tier fixture setup failed"
 mkdir -p "$RT/downbin"
 printf '#!/bin/sh\necho "no server running" >&2\nexit 1\n' > "$RT/downbin/tmux"
@@ -17,8 +17,8 @@ chmod +x "$RT/downbin/tmux"
 # A codex start runs codex --version first: the fake stands in, never the real one.
 cp "$TESTDIR/fakes/codex" "$RT/downbin/codex"
 RTENV="env -u HERDR_PANE_ID -u TMUX_PANE -u HERDR_ENV PATH=$RT/downbin:$PATH"
-rt() { ( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ); }
-rtrc() { RC=0; OUT=$( cd "$RT" && $RTENV "$HV_BIN" --json "$@" 2>/dev/null ) || RC=$?; }
+rt() { ( cd "$RT" && $RTENV "$ROTA_BIN" --json "$@" 2>/dev/null ); }
+rtrc() { RC=0; OUT=$( cd "$RT" && $RTENV "$ROTA_BIN" --json "$@" 2>/dev/null ) || RC=$?; }
 rt item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works' >/dev/null
 HOLDER=$$
 # Tab mode, explicitly: with no work.dispatch a round with no host would be solo (C8).
@@ -71,7 +71,7 @@ rtrc round assign F01 --kind codex --holder-pid "$HOLDER"
 pass "codex resolves its model (none when unset), is refused before marking anything outside herdr, and needs a full map"
 
 # Status shows what a slot was assigned with.
-python3 - "$RT/.hv/workers.json" <<'PY' || fail "could not seed slot tier fields"
+python3 - "$RT/.rota/workers.json" <<'PY' || fail "could not seed slot tier fields"
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))

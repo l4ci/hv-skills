@@ -22,8 +22,8 @@ func gitIn(t *testing.T, dir string, args ...string) {
 func umbrella(t *testing.T, reg string, subs ...string) string {
 	t.Helper()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o755)
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(reg), 0o644)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o755)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(reg), 0o644)
 	for _, s := range subs {
 		os.MkdirAll(filepath.Join(root, s), 0o755)
 		gitIn(t, filepath.Join(root, s), "init", "-q", "-b", "main")
@@ -37,12 +37,12 @@ func TestUmbrellaOn(t *testing.T) {
 	if Umbrella(root) {
 		t.Error("empty registry is an umbrella")
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "a", "path": "a"}]}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "a", "path": "a"}]}`), 0o644)
 	if !Umbrella(root) {
 		t.Error("one entry is not an umbrella")
 	}
 	if Umbrella(t.TempDir()) {
-		t.Error("no .hv is an umbrella")
+		t.Error("no .rota is an umbrella")
 	}
 }
 
@@ -77,28 +77,28 @@ func TestWhichLayoutBWorktree(t *testing.T) {
 
 func TestWhichMaskedByStrayHV(t *testing.T) {
 	root := umbrella(t, `{"repos": [{"name": "web", "path": "web"}]}`, "web")
-	os.MkdirAll(filepath.Join(root, "web", ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(root, "web", ".rota"), 0o755)
 	_, err := Which(filepath.Join(root, "web"))
 	var m *MaskedError
-	if !errors.As(err, &m) || m.Name != "web" || m.Stray != filepath.Join(root, "web", ".hv") {
+	if !errors.As(err, &m) || m.Name != "web" || m.Stray != filepath.Join(root, "web", ".rota") {
 		t.Errorf("masked: %v", err)
 	}
-	// a stray .hv/ in a directory the registry does not list is no mask
-	os.MkdirAll(filepath.Join(root, "other", ".hv"), 0o755)
+	// a stray .rota/ in a directory the registry does not list is no mask
+	os.MkdirAll(filepath.Join(root, "other", ".rota"), 0o755)
 	if got, err := FindUmbrella(filepath.Join(root, "other")); err != nil || got != filepath.Join(root, "other") {
 		t.Errorf("unregistered stray: %q %v", got, err)
 	}
 }
 
-// A stray .hv/ deep inside a registered sub-repo's source tree masks the
+// A stray .rota/ deep inside a registered sub-repo's source tree masks the
 // umbrella just like one at the sub-repo root.
 func TestFindUmbrellaMaskedByDeepStrayHV(t *testing.T) {
 	root := umbrella(t, `{"repos": [{"name": "web", "path": "./web"}]}`)
 	deep := filepath.Join(root, "web", "src")
-	os.MkdirAll(filepath.Join(deep, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(deep, ".rota"), 0o755)
 	_, err := FindUmbrella(deep)
 	var m *MaskedError
-	if !errors.As(err, &m) || m.Name != "web" || m.Stray != filepath.Join(deep, ".hv") {
+	if !errors.As(err, &m) || m.Name != "web" || m.Stray != filepath.Join(deep, ".rota") {
 		t.Errorf("deep stray: %v", err)
 	}
 }
@@ -111,8 +111,8 @@ func TestFindUmbrellaNone(t *testing.T) {
 
 func TestFindUmbrellaMaskAlsoWithoutNameAndAbsolutePath(t *testing.T) {
 	root := umbrella(t, "", "web")
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"path": "`+filepath.Join(root, "web")+`"}]}`), 0o644)
-	os.MkdirAll(filepath.Join(root, "web", ".hv"), 0o755)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"path": "`+filepath.Join(root, "web")+`"}]}`), 0o644)
+	os.MkdirAll(filepath.Join(root, "web", ".rota"), 0o755)
 	var m *MaskedError
 	if _, err := FindUmbrella(filepath.Join(root, "web")); !errors.As(err, &m) {
 		t.Errorf("%v", err)

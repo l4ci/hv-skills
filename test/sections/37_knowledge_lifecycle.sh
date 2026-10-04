@@ -2,10 +2,10 @@
 echo "F03: knowledge-tier sidecar"
 
 # Clean any stale state from prior sections
-rm -f .hv/knowledge-tier.json .hv/knowledge-contradictions.json
+rm -f .rota/knowledge-tier.json .rota/knowledge-contradictions.json
 
 # Seed KNOWLEDGE.md with three titled bullets and verify migration stamps them
-cat > .hv/KNOWLEDGE.md <<'EOF'
+cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Architecture
@@ -55,10 +55,10 @@ RC=0; hvj knowledge tier set --topic "Architecture" --title "Foo rule" --tier ga
 pass "knowledge tier set rejects invalid tier"
 
 # Start the hit checks from an empty sidecar: a first hit registers the bullet.
-rm -f .hv/knowledge-tier.json
+rm -f .rota/knowledge-tier.json
 
 # --- knowledge hit + auto-promote ---
-echo '{"learn":{"verify":true,"promoteThreshold":3}}' > .hv/config.json
+echo '{"learn":{"verify":true,"promoteThreshold":3}}' > .rota/config.json
 
 hvj knowledge hit --topic "Architecture" --title "Bar rule" >/dev/null 2>&1
 OUT=$(hvj knowledge hit --topic "Architecture" --title "Bar rule" 2>/dev/null)
@@ -148,4 +148,4 @@ TIER=$(hvj knowledge tier get --topic "Architecture" --title "Qux rule" | jget d
 pass "knowledge add initializes new bullet as provisional"
 
 # Cleanup
-rm -f .hv/knowledge-tier.json .hv/knowledge-contradictions.json
+rm -f .rota/knowledge-tier.json .rota/knowledge-contradictions.json

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 // Issue mode: the design is a `design` note on the item's issue, and the
@@ -63,7 +63,7 @@ _(2–3 alternatives weighed with Pros / Cons / Why this might or might not be t
 
 ## Open questions
 
-_(unresolved questions to answer before /hv-plan or during execution)_
+_(unresolved questions to answer before /rota-plan or during execution)_
 
 ## Assumptions
 
@@ -110,7 +110,7 @@ func PutNote(n artifact.Notes, ref, id, text string) (bool, error) {
 	if _, ok, err := n.NoteGet(ref, "design"); err != nil {
 		return false, err
 	} else if !ok {
-		return false, noteMissing(id).WithHint("hv design add " + id + " --title <text>")
+		return false, noteMissing(id).WithHint("rota design add " + id + " --title <text>")
 	}
 	return n.NotePut(ref, "design", text)
 }

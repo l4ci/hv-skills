@@ -1,15 +1,15 @@
 package cli
 
 import (
-	"github.com/l4ci/hv/v5/internal/limits"
+	"github.com/l4ci/rota/internal/limits"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/roundlease"
 )
 
 // kaProject is a git project whose config zeroes the backoff.
@@ -19,12 +19,12 @@ func kaProject(t *testing.T, cfg string) string {
 	if cfg == "" {
 		cfg = `{"git":{"baseBranch":"feat/x"},"orchestrator":{"keepaliveBackoffSeconds":0}}`
 	}
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(cfg), 0o644)
+	os.WriteFile(filepath.Join(dir, ".rota", "config.json"), []byte(cfg), 0o644)
 	return dir
 }
 
 func kaHandoff(dir string) string {
-	return handoffFile(dir, config.Load(filepath.Join(dir, ".hv", "config.json")))
+	return handoffFile(dir, config.Load(filepath.Join(dir, ".rota", "config.json")))
 }
 
 // kaChild is a shell child that counts its starts, records its arguments and
@@ -33,8 +33,8 @@ func kaHandoff(dir string) string {
 func kaChild(t *testing.T, dir string) []string {
 	t.Helper()
 	script := `n=$(cat "$1/count" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$1/count"
-echo "$*" >> "$1/args"; echo "$HV_ROUND_HOLDER_PID" > "$1/holder"
-if [ "$n" = 1 ]; then mkdir -p "$(dirname "$2")"; echo "<!-- hv-handoff: orchestrator -->" > "$2"; else rm -f "$2"; fi`
+echo "$*" >> "$1/args"; echo "$ROTA_ROUND_HOLDER_PID" > "$1/holder"
+if [ "$n" = 1 ]; then mkdir -p "$(dirname "$2")"; echo "<!-- rota-handoff: orchestrator -->" > "$2"; else rm -f "$2"; fi`
 	return []string{"sh", "-c", script, "sh", t.TempDir(), kaHandoff(dir)}
 }
 
@@ -50,14 +50,14 @@ func TestKeepaliveRunUsageErrors(t *testing.T) {
 		{"keepalive", "run", "--backoff", "abc", "--", "true"},
 		{"keepalive", "run", "--prompt", "", "--", "true"},
 	} {
-		if code, _, _ := hvIn(t, dir, argv...); code != 2 {
+		if code, _, _ := rotaIn(t, dir, argv...); code != 2 {
 			t.Errorf("%v: exit %d, want 2", argv, code)
 		}
 	}
-	if code, _, _ := hvIn(t, t.TempDir(), "keepalive", "run", "--", "true"); code != 3 {
+	if code, _, _ := rotaIn(t, t.TempDir(), "keepalive", "run", "--", "true"); code != 3 {
 		t.Errorf("outside a project: exit %d, want 3", code)
 	}
-	if code, _, _ := hvIn(t, t.TempDir(), "keepalive", "status"); code != 3 {
+	if code, _, _ := rotaIn(t, t.TempDir(), "keepalive", "status"); code != 3 {
 		t.Errorf("status outside a project: exit %d, want 3", code)
 	}
 }
@@ -65,7 +65,7 @@ func TestKeepaliveRunUsageErrors(t *testing.T) {
 func TestKeepaliveRunRestartsOnFreshHandoff(t *testing.T) {
 	dir := kaProject(t, "")
 	child := kaChild(t, dir)
-	code, out, errOut := hvIn(t, dir, append([]string{"keepalive", "run", "--prompt", "go on", "--json", "--"}, child...)...)
+	code, out, errOut := rotaIn(t, dir, append([]string{"keepalive", "run", "--prompt", "go on", "--json", "--"}, child...)...)
 	if code != 0 {
 		t.Fatalf("exit %d: %s %s", code, out, errOut)
 	}
@@ -82,13 +82,13 @@ func TestKeepaliveRunRestartsOnFreshHandoff(t *testing.T) {
 		t.Errorf("the prompt goes last, on the restart only: %q", lines)
 	}
 	if h, _ := os.ReadFile(filepath.Join(child[4], "holder")); strings.TrimSpace(string(h)) != strconv.Itoa(os.Getpid()) {
-		t.Errorf("child must see HV_ROUND_HOLDER_PID: %q", h)
+		t.Errorf("child must see ROTA_ROUND_HOLDER_PID: %q", h)
 	}
 	cd, _ := roundlease.CommonDir(dir)
 	if _, st, _ := roundlease.DefaultEnv().Read(cd); st != roundlease.None {
 		t.Errorf("lease must be released: %v", st)
 	}
-	code, out, _ = hvIn(t, dir, "keepalive", "status", "--json")
+	code, out, _ = rotaIn(t, dir, "keepalive", "status", "--json")
 	sd := data(t, out)
 	ks, _ := sd["keepalive"].(map[string]any)
 	if code != 0 || sd["running"] != false || ks["status"] != "stopped" || ks["stopReason"] != "no-handoff" {
@@ -104,7 +104,7 @@ func TestKeepaliveRunBreakerExitsOneWithoutEscalateIssue(t *testing.T) {
 	h := kaHandoff(dir)
 	os.MkdirAll(filepath.Dir(h), 0o755)
 	os.WriteFile(h, []byte("x"), 0o644)
-	code, out, errOut := hvIn(t, dir, "keepalive", "run", "--json", "--", "true")
+	code, out, errOut := rotaIn(t, dir, "keepalive", "run", "--json", "--", "true")
 	if code != 1 {
 		t.Fatalf("exit %d: %s", code, out)
 	}
@@ -125,17 +125,17 @@ func TestKeepaliveRunRefusedWhileLeaseHeldAndCommandMissing(t *testing.T) {
 	if _, _, _, err := env.Acquire(cd, dir, roundlease.Holder{PID: 1, Start: mustStart(env, 1)}, 3); err != nil {
 		t.Fatal(err)
 	}
-	code, out, _ := hvIn(t, dir, "keepalive", "run", "--json", "--", "true")
+	code, out, _ := rotaIn(t, dir, "keepalive", "run", "--json", "--", "true")
 	d := data(t, out)
 	if code != 4 || d["blockedBy"] != "lease held" || d["changed"] != false {
 		t.Fatalf("exit %d data %v", code, d)
 	}
-	_, out, _ = hvIn(t, dir, "keepalive", "status", "--json")
+	_, out, _ = rotaIn(t, dir, "keepalive", "status", "--json")
 	if l := data(t, out)["lease"].(map[string]any); l["state"] != "live" || l["holderPid"] != float64(1) || l["round"] != float64(3) {
 		t.Errorf("status lease: %v", l)
 	}
 	os.Remove(roundlease.Path(cd))
-	if code, _, _ := hvIn(t, dir, "keepalive", "run", "--", "/nonexistent/claude"); code != 5 {
+	if code, _, _ := rotaIn(t, dir, "keepalive", "run", "--", "/nonexistent/claude"); code != 5 {
 		t.Errorf("a command that cannot run: exit %d, want 5", code)
 	}
 	if _, st, _ := env.Read(cd); st != roundlease.None {
@@ -158,7 +158,7 @@ func TestKeepaliveRunsTheLimitsLoopUnlessTold(t *testing.T) {
 			argv = append(argv, "--no-limits")
 		}
 		argv = append(argv, "--", "sh", "-c", script, "sh", limits.WatchPath(cd), out)
-		if code, o, e := hvIn(t, dir, argv...); code != 0 {
+		if code, o, e := rotaIn(t, dir, argv...); code != 0 {
 			t.Fatalf("exit %d: %s %s", code, o, e)
 		}
 		b, _ := os.ReadFile(out)
@@ -174,10 +174,10 @@ func TestKeepaliveRunsTheLimitsLoopUnlessTold(t *testing.T) {
 		}
 	}
 	dir := kaProject(t, `{"git":{"baseBranch":"feat/x"},"limits":{"maxResumes":0}}`)
-	if code, _, _ := hvIn(t, dir, "keepalive", "run", "--", "true"); code != 70 {
+	if code, _, _ := rotaIn(t, dir, "keepalive", "run", "--", "true"); code != 70 {
 		t.Errorf("a bad limits key must exit 70, got %d", code)
 	}
-	if code, _, _ := hvIn(t, dir, "keepalive", "run", "--no-limits", "--", "true"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "keepalive", "run", "--no-limits", "--", "true"); code != 0 {
 		t.Errorf("--no-limits must not read the limits keys, got %d", code)
 	}
 }

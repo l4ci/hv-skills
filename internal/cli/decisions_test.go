@@ -53,10 +53,10 @@ const decFixture = `# Decisions
 func decProject(t *testing.T, decisions, status string) string {
 	dir := knProject(t, false)
 	if decisions != "" {
-		knWrite(t, filepath.Join(dir, ".hv", "DECISIONS.md"), decisions)
+		knWrite(t, filepath.Join(dir, ".rota", "DECISIONS.md"), decisions)
 	}
 	if status != "" {
-		knWrite(t, filepath.Join(dir, ".hv", "status.json"), status)
+		knWrite(t, filepath.Join(dir, ".rota", "status.json"), status)
 	}
 	return dir
 }
@@ -163,9 +163,9 @@ const mapFileB = "---\nsubsystem: alpha\n---\n\n# Alpha\n"
 
 func mapProject(t *testing.T) string {
 	dir := knProject(t, false)
-	knWrite(t, filepath.Join(dir, ".hv", "map", "cli.md"), mapFileA)
-	knWrite(t, filepath.Join(dir, ".hv", "map", "alpha.md"), mapFileB)
-	knWrite(t, filepath.Join(dir, ".hv", "map", "nofm.md"), "no frontmatter\n")
+	knWrite(t, filepath.Join(dir, ".rota", "map", "cli.md"), mapFileA)
+	knWrite(t, filepath.Join(dir, ".rota", "map", "alpha.md"), mapFileB)
+	knWrite(t, filepath.Join(dir, ".rota", "map", "nofm.md"), "no frontmatter\n")
 	knWrite(t, filepath.Join(dir, "cmd", "main.go"), "package main\n\nfunc main() {}\n")
 	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n")
 	return dir
@@ -173,7 +173,7 @@ func mapProject(t *testing.T) string {
 
 func TestMapQueryAndQAQueryMatchGolden(t *testing.T) {
 	dir := mapProject(t)
-	knWrite(t, filepath.Join(dir, ".hv", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n\n# Web QA\n")
+	knWrite(t, filepath.Join(dir, ".rota", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n\n# Web QA\n")
 	for _, group := range []string{"map", "qa"} {
 		names := []string{"cli", "ghost", "alpha", "web"}
 		want, got := knFrozen(t, dir, "", append([]string{group, "query"}, names...)...)
@@ -191,16 +191,16 @@ func TestMapQueryAndQAQueryMatchGolden(t *testing.T) {
 }
 
 // The goldens carry the old helpers' blocks with the A9 G4 text: the pointer
-// names the hv verb. Everything else is the frozen output, byte for byte.
+// names the rota verb. Everything else is the frozen output, byte for byte.
 func TestMapAndQAIndexMatchGolden(t *testing.T) {
 	for _, c := range []struct{ group string }{{"map"}, {"qa"}} {
 		for _, withEntries := range []bool{true, false} {
 			dir := mapProject(t)
 			if !withEntries {
-				os.RemoveAll(filepath.Join(dir, ".hv", "map"))
+				os.RemoveAll(filepath.Join(dir, ".rota", "map"))
 			} else {
-				knWrite(t, filepath.Join(dir, ".hv", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n")
-				knWrite(t, filepath.Join(dir, ".hv", "qa", "bare.md"), "---\n---\n")
+				knWrite(t, filepath.Join(dir, ".rota", "qa", "web.md"), "---\nsurface: web\nsummary: browser\n---\n")
+				knWrite(t, filepath.Join(dir, ".rota", "qa", "bare.md"), "---\n---\n")
 			}
 			want, got := knFrozen(t, dir, "", c.group, "index")
 			if want.RC != 0 || got.RC != 0 {
@@ -241,12 +241,12 @@ func TestMapStatsCap(t *testing.T) {
 	if !strings.Contains(below.stdout, `"cap": 20, "overCap": false`) || strings.Contains(below.stderr, "note") {
 		t.Errorf("below cap: %s / %s", below.stdout, below.stderr)
 	}
-	knWrite(t, filepath.Join(dir, ".hv", "config.json"), `{"map": {"softcap_subsystems": 2}}`)
+	knWrite(t, filepath.Join(dir, ".rota", "config.json"), `{"map": {"softcap_subsystems": 2}}`)
 	over := knNew(t, dir, "", "map", "stats", "--cap", "--json")
 	if !strings.Contains(over.stdout, `"cap": 2, "overCap": true`) || !strings.Contains(over.stdout, `"warnings": ["project map has 2 subsystems (cap 2);`) {
 		t.Errorf("over cap: %s", over.stdout)
 	}
-	// The old nudge text matches: the helper printed it on stderr, hv prints it on stdout.
+	// The old nudge text matches: the helper printed it on stderr, rota prints it on stdout.
 	want, got := knFrozen(t, dir, "", "map", "stats", "--cap")
 	if want.Stderr != got.Stdout || !strings.HasPrefix(got.Stdout, "note: project map has 2 subsystems") {
 		t.Errorf("text mode: frozen %q new %q", want.Stderr, got.Stdout)
@@ -274,7 +274,7 @@ func TestCRLFMatchGoldenForDecisionsMapAndQA(t *testing.T) {
 	})
 	t.Run("map query, stats and index", func(t *testing.T) {
 		dir := mapProject(t)
-		knWrite(t, filepath.Join(dir, ".hv", "map", "cli.md"), crlf(mapFileA))
+		knWrite(t, filepath.Join(dir, ".rota", "map", "cli.md"), crlf(mapFileA))
 		knWrite(t, filepath.Join(dir, "cmd", "main.go"), crlf("package main\n\nfunc main() {}\n"))
 		if want, got := knFrozen(t, dir, "", "map", "query", "cli"); want.Stdout != got.Stdout || strings.Contains(got.Stdout, "\r") {
 			t.Errorf("query frozen %q new %q", want.Stdout, got.Stdout)

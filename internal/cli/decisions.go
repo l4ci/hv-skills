@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/knowledge"
-	"github.com/l4ci/hv/v5/internal/mapqa"
+	"github.com/l4ci/rota/internal/knowledge"
+	"github.com/l4ci/rota/internal/mapqa"
 )
 
-// decisionsCommands is the `hv decisions` group (A5, #49).
+// decisionsCommands is the `rota decisions` group (A5, #49).
 func decisionsCommands() *Command {
-	return &Command{Name: "decisions", Summary: "read and log .hv/DECISIONS.md", Subs: []*Command{
+	return &Command{Name: "decisions", Summary: "read and log .rota/DECISIONS.md", Subs: []*Command{
 		{Name: "query", Summary: "print topic sections", Verb: noFlags(decQuery)},
 		{Name: "auto-log", Summary: "log an [Auto:Loop] decision", Verb: decAutoLog},
 		{Name: "auto-since", Summary: "list this loop session's auto-logged decisions", Verb: noFlags(decAutoSince)},
@@ -86,18 +86,18 @@ func decAutoSince(c *Ctx, args []string) (Result, error) {
 	return Result{Data: data, Text: knowledge.DecisionsText(ds)}, nil
 }
 
-// mapCommands is the `hv map` group.
+// mapCommands is the `rota map` group.
 func mapCommands() *Command {
-	return &Command{Name: "map", Summary: "subsystem map in .hv/map", Subs: []*Command{
+	return &Command{Name: "map", Summary: "subsystem map in .rota/map", Subs: []*Command{
 		{Name: "query", Summary: "print subsystem files", Verb: noFlags(mapQuery)},
 		{Name: "index", Summary: "regenerate the map block", Verb: noFlags(mapIndex)},
 		{Name: "stats", Summary: "size and broken-reference counts", Verb: mapStats},
 	}}
 }
 
-// qaCommands is the `hv qa` group.
+// qaCommands is the `rota qa` group.
 func qaCommands() *Command {
-	return &Command{Name: "qa", Summary: "QA strategies in .hv/qa", Subs: []*Command{
+	return &Command{Name: "qa", Summary: "QA strategies in .rota/qa", Subs: []*Command{
 		{Name: "query", Summary: "print QA target files", Verb: noFlags(qaQuery)},
 		{Name: "index", Summary: "regenerate the QA block", Verb: noFlags(qaIndex)},
 	}}

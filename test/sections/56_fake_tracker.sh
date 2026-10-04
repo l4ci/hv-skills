@@ -3,8 +3,8 @@ echo "fake gh/glab (test/fakes)"
 TMP_FT="$(mktemp -d)"
 trap 'rm -rf "$TMP_FT"' EXIT
 FAKES="$TESTDIR/fakes"
-mkdir -p "$TMP_FT/proj/.hv"
-echo '{"issues":{"provider":"github","retryWaitSeconds":0}}' > "$TMP_FT/proj/.hv/config.json"
+mkdir -p "$TMP_FT/proj/.rota"
+echo '{"issues":{"provider":"github","retryWaitSeconds":0}}' > "$TMP_FT/proj/.rota/config.json"
 
 # py <json> <python expr over d> : assert the expression is truthy
 py() { printf '%s' "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($2) else 1)"; }

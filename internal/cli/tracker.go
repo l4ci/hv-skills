@@ -9,21 +9,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/gate"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/gate"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // trackerOptions are applied to every forge CLI the verbs build; tests use
 // them to swap in a fake executor.
 var trackerOptions []tracker.Option
 
-// trackerCommands is the `hv tracker` group (A8, #52).
+// trackerCommands is the `rota tracker` group (A8, #52).
 func trackerCommands() *Command {
 	return &Command{Name: "tracker", Summary: "gh/glab passthrough and upstream issues", Subs: []*Command{
 		{Name: "call", Summary: "run gh or glab with list limits and rate-limit handling", Repo: true, Verb: trCall},
-		{Name: "suggest-upstream", Summary: "file an hv issue from a learning", Verb: trSuggest},
+		{Name: "suggest-upstream", Summary: "file a rota issue from a learning", Verb: trSuggest},
 	}}
 }
 
@@ -34,7 +34,7 @@ func trackerSettings(c *Ctx) tracker.Settings {
 	if err != nil {
 		return tracker.SettingsFromConfig(nil)
 	}
-	return tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".hv", "config.json")))
+	return tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".rota", "config.json")))
 }
 
 // trackerErr maps a tracker failure onto the exit table through its kind.
@@ -55,7 +55,7 @@ func trCall(fs *flag.FlagSet) RunFunc {
 			return Result{}, Usage("--provider must be auto, github or gitlab, not %q", *provider)
 		}
 		if len(args) == 0 {
-			return Result{}, Usage("no CLI arguments; usage: hv tracker call [--provider auto|github|gitlab] -- <cli-arg>...")
+			return Result{}, Usage("no CLI arguments; usage: rota tracker call [--provider auto|github|gitlab] -- <cli-arg>...")
 		}
 		dir, err := c.RepoPath()
 		if err != nil {
@@ -94,7 +94,7 @@ func trCall(fs *flag.FlagSet) RunFunc {
 func trSuggest(fs *flag.FlagSet) RunFunc {
 	title := fs.String("title", "", "issue title")
 	bodyFile := fs.String("body-file", "", "issue body: a path, or - for stdin")
-	upstream := fs.String("upstream-repo", "", "owner/repo (default $HV_UPSTREAM_REPO, else l4ci/hv)")
+	upstream := fs.String("upstream-repo", "", "owner/repo (default $ROTA_UPSTREAM_REPO, else l4ci/rota)")
 	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) > 0 {
@@ -123,10 +123,10 @@ func trSuggest(fs *flag.FlagSet) RunFunc {
 		body := strings.TrimRight(string(raw), "\n")
 		repo := *upstream
 		if repo == "" {
-			repo = os.Getenv("HV_UPSTREAM_REPO")
+			repo = os.Getenv("ROTA_UPSTREAM_REPO")
 		}
 		if repo == "" {
-			repo = "l4ci/hv"
+			repo = "l4ci/rota"
 		}
 		manual := "file it by hand at https://github.com/" + repo + "/issues/new"
 		if res, err := clearGate(c, gate.PublicFiling, repo+": "+*title, conf, nil, nil); err != nil {

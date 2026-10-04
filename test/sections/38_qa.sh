@@ -1,8 +1,8 @@
 echo "qa query + qa index"
 
-# Build a .hv/qa/ tree with one well-formed target.
-mkdir -p .hv/qa
-cat > .hv/qa/web.md <<'EOF'
+# Build a .rota/qa/ tree with one well-formed target.
+mkdir -p .rota/qa
+cat > .rota/qa/web.md <<'EOF'
 ---
 target: web
 surface: web-ui
@@ -65,7 +65,7 @@ rc=0; hvj qa query >/dev/null 2>&1 || rc=$?
 pass "qa query without a target is a usage error"
 
 # Multi-target ordering: requested order is preserved.
-cat > .hv/qa/api.md <<'EOF'
+cat > .rota/qa/api.md <<'EOF'
 ---
 target: api
 surface: http-api
@@ -87,7 +87,7 @@ pass "qa query preserves argument order"
 QA_IDX=$(hvj qa index)
 [ "$(jget data.key <<<"$QA_IDX")" = "qa" ] || fail "qa index data.key wrong: $QA_IDX"
 [ "$(jget data.changed <<<"$QA_IDX")" = "true" ] || fail "first qa index must report changed: $QA_IDX"
-grep -q "<!-- hv-qa-start -->" CLAUDE.md || fail "hv-qa managed block not in CLAUDE.md"
+grep -q "<!-- rota-qa-start -->" CLAUDE.md || fail "rota-qa managed block not in CLAUDE.md"
 grep -q "^## Project QA" CLAUDE.md || fail "Project QA heading missing"
 grep -q "\*\*web\*\*" CLAUDE.md || fail "web target bullet missing from index"
 grep -q "\*\*api\*\*" CLAUDE.md || fail "api target bullet missing from index"
@@ -97,16 +97,16 @@ pass "qa index seeds Project QA block"
 QA_IDX=$(hvj qa index)
 [ "$(jget data.status <<<"$QA_IDX")" = "unchanged" ] || fail "repeat qa index must be unchanged: $QA_IDX"
 [ "$(jget data.changed <<<"$QA_IDX")" = "false" ] || fail "repeat qa index must report changed=false: $QA_IDX"
-COUNT_START=$(grep -c "hv-qa-start" CLAUDE.md)
-[ "$COUNT_START" = "1" ] || fail "hv-qa managed block duplicated on re-run"
+COUNT_START=$(grep -c "rota-qa-start" CLAUDE.md)
+[ "$COUNT_START" = "1" ] || fail "rota-qa managed block duplicated on re-run"
 pass "qa index updates in place"
 
-# Empty .hv/qa/ renders the no-strategy hint.
-rm -f .hv/qa/web.md .hv/qa/api.md
+# Empty .rota/qa/ renders the no-strategy hint.
+rm -f .rota/qa/web.md .rota/qa/api.md
 hvj qa index >/dev/null
 grep -q "no QA strategy yet" CLAUDE.md || fail "empty-state hint missing"
 pass "qa index renders empty-state hint"
 
 # Cleanup so later sections start fresh.
-rm -rf .hv/qa
+rm -rf .rota/qa
 hvj qa index >/dev/null

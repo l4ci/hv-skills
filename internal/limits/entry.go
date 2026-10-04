@@ -1,9 +1,9 @@
-// Package limits is the logic behind `hv limit watch` (D3, #67): a loop that
+// Package limits is the logic behind `rota limit watch` (D3, #67): a loop that
 // keeps a round from stalling on a 5-hour or weekly usage limit. It notices
 // the limit in the orchestrator's or a worker's pane, then either sleeps until
 // the reset and types a resume prompt, or moves a worker's issue to an idle
 // slot on another account. Every transition is recorded in the top-level
-// `limits` list of .hv/workers.json, under the registry lock.
+// `limits` list of .rota/workers.json, under the registry lock.
 //
 // Everything outside its own memory is injected (clock, panes, the account
 // meter, transfer, send, escalation, notification), so tests need no real
@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Entry statuses.

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // Target is one git repo drift walks: a registered sub-repo, or the project
@@ -190,14 +190,14 @@ func contains(xs []string, x string) bool {
 }
 
 // grepFound lists the files that contain symbol at treeish, with the treeish
-// prefix removed and .hv/ excluded (the backlog's own text names the symbol).
+// prefix removed and .rota/ excluded (the backlog's own text names the symbol).
 // ok is false when the grep failed, for instance because treeish does not
 // resolve. An anchor that starts with "-" is not passed to git.
 func grepFound(dir, symbol, treeish string) (files []string, ok bool) {
 	if strings.HasPrefix(treeish, "-") {
 		return nil, false
 	}
-	out, rc := git(dir, "grep", "-I", "-l", "-F", "-e", symbol, treeish, "--", ".", ":(exclude).hv/**")
+	out, rc := git(dir, "grep", "-I", "-l", "-F", "-e", symbol, treeish, "--", ".", ":(exclude).rota/**")
 	switch rc {
 	case 0:
 	case 1:
@@ -233,11 +233,11 @@ var (
 	bracketRe    = regexp.MustCompile(`\[[^\]]+\]`)
 	backtickRe   = regexp.MustCompile("`([^`]+)`")
 
-	camelRe   = regexp.MustCompile(`\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b`)
-	snakeRe   = regexp.MustCompile(`\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`)
-	hvKebabRe = regexp.MustCompile(`\bhv-[a-z0-9-]+\b`)
-	pathRe    = regexp.MustCompile(`\b[\w.-]*/[\w./-]+\b`)
-	fileExtRe = regexp.MustCompile(`\b[\w-]+\.[a-z]{1,4}\b`)
+	camelRe     = regexp.MustCompile(`\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b`)
+	snakeRe     = regexp.MustCompile(`\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`)
+	rotaKebabRe = regexp.MustCompile(`\brota-[a-z0-9-]+\b`)
+	pathRe      = regexp.MustCompile(`\b[\w.-]*/[\w./-]+\b`)
+	fileExtRe   = regexp.MustCompile(`\b[\w-]+\.[a-z]{1,4}\b`)
 )
 
 // foldWord returns s with each non-ASCII rune replaced by ph (when it is a
@@ -272,7 +272,7 @@ func findAllFolded(re *regexp.Regexp, text string, ph byte) []string {
 }
 
 // ExtractSymbols is extract_symbols of hv-todo-drift: up to eight distinctive
-// code symbols (backtick spans, CamelCase, snake_case, hv-* helpers, paths and
+// code symbols (backtick spans, CamelCase, snake_case, rota-* names, paths and
 // file names) from a bullet's title and description, never its trailing fields.
 func ExtractSymbols(bullet, id string) []string {
 	text := bullet
@@ -291,7 +291,7 @@ func ExtractSymbols(bullet, id string) []string {
 	}
 	cands = append(cands, findAllFolded(camelRe, text, '_')...)
 	cands = append(cands, findAllFolded(snakeRe, text, 'Z')...)
-	cands = append(cands, findAllFolded(hvKebabRe, text, 'Z')...)
+	cands = append(cands, findAllFolded(rotaKebabRe, text, 'Z')...)
 	cands = append(cands, findAllFolded(pathRe, text, '_')...)
 	cands = append(cands, findAllFolded(fileExtRe, text, '_')...)
 

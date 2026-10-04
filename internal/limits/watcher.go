@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 const (
@@ -75,7 +75,7 @@ type Deps struct {
 	PickAccount func(ctx context.Context, exclude string) (string, bool)
 	// IdleSlot finds an idle slot on the account.
 	IdleSlot func(ctx context.Context, account string) (string, bool)
-	// Transfer is `hv round transfer <issue> --to <slot>`.
+	// Transfer is `rota round transfer <issue> --to <slot>`.
 	Transfer func(ctx context.Context, issue, to string) error
 	// Send types the prompt into the target's pane and submits it.
 	Send func(ctx context.Context, t Target, prompt string) error
@@ -510,7 +510,7 @@ func (w *Watcher) fail(e *Entry, now time.Time, why string) {
 	e.Note += why + "."
 	title := fmt.Sprintf("Usage limit not resolved: %s", e.Session)
 	body := fmt.Sprintf("The usage-limit watcher gave up on %s (%s): %s.\n\n- Window: %s\n- Detected: %s\n- Reset: %s\n- Resume prompts typed: %d\n- Log: %s (limits %s)\n\n"+
-		"Look at the pane, then restart the session or run hv limit watch again.\n",
+		"Look at the pane, then restart the session or run rota limit watch again.\n",
 		e.Session, e.ID, why, e.Window, e.DetectedAt, firstNonEmpty(e.ResetsAt, "unknown"), e.Cycles, worker.RegistryPath(w.Root), e.ID)
 	switch {
 	case w.Settings.EscalateIssue == 0:

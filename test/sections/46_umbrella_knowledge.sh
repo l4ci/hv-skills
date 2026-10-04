@@ -8,16 +8,16 @@ trap 'rm -rf "$TMP_UK"' EXIT
   cd "$TMP_UK"
   git init -q .
   git config user.email t@t && git config user.name t
-  mkdir -p .hv .hv/contexts/web web api
+  mkdir -p .rota .rota/contexts/web web api
   ( cd web && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   ( cd api && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
-  printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .hv/repos.json
-  printf '{"hv":{"version":"3.0.0"}}' > .hv/config.json
-  printf '# Knowledge\n\n## Architecture\n\n- **umbrella rule** — cross-repo body <!-- 2026-05-19 -->\n\n## Glossary\n\n' > .hv/KNOWLEDGE.md
-  mkdir -p .hv/knowledge/web .hv/knowledge/api
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/web/KNOWLEDGE.md
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/api/KNOWLEDGE.md
-  printf '# Context\n\n## Widget\n\nA web widget.\n' > .hv/contexts/web/CONTEXT.md
+  printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .rota/repos.json
+  printf '{"rota":{"version":"3.0.0"}}' > .rota/config.json
+  printf '# Knowledge\n\n## Architecture\n\n- **umbrella rule** — cross-repo body <!-- 2026-05-19 -->\n\n## Glossary\n\n' > .rota/KNOWLEDGE.md
+  mkdir -p .rota/knowledge/web .rota/knowledge/api
+  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/web/KNOWLEDGE.md
+  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/api/KNOWLEDGE.md
+  printf '# Context\n\n## Widget\n\nA web widget.\n' > .rota/contexts/web/CONTEXT.md
   printf '/web/\n/api/\n' > .gitignore
   git -c user.email=t@t -c user.name=t add -A
   git -c user.email=t@t -c user.name=t commit -qm init
@@ -27,10 +27,10 @@ trap 'rm -rf "$TMP_UK"' EXIT
 echo "F21: scoped write — knowledge add from sub-repo"
 OUT=$( cd "$TMP_UK/web" && hvj knowledge add --topic Architecture --title "web rule" --body-file - <<<"web-local" )
 [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F21[1]: add from web must report changed: $OUT"
-grep -q "web rule" "$TMP_UK/.hv/knowledge/web/KNOWLEDGE.md" \
-  || fail "F21[1]: 'web rule' must appear in .hv/knowledge/web/KNOWLEDGE.md"
-grep -q "web rule" "$TMP_UK/.hv/KNOWLEDGE.md" \
-  && fail "F21[1]: 'web rule' must NOT appear in umbrella .hv/KNOWLEDGE.md"
+grep -q "web rule" "$TMP_UK/.rota/knowledge/web/KNOWLEDGE.md" \
+  || fail "F21[1]: 'web rule' must appear in .rota/knowledge/web/KNOWLEDGE.md"
+grep -q "web rule" "$TMP_UK/.rota/KNOWLEDGE.md" \
+  && fail "F21[1]: 'web rule' must NOT appear in umbrella .rota/KNOWLEDGE.md"
 pass "F21[1]: scoped write lands in sub-repo KNOWLEDGE.md only"
 
 # ── 2. Hybrid query: sub-repo scope shows both files with > from:; umbrella shows only its own ──
@@ -59,13 +59,13 @@ OUT=$( cd "$TMP_UK/web" && hvj knowledge tier set --topic Architecture --title "
 [ "$(jget data.tier <<<"$OUT")" = "confirmed" ] || fail "F21[3]: tier set must report the new tier: $OUT"
 [ "$(cd "$TMP_UK/web" && hvj knowledge tier get --topic Architecture --title "web rule" | jget data.tier)" = "confirmed" ] \
   || fail "F21[3]: tier get from web must read back confirmed"
-[ -f "$TMP_UK/.hv/knowledge/web/knowledge-tier.json" ] \
-  || fail "F21[3]: .hv/knowledge/web/knowledge-tier.json must exist after tier set"
-grep -q "web rule" "$TMP_UK/.hv/knowledge/web/knowledge-tier.json" \
+[ -f "$TMP_UK/.rota/knowledge/web/knowledge-tier.json" ] \
+  || fail "F21[3]: .rota/knowledge/web/knowledge-tier.json must exist after tier set"
+grep -q "web rule" "$TMP_UK/.rota/knowledge/web/knowledge-tier.json" \
   || fail "F21[3]: sub-repo tier sidecar must contain 'web rule'"
 # Umbrella sidecar must NOT have "web rule"
-if [ -f "$TMP_UK/.hv/knowledge-tier.json" ]; then
-  grep -q "web rule" "$TMP_UK/.hv/knowledge-tier.json" \
+if [ -f "$TMP_UK/.rota/knowledge-tier.json" ]; then
+  grep -q "web rule" "$TMP_UK/.rota/knowledge-tier.json" \
     && fail "F21[3]: umbrella tier sidecar must NOT contain 'web rule'"
 fi
 pass "F21[3]: tier sidecar is scoped per sub-repo"
@@ -87,21 +87,21 @@ grep -q -- "--repo" <<<"$AMEND_OUT" \
 # With --repo web: unambiguous → exit 0, amends only web file
 OUT=$( cd "$TMP_UK/web" && hvj knowledge amend --topic Architecture --fragment "shared rule" --mode append --body-file - --repo web <<<"(x)" )
 [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F21[4]: --repo web amend must report changed: $OUT"
-grep -q "(x)" "$TMP_UK/.hv/knowledge/web/KNOWLEDGE.md" \
+grep -q "(x)" "$TMP_UK/.rota/knowledge/web/KNOWLEDGE.md" \
   || fail "F21[4]: --repo web amend must append to web file"
-grep -q "(x)" "$TMP_UK/.hv/KNOWLEDGE.md" \
+grep -q "(x)" "$TMP_UK/.rota/KNOWLEDGE.md" \
   && fail "F21[4]: --repo web amend must NOT touch umbrella file"
 pass "F21[4]: cross-file amend guard blocks ambiguous; --repo web resolves it"
 
 # ── 5. Glossary parity ──────────────────────────────────────────────────────
 echo "F21: glossary parity"
 ( cd "$TMP_UK/web" && hvj glossary write webterm --def "a web term" >/dev/null )
-grep -q "webterm" "$TMP_UK/.hv/knowledge/web/KNOWLEDGE.md" \
-  || fail "F21[5]: webterm must land in .hv/knowledge/web/KNOWLEDGE.md Glossary"
+grep -q "webterm" "$TMP_UK/.rota/knowledge/web/KNOWLEDGE.md" \
+  || fail "F21[5]: webterm must land in .rota/knowledge/web/KNOWLEDGE.md Glossary"
 GLOSS_READ="$( cd "$TMP_UK/web" && hvj glossary read webterm | jget data.text )"
 grep -q "a web term" <<<"$GLOSS_READ" \
   || fail "F21[5]: glossary read must print the term definition"
-grep -q "> from: .hv/knowledge/web/KNOWLEDGE.md (## Glossary)" <<<"$GLOSS_READ" \
+grep -q "> from: .rota/knowledge/web/KNOWLEDGE.md (## Glossary)" <<<"$GLOSS_READ" \
   || fail "F21[5]: glossary read must include provenance line for web scope; got: $GLOSS_READ"
 pass "F21[5]: glossary write scoped to sub-repo; read shows provenance"
 
@@ -136,16 +136,16 @@ trap 'rm -rf "$TMP_UK2"' EXIT
   cd "$TMP_UK2"
   git init -q .
   git config user.email t@t && git config user.name t
-  mkdir -p .hv .hv/contexts/web web api
+  mkdir -p .rota .rota/contexts/web web api
   ( cd web && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   ( cd api && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
-  printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .hv/repos.json
-  printf '{"hv":{"version":"3.0.0"}}' > .hv/config.json
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/KNOWLEDGE.md
-  mkdir -p .hv/knowledge/web .hv/knowledge/api
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/web/KNOWLEDGE.md
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/api/KNOWLEDGE.md
-  printf '# Context\n\n## Widget\n\nA web widget.\n' > .hv/contexts/web/CONTEXT.md
+  printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .rota/repos.json
+  printf '{"rota":{"version":"3.0.0"}}' > .rota/config.json
+  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/KNOWLEDGE.md
+  mkdir -p .rota/knowledge/web .rota/knowledge/api
+  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/web/KNOWLEDGE.md
+  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/api/KNOWLEDGE.md
+  printf '# Context\n\n## Widget\n\nA web widget.\n' > .rota/contexts/web/CONTEXT.md
   printf '/web/\n/api/\n' > .gitignore
   git -c user.email=t@t -c user.name=t add -A
   git -c user.email=t@t -c user.name=t commit -qm init
@@ -157,17 +157,17 @@ OUT=$( cd "$TMP_UK2" && hvj migrate v4 --apply 2>/dev/null ) || MIGRATE_RC=$?
 grep -q '"scope":"web"' <<<"$(jget data.contextMigrations <<<"$OUT")" \
   || fail "F21[7]: contextMigrations must list the web sub-repo: $OUT"
 # CONTEXT.md migrated → Widget term lands in web KNOWLEDGE.md Glossary
-grep -q "Widget" "$TMP_UK2/.hv/knowledge/web/KNOWLEDGE.md" \
-  || fail "F21[7]: 'Widget' term must appear in .hv/knowledge/web/KNOWLEDGE.md after migrate"
+grep -q "Widget" "$TMP_UK2/.rota/knowledge/web/KNOWLEDGE.md" \
+  || fail "F21[7]: 'Widget' term must appear in .rota/knowledge/web/KNOWLEDGE.md after migrate"
 # contexts/web/CONTEXT.md must be gone
-[ ! -f "$TMP_UK2/.hv/contexts/web/CONTEXT.md" ] \
-  || fail "F21[7]: .hv/contexts/web/CONTEXT.md must be deleted after migrate"
+[ ! -f "$TMP_UK2/.rota/contexts/web/CONTEXT.md" ] \
+  || fail "F21[7]: .rota/contexts/web/CONTEXT.md must be deleted after migrate"
 # Backup must exist
-ls "$TMP_UK2/.hv/migrate-backup/" >/dev/null 2>&1 \
-  || fail "F21[7]: .hv/migrate-backup/ must exist after --apply"
-BACKUP_DIR="$(ls -d "$TMP_UK2"/.hv/migrate-backup/*/ 2>/dev/null | head -1)"
+ls "$TMP_UK2/.rota/migrate-backup/" >/dev/null 2>&1 \
+  || fail "F21[7]: .rota/migrate-backup/ must exist after --apply"
+BACKUP_DIR="$(ls -d "$TMP_UK2"/.rota/migrate-backup/*/ 2>/dev/null | head -1)"
 [ -n "$BACKUP_DIR" ] \
-  || fail "F21[7]: no timestamped backup directory found under .hv/migrate-backup/"
+  || fail "F21[7]: no timestamped backup directory found under .rota/migrate-backup/"
 pass "F21[7]: migrate umbrella branch exits 0; context migrated; backup exists"
 
 # ── 8. Decisions stay umbrella-only ─────────────────────────────────────────

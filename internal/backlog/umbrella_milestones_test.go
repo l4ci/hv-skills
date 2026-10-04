@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // msUmbrella is an umbrella over two milestone-capable fake trackers; web is

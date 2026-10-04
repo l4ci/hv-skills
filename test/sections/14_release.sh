@@ -5,7 +5,7 @@ TMP_DV="$DV1"
 trap 'rm -rf "$TMP_DV"' EXIT
 (
   cd "$DV1"
-  mkdir -p .hv .claude-plugin
+  mkdir -p .rota .claude-plugin
   printf '{"version":"1.0.0"}\n' > .claude-plugin/plugin.json
   OUT=$(hvj release version)
   [ "$(echo "$OUT" | jget data.version)" = "1.0.0" ] || { echo "FAIL: version wrong: $OUT"; exit 1; }
@@ -24,10 +24,10 @@ trap 'rm -rf "$TMP_DV"' EXIT
 )
 pass "release version detects plugin.json and computes next read-only"
 
-# Case 2: config override via .hv/config.json
+# Case 2: config override via .rota/config.json
 (
   cd "$DV1"
-  printf '{"release":{"versionFile":"package.json"}}\n' > .hv/config.json
+  printf '{"release":{"versionFile":"package.json"}}\n' > .rota/config.json
   printf '{"version":"2.5.0"}\n' > package.json
   OUT=$(hvj release version)
   [ "$(echo "$OUT" | jget data.file)" = "package.json" ] || { echo "FAIL: file wrong: $OUT"; exit 1; }
@@ -41,7 +41,7 @@ DV2="$(mktemp -d)"
 TMP_DV="$DV2"
 (
   cd "$DV2"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '[project]\nversion = "0.1.2"\n' > pyproject.toml
   OUT=$(hvj release version)
   [ "$(echo "$OUT" | jget data.kind)" = "pyproject" ] || { echo "FAIL: kind wrong: $OUT"; exit 1; }
@@ -55,7 +55,7 @@ DV3="$(mktemp -d)"
 TMP_DV="$DV3"
 (
   cd "$DV3"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '[package]\nversion = "3.4.5"\n' > Cargo.toml
   OUT=$(hvj release version)
   [ "$(echo "$OUT" | jget data.kind)" = "cargo" ] || { echo "FAIL: kind wrong: $OUT"; exit 1; }
@@ -69,7 +69,7 @@ DV4="$(mktemp -d)"
 TMP_DV="$DV4"
 (
   cd "$DV4"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '9.9.9\n' > VERSION
   OUT=$(hvj release version)
   [ "$(echo "$OUT" | jget data.kind)" = "plain" ] || { echo "FAIL: kind wrong: $OUT"; exit 1; }
@@ -83,7 +83,7 @@ DV5="$(mktemp -d)"
 TMP_DV="$DV5"
 (
   cd "$DV5"
-  mkdir -p .hv
+  mkdir -p .rota
   rc=0
   OUT=$(hvj release version 2>/dev/null) || rc=$?
   [ "$rc" = "3" ] || { echo "FAIL: expected exit 3, got $rc"; exit 1; }
@@ -99,7 +99,7 @@ BV1="$(mktemp -d)"
 TMP_DV="$BV1"
 (
   cd "$BV1"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '{"version":"1.0.0"}\n' > package.json
   OUT=$(hvj release bump --level patch)
   [ "$(echo "$OUT" | jget data.to)" = "1.0.1" ] || { echo "FAIL: expected 1.0.1: $OUT"; exit 1; }
@@ -143,7 +143,7 @@ BV2="$(mktemp -d)"
 TMP_DV="$BV2"
 (
   cd "$BV2"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '[project]\nversion = "0.1.0"\nname = "x"\n\n[tool.foo]\nversion = "9.9.9"\n' > pyproject.toml
   NEW=$(hvj release bump --level patch --file pyproject.toml | jget data.to)
   [ "$NEW" = "0.1.1" ] || { echo "FAIL: expected 0.1.1, got $NEW"; exit 1; }
@@ -158,7 +158,7 @@ BV3="$(mktemp -d)"
 TMP_DV="$BV3"
 (
   cd "$BV3"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '[package]\nversion = "1.2.3"\n' > Cargo.toml
   OUT=$(hvj release bump --level major --file Cargo.toml)
   [ "$(echo "$OUT" | jget data.to)" = "2.0.0" ] || { echo "FAIL: expected 2.0.0: $OUT"; exit 1; }
@@ -172,7 +172,7 @@ BV4="$(mktemp -d)"
 TMP_DV="$BV4"
 (
   cd "$BV4"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '0.0.1\n' > VERSION
   NEW=$(hvj release bump --level minor --file VERSION | jget data.to)
   [ "$NEW" = "0.1.0" ] || { echo "FAIL: expected 0.1.0, got $NEW"; exit 1; }
@@ -187,7 +187,7 @@ CL1="$(mktemp -d)"
 TMP_DV="$CL1"
 (
   cd "$CL1"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
@@ -246,7 +246,7 @@ TMP_DV="$UC1"
 TODAY=$(date +%Y-%m-%d)
 (
   cd "$UC1"
-  mkdir -p .hv
+  mkdir -p .rota
   printf '### Highlights\n\n- thing 1\n' > notes.md
   OUT=$(hvj release changelog 1.0.0 --body-file notes.md)
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || { echo "FAIL: changed not true: $OUT"; exit 1; }
@@ -307,7 +307,7 @@ DH1="$(mktemp -d)"
 TMP_DV="$DH1"
 (
   cd "$DH1"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q
   git config user.email t@t && git config user.name t
 

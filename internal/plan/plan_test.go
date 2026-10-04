@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/proof"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/proof"
 )
 
 func exitOf(err error) int {
@@ -37,11 +37,11 @@ func golden(t *testing.T, name string) string {
 // project is the scenario the goldens were recorded on: repos web, api, web-docs.
 func project(t *testing.T) string {
 	root, _ := filepath.EvalSymlinks(t.TempDir())
-	os.MkdirAll(filepath.Join(root, ".hv", "designs"), 0o777)
+	os.MkdirAll(filepath.Join(root, ".rota", "designs"), 0o777)
 	for _, d := range []string{"web", "api", "web-docs"} {
 		os.MkdirAll(filepath.Join(root, d), 0o777)
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"),
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"),
 		[]byte(`{"repos": [{"name": "web", "path": "web"}, {"name": "api", "path": "api"}, {"name": "web-docs", "path": "web-docs"}]}`), 0o644)
 	return root
 }
@@ -50,7 +50,7 @@ func project(t *testing.T) string {
 // wrote (testdata/golden, frozen, changed only by reviewed edit), dates masked.
 func TestAddMatchesOldHelper(t *testing.T) {
 	root := project(t)
-	os.WriteFile(filepath.Join(root, ".hv/designs/B07.md"), []byte("---\nid: B07\n---\n"), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota/designs/B07.md"), []byte("---\nid: B07\n---\n"), 0o644)
 	steps := []struct {
 		o        AddOpts
 		key, knd string
@@ -99,8 +99,8 @@ func TestAddArgumentExits(t *testing.T) {
 			t.Errorf("%s: %v, want exit %d", c.name, err, c.exit)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv/plans")); err == nil {
-		t.Error("a failed add created .hv/plans")
+	if _, err := os.Stat(filepath.Join(root, ".rota/plans")); err == nil {
+		t.Error("a failed add created .rota/plans")
 	}
 	Add(root, AddOpts{Key: "M01-B07", Title: "t"})
 	if _, _, err := Add(root, AddOpts{Key: "M01-B07", Title: "t"}); exitOf(err) != 4 {
@@ -208,7 +208,7 @@ func TestListShowPutRm(t *testing.T) {
 
 func TestValidateDocsMatchesOldHelper(t *testing.T) {
 	root := project(t)
-	os.MkdirAll(filepath.Join(root, ".hv/plans"), 0o777)
+	os.MkdirAll(filepath.Join(root, ".rota/plans"), 0o777)
 	os.WriteFile(path(root, "M03-B01"), []byte(golden(t, "validate-docs.plan.md")), 0o644)
 	ms, text, err := ValidateDocs(root, "M03-B01")
 	if err != nil {
@@ -217,7 +217,7 @@ func TestValidateDocsMatchesOldHelper(t *testing.T) {
 	if got := strings.ReplaceAll(text, root, "ROOT"); got != golden(t, "validate-docs.out") {
 		t.Errorf("text differs from golden:\n%s", got)
 	}
-	if len(ms) != 9 || ms[0].TargetRepo != "web" || ms[0].Suggestion == "" || ms[2].Issue != "sub-repo 'ghost' is not registered in .hv/repos.json" {
+	if len(ms) != 9 || ms[0].TargetRepo != "web" || ms[0].Suggestion == "" || ms[2].Issue != "sub-repo 'ghost' is not registered in .rota/repos.json" {
 		t.Errorf("mismatches = %+v", ms)
 	}
 	// Doc homes present: clean, empty text.
@@ -232,7 +232,7 @@ func TestValidateDocsMatchesOldHelper(t *testing.T) {
 
 func TestValidateDocsExits(t *testing.T) {
 	root := project(t)
-	os.MkdirAll(filepath.Join(root, ".hv/plans"), 0o777)
+	os.MkdirAll(filepath.Join(root, ".rota/plans"), 0o777)
 	if _, _, err := ValidateDocs(root, "M01-B01"); exitOf(err) != 3 {
 		t.Errorf("missing: %v", err)
 	}
@@ -247,8 +247,8 @@ func TestValidateDocsExits(t *testing.T) {
 
 func TestValidateDocsCustomSegmentAndCRLF(t *testing.T) {
 	root := project(t)
-	os.MkdirAll(filepath.Join(root, ".hv/plans"), 0o777)
-	os.WriteFile(filepath.Join(root, ".hv/config.json"), []byte(`{"docs": {"path": "/handbook/"}}`), 0o644)
+	os.MkdirAll(filepath.Join(root, ".rota/plans"), 0o777)
+	os.WriteFile(filepath.Join(root, ".rota/config.json"), []byte(`{"docs": {"path": "/handbook/"}}`), 0o644)
 	os.WriteFile(path(root, "M01-B01"), []byte("---\r\nkey: M01-B01\r\n---\r\n## Tasks\r\n- Files: handbook/a.md, docs/b.md\r\n"), 0o644)
 	ms, _, err := ValidateDocs(root, "M01-B01")
 	if err != nil || len(ms) != 1 || ms[0].Path != "handbook/a.md" {
@@ -314,7 +314,7 @@ func TestExplicitAndMintedSliceRace(t *testing.T) {
 		wg.Wait()
 		// Minting always succeeds; if it took S02 the explicit add must have been refused,
 		// otherwise it took S03 and both plans exist.
-		files, _ := filepath.Glob(filepath.Join(root, ".hv/plans/M01-S*.md"))
+		files, _ := filepath.Glob(filepath.Join(root, ".rota/plans/M01-S*.md"))
 		want := 2 + int(okExplicit.Load())
 		if okMint.Load() != 1 || len(files) != want {
 			t.Fatalf("round %d: explicit ok=%d mint=%v files=%v", round, okExplicit.Load(), mintedKey.Load(), files)
@@ -331,14 +331,14 @@ func TestExplicitAndMintedSliceRace(t *testing.T) {
 func TestUncertainMatchesOldHelper(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join("..", "proof", "testdata", "fixture")
-	hv := filepath.Join(root, ".hv")
+	rota := filepath.Join(root, ".rota")
 	filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
 		rel, _ := filepath.Rel(src, p)
 		if fi.IsDir() {
-			return os.MkdirAll(filepath.Join(hv, rel), 0o777)
+			return os.MkdirAll(filepath.Join(rota, rel), 0o777)
 		}
 		b, _ := os.ReadFile(p)
-		return os.WriteFile(filepath.Join(hv, rel), b, 0o644)
+		return os.WriteFile(filepath.Join(rota, rel), b, 0o644)
 	})
 	// The recorded run did uncertain after its proof adds, so B07 has the detail file they create.
 	if _, _, err := proof.Add(root, "B07", proof.AddOpts{Check: "unit  tests", Result: "PASS", Evidence: "go test ./... ok", Sha: "abc1234"}); err != nil {
@@ -370,14 +370,14 @@ func TestUncertainMatchesOldHelper(t *testing.T) {
 
 func TestUncertainHonoursOpenSections(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
-	os.WriteFile(filepath.Join(root, ".hv/BACKLOG.md"), []byte("## Bugs\n\n- **[B07] [Major] Vague.** unclear? TBD?\n\n## Features\n\n- **[F01] [Major] Vague.** unclear? TBD?\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o777)
+	os.WriteFile(filepath.Join(root, ".rota/BACKLOG.md"), []byte("## Bugs\n\n- **[B07] [Major] Vague.** unclear? TBD?\n\n## Features\n\n- **[F01] [Major] Vague.** unclear? TBD?\n"), 0o644)
 	if _, r, err := Uncertain(root, "F01"); err != nil || len(r) == 0 {
 		t.Fatalf("default sections: %v %v", r, err)
 	}
-	t.Setenv("HV_OPEN_SECTIONS", "Bugs")
+	t.Setenv("ROTA_OPEN_SECTIONS", "Bugs")
 	if _, _, err := Uncertain(root, "F01"); exitOf(err) != 3 {
-		t.Errorf("F01 outside HV_OPEN_SECTIONS: %v", err)
+		t.Errorf("F01 outside ROTA_OPEN_SECTIONS: %v", err)
 	}
 	if _, r, err := Uncertain(root, "B07"); err != nil || len(r) == 0 {
 		t.Errorf("B07 inside: %v %v", r, err)

@@ -3,14 +3,14 @@
 # check before the S7 PR leaves draft. Not part of smoke: it reads the tree,
 # not a verb.
 #
-#   1. bin/ holds exactly the `hv` launcher.
+#   1. bin/ holds exactly the launcher.
 #   2. No tracked file names a legacy helper, the .hv/bin mirror or hvlib.
 #   3. Nothing outside history and migration code uses the old name hv-skills.
-#   4. `hv init` in an empty git repo works and `hv init check` exits 0.
+#   4. `rota init` in an empty git repo works and `rota init check` exits 0.
 #
 # The legacy names come from test/validate-skills.py (LEGACY_HELPERS, frozen
 # from bin/), the same list the doclint section uses, so there is one list.
-# Usage: bash test/grep-gate.sh   (HV_BIN overrides the binary it builds)
+# Usage: bash test/grep-gate.sh   (ROTA_BIN overrides the binary it builds)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,7 +30,7 @@ NAMES="$(python3 test/validate-skills.py --list-legacy | paste -sd'|')"
 [ -n "$NAMES" ] || bad "validate-skills.py --list-legacy printed no names"
 PATTERN="(?<![\\w/.-])(?:${NAMES})(?![\\w-])|\\.hv/bin|hvlib|(?<![\\w.-])bin/hv-"
 SCOPE=(
-  'hv-*/' 'references/' 'docs/' 'test/' '*.md'
+  'rota-*/' 'references/' 'docs/' 'test/' '*.md'
   ':(glob)**/*_test.go' ':(glob)**/testdata/**'
   ':(exclude)CHANGELOG.md'
   ':(exclude)docs/design/5.0-*'
@@ -97,17 +97,17 @@ fi
 # 3. A fresh project initializes and passes its own check.
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "${SCRATCH:?}"' EXIT
-if [ -z "${HV_BIN:-}" ]; then
+if [ -z "${ROTA_BIN:-}" ]; then
   VERSION="$(tr -d '[:space:]' < VERSION)"
-  go build -ldflags "-X github.com/l4ci/hv/v5/internal/version.Version=$VERSION" -o "$SCRATCH/hv" ./cmd/hv
-  HV_BIN="$SCRATCH/hv"
+  go build -ldflags "-X github.com/l4ci/rota/internal/version.Version=$VERSION" -o "$SCRATCH/rota" ./cmd/rota
+  ROTA_BIN="$SCRATCH/rota"
 fi
 mkdir "$SCRATCH/proj"
 git -C "$SCRATCH/proj" init -q
-if (cd "$SCRATCH/proj" && "$HV_BIN" init >/dev/null); then
-  (cd "$SCRATCH/proj" && "$HV_BIN" init check >/dev/null) || bad "hv init check exits non-zero in a freshly initialized repo"
+if (cd "$SCRATCH/proj" && "$ROTA_BIN" init >/dev/null); then
+  (cd "$SCRATCH/proj" && "$ROTA_BIN" init check >/dev/null) || bad "rota init check exits non-zero in a freshly initialized repo"
 else
-  bad "hv init failed in an empty git repo"
+  bad "rota init failed in an empty git repo"
 fi
 
 [ "$fails" = 0 ] || { printf '%s check(s) failed\n' "$fails" >&2; exit 1; }

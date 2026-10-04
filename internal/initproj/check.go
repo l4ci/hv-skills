@@ -5,16 +5,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
 )
 
-// CoreFiles are the files `hv init check` requires under .hv/.
+// CoreFiles are the files `rota init check` requires under .rota/.
 var CoreFiles = []string{"DECISIONS.md", "BACKLOG.md", "KNOWLEDGE.md", "MILESTONES.md", "counters.json", "config.json", "status.json"}
 
 // CheckResult is the answer of Check. Missing holds every absent path
-// (`.hv` alone when the directory is missing), where hv-preflight named only
+// (`.rota` alone when the directory is missing), where hv-preflight named only
 // the first. Warnings are advisory and only reported for an initialized project.
 type CheckResult struct {
 	Initialized bool
@@ -23,18 +23,18 @@ type CheckResult struct {
 }
 
 // Check is hv-preflight without its helper-mirror half, which 5.0 drops. It
-// acts on root, with no walk-up. drift is the version-drift line (what `hv
+// acts on root, with no walk-up. drift is the version-drift line (what `rota
 // version --drift` reports), or nil.
 func Check(root string, drift func() string) CheckResult {
 	res := CheckResult{Missing: []string{}, Warnings: []string{}}
-	hv := filepath.Join(root, ".hv")
-	if fi, err := os.Stat(hv); err != nil || !fi.IsDir() {
-		res.Missing = []string{".hv"}
+	rota := filepath.Join(root, ".rota")
+	if fi, err := os.Stat(rota); err != nil || !fi.IsDir() {
+		res.Missing = []string{".rota"}
 		return res
 	}
 	for _, f := range CoreFiles {
-		if !isFile(filepath.Join(hv, f)) {
-			res.Missing = append(res.Missing, ".hv/"+f)
+		if !isFile(filepath.Join(rota, f)) {
+			res.Missing = append(res.Missing, ".rota/"+f)
 		}
 	}
 	if len(res.Missing) > 0 {
@@ -45,11 +45,11 @@ func Check(root string, drift func() string) CheckResult {
 	// The umbrella flag is informational; the registry is the truth
 	// (DECISIONS.md, "Persistence-trio scoping under umbrella mode"). A flag
 	// with no registered repos is a warning, never a failure.
-	if truthy(umbrellaFlag(hv)) && len(repos.Load(root)) == 0 {
-		if _, err := os.Stat(filepath.Join(hv, "repos.json")); err != nil {
-			res.Warnings = append(res.Warnings, "umbrella.enabled=true but .hv/repos.json missing — run `hv init umbrella` from the umbrella root to register, or set umbrella.enabled=false")
+	if truthy(umbrellaFlag(rota)) && len(repos.Load(root)) == 0 {
+		if _, err := os.Stat(filepath.Join(rota, "repos.json")); err != nil {
+			res.Warnings = append(res.Warnings, "umbrella.enabled=true but .rota/repos.json missing — run `rota init umbrella` from the umbrella root to register, or set umbrella.enabled=false")
 		} else {
-			res.Warnings = append(res.Warnings, "umbrella.enabled=true but no sub-repos in .hv/repos.json — run `hv init umbrella` from the umbrella root to register, or set umbrella.enabled=false")
+			res.Warnings = append(res.Warnings, "umbrella.enabled=true but no sub-repos in .rota/repos.json — run `rota init umbrella` from the umbrella root to register, or set umbrella.enabled=false")
 		}
 	}
 	if drift != nil {
@@ -60,8 +60,8 @@ func Check(root string, drift func() string) CheckResult {
 	return res
 }
 
-func umbrellaFlag(hv string) any {
-	v, _ := config.Lookup(config.Load(filepath.Join(hv, "config.json")), "umbrella.enabled")
+func umbrellaFlag(rota string) any {
+	v, _ := config.Lookup(config.Load(filepath.Join(rota, "config.json")), "umbrella.enabled")
 	return v
 }
 

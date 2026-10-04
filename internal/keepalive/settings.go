@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/hook"
 )
 
 // Settings are the orchestrator.* keepalive keys (the contract's Config
@@ -25,7 +25,7 @@ type Settings struct {
 }
 
 // DefaultPrompt is the default of orchestrator.restartPrompt.
-const DefaultPrompt = "Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round."
+const DefaultPrompt = "Continue as orchestrator: read the handoff injected at session start, run rota round status, and resume the round."
 
 const maxInt = 1 << 30
 

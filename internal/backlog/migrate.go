@@ -12,26 +12,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
-// `hv migrate issues` (bin/hv-migrate-issues): move a file-backend project's
+// `rota migrate issues` (bin/hv-migrate-issues): move a file-backend project's
 // open backlog and its planned or active milestones onto the issue tracker.
-// The map .hv/issue-map.json is written after every successful write, so a
+// The map .rota/issue-map.json is written after every successful write, so a
 // run that stops (a tracker error, a rate limit, --limit) resumes from it.
 
 // Migration refusals; the verb maps them to exits 3 and 4.
 var (
-	// ErrNothingToMigrate: .hv/BACKLOG.md does not exist.
+	// ErrNothingToMigrate: .rota/BACKLOG.md does not exist.
 	ErrNothingToMigrate = errors.New("nothing to migrate")
-	// ErrUmbrellaMigrate: .hv/repos.json registers sub-repos.
+	// ErrUmbrellaMigrate: .rota/repos.json registers sub-repos.
 	ErrUmbrellaMigrate = errors.New("umbrella mode: migrate each sub-repo separately")
-	// ErrBadMap: .hv/issue-map.json is valid JSON but not an object.
+	// ErrBadMap: .rota/issue-map.json is valid JSON but not an object.
 	ErrBadMap = errors.New("issue-map.json is not a JSON object")
 )
 
@@ -41,7 +41,7 @@ type MigrateTracker = MilestoneTracker
 
 // MigrateOptions are the inputs of one run.
 type MigrateOptions struct {
-	Root  string // the project root, the directory that holds .hv/
+	Root  string // the project root, the directory that holds .rota/
 	Apply bool   // false only reports what it would do
 	Limit int    // create at most this many items; negative is no limit
 	Cfg   any    // loaded config
@@ -62,8 +62,8 @@ type MigrateOp struct{ Action, Text string }
 type MigrateResult struct {
 	Lines    []string // the old helper's stdout, line by line
 	Ops      []MigrateOp
-	Map      *jsonx.Object // preview: the would-be map; apply: .hv/issue-map.json afterwards
-	Migrated int           // items with an issue in .hv/issue-map.json
+	Map      *jsonx.Object // preview: the would-be map; apply: .rota/issue-map.json afterwards
+	Migrated int           // items with an issue in .rota/issue-map.json
 	Total    int           // open items found
 	Changed  bool          // the map or BACKLOG.md was written
 	Done     bool          // apply only: every item and milestone exists and BACKLOG.md is frozen
@@ -109,12 +109,12 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 	if o.Today == nil {
 		o.Today = func() string { return time.Now().Format("2006-01-02") }
 	}
-	hv := filepath.Join(o.Root, ".hv")
-	backlogPath := filepath.Join(hv, "BACKLOG.md")
+	rota := filepath.Join(o.Root, ".rota")
+	backlogPath := filepath.Join(rota, "BACKLOG.md")
 	text, err := fsio.ReadText(backlogPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: .hv/BACKLOG.md not found", ErrNothingToMigrate)
+			return nil, fmt.Errorf("%w: .rota/BACKLOG.md not found", ErrNothingToMigrate)
 		}
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 		return nil, ErrUmbrellaMigrate
 	}
 	m := &migrator{o: o, ctx: migrateCtx(o.Ctx), apply: o.Apply, msCache: map[string]bool{},
-		mapRel: filepath.Join(hv, "issue-map.json"), res: &MigrateResult{}}
+		mapRel: filepath.Join(rota, "issue-map.json"), res: &MigrateResult{}}
 	m.items = planItems(o.Root, text, o.Warn)
 	m.ms = planMilestones(o.Root)
 	m.msIDs = map[string]bool{}
@@ -157,10 +157,10 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 			}
 		}
 		if te.Kind == tracker.KindRateLimited {
-			m.say(fmt.Sprintf("rate limited: %d of %d items migrated; the map is saved in .hv/issue-map.json", migrated, len(m.items)))
+			m.say(fmt.Sprintf("rate limited: %d of %d items migrated; the map is saved in .rota/issue-map.json", migrated, len(m.items)))
 			m.say("re-run to continue")
 		} else {
-			m.say("stopped on a tracker error; the map is saved in .hv/issue-map.json; fix the cause and re-run to continue")
+			m.say("stopped on a tracker error; the map is saved in .rota/issue-map.json; fix the cause and re-run to continue")
 		}
 	}
 	if !m.apply {
@@ -203,13 +203,13 @@ func MigrateIssues(o MigrateOptions) (*MigrateResult, error) {
 		return m.finish(), nil
 	}
 	if !strings.HasPrefix(strings.TrimLeftFunc(text, pystr.IsSpace), frozenPrefix) {
-		banner := fmt.Sprintf("%s this backlog moved to the issue tracker on %s (see .hv/issue-map.json). Edit issues, not this file.", frozenPrefix, o.Today())
+		banner := fmt.Sprintf("%s this backlog moved to the issue tracker on %s (see .rota/issue-map.json). Edit issues, not this file.", frozenPrefix, o.Today())
 		if err := fsio.WriteFileAtomic(backlogPath, []byte(banner+"\n\n"+text)); err != nil {
 			return m.finish(), err
 		}
-		m.say("froze .hv/BACKLOG.md")
+		m.say("froze .rota/BACKLOG.md")
 	}
-	m.say("Next: hv config set backlog.backend issues")
+	m.say("Next: rota config set backlog.backend issues")
 	m.res.Done = true
 	return m.finish(), nil
 }
@@ -254,7 +254,7 @@ func truthy(v any) bool {
 // state is the map file and BACKLOG.md as bytes, to tell whether a run wrote.
 func (m *migrator) state() string {
 	a, _ := os.ReadFile(m.mapRel)
-	b, _ := os.ReadFile(filepath.Join(m.o.Root, ".hv", "BACKLOG.md"))
+	b, _ := os.ReadFile(filepath.Join(m.o.Root, ".rota", "BACKLOG.md"))
 	return string(a) + "\x00" + string(b)
 }
 
@@ -728,7 +728,7 @@ func jn(n int) json.Number { return json.Number(strconv.Itoa(n)) }
 
 // ---- milestones: a native milestone and a tracking issue ----------------------------
 
-// The milestone calls live on Issues (milestones.go), shared with hv
+// The milestone calls live on Issues (milestones.go), shared with rota
 // milestone; the migrator only builds the backend and passes its inputs.
 
 func (m *migrator) trackerIssue(mid string) (Issue, error) {

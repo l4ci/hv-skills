@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test for the hv binary. Builds a throwaway .hv/ in a tmpdir, then
+# Smoke test for the rota binary. Builds a throwaway .rota/ in a tmpdir, then
 # sources every section under test/sections/ in alphabetical order. Each
 # section runs in the shared $TMP cwd and may rely on cumulative state from
 # earlier sections — order is load-bearing.
@@ -51,7 +51,7 @@ fi
 
 # macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
-# from verbs like `hv repo umbrella` (which would otherwise mismatch on Darwin).
+# from verbs like `rota repo umbrella` (which would otherwise mismatch on Darwin).
 # Root every temp dir of this run under one base (#110). Sections and
 # the helpers all call mktemp, and sections replace the EXIT trap (F38), so
 # per-site cleanup cannot be relied on: TMPDIR rooting lets the runner remove
@@ -60,20 +60,20 @@ RUN_TMP="$(cd "$(mktemp -d)" && pwd -P)"
 export TMPDIR="$RUN_TMP"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 
-# Black-box target (#46): sections call "$HV_BIN <group> <verb>". It defaults
+# Black-box target (#46): sections call "$ROTA_BIN <group> <verb>". It defaults
 # to the Go binary built once from this checkout, stamped with the VERSION
-# file so version-drift checks see a matching install. Point HV_BIN at any
-# other `hv` binary (absolute path: sections cd) to run the suite against it.
+# file so version-drift checks see a matching install. Point ROTA_BIN at any
+# other `rota` binary (absolute path: sections cd) to run the suite against it.
 # The binary and the scratch dir for the poison stand-ins below live under
 # $RUN_TMP, so the EXIT trap removes them with everything else.
-HV_STAGE="$(mktemp -d)"
-if [ -z "${HV_BIN:-}" ]; then
-  HV_VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-  (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv/v5/internal/version.Version=$HV_VERSION" \
-    -o "$HV_STAGE/hv" ./cmd/hv) || { echo "runner: go build ./cmd/hv failed" >&2; exit 2; }
-  HV_BIN="$HV_STAGE/hv"
+ROTA_STAGE="$(mktemp -d)"
+if [ -z "${ROTA_BIN:-}" ]; then
+  ROTA_VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
+  (cd "$REPO" && go build -ldflags "-X github.com/l4ci/rota/internal/version.Version=$ROTA_VERSION" \
+    -o "$ROTA_STAGE/rota" ./cmd/rota) || { echo "runner: go build ./cmd/rota failed" >&2; exit 2; }
+  ROTA_BIN="$ROTA_STAGE/rota"
 fi
-export HV_BIN
+export ROTA_BIN
 trap 'rm -rf "$RUN_TMP"' EXIT
 
 # Forge and host guard: no section may reach a real gh, glab, herdr or tmux.
@@ -81,22 +81,22 @@ trap 'rm -rf "$RUN_TMP"' EXIT
 # agents' panes. Poison stand-ins sit first on PATH for every section; a
 # section that wants a fake puts it in front of them, as it already does. A poison call logs itself
 # and exits 99, and any logged call fails the run after the leak guard. A
-# section that resets PATH must start it with "$HV_POISON_BIN".
-export HV_POISON_BIN="$HV_STAGE/poison"  # sections that reset PATH keep this first
-HV_POISON_LOG="$HV_STAGE/poison.log"
-mkdir -p "$HV_POISON_BIN" && : > "$HV_POISON_LOG"
+# section that resets PATH must start it with "$ROTA_POISON_BIN".
+export ROTA_POISON_BIN="$ROTA_STAGE/poison"  # sections that reset PATH keep this first
+ROTA_POISON_LOG="$ROTA_STAGE/poison.log"
+mkdir -p "$ROTA_POISON_BIN" && : > "$ROTA_POISON_LOG"
 for cli in gh glab herdr tmux codex; do
-  printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$HV_POISON_LOG" > "$HV_POISON_BIN/$cli"
-  chmod +x "$HV_POISON_BIN/$cli"
+  printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 99\n' "$cli" "$ROTA_POISON_LOG" > "$ROTA_POISON_BIN/$cli"
+  chmod +x "$ROTA_POISON_BIN/$cli"
 done
-export PATH="$HV_POISON_BIN:$PATH"
+export PATH="$ROTA_POISON_BIN:$PATH"
 # Nor may a section inherit this shell's live host identity (pane, tab,
 # socket): sections that need one set fake values themselves.
 for v in $(compgen -e | grep -E '^(HERDR_|TMUX)'); do unset "$v"; done
 
-# Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .hv/
+# Leak guard: snapshot $REPO/CLAUDE.md and the dev tree's tracked .rota/
 # content before any section runs. Under v4.1's partial-tracking model
-# (.hv/ files committed to the repo), a section helper that walks up past
+# (.rota/ files committed to the repo), a section helper that walks up past
 # $TMP can clobber real project state. The post-loop assertion below
 # restores + fails. The check is explicit-at-end (not EXIT-trap-based)
 # because sections follow the F38 local-trap convention and overwrite
@@ -113,22 +113,22 @@ if [ -f "$REPO_AGENTS" ]; then
   REPO_AGENTS_SNAP="$(mktemp)"
   cp "$REPO_AGENTS" "$REPO_AGENTS_SNAP"
 fi
-# Snapshot dev tree's tracked .hv/ content. We snap the whole subtree
+# Snapshot dev tree's tracked .rota/ content. We snap the whole subtree
 # (excluding gitignored paths) so any leak surfaces as a diff at the end.
-REPO_HV_SNAP=""
-if [ -d "$REPO/.hv" ]; then
-  REPO_HV_SNAP="$(mktemp -d)"
+REPO_ROTA_SNAP=""
+if [ -d "$REPO/.rota" ]; then
+  REPO_ROTA_SNAP="$(mktemp -d)"
   # Use git ls-files to capture exactly what git tracks, preserving paths.
-  (cd "$REPO" && git ls-files .hv/) | while IFS= read -r f; do
-    mkdir -p "$REPO_HV_SNAP/$(dirname "$f")"
-    cp "$REPO/$f" "$REPO_HV_SNAP/$f"
+  (cd "$REPO" && git ls-files .rota/) | while IFS= read -r f; do
+    mkdir -p "$REPO_ROTA_SNAP/$(dirname "$f")"
+    cp "$REPO/$f" "$REPO_ROTA_SNAP/$f"
   done
 fi
 
 cd "$TMP"
-mkdir -p .hv/bugs .hv/features .hv/tasks .hv/milestones
+mkdir -p .rota/bugs .rota/features .rota/tasks .rota/milestones
 
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -139,19 +139,19 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-cat > .hv/MILESTONES.md <<'EOF'
+cat > .rota/MILESTONES.md <<'EOF'
 # Milestones
 
-_(no vision yet — run `/hv-vision` to brainstorm milestones)_
+_(no vision yet — run `/rota-vision` to brainstorm milestones)_
 
 ## Active milestones
 
-_(none active — set with `/hv-vision`)_
+_(none active — set with `/rota-vision`)_
 
 ## Milestones
 EOF
-echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
-echo '{"active":[]}' > .hv/status.json
+echo '{"bugs":0,"features":0,"tasks":0,"milestones":0}' > .rota/counters.json
+echo '{"active":[]}' > .rota/status.json
 
 git init -q
 git config user.email t@t && git config user.name t
@@ -170,7 +170,7 @@ check_section_conventions "$TESTDIR/sections" || exit 1
 #
 # cd back to $TMP before each section. Under v4.1's partial-tracking model,
 # a section that leaves cwd inside a sub-fixture (via inner cd) and lets the
-# next section's `.hv/` writes target the dev tree's `.hv/` is a real leak.
+# next section's `.rota/` writes target the dev tree's `.rota/` is a real leak.
 # This pin is defensive — sections following the F38 local-trap convention
 # should already restore cwd, but enforcing it at the boundary makes the
 # leak guard catch only true walk-up clobbers, not cwd-drift residue.
@@ -191,9 +191,9 @@ SECTIONS_RC=$?
 set -e
 
 # Leak guard assertion: if any section wrote to $REPO/CLAUDE.md or any
-# tracked .hv/ file in the dev tree, restore from snapshot and fail.
+# tracked .rota/ file in the dev tree, restore from snapshot and fail.
 # Smoke is supposed to be hermetic w.r.t. $TMP; a diff here means a
-# helper walked up past $TMP/.hv to the dev tree's.
+# helper walked up past $TMP/.rota to the dev tree's.
 LEAKED=0
 if [ -n "$REPO_CLAUDE_SNAP" ] && ! cmp -s "$REPO_CLAUDE_SNAP" "$REPO_CLAUDE"; then
   printf '\n\033[31merror: smoke leaked into %s — restoring from snapshot\033[0m\n' "$REPO_CLAUDE" >&2
@@ -205,9 +205,9 @@ if [ -n "$REPO_AGENTS_SNAP" ] && ! cmp -s "$REPO_AGENTS_SNAP" "$REPO_AGENTS"; th
   cp "$REPO_AGENTS_SNAP" "$REPO_AGENTS"
   LEAKED=1
 fi
-if [ -n "$REPO_HV_SNAP" ]; then
+if [ -n "$REPO_ROTA_SNAP" ]; then
   while IFS= read -r f; do
-    snap_path="$REPO_HV_SNAP/$f"
+    snap_path="$REPO_ROTA_SNAP/$f"
     live_path="$REPO/$f"
     if [ -f "$snap_path" ] && [ -f "$live_path" ] && ! cmp -s "$snap_path" "$live_path"; then
       printf '\n\033[31merror: smoke leaked into %s — restoring from snapshot\033[0m\n' "$live_path" >&2
@@ -219,24 +219,24 @@ if [ -n "$REPO_HV_SNAP" ]; then
       cp "$snap_path" "$live_path"
       LEAKED=1
     fi
-  done < <(cd "$REPO_HV_SNAP" && find . -type f | sed 's|^\./||')
+  done < <(cd "$REPO_ROTA_SNAP" && find . -type f | sed 's|^\./||')
 fi
 [ -n "$REPO_CLAUDE_SNAP" ] && rm -f "$REPO_CLAUDE_SNAP"
 [ -n "$REPO_AGENTS_SNAP" ] && rm -f "$REPO_AGENTS_SNAP"
-[ -n "$REPO_HV_SNAP" ] && rm -rf "$REPO_HV_SNAP"
+[ -n "$REPO_ROTA_SNAP" ] && rm -rf "$REPO_ROTA_SNAP"
 # Temp-dir guard (#110): everything the run made is under $RUN_TMP. Entries
 # other than the runner's own were left behind by sections or helpers; report
 # the count so growth shows up, then the EXIT trap removes it all.
-RUN_LEFT="$(find "$RUN_TMP" -mindepth 1 -maxdepth 1 ! -path "$TMP" ! -path "$HV_STAGE" 2>/dev/null | wc -l | tr -d ' ')"
+RUN_LEFT="$(find "$RUN_TMP" -mindepth 1 -maxdepth 1 ! -path "$TMP" ! -path "$ROTA_STAGE" 2>/dev/null | wc -l | tr -d ' ')"
 [ "$RUN_LEFT" -eq 0 ] || printf 'note: %s temp entries left under %s by sections; removing them\n' "$RUN_LEFT" "$RUN_TMP" >&2
-if [ "$RUN_LEFT" -gt "${HV_SMOKE_TMP_MAX:-150}" ]; then
-  printf '\n\033[31merror: %s temp entries left under %s (limit %s); a section or helper is leaking\033[0m\n' "$RUN_LEFT" "$RUN_TMP" "${HV_SMOKE_TMP_MAX:-150}" >&2
+if [ "$RUN_LEFT" -gt "${ROTA_SMOKE_TMP_MAX:-150}" ]; then
+  printf '\n\033[31merror: %s temp entries left under %s (limit %s); a section or helper is leaking\033[0m\n' "$RUN_LEFT" "$RUN_TMP" "${ROTA_SMOKE_TMP_MAX:-150}" >&2
   LEAKED=1
 fi
 [ "$LEAKED" = 1 ] && exit 1
-if [ -s "$HV_POISON_LOG" ]; then
+if [ -s "$ROTA_POISON_LOG" ]; then
   printf '\n\033[31merror: a section called a real forge or host CLI (poison gh/glab/herdr/tmux on PATH):\033[0m\n' >&2
-  sed 's/^/  /' "$HV_POISON_LOG" >&2
+  sed 's/^/  /' "$ROTA_POISON_LOG" >&2
   exit 1
 fi
 [ "$SECTIONS_RC" = 0 ] || exit "$SECTIONS_RC"

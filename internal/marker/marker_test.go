@@ -8,9 +8,9 @@ func TestLine(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"blocked", nil, "<!-- hv:blocked -->"},
-		{"escalation", []string{"e1"}, "<!-- hv:escalation e1 -->"},
-		{"x", []string{"a", "b"}, "<!-- hv:x a b -->"},
+		{"blocked", nil, "<!-- rota:blocked -->"},
+		{"escalation", []string{"e1"}, "<!-- rota:escalation e1 -->"},
+		{"x", []string{"a", "b"}, "<!-- rota:x a b -->"},
 	} {
 		if got := Line(c.kind, c.args...); got != c.want {
 			t.Errorf("Line(%q,%v) = %q, want %q", c.kind, c.args, got, c.want)

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 func newIssues(t *testing.T, cfg string, issues ...Issue) (*Issues, *fakeTracker) {
@@ -50,7 +50,7 @@ func TestIssuesCreate(t *testing.T) {
 	if res.ID != "1" || res.Type != "B" || res.Detail != "" {
 		t.Fatalf("result %+v", res)
 	}
-	body := "why\n\nSee {ID}\n\n<!-- hv:fields\nRelated: F1\n-->"
+	body := "why\n\nSee {ID}\n\n<!-- rota:fields\nRelated: F1\n-->"
 	fixed := strings.ReplaceAll(body, "{ID}", "B1")
 	wantCalls(t, tr, `find_milestone["M07"] ensure_labels[["type:bug","p1"],true] `+
 		`create["Fix it","`+strings.ReplaceAll(body, "\n", `\n`)+`",["type:bug","p1"],"M07 — Title"] `+
@@ -95,7 +95,7 @@ func TestIssuesCreateErrors(t *testing.T) {
 }
 
 func TestIssuesSetField(t *testing.T) {
-	blocked := Issue{Number: 2, Title: "T", State: "open", Body: "text\n\n<!-- hv:fields\nRelated: B1\nRepos: web\n-->", Milestone: "M07 — Title"}
+	blocked := Issue{Number: 2, Title: "T", State: "open", Body: "text\n\n<!-- rota:fields\nRelated: B1\nRepos: web\n-->", Milestone: "M07 — Title"}
 	closed := Issue{Number: 3, Title: "T", State: "closed"}
 	for _, c := range []struct {
 		name, ref, field, value string
@@ -111,9 +111,9 @@ func TestIssuesSetField(t *testing.T) {
 		{"milestone gone", "1", "milestone", "M42", false, ErrNotFound, `get[1] find_milestone["M42"]`},
 		{"block same", "2", "related", "B1", false, nil, `get[2]`},
 		{"block replace keeps order", "2", "related", "F5,  B6", true, nil,
-			`get[2] edit[2,{"body":"text\n\n<!-- hv:fields\nRelated: F5, B6\nRepos: web\n-->"}]`},
-		{"block clear", "2", "repos", "", true, nil, `get[2] edit[2,{"body":"text\n\n<!-- hv:fields\nRelated: B1\n-->"}]`},
-		{"block new", "1", "subsystem", "capture", true, nil, `get[1] edit[1,{"body":"<!-- hv:fields\nSubsystem: capture\n-->"}]`},
+			`get[2] edit[2,{"body":"text\n\n<!-- rota:fields\nRelated: F5, B6\nRepos: web\n-->"}]`},
+		{"block clear", "2", "repos", "", true, nil, `get[2] edit[2,{"body":"text\n\n<!-- rota:fields\nRelated: B1\n-->"}]`},
+		{"block new", "1", "subsystem", "capture", true, nil, `get[1] edit[1,{"body":"<!-- rota:fields\nSubsystem: capture\n-->"}]`},
 		{"detail", "1", "detail", "x", false, ErrInvalid, ``},
 		{"unknown", "99", "related", "x", false, ErrNotFound, `get[99]`},
 		{"closed", "3", "related", "x", false, ErrClosed, `get[3]`},
@@ -144,18 +144,18 @@ func TestIssuesComplete(t *testing.T) {
 	if ok, err := b.Complete("1", CompleteInput{Commit: "abc", Reason: "done", NoProof: true, Note: "a\nb  c"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[1] remove_labels[1,["in-progress","blocked"]] close[1,"completed","Done in `+"`abc`"+` — a b c\n\n<!-- hv:done -->"]`)
+	wantCalls(t, tr, `get[1] remove_labels[1,["in-progress","blocked"]] close[1,"completed","Done in `+"`abc`"+` — a b c\n\n<!-- rota:done -->"]`)
 	if is := tr.Issues[0]; is.State != "closed" || is.StateReason != "completed" || strings.Join(is.Labels, ",") != "keep" {
 		t.Fatalf("%+v", is)
 	}
 
 	// done with a proof note: two rows in its Proof section.
 	tr.Calls = nil
-	tr.Issues[1].Comments = []tracker.Comment{{ID: "7", Body: "<!-- hv:proof -->\n## Proof\n- build · PASS · ok\n- tests · PASS · ok\n"}}
+	tr.Issues[1].Comments = []tracker.Comment{{ID: "7", Body: "<!-- rota:proof -->\n## Proof\n- build · PASS · ok\n- tests · PASS · ok\n"}}
 	if ok, err := b.Complete("#2", CompleteInput{Commit: "def", Reason: "done"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[2] comments[2] close[2,"completed","Done in `+"`def`"+`\n\n<!-- hv:done -->"]`)
+	wantCalls(t, tr, `get[2] comments[2] close[2,"completed","Done in `+"`def`"+`\n\n<!-- rota:done -->"]`)
 
 	// dropped and handed-off close as not planned and skip the proof gate.
 	for _, reason := range []string{"dropped", "handed-off"} {
@@ -163,7 +163,7 @@ func TestIssuesComplete(t *testing.T) {
 		if ok, err := b.Complete("5", CompleteInput{Commit: "x", Reason: reason, Note: "n"}); !ok || err != nil {
 			t.Fatal(ok, err)
 		}
-		wantCalls(t, tr, `get[5] close[5,"not_planned","Closed: `+reason+` — n\n\n<!-- hv:closed -->"]`)
+		wantCalls(t, tr, `get[5] close[5,"not_planned","Closed: `+reason+` — n\n\n<!-- rota:closed -->"]`)
 	}
 
 	// blocked: label plus comment, no proof gate; blocked again is a no-op.
@@ -171,7 +171,7 @@ func TestIssuesComplete(t *testing.T) {
 	if ok, err := b.Complete("6", CompleteInput{Reason: "blocked", Note: "waiting"}); !ok || err != nil {
 		t.Fatal(ok, err)
 	}
-	wantCalls(t, tr, `get[6] add_labels[6,["blocked"],true] add_comment[6,"Blocked — waiting\n\n<!-- hv:blocked -->"]`)
+	wantCalls(t, tr, `get[6] add_labels[6,["blocked"],true] add_comment[6,"Blocked — waiting\n\n<!-- rota:blocked -->"]`)
 	tr.Calls = nil
 	if ok, _ := b.Complete("6", CompleteInput{Reason: "blocked"}); ok {
 		t.Fatal("already blocked must be a no-op")
@@ -197,7 +197,7 @@ func TestIssuesCompleteProofSeam(t *testing.T) {
 	if ok, err := b.Complete("1", CompleteInput{Commit: "c", Reason: "done"}); !ok || err != nil || asked != "T1" {
 		t.Fatal(ok, err, asked)
 	}
-	wantCalls(t, tr, `get[1] close[1,"completed","Done in `+"`c`"+`\n\n<!-- hv:done -->"]`)
+	wantCalls(t, tr, `get[1] close[1,"completed","Done in `+"`c`"+`\n\n<!-- rota:done -->"]`)
 }
 
 func TestIssuesReopen(t *testing.T) {
@@ -227,7 +227,7 @@ func TestIssuesReady(t *testing.T) {
 	crit := Issue{Number: 1, State: "open", Body: "## Acceptance\n- [ ] ok"}
 	bare := open(2)
 	noted := open(3)
-	noted.Comments = []tracker.Comment{{ID: "1", Body: "<!-- hv:plan -->\nsteps"}}
+	noted.Comments = []tracker.Comment{{ID: "1", Body: "<!-- rota:plan -->\nsteps"}}
 	b, tr := newIssues(t, `{}`, crit, bare, noted)
 	tr.Issues[2].Comments = noted.Comments
 	for _, c := range []struct {
@@ -257,9 +257,9 @@ func TestIssuesComments(t *testing.T) {
 	if err != nil || id == "" {
 		t.Fatal(id, err)
 	}
-	wantCalls(t, tr, `add_comment[1,"<!-- hv:comment question -->\nWhy?\nBecause."]`)
+	wantCalls(t, tr, `add_comment[1,"<!-- rota:comment question -->\nWhy?\nBecause."]`)
 	tr.Issues[0].Comments = append(tr.Issues[0].Comments,
-		tracker.Comment{ID: "9", Body: "plain chatter"}, tracker.Comment{ID: "10", Body: "<!-- hv:comment answer -->\n\nA\n\n", Author: "bob"})
+		tracker.Comment{ID: "9", Body: "plain chatter"}, tracker.Comment{ID: "10", Body: "<!-- rota:comment answer -->\n\nA\n\n", Author: "bob"})
 	rows, err := b.Comments("1", "")
 	if err != nil || len(rows) != 2 || rows[0] != (Comment{"fake-user", "question", "Why?\nBecause."}) || rows[1] != (Comment{"bob", "answer", "A"}) {
 		t.Fatalf("%+v, %v", rows, err)
@@ -314,7 +314,7 @@ func TestIssuesNotes(t *testing.T) {
 }
 
 func TestIssuesNoteSplit(t *testing.T) {
-	t.Setenv("HV_NOTE_LIMIT", "100")
+	t.Setenv("ROTA_NOTE_LIMIT", "100")
 	b, tr := newIssues(t, `{}`, open(1))
 	long := strings.Repeat("0123456789 abcdefghij\n", 12) + strings.Repeat("x", 250)
 	if _, err := b.NotePut("1", "plan", long); err != nil {
@@ -325,7 +325,7 @@ func TestIssuesNoteSplit(t *testing.T) {
 		t.Fatalf("%d parts", n)
 	}
 	for i, c := range tr.Issues[0].Comments {
-		if !strings.HasPrefix(c.Body, "<!-- hv:plan "+string(rune('1'+i))+"/"+string(rune('0'+n))+" -->\n") || len([]rune(c.Body)) > 100 {
+		if !strings.HasPrefix(c.Body, "<!-- rota:plan "+string(rune('1'+i))+"/"+string(rune('0'+n))+" -->\n") || len([]rune(c.Body)) > 100 {
 			t.Fatalf("part %d: %q", i, c.Body)
 		}
 	}
@@ -341,11 +341,11 @@ func TestIssuesNoteSplit(t *testing.T) {
 		t.Fatalf("calls %s", calls(tr))
 	}
 	// a line longer than a part is cut; an unparsable limit falls back to the default
-	t.Setenv("HV_NOTE_LIMIT", "abc")
+	t.Setenv("ROTA_NOTE_LIMIT", "abc")
 	if noteLimit() != noteLimitDefault {
 		t.Fatal(noteLimit())
 	}
-	t.Setenv("HV_NOTE_LIMIT", "5")
+	t.Setenv("ROTA_NOTE_LIMIT", "5")
 	if noteLimit() != 80 {
 		t.Fatal(noteLimit())
 	}
@@ -357,7 +357,7 @@ func TestIssuesClaimReleaseState(t *testing.T) {
 	if !won || holder != "alice" || err != nil {
 		t.Fatal(won, holder, err)
 	}
-	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- hv:claim alice -->\nClaimed by alice"] comments[1] `+
+	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- rota:claim alice -->\nClaimed by alice"] comments[1] `+
 		`ensure_labels[["in-progress"],true] edit[1,{"add_labels":["in-progress"],"remove_labels":["needs-review"]}] assign_self[1]`)
 	if is := tr.Issues[0]; strings.Join(is.Labels, ",") != "keep,in-progress" || len(is.Assignees) != 1 {
 		t.Fatalf("%+v", is)
@@ -374,7 +374,7 @@ func TestIssuesClaimReleaseState(t *testing.T) {
 	if won || holder != "alice" || err != nil {
 		t.Fatal(won, holder, err)
 	}
-	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- hv:claim bob -->\nClaimed by bob"] comments[1] add_comment[1,"<!-- hv:release bob -->"]`)
+	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- rota:claim bob -->\nClaimed by bob"] comments[1] add_comment[1,"<!-- rota:release bob -->"]`)
 	if _, _, err := b.Claim("2", "x"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("closed: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestIssuesClaimReleaseState(t *testing.T) {
 	if ok, _ := b.Release("1", "alice"); !ok {
 		t.Fatal("release")
 	}
-	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- hv:release alice -->"] remove_labels[1,["in-progress"]]`)
+	wantCalls(t, tr, `get[1] comments[1] add_comment[1,"<!-- rota:release alice -->"] remove_labels[1,["in-progress"]]`)
 
 	// state: one edit leaves exactly one state label
 	tr.Calls = nil
@@ -413,13 +413,13 @@ func TestIssuesStatus(t *testing.T) {
 		Milestone: "M07 — Title", Assignees: []string{"alice"}}
 	b, tr := newIssues(t, `{}`, is)
 	tr.Issues[0].Comments = []tracker.Comment{
-		{ID: "1", Body: "<!-- hv:claim a -->\nClaimed by a"},
-		{ID: "2", Body: "<!-- hv:claim b -->\nClaimed by b"},
-		{ID: "3", Body: "<!-- hv:design -->\nD"},
-		{ID: "4", Body: "<!-- hv:plan 1/2 -->\nP"},
-		{ID: "5", Body: "<!-- hv:design -->\nD2"},
-		{ID: "6", Body: "<!-- hv:comment feedback -->\nnice", Author: "eve"},
-		{ID: "7", Body: "<!-- hv:release a -->"},
+		{ID: "1", Body: "<!-- rota:claim a -->\nClaimed by a"},
+		{ID: "2", Body: "<!-- rota:claim b -->\nClaimed by b"},
+		{ID: "3", Body: "<!-- rota:design -->\nD"},
+		{ID: "4", Body: "<!-- rota:plan 1/2 -->\nP"},
+		{ID: "5", Body: "<!-- rota:design -->\nD2"},
+		{ID: "6", Body: "<!-- rota:comment feedback -->\nnice", Author: "eve"},
+		{ID: "7", Body: "<!-- rota:release a -->"},
 	}
 	st, err := b.Status("F4")
 	if err != nil {

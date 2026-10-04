@@ -1,17 +1,17 @@
 # Doctor and reap
 
-Two verbs bracket a [round](parallel-rounds.md). `hv doctor` checks the machine before it starts.
-`hv reap` clears what the round left behind after it ends.
+Two verbs bracket a [round](parallel-rounds.md). `rota doctor` checks the machine before it starts.
+`rota reap` clears what the round left behind after it ends.
 
-## hv doctor
+## rota doctor
 
 ```sh
-hv doctor            # one line per check: status, name, detail
-hv doctor --json     # {"ok": bool, "checks": [...]}
+rota doctor            # one line per check: status, name, detail
+rota doctor --json     # {"ok": bool, "checks": [...]}
 ```
 
 It is read-only. It never writes, never calls a usage endpoint (so it spends no quota) and runs
-without `.hv/`, falling back to default config. Each line is `pass`, `fail` or `skip`. Every `fail`
+without `.rota/`, falling back to default config. Each line is `pass`, `fail` or `skip`. Every `fail`
 carries a hint: the one command or edit that fixes it.
 
 **Exit codes.** `0` when every check passes or skips. `1` when any check fails; `--json` still prints
@@ -25,28 +25,28 @@ never exits 5.
 | `tracker` | `gh` or `glab` on `PATH` and authenticated, for the project's provider | the project has no remote |
 | `accounts` | every account in `work.accounts` has an existing `configDir` with a credentials file | no accounts configured |
 | `hook` | herdr's agent integration for each account (`herdr integration status`) | the host is not herdr, or no account is configured |
-| `statusline` | the effective statusline runs `hv statusline dump` | hooks not installed (opt-in) |
-| `stop-hook` | a `Stop` and a `SessionStart` entry marked `# hv-hook`, and the command resolves | hooks not installed (opt-in) |
+| `statusline` | the effective statusline runs `rota statusline dump` | hooks not installed (opt-in) |
+| `stop-hook` | a `Stop` and a `SessionStart` entry marked `# rota-hook`, and the command resolves | hooks not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: the Stop hook and two accounts with a `configDir` | the key is off |
-| `skills` | every installed skills root (user and project, Claude and Codex) matches the binary's skill set, has no missing or edited files, and no `hv-skills@` plugin is still installed | no root has a `.hv-manifest.json` (run `hv skills install`) |
+| `skills` | every installed skills root (user and project, Claude and Codex) matches the binary's skill set, has no missing or edited files, and no `hv-skills@` plugin is still installed | no root has a `.rota-manifest.json` (run `rota skills install`) |
 | `codex` | `codex` version in the supported range, each slot home logged in, herdr integration per home | `codex` is not on `PATH` and no slot has a home |
 
-The hooks are opt-in, so `statusline` and `stop-hook` skip until `hv hook install` has written
-something, and fail only on a partial or broken install. `skills` is opt-in the same way: it skips until `hv skills install` has written a manifest. `switch` cannot tell whether the orchestrator
-runs under `hv keepalive run`. See [unattended rounds](unattended-rounds.md). For `codex`, see
+The hooks are opt-in, so `statusline` and `stop-hook` skip until `rota hook install` has written
+something, and fail only on a partial or broken install. `skills` is opt-in the same way: it skips until `rota skills install` has written a manifest. `switch` cannot tell whether the orchestrator
+runs under `rota keepalive run`. See [unattended rounds](unattended-rounds.md). For `codex`, see
 [Codex workers](codex-workers.md).
 
-Run it before `hv round start`, and again after changing accounts, hooks or the host.
+Run it before `rota round start`, and again after changing accounts, hooks or the host.
 
-## hv reap
+## rota reap
 
 Rounds leave things behind: merged branches, worktrees no slot owns, tabs with no agent in them, a
-lease whose orchestrator died. `hv reap` finds them.
+lease whose orchestrator died. `rota reap` finds them.
 
 ```sh
-hv reap                          # preview: list candidates, delete nothing
-hv reap --apply                  # delete the candidates that hold no work
-hv reap --kind branch,lease      # only these kinds
+rota reap                          # preview: list candidates, delete nothing
+rota reap --apply                  # delete the candidates that hold no work
+rota reap --kind branch,lease      # only these kinds
 ```
 
 The default is a preview (`warning: preview only; pass --apply`). `--apply` needs no `--confirm`,
@@ -67,7 +67,7 @@ because everything it deletes is proven unowned and merged, and anything holding
   the base is listed with `held: <why>` and never deleted. There is no flag to override that.
 - A `stalled` slot. Reap reclaims `dead` slots only: a worker in a long test run makes no commits and
   looks stalled, and reaping it would kill it. Reclaiming a stalled slot is an explicit
-  [`hv round reclaim`](parallel-rounds.md#moving-an-issue-that-is-assigned).
+  [`rota round reclaim`](parallel-rounds.md#moving-an-issue-that-is-assigned).
 - A parked slot. A `park/<agent>` worktree, clean or not, and any `park/*` branch are never candidates.
 - A live or foreign lease. Only a stale one, whose holder is gone on this host.
 
@@ -75,8 +75,8 @@ because everything it deletes is proven unowned and merged, and anything holding
 rest were still removed; the failures are in the output). `2` for an unknown `--kind`. `3` with no
 project root. `5` when git fails.
 
-Reap and [`hv round reconcile`](parallel-rounds.md#moving-an-issue-that-is-assigned) split the work:
+Reap and [`rota round reconcile`](parallel-rounds.md#moving-an-issue-that-is-assigned) split the work:
 reconcile reports drift between the registry, host, git and forge and repairs only the safe kinds;
-reap deletes. After [`hv round wind-down`](parallel-rounds.md#winding-down), which deletes no branch,
-run `hv reap`. It is not the verb for a registered slot: `hv worker pool reap` deregisters a named
+reap deletes. After [`rota round wind-down`](parallel-rounds.md#winding-down), which deletes no branch,
+run `rota reap`. It is not the verb for a registered slot: `rota worker pool reap` deregisters a named
 slot, and removes its worktree and branch whether or not it holds work.

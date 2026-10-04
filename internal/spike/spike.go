@@ -1,5 +1,5 @@
 // Package spike ports hv-spike-add, -finish, -list and -show: the spike
-// files under .hv/spikes/ and their spike/<name> branches.
+// files under .rota/spikes/ and their spike/<name> branches.
 package spike
 
 import (
@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -29,7 +29,7 @@ func checkName(name string) error {
 	return nil
 }
 
-func file(root, name string) string { return filepath.Join(root, ".hv", "spikes", name+".md") }
+func file(root, name string) string { return filepath.Join(root, ".rota", "spikes", name+".md") }
 
 func git(dir string, args ...string) error {
 	cmd := exec.Command("git", args...)
@@ -38,7 +38,7 @@ func git(dir string, args ...string) error {
 }
 
 // Add (under the spike file's lock) creates branch spike/<name> in gitDir (the sub-repo named by repo, or
-// the working repository) and .hv/spikes/<name>.md under root. The spike
+// the working repository) and .rota/spikes/<name>.md under root. The spike
 // file check runs first, so an existing file leaves no branch behind.
 func Add(root, gitDir, name, question, repo string) (branch string, err error) {
 	if err = checkName(name); err != nil {
@@ -61,7 +61,7 @@ func Add(root, gitDir, name, question, repo string) (branch string, err error) {
 func add(root, gitDir, path, name, question, repo string) (branch string, err error) {
 	branch = "spike/" + name
 	if _, serr := os.Stat(path); serr == nil {
-		return "", artifact.Errf(artifact.ExitRefused, ".hv/spikes/%s.md already exists", name)
+		return "", artifact.Errf(artifact.ExitRefused, ".rota/spikes/%s.md already exists", name)
 	}
 	if git(gitDir, "rev-parse", "--git-dir") != nil {
 		regs := artifact.Repos(root)
@@ -113,7 +113,7 @@ _(viable / not viable / depends-on-X)_
 
 ## Recommended approach
 
-_(if viable, the shape of the real implementation — write only at /hv-spike done)_
+_(if viable, the shape of the real implementation — write only at /rota-spike done)_
 `, name, branch, repoLine, time.Now().Format("2006-01-02"), name, question)
 	if err = os.MkdirAll(filepath.Dir(path), 0o777); err != nil {
 		return
@@ -130,18 +130,18 @@ func Finish(root, name string) (changed bool, err error) {
 	path := file(root, name)
 	content, rerr := fsio.ReadText(path)
 	if rerr != nil {
-		return false, artifact.Errf(artifact.ExitResolution, "spike %s not found (.hv/spikes/%s.md)", name, name)
+		return false, artifact.Errf(artifact.ExitResolution, "spike %s not found (.rota/spikes/%s.md)", name, name)
 	}
 	fm, _, _ := frontmatter.Parse(content)
 	if _, has := fm["status"]; !has {
-		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .hv/spikes/%s.md", name)
+		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .rota/spikes/%s.md", name)
 	}
 	if frontmatter.Str(fm, "status") == "done" {
 		return false, nil
 	}
 	updated, found := frontmatter.UpdateField(content, "status", "done")
 	if !found {
-		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .hv/spikes/%s.md", name)
+		return false, artifact.Errf(artifact.ExitInternal, "status field not found in .rota/spikes/%s.md", name)
 	}
 	date := time.Now().Format("2006-01-02")
 	finished := regexp.MustCompile(`(?m)^(finished:\s*).+$`)
@@ -164,7 +164,7 @@ func Show(root, name string) (string, error) {
 	}
 	b, err := os.ReadFile(file(root, name))
 	if err != nil {
-		return "", artifact.Errf(artifact.ExitResolution, "spike %s not found (.hv/spikes/%s.md)", name, name)
+		return "", artifact.Errf(artifact.ExitResolution, "spike %s not found (.rota/spikes/%s.md)", name, name)
 	}
 	return string(b), nil
 }
@@ -191,11 +191,11 @@ func spikeBranches(dir string) map[string]bool {
 	return set
 }
 
-// List reads .hv/spikes/*.md in name order. Files without frontmatter are
+// List reads .rota/spikes/*.md in name order. Files without frontmatter are
 // skipped. branchExists is checked in the spike's own sub-repo, or in dir
 // (the working directory) for a spike with no repo.
 func List(root, dir string) ([]Entry, error) {
-	files, _ := filepath.Glob(filepath.Join(root, ".hv", "spikes", "*.md"))
+	files, _ := filepath.Glob(filepath.Join(root, ".rota", "spikes", "*.md"))
 	sort.Strings(files)
 	var regs map[string]string
 	cache := map[string]map[string]bool{}

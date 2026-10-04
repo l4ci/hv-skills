@@ -1,6 +1,6 @@
 # Banner preamble
 
-A code-fenced label every user-invocable hv-* skill prints verbatim at the top of its run, so the user can see at a glance which skill is active, what it does, and which triggers and pairs it carries. Consumed by the user-invocable SKILL.md files across the *Capture & pick*, *Plan & build*, *Review & ship*, *Persist*, *Vision & docs*, and *Maintenance* categories (see `README.md` for the current grouping). Each consumer's preamble line cites this file.
+A code-fenced label every user-invocable rota-* skill prints verbatim at the top of its run, so the user can see at a glance which skill is active, what it does, and which triggers and pairs it carries. Consumed by the user-invocable SKILL.md files across the *Capture & pick*, *Plan & build*, *Review & ship*, *Persist*, *Vision & docs*, and *Maintenance* categories (see `README.md` for the current grouping). Each consumer's preamble line cites this file.
 
 ## The rule
 
@@ -39,13 +39,13 @@ A subagent's stdout is captured as a tool result by the orchestrator, not surfac
 
 ## Example
 
-From `hv-pause/SKILL.md`:
+From `rota-pause/SKILL.md`:
 
 ````
 ```
 ════════════════════════════════════════════════════════════════════════
-  💤  hv-pause  ·  write handoff note for clean pause
-  triggers: "pause", "hand off"  ·  pairs: hv-work, hv-learn
+  💤  rota-pause  ·  write handoff note for clean pause
+  triggers: "pause", "hand off"  ·  pairs: rota-work, rota-learn
 ════════════════════════════════════════════════════════════════════════
 ```
 ````

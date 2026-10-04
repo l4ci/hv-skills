@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // ErrNoCandidates: the directory has no immediate child with a .git entry
@@ -20,7 +20,7 @@ import (
 var ErrNoCandidates = errors.New("no immediate git children found")
 
 // umbrellaHeader opens the .gitignore block hv-umbrella-init appends.
-const umbrellaHeader = "# ── hv umbrella ──"
+const umbrellaHeader = "# ── rota umbrella ──"
 
 // Candidates lists the immediate children of root that hold a .git entry (a
 // directory, or the file a git worktree has), sorted. Like the old `for child
@@ -47,7 +47,7 @@ func Candidates(root string) ([]string, error) {
 	return found, nil
 }
 
-// Listing is `hv init umbrella --list`: what the register prompt needs.
+// Listing is `rota init umbrella --list`: what the register prompt needs.
 type Listing struct {
 	Candidates []string
 	IsGitRepo  bool // root itself has a .git entry
@@ -70,7 +70,7 @@ type UmbrellaOptions struct {
 	Names []string
 }
 
-// UmbrellaResult is the data of `hv init umbrella`.
+// UmbrellaResult is the data of `rota init umbrella`.
 type UmbrellaResult struct {
 	Created    []string // paths under root that did not exist before, relative, sorted
 	Registered []string
@@ -80,7 +80,7 @@ type UmbrellaResult struct {
 }
 
 // Umbrella is hv-bootstrap followed by hv-umbrella-init. seed runs the base
-// seeding (what plain `hv init` does); it is called after the candidate check,
+// seeding (what plain `rota init` does); it is called after the candidate check,
 // so ErrNoCandidates leaves nothing behind. Re-running never overwrites: the
 // registry is rebuilt from the selection plus prior registrations still on
 // disk, and the .gitignore block only appends missing lines.
@@ -93,7 +93,7 @@ func Umbrella(root string, opts UmbrellaOptions, seed func() error) (UmbrellaRes
 		return UmbrellaResult{}, ErrNoCandidates
 	}
 	before := snapshot(root)
-	reposPath := filepath.Join(root, ".hv", "repos.json")
+	reposPath := filepath.Join(root, ".rota", "repos.json")
 	oldRegistry, _ := os.ReadFile(reposPath)
 
 	if seed != nil {
@@ -141,14 +141,14 @@ func Umbrella(root string, opts UmbrellaOptions, seed func() error) (UmbrellaRes
 	}
 
 	names := sortedUnion(requested, kept)
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		return UmbrellaResult{}, err
 	}
 	if err := fsio.WriteJSONAtomic(reposPath, registry(names)); err != nil {
 		return UmbrellaResult{}, err
 	}
 	for _, n := range names {
-		if err := os.MkdirAll(filepath.Join(root, ".hv", "knowledge", n), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, ".rota", "knowledge", n), 0o755); err != nil {
 			return UmbrellaResult{}, err
 		}
 	}
@@ -247,7 +247,7 @@ func ignoreBlock(root string, names []string) (bool, error) {
 	for _, l := range lines {
 		have[l] = true
 	}
-	wanted := []string{".claude/", ".hv/"}
+	wanted := []string{".claude/", ".rota/"}
 	for _, n := range names {
 		wanted = append(wanted, "/"+n+"/")
 	}
@@ -268,11 +268,11 @@ func ignoreBlock(root string, names []string) (bool, error) {
 	return true, fsio.WriteFileAtomic(path, []byte(strings.Join(lines, "\n")+"\n"))
 }
 
-// snapshot is `find .hv .gitignore`: every path under .hv and the .gitignore,
+// snapshot is `find .rota .gitignore`: every path under .rota and the .gitignore,
 // relative to root.
 func snapshot(root string) map[string]bool {
 	out := map[string]bool{}
-	for _, top := range []string{".hv", ".gitignore"} {
+	for _, top := range []string{".rota", ".gitignore"} {
 		base := filepath.Join(root, top)
 		_ = filepath.WalkDir(base, func(p string, _ fs.DirEntry, err error) error {
 			if err != nil {

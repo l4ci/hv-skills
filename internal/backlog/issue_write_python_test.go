@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // wStep is one backend call; recorded as golden input; the Python IssueBackend ran it.
@@ -197,7 +197,7 @@ func goStep(b *Issues, st wStep) map[string]any {
 
 func goRunScenario(t *testing.T, s wScenario) map[string]any {
 	t.Helper()
-	t.Setenv("HV_NOTE_LIMIT", s.Limit)
+	t.Setenv("ROTA_NOTE_LIMIT", s.Limit)
 	f := &trackertest.Fake{Milestones: s.Milestones}
 	for _, i := range s.Issues {
 		f.Issues = append(f.Issues, tracker.Issue{Number: i.Number, Title: i.Title, Body: i.Body, Labels: append([]string{}, i.Labels...),
@@ -248,32 +248,32 @@ func norm(t *testing.T, v any) any {
 
 func seedIssues() []wSeedIssue {
 	return []wSeedIssue{
-		{1, "Add export", "Export it.\n\n## Acceptance\n- [ ] works\n\n<!-- hv:fields\nRelated: B9\n-->", []string{"type:feature", "size:Major"}, "M07 — Seven", "open", "", nil},
+		{1, "Add export", "Export it.\n\n## Acceptance\n- [ ] works\n\n<!-- rota:fields\nRelated: B9\n-->", []string{"type:feature", "size:Major"}, "M07 — Seven", "open", "", nil},
 		{2, "Crash on start", "plain", []string{"type:bug", "p1", "in-progress"}, "", "open", "", []string{"fake-user"}},
 		{3, "M07 tracking", "", []string{"milestone-tracker"}, "", "open", "", nil},
 		{4, "Old task", "done", []string{"type:task"}, "", "closed", "completed", nil},
 		{5, "Dropped bug", "x", []string{"type:bug", "blocked", "not-planned"}, "", "closed", "not_planned", nil},
 		{6, "No type", "line\r\n- [x] done\r\n", nil, "M01 — Alpha", "open", "", nil},
 		{7, "Review me", "body", []string{"type:feature", "needs-review", "blocked"}, "", "open", "", nil},
-		{8, "Fielded", "Text\n\n<!-- hv:fields\nSubsystem: web\nOther: keep\nRepos: a\n-->", []string{"type:task"}, "", "open", "", nil},
+		{8, "Fielded", "Text\n\n<!-- rota:fields\nSubsystem: web\nOther: keep\nRepos: a\n-->", []string{"type:task"}, "", "open", "", nil},
 	}
 }
 
 func seedComments() []wSeedComment {
 	return []wSeedComment{
-		{1, "<!-- hv:proof -->\n## Proof\n- build · PASS · ok\n- tests · PASS · ok"},
-		{1, "<!-- hv:design 2/2 -->\nB part\n"},
-		{1, "<!-- hv:design 1/2 -->\nA part\n"},
-		{1, "<!-- hv:claim agent-a -->\nClaimed by agent-a"},
-		{1, "<!-- hv:comment question -->\nWhy?\nmore"},
+		{1, "<!-- rota:proof -->\n## Proof\n- build · PASS · ok\n- tests · PASS · ok"},
+		{1, "<!-- rota:design 2/2 -->\nB part\n"},
+		{1, "<!-- rota:design 1/2 -->\nA part\n"},
+		{1, "<!-- rota:claim agent-a -->\nClaimed by agent-a"},
+		{1, "<!-- rota:comment question -->\nWhy?\nmore"},
 		{1, "random chatter"},
-		{2, "<!-- hv:claim agent-b -->\nClaimed by agent-b"},
-		{2, "<!-- hv:claim agent-a -->\nClaimed by agent-a"},
-		{2, "<!-- hv:release agent-b -->"},
-		{2, "<!-- hv:comment answer -->\r\nBecause."},
-		{6, "<!-- hv:plan:S01 -->\nplan one"},
-		{7, "<!-- hv:proof -->\n## Proof\nnone yet"},
-		{7, "<!-- hv:plan -->\nthe plan\r\n"},
+		{2, "<!-- rota:claim agent-b -->\nClaimed by agent-b"},
+		{2, "<!-- rota:claim agent-a -->\nClaimed by agent-a"},
+		{2, "<!-- rota:release agent-b -->"},
+		{2, "<!-- rota:comment answer -->\r\nBecause."},
+		{6, "<!-- rota:plan:S01 -->\nplan one"},
+		{7, "<!-- rota:proof -->\n## Proof\nnone yet"},
+		{7, "<!-- rota:plan -->\nthe plan\r\n"},
 	}
 }
 
@@ -365,7 +365,9 @@ func handcrafted() []wScenario {
 	long := strings.Repeat("alpha beta é gamma\n", 30) + "last line without newline"
 	oneLine := strings.Repeat("x", 300)
 	var out []wScenario
-	out = append(out, base("80",
+	// 82, not 80: the limit was 80 when the marker was "<!-- hv:" (#236); the
+	// two extra runes of "<!-- rota:" keep the recorded chunking.
+	out = append(out, base("82",
 		noteStep("note_put", "proof", long), noteStep("note_get", "proof", ""), noteStep("note_put", "proof", long),
 		noteStep("note_put", "proof", "short\n"), noteStep("note_get", "proof", ""),
 		noteStep("note_put", "proof", long+long), noteStep("note_put", "proof", oneLine), noteStep("note_get", "proof", ""),
@@ -431,7 +433,7 @@ func TestIssueWritesMatchPython(t *testing.T) {
 		c := cfgs[i%2]
 		s := wScenario{Cfg: c.cfg, Issues: seedIssues(), Comments: seedComments(), Milestones: []string{"M07 — Seven", "M01 — Alpha", "M02"}}
 		if i%5 == 0 {
-			s.Limit = "80"
+			s.Limit = "82"
 		}
 		s = translate(s, c.repl)
 		for j := 0; j < 6+rng.Intn(5); j++ {

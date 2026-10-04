@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func run(t *testing.T, dir string, args ...string) {
@@ -28,7 +28,7 @@ func repo(t *testing.T) string {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	run(t, dir, "init", "-q", "-b", "main")
 	run(t, dir, "-c", "user.email=a@b", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "i")
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o777)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o777)
 	return dir
 }
 
@@ -69,7 +69,7 @@ _(viable / not viable / depends-on-X)_
 
 ## Recommended approach
 
-_(if viable, the shape of the real implementation — write only at /hv-spike done)_
+_(if viable, the shape of the real implementation — write only at /rota-spike done)_
 `
 
 // Spike files are shared with older plugin versions; pin them byte for byte.
@@ -147,8 +147,8 @@ func umbrella(t *testing.T) (root, sub string) {
 	os.MkdirAll(sub, 0o777)
 	run(t, sub, "init", "-q", "-b", "main")
 	run(t, sub, "-c", "user.email=a@b", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "i")
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o777)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
 	return
 }
 
@@ -168,7 +168,7 @@ func TestAddUmbrellaRepo(t *testing.T) {
 	if !strings.Contains(string(raw), "branch: spike/sse\nrepo: web\nstatus: open\n") {
 		t.Fatalf("repo line missing:\n%s", raw)
 	}
-	if _, err := os.Stat(filepath.Join(sub, ".hv")); err == nil {
+	if _, err := os.Stat(filepath.Join(sub, ".rota")); err == nil {
 		t.Error("spike file landed in the sub-repo")
 	}
 	list, _ := List(root, root)
@@ -179,7 +179,7 @@ func TestAddUmbrellaRepo(t *testing.T) {
 
 func TestAddNotGit(t *testing.T) {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o777)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o777)
 	if _, err := Add(dir, dir, "x", "q", ""); exitOf(err) != 5 {
 		t.Fatalf("got %v", err)
 	}

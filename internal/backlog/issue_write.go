@@ -9,11 +9,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/marker"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/marker"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // The issue backend's lifecycle side: IssueBackend.create, set_field,
@@ -42,10 +42,10 @@ var NoteKinds = []string{"proof", "design", "plan"}
 const noteLimitDefault = 60000
 
 var (
-	markerRe     = regexp.MustCompile(`\A<!-- hv:(proof|design|plan(?::S\p{Nd}+)?)(?: (\p{Nd}+)/(\p{Nd}+))? -->(?:\n|\z)`)
+	markerRe     = regexp.MustCompile(`\A<!-- rota:(proof|design|plan(?::S\p{Nd}+)?)(?: (\p{Nd}+)/(\p{Nd}+))? -->(?:\n|\z)`)
 	sliceKindRe  = regexp.MustCompile(`\Aplan:S\p{Nd}+\z`)
-	commentRe    = regexp.MustCompile(`\A<!-- hv:comment (` + wordClass + `+) -->(?:\n|\z)`)
-	claimRe      = regexp.MustCompile(`\A<!-- hv:(claim|release) ([^` + pystr.SpaceClass + `]+) -->`)
+	commentRe    = regexp.MustCompile(`\A<!-- rota:comment (` + wordClass + `+) -->(?:\n|\z)`)
+	claimRe      = regexp.MustCompile(`\A<!-- rota:(claim|release) ([^` + pystr.SpaceClass + `]+) -->`)
 	milestoneIDs = regexp.MustCompile(`\AM\p{Nd}+\z`)
 )
 
@@ -110,7 +110,7 @@ func (b *Issues) number(ref string) (int, error) {
 
 // ---- create ----------------------------------------------------------------
 
-// milestoneTitle is the native milestone title for hv ID value ("M07")
+// milestoneTitle is the native milestone title for rota ID value ("M07")
 // (_milestone_title). An ID the tracker does not know wraps ErrNotFound.
 func (b *Issues) milestoneTitle(value string) (string, error) {
 	value = pystr.Strip(value)
@@ -127,7 +127,7 @@ func (b *Issues) milestoneTitle(value string) (string, error) {
 		}
 	}
 	if !ok {
-		return "", errf(ErrNotFound, "milestone %s not found on the tracker — create it with /hv-vision (M07-S05)", value)
+		return "", errf(ErrNotFound, "milestone %s not found on the tracker — create it with /rota-vision (M07-S05)", value)
 	}
 	return title, nil
 }
@@ -275,7 +275,7 @@ func (b *Issues) SetField(ref, field, value string) (bool, error) {
 // (IssueBackend.complete): done closes as completed with a "Done in `<hash>`"
 // comment; dropped and handed-off close as not planned with "Closed: <reason>";
 // blocked leaves it open with the blocked label and a "Blocked" comment. Each
-// comment ends with an hv marker line (blocked, done, closed).
+// comment ends with a rota marker line (blocked, done, closed).
 // Closing clears the in-progress, needs-review, changes-requested and blocked
 // labels. changed is false for an already closed (or already blocked) issue. A
 // `done` close without a proof row is a RefusedError wrapping ErrProofMissing.
@@ -417,7 +417,7 @@ func (b *Issues) Ready(ref string) ([]string, error) {
 // ---- notes -----------------------------------------------------------------
 
 func noteLimit() int {
-	n, err := strconv.Atoi(pystr.Strip(os.Getenv("HV_NOTE_LIMIT")))
+	n, err := strconv.Atoi(pystr.Strip(os.Getenv("ROTA_NOTE_LIMIT")))
 	if err != nil {
 		return noteLimitDefault
 	}
@@ -455,17 +455,17 @@ func keepLines(s string) []string {
 	return out
 }
 
-// noteParts is the comment bodies for text: one `<!-- hv:kind -->` comment, or
-// numbered `<!-- hv:kind i/n -->` parts split on line boundaries (a line longer
+// noteParts is the comment bodies for text: one `<!-- rota:kind -->` comment, or
+// numbered `<!-- rota:kind i/n -->` parts split on line boundaries (a line longer
 // than a part is cut) (_note_parts).
 func noteParts(kind, text string) []string {
 	text = noteNorm(text)
 	limit := noteLimit()
-	single := "<!-- hv:" + kind + " -->\n"
+	single := "<!-- rota:" + kind + " -->\n"
 	if runes(single)+runes(text) <= limit {
 		return []string{single + text}
 	}
-	budget := limit - runes("<!-- hv:"+kind+" 99/99 -->\n")
+	budget := limit - runes("<!-- rota:"+kind+" 99/99 -->\n")
 	var chunks []string
 	cur := ""
 	for _, line := range keepLines(text) {
@@ -487,7 +487,7 @@ func noteParts(kind, text string) []string {
 	chunks = append(chunks, cur)
 	out := make([]string, len(chunks))
 	for i, c := range chunks {
-		out[i] = "<!-- hv:" + kind + " " + strconv.Itoa(i+1) + "/" + strconv.Itoa(len(chunks)) + " -->\n" + c
+		out[i] = "<!-- rota:" + kind + " " + strconv.Itoa(i+1) + "/" + strconv.Itoa(len(chunks)) + " -->\n" + c
 	}
 	return out
 }
@@ -661,7 +661,7 @@ func countProofRows(content string) int {
 
 // ---- comments --------------------------------------------------------------
 
-// AddComment appends a `<!-- hv:comment <kind> -->` comment and returns its id.
+// AddComment appends a `<!-- rota:comment <kind> -->` comment and returns its id.
 func (b *Issues) AddComment(ref, kind, text string) (string, error) {
 	if !validCommentKind(kind) {
 		return "", commentKindErr()
@@ -674,7 +674,7 @@ func (b *Issues) AddComment(ref, kind, text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return tr.AddComment(b.ctx(), n, "<!-- hv:comment "+kind+" -->\n"+noteNorm(text))
+	return tr.AddComment(b.ctx(), n, "<!-- rota:comment "+kind+" -->\n"+noteNorm(text))
 }
 
 // Comments lists the context comments oldest first, optionally only kind.
@@ -790,7 +790,7 @@ func (b *Issues) Claim(ref, claimID string) (won bool, holder string, err error)
 		return false, "", err
 	}
 	if !(len(held) > 0 && held[0] == claimID) {
-		if _, err := tr.AddComment(b.ctx(), n, "<!-- hv:claim "+claimID+" -->\nClaimed by "+claimID); err != nil {
+		if _, err := tr.AddComment(b.ctx(), n, "<!-- rota:claim "+claimID+" -->\nClaimed by "+claimID); err != nil {
 			return false, "", err
 		}
 		if held, err = b.heldClaims(n); err != nil {
@@ -800,7 +800,7 @@ func (b *Issues) Claim(ref, claimID string) (won bool, holder string, err error)
 			return false, "", errors.New("claim comment not visible after posting")
 		}
 		if held[0] != claimID {
-			if _, err := tr.AddComment(b.ctx(), n, "<!-- hv:release "+claimID+" -->"); err != nil {
+			if _, err := tr.AddComment(b.ctx(), n, "<!-- rota:release "+claimID+" -->"); err != nil {
 				return false, "", err
 			}
 			return false, held[0], nil
@@ -845,7 +845,7 @@ func (b *Issues) Release(ref, claimID string) (bool, error) {
 	if !has(held, claimID) {
 		return false, nil
 	}
-	if _, err := tr.AddComment(b.ctx(), is.Number, "<!-- hv:release "+claimID+" -->"); err != nil {
+	if _, err := tr.AddComment(b.ctx(), is.Number, "<!-- rota:release "+claimID+" -->"); err != nil {
 		return false, err
 	}
 	if len(held) == 1 {

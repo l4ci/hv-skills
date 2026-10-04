@@ -4,8 +4,8 @@ echo "F32: loop-mode auto-planning helpers"
 F32_TMP="$(mktemp -d)"
 trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP" && mkdir .hv
-  echo '{"active": []}' > .hv/status.json
+  cd "$F32_TMP" && mkdir .rota
+  echo '{"active": []}' > .rota/status.json
   OUT=$(hvj status loop show)
   [ "$(jget data.loopStartedAt <<<"$OUT")" = "null" ] \
     || fail "F32(f): status loop show on unset must be null, got '$OUT'"
@@ -23,7 +23,7 @@ trap 'rm -rf "$F32_TMP"' EXIT
     || fail "F32(f): status loop start must be idempotent first-write (T1='$T1' got: $OUT)"
   [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "F32(f): repeat start must report changed=false: $OUT"
   # active array preserved
-  python3 -c 'import json; d = json.load(open(".hv/status.json")); assert d["active"] == [] and d["loopStartedAt"]' \
+  python3 -c 'import json; d = json.load(open(".rota/status.json")); assert d["active"] == [] and d["loopStartedAt"]' \
     || fail "F32(f): status loop must preserve the active array"
   # clear removes
   OUT=$(hvj status loop clear)
@@ -41,27 +41,27 @@ pass "F32(f): status loop start/clear/show"
 F32_TMP="$(mktemp -d)"
 trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP" && mkdir .hv
-  echo "# Decisions" > .hv/DECISIONS.md
-  echo "" >> .hv/DECISIONS.md
+  cd "$F32_TMP" && mkdir .rota
+  echo "# Decisions" > .rota/DECISIONS.md
+  echo "" >> .rota/DECISIONS.md
   OUT=$(hvj decisions auto-log --topic "Test Topic" --title "Test rule" --why "Because reasons" \
     --plan-key "M04-F32" --date "2026-05-09")
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "F32(g): first auto-log must report changed: $OUT"
   [ "$(jget data.topic <<<"$OUT")" = "Test Topic" ] || fail "F32(g): data.topic missing: $OUT"
   [ "$(jget data.title <<<"$OUT")" = "Test rule" ] || fail "F32(g): data.title missing: $OUT"
-  grep -q '## Test Topic' .hv/DECISIONS.md \
+  grep -q '## Test Topic' .rota/DECISIONS.md \
     || fail "F32(g): topic header missing"
-  grep -q '### Test rule' .hv/DECISIONS.md \
+  grep -q '### Test rule' .rota/DECISIONS.md \
     || fail "F32(g): rule heading missing"
-  grep -q '_(Unresolved — user must articulate)_' .hv/DECISIONS.md \
+  grep -q '_(Unresolved — user must articulate)_' .rota/DECISIONS.md \
     || fail "F32(g): placeholder Forbids/Permits missing"
-  grep -q '\[Auto:Loop\] M04-F32 2026-05-09' .hv/DECISIONS.md \
+  grep -q '\[Auto:Loop\] M04-F32 2026-05-09' .rota/DECISIONS.md \
     || fail "F32(g): provenance footer missing or malformed"
   # idempotent — second run must not duplicate the entry
   OUT=$(hvj decisions auto-log --topic "Test Topic" --title "Test rule" --why "Because reasons" \
     --plan-key "M04-F32" --date "2026-05-09")
   [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "F32(g): repeat auto-log must report changed=false: $OUT"
-  COUNT=$(grep -c '### Test rule' .hv/DECISIONS.md)
+  COUNT=$(grep -c '### Test rule' .rota/DECISIONS.md)
   [ "$COUNT" = "1" ] || fail "F32(g): decisions auto-log must be idempotent on (topic, rule-title), got $COUNT entries"
   # required flags: missing --why is a usage error
   rc=0; hvj decisions auto-log --topic "T" --title "R" >/dev/null 2>&1 || rc=$?
@@ -75,11 +75,11 @@ pass "F32(g): decisions auto-log placeholder template + idempotent"
 F32_TMP="$(mktemp -d)"
 trap 'rm -rf "$F32_TMP"' EXIT
 (
-  cd "$F32_TMP" && mkdir .hv
-  cat > .hv/status.json <<'EOFJ'
+  cd "$F32_TMP" && mkdir .rota
+  cat > .rota/status.json <<'EOFJ'
 {"active": [], "loopStartedAt": "2026-05-09T00:00:00Z"}
 EOFJ
-  cat > .hv/DECISIONS.md <<'EOFD'
+  cat > .rota/DECISIONS.md <<'EOFD'
 # Decisions
 
 ## Topic A
@@ -119,7 +119,7 @@ EOFD
   [ "$(jget 'data.decisions[0].status' <<<"$OUT")" = "unresolved" ] \
     || fail "F32(h): unresolved status missing: $OUT"
   # no loop: decisions is empty and since is absent
-  echo '{"active": []}' > .hv/status.json
+  echo '{"active": []}' > .rota/status.json
   OUT=$(hvj decisions auto-since)
   [ "$(jget data.decisions <<<"$OUT")" = "[]" ] || fail "F32(h): empty when loopStartedAt unset, got '$OUT'"
   jget data.since <<<"$OUT" >/dev/null && fail "F32(h): since must be absent without a loop: $OUT"
@@ -130,8 +130,8 @@ rm -rf "$F32_TMP"
 pass "F32(h): decisions auto-since filter + lookup-empty"
 
 # --- map frontmatter & map entries -------------------
-mkdir -p .hv/map
-cat > .hv/map/capture.md <<'EOF'
+mkdir -p .rota/map
+cat > .rota/map/capture.md <<'EOF'
 ---
 subsystem: capture
 summary: Captures items into BACKLOG.md
@@ -142,7 +142,7 @@ related-topics: [Skill Authoring]
 ## Purpose
 One paragraph.
 EOF
-cat > .hv/map/plan.md <<'EOF'
+cat > .rota/map/plan.md <<'EOF'
 ---
 subsystem: plan
 summary: Plans before execution
@@ -151,7 +151,7 @@ touched: 2026-04-01
 body
 EOF
 # malformed: no frontmatter
-echo "no frontmatter here" > .hv/map/broken.md
+echo "no frontmatter here" > .rota/map/broken.md
 
 # --- map query -----------------------------------------------------
 out="$(hvj map query capture | jget data.text)"
@@ -169,7 +169,7 @@ echo "ok map query"
 mkdir -p src
 echo "line1" > src/sample.txt
 echo "line2" >> src/sample.txt
-cat > .hv/map/work.md <<'EOF'
+cat > .rota/map/work.md <<'EOF'
 ---
 subsystem: work
 summary: Orchestrator-driven execution
@@ -206,7 +206,7 @@ echo "ok map stats"
 OUT="$(hvj map index)"
 [ "$(jget data.key <<<"$OUT")" = "map" ] || { echo "FAIL: map index data.key: $OUT"; exit 1; }
 [ "$(jget data.changed <<<"$OUT")" = "true" ] || { echo "FAIL: first map index must report changed: $OUT"; exit 1; }
-grep -q '<!-- hv-map-start -->' CLAUDE.md || { echo "FAIL: map block not in CLAUDE.md"; exit 1; }
+grep -q '<!-- rota-map-start -->' CLAUDE.md || { echo "FAIL: map block not in CLAUDE.md"; exit 1; }
 grep -q '## Project Map' CLAUDE.md || { echo "FAIL: heading missing"; exit 1; }
 grep -q '\*\*capture\*\* — Captures items into BACKLOG.md' CLAUDE.md || { echo "FAIL: capture summary missing"; exit 1; }
 # Idempotence
@@ -216,26 +216,26 @@ sha2=$(sha1sum CLAUDE.md | cut -d' ' -f1)
 [ "$sha1" = "$sha2" ] || { echo "FAIL: map index not idempotent"; exit 1; }
 [ "$(jget data.status <<<"$OUT")" = "unchanged" ] || { echo "FAIL: repeat map index must be unchanged: $OUT"; exit 1; }
 [ "$(jget data.changed <<<"$OUT")" = "false" ] || { echo "FAIL: repeat map index must report changed=false: $OUT"; exit 1; }
-# Empty case: hide the block when .hv/map/ has no valid entries
-mv .hv/map .hv/map.bak
-mkdir .hv/map
+# Empty case: hide the block when .rota/map/ has no valid entries
+mv .rota/map .rota/map.bak
+mkdir .rota/map
 hvj map index >/dev/null
 grep -q '_(no subsystems yet' CLAUDE.md || { echo "FAIL: empty placeholder missing"; exit 1; }
-mv .hv/map .hv/map.empty
-mv .hv/map.bak .hv/map
+mv .rota/map .rota/map.empty
+mv .rota/map.bak .rota/map
 echo "ok map index"
 
 # --- backlog stale -------------------------------------------------
 # Plan (touched 2026-04-01) is older than 30 days from "today=2026-05-09";
 # work is touched 2026-05-09 and should not be flagged at days=30.
-out="$(HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 30 | jget data.entries)"
+out="$(ROTA_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 30 | jget data.entries)"
 grep -q '"name":"plan"' <<<"$out" || { echo "FAIL: plan should be stale"; exit 1; }
 if grep -q '"name":"work"' <<<"$out"; then echo "FAIL: work should NOT be stale"; exit 1; fi
 # days=0 lists all
-HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 0 | jget 'data.entries[1].name' >/dev/null \
+ROTA_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 0 | jget 'data.entries[1].name' >/dev/null \
   || { echo "FAIL: days=0 should list all"; exit 1; }
 # Nothing is stale when the window is huge (silence, not an empty report)
-out="$(HV_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 999999 | jget data.entries)"
+out="$(ROTA_TEST_TODAY=2026-05-09 hvj backlog stale --kind map --days 999999 | jget data.entries)"
 [ "$out" = "[]" ] || { echo "FAIL: backlog stale should be empty when nothing is stale (got: $out)"; exit 1; }
 # Knowledge: KNOWLEDGE.md exists from bootstrap-style fixture; should not error
 hvj backlog stale --kind knowledge --days 0 >/dev/null
@@ -246,10 +246,10 @@ TMP2=$(mktemp -d)
 trap 'rm -rf "$TMP" "$TMP2"' EXIT
 (
   cd "$TMP2" && git init -q
-  "$HV_BIN" init >/dev/null
-  [ -d .hv/map ] || { echo "FAIL: .hv/map not created"; exit 1; }
-  [ -f .hv/MAP.md ] || { echo "FAIL: .hv/MAP.md not seeded"; exit 1; }
-  grep -q "Project map" .hv/MAP.md || { echo "FAIL: .hv/MAP.md content missing"; exit 1; }
+  "$ROTA_BIN" init >/dev/null
+  [ -d .rota/map ] || { echo "FAIL: .rota/map not created"; exit 1; }
+  [ -f .rota/MAP.md ] || { echo "FAIL: .rota/MAP.md not seeded"; exit 1; }
+  grep -q "Project map" .rota/MAP.md || { echo "FAIL: .rota/MAP.md content missing"; exit 1; }
 )
 echo "ok init seeds map"
 
@@ -260,9 +260,9 @@ trap 'rm -rf "$TMP3" "$TMP" "$TMP2"' EXIT
   cd "$TMP3" && git init -q
   git config user.email test@example.com
   git config user.name Test
-  "$HV_BIN" init >/dev/null
+  "$ROTA_BIN" init >/dev/null
   : > CLAUDE.md
-  cat > .hv/map/capture.md <<'EOF'
+  cat > .rota/map/capture.md <<'EOF'
 ---
 subsystem: capture
 summary: Captures items into BACKLOG.md
@@ -276,7 +276,7 @@ Capture flow.
 ## Entry points
 - scripts/bootstrap:1 — broken ref (file does not exist in fixture)
 EOF
-  cat > .hv/map/work.md <<'EOF'
+  cat > .rota/map/work.md <<'EOF'
 ---
 subsystem: work
 summary: Captures items into BACKLOG.md  # near-duplicate summary
@@ -291,13 +291,13 @@ EOF
 
   python3 - <<'PY'
 from pathlib import Path
-p = Path(".hv/map/capture.md")
+p = Path(".rota/map/capture.md")
 text = p.read_text().replace("touched: 2026-05-09", "touched: 2026-05-10")
 p.write_text(text)
 PY
-  grep -q "touched: 2026-05-10" .hv/map/capture.md || { echo "FAIL: after-work bump"; exit 1; }
+  grep -q "touched: 2026-05-10" .rota/map/capture.md || { echo "FAIL: after-work bump"; exit 1; }
 
-  out="$(HV_TEST_TODAY=2026-05-10 hvj backlog stale --kind map --days 30 | jget data.entries)"
+  out="$(ROTA_TEST_TODAY=2026-05-10 hvj backlog stale --kind map --days 30 | jget data.entries)"
   grep -q '"name":"work"' <<<"$out" || { echo "FAIL: work should be stale at days=30"; exit 1; }
 
   count=$(hvj map stats | jget data.count)
@@ -314,4 +314,4 @@ rm -rf "$TMP2" "$TMP3"
 echo "ok end-to-end map flow"
 
 # --- parse_todo_fields handles Subsystem ---------------------------
-echo "B28: /hv-brainstorm --auto-loop dispatch chain"
+echo "B28: /rota-brainstorm --auto-loop dispatch chain"

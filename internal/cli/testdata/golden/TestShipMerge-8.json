@@ -1,1 +1,1 @@
-{"inputs":{"Name":"unknown branch","Args":["ship","merge","hv/none","--body-file","-"],"Stdin":"merge: x","Code":3},"outputs":null}
+{"inputs":{"Name":"unknown branch","Args":["ship","merge","rota/none","--body-file","-"],"Stdin":"merge: x","Code":3},"outputs":null}

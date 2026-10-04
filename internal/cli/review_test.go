@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 const reviewBacklog = `# Backlog
@@ -64,7 +64,7 @@ func reviewFeature(t *testing.T, repo string) {
 	gitT(t, repo, "checkout", "-q", "feat/x")
 }
 
-// reviewProject is a plain repo (with .hv/BACKLOG.md) and an umbrella whose
+// reviewProject is a plain repo (with .rota/BACKLOG.md) and an umbrella whose
 // svc sub-repo has the same branches.
 func reviewProject(t *testing.T) (plain, umb string) {
 	t.Helper()
@@ -73,10 +73,10 @@ func reviewProject(t *testing.T) (plain, umb string) {
 	t.Setenv("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
 	t.Setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
 	plain = newRepo(t, t.TempDir(), "proj", "main")
-	write(t, filepath.Join(plain, ".hv", "BACKLOG.md"), reviewBacklog)
+	write(t, filepath.Join(plain, ".rota", "BACKLOG.md"), reviewBacklog)
 	reviewFeature(t, plain)
 	umb = umbrella(t)
-	write(t, filepath.Join(umb, ".hv", "BACKLOG.md"), reviewBacklog)
+	write(t, filepath.Join(umb, ".rota", "BACKLOG.md"), reviewBacklog)
 	reviewFeature(t, filepath.Join(umb, "svc"))
 	return plain, umb
 }
@@ -356,7 +356,7 @@ func a8Fixture() *a8Forge {
 		issue(7, "Fix crash", []string{"type:bug"}, m, "closed", "completed"),
 		issue(8, "Dropped", []string{"type:feature"}, m, "closed", "not_planned"),
 	}}, Native: []tracker.Milestone{{Number: 1, Title: m, State: "open"}}}}
-	if _, err := f.Fake.AddComment(context.Background(), 1, "<!-- hv:proof -->\n## Proof\n- unit \u00b7 PASS \u00b7 ok"); err != nil {
+	if _, err := f.Fake.AddComment(context.Background(), 1, "<!-- rota:proof -->\n## Proof\n- unit \u00b7 PASS \u00b7 ok"); err != nil {
 		panic(err)
 	}
 	f.prs = []tracker.PR{
@@ -368,7 +368,7 @@ func a8Fixture() *a8Forge {
 	return f
 }
 
-// a8Run runs hv --json in root and returns the exit code, the data object and the error message.
+// a8Run runs rota --json in root and returns the exit code, the data object and the error message.
 func a8Run(t *testing.T, root string, args ...string) (int, map[string]any, string) {
 	t.Helper()
 	o := trRun(t, root, "", append([]string{"--json"}, args...)...)
@@ -385,7 +385,7 @@ func a8Run(t *testing.T, root string, args ...string) (int, map[string]any, stri
 func a8Project(t *testing.T, f *a8Forge) string {
 	t.Helper()
 	root := newRepo(t, t.TempDir(), "proj", "main")
-	write(t, filepath.Join(root, ".hv", "config.json"), issuesConfig)
+	write(t, filepath.Join(root, ".rota", "config.json"), issuesConfig)
 	withTracker(t, f)
 	return root
 }
@@ -393,7 +393,7 @@ func a8Project(t *testing.T, f *a8Forge) string {
 func a8FileProject(t *testing.T) string {
 	t.Helper()
 	root := newRepo(t, t.TempDir(), "proj", "main")
-	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"file"}}`)
+	write(t, filepath.Join(root, ".rota", "config.json"), `{"backlog":{"backend":"file"}}`)
 	return root
 }
 
@@ -480,7 +480,7 @@ func TestReviewQueueUmbrella(t *testing.T) {
 	if o := trRun(t, umb, "", "review", "queue", "--repo", "nope"); o.code != 3 {
 		t.Errorf("unknown --repo: exit %d, want 3\n%s%s", o.code, o.stdout, o.stderr)
 	}
-	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
+	write(t, filepath.Join(umb, ".rota", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	// Past the checks it reaches the sub-repos' trackers; with no forge here that is exit 5.
 	if o := trRun(t, umb, "", "review", "queue"); o.code != 5 {
 		t.Errorf("exit %d, want 5\n%s%s", o.code, o.stdout, o.stderr)

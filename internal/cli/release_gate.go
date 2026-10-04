@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/gate"
-	"github.com/l4ci/hv/v5/internal/release"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/gate"
+	"github.com/l4ci/rota/internal/release"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // The B1 (#54) release verbs: the two release steps that create public state,
@@ -43,7 +43,7 @@ func releasePush(fs *flag.FlagSet) RunFunc {
 	branchOnly := fs.Bool("branch-only", false, "push only the branch, once the tag's release has its binaries")
 	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
-		tag, err := releaseTagArg(args, "hv release push <X.Y.Z> [--branch <name>] [--tag-only|--branch-only] --confirm --confirm-note <answer>")
+		tag, err := releaseTagArg(args, "rota release push <X.Y.Z> [--branch <name>] [--tag-only|--branch-only] --confirm --confirm-note <answer>")
 		if err != nil {
 			return Result{}, err
 		}
@@ -107,7 +107,7 @@ func releasePush(fs *flag.FlagSet) RunFunc {
 				return Result{}, Unavailable("git ls-remote origin failed")
 			}
 			if remote == "" {
-				return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push the tag first: hv release push " + strings.TrimPrefix(tag, "v") + " --tag-only")
+				return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push the tag first: rota release push " + strings.TrimPrefix(tag, "v") + " --tag-only")
 			}
 			// On GitHub the tag alone is not enough: the release must be
 			// published, so the binaries resolve for the version the branch names.
@@ -126,7 +126,7 @@ func releasePush(fs *flag.FlagSet) RunFunc {
 				}
 				if !rel.Found || rel.IsDraft {
 					return Result{}, Resolution("the release for %s is not published", tag).
-						WithHint("finish it first: hv release publish " + strings.TrimPrefix(tag, "v"))
+						WithHint("finish it first: rota release publish " + strings.TrimPrefix(tag, "v"))
 				}
 			}
 		}
@@ -158,7 +158,7 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 	draft := fs.Bool("draft", false, "create a draft release (GitHub only)")
 	confirm := confirmFlags(fs)
 	return func(c *Ctx, args []string) (Result, error) {
-		tag, err := releaseTagArg(args, "hv release publish <X.Y.Z> --title <text> --body-file <path|-> [--draft] --confirm --confirm-note <answer>")
+		tag, err := releaseTagArg(args, "rota release publish <X.Y.Z> --title <text> --body-file <path|-> [--draft] --confirm --confirm-note <answer>")
 		if err != nil {
 			return Result{}, err
 		}
@@ -206,7 +206,7 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 			return Result{}, Unavailable("git ls-remote origin failed")
 		}
 		if remote == "" {
-			return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push it first: hv release push " + strings.TrimPrefix(tag, "v"))
+			return Result{}, Resolution("tag %s is not on origin", tag).WithHint("push it first: rota release push " + strings.TrimPrefix(tag, "v"))
 		}
 		// Look before the gate, so a wait for the workflow (exit 3) does not
 		// spend the maintainer's approval.
@@ -228,7 +228,7 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 		if res, err := clearGate(c, gate.ReleasePublish, tag, conf, nil, nil); err != nil {
 			return res, err
 		}
-		notes, err := os.CreateTemp("", "hv-release-notes-*.md")
+		notes, err := os.CreateTemp("", "rota-release-notes-*.md")
 		if err != nil {
 			return Result{}, err
 		}
@@ -266,7 +266,7 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 }
 
 // releaseAssets is what the release workflow must attach before a draft is
-// finished: one bare binary per platform (the names bin/hv downloads) and the
+// finished: one bare binary per platform (the names bin/rota downloads) and the
 // checksums. The tarballs are not part of that contract.
 var releaseAssets = []string{
 	"hv_linux_amd64", "hv_linux_arm64", "hv_darwin_amd64", "hv_darwin_arm64", "checksums.txt",

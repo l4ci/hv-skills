@@ -29,20 +29,20 @@ func migGit(t *testing.T, dir string, args ...string) {
 func migProject(t *testing.T, umbrella bool) string {
 	t.Helper()
 	dir := knProject(t, umbrella)
-	knWrite(t, filepath.Join(dir, ".hv", "config.json"), "{\n  \"version\": \"3.2.0\",\n  \"keep\": true\n}\n")
-	knWrite(t, filepath.Join(dir, ".hv", "BACKLOG.md"), migBacklog)
-	knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), migKnowledge)
-	knWrite(t, filepath.Join(dir, ".hv", "plans", "P1.md"), "plan: run /hv-undo then /hv-c\n")
-	knWrite(t, filepath.Join(dir, ".hv", "CONTEXT.md"), migContext)
-	knWrite(t, filepath.Join(dir, ".hv", "bin", "hv-context-add"), "#!/bin/sh\n")
-	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\nrun /hv-context\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n")
+	knWrite(t, filepath.Join(dir, ".rota", "config.json"), "{\n  \"version\": \"3.2.0\",\n  \"keep\": true\n}\n")
+	knWrite(t, filepath.Join(dir, ".rota", "BACKLOG.md"), migBacklog)
+	knWrite(t, filepath.Join(dir, ".rota", "KNOWLEDGE.md"), migKnowledge)
+	knWrite(t, filepath.Join(dir, ".rota", "plans", "P1.md"), "plan: run /hv-undo then /hv-c\n")
+	knWrite(t, filepath.Join(dir, ".rota", "CONTEXT.md"), migContext)
+	knWrite(t, filepath.Join(dir, ".rota", "bin", "hv-context-add"), "#!/bin/sh\n")
+	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\nrun /hv-context\n\n<!-- rota-context-start -->\nold\n<!-- rota-context-end -->\n\nend\n")
 	if umbrella {
-		knWrite(t, filepath.Join(dir, ".hv", "knowledge", "web", "KNOWLEDGE.md"), migKnowledge)
-		knWrite(t, filepath.Join(dir, ".hv", "contexts", "web", "CONTEXT.md"), "## Page\n\na view\n")
-		knWrite(t, filepath.Join(dir, ".hv", "contexts", "api", "CONTEXT.md"), "# nothing but a placeholder\n")
-		knWrite(t, filepath.Join(dir, ".hv", "knowledge", "api", "KNOWLEDGE.md"), migKnowledge)
+		knWrite(t, filepath.Join(dir, ".rota", "knowledge", "web", "KNOWLEDGE.md"), migKnowledge)
+		knWrite(t, filepath.Join(dir, ".rota", "contexts", "web", "CONTEXT.md"), "## Page\n\na view\n")
+		knWrite(t, filepath.Join(dir, ".rota", "contexts", "api", "CONTEXT.md"), "# nothing but a placeholder\n")
+		knWrite(t, filepath.Join(dir, ".rota", "knowledge", "api", "KNOWLEDGE.md"), migKnowledge)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".hv/\n"), 0o666); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".rota/\n"), 0o666); err != nil {
 		t.Fatal(err)
 	}
 	migGit(t, dir, "init", "-q")
@@ -69,7 +69,7 @@ func TestMigrateV4ApplyMatchGolden(t *testing.T) {
 		}
 		knSameDelta(t, want, got)
 		tree := knTree(t, newDir)
-		if got := tree["BACKLOG.md"]; !strings.Contains(got, "/hv-capture to add") || !strings.Contains(got, "`/hv-c`") || !strings.Contains(got, "/hv-undo inside a fence") || !strings.Contains(got, "/hv-issues") {
+		if got := tree["BACKLOG.md"]; !strings.Contains(got, "/rota-capture to add") || !strings.Contains(got, "`/hv-c`") || !strings.Contains(got, "/hv-undo inside a fence") || !strings.Contains(got, "/hv-issues") {
 			t.Errorf("rewrite rules misapplied:\n%s", got)
 		}
 		if !strings.Contains(tree["config.json"], `"version": "4.9.9"`) || strings.Contains(tree["config.json"], `"version": "3.2.0"`) {
@@ -147,12 +147,12 @@ func TestMigrateV4Refusals(t *testing.T) {
 		mutate func(t *testing.T, dir string)
 		wantRC int
 	}{
-		{"dirty outside .hv", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, "stray.txt"), "x") }, 4},
+		{"dirty outside .rota", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, "stray.txt"), "x") }, 4},
 		{"pre-3.0 project", func(t *testing.T, d string) {
-			knWrite(t, filepath.Join(d, ".hv", "config.json"), `{"version": "2.1.0"}`)
+			knWrite(t, filepath.Join(d, ".rota", "config.json"), `{"version": "2.1.0"}`)
 		}, 4},
-		{"no version field", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, ".hv", "config.json"), `{}`) }, 3},
-		{"no config", func(t *testing.T, d string) { os.Remove(filepath.Join(d, ".hv", "config.json")) }, 3},
+		{"no version field", func(t *testing.T, d string) { knWrite(t, filepath.Join(d, ".rota", "config.json"), `{}`) }, 3},
+		{"no config", func(t *testing.T, d string) { os.Remove(filepath.Join(d, ".rota", "config.json")) }, 3},
 		{"not a git repo", func(t *testing.T, d string) { os.RemoveAll(filepath.Join(d, ".git")) }, 5},
 	}
 	for _, c := range cases {
@@ -163,7 +163,7 @@ func TestMigrateV4Refusals(t *testing.T) {
 			if n.rc != c.wantRC {
 				t.Fatalf("rc new=%d (want %d)\n%s", n.rc, c.wantRC, n.stderr)
 			}
-			if _, err := os.Stat(filepath.Join(newDir, ".hv", "migrate-backup")); err == nil {
+			if _, err := os.Stat(filepath.Join(newDir, ".rota", "migrate-backup")); err == nil {
 				t.Error("a refused run left a backup")
 			}
 			if c.wantRC == 4 {
@@ -176,7 +176,7 @@ func TestMigrateV4Refusals(t *testing.T) {
 	}
 	// cwd inside a backup directory.
 	dir := migProject(t, false)
-	inside := filepath.Join(dir, ".hv", "migrate-backup", "x")
+	inside := filepath.Join(dir, ".rota", "migrate-backup", "x")
 	os.MkdirAll(inside, 0o777)
 	got := knNew(t, inside, "", "migrate", "v4", "-C", inside)
 	if got.rc != 4 || !strings.Contains(got.stderr, "migrate-backup") {
@@ -188,15 +188,15 @@ func TestMigrateV4KeepsBackupWhenImportFails(t *testing.T) {
 	migPlugin(t)
 	dir := migProject(t, false)
 	// A Glossary heading is required for the import.
-	knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), "# Knowledge\n")
+	knWrite(t, filepath.Join(dir, ".rota", "KNOWLEDGE.md"), "# Knowledge\n")
 	n := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
 	if n.rc != 4 || !strings.Contains(n.stdout, `"blockedBy": "glossary-import"`) || !strings.Contains(n.stdout, `"changed": true`) {
 		t.Fatalf("rc=%d %s", n.rc, n.stdout)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".hv", "CONTEXT.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ".rota", "CONTEXT.md")); err != nil {
 		t.Error("CONTEXT.md was deleted although the import failed")
 	}
-	matches, _ := filepath.Glob(filepath.Join(dir, ".hv", "migrate-backup", "*", "CONTEXT.md"))
+	matches, _ := filepath.Glob(filepath.Join(dir, ".rota", "migrate-backup", "*", "CONTEXT.md"))
 	if len(matches) != 1 {
 		t.Errorf("backup of CONTEXT.md missing: %v", matches)
 	}
@@ -206,9 +206,9 @@ func TestMigrateV4CRLFMatchGolden(t *testing.T) {
 	migPlugin(t)
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	newDir := migProject(t, false)
-	knWrite(t, filepath.Join(newDir, ".hv", "BACKLOG.md"), crlf(migBacklog))
-	knWrite(t, filepath.Join(newDir, ".hv", "CONTEXT.md"), crlf(migContext))
-	knWrite(t, filepath.Join(newDir, "AGENTS.md"), crlf("# Agents\n\nrun /hv-context\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n"))
+	knWrite(t, filepath.Join(newDir, ".rota", "BACKLOG.md"), crlf(migBacklog))
+	knWrite(t, filepath.Join(newDir, ".rota", "CONTEXT.md"), crlf(migContext))
+	knWrite(t, filepath.Join(newDir, "AGENTS.md"), crlf("# Agents\n\nrun /hv-context\n\n<!-- rota-context-start -->\nold\n<!-- rota-context-end -->\n\nend\n"))
 	migGit(t, newDir, "add", "-A", "-f")
 	migGit(t, newDir, "commit", "-q", "-m", "crlf")
 	want, got := knFrozen(t, newDir, "", "migrate", "v4", "--apply")
@@ -252,7 +252,7 @@ func TestMigrateV4DevBuildWarnsAndSkipsStamp(t *testing.T) {
 func TestMigrateV4StripNormalizesCRLF(t *testing.T) {
 	migPlugin(t)
 	newDir := migProject(t, false)
-	knWrite(t, filepath.Join(newDir, "AGENTS.md"), "# Agents\r\n\r\n<!-- hv-context-start -->\r\nold\r\n<!-- hv-context-end -->\r\n\r\nend\r\n")
+	knWrite(t, filepath.Join(newDir, "AGENTS.md"), "# Agents\r\n\r\n<!-- rota-context-start -->\r\nold\r\n<!-- rota-context-end -->\r\n\r\nend\r\n")
 	migGit(t, newDir, "add", "-A", "-f")
 	migGit(t, newDir, "commit", "-q", "-m", "crlf agents")
 	want, got := knFrozen(t, newDir, "", "migrate", "v4", "--apply")
@@ -271,7 +271,7 @@ func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
 	migPlugin(t)
 	dir := migProject(t, false)
 	knNew(t, dir, "", "migrate", "v4", "--apply")
-	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\n<!-- hv-context-start -->\nold\n<!-- hv-context-end -->\n\nend\n")
+	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\n<!-- rota-context-start -->\nold\n<!-- rota-context-end -->\n\nend\n")
 	migGit(t, dir, "add", "-A", "-f")
 	migGit(t, dir, "commit", "-q", "-m", "stray block")
 
@@ -280,7 +280,7 @@ func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
 		t.Fatalf("preview: %s", p.stdout)
 	}
 	a := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
-	if a.rc != 0 || !strings.Contains(a.stdout, `"changed": true`) || !strings.Contains(a.stdout, `"backup": ".hv/migrate-backup/`) {
+	if a.rc != 0 || !strings.Contains(a.stdout, `"changed": true`) || !strings.Contains(a.stdout, `"backup": ".rota/migrate-backup/`) {
 		t.Fatalf("apply: %d %s", a.rc, a.stdout)
 	}
 	got, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
@@ -295,12 +295,12 @@ func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
 	}
 }
 
-// --apply stamps hv.version with the installed plugin version, drops the
+// --apply stamps rota.version with the installed plugin version, drops the
 // legacy top-level version, and reports the stamp as data.versionStamp.
 func TestMigrateV4StampsInstalledVersion(t *testing.T) {
 	migPlugin(t)
 	dir := migProject(t, false)
-	knWrite(t, filepath.Join(dir, ".hv", "config.json"), `{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}`)
+	knWrite(t, filepath.Join(dir, ".rota", "config.json"), `{"version":"3.4.0","hvSkills":{"version":"3.4.0"}}`)
 	migGit(t, dir, "add", "-A", "-f")
 	migGit(t, dir, "commit", "-q", "-m", "cfg")
 	n := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
@@ -315,14 +315,14 @@ func TestMigrateV4StampsInstalledVersion(t *testing.T) {
 	if err := json.Unmarshal([]byte(n.stdout), &env); err != nil {
 		t.Fatalf("json: %v\n%s", err, n.stdout)
 	}
-	raw, err := os.ReadFile(filepath.Join(dir, ".hv", "config.json"))
+	raw, err := os.ReadFile(filepath.Join(dir, ".rota", "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var cfg struct {
 		Hv struct {
 			Version string `json:"version"`
-		} `json:"hv"`
+		} `json:"rota"`
 		HvSkills *json.RawMessage `json:"hvSkills"`
 		Version  *string          `json:"version"`
 	}
@@ -330,7 +330,7 @@ func TestMigrateV4StampsInstalledVersion(t *testing.T) {
 		t.Fatalf("config: %v\n%s", err, raw)
 	}
 	if cfg.Hv.Version != "4.9.9" {
-		t.Errorf("hv.version = %q, want 4.9.9", cfg.Hv.Version)
+		t.Errorf("rota.version = %q, want 4.9.9", cfg.Hv.Version)
 	}
 	if env.Data.VersionStamp != cfg.Hv.Version {
 		t.Errorf("data.versionStamp = %q, stamped %q", env.Data.VersionStamp, cfg.Hv.Version)
@@ -353,7 +353,7 @@ func TestMigrateV4StripKeepsLiveBlockAndProse(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
 		t.Fatal(err)
 	}
-	knWrite(t, filepath.Join(dir, "CLAUDE.md"), "# Project\n\n<!-- hv-knowledge-start -->\n## Project Knowledge\nLive block - must survive.\n<!-- hv-knowledge-end -->\n\n<!-- hv-context-start -->\n## Project Context\nOrphan block - must be stripped.\n<!-- hv-context-end -->\n\nRegular prose stays.\n")
+	knWrite(t, filepath.Join(dir, "CLAUDE.md"), "# Project\n\n<!-- rota-knowledge-start -->\n## Project Knowledge\nLive block - must survive.\n<!-- rota-knowledge-end -->\n\n<!-- rota-context-start -->\n## Project Context\nOrphan block - must be stripped.\n<!-- rota-context-end -->\n\nRegular prose stays.\n")
 	migGit(t, dir, "add", "-A", "-f")
 	migGit(t, dir, "commit", "-q", "-m", "claude md")
 	a := knNew(t, dir, "", "migrate", "v4", "--apply", "--json")
@@ -365,10 +365,10 @@ func TestMigrateV4StripKeepsLiveBlockAndProse(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(b)
-	if strings.Contains(got, "hv-context-start") || strings.Contains(got, "Orphan block") {
+	if strings.Contains(got, "rota-context-start") || strings.Contains(got, "Orphan block") {
 		t.Errorf("orphan block not stripped:\n%s", got)
 	}
-	for _, want := range []string{"hv-knowledge-start", "Live block - must survive.", "Regular prose stays."} {
+	for _, want := range []string{"rota-knowledge-start", "Live block - must survive.", "Regular prose stays."} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%q lost:\n%s", want, got)
 		}

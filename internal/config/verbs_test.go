@@ -7,25 +7,25 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 func project(t *testing.T, cfg, local string) string {
 	t.Helper()
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o755)
 	if cfg != "" {
-		os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte(cfg), 0o644)
+		os.WriteFile(filepath.Join(root, ".rota", "config.json"), []byte(cfg), 0o644)
 	}
 	if local != "" {
-		os.WriteFile(filepath.Join(root, ".hv", "config.local.json"), []byte(local), 0o644)
+		os.WriteFile(filepath.Join(root, ".rota", "config.local.json"), []byte(local), 0o644)
 	}
 	return root
 }
 
 func read(t *testing.T, root string) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(root, ".hv", "config.json"))
+	b, err := os.ReadFile(filepath.Join(root, ".rota", "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestSetWritesCanonicalAndReportsPrevious(t *testing.T) {
 	if got := read(t, root); got != want {
 		t.Errorf("file:\n%s", got)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "config.local.json")); string(b) != `{"models":{"worker":"local"}}` {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "config.local.json")); string(b) != `{"models":{"worker":"local"}}` {
 		t.Errorf("config.local.json was touched: %s", b)
 	}
 	res, err = Set(root, "models.worker", "opus")
@@ -136,7 +136,7 @@ func TestSetCreatesAndReplacesParents(t *testing.T) {
 	if _, err := Set(root, "issues.labels.types.bug", "x"); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(Load(filepath.Join(root, ".hv", "config.json")).(*jsonx.Object).Keys(), []string{"issues"}) {
+	if !reflect.DeepEqual(Load(filepath.Join(root, ".rota", "config.json")).(*jsonx.Object).Keys(), []string{"issues"}) {
 		t.Error("no nested object")
 	}
 }
@@ -176,7 +176,7 @@ func TestSetCorruptOrEmptyFileCountsAsEmpty(t *testing.T) {
 	for _, body := range []string{"{oops", ""} {
 		root := project(t, body, "")
 		if body == "" {
-			os.WriteFile(filepath.Join(root, ".hv", "config.json"), nil, 0o644)
+			os.WriteFile(filepath.Join(root, ".rota", "config.json"), nil, 0o644)
 		}
 		if _, err := Set(root, "docs.path", "x"); err != nil {
 			t.Fatal(err)
@@ -237,29 +237,29 @@ func TestCheckVerdicts(t *testing.T) {
 		t.Errorf("fresh: %s %v", st, m)
 	}
 	for _, body := range []string{"{oops", "[1]", "null", "", "\xff{}", `{"a": NaN}`} {
-		os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte(body), 0o644)
+		os.WriteFile(filepath.Join(root, ".rota", "config.json"), []byte(body), 0o644)
 		if st, _ := Check(root); st != Corrupt {
 			t.Errorf("%q: %s", body, st)
 		}
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "config.json"), []byte("{}"), 0o644)
 	st, m := Check(root)
 	if st != Stale || len(m) == 0 || m[0] != "models.orchestrator" {
 		t.Errorf("stale: %s %v", st, m)
 	}
 	cfg := fullConfig()
 	b, _ := jsonx.Marshal(cfg)
-	os.WriteFile(filepath.Join(root, ".hv", "config.json"), b, 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "config.json"), b, 0o644)
 	if st, m := Check(root); st != UpToDate || len(m) != 0 {
 		t.Errorf("up to date: %s %v", st, m)
 	}
 	// null and a scalar parent both count as missing, in schema order
 	o, _ := getObject(cfg, "umbrella")
 	o.Set("enabled", nil)
-	cfg.Set("hv", "scalar")
+	cfg.Set("rota", "scalar")
 	b, _ = jsonx.Marshal(cfg)
-	os.WriteFile(filepath.Join(root, ".hv", "config.json"), b, 0o644)
-	if st, m := Check(root); st != Stale || !reflect.DeepEqual(m, []string{"umbrella.enabled", "hv.version"}) {
+	os.WriteFile(filepath.Join(root, ".rota", "config.json"), b, 0o644)
+	if st, m := Check(root); st != Stale || !reflect.DeepEqual(m, []string{"umbrella.enabled", "rota.version"}) {
 		t.Errorf("null/scalar: %s %v", st, m)
 	}
 }

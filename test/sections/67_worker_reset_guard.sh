@@ -49,7 +49,7 @@ exit 0
 SH
 chmod +x "$FK/bin/herdr" "$FK/bin/tmux"
 
-mkdir -p "$TMP_RG/repo/.hv"
+mkdir -p "$TMP_RG/repo/.rota"
 (
   cd "$TMP_RG/repo"
   git init -q -b main .
@@ -61,13 +61,13 @@ mkdir -p "$TMP_RG/repo/.hv"
 ) || fail "reset-guard fixture repo setup failed"
 
 rg()  { ( cd "$TMP_RG/repo" && "$@" ); }
-rgh() { ( cd "$TMP_RG/repo" && PATH="$FK/bin:$PATH" FAKE_HERDR="$FK" HERDR_ENV=1 HERDR_WORKSPACE_ID=w9 HV_HOST_KILL_WAIT=1 "$@" ); }
-rgt() { ( cd "$TMP_RG/repo" && PATH="$FK/bin:$PATH" FAKE_TMUX="$FK" HV_HOST_KILL_WAIT=1 "$@" ); }
+rgh() { ( cd "$TMP_RG/repo" && PATH="$FK/bin:$PATH" FAKE_HERDR="$FK" HERDR_ENV=1 HERDR_WORKSPACE_ID=w9 ROTA_HOST_KILL_WAIT=1 "$@" ); }
+rgt() { ( cd "$TMP_RG/repo" && PATH="$FK/bin:$PATH" FAKE_TMUX="$FK" ROTA_HOST_KILL_WAIT=1 "$@" ); }
 slot_field() {
   python3 -c 'import json,sys; s=[s for s in json.load(open(sys.argv[1]))["slots"] if s["name"]==sys.argv[2]][0]; print(s.get(sys.argv[3]))' \
-    "$TMP_RG/repo/.hv/workers.json" "$1" "$2"
+    "$TMP_RG/repo/.rota/workers.json" "$1" "$2"
 }
-cfg() { printf '{"work":{"dispatch":"%s"%s}}\n' "$1" "${2:+,\"workerCommand\":\"$2\"}" > "$TMP_RG/repo/.hv/config.json"; }
+cfg() { printf '{"work":{"dispatch":"%s"%s}}\n' "$1" "${2:+,\"workerCommand\":\"$2\"}" > "$TMP_RG/repo/.rota/config.json"; }
 
 rg hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "pool init failed"
 WT="$(slot_field w1 worktree)"
@@ -83,7 +83,7 @@ case "$(jget 'data.dirty' <<<"$OUT")" in *scratch.txt*) ;; *) fail "refusal data
 RC=0; OUT="$(rg hvj worker reset w1 --task T1 --check-only 2>/dev/null)" || RC=$?
 [ "$RC" = "1" ] || fail "--check-only on a slot holding work must exit 1, got $RC"
 [ "$(jget 'data.clean' <<<"$OUT")" = "false" ] || fail "--check-only verdict must be clean:false, got: $OUT"
-[ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "hv-worker/w1" ] || fail "a refused reset must not move the branch"
+[ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "rota-worker/w1" ] || fail "a refused reset must not move the branch"
 rm "$WT/scratch.txt"
 
 echo more >> "$WT/seed.txt"
@@ -103,19 +103,19 @@ if grep '^tab \|^agent ' "$FK/log" >/dev/null; then fail "a refused dispatch mus
 pass "worker dispatch exits 4 on a dirty slot without touching its session"
 
 # ── (b) clean slot gets a fresh branch from the cycle branch ────────────────
-git -C "$TMP_RG/repo" merge -q hv-worker/w1 || fail "fixture merge failed"
+git -C "$TMP_RG/repo" merge -q rota-worker/w1 || fail "fixture merge failed"
 git -C "$TMP_RG/repo" commit -q --allow-empty -m "landed since" || true
 OUT="$(rg hvj worker reset w1 --task B07 2>/dev/null)" || fail "a merged slot must reset cleanly: $OUT"
-[ "$(jget 'data.branch' <<<"$OUT")" = "hv-worker/w1-b07" ] || fail "reset data must name the new branch, got: $OUT"
+[ "$(jget 'data.branch' <<<"$OUT")" = "rota-worker/w1-b07" ] || fail "reset data must name the new branch, got: $OUT"
 [ "$(jget 'data.changed' <<<"$OUT")" = "true" ] || fail "a real reset reports changed:true: $OUT"
 [ "$(jget 'data.sha' <<<"$OUT")" = "$(git -C "$TMP_RG/repo" rev-parse --short=7 main)" ] || fail "reset data sha must be the base tip: $OUT"
 rg hvj worker reset w1 --task B07 --check-only >/dev/null 2>&1 || fail "--check-only must exit 0 on a clean slot"
-[ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "hv-worker/w1-b07" ] || fail "slot is on $(git -C "$WT" rev-parse --abbrev-ref HEAD), expected hv-worker/w1-b07"
+[ "$(git -C "$WT" rev-parse --abbrev-ref HEAD)" = "rota-worker/w1-b07" ] || fail "slot is on $(git -C "$WT" rev-parse --abbrev-ref HEAD), expected rota-worker/w1-b07"
 [ "$(git -C "$WT" rev-parse HEAD)" = "$(git -C "$TMP_RG/repo" rev-parse main)" ] || fail "fresh branch must start at the tip of the cycle branch"
-[ "$(slot_field w1 branch)" = "hv-worker/w1-b07" ] || fail "registry must record the per-task branch for worker gate"
-git -C "$TMP_RG/repo" rev-parse --verify --quiet hv-worker/w1 >/dev/null && fail "the proved-merged previous branch should be deleted"
+[ "$(slot_field w1 branch)" = "rota-worker/w1-b07" ] || fail "registry must record the per-task branch for worker gate"
+git -C "$TMP_RG/repo" rev-parse --verify --quiet rota-worker/w1 >/dev/null && fail "the proved-merged previous branch should be deleted"
 rg hvj worker pool init --slots 1 --base main >/dev/null 2>&1 || fail "re-init failed"
-[ "$(slot_field w1 branch)" = "hv-worker/w1-b07" ] || fail "re-running pool init must not rewind the slot's branch"
+[ "$(slot_field w1 branch)" = "rota-worker/w1-b07" ] || fail "re-running pool init must not rewind the slot's branch"
 pass "a clean slot is cut a fresh per-task branch from the cycle branch; registry and worker pool init agree"
 
 # ── (c) provable close ──────────────────────────────────────────────────────
@@ -141,10 +141,10 @@ rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T3 >/dev/null \
 
 # tmux twin: first the window refuses to die, then it dies but a pid survives.
 cfg tmux
-python3 - "$TMP_RG/repo/.hv/workers.json" <<'PY'
+python3 - "$TMP_RG/repo/.rota/workers.json" <<'PY'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p))
-d["slots"][0]["handle"] = "hv:w1"; json.dump(d, open(p, "w"))
+d["slots"][0]["handle"] = "rota:w1"; json.dump(d, open(p, "w"))
 PY
 sleep 300 & SLEEPER=$!
 echo "$SLEEPER" > "$FK/pid"
@@ -160,7 +160,7 @@ kill "$SLEEPER" 2>/dev/null || true; wait "$SLEEPER" 2>/dev/null || true
 pass "dispatch exits 5 and spawns nothing when the old tab/window (or its pids) is not confirmed gone"
 
 # ── (d) resume flags and unparseable commands ───────────────────────────────
-cfgj() { python3 -c 'import json,sys; print(json.dumps({"work":{"dispatch":"herdr","workerCommand":sys.argv[1]}}))' "$1" > "$TMP_RG/repo/.hv/config.json"; }
+cfgj() { python3 -c 'import json,sys; print(json.dumps({"work":{"dispatch":"herdr","workerCommand":sys.argv[1]}}))' "$1" > "$TMP_RG/repo/.rota/config.json"; }
 dispatch_rc() { RC=0; OUT="$(rgh hvj worker dispatch w1 --body-file "$TMP_RG/brief.md" --task T5 2>/dev/null)" || RC=$?; }
 for CMD in "claude --model sonnet --continue" "claude -r" "claude -c" "claude --resume" "claude --resume=abc" \
            "claude --continue=1" "claude -cr" 'sh -c "claude -c"' "env X=1 claude -c" "X=1 claude --resume abc"; do

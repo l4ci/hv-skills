@@ -1,7 +1,7 @@
 // Package debugctr ports hv-debug-counter: the persistent fix-attempt
-// counter behind /hv-debug's Iron Law. State lives in
-// .hv/debug/<session>.json, where session is the current git branch with
-// "/" replaced by "-". The file keeps its old snake_case keys so hv and the
+// counter behind /rota-debug's Iron Law. State lives in
+// .rota/debug/<session>.json, where session is the current git branch with
+// "/" replaced by "-". The file keeps its old snake_case keys so rota and the
 // old helper can share it.
 package debugctr
 
@@ -15,9 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Counter addresses one session's state file.
@@ -40,7 +40,7 @@ func Open(root string) (*Counter, error) {
 		return nil, artifact.Errf(artifact.ExitUnavailable, "could not determine current git branch")
 	}
 	session := strings.ReplaceAll(branch, "/", "-")
-	return &Counter{Session: session, Path: filepath.Join(root, ".hv", "debug", session+".json")}, nil
+	return &Counter{Session: session, Path: filepath.Join(root, ".rota", "debug", session+".json")}, nil
 }
 
 func nowISO() string {
@@ -69,8 +69,8 @@ func (c *Counter) exists() bool {
 
 func (c *Counter) require() error {
 	if !c.exists() {
-		return artifact.Errf(artifact.ExitResolution, "no debug session file at .hv/debug/%s.json", c.Session).
-			WithHint("run: hv debug counter init <bugId>")
+		return artifact.Errf(artifact.ExitResolution, "no debug session file at .rota/debug/%s.json", c.Session).
+			WithHint("run: rota debug counter init <bugId>")
 	}
 	return nil
 }
@@ -267,9 +267,9 @@ func (c *Counter) Summary(o *jsonx.Object) (md, bugID string, failed int) {
 		"",
 		"## Next steps",
 		"",
-		"- Run `/hv-pause` to leave a handoff note and step away.",
+		"- Run `/rota-pause` to leave a handoff note and step away.",
 		"- Or re-read the symptom — the root cause is likely in a different subsystem than the hypotheses so far have explored.",
-		"- The failed-fix count is per item and survives a new branch; only `hv debug reset "+bugID+"`, after a human approves it, starts it again.",
+		"- The failed-fix count is per item and survives a new branch; only `rota debug reset "+bugID+"`, after a human approves it, starts it again.",
 	)
 	return strings.Join(lines, "\n"), bugID, failed
 }

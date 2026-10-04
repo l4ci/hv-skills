@@ -6,13 +6,13 @@ echo "solo mode: a round with no host runs subagent workers on the same state (C
 SO="$(mktemp -d "$TMP/solo.XXXXXX")"
 (
   cd "$SO" && git init -q -b main . && git -c user.email=a@b -c user.name=n commit -q --allow-empty -m init \
-    && mkdir -p .hv/milestones \
-    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md \
-    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .hv/milestones/M01.md
+    && mkdir -p .rota/milestones \
+    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md \
+    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .rota/milestones/M01.md
 ) || fail "solo fixture setup failed"
 SOENV="env -u HERDR_ENV -u HERDR_PANE_ID -u TMUX -u TMUX_PANE"
-so() { ( cd "$SO" && $SOENV "$HV_BIN" --json "$@" 2>/dev/null ); }
-reg() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(eval(sys.argv[2]))' "$SO/.hv/workers.json" "$1"; }
+so() { ( cd "$SO" && $SOENV "$ROTA_BIN" --json "$@" 2>/dev/null ); }
+reg() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(eval(sys.argv[2]))' "$SO/.rota/workers.json" "$1"; }
 so item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works\nTouches internal/a.go' >/dev/null
 so item create --kind features --title Second --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works\nTouches internal/b.go' >/dev/null
 printf 'stub worker contract\n' > "$SO/contract.md"
@@ -21,7 +21,7 @@ HOLD=$$
 
 # start resolves and records the host.
 so round start --holder-pid "$HOLD" --slots 2 >/dev/null || fail "solo round start failed"
-[ "$(reg 'd.get("host")')" = "solo" ] || fail "round start with no host should record host solo: $(cat "$SO/.hv/workers.json")"
+[ "$(reg 'd.get("host")')" = "solo" ] || fail "round start with no host should record host solo: $(cat "$SO/.rota/workers.json")"
 pass "round start with no host records host solo"
 
 # Solo runs Claude subagents only: a codex worker is refused before anything is marked.

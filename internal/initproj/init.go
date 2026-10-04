@@ -1,4 +1,4 @@
-// Package initproj is `hv init`: it seeds .hv/ in a directory, migrates what
+// Package initproj is `rota init`: it seeds .rota/ in a directory, migrates what
 // older versions left behind, and checks that a project is initialized. It is
 // the port of bin/hv-bootstrap and bin/hv-preflight; the trees the old
 // bootstrap left, frozen in testdata/golden, are what the tests compare
@@ -19,20 +19,20 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
 )
 
 // ErrSeed is wrapped by every failure of seeding: a file that is unreadable,
 // not writable or corrupt. The cli maps it to exit 70.
-var ErrSeed = errors.New("seeding .hv/ failed")
+var ErrSeed = errors.New("seeding .rota/ failed")
 
 func seedErr(format string, a ...any) error {
 	return fmt.Errorf("%w: %s", ErrSeed, fmt.Sprintf(format, a...))
 }
 
-// Result is what Init did. Created is the diff of `find .hv .gitignore` before
+// Result is what Init did. Created is the diff of `find .rota .gitignore` before
 // and after, sorted and relative to the root, directories included.
 type Result struct {
 	Created []string
@@ -43,7 +43,7 @@ type Result struct {
 	// KNOWLEDGE.md preamble.
 	Migrated bool
 	// Warnings are things the caller should surface: a legacy TODO.md left in
-	// place, custom files left in .hv/bin.
+	// place, custom files left in .rota/bin.
 	Warnings []string
 }
 
@@ -54,16 +54,16 @@ func (r Result) Changed() bool {
 
 var seedDirs = []string{"bugs", "features", "tasks", "milestones", "plans", "spikes", "map"}
 
-// Init seeds .hv/ under root. It never overwrites an existing file, and a
+// Init seeds .rota/ under root. It never overwrites an existing file, and a
 // second run is a no-op, as hv-bootstrap was. Beyond it, Init removes the
-// `.hv/bin` mirror that 4.x wrote (see removeMirror).
+// `.rota/bin` mirror that 4.x wrote (see removeMirror).
 func Init(root string) (Result, error) {
 	var res Result
 	before := snapshot(root)
-	hv := filepath.Join(root, ".hv")
+	rota := filepath.Join(root, ".rota")
 	// A corrupt counters.json is refused before anything is written, so exit 70
 	// leaves the tree as it was.
-	if err := checkCounters(filepath.Join(hv, "counters.json")); err != nil {
+	if err := checkCounters(filepath.Join(rota, "counters.json")); err != nil {
 		return res, err
 	}
 	step := func(wrote bool, err error) error {
@@ -71,20 +71,20 @@ func Init(root string) (Result, error) {
 		return err
 	}
 	for _, d := range seedDirs {
-		if err := os.MkdirAll(filepath.Join(hv, d), 0o777); err != nil {
+		if err := os.MkdirAll(filepath.Join(rota, d), 0o777); err != nil {
 			return res, seedErr("%v", err)
 		}
 	}
 
-	// A legacy .hv/TODO.md becomes BACKLOG.md; with both present BACKLOG.md wins.
-	todo, backlog := filepath.Join(hv, "TODO.md"), filepath.Join(hv, "BACKLOG.md")
+	// A legacy .rota/TODO.md becomes BACKLOG.md; with both present BACKLOG.md wins.
+	todo, backlog := filepath.Join(rota, "TODO.md"), filepath.Join(rota, "BACKLOG.md")
 	if isFile(todo) {
 		if !isFile(backlog) {
 			if err := os.Rename(todo, backlog); err != nil {
 				return res, seedErr("%v", err)
 			}
 		} else {
-			res.Warnings = append(res.Warnings, "legacy .hv/TODO.md still present; not overwriting .hv/BACKLOG.md")
+			res.Warnings = append(res.Warnings, "legacy .rota/TODO.md still present; not overwriting .rota/BACKLOG.md")
 		}
 	}
 
@@ -95,18 +95,18 @@ func Init(root string) (Result, error) {
 		{"MAP.md", mapSeed},
 		{"MILESTONES.md", milestonesSeed},
 	} {
-		if err := seedFile(filepath.Join(hv, f.name), f.text); err != nil {
+		if err := seedFile(filepath.Join(rota, f.name), f.text); err != nil {
 			return res, err
 		}
 	}
-	if err := step(migrateMilestonesHeading(filepath.Join(hv, "MILESTONES.md"))); err != nil {
+	if err := step(migrateMilestonesHeading(filepath.Join(rota, "MILESTONES.md"))); err != nil {
 		return res, err
 	}
 
-	if err := seedFile(filepath.Join(hv, "counters.json"), countersSeed); err != nil {
+	if err := seedFile(filepath.Join(rota, "counters.json"), countersSeed); err != nil {
 		return res, err
 	}
-	if err := step(backfillCounters(filepath.Join(hv, "counters.json"))); err != nil {
+	if err := step(backfillCounters(filepath.Join(rota, "counters.json"))); err != nil {
 		return res, err
 	}
 	for _, f := range []struct{ name, text string }{
@@ -114,7 +114,7 @@ func Init(root string) (Result, error) {
 		{"repos.json", reposSeed},
 		{"config.json", configSeed},
 	} {
-		if err := seedFile(filepath.Join(hv, f.name), f.text); err != nil {
+		if err := seedFile(filepath.Join(rota, f.name), f.text); err != nil {
 			return res, err
 		}
 	}
@@ -122,7 +122,7 @@ func Init(root string) (Result, error) {
 	if err := step(updateGitignore(filepath.Join(root, ".gitignore"), len(repos.Load(root)) > 0)); err != nil {
 		return res, err
 	}
-	if err := step(migrateKnowledgePreamble(filepath.Join(hv, "KNOWLEDGE.md"))); err != nil {
+	if err := step(migrateKnowledgePreamble(filepath.Join(rota, "KNOWLEDGE.md"))); err != nil {
 		return res, err
 	}
 
@@ -190,7 +190,7 @@ func backfillCounters(path string) (bool, error) {
 	v, err := jsonx.Decode(raw)
 	d, ok := v.(*jsonx.Object)
 	if err != nil || !ok {
-		return false, seedErr("%s is not a JSON object; fix or remove it", filepath.ToSlash(filepath.Join(".hv", filepath.Base(path))))
+		return false, seedErr("%s is not a JSON object; fix or remove it", filepath.ToSlash(filepath.Join(".rota", filepath.Base(path))))
 	}
 	changed := false
 	if _, ok := d.Get("milestones"); !ok {
@@ -222,9 +222,9 @@ func checkCounters(path string) error {
 		return seedErr("%v", err)
 	}
 	if v, err := jsonx.Decode(raw); err != nil {
-		return seedErr(".hv/counters.json is not valid JSON; fix or remove it")
+		return seedErr(".rota/counters.json is not valid JSON; fix or remove it")
 	} else if _, ok := v.(*jsonx.Object); !ok {
-		return seedErr(".hv/counters.json is not a JSON object; fix or remove it")
+		return seedErr(".rota/counters.json is not a JSON object; fix or remove it")
 	}
 	return nil
 }
@@ -248,7 +248,7 @@ func updateGitignore(path string, umbrella bool) (bool, error) {
 var legacySlashRe = regexp.MustCompile(`/hv:([a-z][a-z0-9-]*)`)
 
 // migrateKnowledgePreamble rewrites the legacy `/hv:X` command spelling to
-// `/hv-X` above the first `## ` heading. Captured learnings are never touched.
+// `/rota-X` above the first `## ` heading. Captured learnings are never touched.
 func migrateKnowledgePreamble(path string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -274,7 +274,7 @@ func migrateKnowledgePreamble(path string) (bool, error) {
 		if strings.HasPrefix(l, "## ") {
 			break
 		}
-		if n := legacySlashRe.ReplaceAllString(l, "/hv-$1"); n != l {
+		if n := legacySlashRe.ReplaceAllString(l, "/rota-$1"); n != l {
 			lines[i] = n
 			changed = true
 		}
@@ -288,26 +288,26 @@ func migrateKnowledgePreamble(path string) (bool, error) {
 	return true, nil
 }
 
-// removeMirror deletes the `.hv/bin` mirror that the 4.x init skill wrote. 5.0 has no
-// mirror: the hv binary is on PATH. It removes what the old mirror step
+// removeMirror deletes the `.rota/bin` mirror that the 4.x init skill wrote. 5.0 has no
+// mirror: the rota binary is on PATH. It removes what the old mirror step
 // replaced (`hv-*` and `hvlib*.py` files) and the `__pycache__` Python left
 // there, then the directory itself if that emptied it. Anything else stays and
-// is reported, since the old step also left it alone. A symlinked `.hv/bin` is
+// is reported, since the old step also left it alone. A symlinked `.rota/bin` is
 // not followed.
 func removeMirror(root string, warnings []string) (removed, warn []string) {
-	dir := filepath.Join(root, ".hv", "bin")
+	dir := filepath.Join(root, ".rota", "bin")
 	fi, err := os.Lstat(dir)
 	if err != nil || !fi.IsDir() {
 		return nil, warnings
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, append(warnings, fmt.Sprintf("cannot read .hv/bin: %v", err))
+		return nil, append(warnings, fmt.Sprintf("cannot read .rota/bin: %v", err))
 	}
 	var kept []string
 	for _, e := range entries {
 		name := e.Name()
-		rel := filepath.ToSlash(filepath.Join(".hv", "bin", name))
+		rel := filepath.ToSlash(filepath.Join(".rota", "bin", name))
 		stale := e.Type().IsRegular() && (strings.HasPrefix(name, "hv-") || (strings.HasPrefix(name, "hvlib") && strings.HasSuffix(name, ".py")))
 		stale = stale || (e.IsDir() && name == "__pycache__")
 		if !stale {
@@ -323,10 +323,10 @@ func removeMirror(root string, warnings []string) (removed, warn []string) {
 	}
 	if len(kept) == 0 {
 		if err := os.Remove(dir); err == nil {
-			removed = append(removed, ".hv/bin")
+			removed = append(removed, ".rota/bin")
 		}
 	} else {
-		warnings = append(warnings, fmt.Sprintf("left %s in .hv/bin: not an hv mirror file (5.0 does not use .hv/bin)", strings.Join(kept, ", ")))
+		warnings = append(warnings, fmt.Sprintf("left %s in .rota/bin: not a rota mirror file (5.0 does not use .rota/bin)", strings.Join(kept, ", ")))
 	}
 	sort.Strings(removed)
 	return removed, warnings

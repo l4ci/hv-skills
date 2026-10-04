@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// Umbrella is hv-umbrella-on: true iff <base>/.hv/repos.json registers at
+// Umbrella is hv-umbrella-on: true iff <base>/.rota/repos.json registers at
 // least one sub-repo. umbrella.enabled plays no part.
 func Umbrella(base string) bool { return len(Load(base)) > 0 }
 
@@ -22,32 +22,32 @@ var (
 	ErrGitMissing = errors.New("git is not installed")
 	// ErrNotGit: the working directory is not inside a git repo.
 	ErrNotGit = errors.New("not inside a git repo")
-	// ErrNoUmbrella: no .hv/ directory here or above.
-	ErrNoUmbrella = errors.New("no .hv/ found here or in any parent")
+	// ErrNoUmbrella: no .rota/ directory here or above.
+	ErrNoUmbrella = errors.New("no .rota/ found here or in any parent")
 	// ErrNotRegistered: the checkout is not a registered sub-repo.
 	ErrNotRegistered = errors.New("not inside a registered sub-repo")
 )
 
-// MaskedError is hv-walk-up --detect-masking's exit 2: a stray .hv/ in a
+// MaskedError is hv-walk-up --detect-masking's exit 2: a stray .rota/ in a
 // registered sub-repo hides the umbrella above it.
 type MaskedError struct {
-	Name  string // the registered sub-repo that holds the stray .hv/
-	Stray string // the stray .hv/ directory
+	Name  string // the registered sub-repo that holds the stray .rota/
+	Stray string // the stray .rota/ directory
 }
 
 func (e *MaskedError) Error() string {
-	return fmt.Sprintf("stray .hv/ inside registered sub-repo %s masks the umbrella", e.Name)
+	return fmt.Sprintf("stray .rota/ inside registered sub-repo %s masks the umbrella", e.Name)
 }
 
-// FindUmbrella is hv-resolve-umbrella from start: it walks up for .hv/
+// FindUmbrella is hv-resolve-umbrella from start: it walks up for .rota/
 // directories (the filesystem root itself is never checked, as in the old
 // helper), returns the nearest one's parent, and fails with a *MaskedError
-// when a higher .hv/ registers that parent's tree as a sub-repo.
+// when a higher .rota/ registers that parent's tree as a sub-repo.
 func FindUmbrella(start string) (string, error) {
 	var cands []string
 	dir := Realpath(start)
 	for dir != "/" && dir != filepath.Dir(dir) {
-		if fi, err := os.Stat(filepath.Join(dir, ".hv")); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(filepath.Join(dir, ".rota")); err == nil && fi.IsDir() {
 			cands = append(cands, dir)
 		}
 		dir = filepath.Dir(dir)
@@ -58,7 +58,7 @@ func FindUmbrella(start string) (string, error) {
 	first := cands[0]
 	firstReal := Realpath(first)
 	for _, parent := range cands[1:] {
-		reg, _ := fsio.LoadJSON(filepath.Join(parent, ".hv", "repos.json"), nil).(*jsonx.Object)
+		reg, _ := fsio.LoadJSON(filepath.Join(parent, ".rota", "repos.json"), nil).(*jsonx.Object)
 		if reg == nil {
 			continue
 		}
@@ -77,7 +77,7 @@ func FindUmbrella(start string) (string, error) {
 				rel = filepath.Join(parent, rel)
 			}
 			if within(firstReal, Realpath(rel)) {
-				return "", &MaskedError{Name: str(o, "name"), Stray: filepath.Join(first, ".hv")}
+				return "", &MaskedError{Name: str(o, "name"), Stray: filepath.Join(first, ".rota")}
 			}
 		}
 	}

@@ -39,13 +39,13 @@ func TestSnapshotFailuresAreErrors(t *testing.T) {
 
 func TestTmuxSnapshotListsWindows(t *testing.T) {
 	f := &fake{handler: func(string, []string) Result {
-		return Result{Stdout: "hv:ben\t/p/.worktrees/ben\nhv:kit\t/p/.worktrees/kit\n\n"}
+		return Result{Stdout: "rota:ben\t/p/.worktrees/ben\nrota:kit\t/p/.worktrees/kit\n\n"}
 	}}
 	got, err := New("tmux", deps(f, nil, &clock{})).(Snapshotter).Snapshot(bg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Agent{{Tab: "hv:ben", Cwd: "/p/.worktrees/ben"}, {Tab: "hv:kit", Cwd: "/p/.worktrees/kit"}}
+	want := []Agent{{Tab: "rota:ben", Cwd: "/p/.worktrees/ben"}, {Tab: "rota:kit", Cwd: "/p/.worktrees/kit"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("agents = %+v", got)
 	}

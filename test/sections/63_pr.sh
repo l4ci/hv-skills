@@ -11,9 +11,9 @@ for prov in github gitlab; do
   for mode in file issues; do
     P="$TMP_PR/$prov-$mode"; mkdir -p "$P"
     git init -q --bare "$P/origin.git"
-    git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.hv"
+    git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.rota"
     printf '{"backlog":{"backend":"%s"},"issues":{"provider":"%s","retryWaitSeconds":0}}\n' \
-      "$([ "$mode" = issues ] && echo issues || echo file)" "$prov" > "$P/work/.hv/config.json"
+      "$([ "$mode" = issues ] && echo issues || echo file)" "$prov" > "$P/work/.rota/config.json"
     (
       cd "$P/work"
       git config user.email t@t; git config user.name t
@@ -22,8 +22,8 @@ for prov in github gitlab; do
       export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
       DB="$P/db.json"
       if [ "$mode" = issues ]; then
-        "$HV_BIN" item create --kind features --title "One" >/dev/null   # F1
-        "$HV_BIN" item create --kind bugs --title "Two" --tag P1 >/dev/null  # B2
+        "$ROTA_BIN" item create --kind features --title "One" >/dev/null   # F1
+        "$ROTA_BIN" item create --kind bugs --title "Two" --tag P1 >/dev/null  # B2
       fi
       env="$(printf 'Summary line' | hvj ship pr feat/x --title "My title" --body-file - --items F1,2 2>/dev/null)" || fail "$prov/$mode: ship pr failed"
       url="$(jget data.url <<<"$env")"
@@ -58,16 +58,16 @@ P="$TMP_PR/github-issues"
   cd "$P/work"
   git checkout -q -b feat/y && git commit -q --allow-empty -m more
   export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json"
-  rc=0; err="$(printf b | "$HV_BIN" ship pr feat/y --title T --body-file - --items F99 2>&1)" || rc=$?
+  rc=0; err="$(printf b | "$ROTA_BIN" ship pr feat/y --title T --body-file - --items F99 2>&1)" || rc=$?
   [ "$rc" = 3 ] || fail "unknown --items should exit 3 (got $rc)"
   case "$err" in *"F99"*) ;; *) fail "error should name F99: $err" ;; esac
   git -C "$P/origin.git" rev-parse --verify -q refs/heads/feat/y >/dev/null && fail "nothing should be pushed on a bad --items" || true
   # usage errors: no title, empty body, unknown branch
-  rc=0; printf b | "$HV_BIN" ship pr feat/y --body-file - >/dev/null 2>&1 || rc=$?
+  rc=0; printf b | "$ROTA_BIN" ship pr feat/y --body-file - >/dev/null 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "missing --title should exit 2 (got $rc)"
-  rc=0; printf '' | "$HV_BIN" ship pr feat/y --title T --body-file - >/dev/null 2>&1 || rc=$?
+  rc=0; printf '' | "$ROTA_BIN" ship pr feat/y --title T --body-file - >/dev/null 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "empty body should exit 2 (got $rc)"
-  rc=0; printf b | "$HV_BIN" ship pr no/such --title T --body-file - >/dev/null 2>&1 || rc=$?
+  rc=0; printf b | "$ROTA_BIN" ship pr no/such --title T --body-file - >/dev/null 2>&1 || rc=$?
   [ "$rc" = 3 ] || fail "unknown branch should exit 3 (got $rc)"
 )
 pass "ship pr rejects an unknown --items item before pushing, and bad usage"

@@ -1,4 +1,4 @@
-// Package cli is the hv command dispatcher. It owns the global conventions
+// Package cli is the rota command dispatcher. It owns the global conventions
 // in docs/design/5.0-cli-conventions.md (global flags, the --json envelope,
 // the stderr format and the exit codes); verbs return data or an *Error and
 // never print those parts themselves.
@@ -17,11 +17,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
 )
 
-// Command is a group (Subs) or a verb (Verb) in the hv tree.
+// Command is a group (Subs) or a verb (Verb) in the rota tree.
 type Command struct {
 	Name    string
 	Summary string
@@ -33,7 +33,7 @@ type Command struct {
 	Subs []*Command
 	// Stub marks a contract verb the Go binary does not implement yet: any call
 	// exits 71 (not_implemented). Stubs never appear in VerbPaths, so
-	// `hv __verbs` still lists only what really works.
+	// `rota __verbs` still lists only what really works.
 	Stub bool
 }
 
@@ -50,7 +50,7 @@ type Result struct {
 
 // Ctx is what a verb sees of the invocation.
 type Ctx struct {
-	Path   string // "hv group verb", the prefix of every stderr line
+	Path   string // "rota group verb", the prefix of every stderr line
 	JSON   bool
 	Repo   string // the --repo value; resolve it with RepoPath
 	Stdin  io.Reader
@@ -82,26 +82,26 @@ func (c *Ctx) Warn(format string, a ...any) {
 }
 
 // Root finds the project root: the nearest directory at or above the
-// working directory that holds .hv/.
+// working directory that holds .rota/.
 func (c *Ctx) Root() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 	for {
-		if fi, err := os.Stat(filepath.Join(dir, ".hv")); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(filepath.Join(dir, ".rota")); err == nil && fi.IsDir() {
 			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", Resolution("no .hv/ directory here or in any parent").WithHint("run: hv init")
+			return "", Resolution("no .rota/ directory here or in any parent").WithHint("run: rota init")
 		}
 		dir = parent
 	}
 }
 
 // RepoPath resolves --repo to the sub-repo's absolute path through
-// .hv/repos.json (paths there are relative to the project root). It returns
+// .rota/repos.json (paths there are relative to the project root). It returns
 // "" when --repo was not given, and a resolution error (exit 3) outside
 // umbrella mode or for a name that is not registered.
 func (c *Ctx) RepoPath() (string, error) {
@@ -113,16 +113,16 @@ func (c *Ctx) RepoPath() (string, error) {
 		return "", err
 	}
 	if len(repos) == 0 {
-		return "", Resolution("--repo %s: not in umbrella mode (no sub-repos in .hv/repos.json)", c.Repo)
+		return "", Resolution("--repo %s: not in umbrella mode (no sub-repos in .rota/repos.json)", c.Repo)
 	}
 	p, ok := repos[c.Repo]
 	if !ok {
-		return "", Resolution("--repo %s is not registered in .hv/repos.json", c.Repo)
+		return "", Resolution("--repo %s is not registered in .rota/repos.json", c.Repo)
 	}
 	return p, nil
 }
 
-// Repos returns the project root and the registered sub-repos of .hv/repos.json
+// Repos returns the project root and the registered sub-repos of .rota/repos.json
 // as name to absolute path (symlinks resolved when the path exists). The map
 // is empty outside umbrella mode.
 func (c *Ctx) Repos() (root string, paths map[string]string, err error) {
@@ -165,7 +165,7 @@ func (g *globals) register(fs *flag.FlagSet, preVerb, repo bool) {
 		fs.StringVar(&g.repo, "repo", "", "umbrella sub-repo `name`")
 	}
 	if preVerb {
-		fs.BoolVar(&g.version, "version", false, "print the hv version")
+		fs.BoolVar(&g.version, "version", false, "print the rota version")
 	}
 }
 
@@ -219,7 +219,7 @@ func parseFlag(fs *flag.FlagSet, args []string, i int) (int, error) {
 	return used, nil
 }
 
-// Main runs hv with the default command tree and returns the exit code.
+// Main runs rota with the default command tree and returns the exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Hidden: test/hv-hybrid asks the binary which verbs it implements.
 	if len(args) == 1 && args[0] == "__verbs" {
@@ -234,7 +234,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	// Until the arguments parse, an error answers in JSON if any token
 	// before "--" is exactly --json.
-	c := &Ctx{Path: "hv", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args), dashAt: -1}
+	c := &Ctx{Path: "rota", Stdin: stdin, Stdout: stdout, Stderr: stderr, JSON: containsJSON(args), dashAt: -1}
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	c.ctx = sigCtx
@@ -246,7 +246,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 
 	// Before the verb: command words and global flags only.
 	var g globals
-	pre := newFlagSet("hv")
+	pre := newFlagSet("rota")
 	g.register(pre, true, false)
 	cmd := root
 	i := 0
@@ -272,7 +272,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	}
 	if g.version && cmd == root {
 		cmd = root.sub("version")
-		c.Path = "hv version"
+		c.Path = "rota version"
 	}
 
 	// A stub verb answers before any argument parsing: its flags are not known,
@@ -316,7 +316,7 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 	}
 	if cmd.Verb == nil {
 		if cmd == root {
-			return fail(c, stdout, Usage("missing command").WithHint("run: hv --help"))
+			return fail(c, stdout, Usage("missing command").WithHint("run: rota --help"))
 		}
 		return fail(c, stdout, Usage("missing verb; one of: %s", strings.Join(cmd.subNames(), ", ")))
 	}
@@ -497,7 +497,7 @@ func helpResult(path string, cmd *Command, verbFlags *flag.FlagSet) Result {
 }
 
 // VerbPaths lists every verb in the tree as its space-separated command path
-// ("knowledge tier get"), sorted. It is what `hv __verbs` prints.
+// ("knowledge tier get"), sorted. It is what `rota __verbs` prints.
 func VerbPaths(root *Command) []string {
 	var out []string
 	var walk func(c *Command, prefix string)

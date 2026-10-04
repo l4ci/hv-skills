@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func exitOf(err error) int {
@@ -24,7 +24,7 @@ var created = regexp.MustCompile(`(?m)^created: \d{4}-\d{2}-\d{2}$`)
 
 func project(t *testing.T) string {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o777)
 	return root
 }
 
@@ -77,14 +77,14 @@ func TestLifecycleAndExits(t *testing.T) {
 	if err := Rm(root, "B07"); exitOf(err) != 3 {
 		t.Errorf("second rm: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv/designs/F99.md.lock")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, ".rota/designs/F99.md.lock")); err == nil {
 		t.Error("failed put left a lock file")
 	}
 }
 
 func TestListDefaultsAndSkips(t *testing.T) {
 	root := project(t)
-	dir := filepath.Join(root, ".hv", "designs")
+	dir := filepath.Join(root, ".rota", "designs")
 	os.MkdirAll(dir, 0o777)
 	os.WriteFile(filepath.Join(dir, "plain.md"), []byte("# nothing\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "F02.md"), []byte("---\ntitle: T\n---\n"), 0o644)

@@ -23,7 +23,7 @@ func day(t *testing.T, s string) time.Time {
 
 func readFile(t *testing.T, f *File, name string) string {
 	t.Helper()
-	b, err := os.ReadFile(f.hv(name))
+	b, err := os.ReadFile(f.rota(name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func readFile(t *testing.T, f *File, name string) string {
 
 func writeHV(t *testing.T, f *File, name, content string) {
 	t.Helper()
-	if err := os.WriteFile(f.hv(name), []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(f.rota(name), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -89,7 +89,7 @@ func TestArchiveNoWork(t *testing.T) {
 		if moved, err := f.Archive(0, day(t, "2026-10-02")); err != nil || moved != 0 {
 			t.Errorf("%q: %d, %v", name, moved, err)
 		}
-		if _, err := os.Stat(f.hv("ARCHIVE.md")); err == nil {
+		if _, err := os.Stat(f.rota("ARCHIVE.md")); err == nil {
 			t.Errorf("%q: ARCHIVE.md created", name)
 		}
 	}
@@ -114,7 +114,7 @@ func TestArchiveInvalidDateWritesNothing(t *testing.T) {
 	if readFile(t, f, "BACKLOG.md") != md {
 		t.Error("BACKLOG.md changed")
 	}
-	if _, err := os.Stat(f.hv("ARCHIVE.md")); err == nil {
+	if _, err := os.Stat(f.rota("ARCHIVE.md")); err == nil {
 		t.Error("ARCHIVE.md created")
 	}
 }
@@ -300,8 +300,8 @@ func TestExtractSymbols(t *testing.T) {
 		bullet, id string
 		want       []string
 	}{
-		{"- **[B01] [P1] Add `ParserCore` and snake_case_thing.** Detail: `.hv/bugs/B01.md` Since: abc", "B01", []string{"ParserCore", "snake_case_thing"}},
-		{"- **[B02] [P1] Needs hv-new-helper and config/loader.yaml plus lib.py.** y Since: abc", "B02", []string{"hv-new-helper", "config/loader.yaml", "loader.yaml", "lib.py"}},
+		{"- **[B01] [P1] Add `ParserCore` and snake_case_thing.** Detail: `.rota/bugs/B01.md` Since: abc", "B01", []string{"ParserCore", "snake_case_thing"}},
+		{"- **[B02] [P1] Needs rota-new-helper and config/loader.yaml plus lib.py.** y Since: abc", "B02", []string{"rota-new-helper", "config/loader.yaml", "loader.yaml", "lib.py"}},
 		{"- **[B05] [P2] Rework src/größe/modul.go and naïve_parser here.** v Since: abc", "B05", []string{"src/größe/modul.go", "modul.go"}},
 		{"- **[B06] [P2] Short: `abc` and `ab_cd`.** u", "B06", []string{"ab_cd"}},
 		{"- **[B07] [P2] CamelCaseThing and GrößeWert and fooBarBaz and HTTPServer and a.b.c.d.** t", "B07", []string{"CamelCaseThing"}},

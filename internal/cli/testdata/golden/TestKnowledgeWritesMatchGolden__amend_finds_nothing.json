@@ -17,7 +17,7 @@
   },
   "outputs": {
     "stdout": "",
-    "stderr": "error: no bullet in 'Architecture' contains fragment 'zzz' (searched: .hv/KNOWLEDGE.md)\n",
+    "stderr": "error: no bullet in 'Architecture' contains fragment 'zzz' (searched: .rota/KNOWLEDGE.md)\n",
     "rc": 1,
     "changed": {},
     "removed": []

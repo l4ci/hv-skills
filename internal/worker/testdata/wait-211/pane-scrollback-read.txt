@@ -24,7 +24,7 @@
   NOTES.md and commit it on your branch.
   - Do not push, do not run gh or glab, do not open a
   PR (there is no forge), do not start subagents.
-  - Then reply with exactly one line: HV-DONE lr2
+  - Then reply with exactly one line: ROTA-DONE lr2
   lr2/f01-add-a-hello-line-to
 
 ● Reading the worker contract first.
@@ -45,7 +45,7 @@
 
   Committed 30be308
 
-● HV-DONE lr2 lr2/f01-add-a-hello-line-to
+● ROTA-DONE lr2 lr2/f01-add-a-hello-line-to
 
 ✻ Baked for 22s · done 3:52 PM
 

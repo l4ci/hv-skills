@@ -1,21 +1,21 @@
 # Implementing
 
-Items captured in [`BACKLOG.md`](../reference/hv-folder.md) reach "merged" through `/hv-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/hv-capture` ends with an optional hand-off to `/hv-work`.
+Items captured in [`BACKLOG.md`](../reference/rota-folder.md) reach "merged" through `/rota-work`, an orchestrator that plans, dispatches parallel workers, and lands one atomic commit per task. For a single ad-hoc fix, `/rota-capture` ends with an optional hand-off to `/rota-work`.
 
-## /hv-work
+## /rota-work
 
-`/hv-work` is the main implementation driver. The orchestrator plans tasks, dispatches workers in parallel (one per task), verifies each result, then either merges to main or opens a PR based on your `work.mergeStrategy`.
+`/rota-work` is the main implementation driver. The orchestrator plans tasks, dispatches workers in parallel (one per task), verifies each result, then either merges to main or opens a PR based on your `work.mergeStrategy`.
 
 **Trigger phrases:**
 
-- `/hv-work` with no argument reconciles the backlog, suggests an item, then works it
-- `/hv-work [B03]` to implement a specific item by ID
-- `/hv-work [B03] [F07]` to implement a batch of items together
-- `/hv-work "add retry logic to the upload pipeline"` describes the work; it captures and executes
+- `/rota-work` with no argument reconciles the backlog, suggests an item, then works it
+- `/rota-work [B03]` to implement a specific item by ID
+- `/rota-work [B03] [F07]` to implement a batch of items together
+- `/rota-work "add retry logic to the upload pipeline"` describes the work; it captures and executes
 
 **Precondition:** refuses to start on a dirty working tree. Commit or stash first.
 
-**Status tracking:** registers in `.hv/status.json` at start so [`/hv-work` (no argument)](picking-work.md) in another session knows those items are in progress.
+**Status tracking:** registers in `.rota/status.json` at start so [`/rota-work` (no argument)](picking-work.md) in another session knows those items are in progress.
 
 ```mermaid
 sequenceDiagram
@@ -25,10 +25,10 @@ sequenceDiagram
     participant W2 as Worker 2
     participant G as Git
 
-    U->>O: /hv-work [B03] [F07]
+    U->>O: /rota-work [B03] [F07]
     O->>G: clean-tree guard
     O->>O: plan tasks into waves
-    O->>G: create branch hv/<slug>
+    O->>G: create branch rota/<slug>
     par Wave 1 (parallel, write-only)
         O->>W1: brief: edit files for Task A
         O->>W2: brief: edit files for Task B
@@ -52,7 +52,7 @@ d4e5f6a feat: per-project theme support [F07]
 g7h8i9j task: update CI to Node 20 [T02]
 ```
 
-That keeps reverts surgical (drop one task without touching others), makes PR review easier (read commit by commit), and leaves a predictable history `/hv-ship` reads to build PR bodies automatically.
+That keeps reverts surgical (drop one task without touching others), makes PR review easier (read commit by commit), and leaves a predictable history `/rota-ship` reads to build PR bodies automatically.
 
 ## Isolation: branch vs. worktree
 
@@ -65,20 +65,20 @@ Set `work.isolation` in [`config.json`](configuration.md):
 
 With `"branch"`, your main worktree switches to the feature branch for the duration of the run. With `"worktree"`, the main worktree stays on `main`, so you can keep editing there while agents work in isolation.
 
-To run multiple `/hv-work` sessions at the same time on different item batches, pick `"worktree"`. See [parallel-work](parallel-work.md) for the multi-session pattern.
+To run multiple `/rota-work` sessions at the same time on different item batches, pick `"worktree"`. See [parallel-work](parallel-work.md) for the multi-session pattern.
 
 ## Capture, then work it now
 
-For a single ad-hoc fix, run `/hv-capture` and accept the hand-off at the end: it offers to work the new item now and routes to `/hv-work`.
+For a single ad-hoc fix, run `/rota-capture` and accept the hand-off at the end: it offers to work the new item now and routes to `/rota-work`.
 
 ```
-/hv-capture "fix the off-by-one in RingBuffer"
-/hv-capture "add a Cmd+K shortcut to the project picker"
+/rota-capture "fix the off-by-one in RingBuffer"
+/rota-capture "add a Cmd+K shortcut to the project picker"
 ```
 
 The item gets a real ID in `BACKLOG.md` (counters increment, history is preserved). Decline the hand-off and it stays queued. If you're still exploring or the scope is fuzzy, decline and refine the entry first.
 
-**Flow:** `/hv-capture` files the item, then (on accept) `/hv-work` implements it. All `/hv-capture` rules (classification, detail-file overflow, ID assignment) and all `/hv-work` rules (clean-tree guard, branch/worktree isolation, parallel workers, per-task commits) apply.
+**Flow:** `/rota-capture` files the item, then (on accept) `/rota-work` implements it. All `/rota-capture` rules (classification, detail-file overflow, ID assignment) and all `/rota-work` rules (clean-tree guard, branch/worktree isolation, parallel workers, per-task commits) apply.
 
 ## Capture vs. Work: picking the right entry
 
@@ -86,25 +86,25 @@ Pick by **intent**, not by the verb typed:
 
 | The user wants to… | Use | Why |
 |---------------------|-----|-----|
-| Brain-dump items into the backlog without acting now | `/hv-capture` (decline the hand-off) | Records only; no execution, no clean-tree guard |
-| Get one specific thing done right now (not yet captured) | `/hv-capture`, accept the hand-off | Captures, then runs `/hv-work` on the new item |
-| Implement an item that's already in `BACKLOG.md` | `/hv-work <ID>` | Plans, dispatches workers, verifies, commits per task |
-| Pick the next thing from the backlog and execute | `/hv-work` (no argument) | Reconciles, suggests, then works the pick |
+| Brain-dump items into the backlog without acting now | `/rota-capture` (decline the hand-off) | Records only; no execution, no clean-tree guard |
+| Get one specific thing done right now (not yet captured) | `/rota-capture`, accept the hand-off | Captures, then runs `/rota-work` on the new item |
+| Implement an item that's already in `BACKLOG.md` | `/rota-work <ID>` | Plans, dispatches workers, verifies, commits per task |
+| Pick the next thing from the backlog and execute | `/rota-work` (no argument) | Reconciles, suggests, then works the pick |
 
 **Rules of thumb:**
 
-- *"fix X"* / *"add Y"* / *"do Z"*: clear single thing, not yet captured: `/hv-capture`, then accept the hand-off.
-- A list of things, no immediate action, *"capture this"* / *"add to backlog"*: `/hv-capture`, decline the hand-off.
-- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"*: `/hv-work <ID>`.
-- *"what's next?"* / *"pick something"* / *"what should I work on?"*: `/hv-work` with no argument.
+- *"fix X"* / *"add Y"* / *"do Z"*: clear single thing, not yet captured: `/rota-capture`, then accept the hand-off.
+- A list of things, no immediate action, *"capture this"* / *"add to backlog"*: `/rota-capture`, decline the hand-off.
+- Reference to an existing `[B##]`/`[F##]`/`[T##]` plus *"implement"* / *"build"* / *"do this one"*: `/rota-work <ID>`.
+- *"what's next?"* / *"pick something"* / *"what should I work on?"*: `/rota-work` with no argument.
 
-When intent is ambiguous, `/hv-capture` is the cheapest path: the hand-off is optional, so you can still decline.
+When intent is ambiguous, `/rota-capture` is the cheapest path: the hand-off is optional, so you can still decline.
 
-See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how the no-argument `/hv-work` selects and prioritizes.
+See [capturing work](capturing-work.md) for capture details and [picking work](picking-work.md) for how the no-argument `/rota-work` selects and prioritizes.
 
 ## Merge or PR
 
-After `/hv-work` finishes, `work.mergeStrategy` in `config.json` controls what happens next:
+After `/rota-work` finishes, `work.mergeStrategy` in `config.json` controls what happens next:
 
 | Strategy | Behavior |
 |----------|----------|
@@ -115,4 +115,4 @@ The actual ship-time gates (review, preflight, PR body composition) live in [rev
 
 ## Many items at once
 
-`/hv-work` takes items one session at a time, with subagents inside that session. To run several issues in parallel, each worker in its own worktree and terminal tab, use a round: run `hv doctor`, then ask for `/hv-orchestrate`. See [parallel rounds](parallel-rounds.md), the [`hv round` verbs](../reference/cli-helpers.md#hv-round) and [`/hv-orchestrate`](../reference/slash-commands.md#hv-orchestrate).
+`/rota-work` takes items one session at a time, with subagents inside that session. To run several issues in parallel, each worker in its own worktree and terminal tab, use a round: run `rota doctor`, then ask for `/rota-orchestrate`. See [parallel rounds](parallel-rounds.md), the [`rota round` verbs](../reference/cli-helpers.md#rota-round) and [`/rota-orchestrate`](../reference/slash-commands.md#rota-orchestrate).

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/reap"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/reap"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 type reapTestHost struct{ tabs []host.Tab }
@@ -67,7 +67,7 @@ func candIDs(d map[string]any) []string {
 
 func TestReapPreviewThenApply(t *testing.T) {
 	root := reapProject(t, nil, true)
-	code, out, errOut := hvIn(t, root, "--json", "reap")
+	code, out, errOut := rotaIn(t, root, "--json", "reap")
 	d := data(t, out)
 	if code != 0 || d["changed"] != false || len(d["reaped"].([]any)) != 0 || len(d["failed"].([]any)) != 0 {
 		t.Fatalf("preview = %d %v", code, d)
@@ -83,7 +83,7 @@ func TestReapPreviewThenApply(t *testing.T) {
 		t.Fatal("preview deleted a worktree")
 	}
 
-	code, out, _ = hvIn(t, root, "--json", "reap", "--apply")
+	code, out, _ = rotaIn(t, root, "--json", "reap", "--apply")
 	d = data(t, out)
 	if code != 0 || d["changed"] != true || !reflect.DeepEqual(d["reaped"], []any{"worktree:old", "branch:kit/9-gone"}) {
 		t.Fatalf("apply = %d %v", code, d)
@@ -94,31 +94,31 @@ func TestReapPreviewThenApply(t *testing.T) {
 			t.Errorf("worktree %s: gone=%v", name, err != nil)
 		}
 	}
-	if _, out, _ = hvIn(t, root, "--json", "reap"); !reflect.DeepEqual(candIDs(data(t, out)), []string{"worktree:dirty held", "branch:kit/1-old"}) { // old's branch is unowned only now
+	if _, out, _ = rotaIn(t, root, "--json", "reap"); !reflect.DeepEqual(candIDs(data(t, out)), []string{"worktree:dirty held", "branch:kit/1-old"}) { // old's branch is unowned only now
 		t.Errorf("after apply: %s", out)
 	}
 }
 
 func TestReapKindFilterAndUnknownKind(t *testing.T) {
 	root := reapProject(t, nil, true)
-	_, out, _ := hvIn(t, root, "--json", "reap", "--kind", "branch")
+	_, out, _ := rotaIn(t, root, "--json", "reap", "--kind", "branch")
 	if got := candIDs(data(t, out)); !reflect.DeepEqual(got, []string{"branch:kit/9-gone"}) {
 		t.Errorf("--kind branch = %v", got)
 	}
-	if code, _, _ := hvIn(t, root, "--json", "reap", "--kind", "bogus"); code != 2 {
+	if code, _, _ := rotaIn(t, root, "--json", "reap", "--kind", "bogus"); code != 2 {
 		t.Errorf("unknown kind exit %d, want 2", code)
 	}
-	if code, _, _ := hvIn(t, root, "--json", "reap", "--kind", "branch,nope"); code != 2 {
+	if code, _, _ := rotaIn(t, root, "--json", "reap", "--kind", "branch,nope"); code != 2 {
 		t.Errorf("partly unknown kind exit %d, want 2", code)
 	}
-	if code, _, _ := hvIn(t, root, "--json", "reap", "--repo", "x"); code != 2 {
+	if code, _, _ := rotaIn(t, root, "--json", "reap", "--repo", "x"); code != 2 {
 		t.Errorf("--repo exit %d, want 2", code)
 	}
 }
 
 func TestReapHostDownListsNoWorktrees(t *testing.T) {
 	root := reapProject(t, nil, false)
-	code, out, errOut := hvIn(t, root, "--json", "reap", "--apply")
+	code, out, errOut := rotaIn(t, root, "--json", "reap", "--apply")
 	d := data(t, out)
 	if code != 0 || !reflect.DeepEqual(candIDs(d), []string{"branch:kit/9-gone"}) {
 		t.Fatalf("host down = %d %v", code, d)
@@ -135,7 +135,7 @@ func TestReapFailureExitsOneWithData(t *testing.T) {
 	ops := reapTestHost{tabs: []host.Tab{{ID: "w9:t1", Cwds: []string{"/nowhere"}, Agentless: true}}}
 	root := reapProject(t, ops, true)
 	ops.tabs[0].Cwds = []string{filepath.Join(root, ".worktrees", "old")} // a dead tab in the free checkout
-	code, out, _ := hvIn(t, root, "--json", "reap", "--apply")
+	code, out, _ := rotaIn(t, root, "--json", "reap", "--apply")
 	d := data(t, out)
 	failed := d["failed"].([]any)
 	if code != 1 || len(failed) != 1 || failed[0].(map[string]any)["id"] != "tab:w9:t1" {

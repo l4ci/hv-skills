@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/verdict"
+	"github.com/l4ci/rota/internal/verdict"
 )
 
 // ---- B3: verdict refusals, the Iron Law, loop-only flags
@@ -41,7 +41,7 @@ func TestShipPRRefusedByVerdict(t *testing.T) {
 		d["sha"] != "old1234" || d["stale"] != true || d["changed"] != false {
 		t.Fatalf("exit %d data %v", o.code, d)
 	}
-	if !strings.Contains(o.stdout, "hv verdict show feat/x") {
+	if !strings.Contains(o.stdout, "rota verdict show feat/x") {
 		t.Errorf("hint missing: %s", o.stdout)
 	}
 	if len(f.calls) != 0 || gitT(t, work, "ls-remote", "origin", "feat/x") != "" {
@@ -146,37 +146,37 @@ func b3Fails(t *testing.T, root, bug string, n int) {
 func TestIronLawRefusesInitAndRecordAttempt(t *testing.T) {
 	dir := verdictRepo(t)
 	b3Fails(t, dir, "B07", 2)
-	if code, _, _ := hvIn(t, dir, "debug", "counter", "init", "B07"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "debug", "counter", "init", "B07"); code != 0 {
 		t.Fatalf("2 failed fixes must not refuse init: exit %d", code)
 	}
 	b3Fails(t, dir, "B07", 1)
-	code, out, _ := hvIn(t, dir, "debug", "counter", "record-attempt", "--hypothesis", "h", "--commit", "c", "--json")
+	code, out, _ := rotaIn(t, dir, "debug", "counter", "record-attempt", "--hypothesis", "h", "--commit", "c", "--json")
 	d := data(t, out)
 	if code != 4 || d["blockedBy"] != "iron law" || d["bugId"] != "B07" || d["failedFixes"] != float64(3) || d["changed"] != false {
 		t.Fatalf("record-attempt: exit %d data %v", code, d)
 	}
-	if !strings.Contains(out, "hv debug reset B07") {
+	if !strings.Contains(out, "rota debug reset B07") {
 		t.Errorf("hint missing: %s", out)
 	}
-	if _, out, _ := hvIn(t, dir, "debug", "counter", "show", "--json"); strings.Contains(out, `"attempts": [{`) {
+	if _, out, _ := rotaIn(t, dir, "debug", "counter", "show", "--json"); strings.Contains(out, `"attempts": [{`) {
 		t.Errorf("a refused record-attempt recorded: %s", out)
 	}
 	// A cleared session file does not reset the count.
-	hvIn(t, dir, "debug", "counter", "clear")
-	code, out, _ = hvIn(t, dir, "debug", "counter", "init", "B07", "--json")
+	rotaIn(t, dir, "debug", "counter", "clear")
+	code, out, _ = rotaIn(t, dir, "debug", "counter", "init", "B07", "--json")
 	if d := data(t, out); code != 4 || d["blockedBy"] != "iron law" {
 		t.Fatalf("init: exit %d data %v", code, d)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".hv", "debug")); err == nil {
-		if code, _, _ := hvIn(t, dir, "debug", "counter", "show"); code == 0 {
+	if _, err := os.Stat(filepath.Join(dir, ".rota", "debug")); err == nil {
+		if code, _, _ := rotaIn(t, dir, "debug", "counter", "show"); code == 0 {
 			t.Error("a refused init created the session file")
 		}
 	}
 	// Another item is unaffected, and debug verdict is never refused.
-	if code, _, _ := hvIn(t, dir, "debug", "counter", "init", "B08"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "debug", "counter", "init", "B08"); code != 0 {
 		t.Errorf("B08: exit %d", code)
 	}
-	if code, _, _ := hvIn(t, dir, "debug", "verdict", "B07", "--verdict", "FAIL"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "debug", "verdict", "B07", "--verdict", "FAIL"); code != 0 {
 		t.Errorf("debug verdict refused: exit %d", code)
 	}
 }
@@ -184,12 +184,12 @@ func TestIronLawRefusesInitAndRecordAttempt(t *testing.T) {
 func TestDebugReset(t *testing.T) {
 	dir := verdictRepo(t)
 	for _, c := range [][]string{{"B07"}, {"B07", "--reason", "  "}, {" ", "--reason", "r"}, {"B07", "--reason", "r", "--confirm"}} {
-		if code, _, _ := hvIn(t, dir, append([]string{"debug", "reset"}, c...)...); code != 2 {
+		if code, _, _ := rotaIn(t, dir, append([]string{"debug", "reset"}, c...)...); code != 2 {
 			t.Errorf("%v: exit %d, want 2", c, code)
 		}
 	}
 	// Nothing to clear: exit 0, no record.
-	code, out, _ := hvIn(t, dir, "debug", "reset", "B07", "--reason", "r", "--json")
+	code, out, _ := rotaIn(t, dir, "debug", "reset", "B07", "--reason", "r", "--json")
 	if d := data(t, out); code != 0 || d["changed"] != false || d["cleared"] != float64(0) {
 		t.Fatalf("empty reset: %d %v", code, d)
 	}
@@ -197,59 +197,59 @@ func TestDebugReset(t *testing.T) {
 		t.Error("an empty reset wrote a record")
 	}
 	b3Fails(t, dir, "B07", 3)
-	if code, _, _ := hvIn(t, dir, "debug", "counter", "init", "B07"); code != 4 {
+	if code, _, _ := rotaIn(t, dir, "debug", "counter", "init", "B07"); code != 4 {
 		t.Fatalf("init before reset: exit %d", code)
 	}
 	// Without --confirm the debug-reset gate refuses and nothing changes.
-	code, out, _ = hvIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--json")
+	code, out, _ = rotaIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--json")
 	if d := data(t, out); code != 4 || d["gate"] != "debug-reset" || d["changed"] != false {
 		t.Fatalf("unconfirmed reset: %d %v", code, d)
 	}
 	if len(verdict.Load(dir).Items["B07"]) != 3 {
 		t.Fatal("a refused reset wrote a record")
 	}
-	code, out, _ = hvIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--confirm", "--confirm-note", "yes, reset it", "--json")
+	code, out, _ = rotaIn(t, dir, "debug", "reset", "B07", "--reason", "new angle", "--confirm", "--confirm-note", "yes, reset it", "--json")
 	d := data(t, out)
 	if code != 0 || d["bugId"] != "B07" || d["cleared"] != float64(3) || d["failedFixes"] != float64(0) || d["changed"] != true {
 		t.Fatalf("reset: %d %v", code, d)
 	}
-	if b, err := os.ReadFile(filepath.Join(dir, ".hv", "gate-audit.jsonl")); err != nil || !strings.Contains(string(b), `"gate": "debug-reset"`) || !strings.Contains(string(b), "yes, reset it") {
+	if b, err := os.ReadFile(filepath.Join(dir, ".rota", "gate-audit.jsonl")); err != nil || !strings.Contains(string(b), `"gate": "debug-reset"`) || !strings.Contains(string(b), "yes, reset it") {
 		t.Errorf("audit line missing: %s %v", b, err)
 	}
 	list := verdict.Load(dir).Items["B07"]
 	if last := list[len(list)-1]; len(list) != 4 || last.Kind != verdict.DebugReset || last.Verdict != "RESET" || last.Summary != "new angle" || last.Sha == "" {
 		t.Errorf("stored %+v", list)
 	}
-	if code, _, _ := hvIn(t, dir, "debug", "counter", "init", "B07"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "debug", "counter", "init", "B07"); code != 0 {
 		t.Errorf("init after reset: exit %d", code)
 	}
 	// debug verdict counts from the reset.
-	_, out, _ = hvIn(t, dir, "debug", "verdict", "B07", "--verdict", "FAIL", "--json")
+	_, out, _ = rotaIn(t, dir, "debug", "verdict", "B07", "--verdict", "FAIL", "--json")
 	if d := data(t, out); d["failedFixes"] != float64(1) || d["next"] != "hypothesize" {
 		t.Errorf("after reset: %v", d)
 	}
 	// verdict add still rejects the kind.
-	if code, _, _ := hvIn(t, dir, "verdict", "add", "--kind", "debug-reset", "--verdict", "RESET"); code != 2 {
+	if code, _, _ := rotaIn(t, dir, "verdict", "add", "--kind", "debug-reset", "--verdict", "RESET"); code != 2 {
 		t.Errorf("verdict add debug-reset: exit %d", code)
 	}
 }
 
 func TestAutoLoopFlag(t *testing.T) {
 	dir := gitRepo(t)
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{"backlog":{"backend":"file"},"autonomy":{"level":"auto"}}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{"backlog":{"backend":"file"},"autonomy":{"level":"auto"}}`)
 	for _, args := range [][]string{
 		{"design", "add", "B07", "--title", "T", "--auto-loop"},
 		{"plan", "add", "M01-B07", "--title", "T", "--auto-loop"},
 	} {
-		if code, _, errOut := hvIn(t, dir, args...); code != 2 || !strings.Contains(errOut, "--auto-loop is loop-mode only; set autonomy.level to loop") {
+		if code, _, errOut := rotaIn(t, dir, args...); code != 2 || !strings.Contains(errOut, "--auto-loop is loop-mode only; set autonomy.level to loop") {
 			t.Errorf("%v outside loop: exit %d %q", args, code, errOut)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".hv", "designs", "B07.md")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, ".rota", "designs", "B07.md")); err == nil {
 		t.Error("a refused design add wrote the file")
 	}
 	// config.local.json over config.json.
-	write(t, filepath.Join(dir, ".hv", "config.local.json"), `{"autonomy":{"level":"loop"}}`)
+	write(t, filepath.Join(dir, ".rota", "config.local.json"), `{"autonomy":{"level":"loop"}}`)
 	for _, c := range []struct {
 		file string
 		args []string
@@ -258,17 +258,17 @@ func TestAutoLoopFlag(t *testing.T) {
 		{"plans/M01-B07.md", []string{"plan", "add", "M01-B07", "--title", "T", "--auto-loop"}},
 		{"plans/M01-S01.md", []string{"plan", "add", "--milestone", "M01", "--slice", "--title", "T", "--auto-loop"}},
 	} {
-		if code, out, errOut := hvIn(t, dir, c.args...); code != 0 {
+		if code, out, errOut := rotaIn(t, dir, c.args...); code != 0 {
 			t.Fatalf("%v: exit %d %s%s", c.args, code, out, errOut)
 		}
-		raw, err := os.ReadFile(filepath.Join(dir, ".hv", c.file))
+		raw, err := os.ReadFile(filepath.Join(dir, ".rota", c.file))
 		if err != nil || !strings.Contains(string(raw), "status: ") || !strings.Contains(string(raw), "\nauto: true\ncreated: ") {
 			t.Errorf("%s: %v\n%s", c.file, err, raw)
 		}
 	}
 	// Without the flag nothing is added.
-	hvIn(t, dir, "design", "add", "B08", "--title", "T")
-	if raw, _ := os.ReadFile(filepath.Join(dir, ".hv", "designs", "B08.md")); strings.Contains(string(raw), "auto:") {
+	rotaIn(t, dir, "design", "add", "B08", "--title", "T")
+	if raw, _ := os.ReadFile(filepath.Join(dir, ".rota", "designs", "B08.md")); strings.Contains(string(raw), "auto:") {
 		t.Errorf("auto without the flag:\n%s", raw)
 	}
 }

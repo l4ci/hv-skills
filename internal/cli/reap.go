@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/reap"
-	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/reap"
+	"github.com/l4ci/rota/internal/round"
 )
 
 // reapEnv builds the round environment reap reads its live set from and the
@@ -19,11 +19,11 @@ import (
 var reapEnv = defaultReapEnv
 
 // defaultReapEnv is the round's environment with the forge dropped (reap
-// proves "merged" from git alone and never asks a forge). HV_TEST_REAP_HOST
+// proves "merged" from git alone and never asks a forge). ROTA_TEST_REAP_HOST
 // replaces the host entirely with a fixture file (a test hook, not part of
 // the CLI); an unreadable fixture is an unavailable host.
 func defaultReapEnv(ctx context.Context, root string) (round.Env, reap.HostOps) {
-	if path := os.Getenv("HV_TEST_REAP_HOST"); path != "" {
+	if path := os.Getenv("ROTA_TEST_REAP_HOST"); path != "" {
 		e := roundEnv(ctx, root)
 		e.Forge, e.ForgeErr = nil, "not used by reap"
 		fx, err := loadReapFixture(path)
@@ -55,7 +55,7 @@ func (herdrReapOps) StopProcess(context.Context, int) error {
 	return fmt.Errorf("stopping a process is not supported on a real host")
 }
 
-// reapFixture is the HV_TEST_REAP_HOST file: workspaces with their tabs, the
+// reapFixture is the ROTA_TEST_REAP_HOST file: workspaces with their tabs, the
 // live agents, and processes under tabs. Removals are appended to
 // <file>.removed so a test can see what reap did.
 type reapFixture struct {
@@ -68,7 +68,7 @@ type reapFixture struct {
 func loadReapFixture(path string) (*reapFixture, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("HV_TEST_REAP_HOST: %v", err)
+		return nil, fmt.Errorf("ROTA_TEST_REAP_HOST: %v", err)
 	}
 	var doc struct {
 		Workspaces []struct {
@@ -93,7 +93,7 @@ func loadReapFixture(path string) (*reapFixture, error) {
 		} `json:"processes"`
 	}
 	if err := json.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("HV_TEST_REAP_HOST: %v", err)
+		return nil, fmt.Errorf("ROTA_TEST_REAP_HOST: %v", err)
 	}
 	fx := &reapFixture{path: path, agents: []host.Agent{}}
 	for _, ws := range doc.Workspaces {

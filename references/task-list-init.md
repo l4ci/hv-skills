@@ -1,6 +1,6 @@
 # Task list initialization
 
-Canonical block referenced by every hv SKILL.md with three or more phases. Cited from each skill's Step 1; the phases list itself stays per-skill since it reflects the skill's natural structure.
+Canonical block referenced by every rota SKILL.md with three or more phases. Cited from each skill's Step 1; the phases list itself stays per-skill since it reflects the skill's natural structure.
 
 ## The block (cite this from SKILL.md)
 
@@ -33,4 +33,4 @@ Keep the Phases list inline; only the boilerplate citation extracts.
 ## See also
 
 - `authoring-conventions.md` rule #4 — original authoring requirement.
-- Cited from: `hv-capture`, `hv-plan`, `hv-work`, `hv-debug`, `hv-review`, `hv-ship`, `hv-learn`, `hv-decide`, `hv-refactor`, and other multi-phase skills. New SKILL.md files cite this reference from their Step 1 instead of restating the boilerplate.
+- Cited from: `rota-capture`, `rota-plan`, `rota-work`, `rota-debug`, `rota-review`, `rota-ship`, `rota-learn`, `rota-decide`, `rota-refactor`, and other multi-phase skills. New SKILL.md files cite this reference from their Step 1 instead of restating the boilerplate.

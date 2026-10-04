@@ -7,17 +7,17 @@ package artifact
 import (
 	"errors"
 	"fmt"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/repos"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Exit codes an Error may carry; same numbers as docs/design/5.0-cli-conventions.md.
@@ -51,7 +51,7 @@ func (e *Error) WithHint(h string) *Error { e.Hint = h; return e }
 // IssueMode reports whether backlog.backend is "issues". An unreadable
 // config or an unknown value counts as file mode, as the old helpers did.
 func IssueMode(root string) bool {
-	v, ok := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "backlog.backend")
+	v, ok := config.Lookup(config.Load(filepath.Join(root, ".rota", "config.json")), "backlog.backend")
 	s, _ := v.(string)
 	return ok && s == "issues"
 }
@@ -113,7 +113,7 @@ func ListDocs(dir string) ([]Doc, error) {
 }
 
 // Repos is the sub-repo registry, name to absolute path, from
-// .hv/repos.json (internal/repos).
+// .rota/repos.json (internal/repos).
 func Repos(root string) map[string]string { return repos.Paths(root) }
 
 // SplitCSV splits a comma list, trimming blanks and dropping empties

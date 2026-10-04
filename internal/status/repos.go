@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/repos"
 )
 
 // Repo is one registered sub-repo: its name and absolute, symlink-resolved path.
 type Repo struct{ Name, Path string }
 
-// LoadRepos reads <base>/.hv/repos.json through internal/repos, the one
+// LoadRepos reads <base>/.rota/repos.json through internal/repos, the one
 // parser of that file (hvlib_repos.load_repos semantics).
 func LoadRepos(base string) []Repo {
 	var out []Repo
@@ -64,7 +64,7 @@ func HasCode(dir string, repos []Repo) bool {
 		}
 		sub[strings.SplitN(rel, string(filepath.Separator), 2)[0]] = true
 	}
-	ignore := map[string]bool{".git": true, ".hv": true, ".claude": true, ".claude-plugin": true,
+	ignore := map[string]bool{".git": true, ".rota": true, ".claude": true, ".claude-plugin": true,
 		".gitignore": true, ".docsignore": true, ".stow-local-ignore": true, ".DS_Store": true}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

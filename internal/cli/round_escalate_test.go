@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // fakeThread is a scripted gh/glab for one thread's comments. It answers the
@@ -135,7 +135,7 @@ func escProject(t *testing.T, cfg string) string {
 
 func registryDoc(t *testing.T, dir string) map[string]any {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(dir, ".hv", "workers.json"))
+	b, err := os.ReadFile(filepath.Join(dir, ".rota", "workers.json"))
 	if errors.Is(err, os.ErrNotExist) {
 		return map[string]any{}
 	}
@@ -159,7 +159,7 @@ func TestEscalateSendRecordsAndPosts(t *testing.T) {
 	clock := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 	useEscalation(t, h, "1", &clock)
 
-	code, out, errOut := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "Pick one", "--body-file", "body.md", "--timeout", "3600", "--json")
+	code, out, errOut := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "Pick one", "--body-file", "body.md", "--timeout", "3600", "--json")
 	d := data(t, out)
 	if code != 0 {
 		t.Fatalf("send: %d %s %s", code, out, errOut)
@@ -176,14 +176,14 @@ func TestEscalateSendRecordsAndPosts(t *testing.T) {
 		t.Errorf("data: %v", d)
 	}
 	body := f.comments[0]["body"].(string)
-	if !strings.HasPrefix(body, "**hv escalation e1**: Pick one\n") || !strings.Contains(body, "Which option?") ||
-		!strings.Contains(body, "Answer in a new comment on this thread.") || strings.Contains(body, "m:") || !strings.HasSuffix(body, "<!-- hv:escalation e1 -->\n") {
+	if !strings.HasPrefix(body, "**rota escalation e1**: Pick one\n") || !strings.Contains(body, "Which option?") ||
+		!strings.Contains(body, "Answer in a new comment on this thread.") || strings.Contains(body, "m:") || !strings.HasSuffix(body, "<!-- rota:escalation e1 -->\n") {
 		t.Errorf("comment body:\n%s", body)
 	}
 	if !strings.Contains(f.calls[0], "repos/{owner}/{repo}/issues/7/comments") {
 		t.Errorf("issue thread must use the issue comments API: %q", f.calls[0])
 	}
-	if len(h.notes) != 1 || h.notes[0] != "hv escalation e1|Pick one (#7)" {
+	if len(h.notes) != 1 || h.notes[0] != "rota escalation e1|Pick one (#7)" {
 		t.Errorf("notifications: %v", h.notes)
 	}
 	list := registryDoc(t, dir)["escalations"].([]any)
@@ -199,11 +199,11 @@ func TestEscalateSendOnePerThread(t *testing.T) {
 	h := &escHost{cliHost: cliHost{herdr: true}}
 	clock := time.Now().UTC()
 	useEscalation(t, h, "1", &clock)
-	if code, out, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md"); code != 0 {
+	if code, out, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md"); code != 0 {
 		t.Fatalf("first send: %d %s", code, out)
 	}
 	posted := len(f.comments)
-	code, out, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "B", "--body-file", "body.md", "--json")
+	code, out, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "B", "--body-file", "body.md", "--json")
 	d := data(t, out)
 	if code != 4 || d["pending"] != "e1" || d["changed"] != false {
 		t.Fatalf("second send: %d %v", code, d)
@@ -212,7 +212,7 @@ func TestEscalateSendOnePerThread(t *testing.T) {
 		t.Error("a refused send must not post")
 	}
 	// The same number as a PR is another thread; the id keeps counting.
-	code, out, _ = hvIn(t, dir, "round", "escalate", "send", "7", "--pr", "--title", "C", "--body-file", "body.md", "--json")
+	code, out, _ = rotaIn(t, dir, "round", "escalate", "send", "7", "--pr", "--title", "C", "--body-file", "body.md", "--json")
 	if e := data(t, out)["escalation"].(map[string]any); code != 0 || e["id"] != "e2" || e["kind"] != "pr" {
 		t.Fatalf("pr send: %d %s", code, out)
 	}
@@ -239,25 +239,25 @@ func TestEscalateSendUsageAndResolution(t *testing.T) {
 		"negative timeout": {"7", "--title", "t", "--body-file", "body.md", "--timeout", "-1"},
 		"bad timeout":      {"7", "--title", "t", "--body-file", "body.md", "--timeout", "soon"},
 	} {
-		if code, _, _ := hvIn(t, dir, append([]string{"round", "escalate", "send"}, args...)...); code != 2 {
+		if code, _, _ := rotaIn(t, dir, append([]string{"round", "escalate", "send"}, args...)...); code != 2 {
 			t.Errorf("%s: exit %d, want 2", name, code)
 		}
 	}
 	if len(f.calls) != 0 {
 		t.Errorf("usage errors must not reach the forge: %v", f.calls)
 	}
-	if code, _, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--slot", "ghost", "--title", "t", "--body-file", "body.md"); code != 3 {
+	if code, _, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--slot", "ghost", "--title", "t", "--body-file", "body.md"); code != 3 {
 		t.Errorf("unknown slot: %d, want 3", code)
 	}
 	if len(f.calls) != 0 {
 		t.Errorf("slot resolution comes before the forge: %v", f.calls)
 	}
 	bare := t.TempDir()
-	if code, _, _ := hvIn(t, bare, "round", "escalate", "send", "7", "--title", "t", "--body-file", filepath.Join(dir, "body.md")); code != 3 {
+	if code, _, _ := rotaIn(t, bare, "round", "escalate", "send", "7", "--title", "t", "--body-file", filepath.Join(dir, "body.md")); code != 3 {
 		t.Errorf("no project root: %d, want 3", code)
 	}
 	f.notFound = true
-	if code, _, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md"); code != 3 {
+	if code, _, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md"); code != 3 {
 		t.Errorf("forge has no such issue: %d, want 3", code)
 	}
 	if doc := registryDoc(t, dir); doc["escalations"] != nil {
@@ -272,10 +272,10 @@ func TestEscalateSendForgeMissing(t *testing.T) {
 	t.Cleanup(func() { trackerOptions = old })
 	clock := time.Now().UTC()
 	useEscalation(t, &escHost{}, "", &clock)
-	if code, _, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md"); code != 5 {
+	if code, _, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md"); code != 5 {
 		t.Errorf("forge CLI missing: %d, want 5", code)
 	}
-	if code, _, _ := hvIn(t, dir, "round", "escalate", "check"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "round", "escalate", "check"); code != 0 {
 		t.Errorf("check with nothing pending needs no forge: %d, want 0", code)
 	}
 }
@@ -297,7 +297,7 @@ func TestEscalateSendNotifyRules(t *testing.T) {
 		h := &escHost{require: c.require}
 		clock := time.Now().UTC()
 		useEscalation(t, h, c.env, &clock)
-		code, out, errOut := hvIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md", "--json")
+		code, out, errOut := rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "t", "--body-file", "body.md", "--json")
 		d := data(t, out)
 		if code != 0 || d["notified"] != c.notified || d["escalation"].(map[string]any)["notified"] != c.notified {
 			t.Errorf("%s: %d %v", c.name, code, d)
@@ -314,14 +314,14 @@ func TestEscalateSendNotifyRules(t *testing.T) {
 func TestEscalateSendSlotAndGitLabPR(t *testing.T) {
 	dir := workerProject(t, `{"issues":{"provider":"gitlab"}}`)
 	os.WriteFile(filepath.Join(dir, "body.md"), []byte("q\n"), 0o644)
-	if code, _, _ := hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main"); code != 0 {
+	if code, _, _ := rotaIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main"); code != 0 {
 		t.Fatal("pool init")
 	}
 	f := &fakeThread{}
 	useThread(t, f)
 	clock := time.Now().UTC()
 	useEscalation(t, &escHost{}, "", &clock)
-	code, out, _ := hvIn(t, dir, "round", "escalate", "send", "7", "--pr", "--slot", "w1", "--title", "t", "--body-file", "body.md", "--json")
+	code, out, _ := rotaIn(t, dir, "round", "escalate", "send", "7", "--pr", "--slot", "w1", "--title", "t", "--body-file", "body.md", "--json")
 	d := data(t, out)
 	e, _ := d["escalation"].(map[string]any)
 	if code != 0 || e["slot"] != "w1" || d["url"] != "https://gitlab.com/o/r/-/merge_requests/7#note_1" {
@@ -344,12 +344,12 @@ func TestEscalateCheckLifecycle(t *testing.T) {
 	h := &escHost{}
 	clock := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 	useEscalation(t, h, "", &clock)
-	hvIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md", "--timeout", "60")
-	f.add("<!-- hv:claim dana -->\nClaimed by dana")
-	f.add("<!-- hv:escalation e9 -->\nnot an answer either")
+	rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md", "--timeout", "60")
+	f.add("<!-- rota:claim dana -->\nClaimed by dana")
+	f.add("<!-- rota:escalation e9 -->\nnot an answer either")
 
 	check := func(args ...string) (int, map[string]any, string) {
-		code, out, errOut := hvIn(t, dir, append([]string{"round", "escalate", "check", "--json"}, args...)...)
+		code, out, errOut := rotaIn(t, dir, append([]string{"round", "escalate", "check", "--json"}, args...)...)
 		return code, data(t, out), errOut
 	}
 	rowStatus := func(d map[string]any, i int) string {
@@ -398,7 +398,7 @@ func TestEscalateCheckLifecycle(t *testing.T) {
 	if code, _, _ := check("e1", "e5"); code != 3 {
 		t.Errorf("unknown id: %d, want 3", code)
 	}
-	if code, _, _ := hvIn(t, t.TempDir(), "round", "escalate", "check"); code != 3 {
+	if code, _, _ := rotaIn(t, t.TempDir(), "round", "escalate", "check"); code != 3 {
 		t.Errorf("no project root: %d, want 3", code)
 	}
 }
@@ -409,11 +409,11 @@ func TestEscalateCheckForgeFailureAndDeletedComment(t *testing.T) {
 	useThread(t, f)
 	clock := time.Now().UTC()
 	useEscalation(t, &escHost{}, "", &clock)
-	hvIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md")
-	hvIn(t, dir, "round", "escalate", "send", "8", "--title", "B", "--body-file", "body.md")
+	rotaIn(t, dir, "round", "escalate", "send", "7", "--title", "A", "--body-file", "body.md")
+	rotaIn(t, dir, "round", "escalate", "send", "8", "--title", "B", "--body-file", "body.md")
 
 	f.failRead = errors.New("HTTP 500: boom")
-	code, out, errOut := hvIn(t, dir, "round", "escalate", "check", "--json")
+	code, out, errOut := rotaIn(t, dir, "round", "escalate", "check", "--json")
 	d := data(t, out)
 	if code != 0 || d["pending"] != 2.0 || !strings.Contains(errOut, "e1: cannot read issue #7") {
 		t.Errorf("forge failure is a warning: %d %v %s", code, d, errOut)
@@ -423,7 +423,7 @@ func TestEscalateCheckForgeFailureAndDeletedComment(t *testing.T) {
 	// e1's comment is deleted, e2's thread still has it and an answer.
 	f.remove("1")
 	f.add("yes")
-	code, out, errOut = hvIn(t, dir, "round", "escalate", "check", "--json")
+	code, out, errOut = rotaIn(t, dir, "round", "escalate", "check", "--json")
 	d = data(t, out)
 	rows := d["escalations"].([]any)
 	if code != 0 || d["pending"] != 1.0 || d["answered"] != 1.0 || d["changed"] != true ||

@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
-// WatchFileName is the record of a running watcher under <git-common-dir>/hv/,
+// WatchFileName is the record of a running watcher under <git-common-dir>/rota/,
 // next to the lease. It says which process is acting on the limits list, so
-// `hv limit status` can answer "watching" and a second `hv limit watch` does
+// `rota limit status` can answer "watching" and a second `rota limit watch` does
 // not act twice.
 const WatchFileName = "limit-watch.json"
 
@@ -19,8 +19,8 @@ const WatchFileName = "limit-watch.json"
 type Watching struct {
 	PID       int    `json:"pid"`
 	StartedAt string `json:"startedAt"`
-	// Mode is "watch" for `hv limit watch` or "supervisor" for the loop
-	// inside `hv keepalive run`.
+	// Mode is "watch" for `rota limit watch` or "supervisor" for the loop
+	// inside `rota keepalive run`.
 	Mode string `json:"mode"`
 }
 
@@ -31,7 +31,7 @@ const (
 )
 
 // WatchPath is the file of a repo, by its git common dir.
-func WatchPath(commonDir string) string { return filepath.Join(commonDir, "hv", WatchFileName) }
+func WatchPath(commonDir string) string { return filepath.Join(commonDir, "rota", WatchFileName) }
 
 // ReadWatching loads the record; found is false when there is none or it does
 // not parse.

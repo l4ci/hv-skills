@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // The gate tests rebuild smoke section 68's world: a bare origin, a gate
@@ -68,7 +68,7 @@ func newWorld(t *testing.T, pr string) *world {
 	gitq(t, w.worker, "add", "work.txt")
 	gitq(t, w.worker, "commit", "-q", "-m", "work")
 	gitq(t, w.worker, "push", "-q", "origin", "w1")
-	os.MkdirAll(filepath.Join(w.dir, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(w.dir, ".rota"), 0o755)
 	w.setConfig(`{"refactor":{"verifyCommands":[]}}`)
 	w.setSlot(pr, "")
 	os.WriteFile(w.log, nil, 0o644)
@@ -83,7 +83,7 @@ func newWorld(t *testing.T, pr string) *world {
 }
 
 func (w *world) setConfig(cfg string) {
-	os.WriteFile(filepath.Join(w.dir, ".hv", "config.json"), []byte(cfg), 0o644)
+	os.WriteFile(filepath.Join(w.dir, ".rota", "config.json"), []byte(cfg), 0o644)
 }
 
 // setSlot writes workers.json with slot w1 on branch w1 and the given PR and
@@ -96,7 +96,7 @@ func (w *world) setSlot(pr, relays string) {
 	if relays != "" {
 		slot += `,"relays":` + relays
 	}
-	os.WriteFile(filepath.Join(w.dir, ".hv", "workers.json"), []byte(`{"slots":[`+slot+`}]}`), 0o644)
+	os.WriteFile(filepath.Join(w.dir, ".rota", "workers.json"), []byte(`{"slots":[`+slot+`}]}`), 0o644)
 }
 
 // forge sets one key of the fake forge's state (a string value; "merge" and
@@ -148,7 +148,7 @@ func (w *world) env(brokenMergeBase bool) Env {
 	script := fakeForgeScript(w.t)
 	return Env{
 		Sleep:  func(time.Duration) {},
-		Getenv: func(k string) string { return map[string]string{"HV_GATE_SHA_WAIT": "0"}[k] },
+		Getenv: func(k string) string { return map[string]string{"ROTA_GATE_SHA_WAIT": "0"}[k] },
 	}.withForge(func(provider, dir string) *tracker.CLI {
 		tool := "gh"
 		if provider == "gitlab" {

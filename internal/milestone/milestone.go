@@ -1,6 +1,6 @@
 // Package milestone ports the hv-vision-* helpers for file mode: milestone
-// detail files under .hv/milestones/<MNN>.md, the overview in
-// .hv/MILESTONES.md and the managed vision block in the instructions file.
+// detail files under .rota/milestones/<MNN>.md, the overview in
+// .rota/MILESTONES.md and the managed vision block in the instructions file.
 package milestone
 
 import (
@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/knowledge"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/knowledge"
+	"github.com/l4ci/rota/internal/section"
 )
 
-// Statuses are the legal milestone states, in HV_MILESTONE_STATUSES order.
+// Statuses are the legal milestone states, in ROTA_MILESTONE_STATUSES order.
 var Statuses = []string{"planned", "active", "shipped", "archived"}
 
 // fmBlock and fmID are private on purpose. Put's id check mirrors
@@ -56,11 +56,11 @@ func ValidStatus(s string) bool {
 	return false
 }
 
-func detailPath(root, id string) string { return filepath.Join(root, ".hv", "milestones", id+".md") }
-func overviewPath(root string) string   { return filepath.Join(root, ".hv", "MILESTONES.md") }
+func detailPath(root, id string) string { return filepath.Join(root, ".rota", "milestones", id+".md") }
+func overviewPath(root string) string   { return filepath.Join(root, ".rota", "MILESTONES.md") }
 
 func notFound(id string) *artifact.Error {
-	return artifact.Errf(artifact.ExitResolution, "milestone %s not found (.hv/milestones/%s.md)", id, id)
+	return artifact.Errf(artifact.ExitResolution, "milestone %s not found (.rota/milestones/%s.md)", id, id)
 }
 
 // Stub is the starter text of a milestone detail file (milestone_stub); the
@@ -88,7 +88,7 @@ func Add(root, title, summary, depends string) (string, error) {
 	if len(deps) > 0 {
 		overview = strings.Join(deps, ", ")
 	}
-	entry := fmt.Sprintf("\n### %s — %s\n\n**Status:** planned · **Depends:** %s\n\n%s\n\n[Full plan: `.hv/milestones/%s.md`]\n", id, title, overview, summary, id)
+	entry := fmt.Sprintf("\n### %s — %s\n\n**Status:** planned · **Depends:** %s\n\n%s\n\n[Full plan: `.rota/milestones/%s.md`]\n", id, title, overview, summary, id)
 	ms := overviewPath(root)
 	err = fsio.Locked(ms, fsio.LockTimeout, func() error {
 		content, rerr := fsio.ReadText(ms)
@@ -111,10 +111,10 @@ type Entry struct {
 	Ready             bool
 }
 
-// List reads .hv/milestones/*.md in name order. ready is true when every
+// List reads .rota/milestones/*.md in name order. ready is true when every
 // dependency is shipped.
 func List(root string) ([]Entry, error) {
-	docs, err := artifact.ListDocs(filepath.Join(root, ".hv", "milestones"))
+	docs, err := artifact.ListDocs(filepath.Join(root, ".rota", "milestones"))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func Put(root, id, text string) (changed bool, err error) {
 	}
 	p := detailPath(root, id)
 	if _, serr := os.Stat(p); serr != nil {
-		return false, notFound(id).WithHint("hv milestone add --title <text> --summary <text>")
+		return false, notFound(id).WithHint("rota milestone add --title <text> --summary <text>")
 	}
 	var got string
 	if m := fmBlock.FindStringSubmatch(text); m != nil {
@@ -233,7 +233,7 @@ func SetStatus(root, id, status string) (changed bool, err error) {
 		}
 		updated, found := frontmatter.UpdateField(content, "status", status)
 		if !found {
-			return artifact.Errf(artifact.ExitInternal, "status field not found in .hv/milestones/%s.md", id)
+			return artifact.Errf(artifact.ExitInternal, "status field not found in .rota/milestones/%s.md", id)
 		}
 		if updated == content {
 			return nil
@@ -276,8 +276,8 @@ func Index(root string) (changed bool, err error) {
 
 // seed is the MILESTONES.md an issue-mode index starts from when there is none
 // (hv-bootstrap's text).
-const seed = "# Milestones\n\n_(no vision yet \u2014 run `/hv-vision` to brainstorm milestones)_\n\n" +
-	"## Active milestones\n\n_(none active \u2014 set with `/hv-vision`)_\n\n## Milestones\n"
+const seed = "# Milestones\n\n_(no vision yet \u2014 run `/rota-vision` to brainstorm milestones)_\n\n" +
+	"## Active milestones\n\n_(none active \u2014 set with `/rota-vision`)_\n\n## Milestones\n"
 
 // IndexFrom is Index over milestones the caller already listed. In issue mode
 // (issue true) the list comes from the tracking issues, a missing
@@ -319,7 +319,7 @@ func IndexFrom(root string, items []Entry, issue bool) (changed bool, err error)
 					text = updateStatusLine(text, i.ID, i.Status)
 				}
 			}
-			body := "_(none active — set with `/hv-vision`)_"
+			body := "_(none active — set with `/rota-vision`)_"
 			if len(active) > 0 {
 				lines := make([]string, len(active))
 				for k, i := range active {
@@ -370,11 +370,11 @@ func IndexFrom(root string, items []Entry, issue bool) (changed bool, err error)
 			lines[k] = fmt.Sprintf("- **%s** — %s (depends: %s)%s", i.ID, i.Title, deps, flag)
 		}
 		body = strings.Join(lines, "\n")
-		where := "`.hv/milestones/MNN.md`"
+		where := "`.rota/milestones/MNN.md`"
 		if issue {
-			where = "the tracking issues (`hv milestone show MNN`)"
+			where = "the tracking issues (`rota milestone show MNN`)"
 		}
-		intro = "Active milestones live in `.hv/MILESTONES.md` (detail in " + where + "). Tag captured items with their milestone via the `Milestone:` field where applicable."
+		intro = "Active milestones live in `.rota/MILESTONES.md` (detail in " + where + "). Tag captured items with their milestone via the `Milestone:` field where applicable."
 	case len(items) > 0:
 		planned := 0
 		for _, i := range items {
@@ -383,14 +383,14 @@ func IndexFrom(root string, items []Entry, issue bool) (changed bool, err error)
 			}
 		}
 		if planned > 0 {
-			body = fmt.Sprintf("_(no active milestones — %d planned; set one active with `/hv-vision`)_", planned)
+			body = fmt.Sprintf("_(no active milestones — %d planned; set one active with `/rota-vision`)_", planned)
 		} else {
-			body = "_(no active milestones — all shipped or archived; run `/hv-vision` to plan more)_"
+			body = "_(no active milestones — all shipped or archived; run `/rota-vision` to plan more)_"
 		}
-		intro = "Project milestones live in `.hv/MILESTONES.md`."
+		intro = "Project milestones live in `.rota/MILESTONES.md`."
 	default:
-		body = "_(no milestones yet — run `/hv-vision` to brainstorm)_"
-		intro = "Project milestones live in `.hv/MILESTONES.md`."
+		body = "_(no milestones yet — run `/rota-vision` to brainstorm)_"
+		intro = "Project milestones live in `.rota/MILESTONES.md`."
 	}
 	target := section.InstructionsFile(root)
 	before, _ := os.ReadFile(target)

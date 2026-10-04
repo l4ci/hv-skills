@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // ErrSectionExists: the changelog already has a section for the version.

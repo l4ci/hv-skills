@@ -1,6 +1,6 @@
-// Package worker is the Go port of the /hv-work worker helpers
+// Package worker is the Go port of the /rota-work worker helpers
 // (bin/hv-worker-pool, -reset, -account, -dispatch, -poll, -gate, -session).
-// The registry is .hv/workers.json at the project root; its files stay
+// The registry is .rota/workers.json at the project root; its files stay
 // byte-identical to what the old helpers write.
 package worker
 
@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Error is a verb failure with its exit code from the exit table. Data is the
@@ -44,9 +44,9 @@ const (
 )
 
 // RegistryPath is the registry file under the project root.
-func RegistryPath(root string) string { return filepath.Join(root, ".hv", "workers.json") }
+func RegistryPath(root string) string { return filepath.Join(root, ".rota", "workers.json") }
 
-// Registry is a loaded .hv/workers.json.
+// Registry is a loaded .rota/workers.json.
 type Registry struct {
 	Doc    *jsonx.Object
 	Exists bool
@@ -187,7 +187,7 @@ type Env struct {
 	Sleep func(time.Duration)
 	// Now defaults to time.Now (relay timestamps).
 	Now func() time.Time
-	// Getenv defaults to os.Getenv (HV_GATE_SHA_WAIT).
+	// Getenv defaults to os.Getenv (ROTA_GATE_SHA_WAIT).
 	Getenv func(string) string
 	// Forge returns the forge CLI runner for a provider ("github" or
 	// "gitlab") running in dir. Every forge call goes through internal/tracker,

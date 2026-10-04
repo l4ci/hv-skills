@@ -13,17 +13,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // The A7 verbs (worker pool, reset, account, ...) live in internal/worker;
 // this file is their glue. Tests swap the package variables below for fakes.
 var (
 	workerEnv      = func() worker.Env { return worker.Env{} }
-	workerAccounts = func() *worker.Accounts { return &worker.Accounts{Now: hookNow} } // HV_TEST_NOW fixes the meters' clock too
+	workerAccounts = func() *worker.Accounts { return &worker.Accounts{Now: hookNow} } // ROTA_TEST_NOW fixes the meters' clock too
 )
 
 // workerContext is cancelled on SIGINT and SIGTERM, so a Ctrl-C reaches the
@@ -40,7 +40,7 @@ func workerEnvCtx(ctx context.Context) worker.Env {
 }
 
 func workerCommands() *Command {
-	return &Command{Name: "worker", Summary: "/hv-work worker slots, hosts and accounts", Subs: []*Command{
+	return &Command{Name: "worker", Summary: "/rota-work worker slots, hosts and accounts", Subs: []*Command{
 		{Name: "pool", Summary: "slot registry, worktrees and branches", Subs: []*Command{
 			{Name: "init", Summary: "create the slots' worktrees and register them", Verb: poolInit},
 			{Name: "list", Summary: "list the registered slots", Verb: noFlags(runPoolList)},
@@ -86,7 +86,7 @@ func slotLine(s *jsonx.Object) string {
 func poolInit(fs *flag.FlagSet) RunFunc {
 	slots := fs.String("slots", "", "number of slots to create")
 	base := fs.String("base", "", "base branch (default: the current branch)")
-	session := fs.String("session", "", "host session name (default: hv)")
+	session := fs.String("session", "", "host session name (default: rota)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if err := noArgs(args); err != nil {
 			return Result{}, err
@@ -367,7 +367,7 @@ func bodyPath(c *Ctx, path string) (string, func(), error) {
 	if path != "-" {
 		return path, func() {}, nil
 	}
-	f, err := os.CreateTemp("", "hv-body-*")
+	f, err := os.CreateTemp("", "rota-body-*")
 	if err != nil {
 		return "", nil, err
 	}
@@ -462,10 +462,10 @@ func workerPoll(fs *flag.FlagSet) RunFunc {
 		}
 		var res worker.PollResult
 		var err error
-		// HV_TEST_POLL_FIXTURE classifies a file as a static pane: no host, no
+		// ROTA_TEST_POLL_FIXTURE classifies a file as a static pane: no host, no
 		// registry writes. Test hooks, not part of the CLI.
-		if fx := os.Getenv("HV_TEST_POLL_FIXTURE"); fx != "" {
-			res, err = worker.PollFixture(fx, slot, os.Getenv("HV_TEST_POLL_STATUS"), *lines)
+		if fx := os.Getenv("ROTA_TEST_POLL_FIXTURE"); fx != "" {
+			res, err = worker.PollFixture(fx, slot, os.Getenv("ROTA_TEST_POLL_STATUS"), *lines)
 		} else {
 			var root string
 			if root, err = c.Root(); err != nil {
@@ -529,7 +529,7 @@ func sessionCheck(fs *flag.FlagSet) RunFunc {
 }
 
 func sessionEnsure(fs *flag.FlagSet) RunFunc {
-	session := fs.String("session", "", "tmux session name (default: hv)")
+	session := fs.String("session", "", "tmux session name (default: rota)")
 	body := fs.String("body-file", "", "instruction pasted into the operator window; - reads stdin")
 	boot := fs.Int("boot-timeout", 60, "seconds to wait for the operator session to boot")
 	return func(c *Ctx, args []string) (Result, error) {

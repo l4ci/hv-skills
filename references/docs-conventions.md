@@ -1,10 +1,10 @@
-# `/hv-ship` (Docs Mode) scaffold conventions
+# `/rota-ship` (Docs Mode) scaffold conventions
 
-Used by `/hv-ship` (Docs Mode) Step 4 (Propose Tailored Tree) and Step 5 (Scaffold on Approval). The page-naming convention and the seed `.docsignore` are both consumed by `/hv-ship` (Docs Mode) alone — co-located here so the skill's prose stays focused on the UX flow.
+Used by `/rota-ship` (Docs Mode) Step 4 (Propose Tailored Tree) and Step 5 (Scaffold on Approval). The page-naming convention and the seed `.docsignore` are both consumed by `/rota-ship` (Docs Mode) alone — co-located here so the skill's prose stays focused on the UX flow.
 
 ## Page-naming convention
 
-Tailored trees follow this layout — already in use across hv's own `docs/` and reusable for other projects:
+Tailored trees follow this layout — already in use across rota's own `docs/` and reusable for other projects:
 
 - **Spine** — top-level pages: `README.md` (TOC), `getting-started.md` (5-minute walkthrough), `faq.md` (common questions, optional).
 - **Phase-grouped usage pages** — `docs/usage/<verb-noun>.md`: examples — `picking-work.md`, `running-work.md`, `pausing-and-resuming.md`, `review-and-ship.md`. The verb-noun shape keeps file names self-documenting and groups related actions.
@@ -38,10 +38,10 @@ build/
 target/
 ```
 
-The seed is conservative — the user extends it for project-specific paths after the scaffold lands. `/hv-ship` (Docs Mode)'s after-work flow (Step A2) filters the diff through `.docsignore` before classifying changes.
+The seed is conservative — the user extends it for project-specific paths after the scaffold lands. `/rota-ship` (Docs Mode)'s after-work flow (Step A2) filters the diff through `.docsignore` before classifying changes.
 
 ## What this reference does NOT cover
 
-- **First-run vs. after-work mode selection.** Lives inline in `hv-ship/SKILL.md` Step D1 of Docs Mode (mode detection branches on `<docs.path>/` state + `docs.afterWork`).
-- **The post-cycle trigger gate.** Lives in `references/post-cycle-trigger-gate.md` — shared with `/hv-work` and `/hv-ship`.
-- **The three-mode skeleton shared with `/hv-qa`.** Lives in `references/three-mode-skill-shape.md` — covers the family-level shape and intentional divergences.
+- **First-run vs. after-work mode selection.** Lives inline in `rota-ship/SKILL.md` Step D1 of Docs Mode (mode detection branches on `<docs.path>/` state + `docs.afterWork`).
+- **The post-cycle trigger gate.** Lives in `references/post-cycle-trigger-gate.md` — shared with `/rota-work` and `/rota-ship`.
+- **The three-mode skeleton shared with `/rota-qa`.** Lives in `references/three-mode-skill-shape.md` — covers the family-level shape and intentional divergences.

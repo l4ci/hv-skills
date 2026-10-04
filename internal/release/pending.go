@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"regexp"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 var intRe = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)
@@ -59,10 +59,10 @@ func Pending(cfg any, lastTag string, commits int, tagTS, now int64) *jsonx.Obje
 		switch {
 		case big.NewInt(int64(commits)).Cmp(thrC) >= 0:
 			nudge, reason = true, "commits"
-			message = fmt.Sprintf("%d commits since %s; consider /hv-release.", commits, lastTag)
+			message = fmt.Sprintf("%d commits since %s; consider /rota-release.", commits, lastTag)
 		case big.NewInt(days).Cmp(thrD) >= 0:
 			nudge, reason = true, "days"
-			message = fmt.Sprintf("%d commits and %d days since %s; consider /hv-release.", commits, days, lastTag)
+			message = fmt.Sprintf("%d commits and %d days since %s; consider /rota-release.", commits, days, lastTag)
 		}
 	}
 	o.Set("lastTag", lastTag)

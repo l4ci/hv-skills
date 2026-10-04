@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Gate names.
@@ -41,20 +41,20 @@ func (g Gate) Enforced() bool { return len(g.Verbs) > 0 }
 
 // Registry is every manual gate the skills describe, in contract order.
 var Registry = []Gate{
-	{TagPush, []string{"release push"}, []string{"hv-release"}, "the release tag (and branch) on the remote"},
-	{ReleasePublish, []string{"release publish"}, []string{"hv-release"}, "a GitHub or GitLab release page"},
-	{PublicFiling, []string{"tracker suggest-upstream"}, []string{"hv-learn"}, "a public issue on the hv repo"},
-	{MergeApproval, []string{"ship merge", "ship pr-merge", "worker gate"}, []string{"hv-ship", "hv-review", "hv-work"}, "a merge into the base branch"},
-	{DebugReset, []string{"debug reset"}, []string{"hv-debug"}, "a fresh failed-fix count for an item the Iron Law halted"},
-	{"pr-open", nil, []string{"hv-ship"}, "a public PR or MR"},
-	{"issue-close", nil, []string{"hv-ship", "hv-release"}, "closed upstream issues"},
-	{"issue-label", nil, []string{"hv-capture"}, "upstream label added or removed"},
-	{"decision-write", nil, []string{"hv-decide"}, "a hard boundary in DECISIONS.md"},
-	{"runlog-entry", nil, []string{"hv-learn"}, "a signed entry in the public runlog registry"},
+	{TagPush, []string{"release push"}, []string{"rota-release"}, "the release tag (and branch) on the remote"},
+	{ReleasePublish, []string{"release publish"}, []string{"rota-release"}, "a GitHub or GitLab release page"},
+	{PublicFiling, []string{"tracker suggest-upstream"}, []string{"rota-learn"}, "a public issue on the rota repo"},
+	{MergeApproval, []string{"ship merge", "ship pr-merge", "worker gate"}, []string{"rota-ship", "rota-review", "rota-work"}, "a merge into the base branch"},
+	{DebugReset, []string{"debug reset"}, []string{"rota-debug"}, "a fresh failed-fix count for an item the Iron Law halted"},
+	{"pr-open", nil, []string{"rota-ship"}, "a public PR or MR"},
+	{"issue-close", nil, []string{"rota-ship", "rota-release"}, "closed upstream issues"},
+	{"issue-label", nil, []string{"rota-capture"}, "upstream label added or removed"},
+	{"decision-write", nil, []string{"rota-decide"}, "a hard boundary in DECISIONS.md"},
+	{"runlog-entry", nil, []string{"rota-learn"}, "a signed entry in the public runlog registry"},
 }
 
 // AuditFile is the audit log, relative to the project root.
-const AuditFile = ".hv/gate-audit.jsonl"
+const AuditFile = ".rota/gate-audit.jsonl"
 
 // Confirm is the human approval a gated verb was given: --confirm and the
 // quoted answer from --confirm-note. Escalation is the id of the C5 escalation
@@ -107,7 +107,7 @@ func Clear(root, name, verb, target string, c Confirm, paths []string) error {
 		return &Refused{Gate: name, Paths: paths}
 	}
 	autonomy := "off"
-	if v, err := config.Value(config.Load(filepath.Join(root, ".hv", "config.json")), "autonomy.level"); err == nil {
+	if v, err := config.Value(config.Load(filepath.Join(root, ".rota", "config.json")), "autonomy.level"); err == nil {
 		if s, ok := v.(string); ok {
 			autonomy = s
 		}
@@ -162,7 +162,7 @@ var ErrBadMergeMode = errors.New("ship.mergeApproval must be none, all or paths"
 
 // LoadMergePolicy reads the merge policy from the project config.
 func LoadMergePolicy(root string) (MergePolicy, error) {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	var p MergePolicy
 	v, err := config.Value(cfg, "ship.mergeApproval")
 	if err != nil {

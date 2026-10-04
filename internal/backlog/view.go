@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Row is one open item as the listing views (hv-backlog, hv-todo-by-milestone,
@@ -168,7 +168,7 @@ func CountOpen(md string) map[string]int {
 	return out
 }
 
-// ---- hv backlog list -----------------------------------------------------------
+// ---- rota backlog list -----------------------------------------------------------
 
 // Active is one active stream, as hv-backlog reads status.json.
 type Active struct {
@@ -190,7 +190,7 @@ type ListRow struct {
 	Milestone string // "M01, M03", "" when untagged
 }
 
-// Listing is what hv backlog list shows.
+// Listing is what rota backlog list shows.
 type Listing struct {
 	InProgress []InProgress
 	Bugs       []ListRow
@@ -231,7 +231,7 @@ func typeOf(id string) string {
 	return ""
 }
 
-// BuildListing assembles hv backlog list. Items that are active appear only in
+// BuildListing assembles rota backlog list. Items that are active appear only in
 // In Progress. grep, when non-empty, keeps the Bugs, Features and Tasks rows
 // whose bullet contains it, case-insensitively, and the clusters with a member
 // that matched; In Progress is never filtered.
@@ -451,7 +451,7 @@ func (l *Listing) render(md string, active []Active, grep string) {
 		if grep != "" {
 			out = append(out, "No matches for pattern '"+grep+"'.")
 		} else {
-			out = append(out, "Backlog empty. Run /hv-capture to add items.")
+			out = append(out, "Backlog empty. Run /rota-capture to add items.")
 		}
 	}
 	l.text = strings.Join(out, "\n") + "\n"

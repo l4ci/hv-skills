@@ -5,8 +5,8 @@ echo "backlog drift"
 TD_TMP="$(mktemp -d)"
 (
   cd "$TD_TMP"
-  mkdir -p .hv
-  cat > .hv/BACKLOG.md <<'EOF'
+  mkdir -p .rota
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -18,7 +18,7 @@ TD_TMP="$(mktemp -d)"
 
 ## Completed
 EOF
-  echo '{"repos": []}' > .hv/repos.json
+  echo '{"repos": []}' > .rota/repos.json
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
@@ -29,7 +29,7 @@ EOF
   pass "backlog drift detects shipped-but-open ID"
 
   # Completed (strikethrough) IDs are NOT drift — even if they appear in commits.
-  cat > .hv/BACKLOG.md <<'EOF'
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -51,8 +51,8 @@ echo "backlog drift Since-anchor"
 SA_TMP="$(mktemp -d)"
 (
   cd "$SA_TMP"
-  mkdir -p .hv
-  echo '{"repos": []}' > .hv/repos.json
+  mkdir -p .rota
+  echo '{"repos": []}' > .rota/repos.json
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
@@ -64,7 +64,7 @@ SA_TMP="$(mktemp -d)"
   git commit -q --allow-empty -m "feat: old shipment [B07]"
   git commit -q --allow-empty -m "chore: anchor pin"
   ANCHOR="$(git rev-parse --short HEAD)"
-  cat > .hv/BACKLOG.md <<EOF
+  cat > .rota/BACKLOG.md <<EOF
 # TODO
 
 ## Bugs
@@ -88,7 +88,7 @@ EOF
   pass "backlog drift detects commits newer than Since: anchor"
 
   # Scenario C: legacy entry (no Since:) preserves full-log behavior.
-  cat > .hv/BACKLOG.md <<'EOF'
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -105,7 +105,7 @@ EOF
   pass "backlog drift legacy entries keep full-log behavior"
 
   # Scenario D: item create auto-stamps Since on fresh captures.
-  cat > .hv/BACKLOG.md <<'EOF'
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -117,15 +117,15 @@ EOF
 ## Completed
 EOF
   HEAD_AT_CAP="$(git rev-parse --short HEAD)"
-  echo '{"bugs":7,"features":0,"tasks":0,"milestones":0}' > .hv/counters.json
+  echo '{"bugs":7,"features":0,"tasks":0,"milestones":0}' > .rota/counters.json
   OUT_D=$(hvj item create --kind bugs --title "Auto-stamp." --desc "Body." --tag P2)
   [ "$(echo "$OUT_D" | jget data.id)" = "B08" ] || fail "item create minted the wrong ID: $OUT_D"
-  grep -q "Since: $HEAD_AT_CAP" .hv/BACKLOG.md || { cat .hv/BACKLOG.md; fail "item create did not auto-stamp Since"; }
+  grep -q "Since: $HEAD_AT_CAP" .rota/BACKLOG.md || { cat .rota/BACKLOG.md; fail "item create did not auto-stamp Since"; }
   pass "item create auto-stamps Since: <HEAD> on fresh bullets"
 
   # Scenario E: backlog backfill stamps open bullets lacking Since;
   # second invocation is idempotent (no output, no double-stamp).
-  cat > .hv/BACKLOG.md <<'EOF'
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -142,9 +142,9 @@ EOF
   [ "$(echo "$OUT_E" | jget data.stamped)" = "1" ] || fail "backfill should report 1 stamped, got: $OUT_E"
   [ "$(echo "$OUT_E" | jget data.changed)" = "true" ] || fail "backfill should report changed: $OUT_E"
   HEAD_BF="$(git rev-parse --short HEAD)"
-  grep -q "Since: $HEAD_BF" .hv/BACKLOG.md || { cat .hv/BACKLOG.md; fail "backfill did not write Since"; }
+  grep -q "Since: $HEAD_BF" .rota/BACKLOG.md || { cat .rota/BACKLOG.md; fail "backfill did not write Since"; }
   # Completed items must NOT be touched
-  grep -q "Since:.*Completed item" .hv/BACKLOG.md && fail "backfill touched ## Completed entry"
+  grep -q "Since:.*Completed item" .rota/BACKLOG.md && fail "backfill touched ## Completed entry"
   pass "backlog backfill stamps open bullets lacking Since:"
   OUT_E2=$(hvj backlog backfill)
   [ "$(echo "$OUT_E2" | jget data.stamped)" = "0" ] || fail "backfill not idempotent — re-ran with: $OUT_E2"
@@ -157,8 +157,8 @@ echo "backlog drift symbol-drift"
 SY_TMP="$(mktemp -d)"
 (
   cd "$SY_TMP"
-  mkdir -p .hv
-  echo '{"repos": []}' > .hv/repos.json
+  mkdir -p .rota
+  echo '{"repos": []}' > .rota/repos.json
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
@@ -172,7 +172,7 @@ SY_TMP="$(mktemp -d)"
   # Capture two open items anchored at CAP:
   #  - B20 names widget_transcribe_pipeline — NOT in tree at CAP (positive).
   #  - B21 names already_here_helper — already in tree at CAP (negative).
-  cat > .hv/BACKLOG.md <<EOF
+  cat > .rota/BACKLOG.md <<EOF
 # TODO
 
 ## Bugs
@@ -213,7 +213,7 @@ assert 'B21' not in by, f'B21 (pre-existing symbol) should NOT be flagged: {sd}'
 rm -rf "$SY_TMP"
 
 echo "knowledge query"
-cat > .hv/KNOWLEDGE.md <<'EOF'
+cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Architecture
@@ -237,8 +237,8 @@ KS_TMP="$(mktemp -d)"
 trap 'rm -rf "$KS_TMP"' EXIT
 (
   cd "$KS_TMP"
-  mkdir -p .hv
-  cat > .hv/KNOWLEDGE.md <<'EOF'
+  mkdir -p .rota
+  cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Tiny
@@ -249,7 +249,7 @@ trap 'rm -rf "$KS_TMP"' EXIT
 
 EOF
   # Append 30 bullets to ## Big so it crosses the threshold.
-  for i in $(seq 1 30); do echo "- bullet $i" >> .hv/KNOWLEDGE.md; done
+  for i in $(seq 1 30); do echo "- bullet $i" >> .rota/KNOWLEDGE.md; done
   OUT=$(hvj knowledge stats)
   [ "$(echo "$OUT" | python3 -c "import json,sys; print(' '.join(t['name'] for t in json.load(sys.stdin)['data']['topics']))")" = "Tiny Big" ] \
     || fail "stats should list Tiny and Big: $OUT"
@@ -267,7 +267,7 @@ KS2_TMP="$(mktemp -d)"
 trap 'rm -rf "$KS2_TMP"' EXIT
 (
   cd "$KS2_TMP"
-  mkdir -p .hv
+  mkdir -p .rota
   OUT=$(hvj knowledge stats)
   [ "$(echo "$OUT" | jget data.topics)" = "[]" ] || fail "missing-file should yield empty: $OUT"
   pass "knowledge stats silent-empty on missing KNOWLEDGE.md"
@@ -275,7 +275,7 @@ trap 'rm -rf "$KS2_TMP"' EXIT
 trap 'rm -rf "$TMP"' EXIT
 
 echo "decisions query"
-cat > .hv/DECISIONS.md <<'EOF'
+cat > .rota/DECISIONS.md <<'EOF'
 # Decisions
 
 ## Architecture
@@ -313,13 +313,13 @@ grep -q "Permits.*Cert pinning" <<<"$OUT_D" || fail "Permits line missing for Ne
 pass "decisions query preserves forbids/permits structure"
 
 # Empty/missing file is silent (exit 0, no output)
-rm -f .hv/DECISIONS.md
+rm -f .rota/DECISIONS.md
 OUT_EMPTY=$(hvj decisions query "Anything")
 [ "$(echo "$OUT_EMPTY" | jget data.text)" = "" ] || fail "decisions query should be silent when DECISIONS.md missing: $OUT_EMPTY"
 pass "decisions query silent when file missing"
 
-# Restore .hv/DECISIONS.md so subsequent tests have a known state
-cat > .hv/DECISIONS.md <<'EOF'
+# Restore .rota/DECISIONS.md so subsequent tests have a known state
+cat > .rota/DECISIONS.md <<'EOF'
 # Decisions
 EOF
 
@@ -330,16 +330,16 @@ trap 'rm -rf "$BOOT_TMP"' EXIT
 cd "$BOOT_TMP"
 git init -q
 git config user.email t@t && git config user.name t
-"$HV_BIN" init >/dev/null
-[ -f .hv/DECISIONS.md ] || fail "init did not create .hv/DECISIONS.md"
-grep -q "^# Decisions" .hv/DECISIONS.md || fail "DECISIONS.md missing # Decisions header"
-grep -q "Hard boundaries" .hv/DECISIONS.md || fail "DECISIONS.md missing framing sentence"
-pass "init creates .hv/DECISIONS.md with header preamble"
+"$ROTA_BIN" init >/dev/null
+[ -f .rota/DECISIONS.md ] || fail "init did not create .rota/DECISIONS.md"
+grep -q "^# Decisions" .rota/DECISIONS.md || fail "DECISIONS.md missing # Decisions header"
+grep -q "Hard boundaries" .rota/DECISIONS.md || fail "DECISIONS.md missing framing sentence"
+pass "init creates .rota/DECISIONS.md with header preamble"
 
 # Re-running init must NOT overwrite existing DECISIONS.md
-echo "user content marker" >> .hv/DECISIONS.md
-"$HV_BIN" init >/dev/null
-grep -q "user content marker" .hv/DECISIONS.md || fail "init overwrote existing DECISIONS.md"
+echo "user content marker" >> .rota/DECISIONS.md
+"$ROTA_BIN" init >/dev/null
+grep -q "user content marker" .rota/DECISIONS.md || fail "init overwrote existing DECISIONS.md"
 pass "init idempotent — preserves existing DECISIONS.md content"
 
 cd "$TMP"

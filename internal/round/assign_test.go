@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Workflow side of the fake board.
@@ -148,7 +148,7 @@ func blockedBy(t *testing.T, err error) string {
 
 func TestBranchName(t *testing.T) {
 	for _, c := range []struct{ agent, id, title, want string }{
-		{"ben", "59", "C3: hv round start / assign / wind-down with autonomy levels", "ben/59-c3-hv-round-start-assign"},
+		{"ben", "59", "C3: rota round start / assign / wind-down with autonomy levels", "ben/59-c3-rota-round-start-assign"},
 		{"dana", "B07", "Fix it!", "dana/b07-fix-it"},
 		{"kit", "1", "", "kit/1"},
 		{"kit", "2", "Supercalifragilisticexpialidocious-averyveryverylongwordhere", "kit/2-supercalifragilisticexpialidocious-avery"},
@@ -350,7 +350,7 @@ func (b *boardFake) NoteRm(string, string) (bool, error)          { return false
 
 func (f *assignFixture) config(t *testing.T, cfg string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(f.root, ".hv", "config.json"), []byte(cfg), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.root, ".rota", "config.json"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	set, err := roundcfg.Load(f.root)
@@ -498,7 +498,7 @@ func TestAssignCodexResolvesAndStarts(t *testing.T) {
 	if !strings.HasPrefix(f.host.launch, "codex --model c-s ") || strings.Contains(f.host.launch, "{model}") {
 		t.Errorf("launch = %q", f.host.launch)
 	}
-	home := filepath.Join(f.root, ".git", "hv", "codex", "ben")
+	home := filepath.Join(f.root, ".git", "rota", "codex", "ben")
 	if f.host.codexHome != home || f.host.configDir != "" {
 		t.Errorf("home %q configDir %q", f.host.codexHome, f.host.configDir)
 	}

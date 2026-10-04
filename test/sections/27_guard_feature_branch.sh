@@ -7,7 +7,7 @@ trap 'rm -rf "$GUARD_TMP"' EXIT
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
-  mkdir -p .hv
+  mkdir -p .rota
   echo seed > seed.txt && git add seed.txt && git commit -q -m "seed"
 
   # guard <expected exit> <expected feature> [args]: runs the verb, checks exit and data.feature
@@ -26,13 +26,13 @@ trap 'rm -rf "$GUARD_TMP"' EXIT
     || fail "refusal should name branch and base: $GUARD_OUT"
 
   # --- on a feature branch → exit 0 ---
-  git checkout -q -b hv/feature-x
+  git checkout -q -b rota/feature-x
   guard 0 true
-  [ "$(echo "$GUARD_OUT" | jget data.branch)" = "hv/feature-x" ] && [ "$(echo "$GUARD_OUT" | jget data.base)" = "main" ] \
+  [ "$(echo "$GUARD_OUT" | jget data.branch)" = "rota/feature-x" ] && [ "$(echo "$GUARD_OUT" | jget data.base)" = "main" ] \
     || fail "feature branch data should carry branch and base: $GUARD_OUT"
 
   # --- explicit branch arg: passes feature, refuses main ---
-  guard 0 true hv/feature-x
+  guard 0 true rota/feature-x
   guard 1 false main
 
   # --- detached HEAD → exit 1, reason detached, no branch ---
@@ -40,7 +40,7 @@ trap 'rm -rf "$GUARD_TMP"' EXIT
   guard 1 false
   [ "$(echo "$GUARD_OUT" | jget data.reason)" = "detached" ] || fail "detached HEAD should refuse with reason detached: $GUARD_OUT"
   echo "$GUARD_OUT" | jget data.branch >/dev/null && fail "detached HEAD should carry no branch: $GUARD_OUT"
-  git checkout -q hv/feature-x
+  git checkout -q rota/feature-x
 
   # --- master is also refused when it's the resolved base ---
   # The base resolves main first, then master — so to test master as base,
@@ -54,7 +54,7 @@ trap 'rm -rf "$GUARD_TMP"' EXIT
 
   # --- custom git.baseBranch via config: the configured branch is the protected one ---
   git checkout -q main
-  echo '{"git":{"baseBranch":"develop"}}' > .hv/config.json
+  echo '{"git":{"baseBranch":"develop"}}' > .rota/config.json
   git checkout -q -b develop
   guard 1 false
   # main is no longer the base now that develop is configured AND exists

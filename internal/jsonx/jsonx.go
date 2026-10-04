@@ -1,6 +1,6 @@
 // Package jsonx decodes JSON with object key order preserved and encodes it
 // byte-for-byte the way Python's json.dumps(data, indent=2) does, so state
-// files written by hv and by the old bin/ helpers never diff against each other.
+// files written by rota and by the old bin/ helpers never diff against each other.
 //
 // Decoded values are *Object, []any, string, json.Number, bool or nil.
 package jsonx

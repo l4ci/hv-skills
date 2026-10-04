@@ -1,4 +1,4 @@
-// Package repos reads the umbrella sub-repo registry, .hv/repos.json. It is
+// Package repos reads the umbrella sub-repo registry, .rota/repos.json. It is
 // the one parser of that file, a port of hvlib_repos.load_repos: an entry
 // counts when it has a non-empty string name and path, paths are relative to
 // the project root and resolve like os.path.realpath, and a repeated name
@@ -8,8 +8,8 @@ package repos
 import (
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Repo is one registered sub-repo: Rel as written in repos.json, Path
@@ -21,7 +21,7 @@ type Repo struct {
 // Load returns root's registered sub-repos in file order. A missing or
 // unreadable registry is empty.
 func Load(root string) []Repo {
-	reg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "repos.json"), nil).(*jsonx.Object)
+	reg, ok := fsio.LoadJSON(filepath.Join(root, ".rota", "repos.json"), nil).(*jsonx.Object)
 	if !ok {
 		return nil
 	}

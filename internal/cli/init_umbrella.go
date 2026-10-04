@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/initproj"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/initproj"
 )
 
-// seedBase is the base seeding `hv init` does; `init umbrella` runs it first
+// seedBase is the base seeding `rota init` does; `init umbrella` runs it first
 // (the old init skill always ran hv-bootstrap before hv-umbrella-init). A
 // variable so a test can swap the seed.
 var seedBase = func(root string) error { _, err := initproj.Init(root); return err }
@@ -68,7 +68,7 @@ func initUmbrella(fs *flag.FlagSet) RunFunc {
 		}
 		enabled := false
 		if len(res.Registered) > 0 {
-			if cur, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "umbrella.enabled"); cur != true {
+			if cur, _ := config.Lookup(config.Load(filepath.Join(root, ".rota", "config.json")), "umbrella.enabled"); cur != true {
 				if _, err := config.Set(root, "umbrella.enabled", "true"); err != nil {
 					return Result{}, err
 				}

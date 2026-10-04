@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // slotProject builds a project with one initialised slot.
@@ -38,16 +38,16 @@ func TestResetCleanSlotCutsTaskBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustEqual(t, "workers.json", want["workers.json"], registry(t, b))
-	if res.Branch != "hv-worker/w1-t-7-fix-me" || !res.Changed || !res.Clean || res.Retained {
+	if res.Branch != "rota-worker/w1-t-7-fix-me" || !res.Changed || !res.Clean || res.Retained {
 		t.Errorf("%+v", res)
 	}
 	if want := sh(t, b, "git", "rev-parse", "--short", "main"); res.SHA != want {
 		t.Errorf("sha = %s, want %s", res.SHA, want)
 	}
-	if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "hv-worker/w1-t-7-fix-me" {
+	if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "rota-worker/w1-t-7-fix-me" {
 		t.Errorf("worktree on %s", got)
 	}
-	if out := sh(t, b, "git", "branch", "--list", "hv-worker/w1"); out != "" {
+	if out := sh(t, b, "git", "branch", "--list", "rota-worker/w1"); out != "" {
 		t.Errorf("old per-task branch not dropped: %s", out)
 	}
 }
@@ -60,7 +60,7 @@ func TestResetCheckOnlyChangesNothing(t *testing.T) {
 		t.Fatalf("%+v %v", res, err)
 	}
 	mustEqual(t, "registry", before, registry(t, b))
-	if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "hv-worker/w1" {
+	if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "rota-worker/w1" {
 		t.Errorf("--check-only moved the worktree to %s", got)
 	}
 }
@@ -127,7 +127,7 @@ func TestResetRetryKeepsTheTasksOwnWork(t *testing.T) {
 	os.WriteFile(RegistryPath(b), []byte(strings.Replace(string(raw), `"task": null`, `"task": "T4"`, 1)), 0o644)
 	before := registry(t, b)
 	res, err := Env{}.Reset(b, "w1", "T4", false)
-	if err != nil || !res.Retained || res.Changed || res.Clean || res.Branch != "hv-worker/w1-t4" {
+	if err != nil || !res.Retained || res.Changed || res.Clean || res.Branch != "rota-worker/w1-t4" {
 		t.Fatalf("%+v %v", res, err)
 	}
 	mustEqual(t, "registry", before, registry(t, b))
@@ -169,11 +169,11 @@ func TestResetResolutionFailures(t *testing.T) {
 
 func TestBranchFor(t *testing.T) {
 	for _, c := range []struct{ task, want string }{
-		{"", "hv-worker/w1"},
-		{"T-7", "hv-worker/w1-t-7"},
-		{"F42 Add/Thing", "hv-worker/w1-f42-add-thing"},
-		{"a.b_c-d", "hv-worker/w1-a.b_c-d"},
-		{"ä", "hv-worker/w1---"}, // tr works bytewise: two bytes, two dashes
+		{"", "rota-worker/w1"},
+		{"T-7", "rota-worker/w1-t-7"},
+		{"F42 Add/Thing", "rota-worker/w1-f42-add-thing"},
+		{"a.b_c-d", "rota-worker/w1-a.b_c-d"},
+		{"ä", "rota-worker/w1---"}, // tr works bytewise: two bytes, two dashes
 	} {
 		if got := BranchFor("w1", c.task); got != c.want {
 			t.Errorf("BranchFor(%q) = %q, want %q", c.task, got, c.want)
@@ -184,7 +184,7 @@ func TestBranchFor(t *testing.T) {
 func TestBranchForMatchesTr(t *testing.T) {
 	for _, task := range []string{"B07", "Fix: login (v2)", "x\ty", "ÄÖ-1"} {
 		old := sh(t, t.TempDir(), "bash", "-c", `printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._\n-' '-'`, "_", task)
-		if got := BranchFor("w1", task); got != "hv-worker/w1-"+old {
+		if got := BranchFor("w1", task); got != "rota-worker/w1-"+old {
 			t.Errorf("BranchFor(%q) = %q, tr gives %q", task, got, old)
 		}
 	}
@@ -210,7 +210,7 @@ func TestResetTreatsAFailingGitAsUnavailableNotClean(t *testing.T) {
 				t.Errorf("%s checkOnly=%v: %+v %v", failing, checkOnly, res, err)
 			}
 		}
-		if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "hv-worker/w1" {
+		if got := sh(t, wt(b), "git", "symbolic-ref", "--short", "HEAD"); got != "rota-worker/w1" {
 			t.Errorf("%s: the worktree was switched to %s", failing, got)
 		}
 		mustEqual(t, "registry", before, registry(t, b))

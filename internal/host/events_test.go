@@ -60,7 +60,7 @@ func (s *herdrServer) serve(t *testing.T, lines ...string) {
 	}()
 }
 
-const ack = `{"id":"hv-round-wait","result":{"type":"subscription_started"}}`
+const ack = `{"id":"rota-round-wait","result":{"type":"subscription_started"}}`
 
 func event(pane, status string) string {
 	return `{"event":"pane.agent_status_changed","data":{"pane_id":"` + pane + `","workspace_id":"w1","agent_status":"` + status + `"}}`
@@ -134,7 +134,7 @@ func TestWatchNeedsTheSocketPath(t *testing.T) {
 
 func TestWatchSurfacesAnErrorReply(t *testing.T) {
 	d, s, _ := pipeDeps(t, "herdr 0.9.3", panes())
-	s.serve(t, `{"id":"hv-round-wait","error":{"code":"invalid_request","message":"bad subscription"}}`)
+	s.serve(t, `{"id":"rota-round-wait","error":{"code":"invalid_request","message":"bad subscription"}}`)
 	_, err := New("herdr", d).(Watcher).Watch(context.Background(), targets)
 	if err == nil || !strings.Contains(err.Error(), "bad subscription") {
 		t.Errorf("err = %v", err)

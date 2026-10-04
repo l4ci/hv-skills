@@ -8,13 +8,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/knowledge"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/knowledge"
 )
 
-// knowledgeCommands is the `hv knowledge` group (A5, #49).
+// knowledgeCommands is the `rota knowledge` group (A5, #49).
 func knowledgeCommands() *Command {
-	return &Command{Name: "knowledge", Summary: "read and write .hv/KNOWLEDGE.md", Subs: []*Command{
+	return &Command{Name: "knowledge", Summary: "read and write .rota/KNOWLEDGE.md", Subs: []*Command{
 		{Name: "query", Summary: "print topic sections, tier-aware", Repo: true, Verb: knQuery},
 		{Name: "stats", Summary: "bullet count and size per topic", Verb: noFlags(knStats)},
 		{Name: "add", Summary: "add a bullet under a topic", Repo: true, Verb: knAdd},

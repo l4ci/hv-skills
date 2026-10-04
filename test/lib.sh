@@ -21,9 +21,9 @@ fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 
 # Black-box helpers (#46). Callers check the exit code themselves:
 #   rc=0; out=$(hvj item show B01) || rc=$?
-# hvj runs `"$HV_BIN" --json "$@"`, prints the envelope and returns the verb's
+# hvj runs `"$ROTA_BIN" --json "$@"`, prints the envelope and returns the verb's
 # own exit code (stderr is left alone; redirect it where a failure is expected).
-hvj() { "$HV_BIN" --json "$@"; }
+hvj() { "$ROTA_BIN" --json "$@"; }
 
 # jget <path> reads one value from an envelope on stdin. The path is dotted
 # with [n] indexes (data.items[0].id). Strings print raw, bools as true/false,

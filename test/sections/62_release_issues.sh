@@ -4,8 +4,8 @@ TMP_RL="$(mktemp -d)"
 trap 'rm -rf "$TMP_RL"' EXIT
 
 for prov in github gitlab; do
-  P="$TMP_RL/$prov"; mkdir -p "$P/.hv"
-  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_RL/$prov"; mkdir -p "$P/.rota"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
@@ -18,7 +18,7 @@ for prov in github gitlab; do
 import json, sys
 db = json.load(open(sys.argv[1]))
 i = next(i for i in db["issues"] if i["number"] == int(sys.argv[2]))
-# comment bodies are folded to one line (the hv marker line sits under the text)
+# comment bodies are folded to one line (the rota marker line sits under the text)
 # glab has no close reason: a closed issue is completed unless it carries the not-planned label
 reason = i["state_reason"] or (("not_planned" if "not-planned" in i["labels"] else "completed") if i["state"] == "closed" else None)
 print("|".join([i["state"], str(reason), ",".join(sorted(i["labels"])), ";".join(" ".join(c["body"].split()) for c in i["comments"])]))' "$P/db.json" "$1"; }
@@ -102,7 +102,7 @@ print(",".join(m["state"] for m in db["milestones"] if m["title"].startswith(sys
     eq "close-out data" '{"milestone":"M01","release":"1.2.0","tag":"v1.2.0","issues":3,"changed":true}' "$(echo "$OUT" | jget data)"
     eq "feat closed completed" "closed|completed" "$(ISSUE 2 | cut -d"|" -f1,2)"
     for n in 2 3 4; do
-      case "$(ISSUE $n)" in *released*"Released in v1.2.0"*"<!-- hv:released -->"*) ;; *) fail "$prov #$n not released: $(ISSUE $n)" ;; esac
+      case "$(ISSUE $n)" in *released*"Released in v1.2.0"*"<!-- rota:released -->"*) ;; *) fail "$prov #$n not released: $(ISSUE $n)" ;; esac
     done
     case "$(ISSUE 5)" in *released*|*"Released in"*) fail "$prov dropped issue released" ;; esac
     case "$(ISSUE 6)" in *released*|*"Released in"*) fail "$prov outside issue released" ;; esac
@@ -124,11 +124,11 @@ print(",".join(m["state"] for m in db["milestones"] if m["title"].startswith(sys
 done
 
 # --- file mode refuses
-P="$TMP_RL/file"; mkdir -p "$P/.hv/milestones"
+P="$TMP_RL/file"; mkdir -p "$P/.rota/milestones"
 (
   cd "$P"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
-  echo '{}' > .hv/counters.json
+  echo '{}' > .rota/counters.json
   # read-only verbs answer no (1), the mutating one refuses (4); both say why
   for h in "1 release milestone-check M01" "1 release notes --from issues M01" "4 release close-milestone M01 --release 1.0.0"; do
     set -- $h; want=$1; shift

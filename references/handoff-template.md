@@ -1,8 +1,8 @@
 # Handoff note template
 
-Used by `/hv-pause` (writes the note) and `/hv-work` with no argument (reads it). Both skills point here so the template lives in one place.
+Used by `/rota-pause` (writes the note) and `/rota-work` with no argument (reads it). Both skills point here so the template lives in one place.
 
-Fill each section from the current session — omit sections that don't apply, but don't manufacture content. The four sections below are exactly what `/hv-work` consumes (Stage, Next planned step and Current hypothesis are what its no-argument mode reads); anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere (`git log`, `git status`, `/hv-learn`).
+Fill each section from the current session — omit sections that don't apply, but don't manufacture content. The four sections below are exactly what `/rota-work` consumes (Stage, Next planned step and Current hypothesis are what its no-argument mode reads); anything else (commit log, files mid-edit, gotchas, dead ends) belongs elsewhere (`git log`, `git status`, `/rota-learn`).
 
 ## Template
 
@@ -20,7 +20,7 @@ Fill each section from the current session — omit sections that don't apply, b
 
 ## Next planned step
 
-<one or two sentences — the concrete action `/hv-work` should dispatch. Not a summary; a directive.>
+<one or two sentences — the concrete action `/rota-work` should dispatch. Not a summary; a directive.>
 
 ## Current hypothesis (if debugging)
 
@@ -28,5 +28,5 @@ Fill each section from the current session — omit sections that don't apply, b
 
 ## Uncommitted work
 
-<one of: "clean tree" / "stashed as `stash@{0}` — message: hv-pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
+<one of: "clean tree" / "stashed as `stash@{0}` — message: rota-pause <branch>" / "wip commit `a1b2c3d`" / "dirty tree — see `git status`">
 ```

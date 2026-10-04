@@ -11,7 +11,7 @@
   },
   "outputs": {
     "stdout": "## Architecture\n\n\n- **Alpha rule** — Keep modules small. \u003c!-- 2026-01-01 --\u003e\n- **Beta rule** — Prefer files. (provisional) \u003c!-- 2026-01-02 --\u003e\n",
-    "stderr": "warning: hv knowledge query: no topic heading matches 'Nope' — topic args must be the exact '## ' heading text\n",
+    "stderr": "warning: rota knowledge query: no topic heading matches 'Nope' — topic args must be the exact '## ' heading text\n",
     "rc": 0,
     "changed": {},
     "removed": []

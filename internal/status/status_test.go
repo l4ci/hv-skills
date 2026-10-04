@@ -12,7 +12,7 @@ import (
 func project(t *testing.T, statusJSON string) string {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if statusJSON != "" {
@@ -178,8 +178,8 @@ func TestFind(t *testing.T) {
 func TestHandoffPaths(t *testing.T) {
 	root := project(t, "")
 	for rel, body := range map[string]string{
-		".hv/handoff/feat/x.md": "flat", ".hv/handoff/feat/x@web.md": "keyed", ".hv/handoff/solo.md": "s",
-		".hv/handoff/dir.md/inner": "d",
+		".rota/handoff/feat/x.md": "flat", ".rota/handoff/feat/x@web.md": "keyed", ".rota/handoff/solo.md": "s",
+		".rota/handoff/dir.md/inner": "d",
 	} {
 		p := filepath.Join(root, filepath.FromSlash(rel))
 		os.MkdirAll(filepath.Dir(p), 0o755)
@@ -191,15 +191,15 @@ func TestHandoffPaths(t *testing.T) {
 		path         string
 		exists       bool
 	}{
-		{"solo", "", false, ".hv/handoff/solo.md", true},
-		{"feat/x", "web", false, ".hv/handoff/feat/x@web.md", true},
-		{"feat/x", "api", false, ".hv/handoff/feat/x.md", true},
-		{"solo", "web", false, ".hv/handoff/solo.md", true},
+		{"solo", "", false, ".rota/handoff/solo.md", true},
+		{"feat/x", "web", false, ".rota/handoff/feat/x@web.md", true},
+		{"feat/x", "api", false, ".rota/handoff/feat/x.md", true},
+		{"solo", "web", false, ".rota/handoff/solo.md", true},
 		{"none", "web", false, "", false},
 		{"dir", "", false, "", false},
-		{"feat/x", "api", true, ".hv/handoff/feat/x@api.md", false},
-		{"feat/x", "web", true, ".hv/handoff/feat/x@web.md", true},
-		{"none", "", true, ".hv/handoff/none.md", false},
+		{"feat/x", "api", true, ".rota/handoff/feat/x@api.md", false},
+		{"feat/x", "web", true, ".rota/handoff/feat/x@web.md", true},
+		{"none", "", true, ".rota/handoff/none.md", false},
 	} {
 		p, ex, err := Handoff(root, c.branch, c.repo, c.canonical)
 		if err != nil || p != c.path || ex != c.exists {
@@ -207,16 +207,16 @@ func TestHandoffPaths(t *testing.T) {
 		}
 	}
 	if _, _, err := Handoff(root, "../../x", "", false); err == nil {
-		t.Error("a branch that leaves .hv/handoff was accepted")
+		t.Error("a branch that leaves .rota/handoff was accepted")
 	}
 	if _, err := RemoveHandoff(root, "../x", ""); err == nil {
-		t.Error("RemoveHandoff followed a path out of .hv/handoff")
+		t.Error("RemoveHandoff followed a path out of .rota/handoff")
 	}
 }
 
 func TestRemoveHandoff(t *testing.T) {
 	root := project(t, "")
-	p := filepath.Join(root, ".hv", "handoff", "feat")
+	p := filepath.Join(root, ".rota", "handoff", "feat")
 	os.MkdirAll(p, 0o755)
 	os.WriteFile(filepath.Join(p, "x.md"), []byte("h"), 0o644)
 	os.WriteFile(filepath.Join(p, "x@web.md"), []byte("h"), 0o644)

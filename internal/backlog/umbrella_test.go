@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // newUmbrella is an umbrella over fake trackers, one per name, with the
@@ -541,7 +541,7 @@ func TestUmbrellaHomeRepoMustBeRegistered(t *testing.T) {
 
 func TestUmbrellaDetail(t *testing.T) {
 	is := typed(1, "task", "x")
-	is.Body = "Some detail.\n\n<!-- hv:fields\nRelated: B1\n-->"
+	is.Body = "Some detail.\n\n<!-- rota:fields\nRelated: B1\n-->"
 	u, _, _ := newUmbrella(t, `{}`, map[string][]Issue{"web": {is}, "api": {typed(1, "task", "y")}}, "web", "api")
 	if text, ok, err := u.Detail("web:1"); err != nil || !ok || text != "Some detail." && !strings.HasPrefix(text, "Some detail.") {
 		t.Errorf("%q %v %v", text, ok, err)
@@ -601,7 +601,7 @@ func TestListingClustersStaySubRepoLocal(t *testing.T) {
 }
 
 func withFields(is Issue, lines ...string) Issue {
-	is.Body = "<!-- hv:fields\n" + strings.Join(lines, "\n") + "\n-->"
+	is.Body = "<!-- rota:fields\n" + strings.Join(lines, "\n") + "\n-->"
 	return is
 }
 

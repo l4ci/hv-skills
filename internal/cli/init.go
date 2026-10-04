@@ -8,18 +8,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/initproj"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/initproj"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// The `hv init` group (A9): `init` seeds .hv/, `init check` is the preflight.
+// The `rota init` group (A9): `init` seeds .rota/, `init check` is the preflight.
 // They act on the working directory after -C, with no walk-up, because they run
 // before a project root exists.
 
 func initCommands() *Command {
-	return &Command{Name: "init", Summary: "seed .hv/ in this directory", Verb: initVerb, Subs: []*Command{
-		{Name: "check", Summary: "is .hv/ initialized here", Verb: noFlags(initCheck)},
+	return &Command{Name: "init", Summary: "seed .rota/ in this directory", Verb: initVerb, Subs: []*Command{
+		{Name: "check", Summary: "is .rota/ initialized here", Verb: noFlags(initCheck)},
 		{Name: "umbrella", Summary: "register the git repos below this directory as an umbrella", Verb: initUmbrella},
 	}}
 }
@@ -44,16 +44,16 @@ func initErr(err error) error {
 }
 
 func initVerb(fs *flag.FlagSet) RunFunc {
-	noBlocks := fs.Bool("no-blocks", false, "seed .hv/ only; skip AGENTS.md and the managed blocks")
+	noBlocks := fs.Bool("no-blocks", false, "seed .rota/ only; skip AGENTS.md and the managed blocks")
 	// Removed by F6a; kept as flags so they exit 2 with a hint, not "unknown flag".
-	codex := fs.Bool("codex", false, "removed: use hv skills install --scope project --agent codex")
-	skillsDir := fs.String("skills-dir", "", "removed: use hv skills install --scope project --agent codex")
+	codex := fs.Bool("codex", false, "removed: use rota skills install --scope project --agent codex")
+	skillsDir := fs.String("skills-dir", "", "removed: use rota skills install --scope project --agent codex")
 	return func(c *Ctx, args []string) (Result, error) {
 		if err := knNoArgs(args); err != nil {
 			return Result{}, err
 		}
 		if *codex || *skillsDir != "" {
-			return Result{}, Usage("--codex and --skills-dir were removed").WithHint("run: hv skills install --scope project --agent codex")
+			return Result{}, Usage("--codex and --skills-dir were removed").WithHint("run: rota skills install --scope project --agent codex")
 		}
 		dir, err := initDir()
 		if err != nil {
@@ -65,7 +65,7 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 		}
 		warnings := append([]string{}, res.Warnings...)
 		if len(res.Removed) > 0 {
-			warnings = append(warnings, "removed the stale .hv/bin mirror: "+strings.Join(res.Removed, ", ")+" (5.0 has no .hv/bin)")
+			warnings = append(warnings, "removed the stale .rota/bin mirror: "+strings.Join(res.Removed, ", ")+" (5.0 has no .rota/bin)")
 		}
 		changed := res.Changed()
 		data := knObj("root", dir, "created", strSlice(res.Created))
@@ -122,13 +122,13 @@ func (r initConfigResult) report(data *jsonx.Object, lines *[]string) {
 		*lines = append(*lines, "config filled: "+strings.Join(r.filled, ", "))
 	}
 	if r.stamped != "" {
-		*lines = append(*lines, "stamped hv.version: "+r.stamped)
+		*lines = append(*lines, "stamped rota.version: "+r.stamped)
 	}
 }
 
 // initConfig is the config half of the old init skill: fill every missing
 // required key with its schema default (never touching a present key), then
-// stamp hv.version with the binary's version, which clears the drift
+// stamp rota.version with the binary's version, which clears the drift
 // nudge. Idempotent; an unreleased (dev) binary stamps nothing.
 func initConfig(root string) (initConfigResult, error) {
 	var r initConfigResult
@@ -141,7 +141,7 @@ func initConfig(root string) (initConfigResult, error) {
 	}
 	r.filled = filled
 	if v := installedVersionFn(); v != "" {
-		if config.StampedVersion(config.Load(filepath.Join(root, ".hv", "config.json"))) != v {
+		if config.StampedVersion(config.Load(filepath.Join(root, ".rota", "config.json"))) != v {
 			if _, err := config.Set(root, config.VersionKey, v); err != nil {
 				return r, err
 			}
@@ -152,7 +152,7 @@ func initConfig(root string) (initConfigResult, error) {
 }
 
 // initMilestoneIndex runs `milestone index`, which handles issue mode, now
-// that init has created the .hv/ it finds the project root by.
+// that init has created the .rota/ it finds the project root by.
 func initMilestoneIndex(c *Ctx) (bool, error) {
 	res, err := runMilestoneIndex(c, nil)
 	if err != nil {
@@ -190,7 +190,7 @@ func initCheck(c *Ctx, args []string) (Result, error) {
 	res := initproj.Check(dir, func() string { return versionDriftLine(dir) })
 	data := knObj("initialized", res.Initialized, "missing", strSlice(res.Missing))
 	if !res.Initialized {
-		return Result{Data: data}, Failed("not initialized: %s missing", strings.Join(res.Missing, ", ")).WithHint("run: hv init")
+		return Result{Data: data}, Failed("not initialized: %s missing", strings.Join(res.Missing, ", ")).WithHint("run: rota init")
 	}
 	for _, w := range res.Warnings {
 		c.Warn("%s", w)

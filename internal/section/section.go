@@ -1,6 +1,6 @@
 // Package section scans `## Topic` sections in the markdown state files
 // (KNOWLEDGE.md, DECISIONS.md) and writes managed blocks into the project
-// instructions file. It ports bin/hvlib_section.py, so hv and the old helpers
+// instructions file. It ports bin/hvlib_section.py, so rota and the old helpers
 // produce byte-identical files.
 package section
 
@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // Find locates the body of "## name": start is the byte offset where the
@@ -155,7 +155,7 @@ func Matching(content string, wanted map[string]bool) string {
 }
 
 // InstructionsFile is the project-instructions file under root that holds the
-// managed hv blocks: AGENTS.md when it exists, else CLAUDE.md (which may not
+// managed rota blocks: AGENTS.md when it exists, else CLAUDE.md (which may not
 // exist yet; UpsertBlock creates it).
 func InstructionsFile(root string) string {
 	agents := filepath.Join(root, "AGENTS.md")
@@ -166,7 +166,7 @@ func InstructionsFile(root string) string {
 }
 
 // BlockRegex matches a managed block: the canonical
-// "<!-- hv-<key>-start -->…<!-- hv-<key>-end -->" and, when legacy is not
+// "<!-- rota-<key>-start -->…<!-- rota-<key>-end -->" and, when legacy is not
 // empty, the old "<!-- hv:<legacy>:start -->…<!-- hv:<legacy>:end -->" form.
 // consumeNewline also eats one newline after the end marker.
 func BlockRegex(key, legacy string, consumeNewline bool) *regexp.Regexp {
@@ -174,12 +174,13 @@ func BlockRegex(key, legacy string, consumeNewline bool) *regexp.Regexp {
 	if consumeNewline {
 		tail = `\n?`
 	}
+	k := regexp.QuoteMeta(key)
+	start, end := `rota-`+k+`-start`, `rota-`+k+`-end`
 	if legacy != "" {
-		return regexp.MustCompile(`(?s)<!-- hv(?:-` + regexp.QuoteMeta(key) + `-start|:` + regexp.QuoteMeta(legacy) + `:start) -->` +
-			`.*?` +
-			`<!-- hv(?:-` + regexp.QuoteMeta(key) + `-end|:` + regexp.QuoteMeta(legacy) + `:end) -->` + tail)
+		l := regexp.QuoteMeta(legacy)
+		start, end = `(?:`+start+`|hv:`+l+`:start)`, `(?:`+end+`|hv:`+l+`:end)`
 	}
-	return regexp.MustCompile(`(?s)<!-- hv-` + regexp.QuoteMeta(key) + `-start -->.*?<!-- hv-` + regexp.QuoteMeta(key) + `-end -->` + tail)
+	return regexp.MustCompile(`(?s)<!-- ` + start + ` -->.*?<!-- ` + end + ` -->` + tail)
 }
 
 // Block statuses returned by UpsertBlock.

@@ -1,19 +1,19 @@
 # Knowledge & decisions consult
 
-Used by `/hv-debug` Step 3+3.5, `/hv-refactor` (umbrella-fanout context-collect step), `/hv-review` Step 3, and indirectly by `references/context-load-protocol.md` (which composes this pattern into a wider load list for `/hv-plan`, `/hv-vision`, `/hv-work` — including `/hv-work --preview`).
+Used by `/rota-debug` Step 3+3.5, `/rota-refactor` (umbrella-fanout context-collect step), `/rota-review` Step 3, and indirectly by `references/context-load-protocol.md` (which composes this pattern into a wider load list for `/rota-plan`, `/rota-vision`, `/rota-work` — including `/rota-work --preview`).
 
-The pattern is one pair of `hv` calls plus carrier semantics. Skills point here so the call-site logic lives in one place.
+The pattern is one pair of `rota` calls plus carrier semantics. Skills point here so the call-site logic lives in one place.
 
 ## Verbs
 
 ```bash
-hv knowledge query "Topic A" "Topic B"
-hv decisions query "Topic A" "Topic B"
+rota knowledge query "Topic A" "Topic B"
+rota decisions query "Topic A" "Topic B"
 ```
 
-Topic selection: read the `hv-knowledge` and `hv-decisions` managed blocks in `CLAUDE.md`, infer which topics plausibly touch the work (e.g., a backend refactor might pull `Architecture`), and pass those names as arguments. Pass several when in doubt — both verbs filter, so extras cost nothing.
+Topic selection: read the `rota-knowledge` and `rota-decisions` managed blocks in `CLAUDE.md`, infer which topics plausibly touch the work (e.g., a backend refactor might pull `Architecture`), and pass those names as arguments. Pass several when in doubt — both verbs filter, so extras cost nothing.
 
-Both verbs are lookups: they exit 0 with empty `text` when no topic matches (`knowledge query` also lists the unmatched names in `data.missing`). Do not wrap them with `2>/dev/null` or treat empty output as failure — that hides real errors and contradicts the lookup-vs-resolve contract in `.hv/DECISIONS.md`.
+Both verbs are lookups: they exit 0 with empty `text` when no topic matches (`knowledge query` also lists the unmatched names in `data.missing`). Do not wrap them with `2>/dev/null` or treat empty output as failure — that hides real errors and contradicts the lookup-vs-resolve contract in `.rota/DECISIONS.md`.
 
 ## Parallelism
 
@@ -29,17 +29,17 @@ The two verbs return different *kinds* of content and the calling skill must han
 
 ## Hit-register after consumption (F03 lifecycle)
 
-**This step is mandatory whenever the calling skill carries bullets into a downstream brief.** Skip only when `hv knowledge query` returned nothing or all returned bullets were pruned before the brief was written.
+**This step is mandatory whenever the calling skill carries bullets into a downstream brief.** Skip only when `rota knowledge query` returned nothing or all returned bullets were pruned before the brief was written.
 
 After building the brief, identify which KNOWLEDGE bullets actually landed in it. For each, call:
 
 ```bash
-hv knowledge hit --topic "<T>" --title "<first-line-of-bullet>"
+rota knowledge hit --topic "<T>" --title "<first-line-of-bullet>"
 ```
 
-Where `<T>` is the exact `## Topic` heading from `hv knowledge query`'s output and `<title>` is the bold **title** text on that bullet (the text between `**` and `** —`).
+Where `<T>` is the exact `## Topic` heading from `rota knowledge query`'s output and `<title>` is the bold **title** text on that bullet (the text between `**` and `** —`).
 
-**Worked example.** Suppose `hv knowledge query "Architecture"` returned:
+**Worked example.** Suppose `rota knowledge query "Architecture"` returned:
 
 ```
 ## Architecture
@@ -51,8 +51,8 @@ Where `<T>` is the exact `## Topic` heading from `hv knowledge query`'s output a
 And both bullets survived into the brief's `**Known gotchas:**` section. Register both in one parallel batch:
 
 ```
-Bash: hv knowledge hit --topic "Architecture" --title "Always route network calls through NetworkClient"
-Bash: hv knowledge hit --topic "Architecture" --title "Avoid force-unwrap in production paths"
+Bash: rota knowledge hit --topic "Architecture" --title "Always route network calls through NetworkClient"
+Bash: rota knowledge hit --topic "Architecture" --title "Avoid force-unwrap in production paths"
 ```
 
 Issue all calls **in a single parallel tool-call batch** — each verb serializes its sidecar write behind a per-file lock, so concurrent calls don't lose hits. Silent on success. Provisional bullets auto-promote to confirmed once `hits >= learn.promoteThreshold` (default 3) without a pending contradiction.
@@ -68,5 +68,5 @@ A caller MAY add carrier-specific failure semantics on top — for example, "if 
 ## What this reference does NOT cover
 
 - **Full pre-planning context load.** This is the K+D *query* pattern only. The composed load (TODO entry, plan, milestone, git history, plus K+D) lives in `references/context-load-protocol.md`, which cites this file for the K+D subset.
-- **`.hv/KNOWLEDGE.md` `## Glossary` vocabulary lookup.** That's `hv glossary read`, a term-keyed reader against the Glossary topic. Glossary entries are stored alongside other topics in KNOWLEDGE.md but the reader returns nested-bullet entries (term + definition + aliases + not) rather than topic bodies.
-- **MILESTONES.md grep'ing.** Patterns like `hv-plan`'s `--auto-loop` milestone-resolution grep are planning shortcuts, not context-consults, and are out of scope here.
+- **`.rota/KNOWLEDGE.md` `## Glossary` vocabulary lookup.** That's `rota glossary read`, a term-keyed reader against the Glossary topic. Glossary entries are stored alongside other topics in KNOWLEDGE.md but the reader returns nested-bullet entries (term + definition + aliases + not) rather than topic bodies.
+- **MILESTONES.md grep'ing.** Patterns like `rota-plan`'s `--auto-loop` milestone-resolution grep are planning shortcuts, not context-consults, and are out of scope here.

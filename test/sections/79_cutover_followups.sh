@@ -14,26 +14,26 @@ trap 'rm -rf "$RF_TMP"' EXIT
   git init -q -b main . && git config user.email t@t && git config user.name t
   mkdir web
   hvj init >/dev/null 2>&1
-  printf '{"repos":[{"name":"web","path":"./web"}]}\n' > .hv/repos.json
+  printf '{"repos":[{"name":"web","path":"./web"}]}\n' > .rota/repos.json
   git add -A && git commit -q -m seed
 ) || fail "F29: fixture setup failed"
 
-# Everything a verb could have written: tracked and untracked files, .hv
+# Everything a verb could have written: tracked and untracked files, .rota
 # contents (status.json and the spike file are ignored or new) and the branches.
-rf_state() { ( cd "$RF_TMP" && git status --short && git branch --list && find .hv -type f | sort | xargs sha256sum ); }
+rf_state() { ( cd "$RF_TMP" && git status --short && git branch --list && find .rota -type f | sort | xargs sha256sum ); }
 BEFORE="$(rf_state)"
 
 for v in "ship body" "ship merge b" "ship pr b" "review scope" "spike add x" \
          "status add b --items X-1" "status rm b" "git worktree-path b"; do
   rc=0
   ( cd "$RF_TMP" && hvj $v --repo </dev/null >/dev/null 2>&1 ) || rc=$?
-  [ "$rc" -eq 2 ] || fail "F29: hv $v accepted a dangling --repo (rc=$rc; expected 2)"
+  [ "$rc" -eq 2 ] || fail "F29: rota $v accepted a dangling --repo (rc=$rc; expected 2)"
 done
 
 for v in "status add b --items X-1" "git branch b"; do
   rc=0
   ( cd "$RF_TMP" && hvj $v --repos </dev/null >/dev/null 2>&1 ) || rc=$?
-  [ "$rc" -eq 2 ] || fail "F29: hv $v accepted a dangling --repos (rc=$rc; expected 2)"
+  [ "$rc" -eq 2 ] || fail "F29: rota $v accepted a dangling --repos (rc=$rc; expected 2)"
 done
 
 [ "$(rf_state)" = "$BEFORE" ] || fail "F29: a dangling --repo / --repos changed project state"
@@ -47,13 +47,13 @@ echo "migrate v4 removes the stale hv-context files in the old mirror and backs 
 # /hv-context left behind go; anything else in the old mirror stays. A preview touches nothing.
 MG_TMP="$(mktemp -d)"
 # Spelled in fragments so the grep gate and the white-box scan do not trip on the fixture.
-MIRROR='.hv/''bin'; STALE='hv-context''-add'
+MIRROR='.rota/''bin'; STALE='hv-context''-add'
 trap 'rm -rf "$MG_TMP"' EXIT
 (
   cd "$MG_TMP"
   git init -q -b main . && git config user.email t@t && git config user.name t
   mkdir -p "$MIRROR"
-  printf '{"version":"3.9.0"}\n' > .hv/config.json
+  printf '{"version":"3.9.0"}\n' > .rota/config.json
   printf '#!/bin/sh\n' > "$MIRROR/$STALE"
   printf '#!/bin/sh\n' > "$MIRROR/mine"
   printf '.worktrees/\n' > .gitignore

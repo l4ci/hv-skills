@@ -148,13 +148,13 @@ func WorktreePath(umbrella, repo, branch string) string {
 }
 
 // AtUmbrellaRoot reports whether dir is an umbrella root with no git of its
-// own: no .git directory, a .hv directory, and at least one registered
+// own: no .git directory, a .rota directory, and at least one registered
 // sub-repo (hv-require-git-context). registered reports the last part.
 func AtUmbrellaRoot(dir string, registered func() bool) bool {
 	if fi, err := os.Stat(filepath.Join(dir, ".git")); err == nil && fi.IsDir() {
 		return false
 	}
-	if fi, err := os.Stat(filepath.Join(dir, ".hv")); err != nil || !fi.IsDir() {
+	if fi, err := os.Stat(filepath.Join(dir, ".rota")); err != nil || !fi.IsDir() {
 		return false
 	}
 	return registered()
@@ -162,14 +162,14 @@ func AtUmbrellaRoot(dir string, registered func() bool) bool {
 
 // ErrNoRoot and ErrMasked are FindRoot's failures.
 var (
-	ErrNoRoot = errors.New("no .hv/ directory here or in any parent")
-	ErrMasked = errors.New("stray .hv/ inside a registered sub-repo masks the umbrella")
+	ErrNoRoot = errors.New("no .rota/ directory here or in any parent")
+	ErrMasked = errors.New("stray .rota/ inside a registered sub-repo masks the umbrella")
 )
 
 // FindRoot walks up from start (physical paths) to the nearest directory
-// holding .hv/, as hv-walk-up --detect-masking does: when a higher .hv/
+// holding .rota/, as hv-walk-up --detect-masking does: when a higher .rota/
 // registers that directory's tree as a sub-repo in its repos.json, the
-// nearer .hv/ is a stray one and FindRoot returns ErrMasked. registered
+// nearer .rota/ is a stray one and FindRoot returns ErrMasked. registered
 // lists a candidate root's sub-repo paths as written in its repos.json.
 func FindRoot(start string, registered func(root string) []string) (string, error) {
 	dir, err := filepath.EvalSymlinks(start)
@@ -178,7 +178,7 @@ func FindRoot(start string, registered func(root string) []string) (string, erro
 	}
 	var cands []string
 	for {
-		if fi, err := os.Stat(filepath.Join(dir, ".hv")); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(filepath.Join(dir, ".rota")); err == nil && fi.IsDir() {
 			cands = append(cands, dir)
 		}
 		parent := filepath.Dir(dir)

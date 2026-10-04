@@ -17,14 +17,14 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/knowledge"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/knowledge"
 )
 
 // Sentinels the verb maps to exit codes.
 var (
-	// ErrConfig: .hv/config.json is missing, unreadable or has no version (exit 3).
+	// ErrConfig: .rota/config.json is missing, unreadable or has no version (exit 3).
 	ErrConfig = errors.New("config")
 	// ErrRefused: a safety precondition does not hold, or an import failed (exit 4).
 	ErrRefused = errors.New("refused")
@@ -45,17 +45,17 @@ func refuse(blocked, format string, a ...any) error {
 	return &Refusal{blocked, fmt.Sprintf(format, a...)}
 }
 
-// InstalledVersion is the version stamped into hv.version; "" skips the
+// InstalledVersion is the version stamped into rota.version; "" skips the
 // stamp. It is the running binary's version, and tests replace it.
 var InstalledVersion = func() string { return "" }
 
-// removedBinaries are the .hv/bin files orphaned when /hv-context was folded
+// removedBinaries are the .rota/bin files orphaned when /hv-context was folded
 // into the glossary.
 var removedBinaries = []string{"hv-context-add", "hv-context-index", "hv-context-map", "hv-context-query"}
 
-var staticPaths = []string{".hv/BACKLOG.md", ".hv/MILESTONES.md", ".hv/KNOWLEDGE.md", ".hv/DECISIONS.md", "CLAUDE.md", "AGENTS.md"}
+var staticPaths = []string{".rota/BACKLOG.md", ".rota/MILESTONES.md", ".rota/KNOWLEDGE.md", ".rota/DECISIONS.md", "CLAUDE.md", "AGENTS.md"}
 
-var globDirs = []string{".hv/plans", ".hv/designs", ".hv/handoffs", ".hv/handoff", ".hv/qa", ".hv/milestones"}
+var globDirs = []string{".rota/plans", ".rota/designs", ".rota/handoffs", ".rota/handoff", ".rota/qa", ".rota/milestones"}
 
 // Options of Run.
 type Options struct {
@@ -141,7 +141,7 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 	}
 	var bins []string
 	for _, n := range removedBinaries {
-		if _, err := os.Stat(filepath.Join(root, ".hv", "bin", n)); err == nil {
+		if _, err := os.Stat(filepath.Join(root, ".rota", "bin", n)); err == nil {
 			bins = append(bins, n)
 		}
 	}
@@ -179,7 +179,7 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 		return rep, nil
 	}
 
-	rel := filepath.Join(".hv", "migrate-backup", time.Now().Format("20060102T150405"))
+	rel := filepath.Join(".rota", "migrate-backup", time.Now().Format("20060102T150405"))
 	backup := filepath.Join(root, rel)
 	if err := os.MkdirAll(backup, 0o777); err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func Run(root string, repos map[string]string, o Options) (*Report, error) {
 		}
 	}
 	for _, n := range bins {
-		src := filepath.Join(root, ".hv", "bin", n)
+		src := filepath.Join(root, ".rota", "bin", n)
 		if err := copyFile(src, filepath.Join(backup, "bin", n)); err != nil {
 			return nil, err
 		}
@@ -288,8 +288,8 @@ func checkPreconditions(root, cwd string) error {
 	if abs, err := filepath.EvalSymlinks(cwd); err == nil {
 		cwd = abs
 	}
-	if strings.Contains(cwd+"/", "/.hv/migrate-backup/") {
-		return refuse("backup-dir", "cwd is inside .hv/migrate-backup/. Run from project root.")
+	if strings.Contains(cwd+"/", "/.rota/migrate-backup/") {
+		return refuse("backup-dir", "cwd is inside .rota/migrate-backup/. Run from project root.")
 	}
 	cmd := exec.Command("git", "status", "--porcelain")
 	cmd.Dir = root
@@ -306,12 +306,12 @@ func checkPreconditions(root, cwd string) error {
 		if _, dest, ok := strings.Cut(path, " -> "); ok {
 			path = dest
 		}
-		if !strings.HasPrefix(path, ".hv/") {
+		if !strings.HasPrefix(path, ".rota/") {
 			dirty = append(dirty, path)
 		}
 	}
 	if len(dirty) > 0 {
-		return refuse("dirty-tree", "uncommitted changes outside .hv/:\n  %s\nCommit or stash these before running hv migrate v4.", strings.Join(dirty, "\n  "))
+		return refuse("dirty-tree", "uncommitted changes outside .rota/:\n  %s\nCommit or stash these before running rota migrate v4.", strings.Join(dirty, "\n  "))
 	}
 
 	cfg, err := loadConfig(root)
@@ -319,7 +319,7 @@ func checkPreconditions(root, cwd string) error {
 		return err
 	}
 	version := ""
-	for _, parent := range []string{"hv", "hvSkills"} {
+	for _, parent := range []string{"rota", "hvSkills"} {
 		if version == "" {
 			if o, ok := getObj(cfg, parent); ok {
 				version = getString(o, "version")
@@ -330,25 +330,25 @@ func checkPreconditions(root, cwd string) error {
 		version = getString(cfg, "version")
 	}
 	if version == "" {
-		return fmt.Errorf("%w: .hv/config.json has no 'version' field — run hv init", ErrConfig)
+		return fmt.Errorf("%w: .rota/config.json has no 'version' field — run rota init", ErrConfig)
 	}
 	major, _, _ := strings.Cut(version, ".")
 	n, err := strconv.Atoi(major)
 	if err != nil {
-		return fmt.Errorf("%w: .hv/config.json version '%s' is not parseable", ErrConfig, version)
+		return fmt.Errorf("%w: .rota/config.json version '%s' is not parseable", ErrConfig, version)
 	}
 	if n < 3 {
-		return refuse("pre-3.0", "project hv-skills version is %s (pre-3.0). Bring it current with hv init before hv migrate v4.", version)
+		return refuse("pre-3.0", "project hv-skills version is %s (pre-3.0). Bring it current with rota init before rota migrate v4.", version)
 	}
 	return nil
 }
 
-func configPath(root string) string { return filepath.Join(root, ".hv", "config.json") }
+func configPath(root string) string { return filepath.Join(root, ".rota", "config.json") }
 
 func loadConfig(root string) (*jsonx.Object, error) {
 	raw, err := os.ReadFile(configPath(root))
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("%w: .hv/config.json missing — run hv init first", ErrConfig)
+		return nil, fmt.Errorf("%w: .rota/config.json missing — run rota init first", ErrConfig)
 	}
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func loadConfig(root string) (*jsonx.Object, error) {
 	v, err := jsonx.Decode(raw)
 	obj, _ := v.(*jsonx.Object)
 	if err != nil || obj == nil {
-		return nil, fmt.Errorf("%w: .hv/config.json is not valid JSON", ErrConfig)
+		return nil, fmt.Errorf("%w: .rota/config.json is not valid JSON", ErrConfig)
 	}
 	return obj, nil
 }
@@ -373,10 +373,10 @@ func getString(o *jsonx.Object, k string) string {
 	return s
 }
 
-// stampVersion writes hv.version and drops both legacy forms: hvSkills.version
+// stampVersion writes rota.version and drops both legacy forms: hvSkills.version
 // (with its hvSkills object once empty) and the top-level "version". It
 // returns the stamped version, or "" when nothing changed (no installed
-// version known, or hv.version already holds it and no legacy form remains).
+// version known, or rota.version already holds it and no legacy form remains).
 func stampVersion(root string) (string, error) {
 	want := InstalledVersion()
 	if want == "" {
@@ -386,25 +386,28 @@ func stampVersion(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hv, _ := getObj(cfg, "hv")
-	old, _ := getObj(cfg, "hvSkills")
+	rota, _ := getObj(cfg, "rota")
 	_, legacy := cfg.Get("version")
-	if old != nil {
-		_, hasOld := old.Get("version")
-		legacy = legacy || hasOld
+	for _, parent := range []string{"hvSkills"} {
+		if old, ok := getObj(cfg, parent); ok {
+			_, hasOld := old.Get("version")
+			legacy = legacy || hasOld
+		}
 	}
-	if hv != nil && getString(hv, "version") == want && !legacy {
+	if rota != nil && getString(rota, "version") == want && !legacy {
 		return "", nil
 	}
-	if hv == nil {
-		hv = jsonx.NewObject()
-		cfg.Set("hv", hv)
+	if rota == nil {
+		rota = jsonx.NewObject()
+		cfg.Set("rota", rota)
 	}
-	hv.Set("version", want)
-	if old != nil {
-		old.Delete("version")
-		if len(old.Keys()) == 0 {
-			cfg.Delete("hvSkills")
+	rota.Set("version", want)
+	for _, parent := range []string{"hvSkills"} {
+		if old, ok := getObj(cfg, parent); ok {
+			old.Delete("version")
+			if len(old.Keys()) == 0 {
+				cfg.Delete(parent)
+			}
 		}
 	}
 	cfg.Delete("version")
@@ -441,7 +444,7 @@ func planContexts(root string, repos map[string]string) ([]ctxPlan, error) {
 		} else {
 			p.action, p.terms = "migrate", terms
 			p.message = fmt.Sprintf("%swill migrate %d term(s) to %s (Glossary)", prefix, len(terms), where)
-			rows := []string{"# auto-generated by hv migrate v4 from " + label}
+			rows := []string{"# auto-generated by rota migrate v4 from " + label}
 			for _, t := range terms {
 				rows = append(rows, strings.Join([]string{t.Name, strings.Join(strings.Fields(t.Definition), " "), strings.Join(t.Aliases, ", "), strings.Join(t.Nots, ", ")}, "\t"))
 			}
@@ -450,7 +453,7 @@ func planContexts(root string, repos map[string]string) ([]ctxPlan, error) {
 		plans = append(plans, p)
 		return nil
 	}
-	if err := one("", filepath.Join(root, ".hv", "CONTEXT.md"), ".hv/CONTEXT.md", ".hv/KNOWLEDGE.md"); err != nil {
+	if err := one("", filepath.Join(root, ".rota", "CONTEXT.md"), ".rota/CONTEXT.md", ".rota/KNOWLEDGE.md"); err != nil {
 		return nil, err
 	}
 	names := make([]string, 0, len(repos))
@@ -459,8 +462,8 @@ func planContexts(root string, repos map[string]string) ([]ctxPlan, error) {
 	}
 	sort.Strings(names)
 	for _, n := range names {
-		if err := one(n, filepath.Join(root, ".hv", "contexts", n, "CONTEXT.md"),
-			".hv/contexts/"+n+"/CONTEXT.md", ".hv/knowledge/"+n+"/KNOWLEDGE.md"); err != nil {
+		if err := one(n, filepath.Join(root, ".rota", "contexts", n, "CONTEXT.md"),
+			".rota/contexts/"+n+"/CONTEXT.md", ".rota/knowledge/"+n+"/KNOWLEDGE.md"); err != nil {
 			return nil, err
 		}
 	}

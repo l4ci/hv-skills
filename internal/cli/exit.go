@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 // Exit codes; see docs/design/5.0-cli-conventions.md, Exit codes.
@@ -83,5 +83,5 @@ func asError(err error) *Error {
 	if errors.Is(err, fsio.ErrLockTimeout) {
 		return &Error{Exit: ExitRetry, Message: err.Error()}
 	}
-	return &Error{Exit: ExitInternal, Message: err.Error(), Hint: "this is a bug in hv; please report it"}
+	return &Error{Exit: ExitInternal, Message: err.Error(), Hint: "this is a bug in rota; please report it"}
 }

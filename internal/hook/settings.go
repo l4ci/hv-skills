@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Settings are the orchestrator.* config keys (the contract's Config section).
@@ -115,15 +115,15 @@ func (s Scope) rank() int {
 }
 
 // Entries the installer writes. The marker in a hook command is how a re-run
-// and uninstall find what hv wrote.
+// and uninstall find what rota wrote.
 const (
-	Marker           = "# hv-hook"
-	StopCommand      = "hv hook stop " + Marker
-	StartCommand     = "hv hook session-start " + Marker
+	Marker           = "# rota-hook"
+	StopCommand      = "rota hook stop " + Marker
+	StartCommand     = "rota hook session-start " + Marker
 	StartMatcher     = "^(startup|clear)$"
-	StatuslineCmd    = "hv statusline dump"
-	keyWrapped       = "hvWrapped"
-	keyWrappedScope  = "hvWrappedFrom"
+	StatuslineCmd    = "rota statusline dump"
+	keyWrapped       = "rotaWrapped"
+	keyWrappedScope  = "rotaWrappedFrom"
 	statusLineKey    = "statusLine"
 	hooksKey         = "hooks"
 	eventStop        = "Stop"
@@ -172,13 +172,13 @@ func StatusLine(o *jsonx.Object) (entry any, command string, ok bool) {
 	return v, command, true
 }
 
-// IsOurStatusLine reports whether a statusLine command is hv's dump, plain or
+// IsOurStatusLine reports whether a statusLine command is rota's dump, plain or
 // wrapping another command.
 func IsOurStatusLine(command string) bool {
 	return strings.HasPrefix(strings.TrimSpace(command), StatuslineCmd)
 }
 
-// HasMarker reports whether a hook command carries the hv marker.
+// HasMarker reports whether a hook command carries the rota marker.
 func HasMarker(command string) bool { return strings.Contains(command, Marker) }
 
 // MarkedEvents lists the events (Stop, SessionStart) that hold a marked hook
@@ -188,8 +188,8 @@ func MarkedEvents(o *jsonx.Object) map[string]string {
 	if o == nil {
 		return out
 	}
-	hv, _ := o.Get(hooksKey)
-	hooks, _ := hv.(*jsonx.Object)
+	rota, _ := o.Get(hooksKey)
+	hooks, _ := rota.(*jsonx.Object)
 	if hooks == nil {
 		return out
 	}
@@ -256,7 +256,7 @@ type InstallOut struct {
 }
 
 // Install merges the hooks and the statusline into Files[Scope]. It never
-// removes or replaces an entry hv did not write.
+// removes or replaces an entry rota did not write.
 func Install(in InstallIn) (InstallOut, error) {
 	out := InstallOut{Hooks: []string{eventStop, eventSessionBeg}}
 	target := in.Files[in.Scope]
@@ -410,8 +410,8 @@ func Uninstall(o *jsonx.Object) []string {
 	if o == nil {
 		return removed
 	}
-	if hv, ok := o.Get(hooksKey); ok {
-		if hooks, isObj := hv.(*jsonx.Object); isObj {
+	if rota, ok := o.Get(hooksKey); ok {
+		if hooks, isObj := rota.(*jsonx.Object); isObj {
 			for _, ev := range []string{eventStop, eventSessionBeg} {
 				arr, isArr := getAny(hooks, ev).([]any)
 				if !isArr {

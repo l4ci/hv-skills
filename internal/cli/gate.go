@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/gate"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/gate"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// gateCommands is the `hv gate` group (B1, #54).
+// gateCommands is the `rota gate` group (B1, #54).
 func gateCommands() *Command {
 	return &Command{Name: "gate", Summary: "the manual-gate registry", Subs: []*Command{
 		{Name: "list", Summary: "list every manual gate and the verbs that enforce it", Verb: noFlags(gateList)},
@@ -35,7 +35,7 @@ func gateList(c *Ctx, args []string) (Result, error) {
 		rows = append(rows, o)
 		by := "skill only"
 		if g.Enforced() {
-			by = "hv " + strings.Join(g.Verbs, ", hv ")
+			by = "rota " + strings.Join(g.Verbs, ", rota ")
 		}
 		lines = append(lines, g.Name+": "+by+" ("+g.Creates+")")
 	}
@@ -69,7 +69,7 @@ func clearGate(c *Ctx, name, target string, conf gate.Confirm, paths []string, e
 			return Result{}, err
 		}
 	}
-	verb := strings.TrimPrefix(c.Path, "hv ")
+	verb := strings.TrimPrefix(c.Path, "rota ")
 	err := gate.Clear(root, name, verb, target, conf, paths)
 	var r *gate.Refused
 	switch {
@@ -92,7 +92,7 @@ func clearGate(c *Ctx, name, target string, conf gate.Confirm, paths []string, e
 }
 
 // mergePolicy loads ship.mergeApproval for a merge verb; a bad value is exit 2.
-// Without a .hv/ root there is no config, so the default `none` applies.
+// Without a .rota/ root there is no config, so the default `none` applies.
 func mergePolicy(c *Ctx) (gate.MergePolicy, error) {
 	root, err := c.Root()
 	if err != nil {

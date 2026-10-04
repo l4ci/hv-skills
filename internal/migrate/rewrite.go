@@ -20,12 +20,12 @@ type rule struct {
 
 // rules are the eight commands cut in v4.
 var rules = []rule{
-	{"/hv-c", "/hv-capture", ""},
-	{"/hv-assume", "/hv-work --preview", ""},
-	{"/hv-rm", "/hv-capture --remove", ""},
-	{"/hv-undo", "/hv-ship --undo", ""},
-	{"/hv-context", "/hv-learn --term", ""},
-	{"/hv-docs", "/hv-ship --docs", ""},
+	{"/hv-c", "/rota-capture", ""},
+	{"/hv-assume", "/rota-work --preview", ""},
+	{"/hv-rm", "/rota-capture --remove", ""},
+	{"/hv-undo", "/rota-ship --undo", ""},
+	{"/hv-context", "/rota-learn --term", ""},
+	{"/hv-docs", "/rota-ship --docs", ""},
 	{"/hv-issues", "", "ambiguous — could be --from-github or --from-gitlab"},
 	{"/hv-map", "", "ambiguous — could be --init --map (first-run) or delete-the-line"},
 }
@@ -66,7 +66,7 @@ var (
 )
 
 // helperPaths returns the spans of literal helper names such as hv-map-query
-// or .hv/bin/hv-foo.
+// or .rota/bin/hv-foo.
 func helperPaths(text string) []span {
 	var out []span
 	for from := 0; from < len(text); {
@@ -91,7 +91,7 @@ type span struct{ start, end int }
 
 // skipMask returns the byte ranges where rewrites must not apply: fenced code
 // blocks, inline code spans, and literal helper names such as `hv-map-query`
-// or `.hv/bin/hv-foo`, which are not slash-command usages.
+// or `.rota/bin/hv-foo`, which are not slash-command usages.
 func skipMask(text string) []span {
 	var out []span
 	for _, re := range []*regexp.Regexp{fenced, inlineCode} {

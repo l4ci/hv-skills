@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func TestParseBodyAccepts(t *testing.T) {
@@ -145,7 +145,7 @@ func TestStoreCapsAndRoundTrips(t *testing.T) {
 
 func TestLoadToleratesCorruptStore(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o777); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 	for _, text := range []string{"not json", `{"branches": 3}`, `[]`} {

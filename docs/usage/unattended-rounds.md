@@ -7,17 +7,17 @@ All of it is opt-in and acts only on the orchestrator, the session that holds th
 [round lease](parallel-rounds.md#starting-a-round). Workers are not touched.
 
 What you need first is a working round: [parallel rounds](parallel-rounds.md). Without any of this,
-`/hv-pause` and `/hv-work` (no argument) are the manual route; see [pausing and resuming](pausing-and-resuming.md).
+`/rota-pause` and `/rota-work` (no argument) are the manual route; see [pausing and resuming](pausing-and-resuming.md).
 
 | Piece | Verb | Stops | Config |
 |---|---|---|---|
-| Handoff hooks | `hv hook install` | an orchestrator whose context is at `handoffThreshold` | `orchestrator.handoff*` |
-| Keepalive | `hv keepalive run` | nothing: it restarts the orchestrator after a handoff exit | `orchestrator.keepalive*` |
-| Usage limits | `hv limit watch` | a session stalled on a 5-hour or weekly limit | `limits.*` |
+| Handoff hooks | `rota hook install` | an orchestrator whose context is at `handoffThreshold` | `orchestrator.handoff*` |
+| Keepalive | `rota keepalive run` | nothing: it restarts the orchestrator after a handoff exit | `orchestrator.keepalive*` |
+| Usage limits | `rota limit watch` | a session stalled on a 5-hour or weekly limit | `limits.*` |
 | Account switch | `orchestrator.switchOnUsage` | an orchestrator close to a limit, before it hits | `orchestrator.usageThreshold` |
 
-A typical unattended start: `hv hook install`, then in the orchestrator's pane
-`hv keepalive run -- claude --model opus`. The keepalive supervisor runs the limit watcher beside the
+A typical unattended start: `rota hook install`, then in the orchestrator's pane
+`rota keepalive run -- claude --model opus`. The keepalive supervisor runs the limit watcher beside the
 command, so there is nothing more to start.
 
 ## Orchestrator handoff
@@ -31,37 +31,37 @@ no one at the keyboard. They act only on the orchestrator, the session that hold
 Once per project:
 
 ```sh
-hv hook install                      # .claude/settings.local.json, per developer, not committed
-hv hook install --wrap-statusline    # when you already have a statusLine
+rota hook install                      # .claude/settings.local.json, per developer, not committed
+rota hook install --wrap-statusline    # when you already have a statusLine
 ```
 
 `install` merges into the settings file and never replaces anything it did not write. It adds:
 
-- a `Stop` hook (`hv hook stop`),
-- a `SessionStart` hook (`hv hook session-start`),
-- a statusline (`hv statusline dump`).
+- a `Stop` hook (`rota hook stop`),
+- a `SessionStart` hook (`rota hook session-start`),
+- a statusline (`rota statusline dump`).
 
-Hook entries end in `# hv-hook`, so a second run updates them instead of stacking copies.
+Hook entries end in `# rota-hook`, so a second run updates them instead of stacking copies.
 `--scope project` writes `.claude/settings.json` (committed); `--scope user` writes your Claude config dir.
 
 ### Your own statusline keeps working
 
 With a statusline already set, plain `install` refuses (exit 4). `--wrap-statusline` handles it:
 
-- It rewrites the statusline to `hv statusline dump --then '<your command>'` and keeps the original
-  beside it as `hvWrapped`.
+- It rewrites the statusline to `rota statusline dump --then '<your command>'` and keeps the original
+  beside it as `rotaWrapped`.
 - The dump records the session state, then runs your command with the same input and output, so your
   bar looks the same.
-- `hv hook uninstall` removes the hooks and puts your command back.
+- `rota hook uninstall` removes the hooks and puts your command back.
 - The file is rewritten as two-space JSON. If it already is, the round trip is byte for byte.
 
 ### What happens at the threshold
 
 1. Every statusline refresh writes the session's state (context percentage, rate limits) under the git
-   common dir, as `hv/session/<session_id>.json`.
+   common dir, as `rota/session/<session_id>.json`.
 2. When the orchestrator tries to stop and the state shows `orchestrator.handoffThreshold` percent
    (default 75) or more, the Stop hook blocks. It tells the orchestrator to write
-   `.hv/handoff/<base>.md` and run `/exit`.
+   `.rota/handoff/<base>.md` and run `/exit`.
 3. If it was told twice and still wrote nothing, the hook gives up and records `handoffFailed` in the
    state, so a session that cannot write a handoff is not held forever.
 
@@ -74,40 +74,40 @@ The SessionStart hook fires on `startup` and `clear`.
 
 - When the new session holds the lease and the handoff exists, the hook injects the file as context and
   moves it to `<base>.md.consumed`.
-- A restarted orchestrator has not run `hv round start` yet, so it holds no lease. A fresh handoff
-  written by the Stop hook (first line `<!-- hv-handoff: orchestrator -->`) is injected anyway. Its
-  first act is `hv round start`, then it reads the handoff.
+- A restarted orchestrator has not run `rota round start` yet, so it holds no lease. A fresh handoff
+  written by the Stop hook (first line `<!-- rota-handoff: orchestrator -->`) is injected anyway. Its
+  first act is `rota round start`, then it reads the handoff.
 - `resume` and `compact` keep the file.
 
 ### Checking it
 
-`hv doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`,
+`rota doctor` reports whether the statusline runs the dump and the hooks are in place (`statusline`,
 `stop-hook`). The hooks are opt-in:
 
-- Until `hv hook install` has written something, both checks skip.
+- Until `rota hook install` has written something, both checks skip.
 - After that they fail on a partial or broken install: one hook missing, a statusline without the
   dump, or a hook command that no longer resolves.
 
 Restarting the orchestrator after the exit is the next section; usage limits follow it. Without the
-hooks, `/hv-pause` and `/hv-work` (no argument) are the manual route
+hooks, `/rota-pause` and `/rota-work` (no argument) are the manual route
 ([pausing and resuming](pausing-and-resuming.md)).
 
 ## Keepalive
 
-The hooks end an orchestrator session cleanly. `hv keepalive run` starts the next one. Start the
+The hooks end an orchestrator session cleanly. `rota keepalive run` starts the next one. Start the
 orchestrator under it, in the pane it will own:
 
 ```sh
-hv keepalive run -- claude --model opus       # everything after -- is the command
+rota keepalive run -- claude --model opus       # everything after -- is the command
 ```
 
-`hv keepalive run` is the pane's foreground process and `claude` is its child, so it learns the exit from
+`rota keepalive run` is the pane's foreground process and `claude` is its child, so it learns the exit from
 the child's own status and needs neither herdr nor tmux to notice it. It is a supervisor, not a watcher
 of the pane. The cost: an orchestrator not started under `run` is not restarted.
 
 ### When it restarts
 
-On every exit it looks for a fresh handoff, `.hv/handoff/<base>.md` no older than
+On every exit it looks for a fresh handoff, `.rota/handoff/<base>.md` no older than
 `orchestrator.handoffMaxAgeSeconds`.
 
 - **With one:** it waits `orchestrator.keepaliveBackoffSeconds` (5) and starts the command again with
@@ -117,14 +117,14 @@ On every exit it looks for a fresh handoff, `.hv/handoff/<base>.md` no older tha
 ### The lease
 
 `run` takes the round lease and holds it across restarts, and tells its child through
-`HV_ROUND_HOLDER_PID`. So:
+`ROTA_ROUND_HOLDER_PID`. So:
 
-- `hv round start` and the hooks inside the orchestrator see the supervisor as the holder.
+- `rota round start` and the hooks inside the orchestrator see the supervisor as the holder.
 - The round number survives a restart.
-- The SessionStart hook injects the handoff at once, without `hv round start` first.
-- A second `run`, or an orchestrator started by hand, is refused while it lives (`hv round start` exits 4).
+- The SessionStart hook injects the handoff at once, without `rota round start` first.
+- A second `run`, or an orchestrator started by hand, is refused while it lives (`rota round start` exits 4).
 
-`hv keepalive status` shows the supervisor and the lease. A supervisor killed with SIGKILL leaves a stale
+`rota keepalive status` shows the supervisor and the lease. A supervisor killed with SIGKILL leaves a stale
 lease, which the next `run` reclaims.
 
 ### The breaker
@@ -137,7 +137,7 @@ content.
 - After `orchestrator.keepaliveMaxRestarts` (10) restarts in total, it stops regardless.
 
 Both stops post an escalation comment on issue `orchestrator.escalateIssue` through
-`hv round escalate send` and raise the herdr notification. With `escalateIssue` unset, which is the
+`rota round escalate send` and raise the herdr notification. With `escalateIssue` unset, which is the
 default, you get the notification and a warning only. The handoff is kept; fix the cause and run it again.
 
 ### How it stops
@@ -149,7 +149,7 @@ The supervisor stops:
 - when you interrupt it: SIGINT and SIGTERM go to the child, the supervisor waits for it and does not
   restart (`interrupted`).
 
-It then releases the lease and records `status: stopped` in `<git-common-dir>/hv/keepalive.json`. It
+It then releases the lease and records `status: stopped` in `<git-common-dir>/rota/keepalive.json`. It
 never deletes the handoff; only the SessionStart hook consumes it.
 
 ### Flags
@@ -160,29 +160,29 @@ never deletes the handoff; only the SessionStart hook consumes it.
 
 ## Usage limits
 
-A 5-hour or weekly usage limit stops a session until the window resets. `hv limit watch` keeps a round
+A 5-hour or weekly usage limit stops a session until the window resets. `rota limit watch` keeps a round
 from stalling on that: it notices the limit, waits for the reset, and types a resume prompt into the pane.
 
-Under `hv keepalive run` the same loop runs inside the supervisor, so there is nothing more to start. For
+Under `rota keepalive run` the same loop runs inside the supervisor, so there is nothing more to start. For
 an orchestrator not started under `run`, start the verb in the background or in a pane of its own:
 
 ```sh
-hv limit watch            # blocks for the life of the round
-hv limit status           # the log, and whether anything is watching
+rota limit watch            # blocks for the life of the round
+rota limit status           # the log, and whether anything is watching
 ```
 
 `watch` needs the round lease, because moving work between accounts is the orchestrator's act. It
-refuses to start (exit 4) without it, under a live `hv keepalive run` (which already watches), or beside
+refuses to start (exit 4) without it, under a live `rota keepalive run` (which already watches), or beside
 another watcher.
 
 ### How it notices
 
 - **The orchestrator:** it reads the rate limits the statusline dump stores. A window at 100 percent with
   its reset still ahead is a limit; the later reset wins if both are.
-- **A worker slot:** it reads the account meter (`hv worker account list`), but only after the slot's
+- **A worker slot:** it reads the account meter (`rota worker account list`), but only after the slot's
   pane shows a limit message, never on a timer.
 - **The message as fallback:** on herdr 0.9.x the loop subscribes to `pane.output_matched` with the
-  phrases `hv worker poll` already uses for LIMITED. On tmux, or if herdr refuses the subscription, it
+  phrases `rota worker poll` already uses for LIMITED. On tmux, or if herdr refuses the subscription, it
   captures the panes every `--settle` seconds.
 - **No data behind a message:** the reset time comes from the text (`resets at 3pm` reads as the next 3pm
   in your time zone, within 8 days). Otherwise it sleeps `limits.fallbackSleepSeconds`.
@@ -195,9 +195,9 @@ another watcher.
 
 - **`sleep`** waits for the reset.
 - **`switch`** applies to a worker slot only. It keeps the slot's account unless it is cooling, otherwise
-  takes the account with the most headroom (`hv worker account pick --exclude <account>`), the rule
-  `hv round assign` uses. With such an account and an idle slot on it, the slot's issue moves there with
-  `hv round transfer`, so the work continues from its pushed branch and a handoff comment. With no usable
+  takes the account with the most headroom (`rota worker account pick --exclude <account>`), the rule
+  `rota round assign` uses. With such an account and an idle slot on it, the slot's issue moves there with
+  `rota round transfer`, so the work continues from its pushed branch and a handoff comment. With no usable
   account, or no idle slot on it, the limit sleeps instead and the entry says why.
 - **The orchestrator only sleeps.** A limited session cannot write a handoff, and a restarted one with no
   handoff has nothing to continue from. Moving it to another account is opt-in and happens before the
@@ -215,14 +215,14 @@ any whose reset has already passed.
 
 ### The log
 
-The `limits` list in `.hv/workers.json`, beside `slots` and `escalations`. Each entry (`l1`, `l2`, ...)
+The `limits` list in `.rota/workers.json`, beside `slots` and `escalations`. Each entry (`l1`, `l2`, ...)
 records:
 
 - the session (`orchestrator` or a slot) and the window,
 - whether the reset came from data or text, and when it resets,
 - the action, its status (`waiting`, `resumed`, `switched` or `failed`) and a note.
 
-`hv limit status` reads it back. `hv round status` and `hv round reconcile` list the entries still waiting.
+`rota limit status` reads it back. `rota round status` and `rota round reconcile` list the entries still waiting.
 Nothing prunes resolved ones.
 
 ### Config
@@ -238,20 +238,20 @@ limit hands off and restarts under another account, instead of running into the 
 usage-limit sleep stays the behavior when the key is off, and for anything the switch does not cover.
 
 ```sh
-hv config set orchestrator.switchOnUsage true
-hv config set orchestrator.usageThreshold 90      # percent, the default
+rota config set orchestrator.switchOnUsage true
+rota config set orchestrator.usageThreshold 90      # percent, the default
 ```
 
 ### What it needs
 
-- The Stop hook installed (`hv hook install`).
-- The orchestrator started under `hv keepalive run`. Without a supervisor nothing would restart it, so
+- The Stop hook installed (`rota hook install`).
+- The orchestrator started under `rota keepalive run`. Without a supervisor nothing would restart it, so
   the hook does not ask.
 - At least two accounts with a `configDir` in `work.accounts`.
 - The statusline dump on the account it moves to, which the `statusline` check covers.
 
-`hv doctor` has a `switch` check, but it covers only the Stop hook and two accounts with a `configDir`. It
-cannot tell whether the orchestrator runs under `hv keepalive run`.
+`rota doctor` has a `switch` check, but it covers only the Stop hook and two accounts with a `configDir`. It
+cannot tell whether the orchestrator runs under `rota keepalive run`.
 
 ### At the threshold
 
@@ -297,7 +297,7 @@ Each decision is an entry in the `limits` list:
 - `action` `switch` (`status` `switched`): the account left is in `account`, the account switched to in `note`.
 - `action` `restart` (`status` `resumed`): no account was usable; `note` holds why and the hold's end.
 
-`hv limit status` shows them. `keepalive.json` gains `account`, `switches` and `switchHold`.
+`rota limit status` shows them. `keepalive.json` gains `account`, `switches` and `switchHold`.
 
 The herdr agent integration is per account (`herdr integration install claude` with that
-`CLAUDE_CONFIG_DIR`); `hv doctor`'s `hook` check covers it. The project-local hooks apply to every account.
+`CLAUDE_CONFIG_DIR`); `rota doctor`'s `hook` check covers it. The project-local hooks apply to every account.

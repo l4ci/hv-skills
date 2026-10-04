@@ -14,11 +14,11 @@ import (
 func project(t *testing.T, cfg string) string {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if cfg != "" {
-		if err := os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte(cfg), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, ".rota", "config.json"), []byte(cfg), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -135,8 +135,8 @@ func TestMatchPath(t *testing.T) {
 		entry, file string
 		want        bool
 	}{
-		{"hv-release", "hv-release/SKILL.md", true},
-		{"hv-release/", "hv-release/SKILL.md", true},
+		{"rota-release", "rota-release/SKILL.md", true},
+		{"rota-release/", "rota-release/SKILL.md", true},
 		{"./docs", "docs/a/b.md", true},
 		{"docs", "docsx/a.md", false},
 		{"go.mod", "go.mod", true},
@@ -165,11 +165,11 @@ func TestMergePolicy(t *testing.T) {
 	if ok, hit := p.Covers(nil); err != nil || !ok || hit == nil || len(hit) != 0 {
 		t.Errorf("all: %v %v %v", ok, hit, err)
 	}
-	p, err = LoadMergePolicy(project(t, `{"ship": {"mergeApproval": "paths", "mergeApprovalPaths": ["hv-release", " ", 3, "*.md"]}}`))
-	if err != nil || !p.NeedsFiles() || !reflect.DeepEqual(p.Paths, []string{"hv-release", "*.md"}) {
+	p, err = LoadMergePolicy(project(t, `{"ship": {"mergeApproval": "paths", "mergeApprovalPaths": ["rota-release", " ", 3, "*.md"]}}`))
+	if err != nil || !p.NeedsFiles() || !reflect.DeepEqual(p.Paths, []string{"rota-release", "*.md"}) {
 		t.Fatalf("paths: %+v %v", p, err)
 	}
-	if ok, hit := p.Covers([]string{"internal/x.go", "README.md", "hv-release/SKILL.md"}); !ok || !reflect.DeepEqual(hit, []string{"README.md", "hv-release/SKILL.md"}) {
+	if ok, hit := p.Covers([]string{"internal/x.go", "README.md", "rota-release/SKILL.md"}); !ok || !reflect.DeepEqual(hit, []string{"README.md", "rota-release/SKILL.md"}) {
 		t.Errorf("paths hit: %v %v", ok, hit)
 	}
 	if ok, _ := p.Covers([]string{"internal/x.go"}); ok {

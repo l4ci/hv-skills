@@ -6,19 +6,19 @@ trap 'rm -rf "$TMP_MI"' EXIT
 # MAKE <dir> <provider>: a file-backend project with an open backlog, artifacts and two milestones
 MAKE_MI() {
   local P="$1" prov="$2"
-  mkdir -p "$P/.hv/bugs" "$P/.hv/features" "$P/.hv/tasks" "$P/.hv/designs" "$P/.hv/plans" "$P/.hv/milestones"
-  printf '{"issues":{"provider":"%s","retryWaitSeconds":0,"bulkPaceMs":0}}\n' "$prov" > "$P/.hv/config.json"
-  cat > "$P/.hv/BACKLOG.md" <<'BL'
+  mkdir -p "$P/.rota/bugs" "$P/.rota/features" "$P/.rota/tasks" "$P/.rota/designs" "$P/.rota/plans" "$P/.rota/milestones"
+  printf '{"issues":{"provider":"%s","retryWaitSeconds":0,"bulkPaceMs":0}}\n' "$prov" > "$P/.rota/config.json"
+  cat > "$P/.rota/BACKLOG.md" <<'BL'
 # TODO
 
 ## Bugs
 
-- **[B1] [P1] Crash on save.** Saving a large file crashes. Detail: .hv/bugs/B1.md
+- **[B1] [P1] Crash on save.** Saving a large file crashes. Detail: .rota/bugs/B1.md
 - **[B2] [P2] Typo in help.** Fix the help text. Milestone: M01
 
 ## Features
 
-- **[F1] [Major] Export data.** Export to CSV. Detail: .hv/features/F1.md Related: [F2], [F9], F80 Milestone: M07 Since: abc1234
+- **[F1] [Major] Export data.** Export to CSV. Detail: .rota/features/F1.md Related: [F2], [F9], F80 Milestone: M07 Since: abc1234
 - **[F2] [Minor] Load files.** Read files in. Repos: web Related: [F9]
 
 ## Tasks
@@ -29,13 +29,13 @@ MAKE_MI() {
 
 - ~~**[F9] [Minor] Old thing.** done long ago~~ Done 2026-01-01 [`abc1234`]
 BL
-  printf 'Crash details.\n' > "$P/.hv/bugs/B1.md"
-  printf 'Export details.\n\n## Proof\n\n- 2026-09-01 · smoke · PASS · abc1234 · all green\n' > "$P/.hv/features/F1.md"
-  printf '# Design F1\n\nSee [F2] and F2 but not F22.\n' > "$P/.hv/designs/F1.md"
-  printf '# Plan F1\n\nDepends on F2.\n' > "$P/.hv/plans/M07-F1.md"
-  printf -- '---\nid: M07\ntitle: Tracker work\nstatus: active\ndepends: []\n---\n\n# M07 — Tracker work\n\n## Goal\n\nMove to the tracker. Needs [F1].\n' > "$P/.hv/milestones/M07.md"
-  printf -- '---\nid: M01\ntitle: Old launch\nstatus: shipped\ndepends: []\n---\n\n# M01 — Old launch\n\n## Goal\n\nDone.\n' > "$P/.hv/milestones/M01.md"
-  printf '# M07-S01\n\nSlice: [F1] first, then T1 of the plan.\n' > "$P/.hv/plans/M07-S01.md"
+  printf 'Crash details.\n' > "$P/.rota/bugs/B1.md"
+  printf 'Export details.\n\n## Proof\n\n- 2026-09-01 · smoke · PASS · abc1234 · all green\n' > "$P/.rota/features/F1.md"
+  printf '# Design F1\n\nSee [F2] and F2 but not F22.\n' > "$P/.rota/designs/F1.md"
+  printf '# Plan F1\n\nDepends on F2.\n' > "$P/.rota/plans/M07-F1.md"
+  printf -- '---\nid: M07\ntitle: Tracker work\nstatus: active\ndepends: []\n---\n\n# M07 — Tracker work\n\n## Goal\n\nMove to the tracker. Needs [F1].\n' > "$P/.rota/milestones/M07.md"
+  printf -- '---\nid: M01\ntitle: Old launch\nstatus: shipped\ndepends: []\n---\n\n# M01 — Old launch\n\n## Goal\n\nDone.\n' > "$P/.rota/milestones/M01.md"
+  printf '# M07-S01\n\nSlice: [F1] first, then T1 of the plan.\n' > "$P/.rota/plans/M07-S01.md"
 }
 
 for prov in github gitlab; do
@@ -47,7 +47,7 @@ for prov in github gitlab; do
     eq() { [ "$2" = "$3" ] || fail "$prov migrate $1: expected [$2] got [$3]"; }
     has() { case "$3" in *"$2"*) ;; *) fail "$prov migrate $1: [$3] lacks [$2]";; esac; }
     RC() { local rc=0; OUT="$("$@" 2>"$P/err")" || rc=$?; RCV=$rc; ERR="$(cat "$P/err")"; }
-    TREE() { find .hv -type f | sort | xargs cat | md5sum | cut -c1-32; }
+    TREE() { find .rota -type f | sort | xargs cat | md5sum | cut -c1-32; }
     CALLS() { if [ -f "$P/log" ]; then wc -l < "$P/log" | tr -d ' '; else echo 0; fi; }
     # The tracker state is read from the fake's store (FAKE_TRACKER_DB), the same file for both providers.
     # DUMP: one line per issue: number|title|sorted labels|native milestone|state
@@ -73,7 +73,7 @@ for o in json.load(sys.stdin)["data"]["operations"]:
     print(o["action"], o["text"])'; }
     MAPQ() { python3 -c '
 import json, sys
-m = json.load(open(".hv/issue-map.json"))
+m = json.load(open(".rota/issue-map.json"))
 print(eval(sys.argv[1]))' "$1"; }
 
     # --- usage and refusals
@@ -81,11 +81,11 @@ print(eval(sys.argv[1]))' "$1"; }
     eq "bad flag" "2" "$RCV"
     RC hvj migrate issues --limit x
     eq "bad limit" "2" "$RCV"
-    mkdir -p "$TMP_MI/empty-$prov/.hv"; printf '{}\n' > "$TMP_MI/empty-$prov/.hv/config.json"
+    mkdir -p "$TMP_MI/empty-$prov/.rota"; printf '{}\n' > "$TMP_MI/empty-$prov/.rota/config.json"
     RC hvj -C "$TMP_MI/empty-$prov" migrate issues --apply
     eq "missing backlog exit" "3" "$RCV"
     cp -r "$P" "$TMP_MI/umb-$prov"
-    printf '{"repos":[{"name":"a","path":"a"}]}\n' > "$TMP_MI/umb-$prov/.hv/repos.json"; mkdir -p "$TMP_MI/umb-$prov/a"
+    printf '{"repos":[{"name":"a","path":"a"}]}\n' > "$TMP_MI/umb-$prov/.rota/repos.json"; mkdir -p "$TMP_MI/umb-$prov/a"
     RC hvj -C "$TMP_MI/umb-$prov" migrate issues --apply
     eq "umbrella exit" "4" "$RCV"
     eq "umbrella changed" "false" "$(echo "$OUT" | jget data.changed)"
@@ -119,7 +119,7 @@ print("F9" in m or "M01" in m)')"
     has "dry dropped milestone warning" "M01" "$(echo "$OUT" | jget warnings)"
     eq "dry makes no tracker call" "0" "$(CALLS)"
     eq "dry leaves the tree unchanged" "$BEFORE" "$(TREE)"
-    [ ! -e .hv/issue-map.json ] || fail "$prov migrate dry wrote the map"
+    [ ! -e .rota/issue-map.json ] || fail "$prov migrate dry wrote the map"
 
     # --- apply
     RC hvj migrate issues --apply
@@ -138,7 +138,7 @@ print("F9" in m or "M01" in m)')"
        "$(MAPQ '" ".join(k + ":" + str(v["id"] if k != "M07" else v["number"]) for k, v in m.items())')"
     eq "map data matches the file" "True" "$(echo "$OUT" | python3 -c '
 import json, sys
-print(json.load(sys.stdin)["data"]["map"] == json.load(open(".hv/issue-map.json")))')"
+print(json.load(sys.stdin)["data"]["map"] == json.load(open(".rota/issue-map.json")))')"
     eq "map has no completed item" "False" "$(MAPQ '"F9" in m or "M01" in m')"
     eq "map entry url" "True" "$(MAPQ 'm["F1"]["url"].endswith("/4") and m["F1"]["number"] == 4')"
     has "F1 body detail" "Export details." "$(BODY 4)"
@@ -153,18 +153,18 @@ print(json.load(sys.stdin)["data"]["map"] == json.load(open(".hv/issue-map.json"
     case "$(BODY 5)" in *"Related:"*) fail "$prov migrate: F2 kept an all-dangling Related field: $(BODY 5)";; esac
     has "B1 body" "Crash details." "$(BODY 2)"
     N4="$(NOTES 4)"
-    has "proof note" "<!-- hv:proof -->" "$N4"; has "proof rows" "smoke · PASS" "$N4"
+    has "proof note" "<!-- rota:proof -->" "$N4"; has "proof rows" "smoke · PASS" "$N4"
     has "design note rewritten" "See [F5] and F5 but not F22." "$N4"
     has "plan note rewritten" "Depends on F5." "$N4"
     N1="$(NOTES 1)"
-    has "slice note" "<!-- hv:plan:S01 -->" "$N1"
+    has "slice note" "<!-- rota:plan:S01 -->" "$N1"
     has "slice bracket rewrite only" "Slice: [F4] first, then T1 of the plan." "$N1"
     has "milestone body rewritten" "Needs [F4]." "$(BODY 1)"
     has "milestone status kept" "status: active" "$(BODY 1)"
-    eq "banner first line" "true" "$(grep -q '^> Frozen: this backlog moved to the issue tracker on ' <<<"$(head -1 .hv/BACKLOG.md)" && echo true)"
-    eq "banner once" "1" "$(grep -c '^> Frozen:' .hv/BACKLOG.md)"
-    grep -q 'Old thing' .hv/BACKLOG.md || fail "$prov migrate: completed item lost"
-    case "$(cat .hv/config.json)" in *backend*) fail "$prov migrate: backend flipped";; esac
+    eq "banner first line" "true" "$(grep -q '^> Frozen: this backlog moved to the issue tracker on ' <<<"$(head -1 .rota/BACKLOG.md)" && echo true)"
+    eq "banner once" "1" "$(grep -c '^> Frozen:' .rota/BACKLOG.md)"
+    grep -q 'Old thing' .rota/BACKLOG.md || fail "$prov migrate: completed item lost"
+    case "$(cat .rota/config.json)" in *backend*) fail "$prov migrate: backend flipped";; esac
 
     # --- re-run is a no-op
     TREE_DONE="$(TREE)"; C0="$(CALLS)"
@@ -173,7 +173,7 @@ print(json.load(sys.stdin)["data"]["map"] == json.load(open(".hv/issue-map.json"
     eq "rerun changed" "false" "$(echo "$OUT" | jget data.changed)"
     eq "rerun makes no tracker call" "$C0" "$(CALLS)"
     eq "rerun leaves the tree unchanged" "$TREE_DONE" "$(TREE)"
-    eq "rerun banner once" "1" "$(grep -c '^> Frozen:' .hv/BACKLOG.md)"
+    eq "rerun banner once" "1" "$(grep -c '^> Frozen:' .rota/BACKLOG.md)"
     has "rerun skips" "skip F1 " "$(OPS)"
   ) 2>"$TMP_MI/sub-$prov.err" || { cat "$TMP_MI/sub-$prov.err" >&2; fail "$prov migrate main flow failed"; }
 
@@ -197,16 +197,16 @@ print(next(i["body"] for i in db["issues"] if i["number"] == int(sys.argv[1])))'
     FAKE_TRACKER_FAIL="Load files" FAKE_TRACKER_FAIL_MSG="secondary rate limit" RC hvj migrate issues --apply
     eq "stop exit" "6" "$RCV"
     has "stop report" "3 of 5 migrated" "$(echo "$OUT" | jget error.message)"
-    eq "map saved" "M07 B1 B2 F1" "$(python3 -c 'import json;print(" ".join(json.load(open(".hv/issue-map.json"))))')"
+    eq "map saved" "M07 B1 B2 F1" "$(python3 -c 'import json;print(" ".join(json.load(open(".rota/issue-map.json"))))')"
     eq "created so far" "4" "$(COUNT)"
-    [ "$(grep -c '^> Frozen:' .hv/BACKLOG.md || true)" = "0" ] || fail "$prov migrate rate-limit: froze an incomplete migration"
+    [ "$(grep -c '^> Frozen:' .rota/BACKLOG.md || true)" = "0" ] || fail "$prov migrate rate-limit: froze an incomplete migration"
     RC hvj migrate issues --apply
     eq "resume exit" "0" "$RCV"
     eq "resume migrated" "5" "$(echo "$OUT" | jget data.migrated)"
     eq "no duplicates" "6" "$(COUNT)"
-    eq "resume map" "M07 B1 B2 F1 F2 T1" "$(python3 -c 'import json;print(" ".join(json.load(open(".hv/issue-map.json"))))')"
+    eq "resume map" "M07 B1 B2 F1 F2 T1" "$(python3 -c 'import json;print(" ".join(json.load(open(".rota/issue-map.json"))))')"
     has "resume Related rewritten" "Related: [F5]" "$(BODY 4)"
-    eq "resume banner" "1" "$(grep -c '^> Frozen:' .hv/BACKLOG.md)"
+    eq "resume banner" "1" "$(grep -c '^> Frozen:' .rota/BACKLOG.md)"
   ) 2>"$TMP_MI/rl-$prov.err" || { cat "$TMP_MI/rl-$prov.err" >&2; fail "$prov migrate rate-limit flow failed"; }
 
   # --- a plain tracker failure stops with exit 5 and keeps the map
@@ -217,7 +217,7 @@ print(next(i["body"] for i in db["issues"] if i["number"] == int(sys.argv[1])))'
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$E/db.json" FAKE_TRACKER_LOG="$E/log"
     rc=0; FAKE_TRACKER_FAIL="Load files" hvj migrate issues --apply >/dev/null 2>&1 || rc=$?
     [ "$rc" = "5" ] || fail "$prov migrate tracker failure: expected exit 5 got $rc"
-    [ -f .hv/issue-map.json ] || fail "$prov migrate tracker failure: map not saved"
+    [ -f .rota/issue-map.json ] || fail "$prov migrate tracker failure: map not saved"
   ) || fail "$prov migrate tracker failure flow failed"
 
   # --- --limit: create N items per run; notes wait until everything exists
@@ -228,18 +228,18 @@ print(next(i["body"] for i in db["issues"] if i["number"] == int(sys.argv[1])))'
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$L/db.json" FAKE_TRACKER_LOG="$L/log"
     eq() { [ "$2" = "$3" ] || fail "$prov migrate limit $1: expected [$2] got [$3]"; }
     has() { case "$3" in *"$2"*) ;; *) fail "$prov migrate limit $1: [$3] lacks [$2]";; esac; }
-    KEYS() { python3 -c 'import json;print(" ".join(json.load(open(".hv/issue-map.json"))))'; }
+    KEYS() { python3 -c 'import json;print(" ".join(json.load(open(".rota/issue-map.json"))))'; }
     OUT="$(hvj migrate issues --apply --limit 2 2>/dev/null)"
     eq "limit keys" "M07 B1 B2" "$(KEYS)"
     eq "limit migrated" "2" "$(echo "$OUT" | jget data.migrated)"
     eq "limit total" "5" "$(echo "$OUT" | jget data.total)"
-    [ "$(grep -c '^> Frozen:' .hv/BACKLOG.md || true)" = "0" ] || fail "$prov migrate limit: froze early"
+    [ "$(grep -c '^> Frozen:' .rota/BACKLOG.md || true)" = "0" ] || fail "$prov migrate limit: froze early"
     hvj migrate issues --apply --limit 2 >/dev/null 2>&1
     eq "limit second run" "M07 B1 B2 F1 F2" "$(KEYS)"
     hvj migrate issues --apply --limit 2 >/dev/null 2>&1
     eq "limit third run" "M07 B1 B2 F1 F2 T1" "$(KEYS)"
-    eq "limit finished: banner" "1" "$(grep -c '^> Frozen:' .hv/BACKLOG.md)"
-    has "limit finished: notes" "hv:design" "$(python3 -c '
+    eq "limit finished: banner" "1" "$(grep -c '^> Frozen:' .rota/BACKLOG.md)"
+    has "limit finished: notes" "rota:design" "$(python3 -c '
 import json, os
 db = json.load(open(os.environ["FAKE_TRACKER_DB"]))
 print(" ".join(c["body"] for i in db["issues"] if i["number"] == 4 for c in i["comments"]))')"

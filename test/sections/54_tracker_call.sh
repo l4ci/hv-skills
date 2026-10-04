@@ -2,8 +2,8 @@ echo "tracker call"
 
 TMP_TC="$(mktemp -d)"
 trap 'rm -rf "$TMP_TC"' EXIT
-mkdir -p "$TMP_TC/proj/.hv" "$TMP_TC/fake"
-echo '{"issues":{"provider":"github","retryWaitSeconds":0}}' > "$TMP_TC/proj/.hv/config.json"
+mkdir -p "$TMP_TC/proj/.rota" "$TMP_TC/fake"
+echo '{"issues":{"provider":"github","retryWaitSeconds":0}}' > "$TMP_TC/proj/.rota/config.json"
 
 # Fake gh/glab: log argv (+ cwd, stdin) per call; behavior from FAKE_MODE.
 for cli in gh glab; do
@@ -43,7 +43,7 @@ done
   [ "$(cat "$FAKE_LOG")" = "issue list --per-page 100" ] || fail "--provider gitlab should add --per-page 100"
   [ "$(echo "$out" | jget data.provider)" = "gitlab" ] || fail "data.provider should be the --provider flag: $out"
   # Text mode prints the CLI's stdout unchanged.
-  [ "$(PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue view 3 </dev/null)" = '[{"n": 0}, {"n": 1}]' ] \
+  [ "$(PATH="$TMP_TC/fake:$PATH" "$ROTA_BIN" tracker call -- issue view 3 </dev/null)" = '[{"n": 0}, {"n": 1}]' ] \
     || fail "text mode should print the CLI stdout unchanged"
   pass "provider from config and --provider flag; list limits injected"
 
@@ -69,14 +69,14 @@ done
 
   # stdin forwarded; cwd restored to caller's
   mkdir -p sub; : > "$FAKE_LOG"; rm -f "$FAKE_LOG.cwd"
-  (cd sub && echo "body text" | PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue create -F - >/dev/null)
+  (cd sub && echo "body text" | PATH="$TMP_TC/fake:$PATH" "$ROTA_BIN" tracker call -- issue create -F - >/dev/null)
   [ "$(cat "$FAKE_LOG.stdin")" = "body text" ] || fail "stdin should reach the CLI"
   [ "$(cat "$FAKE_LOG.cwd")" = "cwd:$(pwd -P)/sub" ] || fail "CLI must run in the caller's cwd (got $(cat "$FAKE_LOG.cwd"))"
   pass "stdin forwarded; CLI runs in caller's cwd"
 
   # An inherited stdin that never closes must not block a call that takes no `-` argument.
   mkfifo "$TMP_TC/held"; exec 9<>"$TMP_TC/held"
-  rc=0; PATH="$TMP_TC/fake:$PATH" timeout 10 "$HV_BIN" tracker call -- issue view 3 <"$TMP_TC/held" >/dev/null || rc=$?
+  rc=0; PATH="$TMP_TC/fake:$PATH" timeout 10 "$ROTA_BIN" tracker call -- issue view 3 <"$TMP_TC/held" >/dev/null || rc=$?
   exec 9>&-
   [ "$rc" = 0 ] || fail "open stdin pipe should not block a call without '-' (rc=$rc)"
   pass "stdin only read when an argument takes it"
@@ -111,22 +111,22 @@ done
   # missing CLI: PATH with python3/coreutils but no gh/glab
   mkdir -p "$TMP_TC/nobin"
   for t in python3 bash env dirname cat wc tr git; do ln -sf "$(command -v $t)" "$TMP_TC/nobin/$t"; done
-  rc=0; PATH="$TMP_TC/nobin" "$HV_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1 || rc=$?
+  rc=0; PATH="$TMP_TC/nobin" "$ROTA_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1 || rc=$?
   [ "$rc" = 5 ] || fail "missing CLI should exit 5 (got $rc)"
   pass "missing CLI exits 5"
 
   # no provider: no config, no remote
-  mkdir -p "$TMP_TC/noprov/.hv" && echo '{}' > "$TMP_TC/noprov/.hv/config.json"
-  rc=0; (cd "$TMP_TC/noprov" && PATH="$TMP_TC/fake:$PATH" "$HV_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1) || rc=$?
+  mkdir -p "$TMP_TC/noprov/.rota" && echo '{}' > "$TMP_TC/noprov/.rota/config.json"
+  rc=0; (cd "$TMP_TC/noprov" && PATH="$TMP_TC/fake:$PATH" "$ROTA_BIN" tracker call -- issue list </dev/null >/dev/null 2>&1) || rc=$?
   [ "$rc" = 5 ] || fail "no resolvable provider should exit 5 (got $rc)"
   pass "unresolvable provider exits 5"
 
   # usage errors
-  rc=0; "$HV_BIN" tracker call </dev/null --provider 2>/dev/null || rc=$?
+  rc=0; "$ROTA_BIN" tracker call </dev/null --provider 2>/dev/null || rc=$?
   [ "$rc" = 2 ] || fail "bare trailing --provider must exit 2 (got $rc)"
-  rc=0; "$HV_BIN" tracker call </dev/null --provider github 2>/dev/null || rc=$?
+  rc=0; "$ROTA_BIN" tracker call </dev/null --provider github 2>/dev/null || rc=$?
   [ "$rc" = 2 ] || fail "missing CLI args should exit 2 (got $rc)"
-  rc=0; "$HV_BIN" tracker call </dev/null --provider bogus -- issue list 2>/dev/null || rc=$?
+  rc=0; "$ROTA_BIN" tracker call </dev/null --provider bogus -- issue list 2>/dev/null || rc=$?
   [ "$rc" = 2 ] || fail "unknown provider value should exit 2 (got $rc)"
   pass "usage errors exit 2"
 )

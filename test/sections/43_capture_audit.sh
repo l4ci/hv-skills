@@ -31,9 +31,9 @@ git commit -q -m "seed runner/postgres.go and bin/flagship"
 git commit --allow-empty -q -m "feat: implement Driver for postgres backend [F76]"
 git commit --allow-empty -q -m "refactor: rename bin/flagship to bin/flagship-v2"
 
-# The verb needs a project root (no `.hv/` walk-up past the fixture), but audits
+# The verb needs a project root (no `.rota/` walk-up past the fixture), but audits
 # the git repo it runs in.
-mkdir -p .hv
+mkdir -p .rota
 
 # Exit 0 (evidence found): a title whose tokens hit a real commit subject.
 rc=0; OUT="$(hvj item shipped "Implement Driver for postgres backend" 2>/dev/null)" || rc=$?
@@ -59,7 +59,7 @@ rc=0; OUT_CLEAN="$(hvj item shipped "Add zorblax-foofoo zonkmind handler" 2>/dev
 pass "F27 shipped — exit 1, found=false and no hits on titles with no ship evidence"
 
 # Exit 2: usage error on no args.
-rc=0; "$HV_BIN" item shipped >/dev/null 2>&1 || rc=$?
+rc=0; "$ROTA_BIN" item shipped >/dev/null 2>&1 || rc=$?
 [ "$rc" = "2" ] || fail "item shipped exit code: expected 2 on missing args, got $rc"
 pass "F27 shipped — exit 2 on missing args"
 

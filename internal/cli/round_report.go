@@ -4,11 +4,11 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
 )
 
-// The C8 verb `hv round report`: a solo round's stand-in for the pane poll
+// The C8 verb `rota round report`: a solo round's stand-in for the pane poll
 // that writes a slot's state; the rules are round.ReportSlot.
 func roundReport(fs *flag.FlagSet) RunFunc {
 	state := fs.String("state", "", "done, blocked, idle, dead or limited")

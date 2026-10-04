@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundcfg"
 )
 
 func writeAt(t *testing.T, path, body string) {
@@ -38,19 +38,19 @@ func TestBriefPathOrder(t *testing.T) {
 	if p, ok := briefPath(root, roundcfg.Settings{}, env); ok {
 		t.Fatalf("CLAUDE_PLUGIN_ROOT still read: %s", p)
 	}
-	rel := filepath.Join("hv-orchestrate", "references", "worker-contract.md")
+	rel := filepath.Join("rota-orchestrate", "references", "worker-contract.md")
 	userRoot := filepath.Join(home, ".claude", "skills")
 	writeAt(t, filepath.Join(userRoot, rel), "user")
 	if p, ok := briefPath(root, roundcfg.Settings{}, env); ok {
 		t.Fatalf("a root without a manifest counts as installed: %s", p)
 	}
-	writeAt(t, filepath.Join(userRoot, ".hv-manifest.json"), "{}")
+	writeAt(t, filepath.Join(userRoot, ".rota-manifest.json"), "{}")
 	if p, ok := briefPath(root, roundcfg.Settings{}, env); !ok || p != filepath.Join(userRoot, rel) {
 		t.Errorf("user root: %q %v", p, ok)
 	}
 	projRoot := filepath.Join(root, ".claude", "skills")
 	writeAt(t, filepath.Join(projRoot, rel), "project")
-	writeAt(t, filepath.Join(projRoot, ".hv-manifest.json"), "{}")
+	writeAt(t, filepath.Join(projRoot, ".rota-manifest.json"), "{}")
 	if p, _ := briefPath(root, roundcfg.Settings{}, env); p != filepath.Join(projRoot, rel) {
 		t.Errorf("project root before user: %q", p)
 	}
@@ -68,7 +68,7 @@ func TestBriefPathOrder(t *testing.T) {
 	if p, ok := briefPath(root, roundcfg.Settings{}, env); ok {
 		t.Errorf("~/.claude used although CLAUDE_CONFIG_DIR is set: %q", p)
 	}
-	writeAt(t, filepath.Join(cfgDir, "skills", ".hv-manifest.json"), "{}")
+	writeAt(t, filepath.Join(cfgDir, "skills", ".rota-manifest.json"), "{}")
 	writeAt(t, filepath.Join(cfgDir, "skills", rel), "cfg")
 	if p, _ := briefPath(root, roundcfg.Settings{}, env); p != filepath.Join(cfgDir, "skills", rel) {
 		t.Errorf("config dir root: %q", p)

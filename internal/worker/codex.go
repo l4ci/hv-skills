@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/doctor"
-	"github.com/l4ci/hv/v5/internal/shlex"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/doctor"
+	"github.com/l4ci/rota/internal/shlex"
 )
 
 // Codex workers (E1, #68). The contract is "E: Codex workers" in
@@ -42,7 +42,7 @@ const (
 // nothing to put there, which is a usage error. A custom command without the
 // placeholder runs as written.
 func codexCommand(root, model string) (string, error) {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	cmd, custom := DefaultCodexCommand, false
 	if v, ok := config.Lookup(cfg, "work.codexCommand"); ok {
 		if s, _ := v.(string); s != "" {
@@ -122,9 +122,9 @@ func CommonDir(ctx context.Context, git GitFunc, root string) (string, error) {
 }
 
 // CodexHomesDir is where the slot homes live, beside the round lease.
-func CodexHomesDir(commonDir string) string { return filepath.Join(commonDir, "hv", "codex") }
+func CodexHomesDir(commonDir string) string { return filepath.Join(commonDir, "rota", "codex") }
 
-// CodexHome is the slot's CODEX_HOME: <git-common-dir>/hv/codex/<slot>. Never
+// CodexHome is the slot's CODEX_HOME: <git-common-dir>/rota/codex/<slot>. Never
 // ~/.codex, and never inside the worktree, where it would dirty git status.
 func CodexHome(commonDir, slot string) string { return filepath.Join(CodexHomesDir(commonDir), slot) }
 

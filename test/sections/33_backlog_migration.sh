@@ -9,14 +9,14 @@ trap 'rm -rf "$BOOT_DIR"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 # ── (a) Fresh init seeds BACKLOG.md, not TODO.md ─────────────────────────────
 mkdir -p "$BOOT_DIR"
 OUT=$(cd "$BOOT_DIR" && hvj init) || fail "init failed on a fresh directory: $OUT"
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "init did not seed BACKLOG.md on fresh init"
-! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "init seeded legacy TODO.md on fresh init"
+[ -f "$BOOT_DIR/.rota/BACKLOG.md" ] || fail "init did not seed BACKLOG.md on fresh init"
+! [ -f "$BOOT_DIR/.rota/TODO.md" ] || fail "init seeded legacy TODO.md on fresh init"
 [ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "fresh init should report changed: $OUT"
 echo "$OUT" | python3 -c '
 import json, sys
 created = json.load(sys.stdin)["data"]["created"]
-assert ".hv/BACKLOG.md" in created, created
-' || fail "fresh init should list .hv/BACKLOG.md as created: $OUT"
+assert ".rota/BACKLOG.md" in created, created
+' || fail "fresh init should list .rota/BACKLOG.md as created: $OUT"
 pass "init seeds BACKLOG.md on fresh init"
 
 # The seeded project passes the initialized check.
@@ -25,17 +25,17 @@ OUT=$(cd "$BOOT_DIR" && hvj init check) || fail "init check failed on a fresh in
 
 # ── (b) Legacy auto-rename ────────────────────────────────────────────────────
 rm -rf "$BOOT_DIR"
-mkdir -p "$BOOT_DIR/.hv"
-echo "# TODO" > "$BOOT_DIR/.hv/TODO.md"
+mkdir -p "$BOOT_DIR/.rota"
+echo "# TODO" > "$BOOT_DIR/.rota/TODO.md"
 ( cd "$BOOT_DIR" && hvj init >/dev/null ) || fail "init failed with a legacy TODO.md"
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "init did not rename TODO.md → BACKLOG.md"
-! [ -f "$BOOT_DIR/.hv/TODO.md" ] || fail "init left legacy TODO.md after rename"
-grep -q "^# TODO$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "content was not preserved after rename"
+[ -f "$BOOT_DIR/.rota/BACKLOG.md" ] || fail "init did not rename TODO.md → BACKLOG.md"
+! [ -f "$BOOT_DIR/.rota/TODO.md" ] || fail "init left legacy TODO.md after rename"
+grep -q "^# TODO$" "$BOOT_DIR/.rota/BACKLOG.md" || fail "content was not preserved after rename"
 
 # Idempotency: second run must succeed, create nothing and preserve the file.
 OUT=$(cd "$BOOT_DIR" && hvj init) || fail "second init failed: $OUT"
-[ -f "$BOOT_DIR/.hv/BACKLOG.md" ] || fail "BACKLOG.md missing after idempotent second run"
-grep -q "^# TODO$" "$BOOT_DIR/.hv/BACKLOG.md" || fail "second init rewrote BACKLOG.md"
+[ -f "$BOOT_DIR/.rota/BACKLOG.md" ] || fail "BACKLOG.md missing after idempotent second run"
+grep -q "^# TODO$" "$BOOT_DIR/.rota/BACKLOG.md" || fail "second init rewrote BACKLOG.md"
 [ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "second init should report changed false: $OUT"
 [ "$(echo "$OUT" | jget data.created)" = "[]" ] || fail "second init should create nothing: $OUT"
 pass "init renames legacy TODO.md → BACKLOG.md, idempotent"
@@ -44,7 +44,7 @@ pass "init renames legacy TODO.md → BACKLOG.md, idempotent"
 # The legacy TODO.md fallback was removed in v4.1 (F71 self-flagged it for
 # removal once the rename shipped in v4.0). Reader test now verifies a listing
 # reflects what's at BACKLOG.md, not the legacy path.
-cat > "$BOOT_DIR/.hv/BACKLOG.md" <<'EOF'
+cat > "$BOOT_DIR/.rota/BACKLOG.md" <<'EOF'
 # BACKLOG
 
 ## Bugs
@@ -65,8 +65,8 @@ rc=0; OUT=$(cd "$BOOT_DIR" && hvj init check 2>/dev/null) || rc=$?
 echo "$OUT" | python3 -c '
 import json, sys
 missing = json.load(sys.stdin)["data"]["missing"]
-assert missing == [".hv"], missing
-' || fail "init check should name the missing .hv: $OUT"
+assert missing == [".rota"], missing
+' || fail "init check should name the missing .rota: $OUT"
 pass "init check exits 1 and names the missing path when uninitialized"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────

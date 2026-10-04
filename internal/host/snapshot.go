@@ -17,7 +17,7 @@ type Agent struct {
 }
 
 // Snapshotter is the optional read-only view of everything a host runs.
-// `hv round` uses it to find tabs no slot owns; it is separate from Host so
+// `rota round` uses it to find tabs no slot owns; it is separate from Host so
 // the Host interface stays as the worker verbs know it.
 type Snapshotter interface {
 	Snapshot(ctx context.Context) ([]Agent, error)

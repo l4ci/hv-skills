@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-// SupportedHerdr is the herdr minor `hv round wait` is written against.
+// SupportedHerdr is the herdr minor `rota round wait` is written against.
 // herdr is pre-1.0 and its socket API moves between minors, so any other
 // minor is refused instead of guessed at. Pinned to 0.9.x (0.9.3 was the
 // protocol 22 schema this was built from).
@@ -50,7 +50,7 @@ func checkHerdrVersion(out string) error {
 		return fmt.Errorf("%w: cannot read a version from %q", ErrUnsupportedHerdr, strings.TrimSpace(out))
 	}
 	if m[1]+"."+m[2] != SupportedHerdr {
-		return fmt.Errorf("%w: herdr %s.%s.%s, hv round wait supports %s.x", ErrUnsupportedHerdr, m[1], m[2], m[3], SupportedHerdr)
+		return fmt.Errorf("%w: herdr %s.%s.%s, rota round wait supports %s.x", ErrUnsupportedHerdr, m[1], m[2], m[3], SupportedHerdr)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (h *herdr) Watch(ctx context.Context, targets []WatchTarget) (Watch, error)
 		return nil, fmt.Errorf("herdr socket: %w", err)
 	}
 	req, _ := json.Marshal(map[string]any{
-		"id": "hv-round-wait", "method": "events.subscribe",
+		"id": "rota-round-wait", "method": "events.subscribe",
 		"params": map[string]any{"subscriptions": subs},
 	})
 	if _, err := conn.Write(append(req, '\n')); err != nil {

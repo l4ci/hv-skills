@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/roundlease"
 )
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
@@ -117,7 +117,7 @@ func (r *rig) env(signals <-chan os.Signal) Env {
 
 func (r *rig) opts() Options {
 	return Options{Command: []string{"claude", "--x"}, Root: r.dir, CommonDir: r.dir,
-		HandoffPath: filepath.Join(r.dir, ".hv", "handoff", "main.md"), HandoffMaxAge: 900 * time.Second,
+		HandoffPath: filepath.Join(r.dir, ".rota", "handoff", "main.md"), HandoffMaxAge: 900 * time.Second,
 		MaxRestarts: 10, Breaker: 3, Backoff: 5 * time.Second, Prompt: "go on", EscalateIssue: 7}
 }
 
@@ -162,7 +162,7 @@ func TestRestartsOnFreshHandoffWithPromptLastOnRestartsOnly(t *testing.T) {
 	if len(r.sleeps) != 1 || r.sleeps[0] != 5*time.Second {
 		t.Errorf("backoff: %v", r.sleeps)
 	}
-	if r.envs[0][0] != "HV_ROUND_HOLDER_PID=10" {
+	if r.envs[0][0] != "ROTA_ROUND_HOLDER_PID=10" {
 		t.Errorf("child env: %v", r.envs[0])
 	}
 	st := r.state()
@@ -242,7 +242,7 @@ func TestBreakerTripsAfterNoProgressRestartsAndEscalates(t *testing.T) {
 		t.Fatalf("escalation: %q %v", res.Escalation, r.escalate)
 	}
 	e := r.escalate[0]
-	for _, want := range []string{"Orchestrator keepalive stopped: breaker", "Restarts: 2", "no new handoff: 3", "main.md", "keepalive.json", "Run hv keepalive run again after fixing the cause; the handoff is kept."} {
+	for _, want := range []string{"Orchestrator keepalive stopped: breaker", "Restarts: 2", "no new handoff: 3", "main.md", "keepalive.json", "Run rota keepalive run again after fixing the cause; the handoff is kept."} {
 		if !strings.Contains(e, want) {
 			t.Errorf("escalation lacks %q:\n%s", want, e)
 		}

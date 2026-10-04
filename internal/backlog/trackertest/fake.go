@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Call is one recorded tracker call. Method and Args use the Python adapter's
@@ -308,13 +308,13 @@ func (f *Fake) DeleteComment(_ context.Context, n int, id string) error {
 	return nil
 }
 
-// FindMilestone returns the first milestone title that starts with hvID.
-func (f *Fake) FindMilestone(_ context.Context, hvID string) (string, bool, error) {
-	if err := f.rec("find_milestone", hvID); err != nil {
+// FindMilestone returns the first milestone title that starts with rotaID.
+func (f *Fake) FindMilestone(_ context.Context, rotaID string) (string, bool, error) {
+	if err := f.rec("find_milestone", rotaID); err != nil {
 		return "", false, err
 	}
 	for _, t := range f.Milestones {
-		if t == hvID || (len(t) > len(hvID) && t[:len(hvID)] == hvID && (t[len(hvID)] == ' ' || t[len(hvID)] == '\t')) {
+		if t == rotaID || (len(t) > len(rotaID) && t[:len(rotaID)] == rotaID && (t[len(rotaID)] == ' ' || t[len(rotaID)] == '\t')) {
 			return t, true, nil
 		}
 	}

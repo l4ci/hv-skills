@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // fakeTracker is the in-memory, call-recording Tracker.
@@ -79,7 +79,7 @@ func genIssues(rng *rand.Rand, n int, customLabels bool) []issueJSON {
 			body.WriteString(pick(rng, []string{"\n\n", "\n \n", "\n", "\r\n\r\n"}))
 		}
 		if rng.Intn(2) == 0 {
-			body.WriteString(pick(rng, []string{"", "\n\n", "\n"}) + "<!-- hv:fields\n")
+			body.WriteString(pick(rng, []string{"", "\n\n", "\n"}) + "<!-- rota:fields\n")
 			for _, k := range rng.Perm(len(fieldKeys))[:rng.Intn(5)] {
 				body.WriteString(fieldKeys[k] + pick(rng, []string{": ", ":", ":  ", ":\t"}) + pick(rng, fieldVals) + pick(rng, []string{"", " "}) + "\n")
 			}
@@ -193,12 +193,12 @@ func TestIssuesMatchPython(t *testing.T) {
 func TestFieldsBlockMatchesPython(t *testing.T) {
 	rng := rand.New(rand.NewSource(5))
 	bodies := []string{
-		"", "plain", "text\n\n<!-- hv:fields\nRelated: F1\nRepos: web\n-->", "<!-- hv:fields\nA: 1\n-->",
-		"text\r\n\r\n<!-- hv:fields\r\nA: 1\r\nB:   2  \r\n-->\r\n", "t\n<!-- hv:fields\nA: 1\nA: 2\nB:\nC: 3\n-->",
-		"t\n<!-- hv:fields\nnot a field\n9x: y\nA: ok\n -->  \n\n", "t\n<!-- hv:fields\n-->", "t\n<!-- hv:fields\n\n-->",
-		"x<!-- hv:fields\nA: 1\n-->\ny", "<!-- hv:fields\nA: 1\n--> tail", "a\n<!-- hv:fields\nA: 1\n-->\n<!-- hv:fields\nB: 2\n-->",
-		"t\n\n\n<!-- hv:fields\nA: 1\n-->", "t<!-- hv:fields\nA: café \n-->", "<!-- hv:fields\nA: 1",
-		"t\n<!-- hv:fields\nA: -->x\nB: 2\n-->",
+		"", "plain", "text\n\n<!-- rota:fields\nRelated: F1\nRepos: web\n-->", "<!-- rota:fields\nA: 1\n-->",
+		"text\r\n\r\n<!-- rota:fields\r\nA: 1\r\nB:   2  \r\n-->\r\n", "t\n<!-- rota:fields\nA: 1\nA: 2\nB:\nC: 3\n-->",
+		"t\n<!-- rota:fields\nnot a field\n9x: y\nA: ok\n -->  \n\n", "t\n<!-- rota:fields\n-->", "t\n<!-- rota:fields\n\n-->",
+		"x<!-- rota:fields\nA: 1\n-->\ny", "<!-- rota:fields\nA: 1\n--> tail", "a\n<!-- rota:fields\nA: 1\n-->\n<!-- rota:fields\nB: 2\n-->",
+		"t\n\n\n<!-- rota:fields\nA: 1\n-->", "t<!-- rota:fields\nA: café \n-->", "<!-- rota:fields\nA: 1",
+		"t\n<!-- rota:fields\nA: -->x\nB: 2\n-->",
 	}
 	for _, is := range genIssues(rng, 150, false) {
 		bodies = append(bodies, is.Body)

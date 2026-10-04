@@ -16,7 +16,7 @@ import (
 func lockedStore(t *testing.T) Store {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return Store{Root: root}

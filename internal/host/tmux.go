@@ -101,7 +101,7 @@ func (t *tmux) Spawn(ctx context.Context, o SpawnOpts) (string, error) {
 // Send pastes the file's contents, submits, and confirms the pane changed.
 // It gives up after 4 attempts.
 func (t *tmux) Send(ctx context.Context, slot, handle, file string) error {
-	return t.sendFile(ctx, handle, file, "hv-"+slot)
+	return t.sendFile(ctx, handle, file, "rota-"+slot)
 }
 
 func (t *tmux) sendFile(ctx context.Context, handle, file, buf string) error {
@@ -237,7 +237,7 @@ func (t *tmux) EnsureOperator(ctx context.Context, o OperatorOpts) error {
 	if !t.waitReady(ctx, target, o.BootTimeout) {
 		return ErrOperatorBoot
 	}
-	if t.sendFile(ctx, target, o.Instruction, "hv-operator") != nil {
+	if t.sendFile(ctx, target, o.Instruction, "rota-operator") != nil {
 		return ErrOperatorSend
 	}
 	return nil

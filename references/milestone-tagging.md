@@ -1,13 +1,13 @@
 # Milestone tagging
 
-Used by `/hv-capture` Step 4.5. Single-consumer extraction, kept for hv-capture's readability.
+Used by `/rota-capture` Step 4.5. Single-consumer extraction, kept for rota-capture's readability.
 
-When `/hv-capture` produces new TODO items and there's at least one active milestone, the items get tagged into the active milestone via an `AskUserQuestion` flow.
+When `/rota-capture` produces new TODO items and there's at least one active milestone, the items get tagged into the active milestone via an `AskUserQuestion` flow.
 
 ## Gate
 
 ```bash
-hv milestone active --json
+rota milestone active --json
 ```
 
 - If `data.ids` is empty, no milestones are active — skip this step entirely.
@@ -47,10 +47,10 @@ Ask *"Tag with M01?"* once. If the reply is ambiguous, default to leaving the it
 
 ## Outcome
 
-Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into hv-capture's Step 6 `Milestone:` suffix on the TODO entry. If *"No — leave untagged"* was picked, omit the suffix entirely.
+Carry the chosen milestone(s) as a comma-separated list (`"M01"` or `"M01, M03"`) into rota-capture's Step 6 `Milestone:` suffix on the TODO entry. If *"No — leave untagged"* was picked, omit the suffix entirely.
 
 ## What this reference does NOT cover
 
-- **Sub-repo tagging (`Repos:`)** — see hv-capture Step 4.6 inline / `references/umbrella-mode.md` for the registry context.
+- **Sub-repo tagging (`Repos:`)** — see rota-capture Step 4.6 inline / `references/umbrella-mode.md` for the registry context.
 - **Detail-file extraction for bulky items** — see `references/detail-files.md`.
-- **The TODO-entry write itself** — see hv-capture Step 6 inline.
+- **The TODO-entry write itself** — see rota-capture Step 6 inline.

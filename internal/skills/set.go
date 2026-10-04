@@ -1,8 +1,8 @@
-// Package skills installs the skill set embedded in the hv binary for Claude
+// Package skills installs the skill set embedded in the rota binary for Claude
 // Code and Codex (docs/design/5.0-verb-contract.md, F6a). Each skill becomes a
 // self-contained directory: its markdown files plus the references it cites,
 // so a `references/x.md` link resolves against the skill's own directory.
-// A manifest per root records what hv wrote, and hv touches nothing outside it.
+// A manifest per root records what rota wrote, and rota touches nothing outside it.
 package skills
 
 import (
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	hv "github.com/l4ci/hv/v5"
+	rota "github.com/l4ci/rota"
 )
 
 // Set is a skill set in its installed layout.
@@ -35,7 +35,7 @@ var (
 
 // Embedded is the set compiled into the binary.
 func Embedded() (*Set, error) {
-	embeddedOnce.Do(func() { embedded, embeddedErr = Load(hv.FS) })
+	embeddedOnce.Do(func() { embedded, embeddedErr = Load(rota.FS) })
 	return embedded, embeddedErr
 }
 
@@ -47,7 +47,7 @@ var (
 	bareMention = regexp.MustCompile(`[A-Za-z0-9][A-Za-z0-9._-]*\.md`)
 )
 
-// Load builds a Set from a tree with hv-*/*.md skills and references/*.md.
+// Load builds a Set from a tree with rota-*/*.md skills and references/*.md.
 func Load(fsys fs.FS) (*Set, error) {
 	refs := map[string][]byte{}
 	entries, err := fs.ReadDir(fsys, "references")
@@ -70,7 +70,7 @@ func Load(fsys fs.FS) (*Set, error) {
 	}
 	s := &Set{files: map[string][]byte{}}
 	for _, d := range top {
-		if !d.IsDir() || !strings.HasPrefix(d.Name(), "hv-") {
+		if !d.IsDir() || !strings.HasPrefix(d.Name(), "rota-") {
 			continue
 		}
 		files := map[string][]byte{}
@@ -100,7 +100,7 @@ func Load(fsys fs.FS) (*Set, error) {
 		s.skills = append(s.skills, d.Name())
 	}
 	if len(s.skills) == 0 {
-		return nil, fmt.Errorf("skills: no hv-* skill found")
+		return nil, fmt.Errorf("skills: no rota-* skill found")
 	}
 	for p := range s.files {
 		s.paths = append(s.paths, p)

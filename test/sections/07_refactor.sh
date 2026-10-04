@@ -6,14 +6,14 @@ trap 'rm -rf "$TMP_RF"' EXIT
 (
   cd "$TMP_RF"
   git init -q -b main . && git config user.email t@t && git config user.name t
-  mkdir -p .hv && echo '{}' > .hv/counters.json
-  printf '## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
+  mkdir -p .rota && echo '{}' > .rota/counters.json
+  printf '## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md
   git add -A && git commit -q -m seed
   git checkout -q main
   # Reset to isolate this section from prior item complete calls in the suite.
   hvj refactor reset >/dev/null
   # Seed three active entries, then complete each against a real commit.
-  cat >> .hv/BACKLOG.md <<'EOF'
+  cat >> .rota/BACKLOG.md <<'EOF'
 - **[F40] Feature done.**
 - **[B40] Bug fixed.**
 - **[F41] Refactor-driven feature.**
@@ -47,7 +47,7 @@ EOF
   pass "refactor reset zeros the counters"
 
   # Scoped refactor subjects (refactor(scope):) also count as refactor commits.
-  cat >> .hv/BACKLOG.md <<'EOF'
+  cat >> .rota/BACKLOG.md <<'EOF'
 - **[F42] Scoped refactor feature.**
 EOF
   echo "r2" > r2.txt && git add r2.txt && git commit -q -m "refactor(hosts): consolidate"
@@ -58,11 +58,11 @@ EOF
 
   echo "ship merge"
   # An empty merge message is refused (usage), and the branch is left alone.
-  git branch hv/empty-msg main
-  rc=0; echo "" | "$HV_BIN" ship merge hv/empty-msg --body-file - >/dev/null 2>&1 || rc=$?
+  git branch rota/empty-msg main
+  rc=0; echo "" | "$ROTA_BIN" ship merge rota/empty-msg --body-file - >/dev/null 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "ship merge should reject an empty message with exit 2, got $rc"
-  git rev-parse --verify -q hv/empty-msg >/dev/null || fail "ship merge removed the branch it refused to merge"
-  git branch -q -D hv/empty-msg
+  git rev-parse --verify -q rota/empty-msg >/dev/null || fail "ship merge removed the branch it refused to merge"
+  git branch -q -D rota/empty-msg
   pass "ship merge rejects empty message"
   # Don't actually run ship pr — no remote
 )

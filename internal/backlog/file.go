@@ -11,31 +11,31 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
-// File is the backlog kept in .hv/BACKLOG.md, with finished items in
-// .hv/ARCHIVE.md (FileBackend in hvlib_backend.py).
+// File is the backlog kept in .rota/BACKLOG.md, with finished items in
+// .rota/ARCHIVE.md (FileBackend in hvlib_backend.py).
 type File struct {
-	Root string // project root, the directory that holds .hv/
+	Root string // project root, the directory that holds .rota/
 }
 
 // Name is "file".
 func (f *File) Name() string { return "file" }
 
-func (f *File) hv(parts ...string) string {
-	return filepath.Join(append([]string{f.Root, ".hv"}, parts...)...)
+func (f *File) rota(parts ...string) string {
+	return filepath.Join(append([]string{f.Root, ".rota"}, parts...)...)
 }
 
 // Corpus is BACKLOG.md with its trailing newlines trimmed, a newline, then
 // ARCHIVE.md: the text an item ID is looked up in (load_backlog_corpus). A
 // missing or unreadable file counts as empty.
 func (f *File) Corpus() string {
-	primary, _ := fsio.ReadText(f.hv("BACKLOG.md"))
-	archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
+	primary, _ := fsio.ReadText(f.rota("BACKLOG.md"))
+	archive, _ := fsio.ReadText(f.rota("ARCHIVE.md"))
 	return strings.TrimRight(primary, "\n") + "\n" + archive
 }
 
@@ -85,7 +85,7 @@ func (f *File) List(includeClosed bool) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	archive, _ := fsio.ReadText(f.hv("ARCHIVE.md"))
+	archive, _ := fsio.ReadText(f.rota("ARCHIVE.md"))
 	corpus := strings.TrimRight(md, "\n") + "\n" + archive
 
 	var ids []string
@@ -131,15 +131,15 @@ func doneIDs(text string) []string {
 
 // Markdown returns BACKLOG.md verbatim; closedLimit is ignored.
 func (f *File) Markdown(int) (string, error) {
-	text, err := fsio.ReadText(f.hv("BACKLOG.md"))
+	text, err := fsio.ReadText(f.rota("BACKLOG.md"))
 	if errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("%w: .hv/BACKLOG.md does not exist", ErrNotFound)
+		return "", fmt.Errorf("%w: .rota/BACKLOG.md does not exist", ErrNotFound)
 	}
 	return text, err
 }
 
 // Detail returns the content of the item's detail file,
-// .hv/<kind>/<ID>.md. ok is false when the ID has no type, the file is
+// .rota/<kind>/<ID>.md. ok is false when the ID has no type, the file is
 // missing or it cannot be read.
 func (f *File) Detail(ref string) (string, bool, error) {
 	if ref == "" {
@@ -150,7 +150,7 @@ func (f *File) Detail(ref string) (string, bool, error) {
 	if !ok || t.Kind == "" {
 		return "", false, nil
 	}
-	text, err := fsio.ReadText(f.hv(t.Kind, ref+".md"))
+	text, err := fsio.ReadText(f.rota(t.Kind, ref+".md"))
 	if err != nil {
 		return "", false, nil
 	}
@@ -160,7 +160,7 @@ func (f *File) Detail(ref string) (string, bool, error) {
 var kindPrefix = map[string]string{"bugs": "B", "features": "F", "tasks": "T", "milestones": "M"}
 
 // NextID bumps the counter for kind (bugs, features, tasks or milestones) in
-// .hv/counters.json and returns the new zero-padded ID such as "B07". The
+// .rota/counters.json and returns the new zero-padded ID such as "B07". The
 // counter never lags the highest ID already in BACKLOG.md or ARCHIVE.md.
 // Existing keys keep their position and a new key is appended, so the file
 // matches what the Python helper writes.
@@ -172,7 +172,7 @@ func (f *File) NextID(kind string) (string, error) {
 	pat := regexp.MustCompile(`\[` + prefix + `(\p{Nd}+)\]`)
 	highest := 0
 	for _, name := range []string{"BACKLOG.md", "ARCHIVE.md"} {
-		text, err := fsio.ReadText(f.hv(name))
+		text, err := fsio.ReadText(f.rota(name))
 		if err != nil {
 			continue
 		}
@@ -185,7 +185,7 @@ func (f *File) NextID(kind string) (string, error) {
 		}
 	}
 	var next int
-	err := fsio.UpdateJSON(f.hv("counters.json"), jsonx.NewObject(), func(v any) (any, error) {
+	err := fsio.UpdateJSON(f.rota("counters.json"), jsonx.NewObject(), func(v any) (any, error) {
 		d, ok := v.(*jsonx.Object)
 		if !ok {
 			return nil, errors.New("counters.json is not a JSON object")
@@ -196,7 +196,7 @@ func (f *File) NextID(kind string) (string, error) {
 			n, err := strconv.Atoi(string(num))
 			if err != nil {
 				// Python's max() lets a fractional counter through when an ID
-				// is higher; otherwise it writes the float and crashes. hv
+				// is higher; otherwise it writes the float and crashes. rota
 				// refuses before writing.
 				fl, ferr := strconv.ParseFloat(string(num), 64)
 				if ferr != nil || fl >= float64(highest) {

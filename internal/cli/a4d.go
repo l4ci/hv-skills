@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/issues"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/issues"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
-// The A4 `hv issues list|label|imported|close|provider` and `hv migrate
+// The A4 `rota issues list|label|imported|close|provider` and `rota migrate
 // issues` verbs. Shapes, flags and exits are the verb contract's
 // (docs/design/5.0-verb-contract.md); the old helpers named in each `old:`
 // line are the behaviour to match. These verbs exec gh or glab, always
@@ -58,7 +58,7 @@ func a4dScope(c *Ctx) (root, dir string, env issues.Env, err error) {
 			}
 		}
 	}
-	env = issues.Env{Settings: tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".hv", "config.json"))), Opts: trackerOptions}
+	env = issues.Env{Settings: tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".rota", "config.json"))), Opts: trackerOptions}
 	return
 }
 
@@ -184,7 +184,7 @@ func a4dLabel(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		auto, _ := config.Value(config.Load(filepath.Join(root, ".hv", "config.json")), "issues.autoCreateLabel")
+		auto, _ := config.Value(config.Load(filepath.Join(root, ".rota", "config.json")), "issues.autoCreateLabel")
 		changed, err := issues.Label(c.Context(), env, dir, number, name, action == "add", auto != false && auto != nil)
 		if err != nil {
 			return Result{}, a4dErr(err)
@@ -210,7 +210,7 @@ func a4dImported(fs *flag.FlagSet) RunFunc {
 		entries := backlog.ScanImported(root, *forRepo)
 		if *openOnly {
 			ctx := c.Context()
-			env := issues.Env{Settings: tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".hv", "config.json"))), Opts: trackerOptions}
+			env := issues.Env{Settings: tracker.SettingsFromConfig(config.Load(filepath.Join(root, ".rota", "config.json"))), Opts: trackerOptions}
 			paths := repos.Paths(root)
 			var kept []backlog.Imported
 			for _, e := range entries {
@@ -300,7 +300,7 @@ func a4dMigrateIssues(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 		// Notices are kept until the run's outcome is known: a failure answers
 		// with its error alone, so they go to stderr only.
 		var notices []string
@@ -340,7 +340,7 @@ func a4dMigrateFail(res *backlog.MigrateResult, err error) (Result, error) {
 		return Result{}, Resolution("%s", strings.TrimPrefix(err.Error(), backlog.ErrNothingToMigrate.Error()+": ")+" (nothing to migrate)")
 	case errors.Is(err, backlog.ErrUmbrellaMigrate):
 		return Result{Data: a4Obj("blockedBy", "umbrella", "changed", false)},
-			Refused("%s", err.Error()).WithHint("run hv migrate issues inside each sub-repo")
+			Refused("%s", err.Error()).WithHint("run rota migrate issues inside each sub-repo")
 	case errors.Is(err, backlog.ErrBadMap):
 		return Result{}, &Error{Exit: ExitInternal, Message: err.Error()}
 	case errors.As(err, &te):

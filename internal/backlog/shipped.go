@@ -8,10 +8,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
-// The duplicate-shipped audit behind `hv item shipped` (bin/hv-capture-audit):
+// The duplicate-shipped audit behind `rota item shipped` (bin/hv-capture-audit):
 // cheap heuristics only, distinctive tokens grepped against git log subjects
 // plus filesystem path checks.
 

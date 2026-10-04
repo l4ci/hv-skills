@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// WaitOpts are the flags of `hv round wait`.
+// WaitOpts are the flags of `rota round wait`.
 type WaitOpts struct {
 	Slots   []string      // empty: every slot with a handle whose recorded state is not idle
 	Timeout time.Duration // 0 waits indefinitely
@@ -37,7 +37,7 @@ type WaitResult struct {
 }
 
 // Wait blocks until a watched slot needs attention. The host only wakes it:
-// every wake re-classifies through the same code as `hv worker poll`, so
+// every wake re-classifies through the same code as `rota worker poll`, so
 // sentinels, LIMITED and DEAD outrank the host's native status. It reads the
 // registry and writes nothing.
 //
@@ -82,7 +82,7 @@ func (e Env) Wait(ctx context.Context, root string, o WaitOpts) (WaitResult, err
 		}
 	} else {
 		// Pool init seeds every slot idle, and gives a tmux slot a nominal
-		// handle (`hv:w1`) before anything runs in it. A recorded `idle` is
+		// handle (`rota:w1`) before anything runs in it. A recorded `idle` is
 		// "already reported or never started" (see Poll), so it is not
 		// watched, or a parked slot would end every wait at once. Dispatch
 		// records busy, which arms the slot.

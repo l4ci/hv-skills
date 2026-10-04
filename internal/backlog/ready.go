@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 var (
@@ -37,18 +37,18 @@ func readyReasons(criteria, note bool) []string {
 }
 
 // Ready lists what the item lacks to be startable (FileBackend.ready_reasons):
-// acceptance criteria in the detail file, or a design (.hv/designs/<ID>.md) or
-// plan (.hv/plans/*-<ID>.md) note. An empty list means ready.
+// acceptance criteria in the detail file, or a design (.rota/designs/<ID>.md) or
+// plan (.rota/plans/*-<ID>.md) note. An empty list means ready.
 func (f *File) Ready(ref string) ([]string, error) {
 	if _, _, ok := FindOrigin(f.Corpus(), ref); !ok {
 		return nil, errf(ErrNotFound, "[%s] not found in BACKLOG.md or ARCHIVE.md", ref)
 	}
 	note := false
-	if _, err := os.Stat(f.hv("designs", ref+".md")); err == nil {
+	if _, err := os.Stat(f.rota("designs", ref+".md")); err == nil {
 		note = true
 	}
 	if !note {
-		if entries, err := os.ReadDir(f.hv("plans")); err == nil {
+		if entries, err := os.ReadDir(f.rota("plans")); err == nil {
 			for _, e := range entries {
 				note = note || strings.HasSuffix(e.Name(), "-"+ref+".md")
 			}
@@ -174,14 +174,14 @@ func (f *File) AddComment(ref, kind, text string) (string, error) {
 			row += "\n"
 		}
 	}
-	path := f.hv(dir, ref+".md")
+	path := f.rota(dir, ref+".md")
 	if err := os.MkdirAll(filepath.Dir(path), 0o777); err != nil {
 		return "", err
 	}
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
 		content, err := fsio.ReadText(path)
 		if errors.Is(err, os.ErrNotExist) {
-			content = "# " + ref + ": " + title + "\n\n> Related TODO entry: `[" + ref + "]` in `.hv/BACKLOG.md`\n"
+			content = "# " + ref + ": " + title + "\n\n> Related TODO entry: `[" + ref + "]` in `.rota/BACKLOG.md`\n"
 		} else if err != nil {
 			return err
 		}

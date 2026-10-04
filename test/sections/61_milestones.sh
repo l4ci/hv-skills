@@ -4,15 +4,15 @@ TMP_MS="$(mktemp -d)"
 trap 'rm -rf "$TMP_MS"' EXIT
 
 for prov in github gitlab; do
-  P="$TMP_MS/$prov"; mkdir -p "$P/.hv"
-  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_MS/$prov"; mkdir -p "$P/.rota"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
     printf '# Project\n' > CLAUDE.md
     export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$P/db.json" FAKE_TRACKER_LOG="$P/log"
     eq() { [ "$2" = "$3" ] || fail "$prov $1: expected [$2] got [$3]"; }
-    # RC <hv call>: exit code in RCV, stdout (the envelope) in OUT
+    # RC <rota call>: exit code in RCV, stdout (the envelope) in OUT
     RC() { local rc=0; OUT="$("$@" 2>/dev/null)" || rc=$?; RCV=$rc; }
     # The fake tracker's own store stands in for reading the forge.
     # ISSUE n -> state|reason|sorted labels|native milestone
@@ -63,8 +63,8 @@ issues = {i["number"]: i for i in d["issues"]}
 body = issues[2]["body"]
 assert body.startswith("---\nid: M02\ntitle: Beta\nstatus: planned\ndepends: [M01]\n"), body
 assert "\n# M02 — Beta\n\n## Goal\n\nSecond summary\n" in body, body
-assert body.endswith("<!-- hv:fields\nDepends: M01\n-->"), body
-assert issues[1]["body"].count("hv:fields") == 0
+assert body.endswith("<!-- rota:fields\nDepends: M01\n-->"), body
+assert issues[1]["body"].count("rota:fields") == 0
 PY
 
     # --- status transitions
@@ -105,13 +105,13 @@ PY
     eq "status bad value" "2" "$RCV"
 
     # --- show / put round trip
-    "$HV_BIN" milestone show M02 > "$P/m02.md" || fail "$prov milestone show M02 failed"
+    "$ROTA_BIN" milestone show M02 > "$P/m02.md" || fail "$prov milestone show M02 failed"
     eq "show starts with frontmatter" "---" "$(head -1 "$P/m02.md")"
-    case "$(cat "$P/m02.md")" in *'hv:fields'*) fail "$prov show leaks the fields block" ;; esac
+    case "$(cat "$P/m02.md")" in *'rota:fields'*) fail "$prov show leaks the fields block" ;; esac
     printf '\n## Extra section\n\nLonger plan text.\n' >> "$P/m02.md"
     sed -i 's/^depends: .*/depends: [M01, M05]/' "$P/m02.md"
     eq "put changed" "true" "$(hvj milestone put M02 --body-file "$P/m02.md" | jget data.changed)"
-    eq "put round trip" "$(sed 's/^status: .*/status: active/' "$P/m02.md")" "$("$HV_BIN" milestone show M02)"
+    eq "put round trip" "$(sed 's/^status: .*/status: active/' "$P/m02.md")" "$("$ROTA_BIN" milestone show M02)"
     eq "put updates depends" "M02:active:false:M01+M05" "$(SUMMARY | tr ' ' '\n' | grep '^M02')"
     sed -i 's/^status: .*/status: shipped/' "$P/m02.md"
     hvj milestone put M02 --body-file - < "$P/m02.md" >/dev/null || fail "$prov put from stdin failed"
@@ -145,8 +145,8 @@ done
 
 # --- verb round trip with its own project: add -> put -> active -> index -> slice plans -> shipped
 for prov in github gitlab; do
-  P="$TMP_MS/rt-$prov"; mkdir -p "$P/.hv"
-  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_MS/rt-$prov"; mkdir -p "$P/.rota"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
@@ -167,24 +167,24 @@ for prov in github gitlab; do
 
     eq "add" "M01" "$(hvj milestone add --title "Launch" --summary "Ship the thing" | jget data.id)"
     eq "add dep" "M02" "$(hvj milestone add --title "Scale" --summary "Grow it" --depends M01 | jget data.id)"
-    [ ! -e .hv/milestones ] || fail "$prov issue mode wrote .hv/milestones"
-    OUT="$("$HV_BIN" milestone show M01)" || fail "$prov milestone show M01 failed"
+    [ ! -e .rota/milestones ] || fail "$prov issue mode wrote .rota/milestones"
+    OUT="$("$ROTA_BIN" milestone show M01)" || fail "$prov milestone show M01 failed"
     sed 's/_(define what shipped looks like)_/Users can sign up./' <<<"$OUT" > body.md
     hvj milestone put M01 --body-file body.md >/dev/null || fail "$prov put failed"
-    "$HV_BIN" milestone show M01 > shown.md || fail "$prov show failed"
+    "$ROTA_BIN" milestone show M01 > shown.md || fail "$prov show failed"
     HAS shown.md "Users can sign up." "put body"
     hvj milestone status M01 --to active >/dev/null || fail "$prov status active failed"
-    HAS .hv/MILESTONES.md "- M01 — Launch" "active list"
-    NOT .hv/MILESTONES.md "M02 —" "planned milestone not in the active list"
-    HAS .hv/MILESTONES.md "# Milestones" "seeded H1"
-    HAS .hv/MILESTONES.md "_(no vision yet" "seeded vision paragraph"
-    HAS .hv/MILESTONES.md "## Milestones" "seeded milestones heading"
+    HAS .rota/MILESTONES.md "- M01 — Launch" "active list"
+    NOT .rota/MILESTONES.md "M02 —" "planned milestone not in the active list"
+    HAS .rota/MILESTONES.md "# Milestones" "seeded H1"
+    HAS .rota/MILESTONES.md "_(no vision yet" "seeded vision paragraph"
+    HAS .rota/MILESTONES.md "## Milestones" "seeded milestones heading"
     HAS CLAUDE.md "- **M01** — Launch (depends: —)" "CLAUDE.md block"
     HAS CLAUDE.md "the tracking issues" "CLAUDE.md issue-mode pointer"
     HAS CLAUDE.md "Intro." "CLAUDE.md prose kept"
-    NOT .hv/MILESTONES.md "### M01" "no per-milestone overview section"
+    NOT .rota/MILESTONES.md "### M01" "no per-milestone overview section"
     eq "index idempotent" "false" "$(hvj milestone index | jget data.changed)"
-    eq "index keeps one block" "1" "$(grep -c 'hv-vision-start' CLAUDE.md)"
+    eq "index keeps one block" "1" "$(grep -c 'rota-vision-start' CLAUDE.md)"
     hvj milestone status M02 --to active >/dev/null || fail "$prov status active (M02) failed"
     HAS CLAUDE.md "- **M02** — Scale (depends: M01) ⚠ blocked" "blocked flag"
     eq "active ids" '["M01","M02"]' "$(hvj milestone active | jget data.ids)"
@@ -214,15 +214,15 @@ for prov in github gitlab; do
     RC hvj plan add --milestone M01 --slice --design M01 --title "Bad design"
     eq "slice design needs an item id" "2" "$RCV"
     hvj plan rm M01-S03 >/dev/null || fail "$prov plan rm S03 failed"
-    [ ! -e .hv/plans/M01-S01.md ] || fail "$prov slice plan written as a file"
+    [ ! -e .rota/plans/M01-S01.md ] || fail "$prov slice plan written as a file"
     RC hvj plan add M01-S01 --title "dup"
     eq "slice duplicate" "4" "$RCV"
     RC hvj plan add --milestone M09 --slice --title "no tracker"
     eq "slice on unknown milestone" "3" "$RCV"
-    OUT="$("$HV_BIN" plan show M01-S01)" || fail "$prov plan show M01-S01 failed"
+    OUT="$("$ROTA_BIN" plan show M01-S01)" || fail "$prov plan show M01-S01 failed"
     sed 's/^status: planned/status: active/' <<<"$OUT" > plan.md
     hvj plan put M01-S01 --body-file plan.md >/dev/null || fail "$prov plan put failed"
-    eq "slice put/show" "$(cat plan.md)" "$("$HV_BIN" plan show M01-S01)"
+    eq "slice put/show" "$(cat plan.md)" "$("$ROTA_BIN" plan show M01-S01)"
     RC hvj plan put M01-S07 --body-file plan.md
     eq "slice put missing" "3" "$RCV"
     hvj plan list > plan-list.json 2>/dev/null || fail "$prov plan list failed"
@@ -243,38 +243,38 @@ print(" ".join("%s:%s:%s:%s" % (p["key"], p["unitKind"], p["status"], p["title"]
     # ship
     hvj milestone status M01 --to shipped >/dev/null || fail "$prov ship M01 failed"
     hvj milestone status M02 --to shipped >/dev/null || fail "$prov ship M02 failed"
-    HAS .hv/MILESTONES.md "_(none active" "active list emptied"
+    HAS .rota/MILESTONES.md "_(none active" "active list emptied"
     HAS CLAUDE.md "all shipped or archived" "CLAUDE.md after ship"
     eq "nothing active" "[]" "$(hvj milestone active | jget data.ids)"
   )
 done
 
 # --- file mode: milestone put
-P="$TMP_MS/file"; mkdir -p "$P/.hv/milestones"
+P="$TMP_MS/file"; mkdir -p "$P/.rota/milestones"
 (
   cd "$P"
   git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
-  echo '{}' > .hv/counters.json
+  echo '{}' > .rota/counters.json
   eq() { [ "$2" = "$3" ] || fail "file mode $1: expected [$2] got [$3]"; }
   RC() { local rc=0; OUT="$("$@" 2>/dev/null)" || rc=$?; RCV=$rc; }
   eq "add" "M01" "$(hvj milestone add --title "Local" --summary "On disk" | jget data.id)"
-  sed 's/^title: Local/title: Local renamed/' .hv/milestones/M01.md > "$P/new.md"
+  sed 's/^title: Local/title: Local renamed/' .rota/milestones/M01.md > "$P/new.md"
   eq "put changed" "true" "$(hvj milestone put M01 --body-file "$P/new.md" | jget data.changed)"
-  eq "put writes the file" "$(cat "$P/new.md")" "$(cat .hv/milestones/M01.md)"
+  eq "put writes the file" "$(cat "$P/new.md")" "$(cat .rota/milestones/M01.md)"
   printf -- '---\nid: M01\ntitle: Via stdin\nstatus: planned\n---\n# body\n' | hvj milestone put M01 --body-file - >/dev/null || fail "file mode put from stdin failed"
-  eq "put from stdin" "title: Via stdin" "$(sed -n 3p .hv/milestones/M01.md)"
-  cp .hv/milestones/M01.md before.md
+  eq "put from stdin" "title: Via stdin" "$(sed -n 3p .rota/milestones/M01.md)"
+  cp .rota/milestones/M01.md before.md
   printf -- '---\nid: M02\ntitle: x\n---\n' > wrong.md
   RC hvj milestone put M01 --body-file wrong.md
   eq "id mismatch" "4" "$RCV"
   printf 'no frontmatter\n' > nofm.md
   RC hvj milestone put M01 --body-file nofm.md
   eq "no frontmatter" "4" "$RCV"
-  eq "refused put leaves the file" "$(cat before.md)" "$(cat .hv/milestones/M01.md)"
+  eq "refused put leaves the file" "$(cat before.md)" "$(cat .rota/milestones/M01.md)"
   printf -- '---\nid: M09\n---\n' > m09.md
   RC hvj milestone put M09 --body-file m09.md
   eq "unknown milestone" "3" "$RCV"
-  [ ! -e .hv/milestones/M09.md ] || fail "file mode put created M09"
+  [ ! -e .rota/milestones/M09.md ] || fail "file mode put created M09"
   RC hvj milestone put notanid --body-file m09.md
   eq "bad id" "2" "$RCV"
   RC hvj milestone put M01 --body-file "$P/nope.md"

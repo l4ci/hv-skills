@@ -1,8 +1,8 @@
-# `/hv-refactor` umbrella fanout
+# `/rota-refactor` umbrella fanout
 
-Loaded by `/hv-refactor` Step 2 when the user picks any "fanout" scope — *"All sub-repos"*, *"All + umbrella"*, or *"Pick a subset"*. The umbrella's `.git/` (if any) is handled by the *"Umbrella only"* branch, which stays in the SKILL.md.
+Loaded by `/rota-refactor` Step 2 when the user picks any "fanout" scope — *"All sub-repos"*, *"All + umbrella"*, or *"Pick a subset"*. The umbrella's `.git/` (if any) is handled by the *"Umbrella only"* branch, which stays in the SKILL.md.
 
-This reference covers the dispatch choreography end-to-end: collect umbrella context, build the per-target sub-agent prompt, launch all agents in parallel, aggregate the per-repo summaries, run a single counter reset, and exit before the single-repo Steps 2–10 would run. The sub-agent prompt template embedded below is the one variant fanout uses — single-repo `/hv-refactor` does not consult it.
+This reference covers the dispatch choreography end-to-end: collect umbrella context, build the per-target sub-agent prompt, launch all agents in parallel, aggregate the per-repo summaries, run a single counter reset, and exit before the single-repo Steps 2–10 would run. The sub-agent prompt template embedded below is the one variant fanout uses — single-repo `/rota-refactor` does not consult it.
 
 ## Dispatch
 
@@ -15,7 +15,7 @@ The umbrella concept — registry, resolution helpers, sub-repo `.git/` distinct
 **Dispatch sub-agents.** For each target (each chosen sub-repo, plus optionally the umbrella when "All + umbrella" was picked), build a single Agent call with this prompt template:
 
 ```
-You are a /hv-refactor sub-agent operating on a single repo within an umbrella project. Run a focused refactor cycle for THIS REPO ONLY.
+You are a /rota-refactor sub-agent operating on a single repo within an umbrella project. Run a focused refactor cycle for THIS REPO ONLY.
 
 Repo: <name>
 Path: <abs-path>
@@ -25,19 +25,19 @@ Umbrella: <umbrella-abs-path>
 
 1. cd <abs-path>
 
-2. Run `hv git guard clean --context "/hv-refactor" --repo <name>` (`hv` finds the umbrella's `.hv/` by walking up from here). If it exits non-zero (not a git repo, or uncommitted changes), stop and report "no changes" back.
+2. Run `rota git guard clean --context "/rota-refactor" --repo <name>` (`rota` finds the umbrella's `.rota/` by walking up from here). If it exits non-zero (not a git repo, or uncommitted changes), stop and report "no changes" back.
 
-3. Run a focused refactor cycle equivalent to /hv-refactor's Steps 2-9 on THIS REPO:
+3. Run a focused refactor cycle equivalent to /rota-refactor's Steps 2-9 on THIS REPO:
    a. Dispatch an exploration agent (orchestrator model: <orchestrator from config>) to explore THIS REPO ONLY for friction. Do not walk into the umbrella or other sub-repos.
    b. Triage findings; classify simple vs structural; categorize dependencies (in-process / local-substitutable / ports-and-adapters / true-external).
-   c. For structural items, design competing approaches if the umbrella's `.hv/config.json` has `refactor.confirmBeforeExecute: true`; otherwise pick the recommended approach and proceed (the config file lives at the umbrella, not here — read `<umbrella-abs-path>/.hv/config.json`).
+   c. For structural items, design competing approaches if the umbrella's `.rota/config.json` has `refactor.confirmBeforeExecute: true`; otherwise pick the recommended approach and proceed (the config file lives at the umbrella, not here — read `<umbrella-abs-path>/.rota/config.json`).
    d. Dispatch parallel worker agents (worker model: <worker from config>) for the fixes. File-disjoint fixes run in parallel; same-file fixes go to one worker; sequential dependencies serialize.
    e. Verify with a single verification agent (orchestrator model). Re-fix any FAIL verdicts.
    f. Commit in this repo's `.git/`. One commit for the cycle. Stage modified files explicitly (no `git add -A`).
 
 4. Do NOT:
-   - Run `hv refactor reset` — the umbrella orchestrator does that once at the end.
-   - Modify the umbrella's `.hv/`, `.claude*/`, or any other sub-repo.
+   - Run `rota refactor reset` — the umbrella orchestrator does that once at the end.
+   - Modify the umbrella's `.rota/`, `.claude*/`, or any other sub-repo.
    - Push or create PRs.
 
 ## Context for THIS sub-cycle
@@ -62,14 +62,14 @@ items: <N>
 ...
 ```
 
-The orchestrator and worker model names embedded in the prompt come from the umbrella's `.hv/config.json` `models.orchestrator` / `models.worker` (defaults `opus` / `sonnet`).
+The orchestrator and worker model names embedded in the prompt come from the umbrella's `.rota/config.json` `models.orchestrator` / `models.worker` (defaults `opus` / `sonnet`).
 
 **Wait for all sub-agents to complete**, then aggregate.
 
 ## After fanout returns
 
 1. Aggregate the per-repo summaries into a single umbrella-level report.
-2. Run `hv refactor reset` ONCE.
+2. Run `rota refactor reset` ONCE.
 3. Print the aggregated report. Format:
 
 ```

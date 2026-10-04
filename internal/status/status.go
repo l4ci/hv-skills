@@ -1,10 +1,10 @@
-// Package status owns .hv/status.json, the record of active work streams and
-// the loop timestamp, and the sub-repo registry in .hv/repos.json. It matches
+// Package status owns .rota/status.json, the record of active work streams and
+// the loop timestamp, and the sub-repo registry in .rota/repos.json. It matches
 // hv-status-add, hv-status-remove, hv-status-repo-for, hv-resolve-handoff,
 // hv-loop-stamp and hvlib_repos.load_repos.
 //
 // status.json is read and written as a jsonx tree, so keys the helpers do not
-// know and the order of the ones they do survive a round trip, and a file hv
+// know and the order of the ones they do survive a round trip, and a file rota
 // writes is byte for byte what the Python helpers write.
 package status
 
@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // Now is the clock stamps are taken from; tests replace it.
@@ -28,7 +28,7 @@ var Now = time.Now
 func Stamp() string { return Now().UTC().Format("2006-01-02T15:04:05Z") }
 
 // Path is the status.json of the project rooted at root.
-func Path(root string) string { return filepath.Join(root, ".hv", "status.json") }
+func Path(root string) string { return filepath.Join(root, ".rota", "status.json") }
 
 // Entry is one active work stream.
 type Entry struct {
@@ -230,19 +230,19 @@ func Find(root, branch, repo string) (Entry, bool) {
 // ---- handoff -----------------------------------------------------------------
 
 // ErrEscapes is returned for a branch whose handoff path would leave
-// .hv/handoff.
-var ErrEscapes = errors.New("branch name escapes .hv/handoff")
+// .rota/handoff.
+var ErrEscapes = errors.New("branch name escapes .rota/handoff")
 
 // HandoffPath is the canonical handoff note path, relative to the project
-// root with forward slashes: .hv/handoff/<branch>[@<repo>].md. A "/" in the
+// root with forward slashes: .rota/handoff/<branch>[@<repo>].md. A "/" in the
 // branch stays literal.
 func HandoffPath(branch, repo string) (string, error) {
 	name := branch
 	if repo != "" {
 		name += "@" + repo
 	}
-	p := ".hv/handoff/" + name + ".md"
-	rel, err := filepath.Rel(".hv/handoff", filepath.FromSlash(p))
+	p := ".rota/handoff/" + name + ".md"
+	rel, err := filepath.Rel(".rota/handoff", filepath.FromSlash(p))
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		return "", ErrEscapes
 	}

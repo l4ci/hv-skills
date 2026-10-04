@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // bulletRe is a dated, titled bullet: "- **Title** — body <!-- YYYY-MM-DD -->".
@@ -37,7 +37,7 @@ func (s Store) Query(scope string, topics []string, o QueryOpts) (text string, m
 		tiers map[[2]string]string
 		label string
 	}
-	pairs := []pair{{umbrellaFile, umbrellaTier, ".hv/KNOWLEDGE.md"}}
+	pairs := []pair{{umbrellaFile, umbrellaTier, ".rota/KNOWLEDGE.md"}}
 	hybrid := scope != "" && scope != Umbrella
 	if hybrid {
 		f, err := s.KnowledgePath(scope)
@@ -48,7 +48,7 @@ func (s Store) Query(scope string, topics []string, o QueryOpts) (text string, m
 		if err != nil {
 			return "", nil, err
 		}
-		pairs = append(pairs, pair{f, t, ".hv/knowledge/" + scope + "/KNOWLEDGE.md"})
+		pairs = append(pairs, pair{f, t, ".rota/knowledge/" + scope + "/KNOWLEDGE.md"})
 	}
 
 	filter := func(body, name string, tiers map[[2]string]string) []string {

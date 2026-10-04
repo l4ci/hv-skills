@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/repos"
 )
 
-// reviewCommands is the `hv review` group (A8, #52).
+// reviewCommands is the `rota review` group (A8, #52).
 func reviewCommands() *Command {
 	return &Command{Name: "review", Summary: "scope a review, build the second-opinion brief, scan for scaffolding", Subs: []*Command{
 		{Name: "scope", Summary: "commits, files, item IDs and origin entries of a branch", Repo: true, Verb: noFlags(reviewScope)},
@@ -379,7 +379,7 @@ func a8Issues(c *Ctx, hint string, perRepo bool) (a8Backend, error) {
 	if _, err := c.RepoPath(); err != nil {
 		return nil, err
 	}
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	if name, err := config.Backend(cfg); err == nil && name == "file" {
 		return nil, &backlog.RefusedError{BlockedBy: "backend", Hint: hint, Err: backlog.ErrWrongBackend,
 			Msg: c.Path + ` is not available with backlog.backend "file"`}
@@ -404,7 +404,7 @@ func a8Issues(c *Ctx, hint string, perRepo bool) (a8Backend, error) {
 
 func reviewQueue(c *Ctx, args []string) (Result, error) {
 	if len(args) > 0 {
-		return Result{}, Usage("usage: hv review queue")
+		return Result{}, Usage("usage: rota review queue")
 	}
 	be, err := a8Issues(c, "", false)
 	if err != nil {

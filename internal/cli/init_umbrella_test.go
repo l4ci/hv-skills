@@ -2,7 +2,7 @@ package cli
 
 import (
 	"bytes"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -23,21 +23,21 @@ func umbrellaFixture(t *testing.T, kids ...string) string {
 
 func TestInitUmbrellaList(t *testing.T) {
 	root := umbrellaFixture(t, "web", "api")
-	code, env, stderr := hvRun(t, "--json", "-C", root, "init", "umbrella", "--list")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "init", "umbrella", "--list")
 	data := umbData(env)
 	if code != 0 || data["root"] != root || data["isGitRepo"] != false || !reflect.DeepEqual(data["candidates"], []any{"api", "web"}) {
 		t.Fatalf("code=%d env=%v stderr=%s", code, env, stderr)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv")); err == nil {
-		t.Fatal("--list wrote .hv")
+	if _, err := os.Stat(filepath.Join(root, ".rota")); err == nil {
+		t.Fatal("--list wrote .rota")
 	}
 	// no candidates is an answer, not an error
-	code, env, _ = hvRun(t, "--json", "-C", t.TempDir(), "init", "umbrella", "--list")
+	code, env, _ = rotaRun(t, "--json", "-C", t.TempDir(), "init", "umbrella", "--list")
 	if code != 0 || len(umbData(env)["candidates"].([]any)) != 0 {
 		t.Fatalf("code=%d env=%v", code, env)
 	}
 	for _, argv := range [][]string{{"--list", "--all"}, {"--list", "--repos", "web"}} {
-		if code, _, _ := hvRun(t, append([]string{"-C", root, "init", "umbrella"}, argv...)...); code != ExitUsage {
+		if code, _, _ := rotaRun(t, append([]string{"-C", root, "init", "umbrella"}, argv...)...); code != ExitUsage {
 			t.Fatalf("%v: code=%d", argv, code)
 		}
 	}
@@ -47,10 +47,10 @@ func TestInitUmbrellaRegisters(t *testing.T) {
 	root := umbrellaFixture(t, "web", "api")
 	os.MkdirAll(filepath.Join(root, ".git"), 0o755)
 	var seededAt string
-	seedBase = func(r string) error { seededAt = r; return os.MkdirAll(filepath.Join(r, ".hv", "bugs"), 0o755) }
+	seedBase = func(r string) error { seededAt = r; return os.MkdirAll(filepath.Join(r, ".rota", "bugs"), 0o755) }
 	t.Cleanup(func() { seedBase = nil })
 
-	code, env, stderr := hvRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "web,nope")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "web,nope")
 	data := umbData(env)
 	if code != 0 || seededAt != root || data["root"] != root || data["umbrellaIsGitRepo"] != true || data["changed"] != true ||
 		!reflect.DeepEqual(data["registered"], []any{"web"}) {
@@ -60,18 +60,18 @@ func TestInitUmbrellaRegisters(t *testing.T) {
 		t.Fatalf("warnings=%v", env["warnings"])
 	}
 	created := data["created"].([]any)
-	for _, want := range []string{".hv/bugs", ".hv/repos.json", ".hv/knowledge/web", ".gitignore"} {
+	for _, want := range []string{".rota/bugs", ".rota/repos.json", ".rota/knowledge/web", ".gitignore"} {
 		if !containsAny(created, want) {
 			t.Errorf("created lacks %s: %v", want, created)
 		}
 	}
 	// second run: nothing to do
-	code, env, _ = hvRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "web")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "web")
 	if data = umbData(env); code != 0 || data["changed"] != false || len(data["created"].([]any)) != 0 {
 		t.Fatalf("rerun: code=%d env=%v", code, env)
 	}
 	// --repos "" registers none but keeps the prior web
-	code, env, _ = hvRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "init", "umbrella", "--repos", "")
 	if code != 0 || !reflect.DeepEqual(umbData(env)["registered"], []any{"web"}) {
 		t.Fatalf("empty repos: code=%d env=%v", code, env)
 	}
@@ -89,21 +89,21 @@ func containsAny(l []any, s string) bool {
 func TestInitUmbrellaExits(t *testing.T) {
 	root := umbrellaFixture(t, "web")
 	for _, argv := range [][]string{{}, {"--all", "--repos", "web"}, {"--all", "extra"}} {
-		if code, _, _ := hvRun(t, append([]string{"-C", root, "init", "umbrella"}, argv...)...); code != ExitUsage {
+		if code, _, _ := rotaRun(t, append([]string{"-C", root, "init", "umbrella"}, argv...)...); code != ExitUsage {
 			t.Fatalf("%v: code=%d", argv, code)
 		}
 	}
 	empty := t.TempDir()
-	if code, _, _ := hvRun(t, "-C", empty, "init", "umbrella", "--all"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "-C", empty, "init", "umbrella", "--all"); code != ExitResolution {
 		t.Fatalf("no children: code=%d", code)
 	}
-	if _, err := os.Stat(filepath.Join(empty, ".hv")); err == nil {
-		t.Fatal("exit 3 left .hv behind")
+	if _, err := os.Stat(filepath.Join(empty, ".rota")); err == nil {
+		t.Fatal("exit 3 left .rota behind")
 	}
 }
 
 func TestVersionDrift(t *testing.T) {
-	root := a4Project(t, `{"hv": {"version": "4.9.0"}}`)
+	root := a4Project(t, `{"rota": {"version": "4.9.0"}}`)
 	old := installedVersionFn
 	t.Cleanup(func() { installedVersionFn = old })
 
@@ -113,7 +113,7 @@ func TestVersionDrift(t *testing.T) {
 	}{{"4.9.0", "match", false}, {"5.0.0", "drift", true}, {"", "unknown", false}}
 	for _, tc := range cases {
 		installedVersionFn = func() string { return tc.installed }
-		code, env, stderr := hvRun(t, "--json", "-C", root, "version", "--drift")
+		code, env, stderr := rotaRun(t, "--json", "-C", root, "version", "--drift")
 		d := umbData(env)
 		if code != 0 || d["status"] != tc.status || d["drift"] != tc.drift || d["stamped"] != "4.9.0" ||
 			d["installed"] != tc.installed || d["version"] != tc.installed {
@@ -126,7 +126,7 @@ func TestVersionDrift(t *testing.T) {
 	wd, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(wd) })
 	var out, errb bytes.Buffer
-	if code := Main([]string{"-C", root, "version", "--drift"}, nil, &out, &errb); code != 0 || !strings.HasPrefix(out.String(), "hv drift: project at 4.9.0, binary at 5.0.0") {
+	if code := Main([]string{"-C", root, "version", "--drift"}, nil, &out, &errb); code != 0 || !strings.HasPrefix(out.String(), "rota drift: project at 4.9.0, binary at 5.0.0") {
 		t.Fatalf("code=%d out=%q", code, out.String())
 	}
 	out.Reset()
@@ -139,24 +139,24 @@ func TestVersionDrift(t *testing.T) {
 	// no stamp is unknown; config.local.json overrides the stamp
 	bare := a4Project(t, "")
 	installedVersionFn = func() string { return "5.0.0" }
-	if _, env, _ := hvRun(t, "--json", "-C", bare, "version", "--drift"); umbData(env)["status"] != "unknown" {
+	if _, env, _ := rotaRun(t, "--json", "-C", bare, "version", "--drift"); umbData(env)["status"] != "unknown" {
 		t.Fatalf("env=%v", env)
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "config.local.json"), []byte(`{"hv": {"version": "5.0.0"}}`), 0o644)
-	if _, env, _ := hvRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
+	os.WriteFile(filepath.Join(root, ".rota", "config.local.json"), []byte(`{"rota": {"version": "5.0.0"}}`), 0o644)
+	if _, env, _ := rotaRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
 		t.Fatalf("local override ignored: env=%v", env)
 	}
 
-	// no .hv/ anywhere: exit 3
-	if code, _, _ := hvRun(t, "-C", t.TempDir(), "version", "--drift"); code != ExitResolution {
-		t.Fatalf("no .hv: code=%d", code)
+	// no .rota/ anywhere: exit 3
+	if code, _, _ := rotaRun(t, "-C", t.TempDir(), "version", "--drift"); code != ExitResolution {
+		t.Fatalf("no .rota: code=%d", code)
 	}
-	if code, _, _ := hvRun(t, "version", "extra", "--drift"); code != ExitUsage {
+	if code, _, _ := rotaRun(t, "version", "extra", "--drift"); code != ExitUsage {
 		t.Fatalf("extra arg: code=%d", code)
 	}
 }
 
-// umbData is env["data"] as a plain map; hvRun decodes objects as *jsonx.Object.
+// umbData is env["data"] as a plain map; rotaRun decodes objects as *jsonx.Object.
 func umbData(env map[string]any) map[string]any {
 	m := map[string]any{}
 	if o, ok := env["data"].(*jsonx.Object); ok {
@@ -168,29 +168,29 @@ func umbData(env map[string]any) map[string]any {
 }
 
 // A project that still carries the pre-rename hvSkills.version reports drift
-// from it, and hv init moves it to hv.version stamped with the binary version.
+// from it, and rota init moves it to rota.version stamped with the binary version.
 func TestVersionDriftReadsLegacyKeyAndInitMigratesIt(t *testing.T) {
 	root := a4Project(t, `{"hvSkills": {"version": "4.9.0"}}`)
 	old := installedVersionFn
 	t.Cleanup(func() { installedVersionFn = old })
 	installedVersionFn = func() string { return "5.0.0" }
 
-	_, env, stderr := hvRun(t, "--json", "-C", root, "version", "--drift")
+	_, env, stderr := rotaRun(t, "--json", "-C", root, "version", "--drift")
 	if d := umbData(env); d["stamped"] != "4.9.0" || d["status"] != "drift" {
 		t.Fatalf("legacy key not read: env=%v stderr=%s", env, stderr)
 	}
 
-	if code, env, stderr := hvRun(t, "--json", "-C", root, "init", "--no-blocks"); code != 0 {
+	if code, env, stderr := rotaRun(t, "--json", "-C", root, "init", "--no-blocks"); code != 0 {
 		t.Fatalf("init: code=%d env=%v stderr=%s", code, env, stderr)
 	}
-	cfg := readCfg(t, filepath.Join(root, ".hv", "config.json"))
-	if v, _ := lookupDotted(cfg, "hv.version"); v != "5.0.0" {
-		t.Errorf("hv.version = %v, want 5.0.0", v)
+	cfg := readCfg(t, filepath.Join(root, ".rota", "config.json"))
+	if v, _ := lookupDotted(cfg, "rota.version"); v != "5.0.0" {
+		t.Errorf("rota.version = %v, want 5.0.0", v)
 	}
 	if _, ok := lookupDotted(cfg, "hvSkills"); ok {
 		t.Errorf("hvSkills left in config: %v", cfg)
 	}
-	if _, env, _ := hvRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
+	if _, env, _ := rotaRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
 		t.Errorf("drift not cleared: %v", env)
 	}
 }

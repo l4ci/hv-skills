@@ -43,15 +43,15 @@ func write(t *testing.T, path, text string) {
 	}
 }
 
-// umbrella builds root/.hv with repos.json registering svc and web (both
+// umbrella builds root/.rota with repos.json registering svc and web (both
 // repos on main) and a ghost entry whose directory does not exist.
 func umbrella(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	newRepo(t, root, "svc", "main")
 	newRepo(t, root, "web", "main")
-	write(t, filepath.Join(root, ".hv", "config.json"), `{}`)
-	write(t, filepath.Join(root, ".hv", "repos.json"),
+	write(t, filepath.Join(root, ".rota", "config.json"), `{}`)
+	write(t, filepath.Join(root, ".rota", "repos.json"),
 		`{"repos":[{"name":"svc","path":"svc"},{"name":"web","path":"web"},{"name":"ghost","path":"ghost"}]}`)
 	return root
 }
@@ -90,9 +90,9 @@ func TestGitBase(t *testing.T) {
 	main := newRepo(t, d, "main", "main")
 	master := newRepo(t, d, "master", "master")
 	dev := newRepo(t, d, "dev", "dev")
-	write(t, filepath.Join(dev, ".hv", "config.json"), `{"git":{"baseBranch":"dev"}}`)
+	write(t, filepath.Join(dev, ".rota", "config.json"), `{"git":{"baseBranch":"dev"}}`)
 	stale := newRepo(t, d, "stale", "main")
-	write(t, filepath.Join(stale, ".hv", "config.json"), `{"git":{"baseBranch":"gone"}}`)
+	write(t, filepath.Join(stale, ".rota", "config.json"), `{"git":{"baseBranch":"gone"}}`)
 	fresh := filepath.Join(d, "fresh")
 	os.Mkdir(fresh, 0o755)
 	gitT(t, fresh, "init", "-q")
@@ -103,10 +103,10 @@ func TestGitBase(t *testing.T) {
 
 	u := umbrella(t)
 	gitT(t, filepath.Join(u, "svc"), "branch", "-m", "main", "trunk")
-	// A stray .hv/ in a registered sub-repo masks its config.
+	// A stray .rota/ in a registered sub-repo masks its config.
 	masked := filepath.Join(u, "web")
 	gitT(t, masked, "branch", "dev")
-	write(t, filepath.Join(masked, ".hv", "config.json"), `{"git":{"baseBranch":"dev"}}`)
+	write(t, filepath.Join(masked, ".rota", "config.json"), `{"git":{"baseBranch":"dev"}}`)
 
 	b := func(s string) map[string]any { return map[string]any{"base": s} }
 	runGitCases(t, []gitCase{
@@ -149,13 +149,13 @@ func TestGitGuardClean(t *testing.T) {
 		{name: "dirty", dir: dirty, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, false)},
 		{name: "fresh", dir: fresh, args: []string{"git", "guard", "clean"}, code: 1, data: res(false, true)},
 		{name: "not a repo", dir: plain, args: []string{"git", "guard", "clean"}, code: 3},
-		{name: "umbrella", dir: u, args: []string{"git", "guard", "clean", "--context", "/hv-work"}, code: 1,
+		{name: "umbrella", dir: u, args: []string{"git", "guard", "clean", "--context", "/rota-work"}, code: 1,
 			data: res(false, false, "web", "ghost (not a git repo at ghost)")},
 		{name: "umbrella --repo clean", dir: u, args: []string{"git", "guard", "clean", "--repo", "svc"}, data: res(true, false)},
 		{name: "umbrella --repo dirty", dir: u, args: []string{"git", "guard", "clean", "--repo", "web"}, code: 1, data: res(false, false)},
 	})
-	o := trRun(t, dirty, "", "git", "guard", "clean", "--context", "/hv-ship")
-	if !strings.Contains(o.stderr, "before running /hv-ship") {
+	o := trRun(t, dirty, "", "git", "guard", "clean", "--context", "/rota-ship")
+	if !strings.Contains(o.stderr, "before running /rota-ship") {
 		t.Errorf("--context not in the message: %q", o.stderr)
 	}
 }

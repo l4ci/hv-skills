@@ -1,4 +1,4 @@
-// Package config loads .hv/config.json with .hv/config.local.json
+// Package config loads .rota/config.json with .rota/config.local.json
 // deep-merged on top, matching hvlib_io.load_config.
 package config
 
@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Load reads configPath and merges config.local.json from the same directory

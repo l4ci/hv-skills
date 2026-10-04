@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 const migBacklog = `# TODO
@@ -22,7 +22,7 @@ const migBacklog = `# TODO
 - **[B02] [P2] Second bug.** Other. Repos: web
 
 ## Features
-- **[F01] [Major] Feature.** Body. Detail: ` + "`.hv/features/F01.md`" + ` Related: [B01]
+- **[F01] [Major] Feature.** Body. Detail: ` + "`.rota/features/F01.md`" + ` Related: [B01]
 
 ## Tasks
 - **[T01] Task.** Do it.
@@ -43,11 +43,11 @@ func migProject(t *testing.T, files map[string]string) string {
 			t.Fatal(err)
 		}
 	}
-	put(".hv/BACKLOG.md", migBacklog)
-	put(".hv/features/F01.md", "# F01\n\nbody text\n\n## Proof\n- ok\n\n## Log\nlog\n")
-	put(".hv/designs/T01.md", "design of [B01] and F01\n")
-	put(".hv/milestones/M01.md", "---\nid: M01\ntitle: Core\nstatus: active\ndepends: []\n---\n\n# M01 — Core\n\n## Goal\n\nBuild it.\n\nSee B01.\n")
-	put(".hv/plans/M01-S01.md", "slice [B01] and T1\n")
+	put(".rota/BACKLOG.md", migBacklog)
+	put(".rota/features/F01.md", "# F01\n\nbody text\n\n## Proof\n- ok\n\n## Log\nlog\n")
+	put(".rota/designs/T01.md", "design of [B01] and F01\n")
+	put(".rota/milestones/M01.md", "---\nid: M01\ntitle: Core\nstatus: active\ndepends: []\n---\n\n# M01 — Core\n\n## Goal\n\nBuild it.\n\nSee B01.\n")
+	put(".rota/plans/M01-S01.md", "slice [B01] and T1\n")
 	for rel, text := range files {
 		put(rel, text)
 	}
@@ -101,10 +101,10 @@ func TestMigratePreviewTouchesNothing(t *testing.T) {
 	if res.Total != 4 || res.Migrated != 0 || res.Changed {
 		t.Errorf("total %d migrated %d changed %v", res.Total, res.Migrated, res.Changed)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv", "issue-map.json")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, ".rota", "issue-map.json")); err == nil {
 		t.Error("a preview wrote the map")
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md")); string(b) != migBacklog {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md")); string(b) != migBacklog {
 		t.Error("a preview changed BACKLOG.md")
 	}
 	if len(*warns) != 0 {
@@ -133,7 +133,7 @@ func TestMigrateApplyAndNoop(t *testing.T) {
 	if got := f.Issues[1].Body; !strings.Contains(got, "Related: [F4]") || !strings.Contains(got, "Since: abc1234") || !strings.Contains(got, "Related before migration (not migrated): B08") {
 		t.Errorf("B01 body %q", got)
 	}
-	if len(f.Issues[3].Comments) != 1 || !strings.HasPrefix(f.Issues[3].Comments[0].Body, "<!-- hv:proof -->") {
+	if len(f.Issues[3].Comments) != 1 || !strings.HasPrefix(f.Issues[3].Comments[0].Body, "<!-- rota:proof -->") {
 		t.Errorf("F01 comments %+v", f.Issues[3].Comments)
 	}
 	if got := f.Issues[4].Comments[0].Body; !strings.Contains(got, "[B2]") && !strings.Contains(got, "F4") {
@@ -142,7 +142,7 @@ func TestMigrateApplyAndNoop(t *testing.T) {
 	if !slices.Contains(f.Issues[0].Labels, "status:active") {
 		t.Errorf("milestone labels %v", f.Issues[0].Labels)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md")); !strings.HasPrefix(string(b), "> Frozen: this backlog moved to the issue tracker on 2026-10-02") {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md")); !strings.HasPrefix(string(b), "> Frozen: this backlog moved to the issue tracker on 2026-10-02") {
 		t.Errorf("not frozen: %q", b)
 	}
 	if len(*warns) != 0 {
@@ -222,7 +222,7 @@ func TestMigrateLimitResumes(t *testing.T) {
 	if err != nil || res.Done || res.Migrated != 2 {
 		t.Fatalf("first run: %v done %v migrated %d", err, res.Done, res.Migrated)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md")); string(b) != migBacklog {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md")); string(b) != migBacklog {
 		t.Error("froze before every item existed")
 	}
 	if last := res.Lines[len(res.Lines)-1]; !strings.HasPrefix(last, "2 items remaining;") {
@@ -260,7 +260,7 @@ func TestMigrateTrackerStopsKeepProgress(t *testing.T) {
 	if got := strings.Join(res.Lines, "\n"); !strings.Contains(got, "rate limited: 4 of 4 items migrated") || !strings.Contains(got, "re-run to continue") {
 		t.Errorf("lines %q", got)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md")); string(b) != migBacklog {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md")); string(b) != migBacklog {
 		t.Error("froze after a failure")
 	}
 	// resume finishes
@@ -289,18 +289,18 @@ func TestMigrateRefusals(t *testing.T) {
 	if _, err := MigrateIssues(o); !errors.Is(err, ErrNothingToMigrate) {
 		t.Errorf("no backlog: %v", err)
 	}
-	root := migProject(t, map[string]string{".hv/repos.json": `{"repos": [{"name": "web", "path": "web"}]}`})
+	root := migProject(t, map[string]string{".rota/repos.json": `{"repos": [{"name": "web", "path": "web"}]}`})
 	o, _, _ = newMig(t, root, true, nil)
 	if _, err := MigrateIssues(o); !errors.Is(err, ErrUmbrellaMigrate) {
 		t.Errorf("umbrella: %v", err)
 	}
-	root = migProject(t, map[string]string{".hv/issue-map.json": "[]"})
+	root = migProject(t, map[string]string{".rota/issue-map.json": "[]"})
 	o, _, _ = newMig(t, root, true, nil)
 	if _, err := MigrateIssues(o); !errors.Is(err, ErrBadMap) {
 		t.Errorf("array map: %v", err)
 	}
 	// a map that does not parse starts over
-	root = migProject(t, map[string]string{".hv/issue-map.json": "{oops"})
+	root = migProject(t, map[string]string{".rota/issue-map.json": "{oops"})
 	o, _, _ = newMig(t, root, false, nil)
 	if _, err := MigrateIssues(o); err != nil {
 		t.Errorf("unparseable map: %v", err)
@@ -308,7 +308,7 @@ func TestMigrateRefusals(t *testing.T) {
 }
 
 func TestMigrateWarnings(t *testing.T) {
-	root := migProject(t, map[string]string{".hv/BACKLOG.md": "# TODO\n\n## Bugs\n- **[B01] [P9] Odd tag.** a Milestone: M07\n- **[B02] [P1] Fine.** b Milestone: M09\n"})
+	root := migProject(t, map[string]string{".rota/BACKLOG.md": "# TODO\n\n## Bugs\n- **[B01] [P9] Odd tag.** a Milestone: M07\n- **[B02] [P1] Fine.** b Milestone: M09\n"})
 	f := &trackertest.MS{Fake: &trackertest.Fake{Milestones: []string{"M09 — Shipped"}}}
 	o, warns, _ := newMig(t, root, true, f)
 	if _, err := MigrateIssues(o); err != nil {
@@ -358,9 +358,9 @@ func TestScanImported(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	put(".hv/BACKLOG.md", "# T\n\n## Bugs\n- **[B01] [P1] A.** GH: #5 GL:#6 Repos: web, api Related: [F01]\n- **[B02] [P1] B.** GH:   #7\n\n## Completed\n- ~~**[B03] [P1] C.** GH: #8~~ Done 2026-01-01 [`a`]\n")
-	put(".hv/ARCHIVE.md", "## Old\n- ~~**[B01] [P1] A.** GH: #5 Repos: web Related: [F01]~~ Done 2026-01-01 [`a`]\n- ~~**[F05] [Minor] D.** GL: #9~~ Done 2026-01-01 [`a`]\n")
-	put(".hv/bugs/B02.md", "GH: #7\nGH: #70\n")
+	put(".rota/BACKLOG.md", "# T\n\n## Bugs\n- **[B01] [P1] A.** GH: #5 GL:#6 Repos: web, api Related: [F01]\n- **[B02] [P1] B.** GH:   #7\n\n## Completed\n- ~~**[B03] [P1] C.** GH: #8~~ Done 2026-01-01 [`a`]\n")
+	put(".rota/ARCHIVE.md", "## Old\n- ~~**[B01] [P1] A.** GH: #5 Repos: web Related: [F01]~~ Done 2026-01-01 [`a`]\n- ~~**[F05] [Minor] D.** GL: #9~~ Done 2026-01-01 [`a`]\n")
+	put(".rota/bugs/B02.md", "GH: #7\nGH: #70\n")
 	got := ScanImported(root, "")
 	want := []Imported{
 		{"github", "web", 5, "B01", "open"}, {"github", "api", 5, "B01", "open"},

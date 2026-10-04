@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Sentinels for the failures the verbs map to exit codes.

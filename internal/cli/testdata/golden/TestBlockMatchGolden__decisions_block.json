@@ -12,7 +12,7 @@
     "stderr": "",
     "rc": 0,
     "changed": {
-      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-decisions-start --\u003e\n## Project Decisions\n\nHard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:\n\n- Architecture\n\n\u003c!-- hv-decisions-end --\u003e\n"
+      "../AGENTS.md": "# Agents\n\n\u003c!-- rota-decisions-start --\u003e\n## Project Decisions\n\nHard boundaries live in `.rota/DECISIONS.md`. Consult them before acting on work that touches these topics:\n\n- Architecture\n\n\u003c!-- rota-decisions-end --\u003e\n"
     },
     "removed": []
   }

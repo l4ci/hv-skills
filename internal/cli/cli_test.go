@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // testTree exercises every convention without depending on real verbs.
@@ -21,7 +21,7 @@ func testTree() *Command {
 	plain := func(run RunFunc) func(*flag.FlagSet) RunFunc {
 		return func(*flag.FlagSet) RunFunc { return run }
 	}
-	return &Command{Name: "hv", Summary: "test root", Subs: []*Command{
+	return &Command{Name: "rota", Summary: "test root", Subs: []*Command{
 		{Name: "grp", Summary: "a group", Subs: []*Command{
 			{Name: "echo", Summary: "echo args", Repo: true, Verb: func(fs *flag.FlagSet) RunFunc {
 				title := fs.String("title", "", "a `text` value")
@@ -47,7 +47,7 @@ func testTree() *Command {
 			wd, _ := os.Getwd()
 			return Result{Data: data("cwd", wd), Text: wd}, nil
 		})},
-		{Name: "root", Summary: "finds .hv", Verb: plain(func(c *Ctx, _ []string) (Result, error) {
+		{Name: "root", Summary: "finds .rota", Verb: plain(func(c *Ctx, _ []string) (Result, error) {
 			r, err := c.Root()
 			return Result{Text: r}, err
 		})},
@@ -120,46 +120,46 @@ func TestExitCodesAndEnvelope(t *testing.T) {
 		{[]string{"grp", "echo", "--title", "-h", "--json"}, 0, echo("", "-h", false, ""), ""},
 		{[]string{"grp", "echo", "-title=x", "--force=false", "--title", "y"}, 0, "title=y force=false args=\n", ""},
 		{[]string{"grp", "echo", "-", "--", "--json", "-h"}, 0, "title= force=false args=-,--json,-h\n", ""},
-		{[]string{"grp", "warn", "--json"}, 0, `{"ok": true, "data": {}, "warnings": ["careful"]}` + "\n", "hv grp warn: warning: careful\n"},
+		{[]string{"grp", "warn", "--json"}, 0, `{"ok": true, "data": {}, "warnings": ["careful"]}` + "\n", "rota grp warn: warning: careful\n"},
 		// Usage errors.
-		{[]string{"nope"}, 2, "", "hv: unknown command \"nope\"\nhint: run: hv --help\n"},
-		{[]string{}, 2, "", "hv: missing command"},
-		{[]string{"grp"}, 2, "", "hv grp: missing verb; one of: echo, warn\n"},
-		{[]string{"grp", "nope", "--json"}, 2, `{"ok": false, "error": {"code": "usage", "exit": 2, "message": "unknown command \"nope\"", "hint": "run: hv grp --help"}}` + "\n", "hv grp: unknown command"},
-		{[]string{"--title", "x", "grp", "echo"}, 2, "", "hv: unknown flag \"--title\"\n"},
-		{[]string{"grp", "echo", "--bogus"}, 2, "", "hv grp echo: unknown flag \"--bogus\"\n"},
-		{[]string{"grp", "echo", "--title"}, 2, "", "hv grp echo: flag --title needs a value\n"},
-		{[]string{"grp", "echo", "--force=maybe"}, 2, "", "hv grp echo: invalid value \"maybe\" for --force\n"},
+		{[]string{"nope"}, 2, "", "rota: unknown command \"nope\"\nhint: run: rota --help\n"},
+		{[]string{}, 2, "", "rota: missing command"},
+		{[]string{"grp"}, 2, "", "rota grp: missing verb; one of: echo, warn\n"},
+		{[]string{"grp", "nope", "--json"}, 2, `{"ok": false, "error": {"code": "usage", "exit": 2, "message": "unknown command \"nope\"", "hint": "run: rota grp --help"}}` + "\n", "rota grp: unknown command"},
+		{[]string{"--title", "x", "grp", "echo"}, 2, "", "rota: unknown flag \"--title\"\n"},
+		{[]string{"grp", "echo", "--bogus"}, 2, "", "rota grp echo: unknown flag \"--bogus\"\n"},
+		{[]string{"grp", "echo", "--title"}, 2, "", "rota grp echo: flag --title needs a value\n"},
+		{[]string{"grp", "echo", "--force=maybe"}, 2, "", "rota grp echo: invalid value \"maybe\" for --force\n"},
 		{[]string{"grp", "echo", "---x"}, 2, "", "bad flag syntax"},
-		{[]string{"--", "grp", "echo"}, 2, "", "hv: unexpected -- before the verb\n"},
-		{[]string{"cwd", "--repo", "x"}, 2, "", "hv cwd: unknown flag \"--repo\"\n"},
-		{[]string{"--repo", "x", "cwd"}, 2, "", "hv cwd: unknown flag \"--repo\"\n"},
-		{[]string{"--repo"}, 2, "", "hv: flag --repo needs a value\n"},
+		{[]string{"--", "grp", "echo"}, 2, "", "rota: unexpected -- before the verb\n"},
+		{[]string{"cwd", "--repo", "x"}, 2, "", "rota cwd: unknown flag \"--repo\"\n"},
+		{[]string{"--repo", "x", "cwd"}, 2, "", "rota cwd: unknown flag \"--repo\"\n"},
+		{[]string{"--repo"}, 2, "", "rota: flag --repo needs a value\n"},
 		// A parse error still answers in JSON when --json is a token.
 		{[]string{"grp", "echo", "--bogus", "--json"}, 2, `{"ok": false, "error": {"code": "usage", "exit": 2, "message": "unknown flag \"--bogus\""}}` + "\n", ""},
 		// Verb outcomes.
-		{[]string{"fail", "refused", "--json"}, 4, `{"ok": false, "error": {"code": "refused", "exit": 4, "message": "already exists", "hint": "pick another name"}}` + "\n", "hv fail: already exists\nhint: pick another name\n"},
+		{[]string{"fail", "refused", "--json"}, 4, `{"ok": false, "error": {"code": "refused", "exit": 4, "message": "already exists", "hint": "pick another name"}}` + "\n", "rota fail: already exists\nhint: pick another name\n"},
 		// Failure data rides beside error on exit 1 and 4 only.
-		{[]string{"fail", "answer", "--json"}, 1, `{"ok": false, "error": {"code": "failed", "exit": 1, "message": "working tree is dirty"}, "data": {"clean": false}}` + "\n", "hv fail: working tree is dirty\n"},
-		{[]string{"fail", "answer"}, 1, "dirty\n", "hv fail: working tree is dirty\n"},
+		{[]string{"fail", "answer", "--json"}, 1, `{"ok": false, "error": {"code": "failed", "exit": 1, "message": "working tree is dirty"}, "data": {"clean": false}}` + "\n", "rota fail: working tree is dirty\n"},
+		{[]string{"fail", "answer"}, 1, "dirty\n", "rota fail: working tree is dirty\n"},
 		{[]string{"fail", "recorded", "--json"}, 4, `{"ok": false, "error": {"code": "refused", "exit": 4, "message": "item has no proof"}, "data": {"changed": true}}` + "\n", ""},
 		{[]string{"fail", "leak", "--json"}, 3, `{"ok": false, "error": {"code": "resolution", "exit": 3, "message": "gone"}}` + "\n", ""},
-		{[]string{"fail", "leak"}, 3, "", "hv fail: gone\n"},
-		{[]string{"fail", "lock"}, 6, "", "hv fail: saving: lock timeout\n"},
-		{[]string{"fail", "plain"}, 70, "", "hv fail: boom\nhint: this is a bug in hv"},
-		{[]string{"fail", "panic"}, 70, "", "hv fail: panic: kaboom"},
-		{[]string{"fail", "todo", "--json"}, 71, `{"ok": false, "error": {"code": "not_implemented", "exit": 71, "message": "hv fail is not ported yet"}}` + "\n", ""},
-		{[]string{"-C", "/does/not/exist", "cwd"}, 3, "", "hv cwd: cannot use -C /does/not/exist"},
+		{[]string{"fail", "leak"}, 3, "", "rota fail: gone\n"},
+		{[]string{"fail", "lock"}, 6, "", "rota fail: saving: lock timeout\n"},
+		{[]string{"fail", "plain"}, 70, "", "rota fail: boom\nhint: this is a bug in rota"},
+		{[]string{"fail", "panic"}, 70, "", "rota fail: panic: kaboom"},
+		{[]string{"fail", "todo", "--json"}, 71, `{"ok": false, "error": {"code": "not_implemented", "exit": 71, "message": "rota fail is not ported yet"}}` + "\n", ""},
+		{[]string{"-C", "/does/not/exist", "cwd"}, 3, "", "rota cwd: cannot use -C /does/not/exist"},
 		{[]string{"shadow"}, 70, "", "flag redefined: json"},
 	}
 	for _, tc := range cases {
 		got := call(tc.args...)
 		if got.code != tc.code || got.stdout != tc.stdout || !strings.Contains(got.stderr, tc.stderrHas) {
-			t.Errorf("hv %v\n got  code=%d stdout=%q stderr=%q\n want code=%d stdout=%q stderr~%q",
+			t.Errorf("rota %v\n got  code=%d stdout=%q stderr=%q\n want code=%d stdout=%q stderr~%q",
 				tc.args, got.code, got.stdout, got.stderr, tc.code, tc.stdout, tc.stderrHas)
 		}
 		if tc.code == 0 && tc.stderrHas == "" && got.stderr != "" {
-			t.Errorf("hv %v: unexpected stderr %q", tc.args, got.stderr)
+			t.Errorf("rota %v: unexpected stderr %q", tc.args, got.stderr)
 		}
 	}
 }
@@ -168,10 +168,10 @@ func TestJSONOutputIsOneDocument(t *testing.T) {
 	for _, args := range [][]string{{"grp", "echo", "x", "--json"}, {"nope", "--json"}, {"--json", "--help"}} {
 		got := call(args...)
 		if strings.Count(got.stdout, "\n") != 1 || !strings.HasSuffix(got.stdout, "\n") {
-			t.Errorf("hv %v: stdout is not one line: %q", args, got.stdout)
+			t.Errorf("rota %v: stdout is not one line: %q", args, got.stdout)
 		}
 		if _, err := jsonx.Decode([]byte(got.stdout)); err != nil {
-			t.Errorf("hv %v: stdout is not JSON: %v", args, err)
+			t.Errorf("rota %v: stdout is not JSON: %v", args, err)
 		}
 	}
 }
@@ -181,7 +181,7 @@ func TestHelp(t *testing.T) {
 	if got.code != 0 || !strings.Contains(got.stdout, "echo") || !strings.Contains(got.stdout, "warn") {
 		t.Fatalf("group help: %+v", got)
 	}
-	if got := call("grp", "echo", "-h"); got.code != 0 || !strings.HasPrefix(got.stdout, "hv grp echo: echo args") || !strings.Contains(got.stdout, "--title") {
+	if got := call("grp", "echo", "-h"); got.code != 0 || !strings.HasPrefix(got.stdout, "rota grp echo: echo args") || !strings.Contains(got.stdout, "--title") {
 		t.Fatalf("verb help: %+v", got)
 	}
 }
@@ -192,7 +192,7 @@ func TestCwdAndRoot(t *testing.T) {
 	dir := t.TempDir()
 	deep := filepath.Join(dir, "a", "b")
 	os.MkdirAll(deep, 0o755)
-	os.Mkdir(filepath.Join(dir, ".hv"), 0o755)
+	os.Mkdir(filepath.Join(dir, ".rota"), 0o755)
 	real, _ := filepath.EvalSymlinks(dir)
 
 	if got := call("-C", deep, "root"); got.code != 0 || strings.TrimSpace(got.stdout) != real {
@@ -200,14 +200,14 @@ func TestCwdAndRoot(t *testing.T) {
 	}
 	bare := t.TempDir()
 	got := call("--cwd="+bare, "root")
-	if got.code != 3 || !strings.Contains(got.stderr, "hint: run: hv init") {
-		t.Fatalf("no .hv: %+v", got)
+	if got.code != 3 || !strings.Contains(got.stderr, "hint: run: rota init") {
+		t.Fatalf("no .rota: %+v", got)
 	}
 }
 
 func TestVersionVerb(t *testing.T) {
 	var so, se bytes.Buffer
-	if code := Main([]string{"--version"}, nil, &so, &se); code != 0 || !strings.HasPrefix(so.String(), "hv ") {
+	if code := Main([]string{"--version"}, nil, &so, &se); code != 0 || !strings.HasPrefix(so.String(), "rota ") {
 		t.Fatalf("--version: code=%d out=%q err=%q", code, so.String(), se.String())
 	}
 	so.Reset()
@@ -237,14 +237,14 @@ func TestRepoResolution(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(os.MkdirAll(filepath.Join(dir, ".hv"), 0o755))
+	must(os.MkdirAll(filepath.Join(dir, ".rota"), 0o755))
 	must(os.MkdirAll(filepath.Join(dir, "web"), 0o755))
 
 	// Not umbrella mode: no repos.json.
 	if got := call("-C", dir, "repo", "--repo", "web"); got.code != 3 || !strings.Contains(got.stderr, "not in umbrella mode") {
 		t.Fatalf("no registry: %+v", got)
 	}
-	must(os.WriteFile(filepath.Join(dir, ".hv", "repos.json"),
+	must(os.WriteFile(filepath.Join(dir, ".rota", "repos.json"),
 		[]byte(`{"repos": [{"name": "web", "path": "web"}, {"name": "", "path": "x"}]}`), 0o644))
 	if got := call("-C", dir, "repo", "--repo", "web"); got.code != 0 || strings.TrimSpace(got.stdout) != filepath.Join(real, "web") {
 		t.Fatalf("registered: %+v", got)
@@ -311,12 +311,12 @@ func TestRepoFlagResolvesBeforeTheVerb(t *testing.T) {
 	wd, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(wd) })
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "web"), 0o755)
 	if got := call("-C", dir, "grp", "echo", "--repo", "web"); got.code != 3 {
 		t.Fatalf("outside umbrella mode: %+v", got)
 	}
-	os.WriteFile(filepath.Join(dir, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
 	if got := call("-C", dir, "grp", "echo", "--repo", "web", "x"); got.code != 0 || got.stdout != "title= force=false args=x\n" {
 		t.Fatalf("registered: %+v", got)
 	}

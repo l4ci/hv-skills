@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 func initRun(t *testing.T, dir string, args ...string) (int, *jsonx.Object, string) {
@@ -51,7 +51,7 @@ func TestInitVerbSeedsAndRunsBlocks(t *testing.T) {
 	if _, ok := d.Get("instructions"); !ok {
 		t.Error("no instructions")
 	}
-	for _, f := range []string{"AGENTS.md", "CLAUDE.md", ".hv/BACKLOG.md"} {
+	for _, f := range []string{"AGENTS.md", "CLAUDE.md", ".rota/BACKLOG.md"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Error(err)
 		}
@@ -83,22 +83,22 @@ func TestInitNoBlocksSeedsOnly(t *testing.T) {
 
 func TestInitWarnsAboutAStaleMirror(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".hv", "bin"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".hv", "bin", "hv-x"), nil, 0o755)
+	os.MkdirAll(filepath.Join(dir, ".rota", "bin"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".rota", "bin", "hv-x"), nil, 0o755)
 	_, env, errOut := initRun(t, dir, "init", "--no-blocks")
 	w, _ := initData(env).Get("warnings")
-	if l, _ := w.([]any); len(l) != 1 || !strings.Contains(l[0].(string), ".hv/bin") || !strings.Contains(errOut, "warning") {
+	if l, _ := w.([]any); len(l) != 1 || !strings.Contains(l[0].(string), ".rota/bin") || !strings.Contains(errOut, "warning") {
 		t.Errorf("warnings %v / %q", w, errOut)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".hv", "bin")); err == nil {
-		t.Error(".hv/bin survived")
+	if _, err := os.Stat(filepath.Join(dir, ".rota", "bin")); err == nil {
+		t.Error(".rota/bin survived")
 	}
 }
 
 func TestInitCorruptCountersExits70(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".hv", "counters.json"), []byte("{oops"), 0o644)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".rota", "counters.json"), []byte("{oops"), 0o644)
 	if code, _, _ := initRun(t, dir, "init", "--no-blocks"); code != 70 {
 		t.Errorf("exit %d", code)
 	}
@@ -140,7 +140,7 @@ func TestInitCheckWarnsOnVersionDrift(t *testing.T) {
 	old := installedVersionFn
 	installedVersionFn = func() string { return "5.0.0" }
 	t.Cleanup(func() { installedVersionFn = old })
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hv":{"version":"4.9.0"}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".rota", "config.json"), []byte(`{"rota":{"version":"4.9.0"}}`), 0o644)
 	code, env, errOut := initRun(t, dir, "init", "check")
 	w, _ := env.Get("warnings")
 	if l, _ := w.([]any); code != 0 || len(l) != 1 || !strings.Contains(l[0].(string), "project at 4.9.0, binary at 5.0.0") || !strings.Contains(errOut, "drift") {
@@ -148,7 +148,7 @@ func TestInitCheckWarnsOnVersionDrift(t *testing.T) {
 	}
 }
 
-// initCode runs hv with -C and returns the exit code, restoring the cwd.
+// initCode runs rota with -C and returns the exit code, restoring the cwd.
 func initCode(t *testing.T, args ...string) int {
 	t.Helper()
 	wd, _ := os.Getwd()
@@ -188,7 +188,7 @@ func TestInitDefaultHasNoCodex(t *testing.T) {
 func TestInitFillsConfigAndStampsVersion(t *testing.T) {
 	old := installedVersionFn
 	t.Cleanup(func() { installedVersionFn = old })
-	cfgPath := func(dir string) string { return filepath.Join(dir, ".hv", "config.json") }
+	cfgPath := func(dir string) string { return filepath.Join(dir, ".rota", "config.json") }
 	check := func(t *testing.T, dir string) string {
 		t.Helper()
 		_, env, _ := initRun(t, dir, "config", "check")
@@ -204,19 +204,19 @@ func TestInitFillsConfigAndStampsVersion(t *testing.T) {
 		wantCfg map[string]any
 		stamped string
 	}{
-		{"fresh", "5.0.0", "", map[string]any{"hv.version": "5.0.0"}, "5.0.0"},
-		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"hv":{"version":"4.9.0"}}`,
-			map[string]any{"docs.path": "mydocs", "hv.version": "5.0.0"}, "5.0.0"},
+		{"fresh", "5.0.0", "", map[string]any{"rota.version": "5.0.0"}, "5.0.0"},
+		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"rota":{"version":"4.9.0"}}`,
+			map[string]any{"docs.path": "mydocs", "rota.version": "5.0.0"}, "5.0.0"},
 		{"legacy key migrated", "5.0.0", `{"hvSkills":{"version":"4.9.0"}}`,
-			map[string]any{"hv.version": "5.0.0", "hvSkills.version": nil}, "5.0.0"},
-		{"dev binary stamps nothing", "", "", map[string]any{"hv.version": ""}, ""},
+			map[string]any{"rota.version": "5.0.0", "hvSkills.version": nil}, "5.0.0"},
+		{"dev binary stamps nothing", "", "", map[string]any{"rota.version": ""}, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			installedVersionFn = func() string { return tc.version }
 			dir := t.TempDir()
 			if tc.seed != "" {
-				os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+				os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)
 				os.WriteFile(cfgPath(dir), []byte(tc.seed), 0o644)
 			}
 			code, env, _ := initRun(t, dir, "init", "--no-blocks")
@@ -267,7 +267,7 @@ func TestInitClearsVersionDrift(t *testing.T) {
 	t.Cleanup(func() { installedVersionFn = old })
 	dir := t.TempDir()
 	initRun(t, dir, "init", "--no-blocks")
-	os.WriteFile(filepath.Join(dir, ".hv", "config.json"), []byte(`{"hv":{"version":"4.9.0"}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".rota", "config.json"), []byte(`{"rota":{"version":"4.9.0"}}`), 0o644)
 	initRun(t, dir, "init", "--no-blocks")
 	_, env, _ := initRun(t, dir, "init", "check")
 	if w, _ := env.Get("warnings"); w != nil {
@@ -289,7 +289,7 @@ func TestInitUmbrellaEnablesUmbrella(t *testing.T) {
 	if v, _ := d.Get("umbrellaEnabled"); v != true {
 		t.Errorf("umbrellaEnabled %v", v)
 	}
-	cfg := readCfg(t, filepath.Join(dir, ".hv", "config.json"))
+	cfg := readCfg(t, filepath.Join(dir, ".rota", "config.json"))
 	if got, _ := lookupDotted(cfg, "umbrella.enabled"); got != true {
 		t.Errorf("umbrella.enabled = %v", got)
 	}

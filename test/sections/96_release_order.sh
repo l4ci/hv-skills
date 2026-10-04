@@ -1,5 +1,5 @@
 echo "release order: tag first, one release finished from the workflow's draft, branch last (F4, #74)"
-# Real hv, a local bare origin that reads as github, and a scripted gh: it logs
+# Real rota, a local bare origin that reads as github, and a scripted gh: it logs
 # its argv and answers `release view` from the state in $RO/state.
 RO="$(mktemp -d)"
 trap 'rm -rf "${RO:?}"' EXIT
@@ -25,12 +25,12 @@ chmod +x "$RO/bin/gh"
 export RO_LOG="$RO/log" RO_STATE="$RO/state"
 
 P="$RO/proj"
-mkdir -p "$P/.hv"
-printf '{"backlog":{"backend":"file"}}\n' > "$P/.hv/config.json"
+mkdir -p "$P/.rota"
+printf '{"backlog":{"backend":"file"}}\n' > "$P/.rota/config.json"
 ( cd "$P" && git init -q -b main . && git config user.email t@t && git config user.name t \
-  && printf '.hv/gate-audit.jsonl\n.hv/**/*.lock\n' > .gitignore && echo seed > seed.txt \
+  && printf '.rota/gate-audit.jsonl\n.rota/**/*.lock\n' > .gitignore && echo seed > seed.txt \
   && printf 'version: 2\n' > .goreleaser.yaml \
-  && git add seed.txt .gitignore .hv/config.json .goreleaser.yaml && git commit -q -m seed \
+  && git add seed.txt .gitignore .rota/config.json .goreleaser.yaml && git commit -q -m seed \
   && git init -q --bare github.com/fake/repo.git && printf 'github.com/\n' >> .git/info/exclude \
   && git remote add origin github.com/fake/repo.git && git tag -a v1.0.0 -m v1.0.0 )
 RHAS() { [ -n "$(git -C "$P" ls-remote "$1" origin "$2")" ]; }
@@ -51,14 +51,14 @@ RHAS --tags refs/tags/v1.0.0 || fail "tag-only did not push the tag"
 RHAS --heads main && fail "tag-only pushed the branch"
 pass "the tag goes first; the branch cannot lead it"
 
-AUDITED=$(wc -l < "$P/.hv/gate-audit.jsonl") # the tag push so far
+AUDITED=$(wc -l < "$P/.rota/gate-audit.jsonl") # the tag push so far
 rpub() { ( cd "$P" && PATH="$RO/bin:$PATH" hvj release publish 1.0.0 --title T --body-file - $GATE <<<"notes" ); }
 for STATE in none empty partial three tarballs; do
   echo "$STATE" > "$RO_STATE"; : > "$RO_LOG"
   RC=0; OUT=$(rpub 2>/dev/null) || RC=$?
   [ "$RC" = 3 ] || fail "publish with state '$STATE' should exit 3, got $RC: $OUT"
   grep -q 'release create\|release edit' "$RO_LOG" && fail "publish with state '$STATE' wrote a release: $(cat "$RO_LOG")"
-  [ "$(wc -l < "$P/.hv/gate-audit.jsonl")" = "$AUDITED" ] || fail "publish with state '$STATE' spent the approval"
+  [ "$(wc -l < "$P/.rota/gate-audit.jsonl")" = "$AUDITED" ] || fail "publish with state '$STATE' spent the approval"
 done
 pass "publish waits for the workflow (no release, no assets, 3 of 4 binaries, tarballs only) without spending the approval"
 

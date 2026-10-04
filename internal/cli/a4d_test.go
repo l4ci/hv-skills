@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // a4dRepo is a project that is a git repo with the origin remote.
@@ -54,17 +54,17 @@ func a4dForge(t *testing.T, origin string, reply map[string]string) *[]string {
 func TestA4dProvider(t *testing.T) {
 	for origin, want := range map[string]string{"https://github.com/o/r.git": "github", "git@gitlab.com:o/r.git": "gitlab", "https://example.org/r.git": "unknown"} {
 		root := a4dRepo(t, origin)
-		code, env, _ := hvRun(t, "--json", "-C", root, "issues", "provider")
+		code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "provider")
 		if code != 0 || get(dataOf(env), "provider") != want {
 			t.Errorf("%s: %d %v", origin, code, env)
 		}
 	}
-	code, _, _ := hvRun(t, "--json", "-C", t.TempDir(), "issues", "provider")
+	code, _, _ := rotaRun(t, "--json", "-C", t.TempDir(), "issues", "provider")
 	if code != ExitResolution {
 		t.Errorf("no project: %d", code)
 	}
 	root := a4dRepo(t, "https://github.com/o/r.git")
-	if code, _, _ := hvRun(t, "--json", "-C", root, "issues", "provider", "--repo", "web"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "issues", "provider", "--repo", "web"); code != ExitResolution {
 		t.Errorf("--repo outside umbrella: %d", code)
 	}
 }
@@ -76,7 +76,7 @@ func TestA4dListLabelClose(t *testing.T) {
 		"issue list": `[{"number": 3, "title": "T", "body": "b", "labels": [{"name": "x"}], "url": "u", "author": {"login": "me"}}]`,
 		"issue view": `{"labels": [{"name": "x"}]}`,
 	})
-	code, env, _ := hvRun(t, "--json", "-C", root, "issues", "list", "--label", "x", "--limit", "5")
+	code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "list", "--label", "x", "--limit", "5")
 	rows, _ := get(dataOf(env), "issues").([]any)
 	if code != 0 || len(rows) != 1 || get(rows[0], "author") != "me" || get(rows[0], "title") != "T" {
 		t.Fatalf("list: %d %v", code, env)
@@ -84,11 +84,11 @@ func TestA4dListLabelClose(t *testing.T) {
 	if !slices.Contains(*calls, "gh issue list --state open --json number,title,body,labels,url,author --limit 5 --label x") {
 		t.Errorf("calls %q", *calls)
 	}
-	code, env, _ = hvRun(t, "--json", "-C", root, "issues", "label", "3", "--add", "x")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "issues", "label", "3", "--add", "x")
 	if code != 0 || get(dataOf(env), "changed") != false || get(dataOf(env), "action") != "add" {
 		t.Errorf("label no-op: %d %v", code, env)
 	}
-	code, env, _ = hvRun(t, "--json", "-C", root, "issues", "label", "3", "--remove", "x")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "issues", "label", "3", "--remove", "x")
 	if code != 0 || get(dataOf(env), "changed") != true {
 		t.Errorf("label remove: %d %v", code, env)
 	}
@@ -99,13 +99,13 @@ func TestA4dListLabelClose(t *testing.T) {
 		{"issues", "close", "3"}, {"issues", "close", "3x", "--commit", "HEAD"}, {"issues", "close", "--commit", "HEAD"},
 		{"issues", "imported", "x"}, {"migrate", "issues", "--limit", "x"}, {"migrate", "issues", "extra"},
 	} {
-		if code, _, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitUsage {
+		if code, _, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitUsage {
 			t.Errorf("%v: exit %d, want usage", argv, code)
 		}
 	}
 	// the commit is checked before the forge
 	n := len(*calls)
-	code, _, _ = hvRun(t, "--json", "-C", root, "issues", "close", "3", "--commit", "deadbeef")
+	code, _, _ = rotaRun(t, "--json", "-C", root, "issues", "close", "3", "--commit", "deadbeef")
 	if code != ExitResolution || len(*calls) != n {
 		t.Errorf("unknown commit: %d, %d new calls", code, len(*calls)-n)
 	}
@@ -113,24 +113,24 @@ func TestA4dListLabelClose(t *testing.T) {
 
 func TestA4dImported(t *testing.T) {
 	root := a4Project(t, "{}\n")
-	os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte("# T\n\n## Bugs\n- **[B01] [P1] A.** GH: #5 Repos: web\n"), 0o644)
-	code, env, _ := hvRun(t, "--json", "-C", root, "issues", "imported")
+	os.WriteFile(filepath.Join(root, ".rota", "BACKLOG.md"), []byte("# T\n\n## Bugs\n- **[B01] [P1] A.** GH: #5 Repos: web\n"), 0o644)
+	code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "imported")
 	rows, _ := get(dataOf(env), "entries").([]any)
 	if code != 0 || len(rows) != 1 || get(rows[0], "itemId") != "B01" || get(rows[0], "repo") != "web" || get(rows[0], "status") != "open" {
 		t.Errorf("%d %v", code, env)
 	}
-	if code, env, _ := hvRun(t, "--json", "-C", root, "issues", "imported", "--for-repo", "api"); code != 0 || len(get(dataOf(env), "entries").([]any)) != 0 {
+	if code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "imported", "--for-repo", "api"); code != 0 || len(get(dataOf(env), "entries").([]any)) != 0 {
 		t.Errorf("filter: %d %v", code, env)
 	}
 	// --open-only asks the forge; a missing CLI drops the entry, exit stays 0
 	old := trackerOptions
 	trackerOptions = []tracker.Option{tracker.WithExec(nil, func(string) (string, error) { return "", exec.ErrNotFound })}
 	defer func() { trackerOptions = old }()
-	if code, env, _ := hvRun(t, "--json", "-C", root, "issues", "imported", "--open-only"); code != 0 || len(get(dataOf(env), "entries").([]any)) != 0 {
+	if code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "imported", "--open-only"); code != 0 || len(get(dataOf(env), "entries").([]any)) != 0 {
 		t.Errorf("open-only: %d %v", code, env)
 	}
 	// the repo flag belongs to the other verbs
-	if code, _, _ := hvRun(t, "--json", "-C", root, "issues", "imported", "--repo", "web"); code != ExitUsage {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "issues", "imported", "--repo", "web"); code != ExitUsage {
 		t.Errorf("--repo: %d", code)
 	}
 }
@@ -158,7 +158,7 @@ func TestA4dMigrateIssues(t *testing.T) {
 	migrateTracker = func(context.Context, string, any) (backlog.MigrateTracker, error) { return stub, nil }
 	defer func() { migrateTracker = old }()
 
-	code, env, stderr := hvRun(t, "--json", "-C", root, "migrate", "issues")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "migrate", "issues")
 	d := dataOf(env)
 	ops, _ := get(d, "operations").([]any)
 	if code != 0 || get(d, "applied") != false || len(ops) != 1 || get(ops[0], "action") != "create-issue" || len(stub.Issues) != 0 {
@@ -173,12 +173,12 @@ func TestA4dMigrateIssues(t *testing.T) {
 
 	// a rate limit and a failure keep their exits, and the message ends with the progress
 	stub.fail = &tracker.Error{Kind: tracker.KindRateLimited, Code: 4, Message: "slow"}
-	code, env, _ = hvRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
 	if msg, _ := get(env, "error", "message").(string); code != ExitRetry || msg != "0 of 1 migrated" {
 		t.Errorf("rate limit: %d %v", code, env)
 	}
 	stub.fail = &tracker.Error{Kind: tracker.KindFailed, Code: 1, Message: "boom"}
-	code, env, _ = hvRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
 	if msg, _ := get(env, "error", "message").(string); code != ExitUnavailable || msg != "boom; 0 of 1 migrated" {
 		t.Errorf("failure: %d %v", code, env)
 	}
@@ -187,31 +187,31 @@ func TestA4dMigrateIssues(t *testing.T) {
 	}
 
 	stub.fail = nil
-	code, env, _ = hvRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
 	d = dataOf(env)
 	if code != 0 || get(d, "changed") != true || get(d, "migrated").(interface{ String() string }).String() != "1" || len(stub.Issues) != 1 {
 		t.Fatalf("apply: %d %v", code, env)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md")); !strings.HasPrefix(string(b), "> Frozen:") {
+	if b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md")); !strings.HasPrefix(string(b), "> Frozen:") {
 		t.Error("not frozen")
 	}
-	code, env, _ = hvRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "migrate", "issues", "--apply")
 	if code != 0 || get(dataOf(env), "changed") != false {
 		t.Errorf("rerun: %d %v", code, env)
 	}
 
 	// refusals
-	if code, _, _ := hvRun(t, "--json", "-C", t.TempDir(), "migrate", "issues"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", t.TempDir(), "migrate", "issues"); code != ExitResolution {
 		t.Errorf("no project: %d", code)
 	}
 	empty := a4Project(t, "{}\n")
-	os.Remove(filepath.Join(empty, ".hv", "BACKLOG.md"))
-	if code, _, _ := hvRun(t, "--json", "-C", empty, "migrate", "issues"); code != ExitResolution {
+	os.Remove(filepath.Join(empty, ".rota", "BACKLOG.md"))
+	if code, _, _ := rotaRun(t, "--json", "-C", empty, "migrate", "issues"); code != ExitResolution {
 		t.Errorf("no backlog: %d", code)
 	}
 	umb := a4Project(t, "{}\n")
-	os.WriteFile(filepath.Join(umb, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
-	code, env, _ = hvRun(t, "--json", "-C", umb, "migrate", "issues")
+	os.WriteFile(filepath.Join(umb, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	code, env, _ = rotaRun(t, "--json", "-C", umb, "migrate", "issues")
 	if code != ExitRefused || get(dataOf(env), "blockedBy") != "umbrella" || get(dataOf(env), "changed") != false {
 		t.Errorf("umbrella: %d %v", code, env)
 	}
@@ -232,7 +232,7 @@ func TestA4dScopeFollowsWorkingDirectory(t *testing.T) {
 			}
 		}
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}, {"name": "api", "path": "api"}]}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}, {"name": "api", "path": "api"}]}`), 0o644)
 	for _, c := range []struct {
 		argv []string
 		want string
@@ -242,7 +242,7 @@ func TestA4dScopeFollowsWorkingDirectory(t *testing.T) {
 		{[]string{"-C", filepath.Join(root, "web"), "issues", "provider", "--repo", "api"}, "gitlab"},
 		{[]string{"-C", root, "issues", "provider", "--repo", "web"}, "github"},
 	} {
-		code, env, _ := hvRun(t, append([]string{"--json"}, c.argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json"}, c.argv...)...)
 		if code != 0 || get(dataOf(env), "provider") != c.want {
 			t.Errorf("%v: %d %v, want %s", c.argv, code, env, c.want)
 		}
@@ -254,16 +254,16 @@ func TestA4dNoProviderAndMissingIssue(t *testing.T) {
 	root := a4dRepo(t, "")
 	a4dForge(t, "", nil)
 	for _, argv := range [][]string{{"issues", "list"}, {"issues", "label", "3", "--add", "x"}} {
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		if msg, _ := get(env, "error", "message").(string); code != ExitResolution || !strings.Contains(msg, "issues.provider") {
 			t.Errorf("%v: %d %v", argv, code, env)
 		}
 	}
 	// issues.provider stands in for a missing origin
 	root = a4dRepo(t, "")
-	os.WriteFile(filepath.Join(root, ".hv", "config.json"), []byte(`{"issues": {"provider": "github"}}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "config.json"), []byte(`{"issues": {"provider": "github"}}`), 0o644)
 	calls := a4dForge(t, "", map[string]string{"issue list": "[]"})
-	if code, env, _ := hvRun(t, "--json", "-C", root, "issues", "list"); code != 0 || !slices.Contains(*calls, "gh issue list --state open --json number,title,body,labels,url,author --limit 30") {
+	if code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "list"); code != 0 || !slices.Contains(*calls, "gh issue list --state open --json number,title,body,labels,url,author --limit 30") {
 		t.Errorf("config fallback: %d %v %q", code, env, *calls)
 	}
 	// a missing issue is exit 3; another forge failure stays exit 5
@@ -283,7 +283,7 @@ func TestA4dNoProviderAndMissingIssue(t *testing.T) {
 		}
 		old := trackerOptions
 		trackerOptions = []tracker.Option{tracker.WithExec(exe, func(n string) (string, error) { return "/fake/" + n, nil })}
-		code, env, _ := hvRun(t, "--json", "-C", root, "issues", "label", "99", "--remove", "x")
+		code, env, _ := rotaRun(t, "--json", "-C", root, "issues", "label", "99", "--remove", "x")
 		trackerOptions = old
 		if code != want {
 			t.Errorf("%q: exit %d, want %d: %v", stderr, code, want, env)

@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// Key is one known .hv/config.json key: its dotted name, the default used
-// when the key is absent, and whether hv init writes it. Defaults use the
+// Key is one known .rota/config.json key: its dotted name, the default used
+// when the key is absent, and whether rota init writes it. Defaults use the
 // jsonx value types: string, bool, json.Number and []any.
 type Key struct {
 	Name     string // dotted path, e.g. "work.mergeStrategy"
 	Default  any    // value when the key is missing or null
-	Required bool   // written by hv init; the schema check treats it as present-or-stale
+	Required bool   // written by rota init; the schema check treats it as present-or-stale
 }
 
-// VersionKey is the stamp of the hv release that wrote a project's config.
-// LegacyVersionKey is where releases before the rename to hv kept it;
+// VersionKey is the stamp of the rota release that wrote a project's config.
+// LegacyVersionKey is where releases before the rename to hv (#231) kept it;
 // it is read as a fallback and moved by Fill.
 const (
-	VersionKey       = "hv.version"
+	VersionKey       = "rota.version"
 	LegacyVersionKey = "hvSkills.version"
 )
 
@@ -93,7 +93,7 @@ var Keys = []Key{
 	{"issues.autoCreateLabel", true, false},
 	{"issues.filterMineOnly", false, false},
 	{"issues.homeRepo", "", false},
-	{"release.checklistPath", ".hv/RELEASE.md", false},
+	{"release.checklistPath", ".rota/RELEASE.md", false},
 	{"release.confirmLargePushCommits", json.Number("10"), false},
 	{"release.nudgeAfterCommits", json.Number("10"), false},
 	{"release.nudgeAfterDays", json.Number("14"), false},
@@ -119,17 +119,17 @@ var Keys = []Key{
 	{"orchestrator.stateMaxAgeSeconds", json.Number("120"), false},
 	{"orchestrator.handoffMaxAgeSeconds", json.Number("900"), false},
 	{"orchestrator.handoffMaxBlocks", json.Number("2"), false},
-	// D2 keepalive keys: silent defaults, read by `hv keepalive run`.
+	// D2 keepalive keys: silent defaults, read by `rota keepalive run`.
 	{"orchestrator.keepaliveMaxRestarts", json.Number("10"), false},
 	{"orchestrator.keepaliveBreaker", json.Number("3"), false},
 	{"orchestrator.keepaliveBackoffSeconds", json.Number("5"), false},
-	{"orchestrator.restartPrompt", "Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.", false},
+	{"orchestrator.restartPrompt", "Continue as orchestrator: read the handoff injected at session start, run rota round status, and resume the round.", false},
 	{"orchestrator.escalateIssue", json.Number("0"), false},
-	// D4 usage-switch keys: silent defaults, read by the Stop hook and `hv keepalive run`.
+	// D4 usage-switch keys: silent defaults, read by the Stop hook and `rota keepalive run`.
 	{"orchestrator.switchOnUsage", false, false},
 	{"orchestrator.usageThreshold", json.Number("90"), false},
-	// D3 usage-limit keys: silent defaults, read by `hv limit watch` and the
-	// watcher inside `hv keepalive run`.
+	// D3 usage-limit keys: silent defaults, read by `rota limit watch` and the
+	// watcher inside `rota keepalive run`.
 	{"limits.mode", "switch", false},
 	{"limits.resumeMarginSeconds", json.Number("60"), false},
 	{"limits.fallbackSleepSeconds", json.Number("1800"), false},

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Issue is the tracker's view of one issue (hvlib_tracker _norm).
@@ -37,7 +37,7 @@ type Tracker interface {
 	AddComment(ctx context.Context, number int, body string) (string, error)
 	EditComment(ctx context.Context, number int, commentID, body string) error
 	DeleteComment(ctx context.Context, number int, commentID string) error
-	FindMilestone(ctx context.Context, hvID string) (title string, ok bool, err error)
+	FindMilestone(ctx context.Context, rotaID string) (title string, ok bool, err error)
 }
 
 // A change to tracker.Adapter that breaks the subset fails the build here.
@@ -56,7 +56,7 @@ type Issues struct {
 	Warn       func(string) // notices (duplicate tracking issues); nil drops them
 	Repo       string       // umbrella sub-repo name, rendered as Repos:; "" otherwise. IDs stay plain numbers: the umbrella backend qualifies them ("repo:12") and resolves qualified refs, as in Python.
 	// OnMissingMilestone is the umbrella hook (on_missing_milestone): called
-	// with an hv milestone ID the tracker has no native milestone for, it
+	// with a rota milestone ID the tracker has no native milestone for, it
 	// creates it and returns its title; ok false leaves the ID unknown.
 	OnMissingMilestone func(mid string) (title string, ok bool, err error)
 }
@@ -133,7 +133,7 @@ type kv struct{ name, value string }
 // tracker does not supply (Milestone, Detail).
 var blockFields = []string{"Related", "Repos", "Subsystem", "Captured", "Since"}
 
-// milestone is the hv ID of the issue's native milestone ("M07" out of
+// milestone is the rota ID of the issue's native milestone ("M07" out of
 // "M07 — Title"), the whole title when it has none, else the body block's.
 func milestone(is Issue, block map[string]string) string {
 	if title := oneLine(is.Milestone); title != "" {
@@ -488,15 +488,15 @@ func (b *Issues) Detail(ref string) (string, bool, error) {
 }
 
 var (
-	fieldsBlockRe = regexp.MustCompile(`(?s)\n*<!-- hv:fields\n(.*?)\n?-->[ \t]*\n*\z`)
+	fieldsBlockRe = regexp.MustCompile(`(?s)\n*<!-- rota:fields\n(.*?)\n?-->[ \t]*\n*\z`)
 	fieldLineRe   = regexp.MustCompile(`\A([A-Za-z]+):[ \t]*(.*?)[ \t]*\z`)
 )
 
 // fieldsOpen opens the trailing fields comment of an issue body.
-const fieldsOpen = "<!-- hv:fields"
+const fieldsOpen = "<!-- rota:fields"
 
 // ParseFieldsBlock splits an issue body into its text and the trailing
-// "<!-- hv:fields ... -->" comment, one "Name: value" per line
+// "<!-- rota:fields ... -->" comment, one "Name: value" per line
 // (parse_fields_block). order lists the field names in block order; a name
 // that repeats keeps its first position and its last value. Without a block
 // the text is the body (CRLF turned into LF) and fields is empty.

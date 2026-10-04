@@ -1,7 +1,7 @@
-// Package escalation is the logic behind `hv round escalate send|check` (C4):
+// Package escalation is the logic behind `rota round escalate send|check` (C4):
 // a question the orchestrator puts to the human on an issue or PR thread, a
 // herdr notification beside it, and the record in the top-level `escalations`
-// list of .hv/workers.json. Forge calls go through internal/tracker only.
+// list of .rota/workers.json. Forge calls go through internal/tracker only.
 package escalation
 
 import (
@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/marker"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/marker"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Statuses. StatusTimedOut is derived on read and never stored.
@@ -199,9 +199,9 @@ func PendingOn(list []Entry, kind string, number int) (Entry, bool) {
 // Marker is the line every escalation comment ends with.
 func Marker(id string) string { return marker.Line("escalation", id) }
 
-// Compose is the comment hv posts: heading, the body, the ask, the marker.
+// Compose is the comment rota posts: heading, the body, the ask, the marker.
 func Compose(id, title, body string) string {
-	return fmt.Sprintf("**hv escalation %s**: %s\n\n%s\n\nAnswer in a new comment on this thread.\n\n%s\n",
+	return fmt.Sprintf("**rota escalation %s**: %s\n\n%s\n\nAnswer in a new comment on this thread.\n\n%s\n",
 		id, title, strings.Trim(body, "\n"), Marker(id))
 }
 
@@ -239,7 +239,7 @@ func registryDef() *jsonx.Object {
 	return d
 }
 
-// SendOpts are the flags of `hv round escalate send`.
+// SendOpts are the flags of `rota round escalate send`.
 type SendOpts struct {
 	Number  int
 	PR      bool
@@ -258,7 +258,7 @@ type SendResult struct {
 }
 
 func dispatchKind(root string) string {
-	v, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "work.dispatch")
+	v, _ := config.Lookup(config.Load(filepath.Join(root, ".rota", "config.json")), "work.dispatch")
 	s, _ := v.(string)
 	return s
 }
@@ -352,7 +352,7 @@ func notify(ctx context.Context, env Env, root, id string, o SendOpts, warns []s
 	if err := h.Require(); err != nil {
 		return false, append(warns, "no notification: "+err.Error())
 	}
-	h.Notify(ctx, "hv escalation "+id, fmt.Sprintf("%s (#%d)", o.Title, o.Number))
+	h.Notify(ctx, "rota escalation "+id, fmt.Sprintf("%s (#%d)", o.Title, o.Number))
 	return true, warns
 }
 
