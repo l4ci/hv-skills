@@ -21,18 +21,15 @@ bad() { printf '\033[31mFAIL\033[0m %s\n' "$1" >&2; fails=$((fails + 1)); }
 # hv-skills is history (CHANGELOG, the 5.0 design docs, tracked .hv/ state),
 # code that has to know the old name (migrate hv, legacy-format fixtures) and
 # text captured from real panes. The managed block markers keep the key
-# "skills" (hv-skills-start/-end), so the pattern lets those through. README.md, docs/install.md and
-# docs/getting-started.md belong to F5 slice B, which rewrites them after the
-# rename; drop their exclusions once it merges.
+# "skills" (hv-skills-start/-end), so the pattern lets those through.
 OLD_NAME='hv-skills(?!-(?:start|end)\b)'
 OLD_SCOPE=(
   ':(exclude)CHANGELOG.md'
   ':(exclude)docs/design/'
   ':(exclude).hv/'
   ':(exclude)test/grep-gate.sh'
-  ':(exclude)README.md'
+  # The "Coming from hv-skills" migration section names the predecessor.
   ':(exclude)docs/install.md'
-  ':(exclude)docs/getting-started.md'
   ':(exclude)internal/migrate/'
   # Legacy-format fixtures: a pre-rename block heading or .gitignore header.
   ':(exclude)internal/knowledge/knowledge_test.go'
@@ -92,15 +89,8 @@ HV_SCOPE=(
   ':(exclude)test/sections/13_helpers.sh'
   ':(exclude)test/sections/66_agents_md.sh'
   ':(exclude)internal/migrate/'
-  # kit's slice: the front-door docs.
-  ':(exclude)README.md'
-  ':(exclude)docs/README.md'
+  # The "Coming from hv-skills" migration section names .hv/ and /hv-*.
   ':(exclude)docs/install.md'
-  ':(exclude)docs/getting-started.md'
-  ':(exclude)docs/how-it-works.md'
-  ':(exclude)docs/cheatsheet.md'
-  ':(exclude)docs/faq.md'
-  ':(exclude)docs/walkthroughs/'
 )
 HITS="$(git grep -nIP "$HV_NAME" -- . "${HV_SCOPE[@]}" || true)"
 if [ -n "$HITS" ]; then

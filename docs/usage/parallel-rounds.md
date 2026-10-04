@@ -32,9 +32,10 @@ a round is the same idea with the assignment, waiting and merging done by verbs.
 
 ## Setup
 
-1. **A host** for the workers' tabs: herdr (pinned to 0.9.x) or tmux. Set
-   `work.dispatch` to `herdr` or `tmux`, or leave it unset and let `rota round start` detect one from
-   where it runs (herdr inside a herdr pane, tmux inside tmux). With neither it falls back to
+1. **A host** for the workers' tabs: herdr (pinned to 0.9.x) or tmux. Leave
+   `work.dispatch` at the default `rota init` writes (`subagent`) and `rota round start` detects the
+   host from where it runs (herdr inside a herdr pane, tmux inside tmux). Set `herdr` or `tmux` only
+   to force one. With neither it falls back to
    [solo mode](#solo-mode).
 2. **A tracker.** Rounds take GitHub issues (`gh`) or GitLab issues (`glab`), authenticated.
 3. **Accounts, if you have more than one.** `work.accounts` maps slots to separate
@@ -286,7 +287,7 @@ parked anyway, so fix the slot and run it again. It deletes no branch and clears
 ## Solo mode
 
 `rota round start` resolves the round's host once and records it in `.rota/workers.json`. With
-`work.dispatch` unset or `subagent` it is herdr inside a herdr pane (`HERDR_ENV=1`), tmux
+`work.dispatch` at `subagent` (the default) or unset it is herdr inside a herdr pane (`HERDR_ENV=1`), tmux
 inside tmux (`TMUX` set), and otherwise **solo**. An explicit `herdr` or `tmux` is used as
 set and fails when unavailable; solo is never a fallback from it.
 
