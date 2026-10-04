@@ -51,7 +51,7 @@ func a4Update(fs *flag.FlagSet) RunFunc {
 		data := a4Obj("installType", r.InstallType, "installRoot", r.InstallRoot,
 			"currentVersion", r.CurrentVersion, "latestVersion", r.LatestVersion,
 			"status", r.Status, "updateCommand", r.UpdateCommand)
-		text := fmt.Sprintf("hv-skills %s (%s), latest %s: %s", orDash(r.CurrentVersion), r.InstallType, orDash(r.LatestVersion), r.Status)
+		text := fmt.Sprintf("hv %s (%s), latest %s: %s", orDash(r.CurrentVersion), r.InstallType, orDash(r.LatestVersion), r.Status)
 		if r.Status == "behind" {
 			text += "\nupdate with: " + r.UpdateCommand
 		}

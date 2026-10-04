@@ -31,8 +31,12 @@ cs={c["name"]:c for c in json.load(sys.stdin)["data"]["checks"]}
 print(cs[sys.argv[1]].get(sys.argv[2],"ABSENT"))' "$1" "$2"
 }
 dr_ok() { python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["ok"])'; }
+# The skills check reads ~/.claude/skills and ~/.agents/skills: point HOME and
+# CLAUDE_CONFIG_DIR at an empty sandbox so it never sees the real ones. (An
+# account's configDir still reaches the fake herdr; doctor sets it per call.)
+mkdir -p "$TMP_DR/home" "$TMP_DR/claude"
 dr_run() { # dr_run <dir>: doctor in <dir> against the fakes; prints the envelope, returns the exit code
-  HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$1" doctor 2>/dev/null
+  HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$1" doctor 2>/dev/null
 }
 
 # (a) a herdr project with one account and the hook installed: all pass or skip
@@ -47,8 +51,8 @@ rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
 [ "$rc" -eq 0 ] || fail "C6[a]: healthy project exited $rc: $OUT"
 [ "$(printf '%s' "$OUT" | dr_ok)" = "True" ] || fail "C6[a]: ok is not true: $OUT"
 NAMES="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)["data"]["checks"]))')"
-[ "$NAMES" = "git,host,tracker,accounts,hook,statusline,stop-hook,switch,hv,codex" ] || fail "C6[a]: checks were: $NAMES"
-for pair in git:pass host:pass tracker:skip accounts:pass hook:pass statusline:skip stop-hook:skip codex:skip; do
+[ "$NAMES" = "git,host,tracker,accounts,hook,statusline,stop-hook,switch,skills,codex" ] || fail "C6[a]: checks were: $NAMES"
+for pair in git:pass host:pass tracker:skip accounts:pass hook:pass statusline:skip stop-hook:skip skills:skip codex:skip; do
   [ "$(printf '%s' "$OUT" | dr_field "${pair%%:*}" status)" = "${pair##*:}" ] || fail "C6[a]: ${pair%%:*} was not ${pair##*:}: $OUT"
 done
 case "$OUT" in *'"changed"'*) fail "C6[a]: doctor reports changed: $OUT" ;; esac
@@ -100,7 +104,7 @@ done
 pass "C6[f]: doctor runs without .hv/ on defaults"
 
 # (g) no repo scope
-rc=0; HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$TMP_DR/bare" doctor --repo x >/dev/null 2>&1 || rc=$?
+rc=0; HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$TMP_DR/bare" doctor --repo x >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "C6[g]: --repo exited $rc, not 2"
 pass "C6[g]: doctor rejects --repo"
 

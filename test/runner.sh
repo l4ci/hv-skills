@@ -49,10 +49,6 @@ else
   fi
 fi
 
-# Pin the install root `hv update` reports to this checkout. Without it, hv
-# walks ~/.claude/plugins/* and may pick up whatever marketplace install
-# Claude Code happens to have locally. The smoke is about *this* checkout.
-export HV_INSTALL_ROOT="$REPO"
 # macOS mktemp returns /var/folders/... but the underlying dir is /private/var/folders/... .
 # Resolve to the physical path here so sections comparing against $TMP match `pwd -P` output
 # from verbs like `hv repo umbrella` (which would otherwise mismatch on Darwin).
@@ -65,14 +61,14 @@ export TMPDIR="$RUN_TMP"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 
 # Black-box target (#46): sections call "$HV_BIN <group> <verb>". It defaults
-# to the Go binary built once from this checkout, stamped with the plugin
-# version so version-drift checks see a matching install. Point HV_BIN at any
+# to the Go binary built once from this checkout, stamped with the VERSION
+# file so version-drift checks see a matching install. Point HV_BIN at any
 # other `hv` binary (absolute path: sections cd) to run the suite against it.
 # The binary and the scratch dir for the poison stand-ins below live under
 # $RUN_TMP, so the EXIT trap removes them with everything else.
 HV_STAGE="$(mktemp -d)"
 if [ -z "${HV_BIN:-}" ]; then
-  HV_VERSION="$(sed -n 's/^## v\([0-9][^ ]*\).*/\1/p' "$REPO/CHANGELOG.md" | head -1)"
+  HV_VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
   (cd "$REPO" && go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$HV_VERSION" \
     -o "$HV_STAGE/hv" ./cmd/hv) || { echo "runner: go build ./cmd/hv failed" >&2; exit 2; }
   HV_BIN="$HV_STAGE/hv"

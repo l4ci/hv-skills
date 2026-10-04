@@ -141,7 +141,7 @@ If `data.to` differs from `new_version`, stop: the file may be partly modified, 
 hv release push <new_version> --tag-only --json --confirm --confirm-note "$APPROVAL"
 ```
 
-Only the tag goes now (an unflagged push is refused where goreleaser builds the release). The plugin version on the branch points at the release binaries, so the branch waits for Step 11b. Where the repo has a `.goreleaser.yaml`, the tag starts the release workflow, which builds the binaries into a draft release. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
+Only the tag goes now (an unflagged push is refused where goreleaser builds the release). The `VERSION` bump on the branch announces binaries that do not exist until the release is published, so the branch waits for Step 11b. Where the repo has a `.goreleaser.yaml`, the tag starts the release workflow, which builds the binaries into a draft release. Exit 3 (no origin) or 5 (push failed): stop; the error names the tag SHA for manual recovery. Skipped in `--dry-run`.
 
 ## Step 11 — Publish Remote Release
 

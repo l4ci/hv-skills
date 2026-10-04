@@ -44,121 +44,45 @@ func TestCompare(t *testing.T) {
 	}
 }
 
-func plugin(t *testing.T, dir, version string) {
-	t.Helper()
-	os.MkdirAll(filepath.Join(dir, ".claude-plugin"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".claude-plugin", "plugin.json"), []byte(`{"name": "hv-skills", "version": "`+version+`"}`), 0o644)
+func env(exeDir, current, latest string) Env {
+	return Env{ExeDir: exeDir, Current: current, Latest: func() string { return latest }}
 }
 
-func env(home string, vars map[string]string, latest string) Env {
-	return Env{Getenv: func(k string) string { return vars[k] }, Home: home, ExeDir: filepath.Join(home, "nowhere"), Current: "1.0.0",
-		Latest: func() string { return latest }}
-}
-
-func TestDetectOverride(t *testing.T) {
-	dir := t.TempDir()
-	plugin(t, dir, "1.0.0")
-	r := Check(env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, "1.1.0"))
-	if r.InstallType != Override || r.InstallRoot != dir || r.Status != "behind" || r.UpdateCommand != "manual — HV_INSTALL_ROOT was set" {
-		t.Errorf("%+v", r)
-	}
-	// a missing override directory falls through
-	r = Check(env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": filepath.Join(dir, "gone")}, "1.1.0"))
-	if r.InstallType != Unknown {
-		t.Errorf("%+v", r)
-	}
-}
-
-func TestDetectPlugin(t *testing.T) {
-	home := t.TempDir()
-	cpr := t.TempDir()
-	plugin(t, cpr, "1.0.0")
-	r := Check(env(home, map[string]string{"CLAUDE_PLUGIN_ROOT": cpr}, "1.0.0"))
-	if r.InstallType != Plugin || r.InstallRoot != cpr || r.Status != "current" || r.UpdateCommand != "claude plugin update hv-skills" {
-		t.Errorf("CLAUDE_PLUGIN_ROOT: %+v", r)
-	}
-	// another plugin's manifest is not ours
-	other := t.TempDir()
-	os.MkdirAll(filepath.Join(other, ".claude-plugin"), 0o755)
-	os.WriteFile(filepath.Join(other, ".claude-plugin", "plugin.json"), []byte(`{"name": "other"}`), 0o644)
-	if r := Check(env(home, map[string]string{"CLAUDE_PLUGIN_ROOT": other}, "1.0.0")); r.InstallType != Unknown {
-		t.Errorf("foreign plugin: %+v", r)
-	}
-	// marketplace layout
-	plugin(t, filepath.Join(home, ".claude/plugins/market/hv-skills"), "1.0.0")
-	if r := Check(env(home, nil, "1.0.0")); r.InstallType != Plugin || !strings.HasSuffix(r.InstallRoot, "market/hv-skills") {
-		t.Errorf("marketplace: %+v", r)
-	}
-}
-
-func TestDetectPluginCacheNewestWins(t *testing.T) {
-	home := t.TempDir()
-	cache := filepath.Join(home, ".claude/plugins/cache/hv-skills/hv-skills")
-	for _, v := range []string{"4.9.0", "4.10.0", "4.2.0"} {
-		plugin(t, filepath.Join(cache, v), v)
-	}
-	os.MkdirAll(filepath.Join(cache, "9.9.9"), 0o755) // newest, but no manifest
-	r := Check(env(home, nil, ""))
-	if r.InstallType != Plugin || filepath.Base(r.InstallRoot) != "4.10.0" {
-		t.Errorf("%+v", r)
-	}
-}
-
-func TestDetectStow(t *testing.T) {
-	home := t.TempDir()
-	plugin(t, filepath.Join(home, ".agents/skills/hv-skills"), "1.0.0")
-	r := Check(env(home, nil, "2.0.0"))
-	want := filepath.Join(home, ".agents/skills/hv-skills")
-	if r.InstallType != Stow || r.InstallRoot != want || r.UpdateCommand != "cd "+want+" && git pull" {
-		t.Errorf("agents skills: %+v", r)
-	}
-	// the skill-symlink walk: ~/.claude/skills/hv-work -> <clone>/hv-work
-	home = t.TempDir()
-	clone := t.TempDir()
-	clone, _ = filepath.EvalSymlinks(clone)
-	plugin(t, clone, "1.0.0")
-	os.MkdirAll(filepath.Join(clone, "hv-work"), 0o755)
-	os.MkdirAll(filepath.Join(home, ".claude/skills"), 0o755)
-	if err := os.Symlink(filepath.Join(clone, "hv-work"), filepath.Join(home, ".claude/skills/hv-work")); err != nil {
-		t.Fatal(err)
-	}
-	r = Check(env(home, nil, "2.0.0"))
-	if r.InstallType != Stow || r.InstallRoot != clone || r.Status != "behind" {
-		t.Errorf("symlink walk: %+v", r)
-	}
-}
-
-func TestDetectRepoClone(t *testing.T) {
-	home := t.TempDir()
-	clone := t.TempDir()
-	plugin(t, clone, "1.0.0")
-	e := env(home, nil, "1.0.0")
-	for _, rel := range []string{"", "bin", "bin/deep"} {
-		os.MkdirAll(filepath.Join(clone, rel), 0o755)
-		e.ExeDir = filepath.Join(clone, rel)
-		if r := Check(e); r.InstallType != RepoType || r.InstallRoot != clone || r.UpdateCommand != "cd "+clone+" && git pull" {
-			t.Errorf("%q: %+v", rel, r)
+func TestDetect(t *testing.T) {
+	for _, c := range []struct {
+		name, exeDir, current, kind, cmd string
+	}{
+		{"brew arm", "/opt/homebrew/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
+		{"brew shim", "/opt/homebrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
+		{"intel cellar", "/usr/local/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
+		{"linuxbrew", "/home/linuxbrew/.linuxbrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
+		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh && hv skills update"},
+		{"dev suffix", "/home/u/.local/bin", "5.0.0-dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
+		{"unstamped", "/tmp/x", "dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
+		{"devel", "/tmp/x", "(devel)", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
+		{"unresolved", "", "5.0.0", Unknown, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh && hv skills update"},
+	} {
+		r := Check(env(c.exeDir, c.current, "9.0.0"))
+		if r.InstallType != c.kind || r.InstallRoot != c.exeDir || r.UpdateCommand != c.cmd || r.CurrentVersion != c.current {
+			t.Errorf("%s: %+v", c.name, r)
 		}
 	}
-}
-
-// With no install root, currentVersion falls back to the binary's stamped
-// version (env's Current), so the status still compares.
-func TestUnknownInstallUsesStampedVersion(t *testing.T) {
-	r := Check(env(t.TempDir(), nil, "1.0.0"))
-	if r.InstallType != Unknown || r.InstallRoot != "" || r.CurrentVersion != "1.0.0" || r.Status != "current" ||
-		r.UpdateCommand != "reinstall: claude plugin install hv-skills" || r.LatestVersion != "1.0.0" {
-		t.Errorf("%+v", r)
+	// a home directory named like a brew path does not make a script install brew
+	for _, dir := range []string{"/home/homebrewer/.local/bin", "/home/linuxbrew-fan/.local/bin", "/home/u/homebrew/bin"} {
+		if r := Check(env(dir, "5.0.0", "")); r.InstallType != Script {
+			t.Errorf("lookalike path %s: %+v", dir, r)
+		}
 	}
 }
 
 func TestStatuses(t *testing.T) {
-	dir := t.TempDir()
-	plugin(t, dir, "1.0.0")
-	for latest, want := range map[string]string{"1.1.0": "behind", "1.0.0": "current", "0.9.0": "ahead", "": "unknown"} {
-		if r := Check(env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, latest)); r.Status != want {
+	for latest, want := range map[string]string{"5.1.0": "behind", "5.0.0": "current", "4.9.0": "ahead", "": "unknown"} {
+		if r := Check(env("/home/u/.local/bin", "5.0.0", latest)); r.Status != want {
 			t.Errorf("latest %q: %s, want %s", latest, r.Status, want)
 		}
+	}
+	if r := Check(env("/home/u/.local/bin", "", "5.0.0")); r.Status != "unknown" {
+		t.Errorf("no current version: %+v", r)
 	}
 }
 
@@ -195,23 +119,4 @@ func TestGuardRefusesForeignGh(t *testing.T) {
 		}
 	}()
 	ghLatest()
-}
-
-// currentVersion is the installed plugin's version, not the binary's: a fake
-// install at 1.2.0 run by a 4.5.0 binary is behind 1.3.0. A root without a
-// readable version gives "" and status unknown, as the old helper did.
-func TestCurrentVersionFromInstallRoot(t *testing.T) {
-	dir := t.TempDir()
-	plugin(t, dir, "1.2.0")
-	e := env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": dir}, "1.3.0")
-	e.Current = "4.5.0"
-	if r := Check(e); r.CurrentVersion != "1.2.0" || r.Status != "behind" {
-		t.Errorf("%+v", r)
-	}
-	bare := t.TempDir()
-	e = env(t.TempDir(), map[string]string{"HV_INSTALL_ROOT": bare}, "1.3.0")
-	e.Current = "4.5.0"
-	if r := Check(e); r.CurrentVersion != "" || r.Status != "unknown" {
-		t.Errorf("no manifest: %+v", r)
-	}
 }

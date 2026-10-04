@@ -3,6 +3,10 @@
 # step in /hv-release, which finishes this draft instead of creating a second
 # release. Push the tag first (`hv release push --tag-only`), wait for this
 # job, then publish, then push the branch.
+#
+# The tag builds the binary (its version comes from the tag through ldflags);
+# VERSION is what `hv release bump` edits. The first step refuses a tag that
+# does not match VERSION, so the two cannot drift.
 name: Release
 
 on:
@@ -20,6 +24,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Tag matches VERSION
+        run: |
+          want="v$(tr -d '[:space:]' < VERSION)"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "tag $GITHUB_REF_NAME does not match VERSION ($want)" >&2
+            exit 1
+          fi
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -30,3 +41,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Write access to l4ci/homebrew-tap; see .hv/RELEASE.md.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -1,82 +1,39 @@
 echo "update"
-# Seed a fake install with a plugin.json so detection has something to find.
-mkdir -p fake-install/.claude-plugin
-cat > fake-install/.claude-plugin/plugin.json <<'EOF'
-{"name":"hv-skills","version":"1.2.0"}
-EOF
-
-# HV_INSTALL_ROOT is the real install override; HV_TEST_LATEST_VERSION skips the network.
-OUT=$(env HV_INSTALL_ROOT="$TMP/fake-install" HV_TEST_LATEST_VERSION=1.3.0 "$HV_BIN" --json update) \
-  || fail "update exited non-zero"
-[ "$(echo "$OUT" | jget data.currentVersion)" = "1.2.0" ] || fail "update didn't read current version: $OUT"
-[ "$(echo "$OUT" | jget data.latestVersion)" = "1.3.0" ] || fail "update didn't use override latest: $OUT"
+# The binary under test is stamped with VERSION (see runner.sh), so current is
+# known; HV_TEST_LATEST_VERSION skips the network. A binary in $TMP is a
+# script-style install.
+CUR="$(tr -d '[:space:]' < "$REPO/VERSION")"
+OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$HV_BIN" --json update) || fail "update exited non-zero"
+[ "$(echo "$OUT" | jget data.currentVersion)" = "$CUR" ] || fail "update didn't report the binary's version ($CUR): $OUT"
+[ "$(echo "$OUT" | jget data.latestVersion)" = "99.0.0" ] || fail "update didn't use override latest: $OUT"
 [ "$(echo "$OUT" | jget data.status)" = "behind" ] || fail "update didn't mark behind: $OUT"
-[ "$(echo "$OUT" | jget data.installType)" = "override" ] || fail "update didn't report override install: $OUT"
-pass "update reports behind when current < latest"
+[ "$(echo "$OUT" | jget data.installType)" = "script" ] || fail "update didn't report a script install: $OUT"
+case $(echo "$OUT" | jget data.updateCommand) in *install.sh*"hv skills update") ;; *) fail "update command should rerun install.sh then refresh skills: $OUT" ;; esac
+pass "update reports behind and names the install.sh command"
 
-OUT=$(env HV_INSTALL_ROOT="$TMP/fake-install" HV_TEST_LATEST_VERSION=1.2.0 "$HV_BIN" --json update) \
-  || fail "update exited non-zero"
+OUT=$(env HV_TEST_LATEST_VERSION="$CUR" "$HV_BIN" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.status)" = "current" ] || fail "update didn't mark current: $OUT"
 pass "update reports current when equal"
 
-OUT=$(env HV_INSTALL_ROOT="$TMP/fake-install" HV_TEST_LATEST_VERSION=1.1.0 "$HV_BIN" --json update) \
-  || fail "update exited non-zero"
+OUT=$(env HV_TEST_LATEST_VERSION=0.0.1 "$HV_BIN" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.status)" = "ahead" ] || fail "update didn't mark ahead: $OUT"
 pass "update reports ahead when current > latest"
 
-rm -rf fake-install
-
-echo "update Claude Code plugin cache layout"
-# Build a fake Claude Code plugin cache with two installed versions so we can
-# verify the resolver picks the newest by `sort -Vr` and reports it as plugin.
-XX_TMP="$(mktemp -d)"
-trap 'rm -rf "$XX_TMP"' EXIT
-(
-  cd "$XX_TMP"
-
-  # Two sibling versions; 2.0.0 must win over 1.0.0 (and over a 1.10.0-style
-  # lexical winner — we use 2.0.0 to keep the assertion plain).
-  for v in 1.0.0 2.0.0; do
-    mkdir -p "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/.claude-plugin"
-    mkdir -p "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/bin"
-    cat > "fake-home/.claude/plugins/cache/hv-skills/hv-skills/$v/.claude-plugin/plugin.json" <<EOF2
-{"name":"hv-skills","version":"$v"}
-EOF2
-  done
-
-  # Unset HV_INSTALL_ROOT for this run — runner.sh exports it for preflight
-  # comparisons, but here we want the cache-layout resolver to run unbiased
-  # so it can pick up the fake-home/.claude/plugins/cache/... layout.
-  OUT=$(env -u HV_INSTALL_ROOT HOME="$XX_TMP/fake-home" HV_TEST_LATEST_VERSION=2.0.0 "$HV_BIN" --json update)
-  [ "$(echo "$OUT" | jget data.installType)" = "plugin" ] || fail "cache-layout: installType != plugin: $OUT"
-  [ "$(echo "$OUT" | jget data.currentVersion)" = "2.0.0" ] || fail "cache-layout: currentVersion != 2.0.0: $OUT"
-  grep -q '/2.0.0' <<<"$(jget data.installRoot <<<"$OUT")" || fail "cache-layout: installRoot missing /2.0.0/: $OUT"
-  pass "update resolves Claude Code plugin cache and picks newest version"
-
-  # [B05] CLAUDE_PLUGIN_ROOT pointing at a non-hv-skills plugin must NOT be
-  # honored — Claude Code sets it to whatever plugin is the active context, so
-  # a cross-plugin invocation would otherwise resolve to the wrong install.
-  # Resolver must validate plugin.json's `name` and fall through on mismatch.
-  mkdir -p "$XX_TMP/wrong-plugin/.claude-plugin"
-  cat > "$XX_TMP/wrong-plugin/.claude-plugin/plugin.json" <<'EOF2'
-{"name":"context-mode","version":"1.0.89"}
-EOF2
-  OUT=$(env -u HV_INSTALL_ROOT CLAUDE_PLUGIN_ROOT="$XX_TMP/wrong-plugin" HOME="$XX_TMP/fake-home" \
-        HV_TEST_LATEST_VERSION=2.0.0 "$HV_BIN" --json update)
-  [ "$(echo "$OUT" | jget data.currentVersion)" = "2.0.0" ] || fail "cache-layout: wrong CLAUDE_PLUGIN_ROOT leaked through: $OUT"
-  grep -q 'context-mode' <<<"$OUT" && fail "cache-layout: installRoot points at non-hv-skills plugin: $OUT"
-  pass "update ignores CLAUDE_PLUGIN_ROOT when its plugin.json name != hv-skills"
-)
-trap 'rm -rf "$TMP"' EXIT
-rm -rf "$XX_TMP"
+# A binary under a Homebrew prefix is a brew install.
+mkdir -p "$TMP/Cellar/hv/9.9.9/bin"
+cp "$HV_BIN" "$TMP/Cellar/hv/9.9.9/bin/hv"
+OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$TMP/Cellar/hv/9.9.9/bin/hv" --json update) || fail "update exited non-zero"
+[ "$(echo "$OUT" | jget data.installType)" = "brew" ] || fail "update didn't report a brew install: $OUT"
+case $(echo "$OUT" | jget data.updateCommand) in "brew update && brew upgrade hv"*) ;; *) fail "brew install should name brew upgrade: $OUT" ;; esac
+rm -rf "$TMP/Cellar"
+pass "update reports a Homebrew binary as brew"
 
 echo "version"
-# Plain `version` needs no project: it reads plugin.json at the resolved plugin root.
-EXPECTED=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' \
-  "$REPO/.claude-plugin/plugin.json")
+# Plain `version` needs no project: it prints the version stamped into the binary.
+EXPECTED="$CUR"
 OUT=$(cd / && "$HV_BIN" --json version) || fail "version exited non-zero outside a project"
-[ "$(echo "$OUT" | jget data.version)" = "$EXPECTED" ] || fail "version != plugin.json ($EXPECTED): $OUT"
-pass "version prints the plugin version without a project"
+[ "$(echo "$OUT" | jget data.version)" = "$EXPECTED" ] || fail "version != VERSION ($EXPECTED): $OUT"
+pass "version prints the binary version without a project"
 
 echo "version --drift"
 XX_TMP="$(mktemp -d)"

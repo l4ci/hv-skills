@@ -54,9 +54,6 @@ func migProject(t *testing.T, umbrella bool) string {
 var migTS = regexp.MustCompile(`migrate-backup/\d{8}T\d{6}`)
 
 func migPlugin(t *testing.T) {
-	root := t.TempDir()
-	knWrite(t, filepath.Join(root, ".claude-plugin", "plugin.json"), `{"name": "hv-skills", "version": "4.9.9"}`)
-	t.Setenv("HV_INSTALL_ROOT", root)
 	old := installedVersionFn
 	installedVersionFn = func() string { return "4.9.9" }
 	t.Cleanup(func() { installedVersionFn = old })
