@@ -64,7 +64,7 @@ func TestFillKeepsPresentAndUnknownKeys(t *testing.T) {
 	doc, _ := jsonx.Decode([]byte(read(t, root)))
 	o := doc.(*jsonx.Object)
 	// present keys keep their order; added ones go before the first later sibling
-	want := []string{"zzz", "work", "models", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "issues", "hvSkills"}
+	want := []string{"zzz", "work", "models", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "hvSkills", "issues", "hv"}
 	if got := o.Keys(); !reflect.DeepEqual(got, want) {
 		t.Errorf("top keys %v", got)
 	}
@@ -89,8 +89,8 @@ func TestFillKeepsPresentAndUnknownKeys(t *testing.T) {
 	if v, _ := Value(o, "umbrella.enabled"); v != false {
 		t.Errorf("umbrella.enabled %v", v)
 	}
-	if v, _ := Value(o, "hvSkills.version"); v != "" {
-		t.Errorf("hvSkills.version %v", v)
+	if v, _ := Value(o, "hv.version"); v != "" {
+		t.Errorf("hv.version %v", v)
 	}
 	if st, m := Check(root); st != UpToDate {
 		t.Errorf("check: %s %v", st, m)
@@ -120,5 +120,110 @@ func TestFillRefusesCorrupt(t *testing.T) {
 		if b, _ := os.ReadFile(p); string(b) != body {
 			t.Errorf("%q: file changed to %q", body, b)
 		}
+	}
+}
+
+func fillLegacy(t *testing.T, cfg string) (string, []string) {
+	t.Helper()
+	root := project(t, cfg, "")
+	filled, err := Fill(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return read(t, root), filled
+}
+
+func TestFillMigratesLegacyVersionKey(t *testing.T) {
+	root := project(t, `{"hvSkills":{"version":"4.2.0"}}`, "")
+	filled, err := Fill(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(filled, requiredNames()) {
+		t.Errorf("filled %v", filled)
+	}
+	doc, _ := jsonx.Decode([]byte(read(t, root)))
+	o := doc.(*jsonx.Object)
+	if _, ok := o.Get("hvSkills"); ok {
+		t.Errorf("hvSkills left: %s", read(t, root))
+	}
+	if v, _ := Value(o, VersionKey); v != "4.2.0" {
+		t.Errorf("hv.version %v", v)
+	}
+	if st, m := Check(root); st != UpToDate {
+		t.Errorf("check: %s %v", st, m)
+	}
+}
+
+// A file that is otherwise complete is still rewritten for the move alone,
+// and lists exactly hv.version.
+func TestFillLegacyKeyAloneRewrites(t *testing.T) {
+	cfg := fullConfig()
+	hv, _ := getObject(cfg, "hv")
+	hv.Delete("version")
+	cfg.Delete("hv")
+	h, _ := jsonx.Decode([]byte(`{"version":"4.2.0"}`))
+	cfg.Set("hvSkills", h)
+	b, _ := jsonx.Marshal(cfg)
+	root := project(t, string(b), "")
+	filled, err := Fill(root)
+	if err != nil || !reflect.DeepEqual(filled, []string{VersionKey}) {
+		t.Fatalf("filled %v err %v", filled, err)
+	}
+	doc, _ := jsonx.Decode([]byte(read(t, root)))
+	o := doc.(*jsonx.Object)
+	if _, ok := o.Get("hvSkills"); ok {
+		t.Error("hvSkills left")
+	}
+	if v, _ := Value(o, VersionKey); v != "4.2.0" {
+		t.Errorf("hv.version %v", v)
+	}
+}
+
+func TestFillLegacyKeepsExistingNewValue(t *testing.T) {
+	out, filled := fillLegacy(t, `{"hv":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`)
+	doc, _ := jsonx.Decode([]byte(out))
+	o := doc.(*jsonx.Object)
+	if v, _ := Value(o, VersionKey); v != "5.0.0" {
+		t.Errorf("hv.version %v", v)
+	}
+	if _, ok := o.Get("hvSkills"); ok {
+		t.Error("hvSkills left")
+	}
+	// dropping the legacy key counts as filling hv.version either way
+	if filled[len(filled)-1] != VersionKey {
+		t.Errorf("hv.version not listed: %v", filled)
+	}
+}
+
+func TestFillLegacyKeepsOtherHvSkillsKeys(t *testing.T) {
+	out, _ := fillLegacy(t, `{"hvSkills":{"version":"4.2.0","note":"x"}}`)
+	doc, _ := jsonx.Decode([]byte(out))
+	o := doc.(*jsonx.Object)
+	hs, ok := getObject(o, "hvSkills")
+	if !ok || !reflect.DeepEqual(hs.Keys(), []string{"note"}) {
+		t.Errorf("hvSkills %v: %s", ok, out)
+	}
+	if v, _ := Value(o, VersionKey); v != "4.2.0" {
+		t.Errorf("hv.version %v", v)
+	}
+}
+
+func TestStampedVersion(t *testing.T) {
+	cases := []struct{ name, cfg, want string }{
+		{"new", `{"hv":{"version":"5.0.0"}}`, "5.0.0"},
+		{"legacy", `{"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
+		{"both prefers new", `{"hv":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`, "5.0.0"},
+		{"empty new falls back", `{"hv":{"version":""},"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
+		{"neither", `{}`, ""},
+	}
+	for _, tc := range cases {
+		doc, _ := jsonx.Decode([]byte(tc.cfg))
+		if got := StampedVersion(doc); got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	if StampedVersion(nil) != "" {
+		t.Error("nil cfg")
 	}
 }

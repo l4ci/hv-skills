@@ -17,7 +17,7 @@ OUT=$( cd "$CF" && hvj config fill )
 python3 - "$CF/.hv/config.json" <<'PY' || fail "filled seed is not in schema order"
 import json, sys
 cfg = json.load(open(sys.argv[1]))
-want = ["models", "work", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "issues", "hvSkills"]
+want = ["models", "work", "refactor", "learn", "ship", "qa", "autonomy", "debug", "docs", "git", "umbrella", "issues", "hv"]
 assert list(cfg) == want, list(cfg)
 assert list(cfg["issues"]) == ["providers", "label", "autoCreateLabel", "filterMineOnly"], list(cfg["issues"])
 assert cfg["work"]["isolation"] == "branch" and cfg["work"]["accounts"] == [], cfg["work"]
@@ -38,6 +38,26 @@ RC=0; ( cd "$CF" && hvj config fill >/dev/null 2>&1 ) || RC=$?
 [ "$RC" = "70" ] || fail "fill on a corrupt config should exit 70, got $RC"
 [ "$(cat "$CF/.hv/config.json")" = "{oops" ] || fail "fill touched a corrupt config"
 pass "config fill keeps present keys, is idempotent and refuses a corrupt file"
+
+trap 'rm -rf "$TMP"' EXIT
+rm -rf "$CF"
+
+# A config that only holds the pre-rename hvSkills.version moves it to hv.version.
+CF="$(mktemp -d)"
+trap 'rm -rf "$CF"' EXIT
+mkdir -p "$CF/.hv"
+printf '{"hvSkills": {"version": "4.2.0"}}\n' > "$CF/.hv/config.json"
+OUT=$( cd "$CF" && hvj config fill )
+[ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "fill should migrate the legacy stamp: $OUT"
+python3 - "$CF/.hv/config.json" <<'PY' || fail "legacy hvSkills.version was not moved to hv.version"
+import json, sys
+cfg = json.load(open(sys.argv[1]))
+assert "hvSkills" not in cfg, list(cfg)
+assert cfg["hv"] == {"version": "4.2.0"}, cfg["hv"]
+PY
+[ "$( cd "$CF" && hvj config check | jget data.status )" = "upToDate" ] \
+  || fail "config check after migrating the legacy stamp should be upToDate"
+pass "config fill moves hvSkills.version to hv.version"
 
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CF"

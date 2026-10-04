@@ -295,7 +295,7 @@ func TestMigrateV4StripsWhenItIsTheOnlyLeftover(t *testing.T) {
 	}
 }
 
-// --apply stamps hvSkills.version with the installed plugin version, drops the
+// --apply stamps hv.version with the installed plugin version, drops the
 // legacy top-level version, and reports the stamp as data.versionStamp.
 func TestMigrateV4StampsInstalledVersion(t *testing.T) {
 	migPlugin(t)
@@ -320,19 +320,23 @@ func TestMigrateV4StampsInstalledVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	var cfg struct {
-		HvSkills struct {
+		Hv struct {
 			Version string `json:"version"`
-		} `json:"hvSkills"`
-		Version *string `json:"version"`
+		} `json:"hv"`
+		HvSkills *json.RawMessage `json:"hvSkills"`
+		Version  *string          `json:"version"`
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		t.Fatalf("config: %v\n%s", err, raw)
 	}
-	if cfg.HvSkills.Version != "4.9.9" {
-		t.Errorf("hvSkills.version = %q, want 4.9.9", cfg.HvSkills.Version)
+	if cfg.Hv.Version != "4.9.9" {
+		t.Errorf("hv.version = %q, want 4.9.9", cfg.Hv.Version)
 	}
-	if env.Data.VersionStamp != cfg.HvSkills.Version {
-		t.Errorf("data.versionStamp = %q, stamped %q", env.Data.VersionStamp, cfg.HvSkills.Version)
+	if env.Data.VersionStamp != cfg.Hv.Version {
+		t.Errorf("data.versionStamp = %q, stamped %q", env.Data.VersionStamp, cfg.Hv.Version)
+	}
+	if cfg.HvSkills != nil {
+		t.Errorf("legacy hvSkills kept: %s", raw)
 	}
 	if cfg.Version != nil {
 		t.Errorf("legacy top-level version kept: %s", raw)

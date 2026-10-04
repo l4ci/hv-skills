@@ -4,7 +4,7 @@ This page lists every config key with its allowed values. The options below are 
 
 There is no interactive config UI. Two verbs cover it:
 
-- **`hv init`** writes `.hv/config.json` on first setup, fills any missing keys with the Recommended defaults on later runs, and stamps `hvSkills.version`. It never overwrites a value you set.
+- **`hv init`** writes `.hv/config.json` on first setup, fills any missing keys with the Recommended defaults on later runs, and stamps `hv.version`. It never overwrites a value you set.
 - **`hv config show`** and **`hv config set`** read and change keys later.
 
 The "(Recommended)" tag on each option marks the default `hv init` writes.
@@ -136,7 +136,7 @@ Free text. Default: `""` (auto-detect). Key `git.baseBranch`.
 
 `hv init` fills these with the silent default; set them only when you want something else:
 
-- `hvSkills.version`: stamp of the hv release that wrote the config. Auto-managed by `hv init` and `hv update`; do not set it by hand.
+- `hv.version`: stamp of the hv release that wrote the config. Auto-managed by `hv init` and `hv update`; do not set it by hand. The old key `hvSkills.version` is read as a fallback and moved here by `hv init` / `hv config fill`.
 - `refactor.verifyCommands`: array of shell commands run as CI-shape gates by /hv-refactor Step 7. Silent default `[]` (read-only verification). Set via `hv config set refactor.verifyCommands '[...]'`.
 - `ship.secondOpinion`: opt-in fresh-eyes adversarial gate in /hv-ship Step 3.5. Silent default `false` (Rule 9). Set via `hv config set ship.secondOpinion true`.
 - `ship.secondOpinionRunner`: who runs the /hv-ship Step 3.5 gate when `ship.secondOpinion` is `true`. Enum `subagent` (silent default). The `codex` value was removed in 5.0: /hv-ship prints a one-line note and runs the subagent in advisory mode (FAIL is surfaced, never blocks), as the Codex runner did. See [`usage/configuration.md`](../usage/configuration.md#shipsecondopinionrunner).

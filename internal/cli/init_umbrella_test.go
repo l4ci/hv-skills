@@ -103,7 +103,7 @@ func TestInitUmbrellaExits(t *testing.T) {
 }
 
 func TestVersionDrift(t *testing.T) {
-	root := a4Project(t, `{"hvSkills": {"version": "4.9.0"}}`)
+	root := a4Project(t, `{"hv": {"version": "4.9.0"}}`)
 	old := installedVersionFn
 	t.Cleanup(func() { installedVersionFn = old })
 
@@ -142,7 +142,7 @@ func TestVersionDrift(t *testing.T) {
 	if _, env, _ := hvRun(t, "--json", "-C", bare, "version", "--drift"); umbData(env)["status"] != "unknown" {
 		t.Fatalf("env=%v", env)
 	}
-	os.WriteFile(filepath.Join(root, ".hv", "config.local.json"), []byte(`{"hvSkills": {"version": "5.0.0"}}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".hv", "config.local.json"), []byte(`{"hv": {"version": "5.0.0"}}`), 0o644)
 	if _, env, _ := hvRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
 		t.Fatalf("local override ignored: env=%v", env)
 	}
@@ -165,4 +165,32 @@ func umbData(env map[string]any) map[string]any {
 		}
 	}
 	return m
+}
+
+// A project that still carries the pre-rename hvSkills.version reports drift
+// from it, and hv init moves it to hv.version stamped with the binary version.
+func TestVersionDriftReadsLegacyKeyAndInitMigratesIt(t *testing.T) {
+	root := a4Project(t, `{"hvSkills": {"version": "4.9.0"}}`)
+	old := installedVersionFn
+	t.Cleanup(func() { installedVersionFn = old })
+	installedVersionFn = func() string { return "5.0.0" }
+
+	_, env, stderr := hvRun(t, "--json", "-C", root, "version", "--drift")
+	if d := umbData(env); d["stamped"] != "4.9.0" || d["status"] != "drift" {
+		t.Fatalf("legacy key not read: env=%v stderr=%s", env, stderr)
+	}
+
+	if code, env, stderr := hvRun(t, "--json", "-C", root, "init", "--no-blocks"); code != 0 {
+		t.Fatalf("init: code=%d env=%v stderr=%s", code, env, stderr)
+	}
+	cfg := readCfg(t, filepath.Join(root, ".hv", "config.json"))
+	if v, _ := lookupDotted(cfg, "hv.version"); v != "5.0.0" {
+		t.Errorf("hv.version = %v, want 5.0.0", v)
+	}
+	if _, ok := lookupDotted(cfg, "hvSkills"); ok {
+		t.Errorf("hvSkills left in config: %v", cfg)
+	}
+	if _, env, _ := hvRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
+		t.Errorf("drift not cleared: %v", env)
+	}
 }

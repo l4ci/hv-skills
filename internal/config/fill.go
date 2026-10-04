@@ -33,6 +33,12 @@ func decodeObject(raw []byte) (*jsonx.Object, bool) {
 // those keys in schema order. A missing config.json is created. A file with
 // nothing missing is not rewritten. Each added key goes in at its schema
 // position among its siblings, so a file in schema order stays in it.
+//
+// Fill also migrates the legacy stamp: a string at hvSkills.version moves to
+// hv.version (kept as is when hv.version already holds a non-empty value, else
+// copied there), the legacy key is deleted and an emptied hvSkills object goes
+// with it. The move counts as filling hv.version, so it is listed and the file
+// is rewritten.
 func Fill(root string) ([]string, error) {
 	filled := []string{}
 	path := configPath(root)
@@ -50,7 +56,12 @@ func Fill(root string) ([]string, error) {
 			}
 			cfg = obj
 		}
+		cfg, migrated := migrateLegacyVersion(cfg)
 		for _, k := range Keys {
+			if k.Name == VersionKey && migrated {
+				filled = append(filled, k.Name)
+				continue
+			}
 			if _, ok := walk(cfg, k.Name); !k.Required || ok {
 				continue
 			}
@@ -66,6 +77,32 @@ func Fill(root string) ([]string, error) {
 		return nil, err
 	}
 	return filled, nil
+}
+
+// migrateLegacyVersion moves hvSkills.version to hv.version in cfg and returns
+// the resulting object (fillKey may replace cfg) and whether it found a legacy
+// key to move. cfg is edited only when hvSkills is an object holding a string
+// "version".
+func migrateLegacyVersion(cfg *jsonx.Object) (*jsonx.Object, bool) {
+	legacy, ok := getObject(cfg, "hvSkills")
+	if !ok {
+		return cfg, false
+	}
+	lv, ok := legacy.Get("version")
+	if !ok {
+		return cfg, false
+	}
+	if _, isStr := lv.(string); !isStr {
+		return cfg, false
+	}
+	if cur, _ := walk(cfg, VersionKey); cur == nil || cur == "" {
+		cfg = fillKey(cfg, "", strings.Split(VersionKey, "."), lv)
+	}
+	legacy.Delete("version")
+	if len(legacy.Keys()) == 0 {
+		cfg.Delete("hvSkills")
+	}
+	return cfg, true
 }
 
 // fillKey sets segs to v under o, whose dotted path is prefix, and returns o

@@ -122,13 +122,13 @@ func (r initConfigResult) report(data *jsonx.Object, lines *[]string) {
 		*lines = append(*lines, "config filled: "+strings.Join(r.filled, ", "))
 	}
 	if r.stamped != "" {
-		*lines = append(*lines, "stamped hvSkills.version: "+r.stamped)
+		*lines = append(*lines, "stamped hv.version: "+r.stamped)
 	}
 }
 
 // initConfig is the config half of the old init skill: fill every missing
 // required key with its schema default (never touching a present key), then
-// stamp hvSkills.version with the binary's version, which clears the drift
+// stamp hv.version with the binary's version, which clears the drift
 // nudge. Idempotent; an unreleased (dev) binary stamps nothing.
 func initConfig(root string) (initConfigResult, error) {
 	var r initConfigResult
@@ -141,9 +141,8 @@ func initConfig(root string) (initConfigResult, error) {
 	}
 	r.filled = filled
 	if v := installedVersionFn(); v != "" {
-		cur, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "hvSkills.version")
-		if cur != v {
-			if _, err := config.Set(root, "hvSkills.version", v); err != nil {
+		if config.StampedVersion(config.Load(filepath.Join(root, ".hv", "config.json"))) != v {
+			if _, err := config.Set(root, config.VersionKey, v); err != nil {
 				return r, err
 			}
 			r.stamped = v

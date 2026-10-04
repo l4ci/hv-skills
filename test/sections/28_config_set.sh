@@ -113,7 +113,7 @@ json.dump({
     "git": {"baseBranch": ""},
     "umbrella": {"enabled": False},
     "issues": {"providers": {"github": True, "gitlab": True}},
-    "hvSkills": {"version": "4.5.0"},
+    "hv": {"version": "4.5.0"},
 }, open(sys.argv[1], "w"))
 PYEOF
 rc=0; VERDICT=$( cd "$CFG_F78" && hvj config check 2>/dev/null ) || rc=$?

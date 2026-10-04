@@ -12,7 +12,7 @@ trap 'rm -rf "$TMP_UK"' EXIT
   ( cd web && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   ( cd api && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .hv/repos.json
-  printf '{"hvSkills":{"version":"3.0.0"}}' > .hv/config.json
+  printf '{"hv":{"version":"3.0.0"}}' > .hv/config.json
   printf '# Knowledge\n\n## Architecture\n\n- **umbrella rule** — cross-repo body <!-- 2026-05-19 -->\n\n## Glossary\n\n' > .hv/KNOWLEDGE.md
   mkdir -p .hv/knowledge/web .hv/knowledge/api
   printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/web/KNOWLEDGE.md
@@ -140,7 +140,7 @@ trap 'rm -rf "$TMP_UK2"' EXIT
   ( cd web && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   ( cd api && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
   printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .hv/repos.json
-  printf '{"hvSkills":{"version":"3.0.0"}}' > .hv/config.json
+  printf '{"hv":{"version":"3.0.0"}}' > .hv/config.json
   printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/KNOWLEDGE.md
   mkdir -p .hv/knowledge/web .hv/knowledge/api
   printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .hv/knowledge/web/KNOWLEDGE.md

@@ -26,7 +26,7 @@ Core files it checks under `.hv/`:
 - `config.json`
 - `status.json`
 
-Advisory findings come back as `warnings`, never as a failure: an umbrella flag that disagrees with the registry, and version drift between the project's stamped `hvSkills.version` and the installed binary (`hv version --drift` reports the same thing on its own).
+Advisory findings come back as `warnings`, never as a failure: an umbrella flag that disagrees with the registry, and version drift between the project's stamped `hv.version` (the old `hvSkills.version` is read as a fallback until `hv init` / `hv config fill` moves it) and the installed binary (`hv version --drift` reports the same thing on its own).
 
 ## `hv doctor`
 

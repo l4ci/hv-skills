@@ -38,7 +38,7 @@ Default config:
   "git": {
     "baseBranch": ""
   },
-  "hvSkills": {
+  "hv": {
     "version": ""
   }
 }
@@ -430,15 +430,15 @@ Skills that use the base branch (including `/hv-ship`, `/hv-review` and `/hv-wor
 
 `issues.label` is the legacy alias of `issues.labels.inProgress`. It is used when the new key is unset. `hv config show` lists all of these keys with their effective value and source.
 
-## hvSkills.version (auto-managed)
+## hv.version (auto-managed)
 
 - **Type:** string
 - **Default:** `""` (unstamped until `hv init` first runs)
 
-Records the hv plugin version that was installed when `hv init` last ran. Auto-managed: `hv init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
+Records the hv release (binary version) that `hv init` last ran with. Auto-managed: `hv init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
 
 `hv version --drift` compares the stamped value with the installed `hv` binary, and [`hv init check`](../reference/preflight.md) surfaces the same drift as a warning. `--json` returns `stamped`, `installed` and `status` (`match`, `drift` or `unknown`).
 
-Re-running `hv init` re-stamps `hvSkills.version`; there are no project files to refresh. Distinct from `hv update` (which compares installed vs latest GitHub release): this is *project drift*, visible when the plugin updated under you and the project hasn't been re-stamped yet.
+Re-running `hv init` re-stamps `hv.version`; there are no project files to refresh. Projects written before the rename carry `hvSkills.version`: it is read as a fallback and moved to `hv.version` by `hv init` / `hv config fill`. Distinct from `hv update` (which compares installed vs latest GitHub release): this is *project drift*, visible when `hv` was upgraded under you and the project hasn't been re-stamped yet.
 
-When `hv version --drift` reports drift, re-run `hv init` after a plugin upgrade to clear it.
+When `hv version --drift` reports drift, re-run `hv init` after an upgrade to clear it.
