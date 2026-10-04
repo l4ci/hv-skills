@@ -53,7 +53,7 @@ RC=0; sh "$INSTALL" --prefix "$IS/p5" --version 0.0.1 >/dev/null 2>&1 || RC=$?
 [ "$RC" != 0 ] && [ ! -e "$IS/p5/bin/hv" ] || fail "an unpublished version should fail without installing"
 
 # URL guard: userinfo and remote http are refused before any download.
-for bad in "https://x:y@github.com/l4ci/hv-skills/releases" "http://evil.example/releases" "http://localhost:1@evil.example/r" "http://127.0.0.1:8000/releases"; do
+for bad in "https://x:y@github.com/l4ci/hv/releases" "http://evil.example/releases" "http://localhost:1@evil.example/r" "http://127.0.0.1:8000/releases"; do
   RC=0; OUT=$(HV_RELEASE_BASE_URL="$bad" sh "$INSTALL" --prefix "$IS/p6" 2>&1) || RC=$?
   [ "$RC" != 0 ] || fail "install.sh accepted release URL $bad"
   case $OUT in *"refusing release URL"*) ;; *) fail "$bad should be refused by name: $OUT" ;; esac

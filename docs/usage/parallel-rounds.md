@@ -11,7 +11,7 @@ read a stuck worker, what to escalate, when to merge. The mechanics are `hv roun
 never polls inside the orchestrator's context. A worker reads
 [`references/worker-contract.md`](../../references/worker-contract.md); `hv round assign` points it there.
 
-This page covers what a round does and how to run one. Running a round on hv-skills itself, with its
+This page covers what a round does and how to run one. Running a round on hv itself, with its
 gate and repo rules, is in [contributing: rounds](../contributing/rounds.md).
 
 ## Round or `/hv-work`

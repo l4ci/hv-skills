@@ -1,6 +1,6 @@
-# hv-skills documentation
+# hv documentation
 
-Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
+Public user guide for hv, a zero-dependency dev workflow for Claude Code.
 
 ## Contents
 
@@ -13,7 +13,7 @@ Public user guide for hv-skills, a zero-dependency dev workflow for Claude Code.
 ### Walkthroughs
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md). Empty repo plus a one-page brief, taken end-to-end through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md). Established codebase with open issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle.
+- [Brownfield: dropping hv into an existing project](walkthroughs/brownfield-existing-project.md). Established codebase with open issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle.
 
 ### Capture and backlog
 

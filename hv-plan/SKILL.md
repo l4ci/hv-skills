@@ -187,7 +187,7 @@ Activated by the `--auto-loop` flag. Invoked exclusively by `/hv-work` Step 4 in
 For each open question the orchestrator would normally surface to the user, run three steps in order:
 
 1. **Local-first.** Grep `DECISIONS.md` / `MILESTONES.md` / `KNOWLEDGE.md` via `hv decisions query` / `hv knowledge query` on the question's topic keywords. If a matching commitment exists, the answer is "honor the existing commitment" — do **not** log a new `[Auto:Loop]` entry; the existing commitment IS the record.
-2. **Bounded web (opt-in).** If unmatched AND the question references an external library, API, or protocol (anything outside the F14 hv-skills surface scan: `/hv-(\w+)`, `hv <verb>` calls, `.hv/*` artifacts), AND `loop.webResearch == true` in `.hv/config.json` (default `false`), call `WebSearch` with a budget of **2 queries per question, 6 queries per plan**. Block on results; no async fetch.
+2. **Bounded web (opt-in).** If unmatched AND the question references an external library, API, or protocol (anything outside the F14 hv surface scan: `/hv-(\w+)`, `hv <verb>` calls, `.hv/*` artifacts), AND `loop.webResearch == true` in `.hv/config.json` (default `false`), call `WebSearch` with a budget of **2 queries per question, 6 queries per plan**. Block on results; no async fetch.
 3. **Placeholder fallback.** If still unresolved, retain the question literally in the written plan with `_(Unresolved — surfaced for review)_` after the question text. The auto-write proceeds — never stop the loop.
 
 ### Logging

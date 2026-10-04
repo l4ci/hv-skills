@@ -10,7 +10,7 @@ import (
 // release (A9 ruling G5) so upgraders who still have a mirror do not see it as
 // untracked; it is removable once nobody has one.
 var ignoreLines = []string{
-	"# ── hv-skills ──",
+	"# ── hv ──",
 	".hv/bin/",
 	".hv/status.json",
 	".hv/repos.json",

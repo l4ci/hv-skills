@@ -1,4 +1,4 @@
-// Command hv is the hv-skills CLI: the 5.0 home of every bin/ helper.
+// Command hv is the hv CLI: the 5.0 home of every bin/ helper.
 // The command tree and conventions are in docs/design/5.0-cli-conventions.md.
 package main
 

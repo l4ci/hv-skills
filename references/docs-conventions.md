@@ -4,7 +4,7 @@ Used by `/hv-ship` (Docs Mode) Step 4 (Propose Tailored Tree) and Step 5 (Scaffo
 
 ## Page-naming convention
 
-Tailored trees follow this layout — already in use across hv-skills's own `docs/` and reusable for other projects:
+Tailored trees follow this layout — already in use across hv's own `docs/` and reusable for other projects:
 
 - **Spine** — top-level pages: `README.md` (TOC), `getting-started.md` (5-minute walkthrough), `faq.md` (common questions, optional).
 - **Phase-grouped usage pages** — `docs/usage/<verb-noun>.md`: examples — `picking-work.md`, `running-work.md`, `pausing-and-resuming.md`, `review-and-ship.md`. The verb-noun shape keeps file names self-documenting and groups related actions.

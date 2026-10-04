@@ -736,7 +736,7 @@ func shipUndo(fs *flag.FlagSet) RunFunc {
 			if *cycle != "" {
 				return shipBlocked("merge subject", "--cycle commit %s has subject not matching '^merge: ' (subject: %s)", *cycle, subject)
 			}
-			return shipBlocked("merge subject", "most recent merge on %s is not an hv-skills cycle merge (subject: %s)", base, subject)
+			return shipBlocked("merge subject", "most recent merge on %s is not an hv cycle merge (subject: %s)", base, subject)
 		}
 
 		short, err := g("rev-parse", "--short", merge)

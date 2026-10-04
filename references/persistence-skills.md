@@ -45,7 +45,7 @@ The gate strengths are by design. The active/passive distinction lives here:
 | Confirmation gate | conditional (only on existing-term conflict — alias collision is the gate; same-name updates are silent) | **none** — Step 4 explicitly auto-writes | **manual gate**, always |
 | Verifier | none | Opus on by default (`learn.verify`) | none |
 | Source-prefill flags | `--def`, `--alias`, `--not`, `--touch` | none | `--from-learning`, `--from-spike` |
-| Public-artifact follow-ups | none | Step 8.5 (hv-skills issue), Step 8.6 (runlog) | none |
+| Public-artifact follow-ups | none | Step 8.5 (hv issue), Step 8.6 (runlog) | none |
 | Active vs passive | vocabulary (low-risk additive) | passive ("remember if relevant") | active commitment (forbids + permits) |
 
 A future skill author looking at this table should read it as: **these are not bugs to file**. The gate-strength column encodes the project's policy on what costs the user *must* approve. `/hv-decide` always asks because writing a forbids/permits constrains future work; `/hv-learn` topic bullets never ask because passive content is cheap to amend; `/hv-learn --term` only asks on alias collision because adding a fresh term is additive.

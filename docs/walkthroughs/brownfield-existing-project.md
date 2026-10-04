@@ -1,6 +1,6 @@
-# Brownfield: dropping hv-skills into an existing project
+# Brownfield: dropping hv into an existing project
 
-You have a codebase. You've been maintaining it for months or years. You're tracking a list of bugs informally, some open GitHub issues you haven't gotten to, and a vague sense that the same gotchas keep recurring. By the end of this walkthrough hv-skills is wired into the project, your bugs are captured, one is shipped, and a first lesson is in `KNOWLEDGE.md`.
+You have a codebase. You've been maintaining it for months or years. You're tracking a list of bugs informally, some open GitHub issues you haven't gotten to, and a vague sense that the same gotchas keep recurring. By the end of this walkthrough hv is wired into the project, your bugs are captured, one is shipped, and a first lesson is in `KNOWLEDGE.md`.
 
 The example project is **Pinpoint**, an internal incident dashboard. Node and React, deployed as a single container. It's been in production for 18 months. 14 open GitHub issues, 30-odd `TODO` comments scattered through the source, and three bugs you keep meaning to fix.
 
@@ -261,7 +261,7 @@ If you'd configured `work.mergeStrategy = direct` instead, `/hv-ship` would have
 
 ## Step 10: over the next week
 
-After a week of dropping hv-skills into Pinpoint:
+After a week of dropping hv into Pinpoint:
 
 - `BACKLOG.md` has 11 items from the combined import and brain-dump; six are shipped, two in flight, the rest queued
 - `KNOWLEDGE.md` has four to six bullets across `Alerts`, `Storage`, `Integrations`, and `Security`. Surprises worth keeping, not a fix log
@@ -273,4 +273,4 @@ What you notice over time is that the same class of gotcha stops recurring. Thre
 
 ## What changes structurally
 
-You don't have to refactor anything to adopt hv-skills. The only structural addition is `.hv/` (tracked by default, with a few machine-specific paths gitignored) and a managed block in `CLAUDE.md`. Your existing build, tests, deploy pipeline, and code layout stay the same. The map and the knowledge accumulate from how you already work (debug, fix, ship), except now the loop leaves a trace that future cycles consult automatically.
+You don't have to refactor anything to adopt hv. The only structural addition is `.hv/` (tracked by default, with a few machine-specific paths gitignored) and a managed block in `CLAUDE.md`. Your existing build, tests, deploy pipeline, and code layout stay the same. The map and the knowledge accumulate from how you already work (debug, fix, ship), except now the loop leaves a trace that future cycles consult automatically.

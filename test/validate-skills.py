@@ -1,5 +1,5 @@
 """
-validate-skills.py — static schema validator for hv-skills SKILL.md files,
+validate-skills.py — static schema validator for hv SKILL.md files,
 plus the Agent Skills spec frontmatter lint (E2, #69), the legacy-name doclint
 over skills and references (A9, #53) and the prose-contract lint (PROSE_RULES, #173).
 Stdlib only. `--list-legacy` prints the frozen legacy helper names and exits. Exit 0 on all-pass, exit 1 on any failure, exit 2 on unexpected error.

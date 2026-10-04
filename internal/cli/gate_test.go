@@ -130,7 +130,7 @@ func gateCases() []gateCase {
 		{gate.PublicFiling, "tracker suggest-upstream", func(t *testing.T, level string) (string, []string, string, func() bool) {
 			root := trProject(t, gateConfig(t, "", level, nil))
 			f := &forge{answer: func(string, []string) (string, string, int) {
-				return "https://github.com/l4ci/hv-skills/issues/5\n", "", 0
+				return "https://github.com/l4ci/hv/issues/5\n", "", 0
 			}}
 			useForge(t, f)
 			return root, []string{"tracker", "suggest-upstream", "--title", "T", "--body-file", "-"}, "body",

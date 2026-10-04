@@ -70,7 +70,7 @@ grep -q "^- Glossary$" "$TMP_ADD/AGENTS.md" || fail "Glossary topic not surfaced
 pass "glossary write — new term inserts + indexes"
 
 echo "glossary write — no aliases writes _none_"
-"$HV_BIN" -C "$TMP_ADD" glossary write session --def "An active hv-skills work cycle." >/dev/null
+"$HV_BIN" -C "$TMP_ADD" glossary write session --def "An active hv work cycle." >/dev/null
 SESSION_ENTRY=$(grep -A2 "^- \*\*session\*\*" "$TMP_ADD/.hv/KNOWLEDGE.md")
 grep -q "^  - \*\*Aliases:\*\* _none_$" <<<"$SESSION_ENTRY" || fail "missing _none_"
 pass "glossary write — empty aliases produce _none_"

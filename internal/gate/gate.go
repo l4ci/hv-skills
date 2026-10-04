@@ -43,7 +43,7 @@ func (g Gate) Enforced() bool { return len(g.Verbs) > 0 }
 var Registry = []Gate{
 	{TagPush, []string{"release push"}, []string{"hv-release"}, "the release tag (and branch) on the remote"},
 	{ReleasePublish, []string{"release publish"}, []string{"hv-release"}, "a GitHub or GitLab release page"},
-	{PublicFiling, []string{"tracker suggest-upstream"}, []string{"hv-learn"}, "a public issue on the hv-skills repo"},
+	{PublicFiling, []string{"tracker suggest-upstream"}, []string{"hv-learn"}, "a public issue on the hv repo"},
 	{MergeApproval, []string{"ship merge", "ship pr-merge", "worker gate"}, []string{"hv-ship", "hv-review", "hv-work"}, "a merge into the base branch"},
 	{DebugReset, []string{"debug reset"}, []string{"hv-debug"}, "a fresh failed-fix count for an item the Iron Law halted"},
 	{"pr-open", nil, []string{"hv-ship"}, "a public PR or MR"},

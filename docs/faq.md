@@ -1,10 +1,10 @@
 # FAQ
 
-Common questions about hv-skills.
+Common questions about hv.
 
 ## How is this different from a TODO file or issue tracker?
 
-That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv-skills tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, `/hv-pause` and `/hv-work` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
+That's how every workflow starts, and how most of them stay. The places it tends to drift are the ones hv tries to address: commits stop being atomic and one PR ends up touching six unrelated things, you re-discover the same gotcha three sessions in a row because nothing reads it back, and sessions don't survive `/clear` because you lose the live hypothesis when you step away. `/hv-work` enforces atomic per-task commits, `/hv-learn` writes durable gotchas that future runs auto-consult, `/hv-pause` and `/hv-work` carry intent across context resets. If those problems never bite you, stock Claude Code is fine.
 
 ## Is `.hv/` tracked by default?
 
@@ -20,11 +20,11 @@ This works well for small teams. For larger ones a real issue tracker is usually
 
 ## What if I'm not using Claude Code?
 
-hv-skills is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, the `hv` binary, and the `BACKLOG.md` format are agent-agnostic and work on their own; you can call `hv` from any shell. The slash commands themselves only run inside Claude Code.
+hv is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, the `hv` binary, and the `BACKLOG.md` format are agent-agnostic and work on their own; you can call `hv` from any shell. The slash commands themselves only run inside Claude Code.
 
 Other agent harnesses with comparable primitives (Gemini CLI, some Copilot builds) may load the skills with reduced functionality. Where `AskUserQuestion` isn't available, those interactions fall back to plain text prompts instead of native UI. Don't expect full functionality outside Claude Code.
 
-## How do I update hv-skills when a new release ships?
+## How do I update hv when a new release ships?
 
 Run `hv update`. It detects your install type (plugin, repo clone, or stow), reads the current version, fetches the latest GitHub release, and prints the exact update command for your setup. It doesn't run the update itself, since there are too many install paths to handle automatically.
 
@@ -39,4 +39,4 @@ Yes. `.hv/` lives at the root of whatever directory you run `hv init` from. For 
 - **One `.hv/` at the monorepo root** for project-wide work and cross-package tracking.
 - **One `.hv/` per package or app subdirectory** for scoped backlogs that stay close to the code they track.
 
-`hv` and the managed `CLAUDE.md` blocks resolve relative to the current working directory, so per-package setups work as long as you run hv-skills from inside the package. You can mix both styles in one repo; each `.hv/` is independent.
+`hv` and the managed `CLAUDE.md` blocks resolve relative to the current working directory, so per-package setups work as long as you run hv from inside the package. You can mix both styles in one repo; each `.hv/` is independent.

@@ -252,7 +252,7 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
   1. Read the topic's bullets via `hv knowledge query "<topic>"`.
   2. Group bullets into 2 or 3 cohesive facets by semantic theme (e.g. `Helpers` / `Workers & Parallelism`, `Conventions` / `References`). Each facet must hold ≥3 bullets; `Misc` / `Other` / `Etc.` facets are forbidden — every bullet gets a substantive home. If no plausible split axis exists (bullets are byte-equivalent in theme), fall back to the `"off"` nudge for that topic and skip steps 3–7.
   3. Append `## <Topic>: <FacetA>` and `## <Topic>: <FacetB>` headings to `.hv/KNOWLEDGE.md` immediately before the old `## <Topic>` heading.
-  4. For each bullet in `<Topic>`, call `hv knowledge rename-topic --from "<Topic>" --to "<Topic>: <Facet>" --title "<bullet-title>"`. The verb relocates the bullet body byte-identical AND re-keys its `.hv/knowledge-tier.json` entry from `<Topic>::<title>` to `<Topic>: <Facet>::<title>` in one atomic step — tier and hit state survive the split. Issue all calls for one offender as a single parallel batch (each invocation is atomic on a different bullet). Do NOT hand-edit bullets via `Edit` for this — that path silently orphans sidecar entries (the T03 / hv-skills#13 regression this auto-split was fixed to prevent).
+  4. For each bullet in `<Topic>`, call `hv knowledge rename-topic --from "<Topic>" --to "<Topic>: <Facet>" --title "<bullet-title>"`. The verb relocates the bullet body byte-identical AND re-keys its `.hv/knowledge-tier.json` entry from `<Topic>::<title>` to `<Topic>: <Facet>::<title>` in one atomic step — tier and hit state survive the split. Issue all calls for one offender as a single parallel batch (each invocation is atomic on a different bullet). Do NOT hand-edit bullets via `Edit` for this — that path silently orphans sidecar entries (the T03 / hv#13 regression this auto-split was fixed to prevent).
   5. Remove the now-empty old `## <Topic>` heading.
   6. Re-run `hv block knowledge` to refresh the managed `<!-- hv-knowledge-start -->` block in `CLAUDE.md`.
   7. Append one line to the confirm output: `Auto-split <topic> → <topic>: <FacetA> + <topic>: <FacetB> — N → A+B bullets.`
@@ -261,7 +261,7 @@ Updated CLAUDE.md topic index — /hv-work will consult these on relevant tasks.
 
 If verification ran and passed, add a middle line: `Opus verification: PASS — all entries durable, sharp, correctly categorized.` If it returned `PASS_WITH_NOTES`, replace that line with a one-liner naming what was adjusted. If it failed, say so and stop.
 
-## Step 8.5 — Suggest hv-skills issue (when applicable)
+## Step 8.5 — Suggest hv issue (when applicable)
 
 `hv tracker suggest-upstream` enforces the `public-filing` manual gate (`hv gate list`): it exits 4 without `--confirm`, at every autonomy level. The question below is that confirmation, so never auto-pick it.
 
@@ -276,12 +276,12 @@ If no bullet matches any of those, skip the step silently.
 **Ask before filing.** When at least one bullet matches, use `AskUserQuestion`:
 
 - Header: `"Upstream"`
-- Question: *"This learning touches hv-skills behavior. File an issue on the hv-skills repo?"*
+- Question: *"This learning touches hv behavior. File an issue on the hv repo?"*
 - Options (single-select):
-  1. `"File a hv-skills issue (Recommended)"` — *"Pre-fill title + body and run `hv tracker suggest-upstream` to open the issue."*
+  1. `"File an hv issue (Recommended)"` — *"Pre-fill title + body and run `hv tracker suggest-upstream` to open the issue."*
   2. `"Skip"` — *"No upstream issue; the local KNOWLEDGE bullet stands on its own."*
 
-Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
+Plain-text fallback: *"File an hv issue?"* — honor yes/no.
 
 **File the issue.** When the user picks "File":
 
@@ -295,7 +295,7 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
    <one-sentence inversion of the gotcha — what should have happened>
 
    ## Context
-   - hv-skills version: <output of `hv version`>
+   - hv version: <output of `hv version`>
    - Captured topic: <KNOWLEDGE.md topic name>
    - Date: <today, YYYY-MM-DD>
    ```
@@ -309,18 +309,18 @@ Plain-text fallback: *"File a hv-skills issue?"* — honor yes/no.
 
 4. **Append the upstream marker to the bullet** in `.hv/KNOWLEDGE.md`. Call:
    ```bash
-   printf '%s' "Upstream: hv-skills#<N>" | hv knowledge amend --topic "<Topic>" --fragment "<unique body fragment>" --mode append --body-file -
+   printf '%s' "Upstream: hv#<N>" | hv knowledge amend --topic "<Topic>" --fragment "<unique body fragment>" --mode append --body-file -
    ```
-   The fragment can be any case-sensitive substring of the bullet that uniquely identifies it within the topic — typically a distinctive word or phrase from the body. The verb appends ` Upstream: hv-skills#<N>` after the bullet's trailing `<!-- date -->` comment, leaving the rest of the file byte-identical.
+   The fragment can be any case-sensitive substring of the bullet that uniquely identifies it within the topic — typically a distinctive word or phrase from the body. The verb appends ` Upstream: hv#<N>` after the bullet's trailing `<!-- date -->` comment, leaving the rest of the file byte-identical.
 
 5. Add a final line to the Step 8 confirm output:
    ```
-   Filed hv-skills#<N> for the <topic> bullet — https://github.com/l4ci/hv-skills/issues/<N>
+   Filed hv#<N> for the <topic> bullet — https://github.com/l4ci/hv/issues/<N>
    ```
 
 ## Step 8.6 — Suggest runlog entry (when applicable)
 
-This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing to a public registry is high-stakes; the user presses the button. Mirrors Step 8.5's shape but for the *inverse* signal: external dependencies (third-party APIs, libraries, protocols, OSS quirks), not hv-skills internals. See `references/manual-gates.md`.
+This step is **always manual** — never auto-invoked, regardless of `autonomy.level`. Filing to a public registry is high-stakes; the user presses the button. Mirrors Step 8.5's shape but for the *inverse* signal: external dependencies (third-party APIs, libraries, protocols, OSS quirks), not hv internals. See `references/manual-gates.md`.
 
 **Trigger heuristic.** Scan the just-captured bullets for ANY of (literal union, not all):
 
@@ -331,7 +331,7 @@ This step is **always manual** — never auto-invoked, regardless of `autonomy.l
 
 If no bullet matches any signal, skip the step silently. Match the union, not the intersection — one signal is enough to surface the prompt.
 
-**Mutual exclusivity with Step 8.5.** Step 8.5 (hv-skills issue) and Step 8.6 (runlog) are independent — a bullet can match neither, one, or both. When a bullet matches both, run Step 8.5 first and let Step 8.6 ask afterward; they route to different upstreams and shouldn't bundle.
+**Mutual exclusivity with Step 8.5.** Step 8.5 (hv issue) and Step 8.6 (runlog) are independent — a bullet can match neither, one, or both. When a bullet matches both, run Step 8.5 first and let Step 8.6 ask afterward; they route to different upstreams and shouldn't bundle.
 
 **Ask before dispatching.** When at least one bullet matches, use `AskUserQuestion`:
 

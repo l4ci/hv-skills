@@ -112,7 +112,7 @@ Exit 2 from `add` names the malformed field: ask the agent to resend; never gues
 
 Skipped when `ship.qa` is `false` or `REVIEW_CHOICE == ship-anyway`. If there is no `.hv/qa/` strategy for the scope (single repo: no `.hv/qa/*.md`; umbrella: no `.hv/qa/<REPO>.md`), say *"`ship.qa: true` but no QA strategy for `<scope>`. Run `/hv-qa first-run` to bootstrap, or set `ship.qa: false` to skip."* and continue.
 
-Review and second opinion judge the diff; QA runs the product. Invoke `Skill(skill="hv-skills:hv-qa", args="run")` (umbrella: `args="run --repo $REPO"`), then:
+Review and second opinion judge the diff; QA runs the product. Invoke `Skill(skill="hv-qa", args="run")` (umbrella: `args="run --repo $REPO"`), then:
 
 ```bash
 hv verdict route <branch> --for ship-qa --json

@@ -56,11 +56,11 @@ func TestDetect(t *testing.T) {
 		{"brew shim", "/opt/homebrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
 		{"intel cellar", "/usr/local/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
 		{"linuxbrew", "/home/linuxbrew/.linuxbrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
-		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh && hv skills update"},
+		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh && hv skills update"},
 		{"dev suffix", "/home/u/.local/bin", "5.0.0-dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
 		{"unstamped", "/tmp/x", "dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
 		{"devel", "/tmp/x", "(devel)", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
-		{"unresolved", "", "5.0.0", Unknown, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv-skills/main/install.sh | sh && hv skills update"},
+		{"unresolved", "", "5.0.0", Unknown, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh && hv skills update"},
 	} {
 		r := Check(env(c.exeDir, c.current, "9.0.0"))
 		if r.InstallType != c.kind || r.InstallRoot != c.exeDir || r.UpdateCommand != c.cmd || r.CurrentVersion != c.current {

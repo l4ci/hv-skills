@@ -59,7 +59,7 @@ The registry the round writes inside the project is `.hv/workers.json`: see [`.h
 
 ## Related
 
-- [How hv-skills works](../how-it-works.md): system diagram and lane overview
+- [How hv works](../how-it-works.md): system diagram and lane overview
 - [Slash commands](slash-commands.md): every `/hv-*` command
 - [`hv` verb reference](cli-helpers.md): every verb
 - [`.hv/` folder reference](hv-folder.md): per-file detail

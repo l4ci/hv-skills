@@ -22,7 +22,7 @@ import (
 
 func a4cCommands() []*Command {
 	return []*Command{
-		{Name: "update", Summary: "check for a newer hv-skills release", Verb: a4Update},
+		{Name: "update", Summary: "check for a newer hv release", Verb: a4Update},
 		{Name: "config", Summary: "read and write .hv/config.json", Subs: []*Command{
 			{Name: "show", Summary: "effective value and source of config keys", Repo: true, Verb: a4ConfigShow},
 			{Name: "set", Summary: "set one key in .hv/config.json", Repo: true, Verb: a4ConfigSet},

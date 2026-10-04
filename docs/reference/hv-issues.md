@@ -21,7 +21,7 @@ GitLab-hosted sub-repos).
 
 - Onboarding to a repo that already has triaged GitHub/GitLab issues.
 - Bulk-importing a milestone's worth of upstream issues without re-typing them.
-- Periodically syncing upstream backlog signals into hv-skills.
+- Periodically syncing upstream backlog signals into hv.
 - Mixed-host umbrellas where different sub-repos live on GitHub and GitLab.
   Call `/hv-capture --from-github` and `/hv-capture --from-gitlab` separately;
   each handles only matching sub-repos.

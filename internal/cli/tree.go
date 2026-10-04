@@ -15,7 +15,7 @@ import (
 func Tree() *Command {
 	root := &Command{
 		Name:    "hv",
-		Summary: "hv-skills command line",
+		Summary: "hv command line",
 		Subs: []*Command{
 			{Name: "version", Summary: "print the hv version", Verb: versionVerb},
 			knowledgeCommands(),
@@ -104,7 +104,7 @@ func driftLine(stamped, installed, status string) string {
 	if status != "drift" {
 		return ""
 	}
-	return fmt.Sprintf("hv-skills drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+	return fmt.Sprintf("hv drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
 }
 
 // versionDriftLine is the drift nudge for root, or "".

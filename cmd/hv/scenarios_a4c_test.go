@@ -672,7 +672,7 @@ func suiteA4C(t *testing.T) {
 					t.Fatalf("the fake gh was not called: %v", err)
 				}
 				for _, l := range lines(string(b)) {
-					if !strings.HasPrefix(l, "api repos/l4ci/hv-skills/releases/latest") {
+					if !strings.HasPrefix(l, "api repos/l4ci/hv/releases/latest") {
 						t.Errorf("gh was called with %q", l)
 					}
 				}

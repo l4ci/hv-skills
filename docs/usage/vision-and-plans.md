@@ -1,6 +1,6 @@
 # Vision and plans
 
-hv-skills supports planning above the day-to-day backlog. `/hv-vision` frames milestones so the project has a clear direction. `/hv-plan` locks an implementation approach for a slice or item before code lands. Together they keep the orchestrator executing your written intent instead of decomposing ad-hoc from an empty context.
+hv supports planning above the day-to-day backlog. `/hv-vision` frames milestones so the project has a clear direction. `/hv-plan` locks an implementation approach for a slice or item before code lands. Together they keep the orchestrator executing your written intent instead of decomposing ad-hoc from an empty context.
 
 ## /hv-vision: brainstorm milestones
 

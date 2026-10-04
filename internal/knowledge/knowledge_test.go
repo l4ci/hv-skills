@@ -155,3 +155,25 @@ func TestTierReadWithoutKnowledgeFileCreatesNothing(t *testing.T) {
 		t.Errorf("sidecar created: %v", err)
 	}
 }
+
+// A block written before the rename (#231) has the `## hv-skills` heading
+// under the same markers; regenerating it replaces the heading and the body.
+func TestWriteCustomBlockRewritesPreRenameSkillsBlock(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "AGENTS.md")
+	old := "# Agents\n\n<!-- hv-skills-start -->\n## hv-skills\n\nThis project uses hv-skills for backlog tracking.\n<!-- hv-skills-end -->\n\ntail\n"
+	if err := os.WriteFile(p, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, err := Store{Root: dir}.WriteCustomBlock("skills", SkillsBlockBody())
+	if err != nil || status != "updated" {
+		t.Fatalf("status %q, err %v", status, err)
+	}
+	b, _ := os.ReadFile(p)
+	got := string(b)
+	if strings.Contains(got, "hv-skills for") || strings.Contains(got, "## hv-skills\n") ||
+		!strings.Contains(got, "<!-- hv-skills-start -->\n## hv\n") ||
+		strings.Count(got, "<!-- hv-skills-start -->") != 1 || !strings.HasSuffix(got, "\n\ntail\n") {
+		t.Errorf("block not rewritten:\n%s", got)
+	}
+}

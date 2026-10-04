@@ -1,6 +1,6 @@
 # `hv` verb reference
 
-`hv` is the single binary behind every hv-skills skill. Skills call it for all
+`hv` is the single binary behind every hv skill. Skills call it for all
 backlog, knowledge, plan, status, git and release bookkeeping, and you can call
 it directly when scripting against `.hv/`. There is no helper copy to refresh in a
 project. Install `hv` (see [install](../install.md)).
@@ -55,7 +55,7 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 
 | Usage | What it does |
 |---|---|
-| `hv update` | check for a newer hv-skills release |
+| `hv update` | check for a newer hv release |
 
 ## `hv config`
 
@@ -394,7 +394,7 @@ Verdicts are `PASS`, `CONCERNS` or `FAIL` (`qa` also takes `INFRA-FAIL`). They l
 | Usage | What it does |
 |---|---|
 | `hv tracker call [--provider auto\|github\|gitlab] -- <cli-arg>...` | run gh or glab with list limits and rate-limit handling |
-| `hv tracker suggest-upstream --title <text> --body-file <path\|-> [--upstream-repo <owner/repo>] --confirm --confirm-note <answer>` | file a hv-skills issue from a learning (manual gate) |
+| `hv tracker suggest-upstream --title <text> --body-file <path\|-> [--upstream-repo <owner/repo>] --confirm --confirm-note <answer>` | file an hv issue from a learning (manual gate) |
 
 ## `hv git`
 

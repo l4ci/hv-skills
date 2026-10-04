@@ -329,7 +329,7 @@ func Close(ctx context.Context, env Env, dir string, number int, commit, item st
 	if err != nil {
 		return false, err
 	}
-	body := "Closed by hv-skills: shipped in " + short
+	body := "Closed by hv: shipped in " + short
 	if item != "" {
 		body += " ([" + item + "])"
 	}

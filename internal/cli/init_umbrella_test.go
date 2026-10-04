@@ -126,7 +126,7 @@ func TestVersionDrift(t *testing.T) {
 	wd, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(wd) })
 	var out, errb bytes.Buffer
-	if code := Main([]string{"-C", root, "version", "--drift"}, nil, &out, &errb); code != 0 || !strings.HasPrefix(out.String(), "hv-skills drift: project at 4.9.0, binary at 5.0.0") {
+	if code := Main([]string{"-C", root, "version", "--drift"}, nil, &out, &errb); code != 0 || !strings.HasPrefix(out.String(), "hv drift: project at 4.9.0, binary at 5.0.0") {
 		t.Fatalf("code=%d out=%q", code, out.String())
 	}
 	out.Reset()

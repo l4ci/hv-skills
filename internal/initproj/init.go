@@ -326,7 +326,7 @@ func removeMirror(root string, warnings []string) (removed, warn []string) {
 			removed = append(removed, ".hv/bin")
 		}
 	} else {
-		warnings = append(warnings, fmt.Sprintf("left %s in .hv/bin: not an hv-skills mirror file (5.0 does not use .hv/bin)", strings.Join(kept, ", ")))
+		warnings = append(warnings, fmt.Sprintf("left %s in .hv/bin: not an hv mirror file (5.0 does not use .hv/bin)", strings.Join(kept, ", ")))
 	}
 	sort.Strings(removed)
 	return removed, warnings

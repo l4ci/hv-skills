@@ -1,6 +1,6 @@
 # Authoring conventions
 
-These conventions constrain how new hv-skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `hv-*/SKILL.md` file. New authoring rules land here, not inline. The index in `references/README.md` is the entry point.
+These conventions constrain how new hv skills (or new behavior in existing skills) are authored. Skill authors consult this reference when writing or modifying any `hv-*/SKILL.md` file. New authoring rules land here, not inline. The index in `references/README.md` is the entry point.
 
 ## Skills are self-contained — no shared contract file
 
@@ -118,7 +118,7 @@ Two retrofitted skills illustrate compliance:
 
 A skill author asking "what does compliance look like?" can read either retrofit and find a concrete answer for every rule in the reference. New skills follow the same pattern.
 
-**Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the hv-skills dispatch discipline is self-contained.
+**Forbids.** Dispatching for ≤2 small reads, for orchestrator-already-loaded context, for interactive steps, or when the brief would cost more tokens than the work. Cross-worker communication. Returning full transcripts instead of synthesis. Calling out to `superpowers:dispatching-parallel-agents` or other external skills — the hv dispatch discipline is self-contained.
 
 **Permits.** Mixed tiers in a single wave (one haiku worker alongside three sonnet workers in the same turn). Opportunistic haiku usage declared inline in the brief without a config flag. Per-skill judgment on which steps trip the threshold — the rule sets a floor, not a ceiling.
 
@@ -166,7 +166,7 @@ The skill is the side of the exchange holding the context, so translating is its
 - Several questions in one `AskUserQuestion` call — the host renders each separately and returns an answer per question, so batching does not produce the partial answers that a free-text channel would. `/hv-work` Step 2's 1–3 question batch stays correct.
 - Implementation vocabulary in the `description` field of an option, where it disambiguates for a user who *does* have the file open.
 
-Codified from a read of klufft's `swarm.md` (hv-skills#20, 2026-07-31), whose orchestrator pays for this in tmux panes rather than pickers. Its companion rule — *ask one question at a time* — deliberately did **not** transfer: it is a property of a free-text channel where a batch gets a partial reply, and `AskUserQuestion` is not that channel.
+Codified from a read of klufft's `swarm.md` (hv#20, 2026-07-31), whose orchestrator pays for this in tmux panes rather than pickers. Its companion rule — *ask one question at a time* — deliberately did **not** transfer: it is a property of a free-text channel where a batch gets a partial reply, and `AskUserQuestion` is not that channel.
 
 ## Nudges on terminal/idle paths only
 

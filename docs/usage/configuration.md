@@ -111,7 +111,7 @@ When `true` (default), [`/hv-refactor`](../reference/slash-commands.md#hv-refact
 
 Array of shell commands that [`/hv-refactor`](../reference/slash-commands.md#hv-refactor) Step 7 runs as CI-shape gates before committing. Default: `[]` (read-only verification, behavior unchanged).
 
-When non-empty, the Step 7 verifier executes each command in order and refuses to PASS unless every command exits zero. This catches formatter drift, import-sort failures, and type errors locally instead of on push. See [hv-skills #9](https://github.com/l4ci/hv-skills/issues/9) for the motivating incident.
+When non-empty, the Step 7 verifier executes each command in order and refuses to PASS unless every command exits zero. This catches formatter drift, import-sort failures, and type errors locally instead of on push. See [hv #9](https://github.com/l4ci/hv/issues/9) for the motivating incident.
 
 Example for a Python project using ruff + pytest:
 
@@ -435,7 +435,7 @@ Skills that use the base branch (including `/hv-ship`, `/hv-review` and `/hv-wor
 - **Type:** string
 - **Default:** `""` (unstamped until `hv init` first runs)
 
-Records the hv-skills plugin version that was installed when `hv init` last ran. Auto-managed: `hv init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
+Records the hv plugin version that was installed when `hv init` last ran. Auto-managed: `hv init` re-stamps this on every run, including STALE migrations. Don't edit by hand.
 
 `hv version --drift` compares the stamped value with the installed `hv` binary, and [`hv init check`](../reference/preflight.md) surfaces the same drift as a warning. `--json` returns `stamped`, `installed` and `status` (`match`, `drift` or `unknown`).
 

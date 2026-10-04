@@ -15,7 +15,7 @@ EOS
   OUT=$(PATH="$HI_TMP/stub-bin:$PATH" hvj tracker suggest-upstream --title "test title" --body-file - --confirm --confirm-note "yes, file it" <<<"test body" 2>/dev/null) || rc=$?
   [ "$rc" = "5" ] || fail "expected exit 5 when gh fails: rc=$rc"
   [ "$(echo "$OUT" | jget ok)" = "false" ] || fail "expected ok:false envelope: $OUT"
-  echo "$OUT" | jget error.hint | grep "github.com/l4ci/hv-skills/issues/new" >/dev/null || fail "unavailable hint missing repo URL: $OUT"
+  echo "$OUT" | jget error.hint | grep "github.com/l4ci/hv/issues/new" >/dev/null || fail "unavailable hint missing repo URL: $OUT"
   pass "tracker suggest-upstream exits 5 with the manual issue URL when gh unavailable"
 )
 rm -rf "$HI_TMP"
@@ -53,13 +53,13 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 print(len(d["issues"]), d["issues"][-1]["title"], d["issues"][-1].get("repo", "-"), d["issues"][-1]["body"].strip())' "$HI3_TMP/db.json"; }
 
-  # Default target: l4ci/hv-skills (HV_UPSTREAM_REPO unset)
+  # Default target: l4ci/hv (HV_UPSTREAM_REPO unset)
   OUT=$(env -u HV_UPSTREAM_REPO "$HV_BIN" --json tracker suggest-upstream --title "learned a thing" --body-file - --confirm --confirm-note "yes, file it" <<<"the body") || fail "suggest-upstream failed: $OUT"
   [ "$(echo "$OUT" | jget data.number)" = "1" ] || fail "suggest-upstream number: $OUT"
-  [ "$(echo "$OUT" | jget data.upstreamRepo)" = "l4ci/hv-skills" ] || fail "suggest-upstream default repo: $OUT"
+  [ "$(echo "$OUT" | jget data.upstreamRepo)" = "l4ci/hv" ] || fail "suggest-upstream default repo: $OUT"
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "suggest-upstream changed: $OUT"
-  [ "$(echo "$OUT" | jget data.url)" = "https://github.com/l4ci/hv-skills/issues/1" ] || fail "suggest-upstream url: $OUT"
-  [ "$(DBQ)" = "1 learned a thing l4ci/hv-skills the body" ] || fail "issue not filed upstream as asked: $(DBQ)"
+  [ "$(echo "$OUT" | jget data.url)" = "https://github.com/l4ci/hv/issues/1" ] || fail "suggest-upstream url: $OUT"
+  [ "$(DBQ)" = "1 learned a thing l4ci/hv the body" ] || fail "issue not filed upstream as asked: $(DBQ)"
 
   # --upstream-repo wins over HV_UPSTREAM_REPO; the issue lands in that repo
   OUT=$(HV_UPSTREAM_REPO=env/repo "$HV_BIN" --json tracker suggest-upstream --title "second" --upstream-repo fork/repo --body-file - --confirm --confirm-note "yes, file it" <<<"b2") || fail "suggest-upstream --upstream-repo failed: $OUT"

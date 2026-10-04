@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	hvskills "github.com/l4ci/hv/v5"
+	hv "github.com/l4ci/hv/v5"
 )
 
 // Set is a skill set in its installed layout.
@@ -35,7 +35,7 @@ var (
 
 // Embedded is the set compiled into the binary.
 func Embedded() (*Set, error) {
-	embeddedOnce.Do(func() { embedded, embeddedErr = Load(hvskills.FS) })
+	embeddedOnce.Do(func() { embedded, embeddedErr = Load(hv.FS) })
 	return embedded, embeddedErr
 }
 
