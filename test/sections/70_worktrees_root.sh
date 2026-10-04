@@ -3,7 +3,7 @@ echo ".worktrees/ — one gitignored worktree root; nothing walks into it"
 # (b) rota worker pool init creates slots under .worktrees/ and leaves a slot that is
 # registered at the old .claude/worktrees/rota-worker path where it is;
 # (c) a decoy SKILL.md / CLAUDE.md under .worktrees/ is invisible to
-# validate-skills and migrate v4; (d) census: no helper or validator walks the
+# validate-skills; (d) census: no helper or validator walks the
 # project tree recursively, which is what would find a nested checkout.
 
 TMP_WR="$(mktemp -d)"
@@ -116,27 +116,7 @@ cp "$VS/rota-plan/SKILL.md" "$VS/.worktrees/x/rota-plan/SKILL.md"
 DECOY_OUT="$(cd "$VS" && python3 test/validate-skills.py 2>&1)" || fail "validate-skills picked up .worktrees/: $DECOY_OUT"
 [ "$BASE_OUT" = "$DECOY_OUT" ] || fail "validate-skills output changed with a decoy: '$BASE_OUT' vs '$DECOY_OUT'"
 
-# migrate v4 scans CLAUDE.md/AGENTS.md and .rota/*. The real CLAUDE.md carries a
-# retired-command reference that flags one manual-review item, so a preview that
-# skipped it would count zero. The byte-identical decoys under .worktrees/ must
-# leave every count unchanged, and the preview must not have refused.
-MG="$TMP_WR/mg"
-mkdir -p "$MG/.rota/plans"
-printf 'run /hv-map now\n' > "$MG/CLAUDE.md"
-( cd "$MG" && git init -q -b main . && git config user.email t@t && git config user.name t && echo '{"version":"3.9.0"}' > .rota/config.json && printf '.worktrees/\n' > .gitignore && git add -A && git commit -q -m seed )
-RC=0; BASE_M="$(hvj -C "$MG" migrate v4 --verbose 2>/dev/null)" || RC=$?
-[ "$RC" = "0" ] || fail "migrate v4 refused, so the decoy check proves nothing (rc $RC): $BASE_M"
-[ "$(jget data.manualReview <<<"$BASE_M")" -ge 1 ] || fail "migrate v4 must flag the real CLAUDE.md (the non-decoy twin), got: $BASE_M"
-mkdir -p "$MG/.worktrees/x/.rota/plans"
-cp "$MG/CLAUDE.md" "$MG/.worktrees/x/CLAUDE.md"
-cp "$MG/CLAUDE.md" "$MG/.worktrees/x/.rota/plans/p.md"
-RC=0; MOUT="$(hvj -C "$MG" migrate v4 --verbose 2>/dev/null)" || RC=$?
-[ "$RC" = "0" ] || fail "migrate v4 refused with decoys present (rc $RC): $MOUT"
-for K in filesScanned filesRewritten referencesRewritten manualReview; do
-  [ "$(jget "data.$K" <<<"$MOUT")" = "$(jget "data.$K" <<<"$BASE_M")" ] \
-    || fail "migrate v4 $K changed with decoys under .worktrees/: $(jget "data.$K" <<<"$BASE_M") vs $(jget "data.$K" <<<"$MOUT")"
-done
-pass "a decoy SKILL.md/CLAUDE.md under .worktrees/ is invisible to validate-skills and migrate v4"
+pass "a decoy SKILL.md/CLAUDE.md under .worktrees/ is invisible to validate-skills"
 # white-box-end
 
 # ── (d) census: nothing walks the project tree recursively ──────────────────

@@ -97,6 +97,13 @@ func call(args ...string) out {
 }
 
 func TestExitCodesAndEnvelope(t *testing.T) {
+	// Not inside a checkout: a project still on the old state folder would hard-stop
+	// every verb here (#236).
+	wd, _ := os.Getwd()
+	defer os.Chdir(wd)
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
 	echo := func(repo, title string, force bool, args string) string {
 		a := "[]"
 		if args != "" {

@@ -12,6 +12,7 @@ import (
 	"github.com/l4ci/rota/internal/doctor"
 	"github.com/l4ci/rota/internal/hook"
 	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/migrate"
 	"github.com/l4ci/rota/internal/skills"
 	"github.com/l4ci/rota/internal/version"
 	"github.com/l4ci/rota/internal/worker"
@@ -61,6 +62,11 @@ func doctorInput() doctor.Input {
 	in.Dir, _ = os.Getwd()
 	in.Home, _ = os.UserHomeDir()
 	in.Skills = doctorSkills(in.Home)
+	if abs, err := filepath.EvalSymlinks(in.Dir); err == nil {
+		in.LegacyDir, _ = migrate.LegacyState(abs)
+	} else {
+		in.LegacyDir, _ = migrate.LegacyState(in.Dir)
+	}
 	root := ""
 	for d := in.Dir; d != ""; {
 		if fi, err := os.Stat(filepath.Join(d, ".rota")); err == nil && fi.IsDir() {

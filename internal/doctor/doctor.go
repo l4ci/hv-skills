@@ -80,6 +80,10 @@ type Input struct {
 	// nil when nothing was read.
 	Skills *skills.Report
 
+	// LegacyDir is the directory that still holds the old state folder with no .rota/ (a
+	// project `rota migrate hv` has not moved); "" otherwise.
+	LegacyDir string
+
 	// ProjectRoot is the directory holding .rota/, "" outside a rota project:
 	// the orchestrator checks (statusline, stop-hook) skip without it.
 	ProjectRoot string
@@ -95,9 +99,14 @@ type Input struct {
 // Run executes every check in the contract's order.
 func Run(ctx context.Context, in Input) Report {
 	d := &runner{in: in, ctx: ctx}
-	return Report{Checks: []Check{
+	checks := []Check{
 		d.git(), d.host(), d.tracker(), d.accounts(), d.hook(), d.statusline(), d.stopHook(), d.switchCheck(), d.skills(), d.codex(),
-	}}
+	}
+	if in.LegacyDir != "" {
+		// Only a project that still holds the old state folder gets this line.
+		checks = append([]Check{fail("state", in.LegacyDir+" still uses the old .hv state folder", "run: rota migrate hv")}, checks...)
+	}
+	return Report{Checks: checks}
 }
 
 type runner struct {

@@ -330,6 +330,9 @@ func run(root *Command, args []string, stdin io.Reader, stdout, stderr io.Writer
 		}
 	}
 	physicalCwd()
+	if err := legacyStateStop(c.Path); err != nil {
+		return fail(c, stdout, err)
+	}
 	// An unregistered --repo is exit 3 on every repo-scoped verb, ahead of
 	// the verb's own checks (contract rule 9).
 	if c.Repo != "" {

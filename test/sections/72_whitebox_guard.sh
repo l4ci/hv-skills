@@ -40,7 +40,7 @@ OUT="$(wb_scan "$(wb_file 'echo ok' '"$ROTA_BIN" status' "# ${SAMPLES[0]}")")"
 [ -z "$OUT" ] || fail "scanner flagged a clean file: $OUT"
 
 # Near misses stay clean: the version-stamp seam, plugin metadata, and a name that merely ends in bin.
-for S in 'HV_INSTALL_ROOT="$''REPO" hvj migrate v4' 'cat "$''REPO/.claude-plugin/plugin.json"' 'ls abin/''hv-x' 'D="$TMP_B''IN"'; do
+for S in 'HV_INSTALL_ROOT="$''REPO" hvj migrate issues' 'cat "$''REPO/.claude-plugin/plugin.json"' 'ls abin/''hv-x' 'D="$TMP_B''IN"'; do
   OUT="$(wb_scan "$(wb_file 'echo ok' "$S")")"
   [ -z "$OUT" ] || fail "scanner flagged a harmless line: $S => $OUT"
 done
