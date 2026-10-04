@@ -1,87 +1,78 @@
 # Parallel rounds
 
-A round is one orchestrator session plus two to five workers, each a standing agent in
-its own git worktree and herdr workspace (or, with no terminal host, an in-harness
-subagent: see [Solo mode](#solo-mode)), each holding one GitHub issue at a time. Workers
-implement, verify and open a PR; they never merge. The orchestrator assigns issues, relays
-decisions, merges PRs and re-verifies on `main` after every merge.
+A round is one orchestrator session plus two to five workers. Each worker is a standing agent in
+its own git worktree and terminal tab (herdr or tmux), or an in-harness subagent when there is no
+terminal host ([solo mode](#solo-mode)). Each holds one GitHub issue at a time. Workers implement,
+verify and open a PR; they never merge. The orchestrator assigns issues, relays decisions, merges
+PRs and re-verifies the base branch after every merge.
 
-The orchestrator runs the `hv-orchestrate` skill, which holds the judgment (which issues,
-how to read a stuck worker, what to escalate, when to merge). The mechanics are `hv round`
-verbs, so a round never polls in the orchestrator's context. A worker reads
-`references/worker-contract.md`; `hv round assign` points it there. This file adds only what
-is specific to hv-skills.
+The orchestrator runs the `hv-orchestrate` skill, which holds the judgment: which issues, how to
+read a stuck worker, what to escalate, when to merge. The mechanics are `hv round` verbs, so a round
+never polls inside the orchestrator's context. A worker reads
+[`references/worker-contract.md`](../../references/worker-contract.md); `hv round assign` points it there.
+
+This page covers what a round does and how to run one. Running a round on hv-skills itself, with its
+gate and repo rules, is in [contributing: rounds](../contributing/rounds.md).
+
+## Round or `/hv-work`
+
+| | [`/hv-work`](running-work.md) | A round |
+|---|---|---|
+| Sessions | one, with subagents it launches per task | an orchestrator plus standing workers |
+| Isolation | a branch or one worktree per cycle | one worktree per worker, reused across issues |
+| Unit of work | an item or a batch you pick | one issue at a time per worker |
+| Who merges | the session, or a PR you open | the orchestrator, after its own gate |
+| Runs unattended | until the context fills | for hours, across restarts ([unattended rounds](unattended-rounds.md)) |
+| Setup | none | a host, optionally several accounts, `hv doctor` |
+
+Use `/hv-work` for a handful of items you are watching. Use a round when you have a queue of
+well-specified issues that don't touch the same files and you want them merged without you steering
+each one. If you run several `/hv-work` sessions by hand today, see [parallel work](parallel-work.md);
+a round is the same idea with the assignment, waiting and merging done by verbs.
+
+## Setup
+
+1. **A host** for the workers' tabs: herdr (pinned to 0.9.x) or tmux. Set
+   `work.dispatch` to `herdr` or `tmux`, or leave it unset and let `hv round start` detect one from
+   where it runs (herdr inside a herdr pane, tmux inside tmux). With neither it falls back to
+   [solo mode](#solo-mode).
+2. **A tracker.** Rounds take GitHub issues (`gh`) or GitLab issues (`glab`), authenticated.
+3. **Accounts, if you have more than one.** `work.accounts` maps slots to separate
+   `CLAUDE_CONFIG_DIR`s, so workers draw on different usage limits and `hv round assign` can avoid a
+   cooling account. The entries are paths on your machine: put them in `.hv/config.local.json`
+   (per developer, gitignored), not `.hv/config.json`.
+
+   ```sh
+   hv config set work.accounts '[{"name":"a","configDir":"/path/to/claude-a"},{"name":"b","configDir":"/path/to/claude-b"}]'
+   hv worker account list      # each account with its usage verdict
+   ```
+
+4. **Issues a worker can pick up.** A candidate needs acceptance criteria or a design or plan note,
+   closed dependencies and no file overlap with work in flight (see [Picking issues](#picking-issues)).
+5. **Preflight.** `hv doctor` checks all of the above and names the fix for each failure. See
+   [doctor and reap](doctor-and-reap.md).
+
+For a round that must survive the orchestrator's context filling or a usage limit, also install the
+hooks and run the orchestrator under `hv keepalive run`:
+[unattended rounds](unattended-rounds.md). For Codex workers: [Codex workers](codex-workers.md).
 
 ## The round flow
 
 | Step | Verb | What it does |
 |---|---|---|
-| Check | `hv doctor` | git, host, tracker auth, accounts, herdr hooks, `hv` version; each failure carries its fix |
+| Check | `hv doctor` | git, host, tracker auth, accounts, herdr hooks, `hv` version, Codex; each failure carries its fix |
 | Start | `hv round start` | takes the repo's orchestrator lease, provisions slots, lists ready candidates |
 | Pick | `hv round candidates` | the open items that pass the criteria, dependency and overlap checks |
 | Assign | `hv round assign <ID>` | claims the item, marks it in progress, cuts `<agent>/<issue>-<slug>`, starts the worker with a signed pointer brief |
 | Wait | `hv round wait` | blocks until one slot needs the orchestrator, then returns it; never poll |
 | Look | `hv round status`, `hv round reconcile` | the round's rows and drift; `reconcile --apply` repairs what is safe |
-| Ask | `hv round escalate send`, `escalate check` | puts a question to the maintainer on the issue or PR thread and reads the answer |
-| Merge | `hv worker gate <slot> --base <branch>` | verifies on the merged tree, merges on a pass; a manual gate (B1) refuses without the maintainer's answer |
+| Ask | `hv round escalate send`, `hv round escalate check` | puts a question to the maintainer on the issue or PR thread and reads the answer |
+| Merge | `hv worker gate <slot> --base <branch>` | verifies on the merged tree, merges on a pass; a [merge approval](#merge-approval) policy can require a human first |
 | Clean | `hv reap` | lists, then with `--apply` removes, what no live slot owns; never kills a running agent |
 | End | `hv round wind-down` | re-verifies the base, parks every slot, releases the lease |
 
-Each verb's arguments, data and exit codes are in `docs/design/5.0-verb-contract.md`.
-
-## The gate
-
-Both, before every PR, from inside your worktree:
-
-```sh
-python3 test/validate-skills.py      # under a second
-bash test/smoke.sh                   # ~75 s on main; sequential by design
-```
-
-Read the final `All smoke tests passed.` line, not a pipe's exit code. If the suite fails,
-run it on `origin/main` in a throwaway worktree before triaging your branch
-(`.hv/KNOWLEDGE.md`, "Pre-existing smoke failures"). Smoke sections are sourced by
-`test/runner.sh`, never executable alone. New sections take the number your dispatch assigns;
-do not pick one yourself, siblings are numbering theirs at the same time.
-
-The Go gate is `go vet ./...` and `go test -race -timeout 30m ./...` (the default 10m timeout can
-be hit on a loaded box, #120). Most of `cmd/hv`'s time is the `TestFrozen*` scenario suites: each
-scenario runs the Go binary and compares what it did with its record in `cmd/hv/testdata/frozen/`.
-A deliberate behaviour change updates the record with
-`go test ./cmd/hv -run '^TestFrozen<Suite>$' -update-frozen`; say why in the PR, since the jsonl
-diff is the review.
-
-There are no servers and no ports in this repo. The full suite is cheap enough that the
-worker gate and the orchestrator's merge gate are the same commands.
-
-## Repo rules that bind workers
-
-- Edit canonical sources only: `cmd/`, `internal/`, `hv-*/SKILL.md`, `references/`, `docs/`, `test/`.
-- Never hand-edit tracked `.hv/` content. The backlog row for your issue is updated by the
-  orchestrator at merge time.
-- Before touching a verb, pull the matching `.hv/KNOWLEDGE.md` topics with
-  `hv knowledge query "<exact ## heading>"`. The topics that bite most: *Architecture: Helper
-  conventions & invariants*, *Architecture: Module extraction & migration safety*, *Build &
-  Tooling: Smoke testing*.
-- A new verb needs a contract entry in `docs/design/5.0-verb-contract.md` and a smoke section.
-- Config keys are documented in three places at once: `docs/reference/config-options.md`,
-  `docs/usage/configuration.md` and `internal/config/schema.go`. Touch only the lines about your key; a sibling may be adding
-  another key in the same files.
-- Stage explicit paths. Commit messages: imperative subject under 72 chars, body says why,
-  no `Co-Authored-By` trailer.
-- The PR body carries an `## Approvals` section citing the channel of every decision you
-  acted on, and labels your own calls as unratified. Reference the issue so it closes on
-  merge, unless the PR is a partial slice.
-
-## Tracker CLI gotchas
-
-On this repo `gh issue view <N> --comments` and `gh pr edit` fail with a Projects-classic
-GraphQL deprecation error. Read an issue with `gh issue view <N> --json title,body,comments`
-(the brief says `--comments`; use this instead), and edit a PR body through the REST API:
-
-```sh
-gh api -X PATCH repos/<owner>/<repo>/pulls/<N> -F body=@body.md
-```
+Each verb's arguments, data and exit codes are in `docs/design/5.0-verb-contract.md`. Every verb
+takes `--json` for a machine-readable envelope.
 
 ## Starting a round
 
@@ -100,15 +91,28 @@ hv round candidates                         # re-read the board with readiness c
   process) plus its start time; pass `--holder-pid` where that cannot be read. A lease whose
   holder is gone is stale: `hv round reconcile` reports it (`lease-stale`) and `hv round start`
   reclaims it.
-- **Slots** are the first `--slots` names of `round.roster`, each `.worktrees/<agent>` on
-  `park/<agent>`. A healthy existing slot is left alone.
-- **Candidates** carry three checks: `criteria` (acceptance criteria or a design/plan note),
-  `dependencies` (every `## Depends on` reference is closed; one that cannot be looked up
-  fails the check, so fix the issue text) and `overlap` (no shared file with an in-flight
-  slot, from a `## Files` section or the paths the issue text names plus the slot's real
-  changes). The overlap check cannot see files an issue will create, paths nobody wrote down,
-  two issues editing the same function, generated files every issue touches (list those in
-  `round.sharedPaths`), renames, or another machine's round.
+- **Slots** are the first `--slots` names of `round.roster` (default `ben`, `dana`, `nia`, `kit`),
+  each `.worktrees/<agent>` on `park/<agent>`. Slots are provisioned once and reused; a healthy
+  existing slot is left alone. The worktrees live in the project root under `.worktrees/`, which
+  `hv init` adds to `.gitignore`.
+- **Scope** is which issues the round may take: `slate` (only `--items`), `milestone` (the open
+  items of the active milestones) or `next` (the same, then the next planned milestone whose
+  dependencies shipped). Assign refuses anything outside it. See
+  [round keys](configuration.md#round-keys).
+
+### Picking issues
+
+Candidates carry three checks:
+
+- `criteria`: acceptance criteria, or a design or plan note.
+- `dependencies`: every `## Depends on` reference is closed. One that cannot be looked up fails the
+  check, so fix the issue text.
+- `overlap`: no shared file with an in-flight slot, from a `## Files` section or the paths the issue
+  text names plus the slot's real changes.
+
+The overlap check cannot see files an issue will create, paths nobody wrote down, two issues editing
+the same function, generated files every issue touches (list those in `round.sharedPaths`), renames,
+or another machine's round. Read two issues' bodies before you run them side by side.
 
 ## Assigning an issue
 
@@ -124,24 +128,92 @@ claims the item (`<agent>@<round>`), sets it in progress with a comment, cuts th
 branch `<agent>/<issue>-<slug>`, picks the account and dispatches a short signed brief: a
 pointer to the standing contract (`round.brief`, else `references/worker-contract.md`), the
 issue to read and dispute, the siblings and the decisions from `--body-file`.
-`--tier light|standard|heavy` picks the worker's model tier (default `round.tier`); a tier above the default needs `--tier-reason`. The tier and its model are recorded on the slot, shown by `hv round status`, and named in the brief with the tier table for the worker's own subagents. `--kind codex` starts a Codex worker (herdr only): each slot gets its own `CODEX_HOME` at `<git-common-dir>/hv/codex/<slot>`, and you log in once per slot with `CODEX_HOME=<home> codex login`. `round.tiers.codex.*` is optional: unset, the worker runs on Codex's default model.
-`--accept-overlap` skips the file-overlap check only. A failure before dispatch undoes the
-claim and state; one at or after dispatch keeps them, and repeating the call resumes.
 
-## Winding down
+- **Tier.** `--tier light|standard|heavy` picks the worker's model tier (default `round.tier`); a
+  tier above the default needs `--tier-reason`. The tier and its model are recorded on the slot,
+  shown by `hv round status`, and named in the brief with the tier table for the worker's own
+  subagents. See [round keys](configuration.md#round-keys).
+- **Kind.** `--kind codex` starts a Codex worker instead of a Claude one; see
+  [Codex workers](codex-workers.md).
+- **Overlap.** `--accept-overlap` skips the file-overlap check only. Say which PR merges first in
+  the second worker's brief.
+- **Failure.** A failure before dispatch undoes the claim and state; one at or after dispatch keeps
+  them, and repeating the call resumes.
+
+## Waiting on workers
+
+`hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints
+the slot and its state as JSON, so the orchestrator never polls in its own context. It
+classifies with the same rules as `hv worker poll` (sentinels, `limited`, `dead`, then the
+host's status) and writes nothing. With no slot named it watches every slot that has a
+session and whose recorded state is not `idle`; `hv worker dispatch` arms a slot.
+
+- **herdr**: pinned to **0.9.x** (built against 0.9.3, socket protocol 22); another minor
+  exits 5. One `events.subscribe` over `HERDR_SOCKET_PATH` carries a
+  `pane.agent_status_changed` subscription per watched pane, so N slots cost one
+  connection.
+- **tmux**: no event stream and no agent status, so the verb re-captures the panes every
+  `--settle` seconds (default 5) inside its own process.
+- **Timeout** exits 1 with `data.timedOut: true` and every slot's state; it is an answer,
+  not a fault. `--timeout` defaults to 0, which waits indefinitely.
+- **Long waits in Claude Code**: the Bash tool kills a command at its `timeout`, which
+  defaults to 2 minutes (`BASH_DEFAULT_TIMEOUT_MS`) and is capped at 10 minutes
+  (`BASH_MAX_TIMEOUT_MS`). Raise the cap in `settings.json` under `env` (for example
+  `"BASH_MAX_TIMEOUT_MS": "3600000"`) and pass a matching `timeout` on the Bash call, or
+  loop on a finite `--timeout` shorter than the cap.
+
+## Asking the maintainer
+
+A worker or the orchestrator that needs a human decision does not guess. `hv round escalate send`
+posts the question on the issue or PR thread and raises a host notification; `hv round escalate check`
+reads the answers back.
 
 ```sh
-hv round wind-down                # verify the base, park every slot, release the lease
-hv round wind-down --no-verify
+hv round escalate send 59 --slot ben --title "Keep the old flag?" --body-file question.md
+hv round escalate send 61 --pr --title "Merge approval: PR #61"
+hv round escalate check
 ```
 
-Run it from the orchestrator that holds the lease, with the base checked out and clean in
-the project root. It re-verifies the base (`refactor.verifyCommands`), then parks every
-roster slot on `park/<agent>` and releases the claims, then releases the lease. A red base
-(`verify-failed`, exit 1) keeps the lease. A slot with uncommitted changes or commits not on
-the base is reported as `retained` and left alone (`holds-work`, exit 4); the other slots are
-parked anyway, so fix the slot and run it again. It deletes no branch and clears no label: the
-`drift` count says what `hv round reconcile` and `hv reap` still have to do.
+An escalation has a deadline when you pass `--timeout <s>`; past it the entry counts as timed out.
+A slot waiting on an open escalation is never reported `stalled`. Under solo mode the comment is the
+only channel, because there is no host to notify.
+
+## Merge approval
+
+`hv worker gate <slot> --base <branch>` is the one merge path in a round. It checks the branch is
+fresh, the PR is the worker's and provenance holds, then re-runs
+`refactor.verifyCommands` on the merged tree and merges on a pass.
+
+Whether a human also has to say yes is `ship.mergeApproval`:
+
+| Value | Behavior |
+|---|---|
+| `none` (default) | The gate merges once its own checks pass. |
+| `all` | Every merge needs a human. |
+| `paths` | Only a merge that changes a file matching `ship.mergeApprovalPaths` does. |
+
+```sh
+hv config set ship.mergeApproval paths
+hv config set ship.mergeApprovalPaths '["migrations", "*.lock"]'
+```
+
+When the policy covers a merge and no approval is on record, the gate exits 4 and merges nothing
+(`verdict: approval-required`, with the matching files for `paths`). There are two ways to clear it:
+
+- **Ask on the thread.** Add `--escalate`: the gate posts the request on the PR (or on the slot's
+  issue when it has no PR) and exits 4 with the escalation id in `data`. Keep working other slots. Run
+  `hv round escalate check`; once the reply is in, re-run the gate with `--approval <id>`. A reply
+  approves when its first word is `approve`, `approved`, `yes` or `lgtm`, or its first two are `ship it`.
+  Anything else holds the merge (`approval declined`) and the slot waits for you.
+- **Answer at the keyboard.** Re-run with `--confirm --confirm-note "<the answer, quoted>"`.
+
+`--approval`, `--escalate` and `--confirm` are mutually exclusive. An approval belongs to the thread,
+not to a commit: pushes after the answer are covered, though freshness and provenance are re-checked
+every time. Each approval is appended to `.hv/gate-audit.jsonl`. This policy holds at every
+`autonomy.level`; see [manual gates](../../references/manual-gates.md) and
+[configuration](configuration.md#shipmergeapproval-and-shipmergeapprovalpaths).
+
+`hv worker gate <slot> --check-only` judges freshness, PR identity and provenance and merges nothing.
 
 ## Moving an issue that is assigned
 
@@ -152,7 +224,7 @@ hv round transfer 59 --to human                                    # orchestrato
 hv round reclaim ben                                               # orchestrator: dead or stalled slot
 ```
 
-All three free the slot the same way (`Park`): dirty paths are committed by name as
+All three free the slot the same way: dirty paths are committed by name as
 `wip: parked from <slot> (hv round <verb>)`, the work branch is pushed to `origin` (no force)
 and only then is the worktree switched to `park/<agent>`. A failed push or a rejected commit
 leaves the slot as found (exit 5), so the branch is never the only copy of the work. Each
@@ -170,33 +242,26 @@ in `<!-- hv:handoff <slot>@<round> -->`.
 - **reclaim** works on a slot that is `dead` or `stalled` (no commit, edit or state change for
   `round.stallMinutes`, default 30, `0` is off). A healthy slot needs `--force`; a live pane is
   killed first, and with no host to ask it is refused as `live agent`. It does not reassign.
-  `hv reap` may reclaim `dead` slots only, never `stalled` ones: a worker in a long test run
-  makes no commits and looks stalled, and an unattended `reap --apply` would kill it.
-- `hv round reconcile` reports `stalled` (never repaired) and `claim-mismatch` (`--apply`
-  clears a registry `claimId` whose claim is gone; the tracker is never edited).
 
-## Waiting on workers
+`hv round status` lists the round's slots with host, PR and drift. `hv round reconcile` reports
+drift between the registry, the host, git and the forge, including `stalled` (never repaired),
+`lease-stale` and `claim-mismatch`; `--apply` makes the safe repairs, and never edits the tracker.
 
-`hv round wait [<slot>...] [--timeout <s>]` blocks until a worker needs attention and prints
-the slot and its state as JSON, so the orchestrator never polls in its own context. It
-classifies with the same rules as `hv worker poll` (sentinels, `limited`, `dead`, then the
-host's status) and writes nothing. With no slot named it watches every slot that has a
-session and whose recorded state is not `idle`; `worker dispatch` arms a slot.
+## Winding down
 
-- **herdr**: pinned to **0.9.x** (built against 0.9.3, socket protocol 22); another minor
-  exits 5. One `events.subscribe` over `HERDR_SOCKET_PATH` carries a
-  `pane.agent_status_changed` subscription per watched pane, so N slots cost one
-  connection. The CLI's `herdr agent wait` takes one target, so waiting on the first of N
-  slots would mean N child processes.
-- **tmux**: no event stream and no agent status, so the verb re-captures the panes every
-  `--settle` seconds (default 5) inside its own process.
-- **Timeout** exits 1 with `data.timedOut: true` and every slot's state; it is an answer,
-  not a fault. `--timeout` defaults to 0, which waits indefinitely.
-- **Long waits in Claude Code**: the Bash tool kills a command at its `timeout`, which
-  defaults to 2 minutes (`BASH_DEFAULT_TIMEOUT_MS`) and is capped at 10 minutes
-  (`BASH_MAX_TIMEOUT_MS`). Raise the cap in `settings.json` under `env` (for example
-  `"BASH_MAX_TIMEOUT_MS": "3600000"`) and pass a matching `timeout` on the Bash call, or
-  loop on a finite `--timeout` shorter than the cap.
+```sh
+hv round wind-down                # verify the base, park every slot, release the lease
+hv round wind-down --no-verify
+```
+
+Run it from the orchestrator that holds the lease, with the base checked out and clean in
+the project root. It re-verifies the base (`refactor.verifyCommands`), then parks every
+roster slot on `park/<agent>` and releases the claims, then releases the lease. A red base
+(`verify-failed`, exit 1) keeps the lease. A slot with uncommitted changes or commits not on
+the base is reported as `retained` and left alone (`holds-work`, exit 4); the other slots are
+parked anyway, so fix the slot and run it again. It deletes no branch and clears no label: the
+`drift` count says what `hv round reconcile` and `hv reap` still have to do. After a round, run
+`hv reap` ([doctor and reap](doctor-and-reap.md)).
 
 ## Solo mode
 
@@ -208,8 +273,8 @@ set and fails when unavailable; solo is never a fallback from it.
 Under solo, each worker is a Claude `Agent` subagent the orchestrator launches in the slot's
 `.worktrees/<agent>` checkout. `hv round assign` returns the brief and the worktree instead
 of starting a pane, `hv round report <slot> --state ...` records what the subagent said,
-and `hv round wait` reads the registry without blocking. The pane verbs (`worker
-dispatch`, `poll`, `session`) refuse. The registry holds what tab mode writes (minus the
+and `hv round wait` reads the registry without blocking. The pane verbs (`hv worker
+dispatch`, `hv worker poll`, `hv worker session`) refuse. The registry holds what tab mode writes (minus the
 pane fields), so `hv round reconcile`, the gate and the merge policy work unchanged.
 
 **Every solo worker shares the orchestrator's session limit.** The subagents run on the
@@ -218,57 +283,17 @@ worker and the orchestrator together, and every result lands in the orchestrator
 context. Keep solo rounds small (two or three slots) and the results short. Solo runs
 Claude workers only: a Codex subagent cannot be given a working directory.
 
-## Roster
-
-Slots are provisioned once and reused. `hv round start` creates any missing slot at
-`.worktrees/<agent>` on `park/<agent>` and leaves healthy ones alone. Every worktree lives in
-the project root under `.worktrees/<agent>` (gitignored by `hv init`), and `hv worker pool`
-shares the same root. `round.roster` sets the names; the default is `ben`, `dana`, `nia`, `kit`.
-
-### Grouping a slot under the project in herdr
-
-herdr groups a slot under the project only when its workspace is a **linked worktree
-workspace** of the project's primary workspace. A workspace made with plain
-`herdr workspace create`, or a worktree moved with `git worktree move`, is not linked and
-shows up as a separate project. `hv round start` makes the worktree with git and calls no
-herdr, and `hv worker dispatch` opens its tabs in the orchestrator's own workspace, so
-neither is affected. This matters for a standing agent you run in its own herdr workspace.
-
-Provision such a slot from the primary workspace:
-
-```sh
-herdr worktree create --workspace "$HERDR_WORKSPACE_ID" --path .worktrees/<agent> \
-  --branch park/<agent> --base main --label <agent> --no-focus
-```
-
-To link an existing unlinked slot in place, leaving the agent running:
-
-```sh
-herdr worktree open --workspace <primary id> --path .worktrees/<agent>
-herdr workspace rename <id> <agent>
-```
-
-The maintainer checked both in the herdr sidebar (round 4, #79).
-
-Tools that walk the tree without reading `.gitignore` see a second copy of every file
-under `.worktrees/`; none of this repo's verbs or tests do (smoke section 70 pins it).
-
-Workspace ids are re-derived from
-`herdr workspace list` at the start of each round; the label is the handle.
-
-| name | kind | worktree | parking branch | account (`CLAUDE_CONFIG_DIR`) |
-|---|---|---|---|---|
-| ben  | claude | `.worktrees/ben`  | `park/ben`  | `/home/vo/.claude-work` |
-| dana | claude | `.worktrees/dana` | `park/dana` | `/home/vo/.claude-personal` |
-| nia  | claude | `.worktrees/nia`  | `park/nia`  | `/home/vo/.claude-work` |
-| kit  | claude | `.worktrees/kit`  | `park/kit`  | `/home/vo/.claude-personal` |
-| finn | claude | `.worktrees/finn` | `park/finn` | `/home/vo/.claude-personal` |
-
-Model per dispatch is the orchestrator's call (`-- --model <m>` after `agent start`);
-default Sonnet, Opus for multi-helper features.
-
 ## Maintainer answers typed into a pane
 
-Prefix a direct answer with `m:` to make it citable without a confirmation round-trip. The
-prefix is imitable, so a prefixed line that contradicts the last signed orchestrator
-message still gets one confirmation.
+A worker's question reaches you on the thread or in its pane. Prefix a direct answer with `m:` to make
+it citable without a confirmation round-trip. The prefix is imitable, so a prefixed line that
+contradicts the last signed orchestrator message still gets one confirmation.
+
+## See also
+
+- [Unattended rounds](unattended-rounds.md): hooks, keepalive, usage limits and account switching.
+- [Doctor and reap](doctor-and-reap.md): the preflight checks and what cleanup removes.
+- [Codex workers](codex-workers.md): `--kind codex`.
+- [Parallel work](parallel-work.md): several `/hv-work` sessions without an orchestrator.
+- [Autonomy levels](autonomy.md): how far skills chain on their own, a different axis from `round.scope`.
+- [Contributing: rounds](../contributing/rounds.md): this repo's gate, repo rules and roster.

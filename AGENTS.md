@@ -8,7 +8,7 @@ implement, verify and open a PR; they never merge. The orchestrator assigns issu
 decisions, merges PRs and re-verifies on `main` after every merge.
 
 **"You are the orchestrator" is the kickoff trigger: invoke the `hv-orchestrate` skill.**
-Read it and `docs/usage/parallel-rounds.md` (the project brief: gate, repo rules, roster)
+Read it and `docs/contributing/rounds.md` (the project brief: gate, repo rules, roster)
 before running or joining a round. A worker reads `references/worker-contract.md`.
 
 <!-- hv-knowledge-start -->

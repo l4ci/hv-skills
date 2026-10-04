@@ -2,7 +2,11 @@
 
 When `work.isolation` is set to `"worktree"`, you can run multiple [`/hv-work`](running-work.md)
 sessions side by side from separate terminals. Each session gets its own
-directory and branch, so they don't step on each other.
+directory and branch, so they don't step on each other. You start and watch each one yourself.
+
+If you'd rather have one orchestrator assign issues to standing workers, wait on them and merge their
+PRs, that is a [parallel round](parallel-rounds.md). Use this page for two or three sessions you are
+watching; use a round for a queue.
 
 ## When to use this
 
@@ -48,7 +52,7 @@ full `/hv-work` lifecycle.
 
 ## How status.json stays consistent
 
-Both orchestrators write to the same `.hv/status.json` in the main worktree,
+Both sessions write to the same `.hv/status.json` in the main worktree,
 but each owns different entries (one per active branch), so they don't
 conflict under normal operation. `/hv-work` (no argument) in a third terminal sees both
 streams as "In Progress" and skips those items when suggesting new work. If
