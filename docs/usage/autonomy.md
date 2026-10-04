@@ -10,6 +10,15 @@
 | `"auto"` | One-hop chaining. After `/hv-work` finishes a cycle, `/hv-learn` is invoked automatically (when its threshold trips), and `/hv-refactor` is invoked when the refactor-age threshold trips. After `/hv-debug` commits a fix, `/hv-ship` is invoked automatically. After `/hv-ship` integrates, `/hv-learn` is invoked. After `hv update` reports `behind`, Step 4 asks once via `AskUserQuestion` and dispatches `hv init` on confirm so drift clears in one step. The chain stops after the chained step; the user picks the next item themselves. |
 | `"loop"` | Auto chain plus loop continuation, plus auto-pick on routine routing. After each `/hv-work` or `/hv-ship` cycle, `/hv-work` (no argument) is invoked. `/hv-work` (no argument) (also reading `autonomy.level`) auto-selects the suggested item and dispatches `/hv-work` without asking. Routine routing/tagging questions that present a clear `(Recommended)` option (milestone tagging in `/hv-capture`, reconcile resolution in `/hv-work` (no argument), CONCERNS routing in `/hv-ship`, scope and candidate gates in `/hv-refactor`) are silently auto-picked without prompting. Design decisions, manual public-artifact gates, and config flips still surface for explicit user input. After `hv update` reports `behind`, Step 4 dispatches `hv init` unconditionally (no question); if the plugin wasn't actually updated, the STALE migration is a no-op. The loop sustains itself until the backlog drains, a guard fails, or the user interrupts. |
 
+## Autonomy and rounds
+
+`autonomy.level` is about skills chaining into each other. A [parallel round](parallel-rounds.md) is a
+different axis: `round.scope` says which issues the round may take, and the `hv round` verbs do the
+assigning, waiting and merging, whatever the level. What does not move with the level is the
+[merge approval](parallel-rounds.md#merge-approval) policy: `ship.mergeApproval` binds the merge verbs
+at `off`, `auto` and `loop` alike. For a round that runs with no one at the keyboard, see
+[unattended rounds](unattended-rounds.md).
+
 ## What still gates the chain
 
 Autonomy decides whether to invoke the next skill; the destination skill's own gates still decide whether it pauses. So:
