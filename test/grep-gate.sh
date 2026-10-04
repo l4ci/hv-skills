@@ -18,7 +18,7 @@ fails=0
 bad() { printf '\033[31mFAIL\033[0m %s\n' "$1" >&2; fails=$((fails + 1)); }
 
 # 1. The old product name (#231). hv-skills became hv; what may still say
-# hv-skills is history (CHANGELOG, the 5.0 design docs, tracked .hv/ state),
+# hv-skills is history (CHANGELOG, the 5.0 design docs, tracked .rota/ state),
 # code that has to know the old name (migrate hv, legacy-format fixtures) and
 # text captured from real panes. The managed block markers keep the key
 # "skills" (hv-skills-start/-end), so the pattern lets those through.
@@ -26,7 +26,7 @@ OLD_NAME='hv-skills(?!-(?:start|end)\b)'
 OLD_SCOPE=(
   ':(exclude)CHANGELOG.md'
   ':(exclude)docs/design/'
-  ':(exclude).hv/'
+  ':(exclude).rota/'
   ':(exclude)test/grep-gate.sh'
   # The "Coming from hv-skills" migration section names the predecessor.
   ':(exclude)docs/install.md'
@@ -61,7 +61,7 @@ HV_SCOPE=(
   ':(exclude)docs/design/5.0-helper-triage.md'
   ':(exclude)docs/design/5.0-smoke-whitebox.md'
   ':(exclude)docs/design/5.0-verb-contract.md'
-  ':(exclude).hv/'
+  ':(exclude).rota/'
   ':(exclude)AGENTS.md'
   ':(exclude)CLAUDE.md'
   ':(exclude).gitignore'
