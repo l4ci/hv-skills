@@ -319,7 +319,7 @@ func checkPreconditions(root, cwd string) error {
 		return err
 	}
 	version := ""
-	for _, parent := range []string{"rota", "hvSkills"} {
+	for _, parent := range []string{"rota", "hv", "hvSkills"} {
 		if version == "" {
 			if o, ok := getObj(cfg, parent); ok {
 				version = getString(o, "version")
@@ -373,8 +373,8 @@ func getString(o *jsonx.Object, k string) string {
 	return s
 }
 
-// stampVersion writes rota.version and drops both legacy forms: hvSkills.version
-// (with its hvSkills object once empty) and the top-level "version". It
+// stampVersion writes rota.version and drops the legacy forms: hv.version and
+// hvSkills.version (each object once empty) and the top-level "version". It
 // returns the stamped version, or "" when nothing changed (no installed
 // version known, or rota.version already holds it and no legacy form remains).
 func stampVersion(root string) (string, error) {
@@ -388,7 +388,7 @@ func stampVersion(root string) (string, error) {
 	}
 	rota, _ := getObj(cfg, "rota")
 	_, legacy := cfg.Get("version")
-	for _, parent := range []string{"hvSkills"} {
+	for _, parent := range []string{"hv", "hvSkills"} {
 		if old, ok := getObj(cfg, parent); ok {
 			_, hasOld := old.Get("version")
 			legacy = legacy || hasOld
@@ -402,7 +402,7 @@ func stampVersion(root string) (string, error) {
 		cfg.Set("rota", rota)
 	}
 	rota.Set("version", want)
-	for _, parent := range []string{"hvSkills"} {
+	for _, parent := range []string{"hv", "hvSkills"} {
 		if old, ok := getObj(cfg, parent); ok {
 			old.Delete("version")
 			if len(old.Keys()) == 0 {

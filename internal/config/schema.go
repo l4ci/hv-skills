@@ -18,17 +18,16 @@ type Key struct {
 }
 
 // VersionKey is the stamp of the rota release that wrote a project's config.
-// LegacyVersionKey is where releases before the rename to hv (#231) kept it;
-// it is read as a fallback and moved by Fill.
-const (
-	VersionKey       = "rota.version"
-	LegacyVersionKey = "hvSkills.version"
-)
+// LegacyVersionKeys are where releases before rota kept it, newest first: hv
+// (#231) and hvSkills before it. They are read as fallbacks and moved by Fill.
+const VersionKey = "rota.version"
+
+var LegacyVersionKeys = []string{"hv.version", "hvSkills.version"}
 
 // StampedVersion is the version stamped in cfg: the string at VersionKey,
-// else the one at LegacyVersionKey, else "".
+// else the first one at a LegacyVersionKeys key, else "".
 func StampedVersion(cfg any) string {
-	for _, k := range []string{VersionKey, LegacyVersionKey} {
+	for _, k := range append([]string{VersionKey}, LegacyVersionKeys...) {
 		if v, ok := walk(cfg, k); ok {
 			if s, ok := v.(string); ok && s != "" {
 				return s

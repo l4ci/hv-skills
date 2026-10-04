@@ -155,6 +155,32 @@ func TestFillMigratesLegacyVersionKey(t *testing.T) {
 	}
 }
 
+// hv's stamp (#231) moves like the hvSkills one did, and wins over it when a config
+// carries both.
+func TestFillMigratesHvVersionKey(t *testing.T) {
+	for _, c := range []struct{ name, cfg string }{
+		{"hv only", `{"hv":{"version":"5.0.0"}}`},
+		{"hv and hvSkills", `{"hvSkills":{"version":"4.2.0"},"hv":{"version":"5.0.0"}}`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			out, filled := fillLegacy(t, c.cfg)
+			doc, _ := jsonx.Decode([]byte(out))
+			o := doc.(*jsonx.Object)
+			if v, _ := Value(o, VersionKey); v != "5.0.0" {
+				t.Errorf("rota.version %v", v)
+			}
+			for _, k := range []string{"hv", "hvSkills"} {
+				if _, ok := o.Get(k); ok {
+					t.Errorf("%s left: %s", k, out)
+				}
+			}
+			if filled[len(filled)-1] != VersionKey {
+				t.Errorf("rota.version not listed: %v", filled)
+			}
+		})
+	}
+}
+
 // A file that is otherwise complete is still rewritten for the move alone,
 // and lists exactly rota.version.
 func TestFillLegacyKeyAloneRewrites(t *testing.T) {

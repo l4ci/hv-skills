@@ -34,10 +34,11 @@ func decodeObject(raw []byte) (*jsonx.Object, bool) {
 // nothing missing is not rewritten. Each added key goes in at its schema
 // position among its siblings, so a file in schema order stays in it.
 //
-// Fill also migrates the legacy stamp: a string at hvSkills.version moves to
-// rota.version (kept as is when rota.version already holds a non-empty value, else
-// copied there), the legacy key is deleted and an emptied hvSkills object goes
-// with it. The move counts as filling rota.version, so it is listed and the file
+// Fill also migrates the legacy stamps: a string at hv.version or
+// hvSkills.version moves to rota.version (kept as is when rota.version already
+// holds a non-empty value, else copied there, hv.version winning over
+// hvSkills.version), the legacy key is deleted and an emptied hv or hvSkills
+// object goes with it. The move counts as filling rota.version, so it is listed and the file
 // is rewritten.
 func Fill(root string) ([]string, error) {
 	filled := []string{}
@@ -79,30 +80,35 @@ func Fill(root string) ([]string, error) {
 	return filled, nil
 }
 
-// migrateLegacyVersion moves hvSkills.version to rota.version in cfg and returns
-// the resulting object (fillKey may replace cfg) and whether it found a legacy
-// key to move. cfg is edited only when hvSkills is an object holding a string
-// "version".
+// migrateLegacyVersion moves the LegacyVersionKeys stamps to rota.version in
+// cfg and returns the resulting object (fillKey may replace cfg) and whether it
+// found a legacy key to move. A legacy parent is edited only when it is an
+// object holding a string "version".
 func migrateLegacyVersion(cfg *jsonx.Object) (*jsonx.Object, bool) {
-	legacy, ok := getObject(cfg, "hvSkills")
-	if !ok {
-		return cfg, false
+	moved := false
+	for _, key := range LegacyVersionKeys {
+		parent := strings.TrimSuffix(key, ".version")
+		legacy, ok := getObject(cfg, parent)
+		if !ok {
+			continue
+		}
+		lv, ok := legacy.Get("version")
+		if !ok {
+			continue
+		}
+		if _, isStr := lv.(string); !isStr {
+			continue
+		}
+		if cur, _ := walk(cfg, VersionKey); cur == nil || cur == "" {
+			cfg = fillKey(cfg, "", strings.Split(VersionKey, "."), lv)
+		}
+		legacy.Delete("version")
+		if len(legacy.Keys()) == 0 {
+			cfg.Delete(parent)
+		}
+		moved = true
 	}
-	lv, ok := legacy.Get("version")
-	if !ok {
-		return cfg, false
-	}
-	if _, isStr := lv.(string); !isStr {
-		return cfg, false
-	}
-	if cur, _ := walk(cfg, VersionKey); cur == nil || cur == "" {
-		cfg = fillKey(cfg, "", strings.Split(VersionKey, "."), lv)
-	}
-	legacy.Delete("version")
-	if len(legacy.Keys()) == 0 {
-		cfg.Delete("hvSkills")
-	}
-	return cfg, true
+	return cfg, moved
 }
 
 // fillKey sets segs to v under o, whose dotted path is prefix, and returns o
