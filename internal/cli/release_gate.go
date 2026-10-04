@@ -269,7 +269,7 @@ func releasePublish(fs *flag.FlagSet) RunFunc {
 // finished: one bare binary per platform (the names bin/rota downloads) and the
 // checksums. The tarballs are not part of that contract.
 var releaseAssets = []string{
-	"hv_linux_amd64", "hv_linux_arm64", "hv_darwin_amd64", "hv_darwin_arm64", "checksums.txt",
+	"rota_linux_amd64", "rota_linux_arm64", "rota_darwin_amd64", "rota_darwin_arm64", "checksums.txt",
 }
 
 // releaseGoreleaser is the goreleaser config in dir, or "".

@@ -1,30 +1,30 @@
 echo "update"
 # The binary under test is stamped with VERSION (see runner.sh), so current is
-# known; HV_TEST_LATEST_VERSION skips the network. A binary in $TMP is a
+# known; ROTA_TEST_LATEST_VERSION skips the network. A binary in $TMP is a
 # script-style install.
 CUR="$(tr -d '[:space:]' < "$REPO/VERSION")"
-OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$ROTA_BIN" --json update) || fail "update exited non-zero"
+OUT=$(env ROTA_TEST_LATEST_VERSION=99.0.0 "$ROTA_BIN" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.currentVersion)" = "$CUR" ] || fail "update didn't report the binary's version ($CUR): $OUT"
 [ "$(echo "$OUT" | jget data.latestVersion)" = "99.0.0" ] || fail "update didn't use override latest: $OUT"
 [ "$(echo "$OUT" | jget data.status)" = "behind" ] || fail "update didn't mark behind: $OUT"
 [ "$(echo "$OUT" | jget data.installType)" = "script" ] || fail "update didn't report a script install: $OUT"
-case $(echo "$OUT" | jget data.updateCommand) in *install.sh*"hv skills update") ;; *) fail "update command should rerun install.sh then refresh skills: $OUT" ;; esac
+case $(echo "$OUT" | jget data.updateCommand) in *install.sh*"rota skills update") ;; *) fail "update command should rerun install.sh then refresh skills: $OUT" ;; esac
 pass "update reports behind and names the install.sh command"
 
-OUT=$(env HV_TEST_LATEST_VERSION="$CUR" "$ROTA_BIN" --json update) || fail "update exited non-zero"
+OUT=$(env ROTA_TEST_LATEST_VERSION="$CUR" "$ROTA_BIN" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.status)" = "current" ] || fail "update didn't mark current: $OUT"
 pass "update reports current when equal"
 
-OUT=$(env HV_TEST_LATEST_VERSION=0.0.1 "$ROTA_BIN" --json update) || fail "update exited non-zero"
+OUT=$(env ROTA_TEST_LATEST_VERSION=0.0.1 "$ROTA_BIN" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.status)" = "ahead" ] || fail "update didn't mark ahead: $OUT"
 pass "update reports ahead when current > latest"
 
 # A binary under a Homebrew prefix is a brew install.
 mkdir -p "$TMP/Cellar/rota/9.9.9/bin"
 cp "$ROTA_BIN" "$TMP/Cellar/rota/9.9.9/bin/rota"
-OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$TMP/Cellar/rota/9.9.9/bin/rota" --json update) || fail "update exited non-zero"
+OUT=$(env ROTA_TEST_LATEST_VERSION=99.0.0 "$TMP/Cellar/rota/9.9.9/bin/rota" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.installType)" = "brew" ] || fail "update didn't report a brew install: $OUT"
-case $(echo "$OUT" | jget data.updateCommand) in "brew update && brew upgrade hv"*) ;; *) fail "brew install should name brew upgrade: $OUT" ;; esac
+case $(echo "$OUT" | jget data.updateCommand) in "brew update && brew upgrade rota"*) ;; *) fail "brew install should name brew upgrade: $OUT" ;; esac
 rm -rf "$TMP/Cellar"
 pass "update reports a Homebrew binary as brew"
 

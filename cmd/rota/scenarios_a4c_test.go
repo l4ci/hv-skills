@@ -11,7 +11,7 @@ package main
 // install root resolves.
 //
 // Safety: rota update must never reach the network. Every update scenario sets
-// HV_TEST_LATEST_VERSION; the one scenario that leaves it unset runs with
+// ROTA_TEST_LATEST_VERSION; the one scenario that leaves it unset runs with
 // test/fakes first on PATH and proves, through the fake's call log, that gh
 // resolved there.
 
@@ -192,7 +192,7 @@ func checkUpdate(installType, status string) func(t *testing.T, e envl) {
 
 func updScn(name, latest string, installType, status string) scn {
 	return scn{name: "update/" + name, fx: fx{noHV: true}, argv: j("update"), want: 0,
-		env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=" + latest},
+		env:   []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=" + latest},
 		bin:   upd.bin,
 		check: both(checkUpdate(installType, status), eqCheck("data.currentVersion", instVersion))}
 }
@@ -645,23 +645,23 @@ func suiteA4C(t *testing.T) {
 		updScn("script/huge-component", "1.2.99999999999999999999999", "script", "behind"),
 		updScn("script/latest-without-digits", "abc", "script", "ahead"),
 		scn{name: "update/script-command-reruns-the-installer", fx: fx{noHV: true}, argv: j("update"), want: 0, bin: upd.bin,
-			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"},
+			env: []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=1.2.4"},
 			check: func(t *testing.T, e envl) {
-				if c, _ := at(e, "data.updateCommand").(string); !strings.Contains(c, "install.sh") || !strings.HasSuffix(c, "hv skills update") {
+				if c, _ := at(e, "data.updateCommand").(string); !strings.Contains(c, "install.sh") || !strings.HasSuffix(c, "rota skills update") {
 					t.Errorf("updateCommand = %q", c)
 				}
 			}},
 		scn{name: "update/brew-binary", fx: fx{noHV: true}, argv: j("update"), want: 0, bin: upd.brewBin,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"},
-			check: both(checkUpdate("brew", "behind"), eqCheck("data.updateCommand", "brew update && brew upgrade hv && hv skills update"))},
+			env:   []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=1.2.4"},
+			check: both(checkUpdate("brew", "behind"), eqCheck("data.updateCommand", "brew update && brew upgrade rota && rota skills update"))},
 		scn{name: "update/runs-inside-a-project", argv: j("update"), want: 0, bin: upd.bin,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"},
+			env:   []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=1.2.4"},
 			check: checkUpdate("script", "behind")},
 		scn{name: "update/runs-from-a-subdirectory", fx: withFile("sub/x.txt", "x\n"), cwd: "sub", argv: j("update"), want: 0, bin: upd.bin,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"},
+			env:   []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=1.2.4"},
 			check: checkUpdate("script", "behind")},
 		scn{name: "update/dev-build-compares-as-zero", fx: fx{noHV: true}, argv: j("update"), goOnly: true, want: 0,
-			env:   []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=0.0.0"},
+			env:   []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=0.0.0"},
 			check: both(eqCheck("data.currentVersion", "dev"), eqCheck("data.status", "current"), eqCheck("data.installType", "dev"))},
 		scn{name: "update/without-the-test-variable-only-the-fake-gh-runs", fx: fx{noHV: true}, argv: j("update"), want: 0, bin: upd.bin,
 			env: []string{"HOME=" + upd.homeNone, "FAKE_TRACKER_LOG=" + filepath.Join(harnessTmp, "update-gh.log")},
@@ -672,15 +672,15 @@ func suiteA4C(t *testing.T) {
 					t.Fatalf("the fake gh was not called: %v", err)
 				}
 				for _, l := range lines(string(b)) {
-					if !strings.HasPrefix(l, "api repos/l4ci/hv/releases/latest") {
+					if !strings.HasPrefix(l, "api repos/l4ci/rota/releases/latest") {
 						t.Errorf("gh was called with %q", l)
 					}
 				}
 			}},
-		scn{name: "update/positional-rejected", goOnly: true, want: 2, argv: j("update", "x"), env: []string{"HV_TEST_LATEST_VERSION=1.0.0"}},
-		scn{name: "update/repo-flag-rejected", goOnly: true, want: 2, argv: j("update", "--repo", "web"), env: []string{"HV_TEST_LATEST_VERSION=1.0.0"}},
+		scn{name: "update/positional-rejected", goOnly: true, want: 2, argv: j("update", "x"), env: []string{"ROTA_TEST_LATEST_VERSION=1.0.0"}},
+		scn{name: "update/repo-flag-rejected", goOnly: true, want: 2, argv: j("update", "--repo", "web"), env: []string{"ROTA_TEST_LATEST_VERSION=1.0.0"}},
 		scn{name: "update/data-shape", goOnly: true, want: 0, argv: j("update"), bin: upd.bin,
-			env: []string{"HOME=" + upd.homeNone, "HV_TEST_LATEST_VERSION=1.2.4"},
+			env: []string{"HOME=" + upd.homeNone, "ROTA_TEST_LATEST_VERSION=1.2.4"},
 			check: func(t *testing.T, e envl) {
 				d, _ := at(e, "data").(map[string]any)
 				var keys []string

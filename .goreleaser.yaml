@@ -1,13 +1,13 @@
-# Release build for the hv CLI. Asset names are a contract with install.sh: it
-# downloads hv_<os>_<arch> and checks it against checksums.txt. Run
+# Release build for the rota CLI. Asset names are a contract with install.sh: it
+# downloads rota_<os>_<arch> and checks it against checksums.txt. Run
 # `goreleaser release --snapshot --clean` to build locally.
 version: 2
-project_name: hv
+project_name: rota
 
 builds:
-  - id: hv
-    main: ./cmd/hv
-    binary: hv
+  - id: rota
+    main: ./cmd/rota
+    binary: rota
     env:
       - CGO_ENABLED=0
     # No windows: the sidecar lock uses flock (as the Go lock code does).
@@ -23,20 +23,20 @@ archives:
   # Bare binaries for install.sh.
   - id: installer
     formats: [binary]
-    name_template: "hv_{{ .Os }}_{{ .Arch }}"
+    name_template: "rota_{{ .Os }}_{{ .Arch }}"
   # Tarballs for people and package managers.
   - id: tarball
     formats: [tar.gz]
-    name_template: "hv_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "rota_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: checksums.txt
 
 # One GitHub release per version. The release workflow (on a v* tag) makes it
-# as a draft carrying the binaries; `hv release publish` then fills in the
+# as a draft carrying the binaries; `rota release publish` then fills in the
 # approved notes and publishes it. A draft's assets do not resolve at
 # /releases/download/, so install.sh sees nothing until that gated step. Notes come
-# from /hv-release, not from commit messages.
+# from /rota-release, not from commit messages.
 release:
   draft: true
   replace_existing_draft: true
@@ -44,24 +44,24 @@ changelog:
   disable: true
 
 # Homebrew formula, pushed to the tap on release. The tap repo and the token
-# are the maintainer's one-time setup (HOMEBREW_TAP_TOKEN, see .hv/RELEASE.md).
+# are the maintainer's one-time setup (HOMEBREW_TAP_TOKEN, see .rota/RELEASE.md).
 # skip_upload: auto keeps a prerelease tag out of the tap. The formula installs
 # from the tarballs above; goreleaser fills in their URLs and sha256 sums.
 # Note: the formula is built when the draft is made, so it points at assets
-# that only resolve once `hv release publish` publishes the draft; run that
+# that only resolve once `rota release publish` publishes the draft; run that
 # promptly after the workflow finishes.
 brews:
-  - name: hv
+  - name: rota
     ids: [tarball]
     repository:
       owner: l4ci
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/l4ci/hv
+    homepage: https://github.com/l4ci/rota
     description: Plan, ship and run parallel rounds with AI coding agents
     license: MIT
     skip_upload: auto
     test: |
-      assert_match version.to_s, shell_output("#{bin}/hv version")
+      assert_match version.to_s, shell_output("#{bin}/rota version")
     caveats: |
-      Next: hv skills install
+      Next: rota skills install

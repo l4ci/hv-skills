@@ -1,20 +1,20 @@
 #!/bin/sh
-# Install the hv binary from a GitHub release.
+# Install the rota binary from a GitHub release.
 #
-#   curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/l4ci/rota/main/install.sh | sh
 #
-# Downloads hv_<os>_<arch> and checksums.txt from the release, refuses a binary
+# Downloads rota_<os>_<arch> and checksums.txt from the release, refuses a binary
 # whose sha256 does not match (fail closed: nothing is installed), then copies
-# it to <prefix>/bin/hv. The checksum is an integrity check, not authenticity:
+# it to <prefix>/bin/rota. The checksum is an integrity check, not authenticity:
 # checksums.txt comes from the same release as the binary. Signatures are a
-# 5.1 follow-up.
+# later follow-up.
 #
 # Options (flag wins over env), see --help:
-#   --version X.Y.Z   HV_VERSION   release to install (default: latest)
-#   --prefix DIR      HV_PREFIX    install to DIR/bin (default: $HOME/.local)
+#   --version X.Y.Z   ROTA_VERSION   release to install (default: latest)
+#   --prefix DIR      ROTA_PREFIX    install to DIR/bin (default: $HOME/.local)
 #
 # Env:
-#   HV_RELEASE_BASE_URL  default https://github.com/l4ci/hv/releases.
+#   ROTA_RELEASE_BASE_URL  default https://github.com/l4ci/rota/releases.
 #                        Layout: <base>/latest/download/<asset> and
 #                        <base>/download/v<version>/<asset>. https only; a
 #                        file:// base is accepted for tests and needs curl.
@@ -39,17 +39,17 @@ main() {
     cat <<'EOF'
 Usage: install.sh [--version X.Y.Z] [--prefix DIR]
 
-Installs the hv binary from a GitHub release, after checking its sha256.
+Installs the rota binary from a GitHub release, after checking its sha256.
 
-  --version X.Y.Z   release to install (env HV_VERSION; default: latest)
-  --prefix DIR      install to DIR/bin (env HV_PREFIX; default: $HOME/.local)
+  --version X.Y.Z   release to install (env ROTA_VERSION; default: latest)
+  --prefix DIR      install to DIR/bin (env ROTA_PREFIX; default: $HOME/.local)
 
-Env HV_RELEASE_BASE_URL overrides the release location (https, or file:// for tests).
+Env ROTA_RELEASE_BASE_URL overrides the release location (https, or file:// for tests).
 EOF
   }
 
-  version=${HV_VERSION:-}
-  prefix=${HV_PREFIX:-}
+  version=${ROTA_VERSION:-}
+  prefix=${ROTA_PREFIX:-}
   while [ $# -gt 0 ]; do
     case $1 in
       --version) [ $# -ge 2 ] || die "--version needs a value"; version=$2; shift 2 ;;
@@ -71,7 +71,7 @@ EOF
   case $(uname -s) in Linux) os=linux ;; Darwin) os=darwin ;; *) die "unsupported OS $(uname -s)" ;; esac
   case $(uname -m) in x86_64 | amd64) arch=amd64 ;; aarch64 | arm64) arch=arm64 ;; *) die "unsupported CPU $(uname -m)" ;; esac
 
-  root=${HV_RELEASE_BASE_URL:-https://github.com/l4ci/hv/releases}
+  root=${ROTA_RELEASE_BASE_URL:-https://github.com/l4ci/rota/releases}
   root=${root%/}
   # https or file://, and no userinfo anywhere (https://github.com@evil.example
   # is evil.example).
@@ -86,7 +86,7 @@ EOF
   if [ -n "$version" ]; then base=$root/download/v$version; label=v$version
   else base=$root/latest/download; label="the latest release"
   fi
-  asset=hv_${os}_${arch}
+  asset=rota_${os}_${arch}
 
   # curl pins the transport: https only (the first request and every
   # redirect), TLS 1.2 at least. A file:// test base switches the first
@@ -109,7 +109,7 @@ EOF
 
   bindir=$prefix/bin
   mkdir -p "$bindir" 2>/dev/null || die "cannot create $bindir" "pass --prefix with a writable directory"
-  work=$(mktemp -d "$bindir/.hv-install.XXXXXX") || die "cannot write to $bindir" "pass --prefix with a writable directory"
+  work=$(mktemp -d "$bindir/.rota-install.XXXXXX") || die "cannot write to $bindir" "pass --prefix with a writable directory"
   # A signal exits, which runs the EXIT trap: the temp dir never outlives us.
   trap 'rm -rf "$work"' EXIT
   trap 'exit 130' INT
@@ -130,15 +130,15 @@ EOF
 
   chmod 755 "$work/$asset"
   # Same directory as the target, so the rename is atomic.
-  mv -f "$work/$asset" "$bindir/hv" || die "cannot install $bindir/hv"
-  printf 'Installed %s\n' "$bindir/hv"
+  mv -f "$work/$asset" "$bindir/rota" || die "cannot install $bindir/rota"
+  printf 'Installed %s\n' "$bindir/rota"
 
   # shellcheck disable=SC2016  # $PATH is meant literally in the hint
   case ":${PATH:-}:" in
     *":$bindir:"*) ;;
     *) printf '\n%s is not on your PATH. Add it:\n  export PATH="%s:$PATH"\n' "$bindir" "$bindir" ;;
   esac
-  printf '\nNext: hv skills install\n'
+  printf '\nNext: rota skills install\n'
 }
 
 main "$@"

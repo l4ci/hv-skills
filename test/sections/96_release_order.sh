@@ -11,11 +11,11 @@ if [ "$1 $2" = "release view" ]; then
   case $(cat "$RO_STATE") in
     none) echo "release not found" >&2; exit 1 ;;
     empty) echo '{"isDraft":true,"assets":[]}' ;;
-    partial) echo '{"isDraft":true,"assets":[{"name":"hv_linux_amd64"}]}' ;;
-    three) echo '{"isDraft":true,"assets":[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"checksums.txt"}]}' ;;
-    tarballs) echo '{"isDraft":true,"assets":[{"name":"hv_1.0.0_linux_amd64.tar.gz"},{"name":"hv_1.0.0_linux_arm64.tar.gz"},{"name":"hv_1.0.0_darwin_amd64.tar.gz"},{"name":"hv_1.0.0_darwin_arm64.tar.gz"},{"name":"checksums.txt"}]}' ;;
-    ready) echo '{"isDraft":true,"assets":[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"hv_darwin_arm64"},{"name":"checksums.txt"}]}' ;;
-    published) echo '{"isDraft":false,"assets":[{"name":"hv_linux_amd64"},{"name":"hv_linux_arm64"},{"name":"hv_darwin_amd64"},{"name":"hv_darwin_arm64"},{"name":"checksums.txt"}]}' ;;
+    partial) echo '{"isDraft":true,"assets":[{"name":"rota_linux_amd64"}]}' ;;
+    three) echo '{"isDraft":true,"assets":[{"name":"rota_linux_amd64"},{"name":"rota_linux_arm64"},{"name":"rota_darwin_amd64"},{"name":"checksums.txt"}]}' ;;
+    tarballs) echo '{"isDraft":true,"assets":[{"name":"rota_1.0.0_linux_amd64.tar.gz"},{"name":"rota_1.0.0_linux_arm64.tar.gz"},{"name":"rota_1.0.0_darwin_amd64.tar.gz"},{"name":"rota_1.0.0_darwin_arm64.tar.gz"},{"name":"checksums.txt"}]}' ;;
+    ready) echo '{"isDraft":true,"assets":[{"name":"rota_linux_amd64"},{"name":"rota_linux_arm64"},{"name":"rota_darwin_amd64"},{"name":"rota_darwin_arm64"},{"name":"checksums.txt"}]}' ;;
+    published) echo '{"isDraft":false,"assets":[{"name":"rota_linux_amd64"},{"name":"rota_linux_arm64"},{"name":"rota_darwin_amd64"},{"name":"rota_darwin_arm64"},{"name":"checksums.txt"}]}' ;;
   esac
   exit 0
 fi
