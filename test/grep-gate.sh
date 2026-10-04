@@ -58,7 +58,7 @@ fi
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "${SCRATCH:?}"' EXIT
 if [ -z "${HV_BIN:-}" ]; then
-  VERSION="$(sed -n 's/^## v\([0-9][^ ]*\).*/\1/p' CHANGELOG.md | head -1)"
+  VERSION="$(tr -d '[:space:]' < VERSION)"
   go build -ldflags "-X github.com/l4ci/hv-skills/v5/internal/version.Version=$VERSION" -o "$SCRATCH/hv" ./cmd/hv
   HV_BIN="$SCRATCH/hv"
 fi

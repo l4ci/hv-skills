@@ -168,7 +168,7 @@ func updFixtures(t *testing.T) {
 			t.Fatalf("go build: %v\n%s", err, out)
 		}
 		upd.homeNone = mk("home-none")
-		upd.brewBin = filepath.Join(mk("homebrew/bin"), "hv")
+		upd.brewBin = filepath.Join(mk("Cellar/hv/9.9.9/bin"), "hv")
 		if out, err := exec.Command("cp", upd.bin, upd.brewBin).CombinedOutput(); err != nil {
 			t.Fatalf("cp: %v\n%s", err, out)
 		}

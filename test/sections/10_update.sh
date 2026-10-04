@@ -20,12 +20,12 @@ OUT=$(env HV_TEST_LATEST_VERSION=0.0.1 "$HV_BIN" --json update) || fail "update 
 pass "update reports ahead when current > latest"
 
 # A binary under a Homebrew prefix is a brew install.
-mkdir -p "$TMP/homebrew/bin"
-cp "$HV_BIN" "$TMP/homebrew/bin/hv"
-OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$TMP/homebrew/bin/hv" --json update) || fail "update exited non-zero"
+mkdir -p "$TMP/Cellar/hv/9.9.9/bin"
+cp "$HV_BIN" "$TMP/Cellar/hv/9.9.9/bin/hv"
+OUT=$(env HV_TEST_LATEST_VERSION=99.0.0 "$TMP/Cellar/hv/9.9.9/bin/hv" --json update) || fail "update exited non-zero"
 [ "$(echo "$OUT" | jget data.installType)" = "brew" ] || fail "update didn't report a brew install: $OUT"
 case $(echo "$OUT" | jget data.updateCommand) in "brew update && brew upgrade hv"*) ;; *) fail "brew install should name brew upgrade: $OUT" ;; esac
-rm -rf "$TMP/homebrew"
+rm -rf "$TMP/Cellar"
 pass "update reports a Homebrew binary as brew"
 
 echo "version"
