@@ -34,9 +34,6 @@
   "umbrella": {
     "enabled": false
   },
-  "hvSkills": {
-    "version": "4.4.0"
-  },
   "git": {
     "baseBranch": ""
   },
@@ -44,11 +41,13 @@
     "gate": "advisory",
     "afterWork": false
   },
-  "version": "3.3.0",
   "issues": {
     "providers": {
       "github": true,
       "gitlab": true
     }
+  },
+  "rota": {
+    "version": "0.9.0"
   }
 }

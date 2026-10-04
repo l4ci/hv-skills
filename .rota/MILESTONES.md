@@ -4,7 +4,7 @@ hv-skills is a Claude Code workflow that plans before coding, makes one commit p
 
 ## Active milestones
 
-_(none active — set with `/hv-vision`)_
+_(none active — set with `/rota-vision`)_
 
 ## Milestones
 
