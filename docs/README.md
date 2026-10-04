@@ -61,10 +61,10 @@ Public user guide for rota, a zero-dependency dev workflow for Claude Code and C
 ### Reference
 
 - [Slash commands](reference/slash-commands.md): every `/rota-*` command, alphabetical
-- [The `.rota/` folder](reference/hv-folder.md): files and directories created by `rota init`
+- [The `.rota/` folder](reference/rota-folder.md): files and directories created by `rota init`
 - [`rota` verb reference](reference/cli-helpers.md): every `rota` verb, with conventions and exit codes
 - [Configuration options](reference/config-options.md): every config key and option label, set via `rota config set`
-- [`/rota-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md): pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
+- [`/rota-capture --from-github` / `--from-gitlab` reference](reference/rota-issues.md): pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
 - [Project check](reference/preflight.md): what `rota init check` verifies, plus exit-code meanings
 
 ### Contributing
