@@ -211,7 +211,7 @@ The gate is opt-in because product QA needs strategy files (`/hv-qa first-run` b
 
 ## ship.mergeApproval and ship.mergeApprovalPaths
 
-Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-merge`, `hv worker gate`) read it, so it binds `/hv-ship`, `/hv-review --queue` and the `/hv-work` gate step at every `autonomy.level`.
+Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-merge`, `hv worker gate`) read it, so it binds `/hv-ship`, `/hv-review --queue` and the `/hv-work` gate step at every `autonomy.level`. In a round, `hv worker gate` enforces it; see [parallel rounds](parallel-rounds.md).
 
 | `ship.mergeApproval` | Behavior |
 |-------|----------|
@@ -223,7 +223,7 @@ Whether a merge needs a human. The merge verbs (`hv ship merge`, `hv ship pr-mer
 
 ## round keys
 
-Settings for `hv round` (parallel rounds). All are silent defaults; none is written by `hv init`.
+Settings for `hv round` (parallel rounds; see [the rounds guide](parallel-rounds.md), [`hv round` verbs](../reference/cli-helpers.md#hv-round) and [`hv doctor`](../reference/preflight.md#hv-doctor)). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -242,7 +242,7 @@ A custom `work.workerCommand` receives the tier's model only through a `{model}`
 
 ## orchestrator keys
 
-Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [pausing and resuming](pausing-and-resuming.md#orchestrator-handoff)) and its restart (`hv keepalive run`; see [keepalive](pausing-and-resuming.md#keepalive)). All are silent defaults; none is written by `hv init`.
+Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; see [unattended rounds](unattended-rounds.md)) and its restart (`hv keepalive run`; see [unattended rounds](unattended-rounds.md)). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -254,7 +254,7 @@ Settings for the orchestrator handoff (`hv hook stop`, `hv hook session-start`; 
 | `orchestrator.keepaliveBreaker` | `3` | Restarts in a row that leave no new handoff before the breaker stops the loop (integer, 1 or more). |
 | `orchestrator.keepaliveBackoffSeconds` | `5` | Seconds to wait before a restart (integer, 0 or more). |
 | `orchestrator.restartPrompt` | `Continue as orchestrator: read the handoff injected at session start, run hv round status, and resume the round.` | Appended as the last argument of a restart, never of the first start (non-empty string). |
-| `orchestrator.switchOnUsage` | `false` | Opt in to moving the orchestrator to another account before a usage limit: the Stop hook then also blocks for a handoff at `usageThreshold`, and `hv keepalive run` restarts under another account (boolean). See [switching the orchestrator's account](pausing-and-resuming.md#switching-the-orchestrators-account). |
+| `orchestrator.switchOnUsage` | `false` | Opt in to moving the orchestrator to another account before a usage limit: the Stop hook then also blocks for a handoff at `usageThreshold`, and `hv keepalive run` restarts under another account (boolean). See [unattended rounds](unattended-rounds.md). |
 | `orchestrator.usageThreshold` | `90` | Percent (integer, 1 to 100) of the 5-hour or weekly window at which the Stop hook asks for that handoff. Read only when `switchOnUsage` is `true`. |
 | `orchestrator.escalateIssue` | `0` | Issue number the breaker's escalation comment goes on (integer, 0 or more). `0` is unset: the breaker raises a host notification and a warning only. |
 
@@ -262,7 +262,7 @@ An out-of-range value exits 70 in a verb that reads it (`hv keepalive run` inclu
 
 ## limits keys
 
-Settings for the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`; see [usage limits](pausing-and-resuming.md#usage-limits)). All are silent defaults; none is written by `hv init`.
+Settings for the usage-limit watcher (`hv limit watch`, and the loop inside `hv keepalive run`; see [unattended rounds](unattended-rounds.md)). All are silent defaults; none is written by `hv init`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|

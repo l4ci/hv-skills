@@ -3,7 +3,7 @@
 `hv` is the single binary behind every hv-skills skill. Skills call it for all
 backlog, knowledge, plan, status, git and release bookkeeping, and you can call
 it directly when scripting against `.hv/`. There is no helper copy to refresh in a
-project: `hv` ships with the plugin and updates with it.
+project. Install `hv` (see [install](../install.md)).
 
 ```sh
 hv item create --kind bugs --title "Crash on save" --tag P1 --desc "Why."
@@ -284,6 +284,8 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv debug counter summary` | Iron Law halt note |
 | `hv debug counter clear` | delete the counter |
 | `hv debug counter inc-cycle` | count a hypothesis cycle |
+| `hv debug verdict <bugId> --verdict <PASS\|FAIL> [--body-file <path\|->]` | record whether a fix held and route on the item's failed-fix count |
+| `hv debug reset <bugId> --reason <text> --confirm --confirm-note <answer>` | start an item's failed-fix count again (manual gate) |
 
 ## `hv worker`
 
@@ -293,14 +295,99 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 | `hv worker pool list` | list the registered slots |
 | `hv worker pool reap (<slot>... \| --all)` | remove slots, their worktrees and branches |
 | `hv worker reset <slot> [--task <id>] [--check-only]` | refuse a slot that holds work, else cut a fresh task branch |
-| `hv worker dispatch <slot> --body-file <path\|-> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>]` | send a brief into a slot's session |
+| `hv worker dispatch <slot> --body-file <path\|-> [--task <id>] [--relay] [--round <n>] [--boot-timeout <s>] [--kind <claude\|codex>] [--accept-codex-version]` | send a brief into a slot's session |
 | `hv worker poll [<slot>] [--settle <seconds>] [--lines <n>]` | classify slot states from their panes |
-| `hv worker gate <slot> --base <branch> [--check-only] [--no-verify] [--confirm --confirm-note <answer>]` | merge gate for one slot's branch or PR; exit 4 when `ship.mergeApproval` needs a human |
+| `hv worker gate <slot> --base <branch> [--check-only] [--no-verify] [--confirm --confirm-note <answer> \| --approval <escalation> \| --escalate]` | merge gate for one slot's branch or PR; exit 4 when `ship.mergeApproval` needs a human, `--escalate` asks on the thread, `--approval` cites the answer |
 | `hv worker session check [--session <name>]` | inside a managed host session? (exit 1 when outside) |
 | `hv worker session ensure [--session <name>] [--body-file <path\|->] [--boot-timeout <s>]` | hand the orchestrator off into a host session |
 | `hv worker account list` | list accounts with their usage verdict |
 | `hv worker account pick [--exclude <name>[,<name>...]]` | name the account with the most headroom |
 | `hv worker account assign <slot> [--account <name>]` | put an account's config dir on a slot |
+
+## `hv round`
+
+The orchestrator's verbs for a [parallel round](../usage/parallel-rounds.md). All of them read and write `.hv/workers.json` and the round lease.
+
+| Usage | What it does |
+|---|---|
+| `hv round start [--scope <slate\|milestone\|next>] [--items <ID>[,<ID>…]] [--slots <n>] [--base <branch>] [--holder-pid <n>]` | take the orchestrator lease, provision the roster, list candidates |
+| `hv round candidates [--scope <slate\|milestone\|next>]` | list the items the round's scope allows, with readiness |
+| `hv round assign <ID> [--agent <name>] [--tier <light\|standard\|heavy>] [--tier-reason <text>] [--kind <claude\|codex>] [--body-file <path\|->] [--siblings <ID>[,<ID>…]] [--check-only] [--accept-overlap] [--accept-codex-version] [--holder-pid <n>]` | check an item's readiness and hand it to a slot |
+| `hv round wait [<slot>…] [--timeout <seconds>] [--settle <seconds>] [--lines <n>]` | block until a worker needs attention |
+| `hv round status` | list the round's slots with host, PR and drift |
+| `hv round reconcile [--apply]` | report drift between registry, host, git and forge; `--apply` repairs the safe kinds |
+| `hv round report <slot> --state <done\|blocked\|idle\|dead\|limited> [--evidence <text>] [--pr <url\|number>]` | record a solo worker's result: state and PR |
+| `hv round escalate send <number> [--pr] [--slot <name>] --title <text> --body-file <path\|-> [--timeout <seconds>]` | ask the human on an issue or PR thread |
+| `hv round escalate check [<id>…]` | look for the human's answers |
+| `hv round return <slot> --reason <text> [--note-file <path\|->] [--holder-pid <n>]` | a worker hands its issue back: park, comment, release |
+| `hv round transfer <issue> --to <slot\|human> [--note-file <path\|->] [--body-file <path\|->] [--accept-overlap] [--holder-pid <n>]` | move an assigned issue to another slot or to the human |
+| `hv round reclaim <slot> [--force] [--note-file <path\|->] [--holder-pid <n>]` | free a dead or stalled slot and make its issue assignable |
+| `hv round wind-down [--no-verify] [--holder-pid <n>]` | re-verify the base, park every slot, release the lease |
+
+A second `round start` is refused (exit 4) while another orchestrator holds the lease. `round wait` exits 1 on `--timeout` with `data.timedOut: true`, which is an answer, not a fault.
+
+## `hv doctor`
+
+| Usage | What it does |
+|---|---|
+| `hv doctor` | preflight: git, host, forge, accounts, herdr hook, orchestrator hooks, hv, codex |
+
+Read-only, runs without `.hv/`. Exit 1 when any check fails; every failure carries a `hint` with the fix. See [preflight](preflight.md#hv-doctor).
+
+## `hv reap`
+
+| Usage | What it does |
+|---|---|
+| `hv reap [--kind <worktree\|branch\|tab\|process\|lease>[,…]] [--apply]` | list, and with `--apply` remove, what a round left behind that nothing live owns |
+
+Previews by default. It never kills a running agent and never deletes work: a candidate that holds uncommitted changes or unmerged commits is listed with `held` and left alone. Exit 1 under `--apply` when a deletion failed.
+
+## `hv hook`
+
+| Usage | What it does |
+|---|---|
+| `hv hook install [--scope <project-local\|project\|user>] [--wrap-statusline]` | merge the hooks and the statusline into a Claude Code settings file |
+| `hv hook uninstall [--scope <project-local\|project\|user>]` | remove what install wrote and restore a wrapped statusline |
+| `hv hook stop` | Stop hook: block above the context threshold until a handoff is written |
+| `hv hook session-start` | SessionStart hook: inject and consume the handoff |
+
+`install` and `uninstall` are the ones you run; `stop` and `session-start` are what Claude Code calls. Default scope is `project-local` (`.claude/settings.local.json`). `install` exits 4 rather than replace a statusline you already have unless you pass `--wrap-statusline`. The two hooks always exit 0.
+
+## `hv statusline`
+
+| Usage | What it does |
+|---|---|
+| `hv statusline dump [--then <command>]` | record the session state from stdin, then run `--then` with the same input |
+
+A statusline command, not a query: it prints nothing of its own, always exits 0 and takes no `--json`. `hv hook install --wrap-statusline` sets it up around the statusline you have.
+
+## `hv keepalive`
+
+| Usage | What it does |
+|---|---|
+| `hv keepalive run [--max-restarts <n>] [--breaker <n>] [--backoff <seconds>] [--prompt <text>] [--no-limits] -- <command> [<arg>…]` | run the orchestrator as a supervisor and restart it when it exits with a fresh handoff |
+| `hv keepalive status` | show the supervisor state and the round lease |
+
+`run` blocks for the life of the orchestrator. Exit 0 when it stopped on `no-handoff` or `interrupted`, 1 on `max-restarts` or `breaker`, 4 when the lease is held by someone else.
+
+## `hv limit`
+
+| Usage | What it does |
+|---|---|
+| `hv limit watch [--timeout <seconds>] [--settle <seconds>]` | watch the orchestrator and the slots for a usage limit and sleep through it or switch accounts |
+| `hv limit status` | show the usage-limit log |
+
+`keepalive run` already runs the watcher; use `watch` for an orchestrator started another way. It refuses (exit 4) under a live supervisor or without the lease.
+
+## `hv verdict`
+
+| Usage | What it does |
+|---|---|
+| `hv verdict add [<branch>] --kind <review-spec\|review-quality\|second-opinion\|qa> --verdict <verdict> [--body-file <path\|->]` | record a verdict for a branch |
+| `hv verdict show [<branch>]` | latest verdict of each kind for a branch |
+| `hv verdict route [<branch>] --for <ship-review\|ship-second-opinion\|ship-qa\|queue>` | next step for a consumer of a branch's verdict |
+
+Verdicts are `PASS`, `CONCERNS` or `FAIL` (`qa` also takes `INFRA-FAIL`). They live in `.hv/verdicts.json`, which `/hv-ship` routes on.
 
 ## `hv tracker`
 

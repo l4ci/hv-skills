@@ -15,6 +15,7 @@ Setup, config, update and migration are `hv` verbs, not skills: `hv init` (and `
 | `/hv-plan` | Write an implementation plan for a milestone slice or item (`M01-S01`, `M01-B07`): task decomposition with verifiable outcomes, named assumptions, open questions; `/hv-work` consults if present |
 | `/hv-spike` | Throwaway feasibility experiment on a `spike/<name>` branch. Branch never merges, only findings come back as `.hv/spikes/<name>.md` |
 | `/hv-work` | Orchestrated parallel implementation with per-task commits. With no item argument it reconciles the backlog against git state and suggests the next item; consults `KNOWLEDGE.md` and `.hv/plans/<key>.md` if present. Pass `--preview <ID>` for a read-only peek of the intended approach (files, tests, assumptions, unknowns) that gates high-stakes work without writing anything |
+| `/hv-orchestrate` | Run a [parallel round](../usage/parallel-rounds.md) as the orchestrator: choose the slate, read what workers are doing, answer or escalate their questions, merge their PRs, wind the round down. The `hv round` verbs do the sequencing; the skill holds the judgment |
 | `/hv-debug` | Systematic bug cycle: reproduce, hypothesize, verify, fix with one atomic commit; auto-escalates to a fresh-context subagent after 3 hypothesis cycles, hard-stops via the Iron Law after 3 failed committed fixes, nudges `/hv-learn` |
 | `/hv-decide` | Capture a hard-boundary decision into `.hv/DECISIONS.md`. Manually confirmed, never auto-invoked; decisions differ from learnings by being active commitments with explicit forbids/permits |
 | `/hv-review` | Two-stage review of a branch (Stage 1 spec-compliance vs `PLAN.md`, Stage 2 code-quality with silent-failure-hunter + decision-violations) vs `KNOWLEDGE.md`; returns PASS / CONCERNS / FAIL. Short-circuits Stage 2 on Stage 1 `FAIL` |
@@ -47,6 +48,10 @@ Pulls open issues from GitHub or GitLab into `BACKLOG.md` via a multiSelect pick
 ## /hv-learn
 
 Writes durable knowledge from the current session into `.hv/KNOWLEDGE.md`, grouped by topic. Captures gotchas, project conventions, constraints, debugging insights, and decisions with rationale. Skips anything already obvious from reading the code. After writing, asks once whether to file an `hv-skills` upstream issue (when a bullet describes hv-skills behavior) and once whether to contribute to [runlog.org](https://runlog.org) via `/runlog-author` (when a bullet is about an external dependency: third-party API, library, protocol). Both follow-ups are always manual, never auto-fired. In umbrella mode the write (and `--term` Glossary entries) routes to the cwd/`--repo`-resolved scope: repo-local vs the umbrella-shared `.hv/KNOWLEDGE.md`. See [learning](../usage/learning.md) and [umbrella mode](../usage/umbrella-mode.md) for the full flow.
+
+## /hv-orchestrate
+
+Runs a parallel round: you are the orchestrator, and up to five standing workers each take one issue in their own worktree and terminal tab. The skill decides what the `hv round` verbs cannot: which issues make a good slate, how to read a stuck worker, what to escalate to you and when to merge. Sequencing and the rules are the verbs' job (`hv doctor`, `hv round start`, `assign`, `wait`, `hv worker gate`, `hv round wind-down`), and a refusal from a verb is the rule, not an obstacle. Workers build and open PRs; they never merge. Triggered by "you are the orchestrator" or "run a round". For one item, use `/hv-work`. See [parallel rounds](../usage/parallel-rounds.md) and the [`hv round` verbs](cli-helpers.md#hv-round).
 
 ## /hv-pause
 

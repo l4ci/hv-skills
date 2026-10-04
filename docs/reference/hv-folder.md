@@ -22,11 +22,11 @@
 | `milestones/` | One detail file per milestone (`M01.md`, `M02.md`, …) with full plan: goal, acceptance, rationale, risks, research findings, notes |
 | `plans/` | Implementation plans keyed by `<milestone>-<unit>.md` (slices: `M01-S01.md`; items: `M01-B07.md`) |
 | `spikes/` | Spike findings: one Markdown file per spike. The experimental code lives on the `spike/<name>` git branch and is never merged |
-| `handoff/` | _(gitignored)_ `/hv-pause` notes. One file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-work` (no argument). Per-developer scratch. |
+| `handoff/` | _(gitignored)_ `/hv-pause` notes: one file per branch capturing hypothesis, next step, mid-edit files; consumed by `/hv-work` (no argument). `handoff/<base>.md` is also where a round's orchestrator writes its handoff before a restart. Per-developer scratch. |
 | `qa-runs/` | _(gitignored)_ Timestamped `/hv-qa` run artifacts. Bulky, regeneratable from the strategy in `qa/<target>.md` |
 | `verdicts.json` | _(gitignored)_ Typed review, second-opinion, QA and debug verdicts (`hv verdict add`, `hv debug verdict`). Per-developer: `/hv-ship` routes on it. |
 | `gate-audit.jsonl` | _(gitignored)_ One JSON line per manual gate a human cleared: gate, verb, target, time, the quoted answer and the autonomy level. Written by the gated `hv` verbs (`hv gate list`). |
-| `workers.json` | _(gitignored)_ The worker slot registry (`hv round start`, `hv worker pool`): slot names, tab handles, account config dirs and claims. Per-developer runtime state. |
+| `workers.json` | _(gitignored)_ Round state ([details below](#workersjson-round-state)): the worker slots, escalations, the usage-limit log and the round's host and scope. Written by `hv round` and `hv worker`. Per-developer runtime state. |
 | `RELEASE.md` | Release checklist: `- [ ]` items `/hv-release` walks as gates before bumping version. Tracked, shared with the team. |
 | `ARCHIVE.md` | Completed items older than 5 days, moved here automatically |
 
@@ -123,6 +123,26 @@ When you run `/hv-pause`, the current state of the session (active hypothesis, n
 Notes are scoped per branch and overwritten by subsequent `/hv-pause` runs on the same branch. They are not auto-cleaned, so delete them by hand once the branch is shipped.
 
 See [../usage/pausing-and-resuming.md](../usage/pausing-and-resuming.md) for the pause/resume flow.
+
+## workers.json: round state
+
+`workers.json` is the registry behind [parallel rounds](../usage/parallel-rounds.md). `hv round` and `hv worker` read and write it under a lock; you should not need to edit it. Top-level keys:
+
+| Key | Holds |
+|---|---|
+| `slots` | one entry per roster slot: `name`, `branch`, `worktree`, `base`, `state`, the issue it holds (`task`) and its claim (`claimId`), `pr`, the host handle, the account (`configDir`, `account`), the tier and the harness kind |
+| `escalations` | questions put to you with `hv round escalate send`: id (`e1`, `e2`, ...), the issue or PR thread, `pending` or `answered`, and the answer |
+| `limits` | the usage-limit log: one entry per limit, with the session, the reset time, whether it sleeps or switches, and its status |
+| `host` | `herdr`, `tmux` or `solo`, fixed by `hv round start` for the life of the round |
+| `round`, `scope`, `slate` | the round number, the scope it started with, and the issue IDs for a `slate` scope |
+
+`hv round status` and `hv round reconcile` show what it holds against the host, git and the tracker. A slot that is gone from the host but still registered is drift; `reconcile --apply` repairs the safe kinds and `hv reap` removes what nothing owns.
+
+### Beside `.hv/`: the lease, session files and keepalive.json
+
+A few round files do not live in `.hv/`. They sit in `<git-common-dir>/hv/` so every worktree of the repo shares them: the round lease (`round-lease.json`), one session file per Claude session (`session/<id>.json`), the keepalive supervisor's state (`keepalive.json`), the usage-limit watcher's marker (`limit-watch.json`) and one `CODEX_HOME` per Codex slot (`codex/<slot>/`). None is tracked and `hv init` adds no ignore line for them. See [architecture](architecture.md#round-state-outside-hv).
+
+The orchestrator hooks `hv hook install` writes are not in `.hv/` either: by default they go to `.claude/settings.local.json`, which Claude Code treats as per-developer.
 
 ## ARCHIVE.md: old completions
 
