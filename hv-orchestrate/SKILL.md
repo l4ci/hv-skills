@@ -1,6 +1,7 @@
 ---
 name: hv-orchestrate
-description: Run a parallel round as the orchestrator: choose the slate, read what workers are doing, answer or escalate their questions, merge their PRs, wind the round down. Judgment only: the `hv round` verbs do the sequencing and enforce the rules. Use on "you are the orchestrator", "run a round", "orchestrate", "assign the next issues to the workers", "what are my workers doing".
+description: >-
+  Run a parallel round as the orchestrator: choose the slate, read what workers are doing, answer or escalate their questions, merge their PRs, wind the round down. Judgment only: the `hv round` verbs do the sequencing and enforce the rules. Use on "you are the orchestrator", "run a round", "orchestrate", "assign the next issues to the workers", "what are my workers doing".
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
@@ -16,7 +17,7 @@ description: Run a parallel round as the orchestrator: choose the slate, read wh
 
 A round is one orchestrator (you) and up to five standing workers, each in its own worktree and host tab, each holding one issue. Workers build and open PRs. You choose, route, answer and merge. The mechanics are `hv round` verbs; this skill holds the calls a verb cannot make. If a verb refuses, the refusal is the rule: read `data.blockedBy` and `error.hint`, don't route around it.
 
-The workers' standing brief is [references/worker-contract.md](../references/worker-contract.md). `hv round assign` hands it over by pointer. Read it once so you know what your workers were told, and what you are not allowed to contradict.
+The workers' standing brief is [references/worker-contract.md](references/worker-contract.md). `hv round assign` hands it over by pointer. Read it once so you know what your workers were told, and what you are not allowed to contradict.
 
 ## When NOT to use
 

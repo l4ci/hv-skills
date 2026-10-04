@@ -264,7 +264,7 @@ Otherwise the run is done. Don't recap discovery, research, or the challenge rou
 
 ## References
 
-- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/context-load-protocol.md`](../references/context-load-protocol.md) — K+D context loading sequence shared by every cycle-starting skill.
-- [`references/design-exploration.md`](../references/design-exploration.md) — Shared spine (Socratic discovery, propose, iterate, write, user-review) and per-axis divergences with `/hv-brainstorm`.
+- [`references/ask-user-question-fallback.md`](references/ask-user-question-fallback.md) — Plain-text fallback shape for AskUserQuestion-less hosts.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/context-load-protocol.md`](references/context-load-protocol.md) — K+D context loading sequence shared by every cycle-starting skill.
+- [`references/design-exploration.md`](references/design-exploration.md) — Shared spine (Socratic discovery, propose, iterate, write, user-review) and per-axis divergences with `/hv-brainstorm`.

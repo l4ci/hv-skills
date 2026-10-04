@@ -191,5 +191,5 @@ If not viable or inconclusive, the spike is its own conclusion. Don't push to ca
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/umbrella-mode.md`](../references/umbrella-mode.md) — Umbrella-mode verbs, registry shape, and `Repos:` field semantics.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/umbrella-mode.md`](references/umbrella-mode.md) — Umbrella-mode verbs, registry shape, and `Repos:` field semantics.

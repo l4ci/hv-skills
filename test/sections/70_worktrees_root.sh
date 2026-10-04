@@ -106,7 +106,7 @@ pass "worker pool init: slots go under .worktrees/; legacy slots keep their path
 # white-box-begin: A9 #53 doclint
 VS="$TMP_WR/vs"
 mkdir -p "$VS"
-cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/.claude-plugin" "$REPO/CHANGELOG.md" "$VS/"
+cp -R "$REPO"/hv-* "$REPO/references" "$REPO/docs" "$REPO/README.md" "$REPO/CHANGELOG.md" "$VS/"
 mkdir -p "$VS/test"; cp "$REPO/test/validate-skills.py" "$VS/test/"
 BASE_OUT="$(cd "$VS" && python3 test/validate-skills.py 2>&1)" || fail "validate-skills fixture does not pass on its own: $BASE_OUT"
 # A decoy skill that would fail every check, and a duplicate of a real one.

@@ -44,7 +44,7 @@ See KNOWLEDGE.md "Skill Authoring: Prose & References" for the conventions that 
 
 ## Conventions
 
-- **Path style.** Citations from SKILL.md use the form `references/<file>.md` (relative to the project root). The plugin installs the full tree so links resolve wherever a skill is loaded.
+- **Path style.** Citations from SKILL.md use the form `references/<file>.md` (relative to the installed skill's directory). `hv skills install` copies the references each skill cites into `<skill>/references/`, so links resolve wherever a skill is loaded.
 - **Inline vs. extracted.** Inline prose wins when it's local to its step and under 30 lines. Extract to `references/<topic>.md` when the same choreography appears in 2+ skills OR when extraction shrinks a SKILL.md by ≥30 lines of self-contained content (per the "Single-consumer references" KNOWLEDGE entry).
 - **One-line purpose.** Each row's `Purpose` column is one sentence; longer context lives inside the reference file. If the one-liner needs a clause about scope or a noteworthy exception, keep it under 25 words.
 - **Cited by.** The `Cited by` column is the canonical consumer set — derived by `grep -l "references/<name>" hv-*/SKILL.md`. A reference with no consumers should not exist; if you find one while running step 2 above, flag it in your completion report.

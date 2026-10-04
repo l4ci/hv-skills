@@ -227,4 +227,4 @@ Codified on T01: a `/hv-work` session surfaced `Dispatch &amp; verify wave` and 
 
 ## `/hv-x` and `$hv-x` are the same invocation
 
-Codex invokes a skill as `$hv-x`; Claude Code as `/hv-x`. Skill text keeps `/hv-x` everywhere and does not branch on the harness: read `$hv-x` as the same call. Codex lists a skill linked through `hv init --codex` as `hv-skills:hv-x`, and a bare `$hv-x` still resolves it (checked on Codex 0.159.2). Never write both spellings in one sentence, and never rewrite an existing `/hv-x` to `$hv-x`.
+Codex invokes a skill as `$hv-x`; Claude Code as `/hv-x`. Skill text keeps `/hv-x` everywhere and does not branch on the harness: read `$hv-x` as the same call. A skill installed with `hv skills install` lists in Codex as `hv-x`, and `$hv-x` invokes it. Never write both spellings in one sentence, and never rewrite an existing `/hv-x` to `$hv-x`.

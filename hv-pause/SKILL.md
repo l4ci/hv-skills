@@ -122,8 +122,8 @@ Stage, Next and Hypothesis are shared across the wave; Uncommitted is per repo.
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/task-list-init.md`](../references/task-list-init.md) — Task-list init pattern.
-- [`references/ask-user-question-fallback.md`](../references/ask-user-question-fallback.md) — Plain-text fallback for the strategy question.
-- [`references/handoff-template.md`](../references/handoff-template.md) — Handoff-note template written by `/hv-pause`, read by `/hv-work`.
-- [`references/terminal-loop-surface.md`](../references/terminal-loop-surface.md) — `[Auto:Loop]` surface and loop-marker clear.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/task-list-init.md`](references/task-list-init.md) — Task-list init pattern.
+- [`references/ask-user-question-fallback.md`](references/ask-user-question-fallback.md) — Plain-text fallback for the strategy question.
+- [`references/handoff-template.md`](references/handoff-template.md) — Handoff-note template written by `/hv-pause`, read by `/hv-work`.
+- [`references/terminal-loop-surface.md`](references/terminal-loop-surface.md) — `[Auto:Loop]` surface and loop-marker clear.

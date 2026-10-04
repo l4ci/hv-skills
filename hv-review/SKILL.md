@@ -438,6 +438,6 @@ Exit 5 or 6 (tracker unavailable or rate-limited) from any verb stops the queue 
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.
-- [`references/review-verdict-routing.md`](../references/review-verdict-routing.md) — PASS / CONCERNS / FAIL routing for `/hv-review` consumers.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/knowledge-consult.md`](references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.
+- [`references/review-verdict-routing.md`](references/review-verdict-routing.md) — PASS / CONCERNS / FAIL routing for `/hv-review` consumers.

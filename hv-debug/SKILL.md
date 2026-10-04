@@ -177,7 +177,7 @@ If the verdict is `disproved`, the orchestrator returns to Step 6 with the new e
 
 ## Step 7.5 — Escalate on Repeated Hypothesis Failures
 
-Fires only when Step 6's cycle-counter check trips (`counter >= 3`, single-hypothesis mode). The orchestrator's context carries 2+ refuted hypotheses; dispatch a fresh subagent (`Agent` with `subagent_type: general-purpose`, model `models.worker`) carrying a *for-next-agent* brief — refuted hypotheses, files inspected, orchestrator read on why the loop did not converge — and nothing else. On return, reset the cycle counter and carry the fresh hypothesis into Step 7. If the fresh-context attempt also fails verification, surface to the user — do not loop a second fresh-context attempt. See [`references/debug-escalate.md`](../references/debug-escalate.md) for the brief template and the user-surfacing fallback.
+Fires only when Step 6's cycle-counter check trips (`counter >= 3`, single-hypothesis mode). The orchestrator's context carries 2+ refuted hypotheses; dispatch a fresh subagent (`Agent` with `subagent_type: general-purpose`, model `models.worker`) carrying a *for-next-agent* brief — refuted hypotheses, files inspected, orchestrator read on why the loop did not converge — and nothing else. On return, reset the cycle counter and carry the fresh hypothesis into Step 7. If the fresh-context attempt also fails verification, surface to the user — do not loop a second fresh-context attempt. See [`references/debug-escalate.md`](references/debug-escalate.md) for the brief template and the user-surfacing fallback.
 
 ## Step 8 — Fix (worker)
 
@@ -359,6 +359,6 @@ If the fix codified a constraint (e.g., "never use timer-X here", "this surface 
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/debug-hypothesize.md`](../references/debug-hypothesize.md) — Both-modes hypothesize choreography (brief template, single vs competing dispatch, per-axis divergence table) for `/hv-debug` Step 6.
-- [`references/knowledge-consult.md`](../references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/debug-hypothesize.md`](references/debug-hypothesize.md) — Both-modes hypothesize choreography (brief template, single vs competing dispatch, per-axis divergence table) for `/hv-debug` Step 6.
+- [`references/knowledge-consult.md`](references/knowledge-consult.md) — Canonical K+D query pattern (`hv knowledge query` + `hv decisions query`) used by every cycle-starting skill.

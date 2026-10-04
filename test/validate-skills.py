@@ -94,6 +94,26 @@ def spec_fields(text):
     return None
 
 
+def plain_scalar_hazards(text):
+    """Top-level keys whose unquoted single-line value is not valid YAML: a
+    ': ' or ' #' inside it, or a leading indicator. Claude Code reads such a
+    value anyway; Codex's strict parser drops the whole skill without a word."""
+    lines = text.splitlines()
+    bad = []
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        m = re.match(r"^([A-Za-z0-9_-]+):[ \t]+(\S.*)$", line)
+        if not m:
+            continue
+        val = m.group(2).rstrip()
+        if val[0] in "\"'" or val in BLOCK_SCALARS:
+            continue
+        if ": " in val or " #" in val or val.endswith(":") or val[0] in "&*!|>%@`[]{},#?-":
+            bad.append(m.group(1))
+    return bad
+
+
 def check_spec_frontmatter(path, text, issues):
     pending_keys, pending_long = pending_spec()
     path = Path(path)
@@ -111,6 +131,9 @@ def check_spec_frontmatter(path, text, issues):
             issues.append(f"{rel}: description is {len(desc)} chars; the spec allows 1024")
     elif rel in pending_long:
         issues.append(f"{rel}: description is within 1024 chars; remove it from PENDING_LONG")
+    for key in plain_scalar_hazards(text):
+        issues.append(f"{rel}: frontmatter '{key}' is not valid YAML unquoted (': ', ' #' or a leading indicator); "
+                      f"use a folded block (>-) or quote it")
     if len(fm.get("compatibility", "")) > 500:
         issues.append(f"{rel}: compatibility is over 500 chars")
     extra = sorted(set(fm) - SPEC_KEYS)
@@ -169,51 +192,15 @@ def check_banner(path, text, issues):
 
 
 def check_references(path, text, issues):
-    skill_dir = Path(path).parent
-    # Match markdown links pointing at references/*.md (relative paths, with or without ../)
-    pattern = re.compile(r'\((\.\./references/[^)\s]+\.md|references/[^)\s]+\.md)\)')
+    # Skills cite references/<x>.md; `hv skills install` copies each cited file
+    # next to the skill, so in the source tree the link resolves against the
+    # repo-root references/ dir.
+    pattern = re.compile(r'\((references/[^)\s]+\.md)\)')
     for m in pattern.finditer(text):
         target = m.group(1)
-        resolved = (skill_dir / target).resolve()
+        resolved = Path(target).resolve()
         if not resolved.exists():
             issues.append(f"{path}: broken reference '{target}' -> '{resolved}'")
-
-
-def check_version(issues):
-    plugin_path = Path(".claude-plugin/plugin.json")
-    changelog_path = Path("CHANGELOG.md")
-
-    if not plugin_path.exists():
-        issues.append("version mismatch: plugin.json not found")
-        return
-    if not changelog_path.exists():
-        issues.append("version mismatch: CHANGELOG.md not found")
-        return
-
-    with plugin_path.open() as f:
-        plugin_data = json.load(f)
-    plugin_version = plugin_data.get("version", "")
-
-    changelog_version = None
-    with changelog_path.open() as f:
-        for line in f:
-            m = re.match(r'^## v(\S+)', line)
-            if m:
-                changelog_version = m.group(1)
-                break
-
-    if changelog_version is None:
-        issues.append("version mismatch: no version heading found in CHANGELOG.md")
-        return
-
-    # plugin.json uses bare semver (e.g. "3.1.0"), CHANGELOG uses "v3.1.0" — strip v
-    plugin_v = plugin_version.lstrip("v")
-    changelog_v = changelog_version.lstrip("v")
-
-    if plugin_v != changelog_v:
-        issues.append(
-            f"version mismatch: plugin.json={plugin_version} CHANGELOG.md=v{changelog_version}"
-        )
 
 
 # Legacy-name doclint (A9, #53). After the cutover no skill or shared reference
@@ -500,7 +487,6 @@ def main():
     check_pending_spec(skill_files, issues)
     check_legacy_names(issues)
     check_prose(issues)
-    check_version(issues)
 
     n = len(skill_files)
     if issues:

@@ -187,6 +187,6 @@ If the entry created a new topic, prepend a line: *"New topic: `<topic>`."*
 
 ## References
 
-- [`references/banner-preamble.md`](../references/banner-preamble.md) — Banner-print rule shared by every skill.
-- [`references/persistence-skills.md`](../references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.
-- [`references/source-prefill.md`](../references/source-prefill.md) — Source-prefill / promote-between-artifacts semantics for `/hv-decide`.
+- [`references/banner-preamble.md`](references/banner-preamble.md) — Banner-print rule shared by every skill.
+- [`references/persistence-skills.md`](references/persistence-skills.md) — Shared spine and divergence axes for the persistence duo (`/hv-learn`, `/hv-decide`) — including `/hv-learn --term` for Glossary entries.
+- [`references/source-prefill.md`](references/source-prefill.md) — Source-prefill / promote-between-artifacts semantics for `/hv-decide`.

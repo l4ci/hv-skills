@@ -1,6 +1,7 @@
 ---
 name: hv-capture
-description: Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Also supports `--remove <ID>[,<ID>...]` to delete captured items and clean up cross-references (dry-run + confirmation gate), and `--from-github` / `--from-gitlab` to pull open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-refs and round-trip closing via `/hv-ship`. Use when the user brain-dumps work, says "capture", "add to backlog", "note this bug", "/hv-capture", "remove [B07]", "delete this entry", "drop this item", "import issues", "pull open issues from GitHub", "list issues", or describes a problem without asking for an immediate fix. Records, then offers to work a single captured item now via /hv-work; items already in BACKLOG go straight to /hv-work.
+description: >-
+  Capture bugs, features, and tasks into BACKLOG.md without executing them. Classifies each item, assigns priority/size, mints zero-padded IDs ([B01], [F01], [T01]). Also supports `--remove <ID>[,<ID>...]` to delete captured items and clean up cross-references (dry-run + confirmation gate), and `--from-github` / `--from-gitlab` to pull open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-refs and round-trip closing via `/hv-ship`. Use when the user brain-dumps work, says "capture", "add to backlog", "note this bug", "/hv-capture", "remove [B07]", "delete this entry", "drop this item", "import issues", "pull open issues from GitHub", "list issues", or describes a problem without asking for an immediate fix. Records, then offers to work a single captured item now via /hv-work; items already in BACKLOG go straight to /hv-work.
 ---
 
 **Print the banner below verbatim before any other action — skip if dispatched as a subagent.** See `references/banner-preamble.md`.
@@ -272,11 +273,11 @@ Use `→ not labeled` when labeling was skipped. Append a `Skipped repos:` list 
 
 | Reference | Purpose |
 |-----------|---------|
-| [`authoring-conventions.md`](../references/authoring-conventions.md) | Loop-mode auto-picks, destructive and manual gates. |
-| [`banner-preamble.md`](../references/banner-preamble.md) | Banner-print rule shared by every skill. |
-| [`detail-files.md`](../references/detail-files.md) | Detail-file template for bulky input. |
-| [`issue-mode.md`](../references/issue-mode.md) | Issue-backend umbrella rules (Step 4.6). |
-| [`manual-gates.md`](../references/manual-gates.md) | Manual-gate callout shape (Step R3 de-tag, Step I6 label upstream). |
-| [`milestone-tagging.md`](../references/milestone-tagging.md) | Milestone-tagging question shapes (Step 4.5). |
-| [`task-list-init.md`](../references/task-list-init.md) | Task-list init pattern (Step 1). |
-| [`umbrella-mode.md`](../references/umbrella-mode.md) | Umbrella-mode verbs, registry shape, `Repos:` semantics. |
+| [`authoring-conventions.md`](references/authoring-conventions.md) | Loop-mode auto-picks, destructive and manual gates. |
+| [`banner-preamble.md`](references/banner-preamble.md) | Banner-print rule shared by every skill. |
+| [`detail-files.md`](references/detail-files.md) | Detail-file template for bulky input. |
+| [`issue-mode.md`](references/issue-mode.md) | Issue-backend umbrella rules (Step 4.6). |
+| [`manual-gates.md`](references/manual-gates.md) | Manual-gate callout shape (Step R3 de-tag, Step I6 label upstream). |
+| [`milestone-tagging.md`](references/milestone-tagging.md) | Milestone-tagging question shapes (Step 4.5). |
+| [`task-list-init.md`](references/task-list-init.md) | Task-list init pattern (Step 1). |
+| [`umbrella-mode.md`](references/umbrella-mode.md) | Umbrella-mode verbs, registry shape, `Repos:` semantics. |
