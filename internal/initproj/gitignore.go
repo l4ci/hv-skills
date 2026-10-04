@@ -6,12 +6,9 @@ import (
 )
 
 // ignoreLines is the managed block: most of .rota/ travels with the repo, so only
-// machine-specific or regenerated paths are ignored. `.rota/bin/` stays for one
-// release (A9 ruling G5) so upgraders who still have a mirror do not see it as
-// untracked; it is removable once nobody has one.
+// machine-specific or regenerated paths are ignored.
 var ignoreLines = []string{
 	"# ── rota ──",
-	".rota/bin/",
 	".rota/status.json",
 	".rota/repos.json",
 	".rota/config.local.json",

@@ -123,7 +123,8 @@ func readTree(t *testing.T, dir string) map[string]string {
 // TestInitMatchesBootstrapGolden checks that Init leaves the tree the old
 // hv-bootstrap left on every fixture, as recorded in testdata/golden. The
 // deliberate differences are the ones in the A9 rulings: no `.rota/bin` directory, the G4 MAP.md text and the G7 config.json key order, plus B2's
-// `.rota/verdicts.json` line in the .gitignore block (#55), edited into the golden by hand.
+// `.rota/verdicts.json` line in the .gitignore block (#55) and no `.rota/bin/`
+// line in it (#236), both edited into the golden by hand.
 func TestInitMatchesBootstrapGolden(t *testing.T) {
 	var want map[string]map[string]string
 	pytest.Golden(t, fixtures, &want)
@@ -262,42 +263,6 @@ func TestInitWarnsOnLegacyTodoBesideBacklog(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "TODO.md") {
-		t.Errorf("warnings: %v", res.Warnings)
-	}
-}
-
-func TestInitRemovesTheStaleMirror(t *testing.T) {
-	dir := t.TempDir()
-	writeFixture(t, dir, fixture{
-		".rota/bin/hv-preflight":          "#!/bin/sh\n",
-		".rota/bin/hvlib.py":              "",
-		".rota/bin/hvlib_io.py":           "",
-		".rota/bin/__pycache__/hvlib.pyc": "x",
-	})
-	res, err := Init(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, ".rota", "bin")); !os.IsNotExist(err) {
-		t.Errorf(".rota/bin survived: %v", err)
-	}
-	want := []string{".rota/bin", ".rota/bin/__pycache__", ".rota/bin/hv-preflight", ".rota/bin/hvlib.py", ".rota/bin/hvlib_io.py"}
-	if !reflect.DeepEqual(res.Removed, want) || !res.Changed() {
-		t.Errorf("removed %v", res.Removed)
-	}
-}
-
-func TestInitKeepsCustomFilesInTheMirror(t *testing.T) {
-	dir := t.TempDir()
-	writeFixture(t, dir, fixture{".rota/bin/hv-x": "", ".rota/bin/mine.sh": "keep"})
-	res, err := Init(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if readTree(t, dir)[".rota/bin/mine.sh"] != "keep" || contains(res.Removed, ".rota/bin") {
-		t.Errorf("custom file lost: %v", res.Removed)
-	}
-	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], ".rota/bin/mine.sh") {
 		t.Errorf("warnings: %v", res.Warnings)
 	}
 }

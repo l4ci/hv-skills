@@ -36,27 +36,24 @@ func seedErr(format string, a ...any) error {
 // and after, sorted and relative to the root, directories included.
 type Result struct {
 	Created []string
-	// Removed lists what the stale-mirror cleanup deleted, relative to the root.
-	Removed []string
 	// Migrated is whether a migration step rewrote an existing file: the
 	// MILESTONES.md heading, the counters backfill, the .gitignore block or the
 	// KNOWLEDGE.md preamble.
 	Migrated bool
 	// Warnings are things the caller should surface: a legacy TODO.md left in
-	// place, custom files left in .rota/bin.
+	// place.
 	Warnings []string
 }
 
 // Changed is whether Init touched anything.
 func (r Result) Changed() bool {
-	return len(r.Created) > 0 || len(r.Removed) > 0 || r.Migrated
+	return len(r.Created) > 0 || r.Migrated
 }
 
 var seedDirs = []string{"bugs", "features", "tasks", "milestones", "plans", "spikes", "map"}
 
 // Init seeds .rota/ under root. It never overwrites an existing file, and a
-// second run is a no-op, as hv-bootstrap was. Beyond it, Init removes the
-// `.rota/bin` mirror that 4.x wrote (see removeMirror).
+// second run is a no-op, as hv-bootstrap was.
 func Init(root string) (Result, error) {
 	var res Result
 	before := snapshot(root)
@@ -125,8 +122,6 @@ func Init(root string) (Result, error) {
 	if err := step(migrateKnowledgePreamble(filepath.Join(rota, "KNOWLEDGE.md"))); err != nil {
 		return res, err
 	}
-
-	res.Removed, res.Warnings = removeMirror(root, res.Warnings)
 
 	after := snapshot(root)
 	for p := range after {
@@ -286,50 +281,6 @@ func migrateKnowledgePreamble(path string) (bool, error) {
 		return false, seedErr("%v", err)
 	}
 	return true, nil
-}
-
-// removeMirror deletes the `.rota/bin` mirror that the 4.x init skill wrote. 5.0 has no
-// mirror: the rota binary is on PATH. It removes what the old mirror step
-// replaced (`hv-*` and `hvlib*.py` files) and the `__pycache__` Python left
-// there, then the directory itself if that emptied it. Anything else stays and
-// is reported, since the old step also left it alone. A symlinked `.rota/bin` is
-// not followed.
-func removeMirror(root string, warnings []string) (removed, warn []string) {
-	dir := filepath.Join(root, ".rota", "bin")
-	fi, err := os.Lstat(dir)
-	if err != nil || !fi.IsDir() {
-		return nil, warnings
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, append(warnings, fmt.Sprintf("cannot read .rota/bin: %v", err))
-	}
-	var kept []string
-	for _, e := range entries {
-		name := e.Name()
-		rel := filepath.ToSlash(filepath.Join(".rota", "bin", name))
-		stale := e.Type().IsRegular() && (strings.HasPrefix(name, "hv-") || (strings.HasPrefix(name, "hvlib") && strings.HasSuffix(name, ".py")))
-		stale = stale || (e.IsDir() && name == "__pycache__")
-		if !stale {
-			kept = append(kept, rel)
-			continue
-		}
-		if err := os.RemoveAll(filepath.Join(dir, name)); err != nil {
-			warnings = append(warnings, fmt.Sprintf("cannot remove %s: %v", rel, err))
-			kept = append(kept, rel)
-			continue
-		}
-		removed = append(removed, rel)
-	}
-	if len(kept) == 0 {
-		if err := os.Remove(dir); err == nil {
-			removed = append(removed, ".rota/bin")
-		}
-	} else {
-		warnings = append(warnings, fmt.Sprintf("left %s in .rota/bin: not a rota mirror file (5.0 does not use .rota/bin)", strings.Join(kept, ", ")))
-	}
-	sort.Strings(removed)
-	return removed, warnings
 }
 
 func jsonNumber(s string) json.Number { return json.Number(s) }

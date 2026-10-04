@@ -2,8 +2,6 @@ echo "A9: rota init seeds .rota/, runs the blocks, and rota init check reports"
 
 TMP_IN="$(mktemp -d)"
 trap 'rm -rf "$TMP_IN"' EXIT
-# The 4.x mirror directory; spelled in two pieces so the white-box census (72) reads this as a plain path.
-MIRROR=".rota/""bin"
 jfield() { python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(json.dumps(d.get(sys.argv[1], "ABSENT")))' "$1"; }
 
 # (a) clean dir: seeded, blocks written, AGENTS.md is the instructions file
@@ -15,7 +13,6 @@ done
 for f in counters status repos config; do
   [ -f "$TMP_IN/fresh/.rota/$f.json" ] || fail "A9[a]: .rota/$f.json not seeded"
 done
-[ ! -e "$TMP_IN/fresh/$MIRROR" ] || fail "A9[a]: init created the mirror dir"
 grep -qx '.worktrees/' "$TMP_IN/fresh/.gitignore" || fail "A9[a]: .worktrees/ not ignored"
 [ "$(printf '%s' "$OUT" | jfield changed)" = "true" ] || fail "A9[a]: changed is not true"
 KEYS="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(",".join(b["key"] for b in json.load(sys.stdin)["data"]["blocks"]))')"
@@ -50,18 +47,16 @@ rc=0; OUT="$(hvj -C "$TMP_IN/nb" init check)" || rc=$?
 hvj -C "$TMP_IN/fresh" init check >/dev/null || fail "A9[d]: initialized init check did not exit 0"
 pass "A9[d]: init check lists every missing path, exit 1; 0 when initialized"
 
-# (e) legacy TODO.md, stale 4.x mirror, blanket .rota/ ignore
-mkdir -p "$TMP_IN/legacy/$MIRROR"
+# (e) legacy TODO.md, blanket .rota/ ignore
+mkdir -p "$TMP_IN/legacy/.rota"
 printf '# Backlog\n\n## Bugs\n- [B01] old\n' > "$TMP_IN/legacy/.rota/TODO.md"
-: > "$TMP_IN/legacy/$MIRROR/hv-status-add"
 printf 'dist/\n.rota/\n' > "$TMP_IN/legacy/.gitignore"
 hvj -C "$TMP_IN/legacy" init --no-blocks >/dev/null
 [ -f "$TMP_IN/legacy/.rota/BACKLOG.md" ] && [ ! -e "$TMP_IN/legacy/.rota/TODO.md" ] || fail "A9[e]: TODO.md not renamed"
 grep -q 'B01' "$TMP_IN/legacy/.rota/BACKLOG.md" || fail "A9[e]: renamed backlog lost its content"
-[ ! -e "$TMP_IN/legacy/$MIRROR" ] || fail "A9[e]: stale mirror dir not removed"
 if grep -qx '.rota/' "$TMP_IN/legacy/.gitignore"; then fail "A9[e]: blanket .rota/ ignore kept"; fi
 grep -qx 'dist/' "$TMP_IN/legacy/.gitignore" || fail "A9[e]: user ignore line lost"
-pass "A9[e]: legacy TODO.md renamed, stale mirror removed, blanket ignore stripped"
+pass "A9[e]: legacy TODO.md renamed, blanket ignore stripped"
 
 # (f) a corrupt counters.json is refused, not overwritten
 mkdir -p "$TMP_IN/bad/.rota"

@@ -81,20 +81,6 @@ func TestInitNoBlocksSeedsOnly(t *testing.T) {
 	}
 }
 
-func TestInitWarnsAboutAStaleMirror(t *testing.T) {
-	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".rota", "bin"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".rota", "bin", "hv-x"), nil, 0o755)
-	_, env, errOut := initRun(t, dir, "init", "--no-blocks")
-	w, _ := initData(env).Get("warnings")
-	if l, _ := w.([]any); len(l) != 1 || !strings.Contains(l[0].(string), ".rota/bin") || !strings.Contains(errOut, "warning") {
-		t.Errorf("warnings %v / %q", w, errOut)
-	}
-	if _, err := os.Stat(filepath.Join(dir, ".rota", "bin")); err == nil {
-		t.Error(".rota/bin survived")
-	}
-}
-
 func TestInitCorruptCountersExits70(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)

@@ -1,8 +1,7 @@
 package initproj
 
 // Seed texts, byte for byte the heredocs of bin/hv-bootstrap, except MAP.md
-// (G4 of the A9 rulings): it names `rota map query` and `rota map index` where the
-// old text named the `.rota/bin` helpers, because 5.0 has no `.rota/bin`.
+// (G4 of the A9 rulings): it names `rota map query` and `rota map index`.
 
 const backlogSeed = `# Backlog
 
