@@ -21,7 +21,7 @@ never exits 5.
 | Check | Looks at | Skips when |
 |---|---|---|
 | `git` | git on `PATH`, and `.worktrees/` gitignored | never |
-| `host` | the host `work.dispatch` names: herdr on `PATH` and 0.9.x, or tmux on `PATH` | `work.dispatch` is neither `herdr` nor `tmux` (solo and subagent need no host) |
+| `host` | the host a round would run on: `work.dispatch` as named, or with it unset or `subagent`, herdr inside a herdr pane, else tmux inside tmux. herdr on `PATH` and 0.9.x, or tmux on `PATH` | no host is detected (solo needs none) |
 | `tracker` | `gh` or `glab` on `PATH` and authenticated, for the project's provider | the project has no remote |
 | `accounts` | every account in `work.accounts` has an existing `configDir` with a credentials file | no accounts configured |
 | `hook` | herdr's agent integration for each account (`herdr integration status`) | the host is not herdr, or no account is configured |
