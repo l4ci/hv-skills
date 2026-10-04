@@ -28,7 +28,7 @@ never exits 5.
 | `statusline` | the effective statusline runs `hv statusline dump` | hooks not installed (opt-in) |
 | `stop-hook` | a `Stop` and a `SessionStart` entry marked `# hv-hook`, and the command resolves | hooks not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: the Stop hook and two accounts with a `configDir` | the key is off |
-| `hv` | the running binary's version matches the skills it serves | a development build |
+| `hv` | the running binary's version matches `.claude-plugin/plugin.json` | a development build, or outside a source checkout |
 | `codex` | `codex` version in the supported range, each slot home logged in, herdr integration per home | `codex` is not on `PATH` and no slot has a home |
 
 The hooks are opt-in, so `statusline` and `stop-hook` skip until `hv hook install` has written
@@ -65,6 +65,9 @@ because everything it deletes is proven unowned and merged, and anything holding
 - A running agent. A tab or process with a live agent under it is not listed.
 - Work. A candidate with uncommitted changes, commits not on the base, or a branch not reachable from
   the base is listed with `held: <why>` and never deleted. There is no flag to override that.
+- A `stalled` slot. Reap reclaims `dead` slots only: a worker in a long test run makes no commits and
+  looks stalled, and reaping it would kill it. Reclaiming a stalled slot is an explicit
+  [`hv round reclaim`](parallel-rounds.md#moving-an-issue-that-is-assigned).
 - A parked slot. A `park/<agent>` worktree, clean or not, and any `park/*` branch are never candidates.
 - A live or foreign lease. Only a stale one, whose holder is gone on this host.
 

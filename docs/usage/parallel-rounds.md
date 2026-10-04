@@ -39,13 +39,22 @@ a round is the same idea with the assignment, waiting and merging done by verbs.
 2. **A tracker.** Rounds take GitHub issues (`gh`) or GitLab issues (`glab`), authenticated.
 3. **Accounts, if you have more than one.** `work.accounts` maps slots to separate
    `CLAUDE_CONFIG_DIR`s, so workers draw on different usage limits and `hv round assign` can avoid a
-   cooling account. The entries are paths on your machine: put them in `.hv/config.local.json`
-   (per developer, gitignored), not `.hv/config.json`.
+   cooling account. The entries are paths on your machine, so they go in `.hv/config.local.json`
+   (per developer, gitignored, merged over `.hv/config.json`), not in the tracked file.
+   `hv config set` writes the tracked file, so edit this one by hand:
 
-   ```sh
-   hv config set work.accounts '[{"name":"a","configDir":"/path/to/claude-a"},{"name":"b","configDir":"/path/to/claude-b"}]'
-   hv worker account list      # each account with its usage verdict
+   ```json
+   {
+     "work": {
+       "accounts": [
+         { "name": "a", "configDir": "/path/to/claude-a" },
+         { "name": "b", "configDir": "/path/to/claude-b" }
+       ]
+     }
+   }
    ```
+
+   `hv worker account list` then shows each account with its usage verdict.
 
 4. **Issues a worker can pick up.** A candidate needs acceptance criteria or a design or plan note,
    closed dependencies and no file overlap with work in flight (see [Picking issues](#picking-issues)).
@@ -55,6 +64,22 @@ a round is the same idea with the assignment, waiting and merging done by verbs.
 For a round that must survive the orchestrator's context filling or a usage limit, also install the
 hooks and run the orchestrator under `hv keepalive run`:
 [unattended rounds](unattended-rounds.md). For Codex workers: [Codex workers](codex-workers.md).
+
+## Your first round
+
+```sh
+hv doctor                                  # fix every fail it reports
+hv round start --slots 2                   # take the lease, make two slots, list candidates
+hv round assign 59 --body-file notes.md    # first idle slot takes issue 59; repeat for a second issue
+hv round wait                              # blocks until a worker is done, blocked or dead
+hv worker gate ben --base main             # verify on the merged tree, merge on a pass
+hv round wind-down                         # re-verify main, park the slots, release the lease
+hv reap --apply                            # delete the merged branches and leftovers
+```
+
+`hv round wait` returns the slot that needs you, so loop `wait` and `gate` (and `assign` for the next
+issue) until the queue is empty. Replace `ben` with the slot `wait` named. Preview `hv reap` without
+`--apply` first. The sections below cover each step.
 
 ## The round flow
 
@@ -85,12 +110,9 @@ hv round start --scope slate --items 12,13  # only these issues
 hv round candidates                         # re-read the board with readiness checks
 ```
 
-- **One orchestrator per repo.** The lease is `<git-common-dir>/hv/round-lease.json`, so
-  every worktree of the repo shares it. A second `start` is refused (exit 4) and names the
-  holder. The holder is the nearest non-shell ancestor of `hv` (in Claude Code, the `claude`
-  process) plus its start time; pass `--holder-pid` where that cannot be read. A lease whose
-  holder is gone is stale: `hv round reconcile` reports it (`lease-stale`) and `hv round start`
-  reclaims it.
+- **One orchestrator per repo.** A second `start` is refused (exit 4) and names the holder. A lease
+  whose holder is gone is stale: `hv round reconcile` reports it and `hv round start` reclaims it.
+  How the lease is stored and who counts as the holder: [lease internals](#internals).
 - **Slots** are the first `--slots` names of `round.roster` (default `ben`, `dana`, `nia`, `kit`),
   each `.worktrees/<agent>` on `park/<agent>`. Slots are provisioned once and reused; a healthy
   existing slot is left alone. The worktrees live in the project root under `.worktrees/`, which
@@ -156,11 +178,7 @@ session and whose recorded state is not `idle`; `hv worker dispatch` arms a slot
   `--settle` seconds (default 5) inside its own process.
 - **Timeout** exits 1 with `data.timedOut: true` and every slot's state; it is an answer,
   not a fault. `--timeout` defaults to 0, which waits indefinitely.
-- **Long waits in Claude Code**: the Bash tool kills a command at its `timeout`, which
-  defaults to 2 minutes (`BASH_DEFAULT_TIMEOUT_MS`) and is capped at 10 minutes
-  (`BASH_MAX_TIMEOUT_MS`). Raise the cap in `settings.json` under `env` (for example
-  `"BASH_MAX_TIMEOUT_MS": "3600000"`) and pass a matching `timeout` on the Bash call, or
-  loop on a finite `--timeout` shorter than the cap.
+- **Long waits in Claude Code** hit the Bash tool's timeout; see [internals](#internals).
 
 ## Asking the maintainer
 
@@ -170,7 +188,7 @@ reads the answers back.
 
 ```sh
 hv round escalate send 59 --slot ben --title "Keep the old flag?" --body-file question.md
-hv round escalate send 61 --pr --title "Merge approval: PR #61"
+hv round escalate send 61 --pr --title "Merge approval: PR #61" --body-file ask.md
 hv round escalate check
 ```
 
@@ -242,6 +260,8 @@ in `<!-- hv:handoff <slot>@<round> -->`.
 - **reclaim** works on a slot that is `dead` or `stalled` (no commit, edit or state change for
   `round.stallMinutes`, default 30, `0` is off). A healthy slot needs `--force`; a live pane is
   killed first, and with no host to ask it is refused as `live agent`. It does not reassign.
+  `hv reap` reclaims `dead` slots only, never `stalled` ones: a worker in a long test run makes no
+  commits and looks stalled, and an unattended `reap --apply` would kill it.
 
 `hv round status` lists the round's slots with host, PR and drift. `hv round reconcile` reports
 drift between the registry, the host, git and the forge, including `stalled` (never repaired),
@@ -288,6 +308,19 @@ Claude workers only: a Codex subagent cannot be given a working directory.
 A worker's question reaches you on the thread or in its pane. Prefix a direct answer with `m:` to make
 it citable without a confirmation round-trip. The prefix is imitable, so a prefixed line that
 contradicts the last signed orchestrator message still gets one confirmation.
+
+## Internals
+
+**The lease.** It is `<git-common-dir>/hv/round-lease.json`, so every worktree of the repo shares it.
+The holder is the nearest non-shell ancestor of `hv` (in Claude Code, the `claude` process) plus its
+start time. Pass `--holder-pid` where that cannot be read. A lease whose holder is gone is stale.
+
+**Long waits in Claude Code.** The Bash tool kills a command at its `timeout`, which defaults to 2
+minutes (`BASH_DEFAULT_TIMEOUT_MS`) and is capped at 10 minutes (`BASH_MAX_TIMEOUT_MS`). Either:
+
+- raise the cap in `settings.json` under `env` (for example `"BASH_MAX_TIMEOUT_MS": "3600000"`) and
+  pass a matching `timeout` on the Bash call; or
+- loop on a finite `hv round wait --timeout` shorter than the cap.
 
 ## See also
 
