@@ -134,7 +134,7 @@ func fillLegacy(t *testing.T, cfg string) (string, []string) {
 }
 
 func TestFillMigratesLegacyVersionKey(t *testing.T) {
-	root := project(t, `{"hvSkills":{"version":"4.2.0"}}`, "")
+	root := project(t, `{"hv":{"version":"4.2.0"}}`, "")
 	filled, err := Fill(root)
 	if err != nil {
 		t.Fatal(err)
@@ -144,8 +144,8 @@ func TestFillMigratesLegacyVersionKey(t *testing.T) {
 	}
 	doc, _ := jsonx.Decode([]byte(read(t, root)))
 	o := doc.(*jsonx.Object)
-	if _, ok := o.Get("hvSkills"); ok {
-		t.Errorf("hvSkills left: %s", read(t, root))
+	if _, ok := o.Get("hv"); ok {
+		t.Errorf("hv left: %s", read(t, root))
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
 		t.Errorf("rota.version %v", v)
@@ -155,29 +155,16 @@ func TestFillMigratesLegacyVersionKey(t *testing.T) {
 	}
 }
 
-// hv's stamp (#231) moves like the hvSkills one did, and wins over it when a config
-// carries both.
-func TestFillMigratesHvVersionKey(t *testing.T) {
-	for _, c := range []struct{ name, cfg string }{
-		{"hv only", `{"hv":{"version":"5.0.0"}}`},
-		{"hv and hvSkills", `{"hvSkills":{"version":"4.2.0"},"hv":{"version":"5.0.0"}}`},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			out, filled := fillLegacy(t, c.cfg)
-			doc, _ := jsonx.Decode([]byte(out))
-			o := doc.(*jsonx.Object)
-			if v, _ := Value(o, VersionKey); v != "5.0.0" {
-				t.Errorf("rota.version %v", v)
-			}
-			for _, k := range []string{"hv", "hvSkills"} {
-				if _, ok := o.Get(k); ok {
-					t.Errorf("%s left: %s", k, out)
-				}
-			}
-			if filled[len(filled)-1] != VersionKey {
-				t.Errorf("rota.version not listed: %v", filled)
-			}
-		})
+// The hvSkills stamp is migrate hv's to move (#236): fill leaves it alone.
+func TestFillLeavesTheHvSkillsStamp(t *testing.T) {
+	out, _ := fillLegacy(t, `{"hvSkills":{"version":"4.2.0"}}`)
+	doc, _ := jsonx.Decode([]byte(out))
+	o := doc.(*jsonx.Object)
+	if v, _ := Value(o, VersionKey); v != "" {
+		t.Errorf("rota.version %v", v)
+	}
+	if _, ok := o.Get("hvSkills"); !ok {
+		t.Errorf("hvSkills dropped: %s", out)
 	}
 }
 
@@ -189,7 +176,7 @@ func TestFillLegacyKeyAloneRewrites(t *testing.T) {
 	rota.Delete("version")
 	cfg.Delete("rota")
 	h, _ := jsonx.Decode([]byte(`{"version":"4.2.0"}`))
-	cfg.Set("hvSkills", h)
+	cfg.Set("hv", h)
 	b, _ := jsonx.Marshal(cfg)
 	root := project(t, string(b), "")
 	filled, err := Fill(root)
@@ -198,8 +185,8 @@ func TestFillLegacyKeyAloneRewrites(t *testing.T) {
 	}
 	doc, _ := jsonx.Decode([]byte(read(t, root)))
 	o := doc.(*jsonx.Object)
-	if _, ok := o.Get("hvSkills"); ok {
-		t.Error("hvSkills left")
+	if _, ok := o.Get("hv"); ok {
+		t.Error("hv left")
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
 		t.Errorf("rota.version %v", v)
@@ -207,14 +194,14 @@ func TestFillLegacyKeyAloneRewrites(t *testing.T) {
 }
 
 func TestFillLegacyKeepsExistingNewValue(t *testing.T) {
-	out, filled := fillLegacy(t, `{"rota":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`)
+	out, filled := fillLegacy(t, `{"rota":{"version":"5.0.0"},"hv":{"version":"4.2.0"}}`)
 	doc, _ := jsonx.Decode([]byte(out))
 	o := doc.(*jsonx.Object)
 	if v, _ := Value(o, VersionKey); v != "5.0.0" {
 		t.Errorf("rota.version %v", v)
 	}
-	if _, ok := o.Get("hvSkills"); ok {
-		t.Error("hvSkills left")
+	if _, ok := o.Get("hv"); ok {
+		t.Error("hv left")
 	}
 	// dropping the legacy key counts as filling rota.version either way
 	if filled[len(filled)-1] != VersionKey {
@@ -222,13 +209,13 @@ func TestFillLegacyKeepsExistingNewValue(t *testing.T) {
 	}
 }
 
-func TestFillLegacyKeepsOtherHvSkillsKeys(t *testing.T) {
-	out, _ := fillLegacy(t, `{"hvSkills":{"version":"4.2.0","note":"x"}}`)
+func TestFillLegacyKeepsOtherHvKeys(t *testing.T) {
+	out, _ := fillLegacy(t, `{"hv":{"version":"4.2.0","note":"x"}}`)
 	doc, _ := jsonx.Decode([]byte(out))
 	o := doc.(*jsonx.Object)
-	hs, ok := getObject(o, "hvSkills")
+	hs, ok := getObject(o, "hv")
 	if !ok || !reflect.DeepEqual(hs.Keys(), []string{"note"}) {
-		t.Errorf("hvSkills %v: %s", ok, out)
+		t.Errorf("hv %v: %s", ok, out)
 	}
 	if v, _ := Value(o, VersionKey); v != "4.2.0" {
 		t.Errorf("rota.version %v", v)
@@ -238,9 +225,10 @@ func TestFillLegacyKeepsOtherHvSkillsKeys(t *testing.T) {
 func TestStampedVersion(t *testing.T) {
 	cases := []struct{ name, cfg, want string }{
 		{"new", `{"rota":{"version":"5.0.0"}}`, "5.0.0"},
-		{"legacy", `{"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
-		{"both prefers new", `{"rota":{"version":"5.0.0"},"hvSkills":{"version":"4.2.0"}}`, "5.0.0"},
-		{"empty new falls back", `{"rota":{"version":""},"hvSkills":{"version":"4.2.0"}}`, "4.2.0"},
+		{"legacy", `{"hv":{"version":"4.2.0"}}`, "4.2.0"},
+		{"hvSkills stamp is not read", `{"hvSkills":{"version":"4.2.0"}}`, ""},
+		{"both prefers new", `{"rota":{"version":"5.0.0"},"hv":{"version":"4.2.0"}}`, "5.0.0"},
+		{"empty new falls back", `{"rota":{"version":""},"hv":{"version":"4.2.0"}}`, "4.2.0"},
 		{"neither", `{}`, ""},
 	}
 	for _, tc := range cases {

@@ -167,10 +167,10 @@ func umbData(env map[string]any) map[string]any {
 	return m
 }
 
-// A project that still carries the pre-rename hvSkills.version reports drift
-// from it, and rota init moves it to rota.version stamped with the binary version.
+// A project that still carries the pre-rename hv.version reports drift from
+// it, and rota init moves it to rota.version stamped with the binary version.
 func TestVersionDriftReadsLegacyKeyAndInitMigratesIt(t *testing.T) {
-	root := a4Project(t, `{"hvSkills": {"version": "4.9.0"}}`)
+	root := a4Project(t, `{"hv": {"version": "4.9.0"}}`)
 	old := installedVersionFn
 	t.Cleanup(func() { installedVersionFn = old })
 	installedVersionFn = func() string { return "5.0.0" }
@@ -187,8 +187,8 @@ func TestVersionDriftReadsLegacyKeyAndInitMigratesIt(t *testing.T) {
 	if v, _ := lookupDotted(cfg, "rota.version"); v != "5.0.0" {
 		t.Errorf("rota.version = %v, want 5.0.0", v)
 	}
-	if _, ok := lookupDotted(cfg, "hvSkills"); ok {
-		t.Errorf("hvSkills left in config: %v", cfg)
+	if _, ok := lookupDotted(cfg, "hv"); ok {
+		t.Errorf("hv left in config: %v", cfg)
 	}
 	if _, env, _ := rotaRun(t, "--json", "-C", root, "version", "--drift"); umbData(env)["status"] != "match" {
 		t.Errorf("drift not cleared: %v", env)

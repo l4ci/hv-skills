@@ -18,11 +18,12 @@ type Key struct {
 }
 
 // VersionKey is the stamp of the rota release that wrote a project's config.
-// LegacyVersionKeys are where releases before rota kept it, newest first: hv
-// (#231) and hvSkills before it. They are read as fallbacks and moved by Fill.
+// LegacyVersionKeys are where hv, before the rename to rota (#236), kept it.
+// They are read as fallbacks and moved by Fill. hvSkills.version is only
+// migrate hv's to move.
 const VersionKey = "rota.version"
 
-var LegacyVersionKeys = []string{"hv.version", "hvSkills.version"}
+var LegacyVersionKeys = []string{"hv.version"}
 
 // StampedVersion is the version stamped in cfg: the string at VersionKey,
 // else the first one at a LegacyVersionKeys key, else "".

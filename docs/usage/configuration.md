@@ -439,6 +439,6 @@ Records the rota release (binary version) that `rota init` last ran with. Auto-m
 
 `rota version --drift` compares the stamped value with the installed `rota` binary, and [`rota init check`](../reference/preflight.md) surfaces the same drift as a warning. `--json` returns `stamped`, `installed` and `status` (`match`, `drift` or `unknown`).
 
-Re-running `rota init` re-stamps `rota.version`; there are no project files to refresh. Projects written before the rename carry `hvSkills.version`: it is read as a fallback and moved to `rota.version` by `rota init` / `rota config fill`. Distinct from `rota update` (which compares installed vs latest GitHub release): this is *project drift*, visible when `rota` was upgraded under you and the project hasn't been re-stamped yet.
+Re-running `rota init` re-stamps `rota.version`; there are no project files to refresh. A stamp written before the rename to rota is read as a fallback and moved to `rota.version` by `rota init` / `rota config fill`. Distinct from `rota update` (which compares installed vs latest GitHub release): this is *project drift*, visible when `rota` was upgraded under you and the project hasn't been re-stamped yet.
 
 When `rota version --drift` reports drift, re-run `rota init` after an upgrade to clear it.

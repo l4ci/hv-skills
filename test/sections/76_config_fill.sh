@@ -42,22 +42,22 @@ pass "config fill keeps present keys, is idempotent and refuses a corrupt file"
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CF"
 
-# A config that only holds the pre-rename hvSkills.version moves it to rota.version.
+# A config that only holds the pre-rename hv.version moves it to rota.version.
 CF="$(mktemp -d)"
 trap 'rm -rf "$CF"' EXIT
 mkdir -p "$CF/.rota"
-printf '{"hvSkills": {"version": "4.2.0"}}\n' > "$CF/.rota/config.json"
+printf '{"hv": {"version": "4.2.0"}}\n' > "$CF/.rota/config.json"
 OUT=$( cd "$CF" && hvj config fill )
 [ "$(echo "$OUT" | jget data.changed)" = "true" ] || fail "fill should migrate the legacy stamp: $OUT"
-python3 - "$CF/.rota/config.json" <<'PY' || fail "legacy hvSkills.version was not moved to rota.version"
+python3 - "$CF/.rota/config.json" <<'PY' || fail "legacy hv.version was not moved to rota.version"
 import json, sys
 cfg = json.load(open(sys.argv[1]))
-assert "hvSkills" not in cfg, list(cfg)
+assert "hv" not in cfg, list(cfg)
 assert cfg["rota"] == {"version": "4.2.0"}, cfg["rota"]
 PY
 [ "$( cd "$CF" && hvj config check | jget data.status )" = "upToDate" ] \
   || fail "config check after migrating the legacy stamp should be upToDate"
-pass "config fill moves hvSkills.version to rota.version"
+pass "config fill moves hv.version to rota.version"
 
 trap 'rm -rf "$TMP"' EXIT
 rm -rf "$CF"
