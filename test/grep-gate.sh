@@ -28,6 +28,8 @@ OLD_SCOPE=(
   ':(exclude)docs/design/'
   ':(exclude).hv/'
   ':(exclude)test/grep-gate.sh'
+  # The "Coming from hv-skills" migration section names the predecessor.
+  ':(exclude)docs/install.md'
   ':(exclude)internal/migrate/'
   # Legacy-format fixtures: a pre-rename block heading or .gitignore header.
   ':(exclude)internal/knowledge/knowledge_test.go'

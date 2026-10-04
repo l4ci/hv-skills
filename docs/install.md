@@ -73,6 +73,17 @@ brew uninstall rota      # Homebrew; otherwise delete the rota binary
 
 Your projects' `.rota/` folders are untouched.
 
+## Coming from hv-skills
+
+rota is the successor to hv-skills. Install rota as above, then run this in each project that has a `.hv/` folder:
+
+```bash
+rota migrate hv            # dry run: lists what would change
+rota migrate hv --apply    # makes the changes
+```
+
+It moves `.hv/` to `.rota/`, rewrites the `.gitignore` entries, the managed blocks in `AGENTS.md` and `CLAUDE.md`, and the config key that stamps the version. It also replaces the installed `/hv-*` skills with `/rota-*`; pass `--skip-skills` to leave your skills installs alone. Commit the result like any other change.
+
 ## Next
 
 Run `rota init` once at the project root (`rota init --no-blocks` skips `AGENTS.md` and the managed blocks; `rota init umbrella` sets up a multi-repo coordinator). [Getting started](getting-started.md) walks through the first cycle.

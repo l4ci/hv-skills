@@ -34,7 +34,7 @@ rota skills install     # skills for Claude Code and Codex
 rota init               # once, at the project root
 ```
 
-The script checks the download against `checksums.txt` and refuses a mismatch. That catches a corrupted download, not a compromised release; signing is planned. [Install](docs/install.md) has the options, upgrading and removal; [getting started](docs/getting-started.md) has the first cycle.
+The script checks the download against `checksums.txt` and refuses a mismatch. That catches a corrupted download, not a compromised release; signing is planned. [Install](docs/install.md) has the options, upgrading, removal and migrating an older install; [getting started](docs/getting-started.md) has the first cycle.
 
 ## Skills
 
