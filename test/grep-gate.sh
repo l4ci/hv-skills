@@ -5,7 +5,8 @@
 #
 #   1. bin/ holds exactly the launcher.
 #   2. No tracked file names a legacy helper, the .hv/bin mirror or hvlib.
-#   3. Nothing outside history and migration code uses the old name hv-skills.
+#   3. Nothing outside history and migration code uses the old name hv-skills,
+#      or the old binary name hv (#236).
 #   4. `rota init` in an empty git repo works and `rota init check` exits 0.
 #
 # The legacy names come from test/validate-skills.py (LEGACY_HELPERS, frozen
@@ -91,6 +92,74 @@ OLD_SCOPE=(
 HITS="$(git grep -inIP "$OLD_NAME" -- . "${OLD_SCOPE[@]}" || true)"
 if [ -n "$HITS" ]; then
   bad "the old product name hv-skills is still used ($(wc -l <<<"$HITS" | tr -d ' ') lines):"
+  printf '%s\n' "$HITS" >&2
+fi
+
+# 2b. The old binary name (#236). hv became rota: skills /rota-*, state .rota/,
+# env ROTA_*, markers <!-- rota:... --> and rota-<key> blocks, module
+# github.com/l4ci/rota. What may still say hv: history, this repo's own state
+# and instructions until the migration dogfoods them, the legacy read side
+# (old markers, blocks and stamps are read until a project is migrated), the
+# migrate v4 codemod, the legacy-name guards, and the files kit's and lea's
+# slices of #236 rewrite next (front-door docs; release, install and update).
+# Drop those slices' exclusions once they merge.
+SKILLS='brainstorm|capture|debug|decide|learn|orchestrate|pause|plan|qa|refactor|release|review|ship|spike|vision|work'
+HV_NAME="(?<![\\w.-])hv-(?:${SKILLS})(?![\\w-])|\\.hv/(?!bin\\b)|\\bHV_[A-Z]|\\bHV-(?:DONE|BLOCKED)\\b"
+HV_NAME+="|(?:<|\\\\u003c)!-- hv[:-]|github\\.com/l4ci/hv\\b|\`hv[ \`]|\"hv\"|\\bhv\\.version\\b"
+HV_SCOPE=(
+  ':(exclude)CHANGELOG.md'
+  ':(exclude)docs/design/5.0-helper-triage.md'
+  ':(exclude)docs/design/5.0-smoke-whitebox.md'
+  ':(exclude).hv/'
+  ':(exclude)AGENTS.md'
+  ':(exclude)CLAUDE.md'
+  ':(exclude).gitignore'
+  ':(exclude)test/grep-gate.sh'
+  # Legacy read side and stamp migration, with their tests and fixtures.
+  ':(exclude)internal/marker/'
+  ':(exclude)internal/section/'
+  ':(exclude)internal/round/move.go'
+  ':(exclude)internal/round/move_test.go'
+  ':(exclude)internal/config/fill.go'
+  ':(exclude)internal/config/fill_test.go'
+  ':(exclude)internal/config/schema.go'
+  ':(exclude)internal/backlog/legacy_marker_test.go'
+  ':(exclude)internal/backlog/issue_write_python_test.go'
+  ':(exclude)internal/cli/glossary_test.go'
+  ':(exclude)internal/cli/testdata/golden/TestInstructionsInitMatchGolden__*'
+  ':(exclude)test/sections/02_knowledge.sh'
+  ':(exclude)test/sections/13_helpers.sh'
+  ':(exclude)test/sections/66_agents_md.sh'
+  ':(exclude)internal/migrate/'
+  # Legacy-name guards: they spell the old names to catch them.
+  ':(exclude)test/validate-skills.py'
+  ':(exclude)test/whitebox-scan.awk'
+  ':(exclude)test/sections/29_doclint.sh'
+  ':(exclude)test/sections/72_whitebox_guard.sh'
+  # lea's slice: update keeps HV_* and the hv URLs until it is renamed.
+  ':(exclude)VERSION'
+  ':(exclude).goreleaser.yaml'
+  ':(exclude).github/'
+  ':(exclude)install.sh'
+  ':(exclude)internal/update/'
+  ':(exclude)test/sections/97_install_sh.sh'
+  ':(exclude)test/sections/10_update.sh'
+  ':(exclude)cmd/rota/scenarios_a4c_test.go'
+  ':(exclude)cmd/rota/testdata/frozen/a4c.jsonl'
+  ':(exclude)docs/design/5.0-verb-contract.md'
+  # kit's slice: the front-door docs.
+  ':(exclude)README.md'
+  ':(exclude)docs/README.md'
+  ':(exclude)docs/install.md'
+  ':(exclude)docs/getting-started.md'
+  ':(exclude)docs/how-it-works.md'
+  ':(exclude)docs/cheatsheet.md'
+  ':(exclude)docs/faq.md'
+  ':(exclude)docs/walkthroughs/'
+)
+HITS="$(git grep -nIP "$HV_NAME" -- . "${HV_SCOPE[@]}" || true)"
+if [ -n "$HITS" ]; then
+  bad "the old binary name hv is still used ($(wc -l <<<"$HITS" | tr -d ' ') lines):"
   printf '%s\n' "$HITS" >&2
 fi
 
