@@ -18,6 +18,7 @@ Public user guide for rota, a zero-dependency dev workflow for Claude Code and C
 
 ### Rounds
 
+- [Your first round](first-round.md): install, skills, herdr, launching the orchestrator, a first round and wind-down, step by step
 - [Parallel rounds](usage/parallel-rounds.md): an orchestrator, standing workers in worktrees, the merge gate, solo mode
 - [Unattended rounds](usage/unattended-rounds.md): hooks, statusline, keepalive, usage limits, the orchestrator switch
 - [Doctor and reap](usage/doctor-and-reap.md): check the machine before a round, clear leftovers after

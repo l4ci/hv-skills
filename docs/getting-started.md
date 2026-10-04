@@ -39,6 +39,7 @@ Pick whichever matches where your project is today and follow it skill-by-skill.
 ## Where to go next
 
 **Scale to a round**
+- [Your first round](first-round.md): the next step. Set up herdr, start the orchestrator and run a round on a few issues
 - [Parallel rounds](usage/parallel-rounds.md): when you have several independent issues, let an orchestrator hand them to workers and merge what passes
 
 **Capture and backlog**
