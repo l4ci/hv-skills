@@ -51,6 +51,15 @@ The skills are copies, not symlinks, and `install` writes a `.rota-manifest.json
 
 `rota skills status` compares the installed skills with the binary. For Codex, see [skills in Codex](usage/codex-skills.md) and, to run Codex as a round worker, [Codex workers](usage/codex-workers.md).
 
+### User or project scope
+
+- **User scope** (the default) puts one copy in your home directory, and every project on the machine uses it. Pick it when you work alone or across many repos.
+- **Project scope** writes into the repo. Commit `.claude/skills` and `.agents/skills` and everyone who clones gets the same skills, pinned to the rota version that wrote them. Pick it for a team, or when a project must not move when you upgrade rota. Collaborators still need the `rota` binary on their `PATH`.
+
+If both exist, Claude Code uses the user copy of a skill over the project copy with the same name, so a stale user install hides a newer project one. Keep one scope per machine, or run `rota skills update` after every upgrade. `rota skills status` lists every root it finds.
+
+User scope is per Claude Code config directory: rota writes to `$CLAUDE_CONFIG_DIR/skills` when that is set, else `~/.claude/skills`. With several accounts (one `CLAUDE_CONFIG_DIR` each), run `rota skills install` once per account with the variable set, or use project scope, which covers every account.
+
 ## Upgrading
 
 ```bash
