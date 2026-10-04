@@ -85,12 +85,8 @@ HV_SCOPE=(
   ':(exclude)test/sections/13_helpers.sh'
   ':(exclude)test/sections/66_agents_md.sh'
   ':(exclude)internal/migrate/'
-  # kit's slice: the front-door docs.
-  ':(exclude)docs/README.md'
-  ':(exclude)docs/how-it-works.md'
-  ':(exclude)docs/cheatsheet.md'
-  ':(exclude)docs/faq.md'
-  ':(exclude)docs/walkthroughs/'
+  # The "Coming from hv-skills" migration section names .hv/ and /hv-*.
+  ':(exclude)docs/install.md'
 )
 HITS="$(git grep -nIP "$HV_NAME" -- . "${HV_SCOPE[@]}" || true)"
 if [ -n "$HITS" ]; then
