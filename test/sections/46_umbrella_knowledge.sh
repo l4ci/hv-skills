@@ -1,4 +1,4 @@
-# F21 — umbrella-aware KNOWLEDGE.md: scoped writes, hybrid query, tier sidecars, amend guard, glossary, CLAUDE.md blocks, migrate, decisions guard
+# F21 — umbrella-aware KNOWLEDGE.md: scoped writes, hybrid query, tier sidecars, amend guard, glossary, CLAUDE.md blocks, decisions guard
 echo "F21: umbrella-aware KNOWLEDGE.md — end-to-end"
 
 # ── Build primary fixture ───────────────────────────────────────────────────
@@ -127,48 +127,6 @@ UMBRELLA_BLOCK_RC=0
 [ "$(realpath "$TMP_UK/CLAUDE.md")" != "$(realpath "$TMP_UK/web/CLAUDE.md")" ] \
   || fail "F21[6]: umbrella CLAUDE.md and web CLAUDE.md must be different files"
 pass "F21[6]: per-sub-repo CLAUDE.md block written; umbrella block succeeds"
-
-# ── 7. Migrate umbrella branch (fresh fixture) ───────────────────────────────
-echo "F21: migrate umbrella branch"
-TMP_UK2="$(mktemp -d)"
-trap 'rm -rf "$TMP_UK2"' EXIT
-(
-  cd "$TMP_UK2"
-  git init -q .
-  git config user.email t@t && git config user.name t
-  mkdir -p .rota .rota/contexts/web web api
-  ( cd web && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
-  ( cd api && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m i )
-  printf '{"repos":[{"name":"web","path":"./web"},{"name":"api","path":"./api"}]}' > .rota/repos.json
-  printf '{"rota":{"version":"3.0.0"}}' > .rota/config.json
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/KNOWLEDGE.md
-  mkdir -p .rota/knowledge/web .rota/knowledge/api
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/web/KNOWLEDGE.md
-  printf '# Knowledge\n\n## Architecture\n\n## Glossary\n\n' > .rota/knowledge/api/KNOWLEDGE.md
-  printf '# Context\n\n## Widget\n\nA web widget.\n' > .rota/contexts/web/CONTEXT.md
-  printf '/web/\n/api/\n' > .gitignore
-  git -c user.email=t@t -c user.name=t add -A
-  git -c user.email=t@t -c user.name=t commit -qm init
-)
-MIGRATE_RC=0
-OUT=$( cd "$TMP_UK2" && hvj migrate v4 --apply 2>/dev/null ) || MIGRATE_RC=$?
-[ "$MIGRATE_RC" -eq 0 ] \
-  || fail "F21[7]: migrate v4 --apply must exit 0 on umbrella project with version 3.0.0; got RC=$MIGRATE_RC"
-grep -q '"scope":"web"' <<<"$(jget data.contextMigrations <<<"$OUT")" \
-  || fail "F21[7]: contextMigrations must list the web sub-repo: $OUT"
-# CONTEXT.md migrated → Widget term lands in web KNOWLEDGE.md Glossary
-grep -q "Widget" "$TMP_UK2/.rota/knowledge/web/KNOWLEDGE.md" \
-  || fail "F21[7]: 'Widget' term must appear in .rota/knowledge/web/KNOWLEDGE.md after migrate"
-# contexts/web/CONTEXT.md must be gone
-[ ! -f "$TMP_UK2/.rota/contexts/web/CONTEXT.md" ] \
-  || fail "F21[7]: .rota/contexts/web/CONTEXT.md must be deleted after migrate"
-# Backup must exist
-ls "$TMP_UK2/.rota/migrate-backup/" >/dev/null 2>&1 \
-  || fail "F21[7]: .rota/migrate-backup/ must exist after --apply"
-BACKUP_DIR="$(ls -d "$TMP_UK2"/.rota/migrate-backup/*/ 2>/dev/null | head -1)"
-[ -n "$BACKUP_DIR" ] \
-  || fail "F21[7]: no timestamped backup directory found under .rota/migrate-backup/"
-pass "F21[7]: migrate umbrella branch exits 0; context migrated; backup exists"
 
 # ── 8. Decisions stay umbrella-only ─────────────────────────────────────────
 echo "F21: decisions umbrella-only guard"

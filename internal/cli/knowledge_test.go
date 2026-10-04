@@ -165,6 +165,7 @@ type knFrozenOut struct {
 }
 
 var knLoggedAt = regexp.MustCompile(`"loggedAt": "[^"]*"`)
+var migTS = regexp.MustCompile(`migrate-backup/\d{8}T\d{6}`)
 
 // knDelta is the change between two knTree snapshots. Backup directory
 // timestamps and loggedAt stamps are normalised, they differ per run.

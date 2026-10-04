@@ -84,4 +84,3 @@ The scoped `rota knowledge` and `rota glossary` verbs resolve the target file an
 
 **CLAUDE.md managed block.** A sub-repo's CLAUDE.md (or AGENTS.md when present) gets `rota block knowledge --repo <name>`, listing umbrella topics plus that sub-repo's own, so a reader in the sub-repo sees the full topic index. The umbrella-root file lists umbrella topics only. Single-repo projects are unchanged.
 
-**Migration.** `rota migrate v4` writes each `.rota/contexts/<name>/CONTEXT.md` into `.rota/knowledge/<name>/KNOWLEDGE.md`'s Glossary via `rota glossary import --repo <name>`, and the umbrella-root `.rota/CONTEXT.md` into the umbrella Glossary. Originals are backed up under `.rota/migrate-backup/`. Existing umbrella KNOWLEDGE content is untouched.

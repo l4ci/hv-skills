@@ -157,7 +157,6 @@ exit codes and repo scope: [verb contract](../design/5.0-verb-contract.md).
 |---|---|
 | `rota migrate hv [--apply] [--verbose] [--skip-skills]` | move a project from the old state folder and names to `.rota/` and rota (preview unless --apply) |
 | `rota migrate issues [--apply] [--limit <n>]` | move the file backlog onto the issue tracker (preview unless --apply) |
-| `rota migrate v4 [--apply] [--verbose]` | migrate a v3 project to v4 (preview unless --apply) |
 
 ## `rota knowledge`
 

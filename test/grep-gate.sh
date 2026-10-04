@@ -23,7 +23,7 @@ bad() { printf '\033[31mFAIL\033[0m %s\n' "$1" >&2; fails=$((fails + 1)); }
 # skills, references, docs, the root Markdown, test/ and Go tests. Non-test Go
 # source under internal/ is out of scope (A9 ruling, option a): it cites the
 # helper each verb was ported from, and some of it has to know the old names
-# (init deleting the 4.x mirror, the migrate v4 codemod). History keeps them
+# (init deleting the 4.x mirror, migrate hv). History keeps them
 # too: the 5.0 design docs cite helpers as what they
 # replaced. The validator owns the name list, and the white-box scanner, its
 # guard section, the doclint section and this gate spell the patterns.
@@ -41,13 +41,10 @@ SCOPE=(
   ':(exclude)test/whitebox-scan.awk'
   ':(exclude)test/sections/29_doclint.sh'
   ':(exclude)test/sections/72_whitebox_guard.sh'
-  # Tests of the code that has to know the old names: the migrate v4 codemod
+  # Tests of the code that has to know the old names: migrate hv
   # and init removing the 4.x mirror. Their fixtures are legacy text on purpose.
-  ':(exclude)test/sections/39_migrate.sh'
   ':(exclude)test/sections/98_migrate_hv.sh'
   ':(exclude)internal/migrate'
-  ':(exclude)internal/cli/migrate_test.go'
-  ':(exclude)internal/cli/testdata/golden/TestMigrateV4*'
   ':(exclude)internal/cli/init_test.go'
   ':(exclude)internal/initproj'
 )
@@ -59,7 +56,7 @@ fi
 
 # 2. The old product name (#231). hv-skills became hv; what may still say
 # hv-skills is history (CHANGELOG, the 5.0 design docs, tracked .hv/ state),
-# code that has to know the old name (the migrate v4 codemod, plugin
+# code that has to know the old name (migrate hv, plugin
 # detection, legacy-format fixtures) and text captured from real panes. The
 # managed block markers keep the key "skills" (hv-skills-start/-end), the 4.x
 # plugin is "hv-skills@<marketplace>" and hv-skills-index is a legacy helper,
@@ -76,9 +73,6 @@ OLD_SCOPE=(
   ':(exclude)docs/install.md'
   ':(exclude)docs/getting-started.md'
   ':(exclude)internal/migrate/'
-  ':(exclude)internal/cli/migrate_test.go'
-  ':(exclude)internal/cli/testdata/golden/TestMigrateV4*'
-  ':(exclude)test/sections/39_migrate.sh'
   # Legacy-format fixtures: a pre-rename block heading or .gitignore header,
   # the 4.x plugin's cache directory, and doclint not flagging the old name.
   ':(exclude)internal/knowledge/knowledge_test.go'
@@ -101,7 +95,7 @@ fi
 # github.com/l4ci/rota. What may still say hv: history, this repo's own state
 # and instructions until the migration dogfoods them, the legacy read side
 # (old markers, blocks and stamps are read until a project is migrated), the
-# migrate v4 codemod, the legacy-name guards, and the files kit's and lea's
+# migrate hv, the legacy-name guards, and the files kit's and lea's
 # slices of #236 rewrite next (front-door docs; release, install and update).
 # Drop those slices' exclusions once they merge.
 SKILLS='brainstorm|capture|debug|decide|learn|orchestrate|pause|plan|qa|refactor|release|review|ship|spike|vision|work'

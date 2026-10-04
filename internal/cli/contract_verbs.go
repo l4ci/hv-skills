@@ -102,7 +102,6 @@ var contractVerbs = []string{
 	"map stats",
 	"migrate hv",
 	"migrate issues",
-	"migrate v4",
 	"milestone active",
 	"milestone add",
 	"milestone index",

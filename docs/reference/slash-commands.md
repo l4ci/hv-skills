@@ -2,7 +2,7 @@
 
 Quick-reference table of every `/rota-*` command. Detailed entries follow below.
 
-Setup, config, update and migration are `rota` verbs, not skills: `rota init` (and `rota init umbrella`), `rota config show` / `rota config set`, `rota update`, `rota migrate hv` / `rota migrate v4` / `rota migrate issues`. See [config options](config-options.md).
+Setup, config, update and migration are `rota` verbs, not skills: `rota init` (and `rota init umbrella`), `rota config show` / `rota config set`, `rota update`, `rota migrate hv` / `rota migrate issues`. See [config options](config-options.md).
 
 | Skill | Description |
 |-------|-------------|
