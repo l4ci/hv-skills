@@ -58,12 +58,12 @@ The checks, in the order they run:
 | `statusline` | the effective statusline runs `hv statusline dump` | the orchestrator hooks are not installed (opt-in) |
 | `stop-hook` | a Stop and a SessionStart hook installed by `hv hook install` exist and their command resolves | the orchestrator hooks are not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: two or more accounts have a `configDir` and the Stop hook is installed | `orchestrator.switchOnUsage` is off |
-| `hv` | the running binary's version matches the hv-skills checkout it runs in | not run from a checkout |
+| `hv` | the running binary's version equals the `version` in the nearest `.claude-plugin/plugin.json` | a development build, or no `plugin.json` found above the working directory or the binary's directory |
 | `codex` | `codex` is 0.159.x, and each Codex slot home is logged in and has the herdr integration | `codex` is not on `PATH` and no slot has a home |
 
 The two hook checks are opt-in. Until something `hv hook install` writes is present, they skip and do not fail a project that never installed the hooks. Once it is, a partial or broken install fails.
 
-See [pausing and resuming](../usage/pausing-and-resuming.md) for the hooks and [parallel rounds](../usage/parallel-rounds.md) for what a round does after a clean `hv doctor`.
+See [unattended rounds](../usage/unattended-rounds.md) for the hooks and [parallel rounds](../usage/parallel-rounds.md) for what a round does after a clean `hv doctor`.
 
 ## Missing `.hv/` from any other verb
 
