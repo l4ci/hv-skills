@@ -67,7 +67,7 @@ On a terminal path (Stop here, or an empty backlog) run `rota release pending --
 
 ## Preview Mode (`--preview`)
 
-When invoked as `/rota-work --preview <target>` (or with `--preview` anywhere in the args), the skill enters **read-only preview mode** — it produces the same approach peek the formerly-separate `/hv-assume` skill emitted, then stops. No writes, no commits, no `rota` calls beyond reads. Steps 1–15 are bypassed.
+When invoked as `/rota-work --preview <target>` (or with `--preview` anywhere in the args), the skill enters **read-only preview mode** — it produces an approach peek, then stops. No writes, no commits, no `rota` calls beyond reads. Steps 1–15 are bypassed.
 
 The target may be a backlog item (`B07`, `F03`, `T11`), a plan key (`M01-S01`, `M01-B07`), or a milestone (`M01`). Ambiguous → ask once; do not auto-pick.
 

@@ -2,7 +2,7 @@
 
 Used by `/rota-learn` and `/rota-decide` — the duo that writes durable project state into `.rota/<FILE>.md` and re-renders a managed block in `CLAUDE.md` so read-side skills (`/rota-work`, `/rota-debug`, `/rota-plan`, `/rota-refactor`, `/rota-review`, `/rota-vision`) can consult it.
 
-`/rota-learn` carries two modes — passive learnings written as bullets under topic headings in `.rota/KNOWLEDGE.md`, and term entries written as nested-bullets under the pinned `## Glossary` topic of the same file (via the `--term <name>` flag). `/hv-context` was folded into `/rota-learn --term` in v4.0; both modes share the same writer-skill surface.
+`/rota-learn` carries two modes — passive learnings written as bullets under topic headings in `.rota/KNOWLEDGE.md`, and term entries written as nested-bullets under the pinned `## Glossary` topic of the same file (via the `--term <name>` flag). Both modes share the same writer-skill surface.
 
 The two skills share one **contract** but different **gate strengths**. New persistence skills should match the contract; their gate strength is a design pick, not a free-form decision.
 

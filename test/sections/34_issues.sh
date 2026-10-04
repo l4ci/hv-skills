@@ -69,7 +69,7 @@ cat > "$TMP_IMP/.rota/BACKLOG.md" <<'EOF'
 ## Completed
 EOF
 
-# Run from inside the fake tree so hv-self-locate resolves .rota/
+# Run from inside the fake tree so the walk-up resolves .rota/
 out=$(cd "$TMP_IMP" && hvj issues imported) || \
   fail "issues imported exited non-zero on fixture BACKLOG"
 

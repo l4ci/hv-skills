@@ -15,7 +15,7 @@ import (
 var skillsFS embed.FS
 
 // SkillsBlockBody is the static body of the rota managed block. It names
-// rota verbs, so it differs from the old hv-skills-index body (contract, A9 G4).
+// rota verbs (contract, A9 G4).
 func SkillsBlockBody() string {
 	b, _ := skillsFS.ReadFile("skills_block.md")
 	return strings.TrimRight(string(b), "\n")
