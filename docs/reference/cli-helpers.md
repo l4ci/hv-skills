@@ -3,7 +3,7 @@
 `hv` is the single binary behind every hv-skills skill. Skills call it for all
 backlog, knowledge, plan, status, git and release bookkeeping, and you can call
 it directly when scripting against `.hv/`. There is no helper copy to refresh in a
-project: `hv` ships with the plugin and updates with it.
+project. Install `hv` (see [install](../install.md)).
 
 ```sh
 hv item create --kind bugs --title "Crash on save" --tag P1 --desc "Why."
