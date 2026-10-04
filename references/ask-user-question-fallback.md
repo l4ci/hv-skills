@@ -26,13 +26,13 @@ When the host doesn't surface `AskUserQuestion`'s option picker — plain-text t
 
 The three rules in the wild today — read these as illustration, not as authoritative wording (the prose is site-local):
 
-- **Honor yes/no** — `/hv-learn` issue-file gate (*"File an hv issue?"*), `/hv-spike` promote-to-decision gate (*"Promote to a decision?"*), `/hv-pause` uncommitted-work stance (*"Wrap them in a `wip:` commit, stash them, or leave them in place?"*).
-- **Default to Recommended** — `/hv-work` plan-shape ambiguity (one Recommended interpretation among several equally-valid plans), `/hv-ship --docs` route picks (first-run / after-work / restructure), `/hv-vision` brainstorm-vs-edit picks.
-- **Default to opt-in-off / cancel** — `/hv-capture --remove` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/hv-decide` write gate (only `yes` / `write` commits the decision), `/hv-ship --docs` after-work mode opt-in (default **Leave off**).
+- **Honor yes/no** — `/rota-learn` issue-file gate (*"File a rota issue?"*), `/rota-spike` promote-to-decision gate (*"Promote to a decision?"*), `/rota-pause` uncommitted-work stance (*"Wrap them in a `wip:` commit, stash them, or leave them in place?"*).
+- **Default to Recommended** — `/rota-work` plan-shape ambiguity (one Recommended interpretation among several equally-valid plans), `/rota-ship --docs` route picks (first-run / after-work / restructure), `/rota-vision` brainstorm-vs-edit picks.
+- **Default to opt-in-off / cancel** — `/rota-capture --remove` apply gate (anything other than `yes` / `scrub-archive` is Cancel), `/rota-decide` write gate (only `yes` / `write` commits the decision), `/rota-ship --docs` after-work mode opt-in (default **Leave off**).
 
 ## Why three rules and not one
 
-A single "default to Recommended" would be wrong for the destructive and opt-in sites — *"silence flips the config flag because Enable was marked Recommended"* is exactly the auto-flip-on-first-detect drift that the *Opt-in feature flags default to `false`* convention exists to prevent. A single "default to no / cancel" would be wrong for the routine routing sites — `/hv-work` stalling on every ambiguous plan-shape reply makes loop mode unusable and forces re-prompts the user already declined.
+A single "default to Recommended" would be wrong for the destructive and opt-in sites — *"silence flips the config flag because Enable was marked Recommended"* is exactly the auto-flip-on-first-detect drift that the *Opt-in feature flags default to `false`* convention exists to prevent. A single "default to no / cancel" would be wrong for the routine routing sites — `/rota-work` stalling on every ambiguous plan-shape reply makes loop mode unusable and forces re-prompts the user already declined.
 
 The three rules carve up by *consequence*, not by question shape: binary gates honor explicit yes/no because the cases are commit-producing; routing picks default Recommended because one option is the de facto good answer; destructive and opt-in default off because silence is never user approval for either. The site picks the rule when authoring the SKILL.md prose — the mechanic does not infer it from the option list.
 
@@ -40,7 +40,7 @@ The three rules carve up by *consequence*, not by question shape: binary gates h
 
 - **The exact prose question text.** Each skill's UX wording, examples, and option summary belong to that SKILL.md — *"Apply changes? (yes/no/scrub-archive)"* is not the same shape as *"Author a runlog entry?"*.
 - **The mapping from specific free-text replies to specific outcomes.** Each skill's option set differs; `yes` / `write` / `scrub-archive` / `ship` / `leave off` all live in their owning sites.
-- **Which of the three default rules applies.** Declared at each site — the mechanic doesn't decide for you. A binary `/hv-learn` issue-file gate honors yes/no; `/hv-work`'s plan-shape ambiguity defaults to Recommended.
+- **Which of the three default rules applies.** Declared at each site — the mechanic doesn't decide for you. A binary `/rota-learn` issue-file gate honors yes/no; `/rota-work`'s plan-shape ambiguity defaults to Recommended.
 
 ## See also
 

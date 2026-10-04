@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/doctor"
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/skills"
-	"github.com/l4ci/hv/v5/internal/version"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/doctor"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/skills"
+	"github.com/l4ci/rota/internal/version"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// doctorCommand is `hv doctor` (C6): a read-only preflight. It runs without
-// .hv/ and reads the project config only when one is found.
+// doctorCommand is `rota doctor` (C6): a read-only preflight. It runs without
+// .rota/ and reads the project config only when one is found.
 func doctorCommand() *Command {
 	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, orchestrator hooks, skills, codex", Verb: noFlags(runDoctor)}
 }
@@ -54,16 +54,16 @@ func runDoctor(c *Ctx, args []string) (Result, error) {
 	return res, nil
 }
 
-// doctorInput gathers the real environment: HV_TEST_DOCTOR_PATH replaces PATH
+// doctorInput gathers the real environment: ROTA_TEST_DOCTOR_PATH replaces PATH
 // for tool lookup (a test hook, not part of the CLI).
 func doctorInput() doctor.Input {
-	in := doctor.Input{Exec: doctorExec, Look: doctorLook(os.Getenv("HV_TEST_DOCTOR_PATH"))}
+	in := doctor.Input{Exec: doctorExec, Look: doctorLook(os.Getenv("ROTA_TEST_DOCTOR_PATH"))}
 	in.Dir, _ = os.Getwd()
 	in.Home, _ = os.UserHomeDir()
 	in.Skills = doctorSkills(in.Home)
 	root := ""
 	for d := in.Dir; d != ""; {
-		if fi, err := os.Stat(filepath.Join(d, ".hv")); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(filepath.Join(d, ".rota")); err == nil && fi.IsDir() {
 			root = d
 			break
 		}
@@ -76,7 +76,7 @@ func doctorInput() doctor.Input {
 	if root == "" {
 		return in
 	}
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	str := func(key string) string {
 		v, _ := config.Lookup(cfg, key)
 		s, _ := v.(string)
@@ -178,7 +178,7 @@ func doctorExec(ctx context.Context, bin string, args, extraEnv []string, dir st
 	return r, err
 }
 
-// codexHomes lists the slot homes that exist under <git-common-dir>/hv/codex/,
+// codexHomes lists the slot homes that exist under <git-common-dir>/rota/codex/,
 // sorted by slot name. Any failure reads as none: the check then has no home
 // to look at, and git trouble is the git check's to report.
 func codexHomes(root string) []doctor.CodexHome {

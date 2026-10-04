@@ -5,7 +5,7 @@ VD="$(mktemp -d "$TMP/verdicts.XXXXXX")"
   cd "$VD" && git init -q -b main && git -c user.email=a@b -c user.name=n commit -q --allow-empty -m init \
     && git switch -q -c feat/v && git -c user.email=a@b -c user.name=n commit -q --allow-empty -m work
 ) || fail "verdict fixture repo setup failed"
-mkdir -p "$VD/.hv"
+mkdir -p "$VD/.rota"
 
 # Malformed input is exit 2 and writes nothing.
 printf '{"findings": [{"severity": "huge", "title": "t"}]}' > "$VD/bad.json"
@@ -13,7 +13,7 @@ RC=0; ( cd "$VD" && hvj verdict add --kind qa --verdict FAIL --body-file bad.jso
 [ "$RC" = "2" ] || fail "verdict add with a bad severity should exit 2, got $RC"
 RC=0; ( cd "$VD" && hvj verdict add --kind review-spec --verdict INFRA-FAIL >/dev/null 2>&1 ) || RC=$?
 [ "$RC" = "2" ] || fail "review-spec INFRA-FAIL should exit 2, got $RC"
-[ ! -e "$VD/.hv/verdicts.json" ] || fail "a rejected verdict wrote .hv/verdicts.json"
+[ ! -e "$VD/.rota/verdicts.json" ] || fail "a rejected verdict wrote .rota/verdicts.json"
 pass "verdict add rejects malformed bodies and verdicts with exit 2"
 
 # A missing verdict is exit 3 for a consumer.
@@ -28,7 +28,7 @@ OUT=$( cd "$VD" && hvj verdict add --kind review-quality --verdict PASS --body-f
 [ "$(echo "$OUT" | jget data.combined)" = "CONCERNS" ] || fail "combined should be the worse stage: $OUT"
 [ "$( cd "$VD" && hvj verdict route --for ship-review | jget data.next )" = "ask" ] \
   || fail "CONCERNS outside loop should route to ask"
-printf '{"autonomy": {"level": "loop"}}\n' > "$VD/.hv/config.json"
+printf '{"autonomy": {"level": "loop"}}\n' > "$VD/.rota/config.json"
 [ "$( cd "$VD" && hvj verdict route --for ship-review | jget data.next )" = "address" ] \
   || fail "CONCERNS in loop should route to address"
 pass "review stages combine worst-of and route by autonomy"
@@ -43,7 +43,7 @@ OUT=$( cd "$VD" && hvj verdict add --kind review-spec --verdict FAIL )
 ( cd "$VD" && hvj verdict add --kind qa --verdict FAIL >/dev/null ) || fail "qa FAIL add failed"
 [ "$( cd "$VD" && hvj verdict route --for ship-qa | jget data.next )" = "surface" ] \
   || fail "advisory qa FAIL should surface"
-printf '{"qa": {"gate": "blocking"}}\n' > "$VD/.hv/config.json"
+printf '{"qa": {"gate": "blocking"}}\n' > "$VD/.rota/config.json"
 [ "$( cd "$VD" && hvj verdict route --for ship-qa | jget data.next )" = "stop" ] \
   || fail "blocking qa FAIL should stop"
 ( cd "$VD" && hvj verdict add --kind qa --verdict INFRA-FAIL >/dev/null ) || fail "qa INFRA-FAIL add failed"

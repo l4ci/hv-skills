@@ -1,16 +1,16 @@
-echo "dry round: hv-orchestrate's verbs in the skill's order on a fixture repo, plus a verb-existence lint (#63)"
+echo "dry round: rota-orchestrate's verbs in the skill's order on a fixture repo, plus a verb-existence lint (#63)"
 # #63 acceptance: "a dry round on a fixture repo runs end to end using only the
-# new skill and hv". A shell script cannot be the skill, so this section (a) runs
-# the verbs in the order hv-orchestrate/SKILL.md describes (doctor, start,
+# new skill and rota". A shell script cannot be the skill, so this section (a) runs
+# the verbs in the order rota-orchestrate/SKILL.md describes (doctor, start,
 # candidates, assign, wait, status/reconcile, gate with an escalated approval,
-# wind-down, reap) and (b) lints that every `hv <group> <verb>` the skill and
+# wind-down, reap) and (b) lints that every `rota <group> <verb>` the skill and
 # docs/usage/parallel-rounds.md name exists. Everything runs against FAKES: herdr
 # is test/fakes/herdr (behind a wrapper that adds --version and `api snapshot`),
 # gh is test/fakes/gh (issue and PR threads) with `pr view|merge` routed to
 # test/fakes/fake_forge.py (one PR over a real bare origin). Nothing reaches a
 # real forge, herdr or tmux. The section number is provisional.
 #
-# No HV_TEST_ROUND_EVENTS replay hook exists in this tree, and `round wait` on
+# No ROTA_TEST_ROUND_EVENTS replay hook exists in this tree, and `round wait` on
 # herdr always subscribes on HERDR_SOCKET_PATH, so step 5 needs a socket: a
 # minimal fake server (same protocol as section 81's, which keeps its own inline)
 # flips the slot to done and sends the one status event.
@@ -71,44 +71,44 @@ git clone -q "$ORIGIN" "$DY" 2>/dev/null
 (
   cd "$DY" && git checkout -q -b main 2>/dev/null
   git config user.email t@t && git config user.name t
-  mkdir -p .hv/milestones references
-  printf '.hv/\n.worktrees/\n' > .gitignore
+  mkdir -p .rota/milestones references
+  printf '.rota/\n.worktrees/\n' > .gitignore
   cp "$WORKER_CONTRACT" references/worker-contract.md
-  printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
-  printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .hv/milestones/M01.md
+  printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md
+  printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .rota/milestones/M01.md
   # Doctor runs on the config a fresh herdr project has: one account, herdr dispatch.
-  printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]},"refactor":{"verifyCommands":[]}}\n' "$TMP_DY/acct" > .hv/config.json
+  printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]},"refactor":{"verifyCommands":[]}}\n' "$TMP_DY/acct" > .rota/config.json
   git add .gitignore references && git commit -q -m seed && git push -q origin main
 ) || fail "dry round: fixture repo setup failed"
 
-# dy <cmd...> runs in the project with the fakes first on PATH; dyj is hv --json
+# dy <cmd...> runs in the project with the fakes first on PATH; dyj is rota --json
 # with stderr dropped. DYHOLD is the lease holder: this shell, which outlives
 # every call.
 DYHOLD=$$
 dy() {
   ( cd "$DY" && env PATH="$FK/bin:$PATH" FAKE_HERDR="$FK/herdr" FAKE_TRACKER_DB="$TMP_DY/gh.json" \
-      FORGE_DB="$TMP_DY/forge.json" FORGE_LOG="$TMP_DY/forge.log" HV_GATE_SHA_WAIT=0 \
+      FORGE_DB="$TMP_DY/forge.json" FORGE_LOG="$TMP_DY/forge.log" ROTA_GATE_SHA_WAIT=0 \
       HERDR_ENV=1 HERDR_WORKSPACE_ID=w9 HERDR_SOCKET_PATH="$FK/herdr.sock" "$@" )
 }
-dyj() { dy "$HV_BIN" --json "$@" 2>/dev/null; }
+dyj() { dy "$ROTA_BIN" --json "$@" 2>/dev/null; }
 [ "$(dy bash -c "command -v gh")" = "$FK/bin/gh" ] || fail "dry round: gh must resolve to the fake, got $(dy bash -c "command -v gh")"
 [ "$(dy bash -c "command -v herdr")" = "$FK/bin/herdr" ] || fail "dry round: herdr must resolve to the fake"
 
 # ── 1. doctor ───────────────────────────────────────────────────────────────
-rc=0; OUT="$(HV_TEST_DOCTOR_PATH="$FK/doctor" CLAUDE_CONFIG_DIR="$TMP_DY/acct" "$HV_BIN" --json -C "$DY" doctor 2>/dev/null)" || rc=$?
+rc=0; OUT="$(ROTA_TEST_DOCTOR_PATH="$FK/doctor" CLAUDE_CONFIG_DIR="$TMP_DY/acct" "$ROTA_BIN" --json -C "$DY" doctor 2>/dev/null)" || rc=$?
 [ "$rc" = "0" ] || fail "dry round: doctor should pass on the fixture, got $rc: $OUT"
 [ "$(jget data.ok <<<"$OUT")" = "true" ] || fail "dry round: doctor data.ok: $OUT"
 [ "$(jget data.checks[1].name <<<"$OUT")" = "host" ] && [ "$(jget data.checks[1].status <<<"$OUT")" = "pass" ] || fail "dry round: doctor host check: $OUT"
 # A failing check carries its hint and flips the exit code (the skill: fix every fail first).
 rm "$FK/doctor/herdr"
-rc=0; OUT="$(HV_TEST_DOCTOR_PATH="$FK/doctor" "$HV_BIN" --json -C "$DY" doctor 2>/dev/null)" || rc=$?
+rc=0; OUT="$(ROTA_TEST_DOCTOR_PATH="$FK/doctor" "$ROTA_BIN" --json -C "$DY" doctor 2>/dev/null)" || rc=$?
 [ "$rc" = "1" ] && [ "$(jget data.ok <<<"$OUT")" = "false" ] || fail "dry round: doctor without herdr should exit 1: rc=$rc $OUT"
 pass "doctor: healthy on the fixture, exit 1 and ok false once herdr is gone"
 
 # ── 2. start ────────────────────────────────────────────────────────────────
 # The issue goes in before start so start lists it; the config now also names the
 # forge and the merge policy the later steps need.
-printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]},"refactor":{"verifyCommands":[]},"issues":{"provider":"github","retryWaitSeconds":0},"autonomy":{"level":"loop"},"ship":{"mergeApproval":"all"}}\n' "$TMP_DY/acct" > "$DY/.hv/config.json"
+printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]},"refactor":{"verifyCommands":[]},"issues":{"provider":"github","retryWaitSeconds":0},"autonomy":{"level":"loop"},"ship":{"mergeApproval":"all"}}\n' "$TMP_DY/acct" > "$DY/.rota/config.json"
 dyj item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works\nTouches internal/a.go' >/dev/null \
   || fail "dry round: item create failed"
 printf '{"id":"cli","result":{"snapshot":{"agents":[]}}}\n' > "$FK/snapshot.json"
@@ -142,7 +142,7 @@ OUT="$(dyj round status)"
 pass "assign: tier heavy needs a reason, claims F01, cuts ben/f01-first, dispatches through fake herdr"
 
 # The worker's side, simulated with plain git and the fake forge: it commits,
-# pushes, opens a PR on the fake forge and prints HV-DONE. Nothing here is an hv
+# pushes, opens a PR on the fake forge and prints ROTA-DONE. Nothing here is a rota
 # verb the orchestrator calls.
 (
   cd "$DY/.worktrees/ben" && echo work > work.txt && git add work.txt \
@@ -171,7 +171,7 @@ while True:
     req = json.loads(c.makefile().readline())
     c.sendall(b'{"id":"%s","result":{"type":"subscription_started"}}\n' % req["id"].encode())
     time.sleep(1)
-    open(os.path.join(herdr, "pane.txt"), "w").write("HV-DONE ben %s\n" % pr)
+    open(os.path.join(herdr, "pane.txt"), "w").write("ROTA-DONE ben %s\n" % pr)
     open(os.path.join(herdr, "status"), "w").write("done\n")
     pane = req["params"]["subscriptions"][0]["pane_id"]
     try:
@@ -186,21 +186,21 @@ for _ in $(seq 50); do [ -S "$FK/herdr.sock" ] && break; sleep 0.1; done
 [ -S "$FK/herdr.sock" ] || fail "dry round: fake herdr socket never came up"
 
 # ── 5. wait ─────────────────────────────────────────────────────────────────
-BEFORE="$(sha256sum "$DY/.hv/workers.json")"
+BEFORE="$(sha256sum "$DY/.rota/workers.json")"
 rc=0; OUT="$(dyj round wait --settle 0 --timeout 20)" || rc=$?
 [ "$rc" = "0" ] || fail "dry round: wait exit $rc: $OUT"
 [ "$(jget data.slot <<<"$OUT")" = "ben" ] && [ "$(jget data.state <<<"$OUT")" = "done" ] || fail "dry round: wait should return ben done: $OUT"
 case "$(jget data.evidence <<<"$OUT")" in *"/pull/$PRN") ;; *) fail "dry round: wait evidence should carry the PR: $OUT" ;; esac
-[ "$(sha256sum "$DY/.hv/workers.json")" = "$BEFORE" ] || fail "dry round: wait wrote the registry"
+[ "$(sha256sum "$DY/.rota/workers.json")" = "$BEFORE" ] || fail "dry round: wait wrote the registry"
 [ "$(jget data.source <<<"$OUT")" = "herdr-event" ] || fail "dry round: ben should come back through the event: $OUT"
 pass "wait: returns ben as done through the herdr event with the PR as evidence, writes nothing"
 
 kill "$SRV" 2>/dev/null || true; SRV=""
 
-# worker poll reads the HV-DONE line and records the PR on the slot.
+# worker poll reads the ROTA-DONE line and records the PR on the slot.
 dyj worker poll ben >/dev/null || fail "dry round: worker poll failed"
-[ "$(python3 -c 'import json,sys; print([s for s in json.load(open(sys.argv[1]))["slots"] if s["name"]=="ben"][0].get("pr"))' "$DY/.hv/workers.json")" = "$PRURL" ] \
-  || fail "dry round: worker poll should record the PR on the slot: $(cat "$DY/.hv/workers.json")"
+[ "$(python3 -c 'import json,sys; print([s for s in json.load(open(sys.argv[1]))["slots"] if s["name"]=="ben"][0].get("pr"))' "$DY/.rota/workers.json")" = "$PRURL" ] \
+  || fail "dry round: worker poll should record the PR on the slot: $(cat "$DY/.rota/workers.json")"
 
 # ── 6. status and reconcile ─────────────────────────────────────────────────
 rc=0; OUT="$(dyj round status)" || rc=$?
@@ -237,8 +237,8 @@ rc=0; OUT="$(dyj worker gate ben --base main --approval e1)" || rc=$?
 python3 -c '
 import json, sys
 line = json.loads(open(sys.argv[1]).read().splitlines()[-1])
-sys.exit(0 if line["gate"] == "merge-approval" and line["note"] == "approve" and line["escalation"] == "e1" else 1)' "$DY/.hv/gate-audit.jsonl" \
-  || fail "dry round: the audit line should quote the answer and name e1: $(cat "$DY/.hv/gate-audit.jsonl")"
+sys.exit(0 if line["gate"] == "merge-approval" and line["note"] == "approve" and line["escalation"] == "e1" else 1)' "$DY/.rota/gate-audit.jsonl" \
+  || fail "dry round: the audit line should quote the answer and name e1: $(cat "$DY/.rota/gate-audit.jsonl")"
 [ "$(git -C "$DY" rev-parse HEAD)" = "$(git -C "$ORIGIN" rev-parse main)" ] || fail "dry round: the merged base should match origin/main"
 pass "gate: --escalate exits 4 and posts once, pending then answered, --approval merges and the audit line quotes the answer"
 
@@ -248,7 +248,7 @@ rc=0; OUT="$(dyj round wind-down --holder-pid "$DYHOLD")" || rc=$?
 [ "$rc" = "0" ] || fail "dry round: wind-down exit $rc: $OUT"
 [ "$(jget data.verdict <<<"$OUT")" = "clean" ] || fail "dry round: wind-down should be clean: $OUT"
 [ "$(git -C "$DY/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "dry round: wind-down should park ben"
-LEASE="$(git -C "$DY" rev-parse --path-format=absolute --git-common-dir)/hv/round-lease.json"
+LEASE="$(git -C "$DY" rev-parse --path-format=absolute --git-common-dir)/rota/round-lease.json"
 [ ! -f "$LEASE" ] || fail "dry round: wind-down should release the lease"
 pass "wind-down: clean, ben parked on park/ben, lease released"
 
@@ -260,27 +260,27 @@ OUT="$(dyj round reconcile)"
 pass "reconcile: clean after wind-down, no dead tab left behind"
 
 printf '{"workspaces":[],"agents":[],"processes":[]}\n' > "$TMP_DY/host.json"
-rc=0; OUT="$(HV_TEST_REAP_HOST="$TMP_DY/host.json" "$HV_BIN" --json -C "$DY" reap 2>/dev/null)" || rc=$?
+rc=0; OUT="$(ROTA_TEST_REAP_HOST="$TMP_DY/host.json" "$ROTA_BIN" --json -C "$DY" reap 2>/dev/null)" || rc=$?
 [ "$rc" = "0" ] && [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "dry round: reap preview exits 0 and changes nothing: rc=$rc $OUT"
 KINDS="$(python3 -c 'import json,sys; print(",".join(c["id"] for c in json.load(sys.stdin)["data"]["candidates"]))' <<<"$OUT")"
 case ",$KINDS," in *,tab:*|*,process:*|*,worktree:*) fail "dry round: reap lists a live or parked thing: $KINDS" ;; esac
 [ -d "$DY/.worktrees/ben" ] || fail "dry round: a reap preview removed the slot"
 pass "reap preview: lists no tab, process or worktree, removes nothing (candidates: ${KINDS:-none})"
 
-# ── 9. lint: every `hv <group> <verb>` the skill and the docs name exists ───
-# A verb resolves when `hv <words> --help` descends the tree: each group's help
+# ── 9. lint: every `rota <group> <verb>` the skill and the docs name exists ───
+# A verb resolves when `rota <words> --help` descends the tree: each group's help
 # lists its Commands and the next word must be one of them; a leaf ends the walk
 # (later words are positional arguments). Extracted words are the run of
-# lowercase [a-z-] tokens after `hv` in an inline code span or a fenced line;
-# flags, placeholders, quotes and `hv-*` skill names end or never match.
+# lowercase [a-z-] tokens after `rota` in an inline code span or a fenced line;
+# flags, placeholders, quotes and `rota-*` skill names end or never match.
 LINT="$TMP_DY/lint.py"
 cat > "$LINT" <<'PY'
 import re, subprocess, sys
-hv = sys.argv[1]
+rota = sys.argv[1]
 docs = sys.argv[2:]
 
 def commands(path):
-    out = subprocess.run([hv] + path + ["--help"], capture_output=True, text=True)
+    out = subprocess.run([rota] + path + ["--help"], capture_output=True, text=True)
     if out.returncode != 0:
         return None
     names, on = [], False
@@ -302,7 +302,7 @@ for doc in docs:
             continue
         for span in ([line.strip()] if fence else re.findall(r"`([^`]+)`", line)):
             toks = span.split()
-            if not toks or toks[0] != "hv":
+            if not toks or toks[0] != "rota":
                 continue
             words = []
             for t in toks[1:]:
@@ -319,19 +319,19 @@ for words, where in sorted(found.items()):
     for w in words:
         cmds = commands(path)
         if cmds is None:
-            verdict = "no help for hv %s" % " ".join(path)
+            verdict = "no help for rota %s" % " ".join(path)
             break
         if not cmds:          # a leaf: the rest are arguments
             break
         if w not in cmds:
-            verdict = "hv %s has no command %r" % (" ".join(path) or "<root>", w)
+            verdict = "rota %s has no command %r" % (" ".join(path) or "<root>", w)
             break
         path.append(w)
     if verdict == "ok" and not path:
         verdict = "names no verb"
     verb = " ".join(path) if verdict == "ok" else " ".join(words[:2])
     if verdict != "ok":
-        bad.append("%s: hv %s: %s" % (where, " ".join(words), verdict))
+        bad.append("%s: rota %s: %s" % (where, " ".join(words), verdict))
     else:
         ok += 1
 for b in bad:
@@ -340,21 +340,21 @@ print("RESOLVED %d" % ok)
 sys.exit(1 if bad else 0)
 PY
 # white-box-begin: A9 #53 doclint
-rc=0; OUT="$(python3 "$LINT" "$HV_BIN" "$REPO/hv-orchestrate/SKILL.md" "$REPO/docs/usage/parallel-rounds.md" 2>&1)" || rc=$?
+rc=0; OUT="$(python3 "$LINT" "$ROTA_BIN" "$REPO/rota-orchestrate/SKILL.md" "$REPO/docs/usage/parallel-rounds.md" 2>&1)" || rc=$?
 [ "$rc" = "0" ] || fail "dry round: verbs named in the skill or docs that do not exist: $OUT"
 case "$OUT" in *"RESOLVED "*) ;; *) fail "dry round: the verb lint resolved nothing: $OUT" ;; esac
 # The lint must be able to fail: a doc naming a verb that is not there is caught.
-printf 'Run `hv round waitt` and `hv worker gate <slot>`.\n' > "$TMP_DY/bad.md"
-rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/bad.md" 2>&1)" || rc=$?
-[ "$rc" = "1" ] && grep -q 'MISSING .*hv round waitt' <<<"$BAD" || fail "dry round: the lint should reject a made-up verb: rc=$rc $BAD"
+printf 'Run `rota round waitt` and `rota worker gate <slot>`.\n' > "$TMP_DY/bad.md"
+rc=0; BAD="$(python3 "$LINT" "$ROTA_BIN" "$TMP_DY/bad.md" 2>&1)" || rc=$?
+[ "$rc" = "1" ] && grep -q 'MISSING .*rota round waitt' <<<"$BAD" || fail "dry round: the lint should reject a made-up verb: rc=$rc $BAD"
 # The C10 verbs resolve for real now, and a made-up neighbour is still caught.
-printf 'Run `hv round reclaim ben`, `hv round return ben` and `hv round transfer 5 --to dana`.\n' > "$TMP_DY/c10.md"
-rc=0; GOOD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/c10.md" 2>&1)" || rc=$?
+printf 'Run `rota round reclaim ben`, `rota round return ben` and `rota round transfer 5 --to dana`.\n' > "$TMP_DY/c10.md"
+rc=0; GOOD="$(python3 "$LINT" "$ROTA_BIN" "$TMP_DY/c10.md" 2>&1)" || rc=$?
 [ "$rc" = "0" ] && grep -q 'RESOLVED 3' <<<"$GOOD" || fail "dry round: the C10 verbs should resolve: rc=$rc $GOOD"
-printf 'Run `hv round reclaim ben` and `hv round bounce`.\n' > "$TMP_DY/c10b.md"
-rc=0; BAD="$(python3 "$LINT" "$HV_BIN" "$TMP_DY/c10b.md" 2>&1)" || rc=$?
-[ "$rc" = "1" ] && grep -q 'MISSING .*hv round bounce' <<<"$BAD" || fail "dry round: a made-up round verb should fail: rc=$rc $BAD"
-pass "lint: every hv verb in hv-orchestrate/SKILL.md and docs/usage/parallel-rounds.md resolves ($(grep -o 'RESOLVED [0-9]*' <<<"$OUT"))"
+printf 'Run `rota round reclaim ben` and `rota round bounce`.\n' > "$TMP_DY/c10b.md"
+rc=0; BAD="$(python3 "$LINT" "$ROTA_BIN" "$TMP_DY/c10b.md" 2>&1)" || rc=$?
+[ "$rc" = "1" ] && grep -q 'MISSING .*rota round bounce' <<<"$BAD" || fail "dry round: a made-up round verb should fail: rc=$rc $BAD"
+pass "lint: every rota verb in rota-orchestrate/SKILL.md and docs/usage/parallel-rounds.md resolves ($(grep -o 'RESOLVED [0-9]*' <<<"$OUT"))"
 # white-box-end
 
 trap 'rm -rf "$TMP"' EXIT

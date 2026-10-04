@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Board is the backlog an assignment reads and marks.
@@ -49,7 +49,7 @@ type BlockedError struct {
 
 func (e *BlockedError) Error() string { return e.Msg }
 
-// AssignOpts are the flags of `hv round assign`, with the config read.
+// AssignOpts are the flags of `rota round assign`, with the config read.
 type AssignOpts struct {
 	ID            string
 	Agent         string
@@ -108,8 +108,8 @@ func BranchName(agent, id, title string) string {
 
 // briefPath is the standing worker contract the pointer names: round.brief,
 // else references/worker-contract.md in the project (a source checkout), else
-// hv-orchestrate/references/worker-contract.md under the first installed
-// Claude skills root, the project's before the user's (hv skills install).
+// rota-orchestrate/references/worker-contract.md under the first installed
+// Claude skills root, the project's before the user's (rota skills install).
 func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (string, bool) {
 	var cands []string
 	if set.Brief != "" {
@@ -120,7 +120,7 @@ func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (
 		cands = append(cands, p)
 	} else {
 		cands = append(cands, filepath.Join(root, "references", "worker-contract.md"))
-		installed := filepath.Join("hv-orchestrate", "references", "worker-contract.md")
+		installed := filepath.Join("rota-orchestrate", "references", "worker-contract.md")
 		skillRoots := []string{filepath.Join(root, ".claude", "skills")}
 		if d := getenv("CLAUDE_CONFIG_DIR"); d != "" {
 			skillRoots = append(skillRoots, filepath.Join(d, "skills"))
@@ -128,7 +128,7 @@ func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (
 			skillRoots = append(skillRoots, filepath.Join(home, ".claude", "skills"))
 		}
 		for _, r := range skillRoots {
-			if _, err := os.Stat(filepath.Join(r, ".hv-manifest.json")); err == nil {
+			if _, err := os.Stat(filepath.Join(r, ".rota-manifest.json")); err == nil {
 				cands = append(cands, filepath.Join(r, installed))
 				break
 			}
@@ -270,7 +270,7 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 	holder := le.Discover(o.HolderPID, o.Getenv)
 	if (st != roundlease.Live && st != roundlease.Foreign) || !holder.SameAs(lease, le.Host) {
-		return res, blocked(BlockNoRound, "this process holds no round lease: run hv round start first")
+		return res, blocked(BlockNoRound, "this process holds no round lease: run rota round start first")
 	}
 
 	// 2. The slot: the named one, else the first idle roster slot.
@@ -280,7 +280,7 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	if o.Agent != "" {
 		slot = reg.Slot(o.Agent)
 		if slot == nil {
-			return res, &worker.Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("slot %s is not provisioned: run hv round start", o.Agent)}
+			return res, &worker.Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("slot %s is not provisioned: run rota round start", o.Agent)}
 		}
 	} else {
 		for _, name := range set.Roster {
@@ -477,7 +477,7 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 	}
 	text := pointerBrief(agent, id, res.Branch, brief, o.Siblings, decisions, tierBrief{Kind: kind, Tier: tier, Model: res.Model, Default: set.Tier, Reason: reason, Table: set.Models[kind]})
 	if hb := latestHandoffBranch(be, id); hb != "" {
-		text += fmt.Sprintf("\nAn earlier worker handed this issue back: read the latest `hv:handoff` comment on it. Its work is pushed on branch %s (origin/%s); fetch it before you start over.\n", hb, hb)
+		text += fmt.Sprintf("\nAn earlier worker handed this issue back: read the latest `rota:handoff` comment on it. Its work is pushed on branch %s (origin/%s); fetch it before you start over.\n", hb, hb)
 	}
 	if solo {
 		// No pane: mark the slot busy and hand the brief back.
@@ -490,7 +490,7 @@ func (e Env) Assign(ctx context.Context, root string, be Board, o AssignOpts) (r
 		res.Changed = true
 		return res, nil
 	}
-	tmp, err := os.CreateTemp("", "hv-round-brief-")
+	tmp, err := os.CreateTemp("", "rota-round-brief-")
 	if err != nil {
 		undo()
 		return res, err

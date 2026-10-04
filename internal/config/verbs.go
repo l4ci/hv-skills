@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
-// The `hv config show|set|check` verbs, ported from bin/hv-config-show,
-// hv-config-set and hv-config-schema-check. Each reads .hv/config.json and
-// .hv/config.local.json under root, the project root.
+// The `rota config show|set|check` verbs, ported from bin/hv-config-show,
+// hv-config-set and hv-config-schema-check. Each reads .rota/config.json and
+// .rota/config.local.json under root, the project root.
 
 // Entry is one row of `config show`: a key, its effective value and the layer
 // that supplied it ("local", "project" or "default").
@@ -35,11 +35,11 @@ var ErrMalformedKey = errors.New("malformed key path")
 var ErrNotSchemaKey = errors.New("not a config key")
 
 // ErrNotObject is Set's answer when config.json holds JSON that is not an object.
-var ErrNotObject = errors.New(".hv/config.json is not a JSON object")
+var ErrNotObject = errors.New(".rota/config.json is not a JSON object")
 
-func configPath(root string) string { return filepath.Join(root, ".hv", "config.json") }
+func configPath(root string) string { return filepath.Join(root, ".rota", "config.json") }
 
-func localPath(root string) string { return filepath.Join(root, ".hv", "config.local.json") }
+func localPath(root string) string { return filepath.Join(root, ".rota", "config.local.json") }
 
 // IsSchemaKey is whether name is a row of Keys.
 func IsSchemaKey(name string) bool {
@@ -125,7 +125,7 @@ type SetResult struct {
 }
 
 // Set writes value (JSON when it parses, else the raw string) at the dotted
-// key of .hv/config.json and never touches config.local.json. The key must be
+// key of .rota/config.json and never touches config.local.json. The key must be
 // in the schema. Intermediate objects are created, or replaced when a scalar
 // is in the way. A missing or unparseable file counts as {}; a file holding
 // any other JSON than an object is ErrNotObject. The file is rewritten as
@@ -202,7 +202,7 @@ const (
 	Corrupt  = "corrupt"
 )
 
-// Check is hv-config-schema-check: the state of .hv/config.json against the
+// Check is hv-config-schema-check: the state of .rota/config.json against the
 // required schema keys. Missing lists, in schema order, the required keys that
 // are absent or null; it is non-empty only for Stale.
 func Check(root string) (status string, missing []string) {

@@ -7,26 +7,26 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	hvrepos "github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/status"
-	"github.com/l4ci/hv/v5/internal/update"
-	"github.com/l4ci/hv/v5/internal/version"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	hvrepos "github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/status"
+	"github.com/l4ci/rota/internal/update"
+	"github.com/l4ci/rota/internal/version"
 )
 
-// The A4 `hv update`, `hv config show|set|check` and `hv repo which|resolve|
+// The A4 `rota update`, `rota config show|set|check` and `rota repo which|resolve|
 // umbrella` verbs. Shapes, flags and exits are the verb contract's
 // (docs/design/5.0-verb-contract.md, "A3 and A4"); the old helpers named in
 // each `old:` line are the behaviour to match.
 
 func a4cCommands() []*Command {
 	return []*Command{
-		{Name: "update", Summary: "check for a newer hv release", Verb: a4Update},
-		{Name: "config", Summary: "read and write .hv/config.json", Subs: []*Command{
+		{Name: "update", Summary: "check for a newer rota release", Verb: a4Update},
+		{Name: "config", Summary: "read and write .rota/config.json", Subs: []*Command{
 			{Name: "show", Summary: "effective value and source of config keys", Repo: true, Verb: a4ConfigShow},
-			{Name: "set", Summary: "set one key in .hv/config.json", Repo: true, Verb: a4ConfigSet},
-			{Name: "check", Summary: "compare .hv/config.json with the schema", Repo: true, Verb: a4ConfigCheck},
+			{Name: "set", Summary: "set one key in .rota/config.json", Repo: true, Verb: a4ConfigSet},
+			{Name: "check", Summary: "compare .rota/config.json with the schema", Repo: true, Verb: a4ConfigCheck},
 			{Name: "fill", Summary: "write the default of every missing required key", Repo: true, Verb: a4ConfigFill},
 		}},
 		{Name: "repo", Summary: "umbrella sub-repo registry", Subs: []*Command{
@@ -39,7 +39,7 @@ func a4cCommands() []*Command {
 
 // ---- update ----------------------------------------------------------------------
 
-// updateEnv is a seam: tests pin what hv update reads from the machine.
+// updateEnv is a seam: tests pin what rota update reads from the machine.
 var updateEnv = func() update.Env { return update.DefaultEnv(version.Get().Version) }
 
 func a4Update(fs *flag.FlagSet) RunFunc {
@@ -51,7 +51,7 @@ func a4Update(fs *flag.FlagSet) RunFunc {
 		data := a4Obj("installType", r.InstallType, "installRoot", r.InstallRoot,
 			"currentVersion", r.CurrentVersion, "latestVersion", r.LatestVersion,
 			"status", r.Status, "updateCommand", r.UpdateCommand)
-		text := fmt.Sprintf("hv %s (%s), latest %s: %s", orDash(r.CurrentVersion), r.InstallType, orDash(r.LatestVersion), r.Status)
+		text := fmt.Sprintf("rota %s (%s), latest %s: %s", orDash(r.CurrentVersion), r.InstallType, orDash(r.LatestVersion), r.Status)
 		if r.Status == "behind" {
 			text += "\nupdate with: " + r.UpdateCommand
 		}
@@ -146,13 +146,13 @@ func a4ConfigCheck(fs *flag.FlagSet) RunFunc {
 		case config.Stale:
 			return res, Failed("config is stale: %d required keys missing", len(missing))
 		case config.Fresh:
-			return res, Failed("no .hv/config.json yet")
+			return res, Failed("no .rota/config.json yet")
 		}
-		return res, Failed(".hv/config.json is not a valid JSON object")
+		return res, Failed(".rota/config.json is not a valid JSON object")
 	}
 }
 
-// a4ConfigFill is the A9 `hv config fill` (contract G1): `config check`'s
+// a4ConfigFill is the A9 `rota config fill` (contract G1): `config check`'s
 // missing keys get their schema defaults.
 func a4ConfigFill(fs *flag.FlagSet) RunFunc {
 	return func(c *Ctx, args []string) (Result, error) {
@@ -201,7 +201,7 @@ func a4RepoWhich(fs *flag.FlagSet) RunFunc {
 		case errors.Is(err, hvrepos.ErrNotGit):
 			return Result{}, Resolution("not inside a git repo")
 		case errors.Is(err, hvrepos.ErrNoUmbrella):
-			return Result{}, Resolution("no umbrella: no .hv/ here or in any parent")
+			return Result{}, Resolution("no umbrella: no .rota/ here or in any parent")
 		}
 		return Result{}, Resolution("not inside a registered sub-repo")
 	}
@@ -221,7 +221,7 @@ func a4RepoResolve(fs *flag.FlagSet) RunFunc {
 		if missing := status.Missing(registry, names); len(missing) > 0 {
 			e := Resolution("unregistered sub-repo(s): %s", strings.Join(missing, ", "))
 			if len(registry) == 0 {
-				e.WithHint("not an umbrella project: .hv/repos.json registers no sub-repos")
+				e.WithHint("not an umbrella project: .rota/repos.json registers no sub-repos")
 			}
 			return Result{}, e
 		}

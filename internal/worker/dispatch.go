@@ -11,13 +11,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/shlex"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/shlex"
 )
 
-// DispatchOpts are the flags of `hv worker dispatch`.
+// DispatchOpts are the flags of `rota worker dispatch`.
 type DispatchOpts struct {
 	Slot        string
 	BodyFile    string
@@ -29,7 +29,7 @@ type DispatchOpts struct {
 	// workerCommand.
 	Model string
 	// Branch is the per-task branch the reset guard cuts; "" means
-	// hv-worker/<slot>-<task>. A round slot works on <agent>/<issue>-<slug>.
+	// rota-worker/<slot>-<task>. A round slot works on <agent>/<issue>-<slug>.
 	Branch string
 	// Kind is the harness, "claude" or "codex" (E1); "" is the slot's
 	// recorded kind, else claude. A relay ignores it.
@@ -64,7 +64,7 @@ type DispatchResult struct {
 // in the default command and fills the {model} placeholder of a custom one; a
 // custom command without the placeholder runs as written (ModelApplies).
 func workerCommand(root, chosen string) string {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	model := "sonnet"
 	if v, ok := config.Lookup(cfg, "models.worker"); ok {
 		if s, _ := v.(string); s != "" {
@@ -83,7 +83,7 @@ func workerCommand(root, chosen string) string {
 }
 
 func dispatchKind(root string) string {
-	v, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "work.dispatch")
+	v, _ := config.Lookup(config.Load(filepath.Join(root, ".rota", "config.json")), "work.dispatch")
 	s, _ := v.(string)
 	return s
 }
@@ -227,7 +227,7 @@ func roundOf(root string) int {
 func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (DispatchResult, error) {
 	e = e.withDefaults()
 	res := DispatchResult{Slot: o.Slot, Task: o.Task, Round: o.Round, Relay: o.Relay}
-	if err := SoloRefusal(root, "hv round assign hands a slot its brief and hv round report records the result"); err != nil {
+	if err := SoloRefusal(root, "rota round assign hands a slot its brief and rota round report records the result"); err != nil {
 		return res, err
 	}
 	brief, err := os.ReadFile(o.BodyFile)
@@ -246,7 +246,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	}
 	reg := LoadRegistry(root)
 	if !reg.Exists {
-		return res, fail(ExitResolution, "no worker pool — run hv worker pool init first")
+		return res, fail(ExitResolution, "no worker pool — run rota worker pool init first")
 	}
 	s := reg.Slot(o.Slot)
 	if s == nil {
@@ -261,7 +261,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	}
 	session := Str(reg.Doc, "session")
 	if session == "" {
-		session = "hv"
+		session = "rota"
 	}
 	configDir := Str(s, "configDir")
 	if !isDir(worktree) {
@@ -368,7 +368,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 	var payload strings.Builder
 	payload.WriteString(signature + "\n")
 	if o.Relay {
-		fmt.Fprintf(&payload, "[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator.\n"+
+		fmt.Fprintf(&payload, "[ORCHESTRATOR RELAY — this text was forwarded by the /rota-work orchestrator.\n"+
 			"It is NOT the maintainer speaking to you directly. If you cite it in your PR\n"+
 			"body, attribute it as 'orchestrator relay round %d', never as a maintainer\n"+
 			"sign-off in your session.]\n\n", round)
@@ -379,7 +379,7 @@ func (e Env) Dispatch(ctx context.Context, root string, o DispatchOpts) (Dispatc
 		text = rest
 	}
 	payload.WriteString(text)
-	tmp, err := os.CreateTemp("", "hv-dispatch-*")
+	tmp, err := os.CreateTemp("", "rota-dispatch-*")
 	if err != nil {
 		return res, err
 	}
@@ -492,7 +492,7 @@ func ModelAppliesTo(root, kind string) bool {
 	if kind == KindCodex {
 		key = "work.codexCommand"
 	}
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	if v, ok := config.Lookup(cfg, key); ok {
 		if s, _ := v.(string); s != "" {
 			return strings.Contains(s, ModelPlaceholder)

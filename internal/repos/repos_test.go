@@ -10,7 +10,7 @@ import (
 func TestLoad(t *testing.T) {
 	root := t.TempDir()
 	real, _ := filepath.EvalSymlinks(root)
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o755)
 	os.MkdirAll(filepath.Join(root, "svc"), 0o755)
 	os.Symlink(filepath.Join(root, "svc"), filepath.Join(root, "link"))
 	reg := `{"repos":[
@@ -24,7 +24,7 @@ func TestLoad(t *testing.T) {
 		{"name":"ghost","path":"ghost"},
 		{"name":"svc","path":"other"}
 	]}`
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(reg), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(reg), 0o644)
 	want := []Repo{
 		{"svc", "svc", filepath.Join(real, "svc")},
 		{"link", "link", filepath.Join(real, "svc")},
@@ -40,7 +40,7 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("Paths keeps the last of a repeated name: %v", p)
 	}
 	for _, body := range []string{"", "not json", `{"repos":null}`, `[]`, `{"repos":{}}`} {
-		os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(body), 0o644)
+		os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(body), 0o644)
 		if got := Load(root); len(got) != 0 {
 			t.Errorf("%q: %v", body, got)
 		}

@@ -1,4 +1,4 @@
-// Package version reports the hv build: release builds get Version, Commit
+// Package version reports the rota build: release builds get Version, Commit
 // and Date through -ldflags -X; `go install` and `go build` builds fall back
 // to the module version and VCS stamp in the embedded build info.
 package version
@@ -8,14 +8,14 @@ import (
 	"runtime/debug"
 )
 
-// Set at link time: -X github.com/l4ci/hv/v5/internal/version.Version=5.0.0
+// Set at link time: -X github.com/l4ci/rota/internal/version.Version=5.0.0
 var (
 	Version = ""
 	Commit  = ""
 	Date    = ""
 )
 
-// Info is what `hv version` prints.
+// Info is what `rota version` prints.
 type Info struct {
 	Version   string
 	Commit    string

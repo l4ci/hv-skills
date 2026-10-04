@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // Fixture goldens: the Go port runs on a freshly built project and must leave
-// the .hv/workers.json the retired shell helper wrote, frozen under
+// the .rota/workers.json the retired shell helper wrote, frozen under
 // testdata/golden.
 
 func goInit(t *testing.T, dir string, o InitOpts) (InitResult, error) {
@@ -51,7 +51,7 @@ func TestPoolInitDefaultsToCurrentBranchAndHv(t *testing.T) {
 	var want map[string]string
 	pytest.Golden(t, map[string]any{"config": `{}`, "argv": "init --slots 1"}, &want)
 	res, err := goInit(t, b, InitOpts{Slots: 1})
-	if err != nil || res.Base != "main" || res.Session != "hv" {
+	if err != nil || res.Base != "main" || res.Session != "rota" {
 		t.Fatalf("%+v %v", res, err)
 	}
 	mustEqual(t, "workers.json", want["workers.json"], registry(t, b))
@@ -74,16 +74,16 @@ func TestPoolInitMigratesWindowToHandleAndKeepsLiveTab(t *testing.T) {
 	cfg := `{"work":{"dispatch":"herdr"}}`
 	b := newProject(t, cfg)
 	var want map[string]string
-	pytest.Golden(t, map[string]any{"config": cfg, "steps": []string{"init --slots 2 --base main", "slot 1 handle w9:t4, slot 2 window hv:w2", "init --slots 2 --base main"}}, &want)
+	pytest.Golden(t, map[string]any{"config": cfg, "steps": []string{"init --slots 2 --base main", "slot 1 handle w9:t4, slot 2 window rota:w2", "init --slots 2 --base main"}}, &want)
 	goInit(t, b, InitOpts{Slots: 2, Base: "main"})
 	// slot 1 had a live tab recorded; slot 2 is an unmigrated pre-herdr registry
 	raw, _ := os.ReadFile(RegistryPath(b))
 	s := strings.Replace(string(raw), `"handle": null,`, `"handle": "w9:t4",`, 1)
-	s = strings.Replace(s, `"handle": null,`, `"window": "hv:w2",`, 1)
+	s = strings.Replace(s, `"handle": null,`, `"window": "rota:w2",`, 1)
 	os.WriteFile(RegistryPath(b), []byte(s), 0o644)
 	goInit(t, b, InitOpts{Slots: 2, Base: "main"})
 	mustEqual(t, "migrated workers.json", want["workers.json"], registry(t, b))
-	if got := registry(t, b); !strings.Contains(got, `"handle": "w9:t4"`) || !strings.Contains(got, `"handle": "hv:w2"`) || strings.Contains(got, `"window"`) {
+	if got := registry(t, b); !strings.Contains(got, `"handle": "w9:t4"`) || !strings.Contains(got, `"handle": "rota:w2"`) || strings.Contains(got, `"window"`) {
 		t.Errorf("window not migrated or live tab clobbered:\n%s", got)
 	}
 }
@@ -91,12 +91,12 @@ func TestPoolInitMigratesWindowToHandleAndKeepsLiveTab(t *testing.T) {
 func TestPoolInitRegistersTheBranchActuallyCheckedOut(t *testing.T) {
 	b := newProject(t, `{}`)
 	var want map[string]string
-	pytest.Golden(t, map[string]any{"config": `{}`, "steps": []string{"init --slots 1 --base main", "git switch -c hv-worker/w1-t9 in w1", "init --slots 1 --base main"}}, &want)
+	pytest.Golden(t, map[string]any{"config": `{}`, "steps": []string{"init --slots 1 --base main", "git switch -c rota-worker/w1-t9 in w1", "init --slots 1 --base main"}}, &want)
 	goInit(t, b, InitOpts{Slots: 1, Base: "main"})
-	sh(t, filepath.Join(b, ".worktrees", "w1"), "git", "switch", "-q", "-c", "hv-worker/w1-t9")
+	sh(t, filepath.Join(b, ".worktrees", "w1"), "git", "switch", "-q", "-c", "rota-worker/w1-t9")
 	goInit(t, b, InitOpts{Slots: 1, Base: "main"})
 	mustEqual(t, "workers.json", want["workers.json"], registry(t, b))
-	if !strings.Contains(registry(t, b), `"branch": "hv-worker/w1-t9"`) {
+	if !strings.Contains(registry(t, b), `"branch": "rota-worker/w1-t9"`) {
 		t.Error("init registered the init-time name, not the checked-out branch")
 	}
 }
@@ -105,10 +105,10 @@ func TestPoolInitRegistersTheBranchActuallyCheckedOut(t *testing.T) {
 func TestPoolInitLegacySlotStays(t *testing.T) {
 	b := newProject(t, `{}`)
 	var want map[string]string
-	pytest.Golden(t, map[string]any{"config": `{}`, "legacy slot": "w1 at <root>/.claude/worktrees/hv-worker/w1 on hv-worker/w1, handle hv:w1", "argv": "init --slots 1 --base main"}, &want)
-	legacy := filepath.Join(b, ".claude", "worktrees", "hv-worker", "w1")
-	sh(t, b, "git", "worktree", "add", "-q", "-b", "hv-worker/w1", legacy, "main")
-	reg := `{"session":"hv","slots":[{"name":"w1","branch":"hv-worker/w1","worktree":"` + legacy + `","base":"main","handle":"hv:w1","state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
+	pytest.Golden(t, map[string]any{"config": `{}`, "legacy slot": "w1 at <root>/.claude/worktrees/rota-worker/w1 on rota-worker/w1, handle rota:w1", "argv": "init --slots 1 --base main"}, &want)
+	legacy := filepath.Join(b, ".claude", "worktrees", "rota-worker", "w1")
+	sh(t, b, "git", "worktree", "add", "-q", "-b", "rota-worker/w1", legacy, "main")
+	reg := `{"session":"rota","slots":[{"name":"w1","branch":"rota-worker/w1","worktree":"` + legacy + `","base":"main","handle":"rota:w1","state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
 	os.WriteFile(RegistryPath(b), []byte(reg), 0o644)
 	res, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"})
 	if err != nil {
@@ -125,7 +125,7 @@ func TestPoolInitLegacySlotStays(t *testing.T) {
 
 func TestPoolInitRefusesForeignRepoWorktree(t *testing.T) {
 	b, foreignB := newProject(t, `{}`), newProject(t, `{}`)
-	reg := `{"session":"hv","slots":[{"name":"w1","branch":"main","worktree":"` + foreignB + `","base":"main","handle":null,"state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
+	reg := `{"session":"rota","slots":[{"name":"w1","branch":"main","worktree":"` + foreignB + `","base":"main","handle":null,"state":"idle","task":null,"pr":null,"relays":[],"configDir":null}]}`
 	os.WriteFile(RegistryPath(b), []byte(reg), 0o644)
 	before, _ := os.ReadFile(RegistryPath(b))
 	_, err := goInit(t, b, InitOpts{Slots: 1, Base: "main"})
@@ -178,7 +178,7 @@ func TestPoolReap(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(b, ".worktrees", "w2")); err == nil {
 		t.Error("worktree survived the reap")
 	}
-	if out := sh(t, b, "git", "branch", "--list", "hv-worker/w2"); out != "" {
+	if out := sh(t, b, "git", "branch", "--list", "rota-worker/w2"); out != "" {
 		t.Errorf("branch survived: %s", out)
 	}
 
@@ -204,7 +204,7 @@ func TestPoolListDropsNullFields(t *testing.T) {
 	dir := newProject(t, `{}`)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
 	session, round, slots := PoolList(dir)
-	if session != "hv" || round != nil || len(slots) != 1 {
+	if session != "rota" || round != nil || len(slots) != 1 {
 		t.Fatalf("%v %v %v", session, round, slots)
 	}
 	for _, k := range []string{"handle"} {

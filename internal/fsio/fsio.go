@@ -1,5 +1,5 @@
-// Package fsio holds hv's file primitives: atomic writes and the sidecar
-// advisory lock. Both match bin/hvlib_io.py, so hv and the old helpers can
+// Package fsio holds rota's file primitives: atomic writes and the sidecar
+// advisory lock. Both match bin/hvlib_io.py, so rota and the old helpers can
 // share state files during the port (docs/design/5.0-cli-conventions.md, Writes).
 package fsio
 
@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // LockTimeout and lockPoll match hvlib_io.locked.

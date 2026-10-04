@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// roundWait is `hv round wait`; the loop is worker.Env.Wait. It wakes a slot
-// the way `hv worker poll` would classify it and writes nothing.
+// roundWait is `rota round wait`; the loop is worker.Env.Wait. It wakes a slot
+// the way `rota worker poll` would classify it and writes nothing.
 func roundWait(fs *flag.FlagSet) RunFunc {
 	timeout := fs.Float64("timeout", 0, "seconds to wait before giving up; 0 waits indefinitely")
 	settle := fs.Float64("settle", 5, "seconds between the two pane captures of one classification")

@@ -2,14 +2,14 @@ echo "backlog.backend config keys and accessors"
 
 TMP_BK="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK"' EXIT
-mkdir -p "$TMP_BK/proj/.hv"
+mkdir -p "$TMP_BK/proj/.rota"
 (
   cd "$TMP_BK/proj"
   CS() { hvj config show backlog.backend | jget "data.entries[0].$1"; }
   [ "$(CS value):$(CS source)" = "file:default" ] || fail "default backlog.backend: got '$(CS value):$(CS source)'"
-  echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
+  echo '{"backlog":{"backend":"issues"}}' > .rota/config.json
   [ "$(CS value):$(CS source)" = "issues:project" ] || fail "project backlog.backend: got '$(CS value):$(CS source)'"
-  echo '{"backlog":{"backend":"file"}}' > .hv/config.local.json
+  echo '{"backlog":{"backend":"file"}}' > .rota/config.local.json
   [ "$(CS value):$(CS source)" = "file:local" ] || fail "local backlog.backend: got '$(CS value):$(CS source)'"
   pass "config show reports backlog.backend default/project/local"
 )
@@ -18,11 +18,11 @@ echo "FileBackend: create/read verbs byte-identical"
 
 TMP_GB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB"' EXIT
-mkdir -p "$TMP_GB/.hv"
+mkdir -p "$TMP_GB/.rota"
 (
   cd "$TMP_GB"
   git init -q && git config user.email t@t && git config user.name t
-  cat > .hv/BACKLOG.md <<'MD'
+  cat > .rota/BACKLOG.md <<'MD'
 # Backlog
 
 ## Bugs
@@ -44,10 +44,10 @@ mkdir -p "$TMP_GB/.hv"
 - ~~**[B03] [P1] Done thing.** old desc. Milestone: M01 Since: abc1234~~ Done 2026-01-01 [`abc1234`]
 - ~~**[T02] Skipped.** x.~~ Done 2026-01-02 [`def5678`] (dropped: not needed)
 MD
-  printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old. Related: [B01]~~ Done 2025-12-01 [`1111111`] (blocked: waiting)\n' > .hv/ARCHIVE.md
-  echo '{"active":[{"items":["B02"],"branch":"fix/b02","startedAt":"2026-01-01T00:00:00Z"}]}' > .hv/status.json
+  printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old. Related: [B01]~~ Done 2025-12-01 [`1111111`] (blocked: waiting)\n' > .rota/ARCHIVE.md
+  echo '{"active":[{"items":["B02"],"branch":"fix/b02","startedAt":"2026-01-01T00:00:00Z"}]}' > .rota/status.json
   git add -A && git commit -qm seed
-  cp .hv/BACKLOG.md "$TMP_GB/orig.md"
+  cp .rota/BACKLOG.md "$TMP_GB/orig.md"
 
   eq() { # label, expected, actual
     [ "$2" = "$3" ] || fail "golden $1: expected '$2' got '$3'"
@@ -71,17 +71,17 @@ MD
   # item field set
   SFV() { hvj item field set "$1" --name "$2" --value "$3"; }
   eq "set-field changed" "true" "$(SFV F02 milestone M03 | jget data.changed)"
-  eq "set-field line" '- **[F02] [Minor] Small feature.** No fields. Milestone: M03' "$(grep -F '[F02]' .hv/BACKLOG.md)"
+  eq "set-field line" '- **[F02] [Minor] Small feature.** No fields. Milestone: M03' "$(grep -F '[F02]' .rota/BACKLOG.md)"
   eq "set-field same value" "false" "$(SFV F02 milestone M03 | jget data.changed)"
   SFV F02 milestone "" >/dev/null
-  eq "set-field clear" '- **[F02] [Minor] Small feature.** No fields.' "$(grep -F '[F02]' .hv/BACKLOG.md)"
-  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "set-field round trip changed BACKLOG.md"
+  eq "set-field clear" '- **[F02] [Minor] Small feature.** No fields.' "$(grep -F '[F02]' .rota/BACKLOG.md)"
+  cmp -s .rota/BACKLOG.md "$TMP_GB/orig.md" || fail "set-field round trip changed BACKLOG.md"
   eq "set-field unknown" "3" "$(rcof hvj item field set B99 --name milestone --value M1)"
   eq "set-field completed" "4" "$(rcof hvj item field set B03 --name milestone --value M1)"
   eq "set-field archived" "4" "$(rcof hvj item field set B05 --name milestone --value M1)"
   eq "set-field bad field" "2" "$(rcof hvj item field set B01 --name title --value X)"
   eq "set-field usage" "2" "$(rcof hvj item field set B01 --name milestone)"
-  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "rejected item field set changed BACKLOG.md"
+  cmp -s .rota/BACKLOG.md "$TMP_GB/orig.md" || fail "rejected item field set changed BACKLOG.md"
   pass "item field set golden"
 
   # backlog list
@@ -100,20 +100,20 @@ MD
   pass "backlog list golden"
 
   # backlog.backend = issues: item create --raw-file refuses (exit 4), BACKLOG.md untouched
-  echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
+  echo '{"backlog":{"backend":"issues"}}' > .rota/config.json
   rc=0; OUT="$(echo '- **[B10] x.**' | hvj item create --kind bugs --raw-file - 2>/dev/null)" || rc=$?
   eq "raw-file issues refusal" "4:refused" "$rc:$(echo "$OUT" | jget error.code)"
   eq "raw-file refusal data" "false" "$(echo "$OUT" | jget data.changed)"
-  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "item create --raw-file wrote BACKLOG.md under issues backend"
+  cmp -s .rota/BACKLOG.md "$TMP_GB/orig.md" || fail "item create --raw-file wrote BACKLOG.md under issues backend"
   pass "issues backend refused by item create --raw-file (exit 4, file unchanged)"
 
   # bogus backend: the verb fails, nothing is written
-  echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
+  echo '{"backlog":{"backend":"bogus"}}' > .rota/config.json
   eq "bogus raw-file" "1" "$(echo '- **[B10] x.**' | hvj item create --kind bugs --raw-file - >/dev/null 2>&1 && echo 0 || echo 1)"
   eq "bogus field get" "1" "$(hvj item field get B01 --name title >/dev/null 2>&1 && echo 0 || echo 1)"
   eq "bogus field set" "1" "$(hvj item field set B01 --name milestone --value M09 >/dev/null 2>&1 && echo 0 || echo 1)"
   eq "bogus backlog list" "1" "$(hvj backlog list >/dev/null 2>&1 && echo 0 || echo 1)"
-  cmp -s .hv/BACKLOG.md "$TMP_GB/orig.md" || fail "bogus backend wrote BACKLOG.md"
+  cmp -s .rota/BACKLOG.md "$TMP_GB/orig.md" || fail "bogus backend wrote BACKLOG.md"
   pass "bogus backlog.backend fails for create, field get/set and list"
 )
 trap 'rm -rf "$TMP_BK" "$TMP_GB"' EXIT
@@ -130,8 +130,8 @@ trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
   echo b >> a && git commit -qam "refactor(core): tidy"
   R1="$(git log -1 --format=%h)"
   TODAY="$(date +%Y-%m-%d)"
-  mkdir -p .hv
-  cat > .hv/BACKLOG.md <<MD
+  mkdir -p .rota
+  cat > .rota/BACKLOG.md <<MD
 # Backlog
 
 ## Bugs
@@ -151,31 +151,31 @@ trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU"' EXIT
 - ~~**[B03] [P1] Done thing.** old.~~ Done 2026-01-01 [\`$C1\`]
 - ~~**[T02] Skipped.** x.~~ Done 2026-01-02 [\`$C1\`] (dropped: not needed)
 MD
-  printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old.~~ Done 2025-12-01 [`%s`] (blocked: waiting)\n' "$C1" > .hv/ARCHIVE.md
-  echo '{"since_refactor":{"features":3,"bugs":3}}' > .hv/counters.json
+  printf '# Archive\n\n- ~~**[B05] [P2] Archived.** old.~~ Done 2025-12-01 [`%s`] (blocked: waiting)\n' "$C1" > .rota/ARCHIVE.md
+  echo '{"since_refactor":{"features":3,"bugs":3}}' > .rota/counters.json
   hvj proof add B01 --check t --result PASS --evidence x --sha "$C1" >/dev/null
   hvj proof add B02 --check t --result PASS --evidence x --sha "$C1" >/dev/null
-  cp .hv/BACKLOG.md orig.md; cp .hv/ARCHIVE.md orig.arch; cp .hv/counters.json orig.cnt
+  cp .rota/BACKLOG.md orig.md; cp .rota/ARCHIVE.md orig.arch; cp .rota/counters.json orig.cnt
   eq() { [ "$2" = "$3" ] || fail "$1: expected [$2] got [$3]"; }
   rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
-  cnt() { python3 -c 'import json;d=json.load(open(".hv/counters.json"))["since_refactor"];print(d["features"],d["bugs"])'; }
+  cnt() { python3 -c 'import json;d=json.load(open(".rota/counters.json"))["since_refactor"];print(d["features"],d["bugs"])'; }
 
   # complete: proof row present, default Done line, counter bumped
   OUT="$(hvj item complete B01 --commit "$C1")"
   eq "complete data" "B|done|$C1|true" "$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.reason)|$(echo "$OUT" | jget data.commit)|$(echo "$OUT" | jget data.changed)"
-  eq "complete line" "- ~~**[B01] [P1] First bug.** Desc one.~~ Done $TODAY [\`$C1\`]" "$(grep -F '[B01]' .hv/BACKLOG.md)"
+  eq "complete line" "- ~~**[B01] [P1] First bug.** Desc one.~~ Done $TODAY [\`$C1\`]" "$(grep -F '[B01]' .rota/BACKLOG.md)"
   eq "complete counter" "3 4" "$(cnt)"
   # already completed: success no-op, no second bump
   rc=0; OUT="$(hvj item complete B01 --commit "$C1")" || rc=$?
   eq "complete noop" "0:false" "$rc:$(echo "$OUT" | jget data.changed)"; eq "noop counter" "3 4" "$(cnt)"
   # no proof: refused (exit 4), nothing written
-  cp .hv/BACKLOG.md pre.md
+  cp .rota/BACKLOG.md pre.md
   rc=0; OUT="$(hvj item complete B04 --commit "$C1" 2>/dev/null)" || rc=$?
   eq "no proof" "4:proof missing:false" "$rc:$(echo "$OUT" | jget data.blockedBy):$(echo "$OUT" | jget data.changed)"
-  cmp -s .hv/BACKLOG.md pre.md || fail "no-proof close wrote BACKLOG.md"
+  cmp -s .rota/BACKLOG.md pre.md || fail "no-proof close wrote BACKLOG.md"
   # --no-proof with reason and note
   hvj item complete B04 --commit "$C1" --no-proof --reason blocked --note "waiting on X" >/dev/null
-  eq "reason/note line" "- ~~**[B04] [P2] No proof.** Desc.~~ Done $TODAY [\`$C1\`] (blocked: waiting on X)" "$(grep -F '[B04]' .hv/BACKLOG.md | head -1)"
+  eq "reason/note line" "- ~~**[B04] [P2] No proof.** Desc.~~ Done $TODAY [\`$C1\`] (blocked: waiting on X)" "$(grep -F '[B04]' .rota/BACKLOG.md | head -1)"
   # refactor: commit leaves counters alone
   hvj item complete B02 --commit "$R1" >/dev/null
   eq "refactor counter" "3 5" "$(cnt)"
@@ -185,27 +185,27 @@ MD
   pass "item complete golden"
 
   # reopen: from Completed, rewinds counter; from ARCHIVE.md; refactor; active no-op
-  cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
+  cp orig.md .rota/BACKLOG.md; cp orig.arch .rota/ARCHIVE.md; cp orig.cnt .rota/counters.json
   eq "reopen changed" "true" "$(hvj item reopen B03 | jget data.changed)"
-  eq "reopen line" "- **[B03] [P1] Done thing.** old." "$(grep -F '[B03]' .hv/BACKLOG.md)"
-  if grep -qF '~~**[B03]' .hv/BACKLOG.md; then fail "B03 Done line left in BACKLOG"; fi
+  eq "reopen line" "- **[B03] [P1] Done thing.** old." "$(grep -F '[B03]' .rota/BACKLOG.md)"
+  if grep -qF '~~**[B03]' .rota/BACKLOG.md; then fail "B03 Done line left in BACKLOG"; fi
   eq "reopen counter" "3 2" "$(cnt)"
   hvj item reopen B05 >/dev/null
-  eq "archive restore" "- **[B05] [P2] Archived.** old." "$(grep -F '[B05]' .hv/BACKLOG.md)"
-  eq "archive emptied" "# Archive" "$(grep -v '^$' .hv/ARCHIVE.md)"
+  eq "archive restore" "- **[B05] [P2] Archived.** old." "$(grep -F '[B05]' .rota/BACKLOG.md)"
+  eq "archive emptied" "# Archive" "$(grep -v '^$' .rota/ARCHIVE.md)"
   eq "archive counter" "3 1" "$(cnt)"
   rc=0; OUT="$(hvj item reopen B03)" || rc=$?
   eq "reopen noop" "0:false" "$rc:$(echo "$OUT" | jget data.changed)"
   eq "noop counter" "3 1" "$(cnt)"
   hvj item reopen T02 >/dev/null
-  eq "task restore" "- **[T02] Skipped.** x." "$(grep -F '[T02]' .hv/BACKLOG.md)"
+  eq "task restore" "- **[T02] Skipped.** x." "$(grep -F '[T02]' .rota/BACKLOG.md)"
   eq "task counter" "3 1" "$(cnt)"
   eq "reopen unknown" "3" "$(rcof hvj item reopen B99)"
   pass "item reopen golden"
 
   # backlog.backend = issues from here on
-  cp orig.md .hv/BACKLOG.md; cp orig.arch .hv/ARCHIVE.md; cp orig.cnt .hv/counters.json
-  echo '{"backlog":{"backend":"issues"}}' > .hv/config.json
+  cp orig.md .rota/BACKLOG.md; cp orig.arch .rota/ARCHIVE.md; cp orig.cnt .rota/counters.json
+  echo '{"backlog":{"backend":"issues"}}' > .rota/config.json
 
   # file-only verbs refuse in issue mode (exit 4, backend), writing nothing
   # (a mutating verb exits 4; a read-only one, backlog drift, exits 1)
@@ -220,21 +220,21 @@ backlog archive|4|backlog archive --days 0
 backlog backfill|4|backlog backfill
 backlog drift|1|backlog drift
 EOF
-  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/ARCHIVE.md orig.arch && cmp -s .hv/counters.json orig.cnt || fail "file-only verb wrote under issues backend"
+  cmp -s .rota/BACKLOG.md orig.md && cmp -s .rota/ARCHIVE.md orig.arch && cmp -s .rota/counters.json orig.cnt || fail "file-only verb wrote under issues backend"
   pass "file-only verbs refuse under issues backend (exit 4, read-only drift 1, no writes)"
 
   # bogus backend: every verb fails, nothing is written
-  echo '{"backlog":{"backend":"bogus"}}' > .hv/config.json
+  echo '{"backlog":{"backend":"bogus"}}' > .rota/config.json
   for call in "item complete B01 --commit $C1" "item reopen B03" "id next --kind bugs" "item rm B01 --apply" "backlog archive --days 0" "backlog backfill" "backlog drift"; do
     # shellcheck disable=SC2086
     rc=0; hvj $call >/dev/null 2>&1 || rc=$?
-    [ "$rc" != 0 ] || fail "hv $call succeeded under a bogus backlog.backend"
+    [ "$rc" != 0 ] || fail "rota $call succeeded under a bogus backlog.backend"
   done
-  cmp -s .hv/BACKLOG.md orig.md && cmp -s .hv/counters.json orig.cnt || fail "bogus backend wrote"
+  cmp -s .rota/BACKLOG.md orig.md && cmp -s .rota/counters.json orig.cnt || fail "bogus backend wrote"
   pass "bogus backlog.backend fails for all seven verbs"
 
   # file mode: file-only verbs still work
-  rm .hv/config.json
+  rm .rota/config.json
   OUT="$(hvj id next --kind bugs)"
   eq "id next file mode" "B06:true" "$(echo "$OUT" | jget data.id):$(echo "$OUT" | jget data.changed)"
   pass "id next unchanged in file mode"
@@ -247,8 +247,8 @@ TMP_IB="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB"' EXIT
 
 for prov in github gitlab; do
-  P="$TMP_IB/$prov"; mkdir -p "$P/.hv"
-  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_IB/$prov"; mkdir -p "$P/.rota"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t
@@ -256,7 +256,7 @@ for prov in github gitlab; do
     eq() { [ "$2" = "$3" ] || fail "$prov issue mode $1: expected [$2] got [$3]"; }
     rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
     TC() { hvj tracker call -- "$@" </dev/null >/dev/null; }
-    FB="$(printf 'Adds the thing.\n\nSecond paragraph.\n\n<!-- hv:fields\nRelated: F3, B1\nRepos: web\n-->')"
+    FB="$(printf 'Adds the thing.\n\nSecond paragraph.\n\n<!-- rota:fields\nRelated: F3, B1\nRepos: web\n-->')"
     if [ "$prov" = github ]; then
       TC api repos/fake/repo/milestones -f "title=M07 — Issue backend"
       for l in type:bug type:feature type:task p1 size:Major milestone-tracker; do TC label create "$l"; done
@@ -363,12 +363,12 @@ TMP_IC="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB" "$TMP_IC"' EXIT
 
 # --- file mode: byte-identical to the golden bullets ------------------------
-mkdir -p "$TMP_IC/new/.hv"
+mkdir -p "$TMP_IC/new/.rota"
 (
   cd "$TMP_IC/new"
   git init -q && git config user.email t@t && git config user.name t
-  printf '# Backlog\n\n## Bugs\n\n- **[B01] [P1] Old bug.** d. Since: abc1234\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md
-  echo '{"bugs": 1}' > .hv/counters.json
+  printf '# Backlog\n\n## Bugs\n\n- **[B01] [P1] Old bug.** d. Since: abc1234\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md
+  echo '{"bugs": 1}' > .rota/counters.json
   printf 'Body for {ID}\n\nsecond {ID} line, no trailing newline' > "$TMP_IC/body.md"
   git add -A && git commit -q -m seed
   head="$(git rev-parse --short HEAD)"
@@ -377,7 +377,7 @@ mkdir -p "$TMP_IC/new/.hv"
   eq() { [ "$2" = "$3" ] || fail "item create $1: expected [$2] got [$3]"; }
   eq "bug data" "B02|B|bugs|true" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.kind)|$(echo "$OUT" | jget data.changed)"
   OUT="$(IC --kind features --title "Big thing" --tag Major --desc "Does stuff." --body-file "$TMP_IC/body.md" --subsystem core)"
-  eq "feature data" "F02|F|.hv/features/F02.md" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.detail)"
+  eq "feature data" "F02|F|.rota/features/F02.md" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.detail)"
   eq "task id" "T01" "$(IC --kind tasks --title "Is it done?" | jget data.id)"
   eq "bug 2 id" "B03" "$(IC --kind bugs --title "Cosmetic glitch." --tag P3 --desc "Minor." --captured 2026-10-01 | jget data.id)"
   cat > "$TMP_IC/expected.md" <<MD
@@ -390,17 +390,17 @@ mkdir -p "$TMP_IC/new/.hv"
 - **[B03] [P3] Cosmetic glitch.** Minor. Captured: 2026-10-01 Since: $head
 
 ## Features
-- **[F02] [Major] Big thing.** Does stuff. Detail: \`.hv/features/F02.md\` Subsystem: core Since: $head
+- **[F02] [Major] Big thing.** Does stuff. Detail: \`.rota/features/F02.md\` Subsystem: core Since: $head
 
 ## Tasks
 - **[T01] Is it done?** Since: $head
 
 ## Completed
 MD
-  cmp -s "$TMP_IC/expected.md" .hv/BACKLOG.md || fail "file-mode item create BACKLOG.md differs from golden: $(diff "$TMP_IC/expected.md" .hv/BACKLOG.md)"
-  eq "counters" '{"bugs":3,"features":2,"tasks":1}' "$(python3 -c 'import json;print(json.dumps(json.load(open(".hv/counters.json")),separators=(",",":")))')"
-  [ "$(sed -n '3,$p' .hv/features/F02.md | head -c 100 | tr -d '\n')" = "second F02 line, no trailing newline" ] || fail "detail {ID} substitution"
-  [ "$(sed -n 1p .hv/features/F02.md)" = "Body for F02" ] || fail "detail {ID} substitution on line 1"
+  cmp -s "$TMP_IC/expected.md" .rota/BACKLOG.md || fail "file-mode item create BACKLOG.md differs from golden: $(diff "$TMP_IC/expected.md" .rota/BACKLOG.md)"
+  eq "counters" '{"bugs":3,"features":2,"tasks":1}' "$(python3 -c 'import json;print(json.dumps(json.load(open(".rota/counters.json")),separators=(",",":")))')"
+  [ "$(sed -n '3,$p' .rota/features/F02.md | head -c 100 | tr -d '\n')" = "second F02 line, no trailing newline" ] || fail "detail {ID} substitution"
+  [ "$(sed -n 1p .rota/features/F02.md)" = "Body for F02" ] || fail "detail {ID} substitution on line 1"
 )
 # id next mints from the same counters: F02 above only follows B02's `Related: [F01]` reference
 cp -a "$TMP_IC/new" "$TMP_IC/idn"
@@ -408,13 +408,13 @@ cp -a "$TMP_IC/new" "$TMP_IC/idn"
   cd "$TMP_IC/idn"
   git checkout -q -- . && git clean -qfd
   [ "$(hvj id next --kind bugs | jget data.id) $(hvj id next --kind features | jget data.id) $(hvj id next --kind tasks | jget data.id) $(hvj id next --kind bugs | jget data.id)" = "B02 F01 T01 B03" ] || fail "id next sequence"
-  [ "$(python3 -c 'import json;print(json.dumps(json.load(open(".hv/counters.json")),separators=(",",":")))')" = '{"bugs":3,"features":1,"tasks":1}' ] || fail "id next counters"
+  [ "$(python3 -c 'import json;print(json.dumps(json.load(open(".rota/counters.json")),separators=(",",":")))')" = '{"bugs":3,"features":1,"tasks":1}' ] || fail "id next counters"
 )
 pass "file mode: item create == golden bullets, detail file, counters and IDs"
 
 (
   cd "$TMP_IC/new"
-  cp -a .hv "$TMP_IC/before.hv"
+  cp -a .rota "$TMP_IC/before.hv"
   rcof() { local rc=0; "$@" >/dev/null 2>&1 || rc=$?; echo "$rc"; }
   bad() { [ "$(rcof hvj item create "$@")" = 2 ] || fail "item create $*: expected exit 2"; }
   bad --kind bugs --title x --tag Major
@@ -426,18 +426,18 @@ pass "file mode: item create == golden bullets, detail file, counters and IDs"
   bad --kind milestones --title x
   [ "$(rcof hvj item create --kind bugs --title x --body-file /nonexistent)" = 3 ] || fail "item create with a missing --body-file: expected exit 3"
   bad --kind bugs --title x --desc
-  diff -r .hv "$TMP_IC/before.hv" >/dev/null || fail "rejected item create changed .hv"
+  diff -r .rota "$TMP_IC/before.hv" >/dev/null || fail "rejected item create changed .rota"
   # relative --body-file resolves against the caller's cwd
   mkdir -p sub; printf 'rel {ID}' > sub/b.md
   ( cd sub && hvj item create --kind tasks --title Rel --body-file b.md >/dev/null )
-  [ "$(cat .hv/tasks/T02.md)" = "rel T02" ] || fail "relative --body-file"
+  [ "$(cat .rota/tasks/T02.md)" = "rel T02" ] || fail "relative --body-file"
 )
 pass "item create validates tag/fields/title/body-file without writing"
 
 # --- issue mode -------------------------------------------------------------
 for prov in github gitlab; do
-  P="$TMP_IC/$prov"; mkdir -p "$P/.hv"
-  CFG() { echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0$1}}" > "$P/.hv/config.json"; }
+  P="$TMP_IC/$prov"; mkdir -p "$P/.rota"
+  CFG() { echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0$1}}" > "$P/.rota/config.json"; }
   CFG ""
   (
     cd "$P"
@@ -479,10 +479,10 @@ print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "
     eq "bug labels" "p1,type:bug" "$(IV 1 labels)"
     eq "bug milestone" "M07 — Issue backend" "$(IV 1 milestone)"
     eq "bug title" "Crash on start" "$(IV 1 title)"
-    eq "bug body" "$(printf 'It crashes.\n\n<!-- hv:fields\nRelated: F1, B2\nRepos: web\n-->')" "$(IV 1 body)"
+    eq "bug body" "$(printf 'It crashes.\n\n<!-- rota:fields\nRelated: F1, B2\nRepos: web\n-->')" "$(IV 1 body)"
     eq "feature labels" "size:Major,type:feature" "$(IV 2 labels)"
     eq "feature milestone" "-" "$(IV 2 milestone)"
-    eq "feature body" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\n-->')" "$(IV 2 body)"
+    eq "feature body" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- rota:fields\nSubsystem: core\n-->')" "$(IV 2 body)"
     eq "task labels" "type:task" "$(IV 3 labels)"
     eq "task body" "" "$(IV 3 body)"
     FG() { hvj item field get "$1" --name "$2" | jget data.value; }
@@ -497,17 +497,17 @@ print(",".join(sorted(v)) if isinstance(v, list) else (v if v is not None else "
     SF() { hvj item field set "$1" --name "$2" --value "$3"; }
     e0="$(EDITS)"
     eq "set related changed" "true" "$(SF T3 related "[B1]" | jget data.changed)"
-    eq "set related" "$(printf '<!-- hv:fields\nRelated: [B1]\n-->')" "$(IV 3 body)"
+    eq "set related" "$(printf '<!-- rota:fields\nRelated: [B1]\n-->')" "$(IV 3 body)"
     SF T3 related "[B1]" >/dev/null
     SF T3 Related "[B1]" >/dev/null 2>&1 || true
     eq "related no-op: one edit" "$((e0 + 1))" "$(EDITS)"
     SF T3 repos api >/dev/null; SF T3 related "" >/dev/null
-    eq "clear related keeps repos" "$(printf '<!-- hv:fields\nRepos: api\n-->')" "$(IV 3 body)"
+    eq "clear related keeps repos" "$(printf '<!-- rota:fields\nRepos: api\n-->')" "$(IV 3 body)"
     SF T3 repos "" >/dev/null
     eq "all cleared" "" "$(IV 3 body)"
     e1="$(EDITS)"; SF T3 repos "" >/dev/null; eq "clear absent is no-op" "$e1" "$(EDITS)"
     SF F2 related "[B1]" >/dev/null
-    eq "feature keeps text" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- hv:fields\nSubsystem: core\nRelated: [B1]\n-->')" "$(IV 2 body)"
+    eq "feature keeps text" "$(printf 'Does stuff.\n\nDetail for F2.\n\n<!-- rota:fields\nSubsystem: core\nRelated: [B1]\n-->')" "$(IV 2 body)"
     SF T3 milestone M07 >/dev/null
     eq "set milestone" "M07 — Issue backend" "$(IV 3 milestone)"
     e2="$(EDITS)"; SF '#3' milestone M07 >/dev/null; eq "milestone no-op" "$e2" "$(EDITS)"
@@ -531,8 +531,8 @@ echo "Issue mode: item complete / reopen close reasons, labels, proof gate"
 TMP_IL="$(mktemp -d)"
 trap 'rm -rf "$TMP_BK" "$TMP_GB" "$TMP_CU" "$TMP_IB" "$TMP_IC" "$TMP_IL"' EXIT
 for prov in github gitlab; do
-  P="$TMP_IL/$prov"; mkdir -p "$P/.hv"
-  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_IL/$prov"; mkdir -p "$P/.rota"
+  echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
@@ -545,14 +545,14 @@ for prov in github gitlab; do
 import json, re, sys
 i = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
 reason = (i["state_reason"] or (("not_planned" if "not-planned" in i["labels"] else "completed") if i["state"] == "closed" else "")).replace(" ", "_")
-# the trailing hv marker line (hv:blocked|done|closed) is hidden here; MARKERS asserts it
-strip = lambda b: re.sub(r"\n\n<!-- hv:(?:blocked|done|closed) -->$", "", b)
+# the trailing rota marker line (rota:blocked|done|closed) is hidden here; MARKERS asserts it
+strip = lambda b: re.sub(r"\n\n<!-- rota:(?:blocked|done|closed) -->$", "", b)
 print("%s|%s|%s|%s" % (i["state"], reason, ",".join(sorted(i["labels"])),
-                       " // ".join(strip(c["body"]).replace("\n", " ") for c in i["comments"] if not c["body"].startswith("<!-- hv:proof"))))' "$1" "$P/db.json"; }
+                       " // ".join(strip(c["body"]).replace("\n", " ") for c in i["comments"] if not c["body"].startswith("<!-- rota:proof"))))' "$1" "$P/db.json"; }
     MARKERS() { python3 -c '
 import json, sys
 i = next(i for i in json.load(open(sys.argv[2]))["issues"] if i["number"] == int(sys.argv[1]))
-print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["body"].startswith("<!-- hv:proof")))' "$1" "$P/db.json"; }
+print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["body"].startswith("<!-- rota:proof")))' "$1" "$P/db.json"; }
     WRITES() { grep -c "$1" "$P/log" || true; }
     PROOF() { hvj proof add "$1" --check smoke --result PASS --evidence ok --sha abc1234 >/dev/null; }
     DONE() { hvj item complete "$@"; }
@@ -574,7 +574,7 @@ print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["bo
     OUT="$(DONE T1 --commit abc1234)"
     eq "done data" "1|T|done|abc1234|true" "$(echo "$OUT" | jget data.id)|$(echo "$OUT" | jget data.type)|$(echo "$OUT" | jget data.reason)|$(echo "$OUT" | jget data.commit)|$(echo "$OUT" | jget data.changed)"
     eq "done" "closed|completed|type:task|Done in \`abc1234\`" "$(IV 1)"
-    eq "done marker" "<!-- hv:done -->" "$(MARKERS 1)"
+    eq "done marker" "<!-- rota:done -->" "$(MARKERS 1)"
     : > "$P/log"
     eq "done idempotent changed" "false" "$(DONE T1 --commit abc1234 | jget data.changed)"
     eq "done idempotent writes nothing" "0" "$(WRITES 'issue \(edit\|update\|close\)\|api -X')"
@@ -592,7 +592,7 @@ print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["bo
     # blocked: stays open, label + comment, other state labels kept; idempotent
     DONE T5 --commit abc1234 --reason blocked --note "waiting on X" >/dev/null
     eq "blocked" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
-    eq "blocked marker" "<!-- hv:blocked -->" "$(MARKERS 5)"
+    eq "blocked marker" "<!-- rota:blocked -->" "$(MARKERS 5)"
     DONE T5 --commit abc1234 --reason blocked --note "again" >/dev/null
     eq "blocked idempotent" "open||blocked,in-progress,type:task|Blocked $DASH waiting on X" "$(IV 5)"
     # blocked then done: closes and clears blocked + in-progress
@@ -621,7 +621,7 @@ print(",".join(c["body"].rsplit("\n", 1)[-1] for c in i["comments"] if not c["bo
     eq "recomplete" "closed|completed|type:task|Done in \`abc1234\` // Done in \`def5678\`" "$(IV 1)"
 
     # custom blocked label name
-    echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0,\"labels\":{\"blocked\":\"stuck\"}}}" > "$P/.hv/config.json"
+    echo "{\"backlog\":{\"backend\":\"issues\"},\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0,\"labels\":{\"blocked\":\"stuck\"}}}" > "$P/.rota/config.json"
     DONE T6 --commit abc1234 --reason blocked >/dev/null
     eq "custom blocked label" "open||in-progress,stuck,type:task|Blocked // Blocked" "$(IV 6)"
     pass "$prov: item complete / reopen close reasons, labels, gate, idempotency"

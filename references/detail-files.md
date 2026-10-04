@@ -1,8 +1,8 @@
 # Detail files
 
-Used by `/hv-capture` Step 5. Single-consumer extraction — the reference exists for hv-capture's readability. Future skills that capture-then-extract bulky content would cite the same pattern.
+Used by `/rota-capture` Step 5. Single-consumer extraction — the reference exists for rota-capture's readability. Future skills that capture-then-extract bulky content would cite the same pattern.
 
-When a captured item's raw input is bulky enough to bloat the TODO entry beyond ~3 sentences, the extra content lives in `.hv/<bugs|features|tasks>/<id>.md` and the TODO entry carries a `Detail:` pointer.
+When a captured item's raw input is bulky enough to bloat the TODO entry beyond ~3 sentences, the extra content lives in `.rota/<bugs|features|tasks>/<id>.md` and the TODO entry carries a `Detail:` pointer.
 
 ## When this fires
 
@@ -13,7 +13,7 @@ If any item's input contains bulky raw data that would push the TODO entry past 
 ```markdown
 # {ID}: Short title
 
-> Related TODO entry: `[{ID}]` in `.hv/BACKLOG.md`
+> Related TODO entry: `[{ID}]` in `.rota/BACKLOG.md`
 
 ## Summary
 
@@ -27,20 +27,20 @@ If any item's input contains bulky raw data that would push the TODO entry past 
 ## Ordering
 
 1. Write the detail content (shape above, `{ID}` as a placeholder) to a scratch file.
-2. Run `hv item create --kind <bugs|features|tasks> --title ... --body-file <scratch-file>` (hv-capture Step 6). It mints the ID, writes `.hv/<kind>/{ID}.md` with `{ID}` replaced, and appends the TODO entry with the `Detail:` reference.
+2. Run `rota item create --kind <bugs|features|tasks> --title ... --body-file <scratch-file>` (rota-capture Step 6). It mints the ID, writes `.rota/<kind>/{ID}.md` with `{ID}` replaced, and appends the TODO entry with the `Detail:` reference.
 
-With `backlog.backend: "issues"` there is no `.hv/<kind>/` file: the content becomes the issue body and the ID is the issue number with its type letter.
+With `backlog.backend: "issues"` there is no `.rota/<kind>/` file: the content becomes the issue body and the ID is the issue number with its type letter.
 
 ## The Detail: reference
 
 Appended to the TODO bullet after the summary, before `Related:` / `Milestone:` / `Repos:`. Format:
 
 ```
-Detail: .hv/<kind>/{ID}.md
+Detail: .rota/<kind>/{ID}.md
 ```
 
 ## What this reference does NOT cover
 
-- **The BACKLOG-entry write itself** — see hv-capture Step 6 inline.
+- **The BACKLOG-entry write itself** — see rota-capture Step 6 inline.
 - **Milestone tagging** — see `references/milestone-tagging.md`.
-- **Sub-repo tagging** — see hv-capture Step 4.6 inline / `references/umbrella-mode.md`.
+- **Sub-repo tagging** — see rota-capture Step 4.6 inline / `references/umbrella-mode.md`.

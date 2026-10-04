@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// seedEscalations writes the escalations list into .hv/workers.json, keeping
+// seedEscalations writes the escalations list into .rota/workers.json, keeping
 // whatever else the registry holds.
 func seedEscalations(t *testing.T, root string, list ...map[string]any) {
 	t.Helper()
 	doc := registryDoc(t, root)
 	doc["escalations"] = list
 	b, _ := json.Marshal(doc)
-	write(t, filepath.Join(root, ".hv", "workers.json"), string(b))
+	write(t, filepath.Join(root, ".rota", "workers.json"), string(b))
 }
 
 func escEntry(id, kind string, n int, status, answer string) map[string]any {
@@ -47,7 +47,7 @@ func prMergeProject(t *testing.T, ship map[string]any) (string, *a8Forge, *fakeT
 	t.Helper()
 	f := a8Fixture()
 	root := a8Project(t, f)
-	write(t, filepath.Join(root, ".hv", "config.json"), gateConfig(t, prAllCfg, "loop", ship))
+	write(t, filepath.Join(root, ".rota", "config.json"), gateConfig(t, prAllCfg, "loop", ship))
 	th := &fakeThread{}
 	useThread(t, th)
 	clock := time.Date(2026, 10, 3, 10, 0, 0, 0, time.UTC)
@@ -68,7 +68,7 @@ func TestApprovalFlagsMutuallyExclusive(t *testing.T) {
 		}
 	}
 	// the same on worker gate, before any other work
-	if code, _, _ := hvIn(t, t.TempDir(), "worker", "gate", "w1", "--base", "main", "--approval", "e1", "--escalate"); code != 2 {
+	if code, _, _ := rotaIn(t, t.TempDir(), "worker", "gate", "w1", "--base", "main", "--approval", "e1", "--escalate"); code != 2 {
 		t.Errorf("worker gate: exit %d", code)
 	}
 }
@@ -170,7 +170,7 @@ func TestPRMergeEscalatePathsAndSendFailure(t *testing.T) {
 
 func TestSlotApprovalThread(t *testing.T) {
 	root := t.TempDir()
-	write(t, filepath.Join(root, ".hv", "workers.json"), `{"slots":[
+	write(t, filepath.Join(root, ".rota", "workers.json"), `{"slots":[
 {"name":"a","branch":"a/5-x","pr":"https://github.com/o/r/pull/42"},
 {"name":"b","task":"9","branch":"b/3-y"},
 {"name":"c","branch":"c/3-y"},
@@ -202,7 +202,7 @@ func TestSlotApprovalThread(t *testing.T) {
 
 func TestWorkerGateApprovalOnIssueThread(t *testing.T) {
 	dir := workerProject(t, gateConfig(t, `{"refactor":{"verifyCommands":["test -f feature.txt"]},"issues":{"provider":"github"}}`, "loop", map[string]any{"mergeApproval": "all"}))
-	hvIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
+	rotaIn(t, dir, "worker", "pool", "init", "--slots", "1", "--base", "main")
 	wt := filepath.Join(dir, ".worktrees", "w1")
 	write(t, filepath.Join(wt, "feature.txt"), "f")
 	gitT(t, wt, "add", "feature.txt")
@@ -213,7 +213,7 @@ func TestWorkerGateApprovalOnIssueThread(t *testing.T) {
 	useEscalation(t, &escHost{}, "", &clock)
 	merged := func() bool { _, err := os.Stat(filepath.Join(dir, "feature.txt")); return err == nil }
 	run := func(args ...string) (int, map[string]any, string) {
-		code, out, errOut := hvIn(t, dir, append([]string{"--json", "worker", "gate", "w1", "--base", "main"}, args...)...)
+		code, out, errOut := rotaIn(t, dir, append([]string{"--json", "worker", "gate", "w1", "--base", "main"}, args...)...)
 		return code, data(t, out), errOut
 	}
 
@@ -229,7 +229,7 @@ func TestWorkerGateApprovalOnIssueThread(t *testing.T) {
 	doc := registryDoc(t, dir)
 	doc["slots"].([]any)[0].(map[string]any)["task"] = "7"
 	b, _ := json.Marshal(doc)
-	write(t, filepath.Join(dir, ".hv", "workers.json"), string(b))
+	write(t, filepath.Join(dir, ".rota", "workers.json"), string(b))
 
 	code, d, _ := run("--escalate")
 	e, _ := d["escalation"].(map[string]any)
@@ -252,7 +252,7 @@ func TestWorkerGateApprovalOnIssueThread(t *testing.T) {
 	esc := doc["escalations"].([]any)[0].(map[string]any)
 	esc["status"], esc["answer"] = "answered", map[string]any{"commentId": "2", "author": "maint", "body": "not yet", "seenAt": "2026-10-03T10:01:00Z"}
 	b, _ = json.Marshal(doc)
-	write(t, filepath.Join(dir, ".hv", "workers.json"), string(b))
+	write(t, filepath.Join(dir, ".rota", "workers.json"), string(b))
 	code, d, _ = run("--approval", "e1")
 	if code != 4 || d["blockedBy"] != "approval declined" || d["answer"] != "not yet" || merged() {
 		t.Fatalf("declined: %d %v", code, d)
@@ -260,7 +260,7 @@ func TestWorkerGateApprovalOnIssueThread(t *testing.T) {
 	// approved
 	esc["answer"].(map[string]any)["body"] = "LGTM, ship"
 	b, _ = json.Marshal(doc)
-	write(t, filepath.Join(dir, ".hv", "workers.json"), string(b))
+	write(t, filepath.Join(dir, ".rota", "workers.json"), string(b))
 	if code, d, msg := run("--approval", "e1"); code != 0 || !merged() {
 		t.Fatalf("approved: %d %v %s", code, d, msg)
 	}

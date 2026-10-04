@@ -2,9 +2,9 @@ echo "T118: config show reports value + source layer from one defaults table"
 
 CS="$(mktemp -d)"
 trap 'rm -rf "$CS"' EXIT
-mkdir -p "$CS/.hv"
-printf '{"work":{"dispatch":"tmux"},"autonomy":{"level":"auto"}}\n' > "$CS/.hv/config.json"
-printf '{"autonomy":{"level":"loop"}}\n' > "$CS/.hv/config.local.json"
+mkdir -p "$CS/.rota"
+printf '{"work":{"dispatch":"tmux"},"autonomy":{"level":"auto"}}\n' > "$CS/.rota/config.json"
+printf '{"autonomy":{"level":"loop"}}\n' > "$CS/.rota/config.local.json"
 
 # show [<key>…]: run in the fixture project and print the envelope.
 show() { ( cd "$CS" && hvj config show "$@" ); }
@@ -34,7 +34,7 @@ OUT=$(show work.accounts)
 pass "T118: config show resolves local > project > default"
 
 # Schema check derives from the same table: dropping one required key names it.
-printf '{}\n' > "$CS/.hv/config.json"
+printf '{}\n' > "$CS/.rota/config.json"
 RC=0; V=$( cd "$CS" && hvj config check 2>/dev/null ) || RC=$?
 [ "$RC" = "1" ] || fail "T118: config check on an empty config should exit 1, got $RC"
 [ "$(echo "$V" | jget data.status)" = "stale" ] \

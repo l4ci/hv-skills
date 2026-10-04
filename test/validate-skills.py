@@ -1,5 +1,5 @@
 """
-validate-skills.py — static schema validator for hv SKILL.md files,
+validate-skills.py — static schema validator for rota SKILL.md files,
 plus the Agent Skills spec frontmatter lint (E2, #69), the legacy-name doclint
 over skills and references (A9, #53) and the prose-contract lint (PROSE_RULES, #173).
 Stdlib only. `--list-legacy` prints the frozen legacy helper names and exits. Exit 0 on all-pass, exit 1 on any failure, exit 2 on unexpected error.
@@ -60,10 +60,10 @@ PENDING_LONG = set()
 
 
 def pending_spec():
-    # HV_SPEC_PENDING (whitespace-separated; a token ending .md is a path for
+    # ROTA_SPEC_PENDING (whitespace-separated; a token ending .md is a path for
     # PENDING_LONG, anything else a key for PENDING_KEYS) replaces both sets, so
     # smoke sections can test the check on a fixture tree.
-    override = os.environ.get("HV_SPEC_PENDING")
+    override = os.environ.get("ROTA_SPEC_PENDING")
     if override is None:
         return PENDING_KEYS, PENDING_LONG
     toks = override.split()
@@ -192,7 +192,7 @@ def check_banner(path, text, issues):
 
 
 def check_references(path, text, issues):
-    # Skills cite references/<x>.md; `hv skills install` copies each cited file
+    # Skills cite references/<x>.md; `rota skills install` copies each cited file
     # next to the skill, so in the source tree the link resolves against the
     # repo-root references/ dir.
     pattern = re.compile(r'\((references/[^)\s]+\.md)\)')
@@ -204,10 +204,10 @@ def check_references(path, text, issues):
 
 
 # Legacy-name doclint (A9, #53). After the cutover no skill or shared reference
-# may name an old bin/ helper, the .hv/bin mirror or hvlib: skills call `hv
+# may name an old bin/ helper, the .hv/bin mirror or hvlib: skills call `rota
 # <verb>`. The name list is frozen from bin/ at the start of A9, so the check
 # keeps working once S7 deletes bin/. hv-migrate is left out because it is also
-# the name of the `hv migrate` verb. A name preceded by "/" is a slash command, not a helper call;
+# the name of the `rota migrate` verb. A name preceded by "/" is a slash command, not a helper call;
 # bin/ paths are caught by the bin/hv- and .hv/bin patterns instead.
 LEGACY_HELPERS = """
     hv-append hv-archive-old hv-artifact-amend.sh hv-artifact-rm.sh
@@ -257,7 +257,7 @@ LEGACY_RE = re.compile(
     + r"|\.hv/bin|hvlib|(?<![\w.-])bin/hv-"
 )
 
-# Files not yet converted to hv verbs. Each A9 slice deletes its own lines in
+# Files not yet converted to rota verbs. Each A9 slice deletes its own lines in
 # the PR that converts the files; the groups are kept apart so two slices'
 # deletions never touch adjacent lines. An entry whose file is already clean
 # (or gone) fails the check, so the list can only shrink. It is empty after S5.
@@ -266,14 +266,14 @@ UNCONVERTED = set()
 
 def doclint_files():
     # One level each: a recursive walk would reach .worktrees/ checkouts (section 70).
-    files = list(Path(".").glob("hv-*/*.md")) + list(Path("references").glob("*.md"))
+    files = list(Path(".").glob("rota-*/*.md")) + list(Path("references").glob("*.md"))
     return sorted(p.as_posix() for p in files)
 
 
 def unconverted():
-    # HV_DOCLINT_UNCONVERTED (whitespace-separated paths) replaces the list, so
+    # ROTA_DOCLINT_UNCONVERTED (whitespace-separated paths) replaces the list, so
     # smoke section 29 can test the check on a fixture tree.
-    override = os.environ.get("HV_DOCLINT_UNCONVERTED")
+    override = os.environ.get("ROTA_DOCLINT_UNCONVERTED")
     return set(override.split()) if override is not None else UNCONVERTED
 
 
@@ -288,11 +288,11 @@ def check_legacy_names(issues):
                 issues.append(f"{path}: no legacy names left; remove it from UNCONVERTED")
             continue
         for n, name in hits:
-            issues.append(f"{path}:{n}: names legacy '{name}'; call the hv verb instead")
+            issues.append(f"{path}:{n}: names legacy '{name}'; call the rota verb instead")
     for path in sorted(allow - set(doclint_files())):
         issues.append(f"{path}: listed in UNCONVERTED but missing; remove the entry")
 
-# Prose-contract lint (#173). Skills and docs document hv verbs and flags that
+# Prose-contract lint (#173). Skills and docs document rota verbs and flags that
 # other skills and tests rely on; these rules pin that wiring (a skill names the
 # verb it calls, a documented flag keeps its section, a retired phrase stays
 # gone). They replaced the grep blocks that lived in test/sections. Each rule is
@@ -302,7 +302,7 @@ def check_legacy_names(issues):
 #   count_ge(path, text, n, msg)      text appears at least n times
 #   only_in(glob, text, names, msg)   exactly these skill dirs contain text
 #   paired(glob, trigger, need, msg)  every file with trigger also has need
-# A rule on a missing file fails. HV_DOCLINT_PROSE=off skips the lint so section
+# A rule on a missing file fails. ROTA_DOCLINT_PROSE=off skips the lint so section
 # 29 can run the legacy-name check on a fixture tree.
 def has(path, text, msg, re_=False, flags=0):
     return ("has", path, text, msg, re_, flags)
@@ -326,9 +326,9 @@ def paired(glob, trigger, need, msg):
 
 def prose_rules():
     r = []
-    sk = lambda n: f"hv-{n}/SKILL.md"
+    sk = lambda n: f"rota-{n}/SKILL.md"
     CALLOUT = "**always manual** — never auto-invoked, regardless of `autonomy.level`"
-    # /hv-plan and /hv-brainstorm --auto-loop (F32, B28)
+    # /rota-plan and /rota-brainstorm --auto-loop (F32, B28)
     r += [has(sk("plan"), "--auto-loop", "must document the --auto-loop flag"),
           has(sk("plan"), "Auto-loop mode", "must include the dedicated 'Auto-loop mode' section"),
           has(sk("brainstorm"), "--auto-loop", "must document the --auto-loop flag"),
@@ -336,29 +336,29 @@ def prose_rules():
           has(sk("brainstorm"), "auto: true", "must document 'auto: true' frontmatter under --auto-loop"),
           has(sk("brainstorm"), "AUTO_LOOP", "must parse the --auto-loop flag in Step 1"),
           has(sk("work"), "Loop-mode auto-dispatch chain", "must title Step 4 'Loop-mode auto-dispatch chain'"),
-          has(sk("work"), "/hv-plan --auto-loop", "must reference /hv-plan --auto-loop"),
-          has(sk("work"), "/hv-brainstorm --auto-loop", "must reference /hv-brainstorm --auto-loop dispatch"),
+          has(sk("work"), "/rota-plan --auto-loop", "must reference /rota-plan --auto-loop"),
+          has(sk("work"), "/rota-brainstorm --auto-loop", "must reference /rota-brainstorm --auto-loop dispatch"),
           has(sk("work"), "defer to Step 4", "Step 2 must defer Major + Milestone-tagged ambiguity to the Step 4 chain"),
           has("references/loop-mode-plan-dispatch.md", "Design pre-flight", "must include the Design pre-flight section"),
-          only_in("hv-*/SKILL.md", "hv decisions auto-since", {"hv-brainstorm", "hv-plan"},
-                  "hv decisions auto-since is surfaced in exactly hv-brainstorm and hv-plan"),
-          has(sk("work"), "hv status loop start", "must call hv status loop start"),
-          has(sk("pause"), "hv status loop clear", "must call hv status loop clear"),
-          has(sk("work"), "hv status loop clear", "must call hv status loop clear"),
-          has(sk("work"), "hv status handoff", "must call hv status handoff"),
-          has(sk("ship"), "hv git guard feature-branch", "must call hv git guard feature-branch"),
-          has(sk("pause"), "hv git guard feature-branch", "must call hv git guard feature-branch")]
+          only_in("rota-*/SKILL.md", "rota decisions auto-since", {"rota-brainstorm", "rota-plan"},
+                  "rota decisions auto-since is surfaced in exactly rota-brainstorm and rota-plan"),
+          has(sk("work"), "rota status loop start", "must call rota status loop start"),
+          has(sk("pause"), "rota status loop clear", "must call rota status loop clear"),
+          has(sk("work"), "rota status loop clear", "must call rota status loop clear"),
+          has(sk("work"), "rota status handoff", "must call rota status handoff"),
+          has(sk("ship"), "rota git guard feature-branch", "must call rota git guard feature-branch"),
+          has(sk("pause"), "rota git guard feature-branch", "must call rota git guard feature-branch")]
     # map / backlog touchpoints
-    r += [has(sk("work"), r"hv map stats --cap|hv map index", "has no map touchpoint", True),
-          has(sk("debug"), r"hv map stats --cap|hv map index", "has no map touchpoint", True),
-          has(sk("work"), "hv backlog stale", "missing the stale-summary call"),
+    r += [has(sk("work"), r"rota map stats --cap|rota map index", "has no map touchpoint", True),
+          has(sk("debug"), r"rota map stats --cap|rota map index", "has no map touchpoint", True),
+          has(sk("work"), "rota backlog stale", "missing the stale-summary call"),
           has(sk("capture"), "Subsystem:", "missing the Subsystem field")]
     # F37 TaskCreate progress checklists: tiers S/A/B have it, tier C does not
     for n in "work debug ship release refactor learn decide spike vision capture pause review plan".split():
         r.append(has(sk(n), "TaskCreate(", "Tier S/A/B skill must reference TaskCreate("))
     # config verbs and the positional-args doc (F09, F78)
     for n in ("ship",):
-        r.append(has(sk(n), "hv config set", "missing hv config set call"))
+        r.append(has(sk(n), "rota config set", "missing rota config set call"))
     r += [has(sk("ship"), r"\| Manual invoke.*after-work.*manual mode",
               "Docs Mode Modes row for manual invocation must reflect after-work in manual mode", True),
           has(sk("ship"), "Route to the After-work sub-flow", "Docs Mode Step D1 'Already true' branch must route to the after-work sub-flow"),
@@ -380,31 +380,31 @@ def prose_rules():
           lacks(sk("capture"), "single name in V1", "must no longer carry the 'single name in V1' qualifier"),
           has(sk("plan"), "multi-repo items pass the full comma-list", "must explain the multi-repo --repo flow"),
           has(sk("work"), "one line per repo for multi-repo items", "Preview Mode peek must show one Repo line per sub-repo"),
-          has(sk("work"), "hv git branch", "must reference hv git branch for multi-repo branch creation"),
-          has(sk("work"), r"hv status add .*--repos", "must reference hv status add --repos for multi-repo status entries", True),
-          has(sk("work"), "hv repo resolve", "must reference hv repo resolve for multi-repo validation"),
+          has(sk("work"), "rota git branch", "must reference rota git branch for multi-repo branch creation"),
+          has(sk("work"), r"rota status add .*--repos", "must reference rota status add --repos for multi-repo status entries", True),
+          has(sk("work"), "rota repo resolve", "must reference rota repo resolve for multi-repo validation"),
           lacks(sk("work"), "M03 (deferred)", "must no longer say 'M03 (deferred)'"),
           lacks(sk("work"), "wait for M03 multi-repo support", "must no longer say 'wait for M03 multi-repo support'")]
     # worker reset guard, proof path, manual gates
     r += [has(sk("work"), "reset guard", "does not describe the slot reset guard"),
-          paired("hv-*/SKILL.md", "hv item complete", "hv proof add",
-                 "calls hv item complete without an hv proof add path"),
+          paired("rota-*/SKILL.md", "rota item complete", "rota proof add",
+                 "calls rota item complete without a rota proof add path"),
           has(sk("capture"), "Step I6", "missing Step I6 (Import Mode label gate)"),
           has(sk("capture"), "Step R3", "missing Step R3 (Remove Mode de-tag gate)"),
           count_ge(sk("capture"), CALLOUT, 2, "needs the manual-gate callout at Step R3 and Step I6"),
           has(sk("ship"), "Step 6c", "missing Step 6c (direct-push close gate)"),
           has(sk("ship"), CALLOUT, "missing the manual-gate callout (Step 6c)"),
-          has("references/manual-gates.md", r"Step I6|hv-capture --from-.*label|label.*hv-capture --from",
-              "missing the /hv-capture --from-* Step I6 row", True),
-          has("references/manual-gates.md", r"Step R3|hv-capture --remove.*de-tag|de-tag.*hv-capture --remove",
-              "missing the /hv-capture --remove Step R3 row", True),
-          has("references/manual-gates.md", r"Step 6c|direct-push close", "missing the hv-ship Step 6c row", True)]
+          has("references/manual-gates.md", r"Step I6|rota-capture --from-.*label|label.*rota-capture --from",
+              "missing the /rota-capture --from-* Step I6 row", True),
+          has("references/manual-gates.md", r"Step R3|rota-capture --remove.*de-tag|de-tag.*rota-capture --remove",
+              "missing the /rota-capture --remove Step R3 row", True),
+          has("references/manual-gates.md", r"Step 6c|direct-push close", "missing the rota-ship Step 6c row", True)]
     # F73 subagent-dispatch discipline
     D = "references/subagent-dispatch.md"
     for h in ("When to dispatch", "Small-brief template", "Return-shape contract", "Model tier per work type",
               "Parallel fan-out pattern", "What stays on the orchestrator"):
         r.append(has(D, f"^## {h}", f"section '{h}' missing", True, re.M))
-    r += [has(D, "DECISIONS.md", "must cite the .hv/DECISIONS.md worktree-isolation rule"),
+    r += [has(D, "DECISIONS.md", "must cite the .rota/DECISIONS.md worktree-isolation rule"),
           lacks(D, r"TBD|TODO|FIXME|XXX", "contains placeholders", True, re.I),
           has("references/authoring-conventions.md", "^## Dispatch heavy work to subagents",
               "missing the 'Dispatch heavy work to subagents' rule", True, re.M),
@@ -421,7 +421,7 @@ def prose_rules():
 
 
 def check_prose(issues):
-    if os.environ.get("HV_DOCLINT_PROSE") == "off":
+    if os.environ.get("ROTA_DOCLINT_PROSE") == "off":
         return
     cache = {}
 
@@ -475,7 +475,7 @@ def main():
         sys.exit(0)
     issues = []
 
-    skill_files = sorted(Path(".").glob("hv-*/SKILL.md"))
+    skill_files = sorted(Path(".").glob("rota-*/SKILL.md"))
 
     for skill_path in skill_files:
         text = skill_path.read_text(encoding="utf-8")

@@ -20,29 +20,29 @@ trap 'rm -rf "$TMP_DEBUG"' EXIT
   git config user.email "test@test.com"
   git config user.name "Test"
   git commit -q --allow-empty -m "seed"
-  git checkout -q -b hv/F02-smoke
+  git checkout -q -b rota/F02-smoke
 
-  mkdir -p .hv
+  mkdir -p .rota
 
-  SF=".hv/debug/hv-F02-smoke.json"
+  SF=".rota/debug/rota-F02-smoke.json"
   # sget <field>: one field of the state file, via the contract-shaped `show` data
   sget() { hvj debug counter show | jget "data.$1"; }
 
   # ── (a) init creates the file with expected schema ───────────────────────
   OUT=$(hvj debug counter init F02) || { echo "FAIL: init exited non-zero"; exit 1; }
-  [ "$(jget data.session <<<"$OUT")" = "hv-F02-smoke" ] || { echo "FAIL: init session wrong: $OUT"; exit 1; }
+  [ "$(jget data.session <<<"$OUT")" = "rota-F02-smoke" ] || { echo "FAIL: init session wrong: $OUT"; exit 1; }
   [ "$(jget data.bugId <<<"$OUT")" = "F02" ] || { echo "FAIL: init bugId wrong: $OUT"; exit 1; }
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || { echo "FAIL: first init should report changed: $OUT"; exit 1; }
   [ -f "$SF" ] || { echo "FAIL: session file missing"; exit 1; }
   python3 -c "
 import json, sys
 d = json.load(open('$SF'))
-assert d['session'] == 'hv-F02-smoke', f\"session={d['session']}\"
+assert d['session'] == 'rota-F02-smoke', f\"session={d['session']}\"
 assert d['bug_id'] == 'F02', f\"bug_id={d['bug_id']}\"
 assert d['failed_fixes'] == 0, f\"failed_fixes={d['failed_fixes']}\"
 assert d['attempts'] == [], f\"attempts={d['attempts']}\"
 " || { echo "FAIL: schema check"; exit 1; }
-  [ "$(sget session)" = "hv-F02-smoke" ] || { echo "FAIL: show session wrong"; exit 1; }
+  [ "$(sget session)" = "rota-F02-smoke" ] || { echo "FAIL: show session wrong"; exit 1; }
   [ "$(sget failedFixes)" = "0" ] || { echo "FAIL: show failedFixes wrong"; exit 1; }
   [ "$(sget attempts)" = "[]" ] || { echo "FAIL: show attempts wrong"; exit 1; }
 

@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
 )
 
 // Issue mode, item plans: the plan is a `plan` note on the item's issue and
@@ -75,7 +75,7 @@ func PutItemNote(n artifact.Notes, item, key, text string) (bool, error) {
 	if _, ok, err := n.NoteGet(item, "plan"); err != nil {
 		return false, err
 	} else if !ok {
-		return false, noteMissing(item).WithHint("hv plan add " + key + " --title <text>")
+		return false, noteMissing(item).WithHint("rota plan add " + key + " --title <text>")
 	}
 	return n.NotePut(item, "plan", text)
 }

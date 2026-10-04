@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Account usage headroom and slot assignment: the port of
@@ -28,7 +28,7 @@ import (
 //  1. The OAuth usage endpoint, authenticated with the account's own
 //     credentials. Works with NO session running, which is what makes
 //     pre-dispatch balancing possible.
-//  2. A fixture payload (HV_ACCOUNT_USAGE_DIR) for offline tests.
+//  2. A fixture payload (ROTA_ACCOUNT_USAGE_DIR) for offline tests.
 //  3. `unknown`, which callers treat as "rotate", never as "free" and never
 //     as "exhausted".
 //
@@ -91,7 +91,7 @@ type acct struct{ name, configDir string }
 
 // Configured returns work.accounts of the project config.
 func Configured(root string) []acct {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	raw, _ := config.Lookup(cfg, "work.accounts")
 	list, _ := raw.([]any)
 	var out []acct
@@ -230,10 +230,10 @@ func parseReset(v any) *time.Time {
 	return nil
 }
 
-// defaultFetch reads HV_ACCOUNT_USAGE_DIR/<name>.json when set, else the OAuth
+// defaultFetch reads ROTA_ACCOUNT_USAGE_DIR/<name>.json when set, else the OAuth
 // usage endpoint with the account's own access token.
 func (a *Accounts) defaultFetch(ctx context.Context, name, configDir string) (*jsonx.Object, string) {
-	if dir := a.getenv("HV_ACCOUNT_USAGE_DIR"); dir != "" {
+	if dir := a.getenv("ROTA_ACCOUNT_USAGE_DIR"); dir != "" {
 		b, err := os.ReadFile(filepath.Join(dir, name+".json"))
 		if err != nil {
 			return nil, "no fixture"
@@ -424,7 +424,7 @@ func (a *Accounts) OrchestratorTarget(ctx context.Context, root, currentDir stri
 func (a *Accounts) Assign(ctx context.Context, root, slot, account string) (name string, changed bool, err error) {
 	reg := LoadRegistry(root)
 	if !reg.Exists {
-		return "", false, fail(ExitResolution, "no worker pool — run hv worker pool init first")
+		return "", false, fail(ExitResolution, "no worker pool — run rota worker pool init first")
 	}
 	if account == "" {
 		picked, ok := a.Pick(ctx, root, nil)

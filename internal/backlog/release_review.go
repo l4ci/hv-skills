@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/marker"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/marker"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // PRTracker is the part of tracker.Adapter the review queue and the PR merge
@@ -218,7 +218,7 @@ func (b *Issues) MergePRGated(pr int, items []string, approve MergeApprover) (Me
 				return MergeResult{}, err
 			}
 			msg := "PR " + strconv.Itoa(pr) + " not merged: no proof recorded for " + id + ". " +
-				"Add proof with hv proof add, then run the review again."
+				"Add proof with rota proof add, then run the review again."
 			if _, err := b.AddComment(id, "feedback", msg); err != nil {
 				return MergeResult{}, err
 			}

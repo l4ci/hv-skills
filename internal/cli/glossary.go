@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/knowledge"
+	"github.com/l4ci/rota/internal/knowledge"
 )
 
-// glossaryCommands is the `hv glossary` group (A5, #49).
+// glossaryCommands is the `rota glossary` group (A5, #49).
 func glossaryCommands() *Command {
 	return &Command{Name: "glossary", Summary: "terms in the ## Glossary of KNOWLEDGE.md", Subs: []*Command{
 		{Name: "read", Summary: "print term entries", Repo: true, Verb: glRead},
@@ -107,7 +107,7 @@ func glImport(fs *flag.FlagSet) RunFunc {
 
 var blockKeyRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
-// blockCommand is `hv block <key>` and `hv block skills`.
+// blockCommand is `rota block <key>` and `rota block skills`.
 func blockCommand() *Command {
 	return &Command{Name: "block", Summary: "regenerate a managed block in the instructions file", Repo: true, Verb: blockVerb}
 }

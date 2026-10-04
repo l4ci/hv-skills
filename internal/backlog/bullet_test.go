@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 type bulletIn struct {
@@ -22,7 +22,7 @@ func TestBulletParityWithPython(t *testing.T) {
 	rng := rand.New(rand.NewSource(7))
 	in := bulletIn{Lines: lines}
 
-	values := []string{"", " ", "x", "M07", "`p`", " `.hv/a.md` ", "a b", "[F01], [B02]", "``", "é`", "x\ny"}
+	values := []string{"", " ", "x", "M07", "`p`", " `.rota/a.md` ", "a b", "[F01], [B02]", "``", "é`", "x\ny"}
 	for _, l := range lines {
 		for k := 0; k < 3; k++ {
 			in.Sets = append(in.Sets, [3]string{l, pick(rng, SettableFields), pick(rng, values)})

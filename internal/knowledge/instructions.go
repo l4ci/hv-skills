@@ -7,15 +7,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 //go:embed skills_block.md
 var skillsFS embed.FS
 
-// SkillsBlockBody is the static body of the hv managed block. It names
-// hv verbs, so it differs from the old hv-skills-index body (contract, A9 G4).
+// SkillsBlockBody is the static body of the rota managed block. It names
+// rota verbs, so it differs from the old hv-skills-index body (contract, A9 G4).
 func SkillsBlockBody() string {
 	b, _ := skillsFS.ReadFile("skills_block.md")
 	return strings.TrimRight(string(b), "\n")
@@ -31,7 +31,7 @@ type Action struct {
 const claudeStub = "# CLAUDE.md\n\nProject instructions live in AGENTS.md.\n\n@AGENTS.md\n"
 
 var (
-	blockKeyRe = regexp.MustCompile(`<!-- hv(?:-([\w-]+)-start|:([\w-]+):start) -->`)
+	blockKeyRe = regexp.MustCompile(`<!-- (?:(?:rota|hv)-([\w-]+)-start|hv:([\w-]+):start) -->`)
 	blankRuns  = regexp.MustCompile(`\n{3,}`)
 )
 
@@ -49,7 +49,7 @@ func isSymlinkTo(a, b string) bool {
 }
 
 // InstructionsInit makes AGENTS.md the project-instructions file and CLAUDE.md
-// its @AGENTS.md importer. When only CLAUDE.md exists, its managed hv blocks
+// its @AGENTS.md importer. When only CLAUDE.md exists, its managed rota blocks
 // move to the new AGENTS.md. It is idempotent: with nothing to do it returns
 // no actions. Sub-repo files are not touched.
 func (s Store) InstructionsInit() ([]Action, error) {

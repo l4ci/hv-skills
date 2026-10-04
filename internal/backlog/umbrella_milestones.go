@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Milestones at an umbrella root (hvlib_backend.UmbrellaIssueBackend): the

@@ -1,4 +1,4 @@
-9 doc-deliverable mismatch(es) in .hv/plans/M03-B01.md:
+9 doc-deliverable mismatch(es) in .rota/plans/M03-B01.md:
 
   - docs/api/auth.md
       target repo: web
@@ -9,7 +9,7 @@
       expected doc home ROOT/api/docs does not exist
   - docs/api/auth.md
       target repo: ghost
-      sub-repo 'ghost' is not registered in .hv/repos.json
+      sub-repo 'ghost' is not registered in .rota/repos.json
   - web/docs/guide.md
       target repo: web
       expected doc home ROOT/web/docs does not exist
@@ -19,7 +19,7 @@
       expected doc home ROOT/api/docs does not exist
   - web/docs/guide.md
       target repo: ghost
-      sub-repo 'ghost' is not registered in .hv/repos.json
+      sub-repo 'ghost' is not registered in .rota/repos.json
   - docs/ref.md
       target repo: web
       expected doc home ROOT/web/docs does not exist
@@ -29,4 +29,4 @@
       expected doc home ROOT/api/docs does not exist
   - docs/ref.md
       target repo: ghost
-      sub-repo 'ghost' is not registered in .hv/repos.json
+      sub-repo 'ghost' is not registered in .rota/repos.json

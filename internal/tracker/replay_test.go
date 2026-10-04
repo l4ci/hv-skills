@@ -100,7 +100,7 @@ func replay(t *testing.T, path string) {
 			if !errors.As(err, &e) {
 				t.Fatalf("%s: want error %d %q, got %v (result %v)", step, s.Error.Code, s.Error.Message, err, got)
 			}
-			want := strings.TrimPrefix(s.Error.Message, "error: hv tracker call: ")
+			want := strings.TrimPrefix(s.Error.Message, "error: rota tracker call: ")
 			if e.Code != s.Error.Code || e.Message != want {
 				t.Fatalf("%s: error [%d] %q, want [%d] %q", step, e.Code, e.Message, s.Error.Code, want)
 			}
@@ -167,7 +167,7 @@ func dispatch(ctx context.Context, a Adapter, op string, args map[string]json.Ra
 		r, err := c.Run(ctx, list("args"), strings.NewReader(s("stdin")))
 		if err != nil {
 			e := err.(*Error)
-			return map[string]any{"stdout": "", "stderr": "error: hv tracker call: " + e.Message + "\n", "code": e.Code}, nil
+			return map[string]any{"stdout": "", "stderr": "error: rota tracker call: " + e.Message + "\n", "code": e.Code}, nil
 		}
 		return map[string]any{"stdout": string(r.Stdout), "stderr": string(r.Stderr), "code": r.ExitCode}, nil
 	case "closed_numbers":

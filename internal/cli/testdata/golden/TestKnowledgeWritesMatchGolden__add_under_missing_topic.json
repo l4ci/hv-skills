@@ -15,7 +15,7 @@
   },
   "outputs": {
     "stdout": "",
-    "stderr": "error: topic 'Nope' not found in .hv/KNOWLEDGE.md\n",
+    "stderr": "error: topic 'Nope' not found in .rota/KNOWLEDGE.md\n",
     "rc": 1,
     "changed": {},
     "removed": []

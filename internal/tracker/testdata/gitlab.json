@@ -1986,7 +1986,7 @@
    },
    "error": {
     "code": 4,
-    "message": "error: hv tracker call: gitlab secondary rate limit — stopped; wait several minutes before retrying"
+    "message": "error: rota tracker call: gitlab secondary rate limit — stopped; wait several minutes before retrying"
    },
    "calls": [
     {
@@ -2014,7 +2014,7 @@
    },
    "error": {
     "code": 4,
-    "message": "error: hv tracker call: gitlab rate limit — stopped after one retry"
+    "message": "error: rota tracker call: gitlab rate limit — stopped after one retry"
    },
    "calls": [
     {
@@ -2060,7 +2060,7 @@
    },
    "error": {
     "code": 3,
-    "message": "error: hv tracker call: glab is not authenticated; run 'glab auth login'"
+    "message": "error: rota tracker call: glab is not authenticated; run 'glab auth login'"
    },
    "calls": [
     {

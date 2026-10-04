@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 var bg = context.Background()
@@ -39,7 +39,7 @@ func newRepo(t *testing.T, branches map[string]string, ahead ...string) string {
 		t.Fatal(err)
 	}
 	sh(t, root, "init", "-q", "-b", "main", ".")
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "seed"), []byte("x"), 0o644); err != nil {
@@ -390,14 +390,14 @@ func TestParkedSlotAgentsAreAllUnclaimed(t *testing.T) {
 	writeRegistry(t, root, slot(root, "ben", "park/ben", nil))
 	wt := filepath.Join(root, ".worktrees", "ben")
 	e := env([]host.Agent{
-		{Tab: "w1:t5", Name: "hv-ben-t5", Cwd: wt, Status: "idle"},
-		{Tab: "w1:t6", Name: "hv-ben-t6", Cwd: wt, Status: "idle"},
+		{Tab: "w1:t5", Name: "rota-ben-t5", Cwd: wt, Status: "idle"},
+		{Tab: "w1:t6", Name: "rota-ben-t6", Cwd: wt, Status: "idle"},
 	}, &fakeForge{})
 	rep, err := e.Status(bg, root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string][]string{"hv-ben-t5": {UnclaimedTab}, "hv-ben-t6": {UnclaimedTab}}
+	want := map[string][]string{"rota-ben-t5": {UnclaimedTab}, "rota-ben-t6": {UnclaimedTab}}
 	if got := kinds(rep.Findings); !reflect.DeepEqual(got, want) {
 		t.Errorf("findings\n got %v\nwant %v", got, want)
 	}

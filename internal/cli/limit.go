@@ -12,23 +12,23 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/keepalive"
-	"github.com/l4ci/hv/v5/internal/limits"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/keepalive"
+	"github.com/l4ci/rota/internal/limits"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// D3 (#67): `hv limit watch|status`. The loop is internal/limits; this file
+// D3 (#67): `rota limit watch|status`. The loop is internal/limits; this file
 // wires it to the host, the account meter, `round transfer` and the escalation
 // entry, and is the process side of `watch`. The same wiring runs inside
-// `hv keepalive run` (limitsLoop).
+// `rota keepalive run` (limitsLoop).
 
 func limitCommands() *Command {
 	return &Command{Name: "limit", Summary: "usage limits: sleep until the reset or switch accounts", Subs: []*Command{
@@ -75,7 +75,7 @@ func escalateFunc(ctx context.Context, root string) func(issue int, title, body 
 // evidence, so it reads as unknown.
 func orchestratorData(commonDir, root string, maxAge time.Duration) func(now time.Time) limits.Data {
 	return func(now time.Time) limits.Data {
-		ents, err := os.ReadDir(filepath.Join(commonDir, "hv", "session"))
+		ents, err := os.ReadDir(filepath.Join(commonDir, "rota", "session"))
 		if err != nil {
 			return limits.Data{}
 		}
@@ -85,7 +85,7 @@ func orchestratorData(commonDir, root string, maxAge time.Duration) func(now tim
 			if !strings.HasSuffix(e.Name(), ".json") {
 				continue
 			}
-			st, found, err := hook.ReadState(filepath.Join(commonDir, "hv", "session", e.Name()))
+			st, found, err := hook.ReadState(filepath.Join(commonDir, "rota", "session", e.Name()))
 			if err != nil || !found || !sameDir(st.Cwd, root) {
 				continue
 			}
@@ -258,7 +258,7 @@ func buildLimits(ctx context.Context, c *Ctx, root string, cfg any, set limits.S
 			// same call would resume it, but nobody is there to make it).
 			_, err = env.Transfer(context.WithoutCancel(ctx), root, be, round.TransferOpts{
 				Issue: issue, To: to, HolderPID: holderPID, Settings: rc, Getenv: os.Getenv,
-				Note: "The slot's account hit its usage limit; hv limit watch moved the issue to an idle slot on another account.",
+				Note: "The slot's account hit its usage limit; rota limit watch moved the issue to an idle slot on another account.",
 			})
 			return err
 		},
@@ -452,7 +452,7 @@ func limitsLoop(c *Ctx, root string, cfg any, set limits.Settings, holderPID int
 	}
 }
 
-// ---- hv limit watch -----------------------------------------------------------
+// ---- rota limit watch -----------------------------------------------------------
 
 func limitWatch(fs *flag.FlagSet) RunFunc {
 	timeout := fs.Float64("timeout", 0, "seconds to watch before stopping; 0 watches until interrupted")
@@ -471,10 +471,10 @@ func limitWatch(fs *flag.FlagSet) RunFunc {
 		if err != nil {
 			return Result{}, err
 		}
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 		set, err := limits.LoadSettings(cfg)
 		if err != nil {
-			return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: hv config set"}
+			return Result{}, &Error{Exit: ExitInternal, Message: err.Error(), Hint: "fix the limits.* key with: rota config set"}
 		}
 		cd, err := roundlease.CommonDir(root)
 		if err != nil {
@@ -540,11 +540,11 @@ func limitWatchGuard(c *Ctx, root, cd string) (Result, error) {
 	}
 	live := st == roundlease.Live || st == roundlease.Foreign
 	if ks, found, _ := keepalive.ReadState(keepalive.StatePath(cd)); live && found && ks.Status == keepalive.StatusRunning && le.Alive(ks.PID) && lease.PID == ks.PID {
-		return refuse("supervised", fmt.Sprintf("hv keepalive run (pid %d) holds the lease and already watches for usage limits", ks.PID),
-			"run hv limit status, or start the supervisor with --no-limits to watch by hand")
+		return refuse("supervised", fmt.Sprintf("rota keepalive run (pid %d) holds the lease and already watches for usage limits", ks.PID),
+			"run rota limit status, or start the supervisor with --no-limits to watch by hand")
 	}
 	if !live || !le.Discover(hookHolderPID(), os.Getenv).SameAs(lease, le.Host) {
-		return refuse("no round", "this process holds no round lease: run hv round start first", "a switch moves work, which is the orchestrator's act")
+		return refuse("no round", "this process holds no round lease: run rota round start first", "a switch moves work, which is the orchestrator's act")
 	}
 	if w, ok := limits.ReadWatching(cd); ok && w.PID != os.Getpid() && le.Alive(w.PID) {
 		return refuse("watching", fmt.Sprintf("a usage-limit watcher (%s, pid %d) is already running", w.Mode, w.PID), "one watcher acts on the limits list")
@@ -596,7 +596,7 @@ func limitsData(list []limits.Entry) (*jsonx.Object, string) {
 	return d, text
 }
 
-// ---- hv limit status --------------------------------------------------------------
+// ---- rota limit status --------------------------------------------------------------
 
 func limitStatus(c *Ctx, args []string) (Result, error) {
 	if err := noArgs(args); err != nil {

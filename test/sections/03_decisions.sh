@@ -1,6 +1,6 @@
 echo "block decisions"
-mkdir -p .hv
-cat > .hv/DECISIONS.md <<'EOF'
+mkdir -p .rota
+cat > .rota/DECISIONS.md <<'EOF'
 # Decisions
 
 ## Architecture
@@ -19,10 +19,10 @@ Integration tests must hit a real database.
 **Forbids.** Mock DB libraries in tests/integration.
 **Permits.** Mocks elsewhere.
 EOF
-"$HV_BIN" block decisions >/dev/null
-grep -q "<!-- hv-decisions-start -->" CLAUDE.md || fail "hv-decisions managed block not in CLAUDE.md"
+"$ROTA_BIN" block decisions >/dev/null
+grep -q "<!-- rota-decisions-start -->" CLAUDE.md || fail "rota-decisions managed block not in CLAUDE.md"
 grep -q "## Project Decisions" CLAUDE.md || fail "Project Decisions heading missing"
-DEC_BLOCK=$(grep -A 20 "<!-- hv-decisions-start -->" CLAUDE.md)
+DEC_BLOCK=$(grep -A 20 "<!-- rota-decisions-start -->" CLAUDE.md)
 grep -q "^- Architecture" <<<"$DEC_BLOCK" || fail "Architecture topic missing in decisions block"
 grep -q "^- Testing" <<<"$DEC_BLOCK" || fail "Testing topic missing in decisions block"
 pass "decisions managed block created with topics"
@@ -32,18 +32,18 @@ rc=0; out=$(hvj block decisions) || rc=$?
 [ "$rc" = 0 ] || fail "block decisions re-run exit $rc"
 [ "$(jget data.key <<<"$out")" = "decisions" ] || fail "block decisions key wrong: $out"
 [ "$(jget data.changed <<<"$out")" = "false" ] || fail "re-run of unchanged block should report changed=false: $out"
-COUNT_DEC=$(grep -c "hv-decisions-start" CLAUDE.md)
+COUNT_DEC=$(grep -c "rota-decisions-start" CLAUDE.md)
 [ "$COUNT_DEC" = "1" ] || fail "decisions managed block duplicated"
 pass "decisions block updated in place"
 
-# Empty .hv/DECISIONS.md (no topics) — block should still appear with placeholder
-cat > .hv/DECISIONS.md <<'EOF'
+# Empty .rota/DECISIONS.md (no topics) — block should still appear with placeholder
+cat > .rota/DECISIONS.md <<'EOF'
 # Decisions
 
 Hard boundaries for this project.
 EOF
-"$HV_BIN" block decisions >/dev/null
-EMPTY_BLOCK=$(grep -A 10 "<!-- hv-decisions-start -->" CLAUDE.md)
+"$ROTA_BIN" block decisions >/dev/null
+EMPTY_BLOCK=$(grep -A 10 "<!-- rota-decisions-start -->" CLAUDE.md)
 grep -q "no decisions yet" <<<"$EMPTY_BLOCK" || fail "empty-state placeholder missing"
 pass "decisions block handles empty file"
 

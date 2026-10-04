@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Kinds.
@@ -257,14 +257,14 @@ func (r Record) Object() *jsonx.Object {
 	return o
 }
 
-// Store is .hv/verdicts.json.
+// Store is .rota/verdicts.json.
 type Store struct {
 	Branches map[string][]Record `json:"branches"`
 	Items    map[string][]Record `json:"items"`
 }
 
 // Path is the store file under root.
-func Path(root string) string { return filepath.Join(root, ".hv", "verdicts.json") }
+func Path(root string) string { return filepath.Join(root, ".rota", "verdicts.json") }
 
 // BranchKey keys a branch, qualified by its sub-repo in umbrella mode.
 func BranchKey(repo, branch string) string {

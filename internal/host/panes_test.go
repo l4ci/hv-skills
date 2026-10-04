@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const outAck = `{"id":"hv-limit-watch","result":{"type":"subscription_started"}}`
+const outAck = `{"id":"rota-limit-watch","result":{"type":"subscription_started"}}`
 
 func outEvent(pane, line, text string) string {
 	return `{"event":"pane.output_matched","data":{"pane_id":"` + pane + `","matched_line":"` + line +
@@ -54,7 +54,7 @@ func TestWatchOutputSubscribesPerPaneWithTheRegex(t *testing.T) {
 
 func TestWatchOutputTreatsAMatchingReplyAsAMatch(t *testing.T) {
 	d, s, _ := pipeDeps(t, "herdr 0.9.3", nil)
-	s.serve(t, `{"id":"hv-limit-watch","result":{"type":"output_matched","pane_id":"w1:p1","revision":2,"matched_line":"usage limit reached","read":{"pane_id":"w1:p1","workspace_id":"w1","tab_id":"w1:t1","source":"recent","format":"text","text":"usage limit reached","revision":2,"truncated":false}}}`)
+	s.serve(t, `{"id":"rota-limit-watch","result":{"type":"output_matched","pane_id":"w1:p1","revision":2,"matched_line":"usage limit reached","read":{"pane_id":"w1:p1","workspace_id":"w1","tab_id":"w1:t1","source":"recent","format":"text","text":"usage limit reached","revision":2,"truncated":false}}}`)
 	w, err := New("herdr", d).(OutputWatcher).WatchOutput(context.Background(), []string{"w1:p1"}, "x")
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestWatchOutputTreatsAMatchingReplyAsAMatch(t *testing.T) {
 
 func TestWatchOutputFailsOnARefusedSubscriptionOrVersion(t *testing.T) {
 	d, s, _ := pipeDeps(t, "herdr 0.9.3", nil)
-	s.serve(t, `{"id":"hv-limit-watch","error":{"code":"invalid_request","message":"bad regex"}}`)
+	s.serve(t, `{"id":"rota-limit-watch","error":{"code":"invalid_request","message":"bad regex"}}`)
 	if _, err := New("herdr", d).(OutputWatcher).WatchOutput(context.Background(), []string{"w1:p1"}, "("); err == nil || !strings.Contains(err.Error(), "bad regex") {
 		t.Errorf("err = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestWatchOutputFailsOnARefusedSubscriptionOrVersion(t *testing.T) {
 
 func TestHerdrSendPaneTypesTextAndEnter(t *testing.T) {
 	d, s, _ := pipeDeps(t, "herdr 0.9.3", nil)
-	s.serve(t, `{"id":"hv-pane-send_input","result":{"type":"ok"}}`)
+	s.serve(t, `{"id":"rota-pane-send_input","result":{"type":"ok"}}`)
 	if err := New("herdr", d).(PaneHost).SendPane(context.Background(), "w1:p1", "Continue."); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestTmuxCapturePane(t *testing.T) {
 	if got := h.CapturePane(context.Background(), "", 40); got != "" || f.count("tmux") != 1 {
 		t.Errorf("empty pane captured %q", got)
 	}
-	if got := h.PaneOf(context.Background(), "w1", "hv:w1"); got != "hv:w1" {
+	if got := h.PaneOf(context.Background(), "w1", "rota:w1"); got != "rota:w1" {
 		t.Errorf("PaneOf = %q", got)
 	}
 }

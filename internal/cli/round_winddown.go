@@ -6,12 +6,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
 )
 
-// The C3 verb `hv round wind-down`; the steps are round.Env.WindDown.
+// The C3 verb `rota round wind-down`; the steps are round.Env.WindDown.
 
 func slotOutcomeList(slots []round.SlotOutcome) []any {
 	out := make([]any, 0, len(slots))

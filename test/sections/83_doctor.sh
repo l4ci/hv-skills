@@ -1,6 +1,6 @@
-echo "C6: hv doctor reports each preflight check and exits 1 on any failure"
+echo "C6: rota doctor reports each preflight check and exits 1 on any failure"
 
-# Tool lookup is HV_TEST_DOCTOR_PATH, so these fakes stand in for herdr and the
+# Tool lookup is ROTA_TEST_DOCTOR_PATH, so these fakes stand in for herdr and the
 # forge CLIs without ever touching the real ones. Only git is the real one
 # (symlinked in): doctor's git calls are read-only.
 TMP_DR="$(mktemp -d)"
@@ -36,15 +36,15 @@ dr_ok() { python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["ok"])
 # account's configDir still reaches the fake herdr; doctor sets it per call.)
 mkdir -p "$TMP_DR/home" "$TMP_DR/claude"
 dr_run() { # dr_run <dir>: doctor in <dir> against the fakes; prints the envelope, returns the exit code
-  HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$1" doctor 2>/dev/null
+  HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" ROTA_TEST_DOCTOR_PATH="$DR_BIN" "$ROTA_BIN" --json -C "$1" doctor 2>/dev/null
 }
 
 # (a) a herdr project with one account and the hook installed: all pass or skip
-mkdir -p "$TMP_DR/acct" "$TMP_DR/proj/.hv"
+mkdir -p "$TMP_DR/acct" "$TMP_DR/proj/.rota"
 echo '{}' >"$TMP_DR/acct/.credentials.json"
 : >"$TMP_DR/acct/installed"
 printf '.worktrees/\n' >"$TMP_DR/proj/.gitignore"
-printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]}}\n' "$TMP_DR/acct" >"$TMP_DR/proj/.hv/config.json"
+printf '{"work":{"dispatch":"herdr","accounts":[{"name":"a","configDir":"%s"}]}}\n' "$TMP_DR/acct" >"$TMP_DR/proj/.rota/config.json"
 # D1 (#65): the orchestrator hooks are opt-in, so a project that has not installed them skips both checks
 git -C "$TMP_DR/proj" init -q
 rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
@@ -92,19 +92,19 @@ rc=0; OUT="$(dr_run "$TMP_DR/proj")" || rc=$?
 [ "$(printf '%s' "$OUT" | dr_field accounts status)" = "fail" ] || fail "C6[e]: accounts did not fail: $OUT"
 pass "C6[e]: an account with no credentials file fails"
 
-# (f) no .hv/ at all: runs on defaults; no host, accounts or hook to check
+# (f) no .rota/ at all: runs on defaults; no host, accounts or hook to check
 mkdir -p "$TMP_DR/bare"
 printf '.worktrees/\n' >"$TMP_DR/bare/.gitignore"
 git -C "$TMP_DR/bare" init -q
 rc=0; OUT="$(dr_run "$TMP_DR/bare")" || rc=$?
-[ "$rc" -eq 0 ] || fail "C6[f]: doctor without .hv/ exited $rc: $OUT"
+[ "$rc" -eq 0 ] || fail "C6[f]: doctor without .rota/ exited $rc: $OUT"
 for n in host accounts hook statusline stop-hook; do
-  [ "$(printf '%s' "$OUT" | dr_field "$n" status)" = "skip" ] || fail "C6[f]: $n did not skip without .hv/: $OUT"
+  [ "$(printf '%s' "$OUT" | dr_field "$n" status)" = "skip" ] || fail "C6[f]: $n did not skip without .rota/: $OUT"
 done
-pass "C6[f]: doctor runs without .hv/ on defaults"
+pass "C6[f]: doctor runs without .rota/ on defaults"
 
 # (g) no repo scope
-rc=0; HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" HV_TEST_DOCTOR_PATH="$DR_BIN" "$HV_BIN" --json -C "$TMP_DR/bare" doctor --repo x >/dev/null 2>&1 || rc=$?
+rc=0; HOME="$TMP_DR/home" CLAUDE_CONFIG_DIR="$TMP_DR/claude" ROTA_TEST_DOCTOR_PATH="$DR_BIN" "$ROTA_BIN" --json -C "$TMP_DR/bare" doctor --repo x >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || fail "C6[g]: --repo exited $rc, not 2"
 pass "C6[g]: doctor rejects --repo"
 

@@ -9,26 +9,26 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
-// project is one generated .hv/ tree.
+// project is one generated .rota/ tree.
 type project struct {
 	Root      string   `json:"root"`
 	Backlog   string   `json:"backlog"`
 	Archive   string   `json:"archive"`
-	Detail    string   `json:"detail"` // content for .hv/bugs/B07.md and friends, "" = none
+	Detail    string   `json:"detail"` // content for .rota/bugs/B07.md and friends, "" = none
 	IDs       []string `json:"ids"`
 	NoBacklog bool     `json:"noBacklog"`
 }
 
 func (p project) write(t *testing.T) {
-	hv := filepath.Join(p.Root, ".hv")
-	if err := os.MkdirAll(filepath.Join(hv, "bugs"), 0o755); err != nil {
+	rota := filepath.Join(p.Root, ".rota")
+	if err := os.MkdirAll(filepath.Join(rota, "bugs"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	put := func(name, content string) {
-		if err := os.WriteFile(filepath.Join(hv, name), []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(rota, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -212,14 +212,14 @@ func TestNextIDMatchesPython(t *testing.T) {
 	ids := 0
 	for i, s := range scen {
 		root := t.TempDir()
-		hv := filepath.Join(root, ".hv")
-		os.MkdirAll(hv, 0o755)
-		os.WriteFile(filepath.Join(hv, "BACKLOG.md"), []byte(s.Backlog), 0o644)
+		rota := filepath.Join(root, ".rota")
+		os.MkdirAll(rota, 0o755)
+		os.WriteFile(filepath.Join(rota, "BACKLOG.md"), []byte(s.Backlog), 0o644)
 		if s.Archive != "" {
-			os.WriteFile(filepath.Join(hv, "ARCHIVE.md"), []byte(s.Archive), 0o644)
+			os.WriteFile(filepath.Join(rota, "ARCHIVE.md"), []byte(s.Archive), 0o644)
 		}
 		if s.Counters != nil {
-			os.WriteFile(filepath.Join(hv, "counters.json"), []byte(*s.Counters), 0o644)
+			os.WriteFile(filepath.Join(rota, "counters.json"), []byte(*s.Counters), 0o644)
 		}
 		f := &File{Root: root}
 		var res []any
@@ -233,7 +233,7 @@ func TestNextIDMatchesPython(t *testing.T) {
 			}
 		}
 		r := map[string]any{"ids": res, "counters": nil}
-		if raw, err := os.ReadFile(filepath.Join(hv, "counters.json")); err == nil {
+		if raw, err := os.ReadFile(filepath.Join(rota, "counters.json")); err == nil {
 			r["counters"] = string(raw)
 		}
 		got = append(got, r)
@@ -245,18 +245,18 @@ func TestNextIDMatchesPython(t *testing.T) {
 }
 
 // A fractional counter at or above every ID: Python writes the bumped float
-// and then crashes formatting it. hv refuses and leaves the file alone.
+// and then crashes formatting it. rota refuses and leaves the file alone.
 func TestNextIDRefusesFractionalCounter(t *testing.T) {
 	for _, raw := range []string{`{"bugs": 1e2}`, `{"bugs": 100.5, "x": 1}`} {
 		root := t.TempDir()
-		hv := filepath.Join(root, ".hv")
-		os.MkdirAll(hv, 0o755)
-		os.WriteFile(filepath.Join(hv, "BACKLOG.md"), []byte("## Bugs\n- **[B07] a.**\n"), 0o644)
-		os.WriteFile(filepath.Join(hv, "counters.json"), []byte(raw), 0o644)
+		rota := filepath.Join(root, ".rota")
+		os.MkdirAll(rota, 0o755)
+		os.WriteFile(filepath.Join(rota, "BACKLOG.md"), []byte("## Bugs\n- **[B07] a.**\n"), 0o644)
+		os.WriteFile(filepath.Join(rota, "counters.json"), []byte(raw), 0o644)
 		if id, err := (&File{Root: root}).NextID("bugs"); err == nil {
 			t.Fatalf("%s: NextID = %q, want an error", raw, id)
 		}
-		if got, _ := os.ReadFile(filepath.Join(hv, "counters.json")); string(got) != raw {
+		if got, _ := os.ReadFile(filepath.Join(rota, "counters.json")); string(got) != raw {
 			t.Fatalf("%s: counters.json rewritten to %s", raw, got)
 		}
 	}

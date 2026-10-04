@@ -8,17 +8,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
-// The C2 verbs `hv round status` and `hv round reconcile`; the assembly and
+// The C2 verbs `rota round status` and `rota round reconcile`; the assembly and
 // the drift rules are internal/round. Tests swap roundEnv for fakes.
 var roundEnv = defaultRoundEnv
 
@@ -29,7 +29,7 @@ var roundEnv = defaultRoundEnv
 // A host or forge that cannot be built or reached is left nil: the verbs
 // report it as unavailable instead of failing.
 func defaultRoundEnv(ctx context.Context, root string) round.Env {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	e := round.Env{Git: worker.ExecGit, Base: "main"}
 	if b, ok, err := (git.Repo{Dir: root}).Base(ctx, ""); err == nil && ok {
 		e.Base = b
@@ -74,7 +74,7 @@ func withBoard(c *Ctx, root string, env round.Env) round.Env {
 	if env.Board != nil {
 		return env
 	}
-	if name, err := config.Backend(config.Load(filepath.Join(root, ".hv", "config.json"))); err != nil || name != "issues" {
+	if name, err := config.Backend(config.Load(filepath.Join(root, ".rota", "config.json"))); err != nil || name != "issues" {
 		return env
 	}
 	be, err := a4Open(c, root, false, "")

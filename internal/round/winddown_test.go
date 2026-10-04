@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 func (f *assignFixture) windDown(mod func(*WindDownOpts)) (WoundDown, error) {
@@ -25,7 +25,7 @@ func (f *assignFixture) windDown(mod func(*WindDownOpts)) (WoundDown, error) {
 func (f *assignFixture) verifyWith(t *testing.T, cmds string) {
 	t.Helper()
 	cfg := `{"refactor":{"verifyCommands":` + cmds + `}}`
-	if err := os.WriteFile(filepath.Join(f.root, ".hv", "config.json"), []byte(cfg), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.root, ".rota", "config.json"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

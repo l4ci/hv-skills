@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // fakeBacklog is the read side Candidates and Assess need.
@@ -64,7 +64,7 @@ func (f *fakeBacklog) Comments(ref, kind string) ([]backlog.Comment, error) {
 
 func milestoneDoc(t *testing.T, root, id, status string, depends ...string) {
 	t.Helper()
-	dir := filepath.Join(root, ".hv", "milestones")
+	dir := filepath.Join(root, ".rota", "milestones")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestStartNumbersALeaseTakenUnnumberedByTheSameHolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := Env{Git: worker.ExecGit, Base: "main", Lease: le}
-	// Its child runs `round start` with HV_ROUND_HOLDER_PID, no --holder-pid.
+	// Its child runs `round start` with ROTA_ROUND_HOLDER_PID, no --holder-pid.
 	o := startOpts(roundcfg.ScopeMilestone, 0)
 	o.Getenv = func(k string) string {
 		if k == roundlease.HolderPIDEnv {

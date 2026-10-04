@@ -1,6 +1,6 @@
-# `/hv-debug` hypothesize (single and competing modes)
+# `/rota-debug` hypothesize (single and competing modes)
 
-Loaded by `/hv-debug` Step 6. Two modes share one brief template and return shape but differ in agent count, framing, and cycle-counter escalation behavior. The mode is selected by `debug.competingHypotheses` in `.hv/config.json` (default `false`).
+Loaded by `/rota-debug` Step 6. Two modes share one brief template and return shape but differ in agent count, framing, and cycle-counter escalation behavior. The mode is selected by `debug.competingHypotheses` in `.rota/config.json` (default `false`).
 
 ## Brief template (both modes)
 
@@ -14,9 +14,9 @@ Investigate [B##]: <title>.
 <file paths + line numbers you suspect are involved>
 
 **Relevant knowledge:**
-<bullets from `hv knowledge query`, if any>
-<entries from `hv decisions query`, if any — boundaries that rule out fix directions>
-<terms from `hv glossary read`, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
+<bullets from `rota knowledge query`, if any>
+<entries from `rota decisions query`, if any — boundaries that rule out fix directions>
+<terms from `rota glossary read`, if any — definitions to align bug-report phrasing to canonical names; flag drift between the report's wording and the term's definition since misnamed components are a frequent root cause of misattributed bugs>
 
 [FRAMING — competing mode only: insert one lens prompt below]
 

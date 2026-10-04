@@ -18,7 +18,7 @@ func bodyFile(t *testing.T, text string) string {
 
 func issueRun(t *testing.T, root string, args ...string) (int, map[string]any, string) {
 	t.Helper()
-	return hvRun(t, append([]string{"--json", "-C", root}, args...)...)
+	return rotaRun(t, append([]string{"--json", "-C", root}, args...)...)
 }
 
 func ddata(t *testing.T, env map[string]any) map[string]any {

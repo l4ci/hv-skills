@@ -17,18 +17,18 @@ func TestReady(t *testing.T) {
 		err   error
 	}{
 		{"nothing", nil, "B02", both, nil},
-		{"acceptance heading", map[string]string{".hv/bugs/B01.md": "# x\n### Acceptance criteria\n"}, "B01", []string{}, nil},
-		{"lowercase heading", map[string]string{".hv/bugs/B01.md": "## my acceptance\n"}, "B01", []string{}, nil},
-		{"checkbox", map[string]string{".hv/bugs/B01.md": "  * [X] done\n"}, "B01", []string{}, nil},
-		{"word without heading", map[string]string{".hv/bugs/B01.md": "acceptance\n"}, "B01", both, nil},
-		{"design note", map[string]string{".hv/designs/B02.md": "d"}, "B02", []string{}, nil},
-		{"plan note", map[string]string{".hv/plans/M01-B02.md": "p"}, "B02", []string{}, nil},
-		{"plan of another item", map[string]string{".hv/plans/M01-B20.md": "p"}, "B02", both, nil},
+		{"acceptance heading", map[string]string{".rota/bugs/B01.md": "# x\n### Acceptance criteria\n"}, "B01", []string{}, nil},
+		{"lowercase heading", map[string]string{".rota/bugs/B01.md": "## my acceptance\n"}, "B01", []string{}, nil},
+		{"checkbox", map[string]string{".rota/bugs/B01.md": "  * [X] done\n"}, "B01", []string{}, nil},
+		{"word without heading", map[string]string{".rota/bugs/B01.md": "acceptance\n"}, "B01", both, nil},
+		{"design note", map[string]string{".rota/designs/B02.md": "d"}, "B02", []string{}, nil},
+		{"plan note", map[string]string{".rota/plans/M01-B02.md": "p"}, "B02", []string{}, nil},
+		{"plan of another item", map[string]string{".rota/plans/M01-B20.md": "p"}, "B02", both, nil},
 		{"unknown", nil, "B99", nil, ErrNotFound},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			f, _ := proj(t, hvFiles(c.files))
+			f, _ := proj(t, rotaFiles(c.files))
 			got, err := f.Ready(c.id)
 			if !errors.Is(err, c.err) || (err == nil && !reflect.DeepEqual(got, c.want)) {
 				t.Fatalf("got %v, %v; want %v, %v", got, err, c.want, c.err)
@@ -53,7 +53,7 @@ const log = `# B01
 `
 
 func TestComments(t *testing.T) {
-	f, _ := proj(t, hvFiles(map[string]string{".hv/bugs/B01.md": log}))
+	f, _ := proj(t, rotaFiles(map[string]string{".rota/bugs/B01.md": log}))
 	all, err := f.Comments("B01", "")
 	if err != nil {
 		t.Fatal(err)
@@ -82,11 +82,11 @@ func TestComments(t *testing.T) {
 
 func TestAddComment(t *testing.T) {
 	t.Run("existing log", func(t *testing.T) {
-		f, _ := proj(t, hvFiles(map[string]string{".hv/bugs/B01.md": log}))
+		f, _ := proj(t, rotaFiles(map[string]string{".rota/bugs/B01.md": log}))
 		if id, err := f.AddComment("B01", "feedback", "line one\r\n\r\n  indented\n"); err != nil || id != "" {
 			t.Fatalf("id=%q err=%v", id, err)
 		}
-		got := read(t, f, ".hv/bugs/B01.md")
+		got := read(t, f, ".rota/bugs/B01.md")
 		if !strings.Contains(got, " · feedback · line one\n\n    indented\n## Notes") {
 			t.Errorf("detail:\n%s", got)
 		}
@@ -96,17 +96,17 @@ func TestAddComment(t *testing.T) {
 		}
 	})
 	t.Run("creates the detail file", func(t *testing.T) {
-		f, _ := proj(t, hvFiles(nil))
+		f, _ := proj(t, rotaFiles(nil))
 		if _, err := f.AddComment("B02", "question", "Is it?"); err != nil {
 			t.Fatal(err)
 		}
-		got := read(t, f, ".hv/bugs/B02.md")
-		if !strings.HasPrefix(got, "# B02: Second\n\n> Related TODO entry: `[B02]` in `.hv/BACKLOG.md`\n\n## Log\n\n- ") {
+		got := read(t, f, ".rota/bugs/B02.md")
+		if !strings.HasPrefix(got, "# B02: Second\n\n> Related TODO entry: `[B02]` in `.rota/BACKLOG.md`\n\n## Log\n\n- ") {
 			t.Errorf("detail:\n%s", got)
 		}
 	})
 	t.Run("errors", func(t *testing.T) {
-		f, _ := proj(t, hvFiles(nil))
+		f, _ := proj(t, rotaFiles(nil))
 		if _, err := f.AddComment("B02", "remark", "x"); !errors.Is(err, ErrInvalid) {
 			t.Errorf("kind: %v", err)
 		}

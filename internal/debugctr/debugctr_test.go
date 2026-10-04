@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func repo(t *testing.T) string {
@@ -23,7 +23,7 @@ func repo(t *testing.T) string {
 			t.Fatalf("git %v: %v %s", a, err, out)
 		}
 	}
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o777)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o777)
 	return dir
 }
 
@@ -106,9 +106,9 @@ func TestSummaryBytes(t *testing.T) {
 		trunc += "é"
 	}
 	want := "# Iron Law triggered for [B07]\n\n1 fix attempt failed to resolve the bug. Halting.\n\n## Attempts\n\n1. abc — " + trunc + "...\n\n## Next steps\n\n" +
-		"- Run `/hv-pause` to leave a handoff note and step away.\n" +
+		"- Run `/rota-pause` to leave a handoff note and step away.\n" +
 		"- Or re-read the symptom — the root cause is likely in a different subsystem than the hypotheses so far have explored.\n" +
-		"- The failed-fix count is per item and survives a new branch; only `hv debug reset B07`, after a human approves it, starts it again."
+		"- The failed-fix count is per item and survives a new branch; only `rota debug reset B07`, after a human approves it, starts it again."
 	if md != want || bug != "B07" || failed != 1 {
 		t.Fatalf("summary:\n%s", md)
 	}

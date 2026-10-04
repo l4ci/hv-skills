@@ -10,14 +10,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/shlex"
+	"github.com/l4ci/rota/internal/shlex"
 )
 
 // herdr ports bin/hv-host-herdr.sh. A herdr slot is a TAB in the current
 // workspace whose root pane runs Claude Code in the slot's worktree. The
 // handle is the tab id (`w1:t7`). Tab ids are never reused, so the handle
 // changes on every dispatch and the caller must persist it. The agent's name
-// derives from slot + handle (`hv-w1-w1-t7`): herdr agent names are unique per
+// derives from slot + handle (`rota-w1-w1-t7`): herdr agent names are unique per
 // SERVER, and a bare `w1` would collide with another repo's pool. See AgentName
 // for the names herdr accepts.
 //
@@ -53,15 +53,15 @@ func (h *herdr) Where() string {
 // agentNameRe is what herdr 0.9.3 accepts as an agent name.
 var agentNameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 
-// AgentName is the herdr agent name for a slot and handle: `hv-<slot>-<tab id>`
-// (`hv-w1-w1-t7`) when herdr accepts that, which keeps the name of every agent
+// AgentName is the herdr agent name for a slot and handle: `rota-<slot>-<tab id>`
+// (`rota-w1-w1-t7`) when herdr accepts that, which keeps the name of every agent
 // started before this rule. Workspace ids are mixed case (`w1W`) and herdr
-// takes only [a-z][a-z0-9_-]{0,31}, so otherwise it is `hv-<slot>-<hash>`: the
-// slot lowercased with anything else turned into `-` and cut to 20, and the
+// takes only [a-z][a-z0-9_-]{0,31}, so otherwise it is `rota-<slot>-<hash>`: the
+// slot lowercased with anything else turned into `-` and cut to 18, and the
 // first 8 hex of the handle's SHA-1, which stays unique when two workspace ids
 // differ only in case.
 func AgentName(slot, handle string) string {
-	if n := "hv-" + slot + "-" + strings.ReplaceAll(handle, ":", "-"); agentNameRe.MatchString(n) {
+	if n := "rota-" + slot + "-" + strings.ReplaceAll(handle, ":", "-"); agentNameRe.MatchString(n) {
 		return n
 	}
 	var b strings.Builder
@@ -73,11 +73,11 @@ func AgentName(slot, handle string) string {
 		}
 	}
 	s := b.String()
-	if len(s) > 20 {
-		s = s[:20]
+	if len(s) > 18 {
+		s = s[:18]
 	}
 	sum := sha1.Sum([]byte(handle))
-	return "hv-" + s + "-" + hex.EncodeToString(sum[:])[:8]
+	return "rota-" + s + "-" + hex.EncodeToString(sum[:])[:8]
 }
 
 func (h *herdr) herdr(ctx context.Context, args ...string) Result {

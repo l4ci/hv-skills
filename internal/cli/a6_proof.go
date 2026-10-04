@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/plan"
-	"github.com/l4ci/hv/v5/internal/proof"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/plan"
+	"github.com/l4ci/rota/internal/proof"
 )
 
 // Glue for the proof group and plan uncertain, which read items through
@@ -31,7 +31,7 @@ func backlogMode(c *Ctx) (root string, issue bool, err error) {
 	if err != nil {
 		return "", false, err
 	}
-	name, err := config.Backend(config.Load(root + "/.hv/config.json"))
+	name, err := config.Backend(config.Load(root + "/.rota/config.json"))
 	if err != nil {
 		return "", false, &Error{Exit: ExitInternal, Message: err.Error()}
 	}

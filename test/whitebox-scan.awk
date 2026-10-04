@@ -41,7 +41,7 @@ open || /^[[:space:]]*#/ { next }
 /install_helpers/ || /SKILL\.md/ || /PYTHONPATH=/ || /git ls-(tree|files)/ || \
 /(^|[^A-Za-z0-9_])BIN=|export +BIN([^A-Za-z0-9_]|$)|environ\["BIN"\]/ || \
 (/(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*=\(?"?\$\{?REPO\}?"?([ ;)]|$)/ && $0 !~ /HV_INSTALL_ROOT=/) || \
-/\$\{?REPO\}?"?\/(hv-|references|docs|README|CHANGELOG|test\/validate)/ {
+/\$\{?REPO\}?"?\/(rota-|references|docs|README|CHANGELOG|test\/validate)/ {
   bad(FILENAME, FNR, "white-box assertion outside a white-box block: " substr($0, 1, 90))
 }
 END { if (open) bad(open_file, open_line, "white-box-begin never closed") }

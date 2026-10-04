@@ -1,7 +1,7 @@
 echo "summary"
 # Reset to a known state and check the summary lines
-rm -f .hv/ARCHIVE.md
-cat > .hv/BACKLOG.md <<'EOF'
+rm -f .rota/ARCHIVE.md
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -16,7 +16,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 ## Completed
 - ~~**[B01] Resolved bug.**~~ Done 2026-04-18 [`abc1234`]
 EOF
-cat > .hv/KNOWLEDGE.md <<'EOF'
+cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Architecture

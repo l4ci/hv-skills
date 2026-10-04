@@ -1,4 +1,4 @@
-// Package issues is the upstream-issue side of hv: provider detection, list,
+// Package issues is the upstream-issue side of rota: provider detection, list,
 // label, close and the open-only filter of the cross-reference index. It
 // ports bin/hv-issues-{provider,list,label,close,imported}, which called
 // bin/hv-tracker-call; every forge call here goes through tracker.CLI, with
@@ -14,10 +14,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/marker"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/marker"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // ErrCommitNotFound: the commit is not in the repository (exit 3).
@@ -329,7 +329,7 @@ func Close(ctx context.Context, env Env, dir string, number int, commit, item st
 	if err != nil {
 		return false, err
 	}
-	body := "Closed by hv: shipped in " + short
+	body := "Closed by rota: shipped in " + short
 	if item != "" {
 		body += " ([" + item + "])"
 	}

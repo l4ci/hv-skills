@@ -13,7 +13,7 @@
   },
   "outputs": {
     "stdout": "",
-    "stderr": "error: target topic 'Build' already exists in .hv/KNOWLEDGE.md — use --title to move bullets individually\n",
+    "stderr": "error: target topic 'Build' already exists in .rota/KNOWLEDGE.md — use --title to move bullets individually\n",
     "rc": 1,
     "changed": {},
     "removed": []

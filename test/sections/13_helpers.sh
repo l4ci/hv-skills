@@ -4,7 +4,7 @@ echo "## git base + git worktree-clear + block (refactor)"
 BB_TMP="$(mktemp -d)"
 (
   cd "$BB_TMP"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
@@ -26,8 +26,8 @@ BB2_TMP="$(mktemp -d)"
   git checkout -q -b develop
   echo dev > dev.txt && git add dev.txt && git commit -q -m "dev"
   git checkout -q main
-  mkdir -p .hv
-  printf '{"git":{"baseBranch":"develop"}}\n' > .hv/config.json
+  mkdir -p .rota
+  printf '{"git":{"baseBranch":"develop"}}\n' > .rota/config.json
   OUT=$(hvj git base) || { echo "FAIL git base config override: exit non-zero: $OUT"; exit 1; }
   [ "$(jget data.base <<<"$OUT")" = "develop" ] || { echo "FAIL git base config override: expected 'develop', got '$OUT'"; exit 1; }
 )
@@ -38,16 +38,16 @@ pass "git base respects git.baseBranch config override"
 MB_TMP="$(mktemp -d)"
 (
   cd "$MB_TMP"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q && git config user.email t@t && git config user.name t
   OUT=$(hvj block knowledge) || { echo "FAIL: block knowledge exit non-zero: $OUT"; exit 1; }
   [ "$(jget data.status <<<"$OUT")" = "created" ] || { echo "FAIL: expected 'created', got '$OUT'"; exit 1; }
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || { echo "FAIL: expected changed true: $OUT"; exit 1; }
-  grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || { echo "FAIL: marker missing"; exit 1; }
+  grep -q "<!-- rota-knowledge-start -->" CLAUDE.md || { echo "FAIL: marker missing"; exit 1; }
   grep -q "no topics yet" CLAUDE.md || { echo "FAIL: empty msg missing"; exit 1; }
 
-  mkdir -p .hv
-  printf '# Knowledge\n\n## Build\n- details\n\n## Testing\n- more\n' > .hv/KNOWLEDGE.md
+  mkdir -p .rota
+  printf '# Knowledge\n\n## Build\n- details\n\n## Testing\n- more\n' > .rota/KNOWLEDGE.md
   OUT=$(hvj block knowledge) || { echo "FAIL: block knowledge exit non-zero: $OUT"; exit 1; }
   [ "$(jget data.status <<<"$OUT")" = "updated" ] || { echo "FAIL: expected 'updated', got '$OUT'"; exit 1; }
   grep -q "^- Build" CLAUDE.md || { echo "FAIL: Build topic missing"; exit 1; }
@@ -55,7 +55,7 @@ MB_TMP="$(mktemp -d)"
 
   printf '# Preamble\n\n<!-- hv:knowledge:start -->\n## Project Knowledge\n- OldTopic\n<!-- hv:knowledge:end -->\n\n# Postamble\n' > CLAUDE.md
   hvj block knowledge >/dev/null
-  grep -q "<!-- hv-knowledge-start -->" CLAUDE.md || { echo "FAIL: legacy markers not migrated"; exit 1; }
+  grep -q "<!-- rota-knowledge-start -->" CLAUDE.md || { echo "FAIL: legacy markers not migrated"; exit 1; }
   grep -q "hv:knowledge:start" CLAUDE.md && { echo "FAIL: legacy colon markers still present"; exit 1; }
   grep -q "^# Preamble" CLAUDE.md || { echo "FAIL: preamble lost"; exit 1; }
 )
@@ -66,7 +66,7 @@ pass "block knowledge: creates, updates, and migrates legacy markers"
 BS_TMP="$(mktemp -d)"
 (
   cd "$BS_TMP"
-  mkdir -p .hv
+  mkdir -p .rota
   CUSTOM_BODY="## Project Decisions
 
 Custom intro.
@@ -74,8 +74,8 @@ Custom intro.
 - Topic A"
   OUT=$(printf '%s' "$CUSTOM_BODY" | hvj block decisions --body-file -) || { echo "FAIL: block decisions exit non-zero: $OUT"; exit 1; }
   [ "$(jget data.status <<<"$OUT")" = "created" ] || { echo "FAIL: expected 'created', got '$OUT'"; exit 1; }
-  grep -q "<!-- hv-decisions-start -->" CLAUDE.md || { echo "FAIL: start marker missing"; exit 1; }
-  grep -q "<!-- hv-decisions-end -->" CLAUDE.md || { echo "FAIL: end marker missing"; exit 1; }
+  grep -q "<!-- rota-decisions-start -->" CLAUDE.md || { echo "FAIL: start marker missing"; exit 1; }
+  grep -q "<!-- rota-decisions-end -->" CLAUDE.md || { echo "FAIL: end marker missing"; exit 1; }
   grep -q "Topic A" CLAUDE.md || { echo "FAIL: body content missing"; exit 1; }
 )
 rm -rf "$BS_TMP"
@@ -90,15 +90,15 @@ HEAL_TMP="$(mktemp -d)"
   git init -q
   git config user.email t@t && git config user.name t
   git checkout -q -b main 2>/dev/null || git branch -m main
-  mkdir -p .hv/milestones
-  printf -- '---\nid: M99\ntitle: Foo\nstatus: planned\ndepends: []\n---\nBody.\n' > .hv/milestones/M99.md
-  printf '# MILESTONES\n\n## Active milestones\n\n_(none)_\n\n## Milestones\n\n### M99 — Foo\n\n**Status:** archived\n' > .hv/MILESTONES.md
+  mkdir -p .rota/milestones
+  printf -- '---\nid: M99\ntitle: Foo\nstatus: planned\ndepends: []\n---\nBody.\n' > .rota/milestones/M99.md
+  printf '# MILESTONES\n\n## Active milestones\n\n_(none)_\n\n## Milestones\n\n### M99 — Foo\n\n**Status:** archived\n' > .rota/MILESTONES.md
   touch CLAUDE.md
   git add . && git commit -q -m "seed"
   hvj milestone index >/dev/null || { echo "FAIL: milestone index exit non-zero"; exit 1; }
   python3 -c "
 import re, sys
-ms = open('.hv/MILESTONES.md').read()
+ms = open('.rota/MILESTONES.md').read()
 m = re.search(r'### M99 — Foo\n\n\*\*Status:\*\* (\w+)', ms)
 if not (m and m.group(1) == 'planned'):
     print('heal failed; Status line:', m.group(0) if m else 'not found', file=sys.stderr)
@@ -112,8 +112,8 @@ echo "## backlog milestones"
 FM4I_TMP="$(mktemp -d)"
 (
   cd "$FM4I_TMP"
-  mkdir -p .hv
-  cat > .hv/BACKLOG.md <<'EOF'
+  mkdir -p .rota
+  cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -169,7 +169,7 @@ echo "## plan rename-check"
 PRC_TMP="$(mktemp -d)"
 (
   cd "$PRC_TMP"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q
   git config user.email t@t && git config user.name t
 
@@ -217,8 +217,8 @@ echo "## knowledge add"
 KM_TMP="$(mktemp -d)"
 (
   cd "$KM_TMP"
-  mkdir -p .hv
-  cat > .hv/KNOWLEDGE.md <<'EOF'
+  mkdir -p .rota
+  cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Existing Topic
@@ -240,29 +240,29 @@ EOF
   # 3. Successful insert prepends bullet at top of topic
   OUT=$(hvj knowledge add --topic "Existing Topic" --title "Fresh insight" --date 2026-05-11 --body-file - <<<"Fresh insight body.") || fail "insert failed: $OUT"
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "insert: expected changed true: $OUT"
-  grep -q "^- \*\*Fresh insight\*\* — Fresh insight body\. <!-- 2026-05-11 -->" .hv/KNOWLEDGE.md || fail "insert wrong format"
+  grep -q "^- \*\*Fresh insight\*\* — Fresh insight body\. <!-- 2026-05-11 -->" .rota/KNOWLEDGE.md || fail "insert wrong format"
   # The new bullet must come BEFORE 'Older rule'
   python3 -c "
 import sys
-content = open('.hv/KNOWLEDGE.md').read()
+content = open('.rota/KNOWLEDGE.md').read()
 fresh_idx = content.index('**Fresh insight**')
 older_idx = content.index('**Older rule**')
 assert fresh_idx < older_idx, f'Fresh insight ({fresh_idx}) should come before Older rule ({older_idx})'
 " || fail "ordering wrong: Fresh insight should be above Older rule"
   # Legacy bullet preserved
-  grep -q "^- legacy bullet without a title <!-- 2026-03-15 -->" .hv/KNOWLEDGE.md || fail "legacy bullet lost"
+  grep -q "^- legacy bullet without a title <!-- 2026-03-15 -->" .rota/KNOWLEDGE.md || fail "legacy bullet lost"
 
   # 4. Idempotent: calling with the same title is a no-op
-  COUNT_BEFORE=$(grep -c "^\- \*\*Fresh insight\*\*" .hv/KNOWLEDGE.md)
+  COUNT_BEFORE=$(grep -c "^\- \*\*Fresh insight\*\*" .rota/KNOWLEDGE.md)
   OUT=$(hvj knowledge add --topic "Existing Topic" --title "fresh insight" --date 2026-05-11 --body-file - <<<"Different body, same title.") || fail "dedup call failed: $OUT"
   [ "$(jget data.changed <<<"$OUT")" = "false" ] || fail "dedup: expected changed false: $OUT"
-  COUNT_AFTER=$(grep -c "^\- \*\*Fresh insight\*\*" .hv/KNOWLEDGE.md)
+  COUNT_AFTER=$(grep -c "^\- \*\*Fresh insight\*\*" .rota/KNOWLEDGE.md)
   [ "$COUNT_BEFORE" = "$COUNT_AFTER" ] || fail "dedup failed: title repeated (count went from $COUNT_BEFORE to $COUNT_AFTER)"
 
   # 5. --body-file <path> alternative (the old inline --body flag is gone)
   printf 'Body passed from a file.\n' > body.txt
   hvj knowledge add --topic "Existing Topic" --title "Body via file" --body-file body.txt --date 2026-05-11 >/dev/null || fail "--body-file path add failed"
-  grep -q "^- \*\*Body via file\*\* — Body passed from a file\. <!-- 2026-05-11 -->" .hv/KNOWLEDGE.md || fail "--body-file path wrong"
+  grep -q "^- \*\*Body via file\*\* — Body passed from a file\. <!-- 2026-05-11 -->" .rota/KNOWLEDGE.md || fail "--body-file path wrong"
 )
 rm -rf "$KM_TMP"
 pass "knowledge add: argv, missing topic, insert-at-top, idempotent dedup, --body-file path"
@@ -271,8 +271,8 @@ echo "## knowledge amend"
 KA_TMP="$(mktemp -d)"
 (
   cd "$KA_TMP"
-  mkdir -p .hv
-  cat > .hv/KNOWLEDGE.md <<'EOF'
+  mkdir -p .rota
+  cat > .rota/KNOWLEDGE.md <<'EOF'
 # Knowledge
 
 ## Topic A
@@ -298,13 +298,13 @@ EOF
   [ "$rc" = "3" ] || fail "missing fragment: expected exit 3, got $rc"
 
   # 4. Successful append after the trailing date comment
-  OUT=$(hvj knowledge amend --topic "Topic A" --fragment "ALPHA" --mode append --body-file - <<<"Upstream: hv#42") || fail "append failed: $OUT"
+  OUT=$(hvj knowledge amend --topic "Topic A" --fragment "ALPHA" --mode append --body-file - <<<"Upstream: rota#42") || fail "append failed: $OUT"
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "append: expected changed true: $OUT"
-  grep -q "^- \*\*First rule\*\* — body with unique fragment ALPHA\. <!-- 2026-04-01 --> Upstream: hv#42$" .hv/KNOWLEDGE.md || fail "append wrong (Topic A First rule)"
+  grep -q "^- \*\*First rule\*\* — body with unique fragment ALPHA\. <!-- 2026-04-01 --> Upstream: rota#42$" .rota/KNOWLEDGE.md || fail "append wrong (Topic A First rule)"
 
   # 5. Other bullets and topics untouched
-  grep -q "^- \*\*Second rule\*\* — body with unique fragment BETA\. <!-- 2026-04-02 -->$" .hv/KNOWLEDGE.md || fail "Second rule changed unexpectedly"
-  grep -q "^- \*\*Third rule\*\* — body with fragment GAMMA\. <!-- 2026-04-03 -->$" .hv/KNOWLEDGE.md || fail "Topic B Third rule changed unexpectedly"
+  grep -q "^- \*\*Second rule\*\* — body with unique fragment BETA\. <!-- 2026-04-02 -->$" .rota/KNOWLEDGE.md || fail "Second rule changed unexpectedly"
+  grep -q "^- \*\*Third rule\*\* — body with fragment GAMMA\. <!-- 2026-04-03 -->$" .rota/KNOWLEDGE.md || fail "Topic B Third rule changed unexpectedly"
 
   # 6. Fragment must be within the named topic (Topic B has GAMMA, calling with Topic A should miss)
   rc=0; hvj knowledge amend --topic "Topic A" --fragment "GAMMA" --mode append --body-file - <<<"WRONG" >/dev/null 2>&1 || rc=$?

@@ -1,28 +1,28 @@
 # Context-load protocol
 
-Used by `/hv-work` (Step 4 for the normal flow, Preview Mode Step 2 for the peek), `/hv-plan` Step 3, and `/hv-vision` Step 2 — the silent context load that runs before the skill proposes anything to the user. The goal: read everything that informs the planned action in parallel, form a picture, then act.
+Used by `/rota-work` (Step 4 for the normal flow, Preview Mode Step 2 for the peek), `/rota-plan` Step 3, and `/rota-vision` Step 2 — the silent context load that runs before the skill proposes anything to the user. The goal: read everything that informs the planned action in parallel, form a picture, then act.
 
 ## The canonical reads
 
 Run as a checklist. Items are ordered by broadening scope (target item → plan → milestone → repo-wide). Skip an item when its precondition doesn't apply — that's not a failure, that's the protocol.
 
-- **The target item entry** in `.hv/BACKLOG.md` (when a specific backlog ID is the target) and its overflow detail file at `.hv/<bugs|features|tasks>/<id>.md` if one exists.
-- **The plan file** at `.hv/plans/<key>.md` if one exists for this work. Use:
+- **The target item entry** in `.rota/BACKLOG.md` (when a specific backlog ID is the target) and its overflow detail file at `.rota/<bugs|features|tasks>/<id>.md` if one exists.
+- **The plan file** at `.rota/plans/<key>.md` if one exists for this work. Use:
 
   ```
-  hv plan show <key>
+  rota plan show <key>
   ```
 
   A missing plan exits 3 with empty stdout, not a failure. Treat that as "no plan yet".
 
-- **The milestone file** at `.hv/milestones/<MID>.md` if the work is milestone-scoped.
+- **The milestone file** at `.rota/milestones/<MID>.md` if the work is milestone-scoped.
 - **Items scoped to the milestone** via:
 
   ```
-  hv backlog ids --milestone <MID>
+  rota backlog ids --milestone <MID>
   ```
 
-  Used by `/hv-plan` and `/hv-vision` to see siblings under the same milestone.
+  Used by `/rota-plan` and `/rota-vision` to see siblings under the same milestone.
 
 - **KNOWLEDGE + DECISIONS** — see `references/knowledge-consult.md` for the canonical query pattern. Pass the topic names inferred from the work area.
 - **Recent git history**:
@@ -43,9 +43,9 @@ A recent path-encoding helper audit confirmed why: when load steps drift between
 
 Each calling skill adds its own reads inline. The protocol lists only the common subset. Concretely:
 
-- `/hv-vision` Step 2 adds `.hv/MILESTONES.md`, every `.hv/milestones/M*.md`, glossary terms from `.hv/KNOWLEDGE.md` `## Glossary` (via `hv glossary read`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
-- `/hv-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `hv repo resolve` when umbrella mode is on).
-- `/hv-plan` Step 3 adds `hv plan list --milestone <MID>` to see existing plans under the milestone.
+- `/rota-vision` Step 2 adds `.rota/MILESTONES.md`, every `.rota/milestones/M*.md`, glossary terms from `.rota/KNOWLEDGE.md` `## Glossary` (via `rota glossary read`), and stack files (`README.md`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.) — domain-shape reads that other skills don't need.
+- `/rota-work` Preview Mode Step 2 adds Repos: parsing for umbrella items (resolves via `rota repo resolve` when umbrella mode is on).
+- `/rota-plan` Step 3 adds `rota plan list --milestone <MID>` to see existing plans under the milestone.
 
 ## What to do with the loaded context
 
@@ -55,10 +55,10 @@ If a skill finds itself wanting to recite the loaded context back at the user, t
 
 ## Lookup, not resolve
 
-Reads in this list are lookups. A missing plan (`hv plan show` exits 3), an empty `hv backlog ids` list, or a missing detail file is the answer, not a failure. Do not wrap these calls in `2>/dev/null` or fallbacks; handle the exit code or read `--json` `data`.
+Reads in this list are lookups. A missing plan (`rota plan show` exits 3), an empty `rota backlog ids` list, or a missing detail file is the answer, not a failure. Do not wrap these calls in `2>/dev/null` or fallbacks; handle the exit code or read `--json` `data`.
 
 ## What this reference does NOT cover
 
 - **K+D query mechanics** — those live in `references/knowledge-consult.md`. This reference cites that one for the K+D portion; it does not redefine the query pattern.
-- **`--auto-loop` pipeline grep'ing** — used by `/hv-plan --auto-loop` to resolve open questions against existing commitments. That's a separate auto-resolution pattern, not part of the silent pre-planning load.
-- **`/hv-debug`, `/hv-refactor`, `/hv-review` context loads** — those consume only `references/knowledge-consult.md`, not the full protocol. Their inputs are different (a bug ID, a diff range, a feature branch), so they don't load TODO entries / plans / milestones the same way.
+- **`--auto-loop` pipeline grep'ing** — used by `/rota-plan --auto-loop` to resolve open questions against existing commitments. That's a separate auto-resolution pattern, not part of the silent pre-planning load.
+- **`/rota-debug`, `/rota-refactor`, `/rota-review` context loads** — those consume only `references/knowledge-consult.md`, not the full protocol. Their inputs are different (a bug ID, a diff range, a feature branch), so they don't load TODO entries / plans / milestones the same way.

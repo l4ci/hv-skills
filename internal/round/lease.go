@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // LeaseStale is the drift kind for a lease whose holder is gone. It is never
-// repaired by Reconcile: `hv reap` clears it (ClearStaleLease), and
-// `hv round start` reclaims it.
+// repaired by Reconcile: `rota reap` clears it (ClearStaleLease), and
+// `rota round start` reclaims it.
 const LeaseStale = "lease-stale"
 
 // Lease aliases, so reconcile and reap import one package.
@@ -41,7 +41,7 @@ func (e Env) ReadLease(ctx context.Context, root string) (Lease, LeaseState, err
 }
 
 // ClearStaleLease removes the lease when its holder is gone and reports what
-// it removed. A live or foreign lease is left alone. It is the seam `hv reap`
+// it removed. A live or foreign lease is left alone. It is the seam `rota reap`
 // calls.
 func (e Env) ClearStaleLease(ctx context.Context, root string) (Lease, bool, error) {
 	cd, err := e.commonDir(ctx, root)
@@ -61,5 +61,5 @@ func (e Env) leaseFinding(ctx context.Context, root string, rep *Report) {
 	if l.PID > 0 {
 		who = fmt.Sprintf("pid %d (round %d, started %s)", l.PID, l.Round, l.StartedAt)
 	}
-	rep.add(Finding{Kind: LeaseStale, Detail: "the round lease is held by " + who + ", which is gone; `hv round start` reclaims it, `hv reap` clears it"})
+	rep.add(Finding{Kind: LeaseStale, Detail: "the round lease is held by " + who + ", which is gone; `rota round start` reclaims it, `rota reap` clears it"})
 }

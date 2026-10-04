@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // ErrAliasCollision: an alias already belongs to another term, or two terms of
@@ -250,7 +250,7 @@ func (s Store) glossaryTarget(scope string) (path, text string, start, end int, 
 	raw, rerr := readTextBytes(path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
-			err = notFound("%s missing — run hv init first", path)
+			err = notFound("%s missing — run rota init first", path)
 		} else {
 			err = rerr
 		}
@@ -259,7 +259,7 @@ func (s Store) glossaryTarget(scope string) (path, text string, start, end int, 
 	text = string(raw)
 	var ok bool
 	if start, end, ok = section.Find(text, GlossaryTopic); !ok {
-		err = notFound("## Glossary topic missing from %s — run hv init or add the heading manually", path)
+		err = notFound("## Glossary topic missing from %s — run rota init or add the heading manually", path)
 	}
 	return
 }
@@ -388,13 +388,13 @@ func (s Store) GlossaryRead(scope string, terms []string) (string, []string, err
 	if err != nil {
 		return "", nil, err
 	}
-	srcs := []src{{up, ".hv/KNOWLEDGE.md"}}
+	srcs := []src{{up, ".rota/KNOWLEDGE.md"}}
 	if scope != "" && scope != Umbrella {
 		sp, err := s.KnowledgePath(scope)
 		if err != nil {
 			return "", nil, err
 		}
-		srcs = append(srcs, src{sp, ".hv/knowledge/" + scope + "/KNOWLEDGE.md"})
+		srcs = append(srcs, src{sp, ".rota/knowledge/" + scope + "/KNOWLEDGE.md"})
 	}
 	var b strings.Builder
 	printed := false

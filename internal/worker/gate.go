@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Merge gate for one worker slot's branch/PR into the cycle branch: the port
@@ -68,7 +68,7 @@ const (
 	GateApprovalRequired = "approval-required"
 )
 
-// GateOpts are the flags of `hv worker gate`.
+// GateOpts are the flags of `rota worker gate`.
 type GateOpts struct {
 	Slot      string
 	Base      string
@@ -108,7 +108,7 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	res := GateResult{Slot: o.Slot, Base: o.Base}
 	reg := LoadRegistry(root)
 	if !reg.Exists {
-		return res, fail(ExitResolution, "no worker pool — run hv worker pool init first")
+		return res, fail(ExitResolution, "no worker pool — run rota worker pool init first")
 	}
 	s := reg.Slot(o.Slot)
 	if s == nil {
@@ -116,7 +116,7 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	}
 	branch, pr := Str(s, "branch"), Str(s, "pr")
 	res.Branch, res.PR = branch, pr
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	settings := tracker.SettingsFromConfig(cfg)
 
 	g := &gate{e: e, ctx: ctx, root: root, res: &res, o: o, slot: s, reg: reg, branch: branch, pr: pr}
@@ -285,12 +285,12 @@ func (e Env) Gate(ctx context.Context, root string, o GateOpts) (GateResult, err
 	if len(cmds) == 0 {
 		res.Verdict, res.VerifySkipped = GatePass, true
 		res.Notes = append(res.Notes, fmt.Sprintf("NO-VERIFY %s — refactor.verifyCommands is empty; merged tree was NOT gated by a command.", o.Slot),
-			"set refactor.verifyCommands via hv config set to make this gate real")
+			"set refactor.verifyCommands via rota config set to make this gate real")
 		return res, nil
 	}
 	// Output is kept so a failure can be diagnosed: the tail goes to the
 	// message, the whole log stays on disk when anything failed.
-	logf, err := os.CreateTemp("", "hv-gate-verify-")
+	logf, err := os.CreateTemp("", "rota-gate-verify-")
 	if err != nil {
 		return res, err
 	}
@@ -619,7 +619,7 @@ func (g *gate) mergeRemote() (GateResult, bool) {
 	// merge has no merge commit on either provider: state merged with an empty
 	// one falls back to the pinned verified SHA, which must then be on the base.
 	wait := 2 * time.Second
-	if v := e.Getenv("HV_GATE_SHA_WAIT"); v != "" {
+	if v := e.Getenv("ROTA_GATE_SHA_WAIT"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			wait = time.Duration(f * float64(time.Second))
 		}

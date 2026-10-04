@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/migrate"
-	"github.com/l4ci/hv/v5/internal/version"
+	"github.com/l4ci/rota/internal/migrate"
+	"github.com/l4ci/rota/internal/version"
 )
 
-// migrateCommands is the `hv migrate` group. `migrate issues` (A4) joins it.
+// migrateCommands is the `rota migrate` group. `migrate issues` (A4) joins it.
 func migrateCommands() *Command {
 	return &Command{Name: "migrate", Summary: "one-shot project migrations", Subs: []*Command{
 		{Name: "v4", Summary: "migrate a v3 project to v4 (preview unless --apply)", Verb: migrateV4},
@@ -93,7 +93,7 @@ func migrateResult(r *migrate.Report) Result {
 	if r.Applied {
 		mode = "apply"
 	}
-	fmt.Fprintf(&b, "hv migrate v4 (%s)\n\n", mode)
+	fmt.Fprintf(&b, "rota migrate v4 (%s)\n\n", mode)
 	fmt.Fprintf(&b, "  files scanned:      %d\n", r.FilesScanned)
 	fmt.Fprintf(&b, "  files rewritten:    %d\n", r.FilesRewritten)
 	fmt.Fprintf(&b, "  references rewritten: %d\n", r.ReferencesRewritten)

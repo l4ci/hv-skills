@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/repos"
 )
 
-// gitCommands is the `hv git` group (A8, #52).
+// gitCommands is the `rota git` group (A8, #52).
 func gitCommands() *Command {
 	return &Command{Name: "git", Summary: "base branch, guards, branches and worktree paths", Subs: []*Command{
 		{Name: "base", Summary: "print the resolved base branch", Repo: true, Verb: noFlags(gitBase)},
@@ -71,13 +71,13 @@ func registeredRels(root string) []string {
 }
 
 // configuredBase is git.baseBranch of the project that holds dir, or ""
-// when there is none or a stray sub-repo .hv/ masks it (hv-base-branch).
+// when there is none or a stray sub-repo .rota/ masks it (hv-base-branch).
 func configuredBase(dir string) string {
 	root, err := git.FindRoot(dir, registeredRels)
 	if err != nil {
 		return ""
 	}
-	v, _ := config.Lookup(config.Load(filepath.Join(root, ".hv", "config.json")), "git.baseBranch")
+	v, _ := config.Lookup(config.Load(filepath.Join(root, ".rota", "config.json")), "git.baseBranch")
 	s, _ := v.(string)
 	return s
 }
@@ -220,7 +220,7 @@ func gitBranch(fs *flag.FlagSet) RunFunc {
 	reposFlag := fs.String("repos", "", "comma-separated sub-repo names (no spaces)")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 || args[0] == "" {
-			return Result{}, Usage("usage: hv git branch <name> --repos <a,b,...>")
+			return Result{}, Usage("usage: rota git branch <name> --repos <a,b,...>")
 		}
 		branch := args[0]
 		if *reposFlag == "" {
@@ -289,7 +289,7 @@ func gitBranch(fs *flag.FlagSet) RunFunc {
 
 func gitWorktreePath(c *Ctx, args []string) (Result, error) {
 	if len(args) != 1 || args[0] == "" {
-		return Result{}, Usage("usage: hv git worktree-path --repo <name> <branch>")
+		return Result{}, Usage("usage: rota git worktree-path --repo <name> <branch>")
 	}
 	if c.Repo == "" {
 		return Result{}, Usage("--repo is required")

@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/frontmatter"
 )
 
 // Issue mode, slice plans: a `plan:S<NN>` note on the milestone's tracking
@@ -95,7 +95,7 @@ func PutSliceNote(s SliceStore, key, text string) (bool, error) {
 	if _, ok, err := s.SliceGet(m, u); err != nil {
 		return false, err
 	} else if !ok {
-		return false, sliceMissing(key).WithHint("hv plan add " + key + " --title <text>")
+		return false, sliceMissing(key).WithHint("rota plan add " + key + " --title <text>")
 	}
 	return s.SlicePut(m, u, text)
 }

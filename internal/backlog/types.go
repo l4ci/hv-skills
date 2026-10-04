@@ -15,7 +15,7 @@
 // find items.
 package backlog
 
-// Type is one row of the item-type registry (HV_TYPE_REGISTRY in bin/hv-types.sh).
+// Type is one row of the item-type registry (ROTA_TYPE_REGISTRY in bin/hv-types.sh).
 type Type struct {
 	Letter    string // "B"
 	Section   string // open-section heading, "Bugs" ("" for S)

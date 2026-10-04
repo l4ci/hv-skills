@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/rota/internal/config"
 )
 
 // Kind classifies a tracker failure for the CLI exit table.
@@ -60,7 +60,7 @@ func (k Kind) Exit() int {
 // Error is a tracker failure. Code is what the Python TrackerError carried:
 // 3 unavailable, 4 rate-limited, the CLI's own exit code when it failed
 // (also for KindNotFound), and 1 for output that did not parse. Use
-// Kind.Exit, not Code, for an hv exit code.
+// Kind.Exit, not Code, for a rota exit code.
 type Error struct {
 	Kind    Kind
 	Code    int
@@ -198,8 +198,8 @@ type Adapter interface {
 	CommentURL(ctx context.Context, pr bool, number int, commentID string) (string, error)
 
 	// FindMilestone returns the title of the milestone whose leading token is
-	// hvID, preferring open ones; ok is false when none matches.
-	FindMilestone(ctx context.Context, hvID string) (title string, ok bool, err error)
+	// rotaID, preferring open ones; ok is false when none matches.
+	FindMilestone(ctx context.Context, rotaID string) (title string, ok bool, err error)
 	// Milestones lists by state "open", "closed" or "all" (or "").
 	Milestones(ctx context.Context, state string) ([]Milestone, error)
 	CreateMilestone(ctx context.Context, title, description string) (int, error)
@@ -515,14 +515,14 @@ func numberFromURL(out string) (int, error) {
 	return n, nil
 }
 
-// matchMilestone is the title of the milestone whose leading token is hvID,
+// matchMilestone is the title of the milestone whose leading token is rotaID,
 // preferring open ones.
-func matchMilestone(items []Milestone, hvID string) (string, bool) {
+func matchMilestone(items []Milestone, rotaID string) (string, bool) {
 	var closed string
 	found := false
 	for _, m := range items {
 		t := strings.TrimSpace(m.Title)
-		if !strings.HasPrefix(t, hvID) || startsWithWord(t[len(hvID):]) {
+		if !strings.HasPrefix(t, rotaID) || startsWithWord(t[len(rotaID):]) {
 			continue
 		}
 		if m.State != "closed" {

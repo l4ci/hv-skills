@@ -76,7 +76,7 @@ func (h *herdr) call(ctx context.Context, method string, params map[string]any) 
 	defer conn.Close()
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
-	req, _ := json.Marshal(map[string]any{"id": "hv-" + strings.ReplaceAll(method, ".", "-"), "method": method, "params": params})
+	req, _ := json.Marshal(map[string]any{"id": "rota-" + strings.ReplaceAll(method, ".", "-"), "method": method, "params": params})
 	if _, err := conn.Write(append(req, '\n')); err != nil {
 		return nil, fmt.Errorf("herdr socket: %w", err)
 	}
@@ -190,7 +190,7 @@ func (h *herdr) WatchOutput(ctx context.Context, panes []string, regex string) (
 		return nil, fmt.Errorf("herdr socket: %w", err)
 	}
 	req, _ := json.Marshal(map[string]any{
-		"id": "hv-limit-watch", "method": "events.subscribe",
+		"id": "rota-limit-watch", "method": "events.subscribe",
 		"params": map[string]any{"subscriptions": subs},
 	})
 	if _, err := conn.Write(append(req, '\n')); err != nil {

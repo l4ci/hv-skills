@@ -1,6 +1,6 @@
 # Debug escalate — fresh-context handoff on repeated hypothesis failures
 
-Shared reference for `/hv-debug` Step 7.5: when the cycle-counter trips at 3 refuted hypotheses, the orchestrator's context carries enough refuted-hypothesis weight that dispatching another agent on the same transcript yields diminishing returns. This reference holds the *for-next-agent* brief template and the surrounding choreography.
+Shared reference for `/rota-debug` Step 7.5: when the cycle-counter trips at 3 refuted hypotheses, the orchestrator's context carries enough refuted-hypothesis weight that dispatching another agent on the same transcript yields diminishing returns. This reference holds the *for-next-agent* brief template and the surrounding choreography.
 
 ## When the escalation fires
 
@@ -34,7 +34,7 @@ Read the code organically with a fresh perspective. Do not anchor to our prior h
 
 ## Dispatch mechanics
 
-Dispatch a fresh subagent via `Agent` (`subagent_type: general-purpose`, model: `models.worker` from `.hv/config.json`) with the brief above and nothing else. The subagent has no transcript of the failed cycles — that is the point.
+Dispatch a fresh subagent via `Agent` (`subagent_type: general-purpose`, model: `models.worker` from `.rota/config.json`) with the brief above and nothing else. The subagent has no transcript of the failed cycles — that is the point.
 
 When it returns, reset the cycle counter, carry its hypothesis into **Step 7** for verification, and continue the normal flow.
 
@@ -46,4 +46,4 @@ If the fresh hypothesis also fails verification, do **not** loop a second fresh-
 
 ## Cited by
 
-- `/hv-debug` Step 7.5 — *Escalate on Repeated Hypothesis Failures*
+- `/rota-debug` Step 7.5 — *Escalate on Repeated Hypothesis Failures*

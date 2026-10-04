@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/milestone"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/milestone"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Candidate is an item a round could assign, with its readiness.

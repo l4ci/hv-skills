@@ -15,7 +15,7 @@ const glFixture = `# Knowledge
 
 ## Glossary
 
-_(no terms yet — use /hv-learn --term)_
+_(no terms yet — use /rota-learn --term)_
 `
 
 const glFixtureTerms = `# Knowledge
@@ -38,10 +38,10 @@ const glFixtureTerms = `# Knowledge
 
 func glProject(t *testing.T, umbrella bool, knowledge string) string {
 	dir := knProject(t, umbrella)
-	knWrite(t, filepath.Join(dir, ".hv", "KNOWLEDGE.md"), knowledge)
+	knWrite(t, filepath.Join(dir, ".rota", "KNOWLEDGE.md"), knowledge)
 	knWrite(t, filepath.Join(dir, "AGENTS.md"), "# Agents\n\nintro\n")
 	if umbrella {
-		knWrite(t, filepath.Join(dir, ".hv", "knowledge", "web", "KNOWLEDGE.md"), "# Web\n\n## Architecture\n\n- **Web rule** — UI. <!-- 2026-04-01 -->\n\n## Glossary\n\n_(no terms yet)_\n")
+		knWrite(t, filepath.Join(dir, ".rota", "knowledge", "web", "KNOWLEDGE.md"), "# Web\n\n## Architecture\n\n- **Web rule** — UI. <!-- 2026-04-01 -->\n\n## Glossary\n\n_(no terms yet)_\n")
 		knWrite(t, filepath.Join(dir, "web", "CLAUDE.md"), "# Web\n")
 	}
 	return dir
@@ -91,7 +91,7 @@ func TestGlossaryImportMatchGolden(t *testing.T) {
 	cases := []struct {
 		name, manifest string
 		args           []string
-		oldRC, wantRC  int // the helper's exit code (frozen) and hv's
+		oldRC, wantRC  int // the helper's exit code (frozen) and rota's
 	}{
 		{"imports a batch", good, nil, 0, 0},
 		{"touch", good, []string{"--touch"}, 0, 0},
@@ -115,7 +115,7 @@ func TestGlossaryReadMatchGolden(t *testing.T) {
 	for _, umbrella := range []bool{false, true} {
 		dir := glProject(t, umbrella, glFixtureTerms)
 		if umbrella {
-			knWrite(t, filepath.Join(dir, ".hv", "knowledge", "web", "KNOWLEDGE.md"), "## Glossary\n\n- **Page** — a view\n  - **Aliases:** _none_\n  <!-- 2026-04-01 -->\n\n- **Round** — web round\n  - **Aliases:** _none_\n  <!-- 2026-04-02 -->\n")
+			knWrite(t, filepath.Join(dir, ".rota", "knowledge", "web", "KNOWLEDGE.md"), "## Glossary\n\n- **Page** — a view\n  - **Aliases:** _none_\n  <!-- 2026-04-01 -->\n\n- **Round** — web round\n  - **Aliases:** _none_\n  <!-- 2026-04-02 -->\n")
 		}
 		args := []string{"glossary", "read", "worker", "ROUND", "ghost"}
 		if umbrella {
@@ -125,7 +125,7 @@ func TestGlossaryReadMatchGolden(t *testing.T) {
 		if want.Stdout != got.Stdout || got.RC != 0 {
 			t.Errorf("umbrella=%v\n--- frozen ---\n%s\n--- new ---\n%s\nrc=%d %s", umbrella, want.Stdout, got.Stdout, got.RC, got.Stderr)
 		}
-		if !strings.Contains(got.Stdout, "> from: .hv/KNOWLEDGE.md (## Glossary)") {
+		if !strings.Contains(got.Stdout, "> from: .rota/KNOWLEDGE.md (## Glossary)") {
 			t.Errorf("no provenance line: %s", got.Stdout)
 		}
 	}
@@ -162,7 +162,7 @@ func TestBlockMatchGolden(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			dir := glProject(t, c.umbrella, glFixtureTerms)
 			knWrite(t, filepath.Join(dir, "AGENTS.md"), c.agents)
-			knWrite(t, filepath.Join(dir, ".hv", "DECISIONS.md"), "# Decisions\n\n## Architecture\n\n### Rule\n")
+			knWrite(t, filepath.Join(dir, ".rota", "DECISIONS.md"), "# Decisions\n\n## Architecture\n\n### Rule\n")
 			want, got := knFrozen(t, dir, c.stdin, c.newArgs...)
 			if want.RC != c.oldRC || got.RC != c.wantRC {
 				t.Fatalf("rc frozen=%d (want %d) new=%d (want %d)\nfrozen: %s\nnew: %s", want.RC, c.oldRC, got.RC, c.wantRC, want.Stderr, got.Stderr)
@@ -201,7 +201,7 @@ func TestBlockSkillsMatchGolden(t *testing.T) {
 		t.Fatalf("rc frozen=%d new=%d %s %s", want.RC, got.RC, want.Stderr, got.Stderr)
 	}
 	// The golden carries the old helper's output with the A9 G4 body, which
-	// names hv verbs, and B2's `.hv/verdicts.json` in the gitignored list
+	// names rota verbs, and B2's `.rota/verdicts.json` in the gitignored list
 	// (#55); everything around the body is the frozen output.
 	knSameDelta(t, want, got)
 	if got := knNew(t, dir, "x", "block", "skills", "--body-file", "-"); got.rc != 2 {
@@ -210,7 +210,7 @@ func TestBlockSkillsMatchGolden(t *testing.T) {
 }
 
 func TestInstructionsInitMatchGolden(t *testing.T) {
-	blocks := "<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\n<!-- hv:decisions:start -->\nD\n<!-- hv:decisions:end -->\n"
+	blocks := "<!-- rota-knowledge-start -->\nK\n<!-- rota-knowledge-end -->\n\n<!-- hv:decisions:start -->\nD\n<!-- hv:decisions:end -->\n"
 	cases := []struct {
 		name          string
 		claude, agent string // "" means the file does not exist
@@ -289,7 +289,7 @@ func TestCRLFMatchGoldenForGlossaryBlocksAndInstructions(t *testing.T) {
 	})
 	t.Run("instructions init", func(t *testing.T) {
 		dir := knProject(t, false)
-		knWrite(t, filepath.Join(dir, "CLAUDE.md"), crlf("# Mine\n\n<!-- hv-knowledge-start -->\nK\n<!-- hv-knowledge-end -->\n\nafter\n"))
+		knWrite(t, filepath.Join(dir, "CLAUDE.md"), crlf("# Mine\n\n<!-- rota-knowledge-start -->\nK\n<!-- rota-knowledge-end -->\n\nafter\n"))
 		want, got := knFrozen(t, dir, "", "instructions", "init")
 		knSameDelta(t, want, got)
 	})

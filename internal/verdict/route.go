@@ -13,7 +13,7 @@ const (
 const (
 	NextContinue       = "continue"
 	NextAsk            = "ask"     // off/auto: ask the user
-	NextAddress        = "address" // loop: send the findings to /hv-work
+	NextAddress        = "address" // loop: send the findings to /rota-work
 	NextSurface        = "surface" // show the findings and continue
 	NextStop           = "stop"
 	NextMerge          = "merge"

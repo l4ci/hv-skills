@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/skills"
+	"github.com/l4ci/rota/internal/skills"
 )
 
 func fixture(t *testing.T, name string) string {
@@ -120,7 +120,7 @@ func TestRunTable(t *testing.T) {
 	}{
 		{"git ok", Input{}, all, with(nil), "git", Pass, "gitignored", ""},
 		{"git missing", Input{}, without("git"), with(nil), "git", Fail, "not found", "install git"},
-		{"worktrees not ignored", Input{}, all, with(map[string]Result{"git check-ignore -q .worktrees/x": {ExitCode: 1}}), "git", Fail, "not gitignored", "hv init"},
+		{"worktrees not ignored", Input{}, all, with(map[string]Result{"git check-ignore -q .worktrees/x": {ExitCode: 1}}), "git", Fail, "not gitignored", "rota init"},
 		{"not a repo", Input{}, all, with(map[string]Result{"git check-ignore -q .worktrees/x": {ExitCode: 128}}), "git", Fail, "not inside", "git init"},
 
 		{"host subagent skips", Input{}, all, with(nil), "host", Skip, "subagent", ""},
@@ -229,18 +229,18 @@ func TestSkillsCheck(t *testing.T) {
 		detail string // substring
 		hint   string
 	}{
-		{"nothing read", nil, Skip, "hv skills install", ""},
-		{"not installed", rep("", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "hv skills install", ""},
+		{"nothing read", nil, Skip, "rota skills install", ""},
+		{"not installed", rep("", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "rota skills install", ""},
 		{"plugin alone is not an install", rep("hv-skills@hv-skills", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "not installed", ""},
-		{"current", rep("", root(nil)), Pass, "match hv 5.0.0", ""},
-		{"mismatch", rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "4.5.0", "bbbb", false })), Fail, "skills 4.5.0, hv 5.0.0", "run: hv skills update"},
+		{"current", rep("", root(nil)), Pass, "match rota 5.0.0", ""},
+		{"mismatch", rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "4.5.0", "bbbb", false })), Fail, "skills 4.5.0, rota 5.0.0", "run: rota skills update"},
 		{"dev build mismatch", func() *skills.Report {
 			r := rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "", "bbbbbbbbbbbbbbbbbbbb", false }))
 			r.Version = ""
 			return r
-		}(), Fail, "skills bbbbbbbbbbbb, hv aaaaaaaaaaaa", "run: hv skills update"},
-		{"edited", rep("", root(func(r *skills.RootStatus) { r.Edited = []string{"hv-work/SKILL.md"} })), Fail, "1 edited (hv-work/SKILL.md)", "run: hv skills update --overwrite"},
-		{"missing", rep("", root(func(r *skills.RootStatus) { r.Missing = []string{"hv-work/SKILL.md", "hv-ship/SKILL.md"} })), Fail, "2 missing", "run: hv skills update"},
+		}(), Fail, "skills bbbbbbbbbbbb, rota aaaaaaaaaaaa", "run: rota skills update"},
+		{"edited", rep("", root(func(r *skills.RootStatus) { r.Edited = []string{"rota-work/SKILL.md"} })), Fail, "1 edited (rota-work/SKILL.md)", "run: rota skills update --overwrite"},
+		{"missing", rep("", root(func(r *skills.RootStatus) { r.Missing = []string{"rota-work/SKILL.md", "rota-ship/SKILL.md"} })), Fail, "2 missing", "run: rota skills update"},
 		{"plugin leftover", rep("hv-skills@hv-skills", root(nil)), Fail, "plugin hv-skills@hv-skills is still installed", "claude plugin uninstall hv-skills@hv-skills"},
 		{"second root only", rep("", root(func(r *skills.RootStatus) { r.Installed = false }), root(func(r *skills.RootStatus) { r.Path = "/h/.agents/skills" })), Pass, "1 roots", ""},
 	} {
@@ -289,7 +289,7 @@ func TestCodexCheck(t *testing.T) {
 	// the claude fixtures carry a codex line of their own, so build these here
 	codexCur := "claude: current (v10)\ncodex: current (v8) (/x)\n"
 	codexMiss := "claude: current (v10)\ncodex: not installed (/x)\n"
-	homes := []CodexHome{{"ben", "/cd/hv/codex/ben"}, {"dana", "/cd/hv/codex/dana"}}
+	homes := []CodexHome{{"ben", "/cd/rota/codex/ben"}, {"dana", "/cd/rota/codex/dana"}}
 	ver := Result{Stdout: "codex-cli 0.159.2\n"}
 	for _, tc := range []struct {
 		name     string
@@ -315,10 +315,10 @@ func TestCodexCheck(t *testing.T) {
 			Pass, "ben, dana", ""},
 		{"fail: not logged in", []string{"codex", "herdr"}, "herdr", homes,
 			map[string]Result{"codex --version": ver, "codex login status": {ExitCode: 1}, "herdr integration status": {Stdout: codexCur}},
-			Fail, "ben: not logged in", "CODEX_HOME=/cd/hv/codex/ben codex login"},
+			Fail, "ben: not logged in", "CODEX_HOME=/cd/rota/codex/ben codex login"},
 		{"fail: integration missing", []string{"codex", "herdr"}, "herdr", homes[:1],
 			map[string]Result{"codex --version": ver, "codex login status": {}, "herdr integration status": {Stdout: codexMiss}},
-			Fail, "ben: herdr integration not current", "CODEX_HOME=/cd/hv/codex/ben herdr integration install codex"},
+			Fail, "ben: herdr integration not current", "CODEX_HOME=/cd/rota/codex/ben herdr integration install codex"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			have := map[string]bool{}
@@ -424,25 +424,25 @@ func TestStatuslineCheck(t *testing.T) {
 		t.Fatalf("no settings file: %+v", c)
 	}
 	// Plain installed in the project, nothing user-level: both accounts see it.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"type":"command","command":"hv statusline dump"}}`)
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"type":"command","command":"rota statusline dump"}}`)
 	if c := o.check(t, nil, "statusline"); c.Status != Pass {
 		t.Fatalf("current: %+v", c)
 	}
 	// Wrapped counts as running the dump.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"command":"hv statusline dump --then 'x'","hvWrapped":"x"}}`)
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"statusLine":{"command":"rota statusline dump --then 'x'","rotaWrapped":"x"}}`)
 	if c := o.check(t, nil, "statusline"); c.Status != Pass {
 		t.Fatalf("wrapped: %+v", c)
 	}
 	// Hooks installed (so opted in) but no statusline dump: account a has its own
 	// plain line, b has none. A partial install fails.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"rota hook stop # rota-hook"}]}]}}`)
 	o.write(t, filepath.Join(o.a, "settings.json"), `{"statusLine":{"command":"~/bin/line.sh"}}`)
 	c := o.check(t, nil, "statusline")
-	if c.Status != Fail || c.Hint != "hv hook install --wrap-statusline" || !strings.Contains(c.Detail, o.a) || !strings.Contains(c.Detail, o.b+": no statusLine") {
+	if c.Status != Fail || c.Hint != "rota hook install --wrap-statusline" || !strings.Contains(c.Detail, o.a) || !strings.Contains(c.Detail, o.b+": no statusLine") {
 		t.Fatalf("missing: %+v", c)
 	}
 	// A project-local entry outranks both user files.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.json"), `{"statusLine":{"command":"hv statusline dump"}}`)
+	o.write(t, filepath.Join(o.root, ".claude", "settings.json"), `{"statusLine":{"command":"rota statusline dump"}}`)
 	if c := o.check(t, nil, "statusline"); c.Status != Pass {
 		t.Fatalf("project outranks user: %+v", c)
 	}
@@ -456,50 +456,50 @@ func TestStatuslineCheck(t *testing.T) {
 func TestStopHookCheck(t *testing.T) {
 	o := newOrch(t)
 	// Nothing installed is not a fault: the hooks are opt-in.
-	c := o.check(t, map[string]bool{"hv": true}, "stop-hook")
-	if c.Status != Skip || !strings.Contains(c.Detail, "opt-in") || !strings.Contains(c.Detail, "hv hook install") {
+	c := o.check(t, map[string]bool{"rota": true}, "stop-hook")
+	if c.Status != Skip || !strings.Contains(c.Detail, "opt-in") || !strings.Contains(c.Detail, "rota hook install") {
 		t.Fatalf("not installed: %+v", c)
 	}
 	// Only Stop installed.
-	o.write(t, filepath.Join(o.a, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
-	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "SessionStart") || strings.Contains(c.Detail, "Stop and") {
+	o.write(t, filepath.Join(o.a, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"rota hook stop # rota-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"rota": true}, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "SessionStart") || strings.Contains(c.Detail, "Stop and") {
 		t.Fatalf("half: %+v", c)
 	}
 	// Both, spread over two scopes, resolving.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"hv hook session-start # hv-hook"}]}]}}`)
-	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Pass {
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"rota hook session-start # rota-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"rota": true}, "stop-hook"); c.Status != Pass {
 		t.Fatalf("current: %+v", c)
 	}
 	// Command that does not resolve.
-	if c := o.check(t, nil, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "hv, which is not found") {
+	if c := o.check(t, nil, "stop-hook"); c.Status != Fail || !strings.Contains(c.Detail, "rota, which is not found") {
 		t.Fatalf("unresolved: %+v", c)
 	}
 	// A user's own unmarked Stop hook is not ours.
 	o2 := newOrch(t)
-	o2.write(t, filepath.Join(o2.root, ".claude", "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop"}]}]}}`)
-	if c := o2.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Skip {
+	o2.write(t, filepath.Join(o2.root, ".claude", "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"rota hook stop"}]}]}}`)
+	if c := o2.check(t, map[string]bool{"rota": true}, "stop-hook"); c.Status != Skip {
 		t.Fatalf("unmarked: %+v", c)
 	}
 }
 
-// A user's own statusline, with no hv entry anywhere, is not an install to
+// A user's own statusline, with no rota entry anywhere, is not an install to
 // check: both checks skip and say how to opt in. An unreadable settings file
 // is named in the skip, since nothing could be ruled in or out there.
 func TestOrchestratorChecksSkipUntilOptedIn(t *testing.T) {
 	o := newOrch(t)
 	o.write(t, filepath.Join(o.a, "settings.json"), `{"statusLine":{"command":"~/bin/line.sh"}}`)
 	for _, n := range []string{"statusline", "stop-hook"} {
-		if c := o.check(t, map[string]bool{"hv": true}, n); c.Status != Skip || !strings.Contains(c.Detail, "hv hook install") {
+		if c := o.check(t, map[string]bool{"rota": true}, n); c.Status != Skip || !strings.Contains(c.Detail, "rota hook install") {
 			t.Errorf("%s: %+v", n, c)
 		}
 	}
 	o.write(t, filepath.Join(o.b, "settings.json"), `{nope`)
-	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
+	if c := o.check(t, map[string]bool{"rota": true}, "stop-hook"); c.Status != Skip || !strings.Contains(c.Detail, "cannot read") {
 		t.Errorf("unreadable: %+v", c)
 	}
 	// One marked entry anywhere opts in, and then the missing half fails.
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}]}}`)
-	if c := o.check(t, map[string]bool{"hv": true}, "stop-hook"); c.Status != Fail {
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"rota hook stop # rota-hook"}]}]}}`)
+	if c := o.check(t, map[string]bool{"rota": true}, "stop-hook"); c.Status != Fail {
 		t.Errorf("opted in: %+v", c)
 	}
 }
@@ -515,17 +515,17 @@ func TestSwitchCheck(t *testing.T) {
 	if c := run(false, nil, nil); c.Status != Skip {
 		t.Fatalf("off: %+v", c)
 	}
-	if c := run(true, one(two), map[string]bool{"hv": true}); c.Status != Fail || c.Hint != "add a second account to work.accounts" {
+	if c := run(true, one(two), map[string]bool{"rota": true}); c.Status != Fail || c.Hint != "add a second account to work.accounts" {
 		t.Fatalf("one account: %+v", c)
 	}
 	if c := run(true, []Account{{"a", o.a}, {"b", ""}}, nil); c.Status != Fail {
 		t.Fatalf("no configDir does not count: %+v", c)
 	}
-	if c := run(true, two, map[string]bool{"hv": true}); c.Status != Fail || c.Hint != "hv hook install" {
+	if c := run(true, two, map[string]bool{"rota": true}); c.Status != Fail || c.Hint != "rota hook install" {
 		t.Fatalf("no hooks: %+v", c)
 	}
-	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"hv hook stop # hv-hook"}]}],"SessionStart":[{"hooks":[{"type":"command","command":"hv hook session-start # hv-hook"}]}]}}`)
-	if c := run(true, two, map[string]bool{"hv": true}); c.Status != Pass {
+	o.write(t, filepath.Join(o.root, ".claude", "settings.local.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"rota hook stop # rota-hook"}]}],"SessionStart":[{"hooks":[{"type":"command","command":"rota hook session-start # rota-hook"}]}]}}`)
+	if c := run(true, two, map[string]bool{"rota": true}); c.Status != Pass {
 		t.Fatalf("ready: %+v", c)
 	}
 }

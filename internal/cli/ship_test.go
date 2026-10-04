@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // The ship verbs run against fixtures in temp repos: exit code and `data`
 // against goldens that freeze what the retired helpers answered (through the
 // old test shim) on copies of the same fixture, and for the writers the same
-// .hv/ bytes and git state. Fixed git identity and dates (shipDeterministic)
+// .rota/ bytes and git state. Fixed git identity and dates (shipDeterministic)
 // keep the commit hashes in the goldens stable.
 
 // shipDeterministic pins git identity and dates so two runs on copies of a
@@ -73,8 +73,8 @@ func shipFixture(t *testing.T, cfg string) string {
 	if cfg == "" {
 		cfg = `{"backlog":{"backend":"file"},"issues":{"provider":"github","retryWaitSeconds":0}}`
 	}
-	write(t, filepath.Join(work, ".hv", "config.json"), cfg+"\n")
-	write(t, filepath.Join(work, ".hv", "BACKLOG.md"), `# TODO
+	write(t, filepath.Join(work, ".rota", "config.json"), cfg+"\n")
+	write(t, filepath.Join(work, ".rota", "BACKLOG.md"), `# TODO
 
 ## Bugs
 
@@ -125,11 +125,11 @@ func shipBranchOf(t *testing.T, dir, name string, commits ...[3]string) {
 	gitT(t, dir, "checkout", "-q", "main")
 }
 
-// shipTree is every file under dir's .hv/ with its bytes.
+// shipTree is every file under dir's .rota/ with its bytes.
 func shipTree(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	filepath.Walk(filepath.Join(dir, ".hv"), func(p string, fi os.FileInfo, err error) error {
+	filepath.Walk(filepath.Join(dir, ".rota"), func(p string, fi os.FileInfo, err error) error {
 		if err == nil && !fi.IsDir() && !strings.HasSuffix(p, ".lock") {
 			b, _ := os.ReadFile(p)
 			rel, _ := filepath.Rel(dir, p)
@@ -152,27 +152,27 @@ func shipErrHas(t *testing.T, name string, o trOut, code int, sub string) {
 func TestShipBody(t *testing.T) {
 	shipDeterministic(t)
 	work := shipFixture(t, "")
-	shipBranchOf(t, work, "hv/ship-demo",
+	shipBranchOf(t, work, "rota/ship-demo",
 		[3]string{"a.txt", "fix: badge invalidation [B70]", ""},
 		[3]string{"b.txt", "feat: overlay [F70]", "Refs [B70] again and [F99]"},
 		[3]string{"c.txt", "chore: plain", ""})
-	shipBranchOf(t, work, "hv/plain", [3]string{"p.txt", "chore: nothing", ""})
+	shipBranchOf(t, work, "rota/plain", [3]string{"p.txt", "chore: nothing", ""})
 
-	nenv := shipSame(t, "items and closes", work, "", 0, "ship", "body", "hv/ship-demo")
+	nenv := shipSame(t, "items and closes", work, "", 0, "ship", "body", "rota/ship-demo")
 	body := nenv["data"].(map[string]any)["body"].(string)
 	for _, want := range []string{"## Summary\n\n- chore: plain\n- feat: overlay [F70]\n- fix: badge invalidation [B70]\n\n", "## Items resolved\n\n- [F70] Ship demo feature\n- [B70] Ship demo bug\n- [F99]\n\n", "Closes #43\nCloses #42\n\n"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body lacks %q:\n%s", want, body)
 		}
 	}
-	shipSame(t, "no items", work, "", 0, "ship", "body", "hv/plain")
-	gitT(t, work, "checkout", "-q", "hv/plain")
+	shipSame(t, "no items", work, "", 0, "ship", "body", "rota/plain")
+	gitT(t, work, "checkout", "-q", "rota/plain")
 	shipSame(t, "current branch", work, "", 0, "ship", "body")
 	gitT(t, work, "checkout", "-q", "main")
 	shipSame(t, "base branch has no commits", work, "", 1, "ship", "body", "main")
-	shipSame(t, "unknown branch", work, "", 3, "ship", "body", "hv/none")
+	shipSame(t, "unknown branch", work, "", 3, "ship", "body", "rota/none")
 
-	o := trRun(t, work, "", "ship", "body", "hv/plain")
+	o := trRun(t, work, "", "ship", "body", "rota/plain")
 	if o.code != 0 || !strings.HasPrefix(o.stdout, "## Summary\n\n- chore: nothing\n") || strings.HasSuffix(o.stdout, "\n\n\n") {
 		t.Errorf("text mode: %q", o.stdout)
 	}
@@ -189,57 +189,57 @@ func TestShipBody(t *testing.T) {
 func TestShipMerge(t *testing.T) {
 	shipDeterministic(t)
 	work := shipFixture(t, "")
-	shipBranchOf(t, work, "hv/ok", [3]string{"ok.txt", "feat: ok", ""})
-	shipBranchOf(t, work, "hv/wt", [3]string{"wt.txt", "feat: wt", ""})
-	shipBranchOf(t, work, "hv/clash", [3]string{"clash.txt", "feat: other side", ""})
+	shipBranchOf(t, work, "rota/ok", [3]string{"ok.txt", "feat: ok", ""})
+	shipBranchOf(t, work, "rota/wt", [3]string{"wt.txt", "feat: wt", ""})
+	shipBranchOf(t, work, "rota/clash", [3]string{"clash.txt", "feat: other side", ""})
 	shipCommit(t, work, "clash.txt", "chore: base side", "")
 
 	// ok: a linked worktree on the branch is removed first.
-	gitT(t, work, "worktree", "add", "-q", filepath.Join(t.TempDir(), "wt"), "hv/wt")
-	nenv := shipSame(t, "merge with worktree", work, "merge: wt branch\n\nbody\n", 0, "ship", "merge", "hv/wt", "--body-file", "-")
+	gitT(t, work, "worktree", "add", "-q", filepath.Join(t.TempDir(), "wt"), "rota/wt")
+	nenv := shipSame(t, "merge with worktree", work, "merge: wt branch\n\nbody\n", 0, "ship", "merge", "rota/wt", "--body-file", "-")
 	if d := nenv["data"].(map[string]any); d["base"] != "main" || d["changed"] != true || d["sha"] != gitT(t, work, "rev-parse", "--short", "HEAD") {
 		t.Errorf("merge data %v", d)
 	}
 	var wantHead string // the merge commit the retired helper made
-	pytest.Golden(t, "HEAD after the merge of hv/wt", &wantHead)
+	pytest.Golden(t, "HEAD after the merge of rota/wt", &wantHead)
 	if gitT(t, work, "rev-parse", "HEAD") != wantHead {
 		t.Errorf("merge commit differs from the golden %s", wantHead)
 	}
-	if gitT(t, work, "branch", "--list", "hv/wt") != "" || strings.Contains(gitT(t, work, "worktree", "list", "--porcelain"), "hv/wt") {
+	if gitT(t, work, "branch", "--list", "rota/wt") != "" || strings.Contains(gitT(t, work, "worktree", "list", "--porcelain"), "rota/wt") {
 		t.Errorf("branch or worktree left behind: %s", gitT(t, work, "worktree", "list", "--porcelain"))
 	}
 	if msg := gitT(t, work, "log", "-1", "--format=%B"); msg != "merge: wt branch\n\nbody" {
 		t.Errorf("merge message %q", msg)
 	}
-	shipSame(t, "plain merge", work, "merge: ok", 0, "ship", "merge", "hv/ok", "--body-file", "-")
+	shipSame(t, "plain merge", work, "merge: ok", 0, "ship", "merge", "rota/ok", "--body-file", "-")
 
 	// refusals
 	shipSame(t, "base branch", work, "merge: x", 4, "ship", "merge", "main", "--body-file", "-")
 	head := gitT(t, work, "rev-parse", "HEAD")
-	shipSame(t, "conflict", work, "merge: x", 4, "ship", "merge", "hv/clash", "--body-file", "-")
+	shipSame(t, "conflict", work, "merge: x", 4, "ship", "merge", "rota/clash", "--body-file", "-")
 	if gitT(t, work, "rev-parse", "HEAD") != head || gitT(t, work, "status", "--porcelain") != "" {
 		t.Errorf("a conflicting merge must leave the tree as it was")
 	}
-	if gitT(t, work, "branch", "--list", "hv/clash") == "" {
+	if gitT(t, work, "branch", "--list", "rota/clash") == "" {
 		t.Errorf("the conflicting branch must stay")
 	}
 	// usage and resolution
-	shipSame(t, "empty body", work, "\n", 2, "ship", "merge", "hv/clash", "--body-file", "-")
-	shipSame(t, "no --body-file", work, "", 2, "ship", "merge", "hv/clash")
-	shipSame(t, "unknown branch", work, "merge: x", 3, "ship", "merge", "hv/none", "--body-file", "-")
-	shipSame(t, "unreadable file", work, "", 2, "ship", "merge", "hv/clash", "--body-file", filepath.Join(work, "nope"))
+	shipSame(t, "empty body", work, "\n", 2, "ship", "merge", "rota/clash", "--body-file", "-")
+	shipSame(t, "no --body-file", work, "", 2, "ship", "merge", "rota/clash")
+	shipSame(t, "unknown branch", work, "merge: x", 3, "ship", "merge", "rota/none", "--body-file", "-")
+	shipSame(t, "unreadable file", work, "", 2, "ship", "merge", "rota/clash", "--body-file", filepath.Join(work, "nope"))
 	// a body file
 	bf := filepath.Join(t.TempDir(), "msg")
 	write(t, bf, "merge: from file\n")
-	shipBranchOf(t, work, "hv/file", [3]string{"f.txt", "feat: f", ""})
-	if o := trRun(t, work, "", "ship", "merge", "hv/file", "--body-file", bf); o.code != 0 {
+	shipBranchOf(t, work, "rota/file", [3]string{"f.txt", "feat: f", ""})
+	if o := trRun(t, work, "", "ship", "merge", "rota/file", "--body-file", bf); o.code != 0 {
 		t.Errorf("--body-file path: %+v", o)
 	}
 	// git failure: checking out the base fails on an uncommitted change
-	shipBranchOf(t, work, "hv/dirty", [3]string{"seed.txt", "feat: touches seed", ""})
-	gitT(t, work, "checkout", "-q", "hv/dirty")
+	shipBranchOf(t, work, "rota/dirty", [3]string{"seed.txt", "feat: touches seed", ""})
+	gitT(t, work, "checkout", "-q", "rota/dirty")
 	write(t, filepath.Join(work, "seed.txt"), "uncommitted\n")
-	if o := trRun(t, work, "merge: x", "ship", "merge", "hv/dirty", "--body-file", "-"); o.code != ExitUnavailable {
+	if o := trRun(t, work, "merge: x", "ship", "merge", "rota/dirty", "--body-file", "-"); o.code != ExitUnavailable {
 		t.Errorf("a checkout that git refuses should exit 5: %+v", o)
 	}
 	gitT(t, work, "checkout", "-q", "--", "seed.txt")
@@ -449,7 +449,7 @@ func TestShipPRIssueMode(t *testing.T) {
 func TestShipPRIssueModeUmbrella(t *testing.T) {
 	shipDeterministic(t)
 	u := umbrella(t)
-	write(t, filepath.Join(u, ".hv", "config.json"), `{"backlog":{"backend":"issues"},"issues":{"provider":"github"}}`)
+	write(t, filepath.Join(u, ".rota", "config.json"), `{"backlog":{"backend":"issues"},"issues":{"provider":"github"}}`)
 	svc := filepath.Join(u, "svc")
 	shipBranchOf(t, svc, "feat/u", [3]string{"u.txt", "work", ""})
 	withTracker(t, issueFixture())
@@ -531,7 +531,7 @@ func TestShipPRMergeUnproven(t *testing.T) {
 	}
 	is := f.Fake.Issues[1]
 	if !slices.Contains(is.Labels, "changes-requested") || slices.Contains(is.Labels, "needs-review") || is.State != "open" ||
-		!strings.Contains(is.Comments[len(is.Comments)-1].Body, "hv:comment feedback") {
+		!strings.Contains(is.Comments[len(is.Comments)-1].Body, "rota:comment feedback") {
 		t.Fatalf("issue 2 %+v", is)
 	}
 	o := trRun(t, a8Project(t, a8Fixture()), "", "--json", "ship", "pr-merge", "11")
@@ -610,7 +610,7 @@ func TestShipPRMergeBackend(t *testing.T) {
 	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 4 {
 		t.Errorf("file-backend umbrella --repo: exit %d, want 4 (backend)", o.code)
 	}
-	write(t, filepath.Join(umb, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
+	write(t, filepath.Join(umb, ".rota", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	if o := trRun(t, umb, "", "ship", "pr-merge", "1", "--repo", "svc"); o.code != 5 {
 		t.Errorf("umbrella --repo, no forge: exit %d, want 5", o.code)
 	}
@@ -622,7 +622,7 @@ func TestShipPRMergeBackend(t *testing.T) {
 
 // ---- ship undo ---------------------------------------------------------------
 
-// shipCycle builds a /hv-work cycle on a fixture: feature branch with two
+// shipCycle builds a /rota-work cycle on a fixture: feature branch with two
 // commits, a no-ff `merge: ` into main, and F03 completed against the impl hash.
 func shipCycle(t *testing.T) string {
 	t.Helper()
@@ -630,33 +630,33 @@ func shipCycle(t *testing.T) string {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "work")
 	gitT(t, dir, "init", "-q", "-b", "main", root)
-	write(t, filepath.Join(root, ".hv", "BACKLOG.md"), "# TODO\n\n## Bugs\n- **[B01] [P1] Sample bug.** Body.\n\n## Features\n- **[F03] [Minor] Sample feature.** Body.\n\n## Tasks\n\n## Completed\n")
-	write(t, filepath.Join(root, ".hv", "counters.json"), "{\n  \"bugs\": 1,\n  \"features\": 3,\n  \"tasks\": 0,\n  \"milestones\": 0,\n  \"since_refactor\": {\"features\": 0, \"bugs\": 0, \"tasks\": 0}\n}\n")
-	write(t, filepath.Join(root, ".hv", "config.json"), "{}\n")
+	write(t, filepath.Join(root, ".rota", "BACKLOG.md"), "# TODO\n\n## Bugs\n- **[B01] [P1] Sample bug.** Body.\n\n## Features\n- **[F03] [Minor] Sample feature.** Body.\n\n## Tasks\n\n## Completed\n")
+	write(t, filepath.Join(root, ".rota", "counters.json"), "{\n  \"bugs\": 1,\n  \"features\": 3,\n  \"tasks\": 0,\n  \"milestones\": 0,\n  \"since_refactor\": {\"features\": 0, \"bugs\": 0, \"tasks\": 0}\n}\n")
+	write(t, filepath.Join(root, ".rota", "config.json"), "{}\n")
 	write(t, filepath.Join(root, "seed.txt"), "seed\n")
 	gitT(t, root, "add", "-A")
 	gitT(t, root, "commit", "-q", "-m", "seed")
-	gitT(t, root, "checkout", "-q", "-b", "hv/F03-test")
+	gitT(t, root, "checkout", "-q", "-b", "rota/F03-test")
 	shipCommit(t, root, "prep.txt", "chore: prep for F03", "")
 	shipCommit(t, root, "impl.txt", "feat: implement F03", "")
 	short := gitT(t, root, "rev-parse", "--short", "HEAD")
 	shortPrep := gitT(t, root, "rev-parse", "--short", "HEAD~1")
 	gitT(t, root, "checkout", "-q", "main")
-	gitT(t, root, "merge", "--no-ff", "-q", "hv/F03-test", "-m", "merge: F03 — test cycle")
-	gitT(t, root, "branch", "-q", "-d", "hv/F03-test")
-	b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md"))
+	gitT(t, root, "merge", "--no-ff", "-q", "rota/F03-test", "-m", "merge: F03 — test cycle")
+	gitT(t, root, "branch", "-q", "-d", "rota/F03-test")
+	b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md"))
 	text := strings.Replace(string(b), "- **[F03] [Minor] Sample feature.** Body.\n", "", 1)
 	text = strings.Replace(text, "## Completed\n", "## Completed\n- ~~**[F03] [Minor] Sample feature.** Body.~~ Done 2026-01-15 [`"+short+"`]\n"+
 		"- ~~**[B01] [P1] Sample bug.** Body.~~ Done 2026-01-15 [`"+shortPrep+"`]\n", 1)
 	text = strings.Replace(text, "- **[B01] [P1] Sample bug.** Body.\n", "", 1)
-	write(t, filepath.Join(root, ".hv", "BACKLOG.md"), text)
-	gitT(t, root, "add", ".hv/BACKLOG.md")
+	write(t, filepath.Join(root, ".rota", "BACKLOG.md"), text)
+	gitT(t, root, "add", ".rota/BACKLOG.md")
 	gitT(t, root, "commit", "-q", "--amend", "--no-edit")
 	return root
 }
 
 // shipUndoWant is what the retired undo helper left behind and answered: data,
-// the .hv/ tree, HEAD and git status.
+// the .rota/ tree, HEAD and git status.
 type shipUndoWant struct {
 	Data   any
 	Tree   map[string]string
@@ -665,7 +665,7 @@ type shipUndoWant struct {
 }
 
 // shipUndoBoth runs ship undo on a copy of src and compares exit, data, the
-// .hv/ tree, HEAD and status with the golden.
+// .rota/ tree, HEAD and status with the golden.
 func shipUndoBoth(t *testing.T, name string, src string, wantCode int, args ...string) map[string]any {
 	t.Helper()
 	nu := shipCopy(t, src)
@@ -681,7 +681,7 @@ func shipUndoBoth(t *testing.T, name string, src string, wantCode int, args ...s
 		t.Errorf("%s: data\ngolden: %#v\nnew:    %#v", name, want.Data, nenv["data"])
 	}
 	if !reflect.DeepEqual(want.Tree, shipTree(t, nu)) {
-		t.Errorf("%s: .hv/ trees differ\ngolden: %v\nnew:    %v", name, want.Tree, shipTree(t, nu))
+		t.Errorf("%s: .rota/ trees differ\ngolden: %v\nnew:    %v", name, want.Tree, shipTree(t, nu))
 	}
 	if b := gitT(t, nu, "rev-parse", "HEAD"); b != want.Head {
 		t.Errorf("%s: HEAD golden %s new %s", name, want.Head, b)
@@ -710,7 +710,7 @@ func TestShipUndoPreviewAndApply(t *testing.T) {
 	wantText := "Undo plan for last cycle: " + short + "\n\nSubject:  merge: F03 — test cycle\n" +
 		"Base:     main will reset --hard " + short + "^1 (currently " + short + ")\n" +
 		"Items:    F03 will be restored to BACKLOG.md (Features)\n          B01 will be restored to BACKLOG.md (Bugs)\n\n" +
-		"Branch:   deleted by hv ship merge; rerun `git branch <name> " + short + "^2` to keep the work\n" +
+		"Branch:   deleted by rota ship merge; rerun `git branch <name> " + short + "^2` to keep the work\n" +
 		"Status:   no active entry to clear (cycle already removed it)\nHandoff:  gitignored — not restorable\nPlans:    gitignored — not restorable\n\nRe-run with --apply to apply.\n"
 	if o.code != 0 || o.stdout != wantText {
 		t.Errorf("plan text:\n%q\nwant\n%q", o.stdout, wantText)
@@ -737,7 +737,7 @@ func TestShipUndoPreviewAndApply(t *testing.T) {
 
 func TestShipUndoNoItems(t *testing.T) {
 	src := shipCycle(t)
-	write(t, filepath.Join(src, ".hv", "BACKLOG.md"), "# TODO\n\n## Completed\n")
+	write(t, filepath.Join(src, ".rota", "BACKLOG.md"), "# TODO\n\n## Completed\n")
 	gitT(t, src, "add", "-A")
 	gitT(t, src, "commit", "-q", "--amend", "--no-edit")
 	n := shipUndoBoth(t, "no items", src, 0, "--apply")
@@ -790,17 +790,17 @@ func TestShipUndoRefusals(t *testing.T) {
 	check("root commit", plain, 4, "not a merge")
 
 	sub := shipCopy(t, src)
-	gitT(t, sub, "commit", "-q", "--amend", "-m", "Merge branch hv/F03-test")
+	gitT(t, sub, "commit", "-q", "--amend", "-m", "Merge branch rota/F03-test")
 	check("subject is not merge:", sub, 4, "merge subject")
 	check("--cycle subject is not merge:", sub, 4, "merge subject", "--cycle", "HEAD")
 
 	pr := shipCopy(t, src)
-	gitT(t, pr, "update-ref", "refs/remotes/origin/hv/F03-test", gitT(t, pr, "rev-parse", "HEAD^2"))
+	gitT(t, pr, "update-ref", "refs/remotes/origin/rota/F03-test", gitT(t, pr, "rev-parse", "HEAD^2"))
 	check("PR mode", pr, 4, "pr mode")
 
 	empty := t.TempDir()
 	gitT(t, empty, "init", "-q", "-b", "main")
-	write(t, filepath.Join(empty, ".hv", "config.json"), "{}\n")
+	write(t, filepath.Join(empty, ".rota", "config.json"), "{}\n")
 	o := trRun(t, empty, "", "ship", "undo")
 	if o.code == 0 {
 		t.Errorf("an empty repo has nothing to undo: %+v", o)
@@ -815,7 +815,7 @@ func TestShipUndoRefusals(t *testing.T) {
 func TestShipUndoItemFromArchive(t *testing.T) {
 	src := shipCycle(t)
 	// the done line sits in ARCHIVE.md instead of BACKLOG.md ## Completed
-	b, _ := os.ReadFile(filepath.Join(src, ".hv", "BACKLOG.md"))
+	b, _ := os.ReadFile(filepath.Join(src, ".rota", "BACKLOG.md"))
 	var keep, arch []string
 	for _, l := range strings.Split(string(b), "\n") {
 		if strings.HasPrefix(l, "- ~~**[F03]") {
@@ -824,8 +824,8 @@ func TestShipUndoItemFromArchive(t *testing.T) {
 			keep = append(keep, l)
 		}
 	}
-	write(t, filepath.Join(src, ".hv", "BACKLOG.md"), strings.Join(keep, "\n"))
-	write(t, filepath.Join(src, ".hv", "ARCHIVE.md"), "# Archive\n\n"+strings.Join(arch, "\n")+"\n")
+	write(t, filepath.Join(src, ".rota", "BACKLOG.md"), strings.Join(keep, "\n"))
+	write(t, filepath.Join(src, ".rota", "ARCHIVE.md"), "# Archive\n\n"+strings.Join(arch, "\n")+"\n")
 	gitT(t, src, "add", "-A")
 	gitT(t, src, "commit", "-q", "--amend", "--no-edit")
 	n := shipUndoBoth(t, "archive", src, 0, "--apply")
@@ -843,16 +843,16 @@ func TestShipUndoRestoreFails(t *testing.T) {
 	write(t, filepath.Join(root, "seed.txt"), "seed\n")
 	gitT(t, root, "add", "-A")
 	gitT(t, root, "commit", "-q", "-m", "seed")
-	gitT(t, root, "checkout", "-q", "-b", "hv/F03-x")
+	gitT(t, root, "checkout", "-q", "-b", "rota/F03-x")
 	shipCommit(t, root, "impl.txt", "feat: impl", "")
 	short := gitT(t, root, "rev-parse", "--short", "HEAD")
 	// BACKLOG.md exists only on the cycle side, so the reset removes it.
-	write(t, filepath.Join(root, ".hv", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n- ~~**[F03] [Minor] Sample.** Body.~~ Done 2026-01-15 [`"+short+"`]\n")
+	write(t, filepath.Join(root, ".rota", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n- ~~**[F03] [Minor] Sample.** Body.~~ Done 2026-01-15 [`"+short+"`]\n")
 	gitT(t, root, "add", "-A")
 	gitT(t, root, "commit", "-q", "-m", "chore: backlog")
 	gitT(t, root, "checkout", "-q", "main")
-	gitT(t, root, "merge", "--no-ff", "-q", "hv/F03-x", "-m", "merge: F03")
-	gitT(t, root, "branch", "-q", "-d", "hv/F03-x")
+	gitT(t, root, "merge", "--no-ff", "-q", "rota/F03-x", "-m", "merge: F03")
+	gitT(t, root, "branch", "-q", "-d", "rota/F03-x")
 	// the done line must carry a hash of the cycle: it does (short is on the branch)
 	nu := shipCopy(t, root)
 	n := trRun(t, nu, "", "ship", "undo", "--apply", "--json")
@@ -871,13 +871,13 @@ func TestShipUndoRepo(t *testing.T) {
 	u := umbrella(t)
 	svc := filepath.Join(u, "svc")
 	shipDeterministic(t)
-	write(t, filepath.Join(u, ".hv", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n")
-	gitT(t, svc, "checkout", "-q", "-b", "hv/F03-t")
+	write(t, filepath.Join(u, ".rota", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n")
+	gitT(t, svc, "checkout", "-q", "-b", "rota/F03-t")
 	shipCommit(t, svc, "impl.txt", "feat: impl F03", "")
 	short := gitT(t, svc, "rev-parse", "--short", "HEAD")
 	gitT(t, svc, "checkout", "-q", "main")
-	gitT(t, svc, "merge", "--no-ff", "-q", "hv/F03-t", "-m", "merge: F03")
-	write(t, filepath.Join(u, ".hv", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n- ~~**[F03] [Minor] Sample.** Body.~~ Done 2026-01-15 [`"+short+"`]\n")
+	gitT(t, svc, "merge", "--no-ff", "-q", "rota/F03-t", "-m", "merge: F03")
+	write(t, filepath.Join(u, ".rota", "BACKLOG.md"), "# TODO\n\n## Features\n\n## Completed\n- ~~**[F03] [Minor] Sample.** Body.~~ Done 2026-01-15 [`"+short+"`]\n")
 	n := trRun(t, u, "", "ship", "undo", "--repo", "svc", "--apply", "--json")
 	if n.code != 0 {
 		t.Fatalf("%+v", n)
@@ -885,7 +885,7 @@ func TestShipUndoRepo(t *testing.T) {
 	if d := envelope(t, n.stdout)["data"].(map[string]any); !reflect.DeepEqual(d["restored"], []any{"F03"}) {
 		t.Errorf("data %v", d)
 	}
-	b, _ := os.ReadFile(filepath.Join(u, ".hv", "BACKLOG.md"))
+	b, _ := os.ReadFile(filepath.Join(u, ".rota", "BACKLOG.md"))
 	if !strings.Contains(string(b), "## Features\n\n- **[F03] [Minor] Sample.** Body.") {
 		t.Errorf("F03 not restored in the umbrella backlog:\n%s", b)
 	}

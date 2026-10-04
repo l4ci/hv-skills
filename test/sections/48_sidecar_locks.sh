@@ -1,5 +1,5 @@
 echo "sidecar lock — sidecar read-modify-write survives concurrent writers"
-# hv serializes sidecar read-modify-write cycles via
+# rota serializes sidecar read-modify-write cycles via
 # flock on a sibling <path>.lock file. These assertions pin the contract:
 # (a) N concurrent knowledge hit calls lose no increments;
 # (b) N concurrent knowledge contradiction add calls lose no entries;
@@ -8,14 +8,14 @@ echo "sidecar lock — sidecar read-modify-write survives concurrent writers"
 
 TMP_LCK="$(mktemp -d)"
 trap 'rm -rf "$TMP_LCK"' EXIT
-mkdir -p "$TMP_LCK/.hv"
+mkdir -p "$TMP_LCK/.rota"
 # Keep auto-promotion out of the way: threshold far above the hit counts
 # below, so every concurrent writer takes the plain increment path.
-printf '{"learn":{"promoteThreshold":99}}\n' > "$TMP_LCK/.hv/config.json"
+printf '{"learn":{"promoteThreshold":99}}\n' > "$TMP_LCK/.rota/config.json"
 
 # ── (a) 8 concurrent hits on one topic/title — hits must equal exactly 8 ─────
 for _ in 1 2 3 4 5 6 7 8; do
-  "$HV_BIN" -C "$TMP_LCK" knowledge hit \
+  "$ROTA_BIN" -C "$TMP_LCK" knowledge hit \
       --topic "Concurrency" --title "Lock rule" >/dev/null 2>&1 &
 done
 wait
@@ -27,7 +27,7 @@ pass "8 concurrent knowledge hit calls record exactly 8 hits (no lost increments
 
 # ── (b) 6 concurrent --add with distinct texts — queue length must be 6 ──────
 for i in 1 2 3 4 5 6; do
-  "$HV_BIN" -C "$TMP_LCK" knowledge contradiction add \
+  "$ROTA_BIN" -C "$TMP_LCK" knowledge contradiction add \
       --topic "Concurrency" --title "Lock rule" \
       --text "concurrent correction $i" >/dev/null 2>&1 &
 done

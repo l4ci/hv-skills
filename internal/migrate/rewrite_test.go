@@ -6,9 +6,9 @@ import (
 )
 
 func TestRewriteSkipsCodeAndHelperNames(t *testing.T) {
-	in := "run /hv-c now\n`/hv-c` stays\n```\n/hv-rm in fence\n```\nuse hv-map-query and .hv/bin/hv-context-add\nthen /hv-undo, /hv-c.\n/hv-cx is not it\n"
+	in := "run /hv-c now\n`/hv-c` stays\n```\n/hv-rm in fence\n```\nuse hv-map-query and .rota/bin/hv-context-add\nthen /hv-undo, /hv-c.\n/hv-cx is not it\n"
 	out, n, manual := Rewrite(in, "f.md")
-	want := "run /hv-capture now\n`/hv-c` stays\n```\n/hv-rm in fence\n```\nuse hv-map-query and .hv/bin/hv-context-add\nthen /hv-ship --undo, /hv-capture.\n/hv-cx is not it\n"
+	want := "run /rota-capture now\n`/hv-c` stays\n```\n/hv-rm in fence\n```\nuse hv-map-query and .rota/bin/hv-context-add\nthen /rota-ship --undo, /rota-capture.\n/hv-cx is not it\n"
 	if out != want || n != 3 || len(manual) != 0 {
 		t.Errorf("out=%q n=%d manual=%v", out, n, manual)
 	}
@@ -51,23 +51,23 @@ func TestUnifiedDiffMergesCloseHunks(t *testing.T) {
 
 func TestRewriteBoundariesAreUnicodeAware(t *testing.T) {
 	// Python's \b and \w see é and ٣ as word characters, so none of these match.
-	for _, in := range []string{"/hv-cé é", "/hv-c٣", "/hv-rm_x", "/hv-issuesé"} {
+	for _, in := range []string{"/rota-cé é", "/rota-c٣", "/hv-rm_x", "/hv-issuesé"} {
 		out, n, manual := Rewrite(in, "f")
 		if out != in || n != 0 || len(manual) != 0 {
 			t.Errorf("%q rewritten to %q (%d, %v)", in, out, n, manual)
 		}
 	}
 	// A non-word rune after the command still matches.
-	if out, n, _ := Rewrite("/hv-c— é", "f"); out != "/hv-capture— é" || n != 1 {
+	if out, n, _ := Rewrite("/hv-c— é", "f"); out != "/rota-capture— é" || n != 1 {
 		t.Errorf("out=%q n=%d", out, n)
 	}
 	// Helper names mask with Unicode segments, and not after a word character.
 	out, _, _ := Rewrite("hv-é-x /hv-c", "f")
-	if out != "hv-é-x /hv-capture" {
+	if out != "hv-é-x /rota-capture" {
 		t.Errorf("out=%q", out)
 	}
 	out, n, _ := Rewrite("xhv-a-b/hv-c", "f")
-	if out != "xhv-a-b/hv-capture" || n != 1 {
+	if out != "xhv-a-b/rota-capture" || n != 1 {
 		t.Errorf("out=%q n=%d", out, n)
 	}
 }

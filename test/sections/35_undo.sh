@@ -1,22 +1,22 @@
 echo "F24: item reopen + ship undo"
 # Behaviour guard for `item reopen` and `ship undo`.
-# See [F24] — `/hv-ship --undo` guided rollback of the last /hv-work cycle.
+# See [F24] — `/rota-ship --undo` guided rollback of the last /rota-work cycle.
 
 UNDO_TMP="$(mktemp -d)"
 trap 'rm -rf "$UNDO_TMP"' EXIT
 
 # ── fixture builder ──────────────────────────────────────────────────────────
 # Builds a fresh miniature project at $root with:
-#   - .hv/BACKLOG.md   one staged Bug, one staged Feature, empty Completed/Tasks
-#   - .hv/counters.json with since_refactor.{features,bugs} = 0
-#   - .hv/status.json  empty active list
+#   - .rota/BACKLOG.md   one staged Bug, one staged Feature, empty Completed/Tasks
+#   - .rota/counters.json with since_refactor.{features,bugs} = 0
+#   - .rota/status.json  empty active list
 #   - git init on main with a seed commit so future commits have a parent
 build_undo_fixture() {
   local root="$1"
-  rm -rf "$root/.hv" "$root/.git" "$root"/*.txt 2>/dev/null || true
-  mkdir -p "$root/.hv"
+  rm -rf "$root/.rota" "$root/.git" "$root"/*.txt 2>/dev/null || true
+  mkdir -p "$root/.rota"
 
-  cat > "$root/.hv/BACKLOG.md" <<'FIXEOF'
+  cat > "$root/.rota/BACKLOG.md" <<'FIXEOF'
 # TODO
 
 ## Bugs
@@ -30,7 +30,7 @@ build_undo_fixture() {
 ## Completed
 FIXEOF
 
-  cat > "$root/.hv/counters.json" <<'FIXEOF'
+  cat > "$root/.rota/counters.json" <<'FIXEOF'
 {
   "bugs": 1,
   "features": 3,
@@ -39,7 +39,7 @@ FIXEOF
   "since_refactor": {"features": 0, "bugs": 0, "tasks": 0}
 }
 FIXEOF
-  echo '{"active":[]}' > "$root/.hv/status.json"
+  echo '{"active":[]}' > "$root/.rota/status.json"
 
   (
     cd "$root"
@@ -52,7 +52,7 @@ FIXEOF
   )
 }
 
-# Build a complete /hv-work cycle on $root: a feature branch hv/F03-test with
+# Build a complete /rota-work cycle on $root: a feature branch rota/F03-test with
 # two commits, then a no-ff merge into main with subject `merge: F03 …`.
 # Writes a Completed line for F03 referencing the real implementation commit's
 # short hash so ship undo's done-line lookup succeeds.
@@ -61,7 +61,7 @@ build_undo_cycle() {
   build_undo_fixture "$root"
   (
     cd "$root"
-    git checkout -q -b hv/F03-test
+    git checkout -q -b rota/F03-test
     echo prep > prep.txt
     git add prep.txt
     git commit -q -m "chore: prep for F03"
@@ -71,14 +71,14 @@ build_undo_cycle() {
     local SHORT
     SHORT=$(git rev-parse --short HEAD)
     git checkout -q main
-    git merge --no-ff hv/F03-test -q -m "merge: F03 — test cycle"
-    git branch -q -d hv/F03-test
+    git merge --no-ff rota/F03-test -q -m "merge: F03 — test cycle"
+    git branch -q -d rota/F03-test
     # F03 is now in Completed referencing the impl commit short hash.
     # Remove it from the active ## Features section and append to Completed.
     python3 - "$SHORT" <<'PYEOF'
 import sys, pathlib
 short = sys.argv[1]
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 text = p.read_text()
 active = "- **[F03] [Minor] Sample feature.** Body.\n"
 text = text.replace(active, "")
@@ -87,7 +87,7 @@ done = f"- ~~**[F03] [Minor] Sample feature.** Body.~~ Done 2026-01-15 [`{short}
 text = text.replace("## Completed\n", "## Completed\n" + done)
 p.write_text(text)
 PYEOF
-    git add .hv/BACKLOG.md
+    git add .rota/BACKLOG.md
     git commit -q --amend --no-edit
   )
 }
@@ -105,7 +105,7 @@ PYEOF
   python3 - "$SHORT" <<'PYEOF'
 import sys, pathlib
 short = sys.argv[1]
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 text = p.read_text()
 text = text.replace("- **[B01] [P1] Sample bug.** Body.\n", "")
 done = f"- ~~**[B01] [P1] Sample bug.** Body.~~ Done 2026-01-15 [`{short}`]\n"
@@ -115,7 +115,7 @@ PYEOF
   # Bump since_refactor.bugs to 1 (what completing an item does).
   python3 - <<'PYEOF'
 import json, pathlib
-p = pathlib.Path(".hv/counters.json")
+p = pathlib.Path(".rota/counters.json")
 d = json.loads(p.read_text())
 d["since_refactor"]["bugs"] = 1
 p.write_text(json.dumps(d, indent=2) + "\n")
@@ -126,30 +126,30 @@ PYEOF
   [ "$(echo "$OUT" | jget data.changed)" = "true" ] || { echo "FAIL F24(a): changed should be true: $OUT"; exit 1; }
 
   # Active line restored under ## Bugs.
-  grep -qE '^- \*\*\[B01\] \[P1\] Sample bug\.\*\* Body\.$' .hv/BACKLOG.md \
+  grep -qE '^- \*\*\[B01\] \[P1\] Sample bug\.\*\* Body\.$' .rota/BACKLOG.md \
     || { echo "FAIL F24(a): [B01] active line not restored"; exit 1; }
   # ## Completed no longer references B01.
-  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md | grep '\[B01\]' >/dev/null; then
+  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .rota/BACKLOG.md | grep '\[B01\]' >/dev/null; then
     echo "FAIL F24(a): [B01] still present under ## Completed"; exit 1
   fi
   # since_refactor.bugs decremented 1 -> 0.
-  NEW=$(python3 -c "import json; print(json.load(open('.hv/counters.json'))['since_refactor']['bugs'])")
+  NEW=$(python3 -c "import json; print(json.load(open('.rota/counters.json'))['since_refactor']['bugs'])")
   [ "$NEW" = "0" ] || { echo "FAIL F24(a): since_refactor.bugs expected 0, got $NEW"; exit 1; }
 ) || exit 1
 
-# ── (b) item reopen: restore from .hv/ARCHIVE.md ───────────────────────────
+# ── (b) item reopen: restore from .rota/ARCHIVE.md ───────────────────────────
 (
   cd "$UNDO_TMP"
   build_undo_fixture "$UNDO_TMP"
   # Clear the staged Feature so we can prove the active line is appended, not pre-existing.
   python3 - <<'PYEOF'
 import pathlib
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 text = p.read_text()
 text = text.replace("- **[F03] [Minor] Sample feature.** Body.\n", "")
 p.write_text(text)
 PYEOF
-  cat > .hv/ARCHIVE.md <<'ARCHEOF'
+  cat > .rota/ARCHIVE.md <<'ARCHEOF'
 # Archive
 
 ## Features
@@ -159,9 +159,9 @@ ARCHEOF
   RC=0; hvj item reopen F02 >/dev/null 2>&1 || RC=$?
   [ "$RC" = "0" ] || { echo "FAIL F24(b): expected exit 0, got $RC"; exit 1; }
 
-  grep -qE '^- \*\*\[F02\] \[Minor\] Feature title\.\*\* Detail\.$' .hv/BACKLOG.md \
+  grep -qE '^- \*\*\[F02\] \[Minor\] Feature title\.\*\* Detail\.$' .rota/BACKLOG.md \
     || { echo "FAIL F24(b): [F02] active line not restored under ## Features"; exit 1; }
-  grep -q '\[F02\]' .hv/ARCHIVE.md \
+  grep -q '\[F02\]' .rota/ARCHIVE.md \
     && { echo "FAIL F24(b): [F02] still present in ARCHIVE.md"; exit 1; } \
     || true
 ) || exit 1
@@ -173,20 +173,20 @@ ARCHEOF
   # Add B07 as already-active so uncomplete is a no-op.
   python3 - <<'PYEOF'
 import pathlib
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 text = p.read_text()
 text = text.replace("## Bugs\n- **[B01]", "## Bugs\n- **[B07] [P2] Already active.**\n- **[B01]")
 p.write_text(text)
 PYEOF
-  BL_BEFORE=$(cat .hv/BACKLOG.md)
-  CT_BEFORE=$(cat .hv/counters.json)
+  BL_BEFORE=$(cat .rota/BACKLOG.md)
+  CT_BEFORE=$(cat .rota/counters.json)
 
   RC=0; OUT=$(hvj item reopen B07 2>/dev/null) || RC=$?
   [ "$RC" = "0" ] || { echo "FAIL F24(c): expected exit 0, got $RC"; exit 1; }
 
-  [ "$BL_BEFORE" = "$(cat .hv/BACKLOG.md)" ] \
+  [ "$BL_BEFORE" = "$(cat .rota/BACKLOG.md)" ] \
     || { echo "FAIL F24(c): BACKLOG.md changed on no-op restore"; exit 1; }
-  [ "$CT_BEFORE" = "$(cat .hv/counters.json)" ] \
+  [ "$CT_BEFORE" = "$(cat .rota/counters.json)" ] \
     || { echo "FAIL F24(c): counters.json changed on no-op restore"; exit 1; }
   [ "$(echo "$OUT" | jget data.changed)" = "false" ] \
     || { echo "FAIL F24(c): no-op restore should report changed=false: $OUT"; exit 1; }
@@ -213,7 +213,7 @@ PYEOF
   python3 - "$SHORT" <<'PYEOF'
 import sys, pathlib
 short = sys.argv[1]
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 text = p.read_text()
 done = f"- ~~**[F08] [Minor] Refactor feature.** Body.~~ Done 2026-01-15 [`{short}`]\n"
 text = text.replace("## Completed\n", "## Completed\n" + done)
@@ -224,7 +224,7 @@ PYEOF
   # take features negative).
   python3 - <<'PYEOF'
 import json, pathlib
-p = pathlib.Path(".hv/counters.json")
+p = pathlib.Path(".rota/counters.json")
 d = json.loads(p.read_text())
 d["since_refactor"]["features"] = 0
 p.write_text(json.dumps(d, indent=2) + "\n")
@@ -232,7 +232,7 @@ PYEOF
 
   RC=0; hvj item reopen F08 >/dev/null 2>&1 || RC=$?
   [ "$RC" = "0" ] || { echo "FAIL F24(e): expected exit 0, got $RC"; exit 1; }
-  NEW=$(python3 -c "import json; print(json.load(open('.hv/counters.json'))['since_refactor']['features'])")
+  NEW=$(python3 -c "import json; print(json.load(open('.rota/counters.json'))['since_refactor']['features'])")
   [ "$NEW" = "0" ] \
     || { echo "FAIL F24(e): since_refactor.features expected 0 (decrement skipped on refactor:), got $NEW"; exit 1; }
 ) || exit 1
@@ -242,7 +242,7 @@ PYEOF
   cd "$UNDO_TMP"
   build_undo_cycle "$UNDO_TMP"
   MERGE_SHORT=$(git rev-parse --short HEAD)
-  BL_BEFORE=$(cat .hv/BACKLOG.md)
+  BL_BEFORE=$(cat .rota/BACKLOG.md)
   HEAD_BEFORE=$(git rev-parse HEAD)
 
   RC=0; OUT=$(hvj ship undo 2>/dev/null) || RC=$?
@@ -263,7 +263,7 @@ PYEOF
   echo "$OUT" | jget warnings | grep 'pass --apply' >/dev/null \
     || { echo "FAIL F24(f): preview should warn 'pass --apply': $OUT"; exit 1; }
 
-  [ "$BL_BEFORE" = "$(cat .hv/BACKLOG.md)" ] \
+  [ "$BL_BEFORE" = "$(cat .rota/BACKLOG.md)" ] \
     || { echo "FAIL F24(f): dry-run modified BACKLOG.md"; exit 1; }
   [ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] \
     || { echo "FAIL F24(f): dry-run moved HEAD"; exit 1; }
@@ -327,9 +327,9 @@ PYEOF
   [ "$AFTER" = "$EXPECTED_HEAD" ] \
     || { echo "FAIL F24(i): HEAD expected $EXPECTED_HEAD (pre-merge), got $AFTER (was $BEFORE_HEAD)"; exit 1; }
 
-  grep -qE '^- \*\*\[F03\]' .hv/BACKLOG.md \
+  grep -qE '^- \*\*\[F03\]' .rota/BACKLOG.md \
     || { echo "FAIL F24(i): [F03] active line not restored under ## Features"; exit 1; }
-  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .hv/BACKLOG.md | grep '\[F03\]' >/dev/null; then
+  if awk '/^## Completed/{f=1;next} /^## /{f=0} f' .rota/BACKLOG.md | grep '\[F03\]' >/dev/null; then
     echo "FAIL F24(i): [F03] still present under ## Completed after rollback"; exit 1
   fi
 
@@ -346,14 +346,14 @@ PYEOF
 (
   cd "$UNDO_TMP"
   build_undo_fixture "$UNDO_TMP"
-  git checkout -q -b hv/F99-other
+  git checkout -q -b rota/F99-other
   echo other > other.txt
   git add other.txt
   git commit -q -m "feat: other branch"
   git checkout -q main
   # GitHub-style merge commit subject — NOT 'merge: '.
-  git merge --no-ff hv/F99-other -q -m "Merge pull request #1 from foo"
-  git branch -q -d hv/F99-other
+  git merge --no-ff rota/F99-other -q -m "Merge pull request #1 from foo"
+  git branch -q -d rota/F99-other
 
   RC=0; OUT=$(hvj ship undo 2>/dev/null) || RC=$?
   [ "$RC" = "4" ] || { echo "FAIL F24(k): non-hv merge expected exit 4, got $RC"; exit 1; }
@@ -367,21 +367,21 @@ PYEOF
 (
   cd "$UNDO_TMP"
   build_undo_fixture "$UNDO_TMP"
-  python3 -c 'import pathlib; p = pathlib.Path(".hv/BACKLOG.md"); p.write_text("".join(l for l in p.read_text().splitlines(True) if "[F03]" not in l))'
+  python3 -c 'import pathlib; p = pathlib.Path(".rota/BACKLOG.md"); p.write_text("".join(l for l in p.read_text().splitlines(True) if "[F03]" not in l))'
   git commit -q -am "drop F03 from the base"
-  git checkout -q -b hv/F03-test
+  git checkout -q -b rota/F03-test
   echo impl > impl.txt && git add impl.txt && git commit -q -m "feat: implement F03"
   SHORT=$(git rev-parse --short HEAD)
   git checkout -q main
-  git merge --no-ff hv/F03-test -q -m "merge: F03 — test cycle"
-  git branch -q -d hv/F03-test
+  git merge --no-ff rota/F03-test -q -m "merge: F03 — test cycle"
+  git branch -q -d rota/F03-test
   python3 - "$SHORT" <<'PYEOF'
 import sys, pathlib
-p = pathlib.Path(".hv/BACKLOG.md")
+p = pathlib.Path(".rota/BACKLOG.md")
 done = f"- ~~**[F03] [Minor] Sample feature.** Body.~~ Done 2026-01-15 [`{sys.argv[1]}`]\n"
 p.write_text(p.read_text().replace("## Completed\n", "## Completed\n" + done))
 PYEOF
-  git add .hv/BACKLOG.md && git commit -q --amend --no-edit
+  git add .rota/BACKLOG.md && git commit -q --amend --no-edit
   EXPECTED_HEAD=$(git rev-parse HEAD^1)
 
   RC=0; OUT=$(hvj ship undo --apply 2>/dev/null) || RC=$?

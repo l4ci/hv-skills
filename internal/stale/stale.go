@@ -10,11 +10,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Kinds are the values of --kind.
@@ -28,7 +28,7 @@ type Entry struct {
 
 // ParseDate is parse_date: an ISO date, YYYY-MM-DD or YYYYMMDD, after
 // stripping; ok is false for anything else. (Python 3.11 also reads ISO week
-// dates; no hv file carries one.)
+// dates; no rota file carries one.)
 func ParseDate(s string) (time.Time, bool) {
 	s = pystr.Strip(s)
 	for _, layout := range []string{"2006-01-02", "20060102"} {
@@ -91,7 +91,7 @@ func Find(root, kind string, days int, today time.Time) ([]Entry, error) {
 func fmtDate(t time.Time) string { return t.Format("2006-01-02") }
 
 func findMap(root string, days int, today time.Time) ([]Entry, error) {
-	dir := filepath.Join(root, ".hv", "map")
+	dir := filepath.Join(root, ".rota", "map")
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.md"))
 	sort.Strings(paths)
 	type ent struct {
@@ -109,7 +109,7 @@ func findMap(root string, days int, today time.Time) ([]Entry, error) {
 		if name == "" {
 			continue
 		}
-		ents = append(ents, ent{name, ".hv/map/" + filepath.Base(p), fm})
+		ents = append(ents, ent{name, ".rota/map/" + filepath.Base(p), fm})
 	}
 	sort.SliceStable(ents, func(i, j int) bool { return ents[i].name < ents[j].name })
 	var out []Entry
@@ -126,11 +126,11 @@ func findMap(root string, days int, today time.Time) ([]Entry, error) {
 }
 
 func findKnowledge(root string, days int, today time.Time) ([]Entry, error) {
-	text, err := fsio.ReadText(filepath.Join(root, ".hv", "KNOWLEDGE.md"))
+	text, err := fsio.ReadText(filepath.Join(root, ".rota", "KNOWLEDGE.md"))
 	if err != nil {
 		return nil, nil
 	}
-	d, ok := gitMtime(root, ".hv/KNOWLEDGE.md")
+	d, ok := gitMtime(root, ".rota/KNOWLEDGE.md")
 	if !ok || !isStale(d, today, days) {
 		return nil, nil
 	}

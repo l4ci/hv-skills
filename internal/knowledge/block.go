@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/section"
 )
 
 type blockCfg struct {
@@ -16,14 +16,14 @@ type blockCfg struct {
 var blockKinds = map[string]blockCfg{
 	"knowledge": {
 		heading: "## Project Knowledge",
-		intro:   "Durable learnings live in `.hv/KNOWLEDGE.md`. Consult it when work touches these topics:",
-		empty:   "- _(no topics yet — run `/hv-learn` to capture learnings)_",
+		intro:   "Durable learnings live in `.rota/KNOWLEDGE.md`. Consult it when work touches these topics:",
+		empty:   "- _(no topics yet — run `/rota-learn` to capture learnings)_",
 		legacy:  "knowledge",
 	},
 	"decisions": {
 		heading:      "## Project Decisions",
-		intro:        "Hard boundaries live in `.hv/DECISIONS.md`. Consult them before acting on work that touches these topics:",
-		empty:        "- _(no decisions yet — run `/hv-decide` to capture a hard boundary)_",
+		intro:        "Hard boundaries live in `.rota/DECISIONS.md`. Consult them before acting on work that touches these topics:",
+		empty:        "- _(no decisions yet — run `/rota-decide` to capture a hard boundary)_",
 		umbrellaOnly: true,
 	},
 }
@@ -55,7 +55,7 @@ func (s Store) BlockInputs(key, scope string) (topics []string, target string, e
 	}
 	switch key {
 	case "decisions":
-		return topicsOf(filepath.Join(s.Root, ".hv", "DECISIONS.md")), section.InstructionsFile(s.Root), nil
+		return topicsOf(filepath.Join(s.Root, ".rota", "DECISIONS.md")), section.InstructionsFile(s.Root), nil
 	case "knowledge":
 		up, _ := s.KnowledgePath(Umbrella)
 		if scope == "" || scope == Umbrella {
@@ -63,7 +63,7 @@ func (s Store) BlockInputs(key, scope string) (topics []string, target string, e
 		}
 		repoPath, ok := s.Repos[scope]
 		if !ok {
-			return nil, "", fmt.Errorf("%w: sub-repo '%s' not registered in .hv/repos.json", ErrScope, scope)
+			return nil, "", fmt.Errorf("%w: sub-repo '%s' not registered in .rota/repos.json", ErrScope, scope)
 		}
 		sp, err := s.KnowledgePath(scope)
 		if err != nil {
@@ -102,7 +102,7 @@ func (s Store) RegenerateBlock(key, scope string) (string, error) {
 		}
 		body = strings.Join(lines, "\n")
 	}
-	block := fmt.Sprintf("<!-- hv-%s-start -->\n%s\n\n%s\n\n%s\n\n<!-- hv-%s-end -->", key, cfg.heading, cfg.intro, body, key)
+	block := fmt.Sprintf("<!-- rota-%s-start -->\n%s\n\n%s\n\n%s\n\n<!-- rota-%s-end -->", key, cfg.heading, cfg.intro, body, key)
 	return section.UpsertBlock(target, key, block, cfg.legacy)
 }
 
@@ -110,6 +110,6 @@ func (s Store) RegenerateBlock(key, scope string) (string, error) {
 // project's instructions file.
 func (s Store) WriteCustomBlock(key, body string) (string, error) {
 	body = strings.TrimRight(body, "\n")
-	block := fmt.Sprintf("<!-- hv-%s-start -->\n%s\n<!-- hv-%s-end -->", key, body, key)
+	block := fmt.Sprintf("<!-- rota-%s-start -->\n%s\n<!-- rota-%s-end -->", key, body, key)
 	return section.UpsertBlock(section.InstructionsFile(s.Root), key, block, "")
 }

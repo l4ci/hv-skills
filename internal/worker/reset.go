@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // ResetResult is the outcome of the slot reset guard.
@@ -21,13 +21,13 @@ type ResetResult struct {
 	Changed  bool
 }
 
-// BranchFor is the per-task branch name: hv-worker/<slot>-<task> with the task
+// BranchFor is the per-task branch name: rota-worker/<slot>-<task> with the task
 // lowercased and every byte outside [a-z0-9._-] turned into '-' (tr, so a
-// multi-byte character becomes several), or hv-worker/<slot> without a task.
-// (Not hv-worker/<slot>/<task>: git cannot hold both refs.)
+// multi-byte character becomes several), or rota-worker/<slot> without a task.
+// (Not rota-worker/<slot>/<task>: git cannot hold both refs.)
 func BranchFor(slot, task string) string {
 	if task == "" {
-		return "hv-worker/" + slot
+		return "rota-worker/" + slot
 	}
 	b := []byte(task)
 	for i, c := range b {
@@ -39,7 +39,7 @@ func BranchFor(slot, task string) string {
 			b[i] = '-'
 		}
 	}
-	return "hv-worker/" + slot + "-" + string(b)
+	return "rota-worker/" + slot + "-" + string(b)
 }
 
 // Reset is the slot reset guard of bin/hv-worker-reset (#38): refuse to reuse
@@ -62,13 +62,13 @@ func (e Env) Reset(root, slot, task string, checkOnly bool) (ResetResult, error)
 }
 
 // ResetTo is Reset onto an explicit branch: a round slot works on
-// `<agent>/<issue>-<slug>` and parks on `park/<agent>`, not hv-worker/….
+// `<agent>/<issue>-<slug>` and parks on `park/<agent>`, not rota-worker/….
 func (e Env) ResetTo(root, slot, task, newBranch string, checkOnly bool) (ResetResult, error) {
 	e = e.withDefaults()
 	res := ResetResult{Slot: slot}
 	reg := LoadRegistry(root)
 	if !reg.Exists {
-		return res, fail(ExitResolution, "no worker pool — run hv worker pool init first")
+		return res, fail(ExitResolution, "no worker pool — run rota worker pool init first")
 	}
 	s := reg.Slot(slot)
 	if s == nil {
@@ -124,7 +124,7 @@ func (e Env) ResetTo(root, slot, task, newBranch string, checkOnly bool) (ResetR
 	}
 	if dirty != "" {
 		res.Dirty = strings.Split(dirty, "\n")
-		return refuse(fmt.Sprintf("REFUSED %s — uncommitted changes in %s: commit or discard them (or hv worker pool reap %s) before reusing the slot; re-dispatch %s to continue it in place.\n%s",
+		return refuse(fmt.Sprintf("REFUSED %s — uncommitted changes in %s: commit or discard them (or rota worker pool reap %s) before reusing the slot; re-dispatch %s to continue it in place.\n%s",
 			slot, worktree, slot, cont, indent(res.Dirty)))
 	}
 	if len(unmerged) > 0 {
@@ -132,7 +132,7 @@ func (e Env) ResetTo(root, slot, task, newBranch string, checkOnly bool) (ResetR
 			line, _ := e.git(worktree, "log", "-1", "--abbrev=7", "--format=%h %s", sha)
 			res.Unmerged = append(res.Unmerged, line)
 		}
-		return refuse(fmt.Sprintf("REFUSED %s — %d commit(s) not on %s: gate and merge them (hv worker gate), or hv worker pool reap %s, before giving the slot another task; re-dispatch %s to continue it in place.\n%s",
+		return refuse(fmt.Sprintf("REFUSED %s — %d commit(s) not on %s: gate and merge them (rota worker gate), or rota worker pool reap %s, before giving the slot another task; re-dispatch %s to continue it in place.\n%s",
 			slot, len(unmerged), base, slot, cont, indent(res.Unmerged)))
 	}
 	res.Clean = true
@@ -144,7 +144,7 @@ func (e Env) ResetTo(root, slot, task, newBranch string, checkOnly bool) (ResetR
 		return res, fail(ExitUnavailable, fmt.Sprintf("could not cut %s from %s in %s", newBranch, base, worktree))
 	}
 	// The old per-task branch was proved merged above; drop it so they don't pile up.
-	if strings.HasPrefix(oldBranch, "hv-worker/") && oldBranch != newBranch {
+	if strings.HasPrefix(oldBranch, "rota-worker/") && oldBranch != newBranch {
 		e.git(root, "branch", "-D", oldBranch)
 	}
 	if _, err := updateSlot(root, slot, func(s *jsonx.Object) { s.Set("branch", newBranch) }); err != nil {

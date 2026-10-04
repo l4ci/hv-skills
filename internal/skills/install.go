@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 // Agents and scopes, as the verbs spell them.
@@ -22,7 +22,7 @@ const (
 )
 
 // ManifestName sits at the top of every root.
-const ManifestName = ".hv-manifest.json"
+const ManifestName = ".rota-manifest.json"
 
 // File statuses (the contract's file states).
 const (
@@ -100,7 +100,7 @@ func Roots(scope, agent, home, claudeDir, top string) ([]Root, error) {
 	return out, nil
 }
 
-// Manifest is <root>/.hv-manifest.json: exactly what hv wrote.
+// Manifest is <root>/.rota-manifest.json: exactly what rota wrote.
 type Manifest struct {
 	Schema  int               `json:"schema"`
 	Version string            `json:"version"`
@@ -120,8 +120,8 @@ func ReadManifest(root string) (m Manifest, ok bool) {
 	}
 	files := map[string]string{}
 	for k, h := range m.Files {
-		// A key must stay inside the root and start in an hv-* skill directory.
-		if filepath.IsLocal(filepath.FromSlash(k)) && strings.HasPrefix(k, "hv-") && strings.Contains(k, "/") {
+		// A key must stay inside the root and start in a rota-* skill directory.
+		if filepath.IsLocal(filepath.FromSlash(k)) && strings.HasPrefix(k, "rota-") && strings.Contains(k, "/") {
 			files[k] = h
 		}
 	}
@@ -130,7 +130,7 @@ func ReadManifest(root string) (m Manifest, ok bool) {
 }
 
 // unsafe is whether a directory between root and the file p is a symlink, so
-// that touching p would reach outside what hv installed.
+// that touching p would reach outside what rota installed.
 func unsafe(root, p string) bool {
 	parts := strings.Split(p, "/")
 	dir := root
@@ -143,7 +143,7 @@ func unsafe(root, p string) bool {
 	return false
 }
 
-// HasManifest is whether the root was installed by hv.
+// HasManifest is whether the root was installed by rota.
 func HasManifest(root string) bool {
 	_, err := os.Stat(manifestPath(root))
 	return err == nil
@@ -246,7 +246,7 @@ func (s *Set) installRoot(r Root, o Options) (RootResult, error) {
 			}
 		}
 
-		// A skill directory that is a symlink: the legacy `hv init --codex`
+		// A skill directory that is a symlink: the legacy `rota init --codex`
 		// link holds no user content and is replaced; any other symlink is
 		// not ours to write through.
 		blocked := map[string]bool{}
@@ -411,7 +411,7 @@ type UninstallResult struct {
 
 // Uninstall removes what the manifest of each root lists and the hash still
 // matches (every listed path with Overwrite), then empty directories, then the
-// manifest. Edited paths are kept and stay in the manifest. Paths hv did not
+// manifest. Edited paths are kept and stay in the manifest. Paths rota did not
 // write are never touched.
 func Uninstall(roots []Root, o Options) ([]UninstallResult, error) {
 	out := make([]UninstallResult, 0, len(roots))

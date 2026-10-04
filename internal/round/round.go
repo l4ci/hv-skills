@@ -1,5 +1,5 @@
 // Package round rebuilds a round's state from what is on disk and in the
-// outside world: the worker registry (.hv/workers.json), the git worktrees
+// outside world: the worker registry (.rota/workers.json), the git worktrees
 // under .worktrees/, the host's live agents, the forge's open PRs and the
 // issues carrying the in-progress label. It reports where those disagree
 // (drift) and, on request, makes the safe repairs.
@@ -20,13 +20,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/limits"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/limits"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Drift kinds.
@@ -98,7 +98,7 @@ type Env struct {
 	NeedsHuman string
 }
 
-// Row is one line of `hv round status`.
+// Row is one line of `rota round status`.
 type Row struct {
 	Name       string
 	Agent      string
@@ -130,7 +130,7 @@ type Report struct {
 	Warnings    []string
 	Host        string
 	// Escalations are the open ones (pending or timed-out), read from the
-	// registry without a forge call; `hv round escalate check` looks for answers.
+	// registry without a forge call; `rota round escalate check` looks for answers.
 	Escalations []escalation.Report
 	// Limits are the usage-limit entries still waiting (D3), read from the
 	// registry like escalations.
@@ -294,7 +294,7 @@ func (e Env) Status(ctx context.Context, root string) (*Report, error) {
 			held[r.Issue] = true
 		}
 		if !r.Registered {
-			rep.add(Finding{Kind: UnregisteredWorktree, Slot: r.Name, Detail: fmt.Sprintf("%s has no slot in .hv/workers.json", v.worktree), Repair: "register the slot"})
+			rep.add(Finding{Kind: UnregisteredWorktree, Slot: r.Name, Detail: fmt.Sprintf("%s has no slot in .rota/workers.json", v.worktree), Repair: "register the slot"})
 		}
 		if forgeOK && !parked {
 			if pr := prs[r.Branch]; pr != nil {

@@ -28,7 +28,7 @@ var tricky = []string{
 	"- **[B02] [P2] Trailing colon space.** body Detail: ",
 	"- **[B02] [P2] Tab.** body\tMilestone:\tM01\tRepos:\tweb",
 	"- **[B02] [P2] Nbsp.** body Milestone: M01 Repos: web",
-	"- **[B02] [P2] Em dash — title.** body — text. Detail: `.hv/bugs/B02.md`",
+	"- **[B02] [P2] Em dash — title.** body — text. Detail: `.rota/bugs/B02.md`",
 	"- **[B02] [P2] Trailing spaces.**   body   Milestone: M01   ",
 	"- **[B02] [P2] CRLF.** body Milestone: M01\r",
 	"- **[B02] [P2] Two milestones.** Milestone: M01 Milestone: M02",
@@ -88,7 +88,7 @@ var (
 	}
 	genDescs = []string{"", "body", "Body text.", "Related", "Detail", "see Milestone M01", "x Since y", "unicode é中文", "  padded  ", "a:b", "Related:", "—"}
 	genNames = []string{"Detail", "Related", "Milestone", "Repos", "Subsystem", "Captured", "Since"}
-	genVals  = []string{"foo.", "`.hv/bugs/B07.md`", "[F02], [B03]", "M01", "web, api", "capture", "2026-05-09", "a1b2c3d", "", " ", "x  y", "a:b", "Detail: nested", "é", "[B01].", "M01 M02"}
+	genVals  = []string{"foo.", "`.rota/bugs/B07.md`", "[F02], [B03]", "M01", "web, api", "capture", "2026-05-09", "a1b2c3d", "", " ", "x  y", "a:b", "Detail: nested", "é", "[B01].", "M01 M02"}
 	genSeps  = []string{" ", " ", " ", "  ", "\t", " ", "  ", "\n"}
 	genColon = []string{": ", ": ", ":", ":  ", ":\t", ":  ", ":\n"}
 	genEnds  = []string{"", "", "", " ", "  ", "\r", "\n", "\t"}

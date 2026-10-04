@@ -36,7 +36,7 @@ var (
 // fileNoteHint names where a file-mode project keeps what issue mode keeps in
 // notes (_FILE_NOTE_MSG); fileShowHint where it keeps what item show reads.
 const (
-	fileNoteHint = "hv design or hv plan"
+	fileNoteHint = "rota design or rota plan"
 	fileShowHint = "see BACKLOG.md, status.json and the detail file"
 )
 

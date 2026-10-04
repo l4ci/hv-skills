@@ -1,4 +1,4 @@
-// Package mapqa ports the .hv/map and .hv/qa helpers (hv-map-*, hv-qa-*):
+// Package mapqa ports the .rota/map and .rota/qa helpers (hv-map-*, hv-qa-*):
 // per-name reads, the managed index blocks and the map size stats.
 package mapqa
 
@@ -13,14 +13,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // Query returns the body (without frontmatter) of each named file under dir
-// ("map" or "qa", below .hv/), in argument order, separated by a blank line.
+// ("map" or "qa", below .rota/), in argument order, separated by a blank line.
 // Names with no file are returned in missing; an empty body prints nothing.
 func Query(root, dir string, names []string) (text string, missing []string, err error) {
 	var b strings.Builder
@@ -30,7 +30,7 @@ func Query(root, dir string, names []string) (text string, missing []string, err
 			missing = append(missing, name)
 			continue
 		}
-		raw, err := readText(filepath.Join(root, ".hv", dir, name+".md"))
+		raw, err := readText(filepath.Join(root, ".rota", dir, name+".md"))
 		if os.IsNotExist(err) {
 			missing = append(missing, name)
 			continue
@@ -52,7 +52,7 @@ func Query(root, dir string, names []string) (text string, missing []string, err
 	return b.String(), missing, nil
 }
 
-// entry is one parsed .hv/map/*.md file.
+// entry is one parsed .rota/map/*.md file.
 type entry struct {
 	name string
 	fm   map[string]any
@@ -86,10 +86,10 @@ func orDefault(s, def string) string {
 	return def
 }
 
-// MapIndexBlock is the body of the hv-map managed block.
+// MapIndexBlock is the body of the rota-map managed block.
 func MapIndexBlock(root string) string {
-	entries := mapEntries(filepath.Join(root, ".hv", "map"))
-	bullets := "- _(no subsystems yet — write `.hv/map/<name>.md` as you discover subsystems)_"
+	entries := mapEntries(filepath.Join(root, ".rota", "map"))
+	bullets := "- _(no subsystems yet — write `.rota/map/<name>.md` as you discover subsystems)_"
 	if len(entries) > 0 {
 		lines := make([]string, len(entries))
 		for i, e := range entries {
@@ -97,14 +97,14 @@ func MapIndexBlock(root string) string {
 		}
 		bullets = strings.Join(lines, "\n")
 	}
-	return "## Project Map\n\nSubsystems live in `.hv/MAP.md` (detail in `.hv/map/<name>.md`). Pull with `hv map query <name>`.\n\n" + bullets
+	return "## Project Map\n\nSubsystems live in `.rota/MAP.md` (detail in `.rota/map/<name>.md`). Pull with `rota map query <name>`.\n\n" + bullets
 }
 
-// QAIndexBlock is the body of the hv-qa managed block.
+// QAIndexBlock is the body of the rota-qa managed block.
 func QAIndexBlock(root string) string {
-	files, _ := filepath.Glob(filepath.Join(root, ".hv", "qa", "*.md"))
+	files, _ := filepath.Glob(filepath.Join(root, ".rota", "qa", "*.md"))
 	sort.Strings(files)
-	bullets := "- _(no QA strategy yet — run `/hv-qa first-run` to scaffold)_"
+	bullets := "- _(no QA strategy yet — run `/rota-qa first-run` to scaffold)_"
 	if len(files) > 0 {
 		var lines []string
 		for _, f := range files {
@@ -118,12 +118,12 @@ func QAIndexBlock(root string) string {
 		}
 		bullets = strings.Join(lines, "\n")
 	}
-	return "## Project QA\n\nQA strategies live in `.hv/QA.md` (detail in `.hv/qa/<target>.md`). Pull with `hv qa query <target>`. `/hv-qa run` consumes these; the skill never hardcodes runners.\n\n" + bullets
+	return "## Project QA\n\nQA strategies live in `.rota/QA.md` (detail in `.rota/qa/<target>.md`). Pull with `rota qa query <target>`. `/rota-qa run` consumes these; the skill never hardcodes runners.\n\n" + bullets
 }
 
 // WriteIndex upserts body as the key block of the project's instructions file.
 func WriteIndex(root, key, body string) (string, error) {
-	block := fmt.Sprintf("<!-- hv-%s-start -->\n%s\n<!-- hv-%s-end -->", key, strings.TrimRight(body, "\n"), key)
+	block := fmt.Sprintf("<!-- rota-%s-start -->\n%s\n<!-- rota-%s-end -->", key, strings.TrimRight(body, "\n"), key)
 	return section.UpsertBlock(section.InstructionsFile(root), key, block, "")
 }
 
@@ -142,7 +142,7 @@ var entryRe = regexp.MustCompile(`(?m)^- ([^:\s]+):(\d+)\b`)
 // "Entry points" references no longer resolve to a line of a file.
 func Stats(root string) []Subsystem {
 	out := []Subsystem{}
-	for _, e := range mapEntries(filepath.Join(root, ".hv", "map")) {
+	for _, e := range mapEntries(filepath.Join(root, ".rota", "map")) {
 		fi, err := os.Stat(e.path)
 		if err != nil {
 			continue
@@ -203,7 +203,7 @@ const DefaultCap = 20
 
 // SoftCap reads map.softcap_subsystems from the project config.
 func SoftCap(root string) int {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	if v, ok := config.Lookup(cfg, "map.softcap_subsystems"); ok {
 		if n, err := strconv.Atoi(fmt.Sprint(v)); err == nil {
 			return n
@@ -214,7 +214,7 @@ func SoftCap(root string) int {
 
 // CapNote is the nudge printed when count reaches cap.
 func CapNote(count, cap int) string {
-	return fmt.Sprintf("project map has %d subsystems (cap %d); consider merging or retiring stale .hv/map/<name>.md entries", count, cap)
+	return fmt.Sprintf("project map has %d subsystems (cap %d); consider merging or retiring stale .rota/map/<name>.md entries", count, cap)
 }
 
 // readText is fsio.ReadText for callers that work on bytes.

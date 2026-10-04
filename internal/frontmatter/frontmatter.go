@@ -1,4 +1,4 @@
-// Package frontmatter is hv's one frontmatter implementation, byte-compatible
+// Package frontmatter is rota's one frontmatter implementation, byte-compatible
 // with bin/hvlib_frontmatter.py: the flat subset that design, plan, spike,
 // milestone, map and qa files use. Between `---` lines it understands only
 // `key: value` and inline lists `key: [a, b]`; no nesting, no quoting.

@@ -13,7 +13,7 @@
 
   Committed 30be308
 
-● HV-DONE lr2 lr2/f01-add-a-hello-line-to
+● ROTA-DONE lr2 lr2/f01-add-a-hello-line-to
 
 ✻ Baked for 22s · done 3:52 PM
 

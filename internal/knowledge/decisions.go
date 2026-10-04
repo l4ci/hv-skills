@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/section"
 )
 
-func (s Store) decisionsPath() string { return filepath.Join(s.Root, ".hv", "DECISIONS.md") }
+func (s Store) decisionsPath() string { return filepath.Join(s.Root, ".rota", "DECISIONS.md") }
 
 // DecisionsQuery prints the requested "## Topic" sections of DECISIONS.md in
 // document order. Topics matching no heading are returned in missing.
@@ -153,7 +153,7 @@ func decisionStatus(entry string) string {
 // timestamp, empty when no loop is active (and then there are no decisions).
 func (s Store) AutoSince() (since string, out []Decision, err error) {
 	out = []Decision{}
-	if st, ok := fsio.LoadJSON(filepath.Join(s.Root, ".hv", "status.json"), nil).(*jsonx.Object); ok {
+	if st, ok := fsio.LoadJSON(filepath.Join(s.Root, ".rota", "status.json"), nil).(*jsonx.Object); ok {
 		if v, has := st.Get("loopStartedAt"); has {
 			since, _ = v.(string)
 		}

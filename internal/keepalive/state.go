@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
-// FileName is the state file under <git-common-dir>/hv/, next to the lease.
+// FileName is the state file under <git-common-dir>/rota/, next to the lease.
 const FileName = "keepalive.json"
 
 // Status values of State.Status.
@@ -26,9 +26,9 @@ type LastExit struct {
 	At     string `json:"at"`
 }
 
-// State is <git-common-dir>/hv/keepalive.json, rewritten under its own lock on
+// State is <git-common-dir>/rota/keepalive.json, rewritten under its own lock on
 // every transition. D3's usage-limit log is not here: it is `limits` in
-// .hv/workers.json.
+// .rota/workers.json.
 type State struct {
 	PID            int       `json:"pid"`
 	StartedAt      string    `json:"startedAt"`
@@ -51,7 +51,7 @@ type State struct {
 }
 
 // StatePath is the state file of a repo, by its git common dir.
-func StatePath(commonDir string) string { return filepath.Join(commonDir, "hv", FileName) }
+func StatePath(commonDir string) string { return filepath.Join(commonDir, "rota", FileName) }
 
 // ReadState loads the state file. found is false for a missing file; a file
 // that does not parse is an error.

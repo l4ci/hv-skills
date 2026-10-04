@@ -6,8 +6,8 @@ TMP_MA="$(mktemp -d "$TMP/mergeapproval.XXXXXX")"
 (
   P="$TMP_MA/gh"; mkdir -p "$P"
   git init -q --bare "$P/origin.git"
-  git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.hv"
-  printf '{"backlog":{"backend":"issues"},"issues":{"provider":"github","retryWaitSeconds":0},"autonomy":{"level":"loop"},"ship":{"mergeApproval":"all"}}\n' > "$P/work/.hv/config.json"
+  git clone -q "$P/origin.git" "$P/work" 2>/dev/null; mkdir -p "$P/work/.rota"
+  printf '{"backlog":{"backend":"issues"},"issues":{"provider":"github","retryWaitSeconds":0},"autonomy":{"level":"loop"},"ship":{"mergeApproval":"all"}}\n' > "$P/work/.rota/config.json"
   cd "$P/work"
   git config user.email t@t; git config user.name t
   git checkout -q -b main && git commit -q --allow-empty -m seed && git push -q origin main
@@ -43,7 +43,7 @@ TMP_MA="$(mktemp -d "$TMP/mergeapproval.XXXXXX")"
   RC=0; OUT="$(hvj ship pr-merge "$PR" --approval e1 2>/dev/null)" || RC=$?
   [ "$RC" = "4" ] && [ "$(jget data.blockedBy <<<"$OUT")" = "approval declined" ] && [ "$(jget data.answer <<<"$OUT")" = "please wait" ] \
     || fail "a reply outside the allowlist should hold the merge: rc=$RC $OUT"
-  [ ! -e .hv/gate-audit.jsonl ] || fail "a held merge wrote an audit line"
+  [ ! -e .rota/gate-audit.jsonl ] || fail "a held merge wrote an audit line"
   pass "--approval holds the merge until an allowlisted reply"
 
   # A fresh request answered "LGTM!" merges, and the audit quotes the reply.
@@ -55,8 +55,8 @@ TMP_MA="$(mktemp -d "$TMP/mergeapproval.XXXXXX")"
   [ "$(jget data.changed <<<"$OUT")" = "true" ] || fail "the approved merge should land: $OUT"
   python3 -c '
 import json, sys
-line = json.loads(open(".hv/gate-audit.jsonl").read().splitlines()[-1])
+line = json.loads(open(".rota/gate-audit.jsonl").read().splitlines()[-1])
 sys.exit(0 if line["gate"] == "merge-approval" and line["note"] == "LGTM!" and line["escalation"] == "e2" else 1)' \
-    || fail "the audit line should quote the reply and name e2: $(cat .hv/gate-audit.jsonl)"
+    || fail "the audit line should quote the reply and name e2: $(cat .rota/gate-audit.jsonl)"
   pass "an allowlisted reply merges and is audited verbatim with its escalation"
 ) || fail "merge approval section failed"

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // The golden is json.dumps(json.loads(file), indent=2).

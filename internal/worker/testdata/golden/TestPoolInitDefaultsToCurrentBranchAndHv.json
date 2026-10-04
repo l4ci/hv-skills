@@ -4,6 +4,6 @@
     "config": "{}"
   },
   "outputs": {
-    "workers.json": "{\n  \"session\": \"hv\",\n  \"slots\": [\n    {\n      \"name\": \"w1\",\n      \"branch\": \"hv-worker/w1\",\n      \"worktree\": \"ROOT/.worktrees/w1\",\n      \"base\": \"main\",\n      \"handle\": \"hv:w1\",\n      \"state\": \"idle\",\n      \"task\": null,\n      \"pr\": null,\n      \"relays\": [],\n      \"configDir\": null\n    }\n  ]\n}\n"
+    "workers.json": "{\n  \"session\": \"rota\",\n  \"slots\": [\n    {\n      \"name\": \"w1\",\n      \"branch\": \"rota-worker/w1\",\n      \"worktree\": \"ROOT/.worktrees/w1\",\n      \"base\": \"main\",\n      \"handle\": \"rota:w1\",\n      \"state\": \"idle\",\n      \"task\": null,\n      \"pr\": null,\n      \"relays\": [],\n      \"configDir\": null\n    }\n  ]\n}\n"
   }
 }

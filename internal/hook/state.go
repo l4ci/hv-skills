@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/rota/internal/fsio"
 )
 
 // StateTTL is how long an untouched session state file lives.
@@ -21,7 +21,7 @@ const StateTTL = 24 * time.Hour
 // lockWait bounds the state lock: a statusline must never hang.
 const lockWait = 2 * time.Second
 
-// State is <git-common-dir>/hv/session/<session_id>.json. D2 and D3 read it.
+// State is <git-common-dir>/rota/session/<session_id>.json. D2 and D3 read it.
 type State struct {
 	SessionID  string          `json:"sessionId"`
 	Cwd        string          `json:"cwd"`
@@ -47,7 +47,7 @@ func StatePath(commonDir, sessionID string) (string, error) {
 	if !sessionIDRe.MatchString(sessionID) || strings.Contains(sessionID, "..") {
 		return "", fmt.Errorf("unusable session id %q", sessionID)
 	}
-	return filepath.Join(commonDir, "hv", "session", sessionID+".json"), nil
+	return filepath.Join(commonDir, "rota", "session", sessionID+".json"), nil
 }
 
 // ReadState loads a state file. found is false for a missing file; a file

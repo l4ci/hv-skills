@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // tree builds an umbrella fixture: git children (dir or worktree-style .git
@@ -67,8 +67,8 @@ func TestListIsReadOnly(t *testing.T) {
 	if err != nil || !l.IsGitRepo || !reflect.DeepEqual(l.Candidates, []string{"web"}) {
 		t.Fatalf("%+v %v", l, err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv")); err == nil {
-		t.Fatal("List wrote .hv")
+	if _, err := os.Stat(filepath.Join(root, ".rota")); err == nil {
+		t.Fatal("List wrote .rota")
 	}
 	empty, _ := List(t.TempDir())
 	if empty.IsGitRepo || len(empty.Candidates) != 0 {
@@ -83,8 +83,8 @@ func TestNoCandidatesLeavesNothing(t *testing.T) {
 	if !errors.Is(err, ErrNoCandidates) || seeded {
 		t.Fatalf("err=%v seeded=%v", err, seeded)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".hv")); err == nil {
-		t.Fatal(".hv created")
+	if _, err := os.Stat(filepath.Join(root, ".rota")); err == nil {
+		t.Fatal(".rota created")
 	}
 }
 
@@ -134,18 +134,18 @@ func umbrellaCases() []umbrellaCase {
 		{"none", false, nil, []string{"web"}, "none", UmbrellaOptions{}},
 		{"empty line is none", false, nil, []string{"web"}, "", UmbrellaOptions{}},
 		{"unknown and blank names", true, nil, []string{"web"}, " web , nope,,", UmbrellaOptions{Names: []string{" web ", " nope", "", ""}}},
-		{"prior kept, stale dropped", false, map[string]string{".hv/repos.json": prior}, []string{"web", "api", "db"}, "db", UmbrellaOptions{Names: []string{"db"}}},
-		{"gitignore appended", true, map[string]string{".gitignore": "node_modules/\n.hv/\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
+		{"prior kept, stale dropped", false, map[string]string{".rota/repos.json": prior}, []string{"web", "api", "db"}, "db", UmbrellaOptions{Names: []string{"db"}}},
+		{"gitignore appended", true, map[string]string{".gitignore": "node_modules/\n.rota/\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
 		{"gitignore no trailing newline", true, map[string]string{".gitignore": "a\nb"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
 		{"gitignore crlf", true, map[string]string{".gitignore": "a\r\n.claude/\r\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
-		{"gitignore complete", true, map[string]string{".gitignore": ".claude/\n.hv/\n/web/\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
-		{"corrupt repos.json", false, map[string]string{".hv/repos.json": "{nope"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
+		{"gitignore complete", true, map[string]string{".gitignore": ".claude/\n.rota/\n/web/\n"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
+		{"corrupt repos.json", false, map[string]string{".rota/repos.json": "{nope"}, []string{"web"}, "all", UmbrellaOptions{All: true}},
 	}
 }
 
 // TestUmbrellaMatchesHelperGolden checks Umbrella against what the retired
 // hv-umbrella-init wrote and reported on each case, as recorded in
-// testdata/golden: repos.json, .gitignore, the paths under .hv, the summary
+// testdata/golden: repos.json, .gitignore, the paths under .rota, the summary
 // line and the warnings.
 func TestUmbrellaMatchesHelperGolden(t *testing.T) {
 	cases := umbrellaCases()
@@ -162,7 +162,7 @@ func TestUmbrellaMatchesHelperGolden(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, n := range res.Registered {
-				if _, err := os.Stat(filepath.Join(root, ".hv", "knowledge", n)); err != nil {
+				if _, err := os.Stat(filepath.Join(root, ".rota", "knowledge", n)); err != nil {
 					t.Errorf("knowledge dir for %s missing", n)
 				}
 			}
@@ -172,7 +172,7 @@ func TestUmbrellaMatchesHelperGolden(t *testing.T) {
 			}
 			sort.Strings(paths)
 			got := umbrellaOutcome{
-				Repos:     read(t, root, ".hv/repos.json"),
+				Repos:     read(t, root, ".rota/repos.json"),
 				Gitignore: read(t, root, ".gitignore"),
 				Tree:      paths,
 				Summary:   `{"registered":[` + quoteJoin(res.Registered) + `],"umbrellaIsGitRepo":` + map[bool]string{true: "true", false: "false"}[res.IsGitRepo] + "}\n",

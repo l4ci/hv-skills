@@ -8,7 +8,7 @@ import (
 )
 
 // HandoffMarker is the first line of a handoff the Stop hook asked for.
-const HandoffMarker = "<!-- hv-handoff: orchestrator -->"
+const HandoffMarker = "<!-- rota-handoff: orchestrator -->"
 
 // Handoff is what the filesystem says about the handoff file.
 type Handoff struct {
@@ -35,7 +35,7 @@ func StatHandoff(path string) Handoff {
 // StopIn is the Stop payload's relevant fields.
 type StopIn struct {
 	StopHookActive bool
-	// Supervised is whether a live `hv keepalive run` would restart the
+	// Supervised is whether a live `rota keepalive run` would restart the
 	// orchestrator (D4); without one a usage block would strand it.
 	Supervised bool
 	// HoldUntil is the end of the supervisor's switch hold, zero for none.

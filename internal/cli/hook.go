@@ -14,17 +14,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/git"
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/keepalive"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/status"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/git"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/keepalive"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/status"
 )
 
-// D1 (#65): `hv statusline dump` and the `hv hook` verbs. The logic is
+// D1 (#65): `rota statusline dump` and the `rota hook` verbs. The logic is
 // internal/hook; this file is the process side: stdin, the environment, the
 // lease and the settings files.
 
@@ -45,9 +45,9 @@ func hookCommands() *Command {
 
 const maxHookInput = 8 << 20
 
-// hookNow is the clock; HV_TEST_NOW (RFC 3339) fixes it for tests.
+// hookNow is the clock; ROTA_TEST_NOW (RFC 3339) fixes it for tests.
 func hookNow() time.Time {
-	if v := os.Getenv("HV_TEST_NOW"); v != "" {
+	if v := os.Getenv("ROTA_TEST_NOW"); v != "" {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			return t
 		}
@@ -55,10 +55,10 @@ func hookNow() time.Time {
 	return time.Now()
 }
 
-// hookHolderPID is a test seam: HV_TEST_HOLDER_PID stands in for the nearest
+// hookHolderPID is a test seam: ROTA_TEST_HOLDER_PID stands in for the nearest
 // non-shell ancestor, which a smoke test cannot arrange.
 func hookHolderPID() int {
-	n, _ := strconv.Atoi(os.Getenv("HV_TEST_HOLDER_PID"))
+	n, _ := strconv.Atoi(os.Getenv("ROTA_TEST_HOLDER_PID"))
 	return n
 }
 
@@ -89,17 +89,17 @@ func statuslineDump(fs *flag.FlagSet) RunFunc {
 			c.JSON = false // stdout belongs to the wrapped command: no envelope, not even for this error
 			return Result{}, Usage("statusline dump does not take --json: stdout belongs to the wrapped command")
 		}
-		debug := os.Getenv("HV_STATUSLINE_DEBUG") != ""
+		debug := os.Getenv("ROTA_STATUSLINE_DEBUG") != ""
 		input := readInput(c)
 		if err := dumpState(input); err != nil && debug {
-			fmt.Fprintf(c.Stderr, "hv statusline dump: %v\n", err)
+			fmt.Fprintf(c.Stderr, "rota statusline dump: %v\n", err)
 		}
 		if *then != "" {
 			cmd := exec.CommandContext(c.Context(), "sh", "-c", *then)
 			cmd.Stdin = bytes.NewReader(input)
 			cmd.Stdout, cmd.Stderr = c.Stdout, c.Stderr
 			if err := cmd.Run(); err != nil && debug {
-				fmt.Fprintf(c.Stderr, "hv statusline dump: --then: %v\n", err)
+				fmt.Fprintf(c.Stderr, "rota statusline dump: --then: %v\n", err)
 			}
 		}
 		return Result{}, nil
@@ -169,7 +169,7 @@ func hookSetup(c *Ctx, needLeaseFree bool) (hc hookContext, ok bool) {
 	if hc.root == "" {
 		return hc, false
 	}
-	hc.cfg = config.Load(filepath.Join(hc.root, ".hv", "config.json"))
+	hc.cfg = config.Load(filepath.Join(hc.root, ".rota", "config.json"))
 	if hc.set, err = hook.LoadSettings(hc.cfg); err != nil {
 		return hc, false // a bad value is a pass, never a block
 	}
@@ -179,7 +179,7 @@ func hookSetup(c *Ctx, needLeaseFree bool) (hc hookContext, ok bool) {
 
 func findHvRoot(dir string) string {
 	for d := dir; d != ""; {
-		if fi, err := os.Stat(filepath.Join(d, ".hv")); err == nil && fi.IsDir() {
+		if fi, err := os.Stat(filepath.Join(d, ".rota")); err == nil && fi.IsDir() {
 			return d
 		}
 		p := filepath.Dir(d)
@@ -191,8 +191,8 @@ func findHvRoot(dir string) string {
 	return ""
 }
 
-// handoffFile is the absolute `.hv/handoff/<base>.md`, the path
-// `hv status handoff <base> --canonical` returns.
+// handoffFile is the absolute `.rota/handoff/<base>.md`, the path
+// `rota status handoff <base> --canonical` returns.
 func handoffFile(root string, cfg any) string {
 	configured := ""
 	if v, err := config.Value(cfg, "git.baseBranch"); err == nil {
@@ -207,7 +207,7 @@ func handoffFile(root string, cfg any) string {
 	}
 	rel, err := status.HandoffPath(base, "")
 	if err != nil {
-		rel = ".hv/handoff/main.md"
+		rel = ".rota/handoff/main.md"
 	}
 	return filepath.Join(root, filepath.FromSlash(rel))
 }
@@ -256,7 +256,7 @@ func hookStop(c *Ctx, args []string) (res Result, _ error) {
 	return hookPrint(hook.StopOutput(d.Reason)), nil
 }
 
-// supervisedHold reads keepalive.json the way `hv keepalive status` does: a
+// supervisedHold reads keepalive.json the way `rota keepalive status` does: a
 // supervisor is live when the file says running and its pid is alive. The
 // hold is its switchHold when that is still ahead (D4).
 func supervisedHold(commonDir string, now time.Time) (supervised bool, until time.Time) {
@@ -369,7 +369,7 @@ func hookInstall(fs *flag.FlagSet) RunFunc {
 			o, rerr := hook.ReadSettings(p)
 			if rerr != nil {
 				if sc == scope {
-					return Result{}, &Error{Exit: ExitInternal, Message: rerr.Error(), Hint: "fix or move the settings file; hv will not overwrite a file it cannot parse"}
+					return Result{}, &Error{Exit: ExitInternal, Message: rerr.Error(), Hint: "fix or move the settings file; rota will not overwrite a file it cannot parse"}
 				}
 				o = nil // another scope's broken file does not block this one
 			}
@@ -385,7 +385,7 @@ func hookInstall(fs *flag.FlagSet) RunFunc {
 		if out.Blocked {
 			d := knObj("blockedBy", "statusline exists", "scope", string(scope), "settingsPath", path, "changed", false)
 			return Result{Data: d}, Refused("a statusline is already configured and would be replaced").
-				WithHint("run: hv hook install --wrap-statusline (keeps it, runs it after the dump)")
+				WithHint("run: rota hook install --wrap-statusline (keeps it, runs it after the dump)")
 		}
 		if out.Changed {
 			if err := writeSettings(path, files[scope]); err != nil {

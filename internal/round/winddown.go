@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Wind-down verdicts and slot outcomes.
@@ -26,7 +26,7 @@ const (
 	OutcomeUnchanged = "unchanged"
 )
 
-// WindDownOpts are the flags of `hv round wind-down`.
+// WindDownOpts are the flags of `rota round wind-down`.
 type WindDownOpts struct {
 	NoVerify  bool
 	HolderPID int
@@ -73,7 +73,7 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 	}
 	holder := le.Discover(o.HolderPID, o.Getenv)
 	if (st != roundlease.Live && st != roundlease.Foreign) || !holder.SameAs(lease, le.Host) {
-		return res, &worker.Error{Exit: worker.ExitResolution, Message: "this process holds no round lease: nothing to wind down", Hint: "run it from the orchestrator that ran hv round start"}
+		return res, &worker.Error{Exit: worker.ExitResolution, Message: "this process holds no round lease: nothing to wind down", Hint: "run it from the orchestrator that ran rota round start"}
 	}
 	res.Round = lease.Round
 
@@ -225,7 +225,7 @@ func (e Env) WindDown(ctx context.Context, root string, be Board, o WindDownOpts
 }
 
 func verifyCommands(root string) []string {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	v, ok := config.Lookup(cfg, "refactor.verifyCommands")
 	if !ok {
 		return nil

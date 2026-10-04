@@ -8,8 +8,8 @@ import (
 )
 
 // The supported Codex CLI range (E1, #68): 0.159.0 inclusive up to 0.160.0
-// exclusive. It lives here, beside ParseIntegration, because `hv worker
-// dispatch`, `hv round assign` and the `codex` check all read it and this
+// exclusive. It lives here, beside ParseIntegration, because `rota worker
+// dispatch`, `rota round assign` and the `codex` check all read it and this
 // package imports nothing from the worker layer.
 const (
 	CodexMin   = "0.159.0"

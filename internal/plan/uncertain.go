@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
 )
 
 var (
@@ -30,14 +30,14 @@ func Uncertain(root, id string) (typ string, reasons []string, err error) {
 	md, merr := f.Markdown(0)
 	if merr != nil {
 		if errors.Is(merr, backlog.ErrNotFound) {
-			return "", nil, artifact.Errf(artifact.ExitResolution, ".hv/BACKLOG.md not found")
+			return "", nil, artifact.Errf(artifact.ExitResolution, ".rota/BACKLOG.md not found")
 		}
 		return "", nil, merr
 	}
-	// HV_OPEN_SECTIONS ("Bugs|Features|Tasks", as hv-types.sh exports it)
+	// ROTA_OPEN_SECTIONS ("Bugs|Features|Tasks", as hv-types.sh exports it)
 	// limits which open sections the item may live in.
 	active := map[string]bool{}
-	sections := os.Getenv("HV_OPEN_SECTIONS")
+	sections := os.Getenv("ROTA_OPEN_SECTIONS")
 	if sections == "" {
 		sections = "Bugs|Features|Tasks"
 	}

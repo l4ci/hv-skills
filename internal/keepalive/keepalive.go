@@ -1,4 +1,4 @@
-// Package keepalive is the logic behind `hv keepalive run` (D2, #66): a
+// Package keepalive is the logic behind `rota keepalive run` (D2, #66): a
 // supervisor that runs the orchestrator as its child, holds the round lease
 // for its whole life, and restarts the child when it exited leaving a fresh
 // handoff.
@@ -17,8 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/hook"
-	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/rota/internal/hook"
+	"github.com/l4ci/rota/internal/roundlease"
 )
 
 // Stop reasons of Result.StopReason.
@@ -390,6 +390,6 @@ func escalationBody(env Env, o Options, st State, reason, statePath string) stri
 	}
 	return fmt.Sprintf("The orchestrator keepalive supervisor stopped: %s.\n\n"+
 		"- Restarts: %d\n- Restarts that left no new handoff: %d\n- Last exit: %s\n- Handoff: %s\n- State file: %s\n\n"+
-		"Run hv keepalive run again after fixing the cause; the handoff is kept.\n",
+		"Run rota keepalive run again after fixing the cause; the handoff is kept.\n",
 		reason, st.Restarts, st.NoProgress, last, handoff, statePath)
 }

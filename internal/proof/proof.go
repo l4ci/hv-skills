@@ -1,6 +1,6 @@
 // Package proof ports hv-proof-add and hv-proof-show for file mode: proof
 // rows in the "## Proof" section of an item's detail file
-// (.hv/<bugs|features|tasks>/<ID>.md). Rows are facts, not acceptance.
+// (.rota/<bugs|features|tasks>/<ID>.md). Rows are facts, not acceptance.
 package proof
 
 import (
@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/section"
 )
 
 const sep = " · "
@@ -36,7 +36,7 @@ func kindOf(id string) (kind string, err error) {
 	return t.Kind, nil
 }
 
-func detailPath(root, kind, id string) string { return filepath.Join(root, ".hv", kind, id+".md") }
+func detailPath(root, kind, id string) string { return filepath.Join(root, ".rota", kind, id+".md") }
 
 func one(s string) string { return strings.Join(strings.Fields(s), " ") }
 
@@ -81,7 +81,7 @@ func Add(root, id string, o AddOpts) (row Row, changed bool, err error) {
 			return artifact.Errf(artifact.ExitInternal, "cannot read %s: %v", path, rerr)
 		}
 		if rerr != nil { // missing: start the detail file
-			content = fmt.Sprintf("# %s: %s\n\n> Related TODO entry: `[%s]` in `.hv/BACKLOG.md`\n", id, title, id)
+			content = fmt.Sprintf("# %s: %s\n\n> Related TODO entry: `[%s]` in `.rota/BACKLOG.md`\n", id, title, id)
 		}
 		var updated string
 		if s, e, ok := section.Find(content, "Proof"); ok {

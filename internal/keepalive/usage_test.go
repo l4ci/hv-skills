@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/rota/internal/hook"
 )
 
 // usageRig is a rig whose first child leaves a usage handoff.

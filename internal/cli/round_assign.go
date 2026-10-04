@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
 )
 
-// The C3 verb `hv round assign`; the steps are round.Env.Assign.
+// The C3 verb `rota round assign`; the steps are round.Env.Assign.
 
 func overlapList(os []round.Overlap) []any {
 	out := make([]any, 0, len(os))
@@ -53,7 +53,7 @@ func roundAssign(fs *flag.FlagSet) RunFunc {
 		defer stop()
 		bf := *body
 		if bf == "-" {
-			f, err := os.CreateTemp("", "hv-round-decisions-")
+			f, err := os.CreateTemp("", "rota-round-decisions-")
 			if err != nil {
 				return Result{}, err
 			}

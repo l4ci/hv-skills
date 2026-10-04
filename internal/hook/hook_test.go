@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundlease"
 )
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
@@ -68,7 +68,7 @@ func TestDumpKeepsCountersAndSweeps(t *testing.T) {
 	// An old session is swept by another session's dump; a fresh one stays.
 	Dump(cd, []byte(`{"session_id":"old"}`), t0.Add(-48*time.Hour))
 	Dump(cd, []byte(`{"session_id":"s2"}`), t0.Add(2*time.Minute))
-	if _, err := os.Stat(filepath.Join(cd, "hv", "session", "old.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(cd, "rota", "session", "old.json")); !os.IsNotExist(err) {
 		t.Fatalf("old state should be swept: %v", err)
 	}
 	if _, err := os.Stat(p); err != nil {
@@ -83,7 +83,7 @@ func TestDumpRejectsBadInput(t *testing.T) {
 			t.Errorf("%q should fail", in)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(cd, "hv")); err == nil {
+	if _, err := os.Stat(filepath.Join(cd, "rota")); err == nil {
 		t.Error("a rejected payload must write nothing")
 	}
 }
@@ -297,9 +297,9 @@ func TestWrapRoundTripIsByteExact(t *testing.T) {
 	}
 	got := dump(t, o)
 	for _, want := range []string{
-		`hv statusline dump --then '~/bin/my line.sh '\\''x'\\'''`,
-		`"hvWrapped": "~/bin/my line.sh 'x'"`,
-		`hv hook stop # hv-hook`, `hv hook session-start # hv-hook`, `^(startup|clear)$`, `notify-done`,
+		`rota statusline dump --then '~/bin/my line.sh '\\''x'\\'''`,
+		`"rotaWrapped": "~/bin/my line.sh 'x'"`,
+		`rota hook stop # rota-hook`, `rota hook session-start # rota-hook`, `^(startup|clear)$`, `notify-done`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %s in\n%s", want, got)
@@ -348,7 +348,7 @@ func TestWrapUserStatuslineFromProjectLocalShadows(t *testing.T) {
 		t.Fatalf("%+v; user touched", out)
 	}
 	got := dump(t, local)
-	if !strings.Contains(got, `"hvWrappedFrom": "user"`) || !strings.Contains(got, `"padding": 0`) {
+	if !strings.Contains(got, `"rotaWrappedFrom": "user"`) || !strings.Contains(got, `"padding": 0`) {
 		t.Errorf("shadow entry:\n%s", got)
 	}
 	Uninstall(local)

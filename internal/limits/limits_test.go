@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
@@ -45,7 +45,7 @@ type rig struct {
 
 func newRig(t *testing.T) *rig {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv"), 0o777); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".rota"), 0o777); err != nil {
 		t.Fatal(err)
 	}
 	r := &rig{t: t, root: root, now: t0, panes: map[string]string{}, meters: map[string]Reading{}, idle: map[string]string{},
@@ -543,8 +543,8 @@ func TestLoadSettings(t *testing.T) {
 
 func TestStoreRoundTripKeepsOtherKeys(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".hv"), 0o777)
-	os.WriteFile(filepath.Join(root, ".hv", "workers.json"), []byte(`{"slots":[{"name":"ben"}],"escalations":[{"id":"e1"}]}`), 0o666)
+	os.MkdirAll(filepath.Join(root, ".rota"), 0o777)
+	os.WriteFile(filepath.Join(root, ".rota", "workers.json"), []byte(`{"slots":[{"name":"ben"}],"escalations":[{"id":"e1"}]}`), 0o666)
 	e, err := Append(root, Entry{Session: "ben", Window: WindowUnknown, Source: SourceText, DetectedAt: "x", Action: ActionSleep, Status: StatusWaiting})
 	if err != nil || e.ID != "l1" {
 		t.Fatalf("%+v %v", e, err)
@@ -553,7 +553,7 @@ func TestStoreRoundTripKeepsOtherKeys(t *testing.T) {
 	if err := Save(root, e); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(filepath.Join(root, ".hv", "workers.json"))
+	b, _ := os.ReadFile(filepath.Join(root, ".rota", "workers.json"))
 	v, _ := jsonx.Decode(b)
 	doc := v.(*jsonx.Object)
 	for _, k := range []string{"slots", "escalations", "limits"} {

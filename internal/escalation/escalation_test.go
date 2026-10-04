@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 func TestDerivedStatus(t *testing.T) {
@@ -43,12 +43,12 @@ func TestNextID(t *testing.T) {
 
 func TestComposeEndsWithMarker(t *testing.T) {
 	got := Compose("e4", "Pick", "\nbody line\n\n")
-	want := "**hv escalation e4**: Pick\n\nbody line\n\nAnswer in a new comment on this thread.\n\n<!-- hv:escalation e4 -->\n"
+	want := "**rota escalation e4**: Pick\n\nbody line\n\nAnswer in a new comment on this thread.\n\n<!-- rota:escalation e4 -->\n"
 	if got != want {
 		t.Errorf("got:\n%q\nwant:\n%q", got, want)
 	}
 	if IsAnswer(got) {
-		t.Error("hv's own comment must never read as an answer")
+		t.Error("rota's own comment must never read as an answer")
 	}
 }
 
@@ -71,7 +71,7 @@ func (s *stubForge) CommentURL(context.Context, bool, int, string) (string, erro
 // the comment's id and url in the failure data, never a silent success.
 func TestSendRecordWriteFailureKeepsTheURL(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".hv", "workers.json"), 0o755); err != nil { // a directory where the file belongs
+	if err := os.MkdirAll(filepath.Join(root, ".rota", "workers.json"), 0o755); err != nil { // a directory where the file belongs
 		t.Fatal(err)
 	}
 	f := &stubForge{}

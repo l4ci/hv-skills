@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // Parked is what Park did to a slot's worktree.
@@ -57,7 +57,7 @@ func (e Env) dirtyPaths(ctx context.Context, wt string) ([]string, error) {
 
 // Park frees a slot's worktree without losing its work, the sequence return,
 // transfer and reclaim share. It salvages the worktree when dirty (stages the
-// dirty paths by name, never -A, and commits `wip: parked from <slot> (hv
+// dirty paths by name, never -A, and commits `wip: parked from <slot> (rota
 // round <verb>)`), pushes the work branch to origin (`git push -u origin
 // <branch>`, no force) and only after the push succeeded switches the worktree
 // to park/<agent> at the base. A failed push or a rejected commit leaves the
@@ -106,7 +106,7 @@ func (e Env) Park(ctx context.Context, root, name, verb string) (Parked, error) 
 				e.gitOut(ctx, wt, "reset", "-q")
 				return p, unavailable("could not stage %s's changes: %s", name, errOut)
 			}
-			msg := fmt.Sprintf("wip: parked from %s (hv round %s)", name, verb)
+			msg := fmt.Sprintf("wip: parked from %s (rota round %s)", name, verb)
 			if _, errOut, code := e.gitOut(ctx, wt, "commit", "-q", "-m", msg); code != 0 {
 				e.gitOut(ctx, wt, "reset", "-q")
 				return p, unavailable("salvage commit in %s was rejected: %s", name, errOut)

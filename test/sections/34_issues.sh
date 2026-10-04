@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Section 32 — hv issues — helper existence + provider detection + manual-gate callouts.
+# Section 32 — rota issues — helper existence + provider detection + manual-gate callouts.
 # F38 local-trap convention: each tmp tree installs its own trap; restore global before
 # the section's final pass line. (Helpers pass/fail and $REPO/$TMP from runner.sh/lib.sh.)
 set -euo pipefail
@@ -11,34 +11,34 @@ trap 'rm -rf "$TMP_PROV"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
 (
   cd "$TMP_PROV"
-  mkdir -p .hv
+  mkdir -p .rota
   git init -q
   git config user.email t@t
   git config user.name t
 
   # Test 1: github.com SSH
   git remote add origin "git@github.com:foo/bar.git"
-  out=$("$HV_BIN" --json issues provider | jget data.provider)
+  out=$("$ROTA_BIN" --json issues provider | jget data.provider)
   [ "$out" = "github" ] || { echo "github.com SSH → $out, expected github"; exit 1; }
 
   # Test 2: gitlab.com HTTPS
   git remote set-url origin "https://gitlab.com/foo/bar.git"
-  out=$("$HV_BIN" --json issues provider | jget data.provider)
+  out=$("$ROTA_BIN" --json issues provider | jget data.provider)
   [ "$out" = "gitlab" ] || { echo "gitlab.com HTTPS → $out, expected gitlab"; exit 1; }
 
   # Test 3: self-hosted GitLab SSH
   git remote set-url origin "git@gitlab.example.com:foo/bar.git"
-  out=$("$HV_BIN" --json issues provider | jget data.provider)
+  out=$("$ROTA_BIN" --json issues provider | jget data.provider)
   [ "$out" = "gitlab" ] || { echo "self-hosted gitlab SSH → $out, expected gitlab"; exit 1; }
 
   # Test 4: GitHub Enterprise HTTPS
   git remote set-url origin "https://github.company.com/foo/bar.git"
-  out=$("$HV_BIN" --json issues provider | jget data.provider)
+  out=$("$ROTA_BIN" --json issues provider | jget data.provider)
   [ "$out" = "github" ] || { echo "GH Enterprise HTTPS → $out, expected github"; exit 1; }
 
   # Test 5: no origin at all
   git remote remove origin
-  out=$("$HV_BIN" --json issues provider | jget data.provider)
+  out=$("$ROTA_BIN" --json issues provider | jget data.provider)
   [ "$out" = "unknown" ] || { echo "no origin → $out, expected unknown"; exit 1; }
 ) || fail "issues provider classification failed (see subshell output above)"
 
@@ -50,10 +50,10 @@ echo "Section 32: issues imported smoke"
 TMP_IMP="$(mktemp -d)"
 trap 'rm -rf "$TMP_IMP"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
-mkdir -p "$TMP_IMP/.hv/bugs" "$TMP_IMP/.hv/features" "$TMP_IMP/.hv/tasks"
+mkdir -p "$TMP_IMP/.rota/bugs" "$TMP_IMP/.rota/features" "$TMP_IMP/.rota/tasks"
 
 # Seed a minimal BACKLOG.md with one GH and one GL cross-reference
-cat > "$TMP_IMP/.hv/BACKLOG.md" <<'EOF'
+cat > "$TMP_IMP/.rota/BACKLOG.md" <<'EOF'
 # TODO
 
 ## Features
@@ -69,7 +69,7 @@ cat > "$TMP_IMP/.hv/BACKLOG.md" <<'EOF'
 ## Completed
 EOF
 
-# Run from inside the fake tree so hv-self-locate resolves .hv/
+# Run from inside the fake tree so hv-self-locate resolves .rota/
 out=$(cd "$TMP_IMP" && hvj issues imported) || \
   fail "issues imported exited non-zero on fixture BACKLOG"
 
@@ -83,7 +83,7 @@ echo "$out" | jq -e '.data.entries[] | select(.issue == 42 and .provider == "git
   fail "issues imported missing gitlab #42 entry"
 
 # Remove the GH bullet; re-run; expect length 1
-cat > "$TMP_IMP/.hv/BACKLOG.md" <<'EOF'
+cat > "$TMP_IMP/.rota/BACKLOG.md" <<'EOF'
 # TODO
 
 ## Features
@@ -109,10 +109,10 @@ echo "Section 32: issues imported --open-only flag"
 TMP_OO="$(mktemp -d)"
 trap 'rm -rf "$TMP_OO"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
-mkdir -p "$TMP_OO/.hv/bugs" "$TMP_OO/.hv/features" "$TMP_OO/.hv/tasks"
+mkdir -p "$TMP_OO/.rota/bugs" "$TMP_OO/.rota/features" "$TMP_OO/.rota/tasks"
 
 # Seed BACKLOG with GH + GL refs the post-filter has to probe upstream for.
-cat > "$TMP_OO/.hv/BACKLOG.md" <<'EOF'
+cat > "$TMP_OO/.rota/BACKLOG.md" <<'EOF'
 # TODO
 
 ## Features
@@ -146,24 +146,24 @@ for d in /usr/bin /bin; do
     [ -e "$NOGH/$n" ] || ln -s "$t" "$NOGH/$n"
   done
 done
-out_oo=$(cd "$TMP_OO" && env PATH="$NOGH" "$HV_BIN" --json issues imported --open-only) || \
+out_oo=$(cd "$TMP_OO" && env PATH="$NOGH" "$ROTA_BIN" --json issues imported --open-only) || \
   fail "issues imported --open-only exited non-zero with no gh/glab on PATH"
 echo "$out_oo" | jq -e '.data.entries == []' >/dev/null || \
   fail "issues imported --open-only with no gh/glab expected no entries, got $out_oo"
-out_oo=$(cd "$TMP_OO" && env -u FAKE_TRACKER_DB -u FAKE_TRACKER_LOG PATH="$TESTDIR/fakes:$PATH" "$HV_BIN" --json issues imported --open-only) || \
+out_oo=$(cd "$TMP_OO" && env -u FAKE_TRACKER_DB -u FAKE_TRACKER_LOG PATH="$TESTDIR/fakes:$PATH" "$ROTA_BIN" --json issues imported --open-only) || \
   fail "issues imported --open-only exited non-zero with a failing gh/glab"
 echo "$out_oo" | jq -e '.data.entries == []' >/dev/null || \
   fail "issues imported --open-only with a failing gh/glab expected no entries, got $out_oo"
 
 # --open-only is orthogonal to --for-repo: combining them parses fine and still
 # emits an entries array (empty: no Repos:-tagged entry matches 'nonexistent').
-out_combo=$(cd "$TMP_OO" && env PATH="$NOGH" "$HV_BIN" --json issues imported --for-repo nonexistent --open-only) || \
+out_combo=$(cd "$TMP_OO" && env PATH="$NOGH" "$ROTA_BIN" --json issues imported --for-repo nonexistent --open-only) || \
   fail "issues imported --for-repo nonexistent --open-only exited non-zero"
 echo "$out_combo" | jq -e '.data.entries | type == "array"' >/dev/null || \
   fail "issues imported --for-repo … --open-only expected an entries array, got $out_combo"
 
 # The old --repo spelling is the global flag now; imported has no repo scope.
-rc=0; (cd "$TMP_OO" && "$HV_BIN" issues imported --repo nonexistent >/dev/null 2>&1) || rc=$?
+rc=0; (cd "$TMP_OO" && "$ROTA_BIN" issues imported --repo nonexistent >/dev/null 2>&1) || rc=$?
 [ "$rc" = "2" ] || fail "issues imported --repo should exit 2 (no repo scope), got $rc"
 
 trap 'rm -rf "$TMP"' EXIT
@@ -175,8 +175,8 @@ TMP_IV="$(mktemp -d)"
 trap 'rm -rf "$TMP_IV"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
 for prov in github gitlab; do
-  P="$TMP_IV/$prov"; mkdir -p "$P/.hv"
-  echo "{\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.hv/config.json"
+  P="$TMP_IV/$prov"; mkdir -p "$P/.rota"
+  echo "{\"issues\":{\"provider\":\"$prov\",\"retryWaitSeconds\":0}}" > "$P/.rota/config.json"
   (
     cd "$P"
     git init -q && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m seed
@@ -211,7 +211,7 @@ print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
     eq "list --label" "1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
     OUT=$(hvj issues list --limit 1) || fail "$prov issues list --limit failed"
     eq "list --limit" "1" "$(echo "$OUT" | jq '.data.issues | length')"
-    eq "list --limit 0 is usage" 2 "$(rcof "$HV_BIN" --json issues list --limit 0)"
+    eq "list --limit 0 is usage" 2 "$(rcof "$ROTA_BIN" --json issues list --limit 0)"
 
     # label: add, remove, usage and a missing issue
     OUT=$(hvj issues label 2 --add triage) || fail "$prov issues label --add failed: $OUT"
@@ -220,9 +220,9 @@ print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
     OUT=$(hvj issues label 2 --remove triage) || fail "$prov issues label --remove failed: $OUT"
     eq "label remove data" "2 triage remove" "$(echo "$OUT" | jq -r '.data | "\(.issue) \(.label) \(.action)"')"
     eq "label remove state" "" "$(DBQ labels 2)"
-    eq "label needs one of add/remove" 2 "$(rcof "$HV_BIN" --json issues label 2)"
-    eq "label rejects add+remove" 2 "$(rcof "$HV_BIN" --json issues label 2 --add a --remove b)"
-    eq "label missing issue" 3 "$(rcof "$HV_BIN" --json issues label 99 --add triage)"
+    eq "label needs one of add/remove" 2 "$(rcof "$ROTA_BIN" --json issues label 2)"
+    eq "label rejects add+remove" 2 "$(rcof "$ROTA_BIN" --json issues label 2 --add a --remove b)"
+    eq "label missing issue" 3 "$(rcof "$ROTA_BIN" --json issues label 99 --add triage)"
 
     # close: closes once and comments with the short sha; a repeat posts no second comment
     OUT=$(hvj issues close 2 --commit "$SHA" --item B07) || fail "$prov issues close failed: $OUT"
@@ -234,10 +234,10 @@ print({"labels": ",".join(sorted(i["labels"])), "state": i["state"].lower(),
     eq "repeat close adds no comment" 1 "$(DBQ comments 2)"
     OUT=$(hvj issues list) || fail "$prov issues list after close failed"
     eq "list drops closed" "1" "$(echo "$OUT" | jq -r '[.data.issues[].number] | join(",")')"
-    eq "close unknown commit" 3 "$(rcof "$HV_BIN" --json issues close 1 --commit deadbeef0000)"
-    eq "close missing issue" 3 "$(rcof "$HV_BIN" --json issues close 99 --commit "$SHA")"
-    eq "close without --commit" 2 "$(rcof "$HV_BIN" --json issues close 1)"
-    eq "close non-numeric issue" 2 "$(rcof "$HV_BIN" --json issues close abc --commit "$SHA")"
+    eq "close unknown commit" 3 "$(rcof "$ROTA_BIN" --json issues close 1 --commit deadbeef0000)"
+    eq "close missing issue" 3 "$(rcof "$ROTA_BIN" --json issues close 99 --commit "$SHA")"
+    eq "close without --commit" 2 "$(rcof "$ROTA_BIN" --json issues close 1)"
+    eq "close non-numeric issue" 2 "$(rcof "$ROTA_BIN" --json issues close abc --commit "$SHA")"
   ) || fail "issues list/label/close on $prov failed (see subshell output above)"
 done
 
@@ -251,15 +251,15 @@ TMP_EX="$(mktemp -d)"
 trap 'rm -rf "$TMP_EX"; trap '"'"'rm -rf "$TMP"'"'"' EXIT' EXIT
 
 mkexit() { # <dir> <origin url or ""> <config json>
-  mkdir -p "$1/.hv"
-  echo "$3" > "$1/.hv/config.json"
+  mkdir -p "$1/.rota"
+  echo "$3" > "$1/.rota/config.json"
   git -C "$1" init -q
   git -C "$1" config user.email t@t
   git -C "$1" config user.name t
   git -C "$1" commit -q --allow-empty -m init
   if [ -n "$2" ]; then git -C "$1" remote add origin "$2"; fi
 }
-rcv() { local rc=0; (cd "$1" && shift && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" "$HV_BIN" --json "$@") >"$TMP_EX/out" 2>&1 || rc=$?; echo "$rc"; }
+rcv() { local rc=0; (cd "$1" && shift && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" "$ROTA_BIN" --json "$@") >"$TMP_EX/out" 2>&1 || rc=$?; echo "$rc"; }
 
 # A missing issue is not_found (exit 3) on both forges, not a forge failure (5).
 for prov in github gitlab; do
@@ -272,7 +272,7 @@ for prov in github gitlab; do
   rc=$(rcv "$P" issues close 99 --commit HEAD)
   [ "$rc" = "3" ] || fail "$prov issues close on a missing issue should exit 3, got $rc: $(cat "$TMP_EX/out")"
   # another forge failure stays exit 5
-  rc=$(cd "$P" && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" FAKE_TRACKER_FAIL="issue" FAKE_TRACKER_FAIL_MSG="HTTP 500: server error" "$HV_BIN" --json issues close 1 --commit HEAD >/dev/null 2>&1; echo $?)
+  rc=$(cd "$P" && env PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB="$TMP_EX/db.json" FAKE_TRACKER_FAIL="issue" FAKE_TRACKER_FAIL_MSG="HTTP 500: server error" "$ROTA_BIN" --json issues close 1 --commit HEAD >/dev/null 2>&1; echo $?)
   [ "$rc" = "5" ] || fail "$prov issues close with a failing forge should exit 5, got $rc"
 done
 
@@ -281,8 +281,8 @@ P="$TMP_EX/none"
 mkexit "$P" "" '{"issues":{"retryWaitSeconds":0}}'
 for argv in "issues list" "issues label 1 --add bug" "issues close 1 --commit HEAD"; do
   rc=$(rcv "$P" $argv)
-  [ "$rc" = "3" ] || fail "no provider: hv $argv should exit 3, got $rc: $(cat "$TMP_EX/out")"
-  grep -q "issues.provider" "$TMP_EX/out" || fail "no provider: hv $argv message should name issues.provider: $(cat "$TMP_EX/out")"
+  [ "$rc" = "3" ] || fail "no provider: rota $argv should exit 3, got $rc: $(cat "$TMP_EX/out")"
+  grep -q "issues.provider" "$TMP_EX/out" || fail "no provider: rota $argv message should name issues.provider: $(cat "$TMP_EX/out")"
 done
 
 # issues.provider stands in when origin names no forge; an origin that does wins.
@@ -291,9 +291,9 @@ mkexit "$P" "" '{"issues":{"provider":"github","retryWaitSeconds":0}}'
 rc=$(rcv "$P" issues list)
 [ "$rc" = "0" ] || fail "issues list with issues.provider and no origin should exit 0, got $rc: $(cat "$TMP_EX/out")"
 [ "$(jq -r .data.issues <"$TMP_EX/out")" = "[]" ] || fail "issues list fallback expected an empty list from the fake forge: $(cat "$TMP_EX/out")"
-[ "$(cd "$P" && "$HV_BIN" --json issues provider | jget data.provider)" = "github" ] || fail "issues provider should answer from issues.provider with no origin"
+[ "$(cd "$P" && "$ROTA_BIN" --json issues provider | jget data.provider)" = "github" ] || fail "issues provider should answer from issues.provider with no origin"
 git -C "$P" remote add origin "https://gitlab.com/o/r.git"
-[ "$(cd "$P" && "$HV_BIN" --json issues provider | jget data.provider)" = "gitlab" ] || fail "an origin naming a forge should beat issues.provider"
+[ "$(cd "$P" && "$ROTA_BIN" --json issues provider | jget data.provider)" = "gitlab" ] || fail "an origin naming a forge should beat issues.provider"
 
 trap 'rm -rf "$TMP"' EXIT
 pass "issues label/close exit 3 for a missing issue and for no provider; issues.provider is the fallback"

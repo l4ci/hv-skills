@@ -6,11 +6,11 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/debugctr"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/spike"
-	"github.com/l4ci/hv/v5/internal/verdict"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/debugctr"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/spike"
+	"github.com/l4ci/rota/internal/verdict"
 )
 
 // The A6 verbs (milestone, plan, design, spike, proof, debug) live in
@@ -105,7 +105,7 @@ func ironLaw(c *Ctx, bug string) (Result, error) {
 	d.Set("failedFixes", failed)
 	d.Set("changed", false)
 	return Result{Data: d}, Refused("%s has %d failed fixes; the Iron Law halts the session", bug, failed).
-		WithHint("hv debug reset " + bug)
+		WithHint("rota debug reset " + bug)
 }
 
 func runCounterInit(c *Ctx, args []string) (Result, error) {

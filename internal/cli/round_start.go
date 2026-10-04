@@ -7,16 +7,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 	"path/filepath"
 )
 
-// The C3 verbs `hv round start` and `hv round candidates`; the lease,
+// The C3 verbs `rota round start` and `rota round candidates`; the lease,
 // provisioning and readiness are internal/round, the config is internal/roundcfg.
 
 func splitList(s string) []string {
@@ -118,7 +118,7 @@ func roundStart(fs *flag.FlagSet) RunFunc {
 			return Result{}, Usage("--slots must be a positive integer")
 		}
 		ctx := c.Context()
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 		def := 3
 		if v, err := config.Value(cfg, "work.workerSlots"); err == nil {
 			if n, ok := v.(interface{ Int64() (int64, error) }); ok {

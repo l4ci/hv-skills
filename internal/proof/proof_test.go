@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/rota/internal/artifact"
 )
 
 func exitOf(err error) int {
@@ -34,23 +34,23 @@ func golden(t *testing.T, name string) string {
 	return string(b)
 }
 
-// project copies testdata/fixture into a fresh .hv/, as the goldens were recorded.
+// project copies testdata/fixture into a fresh .rota/, as the goldens were recorded.
 func project(t *testing.T) string {
 	root := t.TempDir()
-	hv := filepath.Join(root, ".hv")
+	rota := filepath.Join(root, ".rota")
 	err := filepath.Walk(filepath.Join("testdata", "fixture"), func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(filepath.Join("testdata", "fixture"), p)
 		if fi.IsDir() {
-			return os.MkdirAll(filepath.Join(hv, rel), 0o777)
+			return os.MkdirAll(filepath.Join(rota, rel), 0o777)
 		}
 		b, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(hv, rel), b, 0o644)
+		return os.WriteFile(filepath.Join(rota, rel), b, 0o644)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestAddAndShowMatchOldHelpers(t *testing.T) {
 		}
 	}
 	for id, kind := range map[string]string{"B07": "bugs", "F13": "features", "T03": "tasks", "B05": "bugs"} {
-		got, _ := os.ReadFile(filepath.Join(root, ".hv", kind, id+".md"))
+		got, _ := os.ReadFile(filepath.Join(root, ".rota", kind, id+".md"))
 		if mask(string(got)) != golden(t, id+".md") {
 			t.Errorf("%s differs from golden:\n%s", id, got)
 		}
@@ -149,7 +149,7 @@ func TestDefaultShaFromGit(t *testing.T) {
 
 func TestAddCRLFDetailFile(t *testing.T) {
 	root := project(t)
-	p := filepath.Join(root, ".hv/tasks/T03.md")
+	p := filepath.Join(root, ".rota/tasks/T03.md")
 	os.WriteFile(p, []byte("# T03\r\n\r\n## Proof\r\n\r\n- 2026-01-01 · a · PASS · s · e\r\n"), 0o644)
 	if _, changed, err := Add(root, "T03", AddOpts{"b", "PASS", "e", "s"}); err != nil || !changed {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func TestAddConcurrentIdenticalRows(t *testing.T) {
 // An unreadable detail file is not a missing one: nothing is overwritten.
 func TestUnreadableDetailFileIsExit70(t *testing.T) {
 	root := project(t)
-	p := filepath.Join(root, ".hv/bugs/B07.md")
+	p := filepath.Join(root, ".rota/bugs/B07.md")
 	if err := os.MkdirAll(p, 0o777); err != nil { // a directory: ReadFile fails with EISDIR
 		t.Fatal(err)
 	}

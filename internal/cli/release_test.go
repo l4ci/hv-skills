@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // releaseTree reads every file under dir (skipping .git) into a map.
@@ -47,7 +47,7 @@ func releaseTree(t *testing.T, dir string) map[string]string {
 func releaseProject(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	for p, c := range files {
 		write(t, filepath.Join(dir, p), c)
 	}
@@ -252,7 +252,7 @@ func TestReleaseVersionPriorityAndOverride(t *testing.T) {
 		t.Fatalf("priority: %v golden %q", d, want[0].Out)
 	}
 	for i, over := range releaseVersionOverrides {
-		write(t, filepath.Join(dir, ".hv", "config.json"), `{"release":{"versionFile":"`+over+`"}}`)
+		write(t, filepath.Join(dir, ".rota", "config.json"), `{"release":{"versionFile":"`+over+`"}}`)
 		o := trRun(t, dir, "", "release", "version", "--json")
 		if w := want[i+1]; w.RC == 0 {
 			var wd map[string]any
@@ -265,7 +265,7 @@ func TestReleaseVersionPriorityAndOverride(t *testing.T) {
 		}
 	}
 	// config.local.json wins over config.json.
-	write(t, filepath.Join(dir, ".hv", "config.local.json"), `{"release":{"versionFile":"package.json"}}`)
+	write(t, filepath.Join(dir, ".rota", "config.local.json"), `{"release":{"versionFile":"package.json"}}`)
 	if o := trRun(t, dir, "", "release", "version", "--json"); releaseData(t, o)["file"] != "package.json" {
 		t.Errorf("local override ignored: %s", o.stdout)
 	}
@@ -398,7 +398,7 @@ func TestReleaseNotesParity(t *testing.T) {
 	var want []string // the retired helper's notes per since, hashes masked, h2 headings as h3
 	pytest.Golden(t, map[string]any{"commits": releaseNotesCommits, "sinces": releaseNotesSinces}, &want)
 	dir := newRepo(t, t.TempDir(), "r", "main")
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	gitT(t, dir, "tag", "v0.1.0")
 	for _, c := range releaseNotesCommits {
 		releaseCommit(t, dir, c[0], c[1])
@@ -424,7 +424,7 @@ func TestReleaseNotesParity(t *testing.T) {
 
 func TestReleaseNotesEmptyAndErrors(t *testing.T) {
 	dir := newRepo(t, t.TempDir(), "r", "main")
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	// no commits in range
 	o := trRun(t, dir, "", "release", "notes", "--from", "commits", "--since", "HEAD", "--json")
 	d := releaseData(t, o)
@@ -456,7 +456,7 @@ func TestReleaseNotesEmptyAndErrors(t *testing.T) {
 
 func TestReleaseNotesArgs(t *testing.T) {
 	dir := newRepo(t, t.TempDir(), "r", "main")
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	for _, args := range [][]string{
 		{"release", "notes"},
 		{"release", "notes", "--from", "x"},
@@ -476,7 +476,7 @@ func TestReleaseNotesArgs(t *testing.T) {
 	if o := trRun(t, root, "", "release", "notes", "--from", "issues", "M01", "--json"); o.code != 2 {
 		t.Errorf("umbrella: exit %d", o.code)
 	}
-	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
+	write(t, filepath.Join(root, ".rota", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	if o := trRun(t, root, "", "release", "notes", "--from", "issues", "M01", "--repo", "svc", "--json"); o.code != 5 {
 		t.Errorf("umbrella with --repo: exit %d", o.code)
 	}
@@ -567,7 +567,7 @@ func TestReleaseChangelogOptions(t *testing.T) {
 	}
 	// stdin
 	stdinDir := t.TempDir()
-	write(t, filepath.Join(stdinDir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(stdinDir, ".rota", "config.json"), `{}`)
 	o = trRun(t, stdinDir, "- from stdin\r\n\n", "release", "changelog", "1.0.0", "--body-file", "-", "--json")
 	got := releaseTree(t, stdinDir)["CHANGELOG.md"]
 	if o.code != 0 || !strings.HasPrefix(got, "# Changelog\n\n## v1.0.0 — ") || !strings.HasSuffix(got, "\n\n- from stdin\n\n") {
@@ -614,7 +614,7 @@ func TestReleaseChangelogExits(t *testing.T) {
 func releaseTagRepo(t *testing.T, daysAgo, n int) string {
 	t.Helper()
 	dir := newRepo(t, t.TempDir(), "r", "main")
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	when := "@" + releaseItoa(releaseNow()-int64(daysAgo)*86400) + " +0000"
 	t.Setenv("GIT_COMMITTER_DATE", when)
 	t.Setenv("GIT_AUTHOR_DATE", when)
@@ -654,7 +654,7 @@ func TestReleasePendingParity(t *testing.T) {
 	pytest.Golden(t, releasePendingCases, &want)
 	for i, c := range releasePendingCases {
 		dir := releaseTagRepo(t, c.Days, c.N)
-		write(t, filepath.Join(dir, ".hv", "config.json"), c.Cfg)
+		write(t, filepath.Join(dir, ".rota", "config.json"), c.Cfg)
 		var wd map[string]any
 		if want[i].RC != 0 || json.Unmarshal([]byte(want[i].Out), &wd) != nil {
 			if c.Name == "release not an object" {
@@ -679,15 +679,15 @@ func TestReleasePendingNoTagAndConfigLocal(t *testing.T) {
 	_ = json.Unmarshal([]byte(want[0]), &w1)
 	_ = json.Unmarshal([]byte(want[1]), &w2)
 	dir := newRepo(t, t.TempDir(), "r", "main")
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{"release":{"nudgeAfterCommits":3}}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{"release":{"nudgeAfterCommits":3}}`)
 	o := trRun(t, dir, "", "release", "pending", "--json")
 	if o.code != 0 || !reflect.DeepEqual(releaseData(t, o), w1) || w1["reason"] != "no-tag" || w1["thresholdCommits"] != 10.0 {
 		t.Errorf("no tag: %v vs %v", releaseData(t, o), w1)
 	}
 	// config.local.json overrides, as load_config merges it
 	d2 := releaseTagRepo(t, 1, 3)
-	write(t, filepath.Join(d2, ".hv", "config.json"), `{"release":{"nudgeAfterCommits":50}}`)
-	write(t, filepath.Join(d2, ".hv", "config.local.json"), `{"release":{"nudgeAfterCommits":3}}`)
+	write(t, filepath.Join(d2, ".rota", "config.json"), `{"release":{"nudgeAfterCommits":50}}`)
+	write(t, filepath.Join(d2, ".rota", "config.local.json"), `{"release":{"nudgeAfterCommits":3}}`)
 	if o := trRun(t, d2, "", "release", "pending", "--json"); !reflect.DeepEqual(releaseData(t, o), w2) || w2["shouldNudge"] != true {
 		t.Errorf("local: %v vs %v", releaseData(t, o), w2)
 	}
@@ -713,7 +713,7 @@ func TestReleasePendingGitFails(t *testing.T) {
 
 func TestReleaseIssueVerbsArgsAndBackend(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, ".hv", "config.json"), `{}`)
+	write(t, filepath.Join(dir, ".rota", "config.json"), `{}`)
 	cases := []struct {
 		args []string
 		code int
@@ -731,7 +731,7 @@ func TestReleaseIssueVerbsArgsAndBackend(t *testing.T) {
 		}
 	}
 	root := umbrella(t)
-	write(t, filepath.Join(root, ".hv", "config.json"), `{"backlog":{"backend":"issues"}}`)
+	write(t, filepath.Join(root, ".rota", "config.json"), `{"backlog":{"backend":"issues"}}`)
 	for _, args := range [][]string{{"milestone-check", "M01"}, {"close-milestone", "M01", "--release", "1.2.3"}} {
 		if o := trRun(t, root, "", append(append([]string{"release"}, args...), "--json")...); o.code != 2 {
 			t.Errorf("%v at umbrella root: exit %d", args, o.code)
@@ -866,7 +866,7 @@ func TestReleaseCloseMilestone(t *testing.T) {
 		if n == 4 && is.Number != 4 || n == 7 && is.Number != 7 {
 			t.Fatal("fixture order")
 		}
-		if !slices.Contains(is.Labels, "released") || is.Comments[len(is.Comments)-1].Body != "Released in v1.2.0\n\n<!-- hv:released -->" {
+		if !slices.Contains(is.Labels, "released") || is.Comments[len(is.Comments)-1].Body != "Released in v1.2.0\n\n<!-- rota:released -->" {
 			t.Errorf("issue %d %+v", n, is)
 		}
 	}

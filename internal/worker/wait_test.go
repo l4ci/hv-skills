@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // waitHost is a host whose panes and native status the test steers. With
@@ -110,7 +110,7 @@ func TestWaitReturnsASlotThatAlreadyNeedsAttention(t *testing.T) {
 	dir := waitProject(t, 2, map[string]string{"w1": "w9:t1", "w2": "w9:t2"})
 	h := newWaitHost("herdr")
 	h.set("w1", "working...\n", "working")
-	h.set("w2", "HV-BLOCKED w2: A or B?\n", "idle")
+	h.set("w2", "ROTA-BLOCKED w2: A or B?\n", "idle")
 	before, _ := os.ReadFile(RegistryPath(dir))
 	res, err := envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{})
 	if err != nil {
@@ -135,7 +135,7 @@ func TestWaitWakesOnAnEventAndReclassifies(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		h.events <- "w1" // status changed, but the pane still moves: nothing to return
 		time.Sleep(20 * time.Millisecond)
-		h.set("w1", "HV-DONE w1 https://github.com/o/r/pull/9\n", "done")
+		h.set("w1", "ROTA-DONE w1 https://github.com/o/r/pull/9\n", "done")
 		h.events <- "w1"
 	}()
 	res, err := envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{Timeout: 5 * time.Second})
@@ -151,12 +151,12 @@ func TestWaitOnAHostWithoutEventsPollsUntilTheSlotChanges(t *testing.T) {
 	dir := waitProject(t, 1, map[string]string{"w1": "w9:t1"})
 	h := newWaitHost("tmux")
 	n := 0
-	h.onCapture = func(string) { // the pane moves for two classifications, then settles on HV-DONE
+	h.onCapture = func(string) { // the pane moves for two classifications, then settles on ROTA-DONE
 		n++
 		if n <= 4 {
 			h.set("w1", strings.Repeat("x", n)+"\n", "")
 		} else {
-			h.set("w1", "HV-DONE w1 hv-worker/w1\n", "")
+			h.set("w1", "ROTA-DONE w1 rota-worker/w1\n", "")
 		}
 	}
 	res, err := envWith(h).Wait(bg, dir, WaitOpts{Settle: time.Second})
@@ -184,7 +184,7 @@ func TestWaitTimeoutIsAnAnswerWithTheSlotStates(t *testing.T) {
 func TestWaitSkipsHandlelessSlotsUnlessNamed(t *testing.T) {
 	dir := waitProject(t, 2, map[string]string{"w2": "w9:t2"})
 	h := newWaitHost("herdr")
-	h.set("w2", "HV-DONE w2 x\n", "done")
+	h.set("w2", "ROTA-DONE w2 x\n", "done")
 	res, err := envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{})
 	if err != nil || res.Slot != "w2" {
 		t.Fatalf("%+v %v", res, err)
@@ -201,20 +201,20 @@ func TestWaitSkipsHandlelessSlotsUnlessNamed(t *testing.T) {
 }
 
 func TestWaitDoesNotWatchSlotsRecordedIdle(t *testing.T) {
-	dir := waitProject(t, 2, map[string]string{"w1": "hv:w1", "w2": "hv:w2"})
+	dir := waitProject(t, 2, map[string]string{"w1": "rota:w1", "w2": "rota:w2"})
 	def := jsonx.NewObject()
 	def.Set("slots", []any{})
 	Update(dir, def, func(doc *jsonx.Object) { // w1 was polled idle, w2 is running
 		(Registry{Doc: doc}).Slot("w1").Set("state", "idle")
 	})
 	h := newWaitHost("herdr")
-	h.set("w2", "HV-DONE w2 x\n", "done")
+	h.set("w2", "ROTA-DONE w2 x\n", "done")
 	res, err := envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{})
 	if err != nil || res.Slot != "w2" || len(h.watched) != 1 {
 		t.Fatalf("%+v %v watched=%v", res, err, h.watched)
 	}
 	// Naming a slot watches it whatever its recorded state.
-	h.set("w1", "HV-DONE w1 x\n", "done")
+	h.set("w1", "ROTA-DONE w1 x\n", "done")
 	if res, err = envWith(watcherHost{h}).Wait(bg, dir, WaitOpts{Slots: []string{"w1"}}); err != nil || res.Slot != "w1" {
 		t.Errorf("named: %+v %v", res, err)
 	}
@@ -268,7 +268,7 @@ func TestWaitCancelIsNotATimeout(t *testing.T) {
 // reads busy, and no further event ever re-classifies it. Events and panes are
 // herdr 0.9.3's own, recorded in the live re-check of the slot's tab.
 //
-// The recorded panes end on the worker's `● HV-DONE` reply, which the
+// The recorded panes end on the worker's `● ROTA-DONE` reply, which the
 // classifier sees at once (#210), so the event itself settles that case. A
 // worker that finishes without a sentinel is the case only the re-check can
 // settle: the same panes with the reply line removed.
@@ -296,10 +296,10 @@ func TestWaitAfterTheLastEventRechecksAPaneThatMovedOnce(t *testing.T) {
 	if strings.Join(statuses, ",") != "working,done" {
 		t.Fatalf("frames = %v", statuses)
 	}
-	const reply = "● HV-DONE lr2 lr2/f01-add-a-hello-line-to\n"
+	const reply = "● ROTA-DONE lr2 lr2/f01-add-a-hello-line-to\n"
 	scrollback, settled := read("pane-scrollback-read.txt"), read("pane-settled.txt")
 	if !strings.Contains(scrollback, reply) || !strings.Contains(settled, reply) {
-		t.Fatal("the recorded panes should end on the worker's HV-DONE reply")
+		t.Fatal("the recorded panes should end on the worker's ROTA-DONE reply")
 	}
 	noReply := func(s string) string { return strings.Replace(s, reply, "", 1) }
 

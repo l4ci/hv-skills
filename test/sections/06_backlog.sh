@@ -1,6 +1,6 @@
 echo "backlog list"
 # Seed a mix of items in BACKLOG.md
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -30,7 +30,7 @@ pass "backlog sorts bugs by priority and features by size"
 pass "backlog emits clusters for related items"
 
 # Triple cluster + isolated item: F22↔F23↔T30 form one component, comma-separated.
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -51,7 +51,7 @@ OUT=$(hvj backlog list)
 pass "backlog reports 3+ member clusters as one component"
 
 # No-cluster fixture: must omit the section entirely.
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -69,7 +69,7 @@ OUT=$(hvj backlog list)
 pass "backlog reports no clusters when nothing is related"
 
 # Restore the original fixture for the In-Progress assertions below.
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -87,16 +87,16 @@ cat > .hv/BACKLOG.md <<'EOF'
 EOF
 
 # Active items should move to In Progress
-"$HV_BIN" status add hv/real-branch --items F20 >/dev/null
+"$ROTA_BIN" status add rota/real-branch --items F20 >/dev/null
 OUT=$(hvj backlog list)
 [ "$(echo "$OUT" | jget 'data.inProgress[0].id')" = "F20" ] || fail "In Progress should list F20: $OUT"
 # F20 should no longer appear in the features list
 if echo "$OUT" | jget data.features | grep "F20" >/dev/null; then fail "active F20 leaked into features"; fi
 pass "active items excluded from features"
-"$HV_BIN" status rm hv/real-branch >/dev/null
+"$ROTA_BIN" status rm rota/real-branch >/dev/null
 
 echo "backlog list --grep matches"
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs
@@ -110,7 +110,7 @@ cat > .hv/BACKLOG.md <<'EOF'
 
 ## Completed
 EOF
-echo '{"active":[]}' > .hv/status.json
+echo '{"active":[]}' > .rota/status.json
 
 OUT=$(hvj backlog list --grep dashboard)
 [ "$(echo "$OUT" | jget 'data.features[0].id')" = "F70" ] || fail "F70 (matches 'dashboard') missing: $OUT"
@@ -137,7 +137,7 @@ done
 pass "backlog list --grep with no matches returns empty lists"
 
 echo "backlog list --grep cluster"
-cat > .hv/BACKLOG.md <<'EOF'
+cat > .rota/BACKLOG.md <<'EOF'
 # TODO
 
 ## Bugs

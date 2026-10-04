@@ -7,15 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/host"
 )
 
 // Attachable host session guarantee: the port of bin/hv-worker-session.
 //
 // `work.dispatch: tmux` is worth its cost for one reason: a worker that needs
 // a decision can idle and a human can answer it in that worker's pane. If
-// /hv-work is launched from a terminal that is NOT already inside tmux, the
+// /rota-work is launched from a terminal that is NOT already inside tmux, the
 // worker windows get created in a DETACHED session nobody is looking at, and
 // every escalation goes unanswered. So being inside the host is a
 // PRECONDITION, not a nicety; when it is not met the orchestrator itself has
@@ -52,9 +52,9 @@ func (e Env) SessionCheck(ctx context.Context, root string) SessionState {
 	return SessionState{}
 }
 
-// SessionOpts are the flags of `hv worker session ensure`.
+// SessionOpts are the flags of `rota worker session ensure`.
 type SessionOpts struct {
-	Session     string // default "hv"
+	Session     string // default "rota"
 	BodyFile    string // optional instruction for the operator
 	BootTimeout int    // default 60
 }
@@ -64,7 +64,7 @@ type SessionOpts struct {
 // process that merges into the cycle branch and talks to the user, and the one
 // window a human is actually watching, so it keeps a gate the workers do not.
 func operatorCommand(root string) string {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	if v, ok := config.Lookup(cfg, "work.operatorCommand"); ok {
 		if s, _ := v.(string); s != "" {
 			return s
@@ -85,7 +85,7 @@ func operatorCommand(root string) string {
 func (e Env) SessionEnsure(ctx context.Context, root string, o SessionOpts) (SessionState, error) {
 	e = e.withDefaults()
 	if o.Session == "" {
-		o.Session = "hv"
+		o.Session = "rota"
 	}
 	if o.BootTimeout <= 0 {
 		o.BootTimeout = 60
@@ -102,9 +102,9 @@ func (e Env) SessionEnsure(ctx context.Context, root string, o SessionOpts) (Ses
 	}
 	if h.Name() == "herdr" {
 		cwd, _ := os.Getwd()
-		err := fail(ExitRefused, "work.dispatch=herdr needs /hv-work to run inside a herdr pane")
+		err := fail(ExitRefused, "work.dispatch=herdr needs /rota-work to run inside a herdr pane")
 		err.Data = BlockData{BlockedBy: "outside herdr"}
-		err.Hint = fmt.Sprintf("open herdr, start Claude Code in a pane at %s, and run /hv-work there; worker tabs then open in that workspace, beside the orchestrator", cwd)
+		err.Hint = fmt.Sprintf("open herdr, start Claude Code in a pane at %s, and run /rota-work there; worker tabs then open in that workspace, beside the orchestrator", cwd)
 		return SessionState{}, err
 	}
 	op, ok := h.(host.Operator)

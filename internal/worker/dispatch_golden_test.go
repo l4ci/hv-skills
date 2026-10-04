@@ -8,19 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // These tests run the Go port against the fake herdr/tmux scripts
 // (test/fakes), then compare what reached the host (the fake's argv log, the
-// prompt text) and .hv/workers.json with what the retired shell helpers
+// prompt text) and .rota/workers.json with what the retired shell helpers
 // produced, frozen under testdata/golden. The fakes only write to a log, so
 // nothing here can touch a live herdr server or tmux session.
 
 var (
 	tsRe = regexp.MustCompile(`"ts": "[^"]*"`)
-	// activeAt is the stall clock `hv round reconcile` reads (C10); the retired
+	// activeAt is the stall clock `rota round reconcile` reads (C10); the retired
 	// helper never wrote it, so the golden compares the registry without it.
 	activeRe = regexp.MustCompile(`,\n\s*"activeAt": "[^"]*"`)
 	bufRe    = regexp.MustCompile(`(load-buffer -b \S+) \S+`)

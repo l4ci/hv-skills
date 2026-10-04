@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/rota/internal/config"
 )
 
 // Scope values of round.scope: which issues a round may take.
@@ -86,7 +86,7 @@ func ValidScope(s string) bool {
 
 // Load reads and validates the round.* keys from the project config.
 func Load(root string) (Settings, error) {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	var s Settings
 	v, err := config.Value(cfg, "round.scope")
 	if err != nil {

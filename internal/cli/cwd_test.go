@@ -16,8 +16,8 @@ func TestSymlinkedCwdResolvesPhysically(t *testing.T) {
 	if err := os.MkdirAll(deep, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	os.MkdirAll(filepath.Join(umb, ".hv"), 0o755)
-	os.WriteFile(filepath.Join(umb, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	os.MkdirAll(filepath.Join(umb, ".rota"), 0o755)
+	os.WriteFile(filepath.Join(umb, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
 	link := filepath.Join(base, "link")
 	if err := os.Symlink(filepath.Join(umb, "web"), link); err != nil {
 		t.Fatal(err)
@@ -29,7 +29,7 @@ func TestSymlinkedCwdResolvesPhysically(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PWD", via)
-	code, env, stderr := hvRun(t, "--json", "repo", "umbrella")
+	code, env, stderr := rotaRun(t, "--json", "repo", "umbrella")
 	if code != 0 || get(dataOf(env), "umbrella") != true {
 		t.Fatalf("repo umbrella from %s: exit %d, %v, %s", via, code, env, stderr)
 	}

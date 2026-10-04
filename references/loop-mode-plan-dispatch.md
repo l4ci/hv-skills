@@ -1,34 +1,34 @@
 # Loop-mode auto-dispatch chain & rename-collision detection
 
-Shared reference for `/hv-work` Step 4 *Plan Tasks* details that are dense and self-contained: the loop-mode auto-dispatch chain (B28 design pre-flight, F34 uncertainty pre-flight, F35 orchestrator-model contract, F32 auto-plan) plus the wave-planning *Absorb wave-internal file collisions* rule. The SKILL.md keeps the plan-as-artifact gate and the per-step decomposition list inline; this file holds the longer choreography.
+Shared reference for `/rota-work` Step 4 *Plan Tasks* details that are dense and self-contained: the loop-mode auto-dispatch chain (B28 design pre-flight, F34 uncertainty pre-flight, F35 orchestrator-model contract, F32 auto-plan) plus the wave-planning *Absorb wave-internal file collisions* rule. The SKILL.md keeps the plan-as-artifact gate and the per-step decomposition list inline; this file holds the longer choreography.
 
 ## Design pre-flight (B28, loop mode only)
 
-Before the uncertainty pre-flight, `/hv-work` checks for a design artifact at `.hv/designs/<itemId>.md`. When absent for a Major + Milestone-tagged item, dispatch `/hv-brainstorm --auto-loop <itemId>` via the `Skill` tool — no prompt, no confirmation. The dispatched skill auto-resolves design questions via the same pipeline shape `/hv-plan --auto-loop` uses (Local-first against `DECISIONS.md` / `KNOWLEDGE.md` / `CONTEXT.md` / `MILESTONES.md` → Bounded web when `loop.webResearch == true` → Placeholder fallback for the unresolved), logs fresh picks via `hv decisions auto-log`, and writes the design with `auto: true` frontmatter.
+Before the uncertainty pre-flight, `/rota-work` checks for a design artifact at `.rota/designs/<itemId>.md`. When absent for a Major + Milestone-tagged item, dispatch `/rota-brainstorm --auto-loop <itemId>` via the `Skill` tool — no prompt, no confirmation. The dispatched skill auto-resolves design questions via the same pipeline shape `/rota-plan --auto-loop` uses (Local-first against `DECISIONS.md` / `KNOWLEDGE.md` / `CONTEXT.md` / `MILESTONES.md` → Bounded web when `loop.webResearch == true` → Placeholder fallback for the unresolved), logs fresh picks via `rota decisions auto-log`, and writes the design with `auto: true` frontmatter.
 
 When the design already exists (auto-written or manually authored), this step is a no-op — loop calls are idempotent and never replace existing designs.
 
-The design feeds the downstream `/hv-plan --auto-loop` directly: `/hv-plan` Step 3 already loads `.hv/designs/<itemId>.md` as soft input. The plan inherits the design's chosen approach instead of re-resolving it, and the open questions / assumptions land in the plan's frontmatter pointer (`design: .hv/designs/<itemId>.md`).
+The design feeds the downstream `/rota-plan --auto-loop` directly: `/rota-plan` Step 3 already loads `.rota/designs/<itemId>.md` as soft input. The plan inherits the design's chosen approach instead of re-resolving it, and the open questions / assumptions land in the plan's frontmatter pointer (`design: .rota/designs/<itemId>.md`).
 
 ## Loop-mode auto-plan dispatch
 
-When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), `/hv-work` does **not** stop the loop on the missing plan. After the design pre-flight (above) and the uncertainty pre-flight (below) complete, dispatch `/hv-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool — no prompt, no confirmation, no "want me to" question. When the dispatched plan run returns, `/hv-work` re-runs the plan-as-artifact check (the file now exists) and uses the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition.
+When no plan exists AND `autonomy.level == "loop"` AND the item is **Major** AND the item is **Milestone-tagged** (a plan key exists), `/rota-work` does **not** stop the loop on the missing plan. After the design pre-flight (above) and the uncertainty pre-flight (below) complete, dispatch `/rota-plan --auto-loop <milestone>-<itemId>` via the `Skill` tool — no prompt, no confirmation, no "want me to" question. When the dispatched plan run returns, `/rota-work` re-runs the plan-as-artifact check (the file now exists) and uses the auto-written plan as the orchestrator's plan. Off and auto modes never auto-dispatch — they fall through to the manual decomposition.
 
 ## Uncertainty pre-flight (F34, loop mode only)
 
-Before the auto-plan dispatch, `/hv-work` runs:
+Before the auto-plan dispatch, `/rota-work` runs:
 
 ```bash
-hv plan uncertain <itemId>
+rota plan uncertain <itemId>
 ```
 
-The verb applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.hv/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout, `data.reasons` under `--json`); exit 1 = certain; exit 3 = the item or `BACKLOG.md` is missing.
+The verb applies a structural-triple heuristic — fires "uncertain" when the item is Major AND any of: (a) no detail file at `.rota/<bugs|features|tasks>/<itemId>.md`, (b) brief contains 2+ question marks or explicit uncertainty markers (`TBD`, `unclear`, `unsure`, `open question`, `heuristic TBD`), or (c) brief contains zero backtick-delimited code spans (no concrete identifier anchors → unknown surface). Exit 0 = uncertain (with reasons on stdout, `data.reasons` under `--json`); exit 1 = certain; exit 3 = the item or `BACKLOG.md` is missing.
 
-When uncertain, **run the `/hv-work` Preview Mode procedure inline** with `<itemId>` as the target — no prompt, no confirmation. The peek prints to chat and lands in the orchestrator's session context, where the subsequent `/hv-plan --auto-loop` reads it. After the peek returns, proceed with the `/hv-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/hv-plan --auto-loop` directly.
+When uncertain, **run the `/rota-work` Preview Mode procedure inline** with `<itemId>` as the target — no prompt, no confirmation. The peek prints to chat and lands in the orchestrator's session context, where the subsequent `/rota-plan --auto-loop` reads it. After the peek returns, proceed with the `/rota-plan --auto-loop` dispatch as normal. When certain, skip the peek and dispatch `/rota-plan --auto-loop` directly.
 
 ## Orchestrator-model contract (F35)
 
-The two dispatched skills — `/hv-brainstorm --auto-loop` and `/hv-plan --auto-loop` — are invoked via the `Skill` tool, which loads each inline in the current session. The Preview Mode peek (when uncertain) runs inline inside `/hv-work`'s own session — no dispatch, no Skill call. Since `/hv-work` itself runs in the orchestrator session under `models.orchestrator`, both the dispatched skills AND the inline peek benefit from orchestrator-grade judgment. If a future change moves any of the dispatched skills to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.hv/config.json`) to preserve this guarantee.
+The two dispatched skills — `/rota-brainstorm --auto-loop` and `/rota-plan --auto-loop` — are invoked via the `Skill` tool, which loads each inline in the current session. The Preview Mode peek (when uncertain) runs inline inside `/rota-work`'s own session — no dispatch, no Skill call. Since `/rota-work` itself runs in the orchestrator session under `models.orchestrator`, both the dispatched skills AND the inline peek benefit from orchestrator-grade judgment. If a future change moves any of the dispatched skills to `Agent`-based dispatch, the call site must explicitly pass `model: orchestrator` (read from `.rota/config.json`) to preserve this guarantee.
 
 ## Absorb wave-internal file collisions
 
@@ -54,8 +54,8 @@ The most common intersecting pair is *Task A renames a file (`git mv old new` or
 - **Split ownership cleanly**: rename task owns the file move plus edits to the renamed file's own content; link-sweep task owns link updates in all *other* files. No file appears in both tasks' modified-file sets.
 - **Serialize across waves**: rename in wave N, link-sweep in wave N+1, so the sweep operates on settled paths.
 
-For every rename, derive the incoming-link file set with `hv plan rename-check <old-name> [-- <scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the verb is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
+For every rename, derive the incoming-link file set with `rota plan rename-check <old-name> [-- <scope>...]` (wraps `git grep -l`); the plan author's enumeration is a hint, the verb is ground truth. Re-run the same check at verify time (Step 7) to catch files the plan missed.
 
 ## Cited by
 
-- `/hv-work` Step 4 — *Plan Tasks*
+- `/rota-work` Step 4 — *Plan Tasks*

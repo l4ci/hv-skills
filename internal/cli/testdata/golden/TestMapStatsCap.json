@@ -10,7 +10,7 @@
   },
   "outputs": {
     "stdout": "",
-    "stderr": "note: project map has 2 subsystems (cap 2); consider merging or retiring stale .hv/map/\u003cname\u003e.md entries\n",
+    "stderr": "note: project map has 2 subsystems (cap 2); consider merging or retiring stale .rota/map/\u003cname\u003e.md entries\n",
     "rc": 0,
     "changed": {},
     "removed": []

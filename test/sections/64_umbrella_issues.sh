@@ -3,9 +3,9 @@ echo "Umbrella issue mode: per-sub-repo trackers"
 TMP_UI="$(mktemp -d)"
 trap 'rm -rf "$TMP_UI"' EXIT
 
-U="$TMP_UI/umb"; mkdir -p "$U/.hv" "$TMP_UI/db"
-echo '{"backlog":{"backend":"issues"},"issues":{"retryWaitSeconds":0}}' > "$U/.hv/config.json"
-echo '{"repos":[{"name":"ghrepo","path":"ghrepo"},{"name":"glrepo","path":"glrepo"}]}' > "$U/.hv/repos.json"
+U="$TMP_UI/umb"; mkdir -p "$U/.rota" "$TMP_UI/db"
+echo '{"backlog":{"backend":"issues"},"issues":{"retryWaitSeconds":0}}' > "$U/.rota/config.json"
+echo '{"repos":[{"name":"ghrepo","path":"ghrepo"},{"name":"glrepo","path":"glrepo"}]}' > "$U/.rota/repos.json"
 for pair in "ghrepo:https://github.com/o/ghrepo.git" "glrepo:https://gitlab.com/o/glrepo.git"; do
   r="${pair%%:*}"; mkdir -p "$U/$r"
   (cd "$U/$r" && git init -q && git config user.email t@t && git config user.name t \
@@ -16,7 +16,7 @@ done
   export PATH="$TESTDIR/fakes:$PATH" FAKE_TRACKER_DB_DIR="$TMP_UI/db" FAKE_TRACKER_LOG="$TMP_UI/log"
   unset FAKE_TRACKER_DB
   eq() { [ "$2" = "$3" ] || fail "umbrella issues $1: expected [$2] got [$3]"; }
-  # RC <hv call>: OUT is the envelope (errors included), RCV the exit code, ERR stderr
+  # RC <rota call>: OUT is the envelope (errors included), RCV the exit code, ERR stderr
   RC() { local rc=0; OUT="$("$@" 2>"$TMP_UI/err")" || rc=$?; RCV=$rc; ERR="$(cat "$TMP_UI/err")"; }
   has() { case "$3" in *"$2"*) ;; *) fail "umbrella issues $1: [$3] lacks [$2]";; esac; }
   ID() { echo "$OUT" | jget data.id; }
@@ -198,7 +198,7 @@ done
   git init -q --bare "$TMP_UI/gh-origin.git"
   git -C "$U/ghrepo" config "url.$TMP_UI/gh-origin.git.pushInsteadOf" "https://github.com/o/ghrepo.git"
   git -C "$U/ghrepo" checkout -q -b feat/pr2
-  RC bash -c "printf 'Body' | '$HV_BIN' --json ship pr feat/pr2 --repo ghrepo --title 'Via ship pr' --body-file - --items $GHQ"
+  RC bash -c "printf 'Body' | '$ROTA_BIN' --json ship pr feat/pr2 --repo ghrepo --title 'Via ship pr' --body-file - --items $GHQ"
   eq "ship pr --repo exit" "0" "$RCV"
   has "ship pr --repo body" "Closes #$GHQ" "$(DB ghrepo 'd["prs"][-1]["body"]')"
   git -C "$U/ghrepo" checkout -q master 2>/dev/null || git -C "$U/ghrepo" checkout -q main 2>/dev/null || true
@@ -252,25 +252,25 @@ done
   eq "queue unregistered repo exit" "3" "$RCV"
 
   # ship pr/merge/pr-merge: exit 2 at root, exit 3 unregistered, effect lands in the named sub-repo
-  RC bash -c "printf 'B' | '$HV_BIN' --json ship pr feat/rv --title T --body-file -"
+  RC bash -c "printf 'B' | '$ROTA_BIN' --json ship pr feat/rv --title T --body-file -"
   eq "ship pr at umbrella root exit" "2" "$RCV"
-  RC bash -c "printf 'B' | '$HV_BIN' --json ship pr feat/rv --title T --body-file - --repo nope"
+  RC bash -c "printf 'B' | '$ROTA_BIN' --json ship pr feat/rv --title T --body-file - --repo nope"
   eq "ship pr unregistered repo exit" "3" "$RCV"
-  RC bash -c "printf 'merge: x\n' | '$HV_BIN' --json ship merge feat/rv --body-file -"
+  RC bash -c "printf 'merge: x\n' | '$ROTA_BIN' --json ship merge feat/rv --body-file -"
   eq "ship merge at umbrella root exit" "2" "$RCV"
-  RC bash -c "printf 'merge: x\n' | '$HV_BIN' --json ship merge feat/rv --body-file - --repo nope"
+  RC bash -c "printf 'merge: x\n' | '$ROTA_BIN' --json ship merge feat/rv --body-file - --repo nope"
   eq "ship merge unregistered repo exit" "3" "$RCV"
   RC hvj ship pr-merge 1 --repo nope
   eq "pr-merge unregistered repo exit" "3" "$RCV"
   GL_PRS="$(DB glrepo 'len(d["prs"])')"; GH_PRS="$(DB ghrepo 'len(d["prs"])')"
   git -C "$U/glrepo" config "url.$TMP_UI/gl-origin.git.pushInsteadOf" "https://gitlab.com/o/glrepo.git"
   git init -q --bare "$TMP_UI/gl-origin.git"
-  RC bash -c "printf 'Body' | '$HV_BIN' --json ship pr feat/pr3 --repo glrepo --title 'Gl via ship pr' --body-file -"
+  RC bash -c "printf 'Body' | '$ROTA_BIN' --json ship pr feat/pr3 --repo glrepo --title 'Gl via ship pr' --body-file -"
   eq "ship pr glrepo exit" "0" "$RCV"
   eq "ship pr glrepo provider" "gitlab" "$(echo "$OUT" | jget data.provider)"
   eq "ship pr opened on glrepo forge only" "$((GL_PRS + 1))|$GH_PRS" "$(DB glrepo 'len(d["prs"])')|$(DB ghrepo 'len(d["prs"])')"
   eq "ship pr pushed to glrepo origin" "feat/pr3" "$(git -C "$TMP_UI/gl-origin.git" branch --format='%(refname:short)' | grep feat/pr3)"
-  RC bash -c "printf 'merge: rv\n\n- gl\n' | '$HV_BIN' --json ship merge feat/rv --repo glrepo --body-file -"
+  RC bash -c "printf 'merge: rv\n\n- gl\n' | '$ROTA_BIN' --json ship merge feat/rv --repo glrepo --body-file -"
   eq "ship merge glrepo exit" "0" "$RCV"
   eq "ship merge landed in glrepo only" "1|0" "$(git -C "$U/glrepo" log --oneline --grep='^merge: rv' | wc -l | tr -d ' ')|$(git -C "$U/ghrepo" log --oneline --grep='^merge: rv' | wc -l | tr -d ' ')"
   [ -f "$U/glrepo/gl-only.txt" ] || fail "umbrella issues: ship merge --repo glrepo did not land the file in glrepo"

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
 )
 
 // umbrellaProject is an issue-mode umbrella with git sub-repos web and api and
@@ -41,7 +41,7 @@ func umbrellaProject(t *testing.T) (root string, fakes map[string]*trackertest.F
 		}
 		reg = append(reg, `{"name": "`+name+`", "path": "`+name+`"}`)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [`+strings.Join(reg, ",")+`]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [`+strings.Join(reg, ",")+`]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	old := newTracker
@@ -56,7 +56,7 @@ func umbrellaProject(t *testing.T) (root string, fakes map[string]*trackertest.F
 
 func TestUmbrellaIssueRefs(t *testing.T) {
 	root, _, built := umbrellaProject(t)
-	code, env, stderr := hvRun(t, "--json", "-C", root, "item", "field", "get", "api:F1", "--name", "title")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "field", "get", "api:F1", "--name", "title")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -68,16 +68,16 @@ func TestUmbrellaIssueRefs(t *testing.T) {
 		t.Errorf("a qualified ref built web's tracker: %v", built)
 	}
 	// bare and ambiguous
-	code, _, stderr = hvRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title")
+	code, _, stderr = rotaRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title")
 	if code != ExitUsage || !strings.Contains(stderr, "web:1, api:1") {
 		t.Errorf("ambiguous: exit %d, %s", code, stderr)
 	}
-	code, env, _ = hvRun(t, "--json", "-C", root, "item", "field", "get", "B2", "--name", "title")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "item", "field", "get", "B2", "--name", "title")
 	if code != 0 || issueGet(issueData(t, env), "id") != "web:2" {
 		t.Errorf("unique bare: exit %d %v", code, env)
 	}
 	for _, ref := range []string{"nope:F1", "api:99", "F99"} {
-		if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title"); code != ExitResolution {
+		if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", ref, "--name", "title"); code != ExitResolution {
 			t.Errorf("%s: exit %d, want 3", ref, code)
 		}
 	}
@@ -85,17 +85,17 @@ func TestUmbrellaIssueRefs(t *testing.T) {
 
 func TestUmbrellaRepoFlagNarrows(t *testing.T) {
 	root, _, _ := umbrellaProject(t)
-	code, env, stderr := hvRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title", "--repo", "web")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title", "--repo", "web")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
 	if d := issueData(t, env); issueGet(d, "id") != "web:1" || issueGet(d, "value") != "Web feat" {
 		t.Errorf("data %v", d)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "B2", "--name", "title", "--repo", "api"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", "B2", "--name", "title", "--repo", "api"); code != ExitResolution {
 		t.Errorf("web's B2 outside --repo api: exit %d, want 3", code)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title", "--repo", "nope"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "field", "get", "F1", "--name", "title", "--repo", "nope"); code != ExitResolution {
 		t.Errorf("unregistered --repo: exit %d, want 3", code)
 	}
 }
@@ -103,7 +103,7 @@ func TestUmbrellaRepoFlagNarrows(t *testing.T) {
 func TestUmbrellaCreateTarget(t *testing.T) {
 	create := func(root string, extra ...string) (int, string, string) {
 		args := append([]string{"--json", "-C", root, "item", "create", "--kind", "tasks", "--title", "New"}, extra...)
-		code, env, stderr := hvRun(t, args...)
+		code, env, stderr := rotaRun(t, args...)
 		id := ""
 		if code == 0 {
 			id, _ = issueGet(issueData(t, env), "id").(string)
@@ -143,15 +143,15 @@ func TestUmbrellaCreateTarget(t *testing.T) {
 
 func TestUmbrellaFileModeKeepsOneBacklog(t *testing.T) {
 	root := a4Project(t, "")
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
-	if code, env, stderr := hvRun(t, "--json", "-C", root, "item", "create", "--kind", "bugs", "--title", "Umbrella bug", "--repos", "web", "--repo", "web"); code != 0 {
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	if code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "create", "--kind", "bugs", "--title", "Umbrella bug", "--repos", "web", "--repo", "web"); code != 0 {
 		t.Fatalf("exit %d: %s %v", code, stderr, env)
 	}
-	b, _ := os.ReadFile(filepath.Join(root, ".hv", "BACKLOG.md"))
+	b, _ := os.ReadFile(filepath.Join(root, ".rota", "BACKLOG.md"))
 	if !strings.Contains(string(b), "Umbrella bug.** Repos: web") {
 		t.Errorf("BACKLOG.md:\n%s", b)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "item", "complete", "B01", "--commit", "abc1234", "--no-proof", "--repo", "nope"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "item", "complete", "B01", "--commit", "abc1234", "--no-proof", "--repo", "nope"); code != ExitResolution {
 		t.Errorf("unregistered --repo: exit %d, want 3", code)
 	}
 }
@@ -159,7 +159,7 @@ func TestUmbrellaFileModeKeepsOneBacklog(t *testing.T) {
 func TestUmbrellaFileOnlyVerbsRefused(t *testing.T) {
 	root, _, built := umbrellaProject(t)
 	for _, argv := range [][]string{{"id", "next", "--kind", "bugs"}, {"item", "rm", "web:F1"}, {"backlog", "archive"}} {
-		if code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitRefused || env["ok"] != false {
+		if code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitRefused || env["ok"] != false {
 			t.Errorf("%v: exit %d", argv, code)
 		}
 	}
@@ -170,7 +170,7 @@ func TestUmbrellaFileOnlyVerbsRefused(t *testing.T) {
 
 func TestUmbrellaBacklogListQualifiesIDs(t *testing.T) {
 	root, _, _ := umbrellaProject(t)
-	code, env, stderr := hvRun(t, "--json", "-C", root, "backlog", "list")
+	code, env, stderr := rotaRun(t, "--json", "-C", root, "backlog", "list")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -187,7 +187,7 @@ func TestUmbrellaBacklogListQualifiesIDs(t *testing.T) {
 	if got := strings.Join(ids, " "); got != "web:2 web:1 api:1" {
 		t.Errorf("ids %q", got)
 	}
-	code, env, _ = hvRun(t, "--json", "-C", root, "backlog", "list", "--repo", "api")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "backlog", "list", "--repo", "api")
 	if code != 0 || len(issueGet(issueData(t, env), "features").([]any)) != 1 {
 		t.Errorf("--repo api: exit %d %v", code, env)
 	}

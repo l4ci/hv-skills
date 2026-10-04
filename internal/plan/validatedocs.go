@@ -7,10 +7,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 // Mismatch is a doc-by-path deliverable whose doc home is missing.
@@ -35,7 +35,7 @@ func ValidateDocs(root, key string) (mismatches []Mismatch, text string, err err
 	if err = checkKey(key); err != nil {
 		return
 	}
-	planPath := filepath.Join(".hv", "plans", key+".md")
+	planPath := filepath.Join(".rota", "plans", key+".md")
 	content, rerr := fsio.ReadText(filepath.Join(root, planPath))
 	if rerr != nil {
 		return nil, "", artifact.Errf(artifact.ExitResolution, "plan not found: %s", planPath)
@@ -46,7 +46,7 @@ func ValidateDocs(root, key string) (mismatches []Mismatch, text string, err err
 	}
 
 	docsSegment := "docs"
-	if cfg, ok := fsio.LoadJSON(filepath.Join(root, ".hv", "config.json"), nil).(*jsonx.Object); ok {
+	if cfg, ok := fsio.LoadJSON(filepath.Join(root, ".rota", "config.json"), nil).(*jsonx.Object); ok {
 		if dv, ok := cfg.Get("docs"); ok {
 			if d, ok := dv.(*jsonx.Object); ok {
 				if pv, ok := d.Get("path"); ok {
@@ -122,7 +122,7 @@ func ValidateDocs(root, key string) (mismatches []Mismatch, text string, err err
 				repoRoot = r
 			} else {
 				mismatches = append(mismatches, Mismatch{Path: p, TargetRepo: repoName,
-					Issue: fmt.Sprintf("sub-repo '%s' is not registered in .hv/repos.json", repoName)})
+					Issue: fmt.Sprintf("sub-repo '%s' is not registered in .rota/repos.json", repoName)})
 				continue
 			}
 			docHome := filepath.Join(repoRoot, docsSegment)

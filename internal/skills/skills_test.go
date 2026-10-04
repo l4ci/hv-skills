@@ -12,9 +12,9 @@ import (
 
 func fakeFS(extra map[string]string) fstest.MapFS {
 	m := fstest.MapFS{
-		"hv-a/SKILL.md":         {Data: []byte("# a\nsee [x](../references/x.md) and `references/y.md`\n")},
-		"hv-a/extra.md":         {Data: []byte("also references/z.md\n")},
-		"hv-b/SKILL.md":         {Data: []byte("# b\nnothing cited, README.md is not a reference here\n")},
+		"rota-a/SKILL.md":       {Data: []byte("# a\nsee [x](../references/x.md) and `references/y.md`\n")},
+		"rota-a/extra.md":       {Data: []byte("also references/z.md\n")},
+		"rota-b/SKILL.md":       {Data: []byte("# b\nnothing cited, README.md is not a reference here\n")},
 		"references/x.md":       {Data: []byte("x cites [w](w.md) and `v.md` and ../references/y.md and gone.md\n")},
 		"references/y.md":       {Data: []byte("y\n")},
 		"references/z.md":       {Data: []byte("z\n")},
@@ -23,7 +23,7 @@ func fakeFS(extra map[string]string) fstest.MapFS {
 		"references/unused.md":  {Data: []byte("unused\n")},
 		"references/README.md":  {Data: []byte("readme\n")},
 		"notaskill/SKILL.md":    {Data: []byte("ignored\n")},
-		"hv-nofile/other.md":    {Data: []byte("no SKILL.md, skipped\n")},
+		"rota-nofile/other.md":  {Data: []byte("no SKILL.md, skipped\n")},
 		"references/sub/not.md": {Data: []byte("dir, skipped\n")},
 	}
 	for p, c := range extra {
@@ -44,15 +44,15 @@ func loadFake(t *testing.T, extra map[string]string) *Set {
 func TestLayoutClosure(t *testing.T) {
 	s := loadFake(t, nil)
 	want := []string{
-		"hv-a/SKILL.md", "hv-a/extra.md",
-		"hv-a/references/v.md", "hv-a/references/w.md", "hv-a/references/x.md", "hv-a/references/y.md", "hv-a/references/z.md",
-		"hv-b/SKILL.md",
+		"rota-a/SKILL.md", "rota-a/extra.md",
+		"rota-a/references/v.md", "rota-a/references/w.md", "rota-a/references/x.md", "rota-a/references/y.md", "rota-a/references/z.md",
+		"rota-b/SKILL.md",
 	}
 	sort.Strings(want)
 	if got := s.Paths(); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("paths\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-	if got := strings.Join(s.Skills(), ","); got != "hv-a,hv-b" {
+	if got := strings.Join(s.Skills(), ","); got != "rota-a,rota-b" {
 		t.Errorf("skills %s", got)
 	}
 }
@@ -150,7 +150,7 @@ func TestInstallIdempotentAndManifest(t *testing.T) {
 	if err != nil || !res[0].Changed || res[0].BlockedBy != "" {
 		t.Fatalf("%+v %v", res, err)
 	}
-	if st := status(t, res, "hv-a/SKILL.md"); st != Created {
+	if st := status(t, res, "rota-a/SKILL.md"); st != Created {
 		t.Errorf("first install: %s", st)
 	}
 	m, ok := ReadManifest(roots[0].Path)
@@ -161,7 +161,7 @@ func TestInstallIdempotentAndManifest(t *testing.T) {
 	if err != nil || res[0].Changed {
 		t.Fatalf("second install changed: %+v %v", res, err)
 	}
-	if st := status(t, res, "hv-a/SKILL.md"); st != Unchanged {
+	if st := status(t, res, "rota-a/SKILL.md"); st != Unchanged {
 		t.Errorf("second install: %s", st)
 	}
 }
@@ -173,14 +173,14 @@ func TestEditedAndUnmanagedKeptUnlessOverwrite(t *testing.T) {
 	if _, err := s.Install(roots, Options{}); err != nil {
 		t.Fatal(err)
 	}
-	edited := filepath.Join(root, "hv-a", "SKILL.md")
+	edited := filepath.Join(root, "rota-a", "SKILL.md")
 	os.WriteFile(edited, []byte("mine\n"), 0o644)
-	os.Remove(filepath.Join(root, "hv-b", "SKILL.md"))
+	os.Remove(filepath.Join(root, "rota-b", "SKILL.md"))
 	// Unmanaged: a file on disk that the manifest never listed.
 	m, _ := ReadManifest(root)
-	delete(m.Files, "hv-a/extra.md")
+	delete(m.Files, "rota-a/extra.md")
 	writeManifest(root, m)
-	os.WriteFile(filepath.Join(root, "hv-a", "extra.md"), []byte("theirs\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "rota-a", "extra.md"), []byte("theirs\n"), 0o644)
 
 	res, err := s.Install(roots, Options{})
 	if err != nil {
@@ -190,14 +190,14 @@ func TestEditedAndUnmanagedKeptUnlessOverwrite(t *testing.T) {
 	if r.BlockedBy != Edited || len(r.Kept) != 2 {
 		t.Fatalf("blocked %q kept %v", r.BlockedBy, r.Kept)
 	}
-	if status(t, res, "hv-a/SKILL.md") != Edited || status(t, res, "hv-a/extra.md") != Unmanaged || status(t, res, "hv-b/SKILL.md") != Created {
+	if status(t, res, "rota-a/SKILL.md") != Edited || status(t, res, "rota-a/extra.md") != Unmanaged || status(t, res, "rota-b/SKILL.md") != Created {
 		t.Errorf("states %v", r.Files)
 	}
 	if b, _ := os.ReadFile(edited); string(b) != "mine\n" {
 		t.Error("edited file was overwritten")
 	}
 	// The next run still sees it as edited.
-	if res, _ = s.Install(roots, Options{}); status(t, res, "hv-a/SKILL.md") != Edited {
+	if res, _ = s.Install(roots, Options{}); status(t, res, "rota-a/SKILL.md") != Edited {
 		t.Error("edited not sticky")
 	}
 
@@ -205,10 +205,10 @@ func TestEditedAndUnmanagedKeptUnlessOverwrite(t *testing.T) {
 	if err != nil || len(res[0].Kept) != 0 {
 		t.Fatalf("%+v %v", res, err)
 	}
-	if status(t, res, "hv-a/SKILL.md") != Replaced || status(t, res, "hv-a/extra.md") != Replaced {
+	if status(t, res, "rota-a/SKILL.md") != Replaced || status(t, res, "rota-a/extra.md") != Replaced {
 		t.Errorf("states %v", res[0].Files)
 	}
-	want, _ := s.File("hv-a/SKILL.md")
+	want, _ := s.File("rota-a/SKILL.md")
 	if b, _ := os.ReadFile(edited); string(b) != string(want) {
 		t.Error("--overwrite did not restore the file")
 	}
@@ -217,7 +217,7 @@ func TestEditedAndUnmanagedKeptUnlessOverwrite(t *testing.T) {
 func TestUnmanagedOnlyBlocksAsUnmanaged(t *testing.T) {
 	s := loadFake(t, nil)
 	roots := oneRoot(t)
-	p := filepath.Join(roots[0].Path, "hv-b", "SKILL.md")
+	p := filepath.Join(roots[0].Path, "rota-b", "SKILL.md")
 	os.MkdirAll(filepath.Dir(p), 0o755)
 	os.WriteFile(p, []byte("user's own\n"), 0o644)
 	res, err := s.Install(roots, Options{})
@@ -232,12 +232,12 @@ func TestUnmanagedOnlyBlocksAsUnmanaged(t *testing.T) {
 func TestIdenticalUnmanagedIsAdopted(t *testing.T) {
 	s := loadFake(t, nil)
 	roots := oneRoot(t)
-	p := filepath.Join(roots[0].Path, "hv-b", "SKILL.md")
+	p := filepath.Join(roots[0].Path, "rota-b", "SKILL.md")
 	os.MkdirAll(filepath.Dir(p), 0o755)
-	b, _ := s.File("hv-b/SKILL.md")
+	b, _ := s.File("rota-b/SKILL.md")
 	os.WriteFile(p, b, 0o644)
 	res, _ := s.Install(roots, Options{})
-	if res[0].BlockedBy != "" || status(t, res, "hv-b/SKILL.md") != Unchanged {
+	if res[0].BlockedBy != "" || status(t, res, "rota-b/SKILL.md") != Unchanged {
 		t.Errorf("%+v", res[0])
 	}
 }
@@ -246,19 +246,19 @@ func TestLegacySymlinkReplaced(t *testing.T) {
 	s := loadFake(t, nil)
 	roots := oneRoot(t)
 	root := roots[0].Path
-	target := filepath.Join(t.TempDir(), "checkout", "hv-a")
+	target := filepath.Join(t.TempDir(), "checkout", "rota-a")
 	os.MkdirAll(target, 0o755)
 	os.WriteFile(filepath.Join(target, "SKILL.md"), []byte("legacy\n"), 0o644)
 	os.MkdirAll(root, 0o755)
-	os.Symlink(target, filepath.Join(root, "hv-a"))
+	os.Symlink(target, filepath.Join(root, "rota-a"))
 	res, err := s.Install(roots, Options{})
 	if err != nil || res[0].BlockedBy != "" {
 		t.Fatalf("%+v %v", res[0], err)
 	}
-	if status(t, res, "hv-a") != Replaced || status(t, res, "hv-a/SKILL.md") != Created {
+	if status(t, res, "rota-a") != Replaced || status(t, res, "rota-a/SKILL.md") != Created {
 		t.Errorf("%v", res[0].Files)
 	}
-	if fi, _ := os.Lstat(filepath.Join(root, "hv-a")); fi.Mode()&os.ModeSymlink != 0 {
+	if fi, _ := os.Lstat(filepath.Join(root, "rota-a")); fi.Mode()&os.ModeSymlink != 0 {
 		t.Error("symlink still there")
 	}
 	if b, _ := os.ReadFile(filepath.Join(target, "SKILL.md")); string(b) != "legacy\n" {
@@ -272,9 +272,9 @@ func TestForeignSymlinkNotWrittenThrough(t *testing.T) {
 	root := roots[0].Path
 	target := t.TempDir() // a directory without SKILL.md
 	os.MkdirAll(root, 0o755)
-	os.Symlink(target, filepath.Join(root, "hv-b"))
+	os.Symlink(target, filepath.Join(root, "rota-b"))
 	res, _ := s.Install(roots, Options{})
-	if res[0].BlockedBy != Unmanaged || status(t, res, "hv-b/SKILL.md") != Unmanaged {
+	if res[0].BlockedBy != Unmanaged || status(t, res, "rota-b/SKILL.md") != Unmanaged {
 		t.Errorf("%+v", res[0])
 	}
 	if entries, _ := os.ReadDir(target); len(entries) != 0 {
@@ -300,7 +300,7 @@ func TestUpdateRefreshesOnlyInstalledRoots(t *testing.T) {
 	if err != nil || len(res) != 1 || res[0].Agent != Claude {
 		t.Fatalf("%+v %v", res, err)
 	}
-	if status(t, res, "hv-a/references/y.md") != Updated {
+	if status(t, res, "rota-a/references/y.md") != Updated {
 		t.Errorf("%v", res[0].Files)
 	}
 	if HasManifest(roots[1].Path) {
@@ -316,30 +316,30 @@ func TestUpdateRemovesDroppedFiles(t *testing.T) {
 	roots := oneRoot(t)
 	root := roots[0].Path
 	s.Install(roots, Options{})
-	// The new set drops hv-b and the z and w references; the user edited w.
+	// The new set drops rota-b and the z and w references; the user edited w.
 	fsys := fakeFS(nil)
-	delete(fsys, "hv-b/SKILL.md")
+	delete(fsys, "rota-b/SKILL.md")
 	delete(fsys, "references/z.md")
 	delete(fsys, "references/w.md")
 	next, err := Load(fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(filepath.Join(root, "hv-a", "references", "w.md"), []byte("mine\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "rota-a", "references", "w.md"), []byte("mine\n"), 0o644)
 	res, err := next.Install(roots, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status(t, res, "hv-b/SKILL.md") != Removed || status(t, res, "hv-a/references/z.md") != Removed {
+	if status(t, res, "rota-b/SKILL.md") != Removed || status(t, res, "rota-a/references/z.md") != Removed {
 		t.Errorf("%v", res[0].Files)
 	}
-	if status(t, res, "hv-a/references/w.md") != Edited {
+	if status(t, res, "rota-a/references/w.md") != Edited {
 		t.Errorf("edited drop: %v", res[0].Files)
 	}
-	if _, err := os.Stat(filepath.Join(root, "hv-b")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, "rota-b")); err == nil {
 		t.Error("empty skill directory left behind")
 	}
-	if _, err := os.Stat(filepath.Join(root, "hv-a", "references", "w.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "rota-a", "references", "w.md")); err != nil {
 		t.Error("edited file removed")
 	}
 }
@@ -349,26 +349,26 @@ func TestUninstall(t *testing.T) {
 	roots := oneRoot(t)
 	root := roots[0].Path
 	s.Install(roots, Options{})
-	os.WriteFile(filepath.Join(root, "hv-a", "SKILL.md"), []byte("mine\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "hv-a", "stranger.md"), []byte("not ours\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "rota-a", "SKILL.md"), []byte("mine\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "rota-a", "stranger.md"), []byte("not ours\n"), 0o644)
 	res, err := Uninstall(roots, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := res[0]
-	if !r.Installed || len(r.Kept) != 1 || r.Kept[0] != "hv-a/SKILL.md" || len(r.Removed) != len(s.Paths())-1 {
+	if !r.Installed || len(r.Kept) != 1 || r.Kept[0] != "rota-a/SKILL.md" || len(r.Removed) != len(s.Paths())-1 {
 		t.Fatalf("%+v", r)
 	}
 	m, ok := ReadManifest(root)
 	if !ok || len(m.Files) != 1 {
 		t.Errorf("manifest should keep only the edited path: %+v", m)
 	}
-	for _, p := range []string{"hv-a/SKILL.md", "hv-a/stranger.md"} {
+	for _, p := range []string{"rota-a/SKILL.md", "rota-a/stranger.md"} {
 		if _, err := os.Stat(filepath.Join(root, p)); err != nil {
 			t.Errorf("%s removed", p)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, "hv-b")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, "rota-b")); err == nil {
 		t.Error("empty skill directory left behind")
 	}
 	// With --overwrite the edited file goes; the stranger never does.
@@ -376,10 +376,10 @@ func TestUninstall(t *testing.T) {
 	if len(res[0].Kept) != 0 || HasManifest(root) {
 		t.Errorf("%+v", res[0])
 	}
-	if _, err := os.Stat(filepath.Join(root, "hv-a", "stranger.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "rota-a", "stranger.md")); err != nil {
 		t.Error("unmanaged file removed")
 	}
-	if _, err := os.Stat(filepath.Join(root, "hv-a", "SKILL.md")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, "rota-a", "SKILL.md")); err == nil {
 		t.Error("edited file survived --overwrite")
 	}
 	// A root without a manifest is skipped.
@@ -406,10 +406,10 @@ func TestStatusDevBuildComparesByDigest(t *testing.T) {
 	if rep.Roots[0].Current {
 		t.Error("a different digest must not be current, version empty or not")
 	}
-	os.WriteFile(filepath.Join(roots[0].Path, "hv-a", "SKILL.md"), []byte("mine\n"), 0o644)
-	os.Remove(filepath.Join(roots[0].Path, "hv-b", "SKILL.md"))
+	os.WriteFile(filepath.Join(roots[0].Path, "rota-a", "SKILL.md"), []byte("mine\n"), 0o644)
+	os.Remove(filepath.Join(roots[0].Path, "rota-b", "SKILL.md"))
 	rep, _ = s.Status(roots, "", home)
-	if got := rep.Roots[0]; len(got.Edited) != 1 || got.Edited[0] != "hv-a/SKILL.md" || len(got.Missing) != 1 || got.Missing[0] != "hv-b/SKILL.md" {
+	if got := rep.Roots[0]; len(got.Edited) != 1 || got.Edited[0] != "rota-a/SKILL.md" || len(got.Missing) != 1 || got.Missing[0] != "rota-b/SKILL.md" {
 		t.Errorf("%+v", got)
 	}
 }
@@ -485,7 +485,7 @@ func TestManifestTraversalIgnored(t *testing.T) {
 	os.WriteFile(outside, []byte("keep\n"), 0o644)
 	m, _ := ReadManifest(root)
 	h := hashBytes([]byte("keep\n"))
-	for _, k := range []string{"../victim.txt", "hv-a/../../victim.txt", "/etc/passwd", "other/x.md", "hv-a"} {
+	for _, k := range []string{"../victim.txt", "rota-a/../../victim.txt", "/etc/passwd", "other/x.md", "rota-a"} {
 		m.Files[k] = h
 	}
 	writeManifest(root, m)
@@ -517,7 +517,7 @@ func TestSymlinkedParentNotFollowed(t *testing.T) {
 		for _, f := range names {
 			os.WriteFile(filepath.Join(target, f), []byte("outside\n"), 0o644)
 		}
-		refs := filepath.Join(roots[0].Path, "hv-a", "references")
+		refs := filepath.Join(roots[0].Path, "rota-a", "references")
 		os.RemoveAll(refs)
 		os.Symlink(target, refs)
 		return s, roots, target
@@ -536,7 +536,7 @@ func TestSymlinkedParentNotFollowed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status(t, res, "hv-a/references/x.md") != Unmanaged {
+	if status(t, res, "rota-a/references/x.md") != Unmanaged {
 		t.Errorf("%v", res[0].Files)
 	}
 	untouched(target)

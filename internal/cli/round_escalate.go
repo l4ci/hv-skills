@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // escalationEnv is the seam tests replace to inject a clock and a fake host.
@@ -25,7 +25,7 @@ var escalationEnv = func() escalation.Env { return escalation.Env{} }
 
 func escalationForge() func(ctx context.Context, root string) (escalation.Forge, error) {
 	return func(ctx context.Context, root string) (escalation.Forge, error) {
-		cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+		cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 		return tracker.New(ctx, tracker.SettingsFromConfig(cfg), "", root, trackerOptions...)
 	}
 }
@@ -40,7 +40,7 @@ func fromEscalation(err error) (Result, error) {
 	return Result{}, err
 }
 
-// roundEscalate is the `hv round escalate` group.
+// roundEscalate is the `rota round escalate` group.
 func roundEscalate() *Command {
 	return &Command{Name: "escalate", Summary: "ask the human on an issue or PR thread", Subs: []*Command{
 		{Name: "send", Summary: "post a question on a thread and notify", Verb: roundEscalateSend},
@@ -56,7 +56,7 @@ func roundEscalateSend(fs *flag.FlagSet) RunFunc {
 	timeout := fs.Float64("timeout", 0, "seconds until the escalation counts as timed out; 0 means no deadline")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) != 1 {
-			return Result{}, Usage("usage: hv round escalate send <number> [--pr] --title <text> --body-file <path|->")
+			return Result{}, Usage("usage: rota round escalate send <number> [--pr] --title <text> --body-file <path|->")
 		}
 		n, err := strconv.Atoi(args[0])
 		if err != nil || n < 1 || strings.TrimLeft(args[0], "0123456789") != "" {

@@ -8,14 +8,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
-// The planning half of `hv migrate issues` (bin/hv-migrate-issues): what the
-// file backlog holds that has to move to the tracker. It reads .hv/ and
+// The planning half of `rota migrate issues` (bin/hv-migrate-issues): what the
+// file backlog holds that has to move to the tracker. It reads .rota/ and
 // writes nothing.
 
 type migItem struct {
@@ -64,7 +64,7 @@ func readOpt(path string) *string {
 // planItems is the open Bugs, Features and Tasks bullets of BACKLOG.md with
 // their detail, proof, design and plan text. warn gets the drop notices.
 func planItems(root, backlogText string, warn func(string)) []*migItem {
-	hv := filepath.Join(root, ".hv")
+	rota := filepath.Join(root, ".rota")
 	var items []*migItem
 	for _, e := range OpenBullets(backlogText) {
 		kind := migSectionKind[e.Section]
@@ -93,7 +93,7 @@ func planItems(root, backlogText string, warn func(string)) []*migItem {
 		it.milestone = migMilestoneID.FindString(pystr.Strip(e.Fields.Milestone))
 		it.since = pystr.Strip(e.Fields.Since)
 		if t, ok := TypeByLetter(e.ID[:1]); ok {
-			if d := readOpt(filepath.Join(hv, t.Kind, e.ID+".md")); d != nil {
+			if d := readOpt(filepath.Join(rota, t.Kind, e.ID+".md")); d != nil {
 				detail := *d
 				if s, end, ok := section.Find(detail, "Proof"); ok {
 					if at := strings.LastIndex(detail[:s], "## Proof"); at >= 0 {
@@ -108,8 +108,8 @@ func planItems(root, backlogText string, warn func(string)) []*migItem {
 				}
 			}
 		}
-		it.design = readOpt(filepath.Join(hv, "designs", e.ID+".md"))
-		plans, _ := os.ReadDir(filepath.Join(hv, "plans"))
+		it.design = readOpt(filepath.Join(rota, "designs", e.ID+".md"))
+		plans, _ := os.ReadDir(filepath.Join(rota, "plans"))
 		var names []string
 		for _, p := range plans {
 			names = append(names, p.Name())
@@ -118,7 +118,7 @@ func planItems(root, backlogText string, warn func(string)) []*migItem {
 		planRe := regexp.MustCompile(`\AM\p{Nd}+-` + regexp.QuoteMeta(e.ID) + `\.md\z`)
 		for _, n := range names {
 			if planRe.MatchString(n) {
-				it.plan = readOpt(filepath.Join(hv, "plans", n))
+				it.plan = readOpt(filepath.Join(rota, "plans", n))
 				break
 			}
 		}
@@ -171,11 +171,11 @@ func planItems(root, backlogText string, warn func(string)) []*migItem {
 	return items
 }
 
-// planMilestones is the planned and active milestones of .hv/milestones with
+// planMilestones is the planned and active milestones of .rota/milestones with
 // their slice plans.
 func planMilestones(root string) []*migMilestone {
-	hv := filepath.Join(root, ".hv")
-	entries, _ := os.ReadDir(filepath.Join(hv, "milestones"))
+	rota := filepath.Join(root, ".rota")
+	entries, _ := os.ReadDir(filepath.Join(rota, "milestones"))
 	var names []string
 	for _, e := range entries {
 		n := e.Name()
@@ -187,7 +187,7 @@ func planMilestones(root string) []*migMilestone {
 	var out []*migMilestone
 	for _, name := range names {
 		text := ""
-		if t := readOpt(filepath.Join(hv, "milestones", name)); t != nil {
+		if t := readOpt(filepath.Join(rota, "milestones", name)); t != nil {
 			text = *t
 		}
 		fm, _, body := frontmatter.Parse(text)
@@ -218,7 +218,7 @@ func planMilestones(root string) []*migMilestone {
 		case []string:
 			ms.depends = migMSAllRe.FindAllString(strings.Join(d, ", "), -1)
 		}
-		plans, _ := os.ReadDir(filepath.Join(hv, "plans"))
+		plans, _ := os.ReadDir(filepath.Join(rota, "plans"))
 		var pn []string
 		for _, p := range plans {
 			pn = append(pn, p.Name())
@@ -227,7 +227,7 @@ func planMilestones(root string) []*migMilestone {
 		sliceRe := regexp.MustCompile(`\A` + regexp.QuoteMeta(mid) + `-(S\p{Nd}+)\.md\z`)
 		for _, n := range pn {
 			if sm := sliceRe.FindStringSubmatch(n); sm != nil {
-				t := readOpt(filepath.Join(hv, "plans", n))
+				t := readOpt(filepath.Join(rota, "plans", n))
 				txt := ""
 				if t != nil {
 					txt = *t

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/rota/internal/host"
 )
 
 // operatorHost is a tmux-like fake that can open an operator window.
@@ -46,7 +46,7 @@ func TestSessionEnsureHerdrOutsideIsRefusedNotHandedOff(t *testing.T) {
 	f := &fakeHost{name: "herdr"}
 	_, err := envWith(f).SessionEnsure(bg, dir, SessionOpts{})
 	we, ok := err.(*Error)
-	if !ok || we.Exit != ExitRefused || !strings.Contains(we.Message, "needs /hv-work to run inside a herdr pane") || !strings.Contains(we.Hint, "open herdr") {
+	if !ok || we.Exit != ExitRefused || !strings.Contains(we.Message, "needs /rota-work to run inside a herdr pane") || !strings.Contains(we.Hint, "open herdr") {
 		t.Errorf("err = %v", err)
 	}
 	if len(f.calls) != 0 {
@@ -70,7 +70,7 @@ func TestSessionEnsureOpensTheOperatorWindow(t *testing.T) {
 	oh2 := &operatorHost{fakeHost: &fakeHost{name: "tmux"}}
 	dir2 := newProject(t, `{"work":{"operatorCommand":"my-claude"}}`)
 	(Env{NewHost: func(string) host.Host { return oh2 }}).SessionEnsure(bg, dir2, SessionOpts{})
-	if oh2.opts.Session != "hv" || oh2.opts.Command != "my-claude" || oh2.opts.BootTimeout != 60 {
+	if oh2.opts.Session != "rota" || oh2.opts.Command != "my-claude" || oh2.opts.BootTimeout != 60 {
 		t.Errorf("opts = %+v", oh2.opts)
 	}
 }
@@ -88,9 +88,9 @@ func TestSessionEnsureFailures(t *testing.T) {
 		msg  string
 		hint string
 	}{
-		{host.ErrOperatorBoot, "did not come up within 60s", "tmux attach -t hv"},
+		{host.ErrOperatorBoot, "did not come up within 60s", "tmux attach -t rota"},
 		{host.ErrOperatorSend, "never picked up its instruction", "paste it by hand"},
-		{host.ErrOperatorSession, "could not create tmux session 'hv'", ""},
+		{host.ErrOperatorSession, "could not create tmux session 'rota'", ""},
 		{host.ErrOperatorWindow, "could not create the operator window", ""},
 	} {
 		oh.err = tc.err

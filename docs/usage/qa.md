@@ -1,12 +1,12 @@
 # Product QA
 
-`/hv-qa` answers a question `/hv-review` cannot: *"does the product actually work?"* `/hv-review` reads commits and the diff. `/hv-qa` executes runners against the built artifact (Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares).
+`/rota-qa` answers a question `/rota-review` cannot: *"does the product actually work?"* `/rota-review` reads commits and the diff. `/rota-qa` executes runners against the built artifact (Playwright, smoke scripts, contract tests, Lighthouse, axe, ZAP, whatever the target's strategy declares).
 
-The two skills are separate and never call each other. `/hv-ship` may invoke both, each behind its own opt-in config flag.
+The two skills are separate and never call each other. `/rota-ship` may invoke both, each behind its own opt-in config flag.
 
 ## Per-target strategy files
 
-QA strategy lives in `.hv/qa/<target>.md`, one file per testable surface. In single-repo mode, `<target>` is a user-named surface (`web`, `api`, `cli`, ...). In [umbrella mode](umbrella-mode.md), `<target>` is a registered sub-repo name.
+QA strategy lives in `.rota/qa/<target>.md`, one file per testable surface. In single-repo mode, `<target>` is a user-named surface (`web`, `api`, `cli`, ...). In [umbrella mode](umbrella-mode.md), `<target>` is a registered sub-repo name.
 
 Each strategy file has five body sections:
 
@@ -18,19 +18,19 @@ Each strategy file has five body sections:
 | **Audit checks** | Usability dimensions to inspect by hand or LLM (empty states, error recovery, copy clarity, first-run flow). Rubric, no commands |
 | **Infra requirements** | What must be running for `run` mode (e.g. `npm run dev` on `:3000`, deployed staging URL, sandbox creds). QA refuses to run if these aren't met |
 
-Strategies are written once via `/hv-qa first-run`, which probes the repo for testing infra, proposes a draft, and writes the file after explicit approval.
+Strategies are written once via `/rota-qa first-run`, which probes the repo for testing infra, proposes a draft, and writes the file after explicit approval.
 
 ## Modes
 
 | Mode | What it does |
 |------|-------------|
-| `first-run` | Probes surfaces, detects existing test infra, proposes per-target strategy, writes `.hv/qa/<target>.md` after approval. Never installs tooling. |
-| `run` | Executes the strategy: infra preflight, parallel runner dispatch, audit pass, scored verdict. Read-only against the codebase; writes artifacts to `.hv/qa-runs/<timestamp>/`. |
+| `first-run` | Probes surfaces, detects existing test infra, proposes per-target strategy, writes `.rota/qa/<target>.md` after approval. Never installs tooling. |
+| `run` | Executes the strategy: infra preflight, parallel runner dispatch, audit pass, scored verdict. Read-only against the codebase; writes artifacts to `.rota/qa-runs/<timestamp>/`. |
 | `restructure` | Re-probes surfaces, retires dead strategies, fixes broken commands. Audit equivalent for strategy files. |
 
 ## Verdicts
 
-`/hv-qa run` ends with one of three verdicts and records it with `hv verdict add --kind qa`, which `/hv-ship` routes on:
+`/rota-qa run` ends with one of three verdicts and records it with `rota verdict add --kind qa`, which `/rota-ship` routes on:
 
 | Verdict | Meaning |
 |---------|---------|
@@ -45,18 +45,18 @@ A fourth shape, `INFRA-FAIL`, surfaces when required infra is missing (dev serve
 Manual:
 
 ```
-/hv-qa run             # all targets in active scope
-/hv-qa run web         # specific target
-/hv-qa run --repo api  # umbrella mode, scoped to one sub-repo
-/hv-qa run --all       # umbrella mode, every registered sub-repo
+/rota-qa run             # all targets in active scope
+/rota-qa run web         # specific target
+/rota-qa run --repo api  # umbrella mode, scoped to one sub-repo
+/rota-qa run --all       # umbrella mode, every registered sub-repo
 ```
 
-Triggered by `/hv-ship` when `ship.qa: true`. Runs after `/hv-review` and the second-opinion gate, before merge or PR. Route is controlled by `qa.gate`:
+Triggered by `/rota-ship` when `ship.qa: true`. Runs after `/rota-review` and the second-opinion gate, before merge or PR. Route is controlled by `qa.gate`:
 
 | `qa.gate` | `PASS` | `CONCERNS` | `FAIL` |
 |---|---|---|---|
 | `"advisory"` (default) | continue silently | surface findings, continue | surface findings, continue (advisory means advisory) |
-| `"blocking"` | continue silently | surface, branch on autonomy level | stop; user fixes via `/hv-work` or `/hv-debug` and reruns `/hv-ship` |
+| `"blocking"` | continue silently | surface, branch on autonomy level | stop; user fixes via `/rota-work` or `/rota-debug` and reruns `/rota-ship` |
 
 ## When to use
 
@@ -66,21 +66,21 @@ Triggered by `/hv-ship` when `ship.qa: true`. Runs after `/hv-review` and the se
 
 ## When NOT to use
 
-- Diff-level review → `/hv-review`. `/hv-qa` does not read commits.
-- Nothing built yet → finish via `/hv-work` first. QA needs an artifact to probe.
-- Change code based on findings → consume the report, then `/hv-work` or `/hv-debug`.
+- Diff-level review → `/rota-review`. `/rota-qa` does not read commits.
+- Nothing built yet → finish via `/rota-work` first. QA needs an artifact to probe.
+- Change code based on findings → consume the report, then `/rota-work` or `/rota-debug`.
 
 ## Configuration
 
-`/hv-qa` reads three keys from `.hv/config.json`:
+`/rota-qa` reads three keys from `.rota/config.json`:
 
-- `qa.gate`: `"advisory"` (default) or `"blocking"`. Controls whether `FAIL` halts `/hv-ship` invocations.
-- `qa.afterWork`: `false` (default). When `true`, `/hv-work` invokes `/hv-qa run` post-cycle if touched files match a target's `Watch globs`.
-- `ship.qa`: `false` (default). When `true`, `/hv-ship` calls `/hv-qa run` between review and the merge/PR step.
+- `qa.gate`: `"advisory"` (default) or `"blocking"`. Controls whether `FAIL` halts `/rota-ship` invocations.
+- `qa.afterWork`: `false` (default). When `true`, `/rota-work` invokes `/rota-qa run` post-cycle if touched files match a target's `Watch globs`.
+- `ship.qa`: `false` (default). When `true`, `/rota-ship` calls `/rota-qa run` between review and the merge/PR step.
 
 See [configuration](configuration.md#shipqa) for the full block.
 
 ## See also
 
-- [Review and ship](review-and-ship.md): diff-level review and the `/hv-ship` flow that calls `/hv-qa`
+- [Review and ship](review-and-ship.md): diff-level review and the `/rota-ship` flow that calls `/rota-qa`
 - [Configuration](configuration.md): full key reference

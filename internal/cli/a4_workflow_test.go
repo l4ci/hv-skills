@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 func flowFixture() *trackertest.Fake {
@@ -23,7 +23,7 @@ func list(o *jsonx.Object, k string) []any { v, _ := get(o, k).([]any); return v
 
 func runOK(t *testing.T, root string, want int, argv ...string) *jsonx.Object {
 	t.Helper()
-	code, env, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+	code, env, stderr := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 	if code != want {
 		t.Fatalf("%v: exit %d, want %d\n%s\n%v", argv, code, want, stderr, env)
 	}
@@ -180,7 +180,7 @@ func TestTrackerErrorsMapToExits(t *testing.T) {
 		fake := flowFixture()
 		fake.Fail = map[string]error{"comments": &tracker.Error{Kind: c.kind, Code: 1, Message: "forge said no"}}
 		withTracker(t, fake)
-		code, env, stderr := hvRun(t, "--json", "-C", root, "item", "show", "7")
+		code, env, stderr := rotaRun(t, "--json", "-C", root, "item", "show", "7")
 		if code != c.exit || !strings.Contains(stderr, "forge said no") || env["ok"] != false {
 			t.Errorf("kind %v: exit %d, want %d (%s)", c.kind, code, c.exit, stderr)
 		}

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
 )
 
 func get(v any, path ...string) any {
@@ -37,7 +37,7 @@ func dataOf(env map[string]any) *jsonx.Object {
 func TestA4bIssueModeWithoutProviderExits5(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
 	for _, argv := range [][]string{{"backlog", "list"}, {"backlog", "ids", "--milestone", "M01"}, {"backlog", "milestones", "12"}, {"summary"}} {
-		code, env, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, stderr := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		if code != ExitUnavailable || env["ok"] != false || !strings.Contains(stderr, "provider") {
 			t.Errorf("%v: code=%d stderr=%s", argv, code, stderr)
 		}
@@ -52,7 +52,7 @@ func TestA4bFileOnlyVerbsAreRefusedUnderIssues(t *testing.T) {
 		exit int
 	}{{[]string{"backlog", "drift"}, ExitFailed}, {[]string{"backlog", "backfill"}, ExitRefused}, {[]string{"backlog", "archive"}, ExitRefused}} {
 		argv := c.argv
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		d := dataOf(env)
 		if code != c.exit || get(d, "blockedBy") != "backend" || get(d, "changed") != false {
 			t.Errorf("%v: code=%d env=%v", argv, code, env)
@@ -64,11 +64,11 @@ func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 	root := a4Project(t, `{"backlog": {"backend": "issues"}}`)
 	withTracker(t, &trackertest.Fake{Issues: []backlog.Issue{
 		{Number: 12, Title: "Crash on save", State: "open", Labels: []string{"type:bug"}, Milestone: "M02 — Next",
-			Body: "<!-- hv:fields\nRelated: F3\n-->"},
-		{Number: 3, Title: "Dark mode", State: "open", Labels: []string{"type:feature"}, Body: "<!-- hv:fields\nRelated: B12\n-->"},
+			Body: "<!-- rota:fields\nRelated: F3\n-->"},
+		{Number: 3, Title: "Dark mode", State: "open", Labels: []string{"type:feature"}, Body: "<!-- rota:fields\nRelated: B12\n-->"},
 		{Number: 5, Title: "Chore", State: "open"},
 	}})
-	code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "list")
+	code, env, _ := rotaRun(t, "--json", "-C", root, "backlog", "list")
 	if code != 0 {
 		t.Fatalf("list: exit %d env=%v", code, env)
 	}
@@ -81,12 +81,12 @@ func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 		t.Errorf("clusters = %v", got)
 	}
 
-	code, env, _ = hvRun(t, "--json", "-C", root, "backlog", "ids", "--milestone", "M02")
+	code, env, _ = rotaRun(t, "--json", "-C", root, "backlog", "ids", "--milestone", "M02")
 	if code != 0 || !reflect.DeepEqual(get(dataOf(env), "ids"), []any{"12"}) {
 		t.Errorf("ids: %d %v", code, env)
 	}
 	for _, ref := range []string{"12", "#12", "B12"} {
-		code, env, _ = hvRun(t, "--json", "-C", root, "backlog", "milestones", ref)
+		code, env, _ = rotaRun(t, "--json", "-C", root, "backlog", "milestones", ref)
 		if code != 0 || !reflect.DeepEqual(get(dataOf(env), "milestones"), []any{"M02"}) {
 			t.Errorf("milestones %s: %d %v", ref, code, env)
 		}
@@ -94,8 +94,8 @@ func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 
 	// Active streams use the issue number as the in-progress ID; its type
 	// comes from the listing.
-	os.WriteFile(filepath.Join(root, ".hv", "status.json"), []byte(`{"active": [{"branch": "b", "items": ["12"], "startedAt": "2026-09-01T10:00:00Z"}]}`), 0o644)
-	_, env, _ = hvRun(t, "--json", "-C", root, "backlog", "list")
+	os.WriteFile(filepath.Join(root, ".rota", "status.json"), []byte(`{"active": [{"branch": "b", "items": ["12"], "startedAt": "2026-09-01T10:00:00Z"}]}`), 0o644)
+	_, env, _ = rotaRun(t, "--json", "-C", root, "backlog", "list")
 	prog := get(dataOf(env), "inProgress").([]any)
 	if len(prog) != 1 || get(prog[0], "id") != "12" || get(prog[0], "type") != "B" {
 		t.Errorf("in progress = %v", prog)
@@ -104,16 +104,16 @@ func TestA4bBacklogViewsInIssueMode(t *testing.T) {
 
 func TestA4bUmbrellaFileModeScopes(t *testing.T) {
 	root := a4Project(t, "")
-	os.WriteFile(filepath.Join(root, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	os.WriteFile(filepath.Join(root, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
 	for _, argv := range [][]string{{"backlog", "list"}, {"summary"}, {"backlog", "ids", "--milestone", "M01"}} {
-		if code, _, stderr := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != 0 {
+		if code, _, stderr := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...); code != 0 {
 			t.Errorf("%v in a file umbrella: exit %d: %s", argv, code, stderr)
 		}
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "backlog", "list", "--repo", "web"); code != 0 {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "backlog", "list", "--repo", "web"); code != 0 {
 		t.Errorf("registered --repo: exit %d", code)
 	}
-	if code, _, _ := hvRun(t, "--json", "-C", root, "backlog", "list", "--repo", "api"); code != ExitResolution {
+	if code, _, _ := rotaRun(t, "--json", "-C", root, "backlog", "list", "--repo", "api"); code != ExitResolution {
 		t.Errorf("unregistered --repo: exit %d, want 3", code)
 	}
 }
@@ -126,7 +126,7 @@ func TestA4bUsageErrors(t *testing.T) {
 		{"status", "rm"}, {"status", "show"}, {"status", "handoff"}, {"status", "loop", "start", "--repo", "web"},
 		{"refactor", "targets", "--repo", "web"}, {"summary", "extra"},
 	} {
-		if code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitUsage || env["ok"] != false {
+		if code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...); code != ExitUsage || env["ok"] != false {
 			t.Errorf("%v: exit %d, want 2", argv, code)
 		}
 	}
@@ -134,13 +134,13 @@ func TestA4bUsageErrors(t *testing.T) {
 
 func TestA4bStaleBadTodayEnv(t *testing.T) {
 	root := a4Project(t, "")
-	t.Setenv("HV_TEST_TODAY", "tomorrow")
-	if code, _, stderr := hvRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo"); code != ExitUsage || !strings.Contains(stderr, "HV_TEST_TODAY") {
+	t.Setenv("ROTA_TEST_TODAY", "tomorrow")
+	if code, _, stderr := rotaRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo"); code != ExitUsage || !strings.Contains(stderr, "ROTA_TEST_TODAY") {
 		t.Errorf("exit %d, stderr %s", code, stderr)
 	}
-	t.Setenv("HV_TEST_TODAY", "2999-01-01")
-	os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte("## Bugs\n- **[B01] [P1] a.** x Captured: 2026-01-01\n"), 0o644)
-	code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo", "--days", "90")
+	t.Setenv("ROTA_TEST_TODAY", "2999-01-01")
+	os.WriteFile(filepath.Join(root, ".rota", "BACKLOG.md"), []byte("## Bugs\n- **[B01] [P1] a.** x Captured: 2026-01-01\n"), 0o644)
+	code, env, _ := rotaRun(t, "--json", "-C", root, "backlog", "stale", "--kind", "todo", "--days", "90")
 	entries := get(dataOf(env), "entries").([]any)
 	if code != 0 || len(entries) != 1 || get(entries[0], "name") != "B01" || get(entries[0], "date") != "2026-01-01" {
 		t.Errorf("stale todo: %d %v", code, env)
@@ -149,25 +149,25 @@ func TestA4bStaleBadTodayEnv(t *testing.T) {
 
 func TestA4bArchiveHonoursTestToday(t *testing.T) {
 	root := a4Project(t, "")
-	os.WriteFile(filepath.Join(root, ".hv", "BACKLOG.md"), []byte("# TODO\n\n## Completed\n- ~~**[B01] [P1] a.** x~~ Done 2026-01-10 [`abc1234`]\n"), 0o644)
-	t.Setenv("HV_TEST_TODAY", "2026-01-12")
-	if code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "0" {
+	os.WriteFile(filepath.Join(root, ".rota", "BACKLOG.md"), []byte("# TODO\n\n## Completed\n- ~~**[B01] [P1] a.** x~~ Done 2026-01-10 [`abc1234`]\n"), 0o644)
+	t.Setenv("ROTA_TEST_TODAY", "2026-01-12")
+	if code, env, _ := rotaRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "0" {
 		t.Fatalf("2 days old moved: %d %v", code, env)
 	}
-	t.Setenv("HV_TEST_TODAY", "2026-01-20")
-	if code, env, _ := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "1" {
+	t.Setenv("ROTA_TEST_TODAY", "2026-01-20")
+	if code, env, _ := rotaRun(t, "--json", "-C", root, "backlog", "archive"); code != 0 || fmt.Sprint(get(dataOf(env), "moved")) != "1" {
 		t.Fatalf("10 days old not moved: %d %v", code, env)
 	}
-	t.Setenv("HV_TEST_TODAY", "soon")
-	if code, _, stderr := hvRun(t, "--json", "-C", root, "backlog", "archive"); code != ExitUsage || !strings.Contains(stderr, "HV_TEST_TODAY") {
-		t.Errorf("bad HV_TEST_TODAY: exit %d, stderr %s", code, stderr)
+	t.Setenv("ROTA_TEST_TODAY", "soon")
+	if code, _, stderr := rotaRun(t, "--json", "-C", root, "backlog", "archive"); code != ExitUsage || !strings.Contains(stderr, "ROTA_TEST_TODAY") {
+		t.Errorf("bad ROTA_TEST_TODAY: exit %d, stderr %s", code, stderr)
 	}
 }
 
 func TestA4bStatusLifecycle(t *testing.T) {
 	root := a4Project(t, "")
 	run := func(argv ...string) (int, map[string]any) {
-		code, env, _ := hvRun(t, append([]string{"--json", "-C", root}, argv...)...)
+		code, env, _ := rotaRun(t, append([]string{"--json", "-C", root}, argv...)...)
 		return code, env
 	}
 	code, env := run("status", "add", "feat/x", "--items", "B01,T01", "--worktree", "../wt")
@@ -187,10 +187,10 @@ func TestA4bStatusLifecycle(t *testing.T) {
 	if _, env = run("status", "show", "nope"); get(dataOf(env), "active") != false || get(dataOf(env), "repo") != nil {
 		t.Errorf("show inactive: %v", env)
 	}
-	hp := filepath.Join(root, ".hv", "handoff", "feat", "x.md")
+	hp := filepath.Join(root, ".rota", "handoff", "feat", "x.md")
 	os.MkdirAll(filepath.Dir(hp), 0o755)
 	os.WriteFile(hp, []byte("h"), 0o644)
-	if _, env = run("status", "handoff", "feat/x"); get(dataOf(env), "path") != ".hv/handoff/feat/x.md" || get(dataOf(env), "exists") != true {
+	if _, env = run("status", "handoff", "feat/x"); get(dataOf(env), "path") != ".rota/handoff/feat/x.md" || get(dataOf(env), "exists") != true {
 		t.Errorf("handoff: %v", env)
 	}
 	if code, env = run("status", "rm", "feat/x"); code != 0 || fmt.Sprint(get(dataOf(env), "removed")) != "1" || get(dataOf(env), "handoffRemoved") != true || get(dataOf(env), "changed") != true {
@@ -207,7 +207,7 @@ func TestA4bStatusLifecycle(t *testing.T) {
 func TestA4bLoopLifecycle(t *testing.T) {
 	root := a4Project(t, "")
 	run := func(argv ...string) map[string]any {
-		code, env, stderr := hvRun(t, append([]string{"--json", "-C", root, "status", "loop"}, argv...)...)
+		code, env, stderr := rotaRun(t, append([]string{"--json", "-C", root, "status", "loop"}, argv...)...)
 		if code != 0 {
 			t.Fatalf("%v: %d %s", argv, code, stderr)
 		}
@@ -230,20 +230,20 @@ func TestA4bLoopLifecycle(t *testing.T) {
 
 func TestA4bRefactorTargetsNeedsNoProject(t *testing.T) {
 	dir := t.TempDir()
-	code, env, _ := hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	code, env, _ := rotaRun(t, "--json", "-C", dir, "refactor", "targets")
 	d := dataOf(env)
 	if code != 0 || get(d, "umbrella") != nil || len(get(d, "subRepos").([]any)) != 0 {
-		t.Errorf("no .hv: %d %v", code, env)
+		t.Errorf("no .rota: %d %v", code, env)
 	}
-	os.MkdirAll(filepath.Join(dir, ".hv"), 0o755)
+	os.MkdirAll(filepath.Join(dir, ".rota"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "web"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".hv", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
-	_, env, _ = hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	os.WriteFile(filepath.Join(dir, ".rota", "repos.json"), []byte(`{"repos": [{"name": "web", "path": "web"}]}`), 0o644)
+	_, env, _ = rotaRun(t, "--json", "-C", dir, "refactor", "targets")
 	if get(dataOf(env), "umbrella", "hasCode") != false {
-		t.Errorf("only a sub-repo and .hv: %v", env)
+		t.Errorf("only a sub-repo and .rota: %v", env)
 	}
 	os.WriteFile(filepath.Join(dir, "main.go"), nil, 0o644)
-	_, env, _ = hvRun(t, "--json", "-C", dir, "refactor", "targets")
+	_, env, _ = rotaRun(t, "--json", "-C", dir, "refactor", "targets")
 	if get(dataOf(env), "umbrella", "hasCode") != true {
 		t.Errorf("a top-level file: %v", env)
 	}
@@ -251,8 +251,8 @@ func TestA4bRefactorTargetsNeedsNoProject(t *testing.T) {
 
 func TestA4bSummaryNoBacklogIsResolution(t *testing.T) {
 	root := a4Project(t, "")
-	os.Remove(filepath.Join(root, ".hv", "BACKLOG.md"))
-	if code, _, stderr := hvRun(t, "--json", "-C", root, "summary"); code != ExitResolution || !strings.Contains(stderr, "hv init") {
+	os.Remove(filepath.Join(root, ".rota", "BACKLOG.md"))
+	if code, _, stderr := rotaRun(t, "--json", "-C", root, "summary"); code != ExitResolution || !strings.Contains(stderr, "rota init") {
 		t.Errorf("exit %d stderr %s", code, stderr)
 	}
 }

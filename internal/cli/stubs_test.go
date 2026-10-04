@@ -11,7 +11,7 @@ import (
 )
 
 // contractPaths reads the verb paths out of the contract, the same way the
-// generated list was made: "### hv <path>" headings, argument and flag words
+// generated list was made: "### rota <path>" headings, argument and flag words
 // dropped.
 func contractPaths(t *testing.T) []string {
 	t.Helper()
@@ -19,7 +19,7 @@ func contractPaths(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	re := regexp.MustCompile(`(?m)^### hv (.*)$`)
+	re := regexp.MustCompile(`(?m)^### rota (.*)$`)
 	seen := map[string]bool{}
 	var out []string
 	for _, m := range re.FindAllStringSubmatch(string(b), -1) {
@@ -86,11 +86,11 @@ func TestUnimplementedContractVerbExits71(t *testing.T) {
 		}
 	}
 	_, _, errOut := stubRun("zz", "stub")
-	if !strings.Contains(errOut, "hv zz stub is not ported yet") {
+	if !strings.Contains(errOut, "rota zz stub is not ported yet") {
 		t.Errorf("the message names the full verb path: %q", errOut)
 	}
 	// -h still reaches help
-	if code, out, _ := stubRun("zz", "stub", "--help"); code != 0 || !strings.Contains(out, "hv zz stub") {
+	if code, out, _ := stubRun("zz", "stub", "--help"); code != 0 || !strings.Contains(out, "rota zz stub") {
 		t.Errorf("help: %d %q", code, out)
 	}
 	// a typo under an implemented group stays an unknown command
@@ -99,7 +99,7 @@ func TestUnimplementedContractVerbExits71(t *testing.T) {
 	}
 }
 
-// `hv __verbs` is what test/hv-hybrid routes by: stubs must stay out of it.
+// `rota __verbs` is what test/hv-hybrid routes by: stubs must stay out of it.
 func TestVerbsExcludesStubs(t *testing.T) {
 	withFakeStub(t)
 	_, out, _ := stubRun("__verbs")
@@ -117,7 +117,7 @@ func TestVerbsExcludesStubs(t *testing.T) {
 	}
 	// every listed verb really runs; every other contract verb is a stub. The
 	// probe runs in an empty directory: from the package directory a verb such
-	// as `block skills` walks up to this repo's .hv/ and rewrites AGENTS.md.
+	// as `block skills` walks up to this repo's .rota/ and rewrites AGENTS.md.
 	empty := t.TempDir()
 	for _, p := range contractVerbs {
 		if listed[p] {

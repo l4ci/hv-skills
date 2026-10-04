@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // The write side of the file backend: FileBackend.append, create,
@@ -44,7 +44,7 @@ type CreateInput struct {
 type CreateResult struct {
 	ID     string // "B07"
 	Type   string // "B"
-	Detail string // ".hv/<kind>/<ID>.md" when a body was written, else ""
+	Detail string // ".rota/<kind>/<ID>.md" when a body was written, else ""
 }
 
 // CompleteInput is one close (Backend.Complete).
@@ -90,7 +90,7 @@ var ProofCount = func(root, id string) (int, error) {
 	if dir == "" {
 		return 0, nil
 	}
-	content, err := fsio.ReadText(filepath.Join(root, ".hv", dir, id+".md"))
+	content, err := fsio.ReadText(filepath.Join(root, ".rota", dir, id+".md"))
 	if err != nil || content == "" {
 		return 0, nil
 	}
@@ -129,11 +129,11 @@ func sectionForDir(dir string) string {
 	return "Unknown"
 }
 
-func (f *File) backlogPath() string { return f.hv("BACKLOG.md") }
+func (f *File) backlogPath() string { return f.rota("BACKLOG.md") }
 
 func (f *File) requireBacklog() error {
 	if _, err := os.Stat(f.backlogPath()); err != nil {
-		return errf(ErrNotFound, ".hv/BACKLOG.md not found")
+		return errf(ErrNotFound, ".rota/BACKLOG.md not found")
 	}
 	return nil
 }
@@ -224,7 +224,7 @@ func checkCreate(in CreateInput) (title string, fields []Field, err error) {
 }
 
 // Create captures one item: it mints the ID, appends the bullet (Since
-// stamped by Append) and, with a body, writes .hv/<kind>/<ID>.md with every
+// stamped by Append) and, with a body, writes .rota/<kind>/<ID>.md with every
 // "{ID}" replaced. As in the old helper the counter is bumped before the
 // bullet is appended, so a missing section still burns an ID.
 func (f *File) Create(in CreateInput) (CreateResult, error) {
@@ -252,7 +252,7 @@ func (f *File) Create(in CreateInput) (CreateResult, error) {
 		parts = append(parts, d)
 	}
 	res := CreateResult{ID: id, Type: kindLetter[in.Kind]}
-	rel := ".hv/" + in.Kind + "/" + id + ".md"
+	rel := ".rota/" + in.Kind + "/" + id + ".md"
 	if in.HasBody {
 		parts = append(parts, "Detail: `"+rel+"`")
 	}
@@ -298,9 +298,9 @@ func (f *File) SetField(ref, field, value string) (bool, error) {
 		if m == nil {
 			if _, gerr := f.Get(ref); gerr == nil {
 				return refused("closed item", ErrClosed,
-					"[%s] has no open bullet in .hv/BACKLOG.md (completed or archived)", ref)
+					"[%s] has no open bullet in .rota/BACKLOG.md (completed or archived)", ref)
 			}
-			return errf(ErrNotFound, "[%s] has no open bullet in .hv/BACKLOG.md (unknown, completed, or archived)", ref)
+			return errf(ErrNotFound, "[%s] has no open bullet in .rota/BACKLOG.md (unknown, completed, or archived)", ref)
 		}
 		raw := content[m[0]:m[1]]
 		if field == "detail" && pystr.Strip(value) != "" {
@@ -413,7 +413,7 @@ func (f *File) isRefactor(hash string) bool {
 // bumpSinceRefactor adds delta to counters.json since_refactor[key], never
 // below 0, creating the object with its two default keys when absent.
 func (f *File) bumpSinceRefactor(key string, delta int) error {
-	return fsio.UpdateJSON(f.hv("counters.json"), jsonx.NewObject(), func(v any) (any, error) {
+	return fsio.UpdateJSON(f.rota("counters.json"), jsonx.NewObject(), func(v any) (any, error) {
 		d, ok := v.(*jsonx.Object)
 		if !ok {
 			return nil, errors.New("counters.json is not a JSON object")
@@ -451,7 +451,7 @@ func (f *File) Reopen(ref string) (bool, error) {
 		return false, err
 	}
 	path := f.backlogPath()
-	apath := f.hv("ARCHIVE.md")
+	apath := f.rota("ARCHIVE.md")
 	restored := false
 	doneHash, dirName := "", ""
 	err := fsio.Locked(path, fsio.LockTimeout, func() error {
@@ -495,7 +495,7 @@ func (f *File) Reopen(ref string) (bool, error) {
 			}
 		}
 		if source == "" {
-			return errf(ErrNotFound, "[%s] not found in BACKLOG.md (## Completed) or .hv/ARCHIVE.md", ref)
+			return errf(ErrNotFound, "[%s] not found in BACKLOG.md (## Completed) or .rota/ARCHIVE.md", ref)
 		}
 		activeLine := "- " + done.Inner
 		dirName = detailDir(ref)

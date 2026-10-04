@@ -6,9 +6,9 @@ echo "round start/candidates: lease, roster slots, scope and readiness (C3, #59)
 RN="$(mktemp -d "$TMP/round-start.XXXXXX")"
 (
   cd "$RN" && git init -q -b main . && git -c user.email=a@b -c user.name=n commit -q --allow-empty -m init \
-    && mkdir -p .hv/milestones \
-    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .hv/BACKLOG.md \
-    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .hv/milestones/M01.md
+    && mkdir -p .rota/milestones \
+    && printf '# TODO\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n' > .rota/BACKLOG.md \
+    && printf -- '---\nid: M01\ntitle: "m"\nstatus: active\ndepends: []\n---\n' > .rota/milestones/M01.md
 ) || fail "round fixture setup failed"
 # start counts drift the way `round status` does, which asks the host: a fake
 # tmux whose server is "not running" stands in, so no real host is reachable.
@@ -16,7 +16,7 @@ mkdir -p "$RN/downbin"
 printf '#!/bin/sh\necho "no server running" >&2\nexit 1\n' > "$RN/downbin/tmux"
 chmod +x "$RN/downbin/tmux"
 RNENV="env -u HERDR_PANE_ID -u TMUX_PANE -u HERDR_ENV PATH=$RN/downbin:$PATH"
-rn() { ( cd "$RN" && $RNENV "$HV_BIN" --json "$@" 2>/dev/null ); }
+rn() { ( cd "$RN" && $RNENV "$ROTA_BIN" --json "$@" 2>/dev/null ); }
 rn item create --kind features --title First --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] works\nTouches internal/a.go' >/dev/null
 rn item create --kind features --title Second --milestone M01 --body-file - <<<$'## Acceptance\n- [ ] ok\n\n## Depends on\n- F01\n' >/dev/null
 rn item create --kind tasks --title Third --milestone M01 >/dev/null
@@ -40,7 +40,7 @@ OUT=$(rn round start --holder-pid "$HOLDER" --slots 2)
 [ -d "$RN/.worktrees/ben" ] || fail "slot worktree should be .worktrees/<agent>"
 [ "$(echo "$OUT" | jget data.lease.state)" = "live" ] || fail "start should hold a live lease: $OUT"
 [ "$(echo "$OUT" | jget data.candidates[0].id)" = "F01" ] || fail "start should list candidates: $OUT"
-LEASE="$(git -C "$RN" rev-parse --path-format=absolute --git-common-dir)/hv/round-lease.json"
+LEASE="$(git -C "$RN" rev-parse --path-format=absolute --git-common-dir)/rota/round-lease.json"
 [ -f "$LEASE" ] || fail "the lease should live in the git common dir: $LEASE"
 pass "start takes the lease and provisions roster slots on park/<agent>"
 
@@ -49,7 +49,7 @@ OUT=$(rn round start --holder-pid "$HOLDER" --slots 2)
 [ "$(echo "$OUT" | jget data.round)" = "1" ] || fail "a restart by the holder keeps the round: $OUT"
 [ "$(echo "$OUT" | jget data.changed)" = "false" ] || fail "a restart must change nothing: $OUT"
 sleep 30 & OTHER=$!
-RC=0; OUT=$( cd "$RN/.worktrees/ben" && $RNENV "$HV_BIN" --json round start --holder-pid "$OTHER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN/.worktrees/ben" && $RNENV "$ROTA_BIN" --json round start --holder-pid "$OTHER" 2>/dev/null ) || RC=$?
 kill "$OTHER" 2>/dev/null; wait "$OTHER" 2>/dev/null || true
 [ "$RC" = "4" ] || fail "a second orchestrator should be refused with exit 4, got $RC: $OUT"
 [ "$(echo "$OUT" | jget data.blockedBy)" = "lease held" ] || fail "refusal should say the lease is held: $OUT"
@@ -73,7 +73,7 @@ OUT=$(rn round start --holder-pid "$HOLDER")
 pass "a stale lease is reported by reconcile and reclaimed by start"
 
 # Scope: slate needs --items and limits candidates to them.
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round start --holder-pid "$HOLDER" --scope slate 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round start --holder-pid "$HOLDER" --scope slate 2>/dev/null ) || RC=$?
 [ "$RC" = "2" ] || fail "scope slate without --items should be a usage error, got $RC: $OUT"
 OUT=$(rn round start --holder-pid "$HOLDER" --scope slate --items F02,T01)
 [ "$(echo "$OUT" | jget data.candidates[0].id)" = "F02" ] || fail "slate candidates are the slate: $OUT"
@@ -92,22 +92,22 @@ OUT=$(rn round assign F01 --check-only --holder-pid "$HOLDER")
 [ "$(echo "$OUT" | jget data.ready)" = "true" ] || fail "F01 should be ready: $OUT"
 [ "$(echo "$OUT" | jget data.agent)" = "ben" ] || fail "check-only should name the first idle slot: $OUT"
 [ "$(echo "$OUT" | jget data.branch)" = "ben/f01-first" ] || fail "branch is <agent>/<issue>-<slug>: $OUT"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign T01 --check-only --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round assign T01 --check-only --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "1" ] || fail "check-only on an unready item should exit 1, got $RC: $OUT"
 [ "$(echo "$OUT" | jget data.ready)" = "false" ] || fail "T01 is not ready: $OUT"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign T01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round assign T01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "not ready" ] || fail "assign of an unready item should be refused: $RC $OUT"
 grep -q 'no acceptance criteria' <<<"$OUT" || fail "the refusal should say why: $OUT"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign F01 --holder-pid 1 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round assign F01 --holder-pid 1 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "no round" ] || fail "a process without the lease is refused: $RC $OUT"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round assign F01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round assign F01 --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] && [ "$(echo "$OUT" | jget data.blockedBy)" = "brief missing" ] || fail "a missing worker contract is refused before marking: $RC $OUT"
 [ "$(git -C "$RN/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "a refused assign must leave the slot parked"
 pass "assign refuses before marking: not ready, no lease, missing contract; check-only writes nothing"
 
 # wind-down: verify, park, release. A slot holding work is reported and kept.
 echo "scratch" > "$RN/.worktrees/ben/wip.txt"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "4" ] || fail "wind-down with a dirty slot should exit 4, got $RC: $OUT"
 [ "$(echo "$OUT" | jget data.blockedBy)" = "slot holds work" ] || fail "refusal should name the cause: $OUT"
 [ "$(echo "$OUT" | jget data.slots[0].outcome)" = "retained" ] || fail "ben should be retained: $OUT"
@@ -120,7 +120,7 @@ OUT=$(rn round wind-down --holder-pid "$HOLDER")
 [ "$(echo "$OUT" | jget data.slots[0].outcome)" = "unchanged" ] || fail "both slots end parked: $OUT"
 [ ! -f "$LEASE" ] || fail "a clean wind-down should release the lease"
 [ "$(git -C "$RN/.worktrees/ben" symbolic-ref --short HEAD)" = "park/ben" ] || fail "ben should be on park/ben"
-RC=0; OUT=$( cd "$RN" && $RNENV "$HV_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
+RC=0; OUT=$( cd "$RN" && $RNENV "$ROTA_BIN" --json round wind-down --holder-pid "$HOLDER" 2>/dev/null ) || RC=$?
 [ "$RC" = "3" ] || fail "wind-down without a lease should exit 3, got $RC: $OUT"
 OUT=$(rn round start --holder-pid "$HOLDER")
 [ "$(echo "$OUT" | jget data.round)" -ge 3 ] || fail "a new start after wind-down is a later round: $OUT"

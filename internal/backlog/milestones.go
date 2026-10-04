@@ -10,17 +10,17 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/frontmatter"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/frontmatter"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // Milestones in issue mode (hvlib_backend.IssueBackend's milestone block): a
 // milestone is a native milestone plus a tracking issue labelled
 // milestone-tracker, whose body is the milestone plan, whose status:<s>
 // label is the milestone status, and whose comments carry the slice plans
-// (`plan:S<NN>` notes). hv milestone and hv plan use this, and so does the
+// (`plan:S<NN>` notes). rota milestone and rota plan use this, and so does the
 // issue migration.
 
 // MilestoneTracker is the part of tracker.Adapter the milestone calls need on
@@ -159,7 +159,7 @@ func MilestoneStub(mid, title, summary string, depends []string, today string) s
 	return "---\nid: " + mid + "\ntitle: " + title + "\nstatus: planned\ndepends: [" + strings.Join(depends, ", ") + "]\ncreated: " + today + "\n---\n\n" +
 		"# " + mid + " — " + title + "\n\n## Goal\n\n" + summary + "\n\n## Acceptance criteria\n\n- _(define what shipped looks like)_\n\n" +
 		"## Rationale\n\n_(why this milestone, why now)_\n\n## Open risks\n\n_(unknowns, technical risks, dependencies that could shift)_\n\n" +
-		"## Research findings\n\n_(prior art, references, lessons from /hv-vision web search)_\n\n## Notes\n\n_(free-form brainstorm)_\n"
+		"## Research findings\n\n_(prior art, references, lessons from /rota-vision web search)_\n\n## Notes\n\n_(free-form brainstorm)_\n"
 }
 
 // NextMilestoneID is MNN with NN one above the highest M<digits> title prefix

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // fixture is a starting tree: path (relative to the root) to content.
@@ -19,29 +19,29 @@ type fixture map[string]string
 var fixtures = map[string]fixture{
 	"empty": {},
 	"legacy-todo": {
-		".hv/TODO.md": "# Backlog\n\n## Bugs\n- [B01] old\n",
+		".rota/TODO.md": "# Backlog\n\n## Bugs\n- [B01] old\n",
 	},
 	"todo-and-backlog": {
-		".hv/TODO.md":    "# Old\n",
-		".hv/BACKLOG.md": "# Backlog\n\n## Bugs\n- [B09] mine\n",
+		".rota/TODO.md":    "# Old\n",
+		".rota/BACKLOG.md": "# Backlog\n\n## Bugs\n- [B09] mine\n",
 	},
 	"vision-heading": {
-		".hv/MILESTONES.md": "# Vision\n\nbody line\n# Vision\n",
+		".rota/MILESTONES.md": "# Vision\n\nbody line\n# Vision\n",
 	},
 	"old-counters": {
-		".hv/counters.json": `{"bugs":3,"features":1,"tasks":2}` + "\n",
+		".rota/counters.json": `{"bugs":3,"features":1,"tasks":2}` + "\n",
 	},
 	"old-counters-pretty": {
-		".hv/counters.json": "{\n  \"bugs\": 7,\n  \"milestones\": 2\n}\n",
+		".rota/counters.json": "{\n  \"bugs\": 7,\n  \"milestones\": 2\n}\n",
 	},
 	"knowledge-preamble": {
-		".hv/KNOWLEDGE.md": "# Knowledge\n\nUse `/hv:learn` to save and `/hv:work` to read.\n\n## Topic\n\n- see `/hv:ship` here\n",
+		".rota/KNOWLEDGE.md": "# Knowledge\n\nUse `/hv:learn` to save and `/hv:work` to read.\n\n## Topic\n\n- see `/hv:ship` here\n",
 	},
 	"gitignore-blanket": {
-		".gitignore": "node_modules/\n.hv/\ndist/\n",
+		".gitignore": "node_modules/\n.rota/\ndist/\n",
 	},
 	"gitignore-no-newline": {
-		".gitignore": "node_modules/\n.hv/status.json",
+		".gitignore": "node_modules/\n.rota/status.json",
 	},
 	"gitignore-complete": {
 		".gitignore": strings.Join(ignoreLines, "\n") + "\n",
@@ -53,18 +53,18 @@ var fixtures = map[string]fixture{
 		".gitignore": "dist/\r\n.worktrees/\r\n",
 	},
 	"gitignore-only-blanket": {
-		".gitignore": ".hv/\n",
+		".gitignore": ".rota/\n",
 	},
 	"initialized": {
-		".hv/BACKLOG.md":    "# Backlog\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n",
-		".hv/KNOWLEDGE.md":  "# Knowledge\n\nmine\n",
-		".hv/DECISIONS.md":  "# Decisions\n",
-		".hv/MAP.md":        "# Project map\n\nmine\n",
-		".hv/MILESTONES.md": "# Milestones\n",
-		".hv/counters.json": `{"bugs":1,"features":2,"tasks":3,"milestones":4,"since_refactor":{"features":5,"bugs":6}}` + "\n",
-		".hv/status.json":   `{"active":[]}` + "\n",
-		".hv/repos.json":    `{"repos":[]}` + "\n",
-		".hv/config.json":   `{"work":{"isolation":"worktree"}}` + "\n",
+		".rota/BACKLOG.md":    "# Backlog\n\n## Bugs\n\n## Features\n\n## Tasks\n\n## Completed\n",
+		".rota/KNOWLEDGE.md":  "# Knowledge\n\nmine\n",
+		".rota/DECISIONS.md":  "# Decisions\n",
+		".rota/MAP.md":        "# Project map\n\nmine\n",
+		".rota/MILESTONES.md": "# Milestones\n",
+		".rota/counters.json": `{"bugs":1,"features":2,"tasks":3,"milestones":4,"since_refactor":{"features":5,"bugs":6}}` + "\n",
+		".rota/status.json":   `{"active":[]}` + "\n",
+		".rota/repos.json":    `{"repos":[]}` + "\n",
+		".rota/config.json":   `{"work":{"isolation":"worktree"}}` + "\n",
 	},
 }
 
@@ -122,8 +122,8 @@ func readTree(t *testing.T, dir string) map[string]string {
 
 // TestInitMatchesBootstrapGolden checks that Init leaves the tree the old
 // hv-bootstrap left on every fixture, as recorded in testdata/golden. The
-// deliberate differences are the ones in the A9 rulings: no `.hv/bin` directory, the G4 MAP.md text and the G7 config.json key order, plus B2's
-// `.hv/verdicts.json` line in the .gitignore block (#55), edited into the golden by hand.
+// deliberate differences are the ones in the A9 rulings: no `.rota/bin` directory, the G4 MAP.md text and the G7 config.json key order, plus B2's
+// `.rota/verdicts.json` line in the .gitignore block (#55), edited into the golden by hand.
 func TestInitMatchesBootstrapGolden(t *testing.T) {
 	var want map[string]map[string]string
 	pytest.Golden(t, fixtures, &want)
@@ -135,13 +135,13 @@ func TestInitMatchesBootstrapGolden(t *testing.T) {
 				t.Fatal(err)
 			}
 			got, exp := readTree(t, dir), want[name]
-			delete(exp, ".hv/bin")
+			delete(exp, ".rota/bin")
 			for _, tree := range []map[string]string{got, exp} {
-				if _, mine := fixtures[name][".hv/MAP.md"]; !mine {
-					delete(tree, ".hv/MAP.md")
+				if _, mine := fixtures[name][".rota/MAP.md"]; !mine {
+					delete(tree, ".rota/MAP.md")
 				}
-				if _, mine := fixtures[name][".hv/config.json"]; !mine {
-					delete(tree, ".hv/config.json")
+				if _, mine := fixtures[name][".rota/config.json"]; !mine {
+					delete(tree, ".rota/config.json")
 				}
 			}
 			if !reflect.DeepEqual(got, exp) {
@@ -189,13 +189,13 @@ func TestInitCreatedListsTheDiff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{".gitignore", ".hv", ".hv/BACKLOG.md", ".hv/bugs", ".hv/map", ".hv/config.json", ".hv/status.json"} {
+	for _, p := range []string{".gitignore", ".rota", ".rota/BACKLOG.md", ".rota/bugs", ".rota/map", ".rota/config.json", ".rota/status.json"} {
 		if !contains(res.Created, p) {
 			t.Errorf("created lacks %s: %v", p, res.Created)
 		}
 	}
-	if contains(res.Created, ".hv/bin") {
-		t.Error("init created .hv/bin")
+	if contains(res.Created, ".rota/bin") {
+		t.Error("init created .rota/bin")
 	}
 	if !sort.StringsAreSorted(res.Created) || !res.Changed() {
 		t.Errorf("created %v changed %v", res.Created, res.Changed())
@@ -239,12 +239,12 @@ func TestSeedConfigKeepsSchemaOrder(t *testing.T) {
 func TestInitRefusesACorruptCounters(t *testing.T) {
 	for _, body := range []string{"{not json", "[]", ""} {
 		dir := t.TempDir()
-		writeFixture(t, dir, fixture{".hv/counters.json": body})
+		writeFixture(t, dir, fixture{".rota/counters.json": body})
 		_, err := Init(dir)
 		if err == nil || !strings.Contains(err.Error(), "counters.json") {
 			t.Errorf("%q: %v", body, err)
 		}
-		if got := readTree(t, dir)[".hv/counters.json"]; got != body {
+		if got := readTree(t, dir)[".rota/counters.json"]; got != body {
 			t.Errorf("%q: counters rewritten to %q", body, got)
 		}
 		// nothing else was written: exit 70 leaves the tree as it was
@@ -269,19 +269,19 @@ func TestInitWarnsOnLegacyTodoBesideBacklog(t *testing.T) {
 func TestInitRemovesTheStaleMirror(t *testing.T) {
 	dir := t.TempDir()
 	writeFixture(t, dir, fixture{
-		".hv/bin/hv-preflight":          "#!/bin/sh\n",
-		".hv/bin/hvlib.py":              "",
-		".hv/bin/hvlib_io.py":           "",
-		".hv/bin/__pycache__/hvlib.pyc": "x",
+		".rota/bin/hv-preflight":          "#!/bin/sh\n",
+		".rota/bin/hvlib.py":              "",
+		".rota/bin/hvlib_io.py":           "",
+		".rota/bin/__pycache__/hvlib.pyc": "x",
 	})
 	res, err := Init(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".hv", "bin")); !os.IsNotExist(err) {
-		t.Errorf(".hv/bin survived: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, ".rota", "bin")); !os.IsNotExist(err) {
+		t.Errorf(".rota/bin survived: %v", err)
 	}
-	want := []string{".hv/bin", ".hv/bin/__pycache__", ".hv/bin/hv-preflight", ".hv/bin/hvlib.py", ".hv/bin/hvlib_io.py"}
+	want := []string{".rota/bin", ".rota/bin/__pycache__", ".rota/bin/hv-preflight", ".rota/bin/hvlib.py", ".rota/bin/hvlib_io.py"}
 	if !reflect.DeepEqual(res.Removed, want) || !res.Changed() {
 		t.Errorf("removed %v", res.Removed)
 	}
@@ -289,25 +289,25 @@ func TestInitRemovesTheStaleMirror(t *testing.T) {
 
 func TestInitKeepsCustomFilesInTheMirror(t *testing.T) {
 	dir := t.TempDir()
-	writeFixture(t, dir, fixture{".hv/bin/hv-x": "", ".hv/bin/mine.sh": "keep"})
+	writeFixture(t, dir, fixture{".rota/bin/hv-x": "", ".rota/bin/mine.sh": "keep"})
 	res, err := Init(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if readTree(t, dir)[".hv/bin/mine.sh"] != "keep" || contains(res.Removed, ".hv/bin") {
+	if readTree(t, dir)[".rota/bin/mine.sh"] != "keep" || contains(res.Removed, ".rota/bin") {
 		t.Errorf("custom file lost: %v", res.Removed)
 	}
-	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], ".hv/bin/mine.sh") {
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], ".rota/bin/mine.sh") {
 		t.Errorf("warnings: %v", res.Warnings)
 	}
 }
 
 func TestMergeGitignoreKeepsTheUmbrellaBlanket(t *testing.T) {
-	in := strings.Join(ignoreLines, "\n") + "\n.hv/\n.worktrees/\n"
+	in := strings.Join(ignoreLines, "\n") + "\n.rota/\n.worktrees/\n"
 	if got := MergeGitignore(in, true, true); got != in {
 		t.Errorf("umbrella root rewrote .gitignore:\n%q", got)
 	}
-	if got := MergeGitignore(in, true, false); strings.Contains(got, "\n.hv/\n") {
+	if got := MergeGitignore(in, true, false); strings.Contains(got, "\n.rota/\n") {
 		t.Errorf("single repo kept the blanket line:\n%q", got)
 	}
 }
@@ -325,8 +325,8 @@ func TestMergeGitignore(t *testing.T) {
 		{"complete", block + ".worktrees/\n", true, block + ".worktrees/\n"},
 		{"slash spelling", block + "/.worktrees\n", true, block + "/.worktrees\n"},
 		{"crlf worktrees", block + ".worktrees/\r\n", true, block + ".worktrees/\r\n"},
-		{"blanket stripped", "a\n.hv/\nb\n", true, "a\nb\n\n" + block + worktreesBlock},
-		{"only blanket kept", ".hv/\n", true, "\n" + block + worktreesBlock},
+		{"blanket stripped", "a\n.rota/\nb\n", true, "a\nb\n\n" + block + worktreesBlock},
+		{"only blanket kept", ".rota/\n", true, "\n" + block + worktreesBlock},
 		{"no trailing newline", "a", true, "a\n" + block + worktreesBlock},
 		// A block written before the rename (#231) keeps its old header: the
 		// header is cosmetic and never checked, so nothing is appended.
@@ -351,14 +351,14 @@ func TestInitChangedWhenOnlyAMigrationWrote(t *testing.T) {
 	}
 	for name, mutate := range map[string]func(dir string){
 		"counters backfill": func(d string) {
-			os.WriteFile(filepath.Join(d, ".hv", "counters.json"), []byte(`{"bugs": 3}`), 0o644)
+			os.WriteFile(filepath.Join(d, ".rota", "counters.json"), []byte(`{"bugs": 3}`), 0o644)
 		},
 		"gitignore block": func(d string) { os.WriteFile(filepath.Join(d, ".gitignore"), []byte("x\n"), 0o644) },
 		"milestones heading": func(d string) {
-			os.WriteFile(filepath.Join(d, ".hv", "MILESTONES.md"), []byte("# Vision\n"), 0o644)
+			os.WriteFile(filepath.Join(d, ".rota", "MILESTONES.md"), []byte("# Vision\n"), 0o644)
 		},
 		"knowledge preamble": func(d string) {
-			os.WriteFile(filepath.Join(d, ".hv", "KNOWLEDGE.md"), []byte("Use `/hv:learn`.\n"), 0o644)
+			os.WriteFile(filepath.Join(d, ".rota", "KNOWLEDGE.md"), []byte("Use `/hv:learn`.\n"), 0o644)
 		},
 	} {
 		dir := seeded(t)

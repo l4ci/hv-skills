@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/version"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/version"
 )
 
-// Tree is the hv command tree. Groups and verbs are added here as they are
+// Tree is the rota command tree. Groups and verbs are added here as they are
 // ported (A4-A8); their flags and --json shapes come from the verb contract (#46).
 func Tree() *Command {
 	root := &Command{
-		Name:    "hv",
-		Summary: "hv command line",
+		Name:    "rota",
+		Summary: "rota command line",
 		Subs: []*Command{
-			{Name: "version", Summary: "print the hv version", Verb: versionVerb},
+			{Name: "version", Summary: "print the rota version", Verb: versionVerb},
 			knowledgeCommands(),
 			glossaryCommands(),
 			blockCommand(),
@@ -49,7 +49,7 @@ func noFlags(run RunFunc) func(*flag.FlagSet) RunFunc {
 }
 
 func versionVerb(fs *flag.FlagSet) RunFunc {
-	drift := fs.Bool("drift", false, "compare the version stamped in .hv/config.json with this binary")
+	drift := fs.Bool("drift", false, "compare the version stamped in .rota/config.json with this binary")
 	return func(c *Ctx, args []string) (Result, error) {
 		if len(args) > 0 {
 			return Result{}, Usage("version takes no arguments")
@@ -61,10 +61,10 @@ func versionVerb(fs *flag.FlagSet) RunFunc {
 	}
 }
 
-// runVersionDrift is hv-version-check --json: hv.version of the merged config
+// runVersionDrift is hv-version-check --json: rota.version of the merged config
 // (hvSkills.version on a project not yet migrated) against the running
 // binary. stamped or installed empty is "unknown".
-// The old helper exited 0 without .hv/; 5.0 exits 3 (the root walk-up).
+// The old helper exited 0 without .rota/; 5.0 exits 3 (the root walk-up).
 func runVersionDrift(c *Ctx) (Result, error) {
 	root, err := c.Root()
 	if err != nil {
@@ -80,11 +80,11 @@ func runVersionDrift(c *Ctx) (Result, error) {
 	return Result{Data: data, Text: driftLine(stamped, installed, status)}, nil
 }
 
-// versionDrift compares the stamped version (hv.version, else the legacy
+// versionDrift compares the stamped version (rota.version, else the legacy
 // hvSkills.version) of root's merged config with the running binary. Either
 // side empty is "unknown".
 func versionDrift(root string) (stamped, installed, status string) {
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	stamped = config.StampedVersion(cfg)
 	installed = installedVersionFn()
 	status = "unknown"
@@ -102,7 +102,7 @@ func driftLine(stamped, installed, status string) string {
 	if status != "drift" {
 		return ""
 	}
-	return fmt.Sprintf("hv drift: project at %s, binary at %s: run hv init to refresh", stamped, installed)
+	return fmt.Sprintf("rota drift: project at %s, binary at %s: run rota init to refresh", stamped, installed)
 }
 
 // versionDriftLine is the drift nudge for root, or "".
@@ -117,7 +117,7 @@ func runVersion(*Ctx) (Result, error) {
 	data.Set("commit", info.Commit)
 	data.Set("date", info.Date)
 	data.Set("goVersion", info.GoVersion)
-	text := "hv " + info.Version
+	text := "rota " + info.Version
 	switch {
 	case info.Commit != "" && info.Date != "":
 		text += fmt.Sprintf(" (%s, %s)", info.Commit, info.Date)

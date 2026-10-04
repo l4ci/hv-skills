@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
-	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
+	"github.com/l4ci/rota/internal/section"
 )
 
 // This file holds the file-backend maintenance verbs: archive, Since backfill
@@ -24,12 +24,12 @@ import (
 // calendar date; the Python helper crashes on it before writing anything.
 var ErrBadDate = errors.New("invalid date in ## Completed")
 
-func (f *File) archivePath() string { return f.hv("ARCHIVE.md") }
+func (f *File) archivePath() string { return f.rota("ARCHIVE.md") }
 
 const archiveHeader = "# Archive\n\nCompleted items older than the active window.\n\n"
 
 // Archive moves the done lines of ## Completed that are older than days
-// (done date before today minus days) to .hv/ARCHIVE.md and returns how many
+// (done date before today minus days) to .rota/ARCHIVE.md and returns how many
 // moved. A missing BACKLOG.md or ## Completed is no work. today is the local
 // date, as date.today() in the helper.
 //
@@ -203,7 +203,7 @@ func (f *File) BackfillSince(head string) (stamped int, err error) {
 
 // ---- refactor counters ----------------------------------------------------------
 
-func (f *File) countersPath() string { return f.hv("counters.json") }
+func (f *File) countersPath() string { return f.rota("counters.json") }
 
 var zero = json.Number("0")
 

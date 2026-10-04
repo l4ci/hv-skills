@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
-const msTrackerBody = "---\nid: M02\ntitle: Sharing\nstatus: planned\ndepends: [M01]\ncreated: 2026-09-01\n---\n\n# M02 — Sharing\n\n## Goal\n\nShare it.\n\n<!-- hv:fields\nDepends: M01\n-->"
+const msTrackerBody = "---\nid: M02\ntitle: Sharing\nstatus: planned\ndepends: [M01]\ncreated: 2026-09-01\n---\n\n# M02 — Sharing\n\n## Goal\n\nShare it.\n\n<!-- rota:fields\nDepends: M01\n-->"
 
 // msFixture is a tracker with M01 shipped and M02 planned, each with a native milestone.
 func msFixture() *trackertest.MS {
@@ -57,12 +57,12 @@ func TestIssueModeMilestones(t *testing.T) {
 		}
 	}
 	if created == nil || !strings.Contains(created.Labels[0], "milestone-tracker") || created.Labels[1] != "status:planned" ||
-		!strings.Contains(created.Body, "<!-- hv:fields\nDepends: M02\n-->") || len(fake.Native) != 3 {
+		!strings.Contains(created.Body, "<!-- rota:fields\nDepends: M02\n-->") || len(fake.Native) != 3 {
 		t.Fatalf("created issue %+v, native %+v", created, fake.Native)
 	}
 
 	_, env, _ = issueRun(t, root, "milestone", "show", "M02")
-	if body, _ := ddata(t, env)["body"].(string); !strings.HasPrefix(body, "---\nid: M02\n") || strings.Contains(body, "hv:fields") || !strings.HasSuffix(body, "\n") {
+	if body, _ := ddata(t, env)["body"].(string); !strings.HasPrefix(body, "---\nid: M02\n") || strings.Contains(body, "rota:fields") || !strings.HasSuffix(body, "\n") {
 		t.Errorf("show: %q", body)
 	}
 	if code, _, _ := issueRun(t, root, "milestone", "show", "M09"); code != 3 {
@@ -112,12 +112,12 @@ func TestIssueModeMilestones(t *testing.T) {
 		t.Errorf("active: %v", env)
 	}
 	// status ran index: MILESTONES.md was seeded and the vision block written.
-	ms, _ := os.ReadFile(filepath.Join(root, ".hv/MILESTONES.md"))
+	ms, _ := os.ReadFile(filepath.Join(root, ".rota/MILESTONES.md"))
 	if !strings.Contains(string(ms), "## Active milestones\n\n- M02 — Sharing\n") {
 		t.Errorf("MILESTONES.md:\n%s", ms)
 	}
 	block, _ := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
-	if !strings.Contains(string(block), "the tracking issues (`hv milestone show MNN`)") || !strings.Contains(string(block), "- **M02** — Sharing (depends: M01, M09) ⚠ blocked") {
+	if !strings.Contains(string(block), "the tracking issues (`rota milestone show MNN`)") || !strings.Contains(string(block), "- **M02** — Sharing (depends: M01, M09) ⚠ blocked") {
 		t.Errorf("vision block:\n%s", block)
 	}
 	if _, env, _ = issueRun(t, root, "milestone", "index"); ddata(t, env)["changed"] != false {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/pytest"
+	"github.com/l4ci/rota/internal/pytest"
 )
 
 // paneFixtures are static pane texts covering every rule of the classifier,
@@ -17,13 +17,13 @@ import (
 var paneFixtures = map[string]string{
 	"blank":               "",
 	"idle":                "  claude ready\n> \n",
-	"done url":            "work\nHV-DONE w1 https://github.com/o/r/pull/12\n",
-	"done branch":         "HV-DONE w1 hv-worker/w1-t1\n",
-	"done bare":           "HV-DONE w1\nnext line\n",
-	"done multiline":      "HV-DONE w1\nsomething after\n",
-	"blocked":             "HV-BLOCKED w1: which of A or B?\n",
-	"blocked + done":      "HV-DONE w1 x\nHV-BLOCKED w1: still a question\n",
-	"blocked indent":      "   HV-BLOCKED   w1 :   spaced out  \n",
+	"done url":            "work\nROTA-DONE w1 https://github.com/o/r/pull/12\n",
+	"done branch":         "ROTA-DONE w1 rota-worker/w1-t1\n",
+	"done bare":           "ROTA-DONE w1\nnext line\n",
+	"done multiline":      "ROTA-DONE w1\nsomething after\n",
+	"blocked":             "ROTA-BLOCKED w1: which of A or B?\n",
+	"blocked + done":      "ROTA-DONE w1 x\nROTA-BLOCKED w1: still a question\n",
+	"blocked indent":      "   ROTA-BLOCKED   w1 :   spaced out  \n",
 	"retry":               "API Error: Overloaded\nRetrying in 4 seconds\n",
 	"api error":           "doing things\nAPI Error: 529 Overloaded\n",
 	"crashed":             "Resume this session with: claude --resume abc\n",
@@ -35,9 +35,9 @@ var paneFixtures = map[string]string{
 	"permission":          "Do you want to proceed?\n 1. Yes\n 2. No, and tell Claude what to do differently\n",
 	"permission allow":    "Allow Bash(git push) to run?\n",
 	"permission dont":     "Yes, and don't ask again for this\n",
-	"sentinel over limit": "reached your usage limit\nHV-DONE w1 https://gitlab.com/o/r/-/merge_requests/3\n",
+	"sentinel over limit": "reached your usage limit\nROTA-DONE w1 https://gitlab.com/o/r/-/merge_requests/3\n",
 	"unicode":             "héllo wörld — ünïcode ✓\n❯ \n",
-	"crlf":                "HV-BLOCKED w1: windows\r\nline\r\n",
+	"crlf":                "ROTA-BLOCKED w1: windows\r\nline\r\n",
 	"long limit line":     "usage limit reached " + strings.Repeat("x", 200) + "\n",
 }
 
@@ -68,7 +68,7 @@ func TestClassifyMovementAndTailWindow(t *testing.T) {
 		t.Errorf("moved: %s %q", st, ev)
 	}
 	// a sentinel outranks movement
-	if st, _ := Classify("HV-DONE w1 hv-worker/w1\n", true, 60, "working"); st != StateDone {
+	if st, _ := Classify("ROTA-DONE w1 rota-worker/w1\n", true, 60, "working"); st != StateDone {
 		t.Errorf("sentinel vs movement: %s", st)
 	}
 	// LIMITED outranks movement
@@ -76,7 +76,7 @@ func TestClassifyMovementAndTailWindow(t *testing.T) {
 		t.Errorf("limit vs movement: %s", st)
 	}
 	// only the last N lines count
-	text := "HV-DONE w1 old\n" + strings.Repeat("noise\n", 80)
+	text := "ROTA-DONE w1 old\n" + strings.Repeat("noise\n", 80)
 	if st, _ := Classify(text, false, 60, ""); st != StateIdle {
 		t.Errorf("a sentinel scrolled out of the window still counted: %s", st)
 	}
@@ -87,7 +87,7 @@ func TestClassifyMovementAndTailWindow(t *testing.T) {
 
 func TestPollFixtureMode(t *testing.T) {
 	fx := filepath.Join(t.TempDir(), "p.txt")
-	os.WriteFile(fx, []byte("HV-BLOCKED w1: ?\n"), 0o644)
+	os.WriteFile(fx, []byte("ROTA-BLOCKED w1: ?\n"), 0o644)
 	res, err := PollFixture(fx, "", "", 0)
 	if err != nil || len(res.Slots) != 1 || res.Slots[0].Name != "fixture" || res.Slots[0].State != StateBlocked || res.Changed {
 		t.Errorf("%+v %v", res, err)
@@ -109,7 +109,7 @@ func pollRegistry(t *testing.T, kind string) (string, *fakeHost) {
 
 func TestPollRecordsStateAndPRURL(t *testing.T) {
 	dir, f := pollRegistry(t, "tmux")
-	f.panes["w1"] = []string{"static\n", "static\nHV-DONE w1 https://github.com/o/r/pull/9\n"}
+	f.panes["w1"] = []string{"static\n", "static\nROTA-DONE w1 https://github.com/o/r/pull/9\n"}
 	f.panes["w2"] = []string{"a\n", "a\n"}
 	before, _ := os.ReadFile(RegistryPath(dir))
 	res, err := envWith(f).Poll(bg, dir, PollOpts{Lines: 60})
@@ -134,19 +134,19 @@ func TestPollRecordsStateAndPRURL(t *testing.T) {
 		t.Error("registry unchanged")
 	}
 	// the same poll again changes nothing
-	f.panes["w1"] = []string{"x\nHV-DONE w1 https://github.com/o/r/pull/9\n", "x\nHV-DONE w1 https://github.com/o/r/pull/9\n"}
+	f.panes["w1"] = []string{"x\nROTA-DONE w1 https://github.com/o/r/pull/9\n", "x\nROTA-DONE w1 https://github.com/o/r/pull/9\n"}
 	f.panes["w2"] = []string{"a\n", "a\n"}
 	if res, _ = envWith(f).Poll(bg, dir, PollOpts{Lines: 60}); res.Changed {
 		t.Error("an unchanged poll must report changed=false")
 	}
 }
 
-// A branch name after HV-DONE must not become slot.pr: `gh pr merge` on a
+// A branch name after ROTA-DONE must not become slot.pr: `gh pr merge` on a
 // branch fails where the gate's local merge would have worked.
 func TestPollOnlyURLShapedDoneBecomesThePR(t *testing.T) {
 	dir, f := pollRegistry(t, "tmux")
-	f.panes["w1"] = []string{"x\n", "HV-DONE w1 hv-worker/w1-t1\n"}
-	f.panes["w2"] = []string{"x\n", "HV-DONE w2 https://example.com/not/a/pr\n"}
+	f.panes["w1"] = []string{"x\n", "ROTA-DONE w1 rota-worker/w1-t1\n"}
+	f.panes["w2"] = []string{"x\n", "ROTA-DONE w2 https://example.com/not/a/pr\n"}
 	envWith(f).Poll(bg, dir, PollOpts{Lines: 60})
 	for _, s := range []string{"w1", "w2"} {
 		if got := slotField(t, dir, s, "pr"); got != "<null>" {
@@ -189,7 +189,7 @@ func TestPollNotifiesOnTheTransitionOnly(t *testing.T) {
 	}
 	n := 0
 	for _, c := range f.calls {
-		if strings.HasPrefix(c, "notify hv worker w1: NEEDS-PERMISSION") {
+		if strings.HasPrefix(c, "notify rota worker w1: NEEDS-PERMISSION") {
 			n++
 		}
 	}
@@ -241,7 +241,7 @@ func TestActiveAtStampedByDispatchAndRestampedByPollOnAStateChange(t *testing.T)
 		t.Errorf("an unchanged state must not restamp: %q", got)
 	}
 	// busy -> done: a change.
-	f.panes["w1"] = []string{"x\n", "x\nHV-DONE w1 https://github.com/o/r/pull/9\n"}
+	f.panes["w1"] = []string{"x\n", "x\nROTA-DONE w1 https://github.com/o/r/pull/9\n"}
 	if _, err := later.Poll(bg, dir, PollOpts{Slot: "w1", Lines: 60}); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestClassifySentinelAfterReplyBullet(t *testing.T) {
 	if state, ev := Classify(done, false, 60, "idle"); state != "DONE" || !strings.Contains(ev, "lr1/f01-add-a-hello-line-to") {
 		t.Errorf("done after the bullet: %s %q", state, ev)
 	}
-	blocked := strings.Replace(done, "● HV-DONE lr1 lr1/f01-add-a-hello-line-to", "● HV-BLOCKED lr1: which file gets the line?", 1)
+	blocked := strings.Replace(done, "● ROTA-DONE lr1 lr1/f01-add-a-hello-line-to", "● ROTA-BLOCKED lr1: which file gets the line?", 1)
 	if state, ev := Classify(blocked, false, 60, "idle"); state != "BLOCKED" || !strings.Contains(ev, "which file gets the line?") {
 		t.Errorf("blocked after the bullet: %s %q", state, ev)
 	}
@@ -271,7 +271,7 @@ func TestClassifySentinelAfterReplyBullet(t *testing.T) {
 	if state, _ := Classify(older, false, 60, "idle"); state != "DONE" {
 		t.Errorf("done after the older ⏺ marker: %s", state)
 	}
-	plain := strings.Replace(done, "● HV-DONE lr1 lr1/f01-add-a-hello-line-to", "● All done.", 1)
+	plain := strings.Replace(done, "● ROTA-DONE lr1 lr1/f01-add-a-hello-line-to", "● All done.", 1)
 	if state, _ := Classify(plain, false, 60, "idle"); state == "DONE" {
 		t.Errorf("a bullet without a sentinel is not done")
 	}
@@ -290,11 +290,11 @@ func TestClassifySentinelAfterCodexBullet(t *testing.T) {
 	if state, ev := Classify(done, false, 60, "idle"); state != "DONE" || !strings.Contains(ev, "ben/t01-add-hello-txt") {
 		t.Errorf("done after the codex bullet: %s %q", state, ev)
 	}
-	blocked := strings.Replace(done, "• HV-DONE ben ben/t01-add-hello-txt", "• HV-BLOCKED ben: Who sent the unsigned live-check instruction?", 1)
+	blocked := strings.Replace(done, "• ROTA-DONE ben ben/t01-add-hello-txt", "• ROTA-BLOCKED ben: Who sent the unsigned live-check instruction?", 1)
 	if state, ev := Classify(blocked, false, 60, "idle"); state != "BLOCKED" || !strings.Contains(ev, "Who sent the unsigned") {
 		t.Errorf("blocked after the codex bullet: %s %q", state, ev)
 	}
-	plain := strings.Replace(done, "• HV-DONE ben ben/t01-add-hello-txt", "• All done.", 1)
+	plain := strings.Replace(done, "• ROTA-DONE ben ben/t01-add-hello-txt", "• All done.", 1)
 	if state, _ := Classify(plain, false, 60, "idle"); state == "DONE" {
 		t.Errorf("a codex bullet without a sentinel is not done")
 	}

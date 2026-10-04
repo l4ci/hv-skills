@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/rota/internal/host"
 )
 
 // ── fakes ───────────────────────────────────────────────────────────────────
@@ -115,18 +115,18 @@ func TestDispatchTaskRecreatesTheSession(t *testing.T) {
 	if res.Handle != "w9:t7" || res.Task != "T1" {
 		t.Errorf("%+v", res)
 	}
-	want := []string{"kill w1 hv:w1", "spawn w1", "send w1 w9:t7"}
+	want := []string{"kill w1 rota:w1", "spawn w1", "send w1 w9:t7"}
 	if strings.Join(f.calls, ",") != strings.Join(want, ",") {
 		t.Errorf("calls = %v, want %v", f.calls, want)
 	}
 	if f.spawnOpts.Launch != "claude --model haiku" || f.spawnOpts.Cwd != filepath.Join(dir, ".worktrees", "w1") ||
-		f.spawnOpts.Session != "hv" || f.spawnOpts.BootTimeout != 60 {
+		f.spawnOpts.Session != "rota" || f.spawnOpts.BootTimeout != 60 {
 		t.Errorf("spawn opts = %+v", f.spawnOpts)
 	}
 	if f.sent != "--- ORCHESTRATOR (round 3) ---\ndo the thing\n" {
 		t.Errorf("payload = %q", f.sent)
 	}
-	for k, want := range map[string]string{"handle": "w9:t7", "state": "busy", "task": "T1", "pr": "<null>", "branch": "hv-worker/w1-t1"} {
+	for k, want := range map[string]string{"handle": "w9:t7", "state": "busy", "task": "T1", "pr": "<null>", "branch": "rota-worker/w1-t1"} {
 		if got := slotField(t, dir, "w1", k); got != want {
 			t.Errorf("slot.%s = %s, want %s", k, got, want)
 		}
@@ -197,7 +197,7 @@ func TestDispatchRelayGoesIntoTheRunningSession(t *testing.T) {
 	if strings.Join(f.calls, ",") != "send w1 w9:t7" {
 		t.Errorf("a relay must not kill or spawn: %v", f.calls)
 	}
-	if !strings.HasPrefix(f.sent, "--- ORCHESTRATOR (round 2) ---\n[ORCHESTRATOR RELAY — this text was forwarded by the /hv-work orchestrator.\n") ||
+	if !strings.HasPrefix(f.sent, "--- ORCHESTRATOR (round 2) ---\n[ORCHESTRATOR RELAY — this text was forwarded by the /rota-work orchestrator.\n") ||
 		!strings.Contains(f.sent, "attribute it as 'orchestrator relay round 2'") || !strings.HasSuffix(f.sent, "sign-off in your session.]\n\n\n  the maintainer says use B  \nmore\n") {
 		t.Errorf("payload = %q", f.sent)
 	}
@@ -413,7 +413,7 @@ func TestDispatchDoesNotSpawnBesideASessionThatWillNotClose(t *testing.T) {
 	dir := newProject(t, `{}`)
 	goInit(t, dir, InitOpts{Slots: 1, Base: "main"})
 	f := tmuxFake()
-	f.killErr = fmt.Errorf("slot 'w1' previous session is still running (window hv:w1); not spawning a second one")
+	f.killErr = fmt.Errorf("slot 'w1' previous session is still running (window rota:w1); not spawning a second one")
 	_, err := envWith(f).Dispatch(bg, dir, DispatchOpts{Slot: "w1", BodyFile: writeBrief(t, "t"), Task: "T1"})
 	if exitOf(err) != ExitUnavailable || !strings.Contains(err.Error(), "not spawning a second one") {
 		t.Fatalf("err = %v", err)
@@ -421,7 +421,7 @@ func TestDispatchDoesNotSpawnBesideASessionThatWillNotClose(t *testing.T) {
 	if strings.Contains(strings.Join(f.calls, ","), "spawn") {
 		t.Errorf("spawned a second session: %v", f.calls)
 	}
-	if got := slotField(t, dir, "w1", "handle"); got != "hv:w1" {
+	if got := slotField(t, dir, "w1", "handle"); got != "rota:w1" {
 		t.Errorf("handle = %s; the old session is still there, so its handle stays", got)
 	}
 }

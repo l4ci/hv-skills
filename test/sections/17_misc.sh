@@ -9,7 +9,7 @@ file_version() { python3 -c "import json; print(json.loads(open('$1').read())['v
 
 # release version previews the bump read-only: data.next, file byte-unchanged
 # (own project dir: detection runs from the project root, so it needs a root of its own)
-mkdir -p prev/.hv && cd prev
+mkdir -p prev/.rota && cd prev
 echo '{"name": "foo", "version": "1.2.3"}' > package.json
 ORIG_HASH=$(sha256sum package.json | cut -c1-16)
 preview() { hvj release version "$@" | jget data.next; }
@@ -27,8 +27,8 @@ pass "release version rejects a backwards --to with exit 1"
 cd ..
 
 # release.versionFile points the preview at a pyproject.toml (own project dir again)
-mkdir -p prev-py/.hv && cd prev-py
-echo '{"release":{"versionFile":"pyproject.toml"}}' > .hv/config.json
+mkdir -p prev-py/.rota && cd prev-py
+echo '{"release":{"versionFile":"pyproject.toml"}}' > .rota/config.json
 printf '[project]\nname = "foo"\nversion = "0.5.0"\n' > pyproject.toml
 ORIG_HASH=$(sha256sum pyproject.toml | cut -c1-16)
 OUT=$(hvj release version --level patch)
@@ -90,14 +90,14 @@ git init -q
 git config user.email t@t && git config user.name t
 git checkout -q -b main 2>/dev/null || git branch -m main
 echo "x" > f && git add f && git commit -q -m "seed"
-mkdir -p .hv/spikes
+mkdir -p .rota/spikes
 
 # Create the spike file BUT NO branch (simulating partial-state retry)
-echo "leftover" > .hv/spikes/foo.md
+echo "leftover" > .rota/spikes/foo.md
 
 # spike add should refuse at the file-existence check, NOT create the branch
 rc=0; OUT=$(hvj spike add foo --question "?" 2>/dev/null) || rc=$?
-[ "$rc" = 4 ] || fail "spike add should exit 4 when .hv/spikes/foo.md already exists (got $rc): $OUT"
+[ "$rc" = 4 ] || fail "spike add should exit 4 when .rota/spikes/foo.md already exists (got $rc): $OUT"
 [ "$(echo "$OUT" | jget data.blockedBy)" = "exists" ] && [ "$(echo "$OUT" | jget data.changed)" = "false" ] \
   || fail "spike add refusal should report blockedBy exists, changed false: $OUT"
 

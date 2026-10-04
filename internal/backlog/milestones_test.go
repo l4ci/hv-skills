@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 func TestParseMSTitle(t *testing.T) {
@@ -118,7 +118,7 @@ func TestDuplicateTrackingIssuesWarn(t *testing.T) {
 }
 
 func TestSlicePlansAcrossParts(t *testing.T) {
-	t.Setenv("HV_NOTE_LIMIT", "80")
+	t.Setenv("ROTA_NOTE_LIMIT", "82")
 	f := &trackertest.MS{Fake: &trackertest.Fake{Issues: []tracker.Issue{
 		{Number: 3, Title: "M02 — Sharing", Labels: []string{"milestone-tracker"}, State: "open"},
 	}}}
@@ -188,7 +188,7 @@ func TestSliceNotesMixedWithPlainPlan(t *testing.T) {
 	for _, c := range f.Fake.Issues[0].Comments {
 		marks = append(marks, strings.SplitN(c.Body, "\n", 2)[0])
 	}
-	if want := []string{"<!-- hv:plan:S01 -->", "<!-- hv:plan:S02 -->", "<!-- hv:plan -->"}; !reflect.DeepEqual(marks, want) {
+	if want := []string{"<!-- rota:plan:S01 -->", "<!-- rota:plan:S02 -->", "<!-- rota:plan -->"}; !reflect.DeepEqual(marks, want) {
 		t.Errorf("markers = %v", marks)
 	}
 	if ch, err := b.NotePut(n, "plan:S01", "slice one\nline two"); err != nil || ch {

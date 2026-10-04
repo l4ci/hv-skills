@@ -1,12 +1,12 @@
-echo "C6: hv reap previews by default, never touches a live or held thing, and --apply removes the rest"
+echo "C6: rota reap previews by default, never touches a live or held thing, and --apply removes the rest"
 
-# Everything lives in one fresh mktemp dir. HV_TEST_REAP_HOST stands in for
+# Everything lives in one fresh mktemp dir. ROTA_TEST_REAP_HOST stands in for
 # herdr: no real host is ever asked, so no real tab or agent can be touched.
 TMP_RP="$(mktemp -d)"
 trap 'rm -rf "$TMP_RP"' EXIT
 
 RP="$TMP_RP/proj"
-mkdir -p "$RP/.hv"
+mkdir -p "$RP/.rota"
 rp_git() { git -C "$RP" -c user.email=a@b -c user.name=n "$@"; }
 git init -q -b main "$RP"
 rp_git commit -q --allow-empty -m init
@@ -29,7 +29,7 @@ cat >"$FX" <<JSON
   {"pid":4343,"name":"node","tab":"w3:t1","cwd":"$RP/.worktrees/live"}]}
 JSON
 
-rp_run() { HV_TEST_REAP_HOST="${RP_FX-$FX}" "$HV_BIN" --json -C "$RP" reap "$@" 2>/dev/null; }
+rp_run() { ROTA_TEST_REAP_HOST="${RP_FX-$FX}" "$ROTA_BIN" --json -C "$RP" reap "$@" 2>/dev/null; }
 rp_ids() { python3 -c '
 import json,sys
 d=json.load(sys.stdin)["data"]
@@ -83,7 +83,7 @@ OUT="$(rp_run)"
 pass "C6[reap e]: a second run finds the branch the first freed and still holds the dirty worktree"
 
 # (f) the round lease: only a stale one (holder gone, this host) is listed and cleared
-LEASE_RP="$(rp_git rev-parse --path-format=absolute --git-common-dir)/hv/round-lease.json"
+LEASE_RP="$(rp_git rev-parse --path-format=absolute --git-common-dir)/rota/round-lease.json"
 mkdir -p "$(dirname "$LEASE_RP")"
 true & DEAD_RP=$!; wait "$DEAD_RP" || true
 rp_lease() { python3 - "$LEASE_RP" "$1" "$2" <<'PY'

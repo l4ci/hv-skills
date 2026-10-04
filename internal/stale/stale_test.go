@@ -42,7 +42,7 @@ func TestDaysBetween(t *testing.T) {
 	}
 }
 
-// project is a git repo with the given .hv files committed.
+// project is a git repo with the given .rota files committed.
 func project(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -78,7 +78,7 @@ func names(es []Entry) []string {
 }
 
 func TestFindTodo(t *testing.T) {
-	root := project(t, map[string]string{".hv/BACKLOG.md": "## Bugs\n" +
+	root := project(t, map[string]string{".rota/BACKLOG.md": "## Bugs\n" +
 		"- **[B01] [P1] old.** x Captured: 2026-01-01\n" +
 		"- **[B02] [P1] fresh.** y Captured: 2026-09-15\n" +
 		"- **[B03] [P1] undated.** z\n" +
@@ -98,7 +98,7 @@ func TestFindTodo(t *testing.T) {
 }
 
 func TestFindKnowledgeUsesTheFileCommitDate(t *testing.T) {
-	root := project(t, map[string]string{".hv/KNOWLEDGE.md": "# K\n\n## Alpha\nx\n\n## Beta, gamma\ny\n\n## Delta  \nz\n"})
+	root := project(t, map[string]string{".rota/KNOWLEDGE.md": "# K\n\n## Alpha\nx\n\n## Beta, gamma\ny\n\n## Delta  \nz\n"})
 	far := date(t, "2999-01-01")
 	got, err := Find(root, "knowledge", 90, far)
 	if err != nil || len(got) != 3 || got[0].Name != "Alpha" || got[1].Name != "Beta, gamma" || got[2].Name != "Delta" {
@@ -124,9 +124,9 @@ func TestFindMap(t *testing.T) {
 		return s + "---\nbody\n"
 	}
 	root := project(t, map[string]string{
-		".hv/map/auth.md": fm("auth", "2026-01-01"), ".hv/map/cache.md": fm("cache", "2026-09-30"),
-		".hv/map/billing.md": fm("billing", ""), ".hv/map/nosub.md": "---\ntitle: x\n---\n", ".hv/map/plain.md": "no frontmatter\n",
-		".hv/map/zeta.md": fm("aaa", "2025-12-31"), ".hv/map/bad.md": fm("baddate", "soon"),
+		".rota/map/auth.md": fm("auth", "2026-01-01"), ".rota/map/cache.md": fm("cache", "2026-09-30"),
+		".rota/map/billing.md": fm("billing", ""), ".rota/map/nosub.md": "---\ntitle: x\n---\n", ".rota/map/plain.md": "no frontmatter\n",
+		".rota/map/zeta.md": fm("aaa", "2025-12-31"), ".rota/map/bad.md": fm("baddate", "soon"),
 	})
 	got, err := Find(root, "map", 90, date(t, "2026-10-02"))
 	if err != nil {
@@ -147,8 +147,8 @@ func TestFindMap(t *testing.T) {
 
 func TestFindUntrackedMapFileIsNeverStale(t *testing.T) {
 	root := project(t, nil)
-	os.MkdirAll(filepath.Join(root, ".hv", "map"), 0o755)
-	os.WriteFile(filepath.Join(root, ".hv", "map", "a.md"), []byte("---\nsubsystem: a\n---\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, ".rota", "map"), 0o755)
+	os.WriteFile(filepath.Join(root, ".rota", "map", "a.md"), []byte("---\nsubsystem: a\n---\n"), 0o644)
 	if got, _ := Find(root, "map", 0, date(t, "2999-01-01")); got != nil {
 		t.Errorf("untracked file listed: %v", names(got))
 	}

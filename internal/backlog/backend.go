@@ -2,9 +2,9 @@ package backlog
 
 import (
 	"errors"
-	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/rota/internal/repos"
 
-	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/rota/internal/config"
 )
 
 // Backend is the read side of a backlog, whichever store holds it.
@@ -57,8 +57,8 @@ type Backend interface {
 }
 
 // Open returns the backend selected by backlog.backend in cfg, the loaded
-// config, for the project rooted at root (the directory holding .hv/). The
-// issue backend reads through tr. Umbrella issue mode, where .hv/repos.json
+// config, for the project rooted at root (the directory holding .rota/). The
+// issue backend reads through tr. Umbrella issue mode, where .rota/repos.json
 // registers sub-repos and every one has its own tracker, is NewUmbrella's.
 func Open(root string, cfg any, tr Tracker) (Backend, error) {
 	name, err := config.Backend(cfg)
@@ -77,10 +77,10 @@ func Open(root string, cfg any, tr Tracker) (Backend, error) {
 	return &Issues{Cfg: cfg, Tracker: tr}, nil
 }
 
-// IsUmbrella is whether root registers sub-repos in .hv/repos.json.
+// IsUmbrella is whether root registers sub-repos in .rota/repos.json.
 func IsUmbrella(root string) bool { return hasRepos(root) }
 
-// hasRepos is whether .hv/repos.json registers at least one sub-repo.
+// hasRepos is whether .rota/repos.json registers at least one sub-repo.
 func hasRepos(root string) bool { return len(repos.Load(root)) > 0 }
 
 var (

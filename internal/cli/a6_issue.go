@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/design"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/plan"
-	"github.com/l4ci/hv/v5/internal/proof"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/design"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/plan"
+	"github.com/l4ci/rota/internal/proof"
 )
 
 // The issue-mode halves of the design, plan and proof verbs. They resolve

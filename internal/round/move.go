@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/escalation"
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/roundlease"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/escalation"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/roundlease"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // C10 (#76): moving an issue that is already assigned. The tracker changes
@@ -117,7 +117,7 @@ type handoff struct {
 	note       string
 }
 
-func (h handoff) marker() string { return fmt.Sprintf("<!-- hv:handoff %s@%d -->", h.from, h.round) }
+func (h handoff) marker() string { return fmt.Sprintf("<!-- rota:handoff %s@%d -->", h.from, h.round) }
 
 func (h handoff) body() string {
 	state := "committed"
@@ -133,7 +133,7 @@ func (h handoff) body() string {
 		note = "(no note)"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "**hv handoff** (%s, from %s)\n\n", h.verb, h.from)
+	fmt.Fprintf(&b, "**rota handoff** (%s, from %s)\n\n", h.verb, h.from)
 	fmt.Fprintf(&b, "Branch: `%s`\nHead: %s\nState: %s\nReason: %s\n\n", h.branch, head, state, strings.TrimSpace(h.reason))
 	fmt.Fprintf(&b, "Done and next:\n%s\n\n%s", note, h.marker())
 	return b.String()
@@ -156,15 +156,15 @@ func (h handoff) post(be Board, id string) (commentID string, posted bool, err e
 
 var reHandoffBranch = regexp.MustCompile("(?m)^Branch: `([^`]+)`$")
 
-// latestHandoffBranch is the branch named by the newest hv:handoff comment on
-// the issue, "" when there is none.
+// latestHandoffBranch is the branch named by the newest rota:handoff (or legacy
+// hv:handoff) comment on the issue, "" when there is none.
 func latestHandoffBranch(be Board, id string) string {
 	cs, err := be.Comments(id, "feedback")
 	if err != nil {
 		return ""
 	}
 	for i := len(cs) - 1; i >= 0; i-- {
-		if strings.Contains(cs[i].Text, "<!-- hv:handoff ") {
+		if t := cs[i].Text; strings.Contains(t, "<!-- rota:handoff ") || strings.Contains(t, "<!-- hv:handoff ") {
 			if m := reHandoffBranch.FindStringSubmatch(cs[i].Text); m != nil {
 				return m[1]
 			}
@@ -202,7 +202,7 @@ func releaseClaims(be Board, id, slot, claimID string, sweep bool) (bool, error)
 
 // ---- return -----------------------------------------------------------------
 
-// ReturnOpts are the flags of `hv round return`.
+// ReturnOpts are the flags of `rota round return`.
 type ReturnOpts struct {
 	Slot, Reason string
 	Note         string // the text of --note-file
@@ -244,7 +244,7 @@ func (e Env) Return(ctx context.Context, root string, be Board, o ReturnOpts) (r
 			return res, wrap(err)
 		}
 		if !ok {
-			return res, blocked(BlockNotYourSlot, "hv round return must run inside slot %s's worktree or hold the round lease", o.Slot)
+			return res, blocked(BlockNotYourSlot, "rota round return must run inside slot %s's worktree or hold the round lease", o.Slot)
 		}
 	}
 	it, err := be.Get(id)
@@ -330,7 +330,7 @@ func (e Env) Health(ctx context.Context, root string, s *jsonx.Object, now time.
 	return h
 }
 
-// ReclaimOpts are the flags of `hv round reclaim`.
+// ReclaimOpts are the flags of `rota round reclaim`.
 type ReclaimOpts struct {
 	Slot      string
 	Force     bool
@@ -363,7 +363,7 @@ func (e Env) Reclaim(ctx context.Context, root string, be Board, o ReclaimOpts) 
 		return res, wrap(err)
 	}
 	if !ok {
-		return res, blocked(BlockNoRound, "this process holds no round lease: run hv round start first")
+		return res, blocked(BlockNoRound, "this process holds no round lease: run rota round start first")
 	}
 	now := time.Now
 	if e.Now != nil {
@@ -422,7 +422,7 @@ func (e Env) Reclaim(ctx context.Context, root string, be Board, o ReclaimOpts) 
 
 // ---- transfer ---------------------------------------------------------------
 
-// TransferOpts are the flags of `hv round transfer`.
+// TransferOpts are the flags of `rota round transfer`.
 type TransferOpts struct {
 	Issue, To     string
 	Note          string // the text of --note-file
@@ -475,7 +475,7 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 		return res, wrap(err)
 	}
 	if !ok {
-		return res, blocked(BlockNoRound, "this process holds no round lease: run hv round start first")
+		return res, blocked(BlockNoRound, "this process holds no round lease: run rota round start first")
 	}
 	rnd := registryRound(root)
 
@@ -511,7 +511,7 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 	var to *jsonx.Object
 	if !toHuman {
 		if to = reg.Slot(o.To); to == nil {
-			return res, &worker.Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("slot %s is not provisioned: run hv round start", o.To)}
+			return res, &worker.Error{Exit: worker.ExitResolution, Message: fmt.Sprintf("slot %s is not provisioned: run rota round start", o.To)}
 		}
 		if !resuming {
 			if h := slotIssue(to); h != "" {
@@ -628,7 +628,7 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 	kind, tier := roundcfg.KindClaude, o.Settings.Tier
 	model := o.Settings.Model(kind, tier)
 	text := pointerBrief(o.To, id, branch, brief, nil, decisions, tierBrief{Kind: kind, Tier: tier, Model: model, Default: tier, Table: o.Settings.Models[kind]})
-	text += fmt.Sprintf("\nThis issue was handed to you by %s. Read its latest hv:handoff comment first (it ends with a `<!-- hv:handoff %s@%d -->` marker), then continue from the pushed work on %s, already checked out in your worktree.\n",
+	text += fmt.Sprintf("\nThis issue was handed to you by %s. Read its latest rota:handoff comment first (it ends with a `<!-- rota:handoff %s@%d -->` marker), then continue from the pushed work on %s, already checked out in your worktree.\n",
 		res.From, res.From, rnd, branch)
 	if solo {
 		// No pane: mark the receiver busy and hand the brief back.
@@ -640,7 +640,7 @@ func (e Env) Transfer(ctx context.Context, root string, be Board, o TransferOpts
 		res.Changed = true
 		return res, nil
 	}
-	tmp, err := os.CreateTemp("", "hv-round-brief-")
+	tmp, err := os.CreateTemp("", "rota-round-brief-")
 	if err != nil {
 		return res, wrap(err)
 	}

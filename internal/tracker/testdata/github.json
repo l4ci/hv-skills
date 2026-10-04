@@ -2059,7 +2059,7 @@
    },
    "error": {
     "code": 4,
-    "message": "error: hv tracker call: github secondary rate limit — stopped; wait several minutes before retrying"
+    "message": "error: rota tracker call: github secondary rate limit — stopped; wait several minutes before retrying"
    },
    "calls": [
     {
@@ -2087,7 +2087,7 @@
    },
    "error": {
     "code": 4,
-    "message": "error: hv tracker call: github rate limit — stopped after one retry"
+    "message": "error: rota tracker call: github rate limit — stopped after one retry"
    },
    "calls": [
     {
@@ -2137,7 +2137,7 @@
    },
    "error": {
     "code": 3,
-    "message": "error: hv tracker call: gh is not authenticated; run 'gh auth login'"
+    "message": "error: rota tracker call: gh is not authenticated; run 'gh auth login'"
    },
    "calls": [
     {

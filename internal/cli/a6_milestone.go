@@ -4,8 +4,8 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	ms "github.com/l4ci/hv/v5/internal/milestone"
+	"github.com/l4ci/rota/internal/jsonx"
+	ms "github.com/l4ci/rota/internal/milestone"
 )
 
 // Glue for the milestone group (A6). File mode only; issue mode exits 71

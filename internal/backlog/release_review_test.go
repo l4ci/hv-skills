@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv/v5/internal/pytest"
-	"github.com/l4ci/hv/v5/internal/repos"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/backlog/trackertest"
+	"github.com/l4ci/rota/internal/pytest"
+	"github.com/l4ci/rota/internal/repos"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
 // rrFake is the issue fake with open PRs, a merge and native milestones; every
@@ -171,11 +171,11 @@ func rrIssues() []wSeedIssue {
 
 func rrComments() []wSeedComment {
 	return []wSeedComment{
-		{1, "<!-- hv:proof -->\n## Proof\n- build · PASS · ok"},
-		{2, "<!-- hv:proof -->\n## Proof\n- tests · PASS · ok"},
+		{1, "<!-- rota:proof -->\n## Proof\n- build · PASS · ok"},
+		{2, "<!-- rota:proof -->\n## Proof\n- tests · PASS · ok"},
 		{4, " Released in v1.2.0\n"},
 		{6, "random"},
-		{10, "<!-- hv:proof -->\n## Proof\n- x · PASS · ok"},
+		{10, "<!-- rota:proof -->\n## Proof\n- x · PASS · ok"},
 	}
 }
 
@@ -459,7 +459,7 @@ func TestIssuesMergePR(t *testing.T) {
 		t.Fatalf("F1 %+v", is)
 	}
 	last := is.Comments[len(is.Comments)-1].Body
-	if last != "Done in `0123456`\n\n<!-- hv:done -->" {
+	if last != "Done in `0123456`\n\n<!-- rota:done -->" {
 		t.Fatalf("close comment %q", last)
 	}
 	// Unproven T11: nothing is merged, the item flips and gets the feedback.
@@ -471,7 +471,7 @@ func TestIssuesMergePR(t *testing.T) {
 		t.Fatal("PR 21 was merged")
 	}
 	is = rrIssue(f, 11)
-	want := "<!-- hv:comment feedback -->\nPR 21 not merged: no proof recorded for T11. Add proof with hv proof add, then run the review again."
+	want := "<!-- rota:comment feedback -->\nPR 21 not merged: no proof recorded for T11. Add proof with rota proof add, then run the review again."
 	if !slices.Contains(is.Labels, "changes-requested") || slices.Contains(is.Labels, "needs-review") ||
 		is.Comments[len(is.Comments)-1].Body != want {
 		t.Fatalf("T11 %+v", is)
@@ -575,7 +575,7 @@ func TestIssuesReleaseClose(t *testing.T) {
 	if is := rrIssue(f, 4); !slices.Contains(is.Labels, "released") || len(is.Comments) != 1 {
 		t.Fatalf("#4 %+v", is)
 	}
-	if is := rrIssue(f, 10); len(is.Comments) != 2 || is.Comments[1].Body != "Released in v1.2.0\n\n<!-- hv:released -->" {
+	if is := rrIssue(f, 10); len(is.Comments) != 2 || is.Comments[1].Body != "Released in v1.2.0\n\n<!-- rota:released -->" {
 		t.Fatalf("#10 %+v", is)
 	}
 	if is := rrIssue(f, 5); slices.Contains(is.Labels, "released") {

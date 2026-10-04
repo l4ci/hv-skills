@@ -1,4 +1,4 @@
-// Package release holds the domain logic of the `hv release` verbs (A8, #52),
+// Package release holds the domain logic of the `rota release` verbs (A8, #52),
 // ported from bin/hvlib_version.py and the hv-release-* helpers: the
 // version-file registry, semver bumps, the changelog insert, commit notes,
 // host detection and the release nudge.
@@ -14,9 +14,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/fsio"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/fsio"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
 // Failure classes of Bump; every other error is a plain read or write failure.
@@ -202,7 +202,7 @@ func Detect(dir, override string) (file, version, kind string, err error) {
 			return f, v, k.Name, err
 		}
 	}
-	return "", "", "", errors.New("no version file detected (set release.versionFile in .hv/config.json)")
+	return "", "", "", errors.New("no version file detected (set release.versionFile in .rota/config.json)")
 }
 
 // WriteVersion writes version into the file rel under dir the way the old

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/pystr"
 )
 
-// The issue-mode workflow verbs: `hv item show|claim|release|state` and
-// `hv item note add|show|rm`. The file backend answers claim, release and state
+// The issue-mode workflow verbs: `rota item show|claim|release|state` and
+// `rota item note add|show|rm`. The file backend answers claim, release and state
 // with a successful no-op (changed false; status.json is its lock) and refuses
 // show and the notes as issue-only (exit 4, backend).
 

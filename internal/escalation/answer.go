@@ -4,13 +4,13 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/l4ci/hv/v5/internal/marker"
-	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/rota/internal/marker"
+	"github.com/l4ci/rota/internal/tracker"
 )
 
-// IsAnswer is the answer rule for one comment body: any comment without an hv
+// IsAnswer is the answer rule for one comment body: any comment without a rota
 // marker. The author decides nothing, because the orchestrator and the human
-// usually post as the same account; hv marks every comment it posts instead.
+// usually post as the same account; rota marks every comment it posts instead.
 // To change what counts as an answer, change this function; everything else
 // goes through it.
 func IsAnswer(body string) bool {

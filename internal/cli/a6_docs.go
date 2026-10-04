@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv/v5/internal/artifact"
-	"github.com/l4ci/hv/v5/internal/config"
-	"github.com/l4ci/hv/v5/internal/design"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/plan"
+	"github.com/l4ci/rota/internal/artifact"
+	"github.com/l4ci/rota/internal/config"
+	"github.com/l4ci/rota/internal/design"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/plan"
 )
 
 // Glue for the design and plan groups (A6). File mode only: issue mode
@@ -103,7 +103,7 @@ func checkAutoLoop(c *Ctx, root string, auto bool) error {
 	if !auto {
 		return nil
 	}
-	cfg := config.Load(filepath.Join(root, ".hv", "config.json"))
+	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))
 	if configString(cfg, "autonomy.level") != "loop" {
 		return Usage("--auto-loop is loop-mode only; set autonomy.level to loop")
 	}

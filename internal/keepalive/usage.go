@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/rota/internal/hook"
 )
 
 // Actions of a usage Decision, the `action` of its limits entry.

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/round"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/round"
+	"github.com/l4ci/rota/internal/roundcfg"
 )
 
 func roundTransfer(fs *flag.FlagSet) RunFunc {
@@ -37,7 +37,7 @@ func roundTransfer(fs *flag.FlagSet) RunFunc {
 		}
 		bf := *body
 		if bf == "-" {
-			f, err := os.CreateTemp("", "hv-round-decisions-")
+			f, err := os.CreateTemp("", "rota-round-decisions-")
 			if err != nil {
 				return Result{}, err
 			}

@@ -26,7 +26,7 @@ SAMPLES=(
   'ls "$''REPO/bin"'
   'ls bin/''*'
   'install_''helpers'
-  'grep -q x hv-plan/SKILL''.md'
+  'grep -q x rota-plan/SKILL''.md'
   'PYTHON''PATH=x python3 -c pass'
   'git ls-''files -s bin/x'
   'cat "$''REPO/references/x.md"'
@@ -36,7 +36,7 @@ wb_scan() { awk -f "$SCAN" "$1" 2>&1 || true; }
 wb_file() { printf '%s\n' "$@" > "$WB_TMP/t.sh"; echo "$WB_TMP/t.sh"; }
 
 # Clean input and comments are accepted.
-OUT="$(wb_scan "$(wb_file 'echo ok' '"$HV_BIN" status' "# ${SAMPLES[0]}")")"
+OUT="$(wb_scan "$(wb_file 'echo ok' '"$ROTA_BIN" status' "# ${SAMPLES[0]}")")"
 [ -z "$OUT" ] || fail "scanner flagged a clean file: $OUT"
 
 # Near misses stay clean: the version-stamp seam, plugin metadata, and a name that merely ends in bin.
@@ -75,6 +75,6 @@ rm -rf "$WB_TMP"
 
 # The real sections.
 OUT="$(awk -f "$SCAN" "$TESTDIR"/sections/*.sh)" || fail "white-box scan failed to run"
-[ -z "$OUT" ] || fail "white-box lines outside a marked block (wrap them in white-box-begin/end, or convert them to \$HV_BIN verb calls):
+[ -z "$OUT" ] || fail "white-box lines outside a marked block (wrap them in white-box-begin/end, or convert them to \$ROTA_BIN verb calls):
 $OUT"
 pass "every white-box assertion sits in a tagged white-box block"

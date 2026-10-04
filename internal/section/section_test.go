@@ -71,12 +71,12 @@ func TestInstructionsFile(t *testing.T) {
 
 func TestUpsertBlockIsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "CLAUDE.md")
-	block := "<!-- hv-x-start -->\nbody\n<!-- hv-x-end -->"
+	block := "<!-- rota-x-start -->\nbody\n<!-- rota-x-end -->"
 	steps := []struct{ block, want string }{
 		{block, Created},
 		{block, Unchanged},
-		{"<!-- hv-x-start -->\nnew\n<!-- hv-x-end -->", Updated},
-		{"<!-- hv-x-start -->\nnew\n<!-- hv-x-end -->", Unchanged},
+		{"<!-- rota-x-start -->\nnew\n<!-- rota-x-end -->", Updated},
+		{"<!-- rota-x-start -->\nnew\n<!-- rota-x-end -->", Unchanged},
 	}
 	for i, s := range steps {
 		got, err := UpsertBlock(path, "x", s.block, "")
@@ -85,7 +85,7 @@ func TestUpsertBlockIsIdempotent(t *testing.T) {
 		}
 	}
 	raw, _ := os.ReadFile(path)
-	if string(raw) != "<!-- hv-x-start -->\nnew\n<!-- hv-x-end -->\n" {
+	if string(raw) != "<!-- rota-x-start -->\nnew\n<!-- rota-x-end -->\n" {
 		t.Errorf("file = %q", raw)
 	}
 }
@@ -93,18 +93,33 @@ func TestUpsertBlockIsIdempotent(t *testing.T) {
 func TestUpsertBlockAppendsAndMigratesLegacy(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "AGENTS.md")
 	os.WriteFile(path, []byte("# Project\n\ntext\n"), 0o666)
-	got, err := UpsertBlock(path, "knowledge", "<!-- hv-knowledge-start -->\nA\n<!-- hv-knowledge-end -->", "knowledge")
+	got, err := UpsertBlock(path, "knowledge", "<!-- rota-knowledge-start -->\nA\n<!-- rota-knowledge-end -->", "knowledge")
 	if err != nil || got != Appended {
 		t.Fatalf("append: %q %v", got, err)
 	}
 	// A legacy-marker block is replaced in place by the canonical form.
 	os.WriteFile(path, []byte("top\n<!-- hv:knowledge:start -->\nold\n<!-- hv:knowledge:end -->\nbottom\n"), 0o666)
-	got, err = UpsertBlock(path, "knowledge", "<!-- hv-knowledge-start -->\nA\n<!-- hv-knowledge-end -->", "knowledge")
+	got, err = UpsertBlock(path, "knowledge", "<!-- rota-knowledge-start -->\nA\n<!-- rota-knowledge-end -->", "knowledge")
 	if err != nil || got != Updated {
 		t.Fatalf("legacy: %q %v", got, err)
 	}
 	raw, _ := os.ReadFile(path)
-	if string(raw) != "top\n<!-- hv-knowledge-start -->\nA\n<!-- hv-knowledge-end -->\nbottom\n" {
+	if string(raw) != "top\n<!-- rota-knowledge-start -->\nA\n<!-- rota-knowledge-end -->\nbottom\n" {
+		t.Errorf("file = %q", raw)
+	}
+}
+
+// A block hv wrote before the rename (#236) is replaced in place, not
+// duplicated by an appended rota block.
+func TestUpsertBlockReplacesHvBlockInPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "AGENTS.md")
+	os.WriteFile(path, []byte("top\n<!-- hv-skills-start -->\nold\n<!-- hv-skills-end -->\nbottom\n"), 0o666)
+	got, err := UpsertBlock(path, "skills", "<!-- rota-skills-start -->\nA\n<!-- rota-skills-end -->", "")
+	if err != nil || got != Updated {
+		t.Fatalf("upsert: %q %v", got, err)
+	}
+	raw, _ := os.ReadFile(path)
+	if string(raw) != "top\n<!-- rota-skills-start -->\nA\n<!-- rota-skills-end -->\nbottom\n" {
 		t.Errorf("file = %q", raw)
 	}
 }
@@ -123,7 +138,7 @@ func TestLinesMatchesPythonSplitlines(t *testing.T) {
 func TestUpsertBlockNormalizesCRLF(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "AGENTS.md")
 	os.WriteFile(path, []byte("# A\r\n\r\ntext\r\n"), 0o666)
-	if _, err := UpsertBlock(path, "x", "<!-- hv-x-start -->\nb\n<!-- hv-x-end -->", ""); err != nil {
+	if _, err := UpsertBlock(path, "x", "<!-- rota-x-start -->\nb\n<!-- rota-x-end -->", ""); err != nil {
 		t.Fatal(err)
 	}
 	raw, _ := os.ReadFile(path)

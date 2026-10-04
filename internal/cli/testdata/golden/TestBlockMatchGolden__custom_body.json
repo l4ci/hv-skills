@@ -14,7 +14,7 @@
     "stderr": "",
     "rc": 0,
     "changed": {
-      "../AGENTS.md": "# Agents\n\n\u003c!-- hv-vision-start --\u003e\n## Vision\n\nbody\n\u003c!-- hv-vision-end --\u003e\n"
+      "../AGENTS.md": "# Agents\n\n\u003c!-- rota-vision-start --\u003e\n## Vision\n\nbody\n\u003c!-- rota-vision-end --\u003e\n"
     },
     "removed": []
   }

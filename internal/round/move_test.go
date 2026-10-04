@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv/v5/internal/backlog"
-	"github.com/l4ci/hv/v5/internal/host"
-	"github.com/l4ci/hv/v5/internal/jsonx"
-	"github.com/l4ci/hv/v5/internal/roundcfg"
-	"github.com/l4ci/hv/v5/internal/tracker"
-	"github.com/l4ci/hv/v5/internal/worker"
+	"github.com/l4ci/rota/internal/backlog"
+	"github.com/l4ci/rota/internal/host"
+	"github.com/l4ci/rota/internal/jsonx"
+	"github.com/l4ci/rota/internal/roundcfg"
+	"github.com/l4ci/rota/internal/tracker"
+	"github.com/l4ci/rota/internal/worker"
 )
 
 // moveBoard is a board with a comment store, a claim read-back and a state
@@ -247,7 +247,7 @@ func TestParkSalvagesDirtyPathsByNameAndPushes(t *testing.T) {
 	if !p.Salvaged || !p.Moved || p.Branch != branch {
 		t.Fatalf("%+v", p)
 	}
-	if got := gitIn(t, f.root, "log", "-1", "--format=%s", branch); got != "wip: parked from ben (hv round return)" {
+	if got := gitIn(t, f.root, "log", "-1", "--format=%s", branch); got != "wip: parked from ben (rota round return)" {
 		t.Errorf("salvage subject %q", got)
 	}
 	if files := gitIn(t, f.root, "show", "--name-only", "--format=", branch); !strings.Contains(files, "new.txt") || !strings.Contains(files, "ben-work.txt") || strings.Contains(files, "elsewhere") {
@@ -547,12 +547,12 @@ func TestReturnParksCommentsReleasesAndFreesTheSlot(t *testing.T) {
 		t.Errorf("claim and in-progress must be gone: %v %v", f.be.claims, f.be.states)
 	}
 	last := f.be.comments["12"][len(f.be.comments["12"])-1]
-	for _, want := range []string{"**hv handoff** (return, from ben)", "Branch: `" + branch + "`", "Head: ", "State: committed, salvage commit", "Reason: premise is wrong", "Done and next:\ntried A, B is next", "<!-- hv:handoff ben@1 -->"} {
+	for _, want := range []string{"**rota handoff** (return, from ben)", "Branch: `" + branch + "`", "Head: ", "State: committed, salvage commit", "Reason: premise is wrong", "Done and next:\ntried A, B is next", "<!-- rota:handoff ben@1 -->"} {
 		if !strings.Contains(last, want) {
 			t.Errorf("handoff lacks %q:\n%s", want, last)
 		}
 	}
-	if !strings.HasSuffix(last, "<!-- hv:handoff ben@1 -->") {
+	if !strings.HasSuffix(last, "<!-- rota:handoff ben@1 -->") {
 		t.Errorf("the marker ends the comment:\n%s", last)
 	}
 	s := f.slot("ben")
@@ -585,7 +585,7 @@ func TestReturnThenAssignPicksTheItemUpAgain(t *testing.T) {
 	if err != nil || !res.Dispatched || f.be.claims["12"] != "dana@1" || f.be.states["12"] != "in-progress" {
 		t.Fatalf("assign after return: %v %+v %v", err, res, f.be.claims)
 	}
-	if !strings.Contains(f.host.sent, "hv:handoff") || !strings.Contains(f.host.sent, branch) {
+	if !strings.Contains(f.host.sent, "rota:handoff") || !strings.Contains(f.host.sent, branch) {
 		t.Errorf("the brief must name the handoff and the pushed branch:\n%s", f.host.sent)
 	}
 }
@@ -628,7 +628,7 @@ func TestReturnRepeatsAfterAFailureAndDoesNotCommentTwice(t *testing.T) {
 	}
 	n := 0
 	for _, c := range f.be.comments["12"] {
-		if strings.Contains(c, "hv:handoff") {
+		if strings.Contains(c, "rota:handoff") {
 			n++
 		}
 	}
@@ -686,7 +686,7 @@ func TestTransferToASlotChecksOutTheExistingBranch(t *testing.T) {
 	if worker.Str(b, "task") != "" || worker.Str(b, "claimId") != "" || worker.Str(b, "state") != "idle" {
 		t.Errorf("sender: %v", b)
 	}
-	for _, want := range []string{"You are dana", "handed to you by ben", "hv:handoff ben@1", branch} {
+	for _, want := range []string{"You are dana", "handed to you by ben", "rota:handoff ben@1", branch} {
 		if !strings.Contains(f.host.sent, want) {
 			t.Errorf("brief lacks %q:\n%s", want, f.host.sent)
 		}
@@ -780,7 +780,7 @@ func TestTransferDispatchFailureKeepsTheMoveAndResumes(t *testing.T) {
 	}
 	n := 0
 	for _, c := range f.be.comments["12"] {
-		if strings.Contains(c, "hv:handoff") {
+		if strings.Contains(c, "rota:handoff") {
 			n++
 		}
 	}
@@ -953,5 +953,16 @@ func TestReclaimReleasesEveryClaimOfTheSlotEvenWhenTheRegistryLostIt(t *testing.
 	}
 	if f.be.claims["12"] != "" {
 		t.Errorf("claims by ben@… are swept: %v", f.be.claims)
+	}
+}
+
+// A handoff comment hv posted before the rename (#236) still names the branch
+// the next worker continues from.
+func TestLatestHandoffBranchReadsLegacyMarker(t *testing.T) {
+	b := &moveBoard{comments: map[string][]string{
+		"#5": {"**hv handoff** (return, from ben)\nBranch: `ben/5-x`\n\n<!-- hv:handoff ben@1 -->"},
+	}}
+	if got := latestHandoffBranch(b, "#5"); got != "ben/5-x" {
+		t.Errorf("branch %q", got)
 	}
 }
