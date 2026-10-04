@@ -1,14 +1,17 @@
 # Getting started
 
-Install hv-skills and run your first capture → work → ship cycle in about five minutes.
+Install hv and run your first capture → work → ship cycle in about five minutes.
 
 ## Install
 
+From v5.0.0:
+
 ```bash
-npx skills add l4ci/hv-skills
+curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh   # or: brew install l4ci/tap/hv
+hv skills install
 ```
 
-For other install methods (Claude Code plugin marketplace, GNU Stow, local clone), see [install alternatives](install.md).
+The skills land in the Claude Code and Codex skill directories. Options, upgrading and removal are on the [install page](install.md).
 
 ## Initialize the project
 
@@ -29,11 +32,14 @@ To change a setting later, run `hv config set <key> <value>` (`hv config show` l
 Two end-to-end walkthroughs carry one concrete project from brief to shipped milestone:
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md): empty repo plus a one-page brief, walked through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv-skills into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
+- [Brownfield: dropping hv into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
 
 Pick whichever matches where your project is today and follow it skill-by-skill.
 
 ## Where to go next
+
+**Scale to a round**
+- [Parallel rounds](usage/parallel-rounds.md): when you have several independent issues, let an orchestrator hand them to workers and merge what passes
 
 **Capture and backlog**
 - [Capturing work](usage/capturing-work.md)

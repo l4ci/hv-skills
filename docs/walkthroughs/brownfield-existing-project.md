@@ -274,3 +274,7 @@ What you notice over time is that the same class of gotcha stops recurring. Thre
 ## What changes structurally
 
 You don't have to refactor anything to adopt hv. The only structural addition is `.hv/` (tracked by default, with a few machine-specific paths gitignored) and a managed block in `CLAUDE.md`. Your existing build, tests, deploy pipeline, and code layout stay the same. The map and the knowledge accumulate from how you already work (debug, fix, ship), except now the loop leaves a trace that future cycles consult automatically.
+
+## Scale to a round
+
+Once the backlog holds several independent, well-specified items, you don't need to drive each `/hv-work` cycle yourself. A [parallel round](../usage/parallel-rounds.md) has an orchestrator hand issues to workers in separate worktrees and merge what passes the gate. Use it when you have a queue of issues that don't touch the same files; keep `/hv-work` for the handful you are watching.

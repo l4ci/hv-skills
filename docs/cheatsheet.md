@@ -35,3 +35,14 @@ What each `/hv-*` skill does, one line each. For details: [`reference/slash-comm
 - **`hv config show` / `hv config set`**: read and change settings.
 - **`hv update`**: check for a newer release.
 - **`hv migrate v4` / `hv migrate issues`**: v3 to v4 codemod; backlog to issues.
+- **`hv skills install` / `update` / `status`**: write the skills for Claude Code and Codex, refresh them after an upgrade, compare with the binary.
+- **`hv round start` / `assign` / `wait` / `status` / `wind-down`**: run a round: take the lease, hand an issue to a slot, block until a worker needs you, list slots, park everything and release the lease.
+- **`hv worker`**: slot registry, worktrees, dispatch, polling and the merge gate (`hv worker gate`).
+- **`hv doctor`**: preflight for git, host, forge, accounts, hooks, skills and Codex.
+- **`hv reap`**: preview leftovers a round left behind; `--apply` removes those holding no work.
+- **`hv keepalive run`**: restart the orchestrator in its pane when it exits with a fresh handoff.
+- **`hv limit watch`**: sleep until a usage limit resets, or switch accounts.
+- **`hv hook` / `hv statusline`**: Claude Code hooks and the statusline command that hand the orchestrator off before its context fills.
+- **`hv verdict add` / `route` / `show`**: record typed review, second-opinion and QA verdicts and route on them.
+
+See [parallel rounds](usage/parallel-rounds.md) and [unattended rounds](usage/unattended-rounds.md).

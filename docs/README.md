@@ -1,12 +1,13 @@
 # hv documentation
 
-Public user guide for hv, a zero-dependency dev workflow for Claude Code.
+Public user guide for hv, a zero-dependency dev workflow for Claude Code and Codex: skills plus a CLI.
 
 ## Contents
 
 ### Getting started
 
 - [Cheat sheet](cheatsheet.md): one-line summary of every `/hv-*` skill (rapid scan)
+- [Install](install.md): the install script, Homebrew, release binaries, upgrading, uninstalling
 - [Getting started](getting-started.md): install and run your first cycle
 - [How it works](how-it-works.md): system diagram, plus how each skill connects to the artifacts it touches
 
@@ -14,6 +15,14 @@ Public user guide for hv, a zero-dependency dev workflow for Claude Code.
 
 - [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md). Empty repo plus a one-page brief, taken end-to-end through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
 - [Brownfield: dropping hv into an existing project](walkthroughs/brownfield-existing-project.md). Established codebase with open issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle plus a debug cycle.
+
+### Rounds
+
+- [Parallel rounds](usage/parallel-rounds.md): an orchestrator, standing workers in worktrees, the merge gate, solo mode
+- [Unattended rounds](usage/unattended-rounds.md): hooks, statusline, keepalive, usage limits, the orchestrator switch
+- [Doctor and reap](usage/doctor-and-reap.md): check the machine before a round, clear leftovers after
+- [Codex workers](usage/codex-workers.md): run Codex as a worker in a round
+- [Skills in Codex](usage/codex-skills.md): install and call the skills from Codex
 
 ### Capture and backlog
 
@@ -57,6 +66,10 @@ Public user guide for hv, a zero-dependency dev workflow for Claude Code.
 - [Configuration options](reference/config-options.md): every config key and option label, set via `hv config set`
 - [`/hv-capture --from-github` / `--from-gitlab` reference](reference/hv-issues.md): pull GitHub/GitLab issues into `BACKLOG.md`, with round-trip closing
 - [Project check](reference/preflight.md): what `hv init check` verifies, plus exit-code meanings
+
+### Contributing
+
+- [Rounds on hv itself](contributing/rounds.md): the gate, repo rules and roster for contributors
 
 ### Other
 

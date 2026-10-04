@@ -306,3 +306,7 @@ You run it. M02 and M03 (which both depend on M01) flip from blocked to ready in
 - `.hv/spikes/sqlite-schema.md` is a permanent record of why M01 stayed single-currency
 
 The next session in a fresh `/clear` starts from `/hv-work` (no argument), which reads the active milestone, the open backlog, and the managed blocks in `CLAUDE.md`. Nothing important is in your head. It's on disk, and the orchestrator's planning context now starts with what you learned.
+
+## Scale to a round
+
+Once the backlog holds several independent, well-specified items, you don't need to drive each `/hv-work` cycle yourself. A [parallel round](../usage/parallel-rounds.md) has an orchestrator hand issues to workers in separate worktrees and merge what passes the gate. Use it when you have a queue of issues that don't touch the same files; keep `/hv-work` for the handful you are watching.

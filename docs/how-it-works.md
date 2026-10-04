@@ -1,6 +1,6 @@
 # How hv works
 
-hv is a set of slash commands that form a loop: capture, plan, execute with atomic commits, ship behind a review gate, persist the lessons. The diagram below shows how every skill connects to the artifacts it reads or writes, and which skills nudge or consult each other.
+hv is a CLI plus a set of skills (slash commands in Claude Code). Together they form a loop: capture, plan, execute with atomic commits, ship behind a review gate, persist the lessons. The diagram below shows how every skill connects to the artifacts it reads or writes, and which skills nudge or consult each other.
 
 ```mermaid
 flowchart LR
@@ -55,11 +55,17 @@ flowchart LR
   DOCS --> USERDOCS[(docs/)]
   SHIP -.cut.-> RELEASE["/hv-release"]
   RELEASE --> RELEASES[(GitHub releases)]
+  ORCH["/hv-orchestrate"] --> ROUND["hv round"]
+  ROUND --> WORKERS["workers in worktrees"]
+  WORKERS --> PR
+  ROUND -.gate.-> PR
+  ROUND -.checks.-> DOCTOR["hv doctor / hv reap"]
+  ORCH -.unattended.-> KEEP["hv hook / keepalive / limit"]
 ```
 
 Everything Claude reads or mutates lives under `.hv/` in your project. Git is the source of truth; `status.json` is just a cache, and `/hv-work` with no argument reconciles drift between the two.
 
-## The five lanes
+## The six lanes
 
 **Capture.** `/hv-capture` is the brain-dump entry point. It splits, classifies, and routes items to `BACKLOG.md` with auto-incrementing IDs (`B01`, `F01`, `T01`). `/hv-capture` ends with an optional hand-off to `/hv-work`, so a hot-path fix is capture, accept, done. `/hv-capture --from-github` / `--from-gitlab` syncs open upstream issues into the backlog with `GH: #N` / `GL: #N` cross-references, and round-trips closing via `/hv-ship`. `/hv-capture --remove <ID>` is the local inverse: it strips a captured item and cleans up its dependencies behind a dry-run preview and confirmation gate.
 
@@ -71,6 +77,8 @@ Everything Claude reads or mutates lives under `.hv/` in your project. Git is th
 
 **Persist.** `/hv-learn` writes durable session learnings to `KNOWLEDGE.md`, verified before they land. That includes domain terms via the `--term <name>` flag, which lands the term as a nested-bullet entry under the pinned `## Glossary` topic of the same file. `/hv-decide` captures hard-boundary commitments to `DECISIONS.md` with explicit forbids and permits. The project map (`.hv/map/<name>.md` files describing subsystems) is hand-authored; cycle skills (`/hv-work`, `/hv-debug`) bump `touched:` post-cycle on matched subsystems and regenerate the always-on `## Project Map` block via `hv map index`. `/hv-ship --docs` keeps the public docs in sync with the code (inline at ship time or via the manual `--docs` flag).
 
-**Maintenance.** `hv init` sets up `.hv/` once at the project root. `hv config set` edits config (never hand-edit JSON). `hv update` checks for newer hv releases and prints the exact upgrade command. `/hv-release` cuts your project's own releases: version bump, categorized notes, tag, push, GitHub/GitLab release.
+**Rounds.** `/hv-orchestrate` runs a parallel round. The `hv round` verbs do the mechanics: take the orchestrator lease, assign issues, wait for workers, wind down. Each worker is an agent in its own git worktree (`hv worker` manages slots, hosts and accounts) that implements one issue and opens a PR; the orchestrator runs the gate and merges. `hv doctor` checks the machine first and `hv reap` clears leftovers. For unattended runs, `hv hook`, `hv statusline`, `hv keepalive` and `hv limit` hand the orchestrator off before its context fills, restart it and wait out usage limits. See [parallel rounds](usage/parallel-rounds.md) and [unattended rounds](usage/unattended-rounds.md).
+
+**Maintenance.** `hv init` sets up `.hv/` once at the project root. `hv config set` edits config (never hand-edit JSON). `hv update` checks for newer hv releases and prints the exact upgrade command. `hv skills` installs and refreshes the skills from the binary. `hv doctor` checks git, the forge, accounts and installed skills. `/hv-release` cuts your project's own releases: version bump, categorized notes, tag, push, GitHub/GitLab release.
 
 For the alphabetical reference of every skill see [the slash commands page](reference/slash-commands.md). For two worked examples that carry one concrete project end-to-end, see the [walkthroughs](walkthroughs/).

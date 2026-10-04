@@ -20,17 +20,19 @@ This works well for small teams. For larger ones a real issue tracker is usually
 
 ## What if I'm not using Claude Code?
 
-hv is built around Claude Code's skill system, `AskUserQuestion`, and subagent dispatch. The `.hv/` folder, the `hv` binary, and the `BACKLOG.md` format are agent-agnostic and work on their own; you can call `hv` from any shell. The slash commands themselves only run inside Claude Code.
+Codex is supported. `hv skills install` writes the skills to `~/.agents/skills` as well as the Claude Code directory, and Codex can also run as a worker in a round. See [using the skills in Codex](usage/codex-skills.md) and [Codex workers](usage/codex-workers.md). One caveat: skill bodies still name Claude Code tools (`AskUserQuestion`, `TaskCreate`, `Agent`), so a skill may not run end to end in Codex.
 
-Other agent harnesses with comparable primitives (Gemini CLI, some Copilot builds) may load the skills with reduced functionality. Where `AskUserQuestion` isn't available, those interactions fall back to plain text prompts instead of native UI. Don't expect full functionality outside Claude Code.
+The `.hv/` folder, the `BACKLOG.md` format and the `hv` binary are agent-agnostic; you can call `hv` from any shell. Other harnesses are untested.
+
+## Do I need herdr or tmux?
+
+No. Workers in a [parallel round](usage/parallel-rounds.md) get a tab each in herdr or tmux when the orchestrator runs inside one. Without either, `hv round start` picks solo mode and the orchestrator runs each worker as a subagent in its own worktree. With solo mode there is no host to notify you, so questions go on the issue or PR thread. Solo workers share the orchestrator's account and usage limit, and run Claude only, so keep solo rounds to two or three workers.
 
 ## How do I update hv when a new release ships?
 
-Run `hv update`. It detects your install type (plugin, repo clone, or stow), reads the current version, fetches the latest GitHub release, and prints the exact update command for your setup. It doesn't run the update itself, since there are too many install paths to handle automatically.
+Run `hv update` (needs `gh`). It detects how you installed hv (Homebrew, the install script, or a dev build) and prints the command, for example `brew update && brew upgrade hv && hv skills update`, or the install script's `curl` line followed by `hv skills update`. It doesn't run the update itself.
 
-After updating, there is nothing to refresh in your projects: `hv` ships with the plugin. Run `hv version --drift` in a project to see whether its stamped version trails the installed one.
-
-Requires `gh` on the PATH. See [slash commands](reference/slash-commands.md) for the verb list.
+`hv skills update` refreshes the installed skills to match the new binary. Nothing else in your projects needs refreshing. Run `hv version --drift` in a project to see whether its stamped version trails the installed one. See [install](install.md#upgrading).
 
 ## Does this work with monorepos?
 
