@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/marker"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/marker"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // PRTracker is the part of tracker.Adapter the review queue and the PR merge

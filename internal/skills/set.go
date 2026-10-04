@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	hvskills "github.com/l4ci/hv-skills/v5"
+	hvskills "github.com/l4ci/hv/v5"
 )
 
 // Set is a skill set in its installed layout.

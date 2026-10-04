@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 const msTrackerBody = "---\nid: M02\ntitle: Sharing\nstatus: planned\ndepends: [M01]\ncreated: 2026-09-01\n---\n\n# M02 — Sharing\n\n## Goal\n\nShare it.\n\n<!-- hv:fields\nDepends: M01\n-->"

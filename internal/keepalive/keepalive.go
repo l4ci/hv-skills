@@ -17,8 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/roundlease"
 )
 
 // Stop reasons of Result.StopReason.

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/backlog"
 )
 
 var (

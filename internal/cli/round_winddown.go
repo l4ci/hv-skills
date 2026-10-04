@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/round"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
 )
 
 // The C3 verb `hv round wind-down`; the steps are round.Env.WindDown.

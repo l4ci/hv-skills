@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/fsio"
 )
 
 // Agents and scopes, as the verbs spell them.

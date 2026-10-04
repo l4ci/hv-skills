@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/fsio"
 )
 
 // Exit codes; see docs/design/5.0-cli-conventions.md, Exit codes.

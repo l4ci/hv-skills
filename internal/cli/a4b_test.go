@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/backlog/trackertest"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/backlog/trackertest"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 func get(v any, path ...string) any {

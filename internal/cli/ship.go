@@ -11,16 +11,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/git"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/section"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
-	"github.com/l4ci/hv-skills/v5/internal/verdict"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/git"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/verdict"
 )
 
 // shipCommands is the `hv ship` group (A8, #52).

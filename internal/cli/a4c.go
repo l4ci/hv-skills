@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	hvrepos "github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/status"
-	"github.com/l4ci/hv-skills/v5/internal/update"
-	"github.com/l4ci/hv-skills/v5/internal/version"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	hvrepos "github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/status"
+	"github.com/l4ci/hv/v5/internal/update"
+	"github.com/l4ci/hv/v5/internal/version"
 )
 
 // The A4 `hv update`, `hv config show|set|check` and `hv repo which|resolve|

@@ -15,9 +15,9 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Version={{ .Version }}
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/l4ci/hv-skills/v5/internal/version.Date={{ .Date }}
+      - -X github.com/l4ci/hv/v5/internal/version.Version={{ .Version }}
+      - -X github.com/l4ci/hv/v5/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/l4ci/hv/v5/internal/version.Date={{ .Date }}
 
 archives:
   # Bare binaries for install.sh.

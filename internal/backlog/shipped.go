@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/pystr"
 )
 
 // The duplicate-shipped audit behind `hv item shipped` (bin/hv-capture-audit):

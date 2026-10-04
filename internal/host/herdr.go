@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/shlex"
+	"github.com/l4ci/hv/v5/internal/shlex"
 )
 
 // herdr ports bin/hv-host-herdr.sh. A herdr slot is a TAB in the current

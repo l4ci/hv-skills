@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/artifact"
 )
 
 func exitOf(err error) int {

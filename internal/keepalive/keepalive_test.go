@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/roundlease"
 )
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)

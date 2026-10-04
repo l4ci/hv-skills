@@ -1,15 +1,15 @@
 package cli
 
 import (
-	"github.com/l4ci/hv-skills/v5/internal/limits"
+	"github.com/l4ci/hv/v5/internal/limits"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/roundlease"
 )
 
 // kaProject is a git project whose config zeroes the backoff.

@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/git"
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/keepalive"
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
-	"github.com/l4ci/hv-skills/v5/internal/status"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/git"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/keepalive"
+	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/status"
 )
 
 // D1 (#65): `hv statusline dump` and the `hv hook` verbs. The logic is

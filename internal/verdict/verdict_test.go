@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/artifact"
 )
 
 func TestParseBodyAccepts(t *testing.T) {

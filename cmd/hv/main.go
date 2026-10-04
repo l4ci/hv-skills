@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/l4ci/hv-skills/v5/internal/cli"
+	"github.com/l4ci/hv/v5/internal/cli"
 )
 
 func main() {

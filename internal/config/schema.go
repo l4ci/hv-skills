@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/jsonx"
 )
 
 // Key is one known .hv/config.json key: its dotted name, the default used

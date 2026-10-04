@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/issues"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/issues"
+	"github.com/l4ci/hv/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // The A4 `hv issues list|label|imported|close|provider` and `hv migrate

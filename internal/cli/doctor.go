@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/doctor"
-	"github.com/l4ci/hv-skills/v5/internal/hook"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/skills"
-	"github.com/l4ci/hv-skills/v5/internal/version"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/doctor"
+	"github.com/l4ci/hv/v5/internal/hook"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/skills"
+	"github.com/l4ci/hv/v5/internal/version"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // doctorCommand is `hv doctor` (C6): a read-only preflight. It runs without

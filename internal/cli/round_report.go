@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/round"
 )
 
 // The C8 verb `hv round report`: a solo round's stand-in for the pane poll

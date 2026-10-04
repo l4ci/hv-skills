@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 // forge is a scripted gh and glab: calls records every argument list; reply

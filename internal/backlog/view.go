@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 // Row is one open item as the listing views (hv-backlog, hv-todo-by-milestone,

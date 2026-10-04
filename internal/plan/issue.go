@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/backlog"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/backlog"
 )
 
 // Issue mode, item plans: the plan is a `plan` note on the item's issue and

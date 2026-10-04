@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/knowledge"
-	"github.com/l4ci/hv-skills/v5/internal/mapqa"
+	"github.com/l4ci/hv/v5/internal/knowledge"
+	"github.com/l4ci/hv/v5/internal/mapqa"
 )
 
 // decisionsCommands is the `hv decisions` group (A5, #49).

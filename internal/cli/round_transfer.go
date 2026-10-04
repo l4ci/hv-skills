@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/round"
-	"github.com/l4ci/hv-skills/v5/internal/roundcfg"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/roundcfg"
 )
 
 func roundTransfer(fs *flag.FlagSet) RunFunc {

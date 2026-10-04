@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 )
 
-// Set at link time: -X github.com/l4ci/hv-skills/v5/internal/version.Version=5.0.0
+// Set at link time: -X github.com/l4ci/hv/v5/internal/version.Version=5.0.0
 var (
 	Version = ""
 	Commit  = ""

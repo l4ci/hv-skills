@@ -6,11 +6,11 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/l4ci/hv-skills/v5/internal/artifact"
-	"github.com/l4ci/hv-skills/v5/internal/debugctr"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/spike"
-	"github.com/l4ci/hv-skills/v5/internal/verdict"
+	"github.com/l4ci/hv/v5/internal/artifact"
+	"github.com/l4ci/hv/v5/internal/debugctr"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/spike"
+	"github.com/l4ci/hv/v5/internal/verdict"
 )
 
 // The A6 verbs (milestone, plan, design, spike, proof, debug) live in

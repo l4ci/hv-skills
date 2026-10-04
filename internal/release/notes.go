@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/pystr"
+	"github.com/l4ci/hv/v5/internal/pystr"
 )
 
 // LogFormat is the `git log --pretty` format CommitNotes parses.

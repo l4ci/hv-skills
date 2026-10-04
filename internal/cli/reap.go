@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/host"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/reap"
-	"github.com/l4ci/hv-skills/v5/internal/round"
+	"github.com/l4ci/hv/v5/internal/host"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/reap"
+	"github.com/l4ci/hv/v5/internal/round"
 )
 
 // reapEnv builds the round environment reap reads its live set from and the

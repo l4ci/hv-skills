@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/verdict"
+	"github.com/l4ci/hv/v5/internal/verdict"
 )
 
 // ---- B3: verdict refusals, the Iron Law, loop-only flags

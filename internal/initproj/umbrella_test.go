@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/pytest"
+	"github.com/l4ci/hv/v5/internal/pytest"
 )
 
 // tree builds an umbrella fixture: git children (dir or worktree-style .git

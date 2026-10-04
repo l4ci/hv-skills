@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/tracker"
+	"github.com/l4ci/hv/v5/internal/tracker"
 )
 
 func newIssues(t *testing.T, cfg string, issues ...Issue) (*Issues, *fakeTracker) {

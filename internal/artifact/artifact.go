@@ -7,17 +7,17 @@ package artifact
 import (
 	"errors"
 	"fmt"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/repos"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/frontmatter"
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/section"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/frontmatter"
+	"github.com/l4ci/hv/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/section"
 )
 
 // Exit codes an Error may carry; same numbers as docs/design/5.0-cli-conventions.md.

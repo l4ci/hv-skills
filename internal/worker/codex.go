@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
-	"github.com/l4ci/hv-skills/v5/internal/doctor"
-	"github.com/l4ci/hv-skills/v5/internal/shlex"
+	"github.com/l4ci/hv/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/doctor"
+	"github.com/l4ci/hv/v5/internal/shlex"
 )
 
 // Codex workers (E1, #68). The contract is "E: Codex workers" in

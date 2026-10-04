@@ -17,8 +17,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
-	"github.com/l4ci/hv-skills/v5/internal/repos"
+	"github.com/l4ci/hv/v5/internal/jsonx"
+	"github.com/l4ci/hv/v5/internal/repos"
 )
 
 // Command is a group (Subs) or a verb (Verb) in the hv tree.

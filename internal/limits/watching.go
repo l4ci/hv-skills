@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
+	"github.com/l4ci/hv/v5/internal/fsio"
 )
 
 // WatchFileName is the record of a running watcher under <git-common-dir>/hv/,

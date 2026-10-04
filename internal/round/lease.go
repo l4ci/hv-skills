@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/l4ci/hv-skills/v5/internal/roundlease"
-	"github.com/l4ci/hv-skills/v5/internal/worker"
+	"github.com/l4ci/hv/v5/internal/roundlease"
+	"github.com/l4ci/hv/v5/internal/worker"
 )
 
 // LeaseStale is the drift kind for a lease whose holder is gone. It is never

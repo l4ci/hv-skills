@@ -27,7 +27,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/l4ci/hv-skills/v5/internal/config"
+	"github.com/l4ci/hv/v5/internal/config"
 )
 
 // ---- config fixtures ---------------------------------------------------------------
@@ -162,7 +162,7 @@ func updFixtures(t *testing.T) {
 			return d
 		}
 		upd.bin = filepath.Join(harnessTmp, "hv-stamped")
-		build := exec.Command("go", "build", "-ldflags", "-X github.com/l4ci/hv-skills/v5/internal/version.Version="+instVersion, "-o", upd.bin, ".")
+		build := exec.Command("go", "build", "-ldflags", "-X github.com/l4ci/hv/v5/internal/version.Version="+instVersion, "-o", upd.bin, ".")
 		build.Dir = filepath.Join(repoDir, "cmd", "hv")
 		if out, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("go build: %v\n%s", err, out)
