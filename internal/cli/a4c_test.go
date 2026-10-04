@@ -13,12 +13,12 @@ func TestA4cUpdateIsPinned(t *testing.T) {
 	old := updateEnv
 	defer func() { updateEnv = old }()
 	updateEnv = func() update.Env {
-		return update.Env{Getenv: func(string) string { return "" }, Home: t.TempDir(), Current: "1.0.0",
+		return update.Env{ExeDir: "", Current: "1.0.0",
 			Latest: func() string { return "2.0.0" }}
 	}
 	code, env, _ := hvRun(t, "--json", "update")
 	d := dataOf(env)
-	// No install root resolves, so currentVersion is the stamped fallback.
+	// No binary path resolves, so the install type is unknown.
 	if code != 0 || get(d, "status") != "behind" || get(d, "currentVersion") != "1.0.0" || get(d, "latestVersion") != "2.0.0" || get(d, "installType") != "unknown" {
 		t.Errorf("code=%d env=%v", code, env)
 	}

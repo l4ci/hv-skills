@@ -1,38 +1,32 @@
-// Package update is `hv update`: it finds how hv-skills is installed, reads
-// the running version, asks GitHub for the latest release and says what the
-// user would run to update. It never runs the update. Ported from
-// bin/hv-update-check.
+// Package update is `hv update`: it finds how the hv binary was installed,
+// reads the running version, asks GitHub for the latest release and says what
+// the user would run to update. It never runs the update.
 package update
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
-
-	"github.com/l4ci/hv-skills/v5/internal/fsio"
-	"github.com/l4ci/hv-skills/v5/internal/jsonx"
 )
 
 // Repo is the GitHub repository whose latest release hv update asks about.
 const Repo = "l4ci/hv-skills"
 
-// Install types.
+// Install types: how the running binary got where it is.
 const (
-	Plugin   = "plugin"
-	Stow     = "stow"
-	RepoType = "repo"
-	Override = "override"
-	Unknown  = "unknown"
+	Brew    = "brew"    // under a Homebrew prefix
+	Script  = "script"  // install.sh, or any other copy of a release binary
+	Dev     = "dev"     // built from a checkout (no release version stamped)
+	Unknown = "unknown" // the binary's path could not be resolved
 )
 
-// Result is the data of `hv update`.
+// Result is the data of `hv update`. InstallRoot is the directory holding the
+// running binary.
 type Result struct {
 	InstallType    string
 	InstallRoot    string
@@ -44,9 +38,7 @@ type Result struct {
 
 // Env is everything Check reads from the machine, so tests can pin it.
 type Env struct {
-	Getenv  func(string) string
-	Home    string
-	ExeDir  string // the directory of the running binary: the old BIN_DIR
+	ExeDir  string // the directory of the running binary, symlinks resolved; "" when unknown
 	Current string // the running binary's version
 	// Latest returns the latest release version, or "" when it cannot be found.
 	Latest func() string
@@ -56,20 +48,22 @@ type Env struct {
 // (no network) and otherwise runs `gh api repos/<repo>/releases/latest`, which
 // only reads.
 func DefaultEnv(current string) Env {
-	home, _ := os.UserHomeDir()
-	exe, _ := os.Executable()
-	if real, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = real
+	var dir string
+	if exe, err := os.Executable(); err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = real
+		}
+		dir = filepath.Dir(exe)
 	}
-	return Env{Getenv: os.Getenv, Home: home, ExeDir: filepath.Dir(exe), Current: current, Latest: ghLatest}
+	return Env{ExeDir: dir, Current: current, Latest: ghLatest}
 }
 
 // lookPath finds gh. It is a variable so tests can refuse any gh that is not
 // the fake in test/fakes: hv update must never reach the network from a test.
 var lookPath = exec.LookPath
 
-// ghLatest is fetch_latest: HV_TEST_LATEST_VERSION (the new name of the old
-// HV_LATEST_VERSION) skips the network; without gh or on any failure it is "".
+// ghLatest reads HV_TEST_LATEST_VERSION (no network) first; without gh or on
+// any failure it is "".
 func ghLatest() string {
 	if v := os.Getenv("HV_TEST_LATEST_VERSION"); v != "" {
 		return v
@@ -88,16 +82,11 @@ func ghLatest() string {
 	return strings.TrimPrefix(tag, "v")
 }
 
-// Check is hv-update-check. currentVersion is the installed plugin's version,
-// read from .claude-plugin/plugin.json under the resolved install root as the
-// old helper did; only when no install root resolves is it the running
-// binary's stamped version (orchestrator ruling, A4 acceptance).
+// Check classifies the install, compares the running version with the latest
+// release and names the command that updates it.
 func Check(e Env) Result {
-	kind, root := detect(e)
-	r := Result{InstallType: kind, InstallRoot: root, CurrentVersion: e.Current}
-	if root != "" {
-		r.CurrentVersion = manifestVersion(root)
-	}
+	kind := detect(e)
+	r := Result{InstallType: kind, InstallRoot: e.ExeDir, CurrentVersion: e.Current}
 	if e.Latest != nil {
 		r.LatestVersion = e.Latest()
 	}
@@ -112,144 +101,39 @@ func Check(e Env) Result {
 			r.Status = "current"
 		}
 	}
-	r.UpdateCommand = command(kind, root)
+	r.UpdateCommand = command(kind)
 	return r
 }
 
-func command(kind, root string) string {
+// refresh is the step after any binary update: the skills the binary carries.
+const refresh = " && hv skills update"
+
+func command(kind string) string {
 	switch kind {
-	case Plugin:
-		return "claude plugin update hv-skills"
-	case Stow:
-		if root != "" {
-			return "cd " + root + " && git pull"
-		}
-		return "cd ~/Code/hv-skills && git pull"
-	case RepoType:
-		if root != "" {
-			return "cd " + root + " && git pull"
-		}
-		return "git pull in your hv-skills clone"
-	case Override:
-		return "manual — HV_INSTALL_ROOT was set"
+	case Brew:
+		return "brew update && brew upgrade hv" + refresh
+	case Dev:
+		return "git pull && go build -o <where hv lives> ./cmd/hv" + refresh
 	}
-	return "reinstall: claude plugin install hv-skills"
+	return "curl -fsSL https://raw.githubusercontent.com/" + Repo + "/main/install.sh | sh" + refresh
 }
 
-func isFile(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.Mode().IsRegular()
-}
-
-func isDir(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.IsDir()
-}
-
-func manifest(root string) string { return filepath.Join(root, ".claude-plugin", "plugin.json") }
-
-// manifestVersion is read_version: plugin.json's "version" ("" when the file
-// is missing, unreadable or has none), printed as Python prints a string or
-// a number.
-func manifestVersion(root string) string {
-	m, ok := fsio.LoadJSON(manifest(root), nil).(*jsonx.Object)
-	if !ok {
-		return ""
+// detect: a binary under a Homebrew prefix is brew; a version that is empty,
+// "dev", "(devel)" or carries a -dev suffix is a checkout build; anything else is a
+// release binary somebody copied there, which install.sh also is.
+func detect(e Env) string {
+	if e.ExeDir == "" {
+		return Unknown
 	}
-	switch v, _ := m.Get("version"); v := v.(type) {
-	case string:
-		return v
-	case json.Number:
-		return string(v)
-	}
-	return ""
-}
-
-// detect is resolve_root of hv-update-check: hvlib_paths.resolve_plugin_root
-// first, then the stow symlink walk, then a walk up from the binary.
-func detect(e Env) (kind, root string) {
-	if r, k := resolvePluginRoot(e); k != "" {
-		return k, r
-	}
-	for _, link := range []string{
-		filepath.Join(e.Home, ".claude/skills/hv-work"),
-		filepath.Join(e.Home, ".agents/skills/hv-work"),
-		filepath.Join(e.Home, ".claude/skills/hv-capture"),
-		filepath.Join(e.Home, ".agents/skills/hv-capture"),
-		// installs from before the 5.0 skill removals
-		filepath.Join(e.Home, ".claude/skills/hv-update"),
-		filepath.Join(e.Home, ".agents/skills/hv-update"),
-		filepath.Join(e.Home, ".claude/skills/hv-init"),
-		filepath.Join(e.Home, ".agents/skills/hv-init"),
-	} {
-		fi, err := os.Lstat(link)
-		if err != nil || fi.Mode()&os.ModeSymlink == 0 || !isDir(link) {
-			continue
-		}
-		target, err := filepath.EvalSymlinks(link)
-		if err != nil {
-			continue
-		}
-		repo := filepath.Dir(target)
-		if isFile(manifest(repo)) {
-			return Stow, repo
+	for _, m := range []string{"/Cellar/", "/homebrew/", "/linuxbrew/"} {
+		if strings.Contains(e.ExeDir+"/", m) {
+			return Brew
 		}
 	}
-	for _, up := range []string{e.ExeDir, filepath.Join(e.ExeDir, ".."), filepath.Join(e.ExeDir, "..", "..")} {
-		if e.ExeDir != "" && isFile(manifest(up)) {
-			abs, _ := filepath.Abs(up)
-			return RepoType, abs
-		}
+	if v := e.Current; v == "" || v == "dev" || v == "(devel)" || strings.HasSuffix(v, "-dev") {
+		return Dev
 	}
-	return Unknown, ""
-}
-
-// resolvePluginRoot is hvlib_paths.resolve_plugin_root: the kind is "" when
-// nothing matched.
-func resolvePluginRoot(e Env) (root, kind string) {
-	if o := e.Getenv("HV_INSTALL_ROOT"); o != "" && isDir(o) {
-		return o, Override
-	}
-	if cpr := e.Getenv("CLAUDE_PLUGIN_ROOT"); cpr != "" {
-		if mf := manifest(cpr); isFile(mf) {
-			if m, ok := fsio.LoadJSON(mf, nil).(*jsonx.Object); ok {
-				if n, _ := m.Get("name"); n == "hv-skills" {
-					return cpr, Plugin
-				}
-			}
-		}
-	}
-	cands, _ := filepath.Glob(filepath.Join(e.Home, ".claude/plugins/*/hv-skills"))
-	sort.Strings(cands)
-	cands = append(cands, filepath.Join(e.Home, ".claude/plugins/hv-skills"))
-	for _, c := range cands {
-		if isFile(manifest(c)) {
-			return c, Plugin
-		}
-	}
-	cache := filepath.Join(e.Home, ".claude/plugins/cache/hv-skills/hv-skills")
-	if isDir(cache) {
-		var versions []string
-		if ents, err := os.ReadDir(cache); err == nil {
-			for _, ent := range ents {
-				if isDir(filepath.Join(cache, ent.Name())) {
-					versions = append(versions, ent.Name())
-				}
-			}
-		}
-		sort.SliceStable(versions, func(i, j int) bool { return cmpRuns(versions[i], versions[j]) > 0 })
-		for _, v := range versions {
-			if c := filepath.Join(cache, v); isFile(manifest(c)) {
-				return c, Plugin
-			}
-		}
-	}
-	for _, c := range []string{filepath.Join(e.Home, ".agents/skills/hv-skills"), filepath.Join(e.Home, ".agents/skills")} {
-		if isFile(manifest(c)) {
-			return c, Stow
-		}
-	}
-	return "", ""
+	return Script
 }
 
 var digits = regexp.MustCompile(`[0-9]+`)
@@ -262,30 +146,6 @@ func runs(v string) []*big.Int {
 		out = append(out, n)
 	}
 	return out
-}
-
-// cmpRuns compares the numeric runs of a and b as Python tuples do, with
-// (0,) standing for a name that has none.
-func cmpRuns(a, b string) int {
-	pa, pb := runs(a), runs(b)
-	if len(pa) == 0 {
-		pa = []*big.Int{new(big.Int)}
-	}
-	if len(pb) == 0 {
-		pb = []*big.Int{new(big.Int)}
-	}
-	for i := 0; i < len(pa) && i < len(pb); i++ {
-		if c := pa[i].Cmp(pb[i]); c != 0 {
-			return c
-		}
-	}
-	switch {
-	case len(pa) < len(pb):
-		return -1
-	case len(pa) > len(pb):
-		return 1
-	}
-	return 0
 }
 
 // Compare is cmp_semver: the first three numeric runs of each version, zero
