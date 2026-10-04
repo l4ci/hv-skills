@@ -1,11 +1,11 @@
-# Builds the hv binaries for a version tag and attaches them to a DRAFT GitHub
-# release (see .goreleaser.yaml). Publishing is the gated `hv release publish`
-# step in /hv-release, which finishes this draft instead of creating a second
-# release. Push the tag first (`hv release push --tag-only`), wait for this
+# Builds the rota binaries for a version tag and attaches them to a DRAFT GitHub
+# release (see .goreleaser.yaml). Publishing is the gated `rota release publish`
+# step in /rota-release, which finishes this draft instead of creating a second
+# release. Push the tag first (`rota release push --tag-only`), wait for this
 # job, then publish, then push the branch.
 #
 # The tag builds the binary (its version comes from the tag through ldflags);
-# VERSION is what `hv release bump` edits. The first step refuses a tag that
+# VERSION is what `rota release bump` edits. The first step refuses a tag that
 # does not match VERSION, so the two cannot drift.
 name: Release
 
@@ -41,5 +41,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Write access to l4ci/homebrew-tap; see .hv/RELEASE.md.
+          # Write access to l4ci/homebrew-tap; see .rota/RELEASE.md.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-// TestMain is the safety net: hv update must never reach the network from a
+// TestMain is the safety net: rota update must never reach the network from a
 // test. Any gh lookup that does not land in test/fakes stops the run.
 func TestMain(m *testing.M) {
 	wd, _ := os.Getwd()
 	fakes, _ := filepath.Abs(filepath.Join(wd, "..", "..", "test", "fakes"))
 	os.Setenv("PATH", fakes+string(os.PathListSeparator)+os.Getenv("PATH"))
-	os.Unsetenv("HV_TEST_LATEST_VERSION")
-	os.Unsetenv("HV_LATEST_VERSION")
+	os.Unsetenv("ROTA_TEST_LATEST_VERSION")
+	os.Unsetenv("ROTA_LATEST_VERSION")
 	lookPath = func(name string) (string, error) {
 		p, err := exec.LookPath(name)
 		if err != nil {
@@ -52,15 +52,15 @@ func TestDetect(t *testing.T) {
 	for _, c := range []struct {
 		name, exeDir, current, kind, cmd string
 	}{
-		{"brew arm", "/opt/homebrew/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
-		{"brew shim", "/opt/homebrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
-		{"intel cellar", "/usr/local/Cellar/hv/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
-		{"linuxbrew", "/home/linuxbrew/.linuxbrew/bin", "5.0.0", Brew, "brew update && brew upgrade hv && hv skills update"},
-		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh && hv skills update"},
-		{"dev suffix", "/home/u/.local/bin", "5.0.0-dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
-		{"unstamped", "/tmp/x", "dev", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
-		{"devel", "/tmp/x", "(devel)", Dev, "git pull && go build -o <where hv lives> ./cmd/hv && hv skills update"},
-		{"unresolved", "", "5.0.0", Unknown, "curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh && hv skills update"},
+		{"brew arm", "/opt/homebrew/Cellar/rota/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade rota && rota skills update"},
+		{"brew shim", "/opt/homebrew/bin", "5.0.0", Brew, "brew update && brew upgrade rota && rota skills update"},
+		{"intel cellar", "/usr/local/Cellar/rota/5.0.0/bin", "5.0.0", Brew, "brew update && brew upgrade rota && rota skills update"},
+		{"linuxbrew", "/home/linuxbrew/.linuxbrew/bin", "5.0.0", Brew, "brew update && brew upgrade rota && rota skills update"},
+		{"script", "/home/u/.local/bin", "5.0.0", Script, "curl -fsSL https://raw.githubusercontent.com/l4ci/rota/main/install.sh | sh && rota skills update"},
+		{"dev suffix", "/home/u/.local/bin", "5.0.0-dev", Dev, "git pull && go build -o <where rota lives> ./cmd/rota && rota skills update"},
+		{"unstamped", "/tmp/x", "dev", Dev, "git pull && go build -o <where rota lives> ./cmd/rota && rota skills update"},
+		{"devel", "/tmp/x", "(devel)", Dev, "git pull && go build -o <where rota lives> ./cmd/rota && rota skills update"},
+		{"unresolved", "", "5.0.0", Unknown, "curl -fsSL https://raw.githubusercontent.com/l4ci/rota/main/install.sh | sh && rota skills update"},
 	} {
 		r := Check(env(c.exeDir, c.current, "9.0.0"))
 		if r.InstallType != c.kind || r.InstallRoot != c.exeDir || r.UpdateCommand != c.cmd || r.CurrentVersion != c.current {
@@ -87,7 +87,7 @@ func TestStatuses(t *testing.T) {
 }
 
 func TestLatestFromTestVariable(t *testing.T) {
-	t.Setenv("HV_TEST_LATEST_VERSION", "7.8.9")
+	t.Setenv("ROTA_TEST_LATEST_VERSION", "7.8.9")
 	if got := ghLatest(); got != "7.8.9" {
 		t.Errorf("ghLatest = %q", got)
 	}

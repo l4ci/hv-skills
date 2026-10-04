@@ -1,4 +1,4 @@
-// Package update is `hv update`: it finds how the hv binary was installed,
+// Package update is `rota update`: it finds how the rota binary was installed,
 // reads the running version, asks GitHub for the latest release and says what
 // the user would run to update. It never runs the update.
 package update
@@ -14,8 +14,8 @@ import (
 	"time"
 )
 
-// Repo is the GitHub repository whose latest release hv update asks about.
-const Repo = "l4ci/hv"
+// Repo is the GitHub repository whose latest release rota update asks about.
+const Repo = "l4ci/rota"
 
 // Install types: how the running binary got where it is.
 const (
@@ -25,7 +25,7 @@ const (
 	Unknown = "unknown" // the binary's path could not be resolved
 )
 
-// Result is the data of `hv update`. InstallRoot is the directory holding the
+// Result is the data of `rota update`. InstallRoot is the directory holding the
 // running binary.
 type Result struct {
 	InstallType    string
@@ -44,7 +44,7 @@ type Env struct {
 	Latest func() string
 }
 
-// DefaultEnv is the real machine. Latest reads HV_TEST_LATEST_VERSION first
+// DefaultEnv is the real machine. Latest reads ROTA_TEST_LATEST_VERSION first
 // (no network) and otherwise runs `gh api repos/<repo>/releases/latest`, which
 // only reads.
 func DefaultEnv(current string) Env {
@@ -59,13 +59,13 @@ func DefaultEnv(current string) Env {
 }
 
 // lookPath finds gh. It is a variable so tests can refuse any gh that is not
-// the fake in test/fakes: hv update must never reach the network from a test.
+// the fake in test/fakes: rota update must never reach the network from a test.
 var lookPath = exec.LookPath
 
-// ghLatest reads HV_TEST_LATEST_VERSION (no network) first; without gh or on
+// ghLatest reads ROTA_TEST_LATEST_VERSION (no network) first; without gh or on
 // any failure it is "".
 func ghLatest() string {
-	if v := os.Getenv("HV_TEST_LATEST_VERSION"); v != "" {
+	if v := os.Getenv("ROTA_TEST_LATEST_VERSION"); v != "" {
 		return v
 	}
 	gh, err := lookPath("gh")
@@ -106,14 +106,14 @@ func Check(e Env) Result {
 }
 
 // refresh is the step after any binary update: the skills the binary carries.
-const refresh = " && hv skills update"
+const refresh = " && rota skills update"
 
 func command(kind string) string {
 	switch kind {
 	case Brew:
-		return "brew update && brew upgrade hv" + refresh
+		return "brew update && brew upgrade rota" + refresh
 	case Dev:
-		return "git pull && go build -o <where hv lives> ./cmd/hv" + refresh
+		return "git pull && go build -o <where rota lives> ./cmd/rota" + refresh
 	}
 	return "curl -fsSL https://raw.githubusercontent.com/" + Repo + "/main/install.sh | sh" + refresh
 }
