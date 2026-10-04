@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,8 @@ func doctorFakes(t *testing.T, tools map[string]string) {
 		}
 	}
 	t.Setenv("HV_TEST_DOCTOR_PATH", dir)
+	t.Setenv("HOME", t.TempDir()) // no skills, plugin or settings of the real user
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
 }
 
 func doctorData(t *testing.T, out string) (bool, map[string]map[string]any) {
@@ -36,7 +39,7 @@ func doctorData(t *testing.T, out string) (bool, map[string]map[string]any) {
 		byName[c["name"].(string)] = c
 		order += c["name"].(string) + ","
 	}
-	if order != "git,host,tracker,accounts,hook,statusline,stop-hook,switch,hv,codex," {
+	if order != "git,host,tracker,accounts,hook,statusline,stop-hook,switch,skills,codex," {
 		t.Errorf("check order %s", order)
 	}
 	return env.Data.OK, byName
@@ -90,5 +93,31 @@ func TestDoctorRejectsArgsAndRepo(t *testing.T) {
 	}
 	if code, _, _ := hvIn(t, dir, "doctor", "--repo", "x"); code != 2 {
 		t.Errorf("--repo: %d", code)
+	}
+}
+
+// The skills check skips until hv skills install ran, passes after it, and
+// fails when an installed file was edited.
+func TestDoctorSkillsCheck(t *testing.T) {
+	doctorFakes(t, map[string]string{"git": `case "$1" in remote) exit 2;; esac; exit 0`})
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	home := os.Getenv("HOME")
+	skills := func() map[string]any {
+		_, out, _ := hvIn(t, dir, "doctor", "--json")
+		_, c := doctorData(t, out)
+		return c["skills"]
+	}
+	if c := skills(); c["status"] != "skip" || !strings.Contains(c["detail"].(string), "hv skills install") {
+		t.Errorf("not installed: %v", c)
+	}
+	if code, out, _ := hvIn(t, dir, "skills", "install", "--agent", "claude"); code != 0 {
+		t.Fatalf("install %d %s", code, out)
+	}
+	if c := skills(); c["status"] != "pass" {
+		t.Errorf("installed: %v", c)
+	}
+	os.WriteFile(filepath.Join(home, ".claude", "skills", "hv-work", "SKILL.md"), []byte("mine\n"), 0o644)
+	if c := skills(); c["status"] != "fail" || c["hint"] != "run: hv skills update --overwrite" {
+		t.Errorf("edited: %v", c)
 	}
 }

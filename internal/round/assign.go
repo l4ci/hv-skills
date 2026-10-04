@@ -107,8 +107,9 @@ func BranchName(agent, id, title string) string {
 }
 
 // briefPath is the standing worker contract the pointer names: round.brief,
-// else references/worker-contract.md under CLAUDE_PLUGIN_ROOT, else under the
-// project root.
+// else references/worker-contract.md in the project (a source checkout), else
+// hv-orchestrate/references/worker-contract.md under the first installed
+// Claude skills root, the project's before the user's (hv skills install).
 func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (string, bool) {
 	var cands []string
 	if set.Brief != "" {
@@ -118,10 +119,20 @@ func briefPath(root string, set roundcfg.Settings, getenv func(string) string) (
 		}
 		cands = append(cands, p)
 	} else {
-		if pr := getenv("CLAUDE_PLUGIN_ROOT"); pr != "" {
-			cands = append(cands, filepath.Join(pr, "references", "worker-contract.md"))
-		}
 		cands = append(cands, filepath.Join(root, "references", "worker-contract.md"))
+		installed := filepath.Join("hv-orchestrate", "references", "worker-contract.md")
+		skillRoots := []string{filepath.Join(root, ".claude", "skills")}
+		if d := getenv("CLAUDE_CONFIG_DIR"); d != "" {
+			skillRoots = append(skillRoots, filepath.Join(d, "skills"))
+		} else if home := getenv("HOME"); home != "" {
+			skillRoots = append(skillRoots, filepath.Join(home, ".claude", "skills"))
+		}
+		for _, r := range skillRoots {
+			if _, err := os.Stat(filepath.Join(r, ".hv-manifest.json")); err == nil {
+				cands = append(cands, filepath.Join(r, installed))
+				break
+			}
+		}
 	}
 	for _, c := range cands {
 		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {

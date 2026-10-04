@@ -12,6 +12,7 @@ import (
 	"github.com/l4ci/hv-skills/v5/internal/doctor"
 	"github.com/l4ci/hv-skills/v5/internal/hook"
 	"github.com/l4ci/hv-skills/v5/internal/jsonx"
+	"github.com/l4ci/hv-skills/v5/internal/skills"
 	"github.com/l4ci/hv-skills/v5/internal/version"
 	"github.com/l4ci/hv-skills/v5/internal/worker"
 )
@@ -19,7 +20,7 @@ import (
 // doctorCommand is `hv doctor` (C6): a read-only preflight. It runs without
 // .hv/ and reads the project config only when one is found.
 func doctorCommand() *Command {
-	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, orchestrator hooks, hv, codex", Verb: noFlags(runDoctor)}
+	return &Command{Name: "doctor", Summary: "preflight: git, host, forge, accounts, herdr hook, orchestrator hooks, skills, codex", Verb: noFlags(runDoctor)}
 }
 
 // doctorCallTimeout bounds each tool call, so a hung herdr cannot hang the verb.
@@ -56,16 +57,10 @@ func runDoctor(c *Ctx, args []string) (Result, error) {
 // doctorInput gathers the real environment: HV_TEST_DOCTOR_PATH replaces PATH
 // for tool lookup (a test hook, not part of the CLI).
 func doctorInput() doctor.Input {
-	in := doctor.Input{Version: version.Get().Version, Exec: doctorExec, Look: doctorLook(os.Getenv("HV_TEST_DOCTOR_PATH"))}
+	in := doctor.Input{Exec: doctorExec, Look: doctorLook(os.Getenv("HV_TEST_DOCTOR_PATH"))}
 	in.Dir, _ = os.Getwd()
 	in.Home, _ = os.UserHomeDir()
-	in.PluginRoots = []string{in.Dir}
-	if exe, err := os.Executable(); err == nil {
-		if real, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = real
-		}
-		in.PluginRoots = append(in.PluginRoots, filepath.Dir(exe))
-	}
+	in.Skills = doctorSkills(in.Home)
 	root := ""
 	for d := in.Dir; d != ""; {
 		if fi, err := os.Stat(filepath.Join(d, ".hv")); err == nil && fi.IsDir() {
@@ -128,6 +123,25 @@ func doctorInput() doctor.Input {
 		}
 	}
 	return in
+}
+
+// doctorSkills reads the skill roots in both scopes; nil when the embedded set
+// or the roots cannot be resolved (the check then skips).
+func doctorSkills(home string) *skills.Report {
+	set, err := skills.Embedded()
+	if err != nil {
+		return nil
+	}
+	cdir := skills.ClaudeDir(home)
+	roots, err := skills.Roots("", "all", home, cdir, gitToplevel())
+	if err != nil {
+		return nil
+	}
+	rep, err := set.Status(roots, version.Get().Version, cdir)
+	if err != nil {
+		return nil
+	}
+	return &rep
 }
 
 // doctorLook finds a tool on pathOverride when set, else on PATH.
