@@ -40,9 +40,9 @@ _(no active milestones — all shipped or archived; run `/hv-vision` to plan mor
 **Run `bash test/smoke.sh` only at integration boundaries — not per task.** The full smoke suite is slow (sequential by design, state accumulates across sections). Per-task verification inside `/hv-work` and `/hv-debug` stays structural: `git status` / `git diff` / targeted greps / re-running the specific reproducer. Run the full smoke in `/hv-ship` and `/hv-review` (pre-merge / pre-PR), or when explicitly asked. If a single section is clearly relevant to the change in flight, sourcing just that section file in a sandbox is fine; defer the full run to ship time.
 
 <!-- hv-skills-start -->
-## hv-skills
+## hv
 
-This project uses hv-skills for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, `.hv/verdicts.json`, `.hv/gate-audit.jsonl`, `.hv/workers.json`, and `.hv/**/*.lock` files are gitignored. Use the skills and `hv` verbs to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
+This project uses hv for backlog tracking, planning, and skill orchestration. State lives in `.hv/` — most content is tracked (backlog, knowledge, decisions, plans, designs, milestones) so it travels with the repo. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, `.hv/verdicts.json`, `.hv/gate-audit.jsonl`, `.hv/workers.json`, and `.hv/**/*.lock` files are gitignored. Use the skills and `hv` verbs to update tracked content (never edit by hand). Edit canonical sources (`bin/`, `hv-*/`, `docs/`, `test/`) for skill changes.
 
 **Capture & pick** — `/hv-capture` (with `--remove <ID>` to delete items; offers to hand off to `/hv-work`), `/hv-pause`
 **Plan & build** — `/hv-brainstorm`, `/hv-plan`, `/hv-spike`, `/hv-work` (no argument reconciles active work and suggests the next item; `--preview` for read-only peek), `/hv-debug`
