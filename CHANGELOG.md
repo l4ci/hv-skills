@@ -1,5 +1,25 @@
 # Changelog
 
+## v5.0.0 — 2026-10-04
+
+5.0 moves the mechanics of hv-skills into a Go CLI and adds autonomous rounds: an orchestrator drives parallel workers, each in its own worktree, from GitHub issues.
+
+### Upgrade
+v4 had no active users, so there is no migration to run. Install the plugin (it fetches the matching `hv` binary on first use), or `go install github.com/l4ci/hv-skills/v5/cmd/hv@latest` for other harnesses. `hv init` in a project sets it up. The bash and Python helpers under `bin/` are gone; every call is an `hv` verb. Binaries are checked against `checksums.txt` (sha256). That is an integrity check, not proof of who built them; signatures are planned for 5.1. Homebrew is not available yet.
+
+### Breaking
+- **Helpers replaced by `hv`.** All `bin/hv-*` helpers are Go verbs with `--json` output and stable exit codes.
+- **Skills removed:** `/hv-go`, `/hv-next`, `/hv-init`, `/hv-config`, `/hv-update`, `/hv-migrate`. Capture hands off to work, `/hv-work` with no argument reconciles and suggests the next item, and init, config, update and migrate are `hv` verbs.
+- **Skills thinned to judgment:** `/hv-ship`, `/hv-capture`, `/hv-release`, `/hv-pause`.
+
+### New
+- **Autonomous rounds.** `/hv-orchestrate` and `hv round` (start, candidates, assign, wait, status, reconcile, escalate, wind-down) run Claude or Codex workers under herdr or tmux, or as subagents in solo mode, with per-worker model tiers and merge policy.
+- **Rules enforced in code.** Manual-gate registry, typed review/QA verdicts, the debug Iron Law, and a verified merge gate (`hv worker gate`).
+- **Keepalive.** Orchestrator handoff on a full context, restart in the same pane, and usage-limit handling (sleep to reset or switch account). With `orchestrator.switchOnUsage` on (off by default), the orchestrator hands off and moves to another account before it hits the limit.
+- **Codex.** Codex workers with a per-slot `CODEX_HOME` (each slot logs in separately), a version check in `hv doctor`, recognition of Codex's status sentinels, and no tier map required. Skills follow the Agent Skills spec so Codex discovers them.
+- **Release pipeline.** goreleaser builds `hv` for linux and macOS (amd64, arm64) from a version tag into one draft release; `hv release publish` finishes it, and the branch with the new plugin version is pushed last.
+- **`hv doctor` and `hv reap`.** Preflight and cleanup for rounds.
+
 ## v4.5.0 — 2026-06-19
 
 Three closed issues: design files amend through a helper, drift detection catches silently-shipped work, and knowledge-query stops failing silently.
