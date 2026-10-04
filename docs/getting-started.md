@@ -1,38 +1,38 @@
 # Getting started
 
-Install hv and run your first capture → work → ship cycle in about five minutes.
+Install rota and run your first capture → work → ship cycle in about five minutes.
 
 ## Install
 
-From v5.0.0:
+From 0.9.0:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/l4ci/hv/main/install.sh | sh   # or: brew install l4ci/tap/hv
-hv skills install
+curl -fsSL https://raw.githubusercontent.com/l4ci/rota/main/install.sh | sh   # or: brew install l4ci/tap/rota
+rota skills install
 ```
 
 The skills land in the Claude Code and Codex skill directories. Options, upgrading and removal are on the [install page](install.md).
 
 ## Initialize the project
 
-Run `hv init` once at the project root. It scaffolds `.hv/` and writes the Recommended
+Run `rota init` once at the project root. It scaffolds `.rota/` and writes the Recommended
 config defaults (models, isolation, merge strategy, quality gates, autonomy level). Keep the
 defaults unless you have a reason not to.
 
 Two settings worth a second of thought:
 
 - **Isolation.** `branch` is fine for solo work. Switch to `worktree` if you want `main`
-  untouched while agents run, or if you plan to run parallel `/hv-work` sessions.
+  untouched while agents run, or if you plan to run parallel `/rota-work` sessions.
 - **Merge strategy.** `direct` for fast iteration. `pr` if your team requires GitHub review.
 
-To change a setting later, run `hv config set <key> <value>` (`hv config show` lists the keys). See [config options](reference/config-options.md). Don't hand-edit the JSON files.
+To change a setting later, run `rota config set <key> <value>` (`rota config show` lists the keys). See [config options](reference/config-options.md). Don't hand-edit the JSON files.
 
 ## Worked examples
 
 Two end-to-end walkthroughs carry one concrete project from brief to shipped milestone:
 
-- [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md): empty repo plus a one-page brief, walked through `/hv-vision`, `/hv-plan`, `/hv-work`, `/hv-debug`, `/hv-ship`, `/hv-learn`.
-- [Brownfield: dropping hv into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `hv init`, `/hv-capture --from-github`, `/hv-capture`, then a P0 cycle and a debug cycle.
+- [Greenfield: from a brief to a shipped milestone](walkthroughs/greenfield-from-brief.md): empty repo plus a one-page brief, walked through `/rota-vision`, `/rota-plan`, `/rota-work`, `/rota-debug`, `/rota-ship`, `/rota-learn`.
+- [Brownfield: dropping rota into an existing project](walkthroughs/brownfield-existing-project.md): established codebase with open GitHub issues and a mental bug list, walked through `rota init`, `/rota-capture --from-github`, `/rota-capture`, then a P0 cycle and a debug cycle.
 
 Pick whichever matches where your project is today and follow it skill-by-skill.
 

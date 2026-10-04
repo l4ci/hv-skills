@@ -20,46 +20,46 @@ The repo has the README, a `.gitignore`, and nothing else.
 
 ```mermaid
 flowchart LR
-  BRIEF[README.md brief] --> INIT["hv init"]
-  INIT --> VISION["/hv-vision"]
+  BRIEF[README.md brief] --> INIT["rota init"]
+  INIT --> VISION["/rota-vision"]
   VISION --> MILES[(M01 active)]
-  VISION --> SPIKE["/hv-spike<br/>sqlite-schema"]
-  SPIKE -.findings.-> PLAN["/hv-plan M01-S01"]
+  VISION --> SPIKE["/rota-spike<br/>sqlite-schema"]
+  SPIKE -.findings.-> PLAN["/rota-plan M01-S01"]
   MILES --> PLAN
-  PLAN --> CAP["/hv-capture<br/>F01–F05"]
-  CAP --> WORK["/hv-work"]
-  WORK -.float bug<br/>on F04.-> DEBUG["/hv-debug"]
+  PLAN --> CAP["/rota-capture<br/>F01–F05"]
+  CAP --> WORK["/rota-work"]
+  WORK -.float bug<br/>on F04.-> DEBUG["/rota-debug"]
   DEBUG --> WORK
-  WORK --> SHIP["/hv-ship"]
-  SHIP --> LEARN["/hv-learn"]
+  WORK --> SHIP["/rota-ship"]
+  SHIP --> LEARN["/rota-learn"]
   LEARN --> KNOW[(KNOWLEDGE.md<br/>Money & Decimals)]
   KNOW -.consults.-> WORK
 ```
 
 Ten steps follow, in execution order.
 
-## Step 1: hv init
+## Step 1: rota init
 
 ```bash
-$ hv init
+$ rota init
 ```
 
-No questions. For a solo greenfield the defaults are what I want: orchestrator `opus` and worker `sonnet`, branch isolation, direct merge, review gate on, autonomy off. Flip any of these later with `hv config set`.
+No questions. For a solo greenfield the defaults are what I want: orchestrator `opus` and worker `sonnet`, branch isolation, direct merge, review gate on, autonomy off. Flip any of these later with `rota config set`.
 
 The command writes:
 
-- `.hv/BACKLOG.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `CONTEXT.md`
-- `.hv/counters.json`, `config.json`, `status.json`
+- `.rota/BACKLOG.md`, `KNOWLEDGE.md`, `DECISIONS.md`, `MILESTONES.md`, `CONTEXT.md`
+- `.rota/counters.json`, `config.json`, `status.json`
 - Managed blocks in `CLAUDE.md` so the orchestrator picks up project knowledge, decisions, context, and the active milestone
 
-Most of `.hv/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.hv/status.json`, `.hv/repos.json`, `.hv/config.local.json`, `.hv/handoff/`, `.hv/qa-runs/`, `.hv/gate-audit.jsonl`, and `.hv/**/*.lock` files are gitignored.
+Most of `.rota/` is tracked by default, so the backlog and learnings travel with the repo from the first commit. Only `.rota/status.json`, `.rota/repos.json`, `.rota/config.local.json`, `.rota/handoff/`, `.rota/qa-runs/`, `.rota/gate-audit.jsonl`, and `.rota/**/*.lock` files are gitignored.
 
-## Step 2: /hv-vision
+## Step 2: /rota-vision
 
-`/hv-vision` turns "I have an idea" into "I have milestones I can execute against." It runs Socratic discovery, then web research, then a critique pass.
+`/rota-vision` turns "I have an idea" into "I have milestones I can execute against." It runs Socratic discovery, then web research, then a critique pass.
 
 ```bash
-$ /hv-vision
+$ /rota-vision
 ```
 
 It reads `README.md` and any stack file (`package.json`, `go.mod`, `Cargo.toml`, …) at the project root before asking anything. If your brief lives under a different name (`briefing.md`, `pitch.md`, `idea.md`), point at it in the opening message (*"there's a brief at brief.md"*) and the skill picks it up.
@@ -99,19 +99,19 @@ Privacy-first household budget tracker. CLI as the daily driver, web dashboard f
   Threshold-based notifications. CLI flag plus optional system notification.
 ```
 
-Plus three detail files at `.hv/milestones/M01.md`, `M02.md`, `M03.md`, each with goal, acceptance criteria, rationale, risks, and the research findings from the session.
+Plus three detail files at `.rota/milestones/M01.md`, `M02.md`, `M03.md`, each with goal, acceptance criteria, rationale, risks, and the research findings from the session.
 
-`/hv-vision` marks M01 active and seeds the always-on `## Project Vision` block in `CLAUDE.md`. Every subsequent skill knows what the active milestone is.
+`/rota-vision` marks M01 active and seeds the always-on `## Project Vision` block in `CLAUDE.md`. Every subsequent skill knows what the active milestone is.
 
-## Step 3: /hv-spike (optional)
+## Step 3: /rota-spike (optional)
 
 The vision session named one unknown: the SQLite schema design for transactions, specifically how you'd handle multi-currency. The brief doesn't require it, but you suspect you'll add it within a year. A spike checks whether a one-currency-now schema would hurt later.
 
 ```bash
-$ /hv-spike sqlite-schema "Will a single-currency schema survive multi-currency migration cleanly?"
+$ /rota-spike sqlite-schema "Will a single-currency schema survive multi-currency migration cleanly?"
 ```
 
-This creates a `spike/sqlite-schema` branch (which never merges into `main`) and `.hv/spikes/sqlite-schema.md` with the question recorded. You experiment on the branch: try two schemas, write a sketch migration, see what feels right. When you're done, fill in *Findings* and *Decision* in the spike file:
+This creates a `spike/sqlite-schema` branch (which never merges into `main`) and `.rota/spikes/sqlite-schema.md` with the question recorded. You experiment on the branch: try two schemas, write a sketch migration, see what feels right. When you're done, fill in *Findings* and *Decision* in the spike file:
 
 ```markdown
 **Findings.** A `currency` column added later with default `'USD'` and a backfill works fine; the rollup queries need a one-line change. No data loss.
@@ -119,19 +119,19 @@ This creates a `spike/sqlite-schema` branch (which never merges into `main`) and
 **Decision.** Ship single-currency in M01. Add `currency` column in M03 or later, no need to engineer it in advance.
 ```
 
-Then run `hv spike finish sqlite-schema` to stamp it done. The branch stays in git as reference; only the findings come back to `main`.
+Then run `rota spike finish sqlite-schema` to stamp it done. The branch stays in git as reference; only the findings come back to `main`.
 
 For a brand-new project you might do zero spikes. Use them when the answer materially changes the design.
 
-## Step 4: /hv-plan M01-S01
+## Step 4: /rota-plan M01-S01
 
-`/hv-vision` set the destination. `/hv-plan` sets the route for the first slice.
+`/rota-vision` set the destination. `/rota-plan` sets the route for the first slice.
 
 ```bash
-$ /hv-plan M01-S01
+$ /rota-plan M01-S01
 ```
 
-A focused session walks you through goal, approach, task decomposition, named assumptions, and open questions. The output lives at `.hv/plans/M01-S01.md`:
+A focused session walks you through goal, approach, task decomposition, named assumptions, and open questions. The output lives at `.rota/plans/M01-S01.md`:
 
 ```markdown
 ---
@@ -170,14 +170,14 @@ Single binary, `cobra` for the CLI, `database/sql` plus `mattn/go-sqlite3`. Deci
 - None blocking. Multi-currency deferred per the sqlite-schema spike.
 ```
 
-`/hv-work` consults this plan when it dispatches. The verify step on each task is what keeps workers honest; a task with no verify step is not well-defined.
+`/rota-work` consults this plan when it dispatches. The verify step on each task is what keeps workers honest; a task with no verify step is not well-defined.
 
-## Step 5: /hv-capture
+## Step 5: /rota-capture
 
-The plan named five tasks. You can either run `/hv-work` against the plan directly (it decomposes the same way), or capture the slice as backlog items first so each gets an ID, a detail file, and a KNOWLEDGE.md link. For greenfield I prefer the capture step: it gives me hooks for tracking, and `/hv-work` (no argument) surfaces items in order.
+The plan named five tasks. You can either run `/rota-work` against the plan directly (it decomposes the same way), or capture the slice as backlog items first so each gets an ID, a detail file, and a KNOWLEDGE.md link. For greenfield I prefer the capture step: it gives me hooks for tracking, and `/rota-work` (no argument) surfaces items in order.
 
 ```bash
-$ /hv-capture "tally CLI skeleton, sqlite migrations engine, transactions schema with int64 minor units, tally add command, tally list command"
+$ /rota-capture "tally CLI skeleton, sqlite migrations engine, transactions schema with int64 minor units, tally add command, tally list command"
 ```
 
 The output:
@@ -190,14 +190,14 @@ The output:
 [F05] tally list command                          Feature, Minor, Milestone: M01
 ```
 
-Each gets a row in `BACKLOG.md` under `## Features`, tagged `Milestone: M01`. Detail files live at `.hv/features/F01.md` … `F05.md` (auto-created when the description is long enough to overflow the BACKLOG row).
+Each gets a row in `BACKLOG.md` under `## Features`, tagged `Milestone: M01`. Detail files live at `.rota/features/F01.md` … `F05.md` (auto-created when the description is long enough to overflow the BACKLOG row).
 
-If any of these had been size-Major instead of Minor, `/hv-capture` would have nudged you toward `/hv-brainstorm` before plan to negotiate the design first. Minor items skip that layer.
+If any of these had been size-Major instead of Minor, `/rota-capture` would have nudged you toward `/rota-brainstorm` before plan to negotiate the design first. Minor items skip that layer.
 
-## Step 6: first cycle (/hv-work → /hv-ship → /hv-learn)
+## Step 6: first cycle (/rota-work → /rota-ship → /rota-learn)
 
 ```bash
-$ /hv-work
+$ /rota-work
 ```
 
 ```
@@ -205,25 +205,25 @@ Backlog (M01 active):
   Features: F01, F02, F03, F04, F05 (all Minor)
 
 Suggested next: F01 (head of M01 dependency chain)
-Run /hv-work F01? [y/N]
+Run /rota-work F01? [y/N]
 ```
 
-You confirm. The orchestrator reads `.hv/plans/M01-S01.md`, picks the F01 task, and dispatches a worker on `hv/F01-tally-cli-skeleton` (branch isolation):
+You confirm. The orchestrator reads `.rota/plans/M01-S01.md`, picks the F01 task, and dispatches a worker on `rota/F01-tally-cli-skeleton` (branch isolation):
 
 ```
 [orchestrator] Plan reads: 1. Skeleton CLI ...
-[orchestrator] Dispatching 1 worker on branch hv/F01-tally-cli-skeleton
+[orchestrator] Dispatching 1 worker on branch rota/F01-tally-cli-skeleton
 [worker]  ↳ created cmd/tally/main.go, cmd/tally/root.go, go.mod
 [worker]  ↳ verify: go test ./...                      (PASS)
 [worker]  ↳ verify: tally --version | grep v0.0.0      (PASS)
 [worker]  ↳ commit: feat(cli): scaffold tally root command [F01]
 ```
 
-`hv item complete` marks F01 done in `BACKLOG.md`. `/hv-work` merges the branch into `main` with `--no-ff` (direct merge), deletes the branch, and prompts for the next item.
+`rota item complete` marks F01 done in `BACKLOG.md`. `/rota-work` merges the branch into `main` with `--no-ff` (direct merge), deletes the branch, and prompts for the next item.
 
 You repeat for F02 and F03. F03 introduces something subtle. The transactions schema stores amounts as int64 minor units, but the worker writes a helper that converts `decimal.Decimal` to int64 by multiplying by 100 and casting. Looks right. Isn't.
 
-## Step 7: a real bug, run /hv-debug
+## Step 7: a real bug, run /rota-debug
 
 F04 lands. You try a quick smoke test:
 
@@ -238,7 +238,7 @@ $ tally list
 `0.10` came back as `0.09`. Classic float intermediary. Time for a debug cycle.
 
 ```bash
-$ /hv-debug
+$ /rota-debug
 ```
 
 It asks which open or recently completed item to debug. You point at F04 (the `add` command, though the real bug was introduced in F03's helper). The cycle:
@@ -248,30 +248,30 @@ It asks which open or recently completed item to debug. You point at F04 (the `a
 3. **Verify the hypothesis before changing code.** Add a debug print of the intermediate float. It prints `9.999999999999998`. Confirmed.
 4. **Fix.** Replace the float roundtrip with `decimal`'s own shift. Parse input via `decimal.NewFromString(input)`, then `shifted.Shift(2).IntPart()`. The test now passes for `0.10`, `12.34`, `0.001` (correctly errors), and `99999.99`.
 5. **Commit.** `fix(money): use decimal.Shift instead of Float64 for minor-unit conversion`. One atomic commit.
-6. **Nudge /hv-learn.** `/hv-debug` ends with: *this was a subtle gotcha (decimal/float interaction). Run /hv-learn to capture it?*
+6. **Nudge /rota-learn.** `/rota-debug` ends with: *this was a subtle gotcha (decimal/float interaction). Run /rota-learn to capture it?*
 
 You do, after Step 8.
 
-## Step 8: /hv-ship
+## Step 8: /rota-ship
 
 When F05 lands the slice is functionally complete:
 
 ```bash
-$ /hv-ship
+$ /rota-ship
 ```
 
-`/hv-ship` runs `/hv-review` first. The reviewer reads recent commits, the resolved item IDs, and any `KNOWLEDGE.md` topics that match touched files. It returns one of `PASS`, `CONCERNS`, `FAIL`.
+`/rota-ship` runs `/rota-review` first. The reviewer reads recent commits, the resolved item IDs, and any `KNOWLEDGE.md` topics that match touched files. It returns one of `PASS`, `CONCERNS`, `FAIL`.
 
-For M01-S01 you get `PASS` with one `CONCERNS` note attached: *"F05 uses `fmt.Println` for output; consider `cmd.OutOrStdout()` for testability when the web dashboard imports the same package in M02."* You file that as a follow-up via `/hv-capture` and continue.
+For M01-S01 you get `PASS` with one `CONCERNS` note attached: *"F05 uses `fmt.Println` for output; consider `cmd.OutOrStdout()` for testability when the web dashboard imports the same package in M02."* You file that as a follow-up via `/rota-capture` and continue.
 
-`/hv-ship` then either opens a GitHub PR or merges directly into `main`, depending on `work.mergeStrategy`. Solo mode for Tally is direct merge.
+`/rota-ship` then either opens a GitHub PR or merges directly into `main`, depending on `work.mergeStrategy`. Solo mode for Tally is direct merge.
 
-## Step 9: /hv-learn
+## Step 9: /rota-learn
 
-The float-bug session produced one durable insight. `/hv-learn` writes it into `KNOWLEDGE.md` under a topic of your choice:
+The float-bug session produced one durable insight. `/rota-learn` writes it into `KNOWLEDGE.md` under a topic of your choice:
 
 ```bash
-$ /hv-learn
+$ /rota-learn
 ```
 
 The verifier judges every bullet for durability before it lands. It rejects "fixed the bug" but accepts:
@@ -282,31 +282,31 @@ The verifier judges every bullet for durability before it lands. It rejects "fix
 - **Never multiply a `decimal.Decimal` by a float to convert to minor units.** `Float64() * 100` produces `9.999…` for inputs like `0.10`; truncation gives `9`. Use `decimal.NewFromString(...).Shift(2).IntPart()` end-to-end. The float path is silently wrong, not noisy.
 ```
 
-The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time `/hv-work` touches money handling, the orchestrator pulls this section via `hv knowledge query "Money & Decimals"` before planning, so the same trap doesn't bite a worker again.
+The topic shows up in the `## Project Knowledge` block in `CLAUDE.md`. Next time `/rota-work` touches money handling, the orchestrator pulls this section via `rota knowledge query "Money & Decimals"` before planning, so the same trap doesn't bite a worker again.
 
 ## Step 10: repeat, then close M01
 
-You loop steps 6–9 through additional slices: `tally summary` for monthly rollups, `tally yoy` for year-over-year compare, a CSV importer. Each `/hv-plan M01-S02`, `M01-S03`, `M01-S04` writes its own slice plan; `/hv-capture` seeds items; `/hv-work` ships them; `/hv-learn` catches anything subtle that surfaced.
+You loop steps 6–9 through additional slices: `tally summary` for monthly rollups, `tally yoy` for year-over-year compare, a CSV importer. Each `/rota-plan M01-S02`, `M01-S03`, `M01-S04` writes its own slice plan; `/rota-capture` seeds items; `/rota-work` ships them; `/rota-learn` catches anything subtle that surfaced.
 
-After the importer ships, `/hv-work` (no argument) says:
+After the importer ships, `/rota-work` (no argument) says:
 
 ```
 M01 has no open items.
-Run `hv milestone status M01 shipped` to close the milestone?
+Run `rota milestone status M01 shipped` to close the milestone?
 ```
 
-You run it. M02 and M03 (which both depend on M01) flip from blocked to ready in `MILESTONES.md`. The next `/hv-vision` invocation enters edit mode and refines M02's plan with what you learned in M01. The float gotcha now informs the dashboard's number rendering, and the XDG-paths-Linux-only assumption gets revisited for cross-platform packaging.
+You run it. M02 and M03 (which both depend on M01) flip from blocked to ready in `MILESTONES.md`. The next `/rota-vision` invocation enters edit mode and refines M02's plan with what you learned in M01. The float gotcha now informs the dashboard's number rendering, and the XDG-paths-Linux-only assumption gets revisited for cross-platform packaging.
 
 ## What you have after two weeks
 
 - `main` has one commit per task, each verifiable in isolation
-- `.hv/MILESTONES.md` shows M01 shipped, M02 active
-- `.hv/KNOWLEDGE.md` carries five to ten bullets across three or four topics; learnings, not a fix log
-- `.hv/plans/` keeps the M01-S01 plan on disk (slice plans persist; item-specific plans are auto-cleaned on ship)
-- `.hv/spikes/sqlite-schema.md` is a permanent record of why M01 stayed single-currency
+- `.rota/MILESTONES.md` shows M01 shipped, M02 active
+- `.rota/KNOWLEDGE.md` carries five to ten bullets across three or four topics; learnings, not a fix log
+- `.rota/plans/` keeps the M01-S01 plan on disk (slice plans persist; item-specific plans are auto-cleaned on ship)
+- `.rota/spikes/sqlite-schema.md` is a permanent record of why M01 stayed single-currency
 
-The next session in a fresh `/clear` starts from `/hv-work` (no argument), which reads the active milestone, the open backlog, and the managed blocks in `CLAUDE.md`. Nothing important is in your head. It's on disk, and the orchestrator's planning context now starts with what you learned.
+The next session in a fresh `/clear` starts from `/rota-work` (no argument), which reads the active milestone, the open backlog, and the managed blocks in `CLAUDE.md`. Nothing important is in your head. It's on disk, and the orchestrator's planning context now starts with what you learned.
 
 ## Scale to a round
 
-Once the backlog holds several independent, well-specified items, you don't need to drive each `/hv-work` cycle yourself. A [parallel round](../usage/parallel-rounds.md) has an orchestrator hand issues to workers in separate worktrees and merge what passes the gate. Use it when you have a queue of issues that don't touch the same files; keep `/hv-work` for the handful you are watching.
+Once the backlog holds several independent, well-specified items, you don't need to drive each `/rota-work` cycle yourself. A [parallel round](../usage/parallel-rounds.md) has an orchestrator hand issues to workers in separate worktrees and merge what passes the gate. Use it when you have a queue of issues that don't touch the same files; keep `/rota-work` for the handful you are watching.
