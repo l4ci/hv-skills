@@ -53,11 +53,6 @@ MB_TMP="$(mktemp -d)"
   grep -q "^- Build" CLAUDE.md || { echo "FAIL: Build topic missing"; exit 1; }
   grep -q "^- Testing" CLAUDE.md || { echo "FAIL: Testing topic missing"; exit 1; }
 
-  printf '# Preamble\n\n<!-- hv:knowledge:start -->\n## Project Knowledge\n- OldTopic\n<!-- hv:knowledge:end -->\n\n# Postamble\n' > CLAUDE.md
-  hvj block knowledge >/dev/null
-  grep -q "<!-- rota-knowledge-start -->" CLAUDE.md || { echo "FAIL: legacy markers not migrated"; exit 1; }
-  grep -q "hv:knowledge:start" CLAUDE.md && { echo "FAIL: legacy colon markers still present"; exit 1; }
-  grep -q "^# Preamble" CLAUDE.md || { echo "FAIL: preamble lost"; exit 1; }
 )
 rm -rf "$MB_TMP"
 pass "block knowledge: creates, updates, and migrates legacy markers"

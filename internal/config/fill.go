@@ -34,12 +34,11 @@ func decodeObject(raw []byte) (*jsonx.Object, bool) {
 // nothing missing is not rewritten. Each added key goes in at its schema
 // position among its siblings, so a file in schema order stays in it.
 //
-// Fill also migrates the legacy stamps: a string at hv.version or
-// hvSkills.version moves to rota.version (kept as is when rota.version already
-// holds a non-empty value, else copied there, hv.version winning over
-// hvSkills.version), the legacy key is deleted and an emptied hv or hvSkills
-// object goes with it. The move counts as filling rota.version, so it is listed and the file
-// is rewritten.
+// Fill also migrates the legacy stamp: a string at hv.version moves to
+// rota.version (kept as is when rota.version already holds a non-empty value,
+// else copied there), the legacy key is deleted and an emptied hv object goes
+// with it. The move counts as filling rota.version, so it is listed and the
+// file is rewritten.
 func Fill(root string) ([]string, error) {
 	filled := []string{}
 	path := configPath(root)

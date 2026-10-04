@@ -31,7 +31,7 @@ type Action struct {
 const claudeStub = "# CLAUDE.md\n\nProject instructions live in AGENTS.md.\n\n@AGENTS.md\n"
 
 var (
-	blockKeyRe = regexp.MustCompile(`<!-- (?:(?:rota|hv)-([\w-]+)-start|hv:([\w-]+):start) -->`)
+	blockKeyRe = regexp.MustCompile(`<!-- (?:rota|hv)-([\w-]+)-start -->`)
 	blankRuns  = regexp.MustCompile(`\n{3,}`)
 )
 
@@ -78,13 +78,10 @@ func (s Store) InstructionsInit() ([]Action, error) {
 			var chunks []string
 			for _, m := range blockKeyRe.FindAllStringSubmatch(text, -1) {
 				key := m[1]
-				if key == "" {
-					key = m[2]
-				}
 				if contains(moved, key) {
 					continue
 				}
-				re := section.BlockRegex(key, key, true)
+				re := section.BlockRegex(key, true)
 				found := re.FindAllString(text, -1)
 				if len(found) > 0 {
 					moved = append(moved, key)
@@ -176,7 +173,7 @@ func (s Store) StripDeprecatedBlocks(write bool) ([]string, error) {
 	next := content
 	var stripped []string
 	for _, key := range DeprecatedBlockKeys {
-		re := section.BlockRegex(key, key, true)
+		re := section.BlockRegex(key, true)
 		if re.MatchString(next) {
 			next = re.ReplaceAllString(next, "")
 			stripped = append(stripped, key)

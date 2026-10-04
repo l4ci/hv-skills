@@ -62,7 +62,7 @@ func versionVerb(fs *flag.FlagSet) RunFunc {
 }
 
 // runVersionDrift is hv-version-check --json: rota.version of the merged config
-// (hvSkills.version on a project not yet migrated) against the running
+// (the pre-rename stamp on a project not yet migrated) against the running
 // binary. stamped or installed empty is "unknown".
 // The old helper exited 0 without .rota/; 5.0 exits 3 (the root walk-up).
 func runVersionDrift(c *Ctx) (Result, error) {
@@ -81,7 +81,7 @@ func runVersionDrift(c *Ctx) (Result, error) {
 }
 
 // versionDrift compares the stamped version (rota.version, else the legacy
-// hvSkills.version) of root's merged config with the running binary. Either
+// the pre-rename stamp) of root's merged config with the running binary. Either
 // side empty is "unknown".
 func versionDrift(root string) (stamped, installed, status string) {
 	cfg := config.Load(filepath.Join(root, ".rota", "config.json"))

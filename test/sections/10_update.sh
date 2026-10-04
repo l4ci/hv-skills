@@ -53,7 +53,7 @@ trap 'rm -rf "$XX_TMP"' EXIT
   # version the section above read back; `installed` is the binary's, not a
   # plugin cache's, in 5.0).
   cat > .rota/config.json <<'EOF2'
-{"hvSkills":{"version":"1.0.0"}}
+{"hv":{"version":"1.0.0"}}
 EOF2
   OUT=$("$ROTA_BIN" --json version --drift)
   [ "$(echo "$OUT" | jget data.stamped)" = "1.0.0" ] || fail "drift: wrong stamped: $OUT"
@@ -63,7 +63,7 @@ EOF2
   [ "$(echo "$OUT" | jget data.drift)" = "true" ] || fail "drift: expected drift true: $OUT"
   pass "version --drift reports drift when stamped != installed"
 
-  # (Test 2 stamps the pre-rename hvSkills.version key: the legacy fallback.)
+  # (Test 2 stamps the pre-rename hv.version key: the legacy fallback.)
 
   # Test 3: match when the stamp is the binary's own version.
   printf '{"rota":{"version":"%s"}}\n' "$EXPECTED" > .rota/config.json

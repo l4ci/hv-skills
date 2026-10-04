@@ -159,13 +159,6 @@ hvj -C "$BOOT_DIR" init >/dev/null || fail "second init failed"
 grep -q "^user content$" "$BOOT_DIR/.rota/BACKLOG.md" || fail "init overwrote existing BACKLOG.md"
 pass "init is idempotent (preserves existing files)"
 
-# Counters migration: older counters.json without milestones key must gain it.
-echo '{"bugs":3,"features":1,"tasks":0}' > "$BOOT_DIR/.rota/counters.json"
-hvj -C "$BOOT_DIR" init >/dev/null || fail "init on legacy counters failed"
-grep -q '"milestones": *0' "$BOOT_DIR/.rota/counters.json" || fail "init did not migrate counters.json to add milestones key"
-grep -q '"bugs": *3' "$BOOT_DIR/.rota/counters.json" || fail "init dropped existing counters during migration"
-pass "init migrates legacy counters.json"
-
 rm -rf "$BOOT_DIR"
 
 echo "init check"

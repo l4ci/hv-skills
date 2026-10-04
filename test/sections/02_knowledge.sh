@@ -21,24 +21,6 @@ COUNT_START=$(grep -c "rota-knowledge-start" CLAUDE.md)
 [ "$COUNT_START" = "1" ] || fail "managed block duplicated"
 pass "managed block updated in place"
 
-# Legacy colon markers in CLAUDE.md must migrate to new dashed markers in place
-cat > CLAUDE.md <<'EOF'
-# Preamble
-
-<!-- hv:knowledge:start -->
-## Project Knowledge
-- OldTopic
-<!-- hv:knowledge:end -->
-
-# Postamble
-EOF
-"$ROTA_BIN" block knowledge >/dev/null
-grep -q "<!-- rota-knowledge-start -->" CLAUDE.md || fail "legacy markers not migrated to new format"
-grep -q "hv:knowledge:start" CLAUDE.md && fail "legacy colon markers still present after migration"
-grep -q "^# Preamble" CLAUDE.md || fail "preamble lost during migration"
-grep -q "^# Postamble" CLAUDE.md || fail "postamble lost during migration"
-pass "legacy colon markers migrated to dashed format in place"
-
 # knowledge query — unmatched topic warns, exits 0, text untouched (T109/#16)
 # No EXIT trap here — clean up explicitly so the runner's global `$TMP` trap
 # stays intact (F38 local-trap convention).

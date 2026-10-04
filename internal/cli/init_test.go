@@ -193,8 +193,8 @@ func TestInitFillsConfigAndStampsVersion(t *testing.T) {
 		{"fresh", "5.0.0", "", map[string]any{"rota.version": "5.0.0"}, "5.0.0"},
 		{"custom value kept", "5.0.0", `{"docs":{"path":"mydocs"},"rota":{"version":"4.9.0"}}`,
 			map[string]any{"docs.path": "mydocs", "rota.version": "5.0.0"}, "5.0.0"},
-		{"legacy key migrated", "5.0.0", `{"hvSkills":{"version":"4.9.0"}}`,
-			map[string]any{"rota.version": "5.0.0", "hvSkills.version": nil}, "5.0.0"},
+		{"legacy key migrated", "5.0.0", `{"hv":{"version":"4.9.0"}}`,
+			map[string]any{"rota.version": "5.0.0", "hv.version": nil}, "5.0.0"},
 		{"dev binary stamps nothing", "", "", map[string]any{"rota.version": ""}, ""},
 	}
 	for _, tc := range cases {

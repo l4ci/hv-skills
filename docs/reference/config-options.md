@@ -136,7 +136,7 @@ Free text. Default: `""` (auto-detect). Key `git.baseBranch`.
 
 `rota init` fills these with the silent default; set them only when you want something else:
 
-- `rota.version`: stamp of the rota release that wrote the config. Auto-managed by `rota init` and `rota update`; do not set it by hand. The old key `hvSkills.version` is read as a fallback and moved here by `rota init` / `rota config fill`.
+- `rota.version`: stamp of the rota release that wrote the config. Auto-managed by `rota init` and `rota update`; do not set it by hand. The stamp a project got before the rename to rota is read as a fallback and moved here by `rota init` / `rota config fill`.
 - `refactor.verifyCommands`: array of shell commands run as CI-shape gates by /rota-refactor Step 7. Silent default `[]` (read-only verification). Set via `rota config set refactor.verifyCommands '[...]'`.
 - `ship.secondOpinion`: opt-in fresh-eyes adversarial gate in /rota-ship Step 3.5. Silent default `false` (Rule 9). Set via `rota config set ship.secondOpinion true`.
 - `ship.secondOpinionRunner`: who runs the /rota-ship Step 3.5 gate when `ship.secondOpinion` is `true`. Enum `subagent` (silent default). The `codex` value was removed in 5.0: /rota-ship prints a one-line note and runs the subagent in advisory mode (FAIL is surfaced, never blocks), as the Codex runner did. See [`usage/configuration.md`](../usage/configuration.md#shipsecondopinionrunner).
