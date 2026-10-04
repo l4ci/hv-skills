@@ -28,7 +28,7 @@ never exits 5.
 | `statusline` | the effective statusline runs `hv statusline dump` | hooks not installed (opt-in) |
 | `stop-hook` | a `Stop` and a `SessionStart` entry marked `# hv-hook`, and the command resolves | hooks not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: the Stop hook and two accounts with a `configDir` | the key is off |
-| `hv` | the running binary's version matches the plugin's | a development build, or outside a plugin or source checkout |
+| `hv` | the running binary's version matches the skills it serves | a development build |
 | `codex` | `codex` version in the supported range, each slot home logged in, herdr integration per home | `codex` is not on `PATH` and no slot has a home |
 
 The hooks are opt-in, so `statusline` and `stop-hook` skip until `hv hook install` has written
