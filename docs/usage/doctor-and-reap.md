@@ -28,7 +28,7 @@ never exits 5.
 | `statusline` | the effective statusline runs `rota statusline dump` | hooks not installed (opt-in) |
 | `stop-hook` | a `Stop` and a `SessionStart` entry marked `# rota-hook`, and the command resolves | hooks not installed (opt-in) |
 | `switch` | with `orchestrator.switchOnUsage` on: the Stop hook and two accounts with a `configDir` | the key is off |
-| `skills` | every installed skills root (user and project, Claude and Codex) matches the binary's skill set, has no missing or edited files, and no `hv-skills@` plugin is still installed | no root has a `.rota-manifest.json` (run `rota skills install`) |
+| `skills` | every installed skills root (user and project, Claude and Codex) matches the binary's skill set, and has no missing or edited files | no root has a `.rota-manifest.json` (run `rota skills install`) |
 | `codex` | `codex` version in the supported range, each slot home logged in, herdr integration per home | `codex` is not on `PATH` and no slot has a home |
 
 The hooks are opt-in, so `statusline` and `stop-hook` skip until `rota hook install` has written

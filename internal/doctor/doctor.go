@@ -530,7 +530,7 @@ func (d *runner) resolve(word string) (string, bool) {
 
 // skills compares the installed skill sets with the binary's. It skips until
 // something is installed (the repo's opt-in rule) and fails only on a broken
-// install: another digest, missing or edited files, or a leftover plugin copy.
+// install: another digest, or missing or edited files.
 func (d *runner) skills() Check {
 	const name = "skills"
 	const installHint = "run: rota skills install"
@@ -546,9 +546,6 @@ func (d *runner) skills() Check {
 		return skip(name, "not installed (opt-in): "+installHint)
 	}
 	rep := d.in.Skills
-	if rep.Plugin != "" {
-		return fail(name, "the Claude plugin "+rep.Plugin+" is still installed, so both copies list", "claude plugin uninstall "+rep.Plugin)
-	}
 	var problems []string
 	hint := "run: rota skills update"
 	for _, r := range have {

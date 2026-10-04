@@ -218,8 +218,8 @@ func TestSkillsCheck(t *testing.T) {
 		}
 		return r
 	}
-	rep := func(plugin string, roots ...skills.RootStatus) *skills.Report {
-		return &skills.Report{Version: "5.0.0", Digest: bin, Roots: roots, Plugin: plugin}
+	rep := func(roots ...skills.RootStatus) *skills.Report {
+		return &skills.Report{Version: "5.0.0", Digest: bin, Roots: roots}
 	}
 	f := &fake{have: map[string]bool{}}
 	for _, tc := range []struct {
@@ -230,19 +230,17 @@ func TestSkillsCheck(t *testing.T) {
 		hint   string
 	}{
 		{"nothing read", nil, Skip, "rota skills install", ""},
-		{"not installed", rep("", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "rota skills install", ""},
-		{"plugin alone is not an install", rep("hv-skills@hv-skills", root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "not installed", ""},
-		{"current", rep("", root(nil)), Pass, "match rota 5.0.0", ""},
-		{"mismatch", rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "4.5.0", "bbbb", false })), Fail, "skills 4.5.0, rota 5.0.0", "run: rota skills update"},
+		{"not installed", rep(root(func(r *skills.RootStatus) { r.Installed = false })), Skip, "rota skills install", ""},
+		{"current", rep(root(nil)), Pass, "match rota 5.0.0", ""},
+		{"mismatch", rep(root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "4.5.0", "bbbb", false })), Fail, "skills 4.5.0, rota 5.0.0", "run: rota skills update"},
 		{"dev build mismatch", func() *skills.Report {
-			r := rep("", root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "", "bbbbbbbbbbbbbbbbbbbb", false }))
+			r := rep(root(func(r *skills.RootStatus) { r.Version, r.Digest, r.Current = "", "bbbbbbbbbbbbbbbbbbbb", false }))
 			r.Version = ""
 			return r
 		}(), Fail, "skills bbbbbbbbbbbb, rota aaaaaaaaaaaa", "run: rota skills update"},
-		{"edited", rep("", root(func(r *skills.RootStatus) { r.Edited = []string{"rota-work/SKILL.md"} })), Fail, "1 edited (rota-work/SKILL.md)", "run: rota skills update --overwrite"},
-		{"missing", rep("", root(func(r *skills.RootStatus) { r.Missing = []string{"rota-work/SKILL.md", "rota-ship/SKILL.md"} })), Fail, "2 missing", "run: rota skills update"},
-		{"plugin leftover", rep("hv-skills@hv-skills", root(nil)), Fail, "plugin hv-skills@hv-skills is still installed", "claude plugin uninstall hv-skills@hv-skills"},
-		{"second root only", rep("", root(func(r *skills.RootStatus) { r.Installed = false }), root(func(r *skills.RootStatus) { r.Path = "/h/.agents/skills" })), Pass, "1 roots", ""},
+		{"edited", rep(root(func(r *skills.RootStatus) { r.Edited = []string{"rota-work/SKILL.md"} })), Fail, "1 edited (rota-work/SKILL.md)", "run: rota skills update --overwrite"},
+		{"missing", rep(root(func(r *skills.RootStatus) { r.Missing = []string{"rota-work/SKILL.md", "rota-ship/SKILL.md"} })), Fail, "2 missing", "run: rota skills update"},
+		{"second root only", rep(root(func(r *skills.RootStatus) { r.Installed = false }), root(func(r *skills.RootStatus) { r.Path = "/h/.agents/skills" })), Pass, "1 roots", ""},
 	} {
 		c := statusOf(Run(context.Background(), Input{Skills: tc.in, Exec: f.exec, Look: f.look}), "skills")
 		if c.Status != tc.status || !strings.Contains(c.Detail, tc.detail) || (tc.hint != "" && c.Hint != tc.hint) {

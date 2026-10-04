@@ -166,14 +166,7 @@ echo "mine" > "$DHOME/.claude/skills/rota-work/$SK"
 dr
 [ "$(dsk status)" = "fail" ] && [ "$RC" = 1 ] || fail "F6a[h]: doctor should fail on an edited file (rc $RC): ${OUT:0:300}"
 [ "$(dsk hint)" = "run: rota skills update --overwrite" ] || fail "F6a[h]: doctor hint: $(dsk hint)"
-hs "$DHOME" "$DREPO" update --overwrite
-mkdir -p "$DHOME/.claude/plugins"
-printf '{"version":2,"plugins":{"hv-skills@hv-skills":[{"scope":"user"}]}}\n' > "$DHOME/.claude/plugins/installed_plugins.json"
-dr
-[ "$(dsk status)" = "fail" ] || fail "F6a[h]: doctor should fail on a leftover plugin: ${OUT:0:300}"
-case "$(dsk detail)" in *"hv-skills@hv-skills"*) ;; *) fail "F6a[h]: plugin detail: ${OUT:0:300}" ;; esac
-[ "$(dsk hint)" = "claude plugin uninstall hv-skills@hv-skills" ] || fail "F6a[h]: plugin hint: $(dsk hint)"
-pass "F6a[h]: doctor skips until installed, passes when current, fails on an edit or a leftover plugin"
+pass "F6a[h]: doctor skips until installed, passes when current, fails on an edit"
 
 # (i) CLAUDE_CONFIG_DIR moves the Claude root only; no HOME exits 3
 CFGH="$SPEC_TMP/cfghome"; CFGD="$SPEC_TMP/cfgdir"; mkdir -p "$CFGH" "$CFGD"

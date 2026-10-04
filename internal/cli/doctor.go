@@ -143,7 +143,7 @@ func doctorSkills(home string) *skills.Report {
 	if err != nil {
 		return nil
 	}
-	rep, err := set.Status(roots, version.Get().Version, cdir)
+	rep, err := set.Status(roots, version.Get().Version)
 	if err != nil {
 		return nil
 	}
