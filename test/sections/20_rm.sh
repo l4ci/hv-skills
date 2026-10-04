@@ -1,6 +1,6 @@
 echo "F36: item rm"
 # Behaviour guard for `rota item rm` across all modes.
-# See [F36] — /hv-rm backlog-removal command.
+# See [F36] — backlog removal (rota-capture --remove).
 
 # ── fixture builder ──────────────────────────────────────────────────────────
 # Creates (or re-creates) the standard F36 fixture inside RM_TMP.

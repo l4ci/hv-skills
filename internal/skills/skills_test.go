@@ -391,24 +391,23 @@ func TestUninstall(t *testing.T) {
 func TestStatusDevBuildComparesByDigest(t *testing.T) {
 	s := loadFake(t, nil)
 	roots := oneRoot(t)
-	home := t.TempDir()
-	rep, _ := s.Status(roots, "", home)
+	rep, _ := s.Status(roots, "")
 	if rep.Roots[0].Installed || rep.Roots[0].Current {
 		t.Errorf("%+v", rep.Roots[0])
 	}
 	s.Install(roots, Options{Version: ""})
-	rep, _ = s.Status(roots, "", home)
+	rep, _ = s.Status(roots, "")
 	if !rep.Roots[0].Installed || !rep.Roots[0].Current || rep.Digest != s.Digest() {
 		t.Errorf("%+v", rep)
 	}
 	s2 := loadFake(t, map[string]string{"references/y.md": "newer\n"})
-	rep, _ = s2.Status(roots, "", home)
+	rep, _ = s2.Status(roots, "")
 	if rep.Roots[0].Current {
 		t.Error("a different digest must not be current, version empty or not")
 	}
 	os.WriteFile(filepath.Join(roots[0].Path, "rota-a", "SKILL.md"), []byte("mine\n"), 0o644)
 	os.Remove(filepath.Join(roots[0].Path, "rota-b", "SKILL.md"))
-	rep, _ = s.Status(roots, "", home)
+	rep, _ = s.Status(roots, "")
 	if got := rep.Roots[0]; len(got.Edited) != 1 || got.Edited[0] != "rota-a/SKILL.md" || len(got.Missing) != 1 || got.Missing[0] != "rota-b/SKILL.md" {
 		t.Errorf("%+v", got)
 	}
@@ -447,34 +446,6 @@ func TestRoots(t *testing.T) {
 	}
 }
 
-func TestFindPlugin(t *testing.T) {
-	cfg := t.TempDir()
-	if FindPlugin(cfg) != "" || FindPlugin("") != "" {
-		t.Error("no plugins file")
-	}
-	write := func(body string) {
-		os.MkdirAll(filepath.Join(cfg, "plugins"), 0o755)
-		os.WriteFile(filepath.Join(cfg, "plugins", "installed_plugins.json"), []byte(body), 0o644)
-	}
-	write(`{"version":2,"plugins":{"other@market":[{"scope":"user"}]}}`)
-	if FindPlugin(cfg) != "" {
-		t.Error("unrelated plugin")
-	}
-	// A directory named hv-skills is not an install record.
-	os.MkdirAll(filepath.Join(cfg, "plugins", "cache", "m", "hv-skills"), 0o755)
-	if FindPlugin(cfg) != "" {
-		t.Error("directory name matched")
-	}
-	write(`{"version":2,"plugins":{"other@market":[],"hv-skills@hv-skills":[{"scope":"user"}]}}`)
-	if got := FindPlugin(cfg); got != "hv-skills@hv-skills" {
-		t.Errorf("got %q", got)
-	}
-	write(`not json`)
-	if FindPlugin(cfg) != "" {
-		t.Error("corrupt file")
-	}
-}
-
 // A manifest key that climbs out of the root must never reach a file outside it.
 func TestManifestTraversalIgnored(t *testing.T) {
 	s := loadFake(t, nil)
@@ -495,7 +466,7 @@ func TestManifestTraversalIgnored(t *testing.T) {
 	if _, err := s.Install(roots, Options{Overwrite: true}); err != nil {
 		t.Fatal(err)
 	}
-	if rep, _ := s.Status(roots, "", ""); len(rep.Roots[0].Edited)+len(rep.Roots[0].Missing) != 0 {
+	if rep, _ := s.Status(roots, ""); len(rep.Roots[0].Edited)+len(rep.Roots[0].Missing) != 0 {
 		t.Errorf("%+v", rep.Roots[0])
 	}
 	if _, err := Uninstall(roots, Options{Overwrite: true}); err != nil {
@@ -542,7 +513,7 @@ func TestSymlinkedParentNotFollowed(t *testing.T) {
 	untouched(target)
 
 	s, roots, target = setup()
-	if rep, _ := s.Status(roots, "", ""); len(rep.Roots[0].Edited) == 0 {
+	if rep, _ := s.Status(roots, ""); len(rep.Roots[0].Edited) == 0 {
 		t.Error("status should flag the symlinked paths")
 	}
 	res2, err := Uninstall(roots, Options{Overwrite: true})

@@ -1,4 +1,4 @@
-# hv-docs — never read these as source material for public docs
+# rota ship --docs: never read these as source material for public docs
 .env
 .env.*
 **/secrets/**

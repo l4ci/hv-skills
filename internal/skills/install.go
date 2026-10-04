@@ -484,18 +484,16 @@ type RootStatus struct {
 	Missing   []string
 }
 
-// Report is Status: the binary's version and digest, each root, and a
-// leftover plugin install.
+// Report is Status: the binary's version and digest, and each root.
 type Report struct {
 	Version string
 	Digest  string
 	Roots   []RootStatus
-	Plugin  string
 }
 
-// Status reads the roots; it writes nothing. claudeDir locates a plugin install.
-func (s *Set) Status(roots []Root, version, claudeDir string) (Report, error) {
-	rep := Report{Version: version, Digest: s.digest, Plugin: FindPlugin(claudeDir)}
+// Status reads the roots; it writes nothing.
+func (s *Set) Status(roots []Root, version string) (Report, error) {
+	rep := Report{Version: version, Digest: s.digest}
 	for _, r := range roots {
 		st := RootStatus{Root: r, Edited: []string{}, Missing: []string{}}
 		if m, ok := ReadManifest(r.Path); ok {
@@ -525,34 +523,4 @@ func (s *Set) Status(roots []Root, version, claudeDir string) (Report, error) {
 		rep.Roots = append(rep.Roots, st)
 	}
 	return rep, nil
-}
-
-// FindPlugin is the key of a Claude plugin install of the skills
-// ("hv-skills@<marketplace>") in <claudeDir>/plugins/installed_plugins.json,
-// or "". Several matches give the first key in sorted order.
-func FindPlugin(claudeDir string) string {
-	if claudeDir == "" {
-		return ""
-	}
-	b, err := os.ReadFile(filepath.Join(claudeDir, "plugins", "installed_plugins.json"))
-	if err != nil {
-		return ""
-	}
-	var doc struct {
-		Plugins map[string]json.RawMessage `json:"plugins"`
-	}
-	if json.Unmarshal(b, &doc) != nil {
-		return ""
-	}
-	var keys []string
-	for k := range doc.Plugins {
-		if strings.HasPrefix(k, "hv-skills@") {
-			keys = append(keys, k)
-		}
-	}
-	sort.Strings(keys)
-	if len(keys) == 0 {
-		return ""
-	}
-	return keys[0]
 }

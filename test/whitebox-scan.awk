@@ -2,8 +2,8 @@
 # "file:line: message" per violation and nothing when the files are clean.
 #
 # A white-box assertion looks at bin/ internals instead of calling a verb:
-# helper files, hvlib imports, the .hv/bin mirror, SKILL.md or reference-doc
-# greps. Such lines are allowed only inside an explicit block:
+# helper files, SKILL.md or reference-doc greps. Such lines are allowed only
+# inside an explicit block:
 #
 #   # white-box-begin: go-unit A5 #49     goes away with the A5 Go unit test
 #   # white-box-begin: A9 #53 keep        goes away when A9 deletes bin/
@@ -36,11 +36,10 @@ FNR == 1 { if (open) bad(open_file, open_line, "white-box-begin never closed"); 
 }
 /^[[:space:]]*# white-box/ { bad(FILENAME, FNR, "malformed white-box marker (use white-box-begin: / white-box-end)"); next }
 open || /^[[:space:]]*#/ { next }
-/\$\{?BIN\}?([^A-Za-z0-9_]|$)/ || /hvlib/ || /\.hv\/bin/ || /\$\{?REPO\}?"?\/bin/ || \
-/(^|[^A-Za-z_])bin\/hv-/ || /bin\/\*/ || \
+/\$\{?BIN\}?([^A-Za-z0-9_]|$)/ || /\$\{?REPO\}?"?\/bin/ || /bin\/\*/ || \
 /install_helpers/ || /SKILL\.md/ || /PYTHONPATH=/ || /git ls-(tree|files)/ || \
 /(^|[^A-Za-z0-9_])BIN=|export +BIN([^A-Za-z0-9_]|$)|environ\["BIN"\]/ || \
-(/(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*=\(?"?\$\{?REPO\}?"?([ ;)]|$)/ && $0 !~ /HV_INSTALL_ROOT=/) || \
+/(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*=\(?"?\$\{?REPO\}?"?([ ;)]|$)/ || \
 /\$\{?REPO\}?"?\/(rota-|references|docs|README|CHANGELOG|test\/validate)/ {
   bad(FILENAME, FNR, "white-box assertion outside a white-box block: " substr($0, 1, 90))
 }

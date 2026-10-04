@@ -67,9 +67,6 @@ func TestSkillsInstallStatusUpdateUninstall(t *testing.T) {
 			t.Errorf("status %v", m)
 		}
 	}
-	if _, has := st["plugin"]; has {
-		t.Error("no plugin expected")
-	}
 
 	// Idempotent: nothing changed.
 	_, env, _ = skillsRun(t, home, work, "skills", "install")
@@ -174,33 +171,11 @@ func TestSkillsProjectScope(t *testing.T) {
 	}
 }
 
-func TestSkillsPluginLeftoverWarns(t *testing.T) {
-	home, work := t.TempDir(), t.TempDir()
-	os.MkdirAll(filepath.Join(home, ".claude", "plugins"), 0o755)
-	os.WriteFile(filepath.Join(home, ".claude", "plugins", "installed_plugins.json"),
-		[]byte(`{"version":2,"plugins":{"hv-skills@hv-skills":[{"scope":"user"}]}}`), 0o644)
-	code, env, errOut := skillsRun(t, home, work, "skills", "install", "--agent", "claude")
-	if code != 0 {
-		t.Fatalf("%d %s", code, errOut)
-	}
-	w, _ := skData(env)["warnings"].([]any)
-	if len(w) != 1 || !strings.Contains(w[0].(string), "claude plugin uninstall hv-skills@hv-skills") {
-		t.Errorf("warnings %v", w)
-	}
-	_, env, _ = skillsRun(t, home, work, "skills", "status")
-	if skData(env)["plugin"] != "hv-skills@hv-skills" {
-		t.Error("status misses the plugin")
-	}
-}
-
-// CLAUDE_CONFIG_DIR moves the user Claude root and the plugin lookup; the
-// Codex root stays under HOME.
+// CLAUDE_CONFIG_DIR moves the user Claude root; the Codex root stays under
+// HOME.
 func TestSkillsClaudeConfigDir(t *testing.T) {
 	home, cfg, work := t.TempDir(), t.TempDir(), t.TempDir()
-	os.MkdirAll(filepath.Join(cfg, "plugins"), 0o755)
-	os.WriteFile(filepath.Join(cfg, "plugins", "installed_plugins.json"),
-		[]byte(`{"plugins":{"hv-skills@m":[]}}`), 0o644)
-	code, env, errOut := skillsRunCfg(t, home, cfg, work, "skills", "install")
+	code, _, errOut := skillsRunCfg(t, home, cfg, work, "skills", "install")
 	if code != 0 {
 		t.Fatalf("%d %s", code, errOut)
 	}
@@ -212,9 +187,6 @@ func TestSkillsClaudeConfigDir(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, ".claude")); err == nil {
 		t.Error("the default Claude dir was used")
-	}
-	if w, _ := skData(env)["warnings"].([]any); len(w) != 1 {
-		t.Errorf("plugin lookup ignored CLAUDE_CONFIG_DIR: %v", w)
 	}
 }
 

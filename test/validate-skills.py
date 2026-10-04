@@ -1,8 +1,8 @@
 """
 validate-skills.py — static schema validator for rota SKILL.md files,
-plus the Agent Skills spec frontmatter lint (E2, #69), the legacy-name doclint
-over skills and references (A9, #53) and the prose-contract lint (PROSE_RULES, #173).
-Stdlib only. `--list-legacy` prints the frozen legacy helper names and exits. Exit 0 on all-pass, exit 1 on any failure, exit 2 on unexpected error.
+plus the Agent Skills spec frontmatter lint (E2, #69) and the prose-contract
+lint (PROSE_RULES, #173).
+Stdlib only. Exit 0 on all-pass, exit 1 on any failure, exit 2 on unexpected error.
 """
 
 import json
@@ -203,95 +203,6 @@ def check_references(path, text, issues):
             issues.append(f"{path}: broken reference '{target}' -> '{resolved}'")
 
 
-# Legacy-name doclint (A9, #53). After the cutover no skill or shared reference
-# may name an old bin/ helper, the .hv/bin mirror or hvlib: skills call `rota
-# <verb>`. The name list is frozen from bin/ at the start of A9, so the check
-# keeps working once S7 deletes bin/. hv-migrate is left out because it is also
-# the name of the `rota migrate` verb. A name preceded by "/" is a slash command, not a helper call;
-# bin/ paths are caught by the bin/hv- and .hv/bin patterns instead.
-LEGACY_HELPERS = """
-    hv-append hv-archive-old hv-artifact-amend.sh hv-artifact-rm.sh
-    hv-artifact-show.sh hv-auto-decision-log hv-auto-decisions-since
-    hv-backfill-since hv-backlog hv-base-branch hv-bootstrap hv-capture-audit
-    hv-codex-verify hv-complete hv-config-schema-check hv-config-set hv-config-show
-    hv-debug-counter hv-decisions-query hv-design-add hv-design-amend hv-design-list
-    hv-design-put hv-design-rm hv-design-show hv-find-milestone-for-items hv-fm-list
-    hv-glossary-import hv-glossary-read hv-glossary-write hv-guard-clean
-    hv-guard-feature-branch hv-host-herdr.sh hv-host-select.sh hv-host-tmux.sh
-    hv-instructions-init hv-issue-suggest hv-issues-close hv-issues-common.sh
-    hv-issues-imported hv-issues-label hv-issues-list hv-issues-provider
-    hv-item-claim hv-item-comment hv-item-create hv-item-note hv-item-ready
-    hv-item-release hv-item-show hv-item-state hv-knowledge-amend
-    hv-knowledge-contradiction hv-knowledge-hit hv-knowledge-merge
-    hv-knowledge-migrate hv-knowledge-query hv-knowledge-rename-topic
-    hv-knowledge-scope.sh hv-knowledge-stats hv-knowledge-tier hv-loop-stamp
-    hv-managed-block hv-managed-block-strip-deprecated hv-map-cap-check hv-map-index
-    hv-map-query hv-map-stats hv-merge hv-migrate-issues hv-multi-branch-create
-    hv-next-id hv-plan-add hv-plan-list hv-plan-put hv-plan-rename-check hv-plan-rm
-    hv-plan-show hv-plan-validate-docs hv-pr hv-pr-merge hv-preamble.sh hv-preflight
-    hv-proof-add hv-proof-show hv-qa-index hv-qa-query hv-reconcile hv-refactor-age
-    hv-refactor-reset hv-refactor-targets hv-release-bump-version
-    hv-release-changelog-from-commits hv-release-close-milestone
-    hv-release-detect-host hv-release-detect-version hv-release-milestone-check
-    hv-release-notes-from-issues hv-release-pending hv-release-update-changelog
-    hv-repo-flag.sh hv-require-git-context hv-resolve-handoff hv-resolve-plugin-root
-    hv-resolve-repo hv-resolve-repo-path hv-resolve-repos hv-resolve-umbrella
-    hv-review-queue hv-review-scaffolding hv-review-scope hv-rm
-    hv-second-opinion-brief hv-section-query hv-self-locate.sh hv-ship-body
-    hv-skills-index hv-spike-add hv-spike-finish hv-spike-list hv-spike-show
-    hv-stale-summary hv-staleness hv-status-add hv-status-add-multi hv-status-remove
-    hv-status-repo-for hv-summary hv-todo-by-milestone hv-todo-drift hv-todo-field
-    hv-todo-set-field hv-tracker-call hv-types.sh hv-umbrella-init hv-umbrella-on
-    hv-uncertain hv-uncomplete hv-undo hv-update-check hv-version-check
-    hv-vision-active hv-vision-add hv-vision-empty-active hv-vision-index
-    hv-vision-list hv-vision-put hv-vision-show hv-vision-status hv-walk-up
-    hv-worker-account hv-worker-dispatch hv-worker-gate hv-worker-poll
-    hv-worker-pool hv-worker-reset hv-worker-session hv-worktree-clear
-    hv-worktree-path
-""".split()
-
-LEGACY_RE = re.compile(
-    r"(?<![\w/.-])(?:"
-    + "|".join(re.escape(n) for n in sorted(LEGACY_HELPERS, key=len, reverse=True))
-    + r")(?![\w-])"
-    + r"|\.hv/bin|hvlib|(?<![\w.-])bin/hv-"
-)
-
-# Files not yet converted to rota verbs. Each A9 slice deletes its own lines in
-# the PR that converts the files; the groups are kept apart so two slices'
-# deletions never touch adjacent lines. An entry whose file is already clean
-# (or gone) fails the check, so the list can only shrink. It is empty after S5.
-UNCONVERTED = set()
-
-
-def doclint_files():
-    # One level each: a recursive walk would reach .worktrees/ checkouts (section 70).
-    files = list(Path(".").glob("rota-*/*.md")) + list(Path("references").glob("*.md"))
-    return sorted(p.as_posix() for p in files)
-
-
-def unconverted():
-    # ROTA_DOCLINT_UNCONVERTED (whitespace-separated paths) replaces the list, so
-    # smoke section 29 can test the check on a fixture tree.
-    override = os.environ.get("ROTA_DOCLINT_UNCONVERTED")
-    return set(override.split()) if override is not None else UNCONVERTED
-
-
-def check_legacy_names(issues):
-    allow = unconverted()
-    for path in doclint_files():
-        text = Path(path).read_text(encoding="utf-8")
-        hits = [(n, m.group(0)) for n, line in enumerate(text.splitlines(), 1)
-                for m in LEGACY_RE.finditer(line)]
-        if path in allow:
-            if not hits:
-                issues.append(f"{path}: no legacy names left; remove it from UNCONVERTED")
-            continue
-        for n, name in hits:
-            issues.append(f"{path}:{n}: names legacy '{name}'; call the rota verb instead")
-    for path in sorted(allow - set(doclint_files())):
-        issues.append(f"{path}: listed in UNCONVERTED but missing; remove the entry")
-
 # Prose-contract lint (#173). Skills and docs document rota verbs and flags that
 # other skills and tests rely on; these rules pin that wiring (a skill names the
 # verb it calls, a documented flag keeps its section, a retired phrase stays
@@ -303,7 +214,7 @@ def check_legacy_names(issues):
 #   only_in(glob, text, names, msg)   exactly these skill dirs contain text
 #   paired(glob, trigger, need, msg)  every file with trigger also has need
 # A rule on a missing file fails. ROTA_DOCLINT_PROSE=off skips the lint so section
-# 29 can run the legacy-name check on a fixture tree.
+# 94 can run the spec lint on a fixture tree.
 def has(path, text, msg, re_=False, flags=0):
     return ("has", path, text, msg, re_, flags)
 
@@ -363,8 +274,6 @@ def prose_rules():
               "Docs Mode Modes row for manual invocation must reflect after-work in manual mode", True),
           has(sk("ship"), "Route to the After-work sub-flow", "Docs Mode Step D1 'Already true' branch must route to the after-work sub-flow"),
           has(sk("ship"), "Manual entry bypasses the gate", "Docs Mode Step D-A1 missing the manual-entry bypass clause"),
-          lacks(sk("ship"), r"Re-running .*hv-docs.* manually has no further effect",
-                "stale 'no further effect' no-op text is still present in Docs Mode", True),
           has("docs/reference/config-options.md", "positional", "missing positional-args mention"),
           has("docs/usage/configuration.md", r"positional|<key>=<value>", "missing positional-args mention", True),
           has("docs/usage/configuration.md", "work.dispatch", "does not explain work.dispatch")]
@@ -470,9 +379,6 @@ def check_prose(issues):
 
 
 def main():
-    if "--list-legacy" in sys.argv[1:]:
-        print("\n".join(LEGACY_HELPERS))
-        sys.exit(0)
     issues = []
 
     skill_files = sorted(Path(".").glob("rota-*/SKILL.md"))
@@ -485,7 +391,6 @@ def main():
         check_references(skill_path, text, issues)
 
     check_pending_spec(skill_files, issues)
-    check_legacy_names(issues)
     check_prose(issues)
 
     n = len(skill_files)

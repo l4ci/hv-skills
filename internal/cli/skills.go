@@ -59,16 +59,16 @@ func skillsVerb(run func(*Ctx, skillsArgs) (Result, error), defScope string, ove
 }
 
 // skillsEnv resolves the roots a verb works on.
-func skillsEnv(a skillsArgs) (set *skills.Set, claudeDir string, roots []skills.Root, err error) {
+func skillsEnv(a skillsArgs) (set *skills.Set, roots []skills.Root, err error) {
 	set, err = skills.Embedded()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 	home := os.Getenv("HOME")
 	if home == "" {
 		home, _ = os.UserHomeDir()
 	}
-	claudeDir = skills.ClaudeDir(home)
+	claudeDir := skills.ClaudeDir(home)
 	top := ""
 	if a.scope != skills.User {
 		top = gitToplevel()
@@ -76,13 +76,13 @@ func skillsEnv(a skillsArgs) (set *skills.Set, claudeDir string, roots []skills.
 	roots, err = skills.Roots(a.scope, a.agent, home, claudeDir, top)
 	switch {
 	case errors.Is(err, skills.ErrNoProject):
-		return nil, "", nil, Resolution("--scope project: the working directory is not in a git work tree")
+		return nil, nil, Resolution("--scope project: the working directory is not in a git work tree")
 	case errors.Is(err, skills.ErrNoHome):
-		return nil, "", nil, Resolution("%v", err).WithHint("set HOME (or CLAUDE_CONFIG_DIR for --agent claude), or use --scope project")
+		return nil, nil, Resolution("%v", err).WithHint("set HOME (or CLAUDE_CONFIG_DIR for --agent claude), or use --scope project")
 	case err != nil:
-		return nil, "", nil, Resolution("%v", err)
+		return nil, nil, Resolution("%v", err)
 	}
-	return set, claudeDir, roots, nil
+	return set, roots, nil
 }
 
 // gitToplevel is the toplevel of the git work tree around the working
@@ -105,7 +105,7 @@ func skillsErr(err error) error {
 }
 
 func skillsInstall(c *Ctx, a skillsArgs) (Result, error) {
-	set, cdir, roots, err := skillsEnv(a)
+	set, roots, err := skillsEnv(a)
 	if err != nil {
 		return Result{}, err
 	}
@@ -113,11 +113,11 @@ func skillsInstall(c *Ctx, a skillsArgs) (Result, error) {
 	if err != nil {
 		return Result{}, skillsErr(err)
 	}
-	return skillsInstallResult(c, "install", res, cdir)
+	return skillsInstallResult(c, "install", res)
 }
 
 func skillsUpdate(c *Ctx, a skillsArgs) (Result, error) {
-	set, cdir, roots, err := skillsEnv(a)
+	set, roots, err := skillsEnv(a)
 	if err != nil {
 		return Result{}, err
 	}
@@ -129,12 +129,12 @@ func skillsUpdate(c *Ctx, a skillsArgs) (Result, error) {
 		return Result{Data: knObj("roots", []any{}, "changed", false)},
 			Failed("no skills install found in scope").WithHint("run: rota skills install")
 	}
-	return skillsInstallResult(c, "update", res, cdir)
+	return skillsInstallResult(c, "update", res)
 }
 
 // skillsInstallResult renders install and update results, exit 4 when a path
 // was kept.
-func skillsInstallResult(c *Ctx, verb string, res []skills.RootResult, claudeDir string) (Result, error) {
+func skillsInstallResult(c *Ctx, verb string, res []skills.RootResult) (Result, error) {
 	rootsData := []any{}
 	var text []string
 	var kept []any
@@ -179,11 +179,6 @@ func skillsInstallResult(c *Ctx, verb string, res []skills.RootResult, claudeDir
 	if len(kept) > 0 {
 		data.Set("kept", kept)
 	}
-	if plugin := skills.FindPlugin(claudeDir); plugin != "" {
-		w := pluginWarning(plugin)
-		data.Set("warnings", []any{w})
-		text = append(text, "warning: "+w)
-	}
 	data.Set("changed", changed)
 	out := Result{Data: data, Text: strings.Join(text, "\n")}
 	if blockedBy != "" {
@@ -193,12 +188,8 @@ func skillsInstallResult(c *Ctx, verb string, res []skills.RootResult, claudeDir
 	return out, nil
 }
 
-func pluginWarning(plugin string) string {
-	return fmt.Sprintf("the Claude plugin %s is still installed and both copies would list: run claude plugin uninstall %s", plugin, plugin)
-}
-
 func skillsUninstall(c *Ctx, a skillsArgs) (Result, error) {
-	_, _, roots, err := skillsEnv(a)
+	_, roots, err := skillsEnv(a)
 	if err != nil {
 		return Result{}, err
 	}
@@ -232,11 +223,11 @@ func skillsUninstall(c *Ctx, a skillsArgs) (Result, error) {
 }
 
 func skillsStatus(c *Ctx, a skillsArgs) (Result, error) {
-	set, cdir, roots, err := skillsEnv(a)
+	set, roots, err := skillsEnv(a)
 	if err != nil {
 		return Result{}, err
 	}
-	rep, err := set.Status(roots, version.Get().Version, cdir)
+	rep, err := set.Status(roots, version.Get().Version)
 	if err != nil {
 		return Result{}, skillsErr(err)
 	}
@@ -268,10 +259,6 @@ func skillsStatus(c *Ctx, a skillsArgs) (Result, error) {
 		rootsData = append(rootsData, o)
 	}
 	data := knObj("version", rep.Version, "digest", rep.Digest, "roots", rootsData)
-	if rep.Plugin != "" {
-		data.Set("plugin", rep.Plugin)
-		text = append(text, "plugin: "+rep.Plugin+" (run claude plugin uninstall "+rep.Plugin+")")
-	}
 	return Result{Data: data, Text: strings.Join(text, "\n")}, nil
 }
 

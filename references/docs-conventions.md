@@ -20,7 +20,7 @@ Seed `.docsignore` at the project's repo root if it doesn't already exist. The s
 - **Noise reduction** — common build/dependency dirs kept out so the diff is human-shaped.
 
 ```
-# hv-docs — never read these as source material for public docs
+# rota ship --docs: never read these as source material for public docs
 .env
 .env.*
 **/secrets/**

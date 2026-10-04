@@ -64,9 +64,6 @@ func initVerb(fs *flag.FlagSet) RunFunc {
 			return Result{}, initErr(err)
 		}
 		warnings := append([]string{}, res.Warnings...)
-		if len(res.Removed) > 0 {
-			warnings = append(warnings, "removed the stale .rota/bin mirror: "+strings.Join(res.Removed, ", ")+" (5.0 has no .rota/bin)")
-		}
 		changed := res.Changed()
 		data := knObj("root", dir, "created", strSlice(res.Created))
 		var lines []string

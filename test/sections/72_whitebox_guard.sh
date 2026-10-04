@@ -1,7 +1,6 @@
 echo "white-box census: no white-box assertion outside a marked block"
 # test/whitebox-scan.awk fails any line that looks at bin/ internals (helper
-# files, the helper-library imports, the .hv mirror, SKILL.md or reference
-# greps) unless it sits between "white-box-begin: <tag>" and "white-box-end".
+# files, SKILL.md or reference greps) unless it sits between "white-box-begin: <tag>" and "white-box-end".
 # The format is documented in docs/design/5.0-smoke-whitebox.md. Sample lines
 # below are assembled from fragments so this file never trips the scan itself.
 SCAN="$TESTDIR/whitebox-scan.awk"
@@ -12,10 +11,7 @@ BEGIN_DOC='# white-box-begin: A9 #53 doclint'
 BEGIN_UNIT='# white-box-begin: go-unit A5 #49'
 END_MARK='# white-box-end'
 SAMPLES=(
-  '"$''BIN/hv-x" arg'
-  'from hv''lib import x'
-  'ls .hv/''bin/''hv-x'
-  'ls bin/''hv-x'
+  '"$''BIN/x" arg'
   'ls "$''REPO"/bin/x'
   'D="$''REPO"'
   'D=$''REPO/bin'
@@ -39,8 +35,8 @@ wb_file() { printf '%s\n' "$@" > "$WB_TMP/t.sh"; echo "$WB_TMP/t.sh"; }
 OUT="$(wb_scan "$(wb_file 'echo ok' '"$ROTA_BIN" status' "# ${SAMPLES[0]}")")"
 [ -z "$OUT" ] || fail "scanner flagged a clean file: $OUT"
 
-# Near misses stay clean: the version-stamp seam, plugin metadata, and a name that merely ends in bin.
-for S in 'HV_INSTALL_ROOT="$''REPO" hvj migrate issues' 'cat "$''REPO/.claude-plugin/plugin.json"' 'ls abin/''hv-x' 'D="$TMP_B''IN"'; do
+# Near misses stay clean: plugin metadata and a name that merely ends in bin.
+for S in 'cat "$''REPO/.claude-plugin/plugin.json"' 'D="$TMP_B''IN"'; do
   OUT="$(wb_scan "$(wb_file 'echo ok' "$S")")"
   [ -z "$OUT" ] || fail "scanner flagged a harmless line: $S => $OUT"
 done
